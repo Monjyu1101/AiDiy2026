@@ -163,3 +163,23 @@ test('Hermes確認で失敗した場合はBotに接続せず原因を表示す�
     assert.match(panel.状態.details || '', /Python Path/);
   } finally { await panel.終了(); f.cleanup(); }
 });
+
+test('Live の ON/OFF を保存して接続制御に使い、Code は ON 固定。OFF 時は Live のモデル確認をしない', async () => {
+  const f = fixture(), first = f.panel();
+  try {
+    assert.deepEqual((await first.初期情報()).features, { live: true, code: true });
+    assert.deepEqual(first.機能選択保存({ live: false, code: false }), { live: false, code: true });
+    assert.throws(() => first.機能選択保存({}), /ON\/OFF/);
+    await first.終了();
+    (f.catalog.models as Record<string, Record<string, string>>).freeai_live = {}; // Live が ON なら選択エラーになる状態
+    const next = f.panel();
+    assert.deepEqual((await next.初期情報()).features, { live: false, code: true });
+    await next.開始();
+    assert.equal(next.状態.phase, 'connected');
+    assert.match(next.状態.message, /コードを利用/);
+    assert.deepEqual([f.configurations[0].liveEnabled, f.configurations[0].codeEnabled], [false, true]);
+    assert.throws(() => next.モニター(true), /Live が OFF/);
+    assert.throws(() => next.機能選択保存({ live: true }), /切断してから/);
+    await next.終了();
+  } finally { f.cleanup(); }
+});

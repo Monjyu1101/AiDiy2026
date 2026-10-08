@@ -5,16 +5,28 @@ const provider = el('provider'), model = el('model'), voice = el('voice'), toggl
 const codeProvider = el('code-provider'), codeModel = el('code-model');
 const keys = { freeai_live: ['LIVE_FREEAI_MODEL', 'LIVE_FREEAI_VOICE'], gemini_live: ['LIVE_GEMINI_MODEL', 'LIVE_GEMINI_VOICE'], openai_live: ['LIVE_OPENAI_MODEL', 'LIVE_OPENAI_VOICE'] };
 const labels = { freeai_live: 'FreeAI Live', gemini_live: 'Gemini Live', openai_live: 'OpenAI Live' };
+let features = { live: true, code: true };
 let settings = {}, models = {}, voices = {}, state = { phase: 'idle' }, loaded = false, saving = false, fatal = false;
 let saveQueue = Promise.resolve();
 let catalogGeneration = 0;
 function note(text, error = false) { el('note').textContent = text; el('note').classList.toggle('error', error); }
+const liveToggle = el('live-toggle'), codeToggle = el('code-toggle');
+function showFeatures() {
+  liveToggle.setAttribute('aria-checked', String(features.live)); codeToggle.setAttribute('aria-checked', String(features.code));
+  for (const [name, on] of [['live', features.live], ['code', features.code]]) {
+    const item = el(`feature-${name}`); item.classList.toggle('off', !on); item.querySelector('b').textContent = on ? 'ON' : 'OFF';
+  }
+  document.body.classList.toggle('live-off', !features.live);
+}
 function controls() {
   document.body.classList.toggle('connected', state.phase === 'connected');
   document.body.classList.toggle('live-view', ['connected', 'reconnecting'].includes(state.phase));
   const editable = loaded && !fatal && ['idle', 'error'].includes(state.phase);
-  for (const input of [provider, model, voice, codeProvider, codeModel]) input.disabled = !editable || saving;
-  toggle.disabled = !loaded || fatal || saving || state.phase === 'stopping' || editable && (!model.value || !voice.value);
+  for (const input of [provider, model, voice]) input.disabled = !editable || saving || !features.live;
+  for (const input of [codeProvider, codeModel]) input.disabled = !editable || saving || !features.code;
+  liveToggle.disabled = !editable || saving;
+  codeToggle.disabled = true; // Code は ON 固定（切替を有効にする場合はここと保存側を変更する）
+  toggle.disabled = !loaded || fatal || saving || state.phase === 'stopping' || editable && (features.live && (!model.value || !voice.value) || !features.live && !features.code);
   toggle.textContent = state.phase === 'connecting' ? '接続中…' : ['connected', 'reconnecting'].includes(state.phase) ? '切断' : state.phase === 'stopping' ? '切断中…' : '接続';
   toggle.classList.toggle('awaiting', editable);
 }
@@ -59,19 +71,21 @@ function selection() {
 }
 function save() {
   const value = selection();
-  if (!model.value || !voice.value) { note('モデルと音声を候補から選択してください。', true); controls(); return Promise.resolve(false); }
+  if (features.live && (!model.value || !voice.value)) { note('モデルと音声を候補から選択してください。', true); controls(); return Promise.resolve(false); }
   saving = true; controls();
   saveQueue = saveQueue.then(async () => {
     try {
-      Object.assign(settings, await api.select(value));
+      await api.selectFeatures({ live: features.live, code: features.code });
+      if (features.live) Object.assign(settings, await api.select(value));
       await api.selectCode({ provider: codeProvider.value, model: codeModel.value.trim() });
-      note('選択を保存しました。次回もこのモデル・音声を使用します。'); return true;
+      note(features.live ? '選択を保存しました。次回もこのモデル・音声を使用します。' : '選択を保存しました。Live は OFF で接続します。'); return true;
     }
     catch (error) { note(error.message || '選択を保存できませんでした。保存先を確認して再試行してください。', true); return false; }
     finally { saving = false; controls(); }
   });
   return saveQueue;
 }
+liveToggle.onclick = () => { features.live = !features.live; showFeatures(); controls(); void save(); };
 provider.onchange = () => { settings.LIVE_AI_NAME = provider.value; showModels(); void save(); };
 model.oninput = controls;
 model.onchange = voice.onchange = () => { void save(); };
@@ -166,6 +180,7 @@ api.onActivity(value => {
 });
 api.onState(showState);
 api.initial().then(data => {
+  features = { live: data.features?.live !== false, code: true }; showFeatures();
   settings = data.settings; models = data.models; voices = data.voices;
   options(provider, labels, settings.LIVE_AI_NAME || 'freeai_live');
   options(codeProvider, { '': '自動選択', [data.code.provider]: data.code.provider || '自動選択' }, data.code.provider);

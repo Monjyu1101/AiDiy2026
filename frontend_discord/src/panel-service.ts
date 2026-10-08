@@ -18,6 +18,7 @@ export function パネルサービス(send: (data: パネル通知) => void, pro
       switch (action) {
         case 'initial': result = await panel.初期情報(); break;
         case 'select': result = panel.選択保存(value); break;
+        case 'select-features': result = panel.機能選択保存(value); break;
         case 'select-code': result = panel.コード選択保存(value); break;
         case 'catalog-code': result = await panel.コード候補(value); break;
         case 'start': await panel.開始(); break;

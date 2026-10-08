@@ -196,3 +196,37 @@ test('自動Live開始の失敗通知に段階・Providerの拒否理由を残�
     assert.match(f.sent.at(-1).content, /credit_balance_exhausted/, '手動開始も同じ拒否理由を返す');
   } finally { await bot.終了(); }
 });
+
+test('Live が OFF なら入室しても音声接続せず live コマンドも拒否し、Code は動作する', async () => {
+  const f = fixture(true); let started = 0;
+  const code = new Code接続(config(), { 実行ファイル: process.execPath, 引数: [fileURLToPath(new URL('./fake-cli.cjs', import.meta.url))] });
+  const bot = new DiscordBot({ ...config(), liveEnabled: false }, f.client, code, (_config, channel, _notify, closed) => ({
+    channel, 接続: async () => { started++; }, 終了: closed, テキスト送信: () => {},
+  }));
+  try {
+    f.client.emit(Events.ClientReady, f.client as any);
+    f.voiceChange(null, voiceId);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(started, 0);
+    await bot.メッセージ受信(f.message('!aidiy live'));
+    assert.match(f.sent.at(-1).content, /Live は OFF/);
+    await bot.メッセージ受信(f.message('こんにちは'));
+    assert.equal(JSON.parse(f.sent.at(-1).content).input, 'こんにちは');
+  } finally { await bot.終了(); }
+});
+
+test('Code が OFF なら通常投稿を Hermes に渡さず、Live は接続する', async () => {
+  const f = fixture(true); let started = 0, ran = 0;
+  const code = new Code接続(config(), { 実行ファイル: process.execPath, 引数: [fileURLToPath(new URL('./fake-cli.cjs', import.meta.url))] });
+  const original = code.実行.bind(code); code.実行 = (...args) => { ran++; return original(...args); };
+  const bot = new DiscordBot({ ...config(), codeEnabled: false }, f.client, code, (_config, channel, _notify, closed) => ({
+    channel, 接続: async () => { started++; }, 終了: closed, テキスト送信: () => {},
+  }));
+  try {
+    await bot.メッセージ受信(f.message('こんにちは'));
+    assert.match(f.sent.at(-1).content, /Code は OFF/);
+    assert.equal(ran, 0);
+    f.client.emit(Events.ClientReady, f.client as any);
+    await waitFor(() => started === 1);
+  } finally { await bot.終了(); }
+});

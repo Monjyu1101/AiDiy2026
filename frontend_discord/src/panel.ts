@@ -1,3 +1,4 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DiscordBot } from './bot';
@@ -7,6 +8,25 @@ import { ライブ候補読込 } from './live-catalog';
 import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './connection-error';
 
 export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
+export type 機能設定 = { live: boolean; code: boolean };
+/** Code は現在 ON 固定（パネルでは操作不可）。切替できるようになっても接続制御はそのまま使える。 */
+export const コード固定ON = true;
+export function 機能設定読込(path: string): 機能設定 {
+  let live = true;
+  try { const data = JSON.parse(readFileSync(path, 'utf8')); if (typeof data?.live === 'boolean') live = data.live; } catch {}
+  return { live, code: true };
+}
+export function 機能設定保存(value: unknown, path: string): 機能設定 {
+  const live = (value as { live?: unknown } | null)?.live;
+  if (typeof live !== 'boolean') throw new 設定エラー('Live の ON/OFF を指定してください。');
+  const features = { live, code: コード固定ON ? true : (value as { code?: unknown }).code !== false };
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(features), 'utf8');
+  return features;
+}
+export function 機能案内(features: 機能設定) {
+  return features.live && features.code ? 'コード／音声会話' : features.live ? '音声会話' : features.code ? 'コード' : '機能なし';
+}
 export type パネル発言 = { who: string; text: string; role: 'user' | 'ai' };
 export type パネル状態 = { phase: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopping' | 'error'; message: string; details?: string };
 type Bot = Pick<DiscordBot, '起動' | '終了' | '表示' | 'メーター' | '音声'> & Partial<Pick<DiscordBot, 'モニター設定'>> & { client: { isReady(): boolean } };
@@ -21,6 +41,7 @@ export class Discordパネル {
   private closed = false;
   private preferred: Record<string, string>;
   private codePreferred?: { provider: string; model: string };
+  private features: 機能設定;
   private catalogs = new Set<ReturnType<typeof CLI実行>>();
   発言?: (value: パネル発言) => void;
   音量?: (value: { kind: 'input' | 'output'; level: number; bins: number[] }) => void;
@@ -32,9 +53,11 @@ export class Discordパネル {
     private validateCLI = (config: Discord設定) => { 起動解決(config.cli, config.python, config.folder); },
     private timeoutMs = 40_000,
     private codePreferenceFile = join(dirname(preferenceFile), 'aidiy_discord_code_model.json'),
-    private readCatalog = ライブ候補読込) {
+    private readCatalog = ライブ候補読込,
+    private featureFile = join(dirname(preferenceFile), 'aidiy_discord_features.json')) {
     this.preferred = ライブモデル読込(preferenceFile) || {};
     this.codePreferred = コードモデル読込(codePreferenceFile);
+    this.features = 機能設定読込(featureFile);
   }
   private 状態変更(phase: パネル状態['phase'], message: string, details?: string) {
     this.状態 = { phase, message, ...(details ? { details } : {}) }; this.changed(this.状態);
@@ -43,8 +66,8 @@ export class Discordパネル {
     const config = this.readConfig();
     const settings = { ...config.liveModels, ...this.preferred };
     const { models, voices } = this.readCatalog();
-    const notice = ライブ選択エラー(settings, { models, voices });
-    return { state: this.状態, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
+    const notice = this.features.live ? ライブ選択エラー(settings, { models, voices }) : '';
+    return { state: this.状態, features: this.features, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
   }
   async コード候補(provider: unknown) {
     if (this.closed || typeof provider !== 'string' || provider.length > 200) throw new Error();
@@ -62,6 +85,11 @@ export class Discordパネル {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
     this.codePreferred = コードモデル保存(value, this.codePreferenceFile);
     return this.codePreferred;
+  }
+  機能選択保存(value: unknown) {
+    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してから機能を選択してください。');
+    this.features = 機能設定保存(value, this.featureFile);
+    return this.features;
   }
   選択保存(value: unknown) {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
@@ -81,12 +109,17 @@ export class Discordパネル {
     const startedAt = Date.now();
     try {
       const config = this.readConfig(); token = config.token;
-      stage = 'Hermes確認'; this.validateCLI(config);
-      stage = 'モデル確認';
-      const error = ライブ選択エラー({ ...config.liveModels, ...this.preferred }, this.readCatalog());
-      if (error) throw new 設定エラー(error);
+      // 接続制御: 無効な機能は確認も接続もしない。
+      const features = this.features;
+      if (!features.live && !features.code) throw new 設定エラー('Live と Code の両方が OFF です。どちらかを ON にしてください。');
+      if (features.code) { stage = 'Hermes確認'; this.validateCLI(config); }
+      if (features.live) {
+        stage = 'モデル確認';
+        const error = ライブ選択エラー({ ...config.liveModels, ...this.preferred }, this.readCatalog());
+        if (error) throw new 設定エラー(error);
+      }
       stage = 'Bot作成';
-      const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred } });
+      const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred }, liveEnabled: features.live, codeEnabled: features.code });
       this.bot = bot;
       bot.音声 = (kind, pcm, rate) => { if (run === this.generation) this.音声?.({ kind, data: pcm.toString('base64'), rate }); };
       bot.メーター = (kind, level, bins) => { if (run === this.generation) this.音量?.({ kind, level, bins }); };
@@ -106,7 +139,7 @@ export class Discordパネル {
       await Promise.race([connected, cancelled, timeout]);
       if (run !== this.generation) return;
       if (!bot.client.isReady()) throw new Error();
-      this.状態変更('connected', '接続中 · コード／音声会話を利用できます。');
+      this.状態変更('connected', `接続中 · ${機能案内(this.features)}を利用できます。`);
     } catch (error) {
       if (run !== this.generation) return;
       const message = 接続失敗案内(error, stage);
@@ -123,6 +156,7 @@ export class Discordパネル {
   /** 接続中の音声をパネルで聞くかどうか。新しい接続は常に OFF から始まる。 */
   モニター(value: unknown) {
     if (typeof value !== 'boolean') throw new Error();
+    if (value && !this.features.live) throw new 設定エラー('Live が OFF のためモニターできません。');
     if (value && this.状態.phase !== 'connected' && this.状態.phase !== 'reconnecting') throw new 設定エラー('接続中だけモニターできます。');
     this.bot?.モニター設定?.(value);
     return value;
@@ -130,7 +164,7 @@ export class Discordパネル {
   接続確認() {
     if (!this.bot || !['connected', 'reconnecting'].includes(this.状態.phase)) return;
     const ready = this.bot.client.isReady();
-    if (ready && this.状態.phase !== 'connected') this.状態変更('connected', '接続中 · コード／音声会話を利用できます。');
+    if (ready && this.状態.phase !== 'connected') this.状態変更('connected', `接続中 · ${機能案内(this.features)}を利用できます。`);
     if (!ready && this.状態.phase !== 'reconnecting') this.状態変更('reconnecting', 'Discord への再接続を待っています…');
   }
   停止(): Promise<void> {

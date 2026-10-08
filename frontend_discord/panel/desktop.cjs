@@ -123,7 +123,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     const trusted = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === page;
     ipcMain.handle('discord:request', (event, action, value) => {
-      if (!trusted(event) || !['initial', 'select', 'select-code', 'catalog-code', 'start', 'stop', 'monitor'].includes(action)) throw new Error('許可されていない操作です。');
+      if (!trusted(event) || !['initial', 'select', 'select-features', 'select-code', 'catalog-code', 'start', 'stop', 'monitor'].includes(action)) throw new Error('許可されていない操作です。');
       return request(action, value);
     });
     ipcMain.handle('discord:window', (event, action) => {

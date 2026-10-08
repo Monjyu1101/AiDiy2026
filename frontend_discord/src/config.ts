@@ -9,6 +9,8 @@ export interface Discord設定 {
   token: string; guildId: string; userId: string; textChannelId: string; voiceChannelId: string;
   prefix: string; coreUrl: string; folder: string; cli: string; python: string;
   provider: string; model: string; maxTurns: number; timeoutMs: number; liveModels: Record<string, string>;
+  /** 接続制御。省略時は両方 ON。パネルの設定（Live は切替可、Code は ON 固定）で上書きする。 */
+  liveEnabled?: boolean; codeEnabled?: boolean;
 }
 export class 設定エラー extends Error {}
 

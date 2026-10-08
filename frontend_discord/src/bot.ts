@@ -52,7 +52,7 @@ export class DiscordBot {
     this.client = client ?? new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildVoiceStates], allowedMentions: メンション禁止, rest: { agent: this.network!.rest }, ws: { buildStrategy: Gateway戦略 } });
     this.code = code ?? new Code接続(config);
     this.client.on(Events.ClientReady, () => {
-      console.log('[Discord] 接続しました。専用チャンネルに話しかけると返信します。音声は入退室に合わせて接続します。');
+      console.log(`[Discord] 接続しました。${this.codeEnabled ? '専用チャンネルに話しかけると返信します。' : ''}${this.liveEnabled ? '音声は入退室に合わせて接続します。' : ''}`);
       this.connected = true; void this.自動ライブ同期();
     });
     this.client.on(Events.ShardResume, () => { this.connected = true; void this.自動ライブ同期(); });
@@ -61,6 +61,9 @@ export class DiscordBot {
     this.client.on(Events.ShardDisconnect, () => { this.connected = false; this.live?.終了(); });
     this.client.on(Events.VoiceStateUpdate, (oldState, state) => this.ボイス状態変更(oldState, state));
   }
+  // 接続制御。省略時は ON（Code は現状パネルで ON 固定）。
+  private get liveEnabled() { return this.config.liveEnabled !== false; }
+  private get codeEnabled() { return this.config.codeEnabled !== false; }
   async メッセージ受信(message: Message) {
     if (this.closing || message.webhookId || !利用許可(this.config, message.guildId, message.channelId, message.author.id, message.author.bot)) return;
     const command = コマンド解析(message.content, this.config.prefix, this.client.user?.id ?? '');
@@ -68,13 +71,15 @@ export class DiscordBot {
     const key = 会話キー(message.guildId!, message.channelId, message.author.id);
     const reply = (text: string) => message.reply({ content: text, allowedMentions: メンション禁止 }).then(() => {});
     try {
+      if (!this.codeEnabled && ['stop', 'new', 'chat'].includes(command.name)) { if (command.name === 'chat') await reply('Code は OFF のため利用できません。'); return; }
+      if (!this.liveEnabled && ['leave', 'live'].includes(command.name)) { await reply('Live は OFF のため利用できません。'); return; }
       switch (command.name) {
         case 'help':
           await reply([
-            'このチャンネルに、そのまま話しかけてください。AiDiy が返信します。',
-            '音声で話すときは専用のボイスチャンネルに参加してください。退出すると音声会話も終了します。',
-          ].join('\n')); return;
-        case 'status': await reply(`Code: ${this.code.実行中(key) ? '実行中' : '待機中'} / Live: ${this.live ? '接続中' : '未接続'}`); return;
+            ...this.codeEnabled ? ['このチャンネルに、そのまま話しかけてください。AiDiy が返信します。'] : [],
+            ...this.liveEnabled ? ['音声で話すときは専用のボイスチャンネルに参加してください。退出すると音声会話も終了します。'] : [],
+          ].join('\n') || '利用できる機能がありません。'); return;
+        case 'status': await reply(`Code: ${!this.codeEnabled ? 'OFF' : this.code.実行中(key) ? '実行中' : '待機中'} / Live: ${!this.liveEnabled ? 'OFF' : this.live ? '接続中' : '未接続'}`); return;
         case 'stop': {
           const running = this.code.実行中(key); this.code.停止(key);
           await reply(running ? '停止を要求しました。実行済みの変更は残ります。' : '実行中のコード要求はありません。'); return;
@@ -156,7 +161,7 @@ export class DiscordBot {
     if (state.id === this.config.userId && state.channelId !== oldState.channelId) void this.自動ライブ同期();
   }
   private 自動ライブ同期(): Promise<void> {
-    if (!this.connected || this.closing) return Promise.resolve();
+    if (!this.liveEnabled || !this.connected || this.closing) return Promise.resolve();
     this.voiceDirty = true;
     if (this.voiceSync) return this.voiceSync;
     this.voiceSync = this.自動ライブ処理().catch(() => {

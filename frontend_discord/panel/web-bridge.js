@@ -41,6 +41,7 @@
   window.discordPanel = {
     initial: () => request('initial'),
     select: value => request('select', value),
+    selectFeatures: value => request('select-features', value),
     selectCode: value => request('select-code', value),
     catalogCode: provider => request('catalog-code', provider),
     start: () => request('start'),

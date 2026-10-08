@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('discordPanel', {
   initial: () => ipcRenderer.invoke('discord:request', 'initial'),
   select: value => ipcRenderer.invoke('discord:request', 'select', value),
+  selectFeatures: value => ipcRenderer.invoke('discord:request', 'select-features', value),
   selectCode: value => ipcRenderer.invoke('discord:request', 'select-code', value),
   catalogCode: provider => ipcRenderer.invoke('discord:request', 'catalog-code', provider),
   start: () => ipcRenderer.invoke('discord:request', 'start'),
