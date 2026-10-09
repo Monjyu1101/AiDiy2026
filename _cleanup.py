@@ -287,7 +287,8 @@ def stop_all_services(
 
     if keep_code:
         # aidiy_live は通常 core 無しに動作できないため、core と一緒に止めてよい。
-        print_info("フロントエンド(vscode) の Live 単独実行を停止します（aidiy_code は停止しません）")
+        print_info("フロントエンド(vscode) aidiy_code は継続します")
+        print_info("フロントエンド(vscode) Live 実行を停止します")
         run_stop("Live の単独実行", lambda: _load_folder_start_module("frontend_vscode").kill_ports("live"))
     else:
         print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
