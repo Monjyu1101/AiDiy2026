@@ -1,4 +1,4 @@
-"""Avatar / VS Code 共通セットアップの再利用と取得回数を確認する。"""
+"""Avatar / VS Code / Discord 共通セットアップの再利用と取得回数を確認する。"""
 
 import contextlib
 import importlib.util
@@ -68,6 +68,13 @@ class ElectronSetupTest(unittest.TestCase):
         response.headers = {'Content-Length': str(len(data))}
         return response
 
+    def make_cached_zip(self, version):
+        plat, arch = common._electron_platform_arch()
+        self.cache.mkdir(parents=True, exist_ok=True)
+        archive = self.cache / f'electron-v{version}-{plat}-{arch}.zip'
+        archive.write_bytes(self.zip_bytes(version))
+        return archive
+
     def test_both_frontends_use_the_same_setup_function(self):
         self.assertIs(vscode.setup_dependencies, common.setup_dependencies)
         self.assertIs(avatar.setup_dependencies, common.setup_dependencies)
@@ -104,6 +111,14 @@ class ElectronSetupTest(unittest.TestCase):
         shutil.rmtree(peer / 'node_modules' / 'electron' / 'dist')
         self.assertTrue(common.electron_binary_ready(self.root))
 
+    def test_discord_binary_is_reused_without_network(self):
+        peer = self.make_app('frontend_discord')
+        self.make_ready(peer)
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_not_called()
+        self.assertTrue(common.electron_binary_ready(self.root))
+
     def test_different_peer_version_is_not_reused(self):
         peer = self.make_app('frontend_avatar', '44.5.0')
         self.make_ready(peer, '44.5.0')
@@ -134,6 +149,97 @@ class ElectronSetupTest(unittest.TestCase):
                     self.assertTrue(common.prepare_electron_binary(root, 'test'))
                     self.assertTrue(common.electron_binary_ready(root))
                     self.assertIn(f'electron-v44.5.1-{platform_name}-x64.zip', download.call_args.args[0])
+
+    def test_latest_download_removes_old_cache_on_each_platform(self):
+        for plat in ('win32', 'linux', 'darwin'):
+            with self.subTest(platform=plat), patch.object(common.sys, 'platform', plat), patch.object(
+                common.platform, 'machine', return_value='AMD64'
+            ), patch.object(common.shutil, 'which', return_value=None):
+                root = self.make_app('frontend_vscode', '44.7.0', parent=self.project / plat)
+                old = self.make_cached_zip('44.5.1')
+                with patch.object(common.urllib.request, 'urlopen', return_value=self.response('44.7.0')):
+                    self.assertTrue(common.prepare_electron_binary(root, 'test'))
+                self.assertFalse(old.exists())
+                self.assertTrue((self.cache / f'electron-v44.7.0-{plat}-x64.zip').exists())
+                self.assertTrue(common.electron_binary_ready(root))
+
+    def test_existing_and_repaired_binary_prune_cache_without_network(self):
+        self.make_ready()
+        for repair in (False, True):
+            with self.subTest(repair=repair):
+                if repair:
+                    (self.electron / 'path.txt').unlink()
+                old = self.make_cached_zip('44.5.1')
+                middle = self.make_cached_zip('44.7.0')
+                latest = self.make_cached_zip('44.10.0')
+                with patch.object(common.urllib.request, 'urlopen') as download:
+                    self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+                    download.assert_not_called()
+                self.assertFalse(old.exists())
+                self.assertFalse(middle.exists())
+                self.assertTrue(latest.exists())
+
+    def test_peer_reuse_also_prunes_old_cache(self):
+        peer = self.make_app('frontend_avatar')
+        self.make_ready(peer)
+        old = self.make_cached_zip('44.5.0')
+        latest = self.make_cached_zip('44.5.1')
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_not_called()
+        self.assertFalse(old.exists())
+        self.assertTrue(latest.exists())
+
+    def test_cached_latest_is_reused_and_old_cache_is_pruned(self):
+        old = self.make_cached_zip('44.5.0')
+        latest = self.make_cached_zip('44.5.1')
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_not_called()
+        self.assertFalse(old.exists())
+        self.assertTrue(latest.exists())
+
+    def test_cleanup_preserves_other_platform_arch_and_unrelated_files(self):
+        with patch.object(common.sys, 'platform', 'win32'), patch.object(common.platform, 'machine', return_value='AMD64'):
+            self.make_ready()
+            old = self.make_cached_zip('44.5.0')
+            latest = self.make_cached_zip('44.5.1')
+            preserved = [self.cache / name for name in (
+                'electron-v44.5.0-linux-x64.zip', 'electron-v44.5.0-win32-arm64.zip',
+                'electron-v44.5.0-win32-ia32.zip', 'electron-v45.0.0-beta.1-win32-x64.zip',
+                'notes.zip',
+            )]
+            for path in preserved:
+                path.write_bytes(b'other cache')
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            self.assertFalse(old.exists())
+            self.assertTrue(latest.exists())
+            self.assertTrue(all(path.exists() for path in preserved))
+
+    def test_failed_update_keeps_previous_cache(self):
+        self.make_app('frontend_vscode', '44.7.0')
+        old = self.make_cached_zip('44.5.1')
+        with patch.object(common.urllib.request, 'urlopen', side_effect=OSError('offline')):
+            self.assertFalse(common.prepare_electron_binary(self.root, 'test'))
+        self.assertEqual(list(self.cache.iterdir()), [old])
+
+    def test_broken_latest_cache_does_not_remove_valid_old_cache(self):
+        self.make_ready()
+        old = self.make_cached_zip('44.5.1')
+        latest = self.make_cached_zip('44.7.0')
+        latest.write_bytes(b'broken ZIP')
+        self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+        self.assertTrue(common._archive_ready(old, '44.5.1'))
+
+    def test_cache_deletion_failure_is_reported_without_failing_binary_setup(self):
+        self.make_ready()
+        self.make_cached_zip('44.5.0')
+        self.make_cached_zip('44.5.1')
+        info = Mock()
+        with patch.object(Path, 'unlink', side_effect=PermissionError('in use')):
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test', info=info))
+        self.assertIn('削除できませんでした', info.call_args.args[0])
+        self.assertTrue(common.electron_binary_ready(self.root))
 
     def test_corrupt_cached_zip_is_replaced(self):
         self.cache.mkdir(parents=True)
@@ -187,7 +293,8 @@ class ElectronSetupTest(unittest.TestCase):
         with patch.object(avatar, 'FRONTEND_AVATAR_DIR', peer), patch.object(
             avatar, 'check_npm_installed', return_value=True
         ), patch.object(avatar, 'run_command', return_value=True) as command:
-            self.assertTrue(avatar.setup())
+            with patch.object(avatar, 'install_standalone_launcher', return_value=True):
+                self.assertTrue(avatar.setup())
             self.assertEqual([call.args[0][1] for call in command.call_args_list], ['install', 'update'])
 
     def test_electron_failure_does_not_publish_launcher(self):

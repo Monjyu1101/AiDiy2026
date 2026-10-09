@@ -3,11 +3,12 @@
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE for full terms.
 
-"""Avatar / VS Code 共通の Electron 事前セットアップと ZIP キャッシュ。"""
+"""Avatar / VS Code / Discord 共通の Electron 事前セットアップと ZIP キャッシュ。"""
 
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,18 @@ from pathlib import Path
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_cache" / "electron"
 DOWNLOAD_TIMEOUT = 30
+
+
+def _electron_platform_arch() -> tuple[str, str]:
+    machine = platform.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        arch = "arm64"
+    elif machine in ("x86", "i386", "i686"):
+        arch = "ia32"
+    else:
+        arch = "x64"
+    plat = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
+    return plat, arch
 
 
 def electron_executable_name() -> str:
@@ -70,6 +83,27 @@ def _archive_ready(archive: Path, version: str) -> bool:
         return False
 
 
+def _prune_cached_archives(label: str, info) -> None:
+    """同じ OS・CPU の正常な最新 ZIP を残し、旧バージョンを削除する。"""
+    plat, arch = _electron_platform_arch()
+    pattern = re.compile(rf"electron-v(\d+)\.(\d+)\.(\d+)-{plat}-{arch}\.zip")
+    archives = []
+    for archive in CACHE_DIR.glob(f"electron-v*-{plat}-{arch}.zip"):
+        match = pattern.fullmatch(archive.name)
+        if match and archive.is_file():
+            archives.append((tuple(map(int, match.groups())), archive))
+    if len(archives) < 2:
+        return
+    latest_version, latest_archive = max(archives)
+    # 最新 ZIP が壊れている場合、復旧に使える旧 ZIP を先に消さない。
+    if not _archive_ready(latest_archive, ".".join(map(str, latest_version))):
+        return
+    for version, archive in archives:
+        if version < latest_version:
+            archive.unlink(missing_ok=True)
+            info(f"{label}: 古い Electron ZIP を削除しました: {archive.name}")
+
+
 def _download_archive(archive: Path, version: str, label: str, info) -> None:
     url = f"https://github.com/electron/electron/releases/download/v{version}/{archive.name}"
     info(f"{label}: Electron をダウンロードします: {archive.name}")
@@ -114,6 +148,17 @@ def _place_dist(source: Path, frontend_dir: Path, *, move: bool = False) -> None
 
 
 def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error=print) -> bool:
+    ready = _prepare_electron_binary(frontend_dir, label, info=info, error=error)
+    if ready:
+        try:
+            # 配置済み・他方からのコピーでも、既存の古いキャッシュを整理する。
+            _prune_cached_archives(label, info)
+        except OSError as exc:
+            info(f"{label}: 古い Electron ZIP を削除できませんでした: {exc}")
+    return ready
+
+
+def _prepare_electron_binary(frontend_dir: Path, label: str, *, info, error) -> bool:
     """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備する。"""
     try:
         version = get_electron_version(frontend_dir)
@@ -127,7 +172,7 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error
             (electron_dir / "path.txt").write_bytes(electron_executable_name().encode("utf-8"))
             return True
 
-        for name in ("frontend_avatar", "frontend_vscode"):
+        for name in ("frontend_avatar", "frontend_vscode", "frontend_discord"):
             peer = frontend_dir.parent / name
             if peer.resolve() == frontend_dir.resolve():
                 continue
@@ -137,14 +182,7 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error
                 _place_dist(source, frontend_dir)
                 return electron_binary_ready(frontend_dir)
 
-        machine = platform.machine().lower()
-        if machine in ("arm64", "aarch64"):
-            arch = "arm64"
-        elif machine in ("x86", "i386", "i686"):
-            arch = "ia32"
-        else:
-            arch = "x64"
-        plat = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
+        plat, arch = _electron_platform_arch()
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         archive = CACHE_DIR / f"electron-v{version}-{plat}-{arch}.zip"
         if _archive_ready(archive, version):

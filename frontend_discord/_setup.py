@@ -53,6 +53,9 @@ def setup(choices=None) -> bool:
         env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
         print_info(f"実行中: {npm} ci --no-fund --no-audit")
         subprocess.run([npm, "ci", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        # ロック済みの旧版に留めず、他のフロントエンドと同じ宣言範囲で更新する。
+        print_info(f"実行中: {npm} update electron --no-fund --no-audit")
+        subprocess.run([npm, "update", "electron", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         if not prepare_electron_binary(THIS_DIR, 'Discord'):
             return False
         install_launcher(THIS_DIR)

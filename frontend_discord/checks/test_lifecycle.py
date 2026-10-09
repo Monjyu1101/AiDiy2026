@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -24,9 +25,42 @@ start = load('discord_root_start_test', ROOT / '_start.py')
 setup = load('discord_root_setup_test', ROOT / '_setup.py')
 cleanup = load('discord_root_cleanup_test', ROOT / '_cleanup.py')
 discord_start = load('discord_start_test', FRONTEND / '_start.py')
+discord_setup = load('discord_setup_test', FRONTEND / '_setup.py')
 discord_cleanup = load('discord_cleanup_test', FRONTEND / '_cleanup.py')
 import discord_processes as processes
 import launcher
+
+
+class DiscordSetupTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(contextlib.redirect_stdout(io.StringIO()))
+        self.enterContext(patch.object(discord_setup.shutil, 'which', return_value='npm'))
+        self.run = self.enterContext(patch.object(discord_setup.subprocess, 'run'))
+        self.prepare = self.enterContext(patch.object(discord_setup, 'prepare_electron_binary', return_value=True))
+        self.launcher = self.enterContext(patch.object(discord_setup, 'install_launcher'))
+        # 共通設定・実ランチャーへ書き込まず、呼び出し順だけを確認する。
+        self.enterContext(patch.object(discord_setup.importlib.util, 'spec_from_file_location', return_value=Mock()))
+        self.enterContext(patch.object(discord_setup.importlib.util, 'module_from_spec', return_value=Mock()))
+
+    def test_electron_is_updated_before_binary_preparation(self):
+        calls = Mock()
+        calls.attach_mock(self.run, 'npm')
+        calls.attach_mock(self.prepare, 'prepare')
+        self.assertTrue(discord_setup.setup())
+        self.assertEqual([call.args[0] for call in self.run.call_args_list], [
+            ['npm', 'ci', '--no-fund', '--no-audit'],
+            ['npm', 'update', 'electron', '--no-fund', '--no-audit'],
+        ])
+        for call in self.run.call_args_list:
+            self.assertEqual(call.kwargs['env']['ELECTRON_SKIP_BINARY_DOWNLOAD'], '1')
+        self.assertEqual([call[0] for call in calls.mock_calls], ['npm', 'npm', 'prepare'])
+        self.launcher.assert_called_once()
+
+    def test_failed_electron_update_does_not_prepare_binary_or_publish_launcher(self):
+        self.run.side_effect = [None, subprocess.CalledProcessError(1, ['npm', 'update', 'electron'])]
+        self.assertFalse(discord_setup.setup())
+        self.prepare.assert_not_called()
+        self.launcher.assert_not_called()
 
 
 class DiscordLifecycleTest(unittest.TestCase):
