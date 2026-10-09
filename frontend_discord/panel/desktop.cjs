@@ -124,7 +124,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     // 幅は aidiy_code / aidiy_live と共通、高さは設定パネル用（frontend_vscode/scripts/window-size.cjs）。
     const width = Math.min(size.幅, area.width), height = Math.min(size.パネル高さ, area.height);
     window = new BrowserWindow({
-      title: 'AiDiy (Discord)', width, height, minWidth: size.最小幅, minHeight: size.パネル高さ,
+      title: 'AiDiy Discord', width, height, minWidth: size.最小幅, minHeight: size.パネル高さ,
       x: area.x + Math.round((area.width - width) / 2), y: area.y + 8,
       frame: false, roundedCorners: false, show: false, backgroundColor: '#101217', autoHideMenuBar: true,
       icon: join(root, '../frontend_vscode/media/AiDiy.png'),

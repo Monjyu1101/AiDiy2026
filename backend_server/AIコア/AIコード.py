@@ -122,6 +122,8 @@ class CodeAgent:
         self._累積変更ファイルキー: set[str] = set()  # パス正規化キーで重複排除
         self.強制停止フラグ = False  # cancel_run用
         self.現在タスク: Optional[asyncio.Task] = None  # 実行中の処理タスク
+        self.要求タスク: Optional[asyncio.Task] = None  # 検証・自己改善を含む要求全体
+        self._停止ロック = asyncio.Lock()
 
     def _配下パス判定(self, 対象パス: str, 基準パス: str) -> bool:
         """対象パスが基準パス配下（同一含む）かを返す"""
@@ -434,6 +436,10 @@ class CodeAgent:
                 logger.error(f"[CodeAgent] welcome_text送信エラー: {e}")
 
     async def 強制停止(self) -> bool:
+        async with self._停止ロック:
+            return await self._強制停止実行()
+
+    async def _強制停止実行(self) -> bool:
         """
         現在実行中のタスクを強制停止
 
@@ -445,7 +451,8 @@ class CodeAgent:
         self.強制停止フラグ = True
 
         # 2. 実行中のタスクをキャンセル
-        if self.現在タスク and not self.現在タスク.done():
+        現在タスク = self.要求タスク or self.現在タスク
+        if 現在タスク and not 現在タスク.done():
             # 即時に中断通知を送信（停止処理完了を待たない）
             await self._中断通知送信()
 
@@ -457,9 +464,9 @@ class CodeAgent:
                     logger.warning(f"[CodeAgent] AIインスタンス強制終了エラー: {e}")
 
             # 4. タスクをキャンセル
-            self.現在タスク.cancel()
+            現在タスク.cancel()
             try:
-                await asyncio.wait_for(asyncio.shield(self.現在タスク), timeout=5.0)
+                await asyncio.wait_for(asyncio.shield(現在タスク), timeout=5.0)
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             except Exception as e:
@@ -558,7 +565,9 @@ class CodeAgent:
                     
                 メッセージ識別 = 受信データ.get("メッセージ識別", "")
 
-                if メッセージ識別 == "input_text":
+                if メッセージ識別 in ("input_text", "input_request") and 受信データ.get("実行状態通知") is True:
+                    await self._実行状態つき要求処理(受信データ)
+                elif メッセージ識別 == "input_text":
                     # テキスト処理: [ECHO]付きoutput_text送信 → 会話履歴保存
                     await self._処理_input_text(受信データ)
                 elif メッセージ識別 == "input_request":
@@ -574,6 +583,28 @@ class CodeAgent:
             except Exception as e:
                 logger.error(f"[CodeAgent] チャンネル{self.チャンネル} 処理エラー: {e}")
                 await asyncio.sleep(0.2)
+
+    async def _実行状態つき要求処理(self, 受信データ: dict) -> None:
+        """途中回答と要求全体の完了を分け、停止後のAI再開まで操作を待たせる。"""
+        処理 = self._処理_input_text if 受信データ["メッセージ識別"] == "input_text" else self._処理_input_request
+        await self.接続.send_to_channel(self.チャンネル, {
+            "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+            "メッセージ識別": "output_stream", "メッセージ内容": AIストリーム開始, "実行中": True,
+        })
+        self.要求タスク = asyncio.create_task(処理(受信データ))
+        try:
+            await self.要求タスク
+        except asyncio.CancelledError:
+            if asyncio.current_task().cancelling():
+                raise
+        finally:
+            self.要求タスク = None
+            # 強制停止は中断通知を先行送信する。AIの後始末が済むまで完了にしない。
+            async with self._停止ロック:
+                await self.接続.send_to_channel(self.チャンネル, {
+                    "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+                    "メッセージ識別": "output_end", "メッセージ内容": "", "実行中": False,
+                })
 
     async def _処理_input_text(self, 受信データ: dict) -> None:
         """

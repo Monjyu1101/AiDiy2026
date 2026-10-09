@@ -16,8 +16,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $extensionRoot 'dist/extension.js'))
     } finally { Pop-Location }
 }
 Write-Host "Project folder: $projectRoot"
-Write-Host 'Open the chat with: AiDiy (Code): チャットを開く'
-Write-Host 'Open live voice with: AiDiy (Live): ライブ会話を開く'
+Write-Host 'Open the chat with: AiDiy Code: チャットを開く'
+Write-Host 'Open live voice with: AiDiy Live: ライブ会話を開く'
 # 通常の VS Code が同じフォルダを開いていても、試用ホストで確実に開く。
 $tryProfile = Join-Path $extensionRoot 'out/manual-profile'
 & code.cmd --new-window --skip-welcome --skip-release-notes "--user-data-dir=$tryProfile" "--extensionDevelopmentPath=$extensionRoot" "--extensionDevelopmentPath=$extensionRoot/aidiy_live" $projectRoot

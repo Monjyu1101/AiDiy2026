@@ -327,7 +327,7 @@ def install_extensions(vscode_cli: str) -> bool:
     if installed is None or not expected.issubset(installed):
         print_error(f"拡張機能の配置を確認できません: {', '.join(sorted(expected))}")
         return False
-    print_success('AiDiy (Code) / AiDiy (Live) を別々の拡張機能として配置しました。')
+    print_success('AiDiy Code / AiDiy Live を別々の拡張機能として配置しました。')
     return True
 
 

@@ -23,7 +23,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 `frontend_vscode` は Code / Live の2つの独立した VS Code 拡張とスタンドアロンを提供します。Code（`aidiy.aidiy-code`）と Live（`aidiy.aidiy-live`）は既存 AIコアへ接続します。Code は `AIコード.vue` と同じ Code CLI・モデルを選択します。拡張 ID、ビュー、設定、配布物を分け、片方を無効にしても他方が動作する構成です。
 
-通常の VS Code 拡張モードに加え、同じ Webview と AIコア接続層を使う `aidiy_code/` のスタンドアロンを持ちます。コード版の表示名は `AiDiy (Code)`、ライブ会話版の表示名は `AiDiy (Live)` です。
+通常の VS Code 拡張モードに加え、同じ Webview と AIコア接続層を使う `aidiy_code/` のスタンドアロンを持ちます。コード版の表示名は `AiDiy Code`、ライブ会話版の表示名は `AiDiy Live` です。
 
 `aidiy_live/` は Live 拡張とスタンドアロンの共通画面・音声処理を持ちます。拡張ホスト側で REST / WebSocket と Windows マイクを扱い、Webview へ渡します。マイク補助は Python 標準ライブラリだけを使います。利用・検証方法は [`aidiy_live/README.md`](./aidiy_live/README.md) を参照してください。
 

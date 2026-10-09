@@ -27,7 +27,7 @@ app.whenReady().then(async () => {
   server = await 単独起動(resolve(projectRoot), undefined, initialModel ? JSON.parse(initialModel) : {});
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
-    title: 'AiDiy (Code)', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
+    title: 'AiDiy Code', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
     x: workArea.x + 8, y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000',
     icon: join(__dirname, '../media/AiDiy.png'), autoHideMenuBar: true,

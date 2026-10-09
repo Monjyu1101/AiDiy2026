@@ -141,5 +141,5 @@ async function main() {
     return foreground ? startBrowser() : startBrowserDetached();
   }
 }
-if (mode !== 'serve') console.log('AiDiy (Live) を起動しています…');
+if (mode !== 'serve') console.log('AiDiy Live を起動しています…');
 main().catch(async error => { await instance?.close(); console.error(error.message || String(error)); process.exitCode = 1; });

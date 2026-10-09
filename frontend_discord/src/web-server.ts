@@ -126,7 +126,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
     void app.closed.then(() => process.exit(0));
     if (process.env.AIDIY_DISCORD_READY) writeFileSync(process.env.AIDIY_DISCORD_READY, JSON.stringify({ url: app.url, publicUrl: app.publicUrl, pid: process.pid, windowShown: true }));
-    console.log(`AiDiy (Discord) ブラウザ版: ${app.publicUrl}`);
+    console.log(`AiDiy Discord ブラウザ版: ${app.publicUrl}`);
     if (process.env.AIDIY_DISCORD_CONNECT === '1') void app.service.要求('start', undefined);
   } catch (error) {
     await instance?.close();

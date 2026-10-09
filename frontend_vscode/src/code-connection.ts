@@ -38,6 +38,8 @@ export class CodeConnection {
   private disposed = false;
   private outputHistory: string[] = [];
   private replay = new Map<string, number>();
+  private 実行状態通知 = false;
+  private 実行継続中 = false;
   connected = false;
   modelChanging = false;
   session = '';
@@ -166,6 +168,11 @@ export class CodeConnection {
             if (count) { this.replay.set(text, count - 1); return; }
             this.outputHistory = [...this.outputHistory, text].slice(-60);
           }
+          if (typeof packet.実行中 === 'boolean') {
+            this.実行状態通知 = true; this.実行継続中 = packet.実行中;
+          }
+          // 回答・検証・中断の途中通知では、要求全体の実行状態を維持する。
+          if (this.実行状態通知) packet.実行中 = this.実行継続中;
           if (packet.メッセージ識別 === 'output_stream' && packet.メッセージ内容 === '\x02') this.replay.clear();
           this.onPacket(packet);
         }
@@ -178,8 +185,9 @@ export class CodeConnection {
     const socket = this.sockets.get('input');
     if (!this.connected || this.modelChanging || socket?.readyState !== 1 || socket.bufferedAmount > 128000) return false;
     try {
-      socket.send(JSON.stringify({ ...packet, セッションID: this.session, チャンネル: '1' }));
-      if (packet.メッセージ識別 === 'input_text' || packet.メッセージ識別 === 'input_request') this.replay.clear();
+      const request = packet.メッセージ識別 === 'input_text' || packet.メッセージ識別 === 'input_request';
+      socket.send(JSON.stringify({ ...packet, ...(request ? { 実行状態通知: true } : {}), セッションID: this.session, チャンネル: '1' }));
+      if (request) { this.replay.clear(); this.実行継続中 = true; }
       return true;
     }
     catch { this.lost(); return false; }
@@ -192,6 +200,7 @@ export class CodeConnection {
     for (const controller of this.requests) controller.abort();
     for (const socket of this.sockets.values()) socket.close(); this.sockets.clear();
     this.connected = false; this.connecting = false;
+    this.実行状態通知 = false; this.実行継続中 = false;
   }
   private lost() {
     this.clear(); this.onState();

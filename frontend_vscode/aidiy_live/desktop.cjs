@@ -37,7 +37,7 @@ app.whenReady().then(async () => {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   window = new BrowserWindow({
     // 大きさは aidiy_code と同じ（scripts/window-size.cjs）。位置だけ Code と重ならないよう右上にする。
-    title: 'AiDiy (Live)', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
+    title: 'AiDiy Live', width: size.幅, height: size.会話高さ, minWidth: size.最小幅, minHeight: size.会話最小高さ,
     x: workArea.x + Math.max(0, workArea.width - size.幅 - 8), y: workArea.y + 8,
     frame: false, roundedCorners: false, show: false, backgroundColor: '#000', autoHideMenuBar: true,
     icon: join(__dirname, '../media/AiDiy.png'),

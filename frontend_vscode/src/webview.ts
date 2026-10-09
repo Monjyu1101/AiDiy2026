@@ -44,6 +44,8 @@ const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 let 実行中 = false, 送信待ち = false, 入力許可 = false, 接続済み = false;
 let 自動接続 = true;
+let 停止待ち = false, 接続変更待ち = false;
+let 操作許可 = false, モデル変更中 = false;
 let メッセージJSON = '';
 let 履歴JSON = '';
 let 会話ID = '';
@@ -87,6 +89,9 @@ const ボタン更新 = () => {
   const send = element<HTMLButtonElement>('send');
   send.disabled = !入力許可 || 実行中 || 送信待ち || !prompt.value.trim();
   send.classList.toggle('ws-disabled', !入力許可);
+  自動接続スイッチ.disabled = 実行中 || 送信待ち || 接続変更待ち || モデル変更中 || !操作許可;
+  element<HTMLButtonElement>('stop').disabled = !操作許可 || 停止待ち || !実行中 || (!オフライン && !接続済み);
+  if (送信待ち || 接続変更待ち) { newChat.disabled = true; modelButton.disabled = true; }
 };
 const 一覧切替 = (show: boolean) => {
   一覧表示中 = show;
@@ -169,11 +174,17 @@ prompt.addEventListener('keydown', event => {
   event.preventDefault();
   send.focus();
 });
-element('stop').addEventListener('click', () => vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' }));
+element('stop').addEventListener('click', () => {
+  if (element<HTMLButtonElement>('stop').disabled) return;
+  停止待ち = true; ボタン更新();
+  vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' });
+});
 modelButton.addEventListener('click', モデル選択を開く);
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
 自動接続スイッチ.addEventListener('click', () => {
-  if (!自動接続スイッチ.disabled) post('autoConnect', { enabled: !自動接続 });
+  if (自動接続スイッチ.disabled) return;
+  接続変更待ち = true; ボタン更新();
+  post('autoConnect', { enabled: !自動接続 });
 });
 newChat.addEventListener('click', () => {
   if (newChat.disabled) return;
@@ -296,21 +307,23 @@ window.addEventListener('message', event => {
   検証ループ.disabled = 検証なし;
   if (検証なし) 検証ループ.value = '0';
   element('model-picker-description').textContent = オフライン ? 'aidiy_hermes を直接実行します。オンラインとは別のモデルを保存します。' : 'AIコアのコードAIを選択します。';
-  送信待ち = false; 実行中 = state.実行中;
+  送信待ち = false; 接続変更待ち = false; 実行中 = state.実行中;
+  停止待ち = state.停止中 === true;
+  操作許可 = state.信頼済み === true && state.画面接続済み !== false; モデル変更中 = state.モデル変更中 === true;
   接続済み = state.接続済み === true;
   自動接続 = state.自動接続 !== false;
   自動接続スイッチ.setAttribute('aria-checked', String(自動接続));
   自動接続スイッチ.title = `自動接続 ${自動接続 ? 'ON' : 'OFF'}`;
   自動接続スイッチ.disabled = 実行中 || 送信待ち || state.モデル変更中 || !state.信頼済み;
   element('chat-header').classList.toggle('auto-connect-off', !自動接続);
-  入力許可 = state.信頼済み && (オフライン || 接続済み) && !state.モデル変更中 && Boolean(state.作業フォルダ);
+  入力許可 = 操作許可 && (オフライン || 接続済み) && !state.モデル変更中 && Boolean(state.作業フォルダ);
   element('welcome').hidden = state.メッセージ.length > 0;
   実行表示更新(実行中 && (オフライン || state.接続済み !== false));
   element('activity').classList.toggle('unavailable', !入力許可);
   element('activity').classList.toggle('connected', 接続済み);
   element('chat-header').classList.toggle('connected', 接続済み);
   element('activity-label').textContent = 接続済み ? '接続済み' : state.接続中 ? '接続中' : '未接続';
-  newChat.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || (!オフライン && state.接続済み === false) || (!state.作業フォルダ && !state.新規可能);
+  newChat.disabled = 実行中 || state.モデル変更中 || !操作許可 || (!オフライン && state.接続済み === false) || (!state.作業フォルダ && !state.新規可能);
   const projectName = String(state.作業フォルダ?.名前 ?? '');
   projectFolder.textContent = 末尾省略(projectName);
   projectFolder.title = projectName;
@@ -324,7 +337,7 @@ window.addEventListener('message', event => {
   modelLabel.textContent = label;
   modelLabel.title = label;
   modelButton.title = 'コードAIとモデルを選択';
-  modelButton.disabled = 実行中 || state.モデル変更中 || !state.信頼済み || (!オフライン && !state.作業フォルダ);
+  modelButton.disabled = 実行中 || state.モデル変更中 || !操作許可 || (!オフライン && !state.作業フォルダ);
   element<HTMLButtonElement>('remove-attachment').disabled = 実行中;
   element('stop').hidden = !実行中;
   element<HTMLButtonElement>('stop').disabled = !オフライン && !接続済み;

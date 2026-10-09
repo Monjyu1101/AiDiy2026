@@ -6,7 +6,8 @@ function core() {
     copilot_cli: { auto: '自動', 'gpt-6-sol': 'GPT-6 Sol' }, codex_cli: { auto: '自動' }, claude_cli: { auto: '自動' },
   };
   const defaults = { CODE_AI1_NAME: 'aidiy_hermes', CODE_AI1_MODEL: 'openai_oauth/gpt-6.1-sol' };
-  let unavailable = false, hold = false;
+  let unavailable = false, hold = false, holdCancel = false;
+  let catalogWait;
   class Socket {
     readyState = 0; bufferedAmount = 0; sent = [];
     constructor(url) {
@@ -31,17 +32,23 @@ function core() {
         const output = sockets.findLast(socket => socket.channel === '1' && socket.session === this.session && socket.readyState === 1);
         queueMicrotask(() => {
           output.emit({ メッセージ識別: 'input_text', メッセージ内容: packet.メッセージ内容 });
-          output.emit({ メッセージ識別: 'output_stream', メッセージ内容: '\x02' });
+          output.emit({ メッセージ識別: 'output_stream', メッセージ内容: '\x02', ...(packet.実行状態通知 ? {実行中:true} : {}) });
           output.emit({ メッセージ識別: 'output_stream', メッセージ内容: '日本語の進捗' });
           if (hold) return;
           const reply = JSON.stringify({ input: packet.メッセージ内容, settings: sessions.get(this.session).settings });
           sessions.get(this.session).replies.push(reply);
           output.emit({ メッセージ識別: 'output_stream', メッセージ内容: '\x03' });
           output.emit({ メッセージ識別: 'output_text', メッセージ内容: reply });
+          if (packet.実行状態通知) output.emit({メッセージ識別:'output_end',メッセージ内容:'',実行中:false});
         });
       } else if (packet.メッセージ識別 === 'cancel_run') {
         const output = sockets.findLast(socket => socket.channel === '1' && socket.session === this.session && socket.readyState === 1);
-        queueMicrotask(() => output.emit({ メッセージ識別: 'cancel_run', メッセージ内容: '処理中断！' }));
+        queueMicrotask(() => {
+          output.emit({ メッセージ識別: 'cancel_run', メッセージ内容: '処理中断！' });
+          output.emit({ メッセージ識別: 'output_stream', メッセージ内容: '\x18' });
+          output.emit({ メッセージ識別: 'output_text', メッセージ内容: '処理は強制中断しました。' });
+          if (!holdCancel) output.emit({メッセージ識別:'output_end',メッセージ内容:'',実行中:false});
+        });
       }
     }
     emit(packet) { this.onmessage?.({ data: JSON.stringify({ ...packet, セッションID: this.session, チャンネル: this.channel }) }); }
@@ -50,11 +57,12 @@ function core() {
   const request = async (url, options) => {
     if (unavailable) throw new Error('ECONNREFUSED');
     const body = JSON.parse(options.body); requests.push({ path: decodeURI(new URL(url).pathname), body });
+    if (body.セッションID === '' && catalogWait) await catalogWait;
     const session = sessions.get(body.セッションID);
     if (String(url).endsWith(encodeURI('設定'))) Object.assign(session.settings, body.モデル設定);
     return { ok: true, json: async () => ({ status: 'OK', data: { available_models: { code_models: models }, モデル設定: session?.settings || defaults } }) };
   };
-  return { sockets, requests, sessions, Socket, request, set unavailable(value) { unavailable = value; }, set hold(value) { hold = value; },
+  return { sockets, requests, sessions, Socket, request, set unavailable(value) { unavailable = value; }, set hold(value) { hold = value; }, set holdCancel(value) { holdCancel = value; }, set catalogWait(value) { catalogWait = value; },
     install(t) {
       const originalSocket = global.WebSocket; global.WebSocket = Socket;
       t.after(() => { global.WebSocket = originalSocket; });

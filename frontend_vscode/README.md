@@ -1,6 +1,6 @@
-# AiDiy (Code)
+# AiDiy Code
 
-**AiDiy (Code)** は `aidiy_live` と同じローカル AIコアに接続し、`AIコード.vue` と同じ Code CLI を選択して、プロジェクトのコード調査・編集を支援する独立した VS Code 拡張です。同じチャット画面を使うスタンドアロンも提供します。
+**AiDiy Code** は `aidiy_live` と同じローカル AIコアに接続し、`AIコード.vue` と同じ Code CLI を選択して、プロジェクトのコード調査・編集を支援する独立した VS Code 拡張です。同じチャット画面を使うスタンドアロンも提供します。
 
 拡張 ID は `aidiy.aidiy-code`、配布ファイルは `dist/aidiy-code-0.1.0.vsix` です。拡張機能一覧の歯車から、この拡張を個別に無効化・解除できます。
 
@@ -16,7 +16,7 @@
 
 1. AiDiy の Core サーバーを起動し、使用する Code CLI の認証を用意します。拡張モードを使う場合は VS Code **1.106 以降**も必要です。
 2. AiDiy ルートの `python _setup.py` で、Hermes の次に表示される **フロントエンド(vscode)** を選びます。単体では `python frontend_vscode/_setup.py` を実行できます。
-3. 単独画面は `aidiy_code` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy (Code): チャットを開く**を実行します。
+3. 単独画面は `aidiy_code` を実行します。拡張モードは VS Code でフォルダを開き、コマンドパレットから **AiDiy Code: チャットを開く**を実行します。
 
 セットアップは依存関係と Electron バイナリの事前導入、単独起動コマンドの作成と、VS Code CLI がある場合は VSIX を生成・配置します。`aidiy_code` のランチャーは `aidiy_hermes` と同じ `~/.local/bin` に配置します（Windows は `.cmd`）。このフォルダが PATH にない場合は追加してください。ランチャーだけを更新する場合は `python frontend_vscode/_setup.py --launchers-only` を使います。この作業コピーから配置した旧名 `aidiy_vscode` は解除します。手動で VSIX を配置する場合は、拡張機能画面の `…` → **VSIX からのインストール**で、`dist/aidiy-code-0.1.0.vsix` を選びます。解除と生成物削除は `python frontend_vscode/_cleanup.py`、またはルートの `python _cleanup.py` から実行できます。
 
@@ -48,7 +48,7 @@ VS Code 拡張として試す場合は、次の手順を使います。
 .\frontend_vscode\launch-extension-dev.ps1
 ```
 
-起動したフォルダがプロジェクトフォルダになります。VS Code の開発用ウィンドウが開くので、コマンドパレットの **AiDiy (Code): チャットを開く**で操作してください。AIコアへ接続するため、通常のチャットと同様に依頼を実行します。
+起動したフォルダがプロジェクトフォルダになります。VS Code の開発用ウィンドウが開くので、コマンドパレットの **AiDiy Code: チャットを開く**で操作してください。AIコアへ接続するため、通常のチャットと同様に依頼を実行します。
 
 試用時の VS Code 設定は `out/manual-profile` に保存します。通常の VS Code で同じフォルダを開いていても、試用ウィンドウで開けます。
 

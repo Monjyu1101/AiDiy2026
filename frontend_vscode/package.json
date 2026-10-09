@@ -1,6 +1,6 @@
 {
   "name": "aidiy-code",
-  "displayName": "AiDiy (Code)",
+  "displayName": "AiDiy Code",
   "icon": "media/AiDiy.png",
   "description": "AIコアに接続し、各 Code CLI を選択して右サイドバーでコード支援チャットを提供します。",
   "version": "0.1.0",
@@ -42,7 +42,7 @@
       "secondarySidebar": [
         {
           "id": "aidiy-code",
-          "title": "AiDiy (Code)",
+          "title": "AiDiy Code",
           "icon": "media/AiDiy.png"
         }
       ]
@@ -52,7 +52,7 @@
         {
           "type": "webview",
           "id": "aidiyHermes.chat",
-          "name": "AiDiy (Code)"
+          "name": "AiDiy Code"
         }
       ]
     },
@@ -60,34 +60,34 @@
       {
         "command": "aidiyHermes.open",
         "title": "チャットを開く",
-        "category": "AiDiy (Code)"
+        "category": "AiDiy Code"
       },
       {
         "command": "aidiyHermes.newChat",
         "title": "新しい会話",
-        "category": "AiDiy (Code)",
+        "category": "AiDiy Code",
         "icon": "$(add)"
       },
       {
         "command": "aidiyHermes.attachSelection",
         "title": "選択コードをチャットに添付",
-        "category": "AiDiy (Code)"
+        "category": "AiDiy Code"
       },
       {
         "command": "aidiyHermes.settings",
         "title": "設定を開く",
-        "category": "AiDiy (Code)",
+        "category": "AiDiy Code",
         "icon": "$(settings-gear)"
       },
       {
         "command": "aidiyHermes.terminal",
         "title": "対話 CLI を開く",
-        "category": "AiDiy (Code)"
+        "category": "AiDiy Code"
       },
       {
         "command": "aidiyHermes.logs",
         "title": "実行ログを開く",
-        "category": "AiDiy (Code)"
+        "category": "AiDiy Code"
       }
     ],
     "menus": {
@@ -122,7 +122,7 @@
       ]
     },
     "configuration": {
-      "title": "AiDiy (Code)",
+      "title": "AiDiy Code",
       "properties": {
         "aidiyHermes.cliPath": {
           "type": "string",

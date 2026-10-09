@@ -78,7 +78,7 @@ async function パネル起動(browser) {
     } else if (state.windowShown) {
       // Codespaces ではポート転送先の URL を開く。$BROWSER があれば手元の PC のブラウザで開く。
       if (browser) await ブラウザ版表示(state.publicUrl || state.url, { profile: join(logs, 'browser-profile'), height: ウィンドウ.パネル高さ });
-      console.log(args.includes('--connect') ? 'AiDiy (Discord) パネルを開き、自動接続を開始しました。' : 'AiDiy (Discord) パネルを開きました。「接続」で接続します。');
+      console.log(args.includes('--connect') ? 'AiDiy Discord パネルを開き、自動接続を開始しました。' : 'AiDiy Discord パネルを開きました。「接続」で接続します。');
       if (args.includes('--wait') && child.exitCode === null && child.signalCode === null) await new Promise(resolve => child.once('exit', resolve));
       return child.exitCode ?? 0;
     }

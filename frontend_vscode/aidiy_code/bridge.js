@@ -43,7 +43,7 @@
           emit(data);
         };
         events.onerror = () => {
-          if (state) emit({...state, 接続済み:false, 接続中:false, 実行中:false});
+          if (state) emit({...state, 画面接続済み:false, 接続エラー:'画面との接続が切れました。再接続しています…'});
           else error('接続が切れました。再接続しています…');
         };
       } else if (message.type === 'chooseModel') {

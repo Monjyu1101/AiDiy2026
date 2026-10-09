@@ -42,7 +42,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     ...modeModels[initialModel.offline ? 'offline' : 'online'],
     オフライン対応: true, 実行モード: (initialModel.offline ? 'offline' : 'online') as 'online' | 'offline',
     自動接続: !initialModel.offline, 接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
-    メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false,
+    メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false, 停止中: false,
     セッションID: undefined as string | undefined,
     HermesセッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
@@ -96,7 +96,9 @@ export async function 単独起動(project: string, backend?: string, initialMod
       if (text) state.メッセージ.push({ 種別: 'error', 本文: text });
       state.実行中 = false;
     } else return;
+    if ('実行中' in packet && typeof packet.実行中 === 'boolean') state.実行中 = packet.実行中;
     if (offlineJob) state.実行中 = true;
+    if (!state.実行中) state.停止中 = false;
     trimHistory(); save(); notify();
   };
   const connection = new CodeConnection(backend || ローカル接続先(root, folder), packet => {
@@ -108,7 +110,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     if (connection.connected) {
       state.セッションID = connection.session;
       state.provider = connection.model.provider; state.model = connection.model.model;
-    } else if (!offlineJob) state.実行中 = false;
+    } else if (!offlineJob) { state.実行中 = false; state.停止中 = false; }
     notify();
   });
   const reconnect = () => {
@@ -141,7 +143,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
           }
           if (result.停止理由 || result.終了コード !== 0) receive({ メッセージ識別: 'error', メッセージ内容: result.停止理由 || result.ログ || `Hermes終了コード: ${result.終了コード}` });
         }).catch(error => receive({ メッセージ識別: 'error', メッセージ内容: String(error) }))
-          .finally(() => { offlineJob = undefined; state.実行中 = false; if (!closed) { save(); notify(); } });
+          .finally(() => { offlineJob = undefined; state.実行中 = false; state.停止中 = false; if (!closed) { save(); notify(); } });
       } catch (error) {
         receive({ メッセージ識別: 'error', メッセージ内容: String(error) });
       }
@@ -172,7 +174,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
         res.on('close', () => {
           clearInterval(heartbeat); clients.delete(res);
-          if (!clients.size) idle = setTimeout(() => { void close(); }, 60_000);
+          if (!closed && !clients.size) idle = setTimeout(() => { void close(); }, 60_000);
         });
         return;
       }
@@ -193,17 +195,24 @@ export async function 単独起動(project: string, backend?: string, initialMod
         const data = JSON.parse(body);
         const type = data.メッセージ識別 ?? data.type;
         if (type === 'cancel_run') {
-          if (offlineJob || state.実行モード === 'offline') offlineJob?.停止();
-          else if (!connection.send({ メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' })) { reply(409, {error:'AIコアが未接続です。'}); return; }
+          if (!state.実行中 || state.停止中) { reply(200, {ok:true}); return; }
+          state.停止中 = true;
+          if (offlineJob) offlineJob.停止();
+          else if (!connection.send({ メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' })) {
+            state.停止中 = false; notify(); reply(409, {error:'AIコアが未接続です。'}); return;
+          }
+          notify();
         } else if (type === 'autoConnect') {
           if (typeof data.enabled !== 'boolean') { reply(400, {error:'自動接続の指定が不正です。'}); return; }
           if (state.実行中 || offlineJob || connection.modelChanging) { reply(409, {error:'実行中またはモデル変更中は自動接続を変更できません。'}); return; }
+          if (state.自動接続 === data.enabled) { reply(200, {ok:true}); return; }
           state.自動接続 = data.enabled;
           if (data.enabled && state.実行モード === 'offline') {
-            save(false); modeModels.offline = { provider:state.provider, model:state.model };
+            save(false);
             state.実行モード = 'online'; newConversation();
           } else { reconnect(); notify(); }
         } else if (type === 'disconnect' || type === 'connect') {
+          if (state.実行中 || offlineJob || connection.modelChanging) { reply(409, {error:'実行中またはモデル変更中は接続を変更できません。'}); return; }
           if (state.実行モード === 'offline') { reply(409, {error:'オフラインではAIコアへ接続しません。'}); return; }
           state.自動接続 = type === 'connect';
           接続開始済み = true; reconnect();
@@ -213,7 +222,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         else if (type === 'executionMode') {
           if (!['online','offline'].includes(data.mode)) { reply(400, {error:'実行モードが不正です。'}); return; }
           if (state.実行モード !== data.mode) {
-            save(false); modeModels[state.実行モード] = { provider:state.provider, model:state.model };
+            save(false);
             state.自動接続 = data.mode === 'online'; state.実行モード = data.mode; newConversation();
           }
         }
@@ -225,7 +234,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         } else if (type === 'selectHistory') {
           const entry = history.find(item => item.id === data.id);
           if (!entry) { reply(404, {error:'会話がありません。'}); return; }
-          modeModels[state.実行モード] = { provider:state.provider, model:state.model };
+          // 履歴のモデルはその会話だけへ復元し、モード別の最終手動選択は維持する。
           state.実行モード = entry.実行モード;
           if (state.実行モード === 'offline') state.自動接続 = false;
           state.会話ID = entry.id; state.メッセージ = [...entry.メッセージ]; state.セッションID = entry.セッションID;
@@ -300,7 +309,7 @@ if (require.main === module) {
   const project = process.argv[2] || process.cwd();
   void 単独起動(project, undefined, process.argv[4] ? JSON.parse(process.argv[4]) : {}).then(app => {
     if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({url:app.url, publicUrl:app.publicUrl, pid:process.pid}), 'utf8');
-    else console.log(`AiDiy (Code): ${app.url}`);
+    else console.log(`AiDiy Code: ${app.url}`);
     process.on('SIGINT', () => { void app.close(); });
     process.on('SIGTERM', () => { void app.close(); });
   }).catch(error => { console.error(String(error)); process.exitCode = 1; });

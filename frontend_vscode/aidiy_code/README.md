@@ -1,6 +1,6 @@
-# AiDiy (Code)
+# AiDiy Code
 
-`aidiy_code` はコード支援用のスタンドアロンです。表示名は **AiDiy (Code)** です。オンラインでは `AIコード.vue` と同じAIコアへ接続し、オフラインでは `aidiy_hermes` CLI を直接実行します。VS Code 拡張と会話画面を共用します。
+`aidiy_code` はコード支援用のスタンドアロンです。表示名は **AiDiy Code** です。オンラインでは `AIコード.vue` と同じAIコアへ接続し、オフラインでは `aidiy_hermes` CLI を直接実行します。VS Code 拡張と会話画面を共用します。
 
 セットアップ後は、作業対象のフォルダで `aidiy_code` を実行します。プロジェクトルートから直接起動する場合は `frontend_vscode/aidiy_code.cmd` を使えます。ブラウザモードは `aidiy_code --browser`、フォルダを明示する場合は `aidiy_code "C:\work\project"` です。
 

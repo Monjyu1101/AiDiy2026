@@ -3,6 +3,28 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { screen } = require('./code-screen.cjs');
+const { runInNewContext } = require('node:vm');
+
+test('Code 単独: SSE切断をAIコア切断や処理終了として扱わない', () => {
+  let source;
+  const packets = [], window = {dispatchEvent:event=>packets.push(event.data)};
+  runInNewContext(readFileSync(join(__dirname,'../aidiy_code/bridge.js'),'utf8'),{
+    window,
+    EventSource:function(){source=this;},
+    MessageEvent:function(_name,options){this.data=options.data;},
+  });
+  window.acquireVsCodeApi().postMessage({type:'ready'});
+  const state={type:'state',接続済み:true,実行中:true,provider:'codex_cli',model:'auto'};
+  source.onmessage({data:JSON.stringify(state)});
+  source.onerror();
+  assert.equal(packets.at(-1).接続済み,true);
+  assert.equal(packets.at(-1).実行中,true);
+  assert.equal(packets.at(-1).provider,'codex_cli');
+  assert.equal(packets.at(-1).画面接続済み,false);
+  source.onmessage({data:JSON.stringify({...state,実行中:false})});
+  assert.equal(packets.at(-1).画面接続済み,undefined);
+  assert.equal(packets.at(-1).実行中,false);
+});
 
 test('Code: プロジェクトバーの自動接続は初期ON、OFFで赤いバーに切り替わる', () => {
   const ui = screen(); ui.state({});
@@ -34,6 +56,46 @@ test('Code: プロジェクトバーの自動接続は初期ON、OFFで赤いバ
   const toolbar = html.slice(html.indexOf('id="conversation-toolbar"'), html.indexOf('</header>'));
   assert.ok(toolbar.indexOf('id="auto-connect"') < toolbar.indexOf('id="new-chat"'));
   assert.ok(toolbar.indexOf('id="new-chat"') < toolbar.indexOf('id="history-toggle"'));
+});
+
+test('Code: 送信直後・停止待ち・接続変更待ちの連打を抑止する', () => {
+  const ui = screen(); ui.state({オフライン対応:true});
+  ui.input('送信');
+  ui.element('composer').listeners.get('submit')({preventDefault(){}});
+  assert.equal(ui.element('auto-connect').disabled,true);
+  const submitted = ui.posts.length;
+  ui.element('auto-connect').listeners.get('click')();
+  assert.equal(ui.posts.length,submitted);
+  ui.state({実行中:true});
+  ui.element('stop').listeners.get('click')();
+  const stopped = ui.posts.length;
+  assert.equal(ui.posts.at(-1).メッセージ識別,'cancel_run');
+  assert.equal(ui.element('stop').disabled,true);
+  ui.element('stop').listeners.get('click')();
+  assert.equal(ui.posts.length,stopped);
+  ui.notify({メッセージ識別:'output_stream',メッセージ内容:'\x18'});
+  ui.state({実行中:true,停止中:true});
+  assert.equal(ui.element('auto-connect').disabled,true);
+  assert.equal(ui.element('stop').disabled,true);
+  ui.state({実行中:false,停止中:false});
+  ui.element('auto-connect').listeners.get('click')();
+  const toggled = ui.posts.length;
+  ui.element('auto-connect').listeners.get('click')();
+  assert.equal(ui.posts.length,toggled);
+  ui.state({自動接続:false,接続済み:false});
+  assert.equal(ui.element('auto-connect').disabled,false);
+});
+
+test('Code: 画面中継の切断ではモデルと実行状態を維持し、操作を止める', () => {
+  const ui = screen(); ui.state({オフライン対応:true,provider:'copilot_cli',model:'gpt-6-sol',実行中:true});
+  ui.state({画面接続済み:false});
+  assert.equal(ui.element('model-label').textContent,'copilot_cli - gpt-6-sol');
+  assert.equal(ui.element('stop').hidden,false);
+  assert.equal(ui.element('stop').disabled,true);
+  assert.equal(ui.element('auto-connect').disabled,true);
+  ui.state({画面接続済み:true,実行中:false});
+  assert.equal(ui.element('auto-connect').disabled,false);
+  assert.equal(ui.element('stop').hidden,true);
 });
 
 test('Code: 履歴を上へスクロール中でも、入力メッセージ追加と送信受理後は末尾へ移動する', () => {

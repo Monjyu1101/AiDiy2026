@@ -97,6 +97,28 @@ test('Code モデル: Hermes旧設定とCLI別名を移行し、組み合わせI
   assert.deepEqual(コード選択({provider:'aidiy_hermes',model:'openai_oauth/gpt-6.1-sol'}),{provider:'aidiy_hermes',model:'openai_oauth/gpt-6.1-sol'});
 });
 
+test('Code 接続: 回答・CAN・中断通知後も要求全体の完了まで実行中を伝える', async () => {
+  const backend=core(), {client,packets}=connection(backend);
+  backend.hold=true;backend.holdCancel=true;
+  try {
+    client.start('/project',{provider:'codex_cli',model:'auto'});await flush();
+    client.send({メッセージ識別:'input_text',メッセージ内容:'検証付きの依頼'});await flush();
+    assert.equal(backend.sockets[0].sent.at(-1).実行状態通知,true);
+    const output=backend.sockets[1];
+    output.emit({メッセージ識別:'output_text',メッセージ内容:'通常回答'});
+    assert.equal(packets.at(-1).実行中,true);
+    client.send({メッセージ識別:'cancel_run'});await flush();
+    assert.equal(packets.at(-1).実行中,true);
+    assert.ok(packets.some(p=>p.メッセージ内容==='\x18' && p.実行中===true));
+    output.emit({メッセージ識別:'output_end',メッセージ内容:'',実行中:false});
+    assert.equal(packets.at(-1).実行中,false);
+    client.disconnect();
+    client.start('/project',{provider:'codex_cli',model:'auto'});await flush();
+    backend.sockets.at(-1).emit({メッセージ識別:'output_text',メッセージ内容:'旧コアの回答'});
+    assert.equal(packets.at(-1).実行中,undefined,'新しい接続へ前の実行状態を持ち込まない');
+  } finally {client.dispose();}
+});
+
 test('Code 接続: 共通のモデル既定値を使う再接続で会話をリセットしない', async t => {
   t.mock.timers.enable({apis:['setTimeout','setInterval']});
   const backend=core(), {client}=connection(backend);

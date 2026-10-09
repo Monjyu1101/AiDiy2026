@@ -134,7 +134,7 @@ test('Code: AIコアのモデル候補・選択値・送信と停止を中継す
     await stream.wait(p=>p.type==='state' && p.実行中 && p.メッセージ.at(-1)?.本文==='待機');
     assert.equal((await post(app,{type:'model',provider:'aidiy_hermes',model:'auto'})).status,409);
     await post(app,{メッセージ識別:'cancel_run'});
-    await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.at(-1)?.本文==='処理中断！');
+    await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.本文==='処理中断！'));
   } finally { await stream.close(); await app.close(); }
 });
 
@@ -167,6 +167,49 @@ test('Code: 最終選択を復元し、旧Hermes Providerを組み合わせモ�
       const state = await stream.wait(p=>p.type==='state' && p.接続済み);
       assert.equal(state.provider,provider); assert.equal(state.model,model);
       assert.equal(JSON.parse(readFileSync(file,'utf8')).provider,'openai_oauth');
+    } finally { await stream.close(); await app.close(); }
+  }
+});
+
+test('Code: 古い履歴からのモード切替で最終手動モデルを上書きしない', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  for (const mode of ['online', 'offline']) {
+    const file = join(preferences, `history-last-${mode}.json`);
+    const online = {provider:'codex_cli',model:'auto'};
+    const offline = {provider:'aidiy_hermes',model:'auto'};
+    const latest = mode === 'online' ? {provider:'copilot_cli',model:'gpt-6-sol'}
+      : {provider:'aidiy_hermes',model:'copilot_cli/auto'};
+    writeFileSync(file, JSON.stringify(online));
+    writeFileSync(オフラインモデル保存先(file), JSON.stringify(offline));
+    const run = () => ({完了:Promise.resolve({終了コード:0}),停止(){}});
+    const app = await start(process.cwd(),'http://127.0.0.1:18091',{offline:mode==='offline'},file,run);
+    const stream = await connect(app);
+    const waitState = async (data, predicate) => {
+      const offset = stream.packets.length;
+      assert.equal((await post(app,data)).status,200);
+      return stream.wait(p=>stream.packets.indexOf(p)>=offset && p.type==='state' && predicate(p));
+    };
+    try {
+      const original = await stream.wait(p=>p.type==='state' && p.実行モード===mode && (mode==='offline' || p.接続済み));
+      await waitState({メッセージ識別:'input_text',メッセージ内容:'古いモデルの会話'},p=>!p.実行中 && p.メッセージ.length>0);
+      await waitState({type:'new'},p=>p.会話ID!==original.会話ID && (mode==='offline' || p.接続済み));
+      assert.equal((await post(app,{type:'model',...latest})).status,200);
+      await waitState({メッセージ識別:'input_text',メッセージ内容:'新しいモデルの会話'},p=>!p.実行中 && p.メッセージ.length>0);
+      await waitState({type:'selectHistory',id:original.会話ID},p=>p.会話ID===original.会話ID && (mode==='offline' || p.接続済み));
+      await waitState({type:'selectHistory',id:original.会話ID},p=>p.会話ID===original.会話ID && (mode==='offline' || p.接続済み));
+      const fresh = await waitState({type:'new'},p=>p.会話ID!==original.会話ID && (mode==='offline' || p.接続済み));
+      assert.deepEqual({provider:fresh.provider,model:fresh.model},latest);
+      await waitState({type:'selectHistory',id:original.会話ID},p=>p.会話ID===original.会話ID && (mode==='offline' || p.接続済み));
+      await waitState({type:'executionMode',mode:mode==='online'?'offline':'online'},p=>p.実行モード!==mode && (mode==='online' || p.接続済み));
+      const restored = await waitState({type:'executionMode',mode},p=>p.実行モード===mode && (mode==='offline' || p.接続済み));
+      assert.deepEqual({provider:restored.provider,model:restored.model},latest);
+      if (mode === 'offline') {
+        await waitState({type:'selectHistory',id:original.会話ID},p=>p.会話ID===original.会話ID);
+        await waitState({type:'autoConnect',enabled:true},p=>p.接続済み);
+        const switched = await waitState({type:'executionMode',mode:'offline'},p=>p.実行モード==='offline');
+        assert.deepEqual({provider:switched.provider,model:switched.model},latest);
+      }
+      assert.deepEqual(JSON.parse(readFileSync(mode==='online'?file:オフラインモデル保存先(file),'utf8')),latest);
     } finally { await stream.close(); await app.close(); }
   }
 });
@@ -337,4 +380,59 @@ test('Code offline: CLI起動失敗を表示し、再入力可能にする', asy
     await post(app,{メッセージ識別:'input_text',メッセージ内容:'依頼'});
     await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.some(m=>m.種別==='error' && m.本文.includes('Hermes未配置')));
   } finally { await stream.close(); await app.close(); }
+});
+
+test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変更を拒否する', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  backend.hold=true; backend.holdCancel=true;
+  for (const mode of ['online','offline']) {
+    const file = join(preferences,`stop-switch-${mode}.json`);
+    const online={provider:'codex_cli',model:'auto'}, offline={provider:'aidiy_hermes',model:'copilot_cli/auto'};
+    writeFileSync(file,JSON.stringify(online));
+    writeFileSync(オフラインモデル保存先(file),JSON.stringify(offline));
+    let stops=0, finish;
+    const run=(_root,_folder,_model,_text,_session,receive)=>({
+      完了:new Promise(resolve=>{finish=()=>resolve({終了コード:0,停止理由:'停止しました'});}),
+      停止(){stops++;receive({メッセージ識別:'output_stream',メッセージ内容:'\x18'});receive({メッセージ識別:'output_text',メッセージ内容:'途中の中断通知'});}
+    });
+    const app=await start(process.cwd(),'http://127.0.0.1:18091',{offline:mode==='offline'},file,run), stream=await connect(app);
+    try {
+      const initial=await stream.wait(p=>p.type==='state' && p.実行モード===mode && (mode==='offline'||p.接続済み));
+      assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'停止と切替の確認'})).status,200);
+      await stream.wait(p=>p.type==='state' && p.実行中);
+      const output=backend.sockets.findLast(s=>s.channel==='1' && s.readyState===1);
+      if (mode==='online') {
+        output.emit({メッセージ識別:'output_text',メッセージ内容:'回答後も検証中'});
+        await stream.wait(p=>p.type==='state' && p.実行中 && p.メッセージ.some(m=>m.本文==='回答後も検証中'));
+      }
+      const cancelCount=()=>backend.sockets.flatMap(s=>s.sent).filter(p=>p.メッセージ識別==='cancel_run').length;
+      const before=cancelCount();
+      await post(app,{メッセージ識別:'cancel_run'});
+      await stream.wait(p=>p.type==='state' && p.実行中 && p.停止中);
+      await post(app,{メッセージ識別:'cancel_run'});
+      assert.equal(mode==='offline'?stops:cancelCount()-before,1);
+      for (const data of [{type:'autoConnect',enabled:false},{type:'autoConnect',enabled:true},
+        {type:'disconnect'},{type:'connect'},{type:'new'},{type:'model',provider:'aidiy_hermes',model:'auto'}]) {
+        assert.equal((await post(app,data)).status,409,JSON.stringify(data));
+      }
+      if (mode==='offline') finish();
+      else output.emit({メッセージ識別:'output_end',メッセージ内容:'',実行中:false});
+      await stream.wait(p=>p.type==='state' && !p.実行中 && !p.停止中 && p.メッセージ.length>0);
+      if (mode==='online') await post(app,{type:'autoConnect',enabled:false});
+      const offset=stream.packets.length;
+      await post(app,{type:'model',provider:'aidiy_hermes',model:'codex_cli/auto'});
+      await stream.wait(p=>stream.packets.indexOf(p)>=offset && p.type==='state' && p.model==='codex_cli/auto');
+      const onOffset=stream.packets.length;
+      await post(app,{type:'autoConnect',enabled:true});
+      const restored=await stream.wait(p=>stream.packets.indexOf(p)>=onOffset && p.type==='state' && p.接続済み && p.実行モード==='online');
+      assert.deepEqual({provider:restored.provider,model:restored.model},online);
+      if (mode==='online') {assert.equal(restored.会話ID,initial.会話ID);assert.equal(restored.セッションID,initial.セッションID);}
+      else assert.notEqual(restored.会話ID,initial.会話ID);
+      const sockets=backend.sockets.length;
+      await post(app,{type:'autoConnect',enabled:true});
+      assert.equal(backend.sockets.length,sockets,'同じON通知で接続を作り直さない');
+      assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),online);
+      assert.equal(JSON.parse(readFileSync(オフラインモデル保存先(file),'utf8')).model,'codex_cli/auto');
+    } finally { if(finish) finish(); await stream.close(); await app.close(); }
+  }
 });

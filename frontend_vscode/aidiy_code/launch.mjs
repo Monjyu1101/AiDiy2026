@@ -121,7 +121,7 @@ async function main(browserMode) {
   }
   // Codespaces ではポート転送先の URL を開く。$BROWSER があれば手元の PC のブラウザで開く。
   if (browserMode) await ブラウザ版表示(publicUrl || url, { profile: join(runRoot, 'browser-profile') });
-  console.log(`AiDiy (Code) - Project folder: ${projectRoot}`);
+  console.log(`AiDiy Code - Project folder: ${projectRoot}`);
 }
 
 main(requestedBrowser).catch(error => {

@@ -45,7 +45,7 @@ class ExtensionRemovalTest(unittest.TestCase):
             [cli, '--uninstall-extension', 'aidiy.aidiy-live'],
         ])
         self.assertEqual([call.args for call in listing.call_args_list], [(cli,), (cli,)])
-        self.assertTrue(any('接続元の旧 AiDiy (Live)' in call.args[0] for call in info.call_args_list))
+        self.assertTrue(any('接続元の旧 AiDiy Live' in call.args[0] for call in info.call_args_list))
 
     def test_live_remaining_on_linux_is_reported_as_a_failure(self):
         with patch.object(cleanup.sys, 'platform', 'linux'), patch.object(
