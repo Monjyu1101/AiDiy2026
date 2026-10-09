@@ -37,7 +37,6 @@ button:disabled { opacity: .4; cursor: default; }
 button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 header { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; min-height: 31px; padding: 1px 2px; gap: 8px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); border-bottom: 1px solid var(--border); -webkit-app-region: drag; user-select: none; }
 .brand { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 14px; letter-spacing: -.5px; }
-.brand-dot { display: none; }
 .tag { color: var(--voice); font-size: 9px; letter-spacing: .4px; border: 1px solid var(--border); padding: 0 3px; border-radius: 0; }
 #window-controls { grid-column: 3; justify-self: end; display: flex; gap: 2px; -webkit-app-region: no-drag; }
 #window-controls button { border: 0; background: none; width: 28px; height: 28px; padding: 0; color: var(--muted); font-size: 18px; }
@@ -137,11 +136,29 @@ main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; 
 .message.ai { --message-color: #00ff00; max-width: 90%; color: var(--message-color); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--message-color) 3%, var(--surface)); border-color: color-mix(in srgb, var(--message-color) 16%, var(--border)); }
 .message.ai.output_request { --message-color: var(--stream); }
 .message.ai.recognition_output { --message-color: #9ae6b4; }
-.message.ai .terminal-cursor { display: inline-block; width: 1ch; height: 1em; margin-left: .1ch; vertical-align: text-bottom; background: currentColor; animation: live-cursor-blink .7s step-end infinite; }
 .message.recognition { cursor: pointer; }
 .message.recognition_input { color: #e5e7eb; }
 .message.user:hover, .message.recognition:hover { border-color: var(--focus); }
 .message.system { max-width: 100%; color: var(--muted); font-size: 11px; border: 0; padding: 2px; }
+/* 登場演出（src/arrival-effect.ts、AiDiy Code の media/chat.css と同じ動き）。発言は透明のまま置いて場所を確保し、
+   入力枠・受信通知がその位置へ飛んだ後に白く浮かび上がる。Live は行そのものが発言の枠になる。 */
+.message.arrival-waiting { display: none; }
+.message.arrival-pending { opacity: 0; }
+.message.arrival-reveal { animation: user-arrival-haze .9s ease-out both; }
+@keyframes user-arrival-haze {
+  0% { opacity: 0; filter: blur(8px) brightness(2.4); transform: scale(.97); background: #ffffff38; box-shadow: 0 0 0 #ffffff00; }
+  35% { opacity: 1; filter: blur(3px) brightness(1.8); background: #ffffff24; box-shadow: 0 0 22px #ffffffb0; }
+  100% { opacity: 1; filter: none; transform: none; box-shadow: 0 0 0 #ffffff00; }
+}
+/* AI回答の受信通知: 中央に降りてきて、ターミナル演出の後に会話欄の位置へ飛ぶ。
+   黒地に白枠で固定し、流し込む文字だけを回答の種類の色にする。高さは画面の30%で、本文は縦スクロールで最下部を表示する。 */
+.answer-popup { --popup-color: var(--terminal); position: fixed; inset: 0; z-index: 20; display: flex; width: min(560px, calc(100vw - 32px)); height: 30vh; min-height: 96px; margin: auto; overflow: hidden; pointer-events: none; color: #fff; background: #000; border: 1px solid #fff; box-shadow: 0 18px 60px #000c; animation: answer-popup-in .42s cubic-bezier(.2, .9, .3, 1.15) both; }
+.answer-popup.output_request { --popup-color: var(--stream); }
+.answer-popup.recognition_output { --popup-color: #9ae6b4; }
+/* 本文は frontend_web の AIコード.vue で実際に表示される文字（Courier New / 11px / 行間1.5）に揃える。カーソルは JS の指定（幅8pxのブロック）だけで描く。 */
+.answer-popup-text { flex: 1; min-width: 0; min-height: 0; padding: 6px; overflow: hidden auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--popup-color); font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5; }
+@keyframes answer-popup-in { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+.input-flight { position: fixed; z-index: 20; margin: 0; padding: 4px; overflow: hidden; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; color: var(--foreground); background: var(--input-surface); border: 1px solid #fff; box-shadow: 0 0 16px #ffffff70, inset 0 0 10px #ffffff20; }
 #chat-footer { flex: 0 0 auto; padding: 0 2px 2px; }
 #text-form { border: 0; background: transparent; }
 textarea, input, select { border: 1px solid var(--border); background: var(--input-surface); border-radius: 0; padding: 4px; min-width: 0; }
@@ -171,6 +188,8 @@ header > #activity { grid-column: 1; justify-self: start; min-width: 0; margin-l
 #send:hover:enabled { background: #5a6fd8; border-color: #5a6fd8; }
 #send.ws-disabled { background: #808080; border-color: #808080; color: #fff; }
 #send.ws-disabled img { filter: brightness(0) invert(1); }
+/* AIコアの接続エラーは入力欄の上に表示する。 */
+#error { margin-bottom: 2px; }
 #error, #model-error { color: var(--vscode-errorForeground, #ff8e9e); background: #cc415708; border: 1px solid #cc415740; padding: 4px; border-radius: 0; font-size: 11px; overflow-wrap: anywhere; }
 dialog { width: min(420px, calc(100vw - 4px)); padding: 0; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); border-radius: 0; box-shadow: 0 16px 60px rgba(0, 0, 0, .4); }
 dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }
@@ -187,4 +206,3 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }
 .vscode-host > header { display: none; }
 .vscode-host { min-width: 200px; }
 @media (max-width: 440px) { .keyboard-hint { font-size: 8px; } }
-@media (prefers-reduced-motion: reduce) { button { transition: none; } .welcome-mark { animation: none; } .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite; } .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite; } }

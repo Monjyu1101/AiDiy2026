@@ -95,7 +95,11 @@ Hermes と Python は VS Code と同じ起動探索で自動解決します。Op
 aidiy_discord
 ```
 
-画面中央上部に小さなパネルが開きます。Live の AI・モデル・音声と、コード AI（Hermes の Provider）・モデルを選び、右上の「接続」で Discord に接続します。左上には作業フォルダを「プロジェクト: フォルダ名」で表示します。作業フォルダは aidiy_code / aidiy_live と同じく、`aidiy_discord [作業フォルダ]`（または `--project`）で指定し、省略時は起動したフォルダです。Live のモデル・音声は `_config/AiDiy_live_gemini.json`（Gemini / FreeAI）と `_config/AiDiy_live_openai.json` の候補から選択します。コードモデルは直接入力もできます。コードの候補取得は `aidiy_code` と同じカタログを使います。「切断」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中のモデル変更は切断してから行います。パネルを重ねて起動すると既存の画面を表示します。
+画面中央上部に小さなパネルが開きます。Live の AI・モデル・音声と、コード AI（Hermes の Provider）・モデルを選び、右上の「接続」で Discord に接続します。左上には作業フォルダを「プロジェクト: フォルダ名」で表示します。作業フォルダは aidiy_code / aidiy_live と同じく、`aidiy_discord [作業フォルダ]`（または `--project`）で指定し、省略時は起動したフォルダです。Live のモデル・音声は `_config/AiDiy_live_gemini.json`（Gemini / FreeAI）と `_config/AiDiy_live_openai.json` の候補から選択します。コードモデルは直接入力もできます。コードの候補取得は `aidiy_code` と同じカタログを使います。「切断」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中のモデル変更は切断してから行います。パネルを重ねて起動すると既存の画面を表示します。終了処理中のパネルに重ねて起動した場合は、終了を待ってから開き直します。
+
+「音声会話」「コード」の見出し右にある OFF / ON スイッチで、接続する機能を選びます。音声会話（Live）は切り替えでき、OFF で接続するとボイスチャンネルに入室しても音声会話を開始せず、Live のモデル確認も行いません。コードは現在 ON 固定で、スイッチは操作できません。両方 OFF では接続しません。切り替えは切断中だけ行えます。
+
+接続中のパネルは設定欄の代わりに、AiDiy の絵と、最後のやり取り（発言者と本文）を1件だけ表示し、約1分で消します。プロジェクト行の下の右寄せに「LIVE ON/OFF」「CODE ON/OFF」を表示し、Live が ON の間は背景に入力（赤）と AI の声（水色）の円型インジケーターを描きます。左下の「モニター」を ON にすると、通過する音声（許可ユーザーの入力と AI の声）をこの PC で聞けます。スピーカーの音を Discord のマイクが拾うとエコーになるため、モニターは接続ごとに OFF から始まります。Live が OFF の間はインジケーターとモニターを表示しません。
 
 単独の `aidiy_discord` は未接続で開きます。ルート `_start.py` で Discord を Yes にした場合（または明示的な `aidiy_discord --connect`）は、前回のモデルで自動接続します。全体起動からのパネルも手動で停止・終了でき、閉じたパネルを監視ループで再表示しません。全体の Ctrl+C・cleanup では Discord のプロセスも停止します。
 
@@ -103,7 +107,7 @@ aidiy_discord
 
 JSON の候補から削除されたモデル・音声は自動使用せず、選び直すまで接続を止めます。Discord はパネル表示・保存・開始時に JSON を読み込みます。候補を編集したらパネルを開き直してください。
 
-最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json` に保存します。単独起動でも全体起動からの自動接続でも、両方を復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
+最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json`、Live の ON/OFF は `~/.aidiy/aidiy_discord_features.json`（未保存時は ON）に保存します。単独起動でも全体起動からの自動接続でも、これらを復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
 `cd frontend_discord` 後の `npm start`、`python frontend_discord/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_discord/out/aidiy_discord/` に保存します。
 
@@ -115,7 +119,7 @@ JSON の候補から削除されたモデル・音声は自動使用せず、選
 
 ルート `python _cleanup.py` の Discord 項目は既定 Yes です。削除前にこの作業コピーの Bot を子孫プロセスごと停止し、終了できない場合は削除を中止します。Discord の削除を選ばない場合でも、全体 cleanup の開始時には他サービスと同じく Bot を停止します。
 
-削除対象は `frontend_discord` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、共通 `_config/AiDiy_key.json`、前回のモデル選択は残ります。単独 cleanup は `python frontend_discord/_cleanup.py` です。
+削除対象は `frontend_discord` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、共通 `_config/AiDiy_key.json`、前回のモデル・機能の選択は残ります。単独 cleanup は `python frontend_discord/_cleanup.py` です。
 
 ## 会話のしかた
 
@@ -125,6 +129,8 @@ JSON の候補から削除されたモデル・音声は自動使用せず、選
 | 続けて普通に投稿 | 前の会話を引き継いで、送信順に返信 |
 | 専用ボイスチャンネルに参加 | AiDiy も参加し、音声会話を開始 |
 | ボイスチャンネルから退出 | 指定ユーザーが退出すると、AiDiy も音声会話を終了 |
+
+パネルで音声会話を OFF にして接続した場合、ボイスチャンネルの入退室には反応せず、互換用の `!aidiy live` / `!aidiy leave` も「Live は OFF のため利用できません。」と返します。
 
 Code の会話は「サーバー・テキストチャンネル・ユーザー」ごとに分かれ、プロセス内で最新200会話まで保持します。Bot 再起動後は新規会話です。Hermes 自身の保存セッションは削除しません。続けて届いたメッセージは同じ会話内で順番に処理し、実行中を含む待機数は10件まで、全体の並行実行は4件までです。長文回答は添付テキストにし、回答内の `@everyone` などは通知を発生させません。
 

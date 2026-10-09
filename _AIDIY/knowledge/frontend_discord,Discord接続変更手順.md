@@ -18,7 +18,7 @@
    接続先はローカルの `PORT_CORE`、初回の AI とモデル・音声は共通の `LIVE_AI_NAME` / `LIVE_*_MODEL` / `LIVE_*_VOICE` を使う。手動選択は `~/.aidiy/aidiy_discord_model.json` に保存し、次回以降は優先する。検証・原子的保存は `frontend_vscode/src/model-preferences.ts` を `src/vscode.ts` 経由で共用する。共通キー JSON に Discord 専用のモデル項目を追加しない。
 5. 専用チャンネルの通常投稿をチャットとして受け付ける。`commands.ts` と `bot.ts` の許可判定より前に外部操作・返信を行わない。既存コマンドは互換用として残すが、通常の利用手順に要求しない。
 6. 未接続時は設定画面、接続中（再接続中を含む）は aidiy_live の初期画面と同じ AiDiy 絵と回転する四角形のステージに切り替え、その下に最後の発言（発言者と本文）をターミナル演出で1回だけ表示し、約1分で消す。背景には aidiy_live と同じ円型インジケーター（`panel/visualizer.js` は `aidiy_live/src/visualizer.ts` の移植。変更時は両方を揃える）を描く。入力はAIコアへ送るミキサー出力、再生音は `Discord音声出力` が実際に送出する20ms分から、worker で音量と128帯域の分布（`音声スペクトル` / `音声レベル`）だけを50ms間隔で求めてパネルへ送る。PCM自体は、接続中に「モニター」を ON にした間だけ（接続ごとに OFF から開始）無音を除いて base64 でパネルへ渡し、Web Audio で再生する（`Live接続.モニター送信` / `DiscordBot.モニター設定`）。スピーカー音を Discord のマイクが拾うとエコーになるため既定は OFF とする。Live の文字起こしはパネルへ逐次表示し、Discord へは発言ごとに投稿せず、AI の応答が1.5秒途切れた時点で「人間側の最後の発言＋AI の応答」を1件にまとめて投稿する（`Live接続.文字起こし送信`）。
-7. 設定パネルの「音声会話」「コード」見出し右に OFF (〇　) ON のトグルを置き、結果で Discord への接続制御を行う。Live は切替可（`~/.aidiy/aidiy_discord_features.json` に保存）、Code は現在 ON 固定で操作不可。保存・読込・固定は `src/panel.ts` の `機能設定読込` / `機能設定保存` / `コード固定ON`、Bot への反映は `Discord設定.liveEnabled` / `codeEnabled`。Live OFF では音声の自動接続・`live` / `leave` を行わず、Live のモデル確認も省く。Code OFF では通常投稿・`stop` / `new` を処理せず、Hermes 確認も省く。両方 OFF では接続しない。接続中パネルの左上に「Live ON/OFF  Code ON/OFF」を表示し、Live OFF の間は円型インジケーターとモニター切替を出さない。
+7. 設定パネルの「音声会話」「コード」見出し右に OFF (〇　) ON のトグルを置き、結果で Discord への接続制御を行う。Live は切替可（`~/.aidiy/aidiy_discord_features.json` に保存）、Code は現在 ON 固定で操作不可。保存・読込・固定は `src/panel.ts` の `機能設定読込` / `機能設定保存` / `コード固定ON`、Bot への反映は `Discord設定.liveEnabled` / `codeEnabled`。Live OFF では音声の自動接続・`live` / `leave` を行わず、Live のモデル確認も省く。Code OFF では通常投稿・`stop` / `new` を処理せず、Hermes 確認も省く。両方 OFF では接続しない。接続中パネルのプロジェクト行の下（右寄せ、`#features` の状態チップ）に「LIVE ON/OFF」「CODE ON/OFF」を表示し、Live OFF の間は円型インジケーターとモニター切替を出さない。
 8. 音声の自動接続は Bot 起動・Gateway 復旧・許可ユーザーの入退室で参加状態を照合する。接続準備中の退出を直ちに反映し、接続処理と通知先の取得が遅れても退出済みの利用者に対して開始しない。ミュート切替や Bot 自身の参加で重複接続しない。
 
 ## 確認
@@ -26,12 +26,13 @@
 `frontend_discord` で `npm run check` と `npm test` を実行する。ビルドは不要。
 
 - `checks/code.test.ts`: stdin、ユーザー別・チャンネル別の resume、停止・終了。
-- `checks/bot.test.ts`: 通常投稿→CLI→返信、連続投稿の順序、許可拒否、長文添付、起動・入室時の自動接続と準備中の退出、手動操作との競合。
+- `checks/bot.test.ts`: 通常投稿→CLI→返信、連続投稿の順序、許可拒否、長文添付、起動・入室時の自動接続と準備中の退出、手動操作との競合、Live OFF / Code OFF 時の接続制御。
 - `checks/live.test.ts`: localhost の模擬 AIコアを使った3ソケットの接続順、音声入力、再生予約破棄、接続拒否・切断回収。
 - `checks/audio.test.ts`: 実 Opus コーデック、レート変換、無音、話者混合と上限。
 - `checks/config.test.ts` / `commands.test.ts`: 設定検証、利用許可、本文分割。
 - `checks/launch.test.ts`: 一時作業コピーで、空欄・1文字・`<` で始まるトークンが単独起動・自動接続とも Electron 起動前に拒否されることを確認する。実際のキーは変更しない。
-- `checks/panel.test.ts`: 初回の共通モデル、選択の永続化・復元、重複開始、接続途中の停止、終了、失敗とタイムアウトの回収。
+- `checks/panel.test.ts`: 初回の共通モデル、選択の永続化・復元、Live ON/OFF の保存と Code の ON 固定、重複開始、接続途中の停止、終了、失敗とタイムアウトの回収。
+- `checks/web-server.test.ts` / `desktop.test.ts` / `launch-restart.test.ts`: ブラウザ版の中継と終了、閉じる操作・終了中の再起動（詳細は後述の各節）。
 
 本物の Bot の疎通には `AiDiy_key.json` に接続情報が必要。`npm run config:check` は外部に接続しない。実接続では専用チャンネルへの通常投稿、ボイス参加→自動接続→発話→退出による自動終了を確認する。mock の成功だけで Discord Gateway / DAVE / AI Provider まで検証済みとは扱わない。
 

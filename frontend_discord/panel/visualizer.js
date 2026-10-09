@@ -11,7 +11,6 @@ class AudioCloud {
       output: { level: 0, energy: 0, target: new Float32Array(48), bands: new Float32Array(48), color: '105, 220, 255' },
     };
     this.width = 0; this.height = 0; this.frame = 0; this.last = 0; this.time = 0; this.disposed = false;
-    this.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.visibility = this.visibility.bind(this); this.draw = this.draw.bind(this);
@@ -43,7 +42,8 @@ class AudioCloud {
     if (this.disposed || !this.context) return;
     const delta = this.last ? Math.min(.05, (stamp - this.last) / 1000) : 1 / 60;
     this.last = stamp;
-    if (!this.reducedMotion.matches) this.time += delta;
+    // OS の「動きを減らす」設定には従わず、Windows / macOS / Linux で同じ動きにする。
+    this.time += delta;
     const point = this.center?.(this.width, this.height) || {};
     const ctx = this.context, radius = point.radius ?? Math.min(this.width * .29, this.height * .22, 150);
     const x = point.x ?? this.width / 2, y = point.y ?? this.height * .53;

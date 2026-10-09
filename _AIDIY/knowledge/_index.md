@@ -116,6 +116,8 @@
 | 画面コンポーネントを直す（**frontend_avatar に同名コピーがあるので両方直す**） | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md)（「frontend_avatar との二重管理」）、[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
 | frontend_avatar、Electron、VRM / VRMA、音声 | [`frontend_avatar,変更チェック.md`](./frontend_avatar,変更チェック.md)、[`frontend_avatar,ElectronIPC追加手順.md`](./frontend_avatar,ElectronIPC追加手順.md)、[`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、[`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、[`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
 | VS Code の AiDiy Code / AiDiy Live 拡張を変更・検証・配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| Code の `out/*.cjs` など生成物6件だけが差分に出る、上書きせず再検証する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
+| Code の `out/aidiy_code/<起動ID>.json` だけが変更通知に出る | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
 | Discord の Code / Live 接続、Bot 設定、音声中継を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
 | Discord 音声のチャンク境界で無音が混ざる、発話末尾が欠ける、Opus 回帰テストを見直す | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md)（「出力チャンク境界と末尾処理の再修正チェック」） |
 | command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
@@ -206,6 +208,8 @@
 | 目的 | 参照ファイル |
 |------|--------------|
 | VS Code 拡張（Code / Live）と単独起動版を変更・検証・VSIX 配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| Code の生成物と生成元を `write: false` で照合し、現行生成物を対象テストで確認する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
+| Code の起動完了JSONの形式・生成箇所・読込を検証する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
 | 拡張機能をセットアップして VS Code へ配置する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | 配置済み拡張機能と生成物を解除する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 

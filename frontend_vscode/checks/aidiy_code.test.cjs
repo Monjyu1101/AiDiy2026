@@ -81,6 +81,24 @@ test('Code: 自動接続OFFは再試行・新規・履歴復帰からの接続�
     assert.equal(restarted.自動接続,true);
   } finally { await stream.close(); await app.close(); }
 });
+test('Code: 最後に選んだ検証回数を保存し、再起動後も状態通知で返す（未保存は0回）', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  const file = join(preferences, 'self-check-loop_model.json');
+  let app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file), stream = await connect(app);
+  try {
+    const ready = await stream.wait(p=>p.type==='state' && p.接続済み);
+    assert.equal(ready.検証回数,0);
+    assert.equal((await post(app,{type:'setSelfCheckLoop',count:4})).status,400);
+    assert.equal((await post(app,{type:'setSelfCheckLoop',count:'2'})).status,400);
+    assert.equal((await post(app,{type:'setSelfCheckLoop',count:2})).status,200);
+    assert.deepEqual(JSON.parse(readFileSync(join(preferences,'self-check-loop_options.json'),'utf8')),{検証回数:2});
+  } finally { await stream.close(); await app.close(); }
+  app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file); stream = await connect(app);
+  try {
+    const restarted = await stream.wait(p=>p.type==='state');
+    assert.equal(restarted.検証回数,2);
+  } finally { await stream.close(); await app.close(); }
+});
 test('Code: --offline 起動から自動接続ONで新規オンライン会話へ切り替える', async t => {
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {offline:true}), stream = await connect(app);

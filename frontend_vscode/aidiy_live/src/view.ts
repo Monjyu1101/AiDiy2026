@@ -1,4 +1,5 @@
 import { 最下部追従 } from '../../src/scroll-follow';
+import { 演出初期化, 到着表示, 即時表示, 枠飛行, 入力枠作成, 受信通知作成 } from '../../src/arrival-effect';
 import { LiveConnection, 入力レート, 音声入力, 音声操作, type Packet } from './protocol';
 import { LiveAudio } from './audio';
 import { AudioCloud } from './visualizer';
@@ -99,33 +100,47 @@ function controls() {
   for (const select of [provider, model, voice]) select.disabled = busy || changing || modelLoading || modelSaving || !Object.keys(models).length;
   status.textContent = changing ? '再接続中' : busy ? '接続中' : connected ? mic ? '会話中' : '接続済み' : '未接続';
 }
-function コンソール演出(row: HTMLDivElement, text: string) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    row.textContent = text; 最下部表示(); return;
-  }
-  row.classList.add('console-effect');
-  const terminalText = document.createElement('span');
-  const cursor = document.createElement('span'); cursor.className = 'terminal-cursor';
-  row.replaceChildren(terminalText, cursor);
-  const batch = Math.max(1, Math.floor(text.length / 50) + 1);
-  let index = 0, timer: number;
-  const finish = () => {
-    clearTimeout(timer);
-    row.classList.remove('console-effect'); row.textContent = text;
-    回答演出停止 = undefined;
-    最下部表示();
+// 発言の登場演出は AiDiy Code と共通（src/arrival-effect.ts）。発言は透明のまま会話欄に置いて場所を確保し、
+// そこへ枠を飛ばしてから浮かび上がらせる。OS の「動きを減らす」設定には従わない。
+// 送信した文字入力は、バックエンドから戻った同じ input_text の行へ入力枠を飛ばす。
+let 送信予約: { 起点: DOMRect; 本文: string; 期限: number } | undefined;
+let 入力枠: HTMLElement | undefined;
+function 入力飛行(row: HTMLDivElement, 起点: DOMRect, 本文: string) {
+  入力枠?.remove();
+  row.classList.add('arrival-pending');
+  const frame = 入力枠 = 入力枠作成(本文);
+  枠飛行(frame, 起点, () => row, () => {
+    if (入力枠 === frame) 入力枠 = undefined;
+    if (row.isConnected !== false) 到着表示(row);
+  });
+}
+// AI の回答は画面中央の受信通知にターミナル演出（AIコード.vue と同じ文字送り）で出し、全文を表示し終えてから3秒止めて会話欄の行へ飛ばす。
+// 次の発言が届いたとき・切断・新しい会話では演出を止め、回答の行をすぐに表示する。
+function 受信通知(row: HTMLDivElement, text: string, type: string) {
+  row.classList.add('arrival-waiting');
+  const { popup, body } = 受信通知作成(type);
+  let holdTimer: number | undefined, 終了 = false;
+  const カーソル色 = type === 'output_request' ? '#00ffff' : type === 'recognition_output' ? '#9ae6b4' : '#00ff00';
+  const 片付け = (show: () => void) => {
+    if (終了) return;
+    終了 = true; clearTimeout(holdTimer); effect.停止(); popup.remove();
+    if (回答演出停止 === stop) 回答演出停止 = undefined;
+    show(); 最下部表示();
   };
-  const tick = () => {
-    const end = Math.min(index + batch, text.length);
-    terminalText.textContent += text.slice(index, end); index = end;
+  const stop = () => 片付け(() => 即時表示(row));
+  const 着地 = () => {
+    if (終了) return;
+    row.classList.remove('arrival-waiting'); row.classList.add('arrival-pending');
     最下部表示();
-    if (index < text.length) { timer = window.setTimeout(tick, 10); return; }
-    finish();
-    最下部表示();
+    枠飛行(popup, popup.getBoundingClientRect(), () => row, () => 片付け(() => 到着表示(row)));
   };
-  回答演出停止 = finish;
-  // Code の回答表示と同じく、500ms 待ってから10msごとに文字を追加する。
-  timer = window.setTimeout(tick, 500);
+  const effect = 演出初期化(body, {
+    カーソル色, isStream: false,
+    表示更新: () => { body.scrollTop = body.scrollHeight; },
+    完了: () => { if (!終了) holdTimer = window.setTimeout(着地, 3000); },
+  });
+  回答演出停止 = stop;
+  effect.追加(text, true);
 }
 function message(role: 'user' | 'ai' | 'system', text: string, type = '') {
   if (!text.trim() || ['!', '\x02', '\x03', '\x18'].includes(text.trim())) return;
@@ -144,9 +159,13 @@ function message(role: 'user' | 'ai' | 'system', text: string, type = '') {
     });
   }
   回答演出停止?.();
+  row.textContent = text.slice(0, 20000);
   transcript.append(row);
-  if (role === 'ai') コンソール演出(row, text.slice(0, 20000));
-  else row.textContent = text.slice(0, 20000);
+  const 予約 = 送信予約;
+  if (role === 'user' && type === 'input_text' && 予約 && Date.now() <= 予約.期限 && 予約.本文 === text.trim()) {
+    送信予約 = undefined;
+    入力飛行(row, 予約.起点, 予約.本文);
+  } else if (role === 'ai' && !document.hidden) 受信通知(row, text.slice(0, 20000), type);
   while (transcript.children.length > 100) transcript.firstElementChild?.remove();
   最下部表示();
 }
@@ -205,6 +224,7 @@ async function loadModels(session = connection.session) {
 }
 async function disconnect() {
   回答演出停止?.();
+  送信予約 = undefined; 入力枠?.remove(); 入力枠 = undefined;
   ++generation; connected = false; busy = false; mic = false; micBusy = false; changing = false; modelSaving = false;
   ++micGeneration;
   sessionProject = undefined;
@@ -308,8 +328,11 @@ element<HTMLFormElement>('text-form').onsubmit = event => {
   if (!connected || changing || !text) return;
   showError();
   void audio.unlock().catch(error => showError(String(error)));
-  if (connection.send('input', { チャンネル: '0', メッセージ識別: 'input_text', メッセージ内容: text, 送信モード: 'Live', 出力先チャンネル: '0' })) input.value = '';
-  else showError('送信できませんでした。接続を確認し、もう一度送信してください。');
+  // 送信した位置を覚えておき、戻ってきた同じ文字入力の行へ入力枠を飛ばす。
+  const 起点 = input.getBoundingClientRect();
+  if (connection.send('input', { チャンネル: '0', メッセージ識別: 'input_text', メッセージ内容: text, 送信モード: 'Live', 出力先チャンネル: '0' })) {
+    input.value = ''; 送信予約 = { 起点, 本文: text, 期限: Date.now() + 15_000 };
+  } else showError('送信できませんでした。接続を確認し、もう一度送信してください。');
   controls(); 最下部表示();
 };
 element<HTMLTextAreaElement>('text').addEventListener('input', () => {

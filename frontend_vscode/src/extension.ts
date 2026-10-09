@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { コードモデル読込, コードモデル保存, モデル保存先 } from './model-preferences';
+import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from './model-preferences';
 import { Hermes既定モデル, オフラインモデル候補, オフラインモデル保存先, オフライン実行 } from '../aidiy_code/src/offline';
 import { 起動解決 } from './runner';
 import { CodeConnection, コード選択 } from './code-connection';
@@ -31,6 +31,9 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 最終モデル: { provider: string; model: string };
   private オフラインモデル: { provider: string; model: string };
   private readonly オフライン保存先 = オフラインモデル保存先(モデル保存先('code'));
+  private readonly 設定保存先 = コード設定保存先(モデル保存先('code'));
+  /** 最後に選んだオンラインの検証回数。未保存なら0回。 */
+  private 検証回数 = 0;
   private readonly オフライン候補: { id: string; label: string }[];
   private オフラインジョブ?: ReturnType<typeof オフライン実行>;
   private 最終作業URI?: vscode.Uri;
@@ -47,6 +50,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     const offlineModel = offlineSaved?.provider === 'aidiy_hermes' && this.オフライン候補.some(item => item.id === offlineSaved.model)
       ? offlineSaved.model : this.オフライン候補.some(item => item.id === defaultModel) ? defaultModel : 'auto';
     this.オフラインモデル = { provider: 'aidiy_hermes', model: offlineModel };
+    this.検証回数 = 検証回数読込(this.設定保存先) ?? 0;
     const old = context.workspaceState.get<会話>('会話');
     const saved = context.workspaceState.get<会話履歴>('会話履歴');
     this.履歴 = Array.isArray(saved?.一覧) ? saved.一覧.filter(item => typeof item?.id === 'string' && Array.isArray(item.メッセージ) && typeof item.作業URI === 'string') : [];
@@ -117,7 +121,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       type: 'state', ...this.会話, 会話ID: this.会話ID, 添付: this.添付?.名前, 実行中: this.実行中, 進捗: this.進捗,
       ...(this.オフライン使用() ? this.オフラインモデル : {}),
       オフライン対応: true, 実行モード: this.オフライン使用() ? 'offline' : 'online',
-      自動接続: this.自動接続, 停止中: this.停止中,
+      自動接続: this.自動接続, 停止中: this.停止中, 検証回数: this.検証回数,
       履歴: this.履歴.filter(item => item.作業URI === folder?.uri.toString())
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
@@ -201,6 +205,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       case 'settings': await vscode.commands.executeCommand('aidiyHermes.settings'); break;
       case 'chooseModel': await this.モデル候補通知(data.provider); break;
       case 'setModel': await this.モデル反映(data.provider, data.model); break;
+      case 'setSelfCheckLoop': this.検証回数 = 検証回数保存(data.count, this.設定保存先); break;
       case 'terminal': await this.ターミナル(); break;
       case 'logs': this.ログ.show(true); break;
       case 'link':

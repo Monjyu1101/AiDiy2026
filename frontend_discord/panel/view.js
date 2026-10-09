@@ -164,7 +164,6 @@ api.onActivity(value => {
   el('stage-who').textContent = value.who;
   const text = String(value.text || '');
   clearTimer = setTimeout(() => { message.classList.add('fading'); clearTimer = setTimeout(stageClear, 600); }, 60_000);
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { output.textContent = text; return; }
   const typed = document.createElement('span'), cursor = document.createElement('span');
   cursor.className = 'terminal-cursor'; output.replaceChildren(typed, cursor);
   // Code / Live の回答表示と同じく、500ms 待ってから10msごとに文字を追加する（約0.5秒で全文）。

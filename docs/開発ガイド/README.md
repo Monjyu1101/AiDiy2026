@@ -253,7 +253,7 @@ Code は常駐バックエンドや AI コア WebSocket を使わず、VS Code �
 `frontend_discord` は Discord Bot から同じ Code / Live を使う任意起動のクライアントです。`frontend_vscode` の `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts` を `frontend_discord/src/vscode.ts` 経由で直接共有するため、これらを変更すると Discord 側にも影響します。
 
 - 起動・設定確認: `frontend_discord/src/main.ts`
-- 接続パネル: `frontend_discord/panel/`、`src/panel.ts`、`src/panel-worker.ts`
+- 接続パネル: `frontend_discord/panel/`、`src/panel.ts`、`src/panel-service.ts`、`src/panel-worker.ts`（Electron 版）、`src/web-server.ts`（ブラウザ版）
 - Discord イベント・返信: `frontend_discord/src/bot.ts`、`src/commands.ts`
 - Code（Hermes 会話継続）: `frontend_discord/src/code.ts`
 - Live（ボイスチャンネルと AIコアの中継）: `frontend_discord/src/live.ts`、`src/audio.ts`

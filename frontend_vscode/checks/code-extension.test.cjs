@@ -31,7 +31,9 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
       if(name==='./code-connection') return require('../out/code-connection.cjs');
       if(name==='./model-preferences') return {
         モデル保存先:()=> 'online.json', コードモデル読込:(file='online.json')=>preferences.get(file),
-        コードモデル保存:(value,file='online.json')=>{ selected=JSON.parse(JSON.stringify(value));preferences.set(file,selected);return selected; }
+        コードモデル保存:(value,file='online.json')=>{ selected=JSON.parse(JSON.stringify(value));preferences.set(file,selected);return selected; },
+        コード設定保存先:()=> 'options.json', 検証回数読込:file=>preferences.get(file)?.検証回数,
+        検証回数保存:(count,file)=>{ if(![0,1,2,3].includes(count)) throw new Error('検証回数の指定が不正です。'); preferences.set(file,{検証回数:count}); return count; },
       };
       if(name==='./runner') return {起動解決:()=>({実行ファイル:'fake-hermes',引数:[]})};
       if(name==='../aidiy_code/src/offline') return {
@@ -124,6 +126,12 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
       receive({メッセージ識別:'input_text',メッセージ内容:`検証${count}回`,self_check_loop:count});await flush();
       assert.equal(latestRequest().self_check_loop,count);
     }
+    // 画面で選び直した検証回数を保存し、状態通知で返す（次回の起動で復元する）。
+    assert.equal(posts.findLast(p=>p.type==='state').検証回数,0);
+    receive({type:'setSelfCheckLoop',count:2});await flush();
+    assert.deepEqual(preferences.get('options.json'),{検証回数:2});
+    receive({type:'ready'});await flush();
+    assert.equal(posts.findLast(p=>p.type==='state').検証回数,2);
     view.visible=false;visibility();view.visible=true;visibility();assert.equal(posts.findLast(p=>p.type==='state').接続済み,true);
     const coreSession = latest().コアセッションID;
     backend.hold=true;

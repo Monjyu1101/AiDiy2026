@@ -26,7 +26,8 @@ button:disabled { opacity: .4; cursor: default; }
 [hidden] { display: none !important; }
 label { display: block; font-size: 11px; color: var(--muted); }
 #chat-header { display: flex; flex-direction: column; flex: 0 0 auto; border-bottom: 1px solid var(--border); }
-#title-bar { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
+/* タイトル行: 接続状態を左端、名前を中央、ウィンドウ操作を右端（VS Code 内では非表示）。 */
+#title-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; min-height: 34px; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
 .vscode-host #title-bar { display: none; }
 #activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
 #chat-header.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s linear infinite; }
@@ -57,8 +58,8 @@ label { display: block; font-size: 11px; color: var(--muted); }
   47.5%, 52.5% { background-color: rgb(0, 254, 254); }
   50% { background-color: rgb(0, 255, 255); }
 }
-.brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.brand-icon { width: 21px; height: 21px; object-fit: contain; flex: 0 0 auto; }
+.brand { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+.title-right { display: contents; }
 .brand-name { white-space: nowrap; font-size: 16px; font-weight: 700; letter-spacing: -.5px; }
 #conversation-toolbar { display: flex; align-items: center; gap: 10px; min-height: 28px; padding: 2px; }
 .conversation-context { display: flex; flex: 1; min-width: 0; align-items: baseline; gap: 4px; }
@@ -75,7 +76,7 @@ label { display: block; font-size: 11px; color: var(--muted); }
 #auto-connect[aria-checked="true"] .auto-connect-thumb { transform: translateX(12px); }
 #new-chat { background: var(--accent-soft); }
 #history-toggle[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
-#desktop-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; margin-left: 4px; }
+#desktop-controls { grid-column: 3; grid-row: 1; justify-self: end; display: flex; align-items: center; gap: 2px; }
 #desktop-controls button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; color: var(--muted); }
 .window-minimize { width: 10px; border-top: 1px solid currentColor; }
 .window-maximize { width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 0; }
@@ -125,9 +126,26 @@ main { flex: 1; min-height: 60px; overflow-y: auto; padding: 2px; }
 .assistant { max-width: 90%; width: fit-content; margin-right: auto; }
 .user .content { color: #fff; white-space: pre-wrap; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 0; padding: 4px; max-height: 260px; overflow: auto; cursor: pointer; }
 .user .content:hover { border-color: var(--vscode-focusBorder); }
+/* 登場演出: 発言は透明のまま配置して場所を確保し、入力枠・回答ポップアップがその位置へ飛んだ後に白く浮かび上がる。 */
+.message.arrival-waiting { display: none; }
+.message.arrival-pending { opacity: 0; }
+.message.arrival-reveal .content { animation: user-arrival-haze .9s ease-out both; }
+@keyframes user-arrival-haze {
+  0% { opacity: 0; filter: blur(8px) brightness(2.4); transform: scale(.97); background: #ffffff38; box-shadow: 0 0 0 #ffffff00; }
+  35% { opacity: 1; filter: blur(3px) brightness(1.8); background: #ffffff24; box-shadow: 0 0 22px #ffffffb0; }
+  100% { opacity: 1; filter: none; transform: none; box-shadow: 0 0 0 #ffffff00; }
+}
+/* AI回答の受信通知: 中央に降りてきて、文字送りの後に履歴の位置へ飛ぶ。
+   黒地に白枠で固定し、流し込む文字だけを回答の色にする。高さは画面の30%で、本文は縦スクロールで最下部を表示する。 */
+.answer-popup { position: fixed; inset: 0; z-index: 20; display: flex; width: min(560px, calc(100vw - 32px)); height: 30vh; min-height: 96px; margin: auto; overflow: hidden; pointer-events: none; color: #fff; background: #000; border: 1px solid #fff; box-shadow: 0 18px 60px #000c; font: 11px/1.5 var(--vscode-editor-font-family, monospace); animation: answer-popup-in .42s cubic-bezier(.2, .9, .3, 1.15) both; }
+.answer-popup-text { flex: 1; min-width: 0; min-height: 0; padding: 6px; overflow: hidden auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--terminal); }
+@keyframes answer-popup-in { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+.input-flight { position: fixed; z-index: 20; margin: 0; padding: 4px; overflow: hidden; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; color: var(--foreground); background: var(--input-surface); border: 1px solid #fff; box-shadow: 0 0 16px #ffffff70, inset 0 0 10px #ffffff20; }
 .assistant .content { color: var(--terminal); background: color-mix(in srgb, var(--terminal) 3%, var(--surface)); border: 1px solid color-mix(in srgb, var(--terminal) 16%, var(--border)); border-radius: 0; padding: 4px; font-family: var(--vscode-editor-font-family, monospace); }
-.assistant .content.console-effect { white-space: pre-wrap; }
-.terminal-cursor { display: inline-block; width: 1ch; height: 1em; margin-left: .1ch; vertical-align: text-bottom; background: currentColor; animation: terminal-cursor-blink .7s step-end infinite; }
+/* ターミナル演出の表示領域。frontend_web の AIコード.vue で実際に表示される見た目に揃える。
+   同ファイルの .terminal-text / .terminal-cursor は scoped のため JS で作った要素には当たらず、
+   文字は .agent-content（Courier New / 11px / 行間1.5）を継承し、カーソルは JS の指定（幅8pxのブロック）だけで描かれる。 */
+#progress, .answer-popup-text { font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5; }
 @keyframes terminal-cursor-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 .error .content { color: var(--vscode-errorForeground); white-space: pre-wrap; padding-left: 10px; border-left: 2px solid var(--vscode-errorForeground); }
 .content > :first-child { margin-top: 0; } .content > :last-child { margin-bottom: 0; }
@@ -143,12 +161,30 @@ blockquote { border-left: 2px solid var(--vscode-textBlockQuote-border, var(--bo
 #progress-section { margin: 0 2px 2px; border: 1px solid color-mix(in srgb, var(--stream) 16%, var(--border)); border-radius: 0; background: color-mix(in srgb, var(--stream) 3%, var(--surface)); padding: 4px; font-size: 11px; }
 #progress-section.running { border-color: color-mix(in srgb, var(--stream) 35%, var(--border)); }
 summary { cursor: pointer; overflow-wrap: anywhere; color: var(--muted); }
-#progress { max-height: 150px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--stream); font-family: var(--vscode-editor-font-family); }
-#progress-section.running #progress::after { content: ''; display: inline-block; width: 7px; height: 1em; margin-left: 3px; vertical-align: -.15em; background: var(--stream); animation: terminal-cursor-blink .7s step-end infinite; }
+#progress { max-height: 150px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--stream); }
 footer { flex: 0 0 auto; padding: 0 2px 2px; }
 #composer { border: 0; background: transparent; }
 textarea { font-size: 12px; field-sizing: content; resize: none; display: block; width: 100%; min-height: 76px; max-height: min(220px, 35vh); overflow-y: auto; padding: 4px; color: var(--foreground); background: var(--input-surface); border: 1px solid var(--border); border-radius: 0; }
 textarea:focus-visible { outline: none; border-color: var(--vscode-focusBorder); }
+/* 処理中（STOP 表示中）は、入力欄の上端と下端で、シアンと白の光が左右の外から反対側の外へ、すれ違って一定の速さで突き抜ける。
+   折り返し（alternate）は枠の外で行い、次の回は色の進む向きが入れ替わって、反射して戻ってくるように見せる（中で揺れない）。
+   光は #prompt-frame の疑似要素（入力欄の上下の1pxの枠線に重ねた帯）に重ねたグラデーションで描き、にじませず細い線のまま流す。 */
+#prompt-frame { position: relative; }
+#composer.running #prompt-frame::before, #composer.running #prompt-frame::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 1px; pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, var(--stream), transparent) 0 0 / 35% 100% no-repeat,
+    linear-gradient(90deg, transparent, #fff, transparent) 0 0 / 35% 100% no-repeat;
+  animation: prompt-reflect 4.2s linear infinite alternate;
+}
+#composer.running #prompt-frame::before { top: 0; }
+#composer.running #prompt-frame::after { bottom: 0; }
+/* 光の幅は35%。-60% / 160% で光全体が枠の左右の外に出る。
+   前後20%ずつ枠の外で止め、alternate の折り返しごとに約1.7秒の間を空ける（横切るのは約2.5秒）。 */
+@keyframes prompt-reflect {
+  0%, 20% { background-position: -60% 0, 160% 0; }
+  80%, 100% { background-position: 160% 0, -60% 0; }
+}
 textarea::placeholder { color: var(--muted); }
 .composer-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto 34px; grid-template-rows: auto auto; gap: 2px 6px; align-items: center; padding: 2px 0; }
 .model-selection { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -172,7 +208,7 @@ textarea::placeholder { color: var(--muted); }
 #stop .stop-label { position: absolute; bottom: 3px; left: 0; width: 100%; font-size: 7px; font-weight: bold; line-height: 8px; text-align: center; }
 #stop:hover { background: #c83246; border-color: #c83246; }
 .composer-meta { grid-column: 1; grid-row: 2; display: flex; justify-content: space-between; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; line-height: 1.3; }
-#activity { display: inline-flex; grid-column: 1; justify-self: start; min-width: 0; align-items: center; gap: 5px; margin-left: 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+#activity { grid-column: 1; grid-row: 1; justify-self: start; display: inline-flex; min-width: 0; align-items: center; gap: 5px; margin-left: 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .activity-dot { flex: 0 0 auto; width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
 #activity.connected .activity-dot { background: var(--terminal); }
 #activity.running .activity-dot { background: #00ffff; box-shadow: 0 0 0 3px #00ffff15, 0 0 10px #00ffff60; }
@@ -181,7 +217,8 @@ textarea::placeholder { color: var(--muted); }
 #attachment { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--vscode-textLink-foreground); } #attachment-name { overflow-wrap: anywhere; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 #status { margin-top: 2px; font-size: 10px; line-height: 1.3; color: var(--muted); }
-#error { color: var(--vscode-errorForeground, #ff8e9e); background: #cc415708; border: 1px solid #cc415740; padding: 4px; border-radius: 0; font-size: 11px; overflow-wrap: anywhere; }
+/* AIコアの接続エラーは入力欄の上に表示する。 */
+#error { margin-bottom: 2px; color: var(--vscode-errorForeground, #ff8e9e); background: #cc415708; border: 1px solid #cc415740; padding: 4px; border-radius: 0; font-size: 11px; overflow-wrap: anywhere; }
 dialog { width: min(420px, calc(100vw - 4px)); padding: 0; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); border-radius: 0; box-shadow: 0 16px 60px rgba(0, 0, 0, .4); }
 dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }
 #model-picker-form { display: grid; gap: 9px; padding: 4px; }
@@ -208,19 +245,5 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
   #title-bar { padding: 2px; gap: 7px; }
   #conversation-toolbar { padding: 2px; gap: 7px; }
   .brand { gap: 7px; }
-  #desktop-controls { margin-left: 0; }
   .keyboard-hint { font-size: 8px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  body.ui-ready { animation: startup-fade-in .8s ease-out both !important; }
-  /* 処理中を伝えるゆっくりした明滅は、動きを減らす設定でも維持する。 */
-  #chat-header.connected #activity-bar { animation: cyan-bar-breathe 4.5s linear infinite !important; }
-  #chat-header.auto-connect-off #activity-bar { animation: red-bar-breathe 4.5s linear infinite !important; }
-  /* 浮遊は止め、指定された2つの枠のゆっくりした回転と明滅を維持する。 */
-  .welcome-mark::before { animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 8s ease-in-out infinite, welcome-rainbow 12s linear infinite !important; }
-  .welcome-mark::after { animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 8s ease-in-out -4s infinite, welcome-rainbow 12s linear -6s infinite !important; }
-  /* 初期画面の文字は位置を動かさず、表示範囲とカーソルだけを変化させる。 */
-  #welcome .welcome-text { animation: var(--typing-animation) 12s steps(var(--typing-steps), end) infinite !important; }
-  #welcome .welcome-type::after { animation: var(--caret-animation) 12s steps(var(--typing-steps), end) infinite, terminal-cursor-blink 1.2s step-end infinite !important; }
 }

@@ -120,7 +120,10 @@ const 音声Socket = shallowRef<AIWebSocket | null>(null)
 const アバターRef = ref<{ 表示更新: () => void } | null>(null)
 
 let UI非表示タイマー: ReturnType<typeof setTimeout> | null = null
+let ポインター確認タイマー: ReturnType<typeof setInterval> | null = null
+let ポインター確認中 = false
 let 音声接続世代 = 0
+const ポインター確認間隔 = 500
 
 const 音声処理機 = shallowRef(new AudioController({
   onInputLevel: (value) => {
@@ -229,6 +232,35 @@ function UI表示開始() {
 
 function UI表示終了() {
   UI自動非表示予約()
+}
+
+// Windows では、起動直後の自動ログインなどで非アクティブのまま表示された透明ウィンドウに、
+// 一度クリックされるまで mouseleave が届かないことがある（UI が隠れず透明化しない）。
+// Electron では実際のカーソル位置も確認し、DOM のイベントが欠けても表示状態を合わせる。
+async function ポインター位置確認() {
+  if (ポインター確認中 || !window.desktopApi?.getWindowPointerSnapshot) return
+  ポインター確認中 = true
+  try {
+    const snapshot = await window.desktopApi.getWindowPointerSnapshot()
+    const ホバー中 = UI表示中.value && !UI非表示タイマー
+    if (snapshot.insideWindow && !ホバー中) UI表示開始()
+    else if (!snapshot.insideWindow && ホバー中) UI表示終了()
+  } catch {
+    // 取得できない場合は DOM のイベントだけで判定する。
+  } finally {
+    ポインター確認中 = false
+  }
+}
+
+function ポインター確認開始() {
+  if (ポインター確認タイマー || !window.desktopApi?.getWindowPointerSnapshot) return
+  ポインター確認タイマー = setInterval(() => { void ポインター位置確認() }, ポインター確認間隔)
+}
+
+function ポインター確認停止() {
+  if (!ポインター確認タイマー) return
+  clearInterval(ポインター確認タイマー)
+  ポインター確認タイマー = null
 }
 
 function パネル切替要求(panel: PanelKey) {
@@ -418,10 +450,12 @@ watch(
 
 onMounted(() => {
   UI自動非表示予約()
+  ポインター確認開始()
 })
 
 onBeforeUnmount(() => {
   UI自動非表示停止()
+  ポインター確認停止()
   字幕タイマー停止()
   音声切断()
 })

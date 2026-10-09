@@ -141,9 +141,9 @@ test('Code: 入力欄の伸縮と一覧からの復帰後も、描画後の履�
   assert.equal(history.scrollTop, 1400);
 });
 
-test('Code: 検証ループは初期値1回、選択した0〜3回を送信する', () => {
+test('Code: 検証ループは初期値0回、選択した0〜3回を送信する', () => {
   const ui = screen(); ui.state({});
-  assert.equal(ui.element('self-check-loop').value, '1');
+  assert.equal(ui.element('self-check-loop').value, '0');
   for (const count of [1, 0, 2, 3]) {
     ui.element('self-check-loop').value = String(count);
     ui.input('検証回数の確認');
@@ -155,8 +155,27 @@ test('Code: 検証ループは初期値1回、選択した0〜3回を送信す�
   }
 });
 
+test('Code: 保存済みの検証回数を最初の状態通知で復元し、選び直した回数を保存要求する', () => {
+  const ui = screen(); ui.state({ 検証回数: 2 });
+  assert.equal(ui.element('self-check-loop').value, '2');
+  // 復元は最初の1回だけ。以降の状態通知では画面の選択を上書きしない。
+  ui.element('self-check-loop').value = '3';
+  ui.element('self-check-loop').listeners.get('change')();
+  assert.equal(ui.posts.at(-1).type, 'setSelfCheckLoop');
+  assert.equal(ui.posts.at(-1).count, 3);
+  ui.state({ 検証回数: 2 });
+  assert.equal(ui.element('self-check-loop').value, '3');
+  // オフラインで起動しても、保存済みのオンラインの回数をオンライン復帰時に使う。
+  const offline = screen(); offline.state({ オフライン対応: true, 接続済み: false, 検証回数: 1 });
+  assert.equal(offline.element('self-check-loop').value, '0');
+  offline.state({ 接続済み: true });
+  assert.equal(offline.element('self-check-loop').value, '1');
+});
+
 test('Code offline: 未接続でも送信でき、検証0を固定し、オンラインの回数へ復帰する', () => {
   const ui = screen(); ui.state({オフライン対応:true,実行モード:'online'});
+  // オンラインも0回から始め、選び直した回数をオフラインから戻ったときに復元する。
+  assert.equal(ui.element('self-check-loop').value,'0');
   ui.element('self-check-loop').value='3';
   ui.state({接続済み:false});
   ui.input(' ');

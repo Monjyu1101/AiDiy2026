@@ -5,6 +5,7 @@ const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const protocol = require('../../out/aidiy_live/protocol.cjs');
 const { scrollRuntime } = require('../../checks/scroll-screen.cjs');
+const { moduleInContext } = require('../../checks/code-screen.cjs');
 
 function screen(host, rejectProject = false, holdInput = false, reducedMotion = true, initialModelSettings, blockAudioUnlock = false, backendOptions = {}) {
   const htmlIds = new Set([...readFileSync(join(__dirname, '../media/index.html'), 'utf8').matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
@@ -27,12 +28,13 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
       set textContent(text) { this.children = []; this._textContent = text; },
       get firstElementChild() { return this.children[0]; },
       classList: { add: value => values.add(value), remove: value => values.delete(value), contains: value => values.has(value), toggle: (value, enabled) => enabled ? values.add(value) : values.delete(value) },
+      style: {}, getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; },
       setAttribute() {}, addEventListener(name, handler) { this.listeners.set(name, handler); },
       click() { this.listeners.get('click')?.(); },
       remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); },
       focus() { this.focused = true; }, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
       querySelector() { return this.strong; }, close() { this.open = false; }, showModal() { this.open = true; },
-      replaceChildren(...children) { this.children = children; this._textContent = ''; if (['provider', 'model', 'voice'].includes(id)) this.value = ''; for (const child of children) child.parent = this; }, append(child) { child.parent = this; this.children.push(child); },
+      replaceChildren(...children) { this.children = children; this._textContent = ''; if (['provider', 'model', 'voice'].includes(id)) this.value = ''; for (const child of children) child.parent = this; }, append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } },
       add(option) { this.children.push(option); if (!this.value) this.value = option.value; },
       cloneNode() { const copy = element(); copy.id = this.id; copy.textContent = this.textContent; return copy; },
     };
@@ -80,10 +82,14 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
       } };
     }, ready() {}, dispose() {},
   };
+  const setInterval = () => { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval = id => intervals.delete(id);
   const window = { setTimeout(callback, delay) { const id = ++timerNumber; timers.set(id, { callback, at: clock + delay }); return id; },
+    setInterval, clearInterval,
     matchMedia: () => ({ matches: reducedMotion }), addEventListener: (name, handler) => events.set(name, handler) };
-  runInNewContext(readFileSync(join(__dirname, '../../out/aidiy_live/view.cjs'), 'utf8'), {
+  const sandbox = {
     require(name) {
+      // 共通の登場演出は、画面と同じ document / window で動くよう同じ文脈で読み込む。
+      if (name === '../../src/arrival-effect') return moduleInContext(sandbox, join(__dirname, '../../src/arrival-effect.ts'));
       if (name === '../../src/scroll-follow') return { 最下部追従: scrolling.follow };
       if (name === './protocol') return protocol;
       if (name === './model-catalog') return require('../../out/aidiy_live/model-catalog.cjs');
@@ -102,8 +108,9 @@ function screen(host, rejectProject = false, holdInput = false, reducedMotion = 
       getElementById: id => htmlIds.has(id) ? element(id) : null, createElement: () => element(), querySelectorAll: () => [] },
     Option: function (text, value) { this.text = text; this.value = value; },
     clearTimeout: id => timers.delete(id), requestAnimationFrame: callback => callback(),
-    setInterval() { const id = ++intervalNumber; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id),
-  });
+    setInterval, clearInterval,
+  };
+  runInNewContext(readFileSync(join(__dirname, '../../out/aidiy_live/view.cjs'), 'utf8'), sandbox);
   return { element, sockets, calls, intervals, timers, releaseInput, audioCalls, ...scrolling,
     rejectNextConnection() { rejectProject = true; },
     advance(milliseconds) {
@@ -532,7 +539,8 @@ for (const host of [true, false]) {
       assert.equal(row.classList.contains(type), true);
       assert.equal(row.classList.contains('recognition'), type !== 'input_text');
       assert.equal(row.title, 'クリックして入力欄へ戻す');
-      if (type === 'recognition_output') assert.equal(row.textContent, ''); // 演出中でも全文をコピー。
+      // AIの字幕は受信通知の表示中、全文を置いた行を非表示で確保している。その間でも全文をコピーする。
+      if (type === 'recognition_output') assert.equal(row.classList.contains('arrival-waiting'), true);
       ui.element('text').value = '古い下書き';
       const sentCount = ui.calls.length;
       row.click();
@@ -558,54 +566,97 @@ for (const host of [true, false]) {
     assert.equal(ui.element('text').value, longText);
   });
 
-  test(`Live ${host ? 'VS Code' : '単独画面'}: AI回答の文字送り・連続回答・新規会話での停止`, async t => {
+  test(`Live ${host ? 'VS Code' : '単独画面'}: AI回答は受信通知でターミナル演出し、会話欄の確保した行へ飛ばす・連続回答・新規会話での停止`, async t => {
     const ui = screen(host, false, false, false); t.after(() => ui.close()); await ui.ready();
     await ui.element('connect').onclick();
+    const popups = () => ui.element('body').children.filter(child => String(child.className).startsWith('answer-popup'));
     ui.sockets[1].emit({ メッセージ識別: 'recognition_input', メッセージ内容: '音声の入力です。' });
     assert.equal(ui.element('transcript').children[0].textContent, '音声の入力です。');
     ui.sockets[1].emit({ メッセージ識別: 'welcome_text', メッセージ内容: '会話準備ができました。' });
     assert.equal(ui.element('transcript').children[1].textContent, '会話準備ができました。');
+    assert.equal(popups().length, 0);
     const answer = '日本語の回答です。\n次の行です。';
     ui.sockets[1].emit({ メッセージ識別: 'output_text', メッセージ内容: answer });
+    // 会話欄の行は全文で置き、受信通知の間は非表示で場所を確保する。
     const row = ui.element('transcript').children.at(-1);
     assert.equal(row.classList.contains('output_text'), true);
-    assert.equal(row.classList.contains('console-effect'), true);
-    assert.equal(row.children[1].className, 'terminal-cursor');
-    assert.equal(row.textContent, '');
-    ui.advance(499); assert.equal(row.textContent, '');
-    ui.advance(1); assert.equal(row.textContent, answer.slice(0, 1));
-    ui.advance(10); assert.equal(row.textContent, answer.slice(0, 2));
-    ui.advance(1000);
+    assert.equal(row.classList.contains('arrival-waiting'), true);
     assert.equal(row.textContent, answer);
-    assert.equal(row.classList.contains('console-effect'), false);
-    assert.equal(row.children.length, 0);
+    const [popup] = popups();
+    assert.equal(popup.className, 'answer-popup output_text');
+    // ヘッダーは付けず、本文欄だけを置く。
+    assert.equal(popup.children.length, 1);
+    const [body] = popup.children;
+    assert.equal(body.className, 'answer-popup-text');
+    const [text, cursor] = body.children;
+    assert.equal(cursor.className, 'terminal-cursor');
+    assert.equal(cursor.style.width, '8px');
+    // AIコード.vue と同じく、500ms 待ってから10msごとに floor(文字数 / 50) + 1 文字ずつ流す。
+    ui.advance(499); assert.equal(text.textContent, '');
+    ui.advance(1); assert.equal(text.textContent, answer.slice(0, 1));
+    ui.advance(10); assert.equal(text.textContent, answer.slice(0, 2));
+    ui.advance(1000);
+    assert.equal(text.textContent, answer);
+    assert.equal(body.children.includes(cursor), false);
+    // 16文字は約650msで流し切る。全文表示から3秒止めてから行へ飛ばし、着いた行を浮かび上がらせる。
+    ui.advance(2000);
+    assert.equal(popups().length, 1); assert.equal(row.classList.contains('arrival-waiting'), true);
+    ui.advance(1000);
+    assert.equal(popups().length, 0);
+    assert.equal(row.classList.contains('arrival-waiting'), false);
+    assert.equal(row.classList.contains('arrival-reveal'), true);
     ui.sockets[1].emit({ メッセージ識別: 'output_request', メッセージ内容: 'コードエージェントの回答です。' });
     const previous = ui.element('transcript').children.at(-1);
     assert.equal(previous.classList.contains('output_request'), true);
+    assert.equal(popups()[0].className, 'answer-popup output_request');
     ui.advance(500);
+    // 次の回答が届いたら、表示中の受信通知を閉じて前の回答の行をすぐに表示する。
     ui.sockets[1].emit({ メッセージ識別: 'recognition_output', メッセージ内容: '音声回答の字幕です。' });
     assert.equal(previous.textContent, 'コードエージェントの回答です。');
-    assert.equal(previous.classList.contains('console-effect'), false);
+    assert.equal(previous.classList.contains('arrival-waiting'), false);
+    assert.equal(popups().length, 1);
+    assert.equal(popups()[0].className, 'answer-popup recognition_output');
     const current = ui.element('transcript').children.at(-1);
     assert.equal(current.classList.contains('recognition_output'), true);
-    assert.equal(current.classList.contains('console-effect'), true);
+    assert.equal(current.classList.contains('arrival-waiting'), true);
     assert.equal(ui.timers.size, 1);
     await ui.element('new').onclick();
     assert.equal(ui.timers.size, 0);
-    assert.equal(current.classList.contains('console-effect'), false);
+    assert.equal(popups().length, 0);
+    assert.equal(current.classList.contains('arrival-waiting'), false);
     ui.advance(2000);
     assert.equal(ui.element('transcript').children.length, 1);
     assert.equal(ui.element('transcript').children[0].id, 'empty');
   });
 
-  test(`Live ${host ? 'VS Code' : '単独画面'}: 演出抑制時は全文表示し、画面終了ではタイマーを破棄する`, async t => {
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 送信した文字入力は戻った同じ行へ入力枠を飛ばし、着いた行を浮かび上がらせる`, async t => {
+    const ui = screen(host, false, false, false); t.after(() => ui.close()); await ui.ready();
+    await ui.element('connect').onclick();
+    ui.element('text').value = '入力欄から送ります';
+    ui.element('text-form').onsubmit({ preventDefault() {} });
+    assert.equal(ui.element('text').value, '');
+    // 別の発言では飛ばさない。
+    ui.sockets[1].emit({ メッセージ識別: 'recognition_input', メッセージ内容: '音声の入力です。' });
+    assert.equal(ui.element('transcript').children.at(-1).classList.contains('arrival-reveal'), false);
+    ui.sockets[1].emit({ メッセージ識別: 'input_text', メッセージ内容: '入力欄から送ります' });
+    const row = ui.element('transcript').children.at(-1);
+    assert.equal(row.textContent, '入力欄から送ります');
+    assert.equal(row.classList.contains('arrival-pending'), false);
+    assert.equal(row.classList.contains('arrival-reveal'), true);
+    assert.equal(ui.element('body').children.some(child => child.className === 'input-flight'), false);
+    // 予約は1回だけ使う。
+    ui.sockets[1].emit({ メッセージ識別: 'input_text', メッセージ内容: '入力欄から送ります' });
+    assert.equal(ui.element('transcript').children.at(-1).classList.contains('arrival-reveal'), false);
+  });
+
+  test(`Live ${host ? 'VS Code' : '単独画面'}: 動きを減らす設定でも同じ演出にし、画面終了ではタイマーを破棄する`, async t => {
     const ui = screen(host); t.after(() => ui.close()); await ui.ready();
     await ui.element('connect').onclick();
     ui.sockets[1].emit({ メッセージ識別: 'output', メッセージ内容: '回答の全文です。' });
     const row = ui.element('transcript').children[0];
     assert.equal(row.textContent, '回答の全文です。');
-    assert.equal(row.classList.contains('console-effect'), false);
-    assert.equal(ui.timers.size, 0);
+    assert.equal(row.classList.contains('arrival-waiting'), true);
+    assert.equal(ui.timers.size, 1);
     const animated = screen(host, false, false, false); await animated.ready();
     await animated.element('connect').onclick();
     animated.sockets[1].emit({ メッセージ識別: 'output', メッセージ内容: '表示途中の回答です。' });

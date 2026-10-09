@@ -1,16 +1,20 @@
 import MarkdownIt from 'markdown-it';
 import { streamControlOf, visibleStreamContent } from './stream-control';
 import { 最下部追従 } from './scroll-follow';
+import { 演出初期化, 到着表示, 枠飛行, 入力枠作成, 受信通知作成, type ターミナル演出 } from './arrival-effect';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getState(): { 下書き?: string } | undefined; setState(state: unknown): void };
 const vscode = acquireVsCodeApi();
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const prompt = element<HTMLTextAreaElement>('prompt');
 const 検証ループ = element<HTMLSelectElement>('self-check-loop');
-検証ループ.value = '1';
+// 検証回数は未保存ならオンライン・オフラインとも0回から始める。オフラインの間は0回に固定し、オンラインへ戻ると直前のオンラインの回数に戻す。
+// オンラインで選んだ回数は拡張・単独起動版が保存し、次回の最初の状態通知（検証回数）で復元する。
+検証ループ.value = '0';
 let オフライン = false;
 let 検証なし = false;
-let オンライン検証回数 = '1';
+let オンライン検証回数 = '0';
+let 検証回数復元済み = false;
 const 初期起動画面 = element('welcome').cloneNode(true);
 const modelButton = element<HTMLButtonElement>('choose-model');
 const projectFolder = element<HTMLElement>('project-folder');
@@ -52,7 +56,6 @@ let 会話ID = '';
 let 一覧表示中 = false;
 let 削除対象ID = '';
 const 演出済み回答 = new Set<string>();
-let 演出タイマー: number | undefined;
 prompt.value = vscode.getState()?.下書き ?? '';
 const 初期文字演出停止 = () => {
   if (prompt.value.length > 0) element('welcome').classList.add('welcome-input-started');
@@ -65,25 +68,81 @@ const 実行表示更新 = (running: boolean) => {
 };
 const 末尾省略 = (value: string, maximum = 28) => value.length > maximum ? `...${value.slice(-(maximum - 3))}` : value;
 const 最下部表示 = 最下部追従([element('conversation'), element('progress')]);
-const コンソール演出 = (content: HTMLDivElement, text: string, key: string) => {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    content.innerHTML = markdown.render(text); 演出済み回答.add(key); 最下部表示(); return;
-  }
-  content.classList.add('console-effect');
-  const terminalText = document.createElement('span');
-  const cursor = document.createElement('span'); cursor.className = 'terminal-cursor';
-  content.replaceChildren(terminalText, cursor);
-  const batch = Math.max(1, Math.floor(text.length / 50) + 1);
-  let index = 0;
-  const tick = () => {
-    const end = Math.min(index + batch, text.length);
-    terminalText.textContent += text.slice(index, end); index = end;
+let 飛行予約: { 起点: DOMRect; 本文: string; 件数: number; 期限: number } | undefined;
+let 入力演出: { index: number; 先?: HTMLElement; 枠: HTMLElement } | undefined;
+let 応答演出: { key: string; 段階: 'popup' | 'flight'; 先?: HTMLElement; 枠: HTMLElement; タイマー?: number; 文字?: ターミナル演出 } | undefined;
+let 表示件数 = 0;
+const 発言演出解除 = () => {
+  飛行予約 = undefined;
+  入力演出?.枠.remove(); 入力演出 = undefined;
+  if (応答演出) { clearTimeout(応答演出.タイマー); 応答演出.文字?.停止(); 応答演出.枠.remove(); 応答演出 = undefined; }
+};
+// 発言の登場演出（共通処理は src/arrival-effect.ts）。Code は状態通知ごとに一覧を描き直すため、
+// 演出中の発言は 入力演出 / 応答演出 で段階を引き継ぎ、飛行先はその発言の .content にする。
+const 入力飛行開始 = (index: number, 起点: DOMRect, 本文: string) => {
+  入力演出?.枠.remove();
+  const frame = 入力枠作成(本文);
+  const 演出: NonNullable<typeof 入力演出> = 入力演出 = { index, 枠: frame };
+  return () => 枠飛行(frame, 起点, () => 演出.先?.querySelector<HTMLElement>('.content'), () => {
+    if (入力演出 !== 演出) return;
+    入力演出 = undefined; 到着表示(演出.先);
+  });
+};
+// AI回答は画面中央に受信通知として出し、ターミナル演出で表示してから履歴へ飛ばす。
+const 応答ポップアップ開始 = (key: string, text: string) => {
+  if (応答演出) { clearTimeout(応答演出.タイマー); 応答演出.文字?.停止(); 応答演出.枠.remove(); 到着表示(応答演出.先); }
+  const { popup, body } = 受信通知作成();
+  const 演出: NonNullable<typeof 応答演出> = 応答演出 = { key, 段階: 'popup', 枠: popup };
+  const 着地 = () => {
+    if (応答演出 !== 演出) return;
+    演出.段階 = 'flight';
+    演出.先?.classList.remove('arrival-waiting'); 演出.先?.classList.add('arrival-pending');
     最下部表示();
-    if (index < text.length) { 演出タイマー = window.setTimeout(tick, 10); return; }
-    cursor.remove(); content.classList.remove('console-effect');
-    content.innerHTML = markdown.render(text); 演出済み回答.add(key); 最下部表示();
+    枠飛行(popup, popup.getBoundingClientRect(), () => 演出.先?.querySelector<HTMLElement>('.content'), () => {
+      if (応答演出 !== 演出) return;
+      応答演出 = undefined; 到着表示(演出.先);
+    });
   };
-  演出タイマー = window.setTimeout(tick, 500);
+  // 文字送りで全文を表示し終えたら、3秒中央に止めてから、確保した表示位置へ飛ばす。
+  演出.文字 = 演出初期化(body, {
+    カーソル色: '#00ff00', isStream: false,
+    表示更新: () => { body.scrollTop = body.scrollHeight; },
+    完了: () => { if (応答演出 === 演出) 演出.タイマー = window.setTimeout(着地, 3000); },
+  });
+  演出.文字.追加(text, true);
+};
+// ストリーム受信枠も AIコード.vue の output_stream 処理と同じく、受信した1行ごとに `行\n` をキューへ積んで
+// ストリーム速度・シアンのカーソルで流す（行単位で積むため、短い行は1回8文字ずつ流れる）。
+// 開始の制御コードで演出を作り、終了・中断の制御コードでだけ流し切ってカーソルを外す（実行中フラグでは終えない）。
+// 拡張は次の送信まで進捗を貯めるため、検証などで再び開始されても枠を消さずに続きから流す。
+let 進捗目標 = '';
+let 進捗演出: ターミナル演出 | undefined;
+let 進捗演出中 = false;
+const 進捗演出終了 = () => {
+  if (!進捗演出) return;
+  const effect = 進捗演出; 進捗演出 = undefined;
+  effect.追加('', true);
+};
+const 進捗演出開始 = (初期文字列 = '') => {
+  進捗演出?.停止();
+  進捗演出中 = true;
+  const effect: ターミナル演出 = 演出初期化(element('progress'), {
+    カーソル色: '#00ffff', isStream: true, 初期文字列, 表示更新: 最下部表示,
+    完了: () => { if (!進捗演出 || 進捗演出 === effect) 進捗演出中 = false; },
+  });
+  進捗演出 = effect;
+};
+const 進捗行受信 = (line: string) => {
+  // 途中から開いた画面などで開始を受けていなければ、表示中の内容の続きとして始める。
+  if (!進捗演出) 進捗演出開始(進捗目標 ? `${進捗目標}\n` : '');
+  進捗演出!.追加(`${line}\n`);
+  進捗目標 = 進捗目標 ? `${進捗目標}\n${line}` : line;
+};
+// 状態通知の進捗全文は、初回表示・会話の切替と、演出していない間の表示合わせ（送信時の消去など）にだけ使う。
+const 進捗表示更新 = (text: string, 直接: boolean) => {
+  if (直接) { 進捗演出?.停止(); 進捗演出 = undefined; 進捗演出中 = false; }
+  if (進捗演出中 || text === 進捗目標) return;
+  element('progress').textContent = text; 進捗目標 = text; 最下部表示();
 };
 const ボタン更新 = () => {
   const send = element<HTMLButtonElement>('send');
@@ -97,7 +156,7 @@ const 一覧切替 = (show: boolean) => {
   一覧表示中 = show;
   historyList.hidden = !show;
   element('conversation').hidden = show;
-  element('progress-section').hidden = show || !element('progress').textContent;
+  element('progress-section').hidden = show || !進捗目標;
   element('chat-footer').hidden = show;
   historyToggle.textContent = show ? '戻る' : '一覧';
   historyToggle.setAttribute('aria-expanded', String(show));
@@ -164,6 +223,7 @@ element('composer').addEventListener('submit', event => {
   event.preventDefault();
   if (!入力許可 || 実行中 || 送信待ち || !prompt.value.trim()) return;
   送信待ち = true; ボタン更新(); 最下部表示();
+  飛行予約 = { 起点: prompt.getBoundingClientRect(), 本文: prompt.value, 件数: 表示件数, 期限: Date.now() + 15_000 };
   vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'input_text', メッセージ内容: prompt.value, self_check_loop: オフライン ? 0 : Number(検証ループ.value) });
 });
 prompt.addEventListener('keydown', event => {
@@ -180,6 +240,12 @@ element('stop').addEventListener('click', () => {
   vscode.postMessage({ セッションID: 会話ID, チャンネル: 'code1', メッセージ識別: 'cancel_run', メッセージ内容: '強制停止！' });
 });
 modelButton.addEventListener('click', モデル選択を開く);
+// オンラインで選び直した検証回数を保存し、次回も使う（オフラインの0回固定は選択できないため保存しない）。
+検証ループ.addEventListener('change', () => {
+  if (検証ループ.disabled) return;
+  オンライン検証回数 = 検証ループ.value; 検証回数復元済み = true;
+  post('setSelfCheckLoop', { count: Number(検証ループ.value) });
+});
 historyToggle.addEventListener('click', () => 一覧切替(!一覧表示中));
 自動接続スイッチ.addEventListener('click', () => {
   if (自動接続スイッチ.disabled) return;
@@ -265,13 +331,17 @@ window.addEventListener('message', event => {
       progressSection.classList.add('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = true;
+      進捗演出開始(進捗目標 ? `${進捗目標}\n` : '');
     } else if (control === 'end' || control === 'cancel') {
       実行表示更新(false);
       progressSection.classList.remove('running');
       element('progress-title').textContent = '';
       element<HTMLDetailsElement>('progress-details').open = false;
+      進捗演出終了();
     } else {
-      element('progress-title').textContent = visibleStreamContent(content).slice(0, 160);
+      const line = visibleStreamContent(content);
+      element('progress-title').textContent = line.slice(0, 160);
+      if (line) 進捗行受信(line);
     }
     最下部表示();
     return;
@@ -279,13 +349,14 @@ window.addEventListener('message', event => {
   if (state.type === 'accepted') { prompt.value = ''; vscode.setState({ 下書き: '' }); 送信待ち = false; ボタン更新(); 最下部表示(); return; }
   if (state.type !== 'state') return;
   const 初回状態 = !会話ID;
-  if (会話ID !== state.会話ID) {
+  const 会話切替 = 会話ID !== state.会話ID;
+  if (会話切替) {
     メッセージJSON = '';
     演出済み回答.clear();
     state.メッセージ.forEach((item: { 種別: string; 本文: string }, index: number) => {
       if (item.種別 === 'assistant') 演出済み回答.add(`${index}:${item.本文}`);
     });
-    if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
+    発言演出解除(); 表示件数 = 0;
     if (!初回状態) { prompt.value = ''; vscode.setState({ 下書き: '' }); }
     if (!state.メッセージ.length) {
       // 新規会話では入力で停止した状態を戻し、CSS のターミナル演出を最初から再開する。
@@ -302,6 +373,11 @@ window.addEventListener('message', event => {
   オフライン = nextOffline;
   const nextNoVerification = オフライン || (state.オフライン対応 && state.接続済み !== true);
   if (nextNoVerification && !検証なし) オンライン検証回数 = 検証ループ.value;
+  if (!検証回数復元済み && typeof state.検証回数 === 'number' && [0, 1, 2, 3].includes(state.検証回数)) {
+    検証回数復元済み = true;
+    オンライン検証回数 = String(state.検証回数);
+    if (!nextNoVerification) 検証ループ.value = オンライン検証回数;
+  }
   if (!nextNoVerification && 検証なし) 検証ループ.value = オンライン検証回数;
   検証なし = Boolean(nextNoVerification);
   検証ループ.disabled = 検証なし;
@@ -340,6 +416,8 @@ window.addEventListener('message', event => {
   modelButton.disabled = 実行中 || state.モデル変更中 || !操作許可 || (!オフライン && !state.作業フォルダ);
   element<HTMLButtonElement>('remove-attachment').disabled = 実行中;
   element('stop').hidden = !実行中;
+  // STOP を表示している処理中は、入力欄の枠に光を流して処理中であることを示す。
+  element('composer').classList.toggle('running', 実行中);
   element<HTMLButtonElement>('stop').disabled = !オフライン && !接続済み;
   element('send').hidden = 実行中;
   const status = element('status');
@@ -352,15 +430,34 @@ window.addEventListener('message', event => {
   element('attachment-name').textContent = state.添付 ?? '';
   const json = JSON.stringify(state.メッセージ);
   if (json !== メッセージJSON) {
-    if (演出タイマー !== undefined) { clearTimeout(演出タイマー); 演出タイマー = undefined; }
-    const 演出候補: { content: HTMLDivElement; text: string; key: string }[] = [];
     const 最新応答index = state.メッセージ.reduce((latest: number, item: { 種別: string }, index: number) => item.種別 === 'assistant' ? index : latest, -1);
+    // 送信後に追加されたユーザー発言を飛行先にする。届かないまま期限を過ぎた予約は破棄する。
+    let 入力飛行実行: (() => void) | undefined;
+    if (飛行予約 && Date.now() > 飛行予約.期限) 飛行予約 = undefined;
+    if (飛行予約 && state.メッセージ.length > 飛行予約.件数) {
+      const index = state.メッセージ.findLastIndex((item: { 種別: string }) => item.種別 === 'user');
+      if (index >= 飛行予約.件数) 入力飛行実行 = 入力飛行開始(index, 飛行予約.起点, 飛行予約.本文);
+      飛行予約 = undefined;
+    }
+    let 新規応答: { key: string; text: string; article: HTMLElement } | undefined;
+    // 演出中の発言は描画し直しても同じ状態（ポップアップ中は非表示、飛行中は透明で場所を確保）を引き継ぐ。
+    if (入力演出) 入力演出.先 = undefined;
+    if (応答演出) 応答演出.先 = undefined;
+    表示件数 = state.メッセージ.length;
     element('messages').replaceChildren(...state.メッセージ.map((item: { 種別: string; 本文: string }, index: number) => {
       const article = document.createElement('article'); article.className = `message ${item.種別}`;
+      if (入力演出 && index === 入力演出.index) { article.classList.add('arrival-pending'); 入力演出.先 = article; }
       const content = document.createElement('div'); content.className = 'content';
       const key = `${index}:${item.本文}`;
-      if (item.種別 === 'assistant' && index === 最新応答index && !演出済み回答.has(key)) 演出候補.push({ content, text: item.本文, key });
-      else if (item.種別 === 'assistant') content.innerHTML = markdown.render(item.本文);
+      if (item.種別 === 'assistant') {
+        content.innerHTML = markdown.render(item.本文);
+        if (応答演出?.key === key) {
+          article.classList.add(応答演出.段階 === 'popup' ? 'arrival-waiting' : 'arrival-pending'); 応答演出.先 = article;
+        } else if (index === 最新応答index && !演出済み回答.has(key)) {
+          演出済み回答.add(key);
+          if (!document.hidden) { article.classList.add('arrival-waiting'); 新規応答 = { key, text: item.本文, article }; }
+        }
+      }
       else content.textContent = item.本文;
       if (item.種別 === 'user') {
         content.title = 'クリックして入力欄へ戻す';
@@ -373,10 +470,10 @@ window.addEventListener('message', event => {
     }));
     最下部表示();
     メッセージJSON = json;
-    const 最新応答 = 演出候補.at(-1);
-    if (最新応答) {
-      最下部表示();
-      コンソール演出(最新応答.content, 最新応答.text, 最新応答.key);
+    入力飛行実行?.();
+    if (新規応答) {
+      応答ポップアップ開始(新規応答.key, 新規応答.text);
+      if (応答演出) 応答演出.先 = 新規応答.article;
     }
   }
   // 拡張ホスト側で除外済みでも、古い状態や単独試用からの制御文字を防御的に表示しない。
@@ -385,12 +482,8 @@ window.addEventListener('message', event => {
   progressSection.hidden = 一覧表示中 || !visibleProgress.length;
   progressSection.classList.toggle('running', 実行中);
   element('progress-title').textContent = 実行中 ? (visibleProgress.at(-1) ?? '実行中…').slice(0, 160) : '直前の実行状況';
-  const progress = element('progress');
-  const progressText = visibleProgress.join('\n');
-  if (progress.textContent !== progressText) {
-    progress.textContent = progressText;
-    最下部表示();
-  }
+  // 会話の切替・初回表示では、保存済みの実行状況を演出せずにそのまま表示する。
+  進捗表示更新(visibleProgress.join('\n'), 初回状態 || 会話切替);
   ボタン更新();
   初期表示開始();
 });

@@ -16,10 +16,7 @@
 html { background: var(--surface); }
 body.ui-ready { transform-origin: center center; animation: standalone-reveal 1s cubic-bezier(.16, 1, .3, 1) both !important; }
 @keyframes standalone-reveal { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
-#title-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); min-height: 31px; padding: 1px 2px; gap: 8px; }
-.brand { grid-column: 2; justify-content: center; }
-#desktop-controls { grid-column: 3; justify-self: end; }
-.brand-icon { display: none; }
+#title-bar { min-height: 31px; padding: 1px 2px; }
 .brand-name { font-size: 14px; }
 #activity-bar { height: 3px; }
 .desktop-window body { border: 1px solid var(--vscode-panel-border); }
@@ -27,5 +24,4 @@ body.ui-ready { transform-origin: center center; animation: standalone-reveal 1s
 .desktop-window.desktop-opening body { opacity: 0; animation: none !important; }
 .desktop-window.desktop-opening #welcome *, .desktop-window.desktop-opening #welcome *::before, .desktop-window.desktop-opening #welcome *::after { animation-play-state: paused !important; }
 .desktop-window #title-bar { -webkit-app-region: drag; user-select: none; }
-.desktop-window #conversation-toolbar, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }
-.desktop-window.window-maximized body { border: 0; }
+.desktop-window #conversation-toolbar, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }.desktop-window.window-maximized body { border: 0; }

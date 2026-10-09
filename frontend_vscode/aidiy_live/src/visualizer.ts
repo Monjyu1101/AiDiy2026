@@ -14,7 +14,6 @@ export class AudioCloud {
   private last = 0;
   private time = 0;
   private disposed = false;
-  private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   private observer: ResizeObserver;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -49,7 +48,8 @@ export class AudioCloud {
     if (this.disposed || !this.context) return;
     const delta = this.last ? Math.min(.05, (stamp - this.last) / 1000) : 1 / 60;
     this.last = stamp;
-    if (!this.reducedMotion.matches) this.time += delta;
+    // OS の「動きを減らす」設定には従わず、Windows / macOS / Linux で同じ動きにする。
+    this.time += delta;
     const ctx = this.context, radius = Math.min(this.width * .29, this.height * .22, 150);
     const x = this.width / 2, y = this.height * .53;
     ctx.clearRect(0, 0, this.width, this.height);

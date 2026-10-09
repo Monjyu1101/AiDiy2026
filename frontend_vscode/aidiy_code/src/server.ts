@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
 import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
-import { コードモデル読込, コードモデル保存, モデル保存先 } from '../../src/model-preferences';
+import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
 import { 接続元許可 } from '../../src/forwarded-origin';
 import { オフライン実行, オフラインモデル候補, オフラインモデル保存先, Hermes既定モデル } from './offline';
 import type { Packet } from '../../aidiy_live/src/protocol';
@@ -21,6 +21,8 @@ export async function 単独起動(project: string, backend?: string, initialMod
   const remembered = !requestedModel && (!requestedProvider || requestedProvider === savedModel?.provider) ? savedModel : undefined;
   const offlineFile = オフラインモデル保存先(modelFile);
   const offlineSaved = コードモデル読込(offlineFile);
+  // 最後に選んだオンラインの検証回数を次回も使う（未保存なら0回）。
+  const optionsFile = コード設定保存先(modelFile);
   const offlineModels = オフラインモデル候補(root);
   const offlineModelAllowed = (model: string) => offlineModels.some(item => item.id === model);
   const modeModels = {
@@ -42,6 +44,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     ...modeModels[initialModel.offline ? 'offline' : 'online'],
     オフライン対応: true, 実行モード: (initialModel.offline ? 'offline' : 'online') as 'online' | 'offline',
     自動接続: !initialModel.offline, 接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
+    検証回数: 検証回数読込(optionsFile) ?? 0,
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false, 停止中: false,
     セッションID: undefined as string | undefined,
     HermesセッションID: undefined as string | undefined,
@@ -211,6 +214,10 @@ export async function 単独起動(project: string, backend?: string, initialMod
             save(false);
             state.実行モード = 'online'; newConversation();
           } else { reconnect(); notify(); }
+        } else if (type === 'setSelfCheckLoop') {
+          // 実行中でも選び直せる。次回の起動でもこの回数から始める。
+          try { state.検証回数 = 検証回数保存(data.count, optionsFile); }
+          catch { reply(400, {error:'検証回数の指定が不正です。'}); return; }
         } else if (type === 'disconnect' || type === 'connect') {
           if (state.実行中 || offlineJob || connection.modelChanging) { reply(409, {error:'実行中またはモデル変更中は接続を変更できません。'}); return; }
           if (state.実行モード === 'offline') { reply(409, {error:'オフラインではAIコアへ接続しません。'}); return; }
