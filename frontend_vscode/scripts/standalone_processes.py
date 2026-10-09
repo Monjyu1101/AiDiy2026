@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
-from cleanup_processes import list_processes, process_arguments, stop_matching
+from _cleanup_processes import list_processes, process_arguments, stop_matching
 
 
 def is_standalone(process: dict, root: Path, windows: bool, module: str | None = None) -> bool:

@@ -34,7 +34,7 @@
 
 - 何らかのクリーンアップを実行するときは、ファイル削除を始める前に全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止する（8090 / 8091 / 8092 / 8093 / 8095 / 8096、apps は 8098）。選択した削除対象だけに限定しない。
 - Code / Live の単独実行はランダムポートを使うため、上記のポート停止だけでは終了しない。ルートの削除前処理と `frontend_vscode/_cleanup.py` は、この作業コピーの実行入口・Electron 実行ファイル・専用ブラウザプロファイルを完全一致で判定し、Windows では `taskkill /F /T` で強制終了する。終了を確認できない場合は削除を中止する。通常のブラウザと VS Code 本体は対象外。
-- tools の `mcp_stdio.py` は MCP クライアント側の接続プロセスであり、8095 の待受プロセスを停止しても残る。ルートと tools 単独の cleanup は、この作業コピーの `.venv` / `venv` の Python、および `mcp_stdio.py` / `tools_main.py` の実行入口を照合して、接続プロセスと子孫も強制終了する。クライアント本体は終了しない。プロセス照合と終了確認は `scripts/cleanup_processes.py` を共用する。
+- tools の `mcp_stdio.py` は MCP クライアント側の接続プロセスであり、8095 の待受プロセスを停止しても残る。ルートと tools 単独の cleanup は、この作業コピーの `.venv` / `venv` の Python、および `mcp_stdio.py` / `tools_main.py` の実行入口を照合して、接続プロセスと子孫も強制終了する。クライアント本体は終了しない。プロセス照合と終了確認は `scripts/_cleanup_processes.py` を共用する。
 - tools の `.venv/Scripts/python.exe` で WinError 5、`temp/logs/*mcp_main.log` で WinError 32 が出た場合は、MCP 接続プロセスの残留を確認する。管理者権限の不足とは限らない。終了を確認できない場合は削除を中止し、ディレクトリの削除失敗は tools 単独・ルートともに失敗として終了する。削除対象の仮想環境から cleanup を実行すると自分自身が実行ファイルを保持するため、通常の Python で起動する。
 - ルート `_start.py` が同時に稼働している場合は、`.cleanup_stop_request.json` で全常駐サービスを自動再起動対象から外す。要求ファイル自体は `_cleanup.py` の終了時に削除するが、監視プロセス内のサービス選択は無効のまま維持し、cleanup 後に勝手に再起動させない。
 - Windows で停止要求元 PID の生存確認を行うときは `os.kill(pid, 0)` を使わない。Windows ではプロセス終了になるため、`OpenProcess` と `GetExitCodeProcess` で非破壊に確認する。

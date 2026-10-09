@@ -75,7 +75,7 @@
 - Copilot の `assistant.reasoning_delta` / `assistant.reasoning` とツール開始・進捗・完了は `output_stream` に振り分ける。思考断片は改行または160文字ごとにまとめ、完成版との重複を避ける。思考イベントの有無はモデルによって異なる
 - Copilot の回答断片は `messageId` ごとに保持し、最後の親エージェントの回答本文だけを正式回答にする。ツール要求つきメッセージ、commentary / thinking、子エージェントの回答、入力や利用量、暗号化された思考を正式回答へ混ぜない。未知のJSONイベントは無視し、stdoutの生JSONは画面へ送らない
 - Code CLI の実行待機は既定で900秒。stdout / stderr のどちらかで1チャンクでも受信したら、その時点から900秒を数え直す。画面へのストリーム表示は引き続き行単位にする
-- Windows の監視ラッパー `scripts/process_lifetime.py` では、子の `subprocess.Popen` に `stdin=sys.stdin`、`stdout=sys.stdout`、`stderr=sys.stderr` を明示する。`CREATE_NO_WINDOW` と標準ハンドルの省略を組み合わせると、CLIが動いても出力が届かず「応答なし」になる。確認は backend の仮想環境で `test_code_cli_output_routing.py` と `test_aidiy_hermes_stdin.py` を実行する。
+- Windows の監視ラッパー `backend_tools/tools_proc/process_lifetime.py` では、子の `subprocess.Popen` に `stdin=sys.stdin`、`stdout=sys.stdout`、`stderr=sys.stderr` を明示する。`CREATE_NO_WINDOW` と標準ハンドルの省略を組み合わせると、CLIが動いても出力が届かず「応答なし」になる。確認は backend の仮想環境で `test_code_cli_output_routing.py` と `test_aidiy_hermes_stdin.py` を実行する。
 - `antigravity_cli` は CLI 固有の `--print-timeout` に固定の時間を渡すと、受信が続いていても先に終了する。`0` を渡して固定上限を無効にし、バックエンド側の無受信監視に任せる
 - `CODE_AIDIY_HERMES_MODEL` が `auto` 以外のときは、`--provider ollama --model <model>` を渡す。AiDiy の設定画面で扱う `aidiy_hermes` モデル候補は Ollama 系を前提にする
 - TUI の `/model` では `AiDiy_key.json` を使い、`ollama` / `openai` / `openrt` / `gemini` / `freeai` / `anthropic` を選べるようにする。Code AI 経由のモデル指定とは役割を分ける

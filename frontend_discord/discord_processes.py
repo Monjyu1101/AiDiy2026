@@ -6,7 +6,7 @@ import sys
 from urllib.parse import unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
-from cleanup_processes import list_processes, process_arguments, stop_matching
+from _cleanup_processes import list_processes, process_arguments, stop_matching
 
 
 def is_discord_process(process: dict, root: Path, windows: bool) -> bool:

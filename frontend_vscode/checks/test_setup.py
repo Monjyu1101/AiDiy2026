@@ -24,7 +24,7 @@ def load_setup(name):
 
 vscode = load_setup('frontend_vscode')
 avatar = load_setup('frontend_avatar')
-import setup_electron as common
+import _setup_electron as common
 
 
 class ElectronSetupTest(unittest.TestCase):

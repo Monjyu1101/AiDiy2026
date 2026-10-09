@@ -27,7 +27,7 @@ def check_environment() -> tuple[bool, str]:
     if not (THIS_DIR / 'node_modules/tsx/dist/loader.mjs').is_file():
         return False, '依存関係がありません。python frontend_discord/_setup.py を実行してください。'
     sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
-    from setup_electron import electron_binary_ready
+    from _setup_electron import electron_binary_ready
     if not electron_binary_ready(THIS_DIR):
         return False, 'Electron が未準備です。python frontend_discord/_setup.py を実行してください。'
     try:

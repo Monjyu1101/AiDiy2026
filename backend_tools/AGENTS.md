@@ -61,6 +61,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 |------|------|
 | `tools_main.py` | FastAPI 上に Windows では 19 個、Linux / macOS では 18 個の `MCPServer` を同居 |
 | `mcp_stdio.py` | stdio <-> SSE bridge |
+| `tools_proc/process_lifetime.py` | AIコード・Hermes・stdio MCP 共通の親プロセス監視と子孫の終了管理 |
 | `aidiy_automations/` | MCP / HTTP API を組み合わせる自動化スクリプト |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py` | 一人アバター（AiDiy）による紹介・ガイド型ビデオ自動生成（version: "mcp"、short/long narration 形式） |
 | `aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` | 二人アバター（男女）の掛け合いによる解説・ニュース型ビデオ自動生成（version: "duo-v2"、dialogue 形式） |

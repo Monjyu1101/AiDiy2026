@@ -24253,8 +24253,8 @@ def cli_entry(argv: list[str] | None = None) -> int:
         return 0
 
     # 親 CLI / 拡張が終了したら MCP・terminal の子孫も破棄する。
-    sys.path.insert(0, str(_PROJECT_ROOT.parent / "scripts"))
-    from process_lifetime import guard_parent
+    sys.path.insert(0, str(_PROJECT_ROOT.parent / "backend_tools"))
+    from tools_proc.process_lifetime import guard_parent
     guard_parent(_AIDIY_PARENT_PID)
 
     if args.yolo:

@@ -20,7 +20,7 @@ def load(name, path):
 
 tools = load('tools_cleanup_tests', PROJECT / 'backend_tools/_cleanup.py')
 root_cleanup = load('root_tools_cleanup_tests', PROJECT / '_cleanup.py')
-import cleanup_processes as processes
+import _cleanup_processes as processes
 
 
 class ToolsCleanupTest(unittest.TestCase):

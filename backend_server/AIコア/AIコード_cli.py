@@ -167,7 +167,7 @@ class _CopilotJSON出力:
         return []
 
 
-_PROCESS_LIFETIME = Path(__file__).resolve().parents[2] / "scripts" / "process_lifetime.py"
+_PROCESS_LIFETIME = Path(__file__).resolve().parents[2] / "backend_tools" / "tools_proc" / "process_lifetime.py"
 
 
 async def _所有プロセス終了(process):

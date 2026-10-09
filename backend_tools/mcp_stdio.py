@@ -25,7 +25,6 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 from contextlib import AsyncExitStack
 from typing import Any
 
@@ -348,8 +347,7 @@ async def async_main() -> None:
 
 
 def main() -> None:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-    from process_lifetime import guard_parent
+    from tools_proc.process_lifetime import guard_parent
     guard_parent(_起動元PID)
     try:
         anyio.run(async_main)

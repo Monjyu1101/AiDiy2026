@@ -100,7 +100,7 @@ python frontend_vscode/_setup.py
 
 片方だけを無効にする場合は VS Code の拡張一覧で対象の歯車から「無効にする」または「無効にする（ワークスペース）」を選択する。必要に応じてウィンドウを再読み込みする。
 
-Electron は VSIX 生成・単独画面コンパイルより前に `scripts/setup_electron.py` の共通処理で準備する。配置済みの実行ファイル・`version`・`path.txt` を照合し、未配置なら Avatar の同じバージョンのバイナリ、`_cache/electron/` の共有 ZIP の順に再利用する。まだ取得されていない場合だけ Python で GitHub から取得する。npm の install / update / rebuild では Electron の自動取得をスキップし、同じ取得を繰り返さない。Electron を準備できない場合はセットアップを失敗扱いにする。詳細は [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) の「Electron の共通セットアップ」を参照する。
+Electron は VSIX 生成・単独画面コンパイルより前に `scripts/_setup_electron.py` の共通処理で準備する。配置済みの実行ファイル・`version`・`path.txt` を照合し、未配置なら Avatar の同じバージョンのバイナリ、`_cache/electron/` の共有 ZIP の順に再利用する。まだ取得されていない場合だけ Python で GitHub から取得する。npm の install / update / rebuild では Electron の自動取得をスキップし、同じ取得を繰り返さない。Electron を準備できない場合はセットアップを失敗扱いにする。詳細は [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) の「Electron の共通セットアップ」を参照する。
 
 単独画面は作業フォルダで `aidiy_code`、または `aidiy_code "C:\work\project"` のように明示して起動する。前者は起動時のカレントフォルダを使用する。`~/.local/bin` は Hermes のランチャーと共通なので PATH に含める。Windows の `.cmd` と macOS / Linux のシェルランチャーは、どちらも `aidiy_code/launch.mjs` を直接呼ぶ。`launch-extension-dev.ps1` は Windows で Code / Live の両方を `--extensionDevelopmentPath` に指定した VS Code 拡張の開発ホストを起動する。
 

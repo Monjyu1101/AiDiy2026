@@ -13,7 +13,7 @@ spec = importlib.util.spec_from_file_location('cleanup_process_tests', ROOT / '_
 cleanup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cleanup)
 import standalone_processes as processes
-import cleanup_processes as common
+import _cleanup_processes as common
 
 
 class CleanupProcessesTest(unittest.TestCase):

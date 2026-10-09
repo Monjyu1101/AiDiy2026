@@ -37,7 +37,7 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_TOOLS_DIR = THIS_DIR
 sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
-from cleanup_processes import process_arguments, stop_matching
+from _cleanup_processes import process_arguments, stop_matching
 BACKEND_TOOLS_ENV_LIST = [".venv", "venv"]
 BACKEND_TOOLS_SERVER_PREFIX = "aidiy_"
 VSCODE_CHAT_PROVIDER_PREFIX = "aidiy_"

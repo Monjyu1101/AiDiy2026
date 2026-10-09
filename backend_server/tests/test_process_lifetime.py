@@ -17,7 +17,7 @@ from test_aidiy_hermes_stdin import _load_code_ai_module
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SUPERVISOR = ROOT / "scripts" / "process_lifetime.py"
+SUPERVISOR = ROOT / "backend_tools" / "tools_proc" / "process_lifetime.py"
 FIXTURE = '''
 import os,sys,subprocess,time
 from pathlib import Path
@@ -28,7 +28,7 @@ if mode == 'owner':
     (directory/'wrapper.pid').write_text(str(process.pid))
 elif mode == 'guard':
     sys.path.insert(0,sys.argv[3])
-    from process_lifetime import guard_parent
+    from tools_proc.process_lifetime import guard_parent
     guard=guard_parent()
     assert guard.thread.daemon
     subprocess.Popen([sys.executable,__file__,str(directory),'child'])
@@ -130,7 +130,7 @@ class ProcessLifetimeTest(unittest.IsolatedAsyncioTestCase):
     async def test_standalone_guard_exits_when_parent_dies(self):
         # helper の guard_parent は Hermes / stdio bridge が直接使う経路。
         launcher = "import subprocess,sys,time; subprocess.Popen(sys.argv[1:]); time.sleep(60)"
-        owner = self._spawn([sys.executable, "-c", launcher, *self._command("guard"), str(SUPERVISOR.parent)])
+        owner = self._spawn([sys.executable, "-c", launcher, *self._command("guard"), str(SUPERVISOR.parent.parent)])
         await self._ready(("guard", "child", "leaf"))
         owner.kill()
         await asyncio.to_thread(owner.communicate, timeout=10)

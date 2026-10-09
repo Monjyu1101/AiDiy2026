@@ -11,7 +11,7 @@
 """フロントエンド(vscode) セットアップスクリプト
 
 Node.js 依存関係と Electron バイナリを事前に導入して VSIX を配置し、
-単独起動用ランチャーも作成します。Electron は scripts/setup_electron.py の
+単独起動用ランチャーも作成します。Electron は scripts/_setup_electron.py の
 共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
 
 公開 API:
@@ -37,7 +37,7 @@ FRONTEND_COMMAND = "npm"
 
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
-from setup_electron import setup_dependencies
+from _setup_electron import setup_dependencies
 
 sys.path.insert(0, str(THIS_DIR / "scripts"))
 from vscode_extensions import uninstall_aidiy_extensions

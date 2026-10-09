@@ -11,7 +11,7 @@ THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 from launcher import install_launcher
 sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
-from setup_electron import prepare_electron_binary
+from _setup_electron import prepare_electron_binary
 
 
 class Colors:

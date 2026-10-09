@@ -11,7 +11,7 @@
 """フロントエンド(Avatar) セットアップスクリプト
 
 Vue 3 / Vite / TypeScript / Electron の依存関係を導入し、宣言範囲内の最新版へ更新します。
-Electron は scripts/setup_electron.py の共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
+Electron は scripts/_setup_electron.py の共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
 
 公開 API:
     setup(choices=None) -> bool
@@ -37,7 +37,7 @@ FRONTEND_COMMAND = "npm"
 
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
-from setup_electron import setup_dependencies
+from _setup_electron import setup_dependencies
 
 AUTO_MODE = False
 

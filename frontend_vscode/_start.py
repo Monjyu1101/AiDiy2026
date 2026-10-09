@@ -28,7 +28,7 @@ def check_environment(module: str) -> tuple[bool, str]:
     if not (THIS_DIR / f'dist/aidiy_{module}/server.cjs').is_file():
         return False, '画面が未準備です。python frontend_vscode/_setup.py を実行してください。'
     sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
-    from setup_electron import electron_binary_ready
+    from _setup_electron import electron_binary_ready
     if not electron_binary_ready(THIS_DIR):
         return False, 'Electron が未準備です。python frontend_vscode/_setup.py を実行してください。'
     return True, f'aidiy_{module} / Electron'
