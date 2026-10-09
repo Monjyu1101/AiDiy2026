@@ -23,15 +23,148 @@ from pathlib import Path
 from typing import Optional
 from PIL import Image
 import io
+import json
 
 
-# これらの CLI は stderr を進捗ストリーム、stdout を正式回答として扱う。
+# これらの CLI は stdout の生出力を進捗ストリームへ送らない。
+# Copilot は stdout の JSONL を解析し、他の CLI は stderr を進捗として扱う。
 # stdout を output_stream にも流すと、正式回答が途中表示と最終表示で重複する。
 _STDERR_STREAM_STDOUT_FINAL_AI = frozenset({
     "copilot_cli",
     "opencode_cli",
     "antigravity_cli",
 })
+
+
+class _CopilotJSON出力:
+    """Copilot の JSONL から表示用の進捗と親エージェントの最終回答を取り出す。"""
+
+    def __init__(self):
+        self.メッセージ = {}
+        self.待機断片 = {}
+        self.思考受信済み = set()
+        self.ツール名 = {}
+        self.エラー = ""
+
+    def _断片出力(self, key, text="", 完了=False):
+        # 画面は行単位なので、トークンごとの改行を避けつつ長い思考も途中表示する。
+        pending = self.待機断片.pop(key, "") + text
+        lines = []
+        while pending:
+            newline = pending.find("\n")
+            if 0 <= newline < 160:
+                line, pending = pending[:newline], pending[newline + 1:]
+            elif len(pending) >= 160:
+                line, pending = pending[:160], pending[160:]
+            elif 完了:
+                line, pending = pending, ""
+            else:
+                break
+            if line.strip():
+                lines.append(f"[Copilot {key[0]}] {line.rstrip()}")
+        if pending:
+            self.待機断片[key] = pending
+        return lines
+
+    def 残りの進捗(self):
+        lines = []
+        for key in list(self.待機断片):
+            lines.extend(self._断片出力(key, 完了=True))
+        return lines
+
+    @property
+    def 回答(self):
+        for message in reversed(list(self.メッセージ.values())):
+            if message.get("toolRequests") or message.get("phase") in ("thinking", "analysis", "commentary"):
+                continue
+            content = message.get("content", "".join(message["断片"]))
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        return f"Copilot実行エラー: {self.エラー}" if self.エラー else ""
+
+    def 解析(self, line):
+        if not line.strip():
+            return []
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as e:
+            logger.warning("Copilot JSONL解析失敗: %s", e)
+            return ["[Copilot] JSON出力を解析できませんでした。"]
+        if not isinstance(event, dict):
+            return []
+        kind = event.get("type")
+        data = event.get("data", {})
+        if not isinstance(data, dict):
+            return []
+
+        if kind in ("assistant.reasoning_delta", "assistant.reasoning"):
+            key = ("thinking", event.get("agentId"), data.get("reasoningId", ""))
+            if kind == "assistant.reasoning_delta":
+                self.思考受信済み.add(key)
+                text = data.get("deltaContent", "")
+                return self._断片出力(key, text if isinstance(text, str) else "")
+            # 完成版は差分をすでに表示していれば末尾だけを送る。
+            text = data.get("content", "") if key not in self.思考受信済み else ""
+            self.思考受信済み.add(key)
+            return self._断片出力(key, text if isinstance(text, str) else "", 完了=True)
+
+        if kind in ("assistant.message_start", "assistant.message_delta", "assistant.message"):
+            # 子エージェントの回答を親の正式回答へ混ぜない。
+            if event.get("agentId") or data.get("parentToolCallId"):
+                return []
+            message = self.メッセージ.setdefault(data.get("messageId", ""), {"断片": []})
+            if isinstance(data.get("phase"), str):
+                message["phase"] = data["phase"]
+            if kind == "assistant.message_start":
+                return ["[Copilot] 回答を生成中…"]
+            if kind == "assistant.message_delta":
+                if isinstance(data.get("deltaContent"), str):
+                    message["断片"].append(data["deltaContent"])
+                return []
+            message["toolRequests"] = data.get("toolRequests", [])
+            if isinstance(data.get("content"), str):
+                message["content"] = data["content"]
+            content = message.get("content", "")
+            if content and (message["toolRequests"] or message.get("phase") in ("thinking", "analysis", "commentary")):
+                return [f"[Copilot] {content}"]
+            return []
+
+        tool_id = data.get("toolCallId", "")
+        if kind == "tool.execution_start":
+            name = data.get("toolName") or "tool"
+            self.ツール名[tool_id] = name
+            arguments = data.get("arguments", {})
+            detail = ""
+            if isinstance(arguments, dict):
+                for field in ("path", "file_path", "command", "pattern", "query"):
+                    if isinstance(arguments.get(field), str):
+                        detail = " " + " ".join(arguments[field].split())[:160]
+                        break
+            return [f"[Copilot tool] {name} 開始{detail}"]
+        if kind == "tool.execution_progress":
+            text = data.get("progressMessage")
+            return [f"[Copilot tool] {text}"] if isinstance(text, str) and text else []
+        if kind == "tool.shell_output":
+            text = data.get("text", "")
+            return self._断片出力(("tool", tool_id, data.get("stream", "stdout")), text if isinstance(text, str) else "")
+        if kind == "tool.execution_complete":
+            lines = []
+            for key in list(self.待機断片):
+                if key[0] == "tool" and key[1] == tool_id:
+                    lines.extend(self._断片出力(key, 完了=True))
+            name = self.ツール名.pop(tool_id, "tool")
+            status = "失敗" if data.get("success") is False else "完了"
+            error = data.get("error", {})
+            detail = f": {error['message']}" if isinstance(error, dict) and isinstance(error.get("message"), str) else ""
+            lines.append(f"[Copilot tool] {name} {status}{detail}")
+            return lines
+        if kind == "assistant.intent" and isinstance(data.get("intent"), str):
+            return [f"[Copilot] {data['intent']}"]
+        if kind == "session.error" and isinstance(data.get("message"), str):
+            self.エラー = data["message"]
+            return [f"[Copilot error] {self.エラー}"]
+        # ユーザー入力、利用量、暗号化された思考、未知のイベントは表示しない。
+        return []
 
 
 _PROCESS_LIFETIME = Path(__file__).resolve().parents[2] / "scripts" / "process_lifetime.py"
@@ -456,6 +589,7 @@ class CodeAI:
         if self.code_ai == "copilot_cli":
             # GitHub Copilot CLI
             common = list(base)
+            common.extend(["--output-format", "json", "--stream", "on"])
             if self.code_permissions != "none":
                 common.append("--allow-all-tools")
             # モデルがautoの場合はモデル指定を省略
@@ -1059,11 +1193,31 @@ class CodeAI:
 
             result_lines = []
             stderr_lines = []
+            copilot_output = _CopilotJSON出力() if self.code_ai == "copilot_cli" else None
+            stdout_line_count = 0
             last_output_time = time.monotonic()
 
             def 出力時刻更新():
                 nonlocal last_output_time
                 last_output_time = time.monotonic()
+
+            async def copilot進捗送信(lines):
+                for line in lines:
+                    if self._強制停止要求あり():
+                        await self._停止マーカー送信()
+                        return
+                    if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                        try:
+                            await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                "セッションID": self.セッションID,
+                                "チャンネル": self.チャンネル,
+                                "メッセージ識別": "output_stream",
+                                "メッセージ内容": line,
+                                "ファイル名": None,
+                                "サムネイル画像": None,
+                            })
+                        except Exception as e:
+                            logger.error(f"[CodeCli] Copilot進捗送信エラー: {e}")
 
             # stdin 送信は stdout/stderr の読み取りと並行して行う。
             # 子が先に大量出力する場合でも、双方向のパイプ待ちを起こさない。
@@ -1082,7 +1236,7 @@ class CodeAI:
 
             # stdout監視タスク
             async def stdout_reader():
-                nonlocal last_output_time
+                nonlocal last_output_time, stdout_line_count
                 try:
                     async for line in _出力行を順に取得(process.stdout, 出力時刻更新):
                         # 強制停止チェック（is_aliveがFalseならストリーム中断）
@@ -1093,6 +1247,10 @@ class CodeAI:
 
                         last_output_time = time.monotonic()
                         line_text = line.decode('utf-8', errors='replace').rstrip()
+                        stdout_line_count += 1
+                        if copilot_output is not None:
+                            await copilot進捗送信(copilot_output.解析(line_text))
+                            continue
                         result_lines.append(line_text)
 
                         # 強制停止チェック（送信前にも再確認）
@@ -1101,7 +1259,7 @@ class CodeAI:
                             await self._停止マーカー送信()
                             break
 
-                        # copilot/opencode は stdout を正式回答専用とし、
+                        # opencode は stdout を正式回答専用とし、
                         # codex/claude 等の従来の stdout ストリーム挙動は維持する。
                         stdoutをストリーム送信 = self.code_ai not in _STDERR_STREAM_STDOUT_FINAL_AI
                         if stdoutをストリーム送信 and self.parent_manager and hasattr(self.parent_manager, '接続'):
@@ -1116,6 +1274,8 @@ class CodeAI:
                                 })
                             except Exception as e:
                                 logger.error(f"[CodeCli] output_stream送信エラー(stream): {e}")
+                    if copilot_output is not None:
+                        await copilot進捗送信(copilot_output.残りの進捗())
                 except Exception as e:
                     logger.error(f"stdout読み取りエラー: {e}")
 
@@ -1209,7 +1369,7 @@ class CodeAI:
                 await _所有プロセス終了(process)
 
             # 結果を結合
-            full_output = "\n".join(result_lines)
+            full_output = copilot_output.回答 if copilot_output is not None else "\n".join(result_lines)
             stderr_output = "\n".join(stderr_lines)
 
             # stderr を保存（セッションID抽出用）
@@ -1219,7 +1379,7 @@ class CodeAI:
                 raise monitor_error
 
             # stdout/stderr の行数と先頭内容を記録
-            logger.info(f"[CodeAI] subprocess完了: stdout={len(result_lines)}行, stderr={len(stderr_lines)}行, ai={self.code_ai}, 終了コード={process.returncode}")
+            logger.info(f"[CodeAI] subprocess完了: stdout={stdout_line_count}行, stderr={len(stderr_lines)}行, ai={self.code_ai}, 終了コード={process.returncode}")
             if result_lines:
                 logger.info(f"[CodeAI] stdout先頭: {repr(result_lines[0][:80])}")
                 logger.info(f"[CodeAI] stdout末尾: {repr(result_lines[-1][:80])}")
@@ -1230,6 +1390,8 @@ class CodeAI:
                 return "!"
 
             result = full_output.strip()
+            if copilot_output is not None and not result and process.returncode != 0:
+                return f"Copilot実行エラー: {stderr_output.strip() or f'終了コード {process.returncode}'}"
             # stdout を正式回答とする CLI では stderr を最終回答へ混ぜない。
             # その他の CLI は、非TTY環境で stderr に回答を出す場合に備えて従来挙動を維持する。
             if (

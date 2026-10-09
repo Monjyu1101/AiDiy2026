@@ -70,7 +70,10 @@
 - `aidiy_hermes` の Code AI 呼び出しでは `-Q --oneshot-stdin` を使い、完全プロンプトを UTF-8 標準入力で渡す。本文の長短で argv / stdin を切り替えない。手動実行の `-Q -z "本文"` は互換性のため維持する
 - AIコードパネルから `aidiy_hermes` をモデル `auto` で呼ぶときは、`--model` / `--provider` を付けず、`command_hermes/cli_main.py` 側でも `CODE_AIDIY_HERMES_MODEL` へ置換せず Hermes 本来の auto 解決に任せる。パネルの welcome 表示も `Model: "auto"` のままにする
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
-- `copilot_cli` / `opencode_cli` / `antigravity_cli` も、stdout は正式回答専用、stderr は `output_stream` 専用とする。stdout を途中表示にも送ると最終回答と二重表示になるため、追加時は `AIコード_cli.py` の `_STDERR_STREAM_STDOUT_FINAL_AI` を確認する
+- `opencode_cli` / `antigravity_cli` は stdout を正式回答専用、stderr を `output_stream` 専用とする。stdout を途中表示にも送ると最終回答と二重表示になるため、追加時は `AIコード_cli.py` の `_STDERR_STREAM_STDOUT_FINAL_AI` を確認する
+- `copilot_cli` は初回・継続とも `--output-format json --stream on` を付け、stdout の JSONL を `_CopilotJSON出力` で解析する。通常テキストではツール進捗も stdout に流れ、stderr は終了時の利用量などに限られるため、stderr だけの監視では途中経過を表示できない
+- Copilot の `assistant.reasoning_delta` / `assistant.reasoning` とツール開始・進捗・完了は `output_stream` に振り分ける。思考断片は改行または160文字ごとにまとめ、完成版との重複を避ける。思考イベントの有無はモデルによって異なる
+- Copilot の回答断片は `messageId` ごとに保持し、最後の親エージェントの回答本文だけを正式回答にする。ツール要求つきメッセージ、commentary / thinking、子エージェントの回答、入力や利用量、暗号化された思考を正式回答へ混ぜない。未知のJSONイベントは無視し、stdoutの生JSONは画面へ送らない
 - Code CLI の実行待機は既定で900秒。stdout / stderr のどちらかで1チャンクでも受信したら、その時点から900秒を数え直す。画面へのストリーム表示は引き続き行単位にする
 - Windows の監視ラッパー `scripts/process_lifetime.py` では、子の `subprocess.Popen` に `stdin=sys.stdin`、`stdout=sys.stdout`、`stderr=sys.stderr` を明示する。`CREATE_NO_WINDOW` と標準ハンドルの省略を組み合わせると、CLIが動いても出力が届かず「応答なし」になる。確認は backend の仮想環境で `test_code_cli_output_routing.py` と `test_aidiy_hermes_stdin.py` を実行する。
 - `antigravity_cli` は CLI 固有の `--print-timeout` に固定の時間を渡すと、受信が続いていても先に終了する。`0` を渡して固定上限を無効にし、バックエンド側の無受信監視に任せる
