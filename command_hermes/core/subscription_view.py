@@ -257,7 +257,7 @@ def build_subscription_state(*, timeout: float = 15.0) -> SubscriptionState:
     portal/HTTP failure, returns ``logged_in=False`` with ``error`` set so the
     surface can show a clear message rather than crashing.
 
-    Dev override: when ``HERMES_DEV_SUBSCRIPTION_FIXTURE`` names a fixture state,
+    IDE override: when ``HERMES_DEV_SUBSCRIPTION_FIXTURE`` names a fixture state,
     ``/subscription`` renders from that fixture instead of the real portal — so
     every plan/cancel/downgrade/team/not-admin state is testable on both
     the CLI and TUI without a live account. Throwaway scaffolding; see
@@ -413,7 +413,7 @@ def is_upgrade(state: SubscriptionState, tier_id: str) -> bool:
 
 
 # =============================================================================
-# Dev fixtures (throwaway scaffolding — env-var driven, no live portal)
+# IDE fixtures (throwaway scaffolding — env-var driven, no live portal)
 # =============================================================================
 
 _DEV_FIXTURE_PORTAL = "https://portal.nousresearch.com/billing"

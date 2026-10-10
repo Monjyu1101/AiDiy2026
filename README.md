@@ -14,8 +14,9 @@
 - [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
-- [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md)
+- [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md)
 - [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md)
+- [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md)
 - [docs/](./docs/)
 
 ---
@@ -31,8 +32,9 @@
 - バックエンド TaskTeam: `backend_taskteam`（ポート 8093、AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI）
 - フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- フロントエンド VS Code: TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版、常駐なし）
+- フロントエンド VS Code: TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版。さらに開発スペース `aidiy_ide` の部品としても動作、常駐なし）
 - フロントエンド Discord: TypeScript + discord.js（Hermes チャット / AIコア Live 音声接続、任意起動の Bot）
+- フロントエンド IDE（開発スペース）: Vue 3 + Canvas 2D + Monaco Editor + Electron（宇宙をテーマにした IDE 開発環境。Code / Live を部品として組み込んだ `aidiy_ide`、ポート自動割り当て）
 - 常駐バックエンドは **5 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8098`
@@ -46,12 +48,13 @@
 
 ### 主な特徴
 
+- **開発スペース（宇宙をテーマにした IDE 開発環境）** — プロジェクトを宇宙に見立て、フォルダは銀河、ファイルは星・惑星として浮かびます。目指すのは「ソースをほぼ触らない IDE」。宇宙で全体を眺め、エクスプローラーで辿り、読み取り専用のビューアで中身を読み、変更は Code（コード支援）と Live（音声会話）に頼んで AI に任せます。起点日時より後に AI が更新したファイルは明滅し、どこが変わったかをひと目で見つけられます。Code / Live は単独起動・VS Code 拡張のまま使え、さらに開発スペースの部品として IDE の中から同じプロジェクトで呼び出せるため、IDE 開発への応用が広がります。`aidiy_ide` で起動します
 - **マルチ Code CLI 対応** — `claude_sdk` / `claude_cli` / `copilot_cli` / `codex_cli` / `antigravity_cli` / `grok_cli` / `opencode_cli` / `aidiy_hermes` を切り替えて、`code1`〜`code6` の6コードパネルで同時並走
 - **AIタスク自動実行** — 要求を登録すると AI が明細タスクへ分解し、`backend_taskteam` が Code CLI で実行。カンバン方式でも垂直の流れ作業だけでもなく、先行SEQ（複数指定可）で水平の並行分岐を含む**自由なタスクフロー**を定義でき、**クリティカルパス**基準のフロー図で可視化・実行（Web / Avatar の AIタスク画面から操作）
 - **自己改善機構** — コードエージェントが修正完了後に `_AIDIY/knowledge/` へ知見を自動整理し、使うほど修正精度が上がる
 - **日本語ネイティブ** — テーブル名・API・コンポーネント名まで日本語で統一
 - **AI 音声対話コーディング** — Avatar に話しかけながらコードを書き進められる
-- **VS Code 拡張** — AiDiy (Code) はセカンダリサイドバーから `aidiy_hermes` を直接操作し、選択コード添付、モデル選択、会話継続、停止、実行ログを利用。AiDiy (Live) は AIコアへ接続し、作業フォルダを共有した音声・文字のライブ会話を利用。どちらも `aidiy_code` / `aidiy_live` で単独ウィンドウ起動が可能
+- **VS Code 拡張** — AiDiy (Code) はセカンダリサイドバーから `aidiy_hermes` を直接操作し、選択コード添付、モデル選択、会話継続、停止、実行ログを利用。AiDiy (Live) は AIコアへ接続し、作業フォルダを共有した音声・文字のライブ会話を利用。どちらも `aidiy_code` / `aidiy_live` で単独ウィンドウ起動が可能。さらに開発スペース（`aidiy_ide`）の部品としても動作し、IDE の「＋ Code」「＋ Live」から同じプロジェクトの Code / Live を開けます
 
 ---
 
@@ -65,7 +68,7 @@
 | Node.js | 22 系 |
 | Git | 最新版推奨 |
 | uv | Python パッケージ管理に使用 |
-| VS Code | 1.106 以降（`frontend_vscode` を利用する場合） |
+| VS Code | 1.106 以降（`frontend_ide/host` を利用する場合） |
 
 ### リポジトリ取得
 
@@ -94,8 +97,10 @@ python _setup.py
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
-9. `frontend_vscode` の依存導入 / Electron バイナリ準備 / `aidiy_code`・`aidiy_live` ランチャー配置 / Code・Live の VSIX 生成と VS Code 拡張機能への配置
-10. `frontend_discord` の依存導入 / Electron バイナリ準備 / `aidiy_discord` ランチャー配置 / `AiDiy_key.json` の Discord 設定キー補完（既定 Yes）
+9. `frontend_ide/host` の依存導入 / Electron バイナリ準備 / `aidiy_code`・`aidiy_live` ランチャー配置 / Code・Live の VSIX 生成と VS Code 拡張機能への配置
+10. `frontend_ide/viewer` の依存導入 / Electron 準備 / `aidiy_ide` ランチャー配置（既定 Yes）
+11. `frontend_discord` の依存導入 / Electron バイナリ準備 / `aidiy_discord` ランチャー配置 / `AiDiy_key.json` の Discord 設定キー補完（既定 Yes）
+11. `frontend_ide/viewer` の Monaco Editor 導入 / `aidiy_ide` ランチャー配置（既定 Yes）
 
 補足:
 
@@ -122,12 +127,13 @@ python _start.py
 - バックエンド(task,team) を起動するか
 - フロントエンド(Web) を起動するか
 - フロントエンド(Avatar) を起動するか
+- フロントエンド(IDE) を起動するか（デフォルト No、ポート自動割り当て）
 - フロントエンド(Discord) を起動するか（デフォルト No）
 
 その後、選択したサービスを順に起動し、必要なポートの既存プロセスも自動で整理します。
 
 `command_hermes` は **常駐サーバーではないため `_start.py` の起動対象外** です。セットアップ後は、AIコードパネルから `aidiy_hermes` として呼び出すか、必要時に手動で起動します。
-`frontend_vscode` も常駐サービスではありません。セットアップ後は VS Code のコマンドパレットから **AiDiy (Code): チャットを開く** / **AiDiy (Live): ライブ会話を開く**を実行します。単独ウィンドウは作業フォルダで `aidiy_code` / `aidiy_live`（ルートでは `vscode_code.bat` / `vscode_live.bat`）を実行します。Live は `backend_server`（8091）の起動が必要です。
+`frontend_ide/host` も常駐サービスではありません。セットアップ後は VS Code のコマンドパレットから **AiDiy (Code): チャットを開く** / **AiDiy (Live): ライブ会話を開く**を実行します。単独ウィンドウは作業フォルダで `aidiy_code` / `aidiy_live`（ルートでは `vscode_code.bat` / `vscode_live.bat`）を実行します。Live は `backend_server`（8091）の起動が必要です。
 
 `frontend_discord` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord` または `cd frontend_discord && npm start` での個別起動も可能です。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_discord/README.md](./frontend_discord/README.md) を参照してください。
 
@@ -205,6 +211,8 @@ MCP は Windows で19、Linux / macOS で18サーバー（Windows Control は Wi
 
 ## 3. 停止
 
+全体起動の起動前整理・Ctrl+C・リブートでは Code / IDE / Discord は継続します。IDE は自動再起動せず、cleanup 時に停止します。
+
 ### `_start.py` で起動した場合
 
 ターミナルで `Ctrl+C` を押してください。
@@ -251,8 +259,10 @@ python _cleanup.py
 - `logs`
 - 必要に応じて SQLite DB
 
-`_cleanup.py` は `command_hermes` の `.venv` / `venv` と Python キャッシュに加え、`frontend_vscode` の配置済み拡張機能（Code / Live）、単独起動ランチャー（`aidiy_code` / `aidiy_live`）、`node_modules`、`dist`、`out` も削除対象として確認します。
+`_cleanup.py` は `command_hermes` の `.venv` / `venv` と Python キャッシュに加え、`frontend_ide/host` の配置済み拡張機能（Code / Live）、単独起動ランチャー（`aidiy_code` / `aidiy_live`）、`node_modules`、`dist`、`out` も削除対象として確認します。
 `frontend_discord` の依存物・生成物・キャッシュも削除対象です（既定 Yes）。削除前に実行パスを照合して Bot を停止し、全体監視の自動再起動も止めます。共通 `AiDiy_key.json` の Discord 設定は保持します。
+
+`frontend_ide/viewer` も全体クリーンアップに対応しています（既定 Yes）。この配置先のサーバープロセス停止、`aidiy_ide` ランチャー解除、依存物・Python キャッシュの削除を行います。利用方法は [frontend_ide/viewer/README.md](./frontend_ide/viewer/README.md) を参照してください。
 クリーンアップを実行すると、ファイル削除の前に、選択した対象に限らず全常駐サービスの待受プロセス（Avatar は残留 Electron も含む）を停止します。この作業コピーの Code / Live 単独実行と、tools の MCP 接続プロセスも終了します。ルート `_start.py` の監視中でも全常駐サービスが自動再起動の対象から外れ、クリーンアップ中や直後に再起動しません。
 
 クリーンアップ後は再度 `python _setup.py` が必要です。
@@ -265,7 +275,7 @@ python _cleanup.py
 - Claude 系のブラウザ自動操作を使う場合は `backend_tools` も起動してください。
 - `_start.py` 起動時のバックエンドは `uvicorn --reload` なしです。コード変更を即反映したい場合は個別起動か reboot 機構を使います。
 - `command_hermes` は `_start.py` では起動しません。`python _setup.py` で導入し、`aidiy_hermes` または `command_hermes\cli_main.py` を必要時に実行します。
-- `frontend_vscode` は `_start.py` の対象ではありません。拡張の設定や対応範囲は Code が `frontend_vscode/README.md`、Live が `frontend_vscode/aidiy_live/README.md` を参照してください。
+- `frontend_ide/host` は `_start.py` の対象ではありません。拡張の設定や対応範囲は Code が `frontend_ide/host/README.md`、Live が `frontend_ide/host/aidiy_live/README.md` を参照してください。
 - Web フロントの AI 画面ルートは **`/AiDiy`** です。
 - Avatar は Electron と Web の両モードがあります。Web モードでは認証情報を `sessionStorage` に保持します。
 - DB ファイルは通常 `_data/AiDiy/database.db` にあります。
@@ -282,6 +292,7 @@ python _cleanup.py
 6. [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
-9. [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md)
+9. [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md)
 10. [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md)
-11. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+11. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md)
+12. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

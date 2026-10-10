@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -23,7 +35,8 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
       mkdirSync(dirname(target), { recursive: true });
       symlinkSync(join(source, 'node_modules', name), target, 'junction');
     }
-    symlinkSync(join(プロジェクトルート, 'frontend_vscode'), join(root, 'frontend_vscode'), 'junction');
+    mkdirSync(join(root, 'frontend_ide'));
+    symlinkSync(join(プロジェクトルート, 'frontend_ide/host'), join(root, 'frontend_ide/host'), 'junction');
     for (const args of [[], ['--connect'], ['--wait', '--connect']]) {
       for (const token of ['', '<', '<secret-placeholder>', '>']) {
         writeFileSync(join(root, '_config/AiDiy_key.json'), JSON.stringify({ ...defaults, DISCORD_BOT_TOKEN: token }));

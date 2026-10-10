@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+#
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """aidiy_discord の PATH ランチャーを登録・解除する。"""
 from pathlib import Path
 import shlex
@@ -14,6 +24,8 @@ def install_launcher(root: Path) -> None:
     if not node:
         raise OSError('Node.js が見つかりません。')
     script = root.resolve() / 'panel' / 'launch.mjs'
+    if not script.is_file():
+        raise OSError(f'起動スクリプトが見つかりません: {script}')
     path = launcher_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if sys.platform == 'win32':

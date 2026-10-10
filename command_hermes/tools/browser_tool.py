@@ -1707,14 +1707,14 @@ def _real_profile_cdp() -> tuple:
                 "the toggle off."
             )
         if browser == UNSUPPORTED_CHANNEL:
-            # A recognized pre-release channel (Beta/Dev/Canary) is the OS
+            # A recognized pre-release channel (Beta/IDE/Canary) is the OS
             # default. Its profile lives in a channel-specific directory we
             # don't resolve, and normalizing it to the stable family would
             # drive a DIFFERENT profile/account — a wrong-principal bug. Fail
             # closed rather than guess (#95549 invariant).
             return None, (
                 "browser.use_real_profile is on, but your default browser is a "
-                "pre-release Chromium channel (Beta / Dev / Canary), which "
+                "pre-release Chromium channel (Beta / IDE / Canary), which "
                 "real-profile browsing does not support. Set your default to a "
                 "stable Chrome / Edge / Brave / Brave Origin / Chromium, or turn "
                 "the toggle off."

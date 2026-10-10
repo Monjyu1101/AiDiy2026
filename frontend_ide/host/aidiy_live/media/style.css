@@ -1,0 +1,220 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
+:root {
+  color-scheme: dark;
+  --accent: var(--vscode-button-background, #667eea);
+  --accent-soft: color-mix(in srgb, var(--accent) 5%, transparent);
+  --surface: #000;
+  --foreground: #e3e9f2;
+  --input-surface: color-mix(in srgb, var(--accent) 3%, var(--surface));
+  --hover-surface: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  --border: #242424;
+  --muted: #9aa7b8;
+  --terminal: #00ff00;
+  --stream: #00ffff;
+  --focus: var(--vscode-focusBorder, #889aff);
+  --mic: #ff536e;
+  --voice: #69dcff;
+  font-family: var(--vscode-font-family, "Segoe UI", "Yu Gothic UI", sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  background: var(--surface);
+  color: var(--foreground);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 300px; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; isolation: isolate; background: var(--surface); line-height: 1.65; opacity: 0; }
+body.ui-ready { opacity: 1; transform-origin: center center; animation: standalone-reveal 1s cubic-bezier(.16, 1, .3, 1) both; }
+.vscode-host.ui-ready { animation: startup-fade-in .8s ease-out both; }
+@keyframes startup-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes standalone-reveal { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
+.desktop-window body { border: 1px solid #29313f; }
+.desktop-window body.ui-ready { animation: startup-fade-in .45s ease-out both; }
+.desktop-window.desktop-opening body { opacity: 0; animation: none; }
+body:not(.ui-ready) .empty *, body:not(.ui-ready) .empty *::before, body:not(.ui-ready) .empty *::after,
+.desktop-window.desktop-opening .empty *, .desktop-window.desktop-opening .empty *::before, .desktop-window.desktop-opening .empty *::after { animation-play-state: paused !important; }
+#audio-cloud { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--border); background: transparent; border-radius: 0; padding: 5px 9px; cursor: pointer; transition: background .15s, border-color .15s; }
+button:hover:enabled { background: var(--hover-surface); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+header { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; min-height: 31px; padding: 1px 2px; gap: 8px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); border-bottom: 1px solid var(--border); -webkit-app-region: drag; user-select: none; }
+.brand { grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 14px; letter-spacing: -.5px; }
+.tag { color: var(--voice); font-size: 9px; letter-spacing: .4px; border: 1px solid var(--border); padding: 0 3px; border-radius: 0; }
+#window-controls { grid-column: 3; justify-self: end; display: flex; gap: 2px; -webkit-app-region: no-drag; }
+#window-controls button { border: 0; background: none; width: 28px; height: 28px; padding: 0; color: var(--muted); font-size: 18px; }
+#window-controls button:hover { background: var(--hover-surface); }
+#window-controls button[data-window="close"]:hover { color: #fff; background: #cc415714; }
+#activity-bar { flex: 0 0 auto; height: 2px; box-sizing: content-box; border-top: 1px solid var(--border); background: #000; pointer-events: none; }
+body.connected #activity-bar { background: #00ffff; animation: cyan-bar-breathe 4.5s linear infinite; }
+/* Web の _TopBar.vue と同じ |sin(2πt / 9)| を、4.5秒の明滅周期に沿って標本化する。 */
+@keyframes cyan-bar-breathe {
+  0%, 100% { background-color: rgb(0, 0, 0); }
+  2.5%, 97.5% { background-color: rgb(0, 20, 20); }
+  5%, 95% { background-color: rgb(0, 40, 40); }
+  7.5%, 92.5% { background-color: rgb(0, 60, 60); }
+  10%, 90% { background-color: rgb(0, 79, 79); }
+  12.5%, 87.5% { background-color: rgb(0, 98, 98); }
+  15%, 85% { background-color: rgb(0, 116, 116); }
+  17.5%, 82.5% { background-color: rgb(0, 133, 133); }
+  20%, 80% { background-color: rgb(0, 150, 150); }
+  22.5%, 77.5% { background-color: rgb(0, 166, 166); }
+  25%, 75% { background-color: rgb(0, 180, 180); }
+  27.5%, 72.5% { background-color: rgb(0, 194, 194); }
+  30%, 70% { background-color: rgb(0, 206, 206); }
+  32.5%, 67.5% { background-color: rgb(0, 217, 217); }
+  35%, 65% { background-color: rgb(0, 227, 227); }
+  37.5%, 62.5% { background-color: rgb(0, 236, 236); }
+  40%, 60% { background-color: rgb(0, 243, 243); }
+  42.5%, 57.5% { background-color: rgb(0, 248, 248); }
+  45%, 55% { background-color: rgb(0, 252, 252); }
+  47.5%, 52.5% { background-color: rgb(0, 254, 254); }
+  50% { background-color: rgb(0, 255, 255); }
+}
+#connect { color: #000; background: #fff; border-color: var(--voice); }
+#connect:disabled { opacity: 1; }
+#connect:hover:enabled { color: #000; background: var(--voice); }
+body.connected #connect, body.connected #connect:hover:enabled { color: #000; background: #fff; border-color: #fff; }
+#connect.awaiting:enabled { animation: connect-breathe 4.5s ease-in-out infinite; }
+@keyframes connect-breathe {
+  0%, 100% { background-color: #fff; }
+  50% { background-color: var(--voice); }
+}
+main { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow: auto; padding: 2px; }
+.primary { background: var(--accent-soft); color: var(--foreground); border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }
+.primary:hover:enabled { background: var(--hover-surface); }
+.muted { color: var(--muted); font-size: 10px; margin: 0; overflow-wrap: anywhere; }
+.audio-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.audio-button { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; min-height: 38px; padding: 3px 4px; background: #000c; }
+.audio-button strong { position: relative; z-index: 1; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+.audio-button strong { font-size: 9px; font-weight: 500; line-height: 1.4; }
+.audio-button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--voice) 35%, var(--border)); background: color-mix(in srgb, var(--voice) 5%, var(--surface)); }
+#mic[aria-pressed="true"] { border-color: color-mix(in srgb, var(--mic) 35%, var(--border)); background: color-mix(in srgb, var(--mic) 5%, var(--surface)); }
+.symbol { position: absolute; top: 50%; left: 50%; display: block; width: 36px; max-width: calc(100% - 12px); height: 36px; transform: translate(-50%, -50%); pointer-events: none; opacity: .55; color: var(--voice); background: currentColor; mask: var(--symbol-image) center / contain no-repeat; }
+.audio-button[aria-pressed="true"] .symbol { opacity: .8; }
+.speaker-symbol { --symbol-image: url('speaker.png'); }
+.microphone-symbol { --symbol-image: url('microphone.png'); }
+#mic .symbol { color: var(--mic); }
+.conversation-toolbar { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 6px; min-height: 28px; color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--border); padding: 2px 0; }
+.conversation-toolbar > div { display: flex; gap: 6px; align-items: center; }
+.conversation-toolbar .conversation-context { flex: 1; min-width: 0; align-items: baseline; gap: 4px; }
+/* aidiy_code と共通: 「プロジェクト: フォルダ名」 */
+.project-label { flex: 0 0 auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
+.conversation-actions { flex: 0 0 auto; }
+#project-folder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--foreground); }
+#project-folder:empty::before { content: '未選択'; color: var(--muted); }
+.conversation-toolbar button { padding: 2px 7px; font-size: 11px; line-height: 1.4; }
+#new { background: var(--accent-soft); }
+#transcript { flex: 1; min-height: 130px; overflow: auto; border: 0; border-radius: 0; padding: 2px; background: transparent; }
+.empty { color: var(--muted); text-align: center; line-height: 1.9; font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; margin: 0; padding: 24px 0 40px; }
+.welcome-mark { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 88px; height: 88px; margin-bottom: 24px; background: radial-gradient(circle at 25% 15%, var(--accent-soft), transparent 75%); animation: welcome-float 6s ease-in-out infinite; }
+.welcome-mark::before, .welcome-mark::after { content: ''; position: absolute; border: 1px solid #00ffff; box-shadow: 0 0 24px #00ffff40, inset 0 0 16px #00ffff15; pointer-events: none; }
+.welcome-mark::before { inset: 0; transform: rotate(-6deg); animation: welcome-rotate-clockwise 20s linear infinite, welcome-glow 6s ease-in-out infinite, welcome-rainbow 12s linear infinite; }
+.welcome-mark::after { inset: 0; transform: rotate(6deg); animation: welcome-rotate-counterclockwise 20s linear infinite, welcome-glow 6s ease-in-out -3s infinite, welcome-rainbow 12s linear -6s infinite; }
+.welcome-mark img { position: relative; z-index: 1; width: 54px; height: 54px; object-fit: contain; }
+@keyframes welcome-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes welcome-rotate-clockwise { from { transform: rotate(-6deg); } to { transform: rotate(354deg); } }
+@keyframes welcome-rotate-counterclockwise { from { transform: rotate(6deg); } to { transform: rotate(-354deg); } }
+@keyframes welcome-rainbow { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+@keyframes welcome-glow { 0%, 100% { opacity: .2; } 50% { opacity: .7; } }
+.empty p { margin: 0; font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 2.6vw, 12px); text-shadow: 0 1px 4px #000, 0 0 8px #000; }
+.empty .terminal-eyebrow { font-size: 9px; letter-spacing: 2px; margin-bottom: 10px; --typing-animation: live-type-eyebrow; --caret-animation: live-caret-eyebrow; --typing-steps: 25; }
+.empty .terminal-primary { color: var(--terminal); font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 3.4vw, 18px); font-weight: 600; letter-spacing: -.5px; margin: 0 0 8px; text-shadow: 0 1px 4px #000, 0 0 8px #000; --typing-animation: live-type-primary; --caret-animation: live-caret-primary; --typing-steps: 31; }
+.empty .terminal-secondary { --typing-animation: live-type-secondary; --caret-animation: live-caret-secondary; --typing-steps: 26; }
+.terminal-type { position: relative; display: inline-block; }
+.terminal-text { display: block; white-space: nowrap; animation: var(--typing-animation) 12s steps(var(--typing-steps), end) infinite; }
+.empty .terminal-type::after { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1ch; height: 1em; margin-left: .1ch; background: currentColor; pointer-events: none; animation: var(--caret-animation) 12s steps(var(--typing-steps), end) infinite, live-cursor-blink 1.2s step-end infinite; }
+@keyframes live-type-eyebrow { 0%, 4% { clip-path: inset(0 100% 0 0); } 16%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-type-primary { 0%, 26% { clip-path: inset(0 100% 0 0); } 38%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-type-secondary { 0%, 48% { clip-path: inset(0 100% 0 0); } 60%, 100% { clip-path: inset(0 0 0 0); } }
+@keyframes live-caret-eyebrow { 0%, 3.99% { left: 0; visibility: hidden; } 4% { left: 0; visibility: visible; } 16%, 25.99% { left: 100%; visibility: visible; } 26%, 100% { left: 100%; visibility: hidden; } }
+@keyframes live-caret-primary { 0%, 25.99% { left: 0; visibility: hidden; } 26% { left: 0; visibility: visible; } 38%, 47.99% { left: 100%; visibility: visible; } 48%, 100% { left: 100%; visibility: hidden; } }
+@keyframes live-caret-secondary { 0%, 47.99% { left: 0; visibility: hidden; } 48% { left: 0; visibility: visible; } 60%, 100% { left: 100%; visibility: visible; } }
+@keyframes live-cursor-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+.empty.input-started .terminal-text { animation: none; clip-path: none; }
+.empty.input-started .terminal-type::after { display: none; }
+.message { width: fit-content; margin-bottom: 4px; padding: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; border: 1px solid var(--border); text-shadow: 0 1px 4px #000, 0 0 8px #000; }
+.message:last-child { margin-bottom: 0; }
+.message.user { color: #fff; cursor: pointer; max-width: 70%; margin-left: auto; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }
+.message.ai { --message-color: #00ff00; max-width: 90%; color: var(--message-color); font-family: var(--vscode-editor-font-family, Consolas, monospace); background: color-mix(in srgb, var(--message-color) 3%, var(--surface)); border-color: color-mix(in srgb, var(--message-color) 16%, var(--border)); }
+.message.ai.output_request { --message-color: var(--stream); }
+.message.ai.recognition_output { --message-color: #9ae6b4; }
+.message.recognition { cursor: pointer; }
+.message.recognition_input { color: #e5e7eb; }
+.message.user:hover, .message.recognition:hover { border-color: var(--focus); }
+.message.system { max-width: 100%; color: var(--muted); font-size: 11px; border: 0; padding: 2px; }
+/* 登場演出（src/arrival-effect.ts、AiDiy Code の media/chat.css と同じ動き）。発言は透明のまま置いて場所を確保し、
+   入力枠・受信通知がその位置へ飛んだ後に白く浮かび上がる。Live は行そのものが発言の枠になる。 */
+.message.arrival-waiting { display: none; }
+.message.arrival-pending { opacity: 0; }
+.message.arrival-reveal { animation: user-arrival-haze .9s ease-out both; }
+@keyframes user-arrival-haze {
+  0% { opacity: 0; filter: blur(8px) brightness(2.4); transform: scale(.97); background: #ffffff38; box-shadow: 0 0 0 #ffffff00; }
+  35% { opacity: 1; filter: blur(3px) brightness(1.8); background: #ffffff24; box-shadow: 0 0 22px #ffffffb0; }
+  100% { opacity: 1; filter: none; transform: none; box-shadow: 0 0 0 #ffffff00; }
+}
+/* AI回答の受信通知: 中央に降りてきて、ターミナル演出の後に会話欄の位置へ飛ぶ。
+   黒地に白枠で固定し、流し込む文字だけを回答の種類の色にする。高さは画面の30%で、本文は縦スクロールで最下部を表示する。 */
+.answer-popup { --popup-color: var(--terminal); position: fixed; inset: 0; z-index: 20; display: flex; width: min(560px, calc(100vw - 32px)); height: 30vh; min-height: 96px; margin: auto; overflow: hidden; pointer-events: none; color: #fff; background: #000; border: 1px solid #fff; box-shadow: 0 18px 60px #000c; animation: answer-popup-in .42s cubic-bezier(.2, .9, .3, 1.15) both; }
+.answer-popup.output_request { --popup-color: var(--stream); }
+.answer-popup.recognition_output { --popup-color: #9ae6b4; }
+/* 本文は frontend_web の AIコード.vue で実際に表示される文字（Courier New / 11px / 行間1.5）に揃える。カーソルは JS の指定（幅8pxのブロック）だけで描く。 */
+.answer-popup-text { flex: 1; min-width: 0; min-height: 0; padding: 6px; overflow: hidden auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--popup-color); font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5; }
+@keyframes answer-popup-in { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+.input-flight { position: fixed; z-index: 20; margin: 0; padding: 4px; overflow: hidden; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.5; color: var(--foreground); background: var(--input-surface); border: 1px solid #fff; box-shadow: 0 0 16px #ffffff70, inset 0 0 10px #ffffff20; }
+#chat-footer { flex: 0 0 auto; padding: 0 2px 2px; }
+#text-form { border: 0; background: transparent; }
+textarea, input, select { border: 1px solid var(--border); background: var(--input-surface); border-radius: 0; padding: 4px; min-width: 0; }
+textarea { font-size: 12px; field-sizing: content; display: block; width: 100%; resize: none; max-height: min(220px, 35vh); min-height: 76px; overflow-y: auto; }
+textarea::placeholder { color: var(--muted); }
+textarea:focus-visible { outline: none; border-color: var(--focus); }
+.composer-actions { display: grid; grid-template-columns: minmax(0, 1fr) 34px; grid-template-rows: auto auto; gap: 2px 6px; align-items: center; padding: 2px 0; }
+.keyboard-hint { grid-column: 1; grid-row: 1; text-align: left; color: var(--muted); font-size: 9px; line-height: 1.3; }
+.keyboard-hint span { padding: 0 3px; }
+.composer-meta { grid-column: 1; grid-row: 2; display: flex; justify-content: flex-start; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; line-height: 1.3; }
+#activity { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; white-space: nowrap; }
+/* 単独版の接続状況はタイトル左側に表示する。 */
+header > #activity { grid-column: 1; justify-self: start; min-width: 0; margin-left: 6px; color: var(--muted); font-size: 10px; }
+.activity-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.connected .activity-dot { background: var(--terminal); }
+.running .activity-dot { background: #00ffff; box-shadow: 0 0 0 3px #00ffff15, 0 0 10px #00ffff60; }
+.model-selection { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#choose-model { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 2px 6px; font-size: 10px; line-height: 1.4; border-color: var(--border); background: var(--surface); }
+.model-caption { padding: 0 4px; font-size: 11px; font-weight: 400; line-height: calc(1.65em - 2px); background: #fff; color: #000; }
+.model-chevron { color: var(--muted); }
+#model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
+#send { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 34px; height: 100%; min-height: 34px; padding: 0; background: rgba(255, 255, 255, .95); border-color: #667eea; color: #000; }
+#send img { width: 30px; height: 30px; object-fit: contain; filter: brightness(0); }
+#send:disabled { opacity: 1; cursor: not-allowed; }
+#send:enabled { background: #667eea; border-color: #667eea; }
+#send:enabled img { filter: brightness(0) invert(1); }
+#send:hover:enabled { background: #5a6fd8; border-color: #5a6fd8; }
+#send.ws-disabled { background: #808080; border-color: #808080; color: #fff; }
+#send.ws-disabled img { filter: brightness(0) invert(1); }
+/* AIコアの接続エラーは入力欄の上に表示する。 */
+#error { margin-bottom: 2px; }
+#error, #model-error { color: var(--vscode-errorForeground, #ff8e9e); background: #cc415708; border: 1px solid #cc415740; padding: 4px; border-radius: 0; font-size: 11px; overflow-wrap: anywhere; }
+dialog { width: min(420px, calc(100vw - 4px)); padding: 0; color: var(--foreground); background: var(--surface); border: 1px solid var(--border); border-radius: 0; box-shadow: 0 16px 60px rgba(0, 0, 0, .4); }
+dialog::backdrop { background: rgba(0, 0, 0, .5); backdrop-filter: blur(3px); }
+.settings-content { display: flex; flex-direction: column; gap: 9px; padding: 4px; background: var(--surface); font-size: 11px; }
+.picker-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.picker-header h2 { margin: 0; font-size: 15px; }
+.picker-header p { margin: 4px 0 0; }
+.picker-close { flex: 0 0 auto; padding: 0 5px; border: 0; font-size: 20px; line-height: 1.4; }
+.picker-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 6px; }
+.picker-actions button { min-height: 32px; }
+.settings-content label { display: grid; grid-template-columns: 68px 1fr; gap: 6px; align-items: center; }
+.settings-content input, .settings-content select { min-height: 34px; }
+[hidden] { display: none !important; }
+.vscode-host > header { display: none; }
+.vscode-host { min-width: 200px; }
+@media (max-width: 440px) { .keyboard-hint { font-size: 8px; } }

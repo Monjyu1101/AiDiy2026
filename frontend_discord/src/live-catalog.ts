@@ -1,6 +1,18 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { LiveCatalog } from '../../frontend_vscode/aidiy_live/src/model-catalog';
+import type { LiveCatalog } from '../../frontend_ide/host/aidiy_live/src/model-catalog';
 import { プロジェクトルート, 設定エラー } from './config';
 
 export function ライブ候補読込(directory = join(プロジェクトルート, '_config')): LiveCatalog {

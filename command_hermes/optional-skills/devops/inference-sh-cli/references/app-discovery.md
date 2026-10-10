@@ -86,7 +86,7 @@ Shows full app info including input/output schema.
 ## Popular Apps by Category
 
 ### Image Generation
-- `falai/flux-dev-lora` - FLUX.2 Dev (high quality)
+- `falai/flux-dev-lora` - FLUX.2 IDE (high quality)
 - `falai/flux-2-klein-lora` - FLUX.2 Klein (fastest)
 - `infsh/sdxl` - Stable Diffusion XL
 - `google/gemini-3-pro-image-preview` - Gemini 3 Pro

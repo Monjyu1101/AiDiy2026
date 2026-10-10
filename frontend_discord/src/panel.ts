@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -73,7 +85,7 @@ export class Discordパネル {
     if (this.closed || typeof provider !== 'string' || provider.length > 200) throw new Error();
     const config = this.readConfig(), cli = 起動解決(config.cli, config.python, config.folder);
     if (!cli.引数[0]?.endsWith('.py')) throw new Error();
-    const job = CLI実行({ 起動: { 実行ファイル: cli.実行ファイル, 引数: [join(プロジェクトルート, 'frontend_vscode/scripts/model-catalog.py'), cli.引数[0], provider] }, 作業フォルダ: config.folder, 本文: '', 引数: [], 制限時間: 30_000 });
+    const job = CLI実行({ 起動: { 実行ファイル: cli.実行ファイル, 引数: [join(プロジェクトルート, 'frontend_ide/host/scripts/model-catalog.py'), cli.引数[0], provider] }, 作業フォルダ: config.folder, 本文: '', 引数: [], 制限時間: 30_000 });
     this.catalogs.add(job);
     try {
       const result = await job.完了;

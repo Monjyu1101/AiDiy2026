@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -5,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
-import { プロジェクト引数書式, プロジェクトフォルダ決定, ブラウザ自動判定, ブラウザ版表示, ブラウザ版へ切替, ウィンドウ } from '../../frontend_vscode/scripts/launch-project.mjs';
+import { プロジェクト引数書式, プロジェクトフォルダ決定, ブラウザ自動判定, ブラウザ版表示, ブラウザ版へ切替, ウィンドウ } from '../../frontend_ide/host/scripts/launch-project.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const usage = `aidiy_discord ${プロジェクト引数書式} [--browser] [--check] [--connect]`;

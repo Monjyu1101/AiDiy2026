@@ -45,7 +45,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - ホストへ公開するポートは `8091` / `8098` / `80` / `443` だけ。`8090` はコンテナ内部のみ。
 - [ ] 自動テストは現存するディレクトリと実行方法に合わせて書く。
   - Python: `backend_server/tests/`、`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/`。各プロジェクトで `python -m unittest discover -s tests -v`。
-  - VS Code: `frontend_vscode/checks/`（Code の Node.js / Python）、`frontend_vscode/aidiy_live/checks/`（Live の Node.js）。実行は `frontend_vscode` で `npm test` / `npm run live:test` / `python -m unittest discover -s checks -p "test_*.py"`。
+  - VS Code: `frontend_ide/host/checks/`（Code の Node.js / Python）、`frontend_ide/host/aidiy_live/checks/`（Live の Node.js）。実行は `frontend_ide/host` で `npm test` / `npm run live:test` / `python -m unittest discover -s checks -p "test_*.py"`。
   - Discord: `frontend_discord/checks/`（Node.js / Python）。`frontend_discord` で `npm run check` / `npm test`、ルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"`。
   - Avatar / Web の接続: `frontend_avatar/checks/` の Node.js テスト。ルートで `node --test frontend_avatar/checks/*.test.cjs`。
   - ルート起動: `scripts/test_start_output.py`。ルートで `python -m unittest discover -s scripts -p test_start_output.py`。
@@ -114,7 +114,7 @@ rg -n 'start\.py|_stop\.py|8095.*Docker|npm run build' $files
 rg -n 'core_router/AIコア/|core_router\\AIコア\\|backend_server/_config|_config/aidiy_|aidiy_automations/ビデオページ生成_|_AiDiy\.bat|src/stores/AIモデル設定|components/Avatar\.vue|13 MCP|14 個の MCP' $files
 
 # 実在しないテスト・旧仕様の残骸
-rg -n 'frontend_vscode/test/|test_mcp_smoke|test_post_api_smoke|test_c利用者_password|平文比較|自動テストは整備されていません' $files
+rg -n 'frontend_ide/host/test/|test_mcp_smoke|test_post_api_smoke|test_c利用者_password|平文比較|自動テストは整備されていません' $files
 
 # コンポーネント配置（サブフォルダ化済み。1階層直下で書いていないか）
 rg -n 'components/C管理/C利用者一覧\.vue|components/C管理/C権限一覧\.vue|components/C管理/C採番一覧\.vue' $files

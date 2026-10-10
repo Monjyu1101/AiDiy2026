@@ -1,5 +1,17 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 'use strict';
-// aidiy_live の frontend_vscode/aidiy_live/src/visualizer.ts（AudioCloud）と同じ描画。
+// aidiy_live の frontend_ide/host/aidiy_live/src/visualizer.ts（AudioCloud）と同じ描画。
 // パネルはバンドルしない素の JS のため移植している。描画を変える場合は両方を揃える。
 // 違いは中心位置と半径だけ: 小型パネルに合わせて呼出し元で指定できる。
 class AudioCloud {

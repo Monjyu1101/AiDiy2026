@@ -300,7 +300,7 @@ def classify(gpu: dict | None, ram_gb: float, free_disk_gb: float, *, wsl: bool,
     if free_disk_gb and free_disk_gb < MIN_FREE_DISK_GB:
         notes.append(
             f"Free disk space ({free_disk_gb} GB) is below the {MIN_FREE_DISK_GB} GB recommended minimum. "
-            "ComfyUI core (~5 GB) plus one SDXL model (~6.5 GB) needs space; Flux Dev needs ~24 GB."
+            "ComfyUI core (~5 GB) plus one SDXL model (~6.5 GB) needs space; Flux IDE needs ~24 GB."
         )
 
     # Host RAM matters even for discrete-GPU systems: ComfyUI swaps model

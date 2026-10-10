@@ -4681,7 +4681,7 @@ Baseline Model Performance
 Number of samples: 200
 Mean CER: 149.07%
 Median CER: 80.00%
-Std Dev: 310.39%
+Std IDE: 310.39%
 Min CER: 0.00%
 Max CER: 3500.00%
 ============================================================
@@ -4729,7 +4729,7 @@ With 60 steps, we reduced CER from 149.07% to 60.43% (89% CER improvement)
 Number of samples: 200
 Mean CER: 60.43%
 Median CER: 50.00%
-Std Dev: 80.63%
+Std IDE: 80.63%
 Min CER: 0.00%
 Max CER: 916.67%
 ============================================================

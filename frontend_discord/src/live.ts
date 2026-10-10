@@ -1,8 +1,20 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { createAudioPlayer, createAudioResource, EndBehaviorType, entersState, joinVoiceChannel, NoSubscriberBehavior, StreamType, VoiceConnectionStatus, type AudioReceiveStream, type VoiceConnection } from '@discordjs/voice';
 import type { VoiceChannel } from 'discord.js';
 import WebSocket from 'ws';
 import OpusScript from 'opusscript';
-import type { LiveSocket, Packet } from '../../frontend_vscode/aidiy_live/src/protocol';
+import type { LiveSocket, Packet } from '../../frontend_ide/host/aidiy_live/src/protocol';
 import { LiveConnection, 入力レート, 音声入力, 音声操作 } from './vscode';
 import type { Discord設定 } from './config';
 import { Discord音声出力, 音声入力ミキサー, 音声スペクトル, 音声レベル } from './audio';

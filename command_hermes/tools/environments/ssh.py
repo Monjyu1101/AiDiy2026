@@ -276,7 +276,7 @@ class SSHEnvironment(BaseEnvironment):
                 try:
                     os.symlink(os.path.abspath(host_path), staged)
                 except OSError as e:
-                    # WinError 1314: symlink privilege not held (Windows without Dev Mode)
+                    # WinError 1314: symlink privilege not held (Windows without IDE Mode)
                     if getattr(e, "winerror", None) == 1314:
                         shutil.copy2(host_path, staged)
                     else:

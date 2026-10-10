@@ -3418,7 +3418,7 @@ You will now be in the container. Next, perform an editable install of Axolotl:
 
 Next, if you are using a remote host, Remote into this host with VSCode. If you are using a local host, you can skip this step.
 
-Next, select Dev Containers: Attach to Running Container... using the command palette (CMD + SHIFT + P) in VSCode. You will be prompted to select a container to attach to. Select the container you just created. You will now be in the container with a working directory that is at the root of the project. Any changes you make to the code will be reflected both in the container and on the host.
+Next, select IDE Containers: Attach to Running Container... using the command palette (CMD + SHIFT + P) in VSCode. You will be prompted to select a container to attach to. Select the container you just created. You will now be in the container with a working directory that is at the root of the project. Any changes you make to the code will be reflected both in the container and on the host.
 
 Now you are ready to debug as described above (see Debugging with VSCode).
 

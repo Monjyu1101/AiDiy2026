@@ -46,7 +46,7 @@ What makes Figma distinctive beyond the variable font is its circle-and-pill geo
 
 ### Gradient System
 - **Hero Gradient**: A vibrant multi-stop gradient using electric green, bright yellow, deep purple, and hot pink. This gradient is the visual signature of the hero section — it represents the creative possibilities of the tool.
-- **Product Section Gradients**: Individual product areas (Design, Dev Mode, Prototyping) may use distinct color themes in their showcases.
+- **Product Section Gradients**: Individual product areas (Design, IDE Mode, Prototyping) may use distinct color themes in their showcases.
 
 ## 3. Typography Rules
 
@@ -128,7 +128,7 @@ What makes Figma distinctive beyond the variable font is its circle-and-pill geo
 
 **Product Tab Bar**
 - Horizontal pill-shaped tabs (50px radius)
-- Each tab represents a Figma product area (Design, Dev Mode, Prototyping, etc.)
+- Each tab represents a Figma product area (Design, IDE Mode, Prototyping, etc.)
 - Active tab highlighted
 
 **Hero Gradient Section**

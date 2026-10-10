@@ -20,7 +20,7 @@ When you are developing `apps/desktop` and the user is running that same app
 they are looking at — computed styles, geometry, which CSS rule actually won,
 console output — instead of inferring it from `.tsx` and being wrong.
 
-Dev-server runs open a Chrome DevTools Protocol port on `127.0.0.1:9222`
+IDE-server runs open a Chrome DevTools Protocol port on `127.0.0.1:9222`
 automatically. The renderer is a Chromium page, so everything DevTools can read,
 a script can read.
 

@@ -1,0 +1,16 @@
+/* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026 */
+#ai-toggle { position: fixed; top: var(--workspace-top); right: 16px; z-index: 34; padding: 8px 13px; border: 1px solid #334058; background: #080c1af2; color: #d9e0f2; cursor: pointer; font: 13px var(--mono); }
+#ai-toggle[aria-expanded="true"] { color: #85e9e9; border-color: #528587; }
+#ai-panel { position: fixed; top: calc(var(--workspace-top) + 44px); right: 16px; bottom: 16px; width: min(560px, calc(100vw - 32px)); z-index: 25; display: flex; flex-direction: column; background: #000; border: 1px solid #334058; box-shadow: 0 16px 60px #0009; }
+#ai-panel[hidden], #ai-panel [hidden] { display: none !important; }
+.ai-tabs { display: flex; border-bottom: 1px solid #334058; background: #0b101b; flex: none; }
+.ai-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: #8e9ab2; padding: 9px 20px; cursor: pointer; }
+.ai-tabs button[aria-selected="true"] { border-bottom-color: #7adee0; color: #e8ffff; background: #16202c; }
+.ai-tabs #ai-close { margin-left: auto; padding: 8px 14px; font-size: 18px; }
+#ai-code, #ai-live { flex: 1; min-height: 0; display: flex; }
+#ai-panel iframe { border: 0; width: 100%; height: 100%; background: #000; }
+#ai-error { color: #ffc1cd; font-size: 12px; padding: 12px; overflow-wrap: anywhere; }

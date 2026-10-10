@@ -18,8 +18,9 @@ AiDiy は、日本語を第一言語とするフルスタック業務システ�
 - Backend TaskTeam: AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合したサーバー（ポート 8093）。
 - Frontend Web: Vue 3 + Vite + TypeScript（ポート 8090）。
 - Frontend Avatar: Electron / Web デュアルモードの AI Avatar UI（ポート 8092）。
-- Frontend VS Code: VS Code 拡張 2 種（`aidiy_hermes` を操作する AiDiy (Code)、AIコアへ接続する音声会話の AiDiy (Live)）と単独起動版（常駐なし）。
+- Frontend VS Code: VS Code 拡張 2 種（`aidiy_hermes` を操作する AiDiy (Code)、AIコアへ接続する音声会話の AiDiy (Live)）と単独起動版（常駐なし）。どちらも開発スペース（`aidiy_ide`）の部品としても動作。
 - Frontend Discord: Hermes チャットと AIコア Live 音声会話をつなぐ任意起動の Discord Bot。
+- Frontend IDE: 開発スペース（宇宙をテーマにした IDE 開発環境）。宇宙表示・左側エクスプローラー・読み取り専用ビューアの AiDiy IDE。Code / Live を部品として呼び出せる（ポート自動割り当て、全体のセットアップ・起動・クリーンアップに組み込み済み）。
 - AI コア: チャット、音声、画像、ファイル、code1〜code6 のコード支援パネル。
 - AIタスク: 要求を AI が明細へ分解し Code CLI で自動実行する画面と実行基盤。
 - AIチーム: 複数の AI エージェントが目標を共有し、依頼と作業ループで協働する画面と実行基盤。

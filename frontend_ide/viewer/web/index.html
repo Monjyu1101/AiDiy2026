@@ -1,0 +1,127 @@
+<!doctype html>
+<!--
+  -*- coding: utf-8 -*-
+  
+  -------------------------------------------------------------------------
+  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+  Licensed under "AiDiy 公開利用ライセンス v1.1".
+  Commercial use requires prior written consent from all copyright holders.
+  See LICENSE for full terms. Thank you for keeping the rules.
+  https://github.com/monjyu1101/AiDiy2026
+  -------------------------------------------------------------------------
+-->
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AiDiy IDE</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/connection.css">
+  <link rel="stylesheet" href="/panels.css">
+</head>
+<body>
+  <header id="connection-header">
+    <span id="activity"><span class="activity-dot" aria-hidden="true"></span><span id="connection-status" role="status">未接続</span></span>
+    <div class="connection-brand"><strong>AiDiy IDE</strong></div>
+    <div id="window-controls" hidden><button data-window="minimize" aria-label="最小化">−</button><button data-window="close" aria-label="閉じる">×</button></div>
+  </header>
+  <div id="activity-bar" aria-hidden="true"></div>
+  <div id="connection-toolbar" class="conversation-toolbar">
+    <div class="conversation-context"><span class="project-label">プロジェクト:</span><span id="connection-project"></span></div>
+    <div class="conversation-actions">
+      <button id="core-connect" class="primary awaiting" type="button">AiDiy接続利用</button>
+      <button id="offline-start" type="button">オフライン利用</button>
+      <button id="usage-stop" type="button" hidden>利用終了</button>
+    </div>
+  </div>
+  <section id="connection-welcome" aria-label="AiDiyへの接続">
+    <div class="connection-empty">
+      <div class="welcome-mark" aria-hidden="true"><img src="/AiDiy.png" alt=""></div>
+      <p class="terminal-eyebrow terminal-type"><span class="terminal-text">LET’S EXPLORE YOUR PROJECT</span></p>
+      <h1 class="terminal-primary terminal-type"><span class="terminal-text">WELCOME TO AIDIY IDE.</span></h1>
+      <p class="terminal-secondary terminal-type"><span class="terminal-text">利用方法を選んで開始してください。</span></p>
+      <p class="connection-target">接続先: <span id="connection-target">確認中…</span></p>
+    </div>
+  </section>
+  <div id="connection-error" role="alert" hidden></div>
+  <main id="workspace" hidden inert>
+  <canvas id="sky"></canvas>
+  <button id="ai-toggle" type="button" aria-expanded="false" aria-controls="ai-panel">☰ Code / Live</button>
+  <aside id="ai-panel" aria-label="Code / Live" hidden>
+    <div class="ai-tabs" role="tablist" aria-label="AIパネル">
+      <button id="ai-code-tab" type="button" role="tab" aria-selected="true" aria-controls="ai-code">Code</button>
+      <button id="ai-live-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-live">Live</button>
+      <button id="ai-close" type="button" aria-label="Code / Liveを閉じる">×</button>
+    </div>
+    <p id="ai-error" role="alert" hidden></p>
+    <div id="ai-code" role="tabpanel" aria-labelledby="ai-code-tab"></div>
+    <div id="ai-live" role="tabpanel" aria-labelledby="ai-live-tab" hidden></div>
+  </aside>
+
+  <div id="hud" class="panel">
+    <button type="button" id="explorer-toggle" class="burger" aria-label="エクスプローラーを開閉" aria-controls="explorer" aria-expanded="false" title="エクスプローラー（Ctrl+B）">☰</button>
+  </div>
+
+  <!-- 右側: ファイルを選んだ時だけ中身を表示 -->
+  <aside id="clusters" class="panel" hidden>
+    <section id="viewer" hidden>
+      <div class="viewer-head">
+        <span id="viewer-dot" class="dot"></span>
+        <span id="viewer-kind"></span>
+        <button type="button" id="viewer-close" title="閉じる（Esc）">✕</button>
+      </div>
+      <div id="viewer-name"></div>
+      <div id="viewer-path" class="mono"></div>
+      <div id="viewer-meta"></div>
+      <div id="viewer-actions"></div>
+      <div id="viewer-body"></div>
+    </section>
+  </aside>
+
+  <!-- 左側エクスプローラー（VS Code 風のファイルツリー）。左上の ☰ / Ctrl+B で開閉 -->
+  <aside id="explorer" class="panel" hidden>
+    <div class="explorer-head">
+      <button type="button" class="burger" aria-label="エクスプローラーを閉じる" aria-controls="explorer" aria-expanded="false" title="閉じる（Ctrl+B）">☰</button>
+      <span class="explorer-title">エクスプローラー</span>
+      <button type="button" id="explorer-reveal" class="tool" title="選択中の場所をツリーで表示">◎</button>
+      <button type="button" id="explorer-collapse" class="tool" title="すべて折りたたむ">⊟</button>
+    </div>
+    <section id="explorer-summary" aria-label="ファイルの検索とマーク">
+      <div class="summary-scope">表示中: <span id="stats-scope"></span></div>
+      <fieldset id="mark-mode"><legend>ファイルのマーク</legend>
+        <label><input type="radio" name="mark-mode" value="since" checked> 起点検索</label>
+        <label><input type="radio" name="mark-mode" value="grep"> grep検索</label>
+      </fieldset>
+      <div id="since-row">
+        <label for="since">起点</label>
+        <input id="since" type="datetime-local" step="1">
+        <div class="since-actions">
+        <button type="button" data-since="start" aria-pressed="true" title="接続・オフライン利用を開始した時刻から">起動</button>
+        <button type="button" data-since="ten" aria-pressed="false">10分</button>
+        <button type="button" data-since="hour" aria-pressed="false">1時間</button>
+        <button type="button" data-since="today">今日</button>
+        <button type="button" data-since="clear" title="明滅をやめる">解除</button>
+        </div>
+      </div>
+      <form id="grep-form" hidden>
+        <label for="grep-query">ファイル内容（文字列の部分一致）</label>
+        <div class="grep-actions"><input id="grep-query" type="search" maxlength="256" placeholder="検索する文字列" autocomplete="off"><button type="submit">検索</button><button id="grep-clear" type="button">解除</button></div>
+        <label><input id="grep-case" type="checkbox"> 大文字・小文字を区別</label>
+        <p id="grep-status" role="status">プロジェクト全体を検索します。</p>
+        <small>1MB以下のテキストが対象。依存物・生成物・backupは除外します。</small>
+      </form>
+    </section>
+    <div id="explorer-root" class="mono"></div>
+    <ul id="explorer-tree" tabindex="0" role="tree"></ul>
+  </aside>
+
+  <nav id="crumb" class="panel mono" hidden></nav>
+  <div id="help">ドラッグ 中央を軸に360°回転 ・ 右ドラッグ 移動 ・ Ctrl＋ホイール ズーム ・ クリック 選択 ・ ダブルクリック フォルダを開く / ファイルへフォーカス ・ Esc / Backspace 上のフォルダへ ・ C 移動経路を消す ・ Space 自動回転 ・ R 再読み込み</div>
+  <div id="tooltip" hidden></div>
+  <div id="loading"><div class="ring"></div><div id="loading-text">読み込み中…</div></div>
+  </main>
+
+  <script src="/desktop.js"></script>
+  <script type="module" src="/connection.js"></script>
+</body>
+</html>

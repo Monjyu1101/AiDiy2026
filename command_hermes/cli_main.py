@@ -5010,6 +5010,35 @@ _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 _OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
 _OLLAMA_CLOUD_SUFFIXES = (":cloud", ":cloude", ":clude")
 _CLOUD_MODEL_MAX_AGE_DAYS = 240
+# AiDiy の選択画面で API キーのプロバイダ（OpenAI / Ollama / OpenRouter / Gemini / FreeAI）の /models
+# から除く、対話以外のモデル（画像・音声・動画・音楽・埋め込み・リアルタイム・文字起こし・検索・
+# エージェント専用・バッチ専用など）。新しい対話モデルは除外されず自動で候補に増える。
+_AIDIY_NON_CHAT_MODEL = re.compile(
+    r"image|imagen|nano-banana|realtime|audio|transcribe|tts|whisper|embed|moderation|search|translate"
+    r"|computer-use|dall-e|sora|veo|lyria|aqa|robotics|deep-research|antigravity|davinci|babbage"
+    r"|(?:^|[-/])live(?:-|$)|:batch$",
+    re.IGNORECASE,
+)
+# 作成日を返さない API（Gemini / FreeAI）は240日の判定ができないため、系列ごとに最新の世代
+# （gemini は最大の主版、gemma も同様）だけを出す。版の無い別名（gemini-flash-latest など）は残す。
+_AIDIY_MODEL_GENERATION = re.compile(r"^(gemini|gemma)-?(\d+)(?:\.\d+)?", re.IGNORECASE)
+
+
+def _aidiy_newest_generation_only(model_ids: List[str]) -> List[str]:
+    newest: Dict[str, int] = {}
+    for model_id in model_ids:
+        match = _AIDIY_MODEL_GENERATION.match(model_id)
+        if match:
+            family, major = match.group(1).lower(), int(match.group(2))
+            newest[family] = max(newest.get(family, major), major)
+    kept = []
+    for model_id in model_ids:
+        match = _AIDIY_MODEL_GENERATION.match(model_id)
+        if not match or int(match.group(2)) == newest[match.group(1).lower()]:
+            kept.append(model_id)
+    return kept
+# AiDiy の選択画面で OpenAI (OAuth) に出す世代。ChatGPT 側が返す旧世代（gpt-5.x）は除く。
+_AIDIY_OPENAI_OAUTH_CURRENT_MODEL = re.compile(r"^gpt-6(?:[.\-]|$)", re.IGNORECASE)
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -12481,7 +12510,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 cfg.get("CHAT_FREEAI_MODEL") or cfg.get("CHAT_GEMINI_MODEL")
             )
         if provider == "anthropic":
-            return cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6"
+            return cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-5-5"
         if provider == "local_chat":
             return cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it"
         if provider == _OPENAI_OAUTH_SLUG:
@@ -13090,6 +13119,43 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         self._apply_aidiy_provider_model(provider_entry, model_name)
         return True
 
+    def _fetch_aidiy_openrouter_model_meta(self, vendor: str) -> Dict[str, Tuple[int, bool]]:
+        """OpenRouter のキーが使えるとき、vendor（openai / google）のモデル名 → (作成日, テキスト出力のみ) を返す。
+
+        `:free` / `:batch` などの付記を除いた名前で照合できるようにする。キーが無い・取得できない場合は空。
+        """
+        api_key = str((self._aidiy_config or {}).get("openrt_key_id", "") or "")
+        if not _is_valid_key(api_key):
+            return {}
+        cache = getattr(self, "_aidiy_openrouter_meta_cache", None)
+        if cache is None:
+            import urllib.request
+
+            cache = {}
+            try:
+                req = urllib.request.Request(f"{_OPENROUTER_BASE_URL.rstrip('/')}/models", headers={
+                    "Authorization": f"Bearer {api_key.strip()}",
+                    "HTTP-Referer": "https://github.com/monjyu1101/AiDiy2026",
+                    "X-Title": "AiDiy Hermes",
+                })
+                with urllib.request.urlopen(req, timeout=10) as res:
+                    items = json.loads(res.read().decode("utf-8")).get("data", [])
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    owner, _, name = str(item.get("id", "")).partition("/")
+                    name = name.split(":", 1)[0].strip().lower()
+                    if not owner or not name:
+                        continue
+                    outputs = (item.get("architecture") or {}).get("output_modalities") or ["text"]
+                    text_only = {str(output).lower() for output in outputs} == {"text"}
+                    created = _parse_date_to_timestamp(item.get("created"))
+                    cache.setdefault(owner.lower(), {}).setdefault(name, (created, text_only))
+            except Exception:
+                cache = {}
+            self._aidiy_openrouter_meta_cache = cache
+        return cache.get(vendor, {})
+
     def _fetch_aidiy_provider_model_labels(self, provider_entry: Dict[str, Any], limit: int = 12) -> List[Tuple[str, str]]:
         try:
             if provider_entry.get("slug") == _OPENAI_OAUTH_SLUG:
@@ -13098,6 +13164,10 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 return [(model_id, model_id) for model_id in _xai_oauth_model_ids()[:limit]]
             if provider_entry.get("api_mode") == "anthropic_messages":
                 return self._fetch_aidiy_claude_model_labels(provider_entry, limit=limit)
+
+            # cli_main はモジュール先頭で urllib を読み込まない。未読込のままだと NameError を
+            # 下の except が握りつぶし、OpenAI / Ollama / OpenRouter / Gemini の候補が既定モデル1件になる。
+            import urllib.request
 
             base_url = provider_entry["base_url"].rstrip("/")
             url = f"{base_url}/models"
@@ -13113,6 +13183,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             rows: List[Tuple[int, str, str]] = []
             cutoff = datetime.now() - timedelta(days=_CLOUD_MODEL_MAX_AGE_DAYS)
             provider = provider_entry.get("slug", "")
+            # OpenRouter のキーが使えるときは、同じモデルの OpenRouter の情報と照合して絞り込む。
+            # OpenRouter に無いモデル・テキスト以外も出力するモデルは除き、作成日の無い API（Gemini）
+            # にも OpenRouter の作成日を使って240日の判定をする。キーが無い・取得できないときは従来の判定。
+            vendor = {"openai": "openai", "gemini": "google", "freeai": "google"}.get(provider)
+            openrouter = self._fetch_aidiy_openrouter_model_meta(vendor) if vendor else {}
             for item in items:
                 model_id = str(item.get("id", "")).strip()
                 if not model_id:
@@ -13121,7 +13196,14 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     model_id = _strip_cloud_suffix(model_id)
                 if provider in ("gemini", "freeai") and model_id.startswith("models/"):
                     model_id = model_id.replace("models/", "", 1)
+                if _AIDIY_NON_CHAT_MODEL.search(model_id):
+                    continue
                 created_ts = _parse_date_to_timestamp(item.get("created") or item.get("created_at"))
+                if openrouter:
+                    matched = openrouter.get(model_id.lower())
+                    if not matched or not matched[1]:
+                        continue
+                    created_ts = created_ts or matched[0]
                 if created_ts > 0:
                     created_dt = datetime.fromtimestamp(created_ts)
                     if provider in ("ollama", "openai", "openrt", "gemini", "freeai") and created_dt < cutoff:
@@ -13130,6 +13212,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 else:
                     label = f"yyyy/mm/dd - {model_id.lstrip('~')}"
                 rows.append((created_ts, label, model_id))
+            # 作成日の無い行は240日で絞れないため、系列ごとの最新世代だけを残す。
+            undated = _aidiy_newest_generation_only([model_id for created_ts, _label, model_id in rows if created_ts <= 0])
+            rows = [row for row in rows if row[0] > 0 or row[2] in undated]
             rows.sort(key=lambda row: row[0], reverse=True)
             return [(label, model_id) for _created, label, model_id in rows[:limit]]
         except Exception:
@@ -13141,13 +13226,17 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         アクセストークンがあればライブ取得、無ければ curated fallback を使う。
         """
         model_ids = _openai_oauth_model_ids(refresh=True) or [_OPENAI_OAUTH_FALLBACK_MODEL]
-        return [(model_id, model_id) for model_id in model_ids[:limit]]
+        # 旧世代（gpt-5.x）は出さず gpt-6 系だけにする。該当が無ければ取得した一覧をそのまま使う。
+        current = [model_id for model_id in model_ids if _AIDIY_OPENAI_OAUTH_CURRENT_MODEL.match(model_id)]
+        return [(model_id, model_id) for model_id in (current or model_ids)[:limit]]
 
     def _fetch_aidiy_claude_model_labels(self, provider_entry: Dict[str, Any], limit: int = 12) -> List[Tuple[str, str]]:
+        # AiDiy の選択画面では、hermes_cli/models.py の厳選した現行モデルだけを出す。
+        # provider_model_ids は Anthropic API の一覧（旧世代を含む）を後ろに足すため使わない。
         try:
-            from hermes_cli.models import provider_model_ids
+            from hermes_cli.models import _PROVIDER_MODELS
 
-            model_ids = provider_model_ids("anthropic")
+            model_ids = list(_PROVIDER_MODELS.get("anthropic", []))
             return [(model_id, model_id) for model_id in model_ids[:limit]]
         except Exception:
             return []
@@ -24185,7 +24274,7 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
 
     if provider_slug == "anthropic":
         api_key = str(cfg.get("claude_key_id") or "").strip()
-        model = str(cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-4-6").strip()
+        model = str(cfg.get("CHAT_CLAUDE_MODEL") or "claude-sonnet-5-5").strip()
         defaults = {
             "provider": "anthropic",
             "base_url": _CLAUDE_BASE_URL,

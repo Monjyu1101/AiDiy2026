@@ -1,11 +1,23 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const { fork, spawn } = require('node:child_process');
 const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { writeFileSync } = require('node:fs');
-const size = require('../../frontend_vscode/scripts/window-size.cjs');
-const { 拡大表示 } = require('../../frontend_vscode/scripts/window-opening.cjs');
-const { 起動ロック } = require('../../frontend_vscode/scripts/single-instance.cjs');
+const size = require('../../frontend_ide/host/scripts/window-size.cjs');
+const { 拡大表示 } = require('../../frontend_ide/host/scripts/window-opening.cjs');
+const { 起動ロック } = require('../../frontend_ide/host/scripts/single-instance.cjs');
 
 const root = join(__dirname, '..');
 const page = pathToFileURL(join(__dirname, 'index.html')).href;
@@ -121,13 +133,13 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     };
     worker.on('exit', failed); worker.on('error', failed);
     const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-    // 幅は aidiy_code / aidiy_live と共通、高さは設定パネル用（frontend_vscode/scripts/window-size.cjs）。
+    // 幅は aidiy_code / aidiy_live と共通、高さは設定パネル用（frontend_ide/host/scripts/window-size.cjs）。
     const width = Math.min(size.幅, area.width), height = Math.min(size.パネル高さ, area.height);
     window = new BrowserWindow({
       title: 'AiDiy Discord', width, height, minWidth: size.最小幅, minHeight: size.パネル高さ,
       x: area.x + Math.round((area.width - width) / 2), y: area.y + 8,
       frame: false, roundedCorners: false, show: false, backgroundColor: '#101217', autoHideMenuBar: true,
-      icon: join(root, '../frontend_vscode/media/AiDiy.png'),
+      icon: join(root, '../frontend_ide/host/media/AiDiy.png'),
       webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
     });
     window.setMenu(null);

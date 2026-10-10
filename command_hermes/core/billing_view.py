@@ -345,7 +345,7 @@ def build_billing_state(*, timeout: float = 15.0) -> BillingState:
     failure, returns ``logged_in=False`` with ``error`` set so the surface can show
     a clear message rather than crashing.
 
-    Dev override: ``HERMES_DEV_BILLING_FIXTURE`` short-circuits to a fixture so the
+    IDE override: ``HERMES_DEV_BILLING_FIXTURE`` short-circuits to a fixture so the
     card-on-file / admin / scope states are testable offline (mirrors
     ``HERMES_DEV_CREDITS_FIXTURE`` for the usage model).
     """
@@ -394,7 +394,7 @@ def _fallback_portal_url(base: str) -> str:
 
 
 # =============================================================================
-# Dev fixtures (throwaway scaffolding — env-var driven, no live portal)
+# IDE fixtures (throwaway scaffolding — env-var driven, no live portal)
 # =============================================================================
 
 

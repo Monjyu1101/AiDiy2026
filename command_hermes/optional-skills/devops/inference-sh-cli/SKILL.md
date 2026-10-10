@@ -75,7 +75,7 @@ The JSON output contains URLs to generated media. Present these to the user with
 # Search for image apps
 infsh app list --search image
 
-# FLUX Dev with LoRA
+# FLUX IDE with LoRA
 infsh app run falai/flux-dev-lora --input '{"prompt": "sunset over mountains", "num_images": 1}' --json
 
 # Gemini image generation

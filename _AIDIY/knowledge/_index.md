@@ -24,8 +24,8 @@
 | `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_vscode` | VS Code 拡張 AiDiy Code（AIコアの Code CLI 操作）/ AiDiy Live（AIコア音声会話）と単独起動版 |
 | `frontend_discord` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
+| `frontend_ide` | Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
 
 例:
 
@@ -115,9 +115,9 @@
 | frontend_web の UI ルール、qTubler、明細型編集 | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md) |
 | 画面コンポーネントを直す（**frontend_avatar に同名コピーがあるので両方直す**） | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md)（「frontend_avatar との二重管理」）、[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
 | frontend_avatar、Electron、VRM / VRMA、音声 | [`frontend_avatar,変更チェック.md`](./frontend_avatar,変更チェック.md)、[`frontend_avatar,ElectronIPC追加手順.md`](./frontend_avatar,ElectronIPC追加手順.md)、[`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、[`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、[`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
-| VS Code の AiDiy Code / AiDiy Live 拡張を変更・検証・配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
-| Code の `out/*.cjs` など生成物6件だけが差分に出る、上書きせず再検証する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
-| Code の `out/aidiy_code/<起動ID>.json` だけが変更通知に出る | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
+| VS Code の AiDiy Code / AiDiy Live 拡張を変更・検証・配布する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md) |
+| Code の `out/*.cjs` など生成物6件だけが差分に出る、上書きせず再検証する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
+| Code の `out/aidiy_code/<起動ID>.json` だけが変更通知に出る | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
 | Discord の Code / Live 接続、Bot 設定、音声中継を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
 | Discord 音声のチャンク境界で無音が混ざる、発話末尾が欠ける、Opus 回帰テストを見直す | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md)（「出力チャンク境界と末尾処理の再修正チェック」） |
 | command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
@@ -203,13 +203,17 @@
 | Electron ウィンドウの位置・サイズ・IPC・ライフサイクルを変更する | [`frontend_avatar,Electronウィンドウ管理.md`](./frontend_avatar,Electronウィンドウ管理.md) |
 | 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) |
 
+## Frontend IDE
+
+AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide,文書ビューア.md`](./frontend_ide,文書ビューア.md) を参照してください。
+
 ## Frontend VS Code
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| VS Code 拡張（Code / Live）と単独起動版を変更・検証・VSIX 配布する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md) |
-| Code の生成物と生成元を `write: false` で照合し、現行生成物を対象テストで確認する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
-| Code の起動完了JSONの形式・生成箇所・読込を検証する | [`frontend_vscode,VSCodeチャット拡張変更手順.md`](./frontend_vscode,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
+| VS Code 拡張（Code / Live）と単独起動版を変更・検証・VSIX 配布する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md) |
+| Code の生成物と生成元を `write: false` で照合し、現行生成物を対象テストで確認する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
+| Code の起動完了JSONの形式・生成箇所・読込を検証する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
 | 拡張機能をセットアップして VS Code へ配置する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | 配置済み拡張機能と生成物を解除する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 
@@ -285,3 +289,5 @@
 - 日付つき履歴、担当者メモ、経緯説明、完了報告、編集対象の列挙だけの記録は残さない。
 - 現行実装と同期が必要な値は、同期元のファイルパスを併記する。
 - `_AIDIY/knowledge` 更新とアプリ本体の仕様変更は混同しない。
+
+- [frontend_ide,Vue共通画面変更手順.md](./frontend_ide,Vue共通画面変更手順.md) — Vue部品、起動互換、配布・確認。

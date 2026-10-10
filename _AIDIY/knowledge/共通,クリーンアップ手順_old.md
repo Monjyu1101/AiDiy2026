@@ -1,6 +1,6 @@
 # クリーンアップ手順
 
-> 文書: `共通,クリーンアップ手順.md` | 実装: `_cleanup.py`, `_start.py`, `frontend_vscode/_cleanup.py`, `backend_server/temp/`
+> 文書: `共通,クリーンアップ手順.md` | 実装: `_cleanup.py`, `_start.py`, `frontend_ide/host/_cleanup.py`, `backend_server/temp/`
 
 ## このメモを使う場面
 - `_cleanup.py` の削除対象や確認プロンプトを変更する
@@ -13,7 +13,7 @@
 - `backend_server/temp/`
 - `backend_tools/temp/`
 - `command_hermes/temp/`
-- `frontend_vscode/_cleanup.py`
+- `frontend_ide/host/_cleanup.py`
 - `backup/`
 - `docs/開発ガイド/**/code_samples/_cleanup.py`
 
@@ -23,7 +23,7 @@
 - `backend_server/temp/`
 - `backend_tools/temp/`
 - `command_hermes/temp/`
-- `frontend_vscode/node_modules/`、`frontend_vscode/dist/`、`frontend_vscode/out/`
+- `frontend_ide/host/node_modules/`、`frontend_ide/host/dist/`、`frontend_ide/host/out/`
 - VS Code に配置済みで拡張名が `aidiy-` で始まる拡張機能（`publisher.aidiy-*`、Code / Live / 旧版を含む）
 - 各 `.venv` / `venv`
 - `node_modules`
@@ -33,7 +33,7 @@
 ## 実装方針
 
 - 何らかのクリーンアップを実行するときは、ファイル削除を始める前に全常駐サービスを各フォルダの `_start.py` が公開する `kill_ports()` で停止する（8090 / 8091 / 8092 / 8093 / 8095 / 8096、apps は 8098）。選択した削除対象だけに限定しない。
-- Code / Live の単独実行はランダムポートを使うため、上記のポート停止だけでは終了しない。ルートの削除前処理と `frontend_vscode/_cleanup.py` は、この作業コピーの実行入口・Electron 実行ファイル・専用ブラウザプロファイルを完全一致で判定し、Windows では `taskkill /F /T` で強制終了する。終了を確認できない場合は削除を中止する。通常のブラウザと VS Code 本体は対象外。
+- Code / Live の単独実行はランダムポートを使うため、上記のポート停止だけでは終了しない。ルートの削除前処理と `frontend_ide/host/_cleanup.py` は、この作業コピーの実行入口・Electron 実行ファイル・専用ブラウザプロファイルを完全一致で判定し、Windows では `taskkill /F /T` で強制終了する。終了を確認できない場合は削除を中止する。通常のブラウザと VS Code 本体は対象外。
 - tools の `mcp_stdio.py` は MCP クライアント側の接続プロセスであり、8095 の待受プロセスを停止しても残る。ルートと tools 単独の cleanup は、この作業コピーの `.venv` / `venv` の Python、および `mcp_stdio.py` / `tools_main.py` の実行入口を照合して、接続プロセスと子孫も強制終了する。クライアント本体は終了しない。プロセス照合と終了確認は `scripts/_cleanup_processes.py` を共用する。
 - tools の `.venv/Scripts/python.exe` で WinError 5、`temp/logs/*mcp_main.log` で WinError 32 が出た場合は、MCP 接続プロセスの残留を確認する。管理者権限の不足とは限らない。終了を確認できない場合は削除を中止し、ディレクトリの削除失敗は tools 単独・ルートともに失敗として終了する。削除対象の仮想環境から cleanup を実行すると自分自身が実行ファイルを保持するため、通常の Python で起動する。
 - ルート `_start.py` が同時に稼働している場合は、`.cleanup_stop_request.json` で全常駐サービスを自動再起動対象から外す。要求ファイル自体は `_cleanup.py` の終了時に削除するが、監視プロセス内のサービス選択は無効のまま維持し、cleanup 後に勝手に再起動させない。
@@ -41,7 +41,7 @@
 - `temp` は中身だけではなく、フォルダごと `remove_directory()` で削除する。
 - `core_main.py` / `apps_main.py` / `tools_main.py` は起動時に必要な `temp` を再作成する。
 - `command_hermes/temp` は CLI ツールの一時出力先なので cleanup 対象に含める。
-- `frontend_vscode` の cleanup は `aidiy-` で始まる拡張名を一覧から抽出し、`code --uninstall-extension` で解除する。対象が残っていないことを確認してから依存関係と生成物を削除し、解除を確認できない場合は削除を中止する。VS Code 本体は停止せず、解除の画面反映は利用者によるウィンドウ再読み込みに任せる。
+- `frontend_ide/host` の cleanup は `aidiy-` で始まる拡張名を一覧から抽出し、`code --uninstall-extension` で解除する。対象が残っていないことを確認してから依存関係と生成物を削除し、解除を確認できない場合は削除を中止する。VS Code 本体は停止せず、解除の画面反映は利用者によるウィンドウ再読み込みに任せる。
 - ルート `backup/` は `_cleanup.py` の選択項目に含め、存在する場合は既定 `y` で削除確認する。
 - `logs` は中身削除を維持する。ログフォルダ自体を削除する場合は、ログ設定側の再作成処理を先に確認する。
 - `_cleanup.py` の仕様を変えたら、docs の code_samples に古い説明が残っていないか確認する。
@@ -49,7 +49,7 @@
 ## 検証方法
 
 ```powershell
-python -m py_compile _cleanup.py _start.py frontend_vscode/_cleanup.py
+python -m py_compile _cleanup.py _start.py frontend_ide/host/_cleanup.py
 ```
 
 停止処理は実サービスを起動せず、`_load_folder_start_module()` と `time.sleep()` をモックして、全サービスの `kill_ports()` が削除処理より先に呼ばれることを確認する。Windows では `_pid_is_running(os.getpid())` が `True` を返し、確認元プロセスが終了しないことも確認する。

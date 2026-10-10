@@ -138,14 +138,14 @@ _WINDOWS_PROGID_MAP = (
 # Pre-release ProgId prefixes we recognize but do NOT support (their profiles
 # live in channel-specific dirs the resolver tables don't carry). Matched
 # BEFORE the stable map; a hit fails closed rather than resolving to stable.
-# ``ChromeBHTML`` = Beta, ``ChromeDHTML`` = Dev, ``ChromeSSHTML`` = Canary
+# ``ChromeBHTML`` = Beta, ``ChromeDHTML`` = IDE, ``ChromeSSHTML`` = Canary
 # (SxS); ``MSEdgeBHTML`` / ``MSEdgeDHTML`` / ``MSEdgeCHTML`` = Edge channels.
 _WINDOWS_CHANNEL_PROGIDS = (
     "chromebhtml", "chromedhtml", "chromesshtml", "chromecanaryhtml",
     "msedgebhtml", "msedgedhtml", "msedgechtml",
     "bravebetahtml", "bravenightlyhtml",
     # Brave Origin channels (brave-core install_static): Beta=BraveOBHTML,
-    # Dev=BraveODHTML, Nightly/SxS=BraveOSHTM (no trailing L — 10-char cap).
+    # IDE=BraveODHTML, Nightly/SxS=BraveOSHTM (no trailing L — 10-char cap).
     "braveobhtml", "braveodhtml", "braveoshtm",
 )
 
@@ -214,7 +214,7 @@ _DARWIN_CHANNEL_BUNDLES = (
 )
 
 # Sentinel returned when the OS default is a recognized-but-unsupported
-# Chromium CHANNEL (Beta/Dev/Canary). Distinct from None (non-Chromium) so the
+# Chromium CHANNEL (Beta/IDE/Canary). Distinct from None (non-Chromium) so the
 # caller fails closed with a channel-specific message instead of driving the
 # stable profile of a different account.
 UNSUPPORTED_CHANNEL = "__unsupported_channel__"
@@ -363,7 +363,7 @@ def _detect_default_windows() -> str | None:
     except Exception:
         return None
     low = str(prog_id or "").lower()
-    # Channels first: a recognized Beta/Dev/Canary ProgId must fail closed, not
+    # Channels first: a recognized Beta/IDE/Canary ProgId must fail closed, not
     # fall through to a stable prefix match and drive the stable profile.
     for chan in _WINDOWS_CHANNEL_PROGIDS:
         if low.startswith(chan):
@@ -443,7 +443,7 @@ def _detect_default_darwin() -> str | None:
     if not bundle:
         return None
     b = bundle.lower()
-    # Channels first (exact): a Beta/Dev/Canary bundle must fail closed.
+    # Channels first (exact): a Beta/IDE/Canary bundle must fail closed.
     if b in _DARWIN_CHANNEL_BUNDLES:
         return UNSUPPORTED_CHANNEL
     for frag, browser in _DARWIN_BUNDLE_MAP:

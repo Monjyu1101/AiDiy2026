@@ -1,0 +1,39 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
+:root {
+  color-scheme: dark;
+  --vscode-sideBar-background: #11151d; --vscode-foreground: #e3e9f2;
+  --vscode-font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  --vscode-font-size: 13px; --vscode-descriptionForeground: #8b98ad;
+  --vscode-button-background: #667eea; --vscode-button-foreground: #fff;
+  --vscode-button-hoverBackground: #7b90f2; --vscode-panel-border: #29313f;
+  --vscode-input-background: #191f2b; --vscode-input-foreground: #e3e9f2;
+  --vscode-input-border: #303b4f; --vscode-focusBorder: #889aff;
+  --vscode-textLink-foreground: #a6b8ff; --vscode-toolbar-hoverBackground: #242d3d;
+  --vscode-textBlockQuote-background: #1c2433; --vscode-textBlockQuote-border: #465574;
+  --vscode-textCodeBlock-background: #0d1119; --vscode-errorForeground: #ff8e9e;
+  --vscode-editor-font-family: Consolas, "SFMono-Regular", monospace;
+  --vscode-list-activeSelectionBackground: #252f49; --vscode-list-activeSelectionForeground: #fff;
+}
+html { background: var(--surface); }
+body.ui-ready { transform-origin: center center; animation: standalone-reveal 1s cubic-bezier(.16, 1, .3, 1) both !important; }
+@keyframes standalone-reveal { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
+#title-bar { min-height: 31px; padding: 1px 2px; }
+.brand-name { font-size: 14px; }
+#activity-bar { height: 3px; }
+.desktop-window body { border: 1px solid var(--vscode-panel-border); }
+.desktop-window body.ui-ready { animation: startup-fade-in .45s ease-out both !important; }
+.desktop-window.desktop-opening body { opacity: 0; animation: none !important; }
+.desktop-window.desktop-opening #welcome *, .desktop-window.desktop-opening #welcome *::before, .desktop-window.desktop-opening #welcome *::after { animation-play-state: paused !important; }
+.desktop-window #title-bar { -webkit-app-region: drag; user-select: none; }
+.desktop-window #conversation-toolbar, .desktop-window #desktop-controls { -webkit-app-region: no-drag; }.desktop-window.window-maximized body { border: 0; }

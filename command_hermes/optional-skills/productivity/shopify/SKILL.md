@@ -43,7 +43,7 @@ The REST Admin API is legacy since 2024-04 and only receives security fixes. **U
    SHOPIFY_API_VERSION=2026-01
    ```
 
-> **Heads up:** As of January 1, 2026, new "legacy custom apps" created in the Shopify admin are gone. New setups should use the **Dev Dashboard** (`shopify.dev/docs/apps/build/dev-dashboard`). Existing admin-created apps keep working. If the user's shop has no existing custom app and it's after 2026-01-01, direct them to Dev Dashboard instead of the admin flow.
+> **Heads up:** As of January 1, 2026, new "legacy custom apps" created in the Shopify admin are gone. New setups should use the **IDE Dashboard** (`shopify.dev/docs/apps/build/dev-dashboard`). Existing admin-created apps keep working. If the user's shop has no existing custom app and it's after 2026-01-01, direct them to IDE Dashboard instead of the admin flow.
 
 Common scopes by task:
 - Products / collections: `read_products`, `write_products`

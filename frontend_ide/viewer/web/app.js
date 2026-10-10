@@ -1,0 +1,1603 @@
+// -*- coding: utf-8 -*-
+
+// -------------------------------------------------------------------------
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
+// -------------------------------------------------------------------------
+
+// AiDiy IDE 星図ビューア。いつも1階層だけを宇宙として描く。
+//  - 直下のフォルダ → 銀河（星の数 = 配下の全ファイル数）
+//  - 直下のファイル → 名前で決まる位置の自由惑星
+// 銀河をダブルクリックすると、そのフォルダを新しい宇宙として突入する。
+// 依存なしの Canvas 2D。名前のハッシュから3D座標を作り、透視投影して描く。
+
+import { spacePosition, WORLD_RADIUS, HOME_VIEW, orbitView, panOffset, warpMotion } from './layout.js';
+
+const $ = id => document.getElementById(id);
+const canvas = $('sky');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1, F = 800;
+let CX = 0;                  // 宇宙の中心の画面 x（左右のパネル間へ寄せる）
+
+// ---------------------------------------------------------------- 種類と色
+const KINDS = [
+  { label: 'Python', color: '#ffd36b', ext: ['py', 'pyi', 'ipynb'] },
+  { label: 'TS / JS', color: '#6fb8ff', ext: ['ts', 'tsx', 'js', 'mjs', 'cjs', 'jsx'] },
+  { label: 'Vue', color: '#5cf2a6', ext: ['vue', 'svelte'] },
+  { label: '文書', color: '#eef1ff', ext: ['md', 'txt', 'rst', 'pptx', 'pptm', 'docx', 'dotx', 'pdf', 'xlsx', 'xls', 'xlsm', 'ods'] },
+  { label: '設定・データ', color: '#ffa25c', ext: ['json', 'yaml', 'yml', 'toml', 'ini', 'env', 'csv', 'sql', 'db', 'sqlite', 'lock'] },
+  { label: 'HTML / CSS', color: '#ff7ac8', ext: ['html', 'htm', 'css', 'scss', 'less'] },
+  { label: '画像', color: '#b98cff', ext: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'bmp'] },
+  { label: '音声・動画・3D', color: '#ff5c6a', ext: ['mp3', 'wav', 'ogg', 'mp4', 'webm', 'vrm', 'vrma', 'glb', 'fbx'] },
+  { label: 'スクリプト', color: '#8ff7ea', ext: ['bat', 'cmd', 'sh', 'ps1'] },
+  { label: 'その他', color: '#aab0c0', ext: [] },
+];
+const OTHER = KINDS.length - 1;
+const KIND_BY_EXT = new Map();
+KINDS.forEach((kind, index) => kind.ext.forEach(ext => KIND_BY_EXT.set(ext, index)));
+function kindOf(name) {
+  const lower = name.toLowerCase();
+  if (lower === 'dockerfile') return 8;
+  const dot = lower.lastIndexOf('.');
+  return dot > 0 ? KIND_BY_EXT.get(lower.slice(dot + 1)) ?? OTHER : OTHER;
+}
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const rgba = (hex, a) => `rgba(${rgb(hex).join(',')},${a})`;
+const mix = (hex, to, t) => { const a = rgb(hex), b = rgb(to); return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`; };
+
+// 大量に描く光の粒・銀河の光・惑星は事前に下絵を作る。
+function sprite(size, draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  return c;
+}
+function radial(stops) {
+  return sprite(128, (g, size) => {
+    const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    for (const [at, color] of stops) grad.addColorStop(at, color);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+  });
+}
+const STAR = KINDS.map(k => radial([[0, '#fff'], [0.1, rgba(k.color, 1)], [0.28, rgba(k.color, 0.35)], [0.6, rgba(k.color, 0.06)], [1, rgba(k.color, 0)]]));
+const DISK = KINDS.map(k => radial([[0, rgba(k.color, 0.5)], [0.3, rgba(k.color, 0.2)], [0.7, rgba(k.color, 0.05)], [1, rgba(k.color, 0)]]));
+const CORE = radial([[0, 'rgba(255,250,235,1)'], [0.12, 'rgba(255,236,200,.75)'], [0.4, 'rgba(255,210,160,.18)'], [1, 'rgba(255,200,150,0)']]);
+const FLARE = radial([[0, 'rgba(255,255,255,1)'], [0.15, 'rgba(255,250,220,.6)'], [1, 'rgba(255,240,200,0)']]);
+const PLANET = KINDS.map(k => sprite(128, (g, size) => {
+  const c = size / 2, r = size * 0.3;
+  // 大気の光
+  const halo = g.createRadialGradient(c, c, r * 0.9, c, c, r * 1.6);
+  halo.addColorStop(0, rgba(k.color, 0.45)); halo.addColorStop(1, rgba(k.color, 0));
+  g.fillStyle = halo; g.fillRect(0, 0, size, size);
+  // 左上から光が当たる球
+  const body = g.createRadialGradient(c - r * 0.45, c - r * 0.45, r * 0.05, c, c, r);
+  body.addColorStop(0, mix(k.color, '#ffffff', 0.7)); body.addColorStop(0.45, k.color); body.addColorStop(1, mix(k.color, '#000010', 0.85));
+  g.fillStyle = body;
+  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fill();
+  // 縞模様
+  g.save(); g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.clip();
+  g.globalAlpha = 0.12; g.fillStyle = '#000';
+  for (let i = -3; i <= 3; i++) g.fillRect(c - r, c + i * r * 0.28 - r * 0.05, r * 2, r * 0.08);
+  g.restore();
+}));
+
+// ---------------------------------------------------------------- 乱数（パスから決まる）
+function hash(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function rngFor(text) {
+  let a = hash(text) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------------------------------------------------------------- 宇宙（1階層）の組み立て
+let scan = null;            // サーバーの走査結果
+let trail = [];             // ルートから今の宇宙までのフォルダ名
+let world = null;           // { galaxies, stars, planets, radius }
+let knownPaths = null;      // 前回観測した全パス（新しく生まれた星の判定用）
+
+const galaxyRadius = 160;
+
+// 起点日時以降に更新したファイル（AI が触ったファイルを見つける目印）
+let markMode = 'since', grepMatches = new Set(), grepController, grepRevision = 0;
+const isFresh = file => markMode === 'grep' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
+const fastBlink = t => 0.5 + 0.5 * Math.sin(t * 1.8);          // ファイル: 約3.5秒周期で穏やかに明滅
+const slowBlink = t => 0.5 + 0.5 * Math.sin(t * 1.4 - 1.2);    // フォルダ: 約4.5秒周期
+function recountFresh() {
+  if (!world) return;
+  for (const g of world.galaxies) g.fresh = g.stars.reduce((n, s) => n + (isFresh(s) ? 1 : 0), 0);
+}
+
+function collectFiles(node, prefix, out = []) {
+  for (const [name, size, mtime] of node.f) out.push({ name, path: prefix ? `${prefix}/${name}` : name, size, mtime });
+  for (const child of node.d) collectFiles(child, prefix ? `${prefix}/${child.n}` : child.n, out);
+  return out;
+}
+function nodeAt(names) {
+  let node = scan.tree;
+  for (const name of names) {
+    node = node.d.find(d => d.n === name);
+    if (!node) return null;
+  }
+  return node;
+}
+const basePath = () => trail.join('/');
+
+function buildWorld() {
+  const node = nodeAt(trail);
+  const prefix = basePath();
+  const now = Date.now();
+  const fileInfo = (file, rng) => {
+    const ageDays = Math.max(0, (now - file.mtime) / 86400000);
+    return {
+      ...file, kind: kindOf(file.name), ageDays,
+      mag: 1 + Math.log10(file.size + 1) * 0.55,
+      glow: 0.5 + 0.5 * Math.exp(-ageDays / 90),
+      phase: rng() * Math.PI * 2, speed: 0.6 + rng() * 1.8,
+      born: knownPaths && !knownPaths.has(file.path) ? now : 0,
+      x: 0, y: 0, z: 0,
+    };
+  };
+
+  // 名前のハッシュを、件数に左右されない球内の3D座標へ対応させる。
+  const galaxies = node.d.map(child => ({
+    name: child.n, path: prefix ? `${prefix}/${child.n}` : child.n,
+    files: collectFiles(child, prefix ? `${prefix}/${child.n}` : child.n),
+    sub: child.d.length, R: galaxyRadius, ...spacePosition(child.n),
+  }));
+
+  // 銀河の星（名前で決まる球内の固定3D位置）
+  const stars = [];
+  for (const g of galaxies) {
+    const rng = rngFor(`shape:${g.path}`);
+    g.arms = 1;
+    g.tilt = (rng() - 0.5) * 1.6;
+    g.turn = rng() * Math.PI * 2;
+    g.ct = Math.cos(g.tilt); g.st = Math.sin(g.tilt); g.cs = Math.cos(g.turn); g.ss = Math.sin(g.turn);
+    g.kinds = new Array(KINDS.length).fill(0);
+    g.stars = [];
+    g.fresh = 0;
+    for (const file of g.files) {
+      const s = rngFor(file.path);
+      const star = fileInfo(file, s);
+      star.galaxy = g;
+      // 別の下位フォルダにある同名ファイルは相対パスで区別する。
+      const local = spacePosition(file.name, {
+        scale: g.R, identity: file.path.slice(g.path.length + 1),
+      });
+      star.lr = Math.hypot(local.x, local.y, local.z);
+      const [wx, wy, wz] = rotateLocal(g, local.x, local.y, local.z);
+      star.x = g.x + wx; star.y = g.y + wy; star.z = g.z + wz;
+      g.kinds[star.kind]++;
+      if (isFresh(star)) g.fresh++;
+      g.stars.push(star);
+      stars.push(star);
+    }
+    g.kind = g.kinds.indexOf(Math.max(...g.kinds));
+    // 円盤の法線（見かけの楕円を描くため）
+    g.normal = rotateLocal(g, 0, 1, 0);
+  }
+
+  // 直下のファイルも同じ球状空間に固定する。
+  const radius = WORLD_RADIUS;
+  const planets = node.f.map(([name, size, mtime]) => {
+    const path = prefix ? `${prefix}/${name}` : name;
+    const planet = fileInfo({ name, path, size, mtime }, rngFor(`planet:${path}`));
+    Object.assign(planet, spacePosition(name));
+    planet.R = 9 + Math.log10(size + 1) * 3;
+    planet.isPlanet = true;
+    return planet;
+  });
+
+  const byPath = new Map();
+  for (const s of stars) byPath.set(s.path, s);
+  for (const p of planets) byPath.set(p.path, p);
+  // 親フォルダへの入口は常に中心。入口の渦だけをアニメーションさせる。
+  const gate = trail.length ? {
+    x: 0, y: 0, z: 0, R: 60,
+    name: trail.length > 1 ? trail.at(-2) : scan.tree.n,
+  } : null;
+  return { galaxies, stars, planets, radius, byPath, gate };
+}
+
+function rotateLocal(g, x, y, z) {
+  const y1 = y * g.ct - z * g.st, z1 = y * g.st + z * g.ct;
+  return [x * g.cs - z1 * g.ss, y1, x * g.ss + z1 * g.cs];
+}
+
+// ---------------------------------------------------------------- 遠景の星（天の川）。色ごとにまとめて描く。
+const FAR_GROUPS = [];
+{
+  const r = rngFor('far-sky');
+  const colors = ['225,232,255', '255,214,170', '170,200,255'];
+  for (let c = 0; c < 3; c++) for (let p = 0; p < 2; p++) FAR_GROUPS.push({ color: colors[c], phase: p * Math.PI, base: c === 0 ? 0.55 : 0.45, pts: [] });
+  for (let i = 0; i < 2600; i++) {
+    const band = i < 1500;
+    const theta = r() * Math.PI * 2;
+    const u = band ? (r() + r() + r() - 1.5) * 0.22 : r() * 2 - 1;
+    const side = Math.sqrt(1 - u * u);
+    const x = side * Math.cos(theta), y0 = u, z0 = side * Math.sin(theta);
+    const tilt = 0.5, y = y0 * Math.cos(tilt) - z0 * Math.sin(tilt), z = y0 * Math.sin(tilt) + z0 * Math.cos(tilt);
+    const tint = r(), group = (tint < 0.15 ? 1 : tint > 0.85 ? 2 : 0) * 2 + (r() < 0.5 ? 0 : 1);
+    FAR_GROUPS[group].pts.push(x, y, z, r() < 0.03 ? 1.8 : band ? 0.5 + r() * 0.5 : 0.6 + r() * 0.8);
+  }
+}
+
+// ---------------------------------------------------------------- カメラ
+const cam = { tx: 0, ty: 0, tz: 0, ...HOME_VIEW, dist: 30000 };
+const goal = { ...cam };
+let idleSince = 0, autoSpin = false;
+let cy = 1, sy = 0, cp = 1, sp = 0;
+const P = { x: 0, y: 0, k: 0, z: 0 };
+
+function project(x, y, z) {
+  x -= cam.tx; y -= cam.ty; z -= cam.tz;
+  const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
+  const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+  const depth = z2 + cam.dist;
+  if (depth < 4) return false;
+  P.k = F / depth; P.z = depth;
+  P.x = CX + x1 * P.k; P.y = H / 2 - y2 * P.k;
+  return true;
+}
+/** 向きだけをカメラ座標へ回す（平行移動なし）。 */
+function turn(x, y, z) {
+  const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
+  return [x1, y * cp - z1 * sp, y * sp + z1 * cp];
+}
+const overviewDistance = () => (world ? world.radius * 2.6 : 4000) * (F / Math.min(W, H));
+
+// ---------------------------------------------------------------- 状態
+let focus = null;            // 注目中の銀河
+let selected = null;         // 選択中の星・惑星
+let selectionOrigin = null;  // ファイルを選ぶ前の階層・視点（選び替えても保持）
+let hovered = null;          // マウス下の星・惑星
+let hoveredGalaxy = null;    // マウス下の銀河
+let labelBoxes = [];
+let galaxyHits = [];         // 画面上の銀河の当たり判定 [銀河, x, y, 半径]
+let introAt = performance.now();
+let bodies = [];             // 当たり判定する星・惑星
+let projected = new Float32Array(0);
+let diving = false;
+let tracking = null;         // 追尾中の星・惑星
+let hoveredGate = false;
+let gateHit = null;          // 帰還ゲートの画面上の [x, y, 半径]
+let since = null;            // 起点日時（ms）。これ以降に更新したファイルを明滅させる。null なら明滅なし
+let voyages = {};            // 階層ごとの航路 { 階層パス: ['g:フォルダ' | 'f:ファイル', ...] }
+let journal = [];            // 航海日誌（新しい順） [{ type, path, at }]
+
+// ---------------------------------------------------------------- 描画
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  F = Math.min(W, H) * 1.05;
+}
+addEventListener('resize', resize);
+resize();
+
+/** 選択対象は左右のパネル間の中央へ。エクスプローラー非表示なら画面の25%。 */
+let coverShown = '';
+function measureCover() {
+  let left = 0, right = W;
+  const previewOpen = !$('clusters').hidden;
+  if (previewOpen) {
+    right = $('clusters').getBoundingClientRect().left - 8;
+    if (explorerOpen) left = Math.min(right, $('explorer').getBoundingClientRect().right + 8);
+  }
+  const focusX = previewOpen ? (left + right) / 2 : W / 2;
+  const key = [left, right, previewOpen].join(':');
+  if (key !== coverShown) {
+    coverShown = key;
+    const style = document.body.style;
+    style.setProperty('--focus-x', `${focusX}px`);
+    style.setProperty('--space-left', `${Math.round(left)}px`);
+    style.setProperty('--space-width', `${Math.max(0, Math.round(right - left))}px`);
+  }
+  return focusX;
+}
+
+let last = performance.now(), prevDist = cam.dist;
+function frame(now) {
+  if (!document.body.classList.contains('workspace-active')) { last = now; requestAnimationFrame(frame); return; }
+  const dt = Math.min(0.25, (now - last) / 1000);
+  last = now;
+  const t = now / 1000;
+
+  if (autoSpin && now - idleSince > 6000 && !dragging) goal.yaw += dt * 0.02;
+  if (tracking) { goal.tx = tracking.x; goal.ty = tracking.y; goal.tz = tracking.z; }
+  const ease = 1 - Math.exp(-dt * 4);
+  for (const key of ['tx', 'ty', 'tz', 'yaw', 'pitch']) cam[key] += (goal[key] - cam[key]) * ease;
+  cam.dist *= Math.exp((Math.log(goal.dist) - Math.log(cam.dist)) * ease);
+  // 選択中はパネル間の中央へ、解除時は画面中央へ滑らかに移動する。
+  const cxGoal = measureCover();
+  CX = CX ? CX + (cxGoal - CX) * ease : cxGoal;
+  cy = Math.cos(cam.yaw); sy = Math.sin(cam.yaw); cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch);
+  const warp = Math.min(1.5, Math.abs(Math.log(cam.dist / prevDist)) / Math.max(dt, 1e-3) * 0.08);
+  prevDist = cam.dist;
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  const bg = ctx.createRadialGradient(W * 0.5, H * 0.55, 0, W * 0.5, H * 0.55, Math.max(W, H) * 0.8);
+  bg.addColorStop(0, '#0a0f24'); bg.addColorStop(0.55, '#04060f'); bg.addColorStop(1, '#010208');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = 'lighter';
+  drawFarSky(t, warp);
+  if (world) drawFolderLinks(now);
+  if (world) drawGalaxies(t, now);
+  gateHit = null;
+  if (world?.gate) drawGate(t);
+  ctx.globalCompositeOperation = 'source-over';
+  if (world) { drawPlanets(t, now); drawVoyage(t); drawLabels(t); }
+  requestAnimationFrame(frame);
+}
+
+/** 現在フォルダの3D原点から、直下の銀河・ファイルへ静かな直線を引く。 */
+function drawFolderLinks(now) {
+  if (!project(0, 0, 0)) return;
+  const x = P.x, y = P.y;
+  const appear = Math.min(1, Math.max(0, (now - introAt) / 1000 - 0.8));
+  if (!appear) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = '#7897bf';
+  ctx.lineWidth = 0.7;
+  ctx.globalAlpha = 0.2 * appear;
+  ctx.beginPath();
+  // 配下の全ファイルには引かず、現在見ている1階層の関係だけを表示する。
+  for (const item of [...world.galaxies, ...world.planets]) {
+    if (!project(item.x, item.y, item.z)) continue;
+    ctx.moveTo(x, y); ctx.lineTo(P.x, P.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFarSky(t, warp) {
+  for (const group of FAR_GROUPS) {
+    const pts = group.pts;
+    ctx.globalAlpha = group.base * (0.8 + 0.2 * Math.sin(t * 0.9 + group.phase));
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i += 4) {
+      const [x1, y2, z2] = turn(pts[i], pts[i + 1], pts[i + 2]);
+      if (z2 < 0.05) continue;
+      const px = CX + x1 / z2 * F, py = H / 2 - y2 / z2 * F, s = pts[i + 3];
+      if (px < -50 || px > W + 50 || py < -50 || py > H + 50) continue;
+      if (warp > 0.04) {
+        // ワープ中は中心から放射状の光の筋にする
+        ctx.moveTo(px, py); ctx.lineTo(px - (px - CX) * warp * 0.25, py - (py - H / 2) * warp * 0.25);
+      } else ctx.rect(px - s / 2, py - s / 2, s, s);
+    }
+    if (warp > 0.04) { ctx.strokeStyle = `rgb(${group.color})`; ctx.lineWidth = 1; ctx.stroke(); }
+    else { ctx.fillStyle = `rgb(${group.color})`; ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+const dimmed = g => focus && g !== focus;
+
+function drawGalaxies(t, now) {
+  const { galaxies } = world;
+  const intro = (now - introAt) / 1000;
+  bodies = [];
+  galaxyHits = [];
+  let p = 0;
+  if (projected.length < (world.stars.length + world.planets.length) * 4) projected = new Float32Array((world.stars.length + world.planets.length) * 4);
+
+  for (const g of galaxies) {
+    if (!project(g.x, g.y, g.z)) continue;
+    const gx = P.x, gy = P.y, gk = P.k;
+    const fade = Math.min(1, Math.max(0, (intro - 0.1 - Math.hypot(g.x, g.z) / world.radius * 0.8) / 1.0));
+    const dim = dimmed(g) ? 0.3 : 1;
+    galaxyHits.push([g, gx, gy, g.R * gk]);
+
+    // 円盤の光（見かけの傾きに合わせて楕円にする）。起点以降に更新したファイルを含む銀河はゆっくり明滅する。
+    const [nx, ny, nz] = turn(...g.normal);
+    const size = g.R * 2.6 * gk;
+    const pulse = g.fresh ? slowBlink(t) : 0;
+    if (size > 2) {
+      ctx.save();
+      ctx.translate(gx, gy);
+      ctx.rotate(Math.atan2(-ny, nx));
+      ctx.scale(Math.max(0.12, Math.abs(nz)), 1);
+      ctx.globalAlpha = (0.28 + 0.4 * pulse) * fade * dim;
+      ctx.drawImage(DISK[g.kind], -size / 2, -size / 2, size, size);
+      ctx.restore();
+      const core = g.R * (g.arms ? 0.7 : 1.0) * gk * (1 + 0.35 * pulse);
+      ctx.globalAlpha = Math.min(1, (g.arms ? 0.55 : 0.4) + 0.4 * pulse) * fade * dim;
+      ctx.drawImage(CORE, gx - core / 2, gy - core / 2, core, core);
+    }
+    if (g.fresh) {
+      // 遠くからでも見つけられるよう、銀河を包む光の輪も明滅させる
+      const halo = Math.max(30, g.R * 3.2 * gk);
+      ctx.globalAlpha = 0.22 * pulse * fade;
+      ctx.drawImage(FLARE, gx - halo / 2, gy - halo / 2, halo, halo);
+    }
+
+    // 星
+    for (const s of g.stars) {
+      if (!project(s.x, s.y, s.z)) continue;
+      if (P.x < -60 || P.x > W + 60 || P.y < -60 || P.y > H + 60) continue;
+      const appear = Math.min(1, Math.max(0, fade * 1.6 - s.lr / g.R * 0.6));
+      if (appear <= 0) continue;
+      let alpha = s.glow * (0.78 + 0.22 * Math.sin(t * s.speed + s.phase)) * appear * dim;
+      let size = Math.min(s === selected ? 26 : 48, Math.max(1.6, s.mag * P.k * 4));
+      const bornAge = s.born ? (now - s.born) / 1000 : 99;
+      if (bornAge < 6) { alpha = 1; size *= 1 + 3 * (1 - bornAge / 6); }
+      // 更新・検索対象は穏やかに明滅。選択中は白飛びを抑える。
+      const fresh = isFresh(s);
+      const blink = fresh ? fastBlink(t) : 0;
+      if (fresh) { alpha = Math.min(s === selected ? 0.65 : 0.8, Math.max(alpha, (0.35 + 0.25 * blink) * appear)); size = Math.max(size, 4) * (1 + 0.08 * blink); }
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(STAR[s.kind], P.x - size / 2, P.y - size / 2, size, size);
+      if (s !== selected && ((fresh && blink > 0.45) || bornAge < 6) && appear >= 1) drawNova(P.x, P.y, size, alpha, t, s.phase);
+      bodies.push(s);
+      projected[p++] = P.x; projected[p++] = P.y; projected[p++] = size; projected[p++] = 0;
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawNova(x, y, size, alpha, t, phase) {
+  const flare = size * (1.3 + 0.15 * Math.sin(t * 1.8 + phase));
+  ctx.globalAlpha = alpha * 0.18;
+  ctx.drawImage(FLARE, x - flare / 2, y - flare / 2, flare, flare);
+  ctx.strokeStyle = 'rgba(255,248,220,.22)'; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x - flare, y); ctx.lineTo(x + flare, y);
+  ctx.moveTo(x, y - flare * 0.7); ctx.lineTo(x, y + flare * 0.7);
+  ctx.stroke();
+}
+
+function drawPlanets(t, now) {
+  const intro = (now - introAt) / 1000;
+  let p = bodies.length * 4;
+  // 奥から順に描く
+  const list = world.planets.map(planet => {
+    return project(planet.x, planet.y, planet.z) ? { planet, x: P.x, y: P.y, k: P.k, z: P.z } : null;
+  }).filter(Boolean).sort((a, b) => b.z - a.z);
+  for (const { planet, x, y, k } of list) {
+    const appear = Math.min(1, Math.max(0, intro - 1.2));
+    let size = Math.min(planet === selected ? 90 : 140, Math.max(7, planet.R * k * 3.2));
+    let alpha = appear * (focus ? 0.35 : 1);
+    if (alpha <= 0) continue;
+    const fresh = isFresh(planet);
+    const blink = fresh ? fastBlink(t) : 0;
+    if (fresh) { alpha = Math.max(alpha, appear * 0.6); size *= 1 + 0.025 * blink; }
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(PLANET[planet.kind], x - size / 2, y - size / 2, size, size);
+    if (fresh) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = alpha * blink * (planet === selected ? 0.08 : 0.22);
+      ctx.drawImage(FLARE, x - size * 0.55, y - size * 0.55, size * 1.1, size * 1.1);
+      if (planet !== selected && blink > 0.45) drawNova(x, y, size * 0.45, alpha * blink, t, planet.phase);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    bodies.push(planet);
+    projected[p++] = x; projected[p++] = y; projected[p++] = size * 0.6; projected[p++] = 1;
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** 帰還ゲート（親フォルダへ戻るワームホール）。 */
+function drawGate(t) {
+  const gate = world.gate;
+  if (!project(gate.x, gate.y, gate.z)) return;
+  const r = Math.max(16, gate.R * P.k);
+  const alpha = Math.min(1, Math.max(0, (performance.now() - introAt) / 1000 - 1.2)) * (hoveredGate ? 1 : 0.8);
+  gateHit = [P.x, P.y, r];
+  ctx.globalAlpha = alpha * 0.8;
+  ctx.drawImage(DISK[1], P.x - r * 2.4, P.y - r * 2.4, r * 4.8, r * 4.8);
+  ctx.lineWidth = Math.max(1.2, r * 0.07);
+  for (let i = 0; i < 4; i++) {
+    const rr = r * (1 - i * 0.2), spin = t * (0.8 + i * 0.5) * (i % 2 ? -1 : 1);
+    ctx.globalAlpha = alpha * (0.9 - i * 0.15);
+    ctx.strokeStyle = i % 2 ? '#9fd8ff' : '#c8b6ff';
+    ctx.beginPath(); ctx.arc(P.x, P.y, rr, spin, spin + Math.PI * 1.2); ctx.stroke();
+  }
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(FLARE, P.x - r * 0.7, P.y - r * 0.7, r * 1.4, r * 1.4);
+  ctx.globalAlpha = 1;
+}
+
+/** 航路: この宇宙で訪れた銀河・星を訪れた順に結ぶ。古い区間ほど薄い。 */
+function voyageTargets() {
+  return (voyages[basePath()] || [])
+    .map(key => key[0] === 'g' ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2)))
+    .filter(Boolean);
+}
+function drawVoyage(t) {
+  const points = voyageTargets().map(p => (project(p.x, p.y, p.z) ? [P.x, P.y] : null));
+  if (!points.length) return;
+  const n = points.length;
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = '#ffd98c';
+  ctx.setLineDash([5, 7]);
+  ctx.lineDashOffset = -t * 18;
+  for (let i = 1; i < n; i++) {
+    const a = points[i - 1], b = points[i];
+    if (!a || !b) continue;
+    ctx.globalAlpha = 0.15 + 0.65 * (i / (n - 1));
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ffe2a0';
+  points.forEach((s, i) => {
+    if (!s) return;
+    const latest = i === n - 1;
+    const r = latest ? 5 + Math.sin(t * 3) * 1.2 : 3;
+    ctx.globalAlpha = latest ? 0.95 : 0.25 + 0.5 * (i / n);
+    ctx.beginPath();
+    ctx.moveTo(s[0], s[1] - r); ctx.lineTo(s[0] + r, s[1]); ctx.lineTo(s[0], s[1] + r); ctx.lineTo(s[0] - r, s[1]);
+    ctx.closePath(); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawLabels(t) {
+  const font = '"Segoe UI","Yu Gothic UI",sans-serif';
+  const intro = (performance.now() - introAt) / 1000;
+  labelBoxes = [];
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  const placed = box => {
+    if (labelBoxes.some(b => box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y)) return false;
+    labelBoxes.push(box);
+    return true;
+  };
+  // 銀河の名前。更新のある銀河を優先して置き、残りは大きい順。
+  // 重なる時は 下 → 上 → 右 → 左 の順に空いている位置を探す。
+  for (const [g, gx, gy, r] of [...galaxyHits].sort((a, b) => (b[0].fresh ? 1 : 0) - (a[0].fresh ? 1 : 0) || b[3] - a[3])) {
+    const hover = g === hoveredGalaxy;
+    let alpha = Math.min(1, Math.max(0, intro - 1.0)) * (dimmed(g) ? 0.45 : 1);
+    if (alpha <= 0.02) continue;
+    // 「名前 (ファイル数)」の1行だけ。起点以降の更新があるフォルダは金色でゆっくり明滅させる。
+    const name = `${g.name} (${g.files.length.toLocaleString()})`;
+    ctx.font = `600 13px ${font}`;
+    const w = ctx.measureText(name).width + 12;
+    const below = Math.min(Math.max(r * 0.45, 18), 160), side = Math.min(Math.max(r * 0.5, 14), 160);
+    const spot = [[gx, gy + below], [gx, gy - below - 14], [gx + side + w / 2 + 6, gy], [gx - side - w / 2 - 6, gy]]
+      .find(([cx, cy]) => placed({ x: cx - w / 2, y: cy - 10, w, h: 20, g }));
+    if (!spot) continue;
+    const [x, ly] = spot;
+    ctx.globalAlpha = hover ? 1 : alpha * (g.fresh ? 0.6 + 0.4 * slowBlink(t) : 0.95);
+    ctx.shadowColor = g.fresh ? '#ffd36b' : KINDS[g.kind].color; ctx.shadowBlur = hover ? 16 : 8;
+    ctx.fillStyle = hover ? '#fff' : g.fresh ? '#ffe9a8' : 'rgba(235,242,255,.95)';
+    ctx.fillText(name, x, ly);
+    ctx.shadowBlur = 0;
+  }
+  // 帰還ゲートの行き先
+  if (gateHit) {
+    const [x, y, r] = gateHit;
+    const text = `↩ ${world.gate.name}`;
+    ctx.font = `600 12px ${font}`;
+    const w = ctx.measureText(text).width + 10;
+    if (placed({ x: x - w / 2, y: y + r + 6, w, h: 20, gate: true })) {
+      ctx.globalAlpha = hoveredGate ? 1 : 0.85;
+      ctx.fillStyle = hoveredGate ? '#fff' : '#bfe3ff';
+      ctx.shadowColor = '#7fc8ff'; ctx.shadowBlur = 10;
+      ctx.fillText(text, x, y + r + 16);
+      ctx.shadowBlur = 0;
+    }
+  }
+  // 自由惑星の名前
+  ctx.font = `11.5px ${font}`;
+  ctx.textAlign = 'left';
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    const o = i * 4;
+    const near = !b.isPlanet && projected[o + 2] >= 22 && (!focus || b.galaxy === focus);
+    if (!b.isPlanet && !near) continue;
+    const x = projected[o] + projected[o + 2] * (b.isPlanet ? 0.55 : 0.22) + 4, y = projected[o + 1];
+    const w = ctx.measureText(b.name).width + 6;
+    if (!placed({ x, y: y - 8, w, h: 16 })) continue;
+    ctx.globalAlpha = b.isPlanet ? Math.min(0.9, Math.max(0, intro - 1.4)) * (focus ? 0.4 : 1) : Math.min(0.85, (projected[o + 2] - 22) / 20);
+    ctx.fillStyle = b.isPlanet ? 'rgba(215,225,250,1)' : 'rgba(200,212,240,1)';
+    ctx.fillText(b.name, x, y);
+  }
+  // 選択中・マウス下の照準
+  for (const target of [selected, hovered]) {
+    if (!target) continue;
+    const i = bodies.indexOf(target);
+    if (i < 0) continue;
+    const x = projected[i * 4], y = projected[i * 4 + 1];
+    const r = Math.max(9, Math.min(60, projected[i * 4 + 2] * (target.isPlanet ? 0.6 : 0.35)));
+    ctx.globalAlpha = target === selected ? 0.95 : 0.6;
+    ctx.strokeStyle = KINDS[target.kind].color;
+    ctx.lineWidth = 1.2;
+    const spin = t / 1.4;
+    for (let q = 0; q < 4; q++) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, spin + q * Math.PI / 2, spin + q * Math.PI / 2 + Math.PI / 4);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------- 操作
+let dragging = false, dragMoved = 0, dragButton = 0, lastX = 0, lastY = 0;
+const touch = new Map();
+const touchIdle = () => { idleSince = performance.now(); };
+
+function setAutoSpin(value) {
+  autoSpin = value;
+}
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => {
+  if (diving) return;
+  canvas.setPointerCapture(e.pointerId);
+  touch.set(e.pointerId, [e.clientX, e.clientY]);
+  dragging = true; dragMoved = 0; dragButton = e.button === 2 || e.shiftKey ? 2 : 0;
+  lastX = e.clientX; lastY = e.clientY;
+  canvas.classList.add('dragging');
+  touchIdle();
+});
+canvas.addEventListener('pointermove', e => {
+  if (diving) return;
+  if (touch.has(e.pointerId) && touch.size === 2) {
+    // 2本指: ピンチでズーム
+    const [a, b] = [...touch.values()];
+    const before = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    touch.set(e.pointerId, [e.clientX, e.clientY]);
+    const [c, d] = [...touch.values()];
+    const after = Math.hypot(c[0] - d[0], c[1] - d[1]);
+    if (before > 0 && after > 0) goal.dist = clampDist(goal.dist * before / after);
+    dragMoved += 10;
+    return;
+  }
+  if (dragging) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    if (dragButton === 2) pan(dx, dy);
+    else {
+      orbitView(goal, dx, dy);
+    }
+    touchIdle();
+    return;
+  }
+  updateHover(e.clientX, e.clientY);
+});
+const endDrag = e => {
+  touch.delete(e.pointerId);
+  if (!dragging) return;
+  dragging = touch.size > 0;
+  canvas.classList.remove('dragging');
+  if (dragMoved < 5 && e.type === 'pointerup') handleClick(e.clientX, e.clientY);
+};
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerleave', () => { hovered = null; hoveredGalaxy = null; $('tooltip').hidden = true; });
+canvas.addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;
+  // 宇宙上の Ctrl＋ホイールは、ブラウザ倍率ではなく視点の距離を変える。
+  e.preventDefault();
+  if (diving) return;
+  goal.dist = clampDist(goal.dist * Math.exp(e.deltaY * 0.0012));
+  touchIdle();
+}, { passive: false });
+canvas.addEventListener('dblclick', e => {
+  if (diving) return;
+  handleDoubleClick(e.clientX, e.clientY);
+});
+
+
+const clampDist = d => Math.max(20, Math.min(overviewDistance() * 4, d));
+
+function pan(dx, dy) {
+  tracking = null;
+  const delta = panOffset(cam.yaw, cam.pitch, dx, dy, cam.dist / F);
+  goal.tx += delta.x; goal.ty += delta.y; goal.tz += delta.z;
+}
+
+function updateHover(mx, my) {
+  if (!world) return;
+  hovered = null;
+  const inBox = b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h;
+  hoveredGate = !!gateHit && (Math.hypot(mx - gateHit[0], my - gateHit[1]) < gateHit[2] * 1.2 || labelBoxes.some(b => b.gate && inBox(b)));
+  hoveredGalaxy = hoveredGate ? null : labelBoxes.find(b => b.g && inBox(b))?.g ?? null;
+  if (!hoveredGalaxy && !hoveredGate) {
+    // 遠くの銀河は丸ごと1つの的にする。近づいた銀河と惑星は1つずつ選べる。
+    let best = 196;
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i], o = i * 4;
+      if (!b.isPlanet) {
+        const hit = galaxyHits.find(h => h[0] === b.galaxy);
+        if (!hit || hit[3] < 150) continue;
+      }
+      const d = (projected[o] - mx) ** 2 + (projected[o + 1] - my) ** 2;
+      const reach = Math.max(144, (projected[o + 2] * 0.5) ** 2);
+      if (d < best && d < reach) { best = d; hovered = b; }
+    }
+    if (!hovered) {
+      let bestG = Infinity;
+      for (const [g, x, y, r] of galaxyHits) {
+        const d = Math.hypot(x - mx, y - my);
+        if (d < Math.max(24, r * 0.75) && d < bestG) { bestG = d; hoveredGalaxy = g; }
+      }
+    }
+  }
+  canvas.classList.toggle('pointing', !!(hovered || hoveredGalaxy || hoveredGate));
+  const tip = $('tooltip');
+  const show = (title, sub) => {
+    tip.innerHTML = '<div class="t-name"></div><div class="t-sub"></div>';
+    tip.querySelector('.t-name').textContent = title;
+    tip.querySelector('.t-sub').textContent = sub;
+    tip.style.left = `${mx}px`; tip.style.top = `${my}px`;
+    tip.hidden = false;
+  };
+  if (hoveredGate) show(`↩ ${world.gate.name} へ戻る`, '親フォルダ ・ ダブルクリックで1つ上のフォルダへ');
+  else if (hovered) show(hovered.name, `${hovered.path} ・ ${formatSize(hovered.size)} ・ ${formatAge(hovered.mtime)} ・ クリックでズームとプレビュー`);
+  else if (hoveredGalaxy) show(hoveredGalaxy.path, `ファイル ${hoveredGalaxy.files.length} ・ サブフォルダ ${hoveredGalaxy.sub} ・ ダブルクリックで開く`);
+  else tip.hidden = true;
+}
+
+function handleClick(mx, my) {
+  if (diving) return;
+  updateHover(mx, my);
+  if (hoveredGate) return;  // ダブルクリックが成立するまで階層を変えない。
+  if (hovered) selectBody(hovered);
+  else if (hoveredGalaxy) {
+    // 初回クリックでカメラを動かさず、2回目も同じフォルダを押せるようにする。
+    selected = null; selectionOrigin = null; focus = hoveredGalaxy; tracking = null;
+    updateSide();
+  } else selectBody(null);
+}
+
+function handleDoubleClick(mx, my) {
+  if (diving) return;
+  updateHover(mx, my);
+  if (hoveredGate) return ascend(trail.length - 1);
+  if (hoveredGalaxy) return dive(hoveredGalaxy);
+  if (hovered) return approach(hovered);
+  flyHome();
+}
+
+function flyTo(g) {
+  selected = null; selectionOrigin = null;
+  focus = g;
+  tracking = null;
+  goal.tx = g.x; goal.ty = g.y; goal.tz = g.z;
+  goal.dist = Math.max(120, g.R * 2.8) * (F / Math.min(W, H));
+  touchIdle();
+  remember('dir', g.path);
+  updateSide();
+}
+function flyHome() {
+  selected = null; selectionOrigin = null;
+  focus = null;
+  tracking = null;
+  goal.tx = goal.ty = goal.tz = 0;
+  goal.dist = overviewDistance();
+  Object.assign(goal, HOME_VIEW);
+  setAutoSpin(false);
+  updateSide();
+}
+/** 星・惑星の選択を共通化する（一覧・検索・フォーカス操作も同じ）。 */
+function approach(body) {
+  return selectBody(body);
+}
+
+// ---------------------------------------------------------------- フォルダ移動のワープ
+let warpSequence = 0;
+let sceneAnimation = null;
+function setWarpBusy(value) {
+  diving = value;
+  document.body.classList.toggle('warping', value);
+  canvas.setAttribute('aria-busy', String(value));
+}
+
+/** 古い移動はキャンセルし、最後に選ばれた階層だけへ切り替える。 */
+async function travelTo(next, { direction = 'in', target = null, history = true, after = null, preserveSelection = false } = {}) {
+  if (!nodeAt(next)) return;
+  if (!preserveSelection) selectionOrigin = null;
+  const sequence = ++warpSequence;
+  sceneAnimation?.cancel();
+  setWarpBusy(true);
+  setAutoSpin(false);
+  tracking = null;
+  dragging = false; touch.clear(); canvas.classList.remove('dragging');
+  $('tooltip').hidden = true;
+  Object.assign(goal, cam);  // カメラは止め、画面全体の拡縮とフェードを滑らかに重ねる。
+  let originX = CX, originY = H / 2;
+  if (target && project(target.x, target.y, target.z)) {
+    originX = Math.max(0, Math.min(W, P.x)); originY = Math.max(0, Math.min(H, P.y));
+  }
+  canvas.style.transformOrigin = `${originX}px ${originY}px`;
+  const motion = warpMotion(direction);
+  const play = async stage => {
+    sceneAnimation = canvas.animate(stage.frames, {
+      duration: stage.duration, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards',
+    });
+    try { await sceneAnimation.finished; } catch { return false; }
+    return sequence === warpSequence;
+  };
+  try {
+    if (!await play(motion.exit)) return;
+    trail = [...next];
+    enterWorld({ history, immediate: true });
+    after?.();
+    // 次の全景を初めから表示し、従来の出現待ち・急なズームを重ねない。
+    canvas.style.transformOrigin = `${CX}px ${H / 2}px`;
+    sceneAnimation.cancel();
+    if (!await play(motion.entry)) return;
+  } finally {
+    if (sequence === warpSequence) {
+      sceneAnimation?.cancel(); sceneAnimation = null;
+      canvas.style.removeProperty('transform-origin');
+      setWarpBusy(false);
+    }
+  }
+}
+
+/** 入る時は拡大しながら消え、次の階層がぼんやり現れる。 */
+function dive(g) {
+  if (diving) return;
+  remember('dir', g.path);
+  return travelTo(g.path.split('/'), { direction: 'in', target: g });
+}
+/** 戻る時は今の宇宙が遠ざかりながら消える。 */
+function ascend(count) {
+  if (count >= trail.length || count < 0) return;
+  return travelTo(trail.slice(0, count), { direction: 'out' });
+}
+
+// URL の #/フォルダ/… に今の階層を反映する。ブラウザの戻る・進むで階層を行き来できる。
+const trailHash = () => `#/${trail.map(encodeURIComponent).join('/')}`;
+function trailFromHash() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  try { return parts.map(decodeURIComponent); } catch { return []; }
+}
+addEventListener('popstate', () => {
+  if (!scan) return;
+  const next = trailFromHash();
+  if ((!diving && next.join('/') === basePath()) || !nodeAt(next)) return;
+  travelTo(next, { direction: next.length < trail.length ? 'out' : 'in', history: false });
+});
+
+function enterWorld({ from, leaving, history = true, immediate = false } = {}) {
+  if (history && location.hash !== trailHash()) {
+    if (location.hash || trail.length) window.history.pushState(null, '', trailHash());
+  }
+  world = buildWorld();
+  focus = null; selected = null; hovered = null; hoveredGalaxy = null; hoveredGate = false; tracking = null;
+  introAt = performance.now();
+  const home = overviewDistance();
+  goal.tx = goal.ty = goal.tz = 0; goal.dist = home;
+  Object.assign(goal, HOME_VIEW);
+  setAutoSpin(false);
+  if (immediate) {
+    Object.assign(cam, goal);
+    prevDist = cam.dist;
+    introAt = performance.now() - 5000;
+  } else if (from === 'outside' || from === 'warp') {
+    // 外から突入・ワープ: 遠くから光の筋をくぐって全景へ
+    cam.tx = cam.ty = cam.tz = 0;
+    cam.dist = home * 8;
+    introAt = performance.now() - (from === 'warp' ? 1500 : 300);
+  } else if (from === 'inside') {
+    // 内から脱出: 出てきた銀河の中心から引いていく
+    const g = world.galaxies.find(x => x.path === leaving);
+    if (g) { cam.tx = g.x; cam.ty = g.y; cam.tz = g.z; cam.dist = Math.max(20, g.R * 0.2); }
+    introAt = performance.now() - 5000;
+  }
+  renderAll();
+  updateSide();
+}
+
+/** 全体検索・航海日誌から、そのファイル（自由惑星として）やフォルダ（銀河として）がある宇宙へワープする。 */
+function goTo(entry) {
+  const parts = entry.path.split('/');
+  if (entry.type === 'dir') {
+    if (!nodeAt(parts)) return;
+    if (!diving && entry.path === basePath()) { revealCurrent(); return; }
+    const target = world.galaxies.find(g => g.path === entry.path) ?? null;
+    const upward = parts.length < trail.length && parts.every((name, i) => name === trail[i]);
+    remember('dir', entry.path);
+    return travelTo(parts, { direction: upward ? 'out' : 'in', target });
+  }
+  const level = parts.slice(0, -1);
+  const node = nodeAt(level);
+  if (!node || !node.f.some(file => file[0] === parts.at(-1))) return;
+  rememberSelectionView();
+  const select = () => {
+    const body = world.byPath.get(entry.path);
+    if (body) selectBody(body);
+  };
+  if (diving || level.join('/') !== basePath()) {
+    return travelTo(level, {
+      direction: level.length < trail.length ? 'out' : 'in',
+      after: select, preserveSelection: true,
+    });
+  }
+  select();
+}
+
+// ---------------------------------------------------------------- 航路と航海日誌（ブラウザに保存）
+const storeKey = () => `aidiy_ide:${scan.root}`;
+function saveVoyage() {
+  try { localStorage.setItem(storeKey(), JSON.stringify({ voyages, journal })); } catch { /* 保存できない環境 */ }
+}
+function loadVoyage() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storeKey()) || '{}');
+    voyages = saved.voyages && typeof saved.voyages === 'object' ? saved.voyages : {};
+    journal = Array.isArray(saved.journal) ? saved.journal : [];
+  } catch { voyages = {}; journal = []; }
+}
+function remember(type, path) {
+  const route = voyages[basePath()] ??= [];
+  const key = `${type === 'dir' ? 'g' : 'f'}:${path}`;
+  if (route.at(-1) !== key) route.push(key);
+  if (route.length > 40) route.splice(0, route.length - 40);
+  journal = [{ type, path, at: Date.now() }, ...journal.filter(j => !(j.type === type && j.path === path))].slice(0, 80);
+  saveVoyage();
+}
+function clearVoyage() {
+  delete voyages[basePath()];
+  saveVoyage();
+}
+
+const tail = (text, max = 44) => (text.length > max ? `…${text.slice(-(max - 1))}` : text);
+const parentOf = path => path.split('/').slice(0, -1).join('/');
+
+function rememberSelectionView() {
+  if (selectionOrigin) return;
+  selectionOrigin = {
+    trail: [...trail], camera: { ...goal }, focusPath: focus?.path ?? null, autoSpin,
+  };
+}
+
+function selectBody(body, { record = true, zoom = true } = {}) {
+  if (!body) {
+    const origin = selectionOrigin;
+    selectionOrigin = null; selected = null; tracking = null;
+    updateSide();
+    if (!origin) return;
+    const restore = () => {
+      focus = world.galaxies.find(g => g.path === origin.focusPath) ?? null;
+      Object.assign(goal, origin.camera);
+      setAutoSpin(origin.autoSpin);
+      touchIdle();
+      updateSide();
+    };
+    if (diving || origin.trail.join('/') !== basePath()) {
+      if (nodeAt(origin.trail)) return travelTo(origin.trail, {
+        direction: origin.trail.length < trail.length ? 'out' : 'in', after: restore,
+      });
+      flyHome(); // 再読み込みで元の階層が消えた場合は、現在の全景へ戻る。
+    } else restore();
+    return;
+  }
+  if (zoom) rememberSelectionView();
+  const sameFile = selected?.path === body.path;
+  const followed = tracking?.path === body.path;
+  selected = body;
+  if (zoom) {
+    focus = body.galaxy ?? null;
+    tracking = body;
+    goal.tx = body.x; goal.ty = body.y; goal.tz = body.z;
+    goal.dist = (body.isPlanet ? Math.max(180, body.R * 22) : 170) * (F / Math.min(W, H));
+    setAutoSpin(false);
+    touchIdle();
+  } else if (followed) tracking = body; // 再走査後も新しいオブジェクトを追う。
+  if (record && !sameFile) remember('file', body.path);
+  updateSide();
+}
+
+// ---------------------------------------------------------------- 右側: ファイルビューア
+// ファイルを選んだ時だけ表示する。フォルダの一覧と移動は左のツリーで扱う。
+let sideKey = null, viewing = false, fileToken = 0;
+const fileCache = new Map();   // `パス:更新ms` → /api/file の結果
+
+function updateSide(force = false) {
+  const key = selected ? `f:${selected.path}` : '';
+  if (key === sideKey && !force) { revealCurrent(); return; }
+  fileToken++; // 閉じる・フォルダ選択も、進行中のファイル読込を無効化する。
+  $('viewer-body').classList.remove('with-office');
+  $('viewer-body').querySelector('.office-frame')?.remove();
+  sideKey = key;
+  viewing = !!key;
+  $('clusters').classList.toggle('viewing', viewing);
+  document.body.classList.toggle('viewing', viewing);
+  $('clusters').hidden = !viewing;
+  $('viewer').hidden = !viewing;
+  if (selected) showFile(selected);
+  revealCurrent();
+}
+$('viewer-close').onclick = () => selectBody(null);
+// 文書 iframe にフォーカスがある時も、共通の開閉キーを利用できる。
+addEventListener('message', event => {
+  const frame = $('viewer-body').querySelector('.office-frame');
+  if (!frame || event.origin !== location.origin || event.source !== frame.contentWindow || event.data?.type !== 'aidiy-ide-document-key') return;
+  if (event.data.key === 'explorer') setExplorerOpen(!explorerOpen);
+  else if (event.data.key === 'close') $('viewer-close').click();
+});
+
+function fullPath(path) {
+  const windows = scan.root.includes('\\');
+  return `${scan.root}${windows ? '\\' : '/'}${windows ? path.replaceAll('/', '\\') : path}`;
+}
+function setMeta(items) {
+  const meta = $('viewer-meta');
+  meta.innerHTML = '';
+  for (const [label, value, cls] of items) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    const b = document.createElement('b');
+    b.textContent = value;
+    span.append(label ? `${label} ` : '', b);
+    meta.append(span);
+  }
+}
+function setActions(items) {
+  const box = $('viewer-actions');
+  box.innerHTML = '';
+  for (const [label, run] of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.onclick = () => run(button);
+    box.append(button);
+  }
+}
+const copyAction = path => async button => {
+  try { await navigator.clipboard.writeText(fullPath(path)); button.textContent = 'コピーしました'; } catch { button.textContent = 'コピーできません'; }
+  setTimeout(() => { button.textContent = 'パスをコピー'; }, 1500);
+};
+function viewerMessage(text) {
+  const box = document.createElement('div');
+  box.className = 'viewer-empty';
+  box.textContent = text;
+  $('viewer-body').replaceChildren(box);
+}
+
+// ---- Monaco Editor（読み取り専用）。設定は frontend_web の AIファイル.vue に合わせる。
+// 未導入（/monaco/ が無い）なら null になり、行番号付きの簡易表示を使う。
+const MONACO_LANG = {
+  py: 'python', vue: 'html', html: 'html', htm: 'html', css: 'css', scss: 'scss', sass: 'scss', less: 'less',
+  js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', tsx: 'typescript', mts: 'typescript',
+  json: 'json', md: 'markdown', yml: 'yaml', yaml: 'yaml', sh: 'shell', bash: 'shell', bat: 'bat', cmd: 'bat', ps1: 'powershell',
+  sql: 'sql', xml: 'xml', svg: 'xml', ini: 'ini', env: 'ini', toml: 'ini', cfg: 'ini', conf: 'ini', dockerfile: 'dockerfile',
+};
+function monacoLanguage(name) {
+  const lower = name.toLowerCase();
+  if (lower === 'dockerfile') return 'dockerfile';
+  const dot = lower.lastIndexOf('.');
+  return dot > 0 ? MONACO_LANG[lower.slice(dot + 1)] ?? 'plaintext' : 'plaintext';
+}
+let monacoReady = null, monacoEditor = null, editorHost = null;
+function loadMonaco() {
+  monacoReady ??= new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = '/monaco/vs/loader.js';
+    script.onload = () => {
+      window.require.config({ paths: { vs: '/monaco/vs' } });
+      window.require(['vs/editor/editor.main'], () => {
+        window.monaco.editor.defineTheme('aidiy-space', {
+          base: 'vs-dark', inherit: true, rules: [],
+          colors: { 'editor.background': '#05070f', 'editorGutter.background': '#070a16', 'minimap.background': '#05070f', 'editorLineNumber.foreground': '#48536f' },
+        });
+        resolve(window.monaco);
+      }, () => resolve(null));
+    };
+    script.onerror = () => resolve(null);
+    document.head.append(script);
+  });
+  return monacoReady;
+}
+function showInEditor(monaco, name, text) {
+  if (!editorHost) {
+    editorHost = document.createElement('div');
+    editorHost.className = 'editor-host';
+  }
+  $('viewer-body').classList.add('with-editor');
+  const language = monacoLanguage(name);
+  if (!monacoEditor) {
+    monacoEditor = monaco.editor.create(editorHost, {
+      value: '', language, theme: 'aidiy-space', readOnly: true, domReadOnly: true, automaticLayout: true,
+      minimap: { enabled: true }, scrollBeyondLastLine: false, fontSize: 12, lineNumbers: 'on', folding: true,
+      wordWrap: 'on', renderLineHighlight: 'none', contextmenu: false, overviewRulerLanes: 0, hideCursorInOverviewRuler: true,
+      scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+    });
+  }
+  const old = monacoEditor.getModel();
+  monacoEditor.setModel(monaco.editor.createModel(text, language));
+  old?.dispose();
+  monacoEditor.revealLine(1);
+  return editorHost;
+}
+
+async function showFile(body) {
+  $('viewer-body').classList.remove('with-editor');
+  $('viewer-dot').style.color = KINDS[body.kind].color;
+  $('viewer-kind').textContent = `ファイル ・ ${KINDS[body.kind].label}`;
+  $('viewer-name').textContent = body.name;
+  $('viewer-path').textContent = body.path;
+  const meta = [['サイズ', formatSize(body.size)], ['更新', `${new Date(body.mtime).toLocaleString('ja-JP')}（${formatAge(body.mtime)}）`]];
+  if (isFresh(body)) meta.push(['', markMode === 'grep' ? 'grep検索に一致' : '起点以降に更新', 'fresh']);
+  setMeta(meta);
+  setActions([['フォーカス', () => approach(body)], ['パスをコピー', copyAction(body.path)]]);
+  $('viewer-body').scrollTo(0, 0);
+  viewerMessage('読み込み中…');
+
+  const token = fileToken;
+  const cacheKey = `${body.path}:${body.mtime}`;
+  let data = fileCache.get(cacheKey);
+  if (!data) {
+    try {
+      const response = await fetch(`/api/file?path=${encodeURIComponent(body.path)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(response.status === 404 ? 'ファイルが見つかりません（R で再読み込みしてください）' : await response.text());
+      data = await response.json();
+      fileCache.set(cacheKey, data);
+      if (fileCache.size > 40) fileCache.delete(fileCache.keys().next().value);
+    } catch (error) {
+      if (token === fileToken) viewerMessage(`読み込めませんでした: ${error.message || error}`);
+      return;
+    }
+  }
+  if (token !== fileToken) return;   // 読み込み中に別のファイルを選んだ
+
+  const view = $('viewer-body');
+  if (data.kind === 'office') {
+    if (data.tooLarge) return viewerMessage(`文書が大きすぎるため表示しません（${formatSize(data.size)}・上限 50MB）`);
+    const labels = { word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint', pdf: 'PDF' };
+    $('viewer-kind').textContent = `ファイル ・ ${labels[data.format] || '文書'}`;
+    const frame = document.createElement('iframe');
+    frame.className = 'office-frame';
+    frame.title = `${labels[data.format]} ビューア: ${body.name}`;
+    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    frame.src = `/office.html?path=${encodeURIComponent(body.path)}&format=${data.format}&v=${body.mtime}`;
+    view.classList.add('with-office');
+    view.replaceChildren(frame);
+  } else if (data.kind === 'image') {
+    if (data.tooLarge) return viewerMessage(`画像が大きすぎるため表示しません（${formatSize(data.size)}）`);
+    const wrap = document.createElement('div');
+    wrap.className = 'viewer-image';
+    const img = document.createElement('img');
+    img.alt = body.name;
+    img.src = `/api/raw?path=${encodeURIComponent(body.path)}&v=${body.mtime}`;
+    img.onload = () => { if (token === fileToken) setMeta([...meta, ['画像', `${img.naturalWidth} × ${img.naturalHeight}`]]); };
+    wrap.append(img);
+    view.replaceChildren(wrap);
+  } else if (data.kind === 'binary') {
+    viewerMessage(`このファイルはプレビューできません（バイナリ・${formatSize(data.size)}）`);
+  } else {
+    // テキスト: 行番号付き。文字コードが UTF-8 以外なら表示する
+    if (data.encoding !== 'UTF-8') setMeta([...meta, ['文字コード', data.encoding]]);
+    const lines = data.text.split(/\r?\n/);
+    if (lines.length > 1 && lines.at(-1) === '') lines.pop();
+    const nodes = [];
+    if (data.truncated) {
+      const note = document.createElement('div');
+      note.className = 'viewer-note';
+      note.textContent = `大きいファイルのため先頭 ${lines.length.toLocaleString()} 行だけ表示しています（全体 ${formatSize(data.size)}）`;
+      nodes.push(note);
+    }
+    if (!data.text.length) { viewerMessage('（空のファイル）'); return; }
+    const monaco = await loadMonaco();
+    if (token !== fileToken) return;
+    if (monaco) {
+      nodes.push(showInEditor(monaco, body.name, lines.join('\n')));
+      view.replaceChildren(...nodes);
+      return;
+    }
+    const code = document.createElement('div');
+    code.className = 'code';
+    const gutter = document.createElement('div');
+    gutter.className = 'gutter';
+    gutter.textContent = lines.map((_, i) => i + 1).join('\n');
+    const pre = document.createElement('pre');
+    pre.className = 'lines';
+    pre.textContent = lines.join('\n');
+    code.append(gutter, pre);
+    nodes.push(code);
+    view.replaceChildren(...nodes);
+  }
+}
+
+function renderCrumb() {
+  const crumb = $('crumb');
+  crumb.innerHTML = '';
+  const names = [scan.tree.n, ...trail];
+  names.forEach((name, i) => {
+    if (i) { const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '›'; crumb.append(sep); }
+    const part = document.createElement('span');
+    part.className = i === names.length - 1 ? 'here' : 'part';
+    part.textContent = name;
+    if (i < names.length - 1) part.onclick = () => ascend(i);
+    crumb.append(part);
+  });
+  crumb.hidden = false;
+}
+
+function renderStats() {
+  $('stats-scope').textContent = trail.at(-1) ?? scan.tree.n;
+  document.title = `AiDiy IDE - ${trail.at(-1) ?? scan.tree.n}`;
+}
+
+function renderAll() { renderStats(); renderCrumb(); computeFreshDirs(); revealCurrent(); }
+
+// ---------------------------------------------------------------- エクスプローラー（VS Code 風のファイルツリー）
+// ☰ / Ctrl+B で開閉。ファイルのクリックで宇宙をその場所へ移動してビューアに表示、フォルダはクリックで開閉・
+// ダブルクリックで移動。宇宙側で選んだ場所はツリーでも開いて表示する（VS Code の自動表示と同じ）。
+let explorerOpen = false;
+let expanded = new Set();        // 開いているフォルダのパス
+let explorerCursor = null;       // キー操作の現在行 { type: 'dir' | 'file', path }
+let explorerRows = [];           // 表示中の行（上から順）
+let freshDirs = new Map();       // フォルダのパス → 起点以降に更新した配下ファイル数
+const explorerKey = () => `aidiy_ide:explorer:${scan.root}`;
+const byNameJa = (a, b) => a.localeCompare(b, 'ja', { numeric: true, sensitivity: 'base' });
+
+function loadExplorer() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(explorerKey()) || '{}');
+    explorerOpen = false; // 起動時は前回の開閉状態を引き継がない。
+    expanded = new Set(Array.isArray(saved.expanded) ? saved.expanded : []);
+  } catch { explorerOpen = false; expanded = new Set(); }
+  applyExplorerOpen();
+}
+function saveExplorer() {
+  try { localStorage.setItem(explorerKey(), JSON.stringify({ expanded: [...expanded].slice(0, 3000) })); } catch { /* 保存できない環境 */ }
+}
+function applyExplorerOpen() {
+  $('explorer').hidden = !explorerOpen;
+  document.body.classList.toggle('explorer-open', explorerOpen);
+  document.querySelectorAll('.burger').forEach(button => button.setAttribute('aria-expanded', String(explorerOpen)));
+}
+function setExplorerOpen(open) {
+  explorerOpen = open;
+  applyExplorerOpen();
+  saveExplorer();
+  if (open) { revealCurrent(); $('explorer-tree').focus({ preventScroll: true }); }
+  else $('explorer-toggle').focus({ preventScroll: true });
+}
+document.querySelectorAll('.burger').forEach(button => { button.onclick = () => setExplorerOpen(!explorerOpen); });
+$('explorer-reveal').onclick = () => revealCurrent();
+$('explorer-collapse').onclick = () => { expanded.clear(); saveExplorer(); renderExplorer(); };
+
+function computeFreshDirs() {
+  freshDirs = new Map();
+  if (!scan) return;
+  (function walk(node, prefix) {
+    let count = 0;
+    for (const child of node.d) count += walk(child, prefix ? `${prefix}/${child.n}` : child.n);
+    for (const [name, , mtime] of node.f) if (isFresh({ path: prefix ? `${prefix}/${name}` : name, mtime })) count++;
+    if (prefix && count) freshDirs.set(prefix, count);
+    return count;
+  })(scan.tree, '');
+}
+function shortTime(ms) {
+  const d = new Date(ms), now = new Date();
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (d.toDateString() === now.toDateString()) return time;
+  return d.getFullYear() === now.getFullYear() ? `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${time}` : `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+}
+function explorerSpan(className, text = '') {
+  const span = document.createElement('span');
+  span.className = className;
+  span.textContent = text;
+  return span;
+}
+
+function renderExplorer() {
+  if (!explorerOpen || !scan) return;
+  $('explorer-root').textContent = scan.tree.n;
+  $('explorer-root').title = scan.root;
+  // フォルダ先・名前順（AIファイル.vue と同じ）。開いているフォルダだけ中へ降りる。
+  const rows = [];
+  (function walk(node, prefix, depth) {
+    for (const dir of [...node.d].sort((a, b) => byNameJa(a.n, b.n))) {
+      const path = prefix ? `${prefix}/${dir.n}` : dir.n;
+      const open = expanded.has(path);
+      rows.push({ type: 'dir', name: dir.n, path, depth, open });
+      if (open) walk(dir, path, depth + 1);
+    }
+    for (const [name, size, mtime] of [...node.f].sort((a, b) => byNameJa(a[0], b[0]))) {
+      rows.push({ type: 'file', name, path: prefix ? `${prefix}/${name}` : name, depth, size, mtime });
+    }
+  })(scan.tree, '', 0);
+  explorerRows = rows;
+
+  const active = selected ? { type: 'file', path: selected.path } : focus ? { type: 'dir', path: focus.path } : null;
+  const fragment = document.createDocumentFragment();
+  for (const row of rows) {
+    const li = document.createElement('li');
+    li.className = row.type;
+    li.dataset.path = row.path;
+    li.dataset.type = row.type;
+    li.style.setProperty('--depth', row.depth);
+    li.setAttribute('role', 'treeitem');
+    const icon = explorerSpan('ico');
+    let fresh, meta;
+    if (row.type === 'dir') {
+      icon.textContent = row.open ? '📂' : '📁';
+      fresh = freshDirs.get(row.path) ?? 0;
+      meta = fresh ? `${markMode === 'grep' ? '一致' : '更新'} ${fresh}` : '';
+      li.classList.toggle('open', row.open);
+      li.setAttribute('aria-expanded', String(row.open));
+      li.title = row.path;
+    } else {
+      const dot = explorerSpan('dot');
+      dot.style.color = KINDS[kindOf(row.name)].color;
+      icon.append(dot);
+      fresh = isFresh(row);
+      meta = shortTime(row.mtime);
+      li.title = `${row.path}\n${formatSize(row.size)} ・ ${new Date(row.mtime).toLocaleString('ja-JP')}`;
+    }
+    li.classList.toggle('fresh', !!fresh);
+    li.classList.toggle('selected', !!active && active.type === row.type && active.path === row.path);
+    li.classList.toggle('cursor', !!explorerCursor && explorerCursor.type === row.type && explorerCursor.path === row.path);
+    li.append(explorerSpan('chev', row.type === 'dir' ? '▶' : ''), icon, explorerSpan('name', row.name), explorerSpan('meta', meta));
+    if (fresh) {
+      const mark = explorerSpan('match-mark', '●');
+      mark.title = markMode === 'grep' ? 'grep検索に一致' : '起点以降に更新';
+      li.insertBefore(mark, li.querySelector('.name'));
+    }
+    fragment.append(li);
+  }
+  const tree = $('explorer-tree');
+  const scrollTop = tree.scrollTop;
+  tree.replaceChildren(fragment);
+  tree.scrollTop = scrollTop;
+}
+
+function explorerRowElement(type, path) {
+  return $('explorer-tree').querySelector(`li[data-type="${type}"][data-path="${CSS.escape(path)}"]`);
+}
+/** その場所までフォルダを開き、行を見える位置へ。ファイルなら親フォルダまで、フォルダなら親までを開く。 */
+function revealPath(type, path) {
+  if (!explorerOpen) return;
+  if (path) {
+    const parts = path.split('/');
+    let current = '';
+    for (const part of parts.slice(0, -1)) { current = current ? `${current}/${part}` : part; expanded.add(current); }
+    explorerCursor = { type, path };
+    saveExplorer();
+  }
+  renderExplorer();
+  if (path) explorerRowElement(type, path)?.scrollIntoView({ block: 'nearest' });
+}
+function revealCurrent() {
+  if (selected) revealPath('file', selected.path);
+  else if (focus) revealPath('dir', focus.path);
+  else if (trail.length) revealPath('dir', trail.join('/'));
+  else revealPath('dir', null);
+}
+function toggleDir(path, open = !expanded.has(path)) {
+  if (open) expanded.add(path); else expanded.delete(path);
+  saveExplorer();
+  renderExplorer();
+}
+function openExplorerRow(row) {
+  explorerCursor = { type: row.type, path: row.path };
+  if (row.type === 'dir') { expanded.add(row.path); saveExplorer(); }
+  goTo({ type: row.type === 'dir' ? 'dir' : 'file', path: row.path });
+}
+
+const explorerTree = $('explorer-tree');
+explorerTree.addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (!li || e.detail > 1) return; // ダブルクリックでも同じ移動を再実行しない。
+  const row = { type: li.dataset.type, path: li.dataset.path };
+  explorerCursor = row;
+  if (row.type === 'dir' && e.target.closest('.chev')) toggleDir(row.path);
+  else openExplorerRow(row);
+});
+explorerTree.addEventListener('keydown', e => {
+  if (!explorerRows.length) return;
+  let index = explorerCursor ? explorerRows.findIndex(r => r.type === explorerCursor.type && r.path === explorerCursor.path) : -1;
+  const row = explorerRows[index];
+  const moveTo = i => {
+    const next = explorerRows[Math.max(0, Math.min(explorerRows.length - 1, i))];
+    explorerCursor = { type: next.type, path: next.path };
+    renderExplorer();
+    explorerRowElement(next.type, next.path)?.scrollIntoView({ block: 'nearest' });
+  };
+  let handled = true;
+  if (e.key === 'ArrowDown') moveTo(index + 1);
+  else if (e.key === 'ArrowUp') moveTo(index < 0 ? 0 : index - 1);
+  else if (e.key === 'Home') moveTo(0);
+  else if (e.key === 'End') moveTo(explorerRows.length - 1);
+  else if (e.key === 'ArrowRight' && row?.type === 'dir') { if (!row.open) toggleDir(row.path, true); else moveTo(index + 1); }
+  else if (e.key === 'ArrowLeft' && row) {
+    if (row.type === 'dir' && row.open) toggleDir(row.path, false);
+    else {
+      const parent = parentOf(row.path);
+      const parentIndex = explorerRows.findIndex(r => r.type === 'dir' && r.path === parent);
+      if (parentIndex >= 0) moveTo(parentIndex);
+    }
+  }
+  else if (e.key === 'Enter' && row) openExplorerRow(row);
+  else handled = false;
+  if (handled) { e.preventDefault(); e.stopPropagation(); }
+});
+
+// 選択した検索方法の結果を、宇宙とエクスプローラーに同じマークで反映する。
+function refreshMarks() {
+  recountFresh(); computeFreshDirs();
+  if (world) { renderStats(); updateSide(true); }
+  renderExplorer();
+}
+function clearGrep() {
+  ++grepRevision; grepController?.abort(); grepMatches.clear();
+  $('grep-status').textContent = '検索すると一致ファイルにマークします。';
+  refreshMarks();
+}
+document.querySelectorAll('input[name="mark-mode"]').forEach(input => {
+  input.onchange = () => {
+    markMode = input.value;
+    if (markMode !== 'grep') { ++grepRevision; grepController?.abort(); }
+    $('since-row').hidden = markMode !== 'since';
+    $('grep-form').hidden = markMode !== 'grep';
+    refreshMarks();
+    if (markMode === 'grep') $('grep-query').focus();
+  };
+});
+$('grep-query').oninput = clearGrep;
+$('grep-case').onchange = clearGrep;
+$('grep-clear').onclick = () => { $('grep-query').value = ''; clearGrep(); };
+$('grep-form').onsubmit = async event => {
+  event.preventDefault();
+  const query = $('grep-query').value;
+  clearGrep();
+  if (!query) return;
+  const run = grepRevision;
+  grepController = new AbortController();
+  $('grep-status').textContent = '検索中…';
+  try {
+    const params = new URLSearchParams({ q: query, case: $('grep-case').checked ? '1' : '0' });
+    const response = await fetch('/api/grep?' + params, { signal: grepController.signal });
+    if (!response.ok) throw new Error(await response.text());
+    const result = await response.json();
+    if (run !== grepRevision || markMode !== 'grep') return;
+    grepMatches = new Set(result.paths);
+    // 一致したファイルの親を開き、探し直さずに選べるようにする。
+    for (const path of grepMatches) {
+      const parts = path.split('/');
+      for (let i = 1; i < parts.length; i++) expanded.add(parts.slice(0, i).join('/'));
+    }
+    $('grep-status').textContent = `${result.paths.length}ファイル一致（検索 ${result.checked}・対象外 ${result.skipped}）${result.truncated ? ' ※上限に達したため一部の結果です' : ''}`;
+    refreshMarks();
+  } catch (error) {
+    if (run === grepRevision) $('grep-status').textContent = `検索できません: ${error.message}`;
+  }
+};
+
+// 起点は利用開始ごとに接続成立時刻へ戻す。「起動」はサーバー起動時刻ではない。
+let connectionStartedAt = Date.now();
+const pad = n => String(n).padStart(2, '0');
+const toLocalInput = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function loadSince() {
+  since = connectionStartedAt;
+  $('since').value = toLocalInput(since);
+  updateSinceChoice('start');
+}
+function updateSinceChoice(kind) {
+  document.querySelectorAll('#since-row button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.since === kind)));
+}
+function setSince(ms, kind = 'custom') {
+  since = ms;
+  $('since').value = since === null ? '' : toLocalInput(since);
+  updateSinceChoice(kind);
+  refreshMarks();
+}
+$('since').addEventListener('change', e => {
+  const ms = e.target.value ? new Date(e.target.value).getTime() : NaN;
+  setSince(Number.isFinite(ms) ? ms : null);
+});
+document.querySelectorAll('#since-row button').forEach(button => {
+  button.onclick = () => {
+    const kind = button.dataset.since;
+    if (kind === 'start') setSince(connectionStartedAt, kind);
+    else if (kind === 'ten') setSince(Date.now() - 10 * 60000, kind);
+    else if (kind === 'hour') setSince(Date.now() - 3600000, kind);
+    else if (kind === 'today') setSince(startOfToday(), kind);
+    else setSince(null, kind);
+  };
+});
+
+addEventListener('keydown', e => {
+  if (!document.body.classList.contains('workspace-active')) return;
+  if (diving) return;
+  // Ctrl+B: エクスプローラーの開閉（VS Code と同じ）
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); setExplorerOpen(!explorerOpen); return; }
+  if (e.key === 'Escape' && selected) {
+    e.preventDefault(); selectBody(null); return;
+  }
+  if (e.target instanceof Element && e.target.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+  if (e.key === 'Escape') {
+    if (selected) selectBody(null);
+    else if (focus) flyHome();
+    else if (trail.length) ascend(trail.length - 1);
+  }
+  else if (e.key === 'Backspace') { if (trail.length) ascend(trail.length - 1); }
+  else if (e.key === 'Enter' && focus) dive(focus);
+  else if (e.key === ' ') { e.preventDefault(); setAutoSpin(!autoSpin); }
+  else if (e.key === 'c' || e.key === 'C') clearVoyage();
+  else if (e.key === 'r' || e.key === 'R') observe();
+});
+
+// ---------------------------------------------------------------- 観測（読み込み）
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+function formatAge(ms) {
+  const sec = (Date.now() - ms) / 1000;
+  if (sec < 60) return 'たった今';
+  if (sec < 3600) return `${Math.floor(sec / 60)}分前`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}時間前`;
+  if (sec < 86400 * 60) return `${Math.floor(sec / 86400)}日前`;
+  return new Date(ms).toLocaleDateString('ja-JP');
+}
+
+async function observe() {
+  if (!document.body.classList.contains('workspace-active')) return;
+  if (diving) return;
+  const first = !scan;
+  try {
+    const response = await fetch('/api/galaxy', { cache: 'no-store' });
+    if (!response.ok) throw new Error(await response.text());
+    const result = await response.json();
+    if (diving) return;
+    scan = result;
+    while (trail.length && !nodeAt(trail)) trail.pop();
+    if (first) {
+      loadVoyage();
+      loadSince();
+      loadExplorer();
+      const start = trailFromHash();
+      if (nodeAt(start)) trail = start;
+      enterWorld({ from: 'outside', history: false });
+      cam.dist = overviewDistance() * 10;
+      $('loading').classList.add('done');
+    } else {
+      // 再観測: カメラはそのまま、新しく生まれた星だけを光らせる
+      const focusPath = focus?.path, selectedPath = selected?.path;
+      world = buildWorld();
+      focus = world.galaxies.find(g => g.path === focusPath) ?? null;
+      const again = [...world.stars, ...world.planets].find(s => s.path === selectedPath);
+      selectBody(again ?? null, { record: false, zoom: false });
+      renderAll();
+      updateSide(true);
+    }
+    knownPaths = new Set(collectFiles(scan.tree, '').map(f => f.path));
+  } catch (error) {
+    $('loading-text').textContent = `読み込みに失敗しました: ${error.message || error}`;
+  }
+}
+
+// 開発者ツールから状態を覗くための入口。
+window.aidiyIDE = { get world() { return world; }, get labels() { return labelBoxes; }, get galaxyHits() { return galaxyHits; }, get trail() { return trail; }, get voyages() { return voyages; }, cam, goal, flyTo, flyHome, dive, ascend, approach, goTo };
+
+requestAnimationFrame(frame);
+export async function refreshWorkspace(startedAt) {
+  explorerOpen = false;
+  applyExplorerOpen();
+  connectionStartedAt = Number.isFinite(startedAt) ? startedAt : Date.now();
+  markMode = 'since';
+  ++grepRevision; grepController?.abort();
+  document.querySelector('input[name="mark-mode"][value="since"]').checked = true;
+  $('since-row').hidden = false; $('grep-form').hidden = true;
+  loadSince();
+  await observe();
+}

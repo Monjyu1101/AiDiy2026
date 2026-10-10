@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+#
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """Discord フロントエンドの依存導入と、共通設定の不足キー補完。"""
 import importlib.util
 import shutil
@@ -9,7 +18,11 @@ from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
-from launcher import install_launcher
+# 全体処理で他フォルダの同名 launcher がキャッシュされても取り違えない。
+_launcher_spec = importlib.util.spec_from_file_location('aidiy_frontend_discord_launcher', THIS_DIR / 'launcher.py')
+_launcher = importlib.util.module_from_spec(_launcher_spec)
+_launcher_spec.loader.exec_module(_launcher)
+install_launcher = _launcher.install_launcher
 sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
 from _setup_electron import prepare_electron_binary
 

@@ -46,7 +46,7 @@ from noise):
   (required env vars, generated files not to hand-edit, slow test suites,
   ports already in use), if you found any. Skip the section if you found none.
 - Markdown structure: a short title + one-paragraph overview, then focused
-  sections (e.g. "Dev environment", "Build & test", "Conventions",
+  sections (e.g. "IDE environment", "Build & test", "Conventions",
   "Pitfalls"). Flat and scannable — no deep nesting."""
 
 

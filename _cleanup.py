@@ -27,7 +27,7 @@ Code / Live の単独実行と tools の MCP 接続プロセスも強制終了�
 - frontend_web/_cleanup.py     cleanup(choices)
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
-- frontend_vscode/_cleanup.py  cleanup(choices)（vscode 拡張機能も解除）
+- frontend_ide/_cleanup.py   cleanup(choices)（IDE群の拡張・ランチャー・依存物・共通UIを解除）
 - frontend_discord/_cleanup.py cleanup(choices)（Bot 停止・依存物削除）
 
 Usage:
@@ -201,13 +201,14 @@ SERVICE_CLEANUP_TARGETS = (
         "フロントエンド(Avatar)",
         ("フロントエンド(Avatar)",),
     ),
+    ("ide", "frontend_ide/viewer", "フロントエンド(IDE)", ("フロントエンド(IDE)",)),
     ("discord", "frontend_discord", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
 )
 
 # `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
 IMPORT_CACHE_FOLDERS = tuple(
     folder for _choice_key, folder, _description, _service_names in SERVICE_CLEANUP_TARGETS
-) + (BACKEND_HERMES_PATH, "frontend_vscode")
+) + (BACKEND_HERMES_PATH, "frontend_ide", "frontend_ide/host")
 
 # フォルダ別 `_cleanup.py` の担当外になる、ルート側の Python キャッシュ。
 ROOT_CACHE_SCAN_PATHS = ("scripts",)
@@ -221,8 +222,9 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
         services = [
             service_name
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
+            if _folder not in ("frontend_ide/viewer", "frontend_discord")
             for service_name in service_names
-        ] + ["フロントエンド(code)", "フロントエンド(live)"]
+        ] + ["フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,
@@ -256,6 +258,7 @@ def stop_all_services(
     title: str = "クリーンアップ前の既存プロセス整理",
     strict: bool = True,
     keep_code: bool = False,
+    keep_dev: bool = False,
     keep_discord: bool = False,
 ) -> bool:
     """起動中の常駐サービス・単独実行・MCP 接続をすべて強制終了する。
@@ -264,7 +267,7 @@ def stop_all_services(
     1 件失敗しても残りの停止は続け、最後に `strict` なら RuntimeError、そうでなければ
     警告だけ出して False を返す。`keep_code` なら aidiy_code の単独実行とその配下
     （hermes が使う tools の MCP 接続など）は止めず、aidiy_live だけを止める
-    （`_start.py` 用）。`keep_discord` なら Discord 本体とその配下も停止しない。
+    （`_start.py` 用）。`keep_dev` / `keep_discord` なら IDE / Discord 本体とその配下も停止しない。
     """
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
     print_header(title)
@@ -279,29 +282,37 @@ def stop_all_services(
             failures.append(description)
 
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
-        if keep_discord and folder == "frontend_discord":
-            print_info("フロントエンド(Discord) は継続します")
+        if folder in ("frontend_ide/viewer", "frontend_discord"):
             continue
         print_info(f"{description} の既存プロセスを停止します")
         run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
 
     if keep_code:
         # aidiy_live は通常 core 無しに動作できないため、core と一緒に止めてよい。
-        print_info("フロントエンド(vscode) aidiy_code は継続します")
-        print_info("フロントエンド(vscode) Live 実行を停止します")
-        run_stop("Live の単独実行", lambda: _load_folder_start_module("frontend_vscode").kill_ports("live"))
+        print_info("フロントエンド(Code / Live) aidiy_code は継続します")
+        print_info("フロントエンド(Code / Live) Live 実行を停止します")
+        run_stop("Live の単独実行", lambda: _load_folder_start_module("frontend_ide/host").kill_ports("live"))
     else:
-        print_info("フロントエンド(vscode) の Code / Live 単独実行を停止します")
+        print_info("フロントエンド(Code / Live) の Code / Live 単独実行を停止します")
         run_stop(
             "Code / Live の単独実行",
-            lambda: _load_folder_module("frontend_vscode").stop_standalone_processes(),
+            lambda: _load_folder_module("frontend_ide/host").stop_standalone_processes(),
         )
+    for folder, description, keep in (("frontend_ide/viewer", "フロントエンド(IDE)", keep_dev),
+                                      ("frontend_discord", "フロントエンド(Discord)", keep_discord)):
+        if keep:
+            print_info(f"{description} は継続します")
+        else:
+            print_info(f"{description} の既存プロセスを停止します")
+            run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
     print_info("バックエンド(tools) の Python / MCP 接続を停止します")
-    if keep_code or keep_discord:
+    if keep_code or keep_dev or keep_discord:
         try:
             protected_pids: set[int] = set()
             if keep_code:
-                protected_pids.update(_load_folder_start_module("frontend_vscode").process_tree_pids("code"))
+                protected_pids.update(_load_folder_start_module("frontend_ide/host").process_tree_pids("code"))
+            if keep_dev:
+                protected_pids.update(_load_folder_start_module("frontend_ide/viewer").process_tree_pids())
             if keep_discord:
                 protected_pids.update(_load_folder_start_module("frontend_discord").process_tree_pids())
         except Exception as e:
@@ -563,7 +574,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "web":            False,
         "avatar":         False,
         "hermes":         False,
-        "vscode":         False,
+        "ide":            False,
         "discord":        False,
         "hermes_envs":    {},
         "hermes_temp":    None,
@@ -638,7 +649,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                         f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？", default="y",
                     )
 
-    choices["vscode"] = ask_yes_no("フロントエンド(vscode)をクリーンアップしますか？", default="y")
+    choices["ide"] = ask_yes_no("IDE群(Code / Live / IDE)をクリーンアップしますか？", default="y")
     choices["discord"] = ask_yes_no("フロントエンド(Discord)をクリーンアップしますか？", default="y")
 
     return choices
@@ -706,11 +717,11 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
         print_info("コマンド(hermes) のクリーンアップをスキップしました")
 
     print()
-    if choices["vscode"]:
-        if not _run_folder_cleanup("frontend_vscode", choices):
-            cleanup_errors.append("フロントエンド(vscode)")
+    if choices.get("ide"):
+        if not _run_folder_cleanup("frontend_ide", choices):
+            cleanup_errors.append("IDE群(Code / Live / IDE)")
     else:
-        print_info("フロントエンド(vscode)のクリーンアップをスキップしました")
+        print_info("IDE群(Code / Live / IDE)のクリーンアップをスキップしました")
 
     print()
     if choices.get("discord"):
@@ -762,7 +773,7 @@ def main():
     print_info("  7. フロントエンド(Web)")
     print_info("  8. フロントエンド(Avatar)")
     print_info("  9. コマンド(hermes)")
-    print_info(" 10. フロントエンド(vscode)")
+    print_info(" 10. IDE群(Code / Live / IDE)")
     print_info(" 11. フロントエンド(Discord)")
     print()
 

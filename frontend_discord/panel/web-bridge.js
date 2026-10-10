@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 'use strict';
 // ブラウザ版パネル用。Electron 版の preload.cjs と同じ window.discordPanel を WebSocket で提供する。
 // view.js / visualizer.js は Electron 版と共通で、変更しない。

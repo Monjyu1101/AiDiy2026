@@ -9,7 +9,7 @@ const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
 const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
 // aidiy_code / aidiy_live / aidiy_discord と共通の初回演出（透明キャンバスの中で中央から拡大してから表示する）。
 // ウィンドウを毎フレーム広げると Windows で未描画の縁が白くちらつくため、共通実装を使う。
-const { 拡大表示 } = require(path.join(__dirname, '../../frontend_vscode/scripts/window-opening.cjs')) as {
+const { 拡大表示 } = require(path.join(__dirname, '../../frontend_ide/host/scripts/window-opening.cjs')) as {
   拡大表示: (browserWindow: typeof BrowserWindow, window: BrowserWindow, options?: { background?: string }) => Promise<boolean>
 }
 

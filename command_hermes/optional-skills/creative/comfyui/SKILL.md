@@ -63,7 +63,7 @@ for workflow execution.
 | `health_check.py` | Verification checklist runner — comfy-cli + server + models + smoke test |
 | `fetch_logs.py` | Pull traceback / status messages for a given prompt_id |
 
-**Example workflows (`workflows/`):** SD 1.5, SDXL, Flux Dev, SDXL img2img,
+**Example workflows (`workflows/`):** SD 1.5, SDXL, Flux IDE, SDXL img2img,
 SDXL inpaint, ESRGAN upscale, AnimateDiff video, Wan T2V. See
 `workflows/README.md`.
 
@@ -437,7 +437,7 @@ comfy model download \
   --url "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors" \
   --relative-path models/checkpoints
 
-# Flux Dev fp8 (smaller variant, ~12 GB)
+# Flux IDE fp8 (smaller variant, ~12 GB)
 comfy model download \
   --url "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors" \
   --relative-path models/checkpoints

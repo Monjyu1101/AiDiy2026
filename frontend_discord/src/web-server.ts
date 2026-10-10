@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -8,7 +20,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { パネルサービス, type パネル通知 } from './panel-service';
 import { プロジェクトルート } from './config';
 import { 接続元許可 } from './vscode';
-import instanceLock from '../../frontend_vscode/scripts/single-instance.cjs';
+import instanceLock from '../../frontend_ide/host/scripts/single-instance.cjs';
 
 // ブラウザ版パネル（GitHub Codespaces・画面のない Linux 用）。画面は Electron 版と同じ panel/ のファイルを使い、
 // IPC の代わりに WebSocket で panel-service.ts へ中継する。接続元の確認は aidiy_code / aidiy_live と共通。
@@ -16,8 +28,8 @@ const panelRoot = fileURLToPath(new URL('../panel/', import.meta.url));
 const assets: Record<string, string> = {
   'style.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
 };
-// index.html は ../../frontend_vscode/media/AiDiy.png を参照する。/<token>/ から辿るとこのパスになる。
-const iconPath = '/frontend_vscode/media/AiDiy.png';
+// index.html は ../../frontend_ide/host/media/AiDiy.png を参照する。/<token>/ から辿るとこのパスになる。
+const iconPath = '/frontend_ide/host/media/AiDiy.png';
 
 export function ブラウザ用HTML(html: string) {
   const script = '<script src="visualizer.js" defer></script>';
@@ -51,7 +63,7 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
     }
     const url = req.url ?? '';
     try {
-      if (url === iconPath) { res.writeHead(200, { 'Content-Type': 'image/png' }).end(readFileSync(join(プロジェクトルート, 'frontend_vscode/media/AiDiy.png'))); return; }
+      if (url === iconPath) { res.writeHead(200, { 'Content-Type': 'image/png' }).end(readFileSync(join(プロジェクトルート, 'frontend_ide/host/media/AiDiy.png'))); return; }
       const path = url.startsWith(prefix) ? url.slice(prefix.length) : null;
       if (path === '') {
         res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");

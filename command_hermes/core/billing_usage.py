@@ -226,7 +226,7 @@ def usage_model_from_account(account_info: Any) -> UsageModel:
 def build_usage_model(*, timeout: float = 10.0) -> UsageModel:
     """Fetch account-info and build the shared usage model. Fail-open.
 
-    Dev override: ``HERMES_DEV_CREDITS_FIXTURE`` short-circuits to a fixture so
+    IDE override: ``HERMES_DEV_CREDITS_FIXTURE`` short-circuits to a fixture so
     every usage state is testable without a live account (mirrors the existing
     ``/usage`` credits-block fixture path).
     """
@@ -257,7 +257,7 @@ def build_usage_model(*, timeout: float = 10.0) -> UsageModel:
 
 
 # =============================================================================
-# Dev fixtures (throwaway scaffolding — env-var driven, no live portal)
+# IDE fixtures (throwaway scaffolding — env-var driven, no live portal)
 # =============================================================================
 
 

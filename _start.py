@@ -11,7 +11,7 @@
 """開発環境起動スクリプト（まとめ役）
 
 各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task,team)・
-フロントエンド(Web/Avatar/code/live/Discord) を統一手順で起動します。各サービスの環境確認・
+フロントエンド(Web/Avatar/code/live/IDE/Discord) を統一手順で起動します。各サービスの環境確認・
 起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
 
@@ -22,15 +22,16 @@
 - backend_taskteam/_start.py PORT_TASKTEAM / check_environment / start / kill_ports
 - frontend_web/_start.py     PORT_WEB / check_environment / start / kill_ports
 - frontend_avatar/_start.py  PORT_AVATAR / check_environment / start / kill_electron_processes
-- frontend_vscode/_start.py  check_environment / start_code / start_live / kill_ports
+- frontend_ide/host/_start.py  check_environment / start_code / start_live / kill_ports
+- frontend_ide/viewer/_start.py     check_environment / start / kill_ports（空きポート）
 - frontend_discord/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
 起動前と Ctrl+C 終了時は、常駐サービス・Live の単独実行・tools の MCP 接続を
-`_cleanup.stop_all_services` と同じ手順で停止します。aidiy_code / aidiy_discord とその配下は
+`_cleanup.stop_all_services` と同じ手順で停止します。aidiy_code / aidiy_ide / aidiy_discord とその配下は
 停止対象から外し、全体起動スクリプトの終了後も継続します。
 
 標準の起動順:
-0. 既存プロセス整理（aidiy_code / aidiy_discord とその配下を除いて停止）
+0. 既存プロセス整理（aidiy_code / aidiy_ide / aidiy_discord とその配下を除いて停止）
 1. バックエンド(local)
 2. バックエンド(tools)
 3. バックエンド(core)
@@ -40,9 +41,10 @@
 7. フロントエンド(Avatar)
 8. フロントエンド(code)
 9. フロントエンド(live、選択時に自動接続)
-10. フロントエンド(Discord、選択時にパネルを開いて自動接続)
-11. ページ表示
-12. 自動再起動監視
+10. フロントエンド(IDE・選択時)
+11. フロントエンド(Discord、選択時にパネルを開いて自動接続)
+12. ページ表示
+13. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -139,7 +141,7 @@ MANAGED_SERVICE_NAMES = frozenset({
 })
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = None
+LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = DEV = None
 
 
 def _load_folder_module(folder: str):
@@ -169,18 +171,19 @@ def _remove_folder_import_cache(folder: str) -> None:
 
 
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD
+    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD, DEV
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
     SERVER = _load_folder_module("backend_server")
     TASKTEAM = _load_folder_module("backend_taskteam")
     WEB = _load_folder_module("frontend_web")
     AVATAR = _load_folder_module("frontend_avatar")
-    VSCODE = _load_folder_module("frontend_vscode")
+    VSCODE = _load_folder_module("frontend_ide/host")
+    DEV = _load_folder_module("frontend_ide/viewer")
     DISCORD = _load_folder_module("frontend_discord")
 
     # 起動そのものには不要なので、import で残ったキャッシュは畳んでおく。
-    for folder in ("frontend_web", "frontend_avatar", "frontend_vscode", "frontend_discord"):
+    for folder in ("frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
         _remove_folder_import_cache(folder)
 
 
@@ -470,18 +473,23 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
     return default_yes
 
 
-def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool]:
+def collect_startup_choices() -> tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool]:
     print_header("起動条件の確認")
-    local_enabled         = prompt_choice("バックエンド(local)     起動しますか?", default_yes=False)
-    backend_tools_enabled = prompt_choice("バックエンド(tools)     起動しますか?", default_yes=True)
-    backend_enabled       = prompt_choice("バックエンド(core,apps) 起動しますか?", default_yes=True)
-    backend_taskteam_enabled = prompt_choice("バックエンド(task,team) 起動しますか?", default_yes=True)
-    web_enabled           = prompt_choice("フロントエンド(Web)     起動しますか?", default_yes=True)
-    avatar_enabled        = prompt_choice("フロントエンド(Avatar)  起動しますか?", default_yes=False)
-    code_enabled          = prompt_choice("フロントエンド(code)    起動しますか?", default_yes=False)
-    live_enabled          = prompt_choice("フロントエンド(live)    起動しますか?", default_yes=False)
-    discord_enabled       = prompt_choice("フロントエンド(Discord) 起動しますか?", default_yes=False)
-    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, code_enabled, live_enabled, discord_enabled
+    print("バックエンド")
+    local_enabled         = prompt_choice("  local     : 起動しますか?", default_yes=False)
+    backend_tools_enabled = prompt_choice("  tools     : 起動しますか?", default_yes=True)
+    backend_enabled       = prompt_choice("  core,apps : 起動しますか?", default_yes=True)
+    backend_taskteam_enabled = prompt_choice("  task,team : 起動しますか?", default_yes=True)
+    print("フロントエンド")
+    web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=True)
+    avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=False)
+    print("フロントエンド(IDE)")
+    code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=False)
+    live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=False)
+    dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=False)
+    print("フロントエンド(その他)")
+    discord_enabled       = prompt_choice("  Discord   : 起動しますか?", default_yes=False)
+    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, code_enabled, live_enabled, dev_enabled, discord_enabled
 
 
 # ============================================================
@@ -535,12 +543,13 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standalone: bool = True) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
-    # 通常終了では Code / Discord を継続し、明示的な cleanup 要求では停止する。
+    # 通常終了では Code / IDE / Discord を継続し、明示的な cleanup 要求では停止する。
     standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
                           if f"フロントエンド({module})" in processes]
     discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
+    dev_was_running = not keep_standalone and "フロントエンド(IDE)" in processes
     for name, process in list(processes.items()):
-        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(Discord)"):
+        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)"):
             print_info(f"[{name}] 全体停止の対象外として継続します")
             processes.pop(name, None)
             continue
@@ -577,6 +586,8 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
     if VSCODE is not None:
         for module in standalone_modules:
             VSCODE.kill_ports(module)
+    if dev_was_running and DEV is not None:
+        DEV.kill_ports()
     if discord_was_running and DISCORD is not None:
         DISCORD.kill_ports()
 
@@ -585,7 +596,7 @@ def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
     """起動前・Ctrl+C 終了時に `_cleanup.py` と同じ手順で全サービスを停止する。
 
     常駐サービス、Live の単独実行、tools の MCP 接続を止める。
-    aidiy_code / aidiy_discord は継続するため、本体とその配下を強制停止しない。
+    aidiy_code / aidiy_ide / aidiy_discord は継続するため、本体とその配下を強制停止しない。
     停止手順は `_cleanup.stop_all_services` に一本化し、ここで個別に重複させない。
     停止できないものがあっても起動・終了は続ける。
     """
@@ -593,12 +604,12 @@ def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
         spec = importlib.util.spec_from_file_location("aidiy_root_cleanup_for_start", BASE_DIR / "_cleanup.py")
         cleanup = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cleanup)
-        cleanup.stop_all_services({}, title=title, strict=False, keep_code=True, keep_discord=True)
+        cleanup.stop_all_services({}, title=title, strict=False, keep_code=True, keep_dev=True, keep_discord=True)
     except Exception as exc:
         print_warning(f"一部のタスクを停止できませんでした: {exc}")
     finally:
         # 停止用に import したフォルダ側スクリプトのキャッシュを畳む。
-        for folder in ("frontend_web", "frontend_avatar", "frontend_vscode", "frontend_discord"):
+        for folder in ("frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
             _remove_folder_import_cache(folder)
 
 
@@ -615,6 +626,7 @@ def validate_initial_environment(
     discord_enabled: bool = False,
     code_enabled: bool = False,
     live_enabled: bool = False,
+    dev_enabled: bool = False,
 ) -> tuple[bool, str | None]:
     print_header("環境確認")
     has_error = False
@@ -681,6 +693,8 @@ def validate_initial_environment(
             print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
+    if code_enabled or live_enabled or dev_enabled:
+        print_header("IDE群(Code / Live / IDE)")
     for module, enabled in (("code", code_enabled), ("live", live_enabled)):
         if enabled:
             ok, detail = VSCODE.check_environment(module)
@@ -690,6 +704,13 @@ def validate_initial_environment(
                 print_error(f"フロントエンド({module}): 未準備 ({detail})")
                 has_error = True
 
+    if dev_enabled:
+        ok, detail = DEV.check_environment()
+        if ok:
+            print_success(f"フロントエンド(IDE): OK ({detail})")
+        else:
+            print_error(f"フロントエンド(IDE): 未準備 ({detail})")
+            has_error = True
     if discord_enabled:
         ok, detail = DISCORD.check_environment()
         if ok:
@@ -697,6 +718,7 @@ def validate_initial_environment(
         else:
             print_error(f"フロントエンド(Discord): 未準備 ({detail})")
             has_error = True
+
     return (not has_error), npm_command
 
 
@@ -764,6 +786,9 @@ def start_service(
             process = VSCODE.start_live(auto_connect=True)
         elif name == "フロントエンド(Discord)":
             process = DISCORD.start(auto_connect=True)
+        elif name == "フロントエンド(IDE)":
+            # 全体終了後も継続する独立プロセスとして起動する。
+            process = DEV.start()
         else:
             print_error(f"未対応のサービスです: {name}")
             return False
@@ -789,6 +814,7 @@ def start_initial_services(
     discord_enabled: bool = False,
     code_enabled: bool = False,
     live_enabled: bool = False,
+    dev_enabled: bool = False,
 ) -> dict[str, bool]:
     selected_flags = {
         "バックエンド(local)": start_backend_local_enabled,
@@ -801,11 +827,12 @@ def start_initial_services(
         # 手動で閉じた単独ウィンドウ・パネルは自動で開き直さない。
         "フロントエンド(code)": False,
         "フロントエンド(live)": False,
+        "フロントエンド(IDE)": False,
         "フロントエンド(Discord)": False,
     }
 
-    # Code / Discord とその配下を継続し、それ以外の前回の残り・別起動分を止める。
-    stop_all_tasks("既存プロセス整理（Code / Discord は継続）")
+    # Code / IDE / Discord とその配下を継続し、それ以外の前回の残り・別起動分を止める。
+    stop_all_tasks("既存プロセス整理（Code / IDE / Discord は継続）")
 
     if start_backend_local_enabled:
         print_header("バックエンド(local) 起動")
@@ -847,12 +874,19 @@ def start_initial_services(
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
+    if code_enabled or live_enabled or dev_enabled:
+        print_header("IDE群(Code / Live / IDE)")
     for module, enabled in (("code", code_enabled), ("live", live_enabled)):
         if enabled:
             name = f"フロントエンド({module})"
             print_header(f"{name} 起動" + ("・自動接続" if module == "live" else ""))
             if start_service(name, processes, last_output_times, npm_command):
                 wait_for_services_quiet(last_output_times, [name], label=name)
+
+    if dev_enabled:
+        print_header("フロントエンド(IDE) 起動")
+        if start_service("フロントエンド(IDE)", processes, last_output_times, npm_command):
+            wait_for_services_quiet(last_output_times, ["フロントエンド(IDE)"], label="フロントエンド(IDE)")
 
     if discord_enabled:
         print_header("フロントエンド(Discord) パネル起動・自動接続")
@@ -959,6 +993,7 @@ def main() -> None:
         avatar_enabled,
         code_enabled,
         live_enabled,
+        dev_enabled,
         discord_enabled,
     ) = collect_startup_choices()
 
@@ -972,6 +1007,7 @@ def main() -> None:
         discord_enabled=discord_enabled,
         code_enabled=code_enabled,
         live_enabled=live_enabled,
+        dev_enabled=dev_enabled,
     )
     if not is_ready:
         print()
@@ -999,6 +1035,7 @@ def main() -> None:
                 discord_enabled=discord_enabled,
                 code_enabled=code_enabled,
                 live_enabled=live_enabled,
+                dev_enabled=dev_enabled,
             )
 
             print_header("起動完了")
@@ -1022,16 +1059,18 @@ def main() -> None:
             for module in ("code", "live"):
                 if f"フロントエンド({module})" in processes:
                     print_success(f"フロントエンド({module}): aidiy_{module} 起動済み")
+            if "フロントエンド(IDE)" in processes:
+                print_success("フロントエンド(IDE): 空きポートで起動済み（URL は起動ログを参照）")
             if "フロントエンド(Discord)" in processes:
                 print_success("フロントエンド(Discord): パネル起動済み（接続状態はパネルで確認してください）")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:
             print_header("停止処理")
-            print_info("Ctrl+C を検出しました。Code / Discord を継続し、他のプロセスを停止します")
+            print_info("Ctrl+C を検出しました。Code / IDE / Discord を継続し、他のプロセスを停止します")
             stop_processes(processes)
-            print_info("Code / Discord とその配下を除き、残っているタスクを停止します")
-            stop_all_tasks("終了時の既存プロセス整理（Code / Discord は継続）")
+            print_info("Code / IDE / Discord とその配下を除き、残っているタスクを停止します")
+            stop_all_tasks("終了時の既存プロセス整理（Code / IDE / Discord は継続）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()

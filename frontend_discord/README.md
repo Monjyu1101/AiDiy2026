@@ -1,13 +1,13 @@
 # AiDiy Discord
 
-自分と AiDiy の専用テキストチャンネルに普通に話しかけると、`aidiy_hermes` が返信します。専用ボイスチャンネルに参加すると、AIコアの LiveAI と音声会話できます。チャットは `frontend_vscode` の Code と同じ CLI 実行処理、ライブは同じ Live WebSocket 処理を使います。
+自分と AiDiy の専用テキストチャンネルに普通に話しかけると、`aidiy_hermes` が返信します。専用ボイスチャンネルに参加すると、AIコアの LiveAI と音声会話できます。チャットは `frontend_ide/host` の Code と同じ CLI 実行処理、ライブは同じ Live WebSocket 処理を使います。
 
 ## 導入
 
 - Node.js 22.12 以降（この作業環境では 24.18 で検証）。
 - `command_hermes` をセットアップし、使う Provider を認証しておきます。
 - ライブを使う場合は `backend_server` の Core と LiveAI の設定が必要です。
-- `frontend_vscode` のソースを同じプロジェクトに保持します。VS Code 本体、拡張の導入、VSIX 生成は不要です。
+- `frontend_ide/host` のソースを同じプロジェクトに保持します。VS Code 本体、拡張の導入、VSIX 生成は不要です。
 
 プロジェクトルートで実行します。
 
@@ -113,7 +113,7 @@ JSON の候補から削除されたモデル・音声は自動使用せず、選
 
 ### ブラウザ版（Codespaces など）
 
-`aidiy_discord --browser` で、Electron の代わりにブラウザでパネルを開きます。画面・操作は Electron 版と同じで、パネルのサーバー（`src/web-server.ts`）と WebSocket でやり取りします。GitHub Codespaces（`CODESPACES=true`）と画面のない Linux（`DISPLAY` / `WAYLAND_DISPLAY` なし）では、`--browser` を省略してもブラウザ版で開きます。ブラウザは VS Code / Codespaces が設定する `$BROWSER` を優先して手元の PC で開き、Codespaces の `$BROWSER` には元の localhost URL を渡し、VS Code にポート転送と外部 URI の解決を任せます。手動用にはトークン付き転送先 URL（`https://<名前>-<ポート>.app.github.dev/…`）を表示します。開けない場合は URL を表示します。判定と起動は `frontend_vscode/scripts/launch-project.mjs`、接続元の許可は `frontend_vscode/src/forwarded-origin.ts` で aidiy_code / aidiy_live / aidiy_discord 共通です。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒後（初回は120秒後、Codespaces では初回接続まで終了しない）に Bot も終了します。3本（aidiy_code / aidiy_live / aidiy_discord）の起動規則は `frontend_vscode/scripts/launch-project.mjs` の冒頭に一覧し、そこで共通化しています。Electron の専用ウィンドウを開けない場合（未セットアップ・起動失敗）は、理由を表示してブラウザ版に切り替えます。通常のブラウザ版は初回120秒、最後の画面切断後60秒で終了します。Codespaces では初回接続まで終了しません。Bot の音声は Discord の UDP 通信を使うため、Codespaces で音声会話がつながるかは環境によります。
+`aidiy_discord --browser` で、Electron の代わりにブラウザでパネルを開きます。画面・操作は Electron 版と同じで、パネルのサーバー（`src/web-server.ts`）と WebSocket でやり取りします。GitHub Codespaces（`CODESPACES=true`）と画面のない Linux（`DISPLAY` / `WAYLAND_DISPLAY` なし）では、`--browser` を省略してもブラウザ版で開きます。ブラウザは VS Code / Codespaces が設定する `$BROWSER` を優先して手元の PC で開き、Codespaces の `$BROWSER` には元の localhost URL を渡し、VS Code にポート転送と外部 URI の解決を任せます。手動用にはトークン付き転送先 URL（`https://<名前>-<ポート>.app.github.dev/…`）を表示します。開けない場合は URL を表示します。判定と起動は `frontend_ide/host/scripts/launch-project.mjs`、接続元の許可は `frontend_ide/host/src/forwarded-origin.ts` で aidiy_code / aidiy_live / aidiy_discord 共通です。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒後（初回は120秒後、Codespaces では初回接続まで終了しない）に Bot も終了します。3本（aidiy_code / aidiy_live / aidiy_discord）の起動規則は `frontend_ide/host/scripts/launch-project.mjs` の冒頭に一覧し、そこで共通化しています。Electron の専用ウィンドウを開けない場合（未セットアップ・起動失敗）は、理由を表示してブラウザ版に切り替えます。通常のブラウザ版は初回120秒、最後の画面切断後60秒で終了します。Codespaces では初回接続まで終了しません。Bot の音声は Discord の UDP 通信を使うため、Codespaces で音声会話がつながるかは環境によります。
 
 ## クリーンアップ
 
@@ -152,3 +152,17 @@ npm test
 - DAVE 対応の `@discordjs/voice` と同梱の `@snazzah/davey` を使います。Discord 音声受信は Discord 側の公式 API 仕様が公開されていないため、Discord の変更時には接続の再確認が必要です。[discord.js 音声ライブラリ](https://discord.js.org/docs/packages/voice/0.19.2)、[Discord Voice 仕様](https://docs.discord.com/developers/topics/voice-connections)
 
 応答がないときは Message Content Intent、許可 ID、チャンネル権限を確認します。ライブだけ接続できないときは Core の起動、`LIVE_*` 設定、UDP 通信、ボイス接続・発言権限を確認してください。
+
+## 著作権・ライセンス
+
+独自実装には次の定型文を使用します。ライセンス全文は [LICENSE](./LICENSE) を参照してください。
+
+```text
+COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026
+```
+
+第三者ライブラリには各配布元のライセンスが適用されます。再配布時は、それぞれの著作権表示・ライセンス文書も保持してください。

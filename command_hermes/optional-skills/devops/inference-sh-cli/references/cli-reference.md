@@ -88,7 +88,7 @@ infsh completion fish > ~/.config/fish/completions/infsh.fish
 
 Apps use the format `namespace/app-name`:
 
-- `falai/flux-dev-lora` - fal.ai's FLUX 2 Dev
+- `falai/flux-dev-lora` - fal.ai's FLUX 2 IDE
 - `google/veo-3` - Google's Veo 3
 - `infsh/sdxl` - inference.sh's SDXL
 - `bytedance/seedance-1-5-pro` - ByteDance's Seedance

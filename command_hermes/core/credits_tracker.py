@@ -636,7 +636,7 @@ def parse_credits_headers(
         return None
 
 
-# ── Dev test fixtures (HERMES_DEV_CREDITS_FIXTURE) ───────────────────────────
+# ── IDE test fixtures (HERMES_DEV_CREDITS_FIXTURE) ───────────────────────────
 # Throwaway dev scaffolding: trigger any notice state on demand for testing,
 # without real spend or Redis seeding. Set HERMES_DEV_CREDITS_FIXTURE to either a
 # state NAME (fixed for the session) or a FILE PATH whose contents are a state

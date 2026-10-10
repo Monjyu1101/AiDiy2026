@@ -276,7 +276,7 @@ The fastest "let a teammate poke at my running app" pattern. Random password, pr
 
 ```bash
 PASS=$(openssl rand -base64 12 | tr -d '+/=' | head -c 12)
-echo "Dev server password: $PASS"
+echo "IDE server password: $PASS"
 ssh -p 443 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -o ServerAliveInterval=30 \
     -R0:localhost:3000 "b:dev:$PASS+co+x:https+free@a.pinggy.io"

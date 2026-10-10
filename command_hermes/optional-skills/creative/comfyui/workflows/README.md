@@ -8,7 +8,7 @@ cloud access to) the listed models.
 |------|---------|-----------------|----------|
 | `sd15_txt2img.json` | SD 1.5 text-to-image (512×512) | SD1.5 checkpoint, e.g. `v1-5-pruned-emaonly.safetensors` | 4 GB |
 | `sdxl_txt2img.json` | SDXL text-to-image (1024×1024) | `sd_xl_base_1.0.safetensors` | 8 GB |
-| `flux_dev_txt2img.json` | Flux Dev text-to-image (1024×1024) | `flux1-dev.safetensors`, `t5xxl_fp16.safetensors`, `clip_l.safetensors`, `ae.safetensors` | 24 GB (or use `flux1-dev-fp8`) |
+| `flux_dev_txt2img.json` | Flux IDE text-to-image (1024×1024) | `flux1-dev.safetensors`, `t5xxl_fp16.safetensors`, `clip_l.safetensors`, `ae.safetensors` | 24 GB (or use `flux1-dev-fp8`) |
 | `sdxl_img2img.json` | SDXL image-to-image | SDXL checkpoint | 8 GB |
 | `sdxl_inpaint.json` | SDXL inpainting (image + mask) | SDXL checkpoint | 8 GB |
 | `upscale_4x.json` | Standalone 4× ESRGAN upscale | `4x-UltraSharp.pth` (or any upscaler) | 4 GB |
@@ -55,7 +55,7 @@ python3 ../scripts/check_deps.py wan_video_t2v.json
 - **Denoise strength** in img2img: `0.0` = output identical to input,
   `1.0` = ignore input entirely. Sweet spot is usually 0.4–0.7.
 
-- **Flux Dev** needs ~24 GB VRAM in its base form. The `flux1-dev-fp8.safetensors`
+- **Flux IDE** needs ~24 GB VRAM in its base form. The `flux1-dev-fp8.safetensors`
   variant (already on Comfy Cloud) cuts that roughly in half.
 
 - **Video workflows** can take many minutes. The skill auto-detects video

@@ -1,5 +1,17 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { randomUUID } from 'node:crypto';
-import type { 起動設定 } from '../../frontend_vscode/src/runner';
+import type { 起動設定 } from '../../frontend_ide/host/src/runner';
 import { 会話引数, 起動解決, コード要求実行 } from './vscode';
 import type { Discord設定 } from './config';
 

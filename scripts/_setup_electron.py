@@ -172,8 +172,9 @@ def _prepare_electron_binary(frontend_dir: Path, label: str, *, info, error) -> 
             (electron_dir / "path.txt").write_bytes(electron_executable_name().encode("utf-8"))
             return True
 
-        for name in ("frontend_avatar", "frontend_vscode", "frontend_discord"):
-            peer = frontend_dir.parent / name
+        project_root = frontend_dir.parent.parent if frontend_dir.parent.name == 'frontend_ide' else frontend_dir.parent
+        for name in ("frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
+            peer = project_root / name
             if peer.resolve() == frontend_dir.resolve():
                 continue
             source = peer / "node_modules" / "electron" / "dist"

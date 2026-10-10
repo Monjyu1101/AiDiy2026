@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+#
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """Discord の全体起動・停止連携と、限定された cleanup 対象を検証する。"""
 import contextlib
 import importlib.util
@@ -77,9 +87,10 @@ class DiscordLifecycleTest(unittest.TestCase):
         self.assertEqual(next(call.kwargs['default'] for call in ask.call_args_list if 'Discord' in call.args[0]), 'y')
         with patch.object(start, 'prompt_choice', side_effect=lambda _prompt, default_yes: default_yes) as ask:
             flags = start.collect_startup_choices()
-        self.assertEqual(len(flags), 9)
-        self.assertFalse(flags[-1])
-        self.assertIn('Discord', ask.call_args.args[0])
+        self.assertEqual(len(flags), 10)
+        self.assertFalse(flags[8])
+        self.assertIn('IDE', ask.call_args_list[8].args[0])
+        self.assertIn('Discord', ask.call_args_list[9].args[0])
         with tempfile.TemporaryDirectory() as folder, patch.object(cleanup, 'ask_start_mode', return_value=(True, False)), patch.object(
             cleanup, 'ask_yes_no', side_effect=setup_answer
         ):
@@ -200,8 +211,8 @@ class DiscordLifecycleTest(unittest.TestCase):
     def test_start_stop_preserves_discord_and_code_descendants(self):
         for keep_code in (False, True):
             modules = {folder: Mock() for _, folder, _, _ in cleanup.SERVICE_CLEANUP_TARGETS}
-            modules['frontend_vscode'] = Mock()
-            modules['frontend_vscode'].process_tree_pids.return_value = {100, 101}
+            modules['frontend_ide/host'] = Mock()
+            modules['frontend_ide/host'].process_tree_pids.return_value = {100, 101}
             modules['frontend_discord'].process_tree_pids.return_value = {200, 201, 202}
             tools = Mock()
             with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(

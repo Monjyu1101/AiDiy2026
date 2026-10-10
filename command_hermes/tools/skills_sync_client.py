@@ -209,7 +209,7 @@ def canonical_json_bytes(obj: Dict[str, Any]) -> bytes:
 # decode its payload (unverified) to read the access-gate claim.
 # ---------------------------------------------------------------------------
 
-# Dev-phase gate claim (NAS access-token-issuer.ts:312). Sync is inert unless
+# IDE-phase gate claim (NAS access-token-issuer.ts:312). Sync is inert unless
 # the resolved token carries this claim === true. Remove when sync ships GA.
 # Wire claim name is NAS's; it means "this user is a Nous admin"
 # (populated from Permissions.ADMIN_ACCESS), NOT a tool-gateway right.

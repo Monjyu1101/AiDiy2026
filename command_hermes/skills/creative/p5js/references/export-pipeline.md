@@ -546,7 +546,7 @@ $fx.params([
 let density = $fx.getParam('density');
 
 // Build: npx fxhash build → upload.zip
-// Dev: npx fxhash dev → localhost:3300
+// IDE: npx fxhash dev → localhost:3300
 ```
 
 ### Art Blocks / Generic Platform

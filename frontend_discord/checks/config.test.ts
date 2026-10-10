@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -5,13 +17,13 @@ import { 設定解析, プロジェクトルート } from '../src/config';
 import { defaults } from './helpers';
 
 test('PORT_CORE、共通モデル、作業フォルダを読み込み、元設定は変更しない', () => {
-  const data = { ...defaults, PORT_CORE: '18091', CODE_BASE_PATH: '../frontend_vscode', LIVE_AI_NAME: 'openai_live',
+  const data = { ...defaults, PORT_CORE: '18091', CODE_BASE_PATH: '../frontend_ide/host', LIVE_AI_NAME: 'openai_live',
     CODE_AIDIY_HERMES_MODEL: 'openai_oauth/gpt-6.1-sol', CODE_MAX_TURNS: 999 };
   const before = JSON.stringify(data);
   const result = 設定解析(data);
   assert.equal(new URL(result.coreUrl).port, '18091');
   assert.equal(decodeURI(new URL(result.coreUrl).pathname), '/core/ws/AIコア');
-  assert.equal(result.folder, resolve(プロジェクトルート, 'frontend_vscode'));
+  assert.equal(result.folder, resolve(プロジェクトルート, 'frontend_ide/host'));
   assert.equal(result.liveModels.LIVE_AI_NAME, 'openai_live');
   assert.equal(JSON.stringify(data), before);
   assert.equal(result.provider, 'openai_oauth');

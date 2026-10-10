@@ -239,11 +239,11 @@ def nous_credits_lines(*, markdown: bool = False, timeout: float = 10.0) -> list
     the same block regardless of session API-call count or resume state. Fail-open:
     any auth/portal hiccup or timeout returns [] (the caller shows nothing).
 
-    Dev override: when HERMES_DEV_CREDITS_FIXTURE selects a fixture state, /usage
+    IDE override: when HERMES_DEV_CREDITS_FIXTURE selects a fixture state, /usage
     renders from that fixture instead of the real portal (so the block + gauge are
     testable without a live account). Throwaway scaffolding.
     """
-    # Dev fixture short-circuit — render /usage from the injected state, no portal.
+    # IDE fixture short-circuit — render /usage from the injected state, no portal.
     try:
         from agent.credits_tracker import dev_fixture_credits_state
 

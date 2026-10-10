@@ -31,7 +31,7 @@ Three client options, all distributed via npm. Pick the lightest one that solves
 | Tempo Wallet | MPP services with spend controls, service discovery | `tempo wallet login` |
 | Privy Agent CLI | Multi-chain wallets, browser-based funding | `privy-agent-wallets login` |
 | AgentCash | 300+ pre-priced APIs via one USDC.e balance | `npx agentcash onboard` |
-| `mppx` | Dev + debugging, smallest dep surface | `npm install -g mppx` then `mppx account create` |
+| `mppx` | IDE + debugging, smallest dep surface | `npm install -g mppx` then `mppx account create` |
 
 Default: if the user already has Stripe Link configured or the 402 challenge specifies `method="stripe"`, use `link-cli mpp pay` (the `stripe-link-cli` skill). Otherwise `mppx` for one-off paid calls and debugging, and Tempo Wallet when the user wants persistent spend controls.
 

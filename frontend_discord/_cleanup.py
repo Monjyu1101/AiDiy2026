@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+#
+# -------------------------------------------------------------------------
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+# -------------------------------------------------------------------------
+
 """Discord Bot の停止を確認してから依存物とキャッシュを削除する。共通設定は保持する。"""
 import importlib.util
 import os
@@ -10,7 +19,11 @@ import sys
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 from discord_processes import stop_discord_processes
-from launcher import remove_launcher
+# 全体処理で他フォルダの同名 launcher がキャッシュされても取り違えない。
+_launcher_spec = importlib.util.spec_from_file_location('aidiy_frontend_discord_launcher', THIS_DIR / 'launcher.py')
+_launcher = importlib.util.module_from_spec(_launcher_spec)
+_launcher_spec.loader.exec_module(_launcher)
+remove_launcher = _launcher.remove_launcher
 
 TARGETS = ('node_modules', 'dist', 'out', 'temp', '__pycache__', '.pytest_cache')
 LABEL = 'フロントエンド(Discord)'

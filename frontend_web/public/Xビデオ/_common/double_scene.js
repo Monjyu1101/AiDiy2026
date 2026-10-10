@@ -1,7 +1,7 @@
 (function () {
   // シーン本体と共通CSSの読み込み間に、ブラウザ既定の余白で
   // iframe のスクロールバーが一瞬出ないよう先に固定する。
-  document.head.insertAdjacentHTML('beforeend', '<style>html,body{width:100%;height:100%;margin:0;overflow:hidden;scrollbar-width:none;-ms-overflow-style:none}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0}</style><link rel="stylesheet" href="../_common/scene.css">');
+  document.head.insertAdjacentHTML('beforeend', '<style>html,body{width:100%;height:100%;margin:0;overflow:hidden;scrollbar-width:none;-ms-overflow-style:none}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0}</style><link rel="stylesheet" href="./scene.css">');
   document.head.insertAdjacentHTML('beforeend', '<style>.image-shell { margin-top: 8px; margin-bottom: 8px; }</style>');
 
   document.body.innerHTML = `
@@ -54,7 +54,7 @@
   </div>`;
 
   var scr = document.createElement('script');
-  scr.src = '../_common/scene_core.js';
+  scr.src = './scene_core.js';
   scr.onload = function () { renderScenePage(window._SCENE_INDEX); };
   document.head.appendChild(scr);
 })();

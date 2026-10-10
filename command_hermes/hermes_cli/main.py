@@ -11181,10 +11181,10 @@ def cmd_update(args):
 def _coalesce_session_name_args(argv: list) -> list:
     """Join unquoted multi-word session names after -c/--continue and -r/--resume.
 
-    When a user types ``hermes -c Pokemon Agent Dev`` without quoting the
+    When a user types ``hermes -c Pokemon Agent IDE`` without quoting the
     session name, argparse sees three separate tokens.  This function merges
     them into a single argument so argparse receives
-    ``['-c', 'Pokemon Agent Dev']`` instead.
+    ``['-c', 'Pokemon Agent IDE']`` instead.
 
     Tokens are collected after the flag until we hit another flag (``-*``)
     or a known top-level subcommand.
@@ -15073,7 +15073,7 @@ def main():
     # =========================================================================
     # Pre-process argv so unquoted multi-word session names after -c / -r
     # are merged into a single token before argparse sees them.
-    # e.g. ``hermes -c Pokemon Agent Dev`` → ``hermes -c 'Pokemon Agent Dev'``
+    # e.g. ``hermes -c Pokemon Agent IDE`` → ``hermes -c 'Pokemon Agent IDE'``
     # ── Container-aware routing ────────────────────────────────────────
     # When NixOS container mode is active, route ALL subcommands into
     # the managed container.  This MUST run before parse_args() so that

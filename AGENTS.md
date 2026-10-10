@@ -23,7 +23,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | frontend_web 画面追加 | [`_AIDIY/knowledge/frontend_web,画面追加手順.md`](./_AIDIY/knowledge/frontend_web,画面追加手順.md) |
 | frontend_web Router / Store パターン | [`_AIDIY/knowledge/frontend_web,Vue Routerパターン.md`](./_AIDIY/knowledge/frontend_web,Vue Routerパターン.md)、[`_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md`](./_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md) |
 | frontend_avatar / Electron / VRM / 音声 | [`_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md`](./_AIDIY/knowledge/frontend_avatar,ElectronIPC追加手順.md)、[`_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md`](./_AIDIY/knowledge/frontend_avatar,VRM_VRMA追加手順.md)、[`_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,AI音声処理.md) |
-| frontend_vscode / VS Code 拡張（Code / Live） | [`_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md`](./_AIDIY/knowledge/frontend_vscode,VSCodeチャット拡張変更手順.md) |
+| frontend_ide/host / VS Code 拡張（Code / Live） | [`_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md`](./_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md) |
 | frontend_discord / Discord（Code / Live） | [`_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](./_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
 | AI コア / Code CLI / MCP | [`_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](./_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
 | command_hermes Provider / Slash Command | [`_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](./_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md)、[`_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](./_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
@@ -44,8 +44,9 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md) | AIタスク実行・定期タスク・複数AIエージェントのチーム活動を統合した FastAPI サーバーの実装詳細 |
 | [frontend_web/AGENTS.md](./frontend_web/AGENTS.md) | Vue 3 + Vite + TypeScript の Web UI 実装詳細 |
 | [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md) | Electron/Web デュアルモード Avatar の実装詳細 |
-| [frontend_vscode/AGENTS.md](./frontend_vscode/AGENTS.md) | VS Code 拡張 AiDiy (Code) / AiDiy (Live) と単独起動版の実装詳細 |
+| [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md) | VS Code 拡張 AiDiy (Code) / AiDiy (Live) と単独起動版の実装詳細 |
 | [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md) | Discord Bot の Hermes チャット / AIコア Live 音声接続の実装詳細 |
+| [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) | AiDiy IDE の宇宙表示・エクスプローラー・読み取り専用ファイルビューアの実装詳細 |
 | [docs/](./docs/) | HTML 形式の詳細ドキュメント |
 
 人間向けの紹介資料は [frontend_web/public/X自己紹介/index.html](./frontend_web/public/X自己紹介/index.html) です。
@@ -98,8 +99,9 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `command_hermes` | `aidiy_hermes` CLI 基盤 | 常駐なし |
 | `frontend_web` | 通常 Web UI | 8090 |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar | 8092 |
-| `frontend_vscode` | AIコアへ接続するコード支援の AiDiy (Code) と、音声会話の AiDiy (Live) の VS Code 拡張 / 単独起動版 | 常駐なし |
+| `frontend_ide/host` | AIコアへ接続するコード支援の AiDiy (Code) と、音声会話の AiDiy (Live) の VS Code 拡張 / 単独起動版 | 常駐なし |
 | `frontend_discord` | Discord のテキストチャンネルを `aidiy_hermes`、ボイスチャンネルを AIコア Live へ接続する任意起動の Bot | 待受ポートなし |
+| `frontend_ide/viewer` | AiDiy IDE。作業フォルダを宇宙表示・エクスプローラー・読み取り専用ビューアで把握する開発用 UI | 自動割り当て |
 
 `core_main.py`、`apps_main.py`、`taskteam_main.py` は同じ SQLite DB を共有します。`taskteam_main.py` は `Aタスク*` と `Aチーム*` を同一プロセスで管理します。
 フロントエンドは Vite proxy で `/core/*` を 8091、`/apps/*` を 8098、`/task/*` と `/team/*` を同じ 8093 へ振り分けます。
@@ -115,8 +117,8 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `backend_taskteam/` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー（`/task/*`、`/team/*`、各監視ループ） |
 | `frontend_web/` | Vue 3 + Vite + TypeScript の Web UI |
 | `frontend_avatar/` | Electron/Web 対応の AI Avatar UI |
-| `frontend_vscode/` | VS Code 拡張 AiDiy (Code)（AIコアの Code CLI 操作）/ AiDiy (Live)（AIコア音声会話）と、`aidiy_code` / `aidiy_live` 単独起動版 |
-| `frontend_discord/` | `frontend_vscode` の CLI / Live 接続処理を共有する Discord Bot。接続情報は `_config/AiDiy_key.json` の `DISCORD_*` |
+| `frontend_ide/` | Code / Live / IDEのVue共通画面と単独起動。`host/` にVS Code拡張・Code / Live通信、`viewer/` にファイルAPI・Office表示を統合 |
+| `frontend_discord/` | `frontend_ide/host` の CLI / Live 接続処理を共有する Discord Bot。接続情報は `_config/AiDiy_key.json` の `DISCORD_*` |
 | `_config/` | API キー、AI モデル、MCP などの共通設定 |
 | `_data/` | 共通 SQLite DB などの永続データ |
 | `_icons/` | アプリケーション共通アイコン |
@@ -279,9 +281,9 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 - WebSocket。
 - BroadcastChannel `avatar-desktop-sync`。
 
-## frontend_vscode 概要
+## frontend_ide/host 概要
 
-`frontend_vscode` は、VS Code のセカンダリサイドバーに表示する 2 つの独立した拡張と、同じ画面を使う単独起動版を提供します。
+`frontend_ide/host` は、VS Code のセカンダリサイドバーに表示する 2 つの独立した拡張と、同じ画面を使う単独起動版を提供します。
 
 | 拡張 | 拡張 ID | 役割 | 単独起動 |
 |------|---------|------|----------|
@@ -292,10 +294,23 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 - Code は選択コード添付、Provider / モデル選択、会話継続、停止、実行ログ、対話 CLI を提供し、既存 AIコードと同じ packet 識別子で進捗と正式回答を分離する。
 - Live は接続時に作業フォルダを `CODE_BASE_PATH` として渡し、LiveAI とコードエージェントの回答（`output_request`）を表示する。
 - 単独起動版は Electron のフレームレスウィンドウ、または `--browser` でブラウザを使う。
+- VS Code 拡張・単独起動版はそのまま維持し、さらに開発スペース（AiDiy IDE、`aidiy_ide`）の部品としても動作する。Electron 版 IDE は「＋ Code」「＋ Live」で同じプロジェクト・利用モード・セッションの別ウィンドウを開き、Web 版は画面内タブで使う。同じ部品が3つの場所で動くことで、IDE 開発への応用を広げる。
 - Code / Live とも最後に手動選択したモデルを `~/.aidiy/aidiy_code_model.json` / `aidiy_live_model.json` に保存し、拡張と単独起動版で共用する。
 - Windows デスクトップ版 VS Code を主対象とし、VS Code 1.106 以降を前提とする。
 
-詳細は `frontend_vscode/AGENTS.md` を参照してください。
+詳細は `frontend_ide/host/AGENTS.md` を参照してください。
+
+## frontend_ide/viewer 概要
+
+`frontend_ide/viewer`（AiDiy IDE）は、AiDiy の**開発スペース**（宇宙をテーマにした IDE 開発環境）の中心となる画面で、作業フォルダを眺め、探し、中身を読むための開発用 UI です。目指すのは「ソースをほぼ触らない IDE」で、人は宇宙で全体を眺め、エクスプローラーで辿り、ビューアで読み、変更は部品として呼び出す Code / Live を通じて AI に任せます。
+
+- フォルダを銀河、ファイルを星・惑星として1階層ずつ表示する。
+- 左上のバーガーボタンで左側のエクスプローラーを開閉し、右側でコード・画像・フォルダ内容を表示する。
+- ビューアは読み取り専用。起点日時以降の更新を明滅・金色表示で可視化する。
+- Node.js と Canvas 2D、独自に導入する Monaco Editor で構成し、他サブシステムの依存物を共有しない。
+- 全体のセットアップ・起動・クリーンアップに組み込み済み。単独起動コマンドは `aidiy_ide`、ポートは固定せず自動割り当て。
+
+詳細は [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) を参照してください。
 
 ## 3D アバター概要
 
@@ -345,7 +360,12 @@ MCP の使い分けと設定は `_AIDIY/knowledge/backend_server,backend_tools,M
 - Task / Team: `backend_taskteam/AGENTS.md`
 - Web: `frontend_web/AGENTS.md`
 - Avatar: `frontend_avatar/AGENTS.md`
-- VS Code: `frontend_vscode/AGENTS.md`
+- VS Code: `frontend_ide/host/AGENTS.md`
 - Discord: `frontend_discord/AGENTS.md`
+- IDE: `frontend_ide/viewer/AGENTS.md`
 
 docs と実装が食い違う場合は、現行実装を確認したうえで「現行実装では」と明記します。
+
+## Vue共通画面
+
+現行のCode / Live / IDEの画面は `frontend_ide` のVue部品を使用します。VS Code拡張はCode / Liveのみ、単独実行は3種類です。エクスプローラーは `FileExplorer.vue` に集約し、選択と検索マークを宇宙表示へ通知します。既存の `frontend_ide/host` は拡張ホスト・Code/Hermes・Live音声基盤、`frontend_ide/viewer` はファイルAPI・Office表示資産を提供します。旧起動入口からもVue版へ進みます。詳細は `frontend_ide/AGENTS.md` と `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。

@@ -1,5 +1,14 @@
 @echo off
 chcp 65001 >nul
+rem -*- coding: utf-8 -*-
+rem 
+rem -------------------------------------------------------------------------
+rem COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+rem Licensed under "AiDiy 公開利用ライセンス v1.1".
+rem Commercial use requires prior written consent from all copyright holders.
+rem See LICENSE for full terms. Thank you for keeping the rules.
+rem https://github.com/monjyu1101/AiDiy2026
+rem -------------------------------------------------------------------------
 setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
@@ -64,7 +73,7 @@ if "%EXIT_CODE%"=="0" goto END
 ECHO.
 ECHO AiDiy Code failed to start. Exit code: %EXIT_CODE%
 ECHO Check the error shown above.
-ECHO If the command was not found, run the frontend_vscode setup in your AiDiy installation.
+ECHO If the command was not found, run the frontend_ide/host setup in your AiDiy installation.
 ECHO Browser mode: %~nx0 --browser
 pause
 endlocal & exit /b %EXIT_CODE%

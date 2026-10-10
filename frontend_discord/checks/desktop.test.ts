@@ -1,3 +1,15 @@
+/*!
+ * -*- coding: utf-8 -*-
+ *
+ * -------------------------------------------------------------------------
+ * COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026
+ * -------------------------------------------------------------------------
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -39,7 +51,7 @@ async function desktop(platform = 'win32', owned = true) {
     });
     constructor(options: any) { super(); if (!options.transparent) window = this; }
     setMenu() {} setPosition() {} setBounds() {} setMinimumSize() {} show() {} focus() {} restore() {} minimize() {}
-    // 初回演出（frontend_vscode/scripts/window-opening.cjs）の透明キャンバスと透明度。
+    // 初回演出（frontend_ide/host/scripts/window-opening.cjs）の透明キャンバスと透明度。
     showInactive() {} setOpacity() {} destroy() { this.destroyed = true; }
     getBounds() { return { x: 722, y: 8, width: 476, height: 414 }; }
     isDestroyed() { return this.destroyed; } isMinimized() { return false; } isVisible() { return !this.destroyed; }
@@ -57,9 +69,9 @@ async function desktop(platform = 'win32', owned = true) {
     clearTimeout(id: number) { timers.delete(id); },
     require(name: string) {
       if (name === 'node:path') return path;
-      if (name === '../../frontend_vscode/scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
+      if (name === '../../frontend_ide/host/scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
       // 3本共通のウィンドウ大きさ・初回演出は実物を使う。
-      if (name.startsWith('../../frontend_vscode/scripts/')) return createRequire(import.meta.url)(name);
+      if (name.startsWith('../../frontend_ide/host/scripts/')) return createRequire(import.meta.url)(name);
       if (name === 'node:url') return url;
       if (name === 'node:fs') return { writeFileSync(file: string, value: string) { files.set(file, JSON.parse(value)); } };
       if (name === 'node:child_process') return { fork: () => worker, spawn: (...args: any[]) => {
