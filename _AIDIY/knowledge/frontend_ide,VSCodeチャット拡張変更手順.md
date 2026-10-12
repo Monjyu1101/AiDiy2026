@@ -250,7 +250,7 @@ python -m unittest discover -s checks -p "test_*.py"
 - Windows の AiDiy `.cmd` をシェルなしで解決できる。
 - packet が開始、進捗、終了または中断、正式回答の順になる。
 - Code の両init前・切断中のHermes実行と検証0固定、オンライン／オフライン別のモデル保存・再起動後の復元、Hermes実行中の再接続と完了後のオンライン復帰、5秒間隔の再接続、自動接続OFFによる予約済み再試行の中止と新規・履歴復帰からの接続抑止、ONへの復帰と起動時ON、遅延イベント無視、モデルAPIのNG、破棄を確認する。接続済みで送信・停止・履歴復帰・CLI別モデル候補が動く。
-- VS Code 側で旧 `workspaceState` の単一会話を履歴へ移行でき、作業フォルダごとに履歴が分かれる。最終選択モデルが再起動後と新規会話へ引き継がれる。
+- VS Code 側で旧 `workspaceState` の単一会話・履歴を、作業フォルダの `_AIDIY/aidiy_code/histories/` へ移行でき、作業フォルダ（プロジェクト）ごとに履歴が分かれる。単独起動版を再起動しても同じプロジェクトの履歴が残る（`checks/conversation-store.test.cjs`、`checks/aidiy_code.test.cjs` の再起動確認）。最終選択モデルが再起動後と新規会話へ引き継がれる。
 - `dist/aidiy-code-<version>.vsix` と `dist/aidiy-live-<version>.vsix` が生成され、それぞれのファイルだけを含む。
 - Live のセッション・音声パケット・WebSocket 中継・モデル API・切断・Origin 拒否を模擬バックエンドで確認できる。VS Code / 単独画面の両方で会話表示と末尾追従が動き、単独画面では起動時のモデル指定で1回だけ自動接続する。拡張ではタブを切り替えても接続を保持し、非表示中はマイクを止める。
 

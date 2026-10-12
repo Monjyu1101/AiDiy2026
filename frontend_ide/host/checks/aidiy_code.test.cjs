@@ -13,13 +13,16 @@
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolve, join } = require('node:path');
-const { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { 単独起動: start } = require('../out/aidiy_code/server.cjs');
+const { 単独起動: startServer } = require('../out/aidiy_code/server.cjs');
 const { オフライン実行, オフラインモデル保存先, オフラインモデル候補, Hermes既定モデル } = require('../out/offline.cjs');
 const preferences = mkdtempSync(join(tmpdir(), 'aidiy-code-model-'));
 after(() => rmSync(preferences, { recursive: true, force: true }));
 let fileNumber = 0;
+// 会話履歴はテストごとの一時フォルダへ（作業フォルダの _AIDIY には書かない）
+let historyNumber = 0;
+const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => startServer(project, launch, initial, file, run, history);
 const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 test('Code: Hermes既定モデルを共通設定から読み、モデル候補はbatと同じ固定値に限定する', () => {
@@ -270,9 +273,11 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     calls.push({model:args[2],session:args[4]});
     return オフライン実行(...args,{実行ファイル:process.execPath,引数:[resolve('checks/fake-cli.cjs'),'echo']});
   };
-  const app = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run), stream = await connect(app);
+  const history = join(preferences, 'history-reopen');
+  const app = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run,history), stream = await connect(app);
+  let initial;
   try {
-    const initial = await stream.wait(p=>p.type==='state' && p.実行モード==='offline');
+    initial = await stream.wait(p=>p.type==='state' && p.実行モード==='offline');
     assert.equal(initial.provider,'aidiy_hermes'); assert.equal(initial.model,Hermes既定モデル(process.cwd()));
     assert.equal(backend.sockets.length,0); assert.equal(backend.requests.length,0);
     assert.deepEqual((await (await fetch(app.url+'catalog')).json()).providers.map(p=>p.id),['aidiy_hermes']);
@@ -310,10 +315,17 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     const restored = await stream.wait(p=>p.type==='state' && p.会話ID===initial.会話ID && p.セッションID==='test-session-001' && !p.実行中);
     assert.equal(restored.実行モード,'offline');
   } finally { await stream.close(); await app.close(); }
-  const reopened = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run), second = await connect(reopened);
+  const reopened = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run,history), second = await connect(reopened);
   try {
     const restored = await second.wait(p=>p.type==='state' && p.実行モード==='offline');
     assert.equal(restored.model,'openai_oauth/gpt-6.1-sol');
+    // 会話履歴はプロジェクトの保存先から読み直し、再起動後も選んで続けられる
+    assert.ok(restored.履歴.some(item=>item.id===initial.会話ID),'再起動後も会話履歴が残る');
+    await post(reopened,{type:'selectHistory',id:initial.会話ID});
+    await second.wait(p=>p.type==='state' && p.会話ID===initial.会話ID && p.セッションID==='test-session-001');
+    await post(reopened,{type:'deleteHistory',id:initial.会話ID});
+    await second.wait(p=>p.type==='state' && !p.履歴.some(item=>item.id===initial.会話ID));
+    assert.equal(readdirSync(history).includes(initial.会話ID+'.json'),false,'削除した会話のファイルを消す');
   } finally { await second.close(); await reopened.close(); }
 });
 

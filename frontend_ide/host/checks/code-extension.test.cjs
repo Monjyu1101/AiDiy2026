@@ -48,6 +48,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
         コード設定保存先:()=> 'options.json', 検証回数読込:file=>preferences.get(file)?.検証回数,
         検証回数保存:(count,file)=>{ if(![0,1,2,3].includes(count)) throw new Error('検証回数の指定が不正です。'); preferences.set(file,{検証回数:count}); return count; },
       };
+      if(name==='./conversation-store') return {会話保存先:()=>undefined,会話一覧:()=>[],会話書込(){},会話削除(){}};
       if(name==='./runner') return {起動解決:()=>({実行ファイル:'fake-hermes',引数:[]})};
       if(name==='../aidiy_code/src/offline') return {
         ...require('../out/offline.cjs'),Hermes既定モデル:()=> 'openai_oauth/gpt-6-astra',

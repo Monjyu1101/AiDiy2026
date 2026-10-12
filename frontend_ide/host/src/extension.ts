@@ -22,12 +22,28 @@ import { CodeConnection, コード選択 } from './code-connection';
 import { ローカル接続先 } from '../aidiy_live/local-backend.cjs';
 import type { Packet } from '../aidiy_live/src/protocol';
 import { streamControlOf, visibleStreamContent, type コードパケット } from './protocol';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除, type 保存履歴 } from './conversation-store';
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; コアセッションID?: string; HermesセッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
 interface 保存会話 extends 会話 { id: string; 更新日時: number; 初回依頼?: string }
 interface 会話履歴 { 現在ID: string; 一覧: 保存会話[] }
 interface 添付 { 名前: string; 本文: string }
+
+// 会話履歴はプロジェクトの _AIDIY/aidiy_code/histories/ に保存し、単独起動版・開発スペースとも共用する（共通形へ変換）。
+const 履歴へ = (item: 保存会話): 保存履歴 => ({
+  id: item.id, 更新日時: item.更新日時, 初回依頼: item.初回依頼, メッセージ: item.メッセージ, provider: item.provider, model: item.model,
+  モデル選択済み: item.モデル選択済み, 実行モード: 'online', セッションID: item.コアセッションID, HermesセッションID: item.HermesセッションID,
+});
+const 会話へ = (item: 保存履歴, 作業URI: string): 保存会話 => {
+  const offline = item.実行モード === 'offline';
+  return {
+    id: item.id, 更新日時: item.更新日時, 初回依頼: item.初回依頼, 作業URI, provider: item.provider, model: item.model, モデル選択済み: item.モデル選択済み,
+    メッセージ: item.メッセージ.filter(message => ['user', 'assistant', 'error'].includes(message.種別)) as メッセージ[],
+    // 単独起動版のオフライン会話は Hermes のセッションとして続ける（AIコアのセッションには渡さない）
+    コアセッションID: offline ? undefined : item.セッションID, HermesセッションID: item.HermesセッションID ?? (offline ? item.セッションID : undefined),
+  };
+};
 
 class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposable {
   private view?: vscode.WebviewView;
@@ -41,6 +57,10 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 破棄済み = false;
   private 会話ID: string = randomUUID();
   private 履歴: 保存会話[] = [];
+  /** 旧版が workspaceState に残した履歴のうち、今開いていないフォルダの分（開いた時に移す）。 */
+  private 旧履歴: 保存会話[] = [];
+  private readonly 書込待ち = new Map<string, 保存会話>();
+  private 書込タイマー?: ReturnType<typeof setTimeout>;
   private 最終モデル: { provider: string; model: string };
   private オフラインモデル: { provider: string; model: string };
   private readonly オフライン保存先 = オフラインモデル保存先(モデル保存先('code'));
@@ -66,7 +86,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.検証回数 = 検証回数読込(this.設定保存先) ?? 0;
     const old = context.workspaceState.get<会話>('会話');
     const saved = context.workspaceState.get<会話履歴>('会話履歴');
-    this.履歴 = Array.isArray(saved?.一覧) ? saved.一覧.filter(item => typeof item?.id === 'string' && Array.isArray(item.メッセージ) && typeof item.作業URI === 'string') : [];
+    this.旧履歴 = Array.isArray(saved?.一覧) ? saved.一覧.filter(item => typeof item?.id === 'string' && Array.isArray(item.メッセージ) && typeof item.作業URI === 'string') : [];
+    this.履歴読込();
     const selected = this.履歴.find(item => item.id === saved?.現在ID);
     this.最終モデル = コードモデル読込() ?? context.globalState.get<{ provider: string; model: string }>('最終モデル')
       ?? (selected?.モデル選択済み ? { provider: selected.provider, model: selected.model }
@@ -90,7 +111,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     作業更新(vscode.window.activeTextEditor);
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(作業更新),
-      vscode.workspace.onDidChangeWorkspaceFolders(() => { this.接続更新(); this.通知(); })
+      vscode.workspace.onDidChangeWorkspaceFolders(() => { this.書込実行(); this.履歴読込(); this.接続更新(); this.通知(); })
     );
   }
 
@@ -140,6 +161,36 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 題名(item: 会話): string {
     return ('初回依頼' in item && typeof item.初回依頼 === 'string' ? item.初回依頼 : item.メッセージ.find(message => message.種別 === 'user')?.本文)?.replace(/\s+/g, ' ').slice(0, 160) || '新しい会話';
   }
+  private フォルダパス(作業URI: string): string | undefined {
+    return this.フォルダ一覧().find(item => item.uri.toString() === 作業URI)?.uri.fsPath;
+  }
+  /** 開いているフォルダごとに _AIDIY/aidiy_code/histories/ から読む。旧版の workspaceState の履歴は、そのフォルダへ移す。 */
+  private 履歴読込(): void {
+    const 一覧: 保存会話[] = [];
+    for (const folder of this.フォルダ一覧()) {
+      const uri = folder.uri.toString();
+      try {
+        const list = 会話一覧(会話保存先(folder.uri.fsPath));
+        const ids = new Set(list.map(item => item.id));
+        for (const item of this.旧履歴.filter(entry => entry.作業URI === uri && !ids.has(entry.id))) {
+          会話書込(会話保存先(folder.uri.fsPath, true)!, 履歴へ(item)); list.push(履歴へ(item)); ids.add(item.id);
+        }
+        this.旧履歴 = this.旧履歴.filter(entry => entry.作業URI !== uri);
+        一覧.push(...list.map(item => 会話へ(item, uri)));
+      } catch (error) { this.ログ.appendLine(`会話履歴を読み込めません (${folder.name}): ${String(error)}`); }
+    }
+    this.履歴 = 一覧;
+  }
+  /** 応答の途中経過ごとに書かないよう、まとめてプロジェクトへ書き込む。 */
+  private 書込実行(): void {
+    clearTimeout(this.書込タイマー); this.書込タイマー = undefined;
+    for (const entry of this.書込待ち.values()) {
+      const path = this.フォルダパス(entry.作業URI);
+      if (!path) continue;
+      try { 会話書込(会話保存先(path, true)!, 履歴へ(entry)); } catch (error) { this.ログ.appendLine(`会話を保存できません: ${String(error)}`); }
+    }
+    this.書込待ち.clear();
+  }
   private 保存(更新日時を変更 = true): void {
     // 大量の会話による workspaceState 肥大化を防ぐ。AIコアの履歴はコアセッションIDで継続する。
     let サイズ = 0;
@@ -150,8 +201,11 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         初回依頼: previous?.初回依頼 ?? this.会話.メッセージ.find(item => item.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 160),
         更新日時: 更新日時を変更 ? Date.now() : previous?.更新日時 ?? Date.now() })) as 保存会話;
       this.履歴 = [snapshot, ...this.履歴.filter(item => item.id !== this.会話ID)];
+      this.書込待ち.set(snapshot.id, snapshot);
+      this.書込タイマー ??= setTimeout(() => this.書込実行(), 500);
     }
-    const snapshot: 会話履歴 = { 現在ID: this.会話ID, 一覧: this.履歴 };
+    // workspaceState には今の会話IDと、まだ移していない旧版の履歴だけを残す
+    const snapshot: 会話履歴 = { 現在ID: this.会話ID, 一覧: this.旧履歴 };
     this.保存待ち = this.保存待ち.then(() => this.context.workspaceState.update('会話履歴', snapshot)).then(undefined, error => {
       this.ログ.appendLine(`会話を保存できません: ${String(error)}`);
     });
@@ -378,6 +432,9 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     const entry = this.履歴.find(item => item.id === id && item.作業URI === this.現在フォルダ()?.uri.toString());
     if (!entry) return;
     this.履歴 = this.履歴.filter(item => item.id !== id);
+    this.書込待ち.delete(id);
+    try { const path = this.フォルダパス(entry.作業URI); if (path) 会話削除(会話保存先(path), id); }
+    catch (error) { this.ログ.appendLine(`会話を削除できません: ${String(error)}`); }
     if (this.会話ID === id) {
       this.会話 = { メッセージ: [], 作業URI: entry.作業URI, ...this.最終モデル, モデル選択済み: true };
       this.会話ID = randomUUID(); this.添付 = undefined; this.進捗 = []; this.接続更新(true);
@@ -402,6 +459,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   }
   ログ表示(): void { this.ログ.show(true); }
   dispose(): void {
+    this.書込実行();
     this.破棄済み = true;
     if (this.オフラインジョブ) this.オフラインジョブ.停止();
     else if (this.実行中) this.connection?.send({ メッセージ識別: 'cancel_run' });

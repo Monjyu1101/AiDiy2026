@@ -35,10 +35,11 @@ export function spacePosition(name, { scale = 1500, identity = name } = {}) {
   };
 }
 
-/** 縦横とも360度回転できる。極で止めず、ドラッグの連続性を保つ。 */
+/** 縦横とも360度回転できる。極で止めず、ドラッグの連続性を保つ。
+ *  上下左右とも宇宙をつかんで動かす向き（ドラッグした方向へ手前の星が動く）。 */
 export function orbitView(view, dx, dy) {
-  view.yaw -= dx * 0.005;
-  view.pitch += dy * 0.005;
+  view.yaw += dx * 0.005;
+  view.pitch -= dy * 0.005;
 }
 
 /** 現在の画面の右・上ベクトルに沿う移動。上下反転した視点でも同じ操作感。 */

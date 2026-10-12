@@ -65,24 +65,22 @@ app.on('browser-window-created',(_event,ide)=>{
    for(const url of urls)await until(async()=>{try{await fetch(url);return false;}catch{return true;}});
    await sleep(800);
    writeFileSync(join(__dirname,'../../nn-ide-session-ended.png'),(await ide.webContents.capturePage()).toPNG());
-   // 起動画面の×も確認し、キャンセル後に再び利用できる。
-   await evaluate(ide,`document.querySelector('.window-actions button[aria-label="終了"]').click()`);
-   await until(()=>!!confirmation);assert.equal(confirmation.window,ide);
-   confirmation.resolve({response:1});confirmation=undefined;await sleep(100);
-   assert.equal(ide.isDestroyed(),false);
+   // 起動画面から再び利用できる。利用中の×は確認し、キャンセルで作業を保つ（二重表示しない）。
    await evaluate(ide,`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='AiDiy接続利用').click()`);
    await until(async()=>(await state()).connected);assert.notEqual((await state()).startedAt,startedAt);
    for(const type of ['code','live'])assert.equal((await evaluate(ide,`window.aidiyWindow.openApp('${type}')`)).ok,true);
    const reopened=BrowserWindow.getAllWindows().filter(window=>window!==ide&&window.webContents.getURL().startsWith('http://127.0.0.1:'));
    assert.equal(reopened.length,2);urls.push(...reopened.map(window=>window.webContents.getURL()));
    await evaluate(ide,`document.querySelector('.window-actions button[aria-label="終了"]').click()`);
-   await until(()=>!!confirmation);ide.close();assert.equal(confirmationCount,2,'確認ダイアログを重複表示しない');
+   await until(()=>!!confirmation);assert.equal(confirmation.window,ide);ide.close();await sleep(300);assert.equal(confirmationCount,1,'確認ダイアログを重複表示しない');
    confirmation.resolve({response:1});confirmation=undefined;await sleep(100);
    assert.ok(reopened.every(window=>!window.isDestroyed()));assert.equal((await state()).active,true);
-   ide.once('closed',()=>{try{assert.ok(reopened.every(window=>window.isDestroyed()));process.send({testPassed:true,urls});}catch(error){console.error(error);app.exit(1);}});
-   ide.close();await until(()=>!!confirmation);assert.equal(confirmationCount,3);
-   console.log('IDE EXIT PASS: 終了で起動画面へ復帰、再利用、×の取消・承認・重複防止');
-   confirmation.resolve({response:0});
+   // 「終了」で起動画面へ戻った後の×は、確認なしで閉じる。
+   await evaluate(ide,`document.querySelector('.component-toolbar nav button').click()`);
+   await until(async()=>!(await state()).active&&reopened.every(window=>window.isDestroyed()));
+   ide.once('closed',()=>{try{assert.equal(confirmationCount,1,'起動画面の×は確認しない');process.send({testPassed:true,urls});}catch(error){console.error(error);app.exit(1);}});
+   await evaluate(ide,`document.querySelector('.window-actions button[aria-label="終了"]').click()`);
+   console.log('IDE EXIT PASS: 終了で起動画面へ復帰、再利用、利用中の×の取消・重複防止、起動画面の×は確認なしで終了');
   }catch(error){console.error(error);app.exit(1);}
  });
 });

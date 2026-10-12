@@ -10,15 +10,24 @@ import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { basename,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createAISearch } from './ai-search.mjs';
+import { createFileAnalysis } from './file-analysis.mjs';
+import { createFileHistory } from './file-history.mjs';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
-export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,autoConnect=false,env=process.env,connection}={}){
+export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){
  if(!['code','live','ide'].includes(kind))throw Error('アプリはcode / live / ideから指定してください。');
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
  connection??=kind==='ide'?createCoreConnection(project):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
  const files={'/':['index.html','text/html; charset=utf-8'],'/development/app.js':['app.js','text/javascript; charset=utf-8'],'/development/app.css':['app.css','text/css; charset=utf-8'],'/development/AiDiy.png':['AiDiy.png','image/png'],'/development/sending.png':['sending.png','image/png'],'/development/abort.png':['abort.png','image/png'],'/development/speaker.png':['speaker.png','image/png'],'/development/microphone.png':['microphone.png','image/png'],'/development/THIRD_PARTY_NOTICES.txt':['THIRD_PARTY_NOTICES.txt','text/plain; charset=utf-8'],'/development/LICENSE':['LICENSE','text/plain; charset=utf-8']};
- return startServer(project,port,{strict,env,connection,
+ const aiSearch=createAISearch(project,{...aiSearchOptions,state:connection.state});
+ const fileAnalysis=createFileAnalysis(project,{...fileAnalysisOptions,state:connection.state});
+ const fileHistory=createFileHistory(project,{state:connection.state});
+ const app=await startServer(project,port,{strict,env,connection,
   requestHandler:async(req,res,url)=>{
+   if(kind==='ide'&&await aiSearch.handle(req,res,url))return true;
+   if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;
+   if(kind==='ide'&&await fileHistory.handle(req,res,url))return true;
    if(url.pathname==='/development/config'){
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,icon:'/development/AiDiy.png'}));return true;
    }
@@ -36,4 +45,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
    return bundle.ライブ起動(vscodeRoot,backend,false,folder,settings,undefined,autoConnect);
   })
  });
+ app.server.once('close',()=>{aiSearch.close();fileAnalysis.close();});
+ const close=app.close;app.close=async()=>{aiSearch.close();fileAnalysis.close();await close();};
+ return app;
 }

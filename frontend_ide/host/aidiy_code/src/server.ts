@@ -19,11 +19,12 @@ import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
 import { 接続元許可 } from '../../src/forwarded-origin';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除 } from '../../src/conversation-store';
 import { オフライン実行, オフラインモデル候補, オフラインモデル保存先, Hermes既定モデル } from './offline';
 import type { Packet } from '../../aidiy_live/src/protocol';
 
 // 単独画面と拡張で AIコア接続・メッセージ形式・描画を共用する。
-export async function 単独起動(project: string, backend?: string, initialModel: { provider?: string; model?: string; offline?: boolean; lockedMode?: boolean; keepAlive?: boolean } = {}, modelFile = モデル保存先('code'), runOffline = オフライン実行) {
+export async function 単独起動(project: string, backend?: string, initialModel: { provider?: string; model?: string; offline?: boolean; lockedMode?: boolean; keepAlive?: boolean } = {}, modelFile = モデル保存先('code'), runOffline = オフライン実行, historyFolder?: string) {
   const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
@@ -63,7 +64,23 @@ export async function 単独起動(project: string, backend?: string, initialMod
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
   };
   type 保存会話 = { id: string; メッセージ: typeof state.メッセージ; セッションID?: string; HermesセッションID?: string; 実行モード: 'online' | 'offline'; provider: string; model: string; 更新日時: number; 初回依頼?: string };
-  let history: 保存会話[] = [];
+  // 会話履歴はプロジェクトの _AIDIY/aidiy_code/histories/ に保存し、次回の起動や VS Code 拡張とも共用する
+  const 履歴フォルダ = (create = false) => historyFolder ?? 会話保存先(folder, create);
+  let history: 保存会話[] = 会話一覧(履歴フォルダ()).map(item => ({ ...item, 実行モード: item.実行モード ?? 'online' }));
+  const 履歴表示 = () => [...history].sort((a, b) => b.更新日時 - a.更新日時)
+    .map(item => ({ id: item.id, 題名: `${item.実行モード === 'offline' ? '[オフライン] ' : ''}${item.初回依頼 || '新しい会話'}`, 更新日時: item.更新日時 }));
+  state.履歴 = 履歴表示();
+  // 応答の途中経過ごとに書かないよう、まとめて書き込む（終了時は残りを書き出す）
+  const 書込待ち = new Map<string, 保存会話>();
+  let 書込タイマー: NodeJS.Timeout | undefined;
+  const 書込実行 = () => {
+    clearTimeout(書込タイマー); 書込タイマー = undefined;
+    for (const entry of 書込待ち.values()) {
+      try { 会話書込(履歴フォルダ(true)!, entry); } catch (error) { console.error(`会話を保存できません: ${String(error)}`); }
+    }
+    書込待ち.clear();
+  };
+  const 書込予約 = (entry: 保存会話) => { 書込待ち.set(entry.id, entry); 書込タイマー ??= setTimeout(書込実行, 500); };
   let offlineJob: ReturnType<typeof オフライン実行> | undefined;
   const clients = new Set<ServerResponse>();
   let 接続開始済み = false;
@@ -88,8 +105,8 @@ export async function 単独起動(project: string, backend?: string, initialMod
       実行モード: state.実行モード, provider: state.provider, model: state.model, 更新日時: 更新日時を変更 ? Date.now() : previous?.更新日時 ?? Date.now(),
       初回依頼: previous?.初回依頼 ?? state.メッセージ.find(message => message.種別 === 'user')?.本文.replace(/\s+/g, ' ').slice(0, 160) };
     history = [entry, ...history.filter(item => item.id !== entry.id)];
-    state.履歴 = [...history].sort((a, b) => b.更新日時 - a.更新日時)
-      .map(item => ({ id: item.id, 題名: `${item.実行モード === 'offline' ? '[オフライン] ' : ''}${item.初回依頼 || '新しい会話'}`, 更新日時: item.更新日時 }));
+    state.履歴 = 履歴表示();
+    書込予約(entry);
   };
   const trimHistory = () => {
     let size = 0;
@@ -271,6 +288,8 @@ export async function 単独起動(project: string, backend?: string, initialMod
           if (!entry) { reply(404, {error:'会話がありません。'}); return; }
           history = history.filter(item => item.id !== data.id);
           state.履歴 = state.履歴.filter(item => item.id !== data.id);
+          書込待ち.delete(data.id);
+          try { 会話削除(履歴フォルダ(), data.id); } catch (error) { console.error(`会話を削除できません: ${String(error)}`); }
           if (state.会話ID === data.id) {
             newConversation();
           }
@@ -314,6 +333,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
   });
   async function close() {
     if (closed) return; closed = true;
+    書込実行();
     clearTimeout(idle);
     if (offlineJob) { offlineJob.停止(); await offlineJob.完了.catch(() => {}); }
     if (state.実行モード === 'online' && state.実行中) connection.send({ メッセージ識別: 'cancel_run' });

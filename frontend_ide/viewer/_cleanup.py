@@ -25,7 +25,7 @@ import sys
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 # 全体処理で他フォルダの同名 launcher がキャッシュされても取り違えない。
-_launcher_spec = importlib.util.spec_from_file_location('aidiy_frontend_dev_launcher', THIS_DIR / 'launcher.py')
+_launcher_spec = importlib.util.spec_from_file_location('aidiy_frontend_ide_viewer_launcher', THIS_DIR / 'launcher.py')
 _launcher = importlib.util.module_from_spec(_launcher_spec)
 _launcher_spec.loader.exec_module(_launcher)
 remove_launcher = _launcher.remove_launcher
@@ -67,7 +67,7 @@ def print_info(message):
 
 
 def _load_start_module():
-    spec = importlib.util.spec_from_file_location('aidiy_frontend_dev_start_for_cleanup', THIS_DIR / '_start.py')
+    spec = importlib.util.spec_from_file_location('aidiy_frontend_ide_viewer_start_for_cleanup', THIS_DIR / '_start.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

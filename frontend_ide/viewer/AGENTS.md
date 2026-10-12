@@ -67,7 +67,9 @@
 | `core-connection.mjs` / `web/connection.js` / `web/connection.css` | 配置先の `PORT_CORE` 解決、手動開始・コア稼働確認、初期画面と接続／オフラインの状態バー |
 | `panels.mjs` / `web/panels.js` / `web/panels.css` | Code / Live の遅延起動・同一公開元中継・右上タブパネル。オフライン時はCodeだけ。エクスプローラーより背面に表示 |
 | `panel-permissions.cjs` | Electronのマイク許可を同一公開元のLive子フレーム・音声入力だけへ限定 |
-| `server.mjs` | `127.0.0.1` だけで待ち受け。ツリー（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`・`/api/document`）、Monaco（`/monaco/`）・文書表示資産（`/office-vendor/`）、`web/` を配信 |
+| `server.mjs` | `127.0.0.1` だけで待ち受け。ツリー（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`・`/api/document`）、表示の準備（`/api/preview`）、Monaco（`/monaco/`）・文書表示資産（`/office-vendor/`）、`web/` を配信 |
+| `preview.mjs` | HTML の「表示」用の別オリジン静的サーバー。最初の要求で起動し、`server.mjs` の close で停止。ファイルは書き出さない |
+| `vue-preview.mjs` | `.vue` の「表示」。`frontend_web` の Vite 開発サーバーが起動中の時だけ、その部品を使う画面（ルート）を返す |
 | `web/index.html` / `web/style.css` | 画面の骨組みとパネル類 |
 | `web/app.js` | 宇宙の組み立て・描画・操作 |
 | `web/layout.js` | 名前のハッシュによる球内の固定3D配置・基準視点・回転と平行移動 |
@@ -81,6 +83,8 @@
 - `IGNORED`（`node_modules` / `.git` / `dist` / `out` / `build` / `__pycache__` / `.venv` / `venv` / `_cache` など）は走査しない。上限 30000 ファイルで打ち切り、`truncated` を返す。
 - 単独起動・全体起動ともポートは固定せず、OS が空きポートを自動割り当てする。明示的な `--port` 指定時だけその番号を優先し、`--strict-port` 併用時は競合で失敗する。
 - 接続状態は当該 IDE サーバーの画面間で共有する。コア確認は Live のモデル情報取得APIを使い、IDE 自体ではAI会話・音声セッションを生成しない。接続先・画面・確認方法は README の「AiDiyへの接続」を参照する。
+- `/api/preview?path=` は「表示」の準備。`.html` は `preview.mjs` の URL を返す。静的サーバーは IDE と別ポート（別オリジン）で、URL に起動ごとの token を含め、Host を `127.0.0.1` / `localhost` に限る。HTML には `CSP: sandbox allow-scripts …` を付け、画面側の iframe も `allow-same-origin` なしの sandbox にして、ページのスクリプトを IDE のファイル API から隔離する。`_config`・隠しファイル（`.` 始まり）・鍵らしいファイル・`node_modules`・`.venv`・`backup` は配らない。`/…` 始まりの参照は Referer のページの `public` を根に解決し、Range に対応する。
+- `.vue` の「表示」は **AiDiy の `frontend_web/src` の .vue だけ、かつ `frontend_web` の Vite 開発サーバー（`vite.config.ts` の `PORT_WEB`、既定 8090）が起動中の時だけ**。`frontend_web/src/router/` のルート定義（`path` と `component`。日本語の識別子にも対応）と import の関係をたどり、その部品を使う画面の URL を返す。HTTP で見に行くだけで、`frontend_web` の `node_modules` は借りない。他プロジェクト・他フォルダの .vue は理由を表示する。
 - `/api/file?path=` はテキスト（先頭 1MB、UTF-8 → Shift_JIS の順に判定）・画像・Office文書・バイナリを判定して返す。`/api/raw` は画像だけを生で返す（SVG は CSP でスクリプトを止める）。`/api/document` は対応するOffice文書・PDFだけを最大50MBまで返す。
 - 安全策: 相対パスは `realpath` で解決し、作業フォルダの外（`..`・別ドライブ・リンク先）は 404。Host / Origin は localhost と、Codespaces 環境変数から特定した当該転送先だけを許可し、cross-site 要求を拒否する。
 

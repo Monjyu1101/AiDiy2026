@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { forwardedOrigin } from './launch-options.mjs';
 import { createCoreConnection } from './core-connection.mjs';
 import { createPanels } from './panels.mjs';
+import { createPreview } from './preview.mjs';
+import { vuePreview } from './vue-preview.mjs';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
 // ファイルビューア用の Monaco Editor（`python frontend_ide/viewer/_setup.py` で導入。無ければ画面側が簡易表示にする）
@@ -79,8 +81,30 @@ const IMAGES = {
   '.webp': 'image/webp', '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml',
 };
 
-/** フォルダを再帰的に走査する。フォルダは {n, d:[子フォルダ], f:[[名前, サイズ, 更新ms]]}。 */
-export async function scanTree(root) {
+// AiDiy のバックアップ対象（エクスプローラーのフィルター用）。
+// ルールの元は backend_server/AIコア/AIバックアップ.py の _全ファイルスキャン。独立性のため Python は呼ばず、同じルールをここに持つ。
+// 元を変えたらここも合わせる。
+const BACKUP_EXCLUDED_DIRS = new Set([
+  '__pycache__', '.git', '.venv', 'venv', '_data', 'temp', 'log', 'logs', 'backup', 'node_modules', 'dist', 'build',
+  '.output', '.nuxt', '.next', '.vite', '.turbo', '.cache', '.npm', '.pnpm-store', '.yarn',
+]);
+const BACKUP_EXCLUDED_FILES = new Set([
+  '.DS_Store', 'Thumbs.db', 'package-lock.json', 'package.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'npm-shrinkwrap.json',
+]);
+const BACKUP_EXCLUDED_EXTENSIONS = ['.pyc', '.pyo', '.pyd', '.log', '.tmp', '.swp'];
+const WINDOWS_RESERVED = new Set(['con', 'prn', 'aux', 'nul', 'null',
+  ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`), ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`)]);
+const MAX_BACKUP_FILES = 50000;   // バックアップがキャンセルする件数と同じ
+const backupDirAllowed = name => !BACKUP_EXCLUDED_DIRS.has(name) && !name.startsWith('.');
+const backupFileAllowed = name => !BACKUP_EXCLUDED_FILES.has(name)
+  && !BACKUP_EXCLUDED_EXTENSIONS.some(ext => name.endsWith(ext))
+  && !WINDOWS_RESERVED.has((name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name).toLowerCase());
+
+/** フォルダを再帰的に走査する。フォルダは {n, d:[子フォルダ], f:[[名前, サイズ, 更新ms]]}。
+ *  filter: 'backup' なら AiDiy のバックアップ対象だけ（エクスプローラーのフィルター）。 */
+export async function scanTree(root, { filter } = {}) {
+  const backup = filter === 'backup';
+  const limit = backup ? MAX_BACKUP_FILES : MAX_FILES;
   let count = 0, truncated = false;
   async function walk(dir, name) {
     const node = { n: name, d: [], f: [] };
@@ -88,12 +112,13 @@ export async function scanTree(root) {
     try { entries = await readdir(dir, { withFileTypes: true }); } catch { return node; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (count >= MAX_FILES) { truncated = true; break; }
+      if (count >= limit) { truncated = true; break; }
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (IGNORED.has(entry.name)) continue;
+        if (backup ? !backupDirAllowed(entry.name) : IGNORED.has(entry.name)) continue;
         node.d.push(await walk(full, entry.name));
       } else if (entry.isFile()) {
+        if (backup && !backupFileAllowed(entry.name)) continue;
         try {
           const info = await stat(full);
           node.f.push([entry.name, info.size, Math.round(info.mtimeMs)]);
@@ -143,7 +168,8 @@ async function describeFile(root, rel) {
   const info = await stat(full);
   if (!info.isFile()) return null;
   const image = IMAGES[extname(full).toLowerCase()];
-  if (image) return { kind: 'image', size: info.size, tooLarge: info.size > MAX_IMAGE };
+  // SVGは画像埋込では外部画像を参照できないため、コードと文書プレビューを提供する。
+  if (image && extname(full).toLowerCase() !== '.svg') return { kind: 'image', size: info.size, tooLarge: info.size > MAX_IMAGE };
   const format = DOCUMENTS[extname(full).toLowerCase()];
   if (format) return { kind: 'office', format, size: info.size, tooLarge: info.size > MAX_DOCUMENT };
   const head = await readHead(full, Math.min(info.size, MAX_TEXT));
@@ -209,6 +235,8 @@ export async function startServer(root, port = 0, { strict = false, env = proces
   let allowedHosts = new Set();
   let allowedOrigins = new Set();
   const panels = panelsFactory(root, connection.state);
+  // HTML プレビュー用の別オリジン静的サーバー。最初のプレビュー要求で起動し、このサーバーを閉じる時に止める。
+  const preview = createPreview(root, () => connection.state().active);
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     const fail = (status, message) => { res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' }); res.end(message); };
@@ -258,8 +286,33 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (!connection.state().active) return fail(503, '利用が終了しました。');
         return json(result);
       }
+      // ビューアの「表示」: HTML/SVG は別オリジンの静的プレビュー、.vue は frontend_web の開発サーバーの画面
+      if (url.pathname === '/api/preview') {
+        const path = url.searchParams.get('path') || '';
+        if (/\.(html?|svg)$/i.test(path)) {
+          const kind = /\.svg$/i.test(path) ? 'svg' : 'html';
+          const address = await insideRoot(root, path) ? await preview.url(path) : null;
+          return address ? json({ kind, url: address }) : json({ kind, error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
+        }
+        if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));
+        return fail(404, 'not found');
+      }
+      // エクスプローラー最下部の「最終更新」用。一覧全体は返さず、一番新しく更新されたファイルだけを返す（1分ごとに呼ばれる）。
+      if (url.pathname === '/api/latest') {
+        const filter = url.searchParams.get('filter');
+        if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
+        const { tree } = await scanTree(root, { filter });
+        let latest = null;
+        (function walk(node, prefix) {
+          for (const [name, , mtime] of node.f) if (!latest || mtime > latest.mtime) latest = { name, path: prefix ? `${prefix}/${name}` : name, mtime };
+          for (const dir of node.d) walk(dir, prefix ? `${prefix}/${dir.n}` : dir.n);
+        })(tree, '');
+        return json({ latest });
+      }
       if (url.pathname === '/api/galaxy') {
-        const body = JSON.stringify(await scanTree(root));
+        const filter = url.searchParams.get('filter');
+        if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
+        const body = JSON.stringify(await scanTree(root, { filter }));
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         res.end(body);
         return;
@@ -337,13 +390,13 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         || req.headers['sec-fetch-site'] === 'cross-site') { socket.destroy(); return; }
     void panels.upgrade(req, socket, head).catch(() => socket.destroy());
   });
-  server.once('close', () => { connection.close(); void panels.close(); });
+  server.once('close', () => { connection.close(); void panels.close(); void preview.close(); });
   const listen = p => new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(p, '127.0.0.1', () => { server.off('error', reject); resolve(); });
   });
   try { await listen(port); } catch (error) {
-    if (error.code !== 'EADDRINUSE' || strict) { await panels.close(); connection.close(); throw error; }
+    if (error.code !== 'EADDRINUSE' || strict) { await panels.close(); await preview.close(); connection.close(); throw error; }
     await listen(0);
   }
   const actual = server.address().port;
@@ -355,6 +408,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
     connection.close();
     // upgrade済みの音声ソケットはcloseAllConnectionsでは閉じないため先に破棄する。
     await panels.close();
+    await preview.close();
     server.closeAllConnections();
     await new Promise(done => server.close(done));
   }

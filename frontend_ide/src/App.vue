@@ -4,13 +4,23 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, provide, onMounted, onBeforeUnmount } from 'vue';
 import CodePanel from './components/CodePanel.vue';
 import LivePanel from './components/LivePanel.vue';
 import SpaceView from './components/SpaceView.vue';
 import StatusBar from './components/StatusBar.vue';
 import TerminalWelcome from './components/TerminalWelcome.vue';
+import ViewerWindow from './components/ViewerWindow.vue';
+import FileAnalysisDialog from './components/FileAnalysisDialog.vue';
+import FileHistoryDialog from './components/FileHistoryDialog.vue';
+const analysis=ref(null);
+const history=ref(null);
+provide('openFileHistory',(file,root)=>{history.value={file:{path:file.path,name:file.name},root};});
+// ビューアの3分消去やファイル切替から独立して、解析対象を保持する。
+provide('openFileAnalysis',(file,root)=>{analysis.value={file:{path:file.path,name:file.name},root};});
 const { config }=defineProps({config:Object});
+// IDEのピン留めで開いた独立ウィンドウ（URLの #viewer=ファイル）。IDE本体の画面・接続監視は動かさない。
+const viewerPath=config.kind==='ide'&&location.hash.startsWith('#viewer=')?decodeURIComponent(location.hash.slice('#viewer='.length)):'';
 const state=ref({active:false}),base=reactive({code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false);
 const desktop=!!window.aidiyWindow;let timer,disposed=false,revision=0,polling=false,session='';
@@ -22,7 +32,7 @@ async function status(){
 function update(data){
   if(disposed)return;
   const next=data.active?`${data.mode}:${data.startedAt}`:'';
-  if(next!==session){for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';panelOpen.value=false;tab.value='code';liveOpen.value=false;}
+  if(next!==session){analysis.value=null;history.value=null;for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';panelOpen.value=false;tab.value='code';liveOpen.value=false;}
   state.value=data;error.value=data.message||'';
 }
 async function start(action){
@@ -50,14 +60,17 @@ async function openPanel(kind){
   }catch(e){error.value=e.message;}finally{if(own===session)delete opening[kind];}
 }
 onMounted(async()=>{
-  if(config.host)return;
+  if(config.host||viewerPath)return;
   if(config.kind==='ide'){await status();timer=setInterval(status,1000);}
   else if(!base[config.kind])await openPanel(config.kind);
 });
 onBeforeUnmount(()=>{disposed=true;revision++;clearInterval(timer);});
 </script>
 <template>
-  <div class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop}]" :data-app="config.kind">
+  <FileAnalysisDialog v-if="analysis" :key="analysis.root+'|'+analysis.file.path" :file="analysis.file" :root="analysis.root" @close="analysis=null" />
+  <FileHistoryDialog v-if="history" :key="history.root+'|'+history.file.path" :file="history.file" :root="history.root" @close="history=null" />
+  <ViewerWindow v-if="viewerPath" :path="viewerPath" :desktop="desktop" />
+  <div v-else class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop}]" :data-app="config.kind">
     <template v-if="config.kind==='ide'">
       <div class="ide-heading"><StatusBar title="AiDiy IDE" :connected="state.connected" :mode="state.mode" :busy="state.connecting||pending" :desktop="desktop" clock-pulse />
         <div class="component-toolbar"><span :title="state.project?.path">プロジェクト: {{ state.project?.name }}</span><nav><template v-if="!state.active"><button :disabled="pending" @click="start('connect')">AiDiy接続利用</button><button :disabled="pending" @click="start('offline')">オフライン利用</button></template><button v-else :disabled="pending" @click="start('disconnect')">{{ desktop?'終了':'利用終了' }}</button></nav></div>

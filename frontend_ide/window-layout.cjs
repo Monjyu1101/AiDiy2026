@@ -10,6 +10,12 @@ function windowBounds(kind,area,owner,slot=0){
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
  const base=owner||available;
+ // ピン留めのビューア: IDEの右寄り、高さは作業領域の8割程度。2枚目以降は28pxずつ左下へずらす。
+ if(kind==='viewer'){
+  const width=Math.min(680,available.width),height=Math.min(Math.max(560,Math.round(available.height*.8)),available.height),offset=(slot%6)*28;
+  const x=base.x+base.width-width-24-offset,y=base.y+(owner?36:0)+offset;
+  return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
+ }
  const inset=owner?24:0;
  const width=Math.min(size.幅,available.width);
  const height=Math.min(size.会話高さ,available.height);

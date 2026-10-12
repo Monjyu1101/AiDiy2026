@@ -14,8 +14,17 @@
 // 銀河をダブルクリックすると、そのフォルダを新しい宇宙として突入する。
 // 依存なしの Canvas 2D。名前のハッシュから3D座標を作り、透視投影して描く。
 
-import { spacePosition, WORLD_RADIUS, HOME_VIEW, orbitView, panOffset, warpMotion } from '../../viewer/web/layout.js';
+import { spacePosition, WORLD_RADIUS, HOME_VIEW, warpMotion } from '../../viewer/web/layout.js';
 import { createAutoOrbit } from './auto-orbit.js';
+import { turnToTarget, cameraPosition, orbitAround, interpolateCamera, cockpitLook } from './warp-camera.js';
+import { aiRouteTargets } from './ai-route.js';
+
+// メディアは従来サイズ。その他は20KB以下で半分、100KB以上で3倍にする。
+export function fileSizeScale(name, size) {
+  if (/\.(png|jpe?g|gif|svg|ico|webp|bmp|avif|heic|heif|tiff?|apng|psd|mp3|wav|ogg|oga|opus|flac|aac|m4a|aiff?|mid|midi|mp4|m4v|webm|mov|avi|mkv|wmv|mpeg|mpg|vrm|vrma|glb|gltf|fbx|obj|stl)$/i.test(name)) return 1;
+  const progress = Math.log(Math.max(20 * 1024, size) / (20 * 1024)) / Math.log(5);
+  return .5 + 2.5 * Math.min(1, progress);
+}
 
 export function createSpace(canvas, elements, { change = () => {}, layout = () => ({}), toggleExplorer = () => {} } = {}) {
 let disposed = false, frameId = 0, loadGeneration = 0;
@@ -116,7 +125,7 @@ const galaxyRadius = 160;
 
 // 起点日時以降に更新したファイル（AI が触ったファイルを見つける目印）
 let markMode = 'since', grepMatches = new Set(), grepController, grepRevision = 0;
-const isFresh = file => markMode === 'grep' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
+const isFresh = file => markMode === 'grep' || markMode === 'ai' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
 const fastBlink = t => 0.5 + 0.5 * Math.sin(t * 1.8);          // ファイル: 約3.5秒周期で穏やかに明滅
 const slowBlink = t => 0.5 + 0.5 * Math.sin(t * 1.4 - 1.2);    // フォルダ: 約4.5秒周期
 function recountFresh() {
@@ -147,7 +156,7 @@ function buildWorld() {
     const ageDays = Math.max(0, (now - file.mtime) / 86400000);
     return {
       ...file, kind: kindOf(file.name), ageDays,
-      mag: 1 + Math.log10(file.size + 1) * 0.55,
+      mag: (1 + Math.log10(file.size + 1) * 0.55) * fileSizeScale(file.name, file.size),
       glow: 0.5 + 0.5 * Math.exp(-ageDays / 90),
       phase: rng() * Math.PI * 2, speed: 0.6 + rng() * 1.8,
       born: knownPaths && !knownPaths.has(file.path) ? now : 0,
@@ -200,7 +209,7 @@ function buildWorld() {
     const path = prefix ? `${prefix}/${name}` : name;
     const planet = fileInfo({ name, path, size, mtime }, rngFor(`planet:${path}`));
     Object.assign(planet, spacePosition(name));
-    planet.R = 9 + Math.log10(size + 1) * 3;
+    planet.R = (9 + Math.log10(size + 1) * 3) * fileSizeScale(name, size);
     planet.isPlanet = true;
     return planet;
   });
@@ -240,21 +249,23 @@ const FAR_GROUPS = [];
 }
 
 // ---------------------------------------------------------------- カメラ
-const cam = { tx: 0, ty: 0, tz: 0, ...HOME_VIEW, dist: 30000 };
+const cam = { tx: 0, ty: 0, tz: 0, ...HOME_VIEW, dist: 30000, roll:0 };
 const goal = { ...cam };
 let autoSpin = true;
 const autoOrbit = createAutoOrbit();
-let cy = 1, sy = 0, cp = 1, sp = 0;
+let orbitLine = null, orbitLineLevel = 0, orbitLineFolder = '';
+let cy = 1, sy = 0, cp = 1, sp = 0, cr=1, sr=0;
+let look = (x,y,z) => [x,y,z];
 const P = { x: 0, y: 0, k: 0, z: 0 };
 
 function project(x, y, z) {
   x -= cam.tx; y -= cam.ty; z -= cam.tz;
   const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
   const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
-  const depth = z2 + cam.dist;
+  const [right,up,depth] = look(x1*cr+y2*sr,-x1*sr+y2*cr,z2+cam.dist);
   if (depth < 4) return false;
   P.k = F / depth; P.z = depth;
-  P.x = CX + x1 * P.k; P.y = CY - y2 * P.k;
+  P.x = W/2 + right * P.k; P.y = H/2 - up * P.k;
   return true;
 }
 // 描画寸法はワールド寸法×透視倍率。画面上の最小/最大サイズで遠近差を潰さない。
@@ -263,7 +274,8 @@ const nearFade = depth => Math.min(1, Math.max(0, (depth - 4) / 40));
 /** 向きだけをカメラ座標へ回す（平行移動なし）。 */
 function turn(x, y, z) {
   const x1 = x * cy - z * sy, z1 = x * sy + z * cy;
-  return [x1, y * cp - z1 * sp, y * sp + z1 * cp];
+  const y2=y*cp-z1*sp;
+  return look(x1*cr+y2*sr,-x1*sr+y2*cr,y*sp+z1*cp);
 }
 // 画面の短辺に合わせて全景を広く使う。件数によらず同じ倍率で初期表示・全体表示する。
 const overviewDistance = () => (world ? world.radius * 2.25 : 4000) * (F / Math.min(W, H));
@@ -271,7 +283,6 @@ const overviewDistance = () => (world ? world.radius * 2.25 : 4000) * (F / Math.
 // ---------------------------------------------------------------- 状態
 let focus = null;            // 注目中の銀河
 let selected = null;         // 選択中の星・惑星
-let selectionOrigin = null;  // ファイルを選ぶ前の階層・視点（選び替えても保持）
 let hovered = null;          // マウス下の星・惑星
 let hoveredGalaxy = null;    // マウス下の銀河
 let labelBoxes = [];
@@ -279,13 +290,29 @@ let galaxyHits = [];         // 画面上の銀河の当たり判定 [銀河, x,
 let introAt = performance.now();
 let bodies = [];             // 当たり判定する星・惑星
 let projected = new Float32Array(0);
+let sceneDraws = [];
+// 本体の下地は不透明。明るさは上に重ねる色で調整し、背景を透かさない。
+function opaqueCore(x, y, radius) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 let diving = false;
+let introFlight = null;      // オープニングのワープ { start, from, duration }。描画の時間で進める
+let turnFlight = null;       // 船体位置を固定した旋回。完了するまで前進しない。
+let warpBoost = 0;           // 階層切替のフェード中も前進の光跡を維持する。
+let warpTravel = false;      // 同じ星系の接近にはワープ光跡を付けない。
+let fileFilter = 'backup';   // フィルター（既定 ON）: AiDiy のバックアップ対象だけで宇宙を作る
 let tracking = null;         // 追尾中の星・惑星
+let manualOrbit = false;     // ドラッグだけは注視点を軸とした回り込みを許可する。
+let orbitPivot = {x:0,y:0,z:0};
 let hoveredGate = false;
 let gateHit = null;          // 帰還ゲートの画面上の [x, y, 半径]
 let since = null;            // 起点日時（ms）。これ以降に更新したファイルを明滅させる。null なら明滅なし
 let voyages = {};            // 階層ごとの航路 { 階層パス: ['g:フォルダ' | 'f:ファイル', ...] }
 let journal = [];            // 航海日誌（新しい順） [{ type, path, at }]
+let routeMode = 'view', aiRoute = [];
 
 // ---------------------------------------------------------------- 描画
 function resize() {
@@ -297,12 +324,14 @@ function resize() {
 listen(window, 'resize', resize);
 resize();
 
-/** 横表示は左右のパネル間。縦表示はプレビュー表示時だけ中心を上から25%へ寄せる。 */
+/** 向きと一覧・ビューアの開閉に応じた空き領域の中央。ワープ中は固定する。 */
 let coverShown = '';
-function measureCover() {
-  const { left = 0, right = W, preview = false, centerY = H / 2 } = layout();
-  return { x: preview ? (left + right) / 2 : W / 2, y: centerY };
+let warpProjection = null;
+function measureCover(plannedPreview) {
+  const { left = 0, right = W, preview = false, centerX, centerY = H / 2 } = layout({preview:plannedPreview});
+  return { x: centerX ?? (preview ? (left + right) / 2 : W / 2), y: centerY };
 }
+function holdProjection() { warpProjection ??= { x: CX, y: CY }; }
 
 let last = performance.now(), prevDist = cam.dist;
 function frame(now) {
@@ -311,18 +340,49 @@ function frame(now) {
   last = now;
   const t = now / 1000;
 
-  const flight = autoOrbit.step(now,dt,goal,overviewDistance(),!autoSpin || !world || !!selected || diving || dragging || document.hidden);
-  if (flight) { Object.assign(goal,flight); tracking = null; }
+  const flight = autoOrbit.step(now,dt,cam,overviewDistance(),!autoSpin || !world || !!selected || following || diving || dragging || !!introFlight || document.hidden);
+  if (flight) {
+    Object.assign(goal,flight); Object.assign(cam,flight); tracking = null;
+    orbitPivot={x:0,y:0,z:0};
+    // 自動飛行（彗星の軌道）は何もない時の基本表示: 注目中の銀河（閉じたファイルの銀河など）を外し、全体を明るく戻す
+    if (focus) { focus = null; notify(); }
+  }
   if (tracking) { goal.tx = tracking.x; goal.ty = tracking.y; goal.tz = tracking.z; }
   const ease = 1 - Math.exp(-dt * 4);
-  for (const key of ['tx', 'ty', 'tz', 'yaw', 'pitch']) cam[key] += (goal[key] - cam[key]) * ease;
-  cam.dist *= Math.exp((Math.log(goal.dist) - Math.log(cam.dist)) * ease);
-  // パネル配置と縦横の切替に合わせ、投影中心を滑らかに移動する。
-  const center = measureCover();
+  if (turnFlight) {
+    const progress = Math.min(1, (now - turnFlight.start) / turnFlight.duration);
+    Object.assign(cam, turnToTarget(turnFlight.from, turnFlight.target, progress));
+    Object.assign(goal, cam);
+    prevDist = cam.dist; // 注視点基準への表現変更を、移動速度として扱わない。
+    if (progress >= 1) turnFlight = null;
+  } else if (!flight) {
+    if (introFlight) {
+      // オープニングのワープ: 描画の始まりから duration で、遠くから全景へ（最初は速く、最後はゆっくり）
+      introFlight.start ??= now; introFlight.from ??= cam.dist;
+      const progress = Math.min(1, (now - introFlight.start) / introFlight.duration), k = 1 - (1 - progress) ** 3;
+      cam.dist = Math.exp(Math.log(introFlight.from) * (1 - k) + Math.log(goal.dist) * k);
+      if (progress >= 1) introFlight = null;
+    } else if (manualOrbit) {
+      Object.assign(cam,orbitAround(cam,orbitPivot,(goal.yaw-cam.yaw)*ease,(goal.pitch-cam.pitch)*ease));
+      cam.dist+=(goal.dist-cam.dist)*ease;
+      if(!dragging && Math.abs(cam.yaw-goal.yaw)+Math.abs(cam.pitch-goal.pitch)<1e-6)manualOrbit=false;
+    } else if (Object.keys(cam).some(key=>Math.abs(goal[key]-cam[key])>1e-9)) {
+      Object.assign(cam,interpolateCamera(cam,goal,ease));
+    }
+  }
+  // 予約された最終更新ファイルへの移動は、オープニングが終わり、追いかけてよい状態になってから始める
+  if (pendingFollow && !introFlight && canFollow()) { const path = pendingFollow; pendingFollow = null; void follow(path); }
+  // 自動運転中（視点移動 ON で、彗星の軌道か最終更新ファイルへの移動・表示をしている）かを UI へ知らせる
+  const nowDriving = isDriving(now);
+  if (nowDriving !== driving || notifiedOrbitPhase !== autoOrbit.phase) { driving = nowDriving; notify(); }
+  // パネル配置に合わせて操縦席から見回す。投影面は画面中央に固定する。
+  const center = warpProjection || measureCover();
   CX = CX ? CX + (center.x - CX) * ease : center.x;
   CY = CY ? CY + (center.y - CY) * ease : center.y;
   cy = Math.cos(cam.yaw); sy = Math.sin(cam.yaw); cp = Math.cos(cam.pitch); sp = Math.sin(cam.pitch);
-  const warp = Math.min(1.5, Math.abs(Math.log(cam.dist / prevDist)) / Math.max(dt, 1e-3) * 0.08);
+  cr=Math.cos(cam.roll);sr=Math.sin(cam.roll);
+  look = cockpitLook(CX-W/2,CY-H/2,F);
+  const warp = Math.max(warpBoost, (introFlight || (diving && warpTravel)) ? Math.min(1.5, Math.abs(Math.log(cam.dist / prevDist)) / Math.max(dt, 1e-3) * 0.08) : 0);
   prevDist = cam.dist;
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -333,13 +393,55 @@ function frame(now) {
 
   ctx.globalCompositeOperation = 'lighter';
   drawFarSky(t, warp);
+  drawOrbitPath(dt);
   if (world) drawFolderLinks(now);
-  if (world) drawGalaxies(t, now);
+  sceneDraws = [];
   gateHit = null;
-  if (world?.gate) drawGate(t);
+  if (world) {
+    drawVoyage(t);
+    drawGalaxies(t, now);
+    drawPlanets(t, now);
+    if (world.gate && project(world.gate.x, world.gate.y, world.gate.z)) sceneDraws.push({depth:P.z,draw:()=>drawGate(t)});
+    // フォルダ内の星・直下ファイル・中心星を一緒に奥から描き、手前の本体で隠す。
+    for (const item of sceneDraws.sort((a,b)=>b.depth-a.depth)) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; item.draw(); ctx.restore();
+    }
+  }
   ctx.globalCompositeOperation = 'source-over';
-  if (world) { drawPlanets(t, now); drawVoyage(t); drawLabels(t); }
+  if (world) drawLabels(t);
   requestAnimationFrame(frame);
+}
+
+/** 計算済みの彗星軌道を、天体と同じ3D座標・投影で描く。 */
+function drawOrbitPath(dt) {
+  const folder=trail.join('/');
+  // 星系が切り替わった後へ、前の星系の軌道を持ち越さない。
+  if(folder!==orbitLineFolder || !world){orbitLine=null;orbitLineLevel=0;orbitLineFolder=folder;}
+  const planned=world && autoSpin && !diving && !following && !selected ? autoOrbit.path : null;
+  if(!orbitLine)orbitLine=planned;
+  if(!orbitLine){orbitLineLevel=0;return;}
+  // 古い線が柔らかく消えてから、最新の計算結果を浮かび上がらせる。
+  // 途中で再計算・中断しても、現在の濃さから継続する。
+  orbitLineLevel=orbitLine===planned && autoOrbit.phase!=='idle'
+    ? autoOrbit.visibility : Math.max(0,orbitLineLevel-dt/1.2);
+  if(!orbitLineLevel){orbitLine=planned;return;}
+  const points=orbitLine;
+  if(!points)return;
+  // 船の航行位置は保ち、案内線だけ中心寄りへ15%縮めて内側に見せる。
+  const opacity=orbitLineLevel*orbitLineLevel*(3-2*orbitLineLevel);
+  ctx.save();ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);
+  ctx.filter=opacity<1?`blur(${(1-opacity)*3}px)`:'none';
+  ctx.strokeStyle='#8aa9ed';ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+  let connected=false;
+  for(const point of points){
+    // カメラの背後を結ぶ線や、軌道末尾から先頭への架空の線は描かない。
+    if(!project(point.x*.85,point.y*.85,point.z*.85)){connected=false;continue;}
+    if(connected)ctx.lineTo(P.x,P.y);else ctx.moveTo(P.x,P.y);
+    connected=true;
+  }
+  ctx.globalAlpha=.12*opacity;ctx.lineWidth=4+(1-opacity)*4;ctx.stroke();
+  ctx.globalAlpha=.6*opacity;ctx.lineWidth=1.2;ctx.stroke();
+  ctx.restore();
 }
 
 /** 現在フォルダの3D原点から、直下の銀河・ファイルへ静かな直線を引く。 */
@@ -374,11 +476,11 @@ function drawFarSky(t, warp) {
     for (let i = 0; i < pts.length; i += 4) {
       const [x1, y2, z2] = turn(pts[i], pts[i + 1], pts[i + 2]);
       if (z2 < 0.05) continue;
-      const px = CX + x1 / z2 * F, py = CY - y2 / z2 * F, s = pts[i + 3];
+      const px = W/2 + x1 / z2 * F, py = H/2 - y2 / z2 * F, s = pts[i + 3];
       if (px < -50 || px > W + 50 || py < -50 || py > H + 50) continue;
       if (warp > 0.04) {
         // ワープ中は中心から放射状の光の筋にする
-        ctx.moveTo(px, py); ctx.lineTo(px - (px - CX) * warp * 0.25, py - (py - CY) * warp * 0.25);
+        ctx.moveTo(px, py); ctx.lineTo(px - (px - CX) * warp * 0.45, py - (py - CY) * warp * 0.45);
       } else ctx.rect(px - s / 2, py - s / 2, s, s);
     }
     if (warp > 0.04) { ctx.strokeStyle = `rgb(${group.color})`; ctx.lineWidth = 1; ctx.stroke(); }
@@ -410,16 +512,19 @@ function drawGalaxies(t, now) {
       const [nx, ny, nz] = turn(...g.normal);
       const size = g.R * 2.6 * gk;
       const pulse = g.fresh ? slowBlink(t) : 0;
+      sceneDraws.push({depth,draw:()=>{
       if (size > 2) {
         ctx.save();
         ctx.translate(gx, gy);
         ctx.rotate(Math.atan2(-ny, nx));
         ctx.scale(Math.max(0.12, Math.abs(nz)), 1);
-        ctx.globalAlpha = (0.28 + 0.4 * pulse) * fade * dim * light;
+        ctx.globalAlpha = (0.4 + 0.4 * pulse) * fade * dim * light;
         ctx.drawImage(DISK[g.kind], -size / 2, -size / 2, size, size);
         ctx.restore();
         const core = g.R * (g.arms ? 0.7 : 1.0) * gk * (1 + 0.35 * pulse);
-        ctx.globalAlpha = Math.min(1, (g.arms ? 0.55 : 0.4) + 0.4 * pulse) * fade * dim * light;
+        opaqueCore(gx, gy, core * 0.1);
+        // ファイル数の少ないフォルダも見失わないよう、中心光には明るさを残す。
+        ctx.globalAlpha = Math.min(1, 0.85 + 0.15 * pulse) * fade * dim * light;
         ctx.drawImage(CORE, gx - core / 2, gy - core / 2, core, core);
       }
       if (g.fresh) {
@@ -428,6 +533,7 @@ function drawGalaxies(t, now) {
         ctx.globalAlpha = 0.22 * pulse * fade * light;
         ctx.drawImage(FLARE, gx - halo / 2, gy - halo / 2, halo, halo);
       }
+      }});
     }
 
     // 銀河の中心が背後でも、手前にある個々の星は描く。
@@ -444,10 +550,17 @@ function drawGalaxies(t, now) {
       const blink = fresh ? fastBlink(t) : 0;
       if (fresh) { alpha = Math.min(s === selected ? 0.65 : 0.8, Math.max(alpha, (0.35 + 0.25 * blink) * appear)); size *= 1 + 0.08 * blink; }
       if (P.x < -size || P.x > W + size || P.y < -size || P.y > H + size) continue;
-      alpha *= depthLight(P.z) * nearFade(P.z);
+      // 明るさの下限は距離で減光する前に適用し、遠近差を残す。
+      // 古い星も微かに瞬き、出現・フォーカス・至近距離では従来どおりフェードする。
+      const visibleGlow = (0.7 + 0.08 * Math.sin(t * s.speed + s.phase)) * appear * dim;
+      alpha = Math.max(alpha, visibleGlow) * depthLight(P.z) * nearFade(P.z);
+      const x=P.x,y=P.y;
+      sceneDraws.push({depth:P.z,draw:()=>{
+      opaqueCore(x, y, size * 0.1);
       ctx.globalAlpha = alpha;
-      ctx.drawImage(STAR[s.kind], P.x - size / 2, P.y - size / 2, size, size);
-      if (s !== selected && ((fresh && blink > 0.45) || bornAge < 6) && appear >= 1) drawNova(P.x, P.y, size, alpha, t, s.phase);
+      ctx.drawImage(STAR[s.kind], x - size / 2, y - size / 2, size, size);
+      if (s !== selected && ((fresh && blink > 0.45) || bornAge < 6) && appear >= 1) drawNova(x, y, size, alpha, t, s.phase);
+      }});
       bodies.push(s);
       projected[p++] = P.x; projected[p++] = P.y; projected[p++] = size; projected[p++] = 0;
     }
@@ -483,6 +596,9 @@ function drawPlanets(t, now) {
     if (fresh) { alpha = Math.max(alpha, appear * 0.6); size *= 1 + 0.025 * blink; }
     if (x < -size || x > W + size || y < -size || y > H + size) continue;
     alpha *= depthLight(z) * nearFade(z);
+    sceneDraws.push({depth:z,draw:()=>{
+    opaqueCore(x, y, size * 0.3);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = alpha;
     ctx.drawImage(PLANET[planet.kind], x - size / 2, y - size / 2, size, size);
     if (fresh) {
@@ -492,6 +608,7 @@ function drawPlanets(t, now) {
       if (planet !== selected && blink > 0.45) drawNova(x, y, size * 0.45, alpha * blink, t, planet.phase);
       ctx.globalCompositeOperation = 'source-over';
     }
+    }});
     bodies.push(planet);
     projected[p++] = x; projected[p++] = y; projected[p++] = size * 0.6; projected[p++] = 1;
   }
@@ -514,13 +631,25 @@ function drawGate(t) {
     ctx.strokeStyle = i % 2 ? '#9fd8ff' : '#c8b6ff';
     ctx.beginPath(); ctx.arc(P.x, P.y, rr, spin, spin + Math.PI * 1.2); ctx.stroke();
   }
-  ctx.globalAlpha = alpha;
+  // 中心星の本体は加算合成を使わず、背後の星や軌道線を覆う不透明な球にする。
+  if (alpha > 0) {
+    const radius = r * 0.35;
+    const body = ctx.createRadialGradient(P.x - radius * 0.3, P.y - radius * 0.3, 0, P.x, P.y, radius);
+    body.addColorStop(0, '#abc3d2'); body.addColorStop(0.45, '#7293a9'); body.addColorStop(1, '#334f66');
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(P.x, P.y, radius, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = alpha * 0.18;
   ctx.drawImage(FLARE, P.x - r * 0.7, P.y - r * 0.7, r * 1.4, r * 1.4);
   ctx.globalAlpha = 1;
 }
 
 /** 航路: この宇宙で訪れた銀河・星を訪れた順に結ぶ。古い区間ほど薄い。 */
 function voyageTargets() {
+  if(routeMode==='ai')return aiRouteTargets(aiRoute,trail,world);
   return (voyages[basePath()] || [])
     .map(key => key[0] === 'g' ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2)))
     .filter(Boolean);
@@ -530,7 +659,7 @@ function drawVoyage(t) {
   if (!points.length) return;
   const n = points.length;
   ctx.lineWidth = 1.4;
-  ctx.strokeStyle = '#ffd98c';
+  ctx.strokeStyle = routeMode==='ai'?'#83e5ee':'#ffd98c';
   ctx.setLineDash([5, 7]);
   ctx.lineDashOffset = -t * 18;
   for (let i = 1; i < n; i++) {
@@ -540,7 +669,7 @@ function drawVoyage(t) {
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
   }
   ctx.setLineDash([]);
-  ctx.fillStyle = '#ffe2a0';
+  ctx.fillStyle = routeMode==='ai'?'#a7f6ff':'#ffe2a0';
   points.forEach((s, i) => {
     if (!s) return;
     const latest = i === n - 1;
@@ -635,13 +764,19 @@ function drawLabels(t) {
 }
 
 // ---------------------------------------------------------------- 操作
-let dragging = false, dragMoved = 0, dragButton = 0, lastX = 0, lastY = 0;
+let dragging = false, dragMoved = 0, lastX = 0, lastY = 0;
 const touch = new Map();
-const touchIdle = () => { autoOrbit.interact(performance.now()); };
+// 手動操作: 自動飛行を1分止め、自動で開いたファイルもユーザーが見ている扱いにする
+const touchIdle = () => {
+  autoOrbit.interact(performance.now()); followedPath = null;
+  // 到着済みの最終更新へは引き戻さず、未到着の新しい対象だけを保留する。
+  pendingFollow = latestFollow !== lastFollowedPath ? latestFollow : null;
+};
 
 function setAutoSpin(value) {
+  const entering = !autoSpin && !!value;
   autoSpin = !!value;
-  if (autoSpin) autoOrbit.resume();
+  if (autoSpin) { autoOrbit.resume(); if (entering) pendingFollow = latestFollow !== lastFollowedPath ? latestFollow : null; }
   else {
     autoOrbit.reset();
     if (!selected && !focus && !diving) Object.assign(goal, cam);
@@ -654,10 +789,12 @@ listen(canvas, 'pointerdown', e => {
   if (diving) return;
   canvas.setPointerCapture(e.pointerId);
   touch.set(e.pointerId, [e.clientX, e.clientY]);
-  dragging = true; dragMoved = 0; dragButton = e.button === 2 || e.shiftKey ? 2 : 0;
+  dragging = true; dragMoved = 0;
   lastX = e.clientX; lastY = e.clientY;
   canvas.classList.add('dragging');
   autoOrbit.reset();
+  introFlight = null;  // オープニング中に触ったら、飛び込みをやめて操作を優先する
+  Object.assign(goal,cam); tracking=null; manualOrbit=true;
 });
 listen(canvas, 'pointermove', e => {
   if (diving) return;
@@ -677,10 +814,8 @@ listen(canvas, 'pointermove', e => {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
     dragMoved += Math.abs(dx) + Math.abs(dy);
-    if (dragButton === 2) pan(dx, dy);
-    else {
-      orbitView(goal, dx, dy);
-    }
+    // ドラッグだけは中心を軸に回り込む。以後はその実位置を船の出発地点にする。
+    Object.assign(goal,orbitAround(goal,orbitPivot,dx*.005,-dy*.005));
     touchIdle();
     return;
   }
@@ -702,6 +837,7 @@ listen(canvas, 'wheel', e => {
   // 宇宙上の Ctrl＋ホイールは、ブラウザ倍率ではなく視点の距離を変える。
   e.preventDefault();
   if (diving) return;
+  introFlight = null;
   goal.dist = clampDist(goal.dist * Math.exp(e.deltaY * 0.0012));
   touchIdle();
 }, { passive: false });
@@ -712,12 +848,6 @@ listen(canvas, 'dblclick', e => {
 
 
 const clampDist = d => Math.max(20, Math.min(overviewDistance() * 4, d));
-
-function pan(dx, dy) {
-  tracking = null;
-  const delta = panOffset(cam.yaw, cam.pitch, dx, dy, cam.dist / F);
-  goal.tx += delta.x; goal.ty += delta.y; goal.tz += delta.z;
-}
 
 function updateHover(mx, my) {
   if (!world) return;
@@ -756,7 +886,8 @@ function updateHover(mx, my) {
     tip.hidden = false;
   };
   if (hoveredGate) show(world.gate.name, trail.length ? '現在のフォルダ ・ ダブルクリックで1つ上のフォルダへ' : '現在のフォルダ ・ ルート');
-  else if (hovered) show(hovered.name, `${hovered.path} ・ ${formatSize(hovered.size)} ・ ${formatAge(hovered.mtime)} ・ クリックでズームとプレビュー`);
+  // 星（ファイル）はファイル名だけを見せる（フォルダ名は出さない。場所はパンくずとプレビューで分かる）
+  else if (hovered) show(hovered.name, `${formatSize(hovered.size)} ・ ${formatAge(hovered.mtime)} ・ クリックでズームとプレビュー`);
   else if (hoveredGalaxy) show(hoveredGalaxy.path, `ファイル ${hoveredGalaxy.files.length} ・ サブフォルダ ${hoveredGalaxy.sub} ・ ダブルクリックで開く`);
   else tip.hidden = true;
 }
@@ -768,7 +899,7 @@ function handleClick(mx, my) {
   if (hovered) selectBody(hovered);
   else if (hoveredGalaxy) {
     // 初回クリックでカメラを動かさず、2回目も同じフォルダを押せるようにする。
-    selected = null; selectionOrigin = null; focus = hoveredGalaxy; tracking = null;
+    selected = null; focus = hoveredGalaxy; tracking = null;
     updateSide();
   } else selectBody(null);
 }
@@ -783,25 +914,27 @@ function handleDoubleClick(mx, my) {
 }
 
 function flyTo(g) {
-  selected = null; selectionOrigin = null;
-  focus = g;
-  tracking = null;
-  goal.tx = g.x; goal.ty = g.y; goal.tz = g.z;
-  goal.dist = Math.max(120, g.R * 2.8) * (F / Math.min(W, H));
+  selected = null;
   touchIdle();
   remember('dir', g.path);
   updateSide();
+  return travelTo([...trail],{target:g,transition:false,arrivalDistance:Math.max(120,g.R*2.8),after:()=>{focus=g;updateSide();}});
 }
-function flyHome() {
-  selected = null; selectionOrigin = null;
+async function flyHome() {
+  selected = null;
   focus = null;
   tracking = null;
-  goal.tx = goal.ty = goal.tz = 0;
-  goal.dist = overviewDistance();
-  Object.assign(goal, HOME_VIEW);
-  autoOrbit.reset();
   touchIdle();
   updateSide();
+  const run=++navigationSequence, valid=()=>run===navigationSequence;
+  const eye=cameraPosition(cam), radius=Math.hypot(eye.x,eye.y,eye.z);
+  const scale=overviewDistance()/Math.max(radius,1);
+  const destination=radius>1?{x:eye.x*scale,y:eye.y*scale,z:eye.z*scale}:{x:0,y:0,z:-overviewDistance()};
+  // 全体表示へ戻る時も、後ろへ引かず、外側の観測位置へ向いて前進する。
+  if(Math.abs(radius-overviewDistance())>30 && !await travelTo([...trail],{target:destination,transition:false,arrivalDistance:1,valid}))return;
+  if(!valid())return;
+  await travelTo([...trail],{target:{x:0,y:0,z:0},transition:false,arrivalDistance:Infinity,valid});
+  if(valid())touchIdle();
 }
 /** 星・惑星の選択を共通化する（一覧・検索・フォーカス操作も同じ）。 */
 function approach(body) {
@@ -818,23 +951,21 @@ function setWarpBusy(value) {
 }
 
 /** 古い移動はキャンセルし、最後に選ばれた階層だけへ切り替える。 */
-async function travelTo(next, { direction = 'in', target = null, history = true, after = null, preserveSelection = false } = {}) {
+async function travelTo(next, { direction = 'in', target = null, history = true, after = null, file = null, destinationFile = null, transition = true, arrivalDistance = null, valid = () => true } = {}) {
   if (!nodeAt(next)) return;
-  if (!preserveSelection) selectionOrigin = null;
   const sequence = ++warpSequence;
+  holdProjection();
   sceneAnimation?.cancel();
+  turnFlight = null; introFlight = null; warpBoost = 0;
+  manualOrbit=false;
   setWarpBusy(true);
+  warpTravel = transition;
   autoOrbit.reset();
   tracking = null;
   dragging = false; touch.clear(); canvas.classList.remove('dragging');
   $('tooltip').hidden = true;
-  Object.assign(goal, cam);  // カメラは止め、画面全体の拡縮とフェードを滑らかに重ねる。
-  let originX = CX, originY = CY;
-  if (target && project(target.x, target.y, target.z)) {
-    originX = Math.max(0, Math.min(W, P.x)); originY = Math.max(0, Math.min(H, P.y));
-  }
-  canvas.style.transformOrigin = `${originX}px ${originY}px`;
-  const motion = warpMotion(direction);
+  target ??= direction === 'out' ? world.gate : world.galaxies.find(g => g.path === next.slice(0, trail.length + 1).join('/'));
+  const motion = warpMotion(target ? 'in' : direction);
   const play = async stage => {
     sceneAnimation = canvas.animate(stage.frames, {
       duration: stage.duration, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards',
@@ -842,17 +973,74 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
     try { await sceneAnimation.finished; } catch { return false; }
     return sequence === warpSequence;
   };
+  // カメラが目標へ十分近づくか上限時間まで待つ。別の移動が始まったら false（そこで打ち切る）。
+  // 描画ループの frameId を上書きしないよう、待ちは setTimeout で刻む。
+  const settle = (done, limit) => new Promise(resolve => {
+    const end = performance.now() + limit;
+    const check = () => {
+      if (disposed || sequence !== warpSequence) return resolve(false);
+      if (done() || performance.now() >= end) return resolve(true);
+      setTimeout(check, 16);
+    };
+    check();
+  });
   try {
-    if (!await play(motion.exit)) return;
-    trail = [...next];
-    enterWorld({ history, immediate: true });
+    if (target) {
+      orbitPivot={x:target.x,y:target.y,z:target.z};
+      // 1. 船体の位置は固定し、先に目的の星団（帰還時はゲート）へ向く。
+      Object.assign(goal, cam);
+      turnFlight = { from: { ...cam }, target, start: performance.now(), duration: 1100 };
+      if (!await settle(() => !turnFlight, Infinity) || !valid()) return;
+      // 2. 向きを固定したまま前進する。目的地は常に画面中央に留まる。
+      const distance = arrivalDistance ?? (file ? (file.isPlanet ? Math.max(180, file.R * 22) : 170) : Math.max(30, (target.R || 60) * 1.1));
+      goal.dist = Math.min(cam.dist, distance * (F / Math.min(W, H)));
+      if (!await settle(() => Math.abs(Math.log(cam.dist / goal.dist)) < 0.06, 1600) || !valid()) return;
+    }
+    if (!transition) {
+      // 同じフォルダ内は旋回と直進だけ。拡縮・暗転・再出現を再生しない。
+      Object.assign(goal, cam);
+      if(file) {
+        focus = file.galaxy ?? null; tracking = file;
+        selectBody(file, { zoom: false });
+      }
+      after?.();
+      return true;
+    }
+    // 3. ワープ: カメラは止め、画面全体の拡縮とフェードを重ねる（起点は星団＝画面中央付近）
+    Object.assign(goal, cam);
+    let originX = CX, originY = CY;
+    if (target && project(target.x, target.y, target.z)) {
+      originX = Math.max(0, Math.min(W, P.x)); originY = Math.max(0, Math.min(H, P.y));
+    }
+    canvas.style.transformOrigin = `${originX}px ${originY}px`;
+    warpBoost = 0.65;
+    if (!await play(motion.exit) || !valid()) return;
+    warpBoost = 0;
+    if (!file) {
+      trail = [...next];
+      enterWorld({ history, immediate: true });
+    }
     after?.();
+    // パネル開閉による画面中心の変更は、画面が消えている間に完了する。
+    // 旋回・前進の最中に宇宙全体が横（縦）へ滑らないようにする。
+    warpProjection = measureCover(!!file || !!destinationFile);
+    CX = warpProjection.x; CY = warpProjection.y;
     // 次の全景を初めから表示し、従来の出現待ち・急なズームを重ねない。
     canvas.style.transformOrigin = `${CX}px ${CY}px`;
     sceneAnimation.cancel();
-    if (!await play(motion.entry)) return;
+    if (!await play(motion.entry) || !valid()) return;
+    const arrivedFile=file||(destinationFile?world.byPath.get(destinationFile):null);
+    if (arrivedFile) {
+      // 高速ワープは到着したフォルダのファイルを開き、追加の接近ワープを行わない。
+      focus = file ? arrivedFile.galaxy ?? null : null;
+      tracking = file ? arrivedFile : null;
+      selectBody(arrivedFile, { zoom: false });
+    }
+    return true;
   } finally {
     if (sequence === warpSequence) {
+      Object.assign(goal,cam);
+      turnFlight = null; warpBoost = 0; warpTravel = false; warpProjection = null;
       sceneAnimation?.cancel(); sceneAnimation = null;
       canvas.style.removeProperty('transform-origin');
       setWarpBusy(false);
@@ -860,13 +1048,13 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
   }
 }
 
-/** 入る時は拡大しながら消え、次の階層がぼんやり現れる。 */
+/** 入る時は、その場で星団へ旋回してから直進し、光跡と拡大を重ねて次の階層へ入る。 */
 function dive(g) {
   if (diving) return;
   remember('dir', g.path);
   return travelTo(g.path.split('/'), { direction: 'in', target: g });
 }
-/** 戻る時は今の宇宙が遠ざかりながら消える。 */
+/** 戻る時も、現在フォルダのゲートへ旋回・前進して親階層へ入る。 */
 function ascend(count) {
   if (count >= trail.length || count < 0) return;
   return travelTo(trail.slice(0, count), { direction: 'out' });
@@ -890,20 +1078,23 @@ function enterWorld({ from, leaving, history = true, immediate = false } = {}) {
     if (location.hash || trail.length) window.history.pushState(null, '', trailHash());
   }
   world = buildWorld();
+  orbitPivot={x:0,y:0,z:0};
   focus = null; selected = null; hovered = null; hoveredGalaxy = null; hoveredGate = false; tracking = null;
   introAt = performance.now();
   const home = overviewDistance();
   goal.tx = goal.ty = goal.tz = 0; goal.dist = home;
-  Object.assign(goal, HOME_VIEW);
+  // 別の星系に入っても船首方向は引き継ぐ。初回だけ基準方向を使う。
+  Object.assign(goal, immediate ? {yaw:cam.yaw,pitch:cam.pitch} : HOME_VIEW);
   autoOrbit.reset();
   if (immediate) {
     Object.assign(cam, goal);
     prevDist = cam.dist;
     introAt = performance.now() - 5000;
   } else if (from === 'outside' || from === 'warp') {
-    // 外から突入・ワープ: 遠くから光の筋をくぐって全景へ
+    // 外から突入・ワープ: 遠くから光の筋をくぐって全景へ（時間で進めるので、重いフレームでも一瞬で終わらない）
     cam.tx = cam.ty = cam.tz = 0;
     cam.dist = home * 8;
+    introFlight = { start: null, from: null, duration: 1800 };
     introAt = performance.now() - (from === 'warp' ? 1500 : 300);
   } else if (from === 'inside') {
     // 内から脱出: 出てきた銀河の中心から引いていく
@@ -916,31 +1107,90 @@ function enterWorld({ from, leaving, history = true, immediate = false } = {}) {
 }
 
 /** 全体検索・航海日誌から、そのファイル（自由惑星として）やフォルダ（銀河として）がある宇宙へワープする。 */
-function goTo(entry) {
-  const parts = entry.path.split('/');
-  if (entry.type === 'dir') {
-    if (!nodeAt(parts)) return;
-    if (!diving && entry.path === basePath()) { revealCurrent(); return; }
-    const target = world.galaxies.find(g => g.path === entry.path) ?? null;
-    const upward = parts.length < trail.length && parts.every((name, i) => name === trail[i]);
-    remember('dir', entry.path);
-    return travelTo(parts, { direction: upward ? 'out' : 'in', target });
-  }
-  const level = parts.slice(0, -1);
+let navigationSequence = 0;
+let fastWarp = false;
+async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
+  const parts = entry.path.split('/').filter(Boolean), isFile = entry.type !== 'dir';
+  const level = isFile ? parts.slice(0, -1) : parts;
   const node = nodeAt(level);
-  if (!node || !node.f.some(file => file[0] === parts.at(-1))) return;
-  rememberSelectionView();
-  const select = () => {
-    const body = world.byPath.get(entry.path);
-    if (body) selectBody(body);
-  };
-  if (diving || level.join('/') !== basePath()) {
-    return travelTo(level, {
-      direction: level.length < trail.length ? 'out' : 'in',
-      after: select, preserveSelection: true,
-    });
+  if (!node || (isFile && !node.f.some(file => file[0] === parts.at(-1)))) return;
+  if(!automatic) touchIdle();
+  // 接近済みの同じファイルを再選択しても飛び直さない。
+  if (!automatic && isFile && !diving && selected?.path === entry.path && tracking?.path === entry.path) return true;
+  const run = ++navigationSequence;
+  const stale = () => disposed || run !== navigationSequence || !valid();
+  holdProjection();
+  // 連続クリックでは進行中の旋回・ズーム・フェードを打ち切り、最後の選択を優先する。
+  ++warpSequence; sceneAnimation?.cancel(); sceneAnimation = null;
+  turnFlight = null; introFlight = null; warpBoost = 0;
+  canvas.style.removeProperty('transform-origin'); setWarpBusy(false);
+  Object.assign(goal, cam);
+  // 同階層でも下のファイル接近へ進み、位置固定の旋回→正面への前進で移動する。
+  selected = null; tracking = null; focus = null; updateSide();
+  // 別の枝も共通の親まで戻り、1階層ずつ目的地へ向かう。各段で必ず旋回・前進する。
+  let common = 0;
+  while (common < trail.length && common < level.length && trail[common] === level[common]) common++;
+  if (fastWarp && isFile && level.join('/') !== basePath()) {
+    if (!await travelTo(level, { direction: common < trail.length ? 'out' : 'in', destinationFile: entry.path, valid: () => !stale() }) || stale()) return;
+    if(!automatic) touchIdle();
+    return true;
   }
-  select();
+  while (trail.length > common) {
+    if (!await travelTo(trail.slice(0, -1), { direction: 'out', valid:()=>!stale() }) || stale()) return;
+  }
+  while (trail.length < level.length) {
+    const next = level.slice(0, trail.length + 1);
+    if (!await travelTo(next, { valid:()=>!stale() }) || stale()) return;
+  }
+  if (isFile) {
+    const body = world.byPath.get(entry.path);
+    if (!body || !await travelTo([...trail], { target: body, file: body, transition: false, valid: () => !stale() }) || stale()) return;
+  } else {
+    remember('dir', entry.path); revealCurrent();
+  }
+  warpProjection = null;
+  // 長い航路でも到着直後に自動運転へ奪われないよう、ここから手動操作の待機を数える。
+  if(!automatic) touchIdle();
+  return true;
+}
+
+// ---------------------------------------------------------------- 最終更新ファイルへの自動移動
+// 視点移動（自動飛行）中にエクスプローラーの最終更新が変わったら、そのファイルまで1階層ずつワープして開く。
+// この流れで開いたファイルは、閉じても元の階層へ戻らず、その場で自動飛行に戻る。
+let followSequence = 0, followedPath = null, pendingFollow = null, latestFollow = null, following = false;
+// 自動表示中かどうかと、最後に到着した場所の記憶を分ける。後者は手動操作でも消さない。
+let lastFollowedPath = null, activeFollowPath = null;
+/** 移動を予約する（起動直後の最終更新も含む）。すぐ動けない時は、動ける状態になってから frame で始める。 */
+function requestFollow(path) {
+  latestFollow = path;
+  pendingFollow = path === lastFollowedPath || (following && path === activeFollowPath) ? null : path;
+}
+/** 今追いかけてよいか: 視点移動が ON、手動操作の直後でない、ユーザーが自分で開いたファイルを見ていない。 */
+function canFollow() {
+  return autoSpin && !!world && !following && !diving && !dragging && !document.hidden && performance.now() >= autoOrbit.pausedUntil
+    && (!selected || selected.path === followedPath);
+}
+async function follow(path) {
+  if(path === lastFollowedPath)return true;
+  const parts = path.split('/'), level = parts.slice(0, -1);
+  const run = ++followSequence;
+  const stale = () => disposed || run !== followSequence || !autoSpin || !!pendingFollow || (latestFollow && latestFollow !== path) || performance.now() < autoOrbit.pausedUntil;
+  following = true; activeFollowPath = path;
+  try { return await followSteps(path, parts, level, stale); }
+  finally { if (run === followSequence) { following = false; activeFollowPath = null; } if (!diving) warpProjection = null; }
+}
+async function followSteps(path, parts, level, stale) {
+  holdProjection(); Object.assign(goal, cam);
+  // 開いている自動のビューアは、元へ戻さずに閉じる
+  selected = null; tracking = null; updateSide();
+  // 毎回読み直す。直前の走査後に新規作成されたファイルも、予約を失わず表示する。
+  await refresh(); if (stale()) return false;
+  const node = nodeAt(level);
+  if (!node || !node.f.some(file => file[0] === parts.at(-1))) return false;
+  // 手動・軌跡・自動追跡で航行規則を共有し、同一星系の接近にはワープしない。
+  if (!await goTo({type:'file',path},{automatic:true,valid:()=>!stale()}) || stale()) return false;
+  followedPath = path; lastFollowedPath = path;
+  return true;
 }
 
 // ---------------------------------------------------------------- 航路と航海日誌（ブラウザに保存）
@@ -971,43 +1221,27 @@ function clearVoyage() {
 const tail = (text, max = 44) => (text.length > max ? `…${text.slice(-(max - 1))}` : text);
 const parentOf = path => path.split('/').slice(0, -1).join('/');
 
-function rememberSelectionView() {
-  if (selectionOrigin) return;
-  selectionOrigin = {
-    trail: [...trail], camera: { ...goal }, focusPath: focus?.path ?? null,
-  };
-}
-
 function selectBody(body, { record = true, zoom = true } = {}) {
+  // 星の直接選択も、自動追跡やエクスプローラーと同じ旋回・前進へ統一する。
+  if (body && zoom) return goTo({ type: 'file', path: body.path });
   if (!body) {
-    const origin = selectionOrigin;
-    selectionOrigin = null; selected = null; tracking = null;
+    // ビューアを閉じても到着地点に留まる。移動中なら、その場で停止する。
+    ++navigationSequence; ++warpSequence; ++followSequence;
+    following=false;
+    sceneAnimation?.cancel(); sceneAnimation=null;
+    turnFlight=null; introFlight=null; warpBoost=0; warpTravel=false; warpProjection=null; manualOrbit=false;
+    canvas.style.removeProperty('transform-origin'); setWarpBusy(false);
+    Object.assign(goal,cam);
+    selected = null; tracking = null; focus=null;
+    autoOrbit.reset();
     updateSide();
-    if (!origin) return;
-    const restore = () => {
-      focus = world.galaxies.find(g => g.path === origin.focusPath) ?? null;
-      Object.assign(goal, origin.camera);
-      updateSide();
-    };
-    if (diving || origin.trail.join('/') !== basePath()) {
-      if (nodeAt(origin.trail)) return travelTo(origin.trail, {
-        direction: origin.trail.length < trail.length ? 'out' : 'in', after: restore,
-      });
-      flyHome(); // 再読み込みで元の階層が消えた場合は、現在の全景へ戻る。
-    } else restore();
     return;
   }
-  if (zoom) rememberSelectionView();
   const sameFile = selected?.path === body.path;
   const followed = tracking?.path === body.path;
+  if (!sameFile) followedPath = null;  // 自動で開いたファイルの扱いは follow が付け直す（ユーザーが開いたものは自動扱いにしない）
   selected = body;
-  if (zoom) {
-    focus = body.galaxy ?? null;
-    tracking = body;
-    goal.tx = body.x; goal.ty = body.y; goal.tz = body.z;
-    goal.dist = (body.isPlanet ? Math.max(180, body.R * 22) : 170) * (F / Math.min(W, H));
-    autoOrbit.reset();
-  } else if (followed) tracking = body; // 再走査後も新しいオブジェクトを追う。
+  if (followed) tracking = body; // 再走査後も新しいオブジェクトを追う。
   if (record && !sameFile) remember('file', body.path);
   updateSide();
 }
@@ -1027,18 +1261,34 @@ function formatAge(ms) {
 }
 
 
+/** 自動運転中か: 視点移動 ON で、手動操作の直後でなく、ユーザーが自分で開いたファイルを見ていない（自動で開いたファイルの表示中は含む）。 */
+let driving = false, notifiedOrbitPhase = 'idle';
+function isDriving(now) {
+  if (!autoSpin || !world || document.hidden) return false;
+  if (following) return true;
+  return !dragging && !diving && now >= autoOrbit.pausedUntil && (!selected || selected.path === followedPath);
+}
 function notify() {
   if (disposed) return;
-  change({ scan, trail: [...trail], selected, focus, autoSpin, loading: !scan });
+  notifiedOrbitPhase = autoOrbit.phase;
+  change({ scan, trail: [...trail], selected, focus, journal, autoSpin, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
 }
 function updateSide() { notify(); }
 function renderAll() { notify(); }
 function revealCurrent() {}
+/** フィルターの切り替え。一覧を取り直し、増えた星を「新しく生まれた」扱いで光らせないよう基準を消す。 */
+function setFilter(on) {
+  const next = on ? 'backup' : '';
+  if (next === fileFilter) return;
+  fileFilter = next; knownPaths = null;
+  void refresh();
+}
 async function refresh(startedAt) {
   const run = ++loadGeneration;
   if (Number.isFinite(startedAt)) since = startedAt;
   try {
-    const response = await fetch('/api/galaxy', { cache: 'no-store', signal: listeners.signal });
+    // フィルター ON: AiDiy のバックアップ対象のファイルだけで宇宙を作る
+    const response = await fetch('/api/galaxy' + (fileFilter ? `?filter=${fileFilter}` : ''), { cache: 'no-store', signal: listeners.signal });
     if (!response.ok) throw Error(await response.text());
     const data = await response.json();
     if (disposed || run !== loadGeneration) return;
@@ -1049,7 +1299,8 @@ async function refresh(startedAt) {
       enterWorld({ from: 'outside', history: false }); cam.dist = overviewDistance() * 10;
     } else {
       const path = selected?.path; world = buildWorld();
-      selectBody([...world.stars, ...world.planets].find(item => item.path === path) || null, { record: false, zoom: false });
+      // 未選択での再走査は「閉じる」操作ではない。進行中の自動追跡を取消さない。
+      if(path) selectBody([...world.stars, ...world.planets].find(item => item.path === path) || null, { record: false, zoom: false });
     }
     knownPaths = new Set(collectFiles(scan.tree, '').map(file => file.path)); notify();
   } catch (error) { if (!disposed) change({ error: error.message, loading: false }); }
@@ -1066,9 +1317,15 @@ listen(window, 'keydown', event => {
 });
 requestAnimationFrame(frame);
 return {
-  refresh, goTo, ascend, flyHome, dive, approach, setAutoSpin, clear: () => selectBody(null),
-  get world() { return world; }, get trail() { return trail; }, get labels() { return labelBoxes; }, cam, goal,
+  refresh, goTo, ascend, flyHome, dive, approach, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,
+  get projection() { return { x: CX, y: CY }; },
+  get orbitPath() { return autoOrbit.path; },
+  get orbitPhase() { return autoOrbit.phase; },
+  get orbitVisibility() { return autoOrbit.visibility; },
   color: name => KINDS[kindOf(name)].color,
+  route(value) { routeMode=value.mode; aiRoute=[...(value.paths||[])]; },
+  get routeState() { return {mode:routeMode,paths:[...aiRoute]}; },
   marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
   dispose() { disposed = true; ++loadGeneration; ++warpSequence; listeners.abort(); window.cancelAnimationFrame(frameId); sceneAnimation?.cancel(); },
 };

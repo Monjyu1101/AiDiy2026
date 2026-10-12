@@ -41,13 +41,30 @@ test('名前のハッシュを毎回同じ3D座標へ変換し、全方向へ分
 
 test('上下左右の回転は極で止まらず、一周で同じ向きへ戻る', () => {
   const view = { ...HOME_VIEW };
-  orbitView(view, 0, 400); assert(view.pitch > Math.PI / 2);
-  orbitView(view, 0, -400);
+  orbitView(view, 0, 600); assert(view.pitch < -Math.PI / 2);
+  orbitView(view, 0, -600);
   orbitView(view, Math.PI * 2 / 0.005, Math.PI * 2 / 0.005);
   for (const key of ['yaw', 'pitch']) {
     assert(Math.abs(Math.sin(view[key]) - Math.sin(HOME_VIEW[key])) < 1e-12);
     assert(Math.abs(Math.cos(view[key]) - Math.cos(HOME_VIEW[key])) < 1e-12);
   }
+});
+
+test('ドラッグした方向へ手前の星が動く（宇宙をつかむ向き）', () => {
+  // 描画と同じ投影: x1 = x·cos(yaw) − z·sin(yaw)、y2 = y·cos(pitch) − z1·sin(pitch)。画面の y は下向き正（= 中心 − y2）
+  const screen = (view, point) => {
+    const x1 = point.x * Math.cos(view.yaw) - point.z * Math.sin(view.yaw);
+    const z1 = point.x * Math.sin(view.yaw) + point.z * Math.cos(view.yaw);
+    return { x: x1, y: -(point.y * Math.cos(view.pitch) - z1 * Math.sin(view.pitch)) };
+  };
+  // 原点よりカメラ側にある点（回転後の奥行き z1 が −100）
+  const nearOf = view => ({ x: -100 * Math.sin(view.yaw), y: 0, z: -100 * Math.cos(view.yaw) });
+  let view = { ...HOME_VIEW }, near = nearOf(view), before = screen(view, near);
+  orbitView(view, 0, 20);
+  assert(screen(view, near).y > before.y, '下へドラッグ → 下へ');
+  view = { ...HOME_VIEW }; near = nearOf(view); before = screen(view, near);
+  orbitView(view, 20, 0);
+  assert(screen(view, near).x > before.x, '右へドラッグ → 右へ');
 });
 
 test('平行移動はどの視点でも画面に沿い、奥行きを変えない', () => {

@@ -75,7 +75,7 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='オフライン利用').click()`);
   for(let i=0;i<100&&!await evaluate(`!!window.aidiyIDE?.world`);i++)await sleep(100);
   assert.equal(await evaluate(`!!window.aidiyIDE?.world`),true);
-  assert.equal(await evaluate(`document.querySelector('[role=switch][aria-label="視点移動"]').getAttribute('aria-checked')`),'true');
+  assert.equal(await evaluate(`document.querySelector('[role=switch][aria-label="自動探索"]').getAttribute('aria-checked')`),'true');
   const advance = ms => evaluate(`window.orbitTestAdvance(${ms})`);
   const view = () => evaluate(`({...window.aidiyIDE.goal})`);
   await advance(8000);
@@ -108,8 +108,8 @@ try {
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:230,y:300,button:'left',clickCount:1});
   const dragged = await view();await advance(59999);assert.deepEqual(await view(),dragged);
   await advance(3000);assert.notDeepEqual(await view(),dragged);
-  const toggle=()=>evaluate(`document.querySelector('[role=switch][aria-label="視点移動"]').click()`);
-  const enabled=()=>evaluate(`document.querySelector('[role=switch][aria-label="視点移動"]').getAttribute('aria-checked')`);
+  const toggle=()=>evaluate(`document.querySelector('[role=switch][aria-label="自動探索"]').click()`);
+  const enabled=()=>evaluate(`document.querySelector('[role=switch][aria-label="自動探索"]').getAttribute('aria-checked')`);
   await toggle();assert.equal(await enabled(),'false');
   const stopped=await view();await advance(95000);assert.deepEqual(await view(),stopped);
   await capture('nn-orbit-toggle-off.png');
@@ -153,7 +153,7 @@ try {
   assert.equal(perspective.visibleLinks,1);assert.equal(perspective.offscreenLinks,0);assert.equal(perspective.behindLinks,0);
   console.log('PERSPECTIVE PASS: '+JSON.stringify(perspective));
   assert.deepEqual(errors,[]);
-  console.log('ORBIT PASS: 楕円視点移動・手動操作後60秒停止・トグル初期ON/停止/再開・選択解除/Spaceキー連動');
+  console.log('ORBIT PASS: 楕円自動探索・手動操作後60秒停止・トグル初期ON/停止/再開・選択解除/Spaceキー連動');
   ws.close();
 } finally {
   chrome.kill();
