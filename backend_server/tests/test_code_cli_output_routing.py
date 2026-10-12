@@ -92,7 +92,7 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command[command.index("--model") + 1], "gpt-6-luna")
 
     def test_other_cli_same_omits_model_for_new_and_continued_sessions(self):
-        for provider in ("claude_cli", "copilot_cli", "antigravity_cli", "grok_cli", "opencode_cli", "aidiy_hermes", "claude_ollama", "codex_ollama"):
+        for provider in ("claude_cli", "copilot_cli", "antigravity_cli", "grok_cli", "opencode_cli", "claude_ollama", "codex_ollama"):
             code_ai, parent = self._code_ai(provider)
             # Ollama側にモデル設定があってもsameは明示指定しない。
             parent.モデル設定 = {"CODE_CLAUDE_OLLAMA_MODEL": "configured", "CODE_CODEX_OLLAMA_MODEL": "configured", "CHAT_OLLAMA_MODEL": "fallback"}
@@ -109,6 +109,15 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"ANTIGRAVITY_CLI_CLI_PATH": sys.executable}):
             command = code_ai._コマンド構築("test", 初回=True)
         self.assertEqual("0", command[command.index("--print-timeout") + 1])
+
+    def test_hermes_same_restores_previous_choice_and_keeps_prompt_on_stdin(self):
+        code_ai, _ = self._code_ai("aidiy_hermes")
+        for first in (True, False):
+            for model in ("same", "SAME"):
+                with self.subTest(first=first, model=model), patch.dict(os.environ, {"AIDIY_HERMES_CLI_PATH": "test_cli"}):
+                    code_ai.code_model = model
+                    command = code_ai._コマンド構築("長文の質問", 初回=first)
+                    self.assertEqual(command, ["test_cli", "-Q", "--provider", "same", "--model", "same", "--oneshot-stdin"])
 
     @staticmethod
     def _stdout_stderr_command(stdout="STDOUT_FINAL", stderr="STDERR_PROGRESS"):

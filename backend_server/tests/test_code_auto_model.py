@@ -136,6 +136,9 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
             command = process.call_args.kwargs["command"]
             if model != "same":
                 self.assertEqual(command[command.index("--model") + 1], model)
+            elif provider == "aidiy_hermes":
+                self.assertEqual(command[command.index("--provider") + 1], "same")
+                self.assertEqual(command[command.index("--model") + 1], "same")
             else:
                 self.assertNotIn("--model", command)
             self.assertEqual(parent.接続.messages, [])

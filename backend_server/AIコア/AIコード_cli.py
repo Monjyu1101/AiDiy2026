@@ -551,7 +551,11 @@ class CodeAI:
                 return base + ["-Q"] + local_args + ["--oneshot-stdin"]
 
             _model = self._ollama_cloud_suffix除去(self.code_model)
-            model_args = ["--model", _model] if _model and _model.lower() not in ("auto", "same") else []
+            if (_model or "").lower() == "same":
+                # Hermes の保存済み provider / モデルを、非対話起動でも復元する。
+                model_args = ["--provider", "same", "--model", "same"]
+            else:
+                model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
             return base + ["-Q"] + model_args + ["--oneshot-stdin"]
 
         # 以降の CLI（claude/copilot/gemini/codex/opencode）は npm の .cmd シムを直接実行に

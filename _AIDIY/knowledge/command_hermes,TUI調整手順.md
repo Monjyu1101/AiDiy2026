@@ -72,6 +72,7 @@ AiDiy 固有の `command_hermes/tests/` は別に存在する。upstream のテ�
 - `TextArea`、`FileHistory`、`SlashCommandCompleter`、`SlashCommandAutoSuggest`、主要 keybinding を AiDiy Hermes に合わせて使う
 - 会話出力は TUI 内の出力ウィンドウに入れず、通常 stdout と `patch_stdout()` でスクロールバックへ流す
 - TUI は下部固定の入力、status、spinner、補完メニューを中心にする
+- モデル未確定時のバナー・状態バーは「自動選択」と表示する。`unknown` を初期表示へ出さず、表示名を実行用モデル値へ代入しない。`same/same` の復元は初期描画より前に行う（保存・復元は Provider一覧と選択ロジックを参照）。
 - ANSI 色は対応端末でだけ出す。AiDiy アプリ経由や非TTYでは制御コードを出さない
 
 ## slash command

@@ -5050,6 +5050,7 @@ _OPENAI_OAUTH_RUNTIME_PROVIDER = "openai-codex"
 _XAI_OAUTH_SLUG = "xai-oauth"
 _XAI_OAUTH_DEFAULT_MODEL = "grok-4.6"
 _AIDIY_INITIAL_MODEL = "openai_oauth/gpt-6.1-sol"
+from hermes_cli.aidiy_model_preferences import load_model_choice, save_model_choice, model_display_name
 # Codex backend が返す一覧を取れなかったときだけ使う保険。ChatGPT アカウントで
 # 使えるモデルは契約プランで変わるので、基本はライブ一覧の先頭を既定にする。
 _OPENAI_OAUTH_FALLBACK_MODEL = "gpt-6.1-sol"
@@ -5920,6 +5921,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         self._explicit_api_key = api_key or _startup_api_key_override or None
         self._explicit_base_url = base_url
         self._aidiy_config = _load_aidiy_config()
+        self._aidiy_remember_model_selection = True
 
         # Provider selection is resolved lazily at use-time via _ensure_runtime_credentials().
         self.requested_provider = (
@@ -7012,7 +7014,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # changes mid-session, so the TUI would show a stale name after
         # _try_activate_fallback() switches provider/model.
         agent = getattr(self, "agent", None)
-        model_name = (getattr(agent, "model", None) or self.model or "unknown")
+        configured_model = getattr(agent, "model", None) or self.model
+        model_name = model_display_name(configured_model)
         # Friendly display: prefer reverse-alias from config.yaml ``model_aliases:``
         # before slash/length truncation. This turns long Palantir RIDs like
         # ``ri.language-model-service..language-model.anthropic-claude-4-7-opus``
@@ -7028,7 +7031,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             model_short = model_short[:-5]
         # CLI providers use a virtual "auto" model — show the provider name
         # instead so the status bar identifies which CLI is in use.
-        if model_short.lower() == "auto":
+        if str(configured_model or "").lower() in {"auto", "same"}:
             cli_slug = (getattr(self, "_aidiy_provider_slug", "") or "").lower()
             for cli_def in _AIDIY_CLI_PROVIDERS:
                 if cli_def["slug"] == cli_slug:
@@ -9512,7 +9515,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 toolset_map = snapshot["toolset_map"]
                 build_welcome_banner(
                     console=self.console,
-                    model=self.model,
+                    model=model_display_name(self.model),
                     cwd=cwd,
                     tools=snapshot["tools"],
                     enabled_toolsets=self.enabled_toolsets,
@@ -9560,7 +9563,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
                 build_welcome_banner(
                     console=self.console,
-                    model=self.model,
+                    model=model_display_name(self.model),
                     cwd=cwd,
                     tools=tools,
                     enabled_toolsets=self.enabled_toolsets,
@@ -10218,7 +10221,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             tool_status = f"{tool_count} tools"
 
         # Format model name (shorten if needed)
-        model_short = self.model.split("/")[-1] if "/" in self.model else self.model
+        model_name = model_display_name(self.model)
+        model_short = model_name.split("/")[-1] if "/" in model_name else model_name
         if len(model_short) > 30:
             model_short = model_short[:27] + "..."
 
@@ -10283,8 +10287,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         agent = getattr(self, "agent", None)
         total_tokens = getattr(agent, "session_total_tokens", 0) or 0
-        provider = getattr(self, "provider", None) or "unknown"
-        model = getattr(self, "model", None) or "(unknown)"
+        provider = getattr(self, "provider", None) or "auto"
+        model = model_display_name(getattr(self, "model", None))
         is_running = bool(getattr(self, "_agent_running", False))
 
         # Reasoning level (C-02): resolve the effective effort for display.
@@ -13014,6 +13018,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             self._explicit_base_url = self.base_url
             self._explicit_api_key = self.api_key
         self.model = model_name
+        if getattr(self, "_aidiy_remember_model_selection", False):
+            save_model_choice(provider_entry.get("slug"), model_name)
         self.agent = None
         self._active_agent_route_signature = None
         # CLI provider switch resets the per-CLI session-started tracker so the
@@ -23607,6 +23613,7 @@ def main(
                 pass_session_id=pass_session_id,
                 ignore_rules=ignore_rules,
             )
+            cli._aidiy_remember_model_selection = not quiet
             cli_provider_configured = _configure_aidiy_cli_provider(
                 cli,
                 provider,
@@ -24270,6 +24277,15 @@ def _load_aidiy_hermes_provider_defaults(provider: str | None) -> dict[str, str]
         with config_path.open("r", encoding="utf-8") as f:
             cfg = json.load(f)
     except Exception:
+        cfg = {}
+
+    if provider_slug in {"openai", "openrt", "openrouter", "gemini", "ollama"}:
+        picker = HermesCLI.__new__(HermesCLI)
+        picker._aidiy_config = cfg
+        entry = picker._get_aidiy_provider_entry(provider_slug, include_models=False)
+        if entry:
+            return {"provider": entry["runtime_provider"], "model": entry["default_model"],
+                    "base_url": entry["base_url"], "api_key": entry["api_key"]}
         return {}
 
     if provider_slug == "anthropic":
@@ -24361,6 +24377,17 @@ def cli_entry(argv: list[str] | None = None) -> int:
     # session alive for a bare ``-q`` on a TTY, so force the one-shot path.
     # AiDiy integration uses --oneshot-stdin to keep long prompts out of argv.
     oneshot = args.oneshot is not None or args.oneshot_stdin
+    # same/same は保存した手動選択を復元。auto/auto は従来の自動解決を保つ。
+    if (args.model or "").lower() in {"same/same", "auto/auto"} and not args.provider:
+        args.provider, args.model = args.model.lower().split("/")
+    restore_previous = (args.provider or "").lower() == "same" and (args.model or "").lower() == "same"
+    if restore_previous:
+        previous = None if args.ignore_user_config else load_model_choice()
+        args.provider = previous["provider"] if previous else None
+        args.model = previous["model"] if previous else None
+    elif (args.provider or "").lower() in {"", "auto"} and (args.model or "").lower() in {"", "auto"}:
+        args.provider = args.model = None
+
     # モデル・provider の両方が未指定なら、Hermes 本来の auto 解決へ任せる。
     # AIコードパネルで CODE_AI<N>_MODEL="auto" を選んだ場合もこの経路を通る。
     # ここで AiDiy_key.json の CODE_AIDIY_HERMES_MODEL を補完すると、画面上は
@@ -24382,6 +24409,17 @@ def cli_entry(argv: list[str] | None = None) -> int:
     model = args.model if args.provider and args.model else (defaults.get("model") or args.model)
     if cli_provider and (model or "").strip().lower() in {"auto", "same"}:
         model = None
+
+    # 対話起動で明示選択した値を記憶する。非対話のAI検索・Code実行は上書きしない。
+    if not quiet and not restore_previous:
+        selected_provider = args.provider
+        selected_model = args.model or defaults.get("model")
+        if not selected_provider and args.model:
+            prefix, separator, suffix = args.model.partition("/")
+            if separator and prefix in HermesCLI._aidiy_provider_slugs():
+                selected_provider, selected_model = prefix, suffix
+        if selected_provider and selected_model:
+            save_model_choice(selected_provider, selected_model)
 
     try:
         main(

@@ -16,6 +16,10 @@
 
 ## MCP サーバー一覧
 
+`aidiy_code_agents` の `ai_name` が `auto` / `same` の場合は `aidiy_hermes` を選ぶ。`auto/auto` は Hermes でモデルを自動選択し、`auto/same` と `same/same` は Hermes の前回手動選択（provider / モデル）を復元する。Hermes が利用不可ならエラーを返す。`codex_cli` などを明示指定した場合はそのエージェントを使う。起動時の利用可否確認には、Code パネル登録の有無にかかわらず Hermes を含める。
+
+前回値の保存先と指定方法は [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) を参照する。検証は `backend_tools/.venv` の Python で `python -m unittest discover -s backend_tools/tests -p test_code_agents_auto_model.py`、`backend_server/.venv` の Python で `python -m unittest discover -s backend_server/tests -p test_code_auto_model.py` を実行する。
+
 | サーバー名 | SSE URL | 主な用途 |
 |-----------|---------|---------|
 | `aidiy_chrome_devtools` | `http://127.0.0.1:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション。`session` パラメータ（省略時 `default`）で複数 Chrome を並行セッション管理でき、自動テストの並行実行が可能。使用後は `close_session` で破棄 |

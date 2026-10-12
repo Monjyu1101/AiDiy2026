@@ -22,6 +22,12 @@
 
 `auto` の場合、`_ensure_runtime_credentials()` が環境変数や設定ファイルから認証情報を検出し、利用可能な provider を自動選択します。
 
+`aidiy_hermes --provider same --model same`（または `--model same/same`）は、前回手動で選んだ provider とモデルを復元します。対話起動の明示選択と `/model` の AiDiy picker 選択は `HERMES_HOME/aidiy_model.json`（既定 `~/.hermes/aidiy_model.json`）に保存します。API キーは保存せず、起動時の共通設定と認証ストアから読み直します。保存値がない・壊れている場合は Hermes の通常設定へ戻り、`same` を API provider / モデル名として送信しません。`--ignore-user-config` はこの保存値も無視します。
+
+`--provider auto --model auto`（または `--model auto/auto`）と引数省略は従来の自動解決を使い、前回選択ファイルを復元しません。AI検索や Code の非対話実行（`-Q` / ワンショット）は手動選択を上書きしません。外部 CLI の `<provider>/same` は従来どおり、その CLI へのモデル指定を省略する意味です。
+
+確認: `command_hermes/.venv` の Python で `python -m unittest discover -s command_hermes/tests -p test_model_preferences.py` を実行し、起動選択・picker 保存・次回復元・キー再読込・非対話実行・初期描画を確認します。
+
 AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_aidiy_hermes_defaults()` が共通設定を読みます。`CODE_AIDIY_HERMES_MODEL` は `openai_oauth/gpt-6.1-sol` に加えて `xai-oauth/grok-4.6` を受理します。対応する OAuth が認証済みなら指定 provider を使い、非対話の Code AI 起動時に未認証または認証切れなら `freeai/gemini-3.8-flash` へ退避します。`--provider openai_oauth` / `--provider xai-oauth` を明示指定した場合は OAuth 経路を維持します。CLI の `--model` / `--provider` は初期値より優先されます。
 
 AiDiy の選択画面（aidiy_code / Discord のコードモデル候補も `frontend_ide/host/scripts/model-catalog.py` 経由で同じ）で `anthropic` を選んだときのモデル候補は、`cli_main.py` の `_fetch_aidiy_claude_model_labels` が `hermes_cli/models.py` の `_PROVIDER_MODELS["anthropic"]`（厳選した現行モデル：Fable 5.1 / Opus 5.5 / Sonnet 5.5 / Haiku 5.5）だけを返します。`provider_model_ids("anthropic")` は Anthropic API の一覧（旧世代を含む）を後ろに足すため使いません。新しいモデルが出たら `_PROVIDER_MODELS["anthropic"]` を更新します。`CHAT_CLAUDE_MODEL` 未設定時の既定モデル（`_aidiy_provider_default_model` と `anthropic` の接続設定）も同じ現行モデル（`claude-sonnet-5-5`）に揃えます。

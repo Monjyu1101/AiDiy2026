@@ -57,7 +57,7 @@ _AGENTS_METHODS = [
         "parameters": {
             "prompt": {"type": "string", "required": True, "description": "エージェントへの指示"},
             "project_path": {"type": "string", "required": False, "description": "作業ディレクトリの絶対パス"},
-            "ai_name": {"type": "string", "required": False, "default": "auto", "description": "claude_sdk / claude_cli / copilot_cli / codex_cli / auto など"},
+            "ai_name": {"type": "string", "required": False, "default": "auto", "description": "auto / same は aidiy_hermes。claude_sdk / claude_cli / copilot_cli / codex_cli なども明示指定可"},
             "ai_model": {"type": "string", "required": False, "default": "auto"},
             "max_turns": {"type": "integer", "required": False, "default": 999},
             "code_plan": {"type": "string", "required": False, "default": "auto"},
@@ -190,8 +190,8 @@ def create_router(code_agents) -> APIRouter:
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "エージェントへの指示（日本語可）。実装内容・対象ファイル・制約を具体的に記述する"},
                         "project_path": {"type": "string", "required": False, "description": "作業ディレクトリの絶対パス。省略時は CODE_BASE_PATH"},
-                        "ai_name": {"type": "string", "required": False, "default": "auto", "values": ["auto", "claude_sdk", "claude_cli", "copilot_cli", "codex_cli"], "description": "使用する AI エージェント。auto で利用可能な AI を自動選択"},
-                        "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。autoはCodex/Claude/Copilot CLIで履歴から自動選択、Decisions利用不可・他CLIは指定省略。sameは常に指定省略"},
+                        "ai_name": {"type": "string", "required": False, "default": "auto", "values": ["auto", "same", "aidiy_hermes", "claude_sdk", "claude_cli", "copilot_cli", "codex_cli"], "description": "使用する AI エージェント。auto / same は aidiy_hermes を選択"},
+                        "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。autoはHermes/Codex/Claude/Copilotで履歴から自動選択。Hermesのsameは前回のprovider/モデルを復元、他CLIのsameは指定省略"},
                         "max_turns": {"type": "integer", "required": False, "default": 999, "description": "エージェントの最大ターン数"},
                         "code_plan": {"type": "string", "required": False, "default": "auto", "description": "計画フェーズの有無（auto / on / off）"},
                         "code_verify": {"type": "string", "required": False, "default": "auto", "description": "検証フェーズの有無（auto / on / off）"},

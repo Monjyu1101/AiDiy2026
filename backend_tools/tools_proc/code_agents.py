@@ -112,15 +112,9 @@ class CodeAgents:
     def _resolve_ai_params(self, ai_name: str, ai_model: str) -> tuple[str, str]:
         """AI名を解決。CLIのautoは履歴によるモデル自動選択へ渡す。"""
         key = self._load_key_json()
-        if ai_name == "auto":
-            available = [k for k, v in self.version_info.items() if v.get("ok")]
-            # codex_cli が利用可能なら優先、なければ key.json の並び順で最初に利用可能な AI
-            if "codex_cli" in available:
-                ai_name = "codex_cli"
-            elif available:
-                ai_name = available[0]
-            else:
-                ai_name = key.get("CODE_AI1_NAME", "claude_cli")
+        if ai_name in ("auto", "same"):
+            # 自動・前回指定の入口は Hermes に統一し、モデルの auto / same を渡す。
+            ai_name = "aidiy_hermes"
         if ai_model == "auto" and ai_name == "claude_sdk":
             model_key = f"CODE_{ai_name.upper()}_MODEL"
             ai_model = key.get(model_key, "auto")
@@ -149,8 +143,9 @@ class CodeAgents:
             name = key.get(f"CODE_AI{i}_NAME", "").strip()
             if name and name not in candidates:
                 candidates.append(name)
-        if not candidates:
-            candidates = ["claude_cli"]
+        if "aidiy_hermes" not in candidates:
+            # auto / same の既定エージェントは CODE_AI* の登録有無にかかわらず確認する。
+            candidates.append("aidiy_hermes")
 
         # 各候補の CLI --version は I/O 待ちが支配的なので並列実行する。
         # 逐次だと最悪「候補数 × timeout」秒かかり、8095 起動（uvicorn）全体を
@@ -265,8 +260,8 @@ class CodeAgents:
 Args:
     prompt: エージェントへの依頼テキスト
     project_path: 作業ディレクトリの絶対パス（省略時は AiDiy_key.json の CODE_BASE_PATH）
-    ai_name: 使用 AI（上記の利用可能な ai_name から指定。"auto" は codex_cli 優先で自動選択）
-    ai_model: モデル名。autoはCodex/Claude/Copilot CLIで履歴から自動選択、Decisions利用不可・他CLIは指定省略。sameは常に指定省略。
+    ai_name: 使用 AI（上記の利用可能な ai_name から指定。"auto" / "same" は aidiy_hermes を選択）
+    ai_model: モデル名。autoはHermes/Codex/Claude/Copilotで履歴から自動選択。Hermesのsameは前回のprovider/モデルを復元、他CLIのsameは指定省略。
     max_turns: 最大ターン数（default: 999）
     code_plan: プラン設定（auto / on / off）
     code_verify: 検証設定（auto / on / off）
@@ -305,8 +300,8 @@ Args:
             project_path: 作業ディレクトリの絶対パス。
                           省略時は AiDiy_key.json の CODE_BASE_PATH を使用。
             ai_name: 使用 AI（例: claude_cli / copilot_cli / aidiy_hermes）。
-                     "auto" は codex_cli を優先し、なければ利用可能な最初の AI にフォールバック。
-            ai_model: CLIのautoは履歴から自動選択。sameはモデル指定省略。
+                     "auto" / "same" は aidiy_hermes を選択。利用不可の場合はエラー。
+            ai_model: CLIのautoは履歴から自動選択。Hermesのsameは前回値、他CLIは指定省略。
             max_turns: 最大ターン数（default: 999）
             code_plan: プラン設定（auto / on / off）
             code_verify: 検証設定（auto / on / off）
