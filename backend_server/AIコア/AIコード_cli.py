@@ -232,6 +232,7 @@ class CodeAI:
         # プロバイダー設定
         self.code_ai = AI_NAME
         self.code_model = AI_MODEL
+        self.最終実行モデル = ""
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
@@ -421,14 +422,18 @@ class CodeAI:
 
     def _ollama起動モデル取得(self, provider_key: str) -> str:
         """claude_ollama/codex_ollama 用のモデルを解決する"""
-        model = self.code_model if self.code_model and self.code_model.lower() != "auto" else ""
+        if self.code_model and self.code_model.lower() == "same":
+            return ""
+        model = self.code_model if self.code_model and self.code_model.lower() not in ("auto", "same") else ""
         if not model and self.parent_manager:
             _ms = (getattr(self.parent_manager, 'モデル設定', None)
                    or getattr(getattr(self.parent_manager, '接続', None), 'モデル設定', None)
                    or {})
             model = _ms.get(provider_key, "")
-            if not model or model.lower() == "auto":
+            if not model or model.lower() in ("auto", "same"):
                 model = _ms.get("CHAT_OLLAMA_MODEL", "")
+        if model and model.lower() in ("auto", "same"):
+            return ""
         return model
 
     async def バージョン確認(self) -> str:
@@ -546,7 +551,7 @@ class CodeAI:
                 return base + ["-Q"] + local_args + ["--oneshot-stdin"]
 
             _model = self._ollama_cloud_suffix除去(self.code_model)
-            model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
+            model_args = ["--model", _model] if _model and _model.lower() not in ("auto", "same") else []
             return base + ["-Q"] + model_args + ["--oneshot-stdin"]
 
         # 以降の CLI（claude/copilot/gemini/codex/opencode）は npm の .cmd シムを直接実行に
@@ -559,7 +564,7 @@ class CodeAI:
 
         if self.code_ai == "opencode_cli":
             _model = self._ollama_cloud_suffix除去(self.code_model)
-            model_args = ["--model", _model] if _model and _model.lower() != "auto" else []
+            model_args = ["--model", _model] if _model and _model.lower() not in ("auto", "same") else []
             cmd_args = base + ["run"]
             cmd_args += model_args + [プロンプト]
             if not 初回:
@@ -572,8 +577,8 @@ class CodeAI:
             if self.code_permissions != "none":
                 # --always-approve（別名 --yolo）で全ツール実行を自動承認
                 common.append("--always-approve")
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
+            # auto / same（変更無し）はモデル指定を省略
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--cwd", repo_path])
@@ -592,8 +597,8 @@ class CodeAI:
             common.extend(["--output-format", "json", "--stream", "on"])
             if self.code_permissions != "none":
                 common.append("--allow-all-tools")
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
+            # auto / same（変更無し）はモデル指定を省略
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
@@ -607,8 +612,8 @@ class CodeAI:
             common = list(base)
             if self.code_permissions != "none":
                 common.append("--dangerously-skip-permissions")
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
+            # auto / same（変更無し）はモデル指定を省略
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
@@ -624,8 +629,8 @@ class CodeAI:
             # OpenAI Codex CLI
             # Codex はサンドボックス無視を常に有効にする。
             base_args = base + ["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"]
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
+            # auto / same（変更無し）はCLI側のモデル設定に任せる。
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 base_args.extend(["--model", self.code_model])
 
             # 継続の場合は resume <session-id> を追加
@@ -657,8 +662,8 @@ class CodeAI:
             if self.code_permissions != "none":
                 common.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
             common.append("--chrome")
-            # モデルがautoの場合はモデル指定を省略
-            if self.code_model and self.code_model.lower() != "auto":
+            # auto / same（変更無し）はモデル指定を省略
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
@@ -691,7 +696,7 @@ class CodeAI:
             if self.code_permissions != "none":
                 common.extend(["--allow-dangerously-skip-permissions", "--permission-mode", "bypassPermissions"])
             common.append("--chrome")
-            if self.code_model and self.code_model.lower() != "auto":
+            if self.code_model and self.code_model.lower() not in ("auto", "same"):
                 common.extend(["--model", self.code_model])
             if repo_path:
                 common.extend(["--add-dir", repo_path])
@@ -1030,11 +1035,16 @@ class CodeAI:
                     return "CodeAIが停止状態です。開始してください。"
 
             # 履歴管理
+            if not resume:
+                self.履歴辞書 = {}
+                self.履歴最終番号 = 0
             if len(self.履歴辞書) == 0:
                 self._履歴追加(self.system_prompt, "system")
 
             # 初回判定（resumeがFalseまたはセッション未開始）
             初回送信 = not resume or not self.session_started
+            # 送信文とモデル判断で同じ履歴を使う。生成はターンごとに1回だけ。
+            履歴テキスト = self._履歴取得()
 
             # 完全なプロンプト構築（プロバイダー別）
             if self.code_ai in ["claude_cli", "copilot_cli", "antigravity_cli", "codex_cli", "opencode_cli", "grok_cli"]:
@@ -1062,15 +1072,33 @@ class CodeAI:
                 # 毎回フルコンテキストを送る方式。初回だけ素の system_prompt を先頭に置くと
                 # 2回目以降（履歴テキスト先頭）とプレフィックスが一致せずキャッシュが無効になる。
                 # 初回から履歴テキスト形式で統一し、先頭を追記のみで伸ばす。
-                if not resume:
-                    # 履歴を使わない指定。system のみに戻してから同じ形式で組む
-                    self.履歴辞書 = {}
-                    self.履歴最終番号 = 0
-                    self._履歴追加(self.system_prompt, "system")
-                履歴テキスト = self._履歴取得()
                 完全プロンプト = f"{履歴テキスト}\n\n{送信用要求テキスト}"
                 if 初回送信:
                     self.session_started = True
+
+            # CLI自身が履歴を持つ継続モードでも、判断には保持中の会話履歴を渡す。
+            # 新規会話には以前の会話を混ぜない。選択結果は今回だけ使用する。
+            選択モデル = ""
+            モデル選択失敗 = False
+            実行モデル = self.code_model
+            if (self.code_model or "").strip().lower() == "auto":
+                実行モデル = "same"
+                判断CLI = "codex_cli" if self.code_ai == "aidiy_hermes" else self.code_ai
+                if 判断CLI in ("codex_cli", "claude_cli", "copilot_cli"):
+                    from AIコア.AIコードモデル選択 import select_model
+                    選択モデル = await select_model(
+                        判断CLI, "" if 初回送信 else 履歴テキスト, 完全プロンプト,
+                    )
+                    モデル選択失敗 = not 選択モデル
+                    if モデル選択失敗:
+                        選択モデル = "sonnet" if 判断CLI == "claude_cli" else "gpt-6.1-sol"
+                    if self.code_ai == "aidiy_hermes":
+                        選択モデル = f"openai_oauth/{選択モデル}"
+                    実行モデル = 選択モデル
+            self.最終実行モデル = "" if (実行モデル or "").lower() in ("", "auto", "same") else 実行モデル
+            if self._強制停止要求あり():
+                await self._停止マーカー送信()
+                return ""
 
             # 履歴に今回の要求を追加（完全プロンプト生成後：重複送信を避ける）
             self._履歴追加(要求テキスト, "user")
@@ -1078,18 +1106,39 @@ class CodeAI:
             # コマンド構築（プロバイダー別・初回判定付き）
             作業ディレクトリ = 絶対パス if 絶対パス else self.cwd_str
             repo_path = Path(作業ディレクトリ).resolve().as_posix()
-            command = self._コマンド構築(
-                プロンプト=完全プロンプト,
-                初回=初回送信,
-                repo_path=repo_path,
-                読取専用=読取専用
-            )
+            設定モデル = self.code_model
+            try:
+                # 同期的なコマンド構築だけに適用し、autoを次のターンにも維持する。
+                self.code_model = 実行モデル
+                command = self._コマンド構築(
+                    プロンプト=完全プロンプト,
+                    初回=初回送信,
+                    repo_path=repo_path,
+                    読取専用=読取専用
+                )
+            finally:
+                self.code_model = 設定モデル
+
+            if 選択モデル and self.parent_manager and hasattr(self.parent_manager, '接続'):
+                try:
+                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                        "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+                        "メッセージ識別": "output_stream",
+                        "メッセージ内容": (f"[モデル選択失敗: {選択モデル} を使用します]\n" if モデル選択失敗
+                                           else f"[選択モデル: {選択モデル}]\n"),
+                        "ファイル名": None, "サムネイル画像": None,
+                    })
+                except Exception:
+                    logger.warning("Code CLI選択モデル通知を送信できませんでした")
+            if self._強制停止要求あり():
+                await self._停止マーカー送信()
+                return ""
 
             # テスト用：送信コンテキスト（完全プロンプト）を標準出力に表示（平文）
             try:
                 print("\n" + "=" * 80)
                 print("送信コンテキスト（完全プロンプト）")
-                print(f"AI={self.code_ai} model={self.code_model} resume={resume} 初回送信={初回送信}")
+                print(f"AI={self.code_ai} model={実行モデル} resume={resume} 初回送信={初回送信}")
                 print("-" * 80)
                 print(完全プロンプト)
                 print("=" * 80 + "\n")

@@ -88,6 +88,7 @@ Antigravity CLI は `~/.gemini/config/mcp_config.json` の `mcpServers` に HTTP
 - `python _setup.py` は必要に応じて Claude / Gemini / Copilot / OpenCode / Codex / Grok / Antigravity 用 MCP 設定を生成する
 - `python _cleanup.py` は AiDiy が追加した MCP 設定を削除する
 - `.claude/` と `.gemini/` は CLI がローカルで更新するため、project 配下に置く場合は `.gitignore` に入れる
+- Decisions / FFmpegなどの起動チェック結果にかかわらず、外部設定にMCP接続先を登録する。利用不可は接続後の `initialize.instructions` と診断ツールで伝え、実行ツールだけを非公開にする。
 
 ## Windows の注意点
 

@@ -318,7 +318,7 @@ window.addEventListener('message', event => {
       if (state.provider === provider && model && !rows.some(item => item.id === model)) modelSelect.add(new Option(`${model}（現在のモデル）`, model));
       modelSelect.add(new Option('一覧にないモデル ID を入力…', '__manual__'));
     }
-    modelSelect.value = state.provider === provider ? model : オフライン ? 'auto' : '';
+    modelSelect.value = state.provider === provider ? model : オフライン ? 'same' : '';
     customModel.value = state.provider === provider ? model : '';
     if (modelSelect.selectedIndex < 0) modelSelect.selectedIndex = 0;
     providerSelect.disabled = オフライン; modelSelect.disabled = false;

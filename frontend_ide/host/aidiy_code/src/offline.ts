@@ -53,15 +53,15 @@ export function Hermes既定モデル(...folders: string[]): string {
 
 // AIコアもモデル情報APIも使わず、ローカルのHermesランチャーから候補を読む。
 export function オフラインモデル候補(root: string) {
-  const models = new Set<string>(['auto']);
+  const models = new Set<string>(['same']);
   try {
     const bat = readFileSync(共通ファイル(root, 'scripts', 'cli_bat', '_hermes_cli.bat'), 'utf8');
     for (const match of bat.matchAll(/set "MODEL=([^"%\r\n]+)"/g)) models.add(match[1].includes('/') ? match[1] : `openai_oauth/${match[1]}`);
   } catch {
     // ランチャーを同梱しない配置でも、同じ固定候補を使う。
-    for (const model of ['codex_cli/auto', 'copilot_cli/auto', 'openai_oauth/gpt-6-astra', 'openai_oauth/gpt-6.1-sol', 'openai_oauth/gpt-5.6-terra', 'openai_oauth/gpt-6-luna']) models.add(model);
+    for (const model of ['codex_cli/same', 'copilot_cli/same', 'openai_oauth/gpt-6-astra', 'openai_oauth/gpt-6.1-sol', 'openai_oauth/gpt-5.6-terra', 'openai_oauth/gpt-6-luna']) models.add(model);
   }
-  return [...models].map(id => ({ id, label: id }));
+  return [...models].map(id => ({ id, label: id === 'same' || id.endsWith('/same') ? `${id} (変更なし)` : id }));
 }
 
 export function オフライン実行(root: string, project: string, model: string, text: string,

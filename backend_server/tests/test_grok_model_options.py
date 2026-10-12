@@ -36,8 +36,8 @@ class GrokModelOptionsTest(unittest.TestCase):
 
             saved = json.loads(config_path.read_text(encoding="utf-8"))["models"]
 
-        self.assertEqual(list(models), ["auto", *bat_models])
-        self.assertEqual(saved, models)
+        self.assertEqual(list(models), ["auto", "same", *bat_models])
+        self.assertEqual(saved, {key: value for key, value in models.items() if key not in ("auto", "same")})
 
 
 if __name__ == "__main__":

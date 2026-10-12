@@ -120,14 +120,12 @@ class conf_models:
 
         # コードAIモデル一覧
         self.CODE_CLAUDE_SDK_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "fable": "yyyy/mm/dd - fable",
             "opus": "yyyy/mm/dd - opus",
             "sonnet": "yyyy/mm/dd - sonnet",
             "haiku": "yyyy/mm/dd - haiku",
         }
         self.CODE_CLAUDE_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "fable": "yyyy/mm/dd - fable",
             "opus": "yyyy/mm/dd - opus",
             "sonnet": "yyyy/mm/dd - sonnet",
@@ -135,7 +133,6 @@ class conf_models:
         }
         # scripts/cli_bat/_copilot_cli.bat の MODEL 値だけを公開する。
         self.CODE_COPILOT_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
             "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
@@ -147,20 +144,17 @@ class conf_models:
             "gemini-3.8-flash": "yyyy/mm/dd - gemini-3.8-flash",
         }
         self.CODE_ANTIGRAVITY_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "gemini-3.8-flash-high": "yyyy/mm/dd - gemini-3.8-flash-high",
             "gemini-3.8-flash-medium": "yyyy/mm/dd - gemini-3.8-flash-medium",
             "gemini-3.8-flash-low": "yyyy/mm/dd - gemini-3.8-flash-low",
         }
         self.CODE_CODEX_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
             "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
             "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
             "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
         }
         self.CODE_GROK_CLI_MODELS = {
-            "auto": "yyyy/mm/dd - auto (default)",
             "grok-4.8": "yyyy/mm/dd - grok-4.8",
             "grok-4.7": "yyyy/mm/dd - grok-4.7",
         }
@@ -798,7 +792,6 @@ class conf_models:
     def _get_aidiy_hermes_models(self) -> Dict[str, str]:
         """_hermes.bat の OpenAI OAuth モデルを画面用の候補にする。"""
         return {
-            "auto": "yyyy/mm/dd - auto",
             "openai_oauth/gpt-6-astra": "yyyy/mm/dd - OpenAI OAuth / gpt-6-astra",
             "openai_oauth/gpt-6.1-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6.1-sol (bat default)",
             "openai_oauth/gpt-5.6-terra": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-terra",
@@ -807,21 +800,21 @@ class conf_models:
 
     def _get_opencode_cli_models(self) -> Dict[str, str]:
         """opencode_cli のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        result = {}
         if self.ollama_models:
             result.update(self.ollama_models)
         return result
 
     def _get_claude_ollama_models(self) -> Dict[str, str]:
         """claude_ollama のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        result = {}
         if self.ollama_models:
             result.update(self.ollama_models)
         return result
 
     def _get_codex_ollama_models(self) -> Dict[str, str]:
         """codex_ollama のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {"auto": "yyyy/mm/dd - auto (default)"}
+        result = {}
         if self.ollama_models:
             result.update(self.ollama_models)
         return result
@@ -841,7 +834,15 @@ class conf_models:
         if self.ollama_models:
             models["claude_ollama"] = self._get_claude_ollama_models()
             models["codex_ollama"] = self._get_codex_ollama_models()
-        return models
+        # auto / same はモデルそのものではなく実行方法。JSONには保存せず表示時に付ける。
+        return {
+            provider: {
+                "auto": "auto (自動判定)",
+                "same": "same (変更なし)",
+                **{key: label for key, label in choices.items() if key not in ("auto", "same")},
+            }
+            for provider, choices in models.items()
+        }
 
 
 __all__ = [

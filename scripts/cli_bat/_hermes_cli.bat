@@ -12,8 +12,8 @@ ECHO ============================================================
 :SELECT_MODEL
 ECHO.
 ECHO Model list
-ECHO   1: codex_cli/auto
-ECHO   2: copilot_cli/auto
+ECHO   1: codex_cli/same
+ECHO   2: copilot_cli/same
 ECHO   3: openai_oauth/gpt-6-astra
 ECHO   4: openai_oauth/gpt-6.1-sol
 ECHO   5: openai_oauth/gpt-5.6-terra
@@ -25,8 +25,8 @@ set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: openai_oauth/gpt-6.1-sol]: "
 if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER set "MODEL_NUMBER=4"
-if "%MODEL_NUMBER%"=="1" set "MODEL=codex_cli/auto"
-if "%MODEL_NUMBER%"=="2" set "MODEL=copilot_cli/auto"
+if "%MODEL_NUMBER%"=="1" set "MODEL=codex_cli/same"
+if "%MODEL_NUMBER%"=="2" set "MODEL=copilot_cli/same"
 if "%MODEL_NUMBER%"=="3" set "MODEL=openai_oauth/gpt-6-astra"
 if "%MODEL_NUMBER%"=="4" set "MODEL=openai_oauth/gpt-6.1-sol"
 if "%MODEL_NUMBER%"=="5" set "MODEL=openai_oauth/gpt-5.6-terra"

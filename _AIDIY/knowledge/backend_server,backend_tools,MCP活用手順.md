@@ -10,7 +10,7 @@
 ## 関連ファイル
 - `_config/AiDiy_mcp.json` — Claude Agent SDK に渡す MCP 接続定義
 - `backend_server/AIコア/AIコード_claude.py` — Claude Agent SDK で MCP を使う処理
-- `backend_tools/tools_main.py` — Windows は19個、Linux / macOS は18個の MCP サーバー入口
+- `backend_tools/tools_main.py` — Windows は20個、Linux / macOS は19個の MCP サーバー入口
 - `backend_tools/mcp_stdio.py` — SSE を stdio client へ中継
 - `backend_tools/tools_proc/` — 各 MCP のロジック
 
@@ -34,6 +34,7 @@
 | `aidiy_notification_sounds` | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） |
 | `aidiy_code_agents` | `http://127.0.0.1:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
 | `aidiy_chat_llms` | `http://127.0.0.1:8095/aidiy_chat_llms/sse` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 |
+| `aidiy_decisions_check` | `http://127.0.0.1:8095/aidiy_decisions_check/sse` | AI判断の真偽確率・選択・段階評価 |
 | `aidiy_task_agents` | `http://127.0.0.1:8095/aidiy_task_agents/sse` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 |
 | `aidiy_team_agents` | `http://127.0.0.1:8095/aidiy_team_agents/sse` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 |
 | `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
@@ -78,6 +79,7 @@
 | 長時間処理の開始 / 終了 / 注意をローカル通知音で知らせる | `aidiy_notification_sounds` |
 | AI コードエージェント実行（CodeAI CLI 経由） | `aidiy_code_agents` |
 | AIチャット の ChatAI をツール／OpenAI 互換 API として呼ぶ | `aidiy_chat_llms` |
+| 真偽の確率・候補選択・段階評価を共通形式で取得 | `aidiy_decisions_check`（[AI判断の利用と追加](./backend_server,backend_tools,AI判断追加手順.md)） |
 | AIタスクへ依頼を投入して非同期実行させる | `aidiy_task_agents` |
 | AIチームの要員へ依頼を投入して非同期実行させる | `aidiy_team_agents` |
 | マウス/キーボード操作、ウィンドウ制御、プロセス管理 | `aidiy_windows_control` |

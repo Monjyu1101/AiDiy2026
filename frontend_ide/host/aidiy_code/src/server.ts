@@ -43,12 +43,12 @@ export async function 単独起動(project: string, backend?: string, initialMod
       : remembered ?? (!requestedProvider && !requestedModel ? defaultModel
         : { provider: requestedProvider || 'aidiy_hermes', model: requestedModel || (requestedProvider === 'aidiy_hermes' ? defaultModel.model : '') })),
     offline: { provider: 'aidiy_hermes', model: offlineSaved?.provider === 'aidiy_hermes' && offlineModelAllowed(offlineSaved.model)
-      ? offlineSaved.model : offlineModelAllowed(defaultModel.model) ? defaultModel.model : 'auto' },
+      ? offlineSaved.model : offlineModelAllowed(defaultModel.model) ? defaultModel.model : 'same' },
   };
   if (initialModel.offline && (requestedProvider || requestedModel)) {
     const selected = コード選択({ provider: requestedProvider || 'aidiy_hermes', model: requestedModel || modeModels.offline.model });
     if (selected.provider !== 'aidiy_hermes') throw new Error('オフラインでは aidiy_hermes だけを使用できます。');
-    if (!offlineModelAllowed(selected.model)) throw new Error('オフラインのモデルは auto または _hermes_cli.bat の選択値を指定してください。');
+    if (!offlineModelAllowed(selected.model)) throw new Error('オフラインのモデルは same または _hermes_cli.bat の選択値を指定してください。');
     modeModels.offline = selected;
   }
   const state = {

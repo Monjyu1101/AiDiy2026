@@ -78,7 +78,7 @@ function receive(packet) {
       void changeProvider();
     } else {
       models.value = items;
-      model.value = provider.value === state.provider ? state.model || '' : offline.value ? 'auto' : '';
+      model.value = provider.value === state.provider ? state.model || '' : offline.value ? 'same' : '';
       if (offline.value && !items.some(item => item.id === model.value)) model.value = items[0]?.id || '';
       custom.value = provider.value === state.provider ? state.model || '' : '';
       catalogBusy.value = false; catalogReady.value = true;

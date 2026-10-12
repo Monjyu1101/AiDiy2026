@@ -5305,12 +5305,12 @@ def _aidiy_cli_build_command(
     model: Optional[str] = None,
 ) -> list:
     # Mirrors backend_server/AIコア/AIコード_cli.py::_コマンド構築.
-    # auto は外部 CLI の既定モデルに任せ、明示指定だけ --model へ渡す。
+    # same（旧表記 auto）は外部 CLI のモデルを変更せず、明示指定だけ --model へ渡す。
     cmd_path = _aidiy_cli_command_path(cli_slug)
     one_line = _aidiy_cli_normalize_prompt(prompt)
     permissions = _aidiy_cli_code_permissions()
     selected_model = str(model or "").strip()
-    model_args = ["--model", selected_model] if selected_model and selected_model.lower() != "auto" else []
+    model_args = ["--model", selected_model] if selected_model and selected_model.lower() not in {"auto", "same"} else []
 
     if cli_slug == "claude-code":
         common = [cmd_path]
@@ -24380,7 +24380,7 @@ def cli_entry(argv: list[str] | None = None) -> int:
     base_url = args.base_url or defaults.get("base_url")
     api_key = args.api_key or defaults.get("api_key")
     model = args.model if args.provider and args.model else (defaults.get("model") or args.model)
-    if cli_provider and (model or "").strip().lower() == "auto":
+    if cli_provider and (model or "").strip().lower() in {"auto", "same"}:
         model = None
 
     try:

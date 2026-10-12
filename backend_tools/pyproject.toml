@@ -20,6 +20,8 @@ dependencies = [
     "anthropic",
     "claude-agent-sdk",
     "requests",
+    "httpx",
+    "PyYAML",
     "speechrecognition",
     "lameenc",
     "uiautomation; sys_platform == 'win32'",

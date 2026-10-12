@@ -1210,35 +1210,12 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 ai_name = セッション.モデル設定.get(ai_key, "")
                 ai_model = セッション.モデル設定.get(model_key, "")
                 model_auto = not str(ai_model or "").strip() or str(ai_model).strip().lower() == "auto"
-                if model_auto and ai_name != "aidiy_hermes":
-                    provider_key = ""
-                    if ai_name == "claude_sdk":
-                        provider_key = "CODE_CLAUDE_SDK_MODEL"
-                    elif ai_name == "claude_cli":
-                        provider_key = "CODE_CLAUDE_CLI_MODEL"
-                    elif ai_name == "copilot_cli":
-                        provider_key = "CODE_COPILOT_CLI_MODEL"
-                    elif ai_name == "antigravity_cli":
-                        provider_key = "CODE_ANTIGRAVITY_CLI_MODEL"
-                    elif ai_name == "codex_cli":
-                        provider_key = "CODE_CODEX_CLI_MODEL"
-                    elif ai_name == "grok_cli":
-                        provider_key = "CODE_GROK_CLI_MODEL"
-                    elif ai_name == "aidiy_hermes":
-                        provider_key = "CODE_AIDIY_HERMES_MODEL"
-                    elif ai_name == "opencode_cli":
-                        provider_key = "CODE_OPENCODE_CLI_MODEL"
-                    elif ai_name == "claude_ollama":
-                        provider_key = "CODE_CLAUDE_OLLAMA_MODEL"
-                    elif ai_name == "codex_ollama":
-                        provider_key = "CODE_CODEX_OLLAMA_MODEL"
-                    if provider_key:
-                        ai_model = セッション.モデル設定.get(provider_key, "")
-                elif model_auto:
-                    # aidiy_hermes の auto は CLI 側の自動解決を意味する。
-                    # CODE_AIDIY_HERMES_MODEL へ表示だけを置換すると、実際の起動指定と
-                    # 食い違って特定モデルを選択したように見えるため auto のまま示す。
-                    ai_model = "auto"
+                if model_auto:
+                    # CLIのautoは実行時に判断する。設定済みモデルで表示を置換しない。
+                    ai_model = (
+                        セッション.モデル設定.get("CODE_CLAUDE_SDK_MODEL", "auto")
+                        if ai_name == "claude_sdk" else "auto"
+                    )
 
                 ウェルカム本文 = (
                     f"私は Code Agent ({idx}) です。\n"

@@ -23,6 +23,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | S系スケジューラ追加 | [`../_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md`](../_AIDIY/knowledge/backend_server,S系スケジューラ追加手順.md) |
 | AIコア WebSocket | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
 | AIモデル設定 | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
+| AI判断 / Decisions | [`../_AIDIY/knowledge/backend_server,backend_tools,AI判断追加手順.md`](../_AIDIY/knowledge/backend_server,backend_tools,AI判断追加手順.md) |
 | 設定管理（conf_json / conf_model / conf_path） | [`../_AIDIY/knowledge/backend_server,設定管理(conf).md`](<../_AIDIY/knowledge/backend_server,設定管理(conf).md>) |
 | Code CLI 追加 | [`../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](../_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
 | MCP 構成・活用 | [`../_AIDIY/knowledge/backend_tools,構成.md`](../_AIDIY/knowledge/backend_tools,構成.md)、[`../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](../_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
@@ -134,6 +135,7 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 - `AIストリーミング処理`
 - `AI音声処理`
 - `AIチャット*`（`gemini` / `local` / `ollama` / `openrt` / `openai` / `openai_oauth`。`freeai_chat` は `AIチャット_gemini.py` が扱う）
+- `AI判断*`（`openai_decisions` / `openai_jsonchat`。共通の真偽確率・選択・段階評価）
 - `AIライブ*`（`gemini` / `openai`。`freeai_live` は `AIライブ_gemini.py` が扱う）
 - `AIコード*`（`AIコード_cli.py`、`AIコード_claude.py`）
 - `AI内部ツール`

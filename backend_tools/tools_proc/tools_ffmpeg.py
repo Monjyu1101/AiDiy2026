@@ -14,10 +14,12 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from log_config import get_logger
 from tools_proc.ffmpeg_control import FfmpegControlError
+from tools_proc.tool_availability import availability_status
 
 logger = get_logger(__name__)
 
@@ -38,6 +40,7 @@ class FfmpegRequest(BaseModel):
 def register_tools(mcp_ff, ffmpeg_c):
     """aidiy_ffmpeg_control MCP ツールを mcp_ff インスタンスに登録する。
     version_info に基づいて条件付きツールを登録し、ログに公開ツール一覧を出力する。"""
+    mcp_ff._lowlevel_server.instructions = availability_status("FFmpeg", ffmpeg_c.version_info)["message"]
 
     @mcp_ff.tool()
     async def ffmpeg_versions() -> str:
@@ -206,7 +209,7 @@ def register_tools(mcp_ff, ffmpeg_c):
     if _ff_skipped:
         logger.warning(
             f"aidiy_ffmpeg_control 非公開（-version 失敗）: {_ff_skipped} — "
-            f"_config/aidiy_ffmpeg_control.json のパスを確認してください"
+            f"_config/mcp_ffmpeg_control.json のパスを確認してください"
         )
 
 
@@ -224,6 +227,7 @@ def create_router(ffmpeg_c) -> APIRouter:
         has_ffprobe = ffmpeg_c.version_info.get("ffprobe", {}).get("ok", False)
         has_ffplay = ffmpeg_c.version_info.get("ffplay", {}).get("ok", False)
         return {
+            **availability_status("FFmpeg", ffmpeg_c.version_info),
             "service": "aidiy_ffmpeg_control",
             "description": "ffmpeg / ffprobe / ffplay を実行する。動画・音声の変換・解析・トリミング・プレビュー再生に対応。バイナリが未検出のメソッドは error を返す。",
             "endpoint": "POST /aidiy_ffmpeg_control/{method_name}",
@@ -338,33 +342,35 @@ def create_router(ffmpeg_c) -> APIRouter:
         | video_trimming | 動画トリミング |
         | ffplay_run | ffplay 実行 |
         """
+        required = {
+            "ffmpeg_run": "ffmpeg", "ffprobe_run": "ffprobe", "media_duration": "ffprobe",
+            "analyze_audio": "ffmpeg", "video_trimming": "ffmpeg", "ffplay_run": "ffplay",
+        }.get(method_name)
+        if required and not ffmpeg_c.version_info.get(required, {}).get("ok"):
+            message = f"現在利用不可：{required} の起動チェックに失敗しています。設定を確認して再起動してください。"
+            return JSONResponse(status_code=503, content={
+                "status": "NG", "available": False, "message": message, "error": message,
+                "checks": {required: ffmpeg_c.version_info.get(required, {})},
+            })
         try:
             if method_name == "versions":
                 return ffmpeg_c.get_versions()
             elif method_name == "ffmpeg_run":
-                if not ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
-                    return {"error": "ffmpeg が利用できません"}
                 if not req.args_str:
                     return {"error": "args_str は必須です"}
                 result = await ffmpeg_c.run_ffmpeg(req.args_str, req.timeout_sec)
                 return result if isinstance(result, dict) else {"result": result}
             elif method_name == "ffprobe_run":
-                if not ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
-                    return {"error": "ffprobe が利用できません"}
                 if not req.args_str:
                     return {"error": "args_str は必須です"}
                 result = await ffmpeg_c.run_ffprobe(req.args_str, req.timeout_sec)
                 return result if isinstance(result, dict) else {"result": result}
             elif method_name == "media_duration":
-                if not ffmpeg_c.version_info.get("ffprobe", {}).get("ok"):
-                    return {"error": "ffprobe が利用できません"}
                 if not req.input_path:
                     return {"error": "input_path は必須です"}
                 result = await ffmpeg_c.get_media_duration(req.input_path, timeout_sec=req.timeout_sec)
                 return result if isinstance(result, dict) else {"result": result}
             elif method_name == "analyze_audio":
-                if not ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
-                    return {"error": "ffmpeg が利用できません"}
                 if not req.input_path:
                     return {"error": "input_path は必須です"}
                 result = await ffmpeg_c.analyze_audio_timerange(
@@ -377,15 +383,11 @@ def create_router(ffmpeg_c) -> APIRouter:
                 )
                 return result if isinstance(result, dict) else {"result": result}
             elif method_name == "video_trimming":
-                if not ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"):
-                    return {"error": "ffmpeg が利用できません"}
                 if not req.input_path or req.start_sec is None or req.end_sec is None or not req.output_path:
                     return {"error": "input_path / start_sec / end_sec / output_path は必須です"}
                 result = await ffmpeg_c.video_trimming(req.input_path, req.start_sec, req.end_sec, req.output_path, timeout_sec=req.timeout_sec)
                 return result if isinstance(result, dict) else {"result": result}
             elif method_name == "ffplay_run":
-                if not ffmpeg_c.version_info.get("ffplay", {}).get("ok"):
-                    return {"error": "ffplay が利用できません"}
                 if not req.args_str:
                     return {"error": "args_str は必須です"}
                 result = await ffmpeg_c.run_ffplay(req.args_str, req.timeout_sec)

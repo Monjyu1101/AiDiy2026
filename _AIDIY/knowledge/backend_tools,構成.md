@@ -12,9 +12,18 @@
 - Codex / Antigravity は Streamable HTTP の `/mcp` へ直接接続する。stdio 接続を選ぶクライアント向けの SSE 変換入口は `backend_tools/mcp_stdio.py`
 - 再利用ロジックは `backend_tools/tools_proc/` に置く
 - `tools_main.py` からは `tools_proc.<module>` として import する
-- `tools_main.py` は MCP SDK 2.x の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す。Windows では 19 本、Linux / macOS では 18 本
+- `tools_main.py` は MCP SDK 2.x の `MCPServer` インスタンスを Starlette の `Mount` で合成し、`tools_main:app` として uvicorn に渡す。Windows では 20 本、Linux / macOS では 19 本
+
+## 起動チェックに失敗したMCPの扱い
+
+- 外部クライアントのJSON / TOMLには接続先を登録する。利用不可を理由に接続先を削除しない。
+- Decisions、FFmpeg、Chat LLM、Code Agentsは利用可能な実行機能だけを公開する。全機能が利用不可でもMCP接続と診断ツールは維持する。
+- MCP接続時の `initialize.instructions` で「現在利用不可」を伝え、`decisions_config` / `ffmpeg_versions` / `chat_llms_config` / `code_agents_config` は `status: "NG"`、`available: false`、`message` と既存の診断情報を返す。
+- FFmpegは `ffmpeg` / `ffprobe` / `ffplay` ごとに起動時の `-version` 結果で判定する。一部が動けばその機能を公開し、利用できないバイナリを必要とするHTTP実行要求には503と「現在利用不可」を返す。
+- 設定・認証・依存ツールを修正したら `backend_tools` を再起動し、クライアントを再接続してツール一覧を更新する。
 
 ## 関連ファイル
+
 - `backend_tools/tools_main.py`
 - `backend_tools/mcp_stdio.py`
 - `backend_tools/tools_proc/chrome_manager.py`
@@ -35,6 +44,7 @@
 - `backend_tools/tools_proc/notification_sounds.py`
 - `backend_tools/tools_proc/code_agents.py`
 - `backend_tools/tools_proc/chat_llm.py`（`tools_proc/tools_chat.py` が MCP 登録と OpenAI 互換 HTTP ルートを持つ）
+- `backend_tools/tools_proc/decisions_check.py` / `backend_tools/tools_proc/tools_decisions.py`（判断ロジックは `backend_server/AIコア/AI判断*.py`）
 - `backend_tools/tools_proc/task_agents.py`
 - `backend_tools/tools_proc/team_agents.py`
 - `backend_tools/tools_proc/windows_control.py`
@@ -91,11 +101,12 @@ print(res.json())  # {"save_path": "..."}
 | `aidiy_notification_sounds` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` |
 | `aidiy_code_agents` | AI コードエージェント実行（CodeAI CLI 経由） | `http://127.0.0.1:8095/aidiy_code_agents/sse` |
 | `aidiy_chat_llms` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
+| `aidiy_decisions_check` | AI判断（Decisions API / OAuth Responses JSON Schema） | `http://127.0.0.1:8095/aidiy_decisions_check/sse` |
 | `aidiy_task_agents` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
 | `aidiy_team_agents` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
 | `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
-Linux / macOS では `aidiy_windows_control` の import、MCP 登録、REST ルート、SSE マウントを行わない。`GET /` の `mcps` は 18 件で、Windows 操作の URL は 404 を返す。`uiautomation` も Windows だけにインストールする。`_config/AiDiy_mcp.json` はローカル生成設定であり、Windows で `_setup.py` の MCP 設定を実行すると Windows 操作 MCP を追加する。非 Windows で設定を実行すると、以前登録した Windows 操作 MCP をプロジェクト設定と各 CLI 設定から削除する。画面のない Linux 環境では `pyautogui` の初期化失敗を `desktop_capture.py` が保持し、キャプチャ呼び出し時にエラーを返す。
+Linux / macOS では `aidiy_windows_control` の import、MCP 登録、REST ルート、SSE マウントを行わない。`GET /` の `mcps` は 19 件で、Windows 操作の URL は 404 を返す。`uiautomation` も Windows だけにインストールする。`_config/AiDiy_mcp.json` はローカル生成設定であり、Windows で `_setup.py` の MCP 設定を実行すると Windows 操作 MCP を追加する。非 Windows で設定を実行すると、以前登録した Windows 操作 MCP をプロジェクト設定と各 CLI 設定から削除する。画面のない Linux 環境では `pyautogui` の初期化失敗を `desktop_capture.py` が保持し、キャプチャ呼び出し時にエラーを返す。
 
 ## 新規 MCP サーバー追加手順
 

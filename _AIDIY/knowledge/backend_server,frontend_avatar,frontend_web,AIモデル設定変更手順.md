@@ -63,6 +63,25 @@
 
 ## 設定変更手順
 
+Code CLIの `same（変更無し）` は、CLI起動時に `--model` を渡さない指定。Codex / Claude CLI / Copilot / Antigravity / Grok / OpenCode / AiDiy Hermes / Claude・Codex Ollamaの新規・継続の両方に適用する。Code画面とWeb / AvatarのAI設定画面は共通の `available_models.code_models` を使うため、同じ候補を表示する。候補の追加後はbackend_serverを再起動して画面のモデル一覧を再取得する。
+
+### Code CLIのautoによるモデル自動選択
+
+`AIコード_cli.py` は `auto` の場合、`AIコードモデル選択.py` から `aidiy_decisions_check` のHTTP `/config` と `/check` を呼ぶ。常駐toolsの起動チェックに成功した方式を利用し、OAuthが使えれば優先する。履歴と今回CLIへ送るプロンプト全体を判断材料にする。継続CLIでも保持している会話履歴を渡し、新規会話には旧履歴を混ぜない。
+
+| CLI | 自動候補と基準 |
+|---|---|
+| `codex_cli` / `copilot_cli` | ファイル更新・複数ファイル調査・判断が難しい依頼は `gpt-6.1-sol`、単発の軽い調査は `gpt-5.6-terra`、挨拶程度の会話は `gpt-6-luna` |
+| `claude_cli` | ほぼ全ての依頼は `sonnet`、挨拶程度の会話のみ `haiku` |
+| その他のCLI | `same` と同様にモデル指定を省略 |
+
+- Codex/Copilot用とClaude用の判断プロンプトを分ける。依頼文に今回使うモデルの明示指定があれば軽重より優先し、そのモデルを返す。`astra` / `fable` も候補に含めるが、ユーザーの明示指定がある場合だけ選ぶ。単なる言及・比較・引用・否定は指定とみなさない。
+- 履歴は1ターンにつき1回生成し、送信文の完成後に同じ履歴と送信文を判断へ渡す。判断のための履歴再生成は行わない。
+- Decisions未起動・利用不可・タイムアウト・不正応答・回答拒否の場合もCLIを止めず、モデル指定を省略する。判断の待機は最大15秒。
+- 選択結果は今回の実行だけに適用し、設定の `auto` は変更しない。選択できた場合は `[選択モデル: モデル名]` をCLIの最初の出力より先に `output_stream` で送る。
+- MCP `aidiy_code_agents` の `ai_model: "auto"` もCLIへそのまま渡す。明示モデル・`same` は判断を呼ばない。MCP結果の `selected_model` で使用モデルを確認でき、指定省略時は空文字。
+- `claude_sdk` はCLI自動選択の対象外。
+
 ### JSON を直接編集する場合
 
 `_config/AiDiy_key.json` を編集し、Chat / Live / Code 6枠のキーを揃える。

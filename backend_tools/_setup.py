@@ -510,7 +510,7 @@ def toml_escape_string(value: str) -> str:
 
 def upsert_toml_table(path: Path, table_header: str, body_lines: list[str]) -> bool:
     try:
-        content = path.read_text(encoding="utf-8") if path.exists() else ""
+        content = path.read_text(encoding="utf-8-sig") if path.exists() else ""
         updated = remove_toml_table(content, table_header).rstrip()
         block = table_header + "\n" + "\n".join(body_lines).rstrip() + "\n"
         if updated:
@@ -648,6 +648,7 @@ MCP_MODULES = [
             {"server_name": "aidiy_postgres",          "sse_url": "http://127.0.0.1:8095/aidiy_postgres/sse"},
             {"server_name": "aidiy_logs",              "sse_url": "http://127.0.0.1:8095/aidiy_logs/sse"},
             {"server_name": "aidiy_code_check",        "sse_url": "http://127.0.0.1:8095/aidiy_code_check/sse"},
+            {"server_name": "aidiy_decisions_check",   "sse_url": "http://127.0.0.1:8095/aidiy_decisions_check/sse"},
             {"server_name": "aidiy_backup",            "sse_url": "http://127.0.0.1:8095/aidiy_backup/sse"},
             {"server_name": "aidiy_image_generation",  "sse_url": "http://127.0.0.1:8095/aidiy_image_generation/sse"},
             {"server_name": "aidiy_movie_generation",  "sse_url": "http://127.0.0.1:8095/aidiy_movie_generation/sse"},

@@ -36,6 +36,8 @@ _BAT_MODEL_LINE = re.compile(r'^if "%MODEL_NUMBER%"=="\d+" set "MODEL=([A-Za-z0-
 
 def _cli_models(project_root: Path, provider: str) -> list[dict[str, str]]:
     """外部 CLI の設定 JSON を優先し、候補がなければ bat から補う。"""
+    # 直接CLI実行にはAIコアの自動判定がない。指定省略はsameとして公開する。
+    aliases = [{"label": "same (変更なし)", "id": "same"}]
     config_name = _CLI_MODEL_CONFIGS.get(provider)
     if config_name:
         try:
@@ -46,28 +48,26 @@ def _cli_models(project_root: Path, provider: str) -> list[dict[str, str]]:
                     {"label": label, "id": model}
                     for model, label in configured.items()
                     if isinstance(model, str) and _MODEL_ID.fullmatch(model)
+                    and model not in ("auto", "same")
                     and isinstance(label, str) and label.strip()
                 ]
-                if any(item["id"] != "auto" for item in models):
-                    return [
-                        next((item for item in models if item["id"] == "auto"), {"label": "auto", "id": "auto"}),
-                        *(item for item in models if item["id"] != "auto"),
-                    ]
+                if models:
+                    return [*aliases, *models]
         except (OSError, ValueError, AttributeError):
             pass
     filename = _CLI_MODEL_BATS.get(provider)
     if not filename:
-        return [{"label": "auto", "id": "auto"}]
+        return aliases
     try:
         lines = (project_root / "scripts" / "cli_bat" / filename).read_text(encoding="utf-8-sig").splitlines()
     except OSError:
-        return [{"label": "auto", "id": "auto"}]
+        return aliases
     models = list(dict.fromkeys(
         match.group(1)
         for line in lines
         if (match := _BAT_MODEL_LINE.fullmatch(line.strip()))
     ))
-    return [{"label": "auto", "id": "auto"}, *({"label": model, "id": model} for model in models)]
+    return [*aliases, *({"label": model, "id": model} for model in models if model not in ("auto", "same"))]
 
 
 def catalog(cli_path: str, provider: str = "") -> dict:

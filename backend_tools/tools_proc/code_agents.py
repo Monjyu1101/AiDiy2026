@@ -110,7 +110,7 @@ class CodeAgents:
         return self.root
 
     def _resolve_ai_params(self, ai_name: str, ai_model: str) -> tuple[str, str]:
-        """ai_name / ai_model の "auto" を key.json 値で解決する"""
+        """AI名を解決。CLIのautoは履歴によるモデル自動選択へ渡す。"""
         key = self._load_key_json()
         if ai_name == "auto":
             available = [k for k, v in self.version_info.items() if v.get("ok")]
@@ -121,7 +121,7 @@ class CodeAgents:
                 ai_name = available[0]
             else:
                 ai_name = key.get("CODE_AI1_NAME", "claude_cli")
-        if ai_model == "auto":
+        if ai_model == "auto" and ai_name == "claude_sdk":
             model_key = f"CODE_{ai_name.upper()}_MODEL"
             ai_model = key.get(model_key, "auto")
         return ai_name, ai_model
@@ -266,7 +266,7 @@ Args:
     prompt: エージェントへの依頼テキスト
     project_path: 作業ディレクトリの絶対パス（省略時は AiDiy_key.json の CODE_BASE_PATH）
     ai_name: 使用 AI（上記の利用可能な ai_name から指定。"auto" は codex_cli 優先で自動選択）
-    ai_model: モデル名（"auto" で key.json の設定を使用）
+    ai_model: モデル名。autoはCodex/Claude/Copilot CLIで履歴から自動選択、Decisions利用不可・他CLIは指定省略。sameは常に指定省略。
     max_turns: 最大ターン数（default: 999）
     code_plan: プラン設定（auto / on / off）
     code_verify: 検証設定（auto / on / off）
@@ -306,7 +306,7 @@ Args:
                           省略時は AiDiy_key.json の CODE_BASE_PATH を使用。
             ai_name: 使用 AI（例: claude_cli / copilot_cli / aidiy_hermes）。
                      "auto" は codex_cli を優先し、なければ利用可能な最初の AI にフォールバック。
-            ai_model: モデル名。"auto" は key.json の対応モデルにフォールバック。
+            ai_model: CLIのautoは履歴から自動選択。sameはモデル指定省略。
             max_turns: 最大ターン数（default: 999）
             code_plan: プラン設定（auto / on / off）
             code_verify: 検証設定（auto / on / off）
@@ -380,6 +380,7 @@ Args:
                 タイムアウト秒数=timeout_sec,
                 resume=resume,
             )
+            selected_model = getattr(ai_instance, "最終実行モデル", "")
 
             if self_check_loop > 0:
                 self_check_updated = await agent._バックアップ検証ループ(ai_instance, self_check_loop)
@@ -395,6 +396,7 @@ Args:
             "ai_model": ai_model,
             "prompt_length": len(prompt),
             "self_check_loop": self_check_loop,
+            "selected_model": selected_model,
             "self_check_updated": self_check_updated,
             "self_check_files": self_check_files,
         }

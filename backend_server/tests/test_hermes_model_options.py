@@ -33,8 +33,8 @@ class HermesModelOptionsTest(unittest.TestCase):
                 bat_models = [model for _, model in choices]
                 self.assertEqual(bat_models[:4], expected_gpt_models)
                 config = json.loads((Path(temp_dir.name) / f"AiDiy_code_{cli}_cli.json").read_text(encoding="utf-8"))
-                self.assertEqual(list(config["models"]), ["auto", *bat_models])
-                self.assertEqual(list(defaults), ["auto", *bat_models])
+                self.assertEqual(list(config["models"]), bat_models)
+                self.assertEqual(list(defaults), bat_models)
 
     def test_choices_match_bat_with_oauth_provider(self):
         bat = (ROOT / "scripts/cli_bat/_hermes_cli.bat").read_text(encoding="utf-8")
@@ -43,10 +43,12 @@ class HermesModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
+        # 現行batにはCLI候補もあるため、OAuthモデル候補を照合する。
+        bat_models = [model.removeprefix("openai_oauth/") for model in bat_models if model.startswith("openai_oauth/")]
         self.assertEqual(bat_models, ["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"])
 
         models = conf_models._get_aidiy_hermes_models(object.__new__(conf_models))
-        self.assertEqual(list(models), ["auto", *(f"openai_oauth/{model}" for model in bat_models)])
+        self.assertEqual(list(models), [f"openai_oauth/{model}" for model in bat_models])
 
 
 if __name__ == "__main__":

@@ -219,6 +219,9 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 
 ## AI コア
 
+- [backend_server,backend_tools,AI判断追加手順.md](./backend_server,backend_tools,AI判断追加手順.md) — Decisions API / OAuth JSON Schema、共通入出力、MCP、プロバイダ追加。
+
+
 | 目的 | 参照ファイル |
 |------|--------------|
 | AIコア WebSocket の接続・パケット形式を確認する | [`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |

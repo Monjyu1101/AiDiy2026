@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from log_config import get_logger
 from tools_proc.code_agents import CodeAgentsError
+from tools_proc.tool_availability import availability_status
 
 logger = get_logger(__name__)
 
@@ -78,6 +79,7 @@ _AGENTS_METHODS = [
 def register_tools(mcp_ca, code_agents):
     """aidiy_code_agents MCP ツールを mcp_ca インスタンスに登録する。
     利用可能な AI 一覧を返す。"""
+    mcp_ca._lowlevel_server.instructions = availability_status("Code Agents", code_agents.version_info)["message"]
 
     @mcp_ca.tool()
     async def code_agents_config(project_path: Optional[str] = None) -> str:
@@ -90,6 +92,7 @@ def register_tools(mcp_ca, code_agents):
         """
         try:
             info = await asyncio.to_thread(code_agents.get_config, project_path)
+            info = {**info, **availability_status("Code Agents", code_agents.version_info)}
         except CodeAgentsError as e:
             raise ValueError(str(e)) from e
         return json.dumps(info, ensure_ascii=False)
@@ -188,7 +191,7 @@ def create_router(code_agents) -> APIRouter:
                         "prompt": {"type": "string", "required": True, "description": "エージェントへの指示（日本語可）。実装内容・対象ファイル・制約を具体的に記述する"},
                         "project_path": {"type": "string", "required": False, "description": "作業ディレクトリの絶対パス。省略時は CODE_BASE_PATH"},
                         "ai_name": {"type": "string", "required": False, "default": "auto", "values": ["auto", "claude_sdk", "claude_cli", "copilot_cli", "codex_cli"], "description": "使用する AI エージェント。auto で利用可能な AI を自動選択"},
-                        "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。auto で ai_name の既定モデルを使用"},
+                        "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。autoはCodex/Claude/Copilot CLIで履歴から自動選択、Decisions利用不可・他CLIは指定省略。sameは常に指定省略"},
                         "max_turns": {"type": "integer", "required": False, "default": 999, "description": "エージェントの最大ターン数"},
                         "code_plan": {"type": "string", "required": False, "default": "auto", "description": "計画フェーズの有無（auto / on / off）"},
                         "code_verify": {"type": "string", "required": False, "default": "auto", "description": "検証フェーズの有無（auto / on / off）"},
@@ -225,6 +228,7 @@ def create_router(code_agents) -> APIRouter:
         try:
             if method_name == "config":
                 info = await asyncio.to_thread(code_agents.get_config, req.project_path)
+                info = {**info, **availability_status("Code Agents", code_agents.version_info)}
                 return info if isinstance(info, dict) else {"result": info}
             elif method_name == "run":
                 result = await code_agents.run_async(

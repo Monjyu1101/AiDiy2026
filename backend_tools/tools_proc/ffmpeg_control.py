@@ -735,7 +735,10 @@ class FfmpegControl:
 
     def get_versions(self) -> dict[str, Any]:
         """設定値と起動時の -version 確認結果を返す。"""
+        from tools_proc.tool_availability import availability_status
+
         return {
+            **availability_status("FFmpeg", self.version_info),
             "ffmpeg_path": self.ffmpeg_path,
             "ffprobe_path": self.ffprobe_path,
             "ffplay_path": self.ffplay_path,

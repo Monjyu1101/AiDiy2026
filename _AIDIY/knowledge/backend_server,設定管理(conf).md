@@ -9,6 +9,8 @@
 - 設定ファイルの保存先パスや外部プロジェクト探索を変更するとき
 - 新しい設定キーを追加するとき
 
+コードモデル一覧の `auto` / `same` は実行方法の選択肢なので、`AiDiy_code_*.json` と新規作成用のモデル定義には含めません。`conf_models.get_code_models()` が画面用一覧の先頭に `auto (自動判定)` / `same (変更なし)` を追加します。モデル一覧取得時には設定ファイルを変更せず、実モデルの表示名は設定値を維持します。
+
 ## アーキテクチャ
 
 `backend_server/conf/` は 3 つのクラスで構成されます。
@@ -75,6 +77,7 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |
 | ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OPENAI_MODEL`, `CHAT_OLLAMA_MODEL`, `CHAT_LOCAL_MODEL` |
+| DecisionAI | `DECISION_AI_NAME`, `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
 | LiveAI | `LIVE_AI_NAME`, `LIVE_GEMINI_MODEL/VOICE`, `LIVE_FREEAI_MODEL/VOICE`, `LIVE_OPENAI_MODEL/VOICE` |
 | CodeAI | `CODE_BASE_PATH`, `CODE_AI1~6_NAME/MODEL`, `CODE_CLAUDE_SDK_MODEL`, `CODE_MAX_TURNS`, `CODE_PLAN`, `CODE_VERIFY` |
 | TaskAI / TeamAI | `TASK_AI_NAME`, `TEAM_AI_NAME`, `TASK_AI_MODEL_plan/do/check`, `TEAM_AI_MODEL_plan/do/check`（各フェーズを別キーで保持） |

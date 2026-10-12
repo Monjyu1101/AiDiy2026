@@ -62,13 +62,15 @@
 
 ## 注意点
 
+- 自動モデル判定が失敗・タイムアウト・利用不可の場合、Codex / Copilot は `gpt-6.1-sol`、Claude CLI / SDK は `sonnet` を使用する。CLI / SDK の出力開始前に `output_stream` で `[モデル選択失敗: <モデル> を使用します]` を送り、次回も判定できるよう設定の `auto` は維持する。
+- `claude_sdk` の `auto` は `claude_cli` と同じ `AIコードモデル選択.select_model` を使い、毎回の送信文と会話履歴からモデルを選ぶ。選択結果は `ClaudeAgentOptions.model` と選択モデル通知に反映し、設定値の `auto` は維持する。明示モデルはそのままSDKへ渡し、判断不可時はストリーム先頭へ「モデル選択失敗」と表示して `sonnet` を指定する。`resume=False` ではSDKセッションと判断用の旧履歴をリセットする。`tests/test_claude_sdk_auto_model.py` でSDK呼び出しを模擬し、モデル・継続・新規・停止を確認する。
 - backend の `available_models.code_models` に出ない限り、frontend に項目を足しても選択できない
 - frontend の設定 option は backend 返却値から生成し、CLI 名を固定直書きしない
 - `code1`〜`code6` は WebSocket チャンネル/パネル名。CLI 名をチャンネル名として増やさない
 - Windows で WSL 経由実行が必要な CLI は、作業ディレクトリとパス形式の差異を吸収する
 - 設定変更は起動中サーバーへ自動反映されない。必要に応じて core server を再起動する
 - `aidiy_hermes` の Code AI 呼び出しでは `-Q --oneshot-stdin` を使い、完全プロンプトを UTF-8 標準入力で渡す。本文の長短で argv / stdin を切り替えない。手動実行の `-Q -z "本文"` は互換性のため維持する
-- AIコードパネルから `aidiy_hermes` をモデル `auto` で呼ぶときは、`--model` / `--provider` を付けず、`command_hermes/cli_main.py` 側でも `CODE_AIDIY_HERMES_MODEL` へ置換せず Hermes 本来の auto 解決に任せる。パネルの welcome 表示も `Model: "auto"` のままにする
+- AIコードパネルから `aidiy_hermes` をモデル `auto` で呼ぶときは、毎回 `codex_cli` と同じ候補・判断処理に会話履歴と送信内容を渡し、選択結果に `openai_oauth/` を付けて `--model` に指定する（例: `openai_oauth/gpt-6.1-sol`）。設定値は `auto` のまま維持する。判断サービスが利用できない場合はストリーム先頭へ「モデル選択失敗」と表示して `openai_oauth/gpt-6.1-sol` を指定する。`same`（変更なし）の場合はモデル引数を省略し、明示モデルの場合は判断を行わず指定値を使う。確認は `backend_server/tests/test_code_auto_model.py` で行う
 - `aidiy_hermes` のワンショットでは、stdout は正式回答専用、stderr は thinking / step / tool 進捗 / 警告 / `session_id` 用に分ける
 - `opencode_cli` / `antigravity_cli` は stdout を正式回答専用、stderr を `output_stream` 専用とする。stdout を途中表示にも送ると最終回答と二重表示になるため、追加時は `AIコード_cli.py` の `_STDERR_STREAM_STDOUT_FINAL_AI` を確認する
 - `copilot_cli` は初回・継続とも `--output-format json --stream on` を付け、stdout の JSONL を `_CopilotJSON出力` で解析する。通常テキストではツール進捗も stdout に流れ、stderr は終了時の利用量などに限られるため、stderr だけの監視では途中経過を表示できない

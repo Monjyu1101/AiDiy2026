@@ -360,9 +360,10 @@ class CliStdinTest(unittest.TestCase):
                     )
                     index = command.index("--model")
                     self.assertEqual(model, command[index + 1])
-                    self.assertNotIn("--model", cli_main._aidiy_cli_build_command(
-                        provider, "質問", True, "/repo", model="auto"
-                    ))
+                    for unchanged in ("auto", "same"):
+                        self.assertNotIn("--model", cli_main._aidiy_cli_build_command(
+                            provider, "質問", True, "/repo", model=unchanged
+                        ))
 
     def test_antigravity_cli_prefers_windows_local_install(self):
         expected = cli_main.os.path.join(

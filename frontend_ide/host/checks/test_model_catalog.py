@@ -36,7 +36,7 @@ class ModelCatalogTest(unittest.TestCase):
             models = catalog._cli_models(root, "codex-cli")
 
         self.assertEqual(
-            [{"label": "自動", "id": "auto"}, {"label": "GPT 6.1 Sol", "id": "gpt-6.1-sol"}],
+            [{"label": "same (変更なし)", "id": "same"}, {"label": "GPT 6.1 Sol", "id": "gpt-6.1-sol"}],
             models,
         )
 
@@ -56,7 +56,7 @@ class ModelCatalogTest(unittest.TestCase):
             models = catalog._cli_models(root, "grok-cli")
 
         self.assertEqual(
-            [{"label": "auto", "id": "auto"}, {"label": "grok-4.7", "id": "grok-4.7"}],
+            [{"label": "same (変更なし)", "id": "same"}, {"label": "grok-4.7", "id": "grok-4.7"}],
             models,
         )
 

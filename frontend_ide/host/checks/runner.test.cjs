@@ -41,7 +41,7 @@ test('日本語長文を stdin で渡し、進捗・回答・会話IDを分離�
   assert.ok(!引数.includes('--yolo'));
 });
 test('モデル自動選択では --model を付けず CLI 既定へ任せる', () => {
-  for (const model of ['', 'auto', ' AUTO ']) {
+  for (const model of ['', 'auto', ' AUTO ', 'same', ' SAME ']) {
     const 引数 = 会話引数('copilot-cli', model, 30);
     assert.deepEqual(引数, ['-Q', '--oneshot-stdin', '--max-turns', '30', '--provider', 'copilot-cli']);
   }

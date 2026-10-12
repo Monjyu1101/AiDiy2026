@@ -71,6 +71,39 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
     def test_default_idle_timeout_is_900_seconds(self):
         self.assertEqual(900, inspect.signature(self.module.CodeAI.実行).parameters["タイムアウト秒数"].default)
 
+    def test_codex_same_and_auto_omit_model_for_new_and_resumed_sessions(self):
+        code_ai, _ = self._code_ai("codex_cli")
+        code_ai.codex_セッションID = "existing-session"
+        for first in (True, False):
+            for model in ("auto", "same", "SAME"):
+                with self.subTest(first=first, model=model), patch.dict(os.environ, {"CODEX_CLI_CLI_PATH": "codex_test"}):
+                    code_ai.code_model = model
+                    command = code_ai._コマンド構築("質問", 初回=first)
+                    self.assertNotIn("--model", command)
+                    self.assertEqual(not first, "resume" in command)
+                    if not first:
+                        self.assertEqual(command[command.index("resume") + 1], "existing-session")
+
+    def test_codex_explicit_model_is_still_passed(self):
+        code_ai, _ = self._code_ai("codex_cli")
+        code_ai.code_model = "gpt-6-luna"
+        with patch.dict(os.environ, {"CODEX_CLI_CLI_PATH": "codex_test"}):
+            command = code_ai._コマンド構築("質問", 初回=True)
+        self.assertEqual(command[command.index("--model") + 1], "gpt-6-luna")
+
+    def test_other_cli_same_omits_model_for_new_and_continued_sessions(self):
+        for provider in ("claude_cli", "copilot_cli", "antigravity_cli", "grok_cli", "opencode_cli", "aidiy_hermes", "claude_ollama", "codex_ollama"):
+            code_ai, parent = self._code_ai(provider)
+            # Ollama側にモデル設定があってもsameは明示指定しない。
+            parent.モデル設定 = {"CODE_CLAUDE_OLLAMA_MODEL": "configured", "CODE_CODEX_OLLAMA_MODEL": "configured", "CHAT_OLLAMA_MODEL": "fallback"}
+            for first in (True, False):
+                for model in ("same", "SAME"):
+                    with self.subTest(provider=provider, first=first, model=model), patch.dict(os.environ, {f"{provider.upper()}_CLI_PATH": "test_cli"}):
+                        code_ai.code_model = model
+                        command = code_ai._コマンド構築("質問", 初回=first)
+                        self.assertNotIn("--model", command)
+                        self.assertNotIn(model, command)
+
     def test_antigravity_has_no_separate_fixed_deadline(self):
         code_ai, _ = self._code_ai("antigravity_cli")
         with patch.dict(os.environ, {"ANTIGRAVITY_CLI_CLI_PATH": sys.executable}):

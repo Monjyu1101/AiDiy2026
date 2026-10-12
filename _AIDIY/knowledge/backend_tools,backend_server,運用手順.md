@@ -120,6 +120,7 @@ print(res.json())
 | Notification Sounds | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` |
 | Code Agents | `http://127.0.0.1:8095/aidiy_code_agents/sse` |
 | Chat LLM | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
+| Decisions Check | `http://127.0.0.1:8095/aidiy_decisions_check/sse` |
 | Task Agents | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
 | Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
 | Windows Control（Windows のみ） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |

@@ -13,6 +13,8 @@ IDEのElectron版は右上の「＋ Code」「＋ Live」から別ウィンド�
 
 画面は `frontend_ide/src/components/` を変更します。Code / LiveをIDEへ配置するときも同じVue部品を使用します。ホストと通信プロトコルは `frontend_ide/host`、ファイルAPIとOffice表示資産は `frontend_ide/viewer` に統合しています。親ディレクトリ数を固定して共通設定やHermesを探さず、配置先から親方向へ探索してください。
 
+Codeのオフラインモデル候補は `same`（変更なし）を使い、選択時はHermesへ `--model` / `--provider` を付けずに呼び出します。オンラインの `auto`（AI判断）とは区別します。オフラインの選択値は `~/.aidiy/aidiy_code_model_offline.json` に保存します。
+
 エクスプローラーは `FileExplorer.vue` 一部品にまとめます。入力はtree/root/selected/current/startedAt/open、出力はupdate:open/select/clear/marksです。検索マークはイベントで宇宙へ伝え、エクスプローラーからCanvas内部を書き換えないでください。利用開始時刻が変わると起点検索を初期化します。
 
 「閲覧軌跡」「AiDiy検索軌跡」と関連ファイルへの移動ボタンは、エクスプローラーの開閉に関係なく表示します。閉じている間はバーガーボタンの右隣へ横並びにし、狭い画面では折り返します。開閉だけでは選択した軌跡を変更しません。

@@ -71,6 +71,7 @@ class CodeAI:
         # プロバイダー設定
         self.code_ai = AI_NAME
         self.code_model = AI_MODEL
+        self.最終実行モデル = ""
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
@@ -355,6 +356,10 @@ class CodeAI:
                 return "ClaudeSDKが停止状態です。開始してください。"
 
             # 履歴管理（セッション内で自動管理されるが、独自履歴も維持）
+            if not resume:
+                self.AIセッションID = None
+                self.履歴辞書.clear()
+                self.履歴最終番号 = 0
             if len(self.履歴辞書) == 0:
                 self._履歴追加(self.base_options["system_prompt"], "system")
 
@@ -385,6 +390,40 @@ class CodeAI:
             else:
                 送信用要求テキスト = f"【今回の依頼】\n{依頼本文}\n"
 
+            if self._強制停止要求あり():
+                await self._停止マーカー送信()
+                return "!"
+            # CLIと同じ判断を使い、設定のautoは維持して今回のSDKオプションだけへ反映する。
+            選択モデル = ""
+            モデル選択失敗 = False
+            実行モデル = (self.code_model or "").strip()
+            if 実行モデル.lower() == "auto":
+                from AIコア.AIコードモデル選択 import select_model
+                選択モデル = await select_model(
+                    "claude_cli", self._履歴取得() if self.AIセッションID else "", 送信用要求テキスト,
+                )
+                モデル選択失敗 = not 選択モデル
+                if モデル選択失敗:
+                    選択モデル = "sonnet"
+                実行モデル = 選択モデル
+            self.最終実行モデル = "" if 実行モデル.lower() in ("", "auto", "same") else 実行モデル
+            if self._強制停止要求あり():
+                await self._停止マーカー送信()
+                return "!"
+            if 選択モデル and self.parent_manager and hasattr(self.parent_manager, '接続'):
+                try:
+                    await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                        "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+                        "メッセージ識別": "output_stream",
+                        "メッセージ内容": (f"[モデル選択失敗: {選択モデル} を使用します]\n" if モデル選択失敗
+                                           else f"[選択モデル: {選択モデル}]\n"),
+                        "ファイル名": None, "サムネイル画像": None,
+                    })
+                except Exception:
+                    logger.warning("ClaudeSDK選択モデル通知を送信できませんでした")
+            if self._強制停止要求あり():
+                await self._停止マーカー送信()
+                return "!"
             self._履歴追加(最終要求テキスト, "user")
 
             result_text = ""
@@ -423,7 +462,6 @@ class CodeAI:
                         }
                         if perm_mode:
                             options_kwargs["permission_mode"] = perm_mode
-                        options = ClaudeAgentOptions(**options_kwargs)
                     else:
                         # 継続会話：読取専用パラメータに応じてallowed_toolsを設定
                         options_kwargs = {
@@ -437,7 +475,9 @@ class CodeAI:
                         }
                         if perm_mode:
                             options_kwargs["permission_mode"] = perm_mode
-                        options = ClaudeAgentOptions(**options_kwargs)
+                    if self.最終実行モデル:
+                        options_kwargs["model"] = self.最終実行モデル
+                    options = ClaudeAgentOptions(**options_kwargs)
                      
                     # テスト用：初回のみ system_prompt、毎回「今回の依頼」（送信用）を標準出力に表示（平文）
                     try:

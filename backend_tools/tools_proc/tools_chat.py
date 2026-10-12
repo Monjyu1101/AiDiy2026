@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict
 
 from log_config import get_logger
 from tools_proc.chat_llm import ChatLLMError
+from tools_proc.tool_availability import availability_status
 
 logger = get_logger(__name__)
 
@@ -80,6 +81,7 @@ class ChatCompletionsRequest(BaseModel):
 def register_tools(mcp_cl, chat_llm):
     """aidiy_chat_llms MCP ツールを mcp_cl インスタンスに登録する。
     利用可能な AI 一覧を返す。"""
+    mcp_cl._lowlevel_server.instructions = availability_status("Chat LLM", chat_llm.version_info)["message"]
 
     @mcp_cl.tool()
     async def chat_llms_config(project_path: Optional[str] = None) -> str:
@@ -92,6 +94,7 @@ def register_tools(mcp_cl, chat_llm):
         """
         try:
             info = chat_llm.get_config(project_path)
+            info = {**info, **availability_status("Chat LLM", chat_llm.version_info)}
         except ChatLLMError as e:
             raise ValueError(str(e)) from e
         return json.dumps(info, ensure_ascii=False)
@@ -225,7 +228,7 @@ def create_router(chat_llm) -> APIRouter:
         """
         try:
             if method_name == "config":
-                return chat_llm.get_config(req.project_path)
+                return {**chat_llm.get_config(req.project_path), **availability_status("Chat LLM", chat_llm.version_info)}
             elif method_name == "run":
                 return await chat_llm.run_async(
                     prompt=req.prompt,

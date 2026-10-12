@@ -66,7 +66,7 @@ export function 会話引数(provider: string, model: string, maxTurns: number, 
   const args = ['-Q', '--oneshot-stdin', '--max-turns', String(maxTurns)];
   if (provider.trim()) args.push('--provider', provider.trim());
   const modelId = model.trim();
-  if (modelId && modelId.toLowerCase() !== 'auto') args.push('--model', modelId);
+  if (modelId && !['auto', 'same'].includes(modelId.toLowerCase())) args.push('--model', modelId);
   if (セッションID) args.push('--resume', セッションID);
   return args;
 }

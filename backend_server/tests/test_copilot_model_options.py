@@ -23,7 +23,7 @@ class CopilotModelOptionsTest(unittest.TestCase):
             bat,
             flags=re.MULTILINE,
         )
-        self.assertEqual(len(bat_models), 10)
+        self.assertEqual(len(bat_models), 9)
         self.assertIn("claude-opus-5.5", bat_models)
         self.assertIn("claude-sonnet-5.5", bat_models)
         self.assertNotIn("gemini-3.7-flash", bat_models)
@@ -37,8 +37,8 @@ class CopilotModelOptionsTest(unittest.TestCase):
                 models = conf_models().get_code_models()["copilot_cli"]
             saved = json.loads(config_path.read_text(encoding="utf-8"))["models"]
 
-        self.assertEqual(list(models), ["auto", *bat_models])
-        self.assertEqual(saved, models)
+        self.assertEqual(list(models), ["auto", "same", *bat_models])
+        self.assertEqual(saved, {key: value for key, value in models.items() if key not in ("auto", "same")})
 
 
 if __name__ == "__main__":
