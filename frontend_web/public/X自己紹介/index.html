@@ -1130,7 +1130,8 @@
         <p class="hero-description">
             日本語を第一言語にしたフルスタック業務システム開発フレームワーク。<br>
             FastAPI マルチサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、<br>
-            WebSocket ベースの AI コアを一体で扱えます。
+            WebSocket ベースの AI コアを一体で扱えます。<br>
+            さらに、プロジェクトを宇宙として眺め、変更は AI に頼む開発スペース（Code / Live / IDE）を搭載。
         </p>
         <div class="hero-actions">
             <a href="/AiDiy" class="cyber-button" target="_blank">AiDiy を開く</a>
@@ -1145,6 +1146,7 @@
             <span>claude / copilot / codex / antigravity / grok / opencode / hermes CLI</span>
             <span>🔌 MCP Hub ×19 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / task / team / windows</span>
             <span>🤖 AIタスク自動実行 — AI分解 × 自由なタスクフロー × クリティカルパス実行</span>
+            <span>🌌 開発スペース — Code / Live / IDE（VS Code 拡張 × 単独起動 × IDE 部品）</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -1152,7 +1154,7 @@
     <!-- Feature Overview（特徴概要） -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Feature Overview</h2>
-        <p class="section-subtitle animate-on-scroll">AiDiy を支える 7 つの特徴。</p>
+        <p class="section-subtitle animate-on-scroll">AiDiy を支える 8 つの特徴。</p>
         <div class="core-features">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🇯🇵</span>
@@ -1209,6 +1211,15 @@
                 </p>
             </div>
             <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🌌</span>
+                <h3 class="feature-title">開発スペース — Code / Live / IDE<span class="fx-new-badge">NEW</span></h3>
+                <p class="feature-description">
+                    フォルダは銀河、ファイルは星。宇宙を眺めて・辿って・読み、<br>
+                    変更は Code（コード支援）と Live（音声会話）に頼む。<br>
+                    目指すのは「ソースをほぼ触らない IDE」。
+                </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🔌</span>
                 <h3 class="feature-title">MCP Hub × 19 + Multi CLI</h3>
                 <p class="feature-description">
@@ -1254,6 +1265,11 @@
                 <span class="stat-number" data-count="1">0</span>
                 <span class="stat-label">独自エージェント基盤</span>
                 <span class="stat-sub">aidiy_hermes — カスタムツール・TUI・コンテキスト圧縮</span>
+            </div>
+            <div class="stat-item animate-on-scroll">
+                <span class="stat-number" data-count="3">0</span>
+                <span class="stat-label">開発スペース部品</span>
+                <span class="stat-sub">Code / Live / IDE — VS Code 拡張・単独起動・IDE 部品で共用</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="2">0</span>
@@ -1374,6 +1390,16 @@ Key:   利用者名</pre>
                 <h3 class="architecture-title">📱 frontend_avatar</h3>
                 <p>Electron と通常ブラウザの両対応。BroadcastChannel で状態同期し、AI コアをマルチパネルで扱います。window.desktopApi でモード判定。</p>
                 <div class="meta-tags"><span>Electron</span><span>Web Mode</span><span>BroadcastChannel</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🌌 frontend_ide (Code / Live / IDE)<span class="fx-new-badge">NEW</span></h3>
+                <p>Code / Live / IDE の画面を Vue 3 の共通部品で統一。VS Code 拡張ホストと Code / Live の通信は host/、ファイル API と Office 表示は viewer/ に集約。Electron と Web で同じ画面を使い、ポートは自動割り当て。</p>
+                <div class="meta-tags"><span>aidiy_code / aidiy_live / aidiy_ide</span><span>Vue 3 共通部品</span><span>VSIX × 2</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💬 frontend_discord<span class="fx-new-badge">NEW</span></h3>
+                <p>Hermes チャットと AIコアの Live 音声会話を Discord につなぐ、任意起動の Bot。Code / Live と共通の通信処理を使い、ブラウザ版の操作パネルも備えます。</p>
+                <div class="meta-tags"><span>Discord Bot</span><span>Live 音声</span><span>任意起動</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔒 認証 + 採番</h3>
@@ -1583,7 +1609,76 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 6. command_hermes 独自エージェント基盤 -->
+    <!-- 6. 開発スペース — Code / Live / IDE -->
+    <section class="section">
+        <h2 class="section-title animate-on-scroll">🌌 開発スペース — Code / Live / IDE 実装詳細</h2>
+        <p class="section-subtitle animate-on-scroll">人は書かずに、眺めて・辿って・読んで・頼む。その作業の場を、宇宙という一つの空間にまとめました。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💻 AiDiy Code — コード支援</h3>
+                <p>AIコード画面と同じ Code CLI・モデルを選び、AIコア経由でコードの調査・編集を依頼。AIコアに未接続なら aidiy_hermes の直接実行に自動で切り替えます。「検証ループ」0〜3 回で、バックアップ → 検証 → 修正を差分がなくなるまで繰り返します。</p>
+                <div class="meta-tags"><span>aidiy.aidiy-code</span><span>オンライン ⇄ オフライン</span><span>検証ループ 0〜3</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎙️ AiDiy Live — 音声会話</h3>
+                <p>AIコア（8091）へ接続し、作業フォルダを CODE_BASE_PATH として渡すため、LiveAI とコードエージェントが同じプロジェクトを参照します。VS Code の Webview にはマイク権限がないため、Windows の WinMM から Python 標準ライブラリだけで音声を取り込みます。FreeAI / Gemini / OpenAI を切替可能。</p>
+                <div class="meta-tags"><span>aidiy.aidiy-live</span><span>CODE_BASE_PATH</span><span>WinMM</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🌌 AiDiy IDE — 宇宙表示<span class="fx-new-badge">NEW</span></h3>
+                <p>フォルダは銀河、ファイルは星・惑星。フォルダの大きさ・ファイルの種類・更新の新しさを、銀河の形・星の色・明るさで表します。起点日時より後に更新されたファイルが明滅し、AI が触った場所がひと目でわかります。</p>
+                <div class="meta-tags"><span>aidiy_ide</span><span>Canvas</span><span>読み取り専用</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🚀 自動探索と変化の追跡</h3>
+                <p>自動飛行は彗星のような楕円軌道で星系を周回。AI がファイルを書き換えると、最終更新ファイルへ「旋回 → 前進 → ワープ」で 1 階層ずつ潜って開きます。手動操作の後は 1 分待機、開いたままのビューアは 5 分で閉じて航行を再開します。</p>
+                <div class="meta-tags"><span>彗星軌道</span><span>最終更新の追跡</span><span>ワープ航行</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔎 AiDiy 検索・AiDiy 分析<span class="fx-new-badge">NEW</span></h3>
+                <p>「認証機能に関わるファイル」のような文章で、aidiy_code_agents に読み取り調査を依頼。関連ファイルを理由付きでマークし、入口からの「AiDiy検索軌跡」として順に辿れます。ファイルごとの AI 分析も、結果を保存して再起動後に復元します。</p>
+                <div class="meta-tags"><span>aidiy_code_agents</span><span>検索軌跡</span><span>履歴保存</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">📖 読み取り専用ビューア</h3>
+                <p>コードは Monaco Editor、画像・Office 文書・PDF も表示。HTML / SVG / Vue はサンドボックスで実際の表示に切り替えられます。バックアップと現在のファイルを左右に並べる「更新履歴」、📌 で別ウィンドウに並べるピン留めにも対応。</p>
+                <div class="meta-tags"><span>Monaco</span><span>Office / PDF</span><span>更新履歴</span></div>
+            </div>
+        </div>
+        <div class="advanced-grid" style="margin-top:30px;">
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🧩</span>
+                <h3 class="feature-title">同じ部品が 3 つの場所で動く</h3>
+                <p class="feature-description">
+                    Code / Live は Vue 3 の共通部品。<br>
+                    単独起動・VS Code 拡張・開発スペースの部品として<br>
+                    同じ画面がそのまま動きます。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    単独起動: <code>aidiy_code</code> / <code>aidiy_live</code><br>
+                    VS Code 拡張: セカンダリサイドバー<br>
+                    IDE 部品: 「＋ Code」「＋ Live」（Electron は別ウィンドウ、Web は画面内タブ）<br>
+                    <strong>会話履歴とモデル選択は 3 か所で共用</strong>
+                </div>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🛰️</span>
+                <h3 class="feature-title">どこでも開ける</h3>
+                <p class="feature-description">
+                    Electron のフレームレスウィンドウを基本に、<br>
+                    ブラウザ版・GitHub Codespaces にも対応。<br>
+                    AIコアが止まっても作業を保ち、復帰時に再接続します。
+                </p>
+                <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
+                    二重起動を防いで既存の窓を前面へ。<br>
+                    オフラインでは Code（aidiy_hermes 直接実行）だけ、<br>
+                    オンラインでは Code / Live の両方を使えます。
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. command_hermes 独自エージェント基盤 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧰 command_hermes — 独自エージェント基盤</h2>
         <p class="section-subtitle animate-on-scroll">AiDiy に統合された on-demand コードエージェント CLI。TUI・ツール・コンテキスト圧縮を内蔵。</p>
@@ -1630,7 +1725,8 @@ Key:   利用者名</pre>
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     <code>aidiy_hermes -Q -z "指示"</code> の形式で<br>
-                    ワンショット実行。会話履歴は AiDiy 側が保持。
+                    ワンショット実行。会話履歴は AiDiy 側が保持。<br>
+                    AiDiy Code のオフライン利用でも直接実行されます。
                 </div>
             </div>
             <div class="feature-card animate-on-scroll">
@@ -1650,7 +1746,7 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 7. 自己改善機構 -->
+    <!-- 8. 自己改善機構 -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🧠 自己改善機構 — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">使うほど育つ _AIDIY/knowledge/ 知見システム。</p>
@@ -1686,7 +1782,7 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 8. MCP Hub × 19 + Multi CLI -->
+    <!-- 9. MCP Hub × 19 + Multi CLI -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 19 + Multi CLI — 実装詳細</h2>
         <p class="section-subtitle animate-on-scroll">ポート 8095 に 19 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
@@ -1826,6 +1922,10 @@ Key:   利用者名</pre>
         <p class="section-subtitle animate-on-scroll">育つテンプレート、広がるエコシステム。</p>
         <div class="expansion-grid">
             <div class="expansion-item animate-on-scroll">
+                <h4>🌌 ソースをほぼ触らない IDE</h4>
+                <p>眺める・辿る・読む・頼むを開発スペースに集約し、変更は Code / Live の AI に任せる開発スタイルへ。</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
                 <h4>🌱 蓄積で育つ</h4>
                 <p>_AIDIY/knowledge/ の知見が積み上がるほど、修正の初手精度が上がる。</p>
             </div>
@@ -1871,7 +1971,8 @@ Key:   利用者名</pre>
         </p>
         <p class="animate-on-scroll" style="margin-bottom: 25px; font-size: 0.9rem; color: #777;">
             管理画面を見るなら frontend_web、AI を試すなら /AiDiy、<br>
-            アバター体験まで含めるなら frontend_avatar。
+            アバター体験まで含めるなら frontend_avatar、<br>
+            宇宙を旅しながら開発するなら aidiy_ide。
         </p>
         <a href="/AiDiy" class="cyber-button animate-on-scroll rainbow-blink" target="_blank">
             AiDiy を開く
