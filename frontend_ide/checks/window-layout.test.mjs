@@ -17,10 +17,15 @@ for(const area of [{x:0,y:0,width:1920,height:1040},{x:-1600,y:80,width:1600,hei
    assert.equal(code.width,480);assert.equal(live.width,480);
    assert.equal(code.height,Math.min(600,area.height-16));assert.equal(live.height,code.height);
    if(!owner){assert.equal(code.x,area.x+8);assert.equal(live.x,area.x+area.width-480-8);assert.equal(code.y,area.y+8);assert.equal(live.y,code.y);}
-   for(const b of [ide,code,live]){
+   for(const b of [ide,code,live,windowBounds('term',area,owner),windowBounds('term',area,owner,3)]){
     assert.ok(b.x>=area.x&&b.y>=area.y);
     assert.ok(b.x+b.width<=area.x+area.width&&b.y+b.height<=area.y+area.height);
    }
+   const term=windowBounds('term',area,owner),next=windowBounds('term',area,owner,1);
+   assert.equal(term.width,Math.round(area.width*2/3));assert.equal(term.height,Math.round(area.height/2));
+   assert.ok(Math.abs(term.x+(term.width/2)-(area.x+area.width/2))<=1);
+   assert.equal(term.y+term.height,area.y+area.height-8);
+   assert.equal(next.x,term.x+28);assert.equal(next.y,term.y-28);
    if(area.width>1000&&owner===ide){
     assert.equal(code.x,ide.x+24);assert.equal(live.x+live.width,ide.x+ide.width-24);
     assert.ok(code.x<live.x);assert.equal(code.y,live.y);assert.equal(code.height,live.height);

@@ -53,16 +53,18 @@ class StartTests(unittest.TestCase):
     def test_vue_process_matching_keeps_other_apps_out(self):
         root = dev.THIS_DIR.parent.parent / 'frontend_ide'
         for windows in (True, False):
-            for kind in ('code', 'live', 'ide'):
+            for kind in ('term', 'code', 'live', 'ide'):
                 record = dict(Name='node', CommandLine=f'node "{root / "launch.mjs"}" --app {kind}')
                 self.assertEqual(dev.is_dev_process(record, dev.THIS_DIR, windows), kind == 'ide')
+                self.assertEqual(dev.is_dev_process(record, dev.THIS_DIR, windows, 'term'), kind == 'term')
 
     def test_root_launch_order_and_no_dev_restart(self):
         with patch.object(start, "stop_all_tasks"), patch.object(start, "start_service", return_value=True) as launch, patch.object(start, "wait_for_services_quiet"):
             flags = start.start_initial_services(False, False, False, False, False, False, {}, {}, None,
-                                                 code_enabled=True, live_enabled=True, dev_enabled=True, discord_enabled=True)
+                                                 term_enabled=True, code_enabled=True, live_enabled=True, dev_enabled=True, discord_enabled=True)
         self.assertEqual([c.args[0] for c in launch.call_args_list],
-                         [f"フロントエンド({name})" for name in ("code", "live", "IDE", "Discord")])
+                         [f"フロントエンド({name})" for name in ("term", "code", "live", "IDE", "Discord")])
+        self.assertFalse(flags["フロントエンド(term)"])
         self.assertFalse(flags["フロントエンド(IDE)"])
 
     def test_shutdown_preserves_dev_but_cleanup_stops_it(self):

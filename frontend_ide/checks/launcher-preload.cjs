@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 // 起動コマンドを変更せず、テスト専用プロファイルの実ウィンドウだけを観測する。
 if(process.versions.electron&&process.type==='browser')process.nextTick(()=>{
- const {app,BrowserWindow,dialog}=require('electron');
+ const {app,BrowserWindow,dialog,screen}=require('electron');
  // ランチャー検証の終了操作は承認する。取消の分岐はcore-stop-probeで検証する。
  dialog.showMessageBox=async()=>({response:0});
  const {existsSync,writeFileSync}=require('node:fs');
@@ -31,7 +31,7 @@ if(process.versions.electron&&process.type==='browser')process.nextTick(()=>{
    window.once('closed',()=>clearInterval(timer));
    setTimeout(async()=>{
     if(window.isDestroyed())return;
-    writeFileSync(join(folder,'window.json'),JSON.stringify({pid:process.pid,visible:window.isVisible(),url:window.webContents.getURL()}));
+    writeFileSync(join(folder,'window.json'),JSON.stringify({pid:process.pid,visible:window.isVisible(),url:window.webContents.getURL(),bounds:window.getBounds(),area:screen.getDisplayMatching(window.getBounds()).workArea}));
     writeFileSync(join(__dirname,`../../nn-launcher-${process.env.AIDIY_DEVELOPMENT_KIND}.png`),(await window.webContents.capturePage()).toPNG());
    },1800);
   });

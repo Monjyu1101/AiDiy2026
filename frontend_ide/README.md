@@ -1,6 +1,6 @@
 # AiDiy IDE（Vue）
 
-Code / Live / IDE の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は3種類です。
+Term / Code / Live / IDE の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は4種類です。
 
 ## 開発スペース — 宇宙をテーマにした IDE 開発環境
 
@@ -32,12 +32,38 @@ Code / Live は、これまでどおり単独起動（`aidiy_code` / `aidiy_live
 
 同じ部品が3つの場所で動くことで、IDE 開発への応用が広がっています。
 
+## ターミナル（AiDiy Term）
+
+`aidiy_term` は作業フォルダでシェルを開くシンプルな端末です。WindowsはPowerShell、Linux / macOSは `SHELL`（未指定時は `/bin/sh`）を使います。AiDiyコアへの接続は不要です。
+
+- 単独起動: `aidiy_term`。ブラウザなら `aidiy_term --browser`。
+- Electron版は画面の作業領域の幅2/3・高さ1/2で、画面下中央に開きます。単独コマンドの再実行も別窓になり、IDEの「＋ Term」と共通で28pxずつ右上へずらします。画面端まで進んだら中央下へ戻ります。
+- IDE: 利用開始後の「＋ Term」で別ウィンドウを開きます。複数起動できます。Web版はTermタブです。
+- 最初の入力まではCodeと同じアイコン付き初期表示と、画面下部の端末入力欄を表示します。文字入力・貼り付け・キー操作で端末を全体へ広げ、同じシェルと入力を引き継ぎます。「再起動」で初期表示に戻ります。
+- ANSIカラー、日本語入力、矢印キー、Ctrl+C、貼り付け、スクロール履歴、ウィンドウサイズへの追従に対応します。文字を選択した状態のCtrl+Cはコピーです。
+- 「表示クリア」は端末の表示を消して、アイコン付きの初期画面と下部の入力欄に戻ります。シェルと変数・作業フォルダは維持し、次の入力で再び全体表示になります。`exit`でシェルを終了した後は「再起動」で新しいシェルを開けます。
+- タイトルバーとプロジェクトバーはCodeと共通の配置です。「tools接続確認」トグルは既定ONで、tools（既定8095）の応答があればシアンで明滅し、応答がなければ黒になります。OFFでは疎通確認を止め、Codeと同じ赤いバーに切り替えます。端末や実行中のコマンドは維持します。
+- Windowsでは下記CLI名だけを入力すると、続きの起動オプションを入力行に薄いグレーで表示します。Tabで確定すると通常の文字になり、Enterで実行します。通常のTab補完は維持し、モデル指定は変更しません。
+- Webのタブ切替・パネル非表示ではシェルを維持します。ページ再読込・端末窓の終了・IDEの利用終了ではシェルとその子プロセスを終了します。
+- 実行するのはアプリを動かしているPCのシェルです。ファイルビューアの読み取り専用制約とは別で、通常のターミナルと同じ権限でコマンドを実行します。
+
+実装と確認手順は `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` のTerm節を参照してください。
+
+| 入力 | Tabで追加するオプション（`scripts/cli_bat` 準拠） |
+|---|---|
+| `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| `claude` | `--dangerously-skip-permissions --chrome` |
+| `copilot` | `--allow-all-tools` |
+| `agy` | `--dangerously-skip-permissions` |
+| `grok` | `--yolo` |
+| `aidiy_hermes` | `--yolo` |
+
 ## 起動
 
 セットアップはリポジトリ直下で `python frontend_ide/_setup.py`。既存の全体セットアップからも共通画面を準備します。
-セットアップ済みなら、表示したいフォルダで `aidiy_code`、`aidiy_live`、`aidiy_ide` を実行します。3つのコマンドは共通のVue画面を起動します。IDEの起動名は `aidiy_ide`、アプリ指定は `--app ide` です。
+セットアップ済みなら、表示したいフォルダで `aidiy_term`、`aidiy_code`、`aidiy_live`、`aidiy_ide` を実行します。4つのコマンドは共通のVue画面を起動します。IDEの起動名は `aidiy_ide`、アプリ指定は `--app ide` です。
 
-PATH登録なしでも `node <配置先>/frontend_ide/launch.mjs --app ide`（code / liveも可）。引数を省略した作業フォルダは実行時のカレントフォルダです。`--project <フォルダ>`、`--browser`、`--no-open`、`--port <番号>`、`--strict-port` に対応します。ポートの既定は0（自動割り当て）。Electronを使えない環境とCodespacesはWebで開きます。Codeの `--offline` はHermesを直接使用します。Liveの `--connect` は初回だけ接続します。
+PATH登録なしでも `node <配置先>/frontend_ide/launch.mjs --app ide`（term / code / liveも可）。引数を省略した作業フォルダは実行時のカレントフォルダです。`--project <フォルダ>`、`--browser`、`--no-open`、`--port <番号>`、`--strict-port` に対応します。ポートの既定は0（自動割り当て）。Electronを使えない環境とCodespacesはWebで開きます。Codeの `--offline` はHermesを直接使用します。Liveの `--connect` は初回だけ接続します。
 
 IDEは画面の「AiDiy接続利用」「オフライン利用」で手動開始します。利用開始後にコアとの接続を失っても、ファイル表示・作業起点・Code子窓を維持し、コア復帰時に再接続します。初回接続失敗は手動で再試行します。オフラインではLiveの起動ボタン・タブを表示しません。
 
@@ -62,7 +88,7 @@ Electron版IDEは右上の「＋ Code」「＋ Live」で別ウィンドウを�
 - HTML / SVG: IDEのサーバーとは別ポート（別オリジン）の「なんちゃって」静的サーバーで表示します。最初の「表示」で起動し、IDEを閉じると一緒に止まります。ファイルは書き出さないので、閉じてもゴミは残りません。ページのスクリプトはサンドボックスの中で動き、IDEのファイルAPIには届きません。`_config`・`.env` などの隠しファイル・鍵らしいファイル・`node_modules`・`.venv`・`backup` は配りません。SVGも画像の埋め込みではなく文書として開き、`images/…`・`../…` の画像やCSS・外部SVGを元ファイルのフォルダ基準で読み込みます。相対パスはそのまま、`/…` 始まりは `public` フォルダを根として解決します。音声・動画の途中再生（Range）に対応し、Electron版は自動再生を許可します。外部CDNを使うページはネット接続が必要です。
 - Vue: `frontend_web/src` の `.vue` は、`frontend_web` の開発サーバー（8090）が動いている時だけ、その部品を使っている画面（ルート）を表示します。部品ならimportをたどって画面を探し、候補が複数あれば選べます。ログインが必要な画面ではログイン画面が出ます（IDEのログイン状態はブラウザと別です）。開発サーバーが止まっている時は理由と起動方法を表示します。
 
-Code / Live / IDEの単独Electron起動は、画面表示後にコマンドプロンプトへ戻ります。サーバーと画面は独立して動作し、×で画面を閉じるとサーバーも終了します。起動済みなら既存画面を前面へ出して戻ります。終了までコマンドを待機させる場合は `aidiy_code --foreground` / `aidiy_live --foreground` / `aidiy_ide --foreground`（または `--wait`）。`--browser`、`--no-open`、`--serve` は従来どおりサーバーを前面で動かします。
+Term / Code / Live / IDEの単独Electron起動は、画面表示後にコマンドプロンプトへ戻ります。サーバーと画面は独立して動作し、×で画面を閉じるとサーバーも終了します。Code / Live / IDEは起動済みなら既存画面を前面へ出し、Termは独立した別窓を開きます。終了までコマンドを待機させる場合は各コマンドへ `--foreground`（または `--wait`）を付けます。`--browser`、`--no-open`、`--serve` は従来どおりサーバーを前面で動かします。
 
 ## AiDiy検索と軌跡
 
@@ -130,13 +156,13 @@ Canvas描画は `src/engines/space.js`、通信は `src/transports/` に分離�
 - 同じ Electron 確認で、タイトルバーの最大化／元のサイズへの復元も実ウィンドウで検証します。
 - 音声・バックエンドの回帰確認: `frontend_ide/host` の `npm test` / `npm run live:test`、`frontend_ide/viewer` の `npm test`。
 
-全体のsetup・cleanupは「IDE群(Code / Live / IDE)」を一括選択します。startは同じIDE群の中でCode → Live → IDEを個別に選び、その後にDiscordを選びます。セットアップで稼働中の画面を停止しません。cleanupはhost → viewer → 共通UIの順に解除し、停止・解除に失敗した場合は共通のnode_modulesとdistを残します。
+全体のsetup・cleanupは「IDE群(Term / Code / Live / IDE)」を一括選択します。startは同じIDE群の中でTerm → Code → Live → IDEを個別に選び、その後にDiscordを選びます。セットアップで稼働中の画面を停止しません。cleanupはTerm → Code → Live → IDE → 共通UIの順に解除し、停止・解除に失敗した場合は共通のnode_modulesとdistを残します。
 
 ## ウィンドウ配置
 
 Electron版は現在の画面の作業領域（タスクバーを除く）に合わせ、IDEを余白付きで大きく開きます。Code / Live は幅480 × 高さ600（最小360 × 480、Electronの論理ピクセル）です。寸法は `host/scripts/window-size.cjs` を共用し、収まらない小画面だけ縮小します。単独版は画面上端から8px、Codeを左端から8px、Liveを右端から8pxに開きます。IDEから開くCode / LiveはIDEの左右端から24px内側に置き、上端をどちらもIDEから36px下へずらし、Code / Liveの上端と高さを揃えます。IDE配下のタイトルは「AiDiy IDE / Code」「AiDiy IDE / Live」です。移動済みの窓を再選択しても配置を戻しません。
 
-単独版は種類ごとに二重起動を防ぎ、起動済みの窓を復元して前面に出します。IDEから開いたCode / Liveは常に最前面に表示します。IDE連携の「＋Code」は依頼ごとに別窓を開き、2窓目以降を少しずらして配置します。「＋Live」はオンライン時だけ利用でき、初期化中も含めて1窓に制限します。Live起動後はボタンを隠し、閉じると再表示します。IDEの明示終了に連動して子窓を終了します。
+Code / Live / IDEの単独版は種類ごとに二重起動を防ぎ、起動済みの窓を復元して前面に出します。Termは単独版も複数起動できます。IDEから開いたCode / Liveは常に最前面に表示します。IDE連携の「＋Code」は依頼ごとに別窓を開き、2窓目以降を少しずらして配置します。「＋Live」はオンライン時だけ利用でき、初期化中も含めて1窓に制限します。Live起動後はボタンを隠し、閉じると再表示します。IDEの明示終了に連動して子窓を終了します。
 
 ## 利用条件
 

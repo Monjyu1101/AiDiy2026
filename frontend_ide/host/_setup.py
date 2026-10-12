@@ -332,7 +332,7 @@ def install_extensions(vscode_cli: str) -> bool:
 
 
 def setup(choices: dict | None = None) -> bool:
-    label = "IDE群(Code / Live / IDE)"
+    label = "IDE群(Term / Code / Live / IDE)"
     if not (choices and choices.get("ide")):
         print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
@@ -394,7 +394,7 @@ def main():
             print_error('VS Code CLI が見つかりません。')
             raise SystemExit(1)
         raise SystemExit(0 if install_extensions(vscode_cli) else 1)
-    print_header("IDE群(Code / Live / IDE) セットアップ")
+    print_header("IDE群(Term / Code / Live / IDE) セットアップ")
     run_setup, AUTO_MODE = ask_start_mode(
         "フロントエンド(vscode) のセットアップを実行しますか?", default="n"
     )

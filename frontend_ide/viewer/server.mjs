@@ -258,9 +258,9 @@ export async function startServer(root, port = 0, { strict = false, env = proces
       }
       // 画面を隠すだけでなく、未接続時はファイル取得も停止する。
       if (url.pathname.startsWith('/api/') && !connection.state().active) return fail(503, 'AiDiy接続利用またはオフライン利用を選択してください。');
-      if (url.pathname === '/api/panels/code' || url.pathname === '/api/panels/live') {
+      if (url.pathname === '/api/panels/code' || url.pathname === '/api/panels/live' || url.pathname === '/api/panels/term') {
         if (req.method !== 'POST') return fail(405, 'POST required');
-        if (url.pathname.endsWith('/live') && connection.state().mode !== 'online') return fail(403, 'オフラインではCodeだけを利用できます。');
+        if (url.pathname.endsWith('/live') && connection.state().mode !== 'online') return fail(403, 'LiveはAiDiy接続利用で開けます。');
         req.resume();
         return json({ url: await panels.open(url.pathname.split('/').at(-1)) });
       }

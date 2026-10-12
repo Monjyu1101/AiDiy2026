@@ -9,6 +9,7 @@ const props = defineProps({ icon: String, kind: { default: 'code' }, started: Bo
 const inputStarted = ref(false);
 watch(() => props.started, value => { if (value) inputStarted.value = true; }, { immediate: true });
 const lines = {
+  term: ['WELCOME TO YOUR REMOTE TERMINAL', 'WHAT WOULD YOU LIKE TO RUN?', 'ENTER A COMMAND TO GET STARTED.'],
   code: ['LET’S BUILD SOMETHING', 'WHAT WILL YOU BUILD?', 'IT STARTS HERE.'],
   live: ['LET’S START A CONVERSATION', 'CONNECT, THEN TURN YOUR MIC ON.', 'YOU CAN ALSO TYPE TO CHAT.'],
   ide: ['FROM WORKSPACE TO OUTER SPACE.', 'MAKE SPACE FOR YOUR IDEAS.', 'CONNECT TO AIDIY OR EXPLORE OFFLINE.'],

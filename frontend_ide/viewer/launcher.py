@@ -15,21 +15,21 @@ import shutil
 import sys
 
 
-def launcher_path() -> Path:
-    return Path.home() / '.local' / 'bin' / ('aidiy_ide.cmd' if sys.platform == 'win32' else 'aidiy_ide')
+def launcher_path(kind: str = 'ide') -> Path:
+    return Path.home() / '.local' / 'bin' / (f'aidiy_{kind}.cmd' if sys.platform == 'win32' else f'aidiy_{kind}')
 
 
-def install_launcher(root: Path) -> None:
+def install_launcher(root: Path, kind: str = 'ide') -> None:
     node = shutil.which('node')
     if not node:
         raise OSError('Node.js が見つかりません。')
     script = root.resolve() / 'launch.mjs'
     if not script.is_file():
         raise OSError(f'起動スクリプトが見つかりません: {script}')
-    path = launcher_path()
+    path = launcher_path(kind)
     # この配置先の旧コマンドを撤去する。互換ランチャーは作らない。
     legacy = path.with_name('aidiy_dev.cmd' if sys.platform == 'win32' else 'aidiy_dev')
-    if legacy.is_file() and str(script) in legacy.read_text(encoding='utf-8'):
+    if kind == 'ide' and legacy.is_file() and str(script) in legacy.read_text(encoding='utf-8'):
         legacy.unlink()
     path.parent.mkdir(parents=True, exist_ok=True)
     if sys.platform == 'win32':
@@ -41,8 +41,8 @@ def install_launcher(root: Path) -> None:
     print(f'[OK] ランチャーを登録しました: {path}')
 
 
-def remove_launcher(root: Path) -> bool:
-    path = launcher_path()
+def remove_launcher(root: Path, kind: str = 'ide') -> bool:
+    path = launcher_path(kind)
     try:
         # 別の作業コピーが登録したランチャーは消さない
         if path.is_file() and str(root.resolve() / 'launch.mjs') in path.read_text(encoding='utf-8'):

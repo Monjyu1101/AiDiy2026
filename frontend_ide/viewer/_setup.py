@@ -61,7 +61,7 @@ def print_info(message):
 
 def setup(choices=None) -> bool:
     if not (choices and choices.get("ide")):
-        print_header("IDE群(Code / Live / IDE) セットアップ")
+        print_header("IDE群(Term / Code / Live / IDE) セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
     print_info("対象: Electron / コード・Office文書ビューア（Monaco / docx-preview / SheetJS / PptxViewJS / PDF.js）")
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
@@ -79,7 +79,7 @@ def setup(choices=None) -> bool:
             print_info("Web 起動環境のため Electron 本体のダウンロードは省略します。")
         subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         vue = THIS_DIR.parent.parent / 'frontend_ide'
-        if not (vue / 'node_modules' / 'vue').is_dir():
+        if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
             subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True)
         subprocess.run([npm, 'run', 'build'], cwd=vue, check=True)
         install_launcher(THIS_DIR)
@@ -87,7 +87,7 @@ def setup(choices=None) -> bool:
         print_error("AiDiy IDE の依存導入またはランチャー登録に失敗しました。")
         return False
     if not (choices and choices.get("ide")):
-        print_success("IDE群(Code / Live / IDE): aidiy_ide で起動できます。")
+        print_success("IDE群(Term / Code / Live / IDE): aidiy_ide で起動できます。")
     return True
 
 

@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""IDE群(Code / Live / IDE)の依存・拡張・ランチャーをまとめて準備する。"""
+"""IDE群(Term / Code / Live / IDE)の依存・拡張・ランチャーをまとめて準備する。"""
 import importlib.util
 import shutil
 import subprocess
@@ -26,17 +26,18 @@ def setup(choices=None):
     if choices is not None and choices.get("ide") is False:
         return True
     print("\n" + "=" * 60)
-    print("IDE群(Code / Live / IDE) セットアップ")
+    print("IDE群(Term / Code / Live / IDE) セットアップ")
     print("=" * 60 + "\n")
     child_choices = {**(choices or {}), "ide": True}
     # hostからprepareだけを呼ぶため再帰しない。
-    for name in ('frontend_ide/host', 'frontend_ide/viewer'):
+    for name in ('frontend_ide/aidiy_term', 'frontend_ide/host', 'frontend_ide/viewer'):
         spec = importlib.util.spec_from_file_location('ide_setup_' + name.replace('/', '_'), ROOT.parent / name / '_setup.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         if not module.setup(child_choices):
             return False
-    print("IDE群(Code / Live / IDE) セットアップ完了")
+    print("IDE群(Term / Code / Live / IDE) セットアップ完了")
+    print("Term 起動: aidiy_term")
     print("Code 起動: aidiy_code")
     print("Live 起動: aidiy_live")
     print("IDE  起動: aidiy_ide")

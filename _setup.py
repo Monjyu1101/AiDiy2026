@@ -23,7 +23,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_web/_setup.py     フロントエンド(Web)
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
-- frontend_ide/_setup.py     IDE群(Code / Live / IDE)
+- frontend_ide/_setup.py     IDE群(Term / Code / Live / IDE)
 - frontend_discord/_setup.py フロントエンド(Discord、任意)
 
 Usage:
@@ -678,7 +678,7 @@ def collect_setup_choices() -> dict | None:
     choices["web"] = ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y")
     choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
     choices["hermes"] = ask_yes_no("コマンド(hermes)のセットアップを実行しますか？", default="y")
-    choices["ide"] = ask_yes_no("IDE群(Code / Live / IDE)のセットアップを実行しますか？", default="y")
+    choices["ide"] = ask_yes_no("IDE群(Term / Code / Live / IDE)のセットアップを実行しますか？", default="y")
     choices["discord"] = ask_yes_no("フロントエンド(Discord)のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
@@ -701,7 +701,7 @@ def main():
     print_info("  6. フロントエンド(Web)")
     print_info("  7. フロントエンド(Avatar)")
     print_info("  8. コマンド(hermes)")
-    print_info("  9. IDE群(Code / Live / IDE)")
+    print_info("  9. IDE群(Term / Code / Live / IDE)")
     print_info(" 10. フロントエンド(Discord、任意)")
     print()
 
@@ -823,12 +823,12 @@ def main():
     print()
     if choices.get("ide"):
         if not _load_folder_module("frontend_ide").setup(choices):
-            error_locations.append("IDE群(Code / Live / IDE)")
+            error_locations.append("IDE群(Term / Code / Live / IDE)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("IDE群(Code / Live / IDE)のセットアップをスキップしました。")
+        print_warning("IDE群(Term / Code / Live / IDE)のセットアップをスキップしました。")
 
     print()
     if choices.get("discord"):
@@ -856,6 +856,7 @@ def main():
     print_info("    Web開発    : cd frontend_web && npm run dev")
     print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
     print_info("    Hermes起動 : aidiy_hermes")
+    print_info("    Term起動   : aidiy_term")
     print_info("    Code起動   : aidiy_code")
     print_info("    Live起動   : aidiy_live")
     print_info("    IDE起動    : aidiy_ide")

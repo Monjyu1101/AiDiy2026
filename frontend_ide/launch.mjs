@@ -13,7 +13,7 @@ import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-opt
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){
- const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':'Code';
+ const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='term'?'Term':'Code';
  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--app',defaultKind,'--foreground',...args],{cwd:process.cwd(),env:{...process.env,AIDIY_LAUNCHER_CHILD:'1'},detached:true,windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
  try{
   const result=await new Promise((done,reject)=>{
@@ -32,7 +32,7 @@ async function launchDetached(defaultKind,args){
 export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},help:{type:'boolean'}}});
  const kind=values.app||defaultKind;
- if(!['code','live','ide'].includes(kind))throw Error('--app はcode / live / ideから指定してください。');
+ if(!['code','live','ide','term'].includes(kind))throw Error('--app はcode / live / ide / termから指定してください。');
  if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port] [--provider 名前] [--model モデル]${kind==='code'?' [--offline]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
  const project=projectFolder(positionals,values.project),port=values.port===undefined?0:Number(values.port);
  if(!Number.isInteger(port)||port<0||port>65535)throw Error('--port は0〜65535で指定してください。');

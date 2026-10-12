@@ -201,6 +201,7 @@ SERVICE_CLEANUP_TARGETS = (
         "フロントエンド(Avatar)",
         ("フロントエンド(Avatar)",),
     ),
+    ("ide", "frontend_ide/aidiy_term", "フロントエンド(term)", ("フロントエンド(term)",)),
     ("ide", "frontend_ide/viewer", "フロントエンド(IDE)", ("フロントエンド(IDE)",)),
     ("discord", "frontend_discord", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
 )
@@ -222,9 +223,9 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
         services = [
             service_name
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
-            if _folder not in ("frontend_ide/viewer", "frontend_discord")
+            if _folder not in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord")
             for service_name in service_names
-        ] + ["フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
+        ] + ["フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,
@@ -282,11 +283,16 @@ def stop_all_services(
             failures.append(description)
 
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
-        if folder in ("frontend_ide/viewer", "frontend_discord"):
+        if folder in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord"):
             continue
         print_info(f"{description} の既存プロセスを停止します")
         run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
 
+    if keep_dev:
+        print_info("フロントエンド(term) は継続します")
+    else:
+        print_info("フロントエンド(term) の既存プロセスを停止します")
+        run_stop("Term の単独実行", lambda: _load_folder_start_module("frontend_ide/aidiy_term").kill_ports())
     if keep_code:
         # aidiy_live は通常 core 無しに動作できないため、core と一緒に止めてよい。
         print_info("フロントエンド(Code / Live) aidiy_code は継続します")
@@ -312,6 +318,7 @@ def stop_all_services(
             if keep_code:
                 protected_pids.update(_load_folder_start_module("frontend_ide/host").process_tree_pids("code"))
             if keep_dev:
+                protected_pids.update(_load_folder_start_module("frontend_ide/aidiy_term").process_tree_pids())
                 protected_pids.update(_load_folder_start_module("frontend_ide/viewer").process_tree_pids())
             if keep_discord:
                 protected_pids.update(_load_folder_start_module("frontend_discord").process_tree_pids())
@@ -649,7 +656,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                         f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？", default="y",
                     )
 
-    choices["ide"] = ask_yes_no("IDE群(Code / Live / IDE)をクリーンアップしますか？", default="y")
+    choices["ide"] = ask_yes_no("IDE群(Term / Code / Live / IDE)をクリーンアップしますか？", default="y")
     choices["discord"] = ask_yes_no("フロントエンド(Discord)をクリーンアップしますか？", default="y")
 
     return choices
@@ -719,9 +726,9 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     print()
     if choices.get("ide"):
         if not _run_folder_cleanup("frontend_ide", choices):
-            cleanup_errors.append("IDE群(Code / Live / IDE)")
+            cleanup_errors.append("IDE群(Term / Code / Live / IDE)")
     else:
-        print_info("IDE群(Code / Live / IDE)のクリーンアップをスキップしました")
+        print_info("IDE群(Term / Code / Live / IDE)のクリーンアップをスキップしました")
 
     print()
     if choices.get("discord"):
@@ -773,7 +780,7 @@ def main():
     print_info("  7. フロントエンド(Web)")
     print_info("  8. フロントエンド(Avatar)")
     print_info("  9. コマンド(hermes)")
-    print_info(" 10. IDE群(Code / Live / IDE)")
+    print_info(" 10. IDE群(Term / Code / Live / IDE)")
     print_info(" 11. フロントエンド(Discord)")
     print()
 

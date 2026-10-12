@@ -111,7 +111,7 @@ Code / Live / IDEの接続バーは `StatusBar.vue` のclockPulseを有効にし
 
 ポートは自動割り当てです。aidiy_code / aidiy_live / aidiy_ideからVue版を起動します。旧aidiy_devの互換起動はありません。cleanupのプロセス照合は起動スクリプトの完全一致とアプリ種別で行い、IDE群の解除が成功してから共通Vue生成物を削除します。
 
-Electronの初期配置は `window-layout.cjs` で画面のworkAreaから計算します。IDEは余白付きの大きな画面、Code / Liveは左右に配置し、IDE連携時は親の境界を基準にずらし、Code / Liveの上端と高さは揃えます。連携窓のタイトルは「AiDiy IDE / Code」「AiDiy IDE / Live」で、単独版のタイトルと区別します。既存窓の再表示では最小化を解除して前面に出すだけにします。単独Electronは種別ごとのsingle-instance lock、IDEのCode子窓は複数起動でき、それぞれ独立したサーバー・会話を持ちます。Live子窓だけ親セッションと初期化中のPromiseで重複を防ぎ、起動中は＋Liveを隠します。子窓の状態はメインプロセスから取得し、閉じたときにボタンを戻します。`checks/window-layout.test.mjs` と `scripts/check-windows.mjs` で画面外にはみ出さない配置・連打・前面復帰・終了連携を確認します。
+Electronの初期配置は `window-layout.cjs` で画面のworkAreaから計算します。IDEは余白付きの大きな画面、Code / Liveは左右に配置し、IDE連携時は親の境界を基準にずらし、Code / Liveの上端と高さは揃えます。連携窓のタイトルは「AiDiy IDE / Code」「AiDiy IDE / Live」で、単独版のタイトルと区別します。既存窓の再表示では最小化を解除して前面に出すだけにします。Code / Live / IDEの単独Electronは種別ごとのsingle-instance lockを使い、Termは複数起動を許可します。IDEのCode子窓は複数起動でき、それぞれ独立したサーバー・会話を持ちます。Live子窓だけ親セッションと初期化中のPromiseで重複を防ぎ、起動中は＋Liveを隠します。子窓の状態はメインプロセスから取得し、閉じたときにボタンを戻します。`checks/window-layout.test.mjs` と `scripts/check-windows.mjs` で画面外にはみ出さない配置・連打・前面復帰・終了連携を確認します。
 
 WindowsでElectronのGUI本体をspawnするときは `windowsHide: false` にします。`true` では初回の画面表示が隠され、URLだけ出て再実行するまで窓が見えない場合があります。バックグラウンドの補助プロセスとは区別し、初回起動時の可視状態を `scripts/check-single-instance.mjs` でも確認します。
 
@@ -138,3 +138,30 @@ Code / Live / IDEの単独Electron起動では `launch.mjs` がサーバーを�
 プレビューのiframeと文書CSPには `allow-same-origin` を付け、外部SVGのuse参照などを可能にします。IDE自身とは別ポートで隔離し、元のプロジェクト外や設定・鍵ファイルの配信拒否を維持します。ディレクトリのindex.htmlは末尾スラッシュ付きURLへ誘導し、画像の基準位置をずらさないでください。ファイル切替・破棄では古いプレビューAPIの応答を無効化します。
 
 `node --test frontend_ide/viewer/checks/preview.test.mjs` と `node frontend_ide/scripts/check-preview.mjs` で配信・ブラウザ表示を確認します。実ファイルは `check-preview.mjs --project <ルート> --html <相対パス> --svg <相対パス>` で読み取り専用に検証し、`nn-preview-*.png` に撮影します。配信側を変更した際は、画面再読み込みだけでなくIDEを終了して再起動してください。
+
+## Term（ターミナル）の変更・検証
+
+TermのElectron窓は作業領域の幅2/3・高さ1/2で画面下中央に開き、次の窓を28pxずつ右上へ配置します。親IDEの矩形には合わせず、親と同じディスプレイの作業領域を使います。画面端まで進んだら基点へ戻します。単独Termはsingle-instance lockを使わず、起動ごとの一時Chromiumプロファイルを終了時に片付けます。`term-window-slot.cjs` は127.0.0.1の18440〜18567を操作受付のない排他用ポートとして使い、単独プロセスとIDE子窓で配置番号を共有します。番号は窓終了で解放し、プロセス異常終了でもOSが解放します。Code / Live / IDEの既存窓再利用は維持します。
+
+プロジェクトバーの「tools接続確認」はCodeの `auto-connect` トグルを共用します。既定ON、WebSocketの `tools-check` で切り替え、`tools` 応答の `enabled` / `online` で画面を同期します。OFFは疎通の定期実行を止め、シアン表示を解除して赤いバーにします。ONへ戻すと即時に疎通確認を再開します。シェルの再起動は行わず、端末の再起動でも同じサーバー内の選択を維持します。確認中にOFFへ変わった場合の古い応答は世代番号で無視してください。
+
+Termの入力前はCodeと同じ `TerminalWelcome.vue` とアイコンを使い、実PTYの入力欄を下部へ小さく配置します。xtermの `onKey` とDOMの `input` / `paste` で初回操作を検出し、同じ端末要素を拡張・再fitします。シェルや端末を作り直さず、初回の文字・日本語IME・貼り付けを失わないようにしてください。シェルが自動送信する制御応答を入力開始と誤認しないよう、`onData` だけで判定しません。再起動時は初期表示へ戻し、タブ切替では表示状態を保持します。
+
+CLI補完候補は `TermPanel.vue` でカーソル直後へ薄いグレーの文字として重ねます。xtermのセル寸法・表示中の行位置から配置し、右端で折り返します。端末バッファには候補を書き込まず、Tab確定時だけPSReadLineが入力へ追加します。描画・スクロール・サイズ変更時に位置を更新し、別画面や終了時には表示しません。候補を常設の下部パネルへ戻さず、下部はキー操作の案内だけにします。
+
+タイトルバーはCodeと同じ `StatusBar.vue`、プロジェクトバーは共通の `component-toolbar` を使い、フォルダ名と完全パスのツールチップを表示します。シェルの状態は下部に分け、シアンバーはtoolsの疎通だけで決めます。`terminal.mjs` は `ai-search.mjs` の接続先解決（`PORT_TOOLS`、既定8095）を共用し、`aidiy_code_agents/ping` を3秒ごと・タイムアウト1.5秒で確認します。tools停止でシェルを終了させず、シェルの自然終了後もtoolsの状態通知は維持します。
+
+Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだけにPSReadLineのTabハンドラーを設定します。入力が対象CLI名だけでカーソルが末尾なら、`scripts/cli_bat` と同じ権限省略オプションを追加し、実行はEnterに任せます。対象は `codex` / `claude` / `copilot` / `agy` / `grok` / `aidiy_hermes` で、Claudeは既存バッチに合わせて `--chrome` も追加します。モデルは変更しません。それ以外は元のTab処理へ戻します。`src/terminal-completion.js` の `cliCompletions` を候補表示とシェル補完で共用し、履歴予測の斜体表示と確定済み引数を区別します。ユーザーのプロファイルは変更しません。検証では同名の模擬関数で引数を確認し、実CLIを起動しないでください。
+
+`aidiy_term` は `aidiy_term/launch.mjs` → 共通 `launch.mjs` の `--app term` で起動します。IDEのElectron版は「＋ Term」で独立した子窓を複数開き、Web版は `TermPanel.vue` をTermタブに保持します。利用モードはオンライン・オフライン両方で有効です。setup / start / cleanup の表示と処理は Term → Code → Live → IDE の順に揃えます。`aidiy_term/_setup.py` はランチャー、`_start.py` は環境確認・独立起動・プロセス照合、`_cleanup.py` は停止とランチャー解除を担当し、依存物は共通UIにまとめます。
+
+`terminal.mjs` はランダムパス付きのローカルサーバー、`viewer/panels.mjs` は同一公開元への中継です。Host / Origin・IDE利用状態を検証し、シェル・開始フォルダはサーバー側で決めます。入力サイズと端末寸法を制限し、描画完了のACKで出力を制御します。パネル初期化中・終了中のセッション切替では、破棄中のサーバーも完了まで待ちます。
+
+`terminal-process.mjs` は `terminal-worker.mjs` を端末ごとに起動します。ネイティブのPTYと補助スレッドをそのプロセスに閉じ込め、ElectronからもNodeモードで動かします。Windowsの終了はそのworkerのプロセスツリーを停止します。WebSocket切断・ページ再読込・窓終了・IDE終了で停止し、タブ非表示だけでは切断しません。自然終了では末尾のIPC出力を送り終えてからworkerを終了します。ConPTYをIDEメインプロセスで直接保持すると補助スレッドの寿命がIDEに影響するため、この境界を維持してください。
+
+- `node --test frontend_ide/checks/terminal.test.mjs`: 不正接続・寸法・フロー制御、実PTYの日本語、開始フォルダ、リサイズ、Ctrl+C、シェル配下の子プロセスの終了。
+- `node frontend_ide/scripts/check-term.mjs`: 専用ブラウザで日本語入力、タブ保持、狭い画面、exit後の再起動、利用終了。WindowsのChrome / Edgeで実行します。
+- `node frontend_ide/scripts/check-term-desktop.mjs`: 専用Electronプロファイルで日本語入力、複数窓、個別終了、IDEとの終了連携。
+- `node frontend_ide/scripts/check-launcher.mjs term`: プロンプト復帰、同一プロジェクトの複数起動、幅2/3・高さ1/2、右上への配置、個別終了、待機指定、サーバー終了。
+
+画面確認画像は `temp/term-check/` に日本時間の日時付きで保存します。画面の変更を実行中の配信へ反映する場合は共通Vueの配布ファイルを再生成し、サーバー側を変えた場合は対象アプリを再起動します。PTYの依存は `node-pty`、画面は `@xterm/xterm` / `@xterm/addon-fit`。第三者ライセンスを `scripts/build.mjs` の通知生成へ含めます。新規環境の `npm ci` でPTYのビルドが必要になるOSでは、そのOSのC++ビルド環境も用意してください。

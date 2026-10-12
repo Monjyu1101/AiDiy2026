@@ -9,6 +9,12 @@ function windowBounds(kind,area,owner,slot=0){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
+ if(kind==='term'){
+  const width=Math.min(Math.round(area.width*2/3),available.width),height=Math.min(Math.round(area.height/2),available.height);
+  const originX=area.x+(area.width-width)/2,originY=available.y+available.height-height;
+  const steps=Math.max(1,Math.floor(Math.min(available.x+available.width-width-originX,originY-available.y)/28)+1),offset=(slot%steps)*28;
+  return{x:Math.round(originX+offset),y:Math.round(originY-offset),width,height};
+ }
  const base=owner||available;
  // ピン留めのビューア: IDEの右寄り、高さは作業領域の8割程度。2枚目以降は28pxずつ左下へずらす。
  if(kind==='viewer'){

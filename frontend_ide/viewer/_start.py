@@ -93,20 +93,22 @@ def check_environment() -> tuple[bool, str]:
     return True, "Vue / Node.js / Monaco / Office文書ビューア"
 
 
-def start(open_window: bool | None = None) -> subprocess.Popen[bytes]:
+def start(open_window: bool | None = None, *, kind='ide') -> subprocess.Popen[bytes]:
     """空きポートで独立起動する。親の終了後もログファイルへ出力して継続する。"""
+    label = 'フロントエンド(term)' if kind == 'term' else NAME
     node = node_command()
     if node is None:
         raise RuntimeError("Node.js が見つかりません")
     if open_window is None:
         open_window = True
     project = THIS_DIR.parent.parent
-    command = [node, str(THIS_DIR / "launch.mjs"), str(project)]
+    entry = THIS_DIR / 'launch.mjs' if kind == 'ide' else THIS_DIR.parent / 'aidiy_term/launch.mjs'
+    command = [node, str(entry), str(project)]
     if not open_window:
         command.append("--no-open")
-    print_info(f"[{NAME}] 作業ディレクトリ: {project}")
-    print_info(f"[{NAME}] コマンド: {' '.join(command)}")
-    log_dir = THIS_DIR / "out" / "aidiy_ide"
+    print_info(f"[{label}] 作業ディレクトリ: {project}")
+    print_info(f"[{label}] コマンド: {' '.join(command)}")
+    log_dir = THIS_DIR / 'out' / f'aidiy_{kind}'
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{uuid4().hex}.log"
     kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS} if sys.platform == "win32" else {"start_new_session": True}
@@ -115,14 +117,14 @@ def start(open_window: bool | None = None) -> subprocess.Popen[bytes]:
                                    stdout=output, stderr=subprocess.STDOUT, **kwargs)
     _processes[:] = [item for item in _processes if item.poll() is None]
     _processes.append(process)
-    print_success(f"[{NAME}] 独立起動しました。URL / ログ: {log_path}")
+    print_success(f"[{label}] 独立起動しました。URL / ログ: {log_path}")
     return process
 
 
 # ============================================================
 # 起動元を照合して停止（ポート番号は使わない）
 # ============================================================
-def is_dev_process(process: dict, root: Path, windows: bool) -> bool:
+def is_dev_process(process: dict, root: Path, windows: bool, kind='ide') -> bool:
     """この配置先の絶対パスで起動した Node / Electron だけを対象にする。"""
     if (process.get("Name") or "").lower() not in ("node", "node.exe", "electron", "electron.exe"):
         return False
@@ -133,28 +135,30 @@ def is_dev_process(process: dict, root: Path, windows: bool) -> bool:
     path = ntpath if windows else os.path
     entries = {path.normcase(path.normpath(path.join(str(root), name))) for name in ("launch.mjs", "desktop.cjs")}
     development = path.join(str(root), '..')
-    entries.add(path.normcase(path.normpath(path.join(development, 'aidiy_ide', 'launch.mjs'))))
+    if kind == 'term':
+        entries.clear()
+    entries.add(path.normcase(path.normpath(path.join(development, f'aidiy_{kind}', 'launch.mjs'))))
     if len(args) > 1 and path.normcase(path.normpath(args[1])) in {path.normcase(path.normpath(path.join(development, file))) for file in ('launch.mjs', 'desktop.cjs')}:
         selected = args[args.index('--app') + 1] if '--app' in args and args.index('--app') + 1 < len(args) else 'ide'
-        return selected == 'ide'
+        return selected == kind
     return len(args) > 1 and path.normcase(path.normpath(args[1])) in entries
 
 
-def kill_ports() -> None:
+def kill_ports(*, kind='ide') -> None:
     """全体 cleanup と共通の API 名。自分が起動したプロセスと配置先を照合する。"""
     for process in _processes:
         if process.poll() is None:
             _stop(process)
     _processes.clear()
-    if not stop_matching(lambda item: is_dev_process(item, THIS_DIR, sys.platform == "win32"),
-                         print_info, print_error, "AiDiy IDE"):
+    if not stop_matching(lambda item: is_dev_process(item, THIS_DIR, sys.platform == "win32", kind),
+                         print_info, print_error, f'AiDiy {kind.upper()}'):
         raise RuntimeError("AiDiy IDE を停止できませんでした。")
 
 
-def process_tree_pids() -> set[int]:
+def process_tree_pids(*, kind='ide') -> set[int]:
     """通常の全体停止から保護する IDE と、その子孫の PID を返す。"""
     records = list_processes()
-    pids = {item["ProcessId"] for item in records if is_dev_process(item, THIS_DIR, sys.platform == "win32")}
+    pids = {item["ProcessId"] for item in records if is_dev_process(item, THIS_DIR, sys.platform == "win32", kind)}
     while True:
         children = {item["ProcessId"] for item in records if item.get("ParentProcessId") in pids} - pids
         if not children:

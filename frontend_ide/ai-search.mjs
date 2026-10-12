@@ -13,7 +13,7 @@ const MAX_RESULT = 1024 * 1024;
 const within = (root, path) => { const back=relative(root,path); return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back); };
 export const validSearchPath = path => typeof path==='string' && path.length<=1024 && !/[\\:\0]/.test(path) && !path.startsWith('/') && path.split('/').every(part=>part&&part!=='.'&&part!=='..');
 
-async function toolsTarget(project) {
+export async function toolsTarget(project) {
   const visited=new Set();
   for(const folder of [fileURLToPath(new URL('.',import.meta.url)),project]) {
     let current=resolve(folder);

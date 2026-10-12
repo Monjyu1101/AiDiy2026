@@ -5,14 +5,21 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {app,BrowserWindow,ipcMain,shell,session,screen,dialog}=require('electron');
 const {join}=require('node:path');
+const {mkdtempSync,rmSync}=require('node:fs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
-if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide'].includes(kind))throw Error('起動元が不正です。');
+if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
 app.setName(`aidiy_${kind}`);app.setPath('userData',join(app.getPath('appData'),`aidiy_${kind}_vue`));
+if(kind==='term'){
+ const temporaryProfile=mkdtempSync(join(app.getPath('temp'),'aidiy-term-profile-'));
+ app.setPath('userData',temporaryProfile);
+ app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
+}
 const {windowBounds}=require('./window-layout.cjs');
+const {reserveTermSlot}=require('./term-window-slot.cjs');
 const chatSize=require('./host/scripts/window-size.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
-// 種別ごとに既存の単独ウィンドウを再利用する。
-if(!app.requestSingleInstanceLock()){
+// Code / Live / IDEは既存の単独ウィンドウを再利用し、Termは別プロセスで複数起動する。
+if(kind!=='term'&&!app.requestSingleInstanceLock()){
  if(process.send)process.send({existingWindow:true},()=>app.exit(0));else app.exit(0);
  return;
 }
@@ -61,10 +68,15 @@ async function createWindow(kind,url,server,owner,linkKey){
  const ownerBounds=owner?.window.getBounds();
  const area=(ownerBounds?screen.getDisplayMatching(ownerBounds):screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
  const used=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).map(item=>item.slot));
- let slot=0;if(owner&&(kind==='code'||kind==='viewer'))while(used.has(slot))slot++;
+ const ownerRevision=owner?.revision;
+ const placement=kind==='term'?await reserveTermSlot():null;
+ if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
+ let slot=placement?.slot||0;if(owner&&(kind==='code'||kind==='viewer'))while(used.has(slot))slot++;
  const bounds=windowBounds(kind,area,ownerBounds,slot);
- const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?'Code':'Live'}`;
- const window=new BrowserWindow({title,...bounds,minWidth:Math.min(kind==='ide'?400:chatSize.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:chatSize.会話最小高さ,bounds.height),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});
+ const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?'Code':kind==='term'?'Term':'Live'}`;
+ let window;
+ try{window=new BrowserWindow({title,...bounds,minWidth:Math.min(kind==='ide'?400:chatSize.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:chatSize.会話最小高さ,bounds.height),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
  window.setBounds(bounds);
@@ -137,7 +149,7 @@ app.whenReady().then(async()=>{
  });
  ipcMain.handle('development:open-app',async(event,type)=>{
   const record=trustedEvent(event);
-  if(!record||record.kind!=='ide'||!['code','live'].includes(type))return{ok:false,error:'この画面からは開けません。'};
+  if(!record||record.kind!=='ide'||!['code','live','term'].includes(type))return{ok:false,error:'この画面からは開けません。'};
   // Codeは依頼ごとに別窓。Liveだけ初期化中も共有して1窓にする。
   if(type==='live'&&record.pending.has(type))return record.pending.get(type);
   const opening=(async()=>{

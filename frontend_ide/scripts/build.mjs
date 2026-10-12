@@ -13,7 +13,7 @@ await build({root,plugins:[vue()],define:{'process.env.NODE_ENV':JSON.stringify(
 const template=await readFile(join(root,'index.html'),'utf8');
 await writeFile(join(root,'dist/index.html'),template.replace('<script type="module" src="/src/main.js"></script>','<link rel="stylesheet" href="/development/app.css"><script src="/development/app.js" defer></script>'));
 const notices=[];
-for(const name of ['vue','@vue/shared','@vue/reactivity','@vue/runtime-core','@vue/runtime-dom','markdown-it','entities','linkify-it','mdurl','punycode.js','uc.micro']){
+for(const name of ['@xterm/xterm','@xterm/addon-fit','node-pty','node-addon-api','ws','vue','@vue/shared','@vue/reactivity','@vue/runtime-core','@vue/runtime-dom','markdown-it','entities','linkify-it','mdurl','punycode.js','uc.micro']){
  const folder=join(root,'node_modules',name);let metadata;try{metadata=JSON.parse(await readFile(join(folder,'package.json'),'utf8'));}catch{continue;}
  for(const file of (await readdir(folder)).filter(name=>/^licen[sc]e/i.test(name)))notices.push(`${name} ${metadata.version}\n${await readFile(join(folder,file),'utf8')}`);
 }
