@@ -51,6 +51,8 @@ HIGHLIGHTS = {
     "dee71cc": "Code / Live: 発言の到着演出（arrival-effect.ts — 紙ヒコーキ・入力枠の飛行・ターミナル文字送り）",
     "79e5d7c": "IDE: frontend_ide 新設（開発スペース）— frontend_vscode を host/ へ移設、Code / Live を Vue 3 共通部品化、viewer・宇宙表示・＋Code／＋Live 別窓",
     "e46021e": "IDE: AiDiy検索と軌跡・AiDiy分析・更新履歴比較・HTML/SVG/Vue プレビュー、Code 会話履歴を _AIDIY/aidiy_code/histories へ保存",
+    "f19ece3": "X自己紹介: 開発スペース（Code / Live / IDE）の特徴・実装詳細を追記、MCP Hub ×19 の表記を修正",
+    "c01a65d": "履歴: 9/6〜10/12 を追加、生成スクリプトを未作成の日付だけ生成する方式へ（--all で全件再生成）",
 }
 
 def area_names(parts):
