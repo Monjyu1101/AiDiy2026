@@ -64,6 +64,9 @@ def save_model_choice(provider, model):
                 pass
 
 
-def model_display_name(model):
+def model_display_name(model, provider=None):
     value = str(model or '').strip()
+    provider = str(provider or '').strip()
+    if value.lower() in {'auto', 'same'} and provider.lower() not in {'', 'auto', 'same', 'unknown'}:
+        return f'{provider} ({value.lower()})'
     return '自動選択' if value.lower() in {'', 'auto', 'unknown', '(unknown)'} else value

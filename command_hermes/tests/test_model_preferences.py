@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from datetime import datetime
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -65,14 +66,71 @@ class ModelPreferencesTests(unittest.TestCase):
         self.assertEqual(restored['model'], 'gemini-3.8-flash')
         self.assertEqual(restored['base_url'], cli._GEMINI_OPENAI_BASE_URL)
 
-    def test_auto_auto_and_omitted_arguments_do_not_restore_or_overwrite_previous(self):
+    def test_explicit_auto_auto_does_not_restore_or_overwrite_previous(self):
         preferences.save_model_choice('codex-cli', 'gpt-6-astra')
-        for flags in ([], ['--provider', 'auto', '--model', 'auto'], ['--model', 'auto/auto']):
+        for flags in (['--provider', 'auto', '--model', 'auto'], ['--model', 'auto/auto']):
             with self.subTest(flags=flags):
                 result = self.invoke(flags)
                 self.assertIsNone(result['model'])
                 self.assertIsNone(result['provider'])
         self.assertEqual(preferences.load_model_choice()['model'], 'gpt-6-astra')
+
+    def test_omitted_interactive_arguments_restore_previous_but_quiet_keeps_native_auto(self):
+        preferences.save_model_choice('copilot-cli', 'gpt-6-astra')
+        for flags in ([], ['--compact']):
+            with self.subTest(flags=flags):
+                result = self.invoke(flags)
+                self.assertEqual(result['provider'], 'copilot-cli')
+                self.assertEqual(result['model'], 'gpt-6-astra')
+        result = self.invoke(['-Q', '-z', '質問'])
+        self.assertIsNone(result['provider'])
+        self.assertIsNone(result['model'])
+
+    def test_explicit_session_or_endpoint_does_not_restore_unrelated_cli(self):
+        preferences.save_model_choice('copilot-cli', 'auto')
+        for flags in (['--resume', 'saved-session'], ['--base-url', 'http://127.0.0.1:8096/v1'], ['--api-key', 'explicit-key']):
+            with self.subTest(flags=flags):
+                result = self.invoke(flags)
+                self.assertIsNone(result['provider'])
+                self.assertIsNone(result['model'])
+
+    def test_copilot_auto_picker_then_bare_launch_restores_and_displays_cli(self):
+        def instance():
+            value = cli.HermesCLI.__new__(cli.HermesCLI)
+            value._aidiy_config = {}
+            value._aidiy_provider_slug = None
+            value._aidiy_remember_model_selection = True
+            value.provider = value.requested_provider = 'auto'
+            value.base_url = value.api_key = value.model = ''
+            value.agent = None
+            value.enabled_toolsets = []
+            value._provider_source = None
+            value.session_id = 'test-startup'
+            value.compact = False
+            return value
+
+        previous = instance()
+        with patch.object(cli, '_cprint'):
+            previous._apply_aidiy_provider_model(previous._get_aidiy_provider_entry('copilot-cli'), 'auto')
+        restored = self.invoke([])
+        self.assertEqual(restored['provider'], 'copilot-cli')
+        self.assertIsNone(restored['model'])
+        current = instance()
+        with patch.object(cli, '_cprint'):
+            self.assertTrue(cli._configure_aidiy_cli_provider(current, restored['provider'], requested_model=restored['model']))
+        self.assertEqual(current.model, 'auto')
+        for width in (60, 80, 120):
+            with self.subTest(width=width), redirect_stdout(io.StringIO()):
+                output = io.StringIO()
+                current.console = Console(file=output, width=width, color_system=None)
+                current._console_print = current.console.print
+                snapshot = {'tools': [], 'toolset_map': {}, 'availability': {}, 'skills_by_category': {}}
+                with patch.dict(cli.os.environ, {'HERMES_DEFER_AGENT_STARTUP': '1'}), patch.object(cli.shutil, 'get_terminal_size', return_value=os.terminal_size((width, 30))), patch('hermes_cli.banner.load_banner_snapshot', return_value=snapshot), patch.object(cli.threading, 'Thread'):
+                    current.show_banner()
+                rendered = output.getvalue()
+                self.assertIn('copilot-cli (auto)', rendered)
+                self.assertNotIn('自動選択', rendered)
+                self.assertNotIn('unknown', rendered.lower())
 
     def test_external_cli_keeps_same_and_explicit_model_semantics(self):
         for model in ('same', 'auto', 'gpt-6-astra'):

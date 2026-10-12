@@ -9515,7 +9515,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 toolset_map = snapshot["toolset_map"]
                 build_welcome_banner(
                     console=self.console,
-                    model=model_display_name(self.model),
+                    model=model_display_name(self.model, getattr(self, "_aidiy_provider_slug", None)),
                     cwd=cwd,
                     tools=snapshot["tools"],
                     enabled_toolsets=self.enabled_toolsets,
@@ -9563,7 +9563,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
                 build_welcome_banner(
                     console=self.console,
-                    model=model_display_name(self.model),
+                    model=model_display_name(self.model, getattr(self, "_aidiy_provider_slug", None)),
                     cwd=cwd,
                     tools=tools,
                     enabled_toolsets=self.enabled_toolsets,
@@ -10221,7 +10221,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             tool_status = f"{tool_count} tools"
 
         # Format model name (shorten if needed)
-        model_name = model_display_name(self.model)
+        model_name = model_display_name(self.model, getattr(self, "_aidiy_provider_slug", None))
         model_short = model_name.split("/")[-1] if "/" in model_name else model_name
         if len(model_short) > 30:
             model_short = model_short[:27] + "..."
@@ -10288,7 +10288,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         agent = getattr(self, "agent", None)
         total_tokens = getattr(agent, "session_total_tokens", 0) or 0
         provider = getattr(self, "provider", None) or "auto"
-        model = model_display_name(getattr(self, "model", None))
+        model = model_display_name(getattr(self, "model", None), getattr(self, "_aidiy_provider_slug", None))
         is_running = bool(getattr(self, "_agent_running", False))
 
         # Reasoning level (C-02): resolve the effective effort for display.
@@ -24377,6 +24377,11 @@ def cli_entry(argv: list[str] | None = None) -> int:
     # session alive for a bare ``-q`` on a TTY, so force the one-shot path.
     # AiDiy integration uses --oneshot-stdin to keep long prompts out of argv.
     oneshot = args.oneshot is not None or args.oneshot_stdin
+    # 対話起動で引数を省略した場合は、前回の手動選択を使う。
+    # 非対話のモデル未指定は従来どおり。明示した auto/auto は自動解決を保つ。
+    if (not quiet and args.provider is None and args.model is None
+            and not args.resume and not args.base_url and not args.api_key):
+        args.provider = args.model = "same"
     # same/same は保存した手動選択を復元。auto/auto は従来の自動解決を保つ。
     if (args.model or "").lower() in {"same/same", "auto/auto"} and not args.provider:
         args.provider, args.model = args.model.lower().split("/")

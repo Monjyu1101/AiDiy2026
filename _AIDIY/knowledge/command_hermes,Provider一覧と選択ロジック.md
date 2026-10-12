@@ -24,7 +24,7 @@
 
 `aidiy_hermes --provider same --model same`（または `--model same/same`）は、前回手動で選んだ provider とモデルを復元します。対話起動の明示選択と `/model` の AiDiy picker 選択は `HERMES_HOME/aidiy_model.json`（既定 `~/.hermes/aidiy_model.json`）に保存します。API キーは保存せず、起動時の共通設定と認証ストアから読み直します。保存値がない・壊れている場合は Hermes の通常設定へ戻り、`same` を API provider / モデル名として送信しません。`--ignore-user-config` はこの保存値も無視します。
 
-`--provider auto --model auto`（または `--model auto/auto`）と引数省略は従来の自動解決を使い、前回選択ファイルを復元しません。AI検索や Code の非対話実行（`-Q` / ワンショット）は手動選択を上書きしません。外部 CLI の `<provider>/same` は従来どおり、その CLI へのモデル指定を省略する意味です。
+引数なしの対話起動（`aidiy_hermes`）は `same/same` として前回選択を復元します。`--compact` などの表示設定を付けても同じです。セッション再開（`--resume`）や接続先・キーの明示指定時は、その指定を優先して通常の解決を使います。`--provider auto --model auto`（または `--model auto/auto`）を明示した場合と、非対話実行のモデル未指定も従来の自動解決を使います。AI検索や Code の非対話実行（`-Q` / ワンショット）は手動選択を上書きしません。外部 CLI の `<provider>/same` は従来どおり、その CLI へのモデル指定を省略する意味です。
 
 確認: `command_hermes/.venv` の Python で `python -m unittest discover -s command_hermes/tests -p test_model_preferences.py` を実行し、起動選択・picker 保存・次回復元・キー再読込・非対話実行・初期描画を確認します。
 
