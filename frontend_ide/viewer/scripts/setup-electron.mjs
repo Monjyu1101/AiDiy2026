@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { useBrowser, electronExecutable } from '../launch-options.mjs';
 
 if (useBrowser() || process.env.ELECTRON_SKIP_BINARY_DOWNLOAD === '1') {
-  console.log('Web 起動環境: Electron 本体の導入を省略します。');
+  console.log('Electron 本体の導入を省略します（Web 起動環境または ELECTRON_SKIP_BINARY_DOWNLOAD=1）。');
 } else {
   const installer = fileURLToPath(new URL('../node_modules/electron/install.js', import.meta.url));
   const result = spawnSync(process.execPath, [installer], { stdio: 'inherit', windowsHide: true });

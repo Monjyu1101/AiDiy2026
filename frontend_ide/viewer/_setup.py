@@ -31,6 +31,8 @@ _launcher_spec = importlib.util.spec_from_file_location('aidiy_frontend_ide_view
 _launcher = importlib.util.module_from_spec(_launcher_spec)
 _launcher_spec.loader.exec_module(_launcher)
 install_launcher = _launcher.install_launcher
+sys.path.insert(0, str(THIS_DIR.parents[1] / 'scripts'))
+from _setup_electron import prepare_electron_binary
 
 
 class Colors:
@@ -72,12 +74,15 @@ def setup(choices=None) -> bool:
     command = "ci" if (THIS_DIR / "package-lock.json").exists() else "install"
     try:
         print_info(f"実行中: {npm} {command} --no-fund --no-audit")
-        env = dict(os.environ)
+        # postinstall での Node.js による取得を避け、他の画面と共通の準備処理を使う。
+        env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
         browser_only = env.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not env.get('DISPLAY') and not env.get('WAYLAND_DISPLAY'))
         if browser_only:
-            env['ELECTRON_SKIP_BINARY_DOWNLOAD'] = '1'
             print_info("Web 起動環境のため Electron 本体のダウンロードは省略します。")
         subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
+            if not prepare_electron_binary(THIS_DIR, 'AiDiy IDE', info=print_info, error=print_error):
+                return False
         vue = THIS_DIR.parent.parent / 'frontend_ide'
         if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
             subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True)
