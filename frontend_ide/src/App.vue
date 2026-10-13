@@ -74,13 +74,18 @@ onBeforeUnmount(()=>{disposed=true;revision++;clearInterval(timer);});
   <div v-else class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop}]" :data-app="config.kind">
     <template v-if="config.kind==='ide'">
       <div class="ide-heading"><StatusBar title="AiDiy IDE" :connected="state.connected" :mode="state.mode" :busy="state.connecting||pending" :desktop="desktop" clock-pulse />
-        <div class="component-toolbar"><span :title="state.project?.path">プロジェクト: {{ state.project?.name }}</span><nav><template v-if="!state.active"><button :disabled="pending" @click="start('connect')">AiDiy接続利用</button><button :disabled="pending" @click="start('offline')">オフライン利用</button></template><button v-else :disabled="pending" @click="start('disconnect')">{{ desktop?'終了':'利用終了' }}</button></nav></div>
+        <div class="component-toolbar">
+          <div class="ide-project-actions">
+            <span class="ide-project-name" :title="state.project?.path">プロジェクト: {{ state.project?.name }}</span>
+            <nav v-if="state.active&&desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" @click="openWindow('term')">{{ launching==='term'?'起動中…':'＋ Term' }}</button><button :disabled="!!launching" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button></nav>
+            <button v-else-if="state.active" class="ai-panel-toggle" :aria-expanded="panelOpen" @click="panelOpen ? panelOpen=false : openPanel(tab)">☰ {{ state.mode==='offline'?'Term / Code':'Term / Code / Live' }}</button>
+          </div>
+          <nav><template v-if="!state.active"><button :disabled="pending" @click="start('connect')">AiDiy接続利用</button><button :disabled="pending" @click="start('offline')">オフライン利用</button></template><button v-else :disabled="pending" @click="start('disconnect')">{{ desktop?'終了':'利用終了' }}</button></nav>
+        </div>
       </div>
       <TerminalWelcome v-if="!state.active" kind="ide" :icon="config.icon" />
       <template v-else>
         <SpaceView :key="state.startedAt" :started-at="state.startedAt" />
-        <nav v-if="desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" @click="openWindow('term')">{{ launching==='term'?'起動中…':'＋ Term' }}</button><button :disabled="!!launching" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button></nav>
-        <button v-else class="ai-panel-toggle" :aria-expanded="panelOpen" @click="panelOpen ? panelOpen=false : openPanel(tab)">☰ {{ state.mode==='offline'?'Term / Code':'Term / Code / Live' }}</button>
         <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='term'" @click="openPanel('term')">Term</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false">×</button></nav>
           <CodePanel v-if="base.code" v-show="tab==='code'" :key="base.code" :base="base.code" :icon="config.icon" embedded />
           <LivePanel v-if="base.live&&panelOpen&&tab==='live'&&state.mode==='online'" :key="base.live" :base="base.live" :icon="config.icon" />

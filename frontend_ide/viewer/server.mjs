@@ -94,7 +94,7 @@ const BACKUP_EXCLUDED_FILES = new Set([
 const BACKUP_EXCLUDED_EXTENSIONS = ['.pyc', '.pyo', '.pyd', '.log', '.tmp', '.swp'];
 const WINDOWS_RESERVED = new Set(['con', 'prn', 'aux', 'nul', 'null',
   ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`), ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`)]);
-const MAX_BACKUP_FILES = 50000;   // バックアップがキャンセルする件数と同じ
+const MAX_BACKUP_FILES = 100000;   // バックアップがキャンセルする件数と同じ
 const backupDirAllowed = name => !BACKUP_EXCLUDED_DIRS.has(name) && !name.startsWith('.');
 const backupFileAllowed = name => !BACKUP_EXCLUDED_FILES.has(name)
   && !BACKUP_EXCLUDED_EXTENSIONS.some(ext => name.endsWith(ext))

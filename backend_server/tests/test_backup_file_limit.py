@@ -35,7 +35,7 @@ class BackupFileLimitTest(unittest.TestCase):
         )
 
     def test_limit_cancels_full_and_incremental_backups_before_copy(self):
-        for count in (50_000, 50_001):
+        for count in (100_000, 100_001):
             for previous in (None, (2.0, "1970-01-01 00:00:02")):
                 with self.subTest(count=count, previous=previous):
                     with tempfile.TemporaryDirectory() as directory:
@@ -58,19 +58,19 @@ class BackupFileLimitTest(unittest.TestCase):
                                 セッション設定={"CODE_BASE_PATH": directory}, ログ出力=False
                             )
                         self.assertIsNone(result)
-                        self.assertEqual(len(scanned), 50_000)
+                        self.assertEqual(len(scanned), 100_000)
                         copy.assert_not_called()
                         self.assertFalse((Path(directory) / "backup").exists())
                         self.assertEqual(len(logs.output), 1)
                         self.assertIn("バックアップキャンセル", logs.output[0])
-                        self.assertIn("50,000件以上", logs.output[0])
+                        self.assertIn("100,000件以上", logs.output[0])
                         self.assertIn(directory, logs.output[0])
 
     def test_below_limit_keeps_full_and_incremental_backups(self):
         for previous in (None, (1.0, "1970-01-01 00:00:01")):
             with self.subTest(previous=previous):
                 with tempfile.TemporaryDirectory() as directory:
-                    names = (f"file{index}.txt" for index in range(49_999))
+                    names = (f"file{index}.txt" for index in range(99_999))
                     with (
                         patch.object(self.native.os, "walk", return_value=[(directory, [], names)]),
                         patch.object(self.native.os.path, "getmtime", return_value=2.0),
@@ -80,8 +80,8 @@ class BackupFileLimitTest(unittest.TestCase):
                         result = self.native.バックアップ実行(
                             セッション設定={"CODE_BASE_PATH": directory}, ログ出力=False
                         )
-                    self.assertEqual(len(result[1]), 49_999)
-                    self.assertEqual(len(result[2]), 49_999)
+                    self.assertEqual(len(result[1]), 99_999)
+                    self.assertEqual(len(result[2]), 99_999)
                     self.assertEqual(result[3], previous is None)
                     copy.assert_called_once()
 

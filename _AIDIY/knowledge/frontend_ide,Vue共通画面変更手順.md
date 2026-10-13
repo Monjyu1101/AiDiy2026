@@ -9,7 +9,7 @@
 
 ## 変更先の選び方
 
-IDEのElectron版は右上の「＋ Code」「＋ Live」から別ウィンドウを開き、Web版は画面内タブです。切り分けは `window.aidiyWindow` で行います。IPCにはアプリ種別だけを渡し、プロジェクト・モードはメインプロセスでIDEサーバーの状態から取得します。
+IDEのElectron版はプロジェクト表示行の名前のすぐ右側に並ぶ「＋ Term」「＋ Code」「＋ Live」から別ウィンドウを開き、Web版は画面内タブです。切り分けは `window.aidiyWindow` で行います。IPCにはアプリ種別だけを渡し、プロジェクト・モードはメインプロセスでIDEサーバーの状態から取得します。
 
 画面は `frontend_ide/src/components/` を変更します。Code / LiveをIDEへ配置するときも同じVue部品を使用します。ホストと通信プロトコルは `frontend_ide/host`、ファイルAPIとOffice表示資産は `frontend_ide/viewer` に統合しています。親ディレクトリ数を固定して共通設定やHermesを探さず、配置先から親方向へ探索してください。
 
