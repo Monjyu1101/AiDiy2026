@@ -91,6 +91,11 @@ const BACKUP_EXCLUDED_DIRS = new Set([
 const BACKUP_EXCLUDED_FILES = new Set([
   '.DS_Store', 'Thumbs.db', 'package-lock.json', 'package.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'npm-shrinkwrap.json',
 ]);
+const BACKUP_EXCLUDED_PATHS = new Set(['_AIDIY/aidiy_code', '_AIDIY/aidiy_ide']);
+const backupPathAllowed = path => {
+  const parts = resolve(path).split(sep);
+  return !parts.some((part, index) => BACKUP_EXCLUDED_PATHS.has(`${part}/${parts[index + 1]}`));
+};
 const BACKUP_EXCLUDED_EXTENSIONS = ['.pyc', '.pyo', '.pyd', '.log', '.tmp', '.swp'];
 const WINDOWS_RESERVED = new Set(['con', 'prn', 'aux', 'nul', 'null',
   ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`), ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`)]);
@@ -108,6 +113,7 @@ export async function scanTree(root, { filter } = {}) {
   let count = 0, truncated = false;
   async function walk(dir, name) {
     const node = { n: name, d: [], f: [] };
+    if (backup && !backupPathAllowed(dir)) return node;
     let entries;
     try { entries = await readdir(dir, { withFileTypes: true }); } catch { return node; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -115,7 +121,7 @@ export async function scanTree(root, { filter } = {}) {
       if (count >= limit) { truncated = true; break; }
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (backup ? !backupDirAllowed(entry.name) : IGNORED.has(entry.name)) continue;
+        if (backup ? !backupDirAllowed(entry.name) || !backupPathAllowed(full) : IGNORED.has(entry.name)) continue;
         node.d.push(await walk(full, entry.name));
       } else if (entry.isFile()) {
         if (backup && !backupFileAllowed(entry.name)) continue;

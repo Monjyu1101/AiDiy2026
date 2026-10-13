@@ -149,6 +149,9 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific directories
+# Code / IDE がプロジェクト内に保存する会話・検索・解析の実行記録。
+**/_AIDIY/aidiy_code/
+**/_AIDIY/aidiy_ide/
 _cache/
 _controls/
 _datas/

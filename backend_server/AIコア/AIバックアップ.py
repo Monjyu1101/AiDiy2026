@@ -43,6 +43,12 @@ _バックアップ除外フォルダ = (
     ".yarn",
 )
 
+# _AIDIY の作業記録だけを除外する。同名のソースフォルダは対象に残す。
+_バックアップ除外フォルダ組 = {
+    ("_AIDIY", "aidiy_code"),
+    ("_AIDIY", "aidiy_ide"),
+}
+
 _バックアップ除外ファイル = (
     ".DS_Store",
     "Thumbs.db",
@@ -152,8 +158,16 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
     # 高速ルックアップ用セット
     _除外フォルダセット = set(_バックアップ除外フォルダ)
     for root, dirs, file_names in os.walk(workspace_root):
+        root_parts = os.path.normpath(root).split(os.sep)
+        if any(pair in _バックアップ除外フォルダ組 for pair in zip(root_parts, root_parts[1:])):
+            dirs[:] = []
+            continue
         # ディレクトリ名の完全一致で除外（サブストリング一致は "dialog" → "log" のような誤除外を招く）
-        dirs[:] = [d for d in dirs if d not in _除外フォルダセット and not d.startswith(".")]
+        dirs[:] = [
+            d for d in dirs
+            if d not in _除外フォルダセット and not d.startswith(".")
+            and (os.path.basename(root), d) not in _バックアップ除外フォルダ組
+        ]
         for file_name in file_names:
             file_path = os.path.join(root, file_name)
 

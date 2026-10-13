@@ -120,6 +120,36 @@ class BackupProjectRootTest(unittest.TestCase):
         self.assertTrue(saver.run()["ok"])
         self.assertEqual(checker.list_versions("main.py")["count"], 1)
 
+    def test_runtime_records_are_excluded_from_count_save_and_incremental_scan(self):
+        records = []
+        for folder in ("_AIDIY/aidiy_code/histories", "_AIDIY/aidiy_ide/file_searches", "nested/_AIDIY/aidiy_ide/file_analyses"):
+            destination = self.root / folder
+            destination.mkdir(parents=True)
+            for index in range(10):
+                record = destination / f"{index}.json"
+                record.write_text("{}", encoding="utf-8")
+                records.append(record)
+        # フォルダ名だけが同じソースや、似た名前のフォルダは除外しない。
+        for relative in ("frontend_ide/aidiy_code/source.py", "_AIDIY/aidiy_ide_extra/keep.md"):
+            path = self.root / relative
+            path.parent.mkdir(parents=True)
+            path.write_text("keep", encoding="utf-8")
+        expected = {"src/main.py", "_AIDIY/knowledge/example.md", "frontend_ide/aidiy_code/source.py", "_AIDIY/aidiy_ide_extra/keep.md"}
+        files = self.native._全ファイルスキャン(str(self.root), 最大件数=5)
+        self.assertEqual({item["パス"] for item in files}, expected)
+        for folder in ("_AIDIY/aidiy_code", "_AIDIY/aidiy_ide"):
+            self.assertEqual(self.native._全ファイルスキャン(str(self.root / folder)), [])
+        saver = self.wrapper.BackupSave(str(self.root))
+        result = saver.run()
+        self.assertEqual(result["全件数"], len(expected))
+        target = Path(result["バックアップ先"])
+        self.assertEqual({str(path.relative_to(target)).replace("\\", "/") for path in target.rglob("*") if path.is_file()}, expected)
+        for record in records:
+            changed = record.stat().st_mtime + 10
+            os.utime(record, (changed, changed))
+        self.assertEqual(saver.diff_scan()["count"], 0)
+        self.assertEqual(saver.run()["バックアップ件数"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
