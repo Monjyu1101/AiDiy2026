@@ -100,7 +100,8 @@ ${p.files.map(f => `<h2>${escape(f.name)}</h2><pre lang="en">${escape(f.text)}</
 for (const [name, content] of [['web/THIRD_PARTY_NOTICES.txt', text], ['web/licenses.html', html], ['LICENSE', ownLicense], ['web/LICENSE.txt', ownLicense]]) {
   const target = join(root, name);
   if (check) {
-    if (await readFile(target, 'utf8') !== content) throw new Error(`${name} が古くなっています。npm run licenses を実行してください`);
+    // npm配布物とGit checkoutのCRLF/LFの違いだけでは、表記の更新漏れと判定しない。
+    if ((await readFile(target, 'utf8')).replaceAll('\r\n', '\n') !== content.replaceAll('\r\n', '\n')) throw new Error(`${name} が古くなっています。npm run licenses を実行してください`);
   } else await writeFile(target, content, 'utf8');
 }
 console.log(`著作権・ライセンス: ${packages.length} パッケージ、${packages.reduce((n, p) => n + p.files.length, 0)} 原文ファイルを${check ? '確認' : '保存'}しました。`);
