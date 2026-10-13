@@ -15,7 +15,12 @@
 
 
 
-.ide-project-actions{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.ide-project-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ai-launchers{display:flex;gap:4px;flex:none}.ai-launchers button{white-space:nowrap}
+.ide-project-actions{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.ide-project-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ai-launchers{display:flex;gap:4px;flex:none}
+.ide-heading .ai-launchers button{white-space:nowrap;min-height:25px;padding:3px 8px;font-weight:600;color:#f5f8ff;background:linear-gradient(#3b495c,#263246);border-color:#889db7;box-shadow:inset 0 1px 0 #ffffff26,0 1px 2px #0008}
+.ide-heading .ai-launchers button:hover:not(:disabled){background:linear-gradient(#506581,#33455d);border-color:#c3d9f1}
+.ide-heading .ai-launchers button:active:not(:disabled){background:#182536;box-shadow:inset 0 2px 4px #0008;transform:translateY(1px)}
+.ide-heading .ai-launchers button:focus-visible{outline:2px solid #8cecff;outline-offset:2px}
+.ide-heading .ai-launchers button:disabled{background:#26303d;border-color:#455263;color:#a8b3c2;box-shadow:none;opacity:.6}
 .space-motion-toggle{position:fixed;right:16px;bottom:16px;z-index:35;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#080c1af2;border:1px solid #334058;font:11px var(--mono)}.space-motion-toggle>span:last-child{min-width:3ch}.motion-switch{width:28px;height:14px;border:1px solid #566077;position:relative;background:#1b2230}.motion-switch:after{content:'';position:absolute;top:2px;left:2px;width:8px;height:8px;background:#8897b1;transition:transform .15s}.space-motion-toggle[aria-checked=true]{color:#85e9e9}.space-motion-toggle[aria-checked=true] .motion-switch{border-color:#6bcbcc;background:#183638}.space-motion-toggle[aria-checked=true] .motion-switch:after{background:#85e9e9;transform:translateX(14px)}.space-view .viewer-popup,.development-app.ide .ai-popup{bottom:60px}
 .space-view{--portrait-panel-gap:8px;--explorer-width:25vw;--route-width:25vw}
 .space-view .explorer-panel{width:var(--explorer-width)}
