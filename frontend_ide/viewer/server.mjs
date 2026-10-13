@@ -293,12 +293,14 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (!connection.state().active) return fail(503, '利用が終了しました。');
         return json(result);
       }
-      // ビューアの「表示」: HTML/SVG は別オリジンの静的プレビュー、.vue は frontend_web の開発サーバーの画面
+      // HTML/SVG/Markdownは別オリジンのプレビュー、Vueはfrontend_webの開発サーバーの画面
       if (url.pathname === '/api/preview') {
         const path = url.searchParams.get('path') || '';
-        if (/\.(html?|svg)$/i.test(path)) {
-          const kind = /\.svg$/i.test(path) ? 'svg' : 'html';
-          const address = await insideRoot(root, path) ? await preview.url(path) : null;
+        if (/\.(html?|svg|md|markdown)$/i.test(path)) {
+          const kind = /\.(md|markdown)$/i.test(path) ? 'markdown' : /\.svg$/i.test(path) ? 'svg' : 'html';
+          const full = await insideRoot(root, path);
+          if (kind === 'markdown' && full && (await stat(full)).size > MAX_TEXT) return json({ kind, error: 'Markdownの表示は1MBまでです。コード表示で先頭の内容を確認できます。' });
+          const address = full ? await preview.url(path) : null;
           return address ? json({ kind, url: address }) : json({ kind, error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
         }
         if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));

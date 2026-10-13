@@ -1,10 +1,10 @@
 # 文書ビューア
 
-> 文書: `frontend_ide,文書ビューア.md` | 実装: `frontend_ide/viewer/server.mjs`, `frontend_ide/viewer/web/app.js`, `frontend_ide/viewer/web/office.js`, `frontend_ide/viewer/checks/office.test.mjs`
+> 文書: `frontend_ide,文書ビューア.md` | 実装: `frontend_ide/src/components/FileViewer.vue`, `frontend_ide/markdown-preview.mjs`, `frontend_ide/viewer/server.mjs`, `frontend_ide/viewer/preview.mjs`, `frontend_ide/viewer/web/office.js` | 検証: `frontend_ide/checks/markdown-preview.test.mjs`, `frontend_ide/viewer/checks/office.test.mjs`
 
 ## このメモを使う場面
 
-- AiDiy IDE の Word・Excel・PowerPoint・PDF 表示を変更・確認する。
+- AiDiy IDE の Markdown・Word・Excel・PowerPoint・PDF 表示を変更・確認する。
 - Office文書がバイナリ扱いになる、ライブラリ不足、表示崩れを調べる。
 
 ## 構成と依存
@@ -17,8 +17,9 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 | Excel | SheetJS CE | xlsx、xls、xlsm、ods、csv、tsv |
 | PowerPoint | PptxViewJS / JSZip / Chart.js | pptx、pptm |
 | PDF | PDF.js | pdf |
+| Markdown | markdown-it | md、markdown |
 
-- 依存は `frontend_ide/viewer/package.json` / `package-lock.json` で管理し、他サブシステムから借りない。ライセンスは各パッケージの同梱ファイルに従う。docx-preview / SheetJS / PDF.js は Apache-2.0、PptxViewJS / Chart.js は MIT、JSZip は MIT または GPL-3.0 の選択で MIT を利用する。
+- Office/PDFの依存は `frontend_ide/viewer/package.json` / `package-lock.json` で管理し、他サブシステムから借りない。Markdownは `frontend_ide/package.json` に導入済みの `markdown-it`（MIT）を使う。ライセンスは各パッケージの同梱ファイルに従う。docx-preview / SheetJS / PDF.js は Apache-2.0、PptxViewJS / Chart.js は MIT、JSZip は MIT または GPL-3.0 の選択で MIT を利用する。
 - SheetJS は公式配布元 `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` を固定する。npm registry の `xlsx` は旧版のため置き換えない。
 - `/api/file` が `kind: office` と `format` を返し、`app.js` が `/office.html` の iframe を右側に作る。
 - `/api/document` は対象拡張子のみをバイナリ配信する。既存の `/api/raw` は画像専用のままにする。
@@ -27,6 +28,14 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 - 閉じる・別ファイル選択で iframe を破棄する。`fileToken` はフォルダ選択・閉じる場合も進め、以前の読み込み結果が新しい画面を上書きしないようにする。
 
 ## 導入と検証
+
+### Markdownプレビュー
+
+- 共通画面の `frontend_ide/src/components/FileViewer.vue` は `.md` / `.markdown` を既定でプレビュー表示し、「コード / プレビュー」を切り替える。最後に選んだ表示をMarkdown全体で記憶し、ピン留め窓でも共用する。
+- `/api/preview` から `viewer/preview.mjs` の別オリジンの静的サーバーへ渡し、`frontend_ide/markdown-preview.mjs` でHTMLへ変換する。元ファイルや変換ファイルは書き出さない。
+- UTF-8 / Shift_JIS の1MBまで。見出し・日本語見出しへのアンカー・表・箇条書き・コードブロック・画像に対応する。相対画像・別Markdownへのリンクは元のフォルダを基準にし、外部リンクは別タブで開く。プロジェクト外・設定・鍵・バックアップ等は既存プレビューと同じ配信制限を守る。
+- Markdown内のHTMLは文字として表示する。文書から任意のスクリプトを実行せず、操作通知だけをnonce付きで許可する。外部画像の表示にはネット接続が必要。
+- ルートから `node --test frontend_ide/checks/markdown-preview.test.mjs frontend_ide/viewer/checks/preview.test.mjs`。実画面は `node frontend_ide/scripts/check-markdown.mjs` で見出し・表・コード・相対画像・リンク・コード切替・再読込・縦横画面・ピン留めを確認する。Chrome / Edge の場所が自動検出できない場合は `CHROME_PATH` を指定する。日時・連番付き画像を `temp/markdown-preview-check/` に保存する。
 
 ### 著作権表記の更新
 
@@ -51,7 +60,7 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 
 ## 制限と切り分け
 
-- 文書は50MBまで。Excel は最大100,000行、先頭100列、1画面200行を表示する。大きいシートでは省略を画面に表示する。
+- Office/PDFは50MBまで、Markdownは1MBまで。Excel は最大100,000行、先頭100列、1画面200行を表示する。大きいシートでは省略を画面に表示する。
 - Excel の数式を再計算しない。ファイルに保存された計算結果を表示する。グラフ・画像・高度な書式の再現は対象外。
 - Word / PowerPoint はブラウザ用描画エンジンによる近似表示。フォント・複雑なレイアウト・図形などでOfficeアプリとの差が出る場合がある。
 - `.doc` / `.ppt` の旧形式とパスワード付き文書は対象外。PDF はページ単位のCanvas描画で、文字検索・文字選択は提供しない。

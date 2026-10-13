@@ -19,11 +19,11 @@ function pointerActivity(event){if(event.buttons)activity();}
 function bindFrame(event){if(event.target.tagName!=='IFRAME')return;frameCleanup?.();frameCleanup=null;try{const doc=event.target.contentDocument;if(!doc)return;const types=['pointerdown','click','keydown','wheel','scroll','change'];for(const type of types)doc.addEventListener(type,activity,{capture:true,passive:true});doc.addEventListener('pointermove',pointerActivity,true);frameCleanup=()=>{for(const type of types)doc.removeEventListener(type,activity,true);doc.removeEventListener('pointermove',pointerActivity,true);};}catch{}}
 function frameActivity(event){const frame=viewer.value?.querySelector('iframe');if(frame&&event.source===frame.contentWindow&&event.data?.type==='aidiy-ide-viewer-activity')activity();}
 onMounted(()=>window.addEventListener('message',frameActivity));
-// HTML / SVG / Vue は「コード」と「表示」を切り替えられる。表示は別オリジンのサンドボックス iframe で動かす。
-// 最後に選んだ方を種類ごとに覚える（HTML/Vueはコード、SVGはこれまで通り表示が既定）。
-const previewKind=computed(()=>/\.html?$/i.test(props.file?.name||'')?'html':/\.svg$/i.test(props.file?.name||'')?'svg':/\.vue$/i.test(props.file?.name||'')?'vue':'');
+// HTML / SVG / Vue / Markdown はコードとプレビューを切り替える。文書は別オリジンで表示する。
+// 最後に選んだ方を種類ごとに覚える（SVG / Markdownは表示が既定）。
+const previewKind=computed(()=>/\.(md|markdown)$/i.test(props.file?.name||'')?'markdown':/\.html?$/i.test(props.file?.name||'')?'html':/\.svg$/i.test(props.file?.name||'')?'svg':/\.vue$/i.test(props.file?.name||'')?'vue':'');
 const modeKey=kind=>`aidiy-ide-preview-mode:${kind}`;
-const readMode=kind=>{try{const saved=localStorage.getItem(modeKey(kind));if(saved==='view'||saved==='code')return saved;}catch{}return kind==='svg'?'view':'code';};
+const readMode=kind=>{try{const saved=localStorage.getItem(modeKey(kind));if(saved==='view'||saved==='code')return saved;}catch{}return ['svg','markdown'].includes(kind)?'view':'code';};
 const mode=ref(previewKind.value?readMode(previewKind.value):'code'),preview=ref(),routeIndex=ref(0);
 let previewRun=0;
 async function loadPreview(){
@@ -67,7 +67,7 @@ onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor()
 </script>
 <template>
   <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
-      <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">表示</button></span>
+      <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">{{ previewKind==='markdown'?'プレビュー':'表示' }}</button></span>
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <!-- 右端は ⟳ 📌 × の順。右端へ寄せる役目は先頭の ⟳ が持つ -->
@@ -85,7 +85,7 @@ onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor()
           <template v-else>
             <label v-if="preview.routes?.length>1" class="viewer-route">画面 <select v-model.number="routeIndex"><option v-for="(route,i) in preview.routes" :key="route.path" :value="i">{{ route.path }}</option></select></label>
             <p v-if="previewKind==='vue'" class="viewer-preview-note">frontend_web の開発サーバーで、この部品を使う画面 {{ preview.routes[routeIndex]?.path }} を表示しています（ログイン画面が出たらログインしてください）。</p>
-            <iframe :key="previewUrl+stamp" class="viewer-preview" :src="previewUrl" :sandbox="previewKind==='vue'?'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads':'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock'" allow="autoplay; fullscreen" :title="file.name+' の表示'"></iframe>
+            <iframe :key="previewUrl+stamp" class="viewer-preview" :src="previewUrl" :sandbox="previewKind==='markdown'?'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox':previewKind==='vue'?'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads':'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock'" allow="autoplay; fullscreen" :title="file.name+' の表示'"></iframe>
           </template>
         </template>
         <div v-show="mode!=='view'" class="viewer-code"><p v-if="data.truncated" class="input-hint">先頭の一部を表示しています。</p><pre v-if="fallback">{{ data.text }}</pre><div v-else ref="host" class="monaco-host"></div></div>

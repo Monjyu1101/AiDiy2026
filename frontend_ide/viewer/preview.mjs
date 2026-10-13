@@ -15,9 +15,10 @@
 // - 鍵・設定・依存物・隠しファイルは配らない。HTML にはサンドボックスの CSP を付ける（iframe 側でも sandbox を付ける）。
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { realpath, stat, readFile } from 'node:fs/promises';
+import { open, realpath, stat, readFile } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { MAX_MARKDOWN_BYTES, markdownText, renderMarkdownDocument } from '../markdown-preview.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -98,6 +99,26 @@ export function createPreview(root, isActive = () => true) {
     if (file.directory && !path.endsWith('/')) {
       const canonical = new URL(req.url, 'http://127.0.0.1'); canonical.pathname += '/';
       res.writeHead(302, { location: canonical.pathname + canonical.search, 'cache-control': 'no-store' }); return res.end();
+    }
+    if (/\.(md|markdown)$/i.test(file.full)) {
+      if (file.info.size > MAX_MARKDOWN_BYTES) return fail(413, 'Markdownの表示は1MBまでです。');
+      const handle = await open(file.full, 'r');
+      let bytes;
+      try {
+        const buffer = Buffer.alloc(MAX_MARKDOWN_BYTES + 1);
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+        bytes = buffer.subarray(0, bytesRead);
+      } finally { await handle.close(); }
+      if (bytes.length > MAX_MARKDOWN_BYTES) return fail(413, 'Markdownの表示は1MBまでです。');
+      if (bytes.includes(0)) return fail(415, 'このMarkdownはテキストとして表示できません。');
+      const nonce = randomBytes(16).toString('base64');
+      const body = Buffer.from(renderMarkdownDocument(markdownText(bytes), rel.split('/').at(-1), nonce));
+      res.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8', 'content-length': body.length, 'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin',
+        'content-security-policy': `default-src 'none'; img-src 'self' data: https: http:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; sandbox allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`,
+      });
+      return res.end(req.method === 'HEAD' ? undefined : body);
     }
     const type = TYPES[extname(file.full).toLowerCase()] || 'application/octet-stream';
     const document = type.startsWith('text/html') || type === 'image/svg+xml';
