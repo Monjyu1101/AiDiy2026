@@ -53,6 +53,7 @@ test('端末: 不正Origin・パス・サイズ拒否、入出力、フロー制
     await until(() => sizes.length); assert.deepEqual(writes, ['\u0003日本語\r']); assert.deepEqual(sizes, [[100, 30]]);
     onData('x'.repeat(150000)); await until(() => resumes > 0); assert.equal(pauses, 1);
     const closed = once(ws, 'close'); send({ type: 'resize', cols: -1, rows: 1 }); await closed;
+    await until(() => killed === 1);
     assert.equal(killed, 1);
     const bad = await connect(app.url, new URL(app.url).origin);
     const done = once(bad.ws, 'close'); bad.send({ type: 'start', cols: 100000, rows: 1 }); await done;

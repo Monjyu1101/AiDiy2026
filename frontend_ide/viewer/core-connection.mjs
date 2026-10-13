@@ -33,7 +33,7 @@ export function coreTarget(...folders) {
   return 'http://127.0.0.1:8091';
 }
 
-export function createCoreConnection(project, { target, fetcher = fetch, interval = 5000, timeout = 4000 } = {}) {
+export function createCoreConnection(project, { target, fetcher = fetch, interval = 10000, timeout = 4000 } = {}) {
   let backend, configError;
   try { backend = target || coreTarget(fileURLToPath(new URL('.', import.meta.url)), project); }
   catch (error) { configError = error.message; }

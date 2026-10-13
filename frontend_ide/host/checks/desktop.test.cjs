@@ -21,7 +21,7 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
   const calls = [];
   const written = [];
   const errors = [];
-  const sizes = [], minimums = [], states = [], canvases = [], opacities = [];
+  const sizes = [], minimums = [], states = [], canvases = [], canvasSizes = [], opacities = [];
   const serverArgs = [], files = [];
   const live = module === 'aidiy_live';
   let clock = 0;
@@ -38,7 +38,10 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
       if (this.canvas) canvases.push(JSON.parse(JSON.stringify(options)));
       assert.equal(options.frame, false);
       if (!live && !this.canvas) assert.equal(options.roundedCorners, false);
-      assert.equal(options.x, live ? 1528 : 100); assert.equal(options.y, 200);
+      if (!this.canvas) {
+        assert.equal(options.x, live ? 1524 : 100); assert.equal(options.y, 200);
+        assert.equal(options.width, 480); assert.equal(options.height, 600);
+      }
       this.bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
       this.webContents = new EventEmitter();
       Object.assign(this.webContents, {
@@ -49,7 +52,15 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
     }
     setMenu() {}
     getBounds() { return this.bounds; }
-    setBounds(bounds) { this.bounds = bounds; sizes.push(JSON.parse(JSON.stringify(bounds))); }
+    // 外枠と内容領域を分け、演出が内容領域に揃うことを確認する。
+    getContentBounds() {
+      const { x, y, width, height } = this.bounds;
+      return { x: x + 1, y: y + 1, width: width - 2, height: height - 2 };
+    }
+    setBounds(bounds) {
+      this.bounds = { ...this.bounds, ...bounds };
+      (this.canvas ? canvasSizes : sizes).push(JSON.parse(JSON.stringify(bounds)));
+    }
     setMinimumSize(width, height) { minimums.push([width, height]); }
     isDestroyed() { return !!this.destroyed; }
     isMinimized() { return false; }
@@ -97,7 +108,7 @@ async function launch({ loadError, visible = true, module = 'aidiy_code', env = 
     },
   });
   for (let i = 0; i < 100 && !written.length && !errors.length; i++) await new Promise(resolve => setImmediate(resolve));
-  return { calls, written, errors, fakeProcess, sizes, minimums, states, serverArgs, files, canvases, opacities };
+  return { calls, written, errors, fakeProcess, sizes, minimums, states, serverArgs, files, canvases, canvasSizes, opacities };
 }
 
 test('Code: 作業フォルダ・モデル・起動完了ファイルを環境変数から読み取る', async () => {
@@ -141,7 +152,8 @@ test('window is shown and focused without waiting for ready-to-show, before noti
   assert.deepEqual(result.errors, []);
   assert.equal(result.canvases.length, 1);
   const canvas = result.canvases[0];
-  assert.deepEqual([canvas.x, canvas.y, canvas.width, canvas.height], [100, 200, 476, 602]);
+  assert.deepEqual([canvas.x, canvas.y, canvas.width, canvas.height], [101, 201, 478, 598]);
+  assert.deepEqual(result.canvasSizes, [{ x: 101, y: 201, width: 478, height: 598 }], 'キャンバスを実画面の内容領域に揃える');
   assert.equal(canvas.backgroundColor, '#00000000');
   assert.equal(canvas.focusable, undefined, '透明部分が白くなるため focusable: false は付けない');
   assert.deepEqual(result.sizes, [], '実ウィンドウは拡大のために大きさを変えない');

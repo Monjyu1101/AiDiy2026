@@ -13,7 +13,7 @@ import { toolsTarget } from './ai-search.mjs';
 
 // IDEのパネル中継だけが接続する、ランダムパス付きのローカル端末。
 // シェル・開始フォルダはサーバー側で決め、ブラウザから指定させない。
-export async function startTerminal(project, { spawnTerminal, env = process.env, checkTools, toolsPollInterval = 3000 } = {}) {
+export async function startTerminal(project, { spawnTerminal, env = process.env, checkTools, toolsPollInterval = 10000 } = {}) {
   checkTools ??= async () => {
     const response = await fetch((await toolsTarget(project)) + 'ping', { signal: AbortSignal.timeout(1500) });
     if (!response.ok) return false;

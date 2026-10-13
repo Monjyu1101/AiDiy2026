@@ -18,6 +18,9 @@ import { spacePosition, WORLD_RADIUS, HOME_VIEW, warpMotion } from '../../viewer
 import { createAutoOrbit } from './auto-orbit.js';
 import { turnToTarget, cameraPosition, orbitAround, interpolateCamera, cockpitLook } from './warp-camera.js';
 import { aiRouteTargets } from './ai-route.js';
+import { createTextWidthCache } from './text-width-cache.js';
+
+export const ORBIT_PATH_SCALE = .9;
 
 // メディアは従来サイズ。その他は20KB以下で半分、100KB以上で3倍にする。
 export function fileSizeScale(name, size) {
@@ -30,9 +33,11 @@ export function createSpace(canvas, elements, { change = () => {}, layout = () =
 let disposed = false, frameId = 0, loadGeneration = 0;
 const listeners = new AbortController();
 const listen = (target, name, callback, options = {}) => target.addEventListener(name, callback, { ...options, signal: listeners.signal });
-const requestAnimationFrame = callback => disposed ? 0 : (frameId = window.requestAnimationFrame(callback));
+const requestAnimationFrame = callback => disposed || document.hidden ? 0 : (frameId = window.requestAnimationFrame(callback));
 const $ = id => elements[id];
 const ctx = canvas.getContext('2d');
+const textWidths = createTextWidthCache(ctx);
+if (document.fonts) listen(document.fonts, 'loadingdone', () => textWidths.clear());
 let W = 0, H = 0, DPR = 1, F = 800;
 let CX = 0, CY = 0;          // 宇宙の画面中心。縦表示は上側の領域へ寄せる。
 
@@ -149,6 +154,7 @@ function nodeAt(names) {
 const basePath = () => trail.join('/');
 
 function buildWorld() {
+  textWidths.clear();
   const node = nodeAt(trail);
   const prefix = basePath();
   const now = Date.now();
@@ -316,6 +322,7 @@ let routeMode = 'view', aiRoute = [];
 
 // ---------------------------------------------------------------- 描画
 function resize() {
+  textWidths.clear();
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = innerWidth; H = innerHeight;
   canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
@@ -335,7 +342,8 @@ function holdProjection() { warpProjection ??= { x: CX, y: CY }; }
 
 let last = performance.now(), prevDist = cam.dist;
 function frame(now) {
-  if (disposed) { last = now; requestAnimationFrame(frame); return; }
+  frameId = 0;
+  if (disposed || document.hidden) { last = now; return; }
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   const t = now / 1000;
@@ -427,7 +435,7 @@ function drawOrbitPath(dt) {
   if(!orbitLineLevel){orbitLine=planned;return;}
   const points=orbitLine;
   if(!points)return;
-  // 船の航行位置は保ち、案内線だけ中心寄りへ15%縮めて内側に見せる。
+  // 船の航行位置は保ち、案内線だけ中心寄りへ10%縮めて内側に見せる。
   const opacity=orbitLineLevel*orbitLineLevel*(3-2*orbitLineLevel);
   ctx.save();ctx.globalCompositeOperation='source-over';ctx.setLineDash([]);
   ctx.filter=opacity<1?`blur(${(1-opacity)*3}px)`:'none';
@@ -435,7 +443,7 @@ function drawOrbitPath(dt) {
   let connected=false;
   for(const point of points){
     // カメラの背後を結ぶ線や、軌道末尾から先頭への架空の線は描かない。
-    if(!project(point.x*.85,point.y*.85,point.z*.85)){connected=false;continue;}
+    if(!project(point.x*ORBIT_PATH_SCALE,point.y*ORBIT_PATH_SCALE,point.z*ORBIT_PATH_SCALE)){connected=false;continue;}
     if(connected)ctx.lineTo(P.x,P.y);else ctx.moveTo(P.x,P.y);
     connected=true;
   }
@@ -702,7 +710,7 @@ function drawLabels(t) {
     // 「名前 (ファイル数)」の1行だけ。起点以降の更新があるフォルダは金色でゆっくり明滅させる。
     const name = `${g.name} (${g.files.length.toLocaleString()})`;
     ctx.font = `600 13px ${font}`;
-    const w = ctx.measureText(name).width + 12;
+    const w = textWidths.measure(name) + 12;
     const below = Math.min(Math.max(r * 0.45, 18), 160), side = Math.min(Math.max(r * 0.5, 14), 160);
     const spot = [[gx, gy + below], [gx, gy - below - 14], [gx + side + w / 2 + 6, gy], [gx - side - w / 2 - 6, gy]]
       .find(([cx, cy]) => placed({ x: cx - w / 2, y: cy - 10, w, h: 20, g }));
@@ -719,7 +727,7 @@ function drawLabels(t) {
     const [x, y, r] = gateHit;
     const text = world.gate.name;
     ctx.font = `600 12px ${font}`;
-    const w = ctx.measureText(text).width + 10;
+    const w = textWidths.measure(text) + 10;
     if (placed({ x: x - w / 2, y: y + r + 6, w, h: 20, gate: true })) {
       ctx.globalAlpha = hoveredGate ? 1 : 0.85;
       ctx.fillStyle = hoveredGate ? '#fff' : '#bfe3ff';
@@ -737,7 +745,7 @@ function drawLabels(t) {
     const near = !b.isPlanet && projected[o + 2] >= 22 && (!focus || b.galaxy === focus);
     if (!b.isPlanet && !near) continue;
     const x = projected[o] + projected[o + 2] * (b.isPlanet ? 0.55 : 0.22) + 4, y = projected[o + 1];
-    const w = ctx.measureText(b.name).width + 6;
+    const w = textWidths.measure(b.name) + 6;
     if (!placed({ x, y: y - 8, w, h: 16 })) continue;
     ctx.globalAlpha = b.isPlanet ? Math.min(0.9, Math.max(0, intro - 1.4)) * (focus ? 0.4 : 1) : Math.min(0.85, (projected[o + 2] - 22) / 20);
     ctx.fillStyle = b.isPlanet ? 'rgba(215,225,250,1)' : 'rgba(200,212,240,1)';
@@ -1332,6 +1340,12 @@ listen(window, 'keydown', event => {
   else if (event.key === ' ') { event.preventDefault(); setAutoSpin(!autoSpin); }
   else if (event.key.toLowerCase() === 'r') void refresh();
   else if (event.key.toLowerCase() === 'c') clearVoyage();
+});
+// 非表示中はCanvas描画と毎フレームのDOM寸法取得を止める。復帰時の時間差を飛行へ加算しない。
+listen(document, 'visibilitychange', () => {
+  window.cancelAnimationFrame(frameId); frameId = 0; last = performance.now();
+  if (document.hidden) { if (driving) { driving = false; notify(); } }
+  else requestAnimationFrame(frame);
 });
 requestAnimationFrame(frame);
 return {

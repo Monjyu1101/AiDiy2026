@@ -12,14 +12,17 @@ const props=defineProps({path:String,desktop:Boolean});
 const state=ref({}),error=ref('');
 const name=props.path.split('/').at(-1);
 const file={name,path:props.path,mtime:0};
-let timer;
+let timer,disposed=false,polling=false;
+const controller=new AbortController();
 // IDEの利用が終わったらファイルAPIは使えないので、状態を見て案内に切り替える（Electron版は子ウィンドウごと閉じる）
 async function status(){
-  try{const response=await fetch('/api/connection',{cache:'no-store',signal:AbortSignal.timeout(5000)});if(!response.ok)throw Error();state.value=await response.json();error.value=state.value.active?'':'IDEの利用が終了しました。';}
-  catch{error.value='IDEに接続できません。';}
+  if(disposed||polling)return;polling=true;
+  try{const response=await fetch('/api/connection',{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});if(!response.ok)throw Error();const next=await response.json();if(disposed)return;state.value=next;error.value=next.active?'':'IDEの利用が終了しました。';}
+  catch{if(!disposed)error.value='IDEに接続できません。';}
+  finally{polling=false;}
 }
-onMounted(()=>{document.title=`AiDiy IDE / Viewer - ${name}`;void status();timer=setInterval(status,3000);});
-onBeforeUnmount(()=>clearInterval(timer));
+onMounted(()=>{document.title=`AiDiy IDE / Viewer - ${name}`;void status();timer=setInterval(status,10000);});
+onBeforeUnmount(()=>{disposed=true;clearInterval(timer);controller.abort();});
 </script>
 <template>
   <div class="development-app viewer-window" :class="{'desktop-window':desktop}" data-app="viewer">

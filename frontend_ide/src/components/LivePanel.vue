@@ -35,6 +35,8 @@ function scroll() {
 }
 const environment = new LiveEnvironment(props.config, new URL(props.base || './', location.href).href);
 let cloud, audio, connection, heartbeat, generation = 0, micGeneration = 0, disposed = false;
+// 初期化済みソケットの切断はconnectのcatchより先に通知されるため、再接続中の保持方針を共有する。
+let preserveOnConnectionLost = false;
 const keys = (name = provider.value) => { const vendor = name === 'openai_live' ? 'OPENAI' : name === 'freeai_live' ? 'FREEAI' : 'GEMINI'; return { model: `LIVE_${vendor}_MODEL`, voice: `LIVE_${vendor}_VOICE` }; };
 const modelLabel = computed(() => [settings.value.LIVE_AI_NAME, settings.value[keys(settings.value.LIVE_AI_NAME).model]].filter(Boolean).join(' - ') || 'AiDiy のライブ会話');
 const blocked = computed(() => busy.value || modelSaving.value);
@@ -70,6 +72,7 @@ async function loadModels(session = '') {
   if (!session) error.value = ライブ選択エラー(settings.value, { models: models.value, voices: voices.value });
 }
 function disconnect(clear = true) {
+  preserveOnConnectionLost = false;
   arrivals.reset();
   generation++; micGeneration++; connected.value = false; busy.value = false; changing.value = false; mic.value = false; micBusy.value = false;
   clearInterval(heartbeat); heartbeat = undefined;
@@ -83,6 +86,7 @@ function disconnect(clear = true) {
 async function connect(preserve = false, automatic = false) {
   if (busy.value || disposed) return;
   const run = ++generation; busy.value = true; error.value = '';
+  preserveOnConnectionLost = preserve;
   try {
     if (!automatic) await audio.unlock();
     if (run !== generation || disposed) return;
@@ -101,7 +105,7 @@ async function connect(preserve = false, automatic = false) {
     connected.value = true; connection.send('input', 音声操作(false, speaker.value));
     if (!environment.host) heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
   } catch (e) { if (run === generation) { disconnect(!preserve); error.value = e.message; } }
-  finally { if (run === generation) { busy.value = false; changing.value = false; } }
+  finally { if (run === generation) { preserveOnConnectionLost = false; busy.value = false; changing.value = false; } }
 }
 async function microphone() {
   if (!connected.value || micBusy.value || blocked.value || disposed) return;
@@ -181,7 +185,7 @@ onMounted(async () => {
   resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value);
   cloud = new AudioCloud(canvas.value);
   audio = new LiveAudio(base64 => connection.send('audio', 音声入力(base64)), (kind, value) => cloud.level(kind, value), (kind, values) => cloud.spectrum(kind, values), environment.captureUrl, environment.host ? environment.acquireMicrophone : undefined);
-  connection = new LiveConnection(environment.socketUrl, receive, () => { disconnect(); error.value = '接続が切れました。接続ボタンで開始してください。'; }, environment.socket);
+  connection = new LiveConnection(environment.socketUrl, receive, () => { disconnect(!preserveOnConnectionLost); error.value = '接続が切れました。接続ボタンで開始してください。'; }, environment.socket);
   environment.onStop(message => { disconnect(); error.value = message || ''; });
   environment.onMicrophoneStop(() => { micGeneration++; audio.stop(); mic.value = false; micBusy.value = false; });
   environment.onFolder(folder => { if (project.value?.パス !== folder?.パス && (connected.value || busy.value || modelSaving.value || modelLoading.value)) { disconnect(); error.value = 'プロジェクトフォルダが変わりました。「接続」で新しいプロジェクトの会話を開始してください。'; } project.value = folder; });

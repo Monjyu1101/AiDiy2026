@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 
-// 模擬コアと実ブラウザで、5秒間隔の確認中も接続済み表示を維持することを確認する。
+// 模擬コアと実ブラウザで、10秒間隔の確認中も接続済み表示を維持することを確認する。
 // ルートから node frontend_ide/scripts/check-connection.mjs。CHROME_PATHでブラウザを指定可能。
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -40,7 +40,7 @@ const app = await startDevelopment(project, { connection });
 const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(temporary, 'browser')}`,
   '--window-size=1280,800', ...(process.platform === 'linux' ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore', windowsHide: true });
 const sleep = ms => new Promise(done => setTimeout(done, ms));
-async function until(check, label) { const end = Date.now() + 15000; while (Date.now() < end) { if (await check()) return; await sleep(100); } throw Error(`待機タイムアウト: ${label}`); }
+async function until(check, label) { const end = Date.now() + 30000; while (Date.now() < end) { if (await check()) return; await sleep(100); } throw Error(`待機タイムアウト: ${label}`); }
 let socket;
 try {
   const activePort = join(temporary, 'browser', 'DevToolsActivePort');
@@ -77,16 +77,16 @@ try {
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     const path = join(folder, `${stamp}_${name}.png`); writeFileSync(path, Buffer.from(shot.result.data, 'base64')); console.log(path);
   }
-  await until(() => calls.length >= 2, '5秒後の定期確認');
+  await until(() => calls.length >= 2, '10秒後の定期確認');
   assert.equal(connection.state().connecting, false);
   assert.equal(await evaluate(label), '接続済み');
   await capture('01_connected-checking');
-  await until(async () => calls.length >= 3 && (await evaluate('window.connectionPolls.length')) >= 3, '次の5秒周期');
+  await until(async () => calls.length >= 3 && (await evaluate('window.connectionPolls.length')) >= 3, '次の10秒周期');
   assert.equal(await evaluate(label), '接続済み');
   assert.deepEqual(await evaluate('window.connectionLabels'), []);
   const polls = await evaluate('window.connectionPolls');
-  for (let i = 1; i < polls.length; i++) assert.ok(polls[i] - polls[i - 1] >= 4800, `状態取得が頻繁です: ${polls}`);
-  for (let i = 1; i < calls.length; i++) assert.ok(calls[i] - calls[i - 1] >= 4800, `コア確認が頻繁です: ${calls}`);
+  for (let i = 1; i < polls.length; i++) assert.ok(polls[i] - polls[i - 1] >= 9800, `状態取得が頻繁です: ${polls}`);
+  for (let i = 1; i < calls.length; i++) assert.ok(calls[i] - calls[i - 1] >= 9800, `コア確認が頻繁です: ${calls}`);
   healthy = false;
   await until(async () => !connection.state().connected && (await evaluate(label)) === '未接続', 'コア停止');
   assert.equal(connection.state().active, true); assert.equal(connection.state().startedAt, startedAt);
@@ -95,7 +95,7 @@ try {
   await until(async () => (await evaluate(label)) === '接続済み', '同じセッションで復帰');
   assert.equal(connection.state().startedAt, startedAt);
   await capture('03_reconnected'); assert.deepEqual(errors, []);
-  console.log('CONNECTION PASS: 5秒周期、確認中の表示維持、切断検出、セッションを維持した再接続');
+  console.log('CONNECTION PASS: 10秒周期、確認中の表示維持、切断検出、セッションを維持した再接続');
 } finally {
   socket?.close(); const exited = once(chrome, 'exit'); chrome.kill(); await exited;
   await app.close(); connection.close(); for (const timer of replies) clearTimeout(timer);

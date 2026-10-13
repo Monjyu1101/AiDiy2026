@@ -101,7 +101,7 @@ Live では `aidiy_live/src/view.ts` が画面と音声を担当し、`bridge.ts
 
 - Code は input／1、Live は input／0／audio のソケットを使う。
 - Code のコードAIとモデルはAIコアのモデル情報APIから取得し、接続中のセッションへ反映する。
-- Code は通信切断時に約5秒間隔で再接続する。明示的な切断・破棄は再試行を止める。
+- Code は通信切断時に約10秒間隔で再接続する。明示的な切断・破棄は再試行を止める。
 - Code の会話履歴は作業フォルダ別に管理し、AIコアのセッションIDで再開する。保存先はプロジェクトの `_AIDIY/aidiy_code/histories/<会話ID>.json`（`src/conversation-store.ts`）で、拡張・単独起動版・開発スペースが同じ形式で共用する。応答の途中経過ごとに書かないよう0.5秒まとめて書き、終了時に書き出す。拡張の旧 `workspaceState` 履歴は開いたフォルダへ移し、テストは一時フォルダへ書く（作業フォルダの `_AIDIY` に書かない）。旧Hermesの表示履歴は保持するが、CLIセッションIDをコアへ渡さない。
 - 最終手動モデルは `~/.aidiy/aidiy_code_model.json` で拡張・単独画面共通に保存する。
 - `src/runner.ts` と `src/protocol.ts` は引き続き Discord の直接CLI実行と対話CLIを支える。

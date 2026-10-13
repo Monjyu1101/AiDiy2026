@@ -40,11 +40,19 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
   return {state,emitted,timers,async mount(){for(const callback of mounted)await callback();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
 }
 
-async function liveFixture(t) {
+function liveProtocol() {
+  const module={exports:{}};
+  const source=readFileSync(new URL('../host/aidiy_live/src/protocol.ts',import.meta.url),'utf8');
+  vm.runInNewContext(transformSync(source,{loader:'ts',format:'cjs'}).code,{module,exports:module.exports,setTimeout,clearTimeout});
+  return module.exports;
+}
+
+async function liveFixture(t,{socketFactory}={}) {
   let apiFailure='',socketFailure='',audioCloses=0,disconnects=0;
   const settings={LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'test-model',LIVE_FREEAI_VOICE:'Zephyr'};
   class Environment {
     host=true;socketUrl='';captureUrl='';
+    socket=socketFactory;
     context(){return Promise.resolve({作業フォルダ:{名前:'fixture',パス:'/fixture'},保存モデル設定:settings});}
     async api(path,body){
       if(apiFailure==='all'||(apiFailure==='session'&&body.セッションID))throw Error('モデル取得の試験エラー');
@@ -61,13 +69,13 @@ async function liveFixture(t) {
   const fixture=setupComponent('LivePanel',{
     props:{config:{}},modules:{
       '../transports/live':{LiveEnvironment:Environment},
-      '../../host/aidiy_live/src/protocol':{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
+      '../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
       '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(){}stop(){}}},
       '../../host/aidiy_live/src/visualizer':{AudioCloud:class {dispose(){}}},
       '../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
       '../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
       './StatusBar.vue':{},'./TerminalWelcome.vue':{},'./ModalDialog.vue':{},
-      '../engines/chat-arrival':{chatArrival:()=>({reset(){},dispose(){}})},
+      '../engines/chat-arrival':{chatArrival:()=>({reset(){},dispose(){},show(){}})},
     },
   });
   t.after(()=>fixture.dispose());await fixture.mount();
@@ -102,6 +110,63 @@ test('Live: 通常の新規接続失敗は従来どおり初期状態へ戻す',
   await state.connect();
   assert.equal(state.messages.value.length,0);assert.equal(state.prompt.value,'');
   assert.equal(state.welcomeVisible.value,true);assert.equal(state.busy.value,false);
+});
+
+// 接続全体を置き換えず、実際のprotocolが初期化済みソケットの切断を通知する経路を通す。
+function interruptedLiveSockets(closedChannel,pendingChannel) {
+  const sockets=[];
+  class Socket {
+    readyState=1;bufferedAmount=0;
+    constructor(){sockets.push(this);queueMicrotask(()=>this.onopen?.({}));}
+    send(data){
+      const packet=JSON.parse(data);if(packet.type!=='connect')return;
+      this.channel=packet.ソケット番号;
+      if(this.channel===pendingChannel)queueMicrotask(()=>sockets.find(socket=>socket.channel===closedChannel).close());
+      else queueMicrotask(()=>this.onmessage?.({data:JSON.stringify({メッセージ識別:'init',セッションID:'new-session'})}));
+    }
+    close(){if(this.readyState===3)return;this.readyState=3;queueMicrotask(()=>this.onclose?.({}));}
+  }
+  return {socketFactory:()=>new Socket(),sockets};
+}
+
+for(const [closedChannel,pendingChannel] of [['input','0'],['0','audio']]){
+  test(`Live: 実protocolの${closedChannel}切断が${pendingChannel}再接続待ちに届いても会話・下書きを保持する`,async t=>{
+    const transport=interruptedLiveSockets(closedChannel,pendingChannel);
+    const fixture=await liveFixture(t,transport),state=fixture.state;
+    state.connected.value=true;state.mic.value=true;
+    await state.openModels();state.model.value='other-model';
+    const history=JSON.stringify(state.messages.value);
+    await state.applyModel();
+    assert.equal(JSON.stringify(state.messages.value),history);
+    assert.equal(state.prompt.value,'未送信の下書き');assert.equal(state.welcomeVisible.value,false);
+    for(const flag of ['connected','busy','mic','micBusy','changing','modelSaving','picker'])assert.equal(state[flag].value,false,flag);
+    assert.match(state.error.value,/接続が切れました/);
+    assert.equal(state.preferred.value.LIVE_FREEAI_MODEL,'other-model');
+    assert.ok(transport.sockets.length>=2);assert.ok(transport.sockets.every(socket=>socket.readyState===3));
+    await state.newChat();
+    assert.equal(state.messages.value.length,0);assert.equal(state.prompt.value,'');assert.equal(state.welcomeVisible.value,true);
+  });
+}
+
+test('Live: 実protocolで通常の新規接続中に切断した場合は初期状態へ戻す',async t=>{
+  const transport=interruptedLiveSockets('input','0');
+  const fixture=await liveFixture(t,transport),state=fixture.state;
+  await state.connect();
+  assert.equal(state.messages.value.length,0);assert.equal(state.prompt.value,'');
+  assert.equal(state.welcomeVisible.value,true);assert.equal(state.busy.value,false);
+  assert.ok(transport.sockets.every(socket=>socket.readyState===3));
+});
+
+test('Live: モデル再接続成功後には保持方針を解除し、通常の切断処理へ戻る',async t=>{
+  const transport=interruptedLiveSockets();
+  const fixture=await liveFixture(t,transport),state=fixture.state;
+  state.connected.value=true;
+  await state.openModels();state.model.value='other-model';await state.applyModel();
+  assert.equal(state.connected.value,true);assert.equal(state.prompt.value,'未送信の下書き');
+  transport.sockets.find(socket=>socket.channel==='input').close();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(state.connected.value,false);assert.equal(state.messages.value.length,0);assert.equal(state.prompt.value,'');
+  assert.ok(transport.sockets.every(socket=>socket.readyState===3));
 });
 
 async function analysisFixture(t) {

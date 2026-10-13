@@ -46,7 +46,7 @@ test('Code 接続: inputのinit・モデル設定後に出力ソケットを開�
   } finally { client.dispose(); }
 });
 
-test('Code 接続: 切断から5秒後に再接続し、同じセッションと会話を保持、遅延イベントを無視する', async t => {
+test('Code 接続: 切断から10秒後に再接続し、同じセッションと会話を保持、遅延イベントを無視する', async t => {
   t.mock.timers.enable({ apis:['setTimeout','setInterval'] });
   const backend = core(), {client, packets, states} = connection(backend);
   try {
@@ -58,7 +58,7 @@ test('Code 接続: 切断から5秒後に再接続し、同じセッションと
     old.close(); assert.equal(client.connected,false); assert.equal(backend.sockets[0].readyState,3);
     assert.deepEqual(states.at(-1),{connected:false,connecting:false});
     assert.equal(client.send({メッセージ識別:'input_text',メッセージ内容:'切断中'}),false);
-    t.mock.timers.tick(4999); await flush(); assert.equal(backend.sockets.length,2);
+    t.mock.timers.tick(9999); await flush(); assert.equal(backend.sockets.length,2);
     t.mock.timers.tick(1); await flush();
     assert.deepEqual(states.slice(-2),[{connected:false,connecting:true},{connected:true,connecting:false}]);
     assert.equal(client.connected,true); assert.equal(client.session,session);
@@ -72,15 +72,15 @@ test('Code 接続: 切断から5秒後に再接続し、同じセッションと
   } finally { client.dispose(); t.mock.timers.reset(); }
 });
 
-test('Code 接続: 初回失敗も5秒間隔で再試行し、破棄・接続変更で途中の処理を終了する', async t => {
+test('Code 接続: 初回失敗も10秒間隔で再試行し、破棄・接続変更で途中の処理を終了する', async t => {
   t.mock.timers.enable({ apis:['setTimeout','setInterval'] });
   const backend = core(), {client} = connection(backend); backend.unavailable = true;
   try {
     client.start('/project',{provider:'aidiy_hermes',model:'openai_oauth/gpt-6.1-sol'}); await flush();
     assert.equal(client.connected,false);
-    t.mock.timers.tick(5000); await flush(); assert.equal(backend.sockets.length,2);
+    t.mock.timers.tick(10000); await flush(); assert.equal(backend.sockets.length,2);
     backend.unavailable = false;
-    t.mock.timers.tick(5000); await flush(); assert.equal(client.connected,true);
+    t.mock.timers.tick(10000); await flush(); assert.equal(client.connected,true);
     client.start('/other',{provider:'copilot_cli',model:'gpt-6-sol'});
     client.dispose(); await flush(); t.mock.timers.tick(10000); await flush();
     assert.equal(client.connected,false); assert.ok(backend.sockets.every(s=>s.readyState===3));
@@ -138,7 +138,7 @@ test('Code 接続: 共通のモデル既定値を使う再接続で会話をリ�
     client.start('/project',{provider:'',model:''}); await flush();
     const session=backend.sessions.get(client.session);
     session.settings.CODE_AI1_MODEL='';session.settings.CODE_AIDIY_HERMES_MODEL='openai_oauth/gpt-6.1-sol';
-    backend.sockets[1].close();t.mock.timers.tick(5000);await flush();
+    backend.sockets[1].close();t.mock.timers.tick(10000);await flush();
     assert.equal(client.connected,true);
     assert.ok(!backend.requests.some(request=>request.path.endsWith('設定')));
   } finally {client.dispose();t.mock.timers.reset();}

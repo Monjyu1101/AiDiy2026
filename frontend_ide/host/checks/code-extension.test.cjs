@@ -232,7 +232,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     ui.element('composer').listeners.get('submit')({preventDefault(){}});await flush();
     assert.equal(runs.length,1);assert.equal(runs[0].model,'copilot_cli/same');assert.equal(runs[0].session,undefined);
     assert.equal(runs[0].project,'/project');assert.equal(latest().実行中,true);
-    backend.unavailable=false;t.mock.timers.tick(5000);await flush();assert.equal(latest().接続済み,true);
+    backend.unavailable=false;t.mock.timers.tick(10000);await flush();assert.equal(latest().接続済み,true);
     assert.equal(latest().実行モード,'offline');assert.equal(latest().model,'copilot_cli/same');assert.equal(latest().実行中,true);
     for(const data of [{type:'autoConnect',enabled:false},{type:'autoConnect',enabled:true},{type:'connect'},{type:'disconnect'}]) {
       receive(data);await flush();assert.equal(latest().接続済み,true);assert.equal(latest().実行中,true);

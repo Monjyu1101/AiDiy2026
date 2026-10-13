@@ -15,7 +15,7 @@ import { startServer } from '../server.mjs';
 const project = fileURLToPath(new URL('../web/', import.meta.url));
 const valid = { status: 'OK', data: { available_models: {}, モデル設定: {} } };
 
-test('5秒間隔の稼働確認中は接続済みを維持し、失敗後の再接続だけ接続中にする', async t => {
+test('10秒間隔の稼働確認中は接続済みを維持し、失敗後の再接続だけ接続中にする', async t => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   let calls = 0, release;
   const connection = createCoreConnection(project, {
@@ -28,7 +28,7 @@ test('5秒間隔の稼働確認中は接続済みを維持し、失敗後の再�
   release({ ok: true, json: async () => valid });
   await first;
   const startedAt = connection.state().startedAt;
-  t.mock.timers.tick(4999);
+  t.mock.timers.tick(9999);
   assert.equal(calls, 1);
   t.mock.timers.tick(1);
   assert.equal(calls, 2);
@@ -36,14 +36,14 @@ test('5秒間隔の稼働確認中は接続済みを維持し、失敗後の再�
   assert.equal(connection.state().connecting, false);
   assert.equal(connection.state().startedAt, startedAt);
   const checked = connection.check();
-  t.mock.timers.tick(5000);
+  t.mock.timers.tick(10000);
   assert.equal(calls, 2); // 確認中は次の確認を重ねない。
   release({ ok: false, status: 503 });
   await checked;
   assert.equal(connection.state().connected, false);
   assert.equal(connection.state().connecting, false);
   assert.equal(connection.state().active, true);
-  t.mock.timers.tick(5000);
+  t.mock.timers.tick(10000);
   assert.equal(calls, 3);
   assert.equal(connection.state().connecting, true);
   const recovered = connection.check();

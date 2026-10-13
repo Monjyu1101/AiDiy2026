@@ -53,8 +53,8 @@ async function connect(app) {
       }
     }
   })();
-  return {packets, close:async()=>{await reader.cancel(); await pump;}, wait:async predicate=>{
-    const deadline = Date.now()+7000;
+  return {packets, close:async()=>{await reader.cancel(); await pump;}, wait:async (predicate, timeout = 7000)=>{
+    const deadline = Date.now()+timeout;
     while (Date.now()<deadline) { const found = packets.find(predicate); if (found) return found; await pause(20); }
     throw new Error('SSE timeout');
   }};
@@ -91,7 +91,7 @@ test('Code: 自動接続OFFは再試行・新規・履歴復帰からの接続�
     assert.equal((await post(app,{type:'autoConnect',enabled:false})).status,409);
     await post(app,{メッセージ識別:'cancel_run'});backend.hold=false;
     await stream.wait(p=>p.type==='state' && !p.実行中 && p.メッセージ.length>0);
-    // 通信切断で予約された5秒後の再試行もOFFでキャンセルする。
+    // 通信切断で予約された10秒後の再試行もOFFでキャンセルする。
     backend.sockets.at(-1).close();
     assert.equal((await post(app,{type:'autoConnect',enabled:false})).status,200);
     const off = await stream.wait(p=>p.type==='state' && p.自動接続===false);
@@ -99,7 +99,7 @@ test('Code: 自動接続OFFは再試行・新規・履歴復帰からの接続�
     const socketCount = backend.sockets.length, requestCount = backend.requests.length;
     await post(app,{type:'new'});
     await post(app,{type:'selectHistory',id:ready.会話ID});
-    await pause(5100);
+    await pause(10100);
     assert.equal(backend.sockets.length,socketCount);assert.equal(backend.requests.length,requestCount);
     assert.ok(backend.sockets.every(socket=>socket.readyState===3));
     assert.equal((await post(app,{type:'autoConnect',enabled:true})).status,200);
@@ -149,7 +149,8 @@ test('Code: --offline 起動から自動接続ONで新規オンライン会話�
 test('Code: AIコアのモデル候補・選択値・送信と停止を中継する', async t => {
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   const file = join(preferences, 'remember.json');
-  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}, file);
+  // 中継の検証は配置先の共通設定に依存させず、初期選択を明示する。
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', { provider: 'aidiy_hermes', model: 'openai_oauth/gpt-6.1-sol' }, file);
   const stream = await connect(app);
   try {
     const ready = await stream.wait(p => p.type === 'state' && p.接続済み);
@@ -440,8 +441,8 @@ test('Code: 未接続はHermesへ送信し、実行中も自動再接続、完�
     assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'未接続の依頼',self_check_loop:3})).status,200);
     assert.equal(jobs.length,1); assert.equal(jobs[0].model,'same'); assert.equal(jobs[0].session,undefined);
     backend.unavailable = false;
-    // 手動接続なしで5秒後の再試行を通す。Hermes実行は接続成功後も保持する。
-    await stream.wait(p=>p.type==='state' && p.接続済み && p.実行中 && p.実行モード==='offline');
+    // 手動接続なしで10秒後の再試行を通す。Hermes実行は接続成功後も保持する。
+    await stream.wait(p=>p.type==='state' && p.接続済み && p.実行中 && p.実行モード==='offline',12000);
     assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'二重送信'})).status,409);
     jobs[0].finish();
     const ready = await stream.wait(p=>p.type==='state' && p.接続済み && !p.実行中 && p.実行モード==='online');

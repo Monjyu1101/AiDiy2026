@@ -216,7 +216,7 @@ export class CodeConnection {
   }
   private lost() {
     this.clear(); this.onState();
-    if (this.enabled && !this.disposed) this.retry = setTimeout(() => { this.retry = undefined; void this.connect(); }, 5000);
+    if (this.enabled && !this.disposed) this.retry = setTimeout(() => { this.retry = undefined; void this.connect(); }, 10000);
   }
   disconnect() { this.enabled = false; this.clear(); this.onState(); }
   dispose() { this.disposed = true; this.disconnect(); }
