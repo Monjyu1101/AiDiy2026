@@ -13,10 +13,11 @@
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolve, join } = require('node:path');
-const { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { 単独起動: startServer } = require('../out/aidiy_code/server.cjs');
 const { オフライン実行, オフラインモデル保存先, オフラインモデル候補, Hermes既定モデル } = require('../out/offline.cjs');
+const { 会話本文上限, 会話ファイル上限 } = require('../out/conversation-store.cjs');
 const preferences = mkdtempSync(join(tmpdir(), 'aidiy-code-model-'));
 after(() => rmSync(preferences, { recursive: true, force: true }));
 let fileNumber = 0;
@@ -326,6 +327,41 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     await post(reopened,{type:'deleteHistory',id:initial.会話ID});
     await second.wait(p=>p.type==='state' && !p.履歴.some(item=>item.id===initial.会話ID));
     assert.equal(readdirSync(history).includes(initial.会話ID+'.json'),false,'削除した会話のファイルを消す');
+  } finally { await second.close(); await reopened.close(); }
+});
+
+test('Code 会話履歴: 本文上限の日本語回答を保存し、再起動後も全文を選び直せる', async t => {
+  const backend = require('./fake-core.cjs').core(); backend.install(t);
+  const file = join(preferences, 'long-japanese.json');
+  const history = join(preferences, 'history-long-japanese');
+  const request = '長文';
+  const answer = 'あ'.repeat(会話本文上限 - request.length);
+  const run = (_root, _folder, _model, _text, _session, receive) => {
+    queueMicrotask(() => receive({ メッセージ識別: 'output_text', メッセージ内容: answer }));
+    return { 完了: Promise.resolve({ 終了コード: 0, セッションID: 'long-japanese-session' }), 停止() {} };
+  };
+  const app = await start(process.cwd(), 'http://127.0.0.1:18091', { offline: true }, file, run, history);
+  const stream = await connect(app);
+  let id;
+  const messages = [{ 種別: 'user', 本文: request }, { 種別: 'assistant', 本文: answer }];
+  try {
+    assert.equal((await post(app, { メッセージ識別: 'input_text', メッセージ内容: request })).status, 200);
+    const done = await stream.wait(p => p.type === 'state' && !p.実行中 && p.セッションID === 'long-japanese-session');
+    id = done.会話ID;
+    assert.deepEqual(done.メッセージ, messages);
+  } finally { await stream.close(); await app.close(); }
+  const bytes = statSync(join(history, `${id}.json`)).size;
+  assert.ok(bytes > 4 * 1024 * 1024 && bytes <= 会話ファイル上限);
+
+  const reopened = await start(process.cwd(), 'http://127.0.0.1:18091', { offline: true }, file, run, history);
+  const second = await connect(reopened);
+  try {
+    await second.wait(p => p.type === 'state' && p.履歴.some(item => item.id === id));
+    assert.equal((await post(reopened, { type: 'selectHistory', id })).status, 200);
+    const restored = await second.wait(p => p.type === 'state' && p.会話ID === id);
+    assert.deepEqual(restored.メッセージ, messages);
+    assert.equal(restored.セッションID, 'long-japanese-session');
+    assert.equal(backend.sockets.length, 0); assert.equal(backend.requests.length, 0);
   } finally { await second.close(); await reopened.close(); }
 });
 

@@ -12,10 +12,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, mkdirSync, rmSync, readdirSync, writeFileSync, symlinkSync, existsSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, rmSync, readdirSync, readFileSync, statSync, writeFileSync, symlinkSync, existsSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
-const { 会話保存先, 会話一覧, 会話書込, 会話削除 } = require('../out/conversation-store.cjs');
+const { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限, 会話ファイル上限 } = require('../out/conversation-store.cjs');
 
 const entry = (id, 更新日時) => ({ id, 更新日時, 初回依頼: `依頼${id}`, メッセージ: [{ 種別: 'user', 本文: 'こんにちは' }], provider: 'aidiy_hermes', model: 'auto' });
 
@@ -41,4 +41,54 @@ test('Code 会話履歴: リンクでプロジェクト外へ書き出さない'
   symlinkSync(outside, join(project, '_AIDIY'), process.platform === 'win32' ? 'junction' : 'dir');
   assert.throws(() => 会話保存先(project, true), /プロジェクト外/);
   assert.equal(existsSync(join(outside, 'aidiy_code')), false);
+});
+
+test('Code 会話履歴: 旧版が保存した4MiB超の日本語履歴も全文を復元する', t => {
+  const project = mkdtempSync(join(tmpdir(), 'aidiy-code-history-'));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const folder = 会話保存先(project, true);
+  const saved = { ...entry('legacy-japanese', 100), メッセージ: [{ 種別: 'assistant', 本文: 'あ'.repeat(1_500_000) }] };
+  const path = join(folder, `${saved.id}.json`);
+  writeFileSync(path, JSON.stringify(saved), 'utf8');
+  assert.ok(statSync(path).size > 4 * 1024 * 1024, '旧読込上限を超える再現データ');
+  assert.deepEqual(会話一覧(folder), [saved]);
+});
+
+for (const [id, character] of [['ascii', 'a'], ['japanese', 'あ'], ['emoji', '😀'], ['escaped', '\u0000'], ['surrogate', '\ud800']]) {
+  test(`Code 会話履歴: 本文上限の${id}を保存し全文を復元する`, t => {
+    const project = mkdtempSync(join(tmpdir(), 'aidiy-code-history-'));
+    t.after(() => rmSync(project, { recursive: true, force: true }));
+    const folder = 会話保存先(project, true);
+    const text = character.repeat(会話本文上限 / character.length);
+    assert.equal(text.length, 2_000_000, '既存の本文上限は縮小しない');
+    const saved = { ...entry(id, 100), メッセージ: [{ 種別: 'assistant', 本文: text }] };
+    会話書込(folder, saved);
+    assert.ok(statSync(join(folder, `${id}.json`)).size <= 会話ファイル上限);
+    assert.deepEqual(会話一覧(folder), [saved]);
+  });
+}
+
+test('Code 会話履歴: UTF-8のファイル上限と同値は読み書きし、1バイト超過は元の履歴を保持する', t => {
+  const project = mkdtempSync(join(tmpdir(), 'aidiy-code-history-'));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const folder = 会話保存先(project, true);
+  const saved = { ...entry('boundary', 100), model: '', メッセージ: [{ 種別: 'assistant', 本文: '\u0000'.repeat(会話本文上限) }] };
+  const remaining = 会話ファイル上限 - Buffer.byteLength(JSON.stringify(saved), 'utf8');
+  saved.model = 'あ'.repeat(Math.floor(remaining / 3)) + 'a'.repeat(remaining % 3);
+  assert.equal(Buffer.byteLength(JSON.stringify(saved), 'utf8'), 会話ファイル上限);
+  const path = join(folder, `${saved.id}.json`);
+  会話書込(folder, saved);
+  assert.equal(statSync(path).size, 会話ファイル上限);
+  assert.deepEqual(会話一覧(folder), [saved]);
+
+  const original = readFileSync(path, 'utf8');
+  const oversized = { ...saved, model: saved.model + 'a' };
+  assert.throws(() => 会話書込(folder, oversized), /保存サイズ.*上限/);
+  assert.equal(readFileSync(path, 'utf8'), original, '保存失敗で以前の履歴を失わない');
+  assert.deepEqual(readdirSync(folder), [`${saved.id}.json`], '拒否した保存の一時ファイルを作らない');
+
+  // 外部で作られたファイルにも、書込と同じ上限を適用する。
+  writeFileSync(path, JSON.stringify(oversized), 'utf8');
+  assert.equal(statSync(path).size, 会話ファイル上限 + 1);
+  assert.deepEqual(会話一覧(folder), []);
 });

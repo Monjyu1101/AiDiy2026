@@ -151,7 +151,11 @@ Electron本体の起動は `desktop-process.mjs` に集約します。stdinを�
 
 プレビューのiframeと文書CSPには `allow-same-origin` を付け、外部SVGのuse参照などを可能にします。IDE自身とは別ポートで隔離し、元のプロジェクト外や設定・鍵ファイルの配信拒否を維持します。ディレクトリのindex.htmlは末尾スラッシュ付きURLへ誘導し、画像の基準位置をずらさないでください。ファイル切替・破棄では古いプレビューAPIの応答を無効化します。
 
-`node --test frontend_ide/viewer/checks/preview.test.mjs` と `node frontend_ide/scripts/check-preview.mjs` で配信・ブラウザ表示を確認します。実ファイルは `check-preview.mjs --project <ルート> --html <相対パス> --svg <相対パス>` で読み取り専用に検証し、`nn-preview-*.png` に撮影します。配信側を変更した際は、画面再読み込みだけでなくIDEを終了して再起動してください。
+文書と資産の `Referrer-Policy` は `same-origin` とし、外部画像などへtokenとプロジェクト内パスを送らないでください。同一プレビュー内ではRefererを維持し、`/…` 始まりの資産をページの `public` 基準で解決します。参照元の公開元も、このプレビューのローカルまたは確認済み転送先に限定します。
+
+Codespacesの転送先からAPIを開いた場合は、既存の `forwardedOrigin()` でプレビュー用ポートのHTTPS URLを返します。IDEとプレビューは別の転送公開元を維持し、IDEと同一公開元へHTMLを中継しないでください。Hostを書き換える転送では既知のOrigin / Refererも判定に使います。ローカルから開いた場合はループバックURLを返します。初回起動でtokenを含まないローカルURLを出力し、Codespacesのポート検出へ通知します。自動転送されない場合はPortsからそのプレビューポートをPrivateのまま転送し、必要なら転送先を別タブで一度開いて認証してから再読込します。ポートをPublicへ変更する必要はありません。
+
+`node --test frontend_ide/viewer/checks/preview.test.mjs` と `node frontend_ide/scripts/check-preview.mjs` で配信・ブラウザ表示を確認します。前者は転送HostとプロキシがHostを書き換えた場合、ローカル利用、token・パス・別サイトの拒否も確認します。後者は別ポートの模擬外部画像にRefererが送られず、ルート相対画像は読めることも確認します。実Codespacesのポート転送・認証確認はローカルのHost模擬テストとは別に実施してください。実ファイルは `check-preview.mjs --project <ルート> --html <相対パス> --svg <相対パス>` で読み取り専用に検証し、`nn-preview-*.png` に撮影します。配信側を変更した際は、画面再読み込みだけでなくIDEを終了して再起動してください。
 
 ## Term（ターミナル）の変更・検証
 

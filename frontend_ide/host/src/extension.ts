@@ -22,7 +22,7 @@ import { CodeConnection, コード選択 } from './code-connection';
 import { ローカル接続先 } from '../aidiy_live/local-backend.cjs';
 import type { Packet } from '../aidiy_live/src/protocol';
 import { streamControlOf, visibleStreamContent, type コードパケット } from './protocol';
-import { 会話保存先, 会話一覧, 会話書込, 会話削除, type 保存履歴 } from './conversation-store';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限, type 保存履歴 } from './conversation-store';
 
 interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; コアセッションID?: string; HermesセッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
@@ -194,7 +194,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 保存(更新日時を変更 = true): void {
     // 大量の会話による workspaceState 肥大化を防ぐ。AIコアの履歴はコアセッションIDで継続する。
     let サイズ = 0;
-    const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 2_000_000).reverse();
+    const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 会話本文上限).reverse();
     if (this.会話.作業URI && (messages.length || this.会話.コアセッションID)) {
       const previous = this.履歴.find(item => item.id === this.会話ID);
       const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID,

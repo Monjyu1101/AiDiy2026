@@ -15,11 +15,17 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { createServer } from 'node:http';
 import { startDevelopment } from '../server.mjs';
 
 const project = mkdtempSync(join(tmpdir(), 'aidiy_preview-'));
 for(const path of ['pages/assets','shared','pages/sub'])mkdirSync(join(project,path),{recursive:true});
 const png=readFileSync(resolve('frontend_ide/dist/AiDiy.png'));
+// 外部サイト役もローカルで動かし、ブラウザのRefererにプレビューtokenが入らないことを確認する。
+const externalRequests=[];
+const external=createServer((req,res)=>{externalRequests.push({path:req.url,referer:req.headers.referer});res.writeHead(200,{'content-type':'image/png'});res.end(png);});
+await new Promise(done=>external.listen(0,'127.0.0.1',done));
+const externalImage=`http://127.0.0.1:${external.address().port}/external.png`;
 for(const path of ['pages/assets/ロゴ 画像.png','shared/logo.png'])writeFileSync(join(project,path),png);
 writeFileSync(join(project,'pages/assets/defs.svg'),'<svg xmlns="http://www.w3.org/2000/svg"><symbol id="mark" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#9559eb"/></symbol></svg>');
 writeFileSync(join(project,'pages/assets/style.css'),'body{margin:24px;background:#f3f5fa;color:#17243b;font:16px sans-serif}h1{font-size:22px}.card{background:white;border:1px solid #ddd;padding:16px;margin:16px 0}img,.css-image{width:96px;height:96px;object-fit:contain}.css-image{background:url("../../shared/logo.png") center/contain no-repeat}');
@@ -27,6 +33,8 @@ writeFileSync(join(project,'pages/assets/module.js'),'document.body.dataset.modu
 writeFileSync(join(project,'pages/日本語 ページ.html'),`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="assets/style.css"><h1>相対参照の表示確認</h1><div class="card">同じフォルダからの画像<br><img id="local" src="assets/ロゴ%20画像.png"></div><div class="card">親フォルダからの画像<br><img id="parent" src="../shared/logo.png"></div><div class="card">CSSの相対画像<div class="css-image"></div>外部SVG参照 <svg width="32" height="32"><use id="symbol" href="assets/defs.svg#mark" width="32" height="32"/></svg></div><script type="module" src="assets/module.js"></script><script>try{parent.document.body;document.body.dataset.isolated='no'}catch{document.body.dataset.isolated='yes'}</script>`);
 writeFileSync(join(project,'pages/図面.svg'),`<svg xmlns="http://www.w3.org/2000/svg" width="520" height="430" viewBox="0 0 520 430"><rect width="520" height="430" fill="#f3f5fa"/><text x="24" y="40" font-size="22">SVGの相対画像</text><image id="local" href="assets/ロゴ%20画像.png" x="24" y="64" width="180" height="180" onload="this.dataset.loaded='yes'"/><image id="parent" href="../shared/logo.png" x="254" y="64" width="180" height="180" onload="this.dataset.loaded='yes'"/><text x="24" y="280" font-size="18">同じフォルダ / 親フォルダ</text><use id="symbol" href="assets/defs.svg#mark" x="24" y="320" width="48" height="48"/></svg>`);
 writeFileSync(join(project,'pages/sub/index.html'),'<img id="index-image" src="../assets/ロゴ%20画像.png">');
+const htmlFixture=join(project,'pages/日本語 ページ.html');
+writeFileSync(htmlFixture,readFileSync(htmlFixture,'utf8')+`<img id="root-relative" src="/assets/ロゴ%20画像.png"><img id="external" src="${externalImage}">`);
 const argument=name=>{const index=process.argv.indexOf(name);return index>=0?process.argv[index+1]:null;};
 const htmlExample=argument('--html'),svgExample=argument('--svg');
 const app = await startDevelopment(htmlExample&&svgExample?resolve(argument('--project')||'.'):project);
@@ -106,6 +114,9 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('.viewer-mode button')).find(b=>b.textContent==='表示').click()`);
   await until(()=>child(`document.querySelector('#local')?.naturalWidth>0&&document.querySelector('#parent')?.naturalWidth>0&&document.body.dataset.module==='loaded'`),'HTMLの相対画像とモジュール');
   assert.equal(await child(`document.body.dataset.isolated`),'yes','IDEへの親DOMアクセスは隔離');
+  await until(()=>child(`document.querySelector('#root-relative')?.naturalWidth>0&&document.querySelector('#external')?.naturalWidth>0`),'ルート相対画像と別公開元の画像');
+  assert.ok(externalRequests.some(request=>request.path==='/external.png'));
+  assert.ok(externalRequests.every(request=>!request.referer),'外部画像にtokenやプロジェクト内パスを送らない');
   await evaluate(`window.previewActivity=0;addEventListener('message',e=>{if(e.source===document.querySelector('.viewer-preview')?.contentWindow&&e.data?.type==='aidiy-ide-viewer-activity')window.previewActivity++;});`);
   await child(`dispatchEvent(new WheelEvent('wheel',{deltaY:100}));true`);
   await until(()=>evaluate('window.previewActivity>0'),'HTML内の操作を親へ通知');
@@ -131,6 +142,7 @@ try {
   }
   ws.close();
 } finally {
+  external.closeAllConnections();await new Promise(done=>external.close(done));
   chrome.kill();
   await app.close();
   await sleep(300);

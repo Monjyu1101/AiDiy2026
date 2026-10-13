@@ -244,7 +244,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
   let allowedOrigins = new Set();
   const panels = panelsFactory(root, connection.state);
   // HTML プレビュー用の別オリジン静的サーバー。最初のプレビュー要求で起動し、このサーバーを閉じる時に止める。
-  const preview = createPreview(root, () => connection.state().active);
+  const preview = createPreview(root, () => connection.state().active, { env });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     const fail = (status, message) => { res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' }); res.end(message); };
@@ -301,7 +301,12 @@ export async function startServer(root, port = 0, { strict = false, env = proces
           const kind = /\.(md|markdown)$/i.test(path) ? 'markdown' : /\.svg$/i.test(path) ? 'svg' : 'html';
           const full = await insideRoot(root, path);
           if (kind === 'markdown' && full && (await stat(full)).size > MAX_TEXT) return json({ kind, error: 'Markdownの表示は1MBまでです。コード表示で先頭の内容を確認できます。' });
-          const address = full ? await preview.url(path) : null;
+          // APIを開いた公開元に合わせる。Hostを書き換える転送もOrigin / Refererで判定する。
+          const publicOrigin = forwardedOrigin(server.address().port, env);
+          let refererOrigin;
+          try { refererOrigin = new URL(req.headers.referer || '').origin; } catch {}
+          const forwarded = !!publicOrigin && (req.headers.host === new URL(publicOrigin).host || req.headers.origin === publicOrigin || refererOrigin === publicOrigin);
+          const address = full ? await preview.url(path, { forwarded }) : null;
           return address ? json({ kind, url: address }) : json({ kind, error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
         }
         if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));

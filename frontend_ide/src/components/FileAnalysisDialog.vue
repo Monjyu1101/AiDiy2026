@@ -4,11 +4,12 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import {ref,computed,onMounted,onBeforeUnmount} from 'vue';
+import {ref,computed,onMounted,onBeforeUnmount,nextTick} from 'vue';
 import MarkdownIt from 'markdown-it';
 const props=defineProps({file:Object,root:String});
 const emit=defineEmits(['close']);
 const dialog=ref(),input=ref(),loading=ref(true),saving=ref(false),error=ref(''),record=ref(null),job=ref(null),stale=ref(false);
+const closeError=ref(''),keepEditingButton=ref();
 const example=/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|tiff?|heic|heif)$/i.test(props.file.name)
   ?'この画像を確認し、描かれている内容、構図・配色、画像内の文字、想定される用途を日本語で説明してください。実際に読み取れる情報と推測を区別し、確認できない部分は明記してください。画像や関連ファイルの変更は不要です。'
   :'このファイルの機能概要を日本語で説明してください。主な役割、主要な関数・処理の流れ、入出力、依存先や呼び出し元、読む際の注意点を整理し、根拠となる関数名や行番号も示してください。ソースの変更は不要です。';
@@ -42,14 +43,25 @@ async function analyze() {
   catch(e){error.value=e.message;}finally{saving.value=false;}
 }
 async function close() {
-  if(saving.value)return;
+  if(saving.value||closed)return;
   if(!loading.value){
-    saving.value=true;error.value='';
+    saving.value=true;error.value='';closeError.value='';
     try{await request('PUT',{path:props.file.path,instruction:instruction.value});}
-    catch(e){error.value=e.message;return;}
-    finally{saving.value=false;}
+    catch(e){closeError.value=e.message;return;}
+    finally{
+      saving.value=false;
+      if(closeError.value){await nextTick();keepEditingButton.value?.focus();}
+    }
   }
+  finishClose();
+}
+function finishClose() {
+  if(closed||saving.value)return;
+  closed=true;clearTimeout(timer);controller.abort();
   dialog.value?.close();emit('close');
+}
+async function keepEditing() {
+  closeError.value='';await nextTick();input.value?.focus();
 }
 const when=value=>new Date(value).toLocaleString('ja-JP');
 onMounted(()=>{dialog.value.showModal();void load(true);});
@@ -69,6 +81,11 @@ onBeforeUnmount(()=>{closed=true;clearTimeout(timer);controller.abort();dialog.v
         <p v-if="job&&!busy&&job.status!=='complete'">エージェントの実行状況をご確認ください。未実行の場合は下の依頼文で実行してください。<button @click="load()">結果を再確認</button></p>
         <details v-if="job&&!busy&&job.status!=='complete'"><summary>エージェントへの依頼文</summary><textarea readonly :value="job.prompt" rows="5" aria-label="解析エージェントへの依頼文" /></details>
         <p v-if="error" class="error" role="alert">{{ error }} <button @click="load()">再確認</button></p>
+        <div v-if="closeError" class="analysis-save-error" role="alert">
+          <p class="error">解析指示を保存できませんでした: {{ closeError }}</p>
+          <p>入力はこの画面に残っています。保存せずに閉じると、今回の指示の変更は失われます。</p>
+          <div class="analysis-actions"><button ref="keepEditingButton" :disabled="saving" @click="keepEditing">編集を続ける</button><button :disabled="saving" @click="close">保存して閉じる</button><button :disabled="saving" @click="finishClose">保存せずに閉じる</button></div>
+        </div>
       </section>
       <section class="analysis-history" aria-label="前回の解析内容">
         <div class="analysis-result-heading"><h3>解析内容</h3><time v-if="record">{{ when(record.createdAt) }}</time></div>

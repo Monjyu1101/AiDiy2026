@@ -13,11 +13,62 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runInNewContext } = require('node:vm');
-const { readFileSync } = require('node:fs');
+const { mkdtempSync, readFileSync, rmSync, statSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 const { transformSync } = require('esbuild');
 const { core } = require('./fake-core.cjs');
 const { screen } = require('./code-screen.cjs');
 const flush = async () => { for (let i=0;i<8;i++) await new Promise(resolve=>setImmediate(resolve)); };
+
+test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存し、再起動後も全文を復元する', async t => {
+  const project = mkdtempSync(join(tmpdir(), 'aidiy-code-extension-history-'));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const store = require('../out/conversation-store.cjs');
+  const uri = { scheme: 'file', fsPath: project, toString: () => `file://${project}` }, folder = { uri, name: 'project' };
+  const messages = [{ 種別: 'user', 本文: '長文' }, { 種別: 'assistant', 本文: 'あ'.repeat(store.会話本文上限 - 2) }];
+  const saved = new Map([['会話', { メッセージ: messages, 作業URI: uri.toString(), provider: 'aidiy_hermes', model: 'same', コアセッションID: 'long-japanese-session' }]]);
+  const context = { extensionPath: project, subscriptions: [], workspaceState: {
+    get: key => saved.get(key), update: async (key, value) => { saved.set(key, value); },
+  }, globalState: { get() {} } };
+  const errors = [], subscription = { dispose() {} };
+  let provider;
+  const vscode = {
+    workspace: { isTrusted: true, workspaceFolders: [folder], getConfiguration: () => ({ get: (_key, fallback) => fallback }),
+      getWorkspaceFolder: () => folder, onDidChangeWorkspaceFolders: () => subscription },
+    window: { onDidChangeActiveTextEditor: () => subscription,
+      createOutputChannel: () => ({ appendLine: message => errors.push(message), dispose() {} }),
+      registerWebviewViewProvider: (_id, object) => { provider = object; return subscription; } },
+    commands: { registerCommand: () => subscription },
+  };
+  const loaded = { exports: {} };
+  runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
+    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console,
+    require(name) {
+      if (name === 'vscode') return vscode;
+      if (name === './conversation-store') return store;
+      if (name === './code-connection') return { コード選択: value => ({ provider: value.provider, model: value.model }) };
+      if (name === './model-preferences') return { モデル保存先: () => 'model.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込() {} };
+      if (name === '../aidiy_code/src/offline') return { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline.json' };
+      if (name.endsWith('/vscode-html') || name === './runner' || name === './protocol' || name.endsWith('/local-backend.cjs')) return {};
+      return require(name);
+    },
+  });
+  loaded.exports.activate(context);
+  provider.dispose(); // 終了時に保留中の履歴をファイルへ書き出す。
+  await flush();
+  const id = saved.get('会話履歴').現在ID;
+  const path = join(store.会話保存先(project), `${id}.json`);
+  assert.ok(statSync(path).size > 4 * 1024 * 1024);
+  saved.delete('会話');
+  loaded.exports.activate(context);
+  try {
+    assert.equal(provider.会話ID, id);
+    assert.deepEqual(JSON.parse(JSON.stringify(provider.会話.メッセージ)), messages);
+    assert.equal(provider.会話.コアセッションID, 'long-japanese-session');
+    assert.deepEqual(errors, []);
+  } finally { provider.dispose(); }
+});
 
 test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行、再接続中の維持と停止', async t => {
   t.mock.timers.enable({apis:['setTimeout','setInterval']});
@@ -48,7 +99,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
         コード設定保存先:()=> 'options.json', 検証回数読込:file=>preferences.get(file)?.検証回数,
         検証回数保存:(count,file)=>{ if(![0,1,2,3].includes(count)) throw new Error('検証回数の指定が不正です。'); preferences.set(file,{検証回数:count}); return count; },
       };
-      if(name==='./conversation-store') return {会話保存先:()=>undefined,会話一覧:()=>[],会話書込(){},会話削除(){}};
+      if(name==='./conversation-store') return {...require('../out/conversation-store.cjs'),会話保存先:()=>undefined,会話一覧:()=>[],会話書込(){},会話削除(){}};
       if(name==='./runner') return {起動解決:()=>({実行ファイル:'fake-hermes',引数:[]})};
       if(name==='../aidiy_code/src/offline') return {
         ...require('../out/offline.cjs'),Hermes既定モデル:()=> 'openai_oauth/gpt-6-astra',

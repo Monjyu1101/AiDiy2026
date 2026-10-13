@@ -100,7 +100,7 @@ async function connect(preserve = false, automatic = false) {
     if (run !== generation || disposed) return;
     connected.value = true; connection.send('input', 音声操作(false, speaker.value));
     if (!environment.host) heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
-  } catch (e) { if (run === generation) { disconnect(); error.value = e.message; } }
+  } catch (e) { if (run === generation) { disconnect(!preserve); error.value = e.message; } }
   finally { if (run === generation) { busy.value = false; changing.value = false; } }
 }
 async function microphone() {

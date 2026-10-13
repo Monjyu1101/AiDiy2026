@@ -241,7 +241,25 @@ try {
   assert.equal(await evaluate(`JSON.parse(fixtureMessages.findLast(m=>m.type==='socket-send'&&JSON.parse(m.data).type==='connect').data).モデル設定.LIVE_FREEAI_VOICE`),'Puck');
   assert.equal(await evaluate(`document.querySelector('.microphone').getAttribute('aria-pressed')`),'false');
   assert.ok(await evaluate(`document.querySelectorAll('article').length`)>=historyBeforeVoice);
-  // 再接続の失敗では旧版同様に初期画面へ戻り、再試行できる。
+  // モデル変更後の再接続が失敗しても、表示済みの会話と未送信の下書きを失わない。
+  await evaluate(`const draft=document.querySelector('.composer textarea');draft.value='再接続失敗後も残す下書き';draft.dispatchEvent(new Event('input',{bubbles:true}));Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='モデル ▾').click()`);await sleep(70);
+  const historyBeforeReconnectFailure = await evaluate(`[...document.querySelectorAll('.live-conversation article')].map(item=>({role:item.classList.contains('user')?'user':item.classList.contains('system')?'system':'assistant',text:item.textContent}))`);
+  assert.ok(historyBeforeReconnectFailure.length>0);
+  await evaluate(`const nextModel=document.querySelectorAll('dialog select')[1];nextModel.value=nextModel.value==='test-model'?'other-model':'test-model';nextModel.dispatchEvent(new Event('change',{bubbles:true}));fixtureApiError='モデル再接続の試験エラー'`);await sleep(40);
+  await evaluate(`document.querySelector('.apply-model').click()`);await sleep(150);
+  assert.equal(await evaluate(`document.querySelector('.live-connect').textContent`),'接続');
+  assert.equal(await evaluate(`document.querySelector('.live-connect').disabled`),false);
+  assert.equal(await evaluate(`document.querySelector('.microphone').getAttribute('aria-pressed')`),'false');
+  assert.equal(await evaluate(`document.querySelector('.composer textarea').value`),'再接続失敗後も残す下書き');
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('.live-conversation article')].map(item=>({role:item.classList.contains('user')?'user':item.classList.contains('system')?'system':'assistant',text:item.textContent}))`),historyBeforeReconnectFailure);
+  assert.equal(await evaluate(`!!document.querySelector('.terminal-welcome')`),false);
+  assert.match(await evaluate(`document.querySelector('.composer .error').textContent`),/モデル再接続の試験エラー/);
+  await capture('nn-audit-live-reconnect-failure.png');
+  // 「新しい会話」では明示どおり履歴と下書きを消し、その後は通常どおり再試行できる。
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='新しい会話').click();fixtureApiError=null;document.querySelector('.live-connect').click()`);await sleep(300);
+  assert.equal(await evaluate(`document.querySelector('.composer textarea').value`),'');
+  assert.equal(await evaluate(`document.querySelector('.live-connect').textContent`),'切断');
+  // 新しい会話の再接続失敗は初期画面を保持する。
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='新しい会話').click();fixtureApiError='接続の試験エラー'`);await sleep(150);
   assert.equal(await evaluate(`document.querySelector('.live-connect').textContent`),'接続');
   assert.equal(await evaluate(`document.querySelectorAll('article').length`),0);
@@ -250,7 +268,7 @@ try {
   await evaluate(`fixtureApiError=null;document.querySelector('.live-connect').click()`);await sleep(300);
   assert.equal(await evaluate(`document.querySelector('.live-connect').textContent`),'切断');
   assert.deepEqual(errors,[]);
-  console.log('Vue Code / Live: 送信・履歴確認・モデル候補・遅延応答・接続中フォルダ変更・保存中停止・音声Worklet・マイク中断・新規会話引継ぎ・音声変更・保存失敗を確認');
+  console.log('Vue Code / Live: 送信・履歴確認・モデル候補・遅延応答・接続中フォルダ変更・保存中停止・音声Worklet・マイク中断・新規会話引継ぎ・音声変更・保存失敗・モデル再接続失敗時の会話と下書き保持を確認');
   ws.close();
 } finally {
   chrome.kill();

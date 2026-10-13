@@ -19,7 +19,7 @@ import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
 import { 接続元許可 } from '../../src/forwarded-origin';
-import { 会話保存先, 会話一覧, 会話書込, 会話削除 } from '../../src/conversation-store';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限 } from '../../src/conversation-store';
 import { オフライン実行, オフラインモデル候補, オフラインモデル保存先, Hermes既定モデル } from './offline';
 import type { Packet } from '../../aidiy_live/src/protocol';
 
@@ -110,7 +110,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
   };
   const trimHistory = () => {
     let size = 0;
-    state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += item.本文.length) <= 2_000_000).reverse();
+    state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += item.本文.length) <= 会話本文上限).reverse();
   };
   const receive = (packet: Packet | コードパケット) => {
     if (closed) return;

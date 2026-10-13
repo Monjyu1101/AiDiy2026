@@ -19,6 +19,7 @@ import { open, realpath, stat, readFile } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { MAX_MARKDOWN_BYTES, markdownText, renderMarkdownDocument } from '../markdown-preview.mjs';
+import { forwardedOrigin } from './launch-options.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -52,9 +53,9 @@ export function siteRoot(documentRel) {
   return (index >= 0 ? folders.slice(0, index + 1) : folders).join('/');
 }
 
-export function createPreview(root, isActive = () => true) {
+export function createPreview(root, isActive = () => true, { env = process.env } = {}) {
   const token = randomBytes(16).toString('hex');
-  let server, origin, starting, allowedHosts = new Set();
+  let server, origin, publicOrigin, starting, allowedHosts = new Set();
   const realRoot = realpath(root);
 
   async function resolveFile(rel) {
@@ -76,7 +77,7 @@ export function createPreview(root, isActive = () => true) {
 
   async function handle(req, res) {
     const fail = (status, message) => { res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }); res.end(message); };
-    // DNS リバインディング対策: 127.0.0.1 / localhost 以外の Host 名では応答しない
+    // DNS リバインディング対策: ローカルと、このポートの確認済みCodespaces転送先だけを許可する。
     if (!allowedHosts.has(req.headers.host)) return fail(403, 'forbidden host');
     if (!isActive()) return fail(503, 'IDE の利用が終了しています。');
     if (req.method !== 'GET' && req.method !== 'HEAD') return fail(405, 'GET only');
@@ -88,7 +89,11 @@ export function createPreview(root, isActive = () => true) {
     else {
       // ページ内の `/…` 始まりの参照: 参照元ページ（Referer）の public フォルダを根として解決する
       let referer;
-      try { referer = decodeURIComponent(new URL(req.headers.referer || '').pathname); } catch { return fail(404, 'not found'); }
+      try {
+        const source = new URL(req.headers.referer || '');
+        if (![origin, origin.replace('127.0.0.1', 'localhost'), publicOrigin].includes(source.origin)) return fail(404, 'not found');
+        referer = decodeURIComponent(source.pathname);
+      } catch { return fail(404, 'not found'); }
       if (!referer.startsWith(prefix)) return fail(404, 'not found');
       const base = siteRoot(referer.slice(prefix.length));
       rel = [base, path.replace(/^\/+/, '')].filter(Boolean).join('/');
@@ -124,9 +129,11 @@ export function createPreview(root, isActive = () => true) {
     const document = type.startsWith('text/html') || type === 'image/svg+xml';
     const headers = {
       'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes',
+      // 同じプレビュー内のルート相対参照は保ち、外部画像・CSS等へtokenやファイル名を渡さない。
+      'referrer-policy': 'same-origin',
       // モジュール・フォントなども配信する（URLはtokenを知るIDEから渡す）。
       'access-control-allow-origin': '*',
-      ...(document ? { 'content-security-policy': DOCUMENT_CSP, 'referrer-policy': 'unsafe-url' } : {}),
+      ...(document ? { 'content-security-policy': DOCUMENT_CSP } : {}),
     };
     // 動画・音声の途中からの再生（Range）
     const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
@@ -165,6 +172,12 @@ export function createPreview(root, isActive = () => true) {
         const port = server.address().port;
         allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
         origin = `http://127.0.0.1:${port}`;
+        publicOrigin = forwardedOrigin(port, env);
+        if (publicOrigin) {
+          allowedHosts.add(new URL(publicOrigin).host);
+          // Codespacesのポート自動検出へ通知する。token付きURLはログに残さない。
+          console.log(`AiDiy preview: ${origin}/`);
+        }
         done();
       });
     });
@@ -173,15 +186,15 @@ export function createPreview(root, isActive = () => true) {
 
   return {
     /** プロジェクト相対パスの文書をプレビューする URL。配らない場所なら null。 */
-    async url(rel) {
+    async url(rel, { forwarded = false } = {}) {
       if (!previewAllowed(rel) || !(await resolveFile(rel))) return null;
       await start();
-      return `${origin}/p/${token}/${rel.split('/').map(encodeURIComponent).join('/')}`;
+      return `${forwarded && publicOrigin ? publicOrigin : origin}/p/${token}/${rel.split('/').map(encodeURIComponent).join('/')}`;
     },
     async close() {
       if (!server) return;
       const closing = server;
-      server = undefined; origin = undefined;
+      server = undefined; origin = undefined; publicOrigin = undefined;
       closing.closeAllConnections();
       await new Promise(done => closing.close(() => done()));
     },

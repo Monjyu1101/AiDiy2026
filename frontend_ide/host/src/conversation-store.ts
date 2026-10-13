@@ -25,7 +25,12 @@ export interface 保存履歴 {
   実行モード?: 'online' | 'offline'; セッションID?: string; HermesセッションID?: string;
 }
 
-const MAX_FILE = 4 * 1024 * 1024, MAX_ENTRIES = 500;
+// 本文の上限は拡張・単独起動版で共用する（JavaScript の UTF-16 コード単位数）。
+export const 会話本文上限 = 2_000_000;
+// JSON の制御文字エスケープは1コード単位あたり最大6バイト。本文に加えてメタデータ用の余裕を持たせる。
+// 旧版で保存された4MiB超の日本語履歴も、本文を削らず再び読み込めるようにする。
+export const 会話ファイル上限 = 会話本文上限 * 6 + 64 * 1024;
+const MAX_ENTRIES = 500;
 const validId = (id: unknown): id is string => typeof id === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(id);
 const within = (root: string, path: string) => { const back = relative(root, path); return back !== '..' && !back.startsWith(`..${sep}`) && !isAbsolute(back); };
 
@@ -58,7 +63,7 @@ export function 会話一覧(folder: string | undefined): 保存履歴[] {
   for (const name of names) {
     try {
       const path = join(folder, name);
-      if (!within(folder, realpathSync(path)) || statSync(path).size > MAX_FILE) continue;
+      if (!within(folder, realpathSync(path)) || statSync(path).size > 会話ファイル上限) continue;
       const item = 形式確認(JSON.parse(readFileSync(path, 'utf8')));
       if (item && `${item.id}.json` === name) list.push(item);
     } catch { /* 書き込み途中・壊れた記録は使わない */ }
@@ -69,9 +74,12 @@ export function 会話一覧(folder: string | undefined): 保存履歴[] {
 /** 一時ファイルへ書いてから置き換える（途中で止まっても前の記録が残る）。 */
 export function 会話書込(folder: string, entry: 保存履歴): void {
   if (!validId(entry.id)) throw new Error('会話IDが不正です。');
+  const json = JSON.stringify(entry);
+  // 読込と同じバイト上限を置き、読めないファイルで既存履歴を置き換えない。
+  if (Buffer.byteLength(json, 'utf8') > 会話ファイル上限) throw new Error('会話履歴の保存サイズが上限を超えています。');
   mkdirSync(folder, { recursive: true });
   const temp = join(folder, `${randomUUID()}.tmp`);
-  writeFileSync(temp, JSON.stringify(entry), { encoding: 'utf8', flag: 'wx' });
+  writeFileSync(temp, json, { encoding: 'utf8', flag: 'wx' });
   try { renameSync(temp, join(folder, `${entry.id}.json`)); } catch (error) { rmSync(temp, { force: true }); throw error; }
 }
 

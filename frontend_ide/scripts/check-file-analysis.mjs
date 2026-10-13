@@ -83,6 +83,14 @@ try {
     window.requestAnimationFrame=callback=>{callbacks.set(++sequence,callback);return sequence;};
     window.cancelAnimationFrame=id=>callbacks.delete(id);
     window.orbitTestAdvance=ms=>{const end=clock+ms;while(clock<end){clock=Math.min(end,clock+250);const batch=[...callbacks.values()];callbacks.clear();for(const callback of batch)callback(clock);}return clock;};
+    const realFetch=window.fetch.bind(window);window.analysisSaveError=false;window.analysisSaveCalls=[];
+    window.fetch=(url,options)=>{
+      if(String(url).startsWith('/api/file-analysis')&&options?.method==='PUT'){
+        window.analysisSaveCalls.push(JSON.parse(options.body));
+        if(window.analysisSaveError)return Promise.resolve(new Response(JSON.stringify({error:'指示保存の試験エラー'}),{status:503,headers:{'content-type':'application/json'}}));
+      }
+      return realFetch(url,options);
+    };
   `});
   await send('Page.navigate', { url });
   async function evaluate(expression) {
@@ -122,6 +130,39 @@ try {
   await until(`!document.querySelector('.file-analysis-dialog')`,'指示を保存して閉じる');
   await evaluate(`document.querySelector('[aria-label="AiDiy分析"]').click()`);
   await until(`document.querySelector('#file-analysis-instruction')?.value==='機能概要と処理の流れを説明してください'`,'前回指示を復元');
+  // 保存失敗時は入力を残し、編集継続・明示破棄・保存再試行を選べる。
+  const savesBeforeFailure=await evaluate(`analysisSaveCalls.length`);
+  await evaluate(`{const input=document.querySelector('#file-analysis-instruction');input.value='保存せずに破棄する指示';input.dispatchEvent(new Event('input',{bubbles:true}));analysisSaveError=true;const close=document.querySelector('[aria-label="AiDiy解析を閉じる"]');close.click();close.click();}`);
+  await until(`!!document.querySelector('.analysis-save-error')&&!document.querySelector('[aria-label="AiDiy解析を閉じる"]').disabled`,'保存失敗時に閉じ方を選べる');
+  assert.equal(await evaluate(`analysisSaveCalls.length`),savesBeforeFailure+1,'保存中の連打では重複保存しない');
+  assert.equal(await evaluate(`!!document.querySelector('.file-analysis-dialog[open]')`),true);
+  assert.equal(await evaluate(`document.querySelector('#file-analysis-instruction').value`),'保存せずに破棄する指示');
+  assert.match(await evaluate(`document.querySelector('.analysis-save-error').textContent`),/指示保存の試験エラー.*今回の指示の変更は失われます/s);
+  assert.equal(await evaluate(`document.activeElement.textContent`),'編集を続ける','失敗時は安全な選択肢にフォーカスする');
+  await evaluate(`[...document.querySelectorAll('.analysis-save-error button')].find(b=>b.textContent==='編集を続ける').click()`);
+  await until(`!document.querySelector('.analysis-save-error')`,'閉じる操作を取り消して編集を続ける');
+  assert.equal(await evaluate(`document.querySelector('#file-analysis-instruction').value`),'保存せずに破棄する指示');
+  assert.equal(await evaluate(`document.activeElement.id`),'file-analysis-instruction');
+  assert.equal(await evaluate(`analysisSaveCalls.length`),savesBeforeFailure+1);
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await until(`!!document.querySelector('.analysis-save-error')`,'Escからの保存失敗も同じ選択肢を出す');
+  assert.equal(await evaluate(`analysisSaveCalls.length`),savesBeforeFailure+2);
+  await capture('01-analysis-save-failure.png');
+  await evaluate(`[...document.querySelectorAll('.analysis-save-error button')].find(b=>b.textContent==='保存せずに閉じる').click()`);
+  await until(`!document.querySelector('.file-analysis-dialog')`,'保存できなくても明示破棄で閉じられる');
+  assert.equal(await evaluate(`analysisSaveCalls.length`),savesBeforeFailure+2,'破棄で保存を再実行しない');
+  assert.equal((await fetch(url+'api/file-analysis?path=first.txt').then(r=>r.json())).instruction,'機能概要と処理の流れを説明してください','破棄は前回保存した指示を上書きしない');
+  await evaluate(`document.querySelector('[aria-label="AiDiy分析"]').click()`);
+  await until(`document.querySelector('#file-analysis-instruction')?.value==='機能概要と処理の流れを説明してください'`,'破棄後は保存済みの指示を復元');
+  await evaluate(`{const input=document.querySelector('#file-analysis-instruction');input.value='機能概要と処理の流れを説明してください（保存を再試行）';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('[aria-label="AiDiy解析を閉じる"]').click();}`);
+  await until(`!!document.querySelector('.analysis-save-error')`,'再試行する指示の保存失敗を表示');
+  await evaluate(`analysisSaveError=false;[...document.querySelectorAll('.analysis-save-error button')].find(b=>b.textContent==='保存して閉じる').click()`);
+  await until(`!document.querySelector('.file-analysis-dialog')`,'保存の再試行が成功したら閉じる');
+  assert.equal(await evaluate(`analysisSaveCalls.length`),savesBeforeFailure+4);
+  await evaluate(`document.querySelector('[aria-label="AiDiy分析"]').click()`);
+  await until(`document.querySelector('#file-analysis-instruction')?.value==='機能概要と処理の流れを説明してください（保存を再試行）'`,'再試行で保存した指示を復元');
+  assert.equal(calls,0,'閉じる操作の失敗や再試行でエージェントを実行しない');
   await capture('01-analysis-instruction.png');
   await evaluate(`[...document.querySelectorAll('.file-analysis-dialog button')].find(b=>b.textContent==='解析を実行').click()`);
   await until(`document.querySelector('.file-analysis-dialog').textContent.includes('解析中…')`,'AI解析を依頼');
@@ -154,7 +195,7 @@ try {
   await evaluate(`document.querySelector('[aria-label="AiDiy分析"]').click()`);
   await until(`document.querySelector('#file-analysis-instruction')?.value==='画像内の文字を読み取ってください'`,'画像でも前回指示を優先して復元');
   assert.equal(calls,1,'画像を開くだけでは解析しない');
-  assert.deepEqual(errors,[]);console.log('FILE ANALYSIS PASS: ソースと画像の指示例・前回指示優先・明示実行・閉じた後の保存・結果復元・HTML無効化・ビューア独立・縦表示');
+  assert.deepEqual(errors,[]);console.log('FILE ANALYSIS PASS: ソースと画像の指示例・前回指示優先・保存失敗時の入力保持・×とEsc・編集継続・明示破棄・保存再試行・明示実行・閉じた後の保存・結果復元・HTML無効化・ビューア独立・縦表示');
   ws.close();
 } finally {
   chrome.kill();await app.close();await sleep(300);
