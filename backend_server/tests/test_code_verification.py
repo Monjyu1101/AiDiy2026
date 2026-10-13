@@ -2,8 +2,10 @@
 
 import importlib
 import logging
+import os
 from pathlib import Path
 import sys
+import tempfile
 import types
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
@@ -45,6 +47,8 @@ class CodeVerificationTest(unittest.IsolatedAsyncioTestCase):
         ]
         with patch.object(self.module, "バックアップ実行", return_value=difference, side_effect=results) as backup, patch.object(
             self.module.asyncio, "sleep", new_callable=AsyncMock
+        ), patch.object(
+            self.module, "_バックアップ保存版パス確認", return_value="backup/test"
         ):
             result = await self.agent._基本AI処理({
                 "メッセージ識別": "input_text", "メッセージ内容": "変更依頼", **attributes,
@@ -110,6 +114,108 @@ class CodeVerificationTest(unittest.IsolatedAsyncioTestCase):
                 backup = await self.run_request({"self_check_loop": requested}, differences_remain=True)
                 self.assertEqual(expected, backup.call_count)
                 self.assertEqual(1 + expected, self.ai.実行.await_count)
+
+    async def test_shared_verification_saves_and_renames_inside_execution_project(self):
+        native = importlib.import_module("AIコア.AIバックアップ")
+        providers = ("copilot_cli", "codex_cli", "claude_cli", "claude_sdk",
+                     "antigravity_cli", "grok_cli", "opencode_cli", "aidiy_hermes")
+        for provider in providers:
+            for incremental in (False, True):
+                with self.subTest(provider=provider, incremental=incremental):
+                    self.setUp()
+                    with tempfile.TemporaryDirectory(prefix="aidiy verification ") as directory:
+                        root = Path(directory) / "_global"
+                        (root / "src").mkdir(parents=True)
+                        (root / "_AIDIY/knowledge").mkdir(parents=True)
+                        source = root / "src/main.py"
+                        source.write_text("before", encoding="utf-8")
+                        original_time = source.stat().st_mtime - 120
+                        os.utime(source, (original_time, original_time))
+                        knowledge = root / "_AIDIY/knowledge/example.md"
+                        knowledge.write_text("再利用ナレッジ", encoding="utf-8")
+                        os.utime(knowledge, (original_time, original_time))
+                        settings = {"CODE_BASE_PATH": str(root)}
+                        if incremental:
+                            baseline = native.バックアップ実行(セッション設定=settings, ログ出力=False)
+                            self.assertTrue(baseline[3])
+                        source.write_text("after", encoding="utf-8")
+                        changed_time = original_time + 60
+                        os.utime(source, (changed_time, changed_time))
+                        self.agent.AI_NAME = provider
+                        self.agent.絶対パス = str(root)
+                        # 古い設定が _AIDIY を向いていても、実際のCLI実行先を使う。
+                        original_settings = {"CODE_BASE_PATH": str(root / "_AIDIY")}
+                        self.agent.接続.モデル設定 = original_settings
+                        self.agent.親 = types.SimpleNamespace(conf=types.SimpleNamespace(json=original_settings))
+                        saved = []
+
+                        async def verify(**kwargs):
+                            prompt = kwargs["要求テキスト"]
+                            self.assertEqual(kwargs["絶対パス"], str(root))
+                            expected = {"src/main.py"} if incremental else {"src/main.py", "_AIDIY/knowledge/example.md"}
+                            self.assertEqual(set(kwargs["変更ファイル一覧"]), expected)
+                            self.assertIn(f"プロジェクトルート（差分ファイルの基準）: {root}", prompt)
+                            self.assertIn("_AIDIY/backup へは保存・移動しない", prompt)
+                            self.assertIn("親フォルダ内だけ", prompt)
+                            self.assertIn("先頭の時刻と .all", prompt)
+                            prefix = "バックアップ保存先（絶対パス）: "
+                            target = Path(next(line[len(prefix):] for line in prompt.splitlines() if line.startswith(prefix)))
+                            self.assertTrue(target.is_relative_to(root / "backup"))
+                            self.assertEqual(target.name.endswith(".all"), not incremental)
+                            self.assertEqual((target / "src/main.py").read_text(encoding="utf-8"), "after")
+                            # AIのリネームを模擬し、保存場所と時刻接頭辞を維持する。
+                            renamed = target.with_name(target.name + ".検証")
+                            target.rename(renamed)
+                            saved.append(renamed)
+                            return "検証完了"
+
+                        self.ai.実行 = AsyncMock(side_effect=verify)
+                        with patch.object(self.module.asyncio, "sleep", new_callable=AsyncMock):
+                            updated = await self.agent._バックアップ検証ループ(self.ai, 1)
+                        self.assertTrue(updated)
+                        self.ai.実行.assert_awaited_once()
+                        self.assertEqual(len(saved), 1)
+                        self.assertEqual(self.module._バックアップ保存版パス確認(str(saved[0]).removesuffix(".検証")), str(saved[0]))
+                        self.assertFalse((root / "_AIDIY/backup").exists())
+                        self.assertEqual(self.agent.接続.モデル設定, original_settings)
+                        # リネーム後も日時判定が機能し、同じ差分を再保存しない。
+                        repeated = native.バックアップ実行(セッション設定=settings, ログ出力=False)
+                        self.assertEqual(repeated[2], [])
+
+    async def test_verification_without_execution_path_uses_session_project(self):
+        self.agent.絶対パス = ""
+        self.agent.接続.モデル設定["CODE_BASE_PATH"] = str(BACKEND_DIR.parent)
+        backup = await self.run_request({"self_check_loop": 1}, differences_remain=True)
+        self.assertEqual(backup.call_args.kwargs["セッション設定"]["CODE_BASE_PATH"], str(BACKEND_DIR.parent))
+        self.assertEqual(self.ai.実行.await_args.kwargs["絶対パス"], str(BACKEND_DIR.parent))
+
+    async def test_verification_reports_backup_relocated_by_ai(self):
+        native = importlib.import_module("AIコア.AIバックアップ")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "main.py").write_text("source", encoding="utf-8")
+            self.agent.絶対パス = str(root)
+            original = native.バックアップ実行
+            saved = []
+
+            def backup(**kwargs):
+                result = original(**kwargs)
+                saved.append(Path(result[4]))
+                return result
+
+            async def move_backup(**kwargs):
+                destination = root / "_AIDIY/backup" / saved[0].parent.name / saved[0].name
+                destination.parent.mkdir(parents=True)
+                saved[0].rename(destination)
+                return "検証完了"
+
+            self.ai.実行 = AsyncMock(side_effect=move_backup)
+            with patch.object(self.module, "バックアップ実行", side_effect=backup), patch.object(
+                self.module.asyncio, "sleep", new_callable=AsyncMock
+            ), self.assertLogs(self.module.logger, level="WARNING") as logs:
+                await self.agent._バックアップ検証ループ(self.ai, 1)
+            self.assertTrue(any("元の親フォルダ内に見つかりません" in line for line in logs.output))
+            self.assertIsNone(self.module._バックアップ保存版パス確認(str(saved[0])))
 
 
 if __name__ == "__main__":

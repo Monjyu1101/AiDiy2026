@@ -30,7 +30,7 @@ export function createFileHistory(project,{state}={}) {
       const days=(await directories(backup)).filter(d=>/^\d{8}$/.test(d.name)).sort((a,b)=>b.name.localeCompare(a.name));
       for(const day of days){
         const dayPath=await safe(backup,join(backup,day.name));if(!dayPath)continue;
-        const times=(await directories(dayPath)).filter(d=>/^\d{6}(?:\.all)?$/.test(d.name)).sort((a,b)=>b.name.localeCompare(a.name));
+        const times=(await directories(dayPath)).filter(d=>/^\d{6}(?:\..+)?$/.test(d.name)).sort((a,b)=>b.name.localeCompare(a.name));
         for(const time of times){
           if(++checked>MAX_SNAPSHOTS){truncated=true;break outer;}
           const snapshot=await safe(backup,join(dayPath,time.name));if(!snapshot)continue;
@@ -40,7 +40,7 @@ export function createFileHistory(project,{state}={}) {
           const stamp=day.name+time.name.slice(0,6);
           versions.push({id:createHash('sha256').update(backupPath).digest('hex'),backupPath,stamp,
             label:`${stamp.slice(0,4)}/${stamp.slice(4,6)}/${stamp.slice(6,8)} ${stamp.slice(8,10)}:${stamp.slice(10,12)}:${stamp.slice(12,14)}`,
-            fullBackup:time.name.endsWith('.all'),size:info.size,mtime:info.mtimeMs});
+            fullBackup:/^\d{6}\.all(?:\.|$)/.test(time.name),size:info.size,mtime:info.mtimeMs});
         }
       }
     }

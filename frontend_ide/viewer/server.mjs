@@ -19,6 +19,7 @@ import { createCoreConnection } from './core-connection.mjs';
 import { createPanels } from './panels.mjs';
 import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
+import { latestFile } from '../src/latest-file.js';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
 // ファイルビューア用の Monaco Editor（`python frontend_ide/viewer/_setup.py` で導入。無ければ画面側が簡易表示にする）
@@ -308,12 +309,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         const filter = url.searchParams.get('filter');
         if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
         const { tree } = await scanTree(root, { filter });
-        let latest = null;
-        (function walk(node, prefix) {
-          for (const [name, , mtime] of node.f) if (!latest || mtime > latest.mtime) latest = { name, path: prefix ? `${prefix}/${name}` : name, mtime };
-          for (const dir of node.d) walk(dir, prefix ? `${prefix}/${dir.n}` : dir.n);
-        })(tree, '');
-        return json({ latest });
+        return json({ latest: latestFile(tree) });
       }
       if (url.pathname === '/api/galaxy') {
         const filter = url.searchParams.get('filter');

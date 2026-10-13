@@ -6,21 +6,14 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AISearchPanel from './AISearchPanel.vue';
+import { latestFile } from '../latest-file.js';
 const props = defineProps({ tree: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'route']);
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
-// 今の一覧の中で一番新しく更新されたファイル（最下部に表示）。
+// _AIDIY・_data・_datas配下を除いた最終更新ファイル（最下部に表示）。
 // 一覧から求めた値に加え、約1分ごとにサーバーへ最新だけを問い合わせて差し替える（一覧そのものは取り直さない）。
-const listLatest = computed(() => {
-  let best = null;
-  (function walk(node, prefix) {
-    if (!node) return;
-    for (const [name, size, mtime] of node.f) if (!best || mtime > best.mtime) best = { name, path: prefix ? `${prefix}/${name}` : name, mtime };
-    for (const dir of node.d) walk(dir, prefix ? `${prefix}/${dir.n}` : dir.n);
-  })(tree.value, '');
-  return best;
-});
+const listLatest = computed(() => latestFile(tree.value));
 const polled = shallowRef(null);
 let latestRun = 0;
 async function pollLatest() {

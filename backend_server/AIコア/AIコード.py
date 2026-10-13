@@ -22,7 +22,7 @@ import shutil
 import random
 from typing import Optional, Any
 from types import ModuleType
-from AIコア.AIバックアップ import バックアップ実行
+from AIコア.AIバックアップ import バックアップ実行, コードベース絶対パス取得
 from AIコア.AIストリーム制御 import AIストリーム開始, AIストリーム終了, AIストリーム中断
 
 from log_config import get_logger
@@ -87,6 +87,19 @@ def _load_or_create_code_context() -> str:
     except Exception as e:
         logger.error(f"[CodeAgent] 定型コンテキスト読込エラー: {e}")
         return template_instruction
+
+
+def _バックアップ保存版パス確認(保存先: str) -> Optional[str]:
+    """元の保存先か、同じ親内でコメントを追記した保存版を確認する。"""
+    parent, name = os.path.split(保存先)
+    try:
+        with os.scandir(parent) as entries:
+            for entry in entries:
+                if (entry.name == name or entry.name.startswith(name + ".")) and entry.is_dir(follow_symlinks=False):
+                    return entry.path
+    except OSError:
+        pass
+    return None
 
 
 class CodeAgent:
@@ -924,11 +937,16 @@ class CodeAgent:
         """バックアップ→検証→修正を繰り返すシンプルループ（最大回数はself_check_loopで指定）"""
 
 
-        # プロジェクトルート（backend_serverの親ディレクトリ）を対象とする
+        # CLI / SDK の実行先とバックアップ対象を一致させる。
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         アプリ設定 = getattr(self.親, "conf", None)
-        # セッション固有のCODE_BASE_PATHを使用
-        セッション設定 = self.接続.モデル設定 if self.接続 and hasattr(self.接続, "モデル設定") else None
+        セッション設定 = dict(getattr(self.接続, "モデル設定", None) or {})
+        if self.絶対パス:
+            セッション設定["CODE_BASE_PATH"] = self.絶対パス
+        実行パス = コードベース絶対パス取得(
+            アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定
+        )
+        セッション設定["CODE_BASE_PATH"] = 実行パス
         今回更新あり = False
 
         logger.info(f"[検証ループ] 開始（最大{最大ループ回数}回）")
@@ -942,7 +960,7 @@ class CodeAgent:
                 logger.info(f"[検証ループ] 強制停止フラグ検出 → 検証中断")
                 break
 
-            # バックアップ実行（差分のみ、セッション固有のCODE_BASE_PATHを使用）
+            # 同じ実行先で初回全件・以後差分を保存する。
             logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
             result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
             
@@ -965,8 +983,7 @@ class CodeAgent:
             logger.info(f"[検証{n}回目] 総ファイル数={len(全ファイル)}, 差分={len(差分ファイル)}件, 累積={len(self.累積変更ファイル)}件, 全件={全件フラグ}")
             
             # 検証メッセージ送信
-            フォルダ名 = os.path.basename(バックアップフォルダ)
-            ファイル一覧 = "\n".join(f"・{f}" for f in 差分ファイル)
+            logger.info(f"[検証{n}回目] バックアップ保存先: {バックアップフォルダ}")
             
             await self.接続.send_to_channel(self.チャンネル, {
                 "セッションID": self.セッションID,
@@ -978,8 +995,14 @@ class CodeAgent:
             プロンプトファイル一覧 = "\n".join(f"- {f}" for f in 差分ファイル)
             検証プロンプト = (
                 f"【{n}回目の検証】\n"
+                f"プロジェクトルート（差分ファイルの基準）: {実行パス}\n"
+                f"バックアップ保存先（絶対パス）: {バックアップフォルダ}\n"
+                f"バックアップ親フォルダ（絶対パス）: {os.path.dirname(バックアップフォルダ)}\n\n"
                 f"差分ファイル{len(差分ファイル)}件:\n{プロンプトファイル一覧}\n\n"
-                f"バックアップフォルダ「{フォルダ名}」を変更内容でリネームし、\n"
+                f"上記の既存バックアップフォルダの名前に、変更内容を .コメント として追記してください。\n"
+                f"リネームは上記の親フォルダ内だけで行い、先頭の時刻と .all があればそれも維持してください。\n"
+                f"バックアップフォルダや保存済みファイルを別の場所へ移動・複製・新規作成しないでください。\n"
+                f"_AIDIY/backup へは保存・移動しないでください。\n"
                 f"ファイルの検証を行い、問題があれば修正してください。\n"
                 f"問題がなければ「検証完了」とだけ回答してください。"
             )
@@ -991,8 +1014,17 @@ class CodeAgent:
             検証結果 = await ai_instance.実行(
                 要求テキスト=検証プロンプト,
                 変更ファイル一覧=差分ファイル,
-                絶対パス=self.絶対パス or None,
+                絶対パス=実行パス,
             ) or "（応答なし）"
+
+            検証後保存先 = _バックアップ保存版パス確認(バックアップフォルダ)
+            if 検証後保存先:
+                logger.info(f"[検証{n}回目] 検証後バックアップ保存先: {検証後保存先}")
+            else:
+                logger.warning(
+                    f"[検証{n}回目] 検証後にバックアップ保存版が元の親フォルダ内に見つかりません"
+                    f"（保存時: {バックアップフォルダ}）"
+                )
 
             # ストリーム終了通知（検証）
             await self._ストリーム終了通知送信()

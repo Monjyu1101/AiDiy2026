@@ -34,6 +34,16 @@ test('更新履歴: プロジェクト外・不正ID・バックアップ外へ�
  assert.deepEqual((await service.list('src/main.js')).versions,[]);
  await assert.rejects(()=>service.compare('src/main.js','../../src/main.js'),{status:404});
 });
+test('更新履歴: 検証コメント付きの全件・差分フォルダも比較できる',async t=>{
+ const root=await fixture(t),service=createFileHistory(root);
+ await put(root,'backup/20261010/100000.all.初回保存/src/main.js','initial');
+ await put(root,'backup/20261011/120000.ログ修正/src/main.js','previous');
+ await put(root,'backup/20261012/120000_invalid/src/main.js','invalid');
+ const list=await service.list('src/main.js');assert.equal(list.versions.length,2);
+ assert.equal(list.versions[0].fullBackup,false);assert.equal(list.versions[1].fullBackup,true);
+ assert.equal((await service.compare('src/main.js',list.versions[0].id)).original.text,'previous');
+ assert.equal((await service.compare('src/main.js',list.versions[1].id)).original.text,'initial');
+});
 test('更新履歴: UTF-8・Shift_JIS、サイズ上限、バイナリを明確に扱う',async t=>{
  const root=await fixture(t),service=createFileHistory(root),old='backup/20261010/100000.all/src/main.js';
  await put(root,old,Buffer.from([0x82,0xa0]));let version=(await service.list('src/main.js')).versions[0];
