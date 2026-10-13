@@ -13,6 +13,8 @@ IDEのElectron版は右上の「＋ Code」「＋ Live」から別ウィンド�
 
 画面は `frontend_ide/src/components/` を変更します。Code / LiveをIDEへ配置するときも同じVue部品を使用します。ホストと通信プロトコルは `frontend_ide/host`、ファイルAPIとOffice表示資産は `frontend_ide/viewer` に統合しています。親ディレクトリ数を固定して共通設定やHermesを探さず、配置先から親方向へ探索してください。
 
+IDEのオンライン利用では、`viewer/core-connection.mjs` がコアの疎通を5秒ごとに確認し、`src/App.vue` も状態を5秒ごとに取得します。接続済みの定期確認中は `connected=true` / `connecting=false` を維持し、確認が失敗した時に接続表示を変えます。初回接続と切断後の再接続では `connecting=true` を表示します。コア停止でも利用開始時刻・作業・子窓を維持してください。単体検証は `node --test frontend_ide/viewer/checks/connection.test.mjs`、実画面検証はVue配布ファイル生成後の `node frontend_ide/scripts/check-connection.mjs`（Chromeを任意配置している場合は `CHROME_PATH` で指定）。模擬コアを使い、5秒周期・定期確認中の表示維持・停止と復帰を確認し、日本時間の日時付き画像を `temp/connection-check/` へ保存します。
+
 Codeのオフラインモデル候補は `same`（変更なし）を使い、選択時はHermesへ `--model` / `--provider` を付けずに呼び出します。オンラインの `auto`（AI判断）とは区別します。オフラインの選択値は `~/.aidiy/aidiy_code_model_offline.json` に保存します。
 
 エクスプローラーは `FileExplorer.vue` 一部品にまとめます。入力はtree/root/selected/current/startedAt/open、出力はupdate:open/select/clear/marksです。検索マークはイベントで宇宙へ伝え、エクスプローラーからCanvas内部を書き換えないでください。利用開始時刻が変わると起点検索を初期化します。

@@ -62,7 +62,7 @@ async function openPanel(kind){
 }
 onMounted(async()=>{
   if(config.host||viewerPath)return;
-  if(config.kind==='ide'){await status();timer=setInterval(status,1000);}
+  if(config.kind==='ide'){await status();timer=setInterval(status,5000);}
   else if(!base[config.kind])await openPanel(config.kind);
 });
 onBeforeUnmount(()=>{disposed=true;revision++;clearInterval(timer);});

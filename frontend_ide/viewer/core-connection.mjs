@@ -39,7 +39,8 @@ export function createCoreConnection(project, { target, fetcher = fetch, interva
   catch (error) { configError = error.message; }
   let startedAt = null;
   let mode = 'initial', connected = false, wanted = false, message = configError || '', pending, controller, timer, generation = 0, disposed = false;
-  const state = () => ({ mode, startedAt, active: startedAt !== null, connected, connecting: !!pending, wanted, message, backend: backend || '',
+  // 接続済みの定期確認は表示を維持し、初回接続・切断後の再接続だけを接続中にする。
+  const state = () => ({ mode, startedAt, active: startedAt !== null, connected, connecting: !!pending && !connected, wanted, message, backend: backend || '',
     project: { name: basename(project), path: project } });
   async function check() {
     if (!wanted || disposed) return state();
