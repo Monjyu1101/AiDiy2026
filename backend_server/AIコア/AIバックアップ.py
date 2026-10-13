@@ -414,14 +414,18 @@ def _バックアップ全体の最終日時取得(backup_root: str) -> Optional
         return None
 
 
-def 差分ファイル取得(アプリ設定=None, backend_dir: Optional[str] = None) -> Optional[Tuple[str, List[str]]]:
+def 差分ファイル取得(
+    アプリ設定=None,
+    backend_dir: Optional[str] = None,
+    セッション設定: Optional[dict] = None,
+) -> Optional[Tuple[str, List[str]]]:
     """
     バックアップフォルダから最終日時を取得し、その+1秒以降に更新されたファイル一覧を返す
 
     戻り値: (最終バックアップ日時, 差分ファイル一覧) または None
     """
     try:
-        base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir)
+        base_path = _コードベース絶対パス取得(アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
         if not os.path.isdir(base_path):
             return None
 

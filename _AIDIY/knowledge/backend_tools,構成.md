@@ -181,7 +181,7 @@ Chrome DevTools 系ツールは `_ensure_chrome()` で Chrome の起動状態を
 - stdio と SSE の transport 変換は `mcp_stdio.py` に閉じ込める
 - SQLite / PostgreSQL は既定 read-only。検証は SELECT / describe / count を優先する
 - Chrome DevTools MCP は Python CDP 実装。Node.js 版 `chrome-devtools-mcp` 前提で復旧しない
-- `aidiy_backup` の path 問題は、まず `backend_tools` 直下で `BackupSave().diff_scan()` を直接実行して root / backend_dir を確認する
+- `aidiy_backup` の path 問題は、`BackupSave(project_root)` の `root`（対象）と `backend_dir`（AiDiy実装の配置先）、`BackupCheck(project_root).backup_root`（対象直下の `backup/`）を照合する。保存と差分確認は対象の絶対パスをセッション設定で明示する。詳細は [`command_hermes,共通,MCPバックアップ検証手順.md`](./command_hermes,共通,MCPバックアップ検証手順.md) の「保存先とプロジェクトルートの確認」を参照する
 
 ## 確認方法
 

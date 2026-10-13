@@ -1,6 +1,6 @@
 # MCP バックアップツールを使ったファイル検証手順
 
-> 文書: `command_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_tools/` (aidiy_backup)
+> 文書: `command_hermes,共通,MCPバックアップ検証手順.md` | 実装: `backend_tools/tools_proc/backup.py`, `backend_server/AIコア/AIバックアップ.py`, `frontend_ide/launch.mjs`, `backend_server/core_router/AIコア.py`
 
 ## このメモを使う場面
 
@@ -18,6 +18,14 @@
 | `aidiy_backup_backup_find_changed` | 指定期間の変更ファイル一覧 |
 
 ## 検証手順
+
+### 保存先とプロジェクトルートの確認
+
+- 保存先は対象プロジェクト直下の `backup/YYYYMMDD/HHMMSS[.all]/`。`_AIDIY/` はナレッジ・会話履歴などの保存先であり、プロジェクト直下から起動したIDEのバックアップ先ではない。
+- `aidiy_ide` の対象は起動時の作業フォルダ、または位置引数 / `--project` で指定したフォルダ。IDEを開くだけではバックアップしない。Codeのオンライン接続で新規inputセッションを作ると、WebSocket初回メッセージの `CODE_BASE_PATH` を確定してから保存する。配置側の共通設定よりセッションの指定を優先する。
+- MCP / HTTPの保存処理は `project_root` を対象とし、省略時はAiDiy配置先のルートを使う。ネイティブ実装は常にAiDiy配置先から読み込み、保存と差分確認の両方へ対象の絶対パスを明示する。対象側の `backend_server/` は不要。
+- 別環境だけ保存先が違う場合は、IDE画面のプロジェクトパス、実際に呼ばれたPATHランチャー（Windows: `where aidiy_ide`、Linux / macOS: `command -v aidiy_ide`）、バックエンドログの `バックアップ開始(対象パス)` を照合する。ランチャー・Code配布物・稼働中バックエンドが同じ更新済み配置先を使っているか確認し、配布物更新後はIDEとバックエンドを再起動する。
+- `python -m unittest discover -s backend_server/tests -p 'test_backup*.py'` は外部プロジェクトの保存・差分確認・参照の一致とファイル数上限を検証する。IDE起動経路の確認には一時プロジェクトを用意し、起動だけの状態とCodeオンライン接続後の状態を分けて保存先を調べる。
 
 ### 1. バックアップと現行ファイルの内容比較
 

@@ -64,12 +64,9 @@ class BackupSave:
     """AiDiy ネイティブのバックアップ機能を MCP から実行するラッパー"""
 
     def __init__(self, project_root: Optional[str] = None):
-        if project_root:
-            self.root = os.path.abspath(project_root)
-        else:
-            here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self.root = os.path.dirname(here)
-        self.backend_dir = os.path.join(self.root, "backend_server")
+        self.root = os.path.abspath(project_root) if project_root else _AIDIY_ROOT
+        # 実装の配置先とバックアップ対象を分離し、対象はセッション設定で明示する。
+        self.backend_dir = os.path.join(_AIDIY_ROOT, "backend_server")
         self._native = None
 
     def _get_native(self):
@@ -84,7 +81,7 @@ class BackupSave:
             result = native.バックアップ実行(
                 アプリ設定=None,
                 backend_dir=self.backend_dir,
-                セッション設定=None,
+                セッション設定={"CODE_BASE_PATH": self.root},
                 ログ出力=False,
             )
         except Exception as e:
@@ -121,6 +118,7 @@ class BackupSave:
             result = native.差分ファイル取得(
                 アプリ設定=None,
                 backend_dir=self.backend_dir,
+                セッション設定={"CODE_BASE_PATH": self.root},
             )
         except Exception as e:
             raise BackupSaveError(f"差分スキャン中に例外: {e}") from e
@@ -150,11 +148,7 @@ class BackupCheck:
     _TIME_RE = re.compile(r"^(\d{6})")
 
     def __init__(self, project_root: Optional[str] = None):
-        if project_root:
-            self.root = os.path.abspath(project_root)
-        else:
-            here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self.root = os.path.dirname(here)
+        self.root = os.path.abspath(project_root) if project_root else _AIDIY_ROOT
         self.backup_root = os.path.join(self.root, self.BACKUP_DIR_NAME)
 
     def _normalize_rel(self, path: str) -> str:
