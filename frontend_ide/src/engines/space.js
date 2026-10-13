@@ -30,10 +30,21 @@ export function fileSizeScale(name, size) {
 }
 
 export function createSpace(canvas, elements, { change = () => {}, layout = () => ({}), toggleExplorer = () => {} } = {}) {
-let disposed = false, frameId = 0, loadGeneration = 0;
+let disposed = false, frameId = 0, loadGeneration = 0, refreshPending = null, sessionStartedAt;
+let viewMode = '3d';
 const listeners = new AbortController();
 const listen = (target, name, callback, options = {}) => target.addEventListener(name, callback, { ...options, signal: listeners.signal });
-const requestAnimationFrame = callback => disposed || document.hidden ? 0 : (frameId = window.requestAnimationFrame(callback));
+// 2D は同じ状態を使うが、Canvas の描画ループを持たない。復帰時も予約は1本だけ。
+const requestAnimationFrame = callback => {
+  if (disposed || document.hidden || viewMode !== '3d') return 0;
+  if (frameId) return frameId;
+  const id = window.requestAnimationFrame(now => {
+    if (frameId !== id) return;
+    frameId = 0;
+    callback(now);
+  });
+  return frameId = id;
+};
 const $ = id => elements[id];
 const ctx = canvas.getContext('2d');
 const textWidths = createTextWidthCache(ctx);
@@ -144,7 +155,8 @@ function collectFiles(node, prefix, out = []) {
   return out;
 }
 function nodeAt(names) {
-  let node = scan.tree;
+  let node = scan?.tree;
+  if (!node) return null;
   for (const name of names) {
     node = node.d.find(d => d.n === name);
     if (!node) return null;
@@ -343,7 +355,7 @@ function holdProjection() { warpProjection ??= { x: CX, y: CY }; }
 let last = performance.now(), prevDist = cam.dist;
 function frame(now) {
   frameId = 0;
-  if (disposed || document.hidden) { last = now; return; }
+  if (disposed || document.hidden || viewMode !== '3d') { last = now; return; }
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   const t = now / 1000;
@@ -776,6 +788,7 @@ let dragging = false, dragMoved = 0, lastX = 0, lastY = 0;
 const touch = new Map();
 // 手動操作: 自動飛行を1分止め、自動で開いたファイルもユーザーが見ている扱いにする
 const touchIdle = () => {
+  ++navigationSequence;
   autoOrbit.interact(performance.now()); followedPath = null;
   // 到着済みの最終更新へは引き戻さず、未到着の新しい対象だけを保留する。
   pendingFollow = updatePaths.length || latestFollow !== lastFollowedPath ? latestFollow : null;
@@ -786,15 +799,20 @@ function setAutoSpin(value) {
   autoSpin = !!value;
   if (autoSpin) { autoOrbit.resume(); if (entering) pendingFollow = updatePaths.length || latestFollow !== lastFollowedPath ? latestFollow : null; }
   else {
+    cancelScheduledFollow();
+    if (viewMode === '2d' && following) {
+      pendingFollow ??= activeFollowPath;
+      invalidateNavigation();
+    }
     autoOrbit.reset();
     if (!selected && !focus && !diving) Object.assign(goal, cam);
   }
   notify();
 }
 
-listen(canvas, 'contextmenu', e => e.preventDefault());
+listen(canvas, 'contextmenu', e => { if (viewMode === '3d') e.preventDefault(); });
 listen(canvas, 'pointerdown', e => {
-  if (diving) return;
+  if (viewMode !== '3d' || diving) return;
   canvas.setPointerCapture(e.pointerId);
   touch.set(e.pointerId, [e.clientX, e.clientY]);
   dragging = true; dragMoved = 0;
@@ -805,7 +823,7 @@ listen(canvas, 'pointerdown', e => {
   Object.assign(goal,cam); tracking=null; manualOrbit=true;
 });
 listen(canvas, 'pointermove', e => {
-  if (diving) return;
+  if (viewMode !== '3d' || diving) return;
   if (touch.has(e.pointerId) && touch.size === 2) {
     // 2本指: ピンチでズーム
     const [a, b] = [...touch.values()];
@@ -830,6 +848,7 @@ listen(canvas, 'pointermove', e => {
   updateHover(e.clientX, e.clientY);
 });
 const endDrag = e => {
+  if (viewMode !== '3d') return;
   touch.delete(e.pointerId);
   if (!dragging) return;
   dragging = touch.size > 0;
@@ -841,7 +860,7 @@ listen(canvas, 'pointerup', endDrag);
 listen(canvas, 'pointercancel', endDrag);
 listen(canvas, 'pointerleave', () => { hovered = null; hoveredGalaxy = null; $('tooltip').hidden = true; });
 listen(canvas, 'wheel', e => {
-  if (!e.ctrlKey) return;
+  if (viewMode !== '3d' || !e.ctrlKey) return;
   // 宇宙上の Ctrl＋ホイールは、ブラウザ倍率ではなく視点の距離を変える。
   e.preventDefault();
   if (diving) return;
@@ -850,7 +869,7 @@ listen(canvas, 'wheel', e => {
   touchIdle();
 }, { passive: false });
 listen(canvas, 'dblclick', e => {
-  if (diving) return;
+  if (viewMode !== '3d' || diving) return;
   handleDoubleClick(e.clientX, e.clientY);
 });
 
@@ -906,6 +925,7 @@ function handleClick(mx, my) {
   if (hoveredGate) return;  // ダブルクリックが成立するまで階層を変えない。
   if (hovered) selectBody(hovered);
   else if (hoveredGalaxy) {
+    touchIdle();
     // 初回クリックでカメラを動かさず、2回目も同じフォルダを押せるようにする。
     selected = null; focus = hoveredGalaxy; tracking = null;
     updateSide();
@@ -929,6 +949,8 @@ function flyTo(g) {
   return travelTo([...trail],{target:g,transition:false,arrivalDistance:Math.max(120,g.R*2.8),after:()=>{focus=g;updateSide();}});
 }
 async function flyHome() {
+  if (disposed) return false;
+  if (viewMode === '2d') { selectBody(null); return true; }
   selected = null;
   focus = null;
   tracking = null;
@@ -952,6 +974,7 @@ function approach(body) {
 // ---------------------------------------------------------------- フォルダ移動のワープ
 let warpSequence = 0;
 let sceneAnimation = null;
+const travelWaiters = new Set();
 function setWarpBusy(value) {
   diving = value;
   canvas.classList.toggle('warping', value);
@@ -960,8 +983,9 @@ function setWarpBusy(value) {
 
 /** 古い移動はキャンセルし、最後に選ばれた階層だけへ切り替える。 */
 async function travelTo(next, { direction = 'in', target = null, history = true, after = null, file = null, destinationFile = null, transition = true, arrivalDistance = null, valid = () => true } = {}) {
-  if (!nodeAt(next)) return;
+  if (disposed || viewMode !== '3d' || !nodeAt(next)) return false;
   const sequence = ++warpSequence;
+  for (const cancel of [...travelWaiters]) cancel();
   holdProjection();
   sceneAnimation?.cancel();
   turnFlight = null; introFlight = null; warpBoost = 0;
@@ -974,21 +998,34 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
   $('tooltip').hidden = true;
   target ??= direction === 'out' ? world.gate : world.galaxies.find(g => g.path === next.slice(0, trail.length + 1).join('/'));
   const motion = warpMotion(target ? 'in' : direction);
-  const play = async stage => {
+  const play = stage => new Promise(resolve => {
     sceneAnimation = canvas.animate(stage.frames, {
       duration: stage.duration, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards',
     });
-    try { await sceneAnimation.finished; } catch { return false; }
-    return sequence === warpSequence;
-  };
+    const finish = success => {
+      travelWaiters.delete(cancel);
+      resolve(success && !disposed && viewMode === '3d' && sequence === warpSequence);
+    };
+    const cancel = () => finish(false);
+    travelWaiters.add(cancel);
+    sceneAnimation.finished.then(() => finish(true), () => finish(false));
+  });
   // カメラが目標へ十分近づくか上限時間まで待つ。別の移動が始まったら false（そこで打ち切る）。
   // 描画ループの frameId を上書きしないよう、待ちは setTimeout で刻む。
   const settle = (done, limit) => new Promise(resolve => {
     const end = performance.now() + limit;
+    let timer = 0;
+    const finish = success => {
+      clearTimeout(timer);
+      travelWaiters.delete(cancel);
+      resolve(success);
+    };
+    const cancel = () => finish(false);
+    travelWaiters.add(cancel);
     const check = () => {
-      if (disposed || sequence !== warpSequence) return resolve(false);
-      if (done() || performance.now() >= end) return resolve(true);
-      setTimeout(check, 16);
+      if (disposed || viewMode !== '3d' || sequence !== warpSequence || !valid()) return finish(false);
+      if (done() || performance.now() >= end) return finish(true);
+      timer = setTimeout(check, 16);
     };
     check();
   });
@@ -1058,13 +1095,17 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
 
 /** 入る時は、その場で星団へ旋回してから直進し、光跡と拡大を重ねて次の階層へ入る。 */
 function dive(g) {
-  if (diving) return;
+  if (viewMode === '2d') return goTo({ type: 'dir', path: g.path });
+  if (disposed || diving) return;
+  touchIdle();
   remember('dir', g.path);
   return travelTo(g.path.split('/'), { direction: 'in', target: g });
 }
 /** 戻る時も、現在フォルダのゲートへ旋回・前進して親階層へ入る。 */
 function ascend(count) {
-  if (count >= trail.length || count < 0) return;
+  if (disposed || count >= trail.length || count < 0) return;
+  if (viewMode === '2d') return goTo({ type: 'dir', path: trail.slice(0, count).join('/') });
+  touchIdle();
   return travelTo(trail.slice(0, count), { direction: 'out' });
 }
 
@@ -1078,6 +1119,12 @@ listen(window, 'popstate', () => {
   if (!scan) return;
   const next = trailFromHash();
   if ((!diving && next.join('/') === basePath()) || !nodeAt(next)) return;
+  touchIdle();
+  if (viewMode === '2d') {
+    invalidateNavigation();
+    enterFolderDirect(next, { history: false });
+    return;
+  }
   travelTo(next, { direction: next.length < trail.length ? 'out' : 'in', history: false });
 });
 
@@ -1117,22 +1164,129 @@ function enterWorld({ from, leaving, history = true, immediate = false } = {}) {
 /** 全体検索・航海日誌から、そのファイル（自由惑星として）やフォルダ（銀河として）がある宇宙へワープする。 */
 let navigationSequence = 0;
 let fastWarp = false;
-async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
-  const parts = entry.path.split('/').filter(Boolean), isFile = entry.type !== 'dir';
-  const level = isFile ? parts.slice(0, -1) : parts;
-  const node = nodeAt(level);
-  if (!node || (isFile && !node.f.some(file => file[0] === parts.at(-1)))) return;
-  if(!automatic) touchIdle();
-  // 接近済みの同じファイルを再選択しても飛び直さない。
-  if (!automatic && isFile && !diving && selected?.path === entry.path && tracking?.path === entry.path) return true;
-  const run = ++navigationSequence;
-  const stale = () => disposed || run !== navigationSequence || !valid();
-  holdProjection();
-  // 連続クリックでは進行中の旋回・ズーム・フェードを打ち切り、最後の選択を優先する。
+function stopTravel() {
   ++warpSequence; sceneAnimation?.cancel(); sceneAnimation = null;
-  turnFlight = null; introFlight = null; warpBoost = 0;
+  for (const cancel of [...travelWaiters]) cancel();
+  turnFlight = null; introFlight = null; warpBoost = 0; warpTravel = false; warpProjection = null;
   canvas.style.removeProperty('transform-origin'); setWarpBusy(false);
   Object.assign(goal, cam);
+}
+function invalidateNavigation() {
+  cancelScheduledFollow();
+  ++navigationSequence; ++followSequence; following = false; activeFollowPath = null;
+  stopTravel();
+}
+// 2D で別フォルダを見た後も、訪問済みの3D視点へ戻れる。単なるモード切替では world を再生成しない。
+const folderViews = new Map();
+function rememberView() {
+  if (!world) return;
+  const path = basePath();
+  folderViews.delete(path);
+  folderViews.set(path, { cam: { ...cam }, pivot: { ...orbitPivot } });
+  if (folderViews.size > 80) folderViews.delete(folderViews.keys().next().value);
+}
+function restoreView() {
+  const saved = folderViews.get(basePath());
+  Object.assign(cam, saved?.cam || { tx: 0, ty: 0, tz: 0, ...HOME_VIEW, dist: overviewDistance(), roll: 0 });
+  Object.assign(goal, cam);
+  orbitPivot = saved ? { ...saved.pivot } : { x: 0, y: 0, z: 0 };
+  prevDist = cam.dist;
+  introAt = performance.now() - 5000;
+}
+function enterFolderDirect(next, { history = true } = {}) {
+  const changed = next.join('/') !== basePath();
+  if (changed) {
+    rememberView();
+    trail = [...next];
+    world = buildWorld();
+    restoreView();
+    autoOrbit.reset();
+  }
+  if (history && location.hash !== trailHash() && (location.hash || trail.length)) window.history.pushState(null, '', trailHash());
+  selected = null; tracking = null; focus = null;
+  hovered = null; hoveredGalaxy = null; hoveredGate = false;
+  notify();
+}
+function setViewMode(value) {
+  if (disposed || (value !== '2d' && value !== '3d') || value === viewMode) return;
+  invalidateNavigation();
+  if (value === '2d') rememberView();
+  viewMode = value;
+  window.cancelAnimationFrame(frameId); frameId = 0;
+  last = performance.now(); prevDist = cam.dist;
+  dragging = false; touch.clear(); canvas.classList.remove('dragging');
+  manualOrbit = false; tracking = null;
+  hovered = null; hoveredGalaxy = null; hoveredGate = false; $('tooltip').hidden = true;
+  driving = false;
+  notify();
+  requestAnimationFrame(frame);
+}
+const selectionLocation = file => file?.line ? {
+  line:file.line,column:file.column,query:file.query,caseSensitive:file.caseSensitive,
+  matchMtime:file.matchMtime,matchLength:file.matchLength,navigationId:file.navigationId,
+} : {};
+function applyLocation(entry, run) {
+  if (!selected || selected.path !== entry.path) return;
+  const {line,column,query,caseSensitive,matchMtime,matchLength}=entry;
+  // ファイル自体とジャンプ要求を分け、同じ箇所の再クリックもビューアへ届ける。
+  const {line:oldLine,column:oldColumn,query:oldQuery,caseSensitive:oldCase,matchMtime:oldMtime,matchLength:oldLength,navigationId:oldId,...body}=selected;
+  selected = line ? {...body,line,column,query,caseSensitive,matchMtime,matchLength,navigationId:run} : body;
+  updateSide();
+}
+async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
+  if (disposed || !entry || typeof entry.path !== 'string') return false;
+  if (automatic && viewMode === '2d' && (!autoSpin || document.hidden || performance.now() < autoOrbit.pausedUntil || (selected && selected.path !== followedPath))) return false;
+  const parts = entry.path.split('/').filter(Boolean), isFile = entry.type !== 'dir';
+  const level = isFile ? parts.slice(0, -1) : parts;
+  if(!automatic) touchIdle();
+  const run = ++navigationSequence, forFilter = fileFilter;
+  const stale = () => disposed || run !== navigationSequence || forFilter !== fileFilter || !valid();
+  const exists = () => { const node=nodeAt(level);return node && (!isFile || node.f.some(file=>file[0]===parts.at(-1))); };
+  // クリックを先に予約し、読み直し中の別選択・フィルター切替・終了で必ず失効させる。
+  // 最終更新・grepは表示ツリーにない新規ファイルも、同じ手動経路から開く。
+  if(!automatic){cancelScheduledFollow();++followSequence;following=false;activeFollowPath=null;}
+  stopTravel();
+  if (entry.source === 'latest' || !exists()) {
+    const joinedEarlierRequest=!!refreshPending;
+    if (!await refresh(undefined,{fresh:true}) || stale()) return false;
+    const file=nodeAt(level)?.f.find(file=>file[0]===parts.at(-1));
+    // すでに進行していた走査はクリックより前の内容かもしれない。
+    if(joinedEarlierRequest && (!exists() || (entry.mtime && file && file[2]<entry.mtime))) {
+      if (!await refresh(undefined,{fresh:true}) || stale()) return false;
+    }
+  }
+  if(stale())return false;
+  if(!exists()) {
+    if(!automatic && isFile && entry.source==='grep') {
+      if (viewMode === '2d' && nodeAt(level)) enterFolderDirect(level);
+      tracking=null;focus=null;
+      selectBody({path:entry.path,name:parts.at(-1),size:entry.size||0,mtime:entry.mtime,unlisted:true},{zoom:false});
+      applyLocation(entry,run);return true;
+    }
+    if(!automatic)change({
+      error:viewMode==='2d'
+        ? `${scan?.truncated?'走査上限のため、':'現在の一覧には'}対象のフォルダ・ファイルが見つかりません。フィルターをOFFにするか、一覧を更新してください。移動・削除された可能性もあります。`
+        : scan?.truncated?'一覧の走査上限により、このファイルを表示できません。':'ファイルが見つかりません。一覧のフィルター、移動・削除を確認してください。',
+      loading:false,
+    });
+    return false;
+  }
+  change({error:'',loading:false});
+  if (viewMode === '2d') {
+    if (!isFile || level.join('/') !== basePath()) enterFolderDirect(level);
+    tracking = null; focus = null;
+    if (isFile) {
+      selectBody(world.byPath.get(entry.path), { zoom: false });
+      applyLocation(entry, run);
+    } else {
+      if (entry.path) remember('dir', entry.path, parentOf(entry.path));
+      notify();
+    }
+    return true;
+  }
+  // 接近済みの同じファイルは飛び直さず、grepの行位置だけ更新する。
+  if (!automatic && isFile && selected?.path === entry.path && tracking?.path === entry.path) {applyLocation(entry,run);return true;}
+  holdProjection();
   // 同階層でも下のファイル接近へ進み、位置固定の旋回→正面への前進で移動する。
   selected = null; tracking = null; focus = null; updateSide();
   // 別の枝も共通の親まで戻り、1階層ずつ目的地へ向かう。各段で必ず旋回・前進する。
@@ -1140,6 +1294,7 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
   while (common < trail.length && common < level.length && trail[common] === level[common]) common++;
   if (fastWarp && isFile && level.join('/') !== basePath()) {
     if (!await travelTo(level, { direction: common < trail.length ? 'out' : 'in', destinationFile: entry.path, valid: () => !stale() }) || stale()) return;
+    applyLocation(entry,run);
     if(!automatic) touchIdle();
     return true;
   }
@@ -1156,6 +1311,7 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
   } else {
     remember('dir', entry.path); revealCurrent();
   }
+  applyLocation(entry,run);
   warpProjection = null;
   // 長い航路でも到着直後に自動運転へ奪われないよう、ここから手動操作の待機を数える。
   if(!automatic) touchIdle();
@@ -1169,8 +1325,32 @@ let followSequence = 0, followedPath = null, pendingFollow = null, latestFollow 
 // 自動表示中かどうかと、最後に到着した場所の記憶を分ける。後者は手動操作でも消さない。
 let lastFollowedPath = null, activeFollowPath = null;
 let updatePaths = [];
-/** 移動を予約する（起動直後の最終更新も含む）。すぐ動けない時は、動ける状態になってから frame で始める。 */
+let followTimer = 0, followSchedule = 0;
+function cancelScheduledFollow() {
+  ++followSchedule;
+  clearTimeout(followTimer); followTimer = 0;
+}
+/** 2D は更新通知と状態変化だけで追跡する。実際の予約が手動操作の猶予を待つ時だけ単発タイマーを使う。 */
+function scheduleFollow2D() {
+  cancelScheduledFollow();
+  if (disposed || viewMode !== '2d' || !pendingFollow || !autoSpin || !world || following || diving || dragging || document.hidden
+    || (selected && selected.path !== followedPath)) return;
+  const sequence = followSchedule;
+  const start = () => {
+    if (sequence !== followSchedule) return;
+    followTimer = 0;
+    if (!pendingFollow || !canFollow()) return;
+    // 開始時に予約を消費する。取得失敗・欠落パスでも notify から即時再試行を繰り返さない。
+    const path = pendingFollow; pendingFollow = null;
+    void follow(path);
+  };
+  const delay = autoOrbit.pausedUntil - performance.now();
+  if (delay > 0) followTimer = setTimeout(start, delay);
+  else queueMicrotask(start);
+}
+/** 移動を予約する（起動直後の最終更新も含む）。3D は frame、2D は更新通知から直接開始する。 */
 function requestFollow(path) {
+  if (disposed) return;
   if (Array.isArray(path)) {
     // 待機中の追加更新も経路に残し、移動先だけは常に最後のファイルにする。
     const received = new Set(path);
@@ -1180,29 +1360,43 @@ function requestFollow(path) {
   }
   latestFollow = path;
   pendingFollow = !updatePaths.length && (path === lastFollowedPath || (following && path === activeFollowPath)) ? null : path;
+  if (viewMode === '2d' && following && pendingFollow) invalidateNavigation();
+  scheduleFollow2D();
 }
 /** 今追いかけてよいか: 視点移動が ON、手動操作の直後でない、ユーザーが自分で開いたファイルを見ていない。 */
 function canFollow() {
-  return autoSpin && !!world && !following && !diving && !dragging && !document.hidden && performance.now() >= autoOrbit.pausedUntil
+  return !disposed && autoSpin && !!world && !following && !diving && !dragging && !document.hidden && performance.now() >= autoOrbit.pausedUntil
     && (!selected || selected.path === followedPath);
 }
 async function follow(path) {
+  if (disposed || (viewMode === '2d' && !canFollow())) return false;
   if(path === lastFollowedPath&&!updatePaths.length)return true;
   const parts = path.split('/'), level = parts.slice(0, -1);
-  const run = ++followSequence;
-  const stale = () => disposed || run !== followSequence || !autoSpin || !!pendingFollow || (latestFollow && latestFollow !== path) || performance.now() < autoOrbit.pausedUntil;
+  const run = ++followSequence, mode = viewMode;
+  const stale = () => disposed || mode !== viewMode || document.hidden || run !== followSequence || !autoSpin || !!pendingFollow || (latestFollow && latestFollow !== path) || performance.now() < autoOrbit.pausedUntil;
   following = true; activeFollowPath = path;
   try { return await followSteps(path, parts, level, stale); }
-  finally { if (run === followSequence) { following = false; activeFollowPath = null; } if (!diving) warpProjection = null; }
+  finally {
+    if (run === followSequence) {
+      following = false; activeFollowPath = null;
+      notify();
+    }
+    if (!diving) warpProjection = null;
+  }
 }
 async function followSteps(path, parts, level, stale) {
-  holdProjection(); Object.assign(goal, cam);
+  if (viewMode === '3d') { holdProjection(); Object.assign(goal, cam); }
   // 開いている自動のビューアは、元へ戻さずに閉じる
   if (path !== lastFollowedPath) { selected = null; tracking = null; updateSide(); }
   // 毎回読み直す。直前の走査後に新規作成されたファイルも、予約を失わず表示する。
-  await refresh(); if (stale()) return false;
-  const node = nodeAt(level);
-  if (!node || !node.f.some(file => file[0] === parts.at(-1))) return false;
+  const joinedEarlierRequest = !!refreshPending;
+  if (!await refresh(undefined,{fresh:viewMode==='2d'}) || stale()) return false;
+  const exists = () => nodeAt(level)?.f.some(file => file[0] === parts.at(-1));
+  // 先行する一覧取得へ合流した場合も、新規ファイルの更新通知を古い結果で失わない。
+  if (viewMode === '2d' && joinedEarlierRequest && !exists()) {
+    if (!await refresh(undefined,{fresh:true}) || stale()) return false;
+  }
+  if (!exists()) return false;
   // 先行ファイルには移動・表示せず、階層ごとの経路と閲覧軌跡だけを保存する。
   const recorded = updatePaths; updatePaths = [];
   for (const updated of recorded) {
@@ -1252,12 +1446,8 @@ function selectBody(body, { record = true, zoom = true } = {}) {
   if (body && zoom) return goTo({ type: 'file', path: body.path });
   if (!body) {
     // ビューアを閉じても到着地点に留まる。移動中なら、その場で停止する。
-    ++navigationSequence; ++warpSequence; ++followSequence;
-    following=false;
-    sceneAnimation?.cancel(); sceneAnimation=null;
-    turnFlight=null; introFlight=null; warpBoost=0; warpTravel=false; warpProjection=null; manualOrbit=false;
-    canvas.style.removeProperty('transform-origin'); setWarpBusy(false);
-    Object.assign(goal,cam);
+    invalidateNavigation();
+    manualOrbit=false;
     selected = null; tracking = null; focus=null;
     autoOrbit.reset();
     updateSide();
@@ -1292,48 +1482,86 @@ let driving = false, notifiedOrbitPhase = 'idle';
 function isDriving(now) {
   if (!autoSpin || !world || document.hidden) return false;
   if (following) return true;
+  if (viewMode === '2d') return !!selected && selected.path === followedPath;
   return !dragging && !diving && now >= autoOrbit.pausedUntil && (!selected || selected.path === followedPath);
 }
 function notify() {
   if (disposed) return;
   notifiedOrbitPhase = autoOrbit.phase;
-  change({ scan, trail: [...trail], selected, focus, journal, autoSpin, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
+  if (viewMode === '2d') driving = isDriving(performance.now());
+  change({ scan, trail: [...trail], selected, focus, journal, autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
+  scheduleFollow2D();
 }
 function updateSide() { notify(); }
 function renderAll() { notify(); }
 function revealCurrent() {}
 /** フィルターの切り替え。一覧を取り直し、増えた星を「新しく生まれた」扱いで光らせないよう基準を消す。 */
+function clearFollowRequests() {
+  cancelScheduledFollow();
+  pendingFollow = latestFollow = followedPath = lastFollowedPath = null; updatePaths = [];
+}
+function cancelRefresh() {
+  ++loadGeneration; refreshPending?.controller.abort(); refreshPending = null;
+}
 function setFilter(on) {
   const next = on ? 'backup' : '';
   if (next === fileFilter) return;
+  invalidateNavigation(); clearFollowRequests(); cancelRefresh();
   fileFilter = next; knownPaths = null;
-  void refresh();
+  void refresh(undefined,{fresh:false});
 }
-async function refresh(startedAt) {
-  const run = ++loadGeneration;
-  if (Number.isFinite(startedAt)) since = startedAt;
-  try {
-    // フィルター ON: AiDiy のバックアップ対象のファイルだけで宇宙を作る
-    const response = await fetch('/api/galaxy' + (fileFilter ? `?filter=${fileFilter}` : ''), { cache: 'no-store', signal: listeners.signal });
-    if (!response.ok) throw Error(await response.text());
-    const data = await response.json();
-    if (disposed || run !== loadGeneration) return;
-    const first = !scan; scan = data;
-    while (trail.length && !nodeAt(trail)) trail.pop();
-    if (first) {
-      loadVoyage(); const start = trailFromHash(); if (nodeAt(start)) trail = start;
-      enterWorld({ from: 'outside', history: false }); cam.dist = overviewDistance() * 10;
-    } else {
-      const path = selected?.path; world = buildWorld();
-      // 未選択での再走査は「閉じる」操作ではない。進行中の自動追跡を取消さない。
-      if(path) selectBody([...world.stars, ...world.planets].find(item => item.path === path) || null, { record: false, zoom: false });
+function refresh(startedAt, {fresh=true}={}) {
+  if(disposed)return Promise.resolve(false);
+  if (Number.isFinite(startedAt)) {
+    if(sessionStartedAt!==undefined && sessionStartedAt!==startedAt) {
+      invalidateNavigation(); clearFollowRequests(); cancelRefresh();
+      selected=null;tracking=null;focus=null;knownPaths=null;folderViews.clear();
     }
-    knownPaths = new Set(collectFiles(scan.tree, '').map(file => file.path)); notify();
-  } catch (error) { if (!disposed) change({ error: error.message, loading: false }); }
+    sessionStartedAt=startedAt;since=startedAt;
+  }
+  // 同じ条件の読み込みを重ねず、手動選択と更新通知は同じ結果を待つ。
+  if(refreshPending?.filter===fileFilter)return refreshPending.promise;
+  const run=++loadGeneration, request={filter:fileFilter,controller:new AbortController(),promise:null};
+  refreshPending=request;
+  request.promise=(async()=>{
+    try {
+      const params=new URLSearchParams({...(fileFilter?{filter:fileFilter}:{}),...(fresh?{fresh:'1'}:{})});
+      const response=await fetch('/api/galaxy'+(params.size?'?'+params:''),{cache:'no-store',signal:request.controller.signal});
+      if(!response.ok)throw Error(await response.text());
+      const data=await response.json();
+      if(disposed || run!==loadGeneration || request.filter!==fileFilter)return false;
+      const first=!scan;scan=data;
+      const available = [...trail];
+      while(available.length&&!nodeAt(available))available.pop();
+      if(first) {
+        loadVoyage();const start=trailFromHash();if(nodeAt(start))trail=start;
+        enterWorld({from:'outside',history:false,immediate:viewMode==='2d'});
+        if(viewMode==='3d')cam.dist=overviewDistance()*10;
+      } else if(viewMode==='2d' && available.join('/')!==basePath()) {
+        enterFolderDirect(available);
+      } else {
+        trail=available;
+        const previous=selected;world=buildWorld();
+        // 再走査でも検索位置は保持する。新しいクリックの場所は後から上書きしない。
+        if(previous){
+          const body=world.byPath.get(previous.path);
+          if(body)selectBody({...body,...selectionLocation(previous)},{record:false,zoom:false});
+          else if(!scan.truncated&&!previous.unlisted){selected=null;tracking=null;focus=null;updateSide();}
+        }
+      }
+      knownPaths=new Set(collectFiles(scan.tree,'').map(file=>file.path));
+      change({error:'',loading:false});notify();return true;
+    }catch(error){
+      if(!disposed&&run===loadGeneration&&!request.controller.signal.aborted)change({error:error.message,loading:false});
+      return false;
+    }finally{if(refreshPending===request)refreshPending=null;}
+  })();
+  return request.promise;
 }
 listen(window, 'keydown', event => {
   if (disposed || diving) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); toggleExplorer(); return; }
+  if (viewMode !== '3d') return;
   if (event.target instanceof Element && event.target.closest('input, textarea, select, button, [contenteditable="true"], .ai-component')) return;
   if (event.key === 'Escape') { if (selected) selectBody(null); else if (focus) flyHome(); else if (trail.length) ascend(trail.length - 1); }
   else if (event.key === 'Backspace' && trail.length) ascend(trail.length - 1);
@@ -1344,12 +1572,22 @@ listen(window, 'keydown', event => {
 // 非表示中はCanvas描画と毎フレームのDOM寸法取得を止める。復帰時の時間差を飛行へ加算しない。
 listen(document, 'visibilitychange', () => {
   window.cancelAnimationFrame(frameId); frameId = 0; last = performance.now();
-  if (document.hidden) { if (driving) { driving = false; notify(); } }
-  else requestAnimationFrame(frame);
+  if (document.hidden) {
+    cancelScheduledFollow();
+    if (viewMode === '2d' && following) {
+      pendingFollow ??= activeFollowPath;
+      invalidateNavigation();
+    }
+    if (driving) { driving = false; notify(); }
+  } else {
+    requestAnimationFrame(frame);
+    scheduleFollow2D();
+  }
 });
 requestAnimationFrame(frame);
 return {
-  refresh, goTo, ascend, flyHome, dive, approach, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  refresh, goTo, ascend, flyHome, dive, approach, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  get viewMode() { return viewMode; }, get selected() { return selected; },
   get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,
   get projection() { return { x: CX, y: CY }; },
   get orbitPath() { return autoOrbit.path; },
@@ -1359,6 +1597,6 @@ return {
   route(value) { routeMode=value.mode; aiRoute=[...(value.paths||[])]; },
   get routeState() { return {mode:routeMode,paths:[...aiRoute]}; },
   marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
-  dispose() { disposed = true; ++loadGeneration; ++warpSequence; listeners.abort(); window.cancelAnimationFrame(frameId); sceneAnimation?.cancel(); },
+  dispose() { disposed = true; cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
 };
 }

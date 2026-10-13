@@ -15,12 +15,14 @@ import StatusBar from './StatusBar.vue';
 import TerminalWelcome from './TerminalWelcome.vue';
 import ModalDialog from './ModalDialog.vue';
 import { chatArrival } from '../engines/chat-arrival';
-const props = defineProps({ base: String, config: { default: () => ({}) }, icon: String, linked: Boolean, desktop: Boolean });
+import { createDraftReceiver } from '../draft-handoff.js';
+const props = defineProps({ base: String, config: { default: () => ({}) }, icon: String, linked: Boolean, desktop: Boolean, visible: { type: Boolean, default: true } });
 const connected = ref(false), busy = ref(false), mic = ref(false), micBusy = ref(false), speaker = ref(true), error = ref(''), prompt = ref('');
 const messages = ref([]), project = ref(null), settings = ref({}), preferred = ref({}), models = ref({}), voices = ref({});
 const picker = ref(false), provider = ref(''), model = ref(''), voice = ref('');
 const modelLoading = ref(true), modelSaving = ref(false);
 const changing = ref(false), welcomeVisible = ref(true);
+const draftGeneration = ref(0);
 const canvas = ref(), conversation = ref(), input = ref(), sendButton = ref();
 const rows = new Map(), welcomeKey = ref(0);
 const sendIcon = computed(() => new URL('sending.png', new URL(props.icon || '/development/AiDiy.png', location.href)).href);
@@ -40,6 +42,7 @@ let preserveOnConnectionLost = false;
 const keys = (name = provider.value) => { const vendor = name === 'openai_live' ? 'OPENAI' : name === 'freeai_live' ? 'FREEAI' : 'GEMINI'; return { model: `LIVE_${vendor}_MODEL`, voice: `LIVE_${vendor}_VOICE` }; };
 const modelLabel = computed(() => [settings.value.LIVE_AI_NAME, settings.value[keys(settings.value.LIVE_AI_NAME).model]].filter(Boolean).join(' - ') || 'AiDiy のライブ会話');
 const blocked = computed(() => busy.value || modelSaving.value);
+const audible = computed(() => props.visible !== false && speaker.value);
 const selectedModel = computed(() => ({ LIVE_AI_NAME: provider.value, [keys().model]: model.value, [keys().voice]: voice.value }));
 const selectionError = computed(() => ライブ選択エラー(selectedModel.value, { models: models.value, voices: voices.value }));
 const selectionChanged = computed(() => Object.entries(selectedModel.value).some(([key, value]) => value !== (settings.value[key] || '')));
@@ -54,7 +57,7 @@ function append(role, text, type = '') {
 function receive(packet) {
   if (disposed) return;
   const type = packet.メッセージ識別, text = String(packet.メッセージ内容 || '');
-  if (type === 'output_audio') audio.play(packet);
+  if (type === 'output_audio') { if (props.visible !== false) audio.play(packet); }
   else if (type === 'cancel_audio') audio.cancel();
   else if (['input_text','output_text','output_request','output','recognition_input','recognition_output'].includes(type) && packet.チャンネル === '0') {
     if (type === 'output_text' && text.trim() === '!') { error.value = 'LiveAIに送信できませんでした。再接続してください。'; return; }
@@ -74,7 +77,7 @@ async function loadModels(session = '') {
 function disconnect(clear = true) {
   preserveOnConnectionLost = false;
   arrivals.reset();
-  generation++; micGeneration++; connected.value = false; busy.value = false; changing.value = false; mic.value = false; micBusy.value = false;
+  generation++; draftGeneration.value++; micGeneration++; connected.value = false; busy.value = false; changing.value = false; mic.value = false; micBusy.value = false;
   clearInterval(heartbeat); heartbeat = undefined;
   connection?.send('input', 音声操作(false, false)); audio?.close(); connection?.disconnect();
   audio?.mute(true); speaker.value = true;
@@ -85,7 +88,7 @@ function disconnect(clear = true) {
 }
 async function connect(preserve = false, automatic = false) {
   if (busy.value || disposed) return;
-  const run = ++generation; busy.value = true; error.value = '';
+  const run = ++generation; draftGeneration.value++; busy.value = true; error.value = '';
   preserveOnConnectionLost = preserve;
   try {
     if (!automatic) await audio.unlock();
@@ -102,28 +105,28 @@ async function connect(preserve = false, automatic = false) {
     if (run !== generation || disposed) return;
     await loadModels(connection.session);
     if (run !== generation || disposed) return;
-    connected.value = true; connection.send('input', 音声操作(false, speaker.value));
+    connected.value = true; audio.mute(audible.value); connection.send('input', 音声操作(false, audible.value));
     if (!environment.host) heartbeat = setInterval(() => connection.send('input', { type: 'ping' }), 20000);
   } catch (e) { if (run === generation) { disconnect(!preserve); error.value = e.message; } }
   finally { if (run === generation) { preserveOnConnectionLost = false; busy.value = false; changing.value = false; } }
 }
 async function microphone() {
-  if (!connected.value || micBusy.value || blocked.value || disposed) return;
-  if (mic.value) { error.value = ''; micGeneration++; audio.stop(); mic.value = false; connection.send('input', 音声操作(false, speaker.value)); return; }
+  if (!connected.value || micBusy.value || blocked.value || disposed || props.visible === false) return;
+  if (mic.value) { error.value = ''; micGeneration++; audio.stop(); mic.value = false; connection.send('input', 音声操作(false, audible.value)); return; }
   const run = generation, own = ++micGeneration; micBusy.value = true; error.value = '';
   try {
     await audio.unlock();
-    if (run !== generation || own !== micGeneration || disposed) return;
+    if (run !== generation || own !== micGeneration || disposed || props.visible === false) return;
     const active = await audio.start(入力レート(settings.value.LIVE_AI_NAME || ''));
-    if (run !== generation || own !== micGeneration || disposed) return;
-    mic.value = active; connection.send('input', 音声操作(active, speaker.value));
+    if (run !== generation || own !== micGeneration || disposed || props.visible === false) return;
+    mic.value = active; connection.send('input', 音声操作(active, audible.value));
   } catch (e) { if (run === generation && own === micGeneration && !disposed) { mic.value = false; error.value = `マイクを開始できません: ${microphoneError(e)}`; } }
   finally { if (own === micGeneration) micBusy.value = false; }
 }
 async function sound() {
-  if (!connected.value || blocked.value) return;
+  if (!connected.value || blocked.value || props.visible === false) return;
   const run = generation, enabled = !speaker.value;
-  try { if (enabled) await audio.unlock(); if (disposed || run !== generation || !connected.value) return; speaker.value = enabled; audio.mute(enabled); connection.send('input', 音声操作(mic.value, enabled)); }
+  try { if (enabled) await audio.unlock(); if (disposed || run !== generation || !connected.value || props.visible === false) return; speaker.value = enabled; audio.mute(audible.value); connection.send('input', 音声操作(mic.value, enabled)); }
   catch (e) { if (run === generation && !disposed) error.value = e.message; }
 }
 function submit() {
@@ -156,7 +159,7 @@ async function applyModel() {
   preferred.value = selected; settings.value = { ...settings.value, ...selected };
   if (!connected.value) { picker.value = false; return; }
   const wasSpeaker = speaker.value;
-  disconnect(false); speaker.value = wasSpeaker; audio.mute(wasSpeaker);
+  disconnect(false); speaker.value = wasSpeaker; audio.mute(audible.value);
   picker.value = true; changing.value = true;
   const connecting = connect(true), reconnectRun = generation;
   await connecting;
@@ -172,7 +175,7 @@ async function newChat() {
   for (const key of ['LIVE_AI_NAME', ...Object.values(keys(settings.value.LIVE_AI_NAME))]) if (settings.value[key]) selected[key] = settings.value[key];
   disconnect();
   if (reconnect) {
-    preferred.value = selected; speaker.value=wasSpeaker; audio.mute(wasSpeaker);
+    preferred.value = selected; speaker.value=wasSpeaker; audio.mute(audible.value);
     const connecting = connect(true), run = generation;
     await connecting;
     if(run === generation && connected.value && wasMic && !disposed) await microphone();
@@ -180,11 +183,28 @@ async function newChat() {
 }
 function copyInput(item) { if (item.role !== 'user' && !item.type.startsWith('recognition_')) return; prompt.value = item.text; nextTick(() => { input.value.focus(); input.value.setSelectionRange(item.text.length, item.text.length); scroll(); }); }
 watch(prompt, () => nextTick(scroll));
+// Webの別タブでも会話と下書きを保持する。非表示中は音声入出力を止め、マイクは自動再開しない。
+watch(() => props.visible, visible => {
+  if (visible === false) { micGeneration++; audio?.stop(); mic.value = false; micBusy.value = false; }
+  audio?.mute(audible.value);
+  if (connected.value) connection?.send('input', 音声操作(false, audible.value));
+}, { flush: 'sync' });
+const draftReceiver = createDraftReceiver({
+  kind: 'live', project: () => project.value?.パス, scope: () => String(draftGeneration.value),
+  ready: () => !disposed && !blocked.value && !modelLoading.value,
+  draft: () => prompt.value, setDraft: value => { prompt.value = value; }, label: () => 'Live',
+  focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
+  api: props.desktop && props.linked ? window.aidiyWindow : undefined,
+});
+defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
+watch(() => [project.value?.パス, draftGeneration.value, blocked.value, modelLoading.value], () => draftReceiver.publish());
 onMounted(async () => {
+  draftReceiver.mount();
   const initialRun = generation;
   resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value);
   cloud = new AudioCloud(canvas.value);
   audio = new LiveAudio(base64 => connection.send('audio', 音声入力(base64)), (kind, value) => cloud.level(kind, value), (kind, values) => cloud.spectrum(kind, values), environment.captureUrl, environment.host ? environment.acquireMicrophone : undefined);
+  audio.mute(audible.value);
   connection = new LiveConnection(environment.socketUrl, receive, () => { disconnect(!preserveOnConnectionLost); error.value = '接続が切れました。接続ボタンで開始してください。'; }, environment.socket);
   environment.onStop(message => { disconnect(); error.value = message || ''; });
   environment.onMicrophoneStop(() => { micGeneration++; audio.stop(); mic.value = false; micBusy.value = false; });
@@ -199,7 +219,7 @@ onMounted(async () => {
     if (!environment.host && (config.自動接続 || explicit[keys(explicit.LIVE_AI_NAME).model])) await connect(false, true); }
   catch (e) { if (!disposed && initialRun === generation) { error.value = e.message; modelLoading.value = false; } }
 });
-onBeforeUnmount(() => { disposed = true; disconnect(); arrivals.dispose(); cancelAnimationFrame(scrollFrame); resizeObserver?.disconnect(); cloud?.dispose(); environment.dispose(); });
+onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); arrivals.dispose(); cancelAnimationFrame(scrollFrame); resizeObserver?.disconnect(); cloud?.dispose(); environment.dispose(); });
 </script>
 <template>
   <section class="ai-component live-component" :class="{ 'desktop-window': desktop, connected }" data-component="LivePanel">

@@ -6,13 +6,15 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, computed, inject, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { loadMonaco, monacoLanguage } from '../engines/monaco.js';
+import { searchReference, fileDraftReference } from '../file-reference.js';
 // pinned: 右側のプレビューではなく、ピン留めした独立ウィンドウの中身として全面に表示する
 const props=defineProps({file:Object,root:String,pinned:Boolean});const emit=defineEmits(['close','pin','activity']);
-const openAnalysis=inject('openFileAnalysis',null);
+const openAnalysis=inject('openFileAnalysis',null),openDraft=inject('openFileDraft',null);
 const openHistory=inject('openFileHistory',null),hasHistory=ref(false),historyError=ref('');
 const data=ref(),error=ref(''),host=ref(),fallback=ref(false),copied=ref(false),stamp=ref(Date.now()),reloading=ref(false);
 let controller,editor,scrollSubscription,revision=0,frameCleanup;
-const viewer=ref();
+const viewer=ref(),fallbackHost=ref(),fallbackMatch=ref(),jump=ref(null),jumpNote=ref('');
+const fallbackParts=computed(()=>{const text=data.value?.text||'',at=jump.value;return at&&!at.stale?{before:text.slice(0,at.start),match:text.slice(at.start,at.start+at.length),after:text.slice(at.start+at.length)}:null;});
 function activity(){emit('activity');}
 function pointerActivity(event){if(event.buttons)activity();}
 // Officeなど同一オリジンの文書内イベントも拾う。別オリジンのプレビューは通知を受け取る。
@@ -40,29 +42,56 @@ async function checkHistory(file,run,signal){
   catch(e){if(run===revision&&e.name!=='AbortError')historyError.value='更新履歴を確認できませんでした。⟳で再確認できます。';}
 }
 // ファイルを読み込む。リフレッシュでも同じ処理を使い、キャッシュを使わず最新の内容を取り直す。
+async function revealMatch(file,run){
+  jump.value=searchReference(data.value?.text||'',file);
+  if(!jump.value)return;
+  if(jump.value.stale){jumpNote.value='検索後に内容が変わった可能性があります。検索し直して位置を確認してください。';return;}
+  const at=jump.value;
+  jumpNote.value=`検索結果: ${at.line}行 ${at.column}列`;
+  if(editor){editor.setSelection({startLineNumber:at.line,startColumn:at.column,endLineNumber:at.line,endColumn:at.endColumn});editor.revealLineInCenter(at.line);}
+  else{await nextTick();if(run===revision)fallbackMatch.value?.scrollIntoView({block:'center'});}
+}
 async function load(file){
-  const run=++revision;controller?.abort();controller=new AbortController();disposeEditor();data.value=null;error.value='';fallback.value=false;hasHistory.value=false;historyError.value='';
+  const run=++revision;controller?.abort();controller=new AbortController();disposeEditor();data.value=null;error.value='';fallback.value=false;hasHistory.value=false;historyError.value='';jump.value=null;jumpNote.value='';
   if(!file)return;
   try{
     const response=await fetch('/api/file?'+new URLSearchParams({path:file.path}),{signal:controller.signal,cache:'no-store'});
-    if(!response.ok)throw Error(await response.text());const value=await response.json();if(run!==revision)return;
+    if(!response.ok)throw Error(response.status===404?'ファイルが移動・削除されたため開けません。最新の一覧や検索を確認してください。':await response.text());const value=await response.json();if(run!==revision)return;
     data.value=value;
     if(value.tooLarge){error.value='表示できるサイズの上限を超えています。';return;}
     if(value.kind==='text'){
       if(openHistory)void checkHistory(file,run,controller.signal);
       await nextTick();const monaco=await loadMonaco().catch(()=>null);if(run!==revision)return;
-      if(!monaco){fallback.value=true;return;}
+      if(!monaco){fallback.value=true;await revealMatch(file,run);return;}
       const fontSize=parseFloat(getComputedStyle(host.value).getPropertyValue('--file-font-size'))||10;
       editor=monaco.editor.create(host.value,{value:value.text,language:monacoLanguage(file.name),theme:'aidiy-space',readOnly:true,domReadOnly:true,automaticLayout:true,fontSize,wordWrap:'on',minimap:{enabled:!props.pinned},scrollBeyondLastLine:false,contextmenu:false});
       scrollSubscription=editor.onDidScrollChange(event=>{if(event.scrollTopChanged||event.scrollLeftChanged)activity();});
+      await revealMatch(file,run);
     }
   }catch(e){if(run===revision)error.value=e.message;}
 }
-watch(()=>props.file,file=>{previewRun++;stamp.value=Date.now();routeIndex.value=0;preview.value=null;mode.value=previewKind.value?readMode(previewKind.value):'code';void load(file);if(mode.value==='view')void loadPreview();},{immediate:true});
+watch(()=>props.file,file=>{previewRun++;stamp.value=Date.now();routeIndex.value=0;preview.value=null;mode.value=file?.line?'code':previewKind.value?readMode(previewKind.value):'code';void load(file);if(mode.value==='view')void loadPreview();},{immediate:true});
 // 画像・Office文書は URL の v を変えて読み直させる。テキストは Monaco を作り直す。表示中のページは iframe を作り直す。
 async function refresh(){if(reloading.value)return;reloading.value=true;stamp.value=Date.now();try{await Promise.all([load(props.file),mode.value==='view'?loadPreview():null]);}finally{reloading.value=false;}}
 const fullPath=computed(()=>{const root=props.root||'';const separator=root.includes('\\')?'\\':'/';return (root?root.replace(/[\\/]+$/,'')+separator:'')+(props.file?.path||'').replaceAll('/',separator);});
 async function copy(){try{await navigator.clipboard.writeText(fullPath.value);copied.value=true;setTimeout(()=>copied.value=false,1500);}catch{error.value='パスをコピーできません。';}}
+function selectedReference(){
+  if(mode.value==='view'||data.value?.kind!=='text')return null;
+  const selection=editor?.getSelection();
+  if(selection&&!selection.isEmpty())return{text:editor.getModel().getValueInRange(selection),startLine:selection.startLineNumber,endLine:selection.endLineNumber};
+  const dom=window.getSelection?.();
+  if(!fallbackHost.value||!dom?.rangeCount||dom.isCollapsed)return null;
+  const range=dom.getRangeAt(0);
+  if(!fallbackHost.value.contains(range.startContainer)||!fallbackHost.value.contains(range.endContainer))return null;
+  const prefix=range.cloneRange();prefix.selectNodeContents(fallbackHost.value);prefix.setEnd(range.startContainer,range.startOffset);
+  const startLine=prefix.toString().split(/\r\n|\r|\n/).length,text=range.toString();
+  return{text,startLine,endLine:startLine+text.split(/\r\n|\r|\n/).length-1};
+}
+function handoff(){
+  if(!openDraft||!props.root)return;
+  try{const selection=selectedReference();openDraft({projectPath:props.root,path:props.file.path,name:props.file.name,text:fileDraftReference(props.file,selection),selection:!!selection});}
+  catch(e){error.value=e.message;}
+}
 onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor();frameCleanup?.();window.removeEventListener('message',frameActivity);});
 </script>
 <template>
@@ -70,9 +99,12 @@ onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor()
       <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">{{ previewKind==='markdown'?'プレビュー':'表示' }}</button></span>
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
+      <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
       <!-- 右端は ⟳ 📌 × の順。右端へ寄せる役目は先頭の ⟳ が持つ -->
       <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" title="ピン留め（別ウィンドウで開く）" aria-label="ピン留め" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')">×</button></header>
     <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><button class="viewer-copy" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
+    <p v-if="file.unlisted" class="input-hint">現在の一覧に含まれない検索結果を直接表示しています。</p>
+    <p v-if="jumpNote" class="input-hint" role="status">{{ jumpNote }}</p>
     <p v-if="historyError" class="input-hint">{{ historyError }}</p>
     <p v-if="error" class="error">{{ error }}</p><p v-else-if="!data">読み込み中…</p>
     <div v-else class="viewer-content"><iframe v-if="data.kind==='office'&&!data.tooLarge" :key="file.path+stamp" :src="'/office.html?'+params({path:file.path,format:data.format,v:`${file.mtime}-${stamp}`})" sandbox="allow-scripts allow-same-origin" :title="file.name+' ビューア'"></iframe>
@@ -88,7 +120,7 @@ onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor()
             <iframe :key="previewUrl+stamp" class="viewer-preview" :src="previewUrl" :sandbox="previewKind==='markdown'?'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox':previewKind==='vue'?'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads':'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock'" allow="autoplay; fullscreen" :title="file.name+' の表示'"></iframe>
           </template>
         </template>
-        <div v-show="mode!=='view'" class="viewer-code"><p v-if="data.truncated" class="input-hint">先頭の一部を表示しています。</p><pre v-if="fallback">{{ data.text }}</pre><div v-else ref="host" class="monaco-host"></div></div>
+        <div v-show="mode!=='view'" class="viewer-code"><p v-if="data.truncated" class="input-hint">先頭の一部を表示しています。</p><pre v-if="fallback" ref="fallbackHost"><template v-if="fallbackParts">{{ fallbackParts.before }}<mark ref="fallbackMatch">{{ fallbackParts.match }}</mark>{{ fallbackParts.after }}</template><template v-else>{{ data.text }}</template></pre><div v-else ref="host" class="monaco-host"></div></div>
       </template>
       <p v-else>この形式はプレビューできません。</p>
     </div>

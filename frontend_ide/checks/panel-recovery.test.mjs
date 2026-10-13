@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
+import * as draftHandoff from '../src/draft-handoff.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const MarkdownIt=require('markdown-it');
@@ -31,13 +32,15 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
     require(id){
       if(id==='vue')return {...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};
       if(id==='markdown-it')return MarkdownIt;
+      if(id==='../draft-handoff.js')return draftHandoff;
       if(Object.hasOwn(modules,id))return modules[id];
       throw Error(`予期しない依存: ${id}`);
     },...globals,
   },{filename:`${name}.vue`});
   const scope=vue.effectScope();
-  const state=scope.run(()=>module.exports.setup(props,{expose(){},emit:(...args)=>emitted.push(args)}));
-  return {state,emitted,timers,async mount(){for(const callback of mounted)await callback();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
+  let exposed;
+  const state=scope.run(()=>module.exports.setup(props,{expose:value=>{exposed=value;},emit:(...args)=>emitted.push(args)}));
+  return {state,exposed,emitted,timers,async mount(){for(const callback of mounted)await callback();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
 }
 
 function liveProtocol() {
@@ -47,8 +50,8 @@ function liveProtocol() {
   return module.exports;
 }
 
-async function liveFixture(t,{socketFactory}={}) {
-  let apiFailure='',socketFailure='',audioCloses=0,disconnects=0;
+async function liveFixture(t,{socketFactory,props={}}={}) {
+  let apiFailure='',socketFailure='',audioCloses=0,disconnects=0;const audioMutes=[],packets=[];
   const settings={LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'test-model',LIVE_FREEAI_VOICE:'Zephyr'};
   class Environment {
     host=true;socketUrl='';captureUrl='';
@@ -64,13 +67,13 @@ async function liveFixture(t,{socketFactory}={}) {
   class Connection {
     session='';
     async connect(){if(socketFailure)throw Error(socketFailure);this.session='new-session';}
-    disconnect(){disconnects++;this.session='';}send(){return true;}
+    disconnect(){disconnects++;this.session='';}send(...args){packets.push(args);return true;}
   }
   const fixture=setupComponent('LivePanel',{
-    props:{config:{}},modules:{
+    props:Object.assign(props,{config:{}}),modules:{
       '../transports/live':{LiveEnvironment:Environment},
       '../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
-      '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(){}stop(){}}},
+      '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(value){audioMutes.push(value);}stop(){}}},
       '../../host/aidiy_live/src/visualizer':{AudioCloud:class {dispose(){}}},
       '../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
       '../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
@@ -82,7 +85,7 @@ async function liveFixture(t,{socketFactory}={}) {
   const state=fixture.state;
   state.messages.value=[{role:'user',text:'前の依頼',id:'user'},{role:'assistant',text:'保持する回答',id:'answer'}];
   state.prompt.value='未送信の下書き';state.welcomeVisible.value=false;
-  return {...fixture,failAPI:kind=>{apiFailure=kind;},failSocket:message=>{socketFailure=message;},resources:()=>({audioCloses,disconnects})};
+  return {...fixture,audioMutes,packets,failAPI:kind=>{apiFailure=kind;},failSocket:message=>{socketFailure=message;},resources:()=>({audioCloses,disconnects})};
 }
 
 for(const failure of ['models','socket','sessionModels']){
@@ -239,4 +242,69 @@ test('解析: 保存待ちの連打と破棄は無視し、失敗後は再び操
 test('解析: 初回読込中に閉じた場合は未取得の指示を上書きしない',async t=>{
   const fixture=await analysisFixture(t),state=fixture.state;state.loading.value=true;
   await state.close();assert.equal(fixture.saves().length,0);assert.deepEqual(fixture.emitted,[['close']]);
+});
+
+test('Live: 公開受信APIは既存下書きへ追記だけを行い、再接続・会話変更・上限を照合する',async t=>{
+  const fixture=await liveFixture(t),state=fixture.state,target=fixture.exposed.draftTarget();
+  assert.equal(target.kind,'live');assert.equal(target.projectPath,'/fixture');
+  const before=JSON.stringify(state.messages.value);
+  assert.equal(fixture.exposed.insertDraft({...target,text:'ファイル: a.txt\n選択本文'}).ok,true);
+  assert.equal(state.prompt.value,'未送信の下書き\n\nファイル: a.txt\n選択本文');assert.equal(JSON.stringify(state.messages.value),before);
+  assert.equal(state.connected.value,false,'下書き追加だけでAIへ接続しない');
+  assert.equal(fixture.exposed.insertDraft({...target,text:'x'.repeat(20000)}).ok,false);
+  const draft=state.prompt.value;state.busy.value=true;
+  assert.equal(fixture.exposed.insertDraft({...target,text:'不可'}).ok,false);assert.equal(state.prompt.value,draft);
+  state.busy.value=false;state.disconnect();
+  assert.equal(fixture.exposed.insertDraft({...target,text:'古い会話'}).ok,false);
+});
+
+test('Live: パネルを隠しても下書きは保ち、マイクは停止して勝手に再開しない',async t=>{
+  const props=vue.reactive({visible:true});const fixture=await liveFixture(t,{props}),state=fixture.state;
+  state.connected.value=true;state.mic.value=true;state.micBusy.value=true;
+  const target=fixture.exposed.draftTarget(),before=JSON.stringify(state.messages.value);
+  props.visible=false;
+  assert.equal(state.mic.value,false);assert.equal(state.micBusy.value,false);assert.equal(state.connected.value,true);
+  assert.equal(state.prompt.value,'未送信の下書き');assert.equal(JSON.stringify(state.messages.value),before);
+  assert.equal(fixture.audioMutes.at(-1),false);assert.equal(state.speaker.value,true);assert.equal(fixture.packets.at(-1)[1].speaker,false);
+  assert.equal(fixture.exposed.insertDraft({...target,text:'非表示の入力欄へ'}).ok,true);
+  await state.microphone();assert.equal(state.mic.value,false);
+  props.visible=true;await vue.nextTick();assert.equal(state.mic.value,false);assert.equal(state.prompt.value,'未送信の下書き\n\n非表示の入力欄へ');
+  assert.equal(fixture.audioMutes.at(-1),true);assert.equal(fixture.packets.at(-1)[1].speaker,true);
+  state.speaker.value=false;props.visible=false;props.visible=true;assert.equal(fixture.audioMutes.at(-1),false);assert.equal(state.speaker.value,false);
+});
+
+async function codeFixture(t){
+  let receive;const sent=[],saved=[];
+  const fixture=setupComponent('CodePanel',{modules:{
+    '../transports/code.js':{codeTransport(_props,callback){receive=callback;return{draft:()=>'',saveDraft:value=>saved.push(value),start(){},dispose(){},async send(message){sent.push(message);}};}},
+    '../../host/src/stream-control':{visibleStreamContent:value=>value},
+    './StatusBar.vue':{},'./TerminalWelcome.vue':{},'./TerminalProgress.vue':{},'./ModalDialog.vue':{},
+    '../engines/chat-arrival':{chatArrival:()=>({reset(){},dispose(){},show(){},reserve(){},cancelReservation(){}})},
+  }});
+  t.after(()=>fixture.dispose());await fixture.mount();
+  const state={type:'state',会話ID:'conversation-1',メッセージ:[],履歴:[{id:'conversation-1',題名:'最初の会話'}],進捗:[],信頼済み:true,画面接続済み:true,オフライン対応:true,作業フォルダ:{名前:'fixture',パス:'/fixture'}};
+  receive(state);await vue.nextTick();return {...fixture,sent,saved,receive,packet:state};
+}
+
+test('Code: 公開受信APIは既存下書きへ追記し、履歴を閉じてもAI要求を一切送らない',async t=>{
+  const fixture=await codeFixture(t),state=fixture.state,target=fixture.exposed.draftTarget();
+  state.prompt.value='保持する下書き';state.history.value=true;
+  assert.equal(target.kind,'code');assert.equal(target.label,'最初の会話');
+  assert.equal(fixture.exposed.insertDraft({...target,text:'ファイル: readme.md\n本文'}).ok,true);
+  await vue.nextTick();assert.equal(state.prompt.value,'保持する下書き\n\nファイル: readme.md\n本文');assert.equal(state.history.value,false);
+  assert.equal(fixture.sent.length,0);assert.equal(fixture.saved.at(-1),state.prompt.value);
+});
+
+test('Code: 送信受理待ち・切断・会話変更・プロジェクト変更・破棄では古い渡し先を拒否する',async t=>{
+  const fixture=await codeFixture(t),state=fixture.state,target=fixture.exposed.draftTarget();
+  state.prompt.value='保持';state.pending.value=true;
+  assert.equal(fixture.exposed.insertDraft({...target,text:'不可'}).ok,false);assert.equal(state.prompt.value,'保持');
+  fixture.receive({type:'accepted'});assert.equal(state.prompt.value,'');
+  assert.equal(fixture.exposed.insertDraft({...target,text:'古い選択'}).ok,false);
+  const current=fixture.exposed.draftTarget();fixture.receive({...fixture.packet,会話ID:'conversation-2'});
+  assert.equal(fixture.exposed.insertDraft({...current,text:'前の会話へ'}).ok,false);
+  const next=fixture.exposed.draftTarget();state.state.作業フォルダ={名前:'other',パス:'/other'};
+  assert.equal(fixture.exposed.insertDraft({...next,text:'別プロジェクト'}).ok,false);
+  fixture.receive({type:'transportError',message:'切断'});assert.equal(fixture.exposed.draftTarget(),null);
+  fixture.dispose();assert.equal(fixture.exposed.draftTarget(),null);assert.equal(fixture.sent.length,0);
 });

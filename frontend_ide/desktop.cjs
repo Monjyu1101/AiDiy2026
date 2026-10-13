@@ -24,6 +24,9 @@ if(kind!=='term'&&!app.requestSingleInstanceLock()){
  return;
 }
 const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
+const {createDraftRouter}=require('./draft-router.cjs');
+const {readDevelopmentState}=require('./desktop-session.cjs');
+const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
 let quitting=false;
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
@@ -37,25 +40,23 @@ function closeServer(server){
  void pending.finally(()=>closing.delete(pending));
 }
 const sessionKey=state=>state.active?`${state.mode}:${state.startedAt}`:'';
-async function readState(record){
- const response=await fetch(new URL('api/connection',record.url),{signal:AbortSignal.timeout(3000)});
- if(!response.ok)throw Error('IDEの利用状態を取得できません。');return response.json();
-}
+async function readState(record){return readDevelopmentState(record);}
 function closeChildren(owner){
- owner.revision++;
+ owner.revision++;draftRouter.invalidate(owner);
  for(const child of [...windows.values()])if(child.owner===owner&&!child.window.isDestroyed())child.window.destroy();
 }
 async function checkChildren(owner){
  if(owner.checking||owner.window.isDestroyed()||![...windows.values()].some(child=>child.owner===owner))return;
- owner.checking=true;
+ owner.checking=true;const revision=owner.revision;
  try{
   const state=await readState(owner);
+  if(owner.window.isDestroyed()||owner.revision!==revision)return;
   if(!sessionKey(state)||[...windows.values()].some(child=>child.owner===owner&&child.linkKey!==sessionKey(state)))closeChildren(owner);
- }catch{closeChildren(owner);}finally{owner.checking=false;}
+ }catch{ /* 一時的な通信断・不正応答は終了の根拠にせず、次回の監視で再確認する。 */ }finally{owner.checking=false;}
 }
 function trustedEvent(event){
- const record=windows.get(event.sender);
- return record&&event.senderFrame===event.sender.mainFrame&&event.senderFrame.url.split('#')[0]===record.url?record:null;
+ const record=windows.get(event.sender),frame=event.senderFrame;
+ return record&&!record.window.isDestroyed()&&frame&&frame===event.sender.mainFrame&&typeof frame.url==='string'&&frame.url.split('#')[0]===record.url?record:null;
 }
 function audioAllowed(contents,permission,details){
  const record=windows.get(contents);
@@ -86,14 +87,14 @@ async function createWindow(kind,url,server,owner,linkKey){
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,revision:0,pending:new Map()};windows.set(contents,record);
  // IDEの×・Alt+F4は、利用中（接続利用・オフライン利用の開始後）だけ確認してから全体を閉じる。
- // 初期画面と「終了」で起動画面へ戻った後は、守る作業がないので確認しない（状態を取れない時も同じ）。利用終了は子窓だけを閉じる。
+ // 初期画面と「終了」で起動画面へ戻った後は、守る作業がないので確認しない（状態が不明な時は作業を守るため確認する）。利用終了は子窓だけを閉じる。
  if(kind==='ide'){
   let confirming=false,approved=false;
   window.on('close',event=>{
    if(quitting||approved)return;
    event.preventDefault();if(confirming)return;confirming=true;
    void (async()=>{
-    const active=await readState(record).then(state=>!!state.active,()=>false);
+    const active=await readState(record).then(state=>state.active,()=>true);
     if(window.isDestroyed())return;
     if(!active){approved=true;window.close();return;}
     const {response}=await dialog.showMessageBox(window,{type:'question',title:'AiDiy IDE',message:'AiDiy IDE を終了しますか？',buttons:['終了する','キャンセル'],defaultId:1,cancelId:1,noLink:true});
@@ -102,7 +103,9 @@ async function createWindow(kind,url,server,owner,linkKey){
   });
  }
  const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{clearInterval(monitor);closeChildren(record);windows.delete(contents);closeServer(server);});
+ window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);});
+ contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame&&!isInPlace)draftRouter.invalidate(record);});
+ contents.on('render-process-gone',()=>draftRouter.invalidate(record));
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
  contents.on('will-redirect',event=>event.preventDefault());contents.on('will-attach-webview',event=>event.preventDefault());
  contents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//i.test(url))void shell.openExternal(url);return{action:'deny'};});
@@ -139,6 +142,10 @@ app.whenReady().then(async()=>{
   else if(action==='maximize'){if(record.window.isMaximized())record.window.unmaximize();else record.window.maximize();}
   if(action==='maximize'||action==='isMaximized')return record.window.isMaximized();
  });
+ ipcMain.handle('development:draft-target-register',(event,value)=>draftRouter.register(trustedEvent(event),value));
+ ipcMain.handle('development:draft-targets',event=>draftRouter.list(trustedEvent(event)));
+ ipcMain.handle('development:draft-insert',(event,value)=>draftRouter.insert(trustedEvent(event),value));
+ ipcMain.on('development:draft-result',(event,value)=>draftRouter.acknowledge(trustedEvent(event),value));
  ipcMain.handle('development:end-session',async event=>{
   const record=trustedEvent(event);if(!record||record.kind!=='ide')return;
   closeChildren(record);await Promise.allSettled([...closing]);
@@ -148,23 +155,27 @@ app.whenReady().then(async()=>{
   return{live:!!owner&&owner.kind==='ide'&&[...windows.values()].some(child=>child.owner===owner&&child.kind==='live'&&!child.window.isDestroyed())};
  });
  ipcMain.handle('development:open-app',async(event,type)=>{
-  const record=trustedEvent(event);
-  if(!record||record.kind!=='ide'||!['code','live','term'].includes(type))return{ok:false,error:'この画面からは開けません。'};
+  const source=trustedEvent(event),record=source?.kind==='viewer'?source.owner:source;
+  if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','term'].includes(type))return{ok:false,error:'この画面からは開けません。'};
+  // ピン留めからの明示起動も、元のIDEと同じ利用セッションだけに限定する。
+  const revision=record.revision;let state;
+  try{
+   state=await readState(record);
+   if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.window.isDestroyed()||record.revision!==revision||!state.active||!state.project?.path||(source!==record&&source.linkKey!==sessionKey(state)))throw Error('IDEの利用状態が変わりました。');
+   if(type==='live'&&state.mode!=='online')throw Error('LiveはAiDiy接続利用で開けます。');
+  }catch(error){return{ok:false,error:error.message};}
   // Codeは依頼ごとに別窓。Liveだけ初期化中も共有して1窓にする。
   if(type==='live'&&record.pending.has(type))return record.pending.get(type);
   const opening=(async()=>{
-   let child;const revision=record.revision;
+   let child;
    try{
-    const state=await readState(record);
-    if(!state.active||!state.project?.path)throw Error('IDEの利用を開始してください。');
-    if(type==='live'&&state.mode!=='online')throw Error('LiveはAiDiy接続利用で開けます。');
     const key=sessionKey(state);
     const existing=[...windows.values()].find(item=>item.owner===record&&item.kind===type&&item.linkKey===key&&!item.window.isDestroyed());
     if(type==='live'&&existing){focusWindow(existing.window);return{ok:true,reused:true};}
     const {startDevelopment}=await import('./server.mjs');
     child=await startDevelopment(state.project.path,{kind:type,offline:state.mode==='offline',linked:true});
     const current=await readState(record);
-    if(quitting||record.revision!==revision||record.window.isDestroyed()||!current.active||sessionKey(current)!==key)throw Error('IDEの利用状態が変わりました。もう一度開いてください。');
+    if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.revision!==revision||record.window.isDestroyed()||!current.active||current.project?.path!==state.project.path||sessionKey(current)!==key||(source!==record&&source.linkKey!==key))throw Error('IDEの利用状態が変わりました。もう一度開いてください。');
     await createWindow(type,child.url,child,record,key);child=undefined;
     return{ok:true};
    }catch(error){closeServer(child);return{ok:false,error:error.message};}

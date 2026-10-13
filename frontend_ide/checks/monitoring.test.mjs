@@ -11,22 +11,24 @@ import vm from 'node:vm';
 import { tmpdir } from 'node:os';
 import { startTerminal } from '../terminal.mjs';
 import { createSpace, ORBIT_PATH_SCALE } from '../src/engines/space.js';
+import { validConnectionState } from '../src/connection-state.js';
+import { createDraftTargetRegistry } from '../src/draft-target-registry.js';
 import { createTextWidthCache } from '../src/engines/text-width-cache.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let n=0;n<12;n++)await Promise.resolve();};
 
-function component(name,{props={},fetcher=async()=>({ok:true,json:async()=>({active:true})})}={}){
+function component(name,{props={},windowAPI,fetcher=async()=>({ok:true,json:async()=>({active:true})})}={}){
   const {descriptor}=parse(readFileSync(new URL(`../src/${name}.vue`,import.meta.url),'utf8'));
   const script=compileScript(descriptor,{id:name,genDefaultAs:'component'});
   const {code}=transformSync(`${script.content}\nmodule.exports=component;`,{format:'cjs'});
   const mounted=[],unmounted=[],timers=new Map(),document=new EventTarget(),window=new EventTarget();
-  document.hidden=false;let id=0;
+  document.hidden=false;if(windowAPI)window.aidiyWindow=windowAPI;let id=0;
   const module={exports:{}};
   vm.runInNewContext(code,{
     module,document,window,fetch:fetcher,AbortSignal,AbortController,Date,location:{hash:''},
     setInterval:(callback,ms)=>{timers.set(++id,{callback,ms});return id;},clearInterval:key=>timers.delete(key),
-    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:{},
+    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.endsWith('/connection-state.js')?{validConnectionState}:id==='./draft-target-registry.js'?{createDraftTargetRegistry}:{},
   });
   const reactive=vue.reactive(props),scope=vue.effectScope();
   const state=scope.run(()=>module.exports.setup(reactive,{expose(){}}));
@@ -35,7 +37,7 @@ function component(name,{props={},fetcher=async()=>({ok:true,json:async()=>({act
 
 test('IDE: 初回即時・以後10秒の状態取得、手動開始は待たず、破棄中の初回応答でタイマーを残さない',async()=>{
   const calls=[];
-  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async(url)=>{calls.push(url);return{ok:true,json:async()=>({active:true,startedAt:1,mode:'online'})};}});
+  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async(url)=>{calls.push(url);return{ok:true,json:async()=>({active:true,startedAt:1,mode:'online',project:{path:'/fixture'}})};}});
   try{
     await fixture.mount();assert.deepEqual(calls,['/api/connection']);
     assert.deepEqual([...fixture.timers.values()].map(timer=>timer.ms),[10000]);
@@ -53,7 +55,7 @@ test('ピン留めビューア: 10秒間隔、遅い応答を重ねず、閉じ�
   const fixture=component('components/ViewerWindow',{props:{path:'file.txt'},fetcher:(_url,options)=>{calls++;signal=options.signal;return new Promise(resolve=>{release=resolve;});}});
   await fixture.mount();const [timer]=fixture.timers.values();assert.equal(timer.ms,10000);assert.equal(calls,1);
   await timer.callback();assert.equal(calls,1);
-  release({ok:true,json:async()=>({active:true,connected:true})});await flush();assert.equal(fixture.state.state.value.active,true);
+  release({ok:true,json:async()=>({active:true,connected:true,mode:'online',startedAt:1,project:{path:'/fixture'}})});await flush();assert.equal(fixture.state.state.value.active,true);
   const pending=timer.callback();assert.equal(calls,2);fixture.dispose();assert.equal(signal.aborted,true);
   release({ok:true,json:async()=>({active:false})});await pending;assert.equal(fixture.state.state.value.active,true);
   assert.equal(fixture.timers.size,0);
@@ -98,7 +100,7 @@ test('IDE描画: 非表示ではフレーム/DOM計測を止め、復帰・再�
   const frames=new Map(),window=new EventTarget(),document=new EventTarget();
   Object.assign(window,{devicePixelRatio:1,requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id)});
   const context=new Proxy({font:'',createRadialGradient:()=>({addColorStop(){}}),measureText:text=>({width:text.length*6})},{get:(object,key)=>key in object?object[key]:()=>{}});
-  const canvas=new EventTarget();canvas.getContext=()=>context;canvas.classList={add(){},remove(){}};
+  const canvas=new EventTarget();canvas.getContext=()=>context;canvas.classList={add(){},remove(){},toggle(){}};canvas.style={removeProperty(){}};canvas.setAttribute=()=>{};
   document.hidden=false;document.createElement=()=>({getContext:()=>context});
   for(const [key,value] of Object.entries({window,document,innerWidth:1280,innerHeight:800})){old.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});}
   t.mock.method(performance,'now',()=>clock);
@@ -124,4 +126,66 @@ test('軌道案内線は元軌道の90%を描画し、船の飛行座標を変�
   assert.deepEqual(point,{x:100,y:-200,z:300});
   const source=readFileSync(new URL('../src/engines/space.js',import.meta.url),'utf8');
   assert.match(source,/project\(point\.x\*ORBIT_PATH_SCALE,point\.y\*ORBIT_PATH_SCALE,point\.z\*ORBIT_PATH_SCALE\)/);
+});
+
+test('IDE: 状態確認の通信失敗・不正応答でも作業、下書き、PTYを保持し、同じセッションへ復帰する',async()=>{
+  const active={active:true,startedAt:1,mode:'online',connected:true,project:{path:'/fixture',name:'fixture'}};
+  let reply=active,fail=false;
+  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async()=>{if(fail)throw Error('offline');return{ok:true,json:async()=>reply};}});
+  try{
+    await fixture.mount();const state=fixture.state;
+    Object.assign(state.base,{code:'/code/',live:'/live/',term:'/term/'});state.panelOpen.value=true;
+    state.analysis.value={file:'sample'};state.history.value={file:'history'};
+    fail=true;await state.status();
+    assert.equal(state.state.value.active,true);assert.equal(state.base.term,'/term/');assert.equal(state.base.code,'/code/');assert.equal(state.base.live,'/live/');
+    assert.equal(state.panelOpen.value,true);assert.equal(state.analysis.value.file,'sample');assert.equal(state.history.value.file,'history');assert.match(state.statusError.value,/保持/);
+    fail=false;reply={};await state.status();assert.equal(state.base.term,'/term/');assert.equal(state.state.value.active,true);
+    reply={active:true};await state.status();assert.equal(state.base.term,'/term/');
+    reply={...active,connected:false};await state.status();assert.equal(state.state.value.connected,false);assert.equal(state.statusError.value,'');assert.equal(state.base.term,'/term/');
+    reply={...active,startedAt:2};await state.status();assert.equal(state.base.term,'');assert.equal(state.analysis.value,null);
+    state.base.term='/next/';reply={...active,active:false};await state.status();assert.equal(state.base.term,'');assert.equal(state.state.value.active,false);
+  }finally{fixture.dispose();}
+});
+
+test('IDE: 子ウィンドウの確認失敗は有効な接続状態を利用終了に変えない',async()=>{
+  const fixture=component('App',{props:{config:{kind:'ide'}},windowAPI:{childWindows:async()=>{throw Error('ipc');}},fetcher:async()=>({ok:true,json:async()=>({active:true,startedAt:1,mode:'online',connected:false,project:{path:'/fixture'}})})});
+  try{await fixture.mount();fixture.state.base.term='/term/';await fixture.state.status();assert.equal(fixture.state.state.value.active,true);assert.equal(fixture.state.base.term,'/term/');assert.match(fixture.state.statusError.value,/子ウィンドウ/);}
+  finally{fixture.dispose();}
+});
+
+test('IDE: 手動終了より前に始めた遅い状態応答は終了後の画面を復活させない',async()=>{
+  let release,delay=false;
+  const active={active:true,startedAt:1,mode:'offline',project:{path:'/fixture'}};
+  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async url=>url.endsWith('/disconnect')?{ok:true,json:async()=>({active:false})}:delay?new Promise(resolve=>{release=resolve;}):{ok:true,json:async()=>active}});
+  try{await fixture.mount();delay=true;const polling=fixture.state.status();await fixture.state.start('disconnect');release({ok:true,json:async()=>active});await polling;assert.equal(fixture.state.state.value.active,false);assert.equal(fixture.state.base.term,'');}
+  finally{fixture.dispose();}
+});
+
+test('IDE: 下書き連携の遅い状態確認は手動終了・新セッションを巻き戻さない',async()=>{
+  let delayed=false,release;
+  const active={active:true,startedAt:1,mode:'online',project:{path:'/fixture'}};
+  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async url=>url.endsWith('/disconnect')?{ok:true,json:async()=>({active:false})}:delayed?new Promise(resolve=>{release=resolve;}):{ok:true,json:async()=>active}});
+  try{
+    await fixture.mount();delayed=true;
+    const checking=fixture.state.confirmDraftSession({projectPath:'/fixture'});
+    await fixture.state.start('disconnect');
+    fixture.state.update({...active,startedAt:2});fixture.state.base.term='/new-term/';
+    release({ok:true,json:async()=>active});await assert.rejects(checking,/利用状態が変わり/);
+    assert.equal(fixture.state.state.value.startedAt,2);assert.equal(fixture.state.base.term,'/new-term/');
+  }finally{fixture.dispose();}
+});
+
+test('Webピン留め: 連携確認の途中で送信元が閉じた場合は追加しない',async()=>{
+  let delayed=false,release,insertions=0;
+  const active={active:true,startedAt:1,mode:'online',project:{path:'/fixture'}};
+  const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async()=>delayed?new Promise(resolve=>{release=resolve;}):{ok:true,json:async()=>active}});
+  try{
+    await fixture.mount();const state=fixture.state,source={closed:false};
+    state.codePanel.value={draftTarget:()=>({kind:'code',projectPath:'/fixture',contextId:'one',label:'Code',maxLength:200000}),insertDraft:()=>{insertions++;return{ok:true};}};
+    const listing=await state.loadDraftTargets({projectPath:'/fixture'});
+    state.pinnedViewers.set(source,{sessionKey:listing.sessionKey,projectPath:'/fixture'});
+    const request={...listing.targets[0],targetId:listing.targets[0].id,sessionKey:listing.sessionKey,text:'参照'};
+    delayed=true;const pending=state.draftLink.insert(source,request);source.closed=true;release({ok:true,json:async()=>active});
+    await assert.rejects(pending,/ピン留め元/);assert.equal(insertions,0);
+  }finally{fixture.dispose();}
 });

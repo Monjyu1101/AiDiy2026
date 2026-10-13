@@ -11,8 +11,8 @@
 // AiDiy IDE の単独サーバー。作業フォルダを走査して星図用のツリーを返し、ファイルの中身と web/ の画面を配信する。
 // 依存パッケージなし（Node 標準のみ）。待受は 127.0.0.1 だけ。
 import { createServer } from 'node:http';
-import { open, readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { open, readFile, realpath, stat } from 'node:fs/promises';
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { forwardedOrigin } from './launch-options.mjs';
 import { createCoreConnection } from './core-connection.mjs';
@@ -20,6 +20,8 @@ import { createPanels } from './panels.mjs';
 import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
 import { latestFile, latestFiles } from '../src/latest-file.js';
+import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
+export { scanTree, createScanPool } from './file-scan.mjs';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
 // ファイルビューア用の Monaco Editor（`python frontend_ide/viewer/_setup.py` で導入。無ければ画面側が簡易表示にする）
@@ -43,12 +45,6 @@ const OFFICE_ASSETS = {
 };
 const OFFICE_CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' blob:; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
-// 星にしないフォルダ（依存物・生成物・キャッシュ）。
-const IGNORED = new Set([
-  'node_modules', '.git', 'dist', 'out', 'build', '__pycache__', '.venv', 'venv',
-  '_cache', '.pytest_cache', '.mypy_cache', '.ruff_cache', '.next', '.turbo', '.cache',
-]);
-const MAX_FILES = 30000;
 const MAX_TEXT = 1024 * 1024;          // ビューアに送るテキストの上限（先頭のみ）
 const MAX_IMAGE = 20 * 1024 * 1024;    // ビューアに送る画像の上限
 const MAX_DOCUMENT = 50 * 1024 * 1024; // Office / PDF の表示上限
@@ -81,64 +77,6 @@ const IMAGES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
   '.webp': 'image/webp', '.bmp': 'image/bmp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml',
 };
-
-// AiDiy のバックアップ対象（エクスプローラーのフィルター用）。
-// ルールの元は backend_server/AIコア/AIバックアップ.py の _全ファイルスキャン。独立性のため Python は呼ばず、同じルールをここに持つ。
-// 元を変えたらここも合わせる。
-const BACKUP_EXCLUDED_DIRS = new Set([
-  '__pycache__', '.git', '.venv', 'venv', '_data', 'temp', 'log', 'logs', 'backup', 'node_modules', 'dist', 'build',
-  '.output', '.nuxt', '.next', '.vite', '.turbo', '.cache', '.npm', '.pnpm-store', '.yarn',
-]);
-const BACKUP_EXCLUDED_FILES = new Set([
-  '.DS_Store', 'Thumbs.db', 'package-lock.json', 'package.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'npm-shrinkwrap.json',
-]);
-const BACKUP_EXCLUDED_PATHS = new Set(['_AIDIY/aidiy_code', '_AIDIY/aidiy_ide']);
-const backupPathAllowed = path => {
-  const parts = resolve(path).split(sep);
-  return !parts.some((part, index) => BACKUP_EXCLUDED_PATHS.has(`${part}/${parts[index + 1]}`));
-};
-const BACKUP_EXCLUDED_EXTENSIONS = ['.pyc', '.pyo', '.pyd', '.log', '.tmp', '.swp'];
-const WINDOWS_RESERVED = new Set(['con', 'prn', 'aux', 'nul', 'null',
-  ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`), ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`)]);
-const MAX_BACKUP_FILES = 100000;   // バックアップがキャンセルする件数と同じ
-const backupDirAllowed = name => !BACKUP_EXCLUDED_DIRS.has(name) && !name.startsWith('.');
-const backupFileAllowed = name => !BACKUP_EXCLUDED_FILES.has(name)
-  && !name.startsWith('~$') // Officeの一時ロック。Pythonの共通バックアップ判定と合わせる。
-  && !BACKUP_EXCLUDED_EXTENSIONS.some(ext => name.endsWith(ext))
-  && !WINDOWS_RESERVED.has((name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name).toLowerCase());
-
-/** フォルダを再帰的に走査する。フォルダは {n, d:[子フォルダ], f:[[名前, サイズ, 更新ms]]}。
- *  filter: 'backup' なら AiDiy のバックアップ対象だけ（エクスプローラーのフィルター）。 */
-export async function scanTree(root, { filter } = {}) {
-  const backup = filter === 'backup';
-  const limit = backup ? MAX_BACKUP_FILES : MAX_FILES;
-  let count = 0, truncated = false;
-  async function walk(dir, name) {
-    const node = { n: name, d: [], f: [] };
-    if (backup && !backupPathAllowed(dir)) return node;
-    let entries;
-    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return node; }
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-    for (const entry of entries) {
-      if (count >= limit) { truncated = true; break; }
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (backup ? !backupDirAllowed(entry.name) || !backupPathAllowed(full) : IGNORED.has(entry.name)) continue;
-        node.d.push(await walk(full, entry.name));
-      } else if (entry.isFile()) {
-        if (backup && !backupFileAllowed(entry.name)) continue;
-        try {
-          const info = await stat(full);
-          node.f.push([entry.name, info.size, Math.round(info.mtimeMs)]);
-          count++;
-        } catch { /* 走査中に消えたファイル */ }
-      }
-    }
-    return node;
-  }
-  const tree = await walk(root, basename(root) || root);
-  return { root, scannedAt: Date.now(), files: count, truncated, tree };
-}
 
 /** 作業フォルダからの相対パス（/ 区切り）を実ファイルへ解決する。作業フォルダの外（.. やリンク先）は null。 */
 async function insideRoot(root, rel) {
@@ -191,63 +129,117 @@ async function describeFile(root, rel) {
 }
 
 /** テキスト内容の部分一致検索。外部コマンドや正規表現は実行しない。 */
-export async function grepFiles(root, query, { caseSensitive = false, signal } = {}) {
+export async function grepFiles(root, query, { caseSensitive = false, signal, pool, fresh = false, limits = {}, now } = {}) {
+  if (typeof query !== 'string' || !query || query.length > 256) throw new Error('検索語は1〜256文字で指定してください。');
   const needle = caseSensitive ? query : query.toLocaleLowerCase();
-  if (!needle || query.length > 256) throw new Error('検索語は1〜256文字で指定してください。');
-  const paths = [], files = [];
-  let checked = 0, skipped = 0, bytes = 0, truncated = false, cursor = 0;
-  const deadline = Date.now() + 30000;
-  async function walk(dir, prefix = '') {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-    for (const entry of entries) {
-      if (signal?.aborted) return;
-      if (files.length >= MAX_FILES || Date.now() > deadline) { truncated = true; return; }
-      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        if (!IGNORED.has(entry.name) && entry.name !== 'backup') await walk(join(dir, entry.name), path);
-      } else if (entry.isFile()) files.push(path);
-      if (truncated) return;
+  const caps = { maxFiles: 30000, maxFileBytes: MAX_TEXT, maxBytes: 256 * MAX_TEXT, maxMatches: 1000, timeMs: 30000, ...limits };
+  const budget = createBudget({ signal, timeMs: caps.timeMs, now });
+  const paths = new Set(), matches = [], files = [];
+  let checked = 0, skipped = 0, bytes = 0, reservedBytes = 0, scannedFiles = 0, cursor = 0, scan;
+  const reasons = new Set();
+  function collect(node, prefix = '') {
+    if (budget.check()) return;
+    for (const [name] of node.f) files.push(prefix + name);
+    for (const child of node.d) if (child.n !== 'backup') collect(child, `${prefix}${child.n}/`);
+  }
+  function findMatches(text, path, info) {
+    const haystack = caseSensitive ? text : text.toLocaleLowerCase();
+    let offset = haystack.indexOf(needle);
+    if (offset < 0) return;
+    // 大文字小文字の変換で長さが変わる文字（İなど）も元のUTF-16位置へ戻す。
+    let originalOffsets;
+    if (haystack.length !== text.length) {
+      originalOffsets = [];
+      let original = 0;
+      for (const character of text) {
+        for (let n = 0; n < character.toLocaleLowerCase().length; n++) originalOffsets.push(original);
+        original += character.length;
+      }
+    }
+    const originalStart = index => originalOffsets ? originalOffsets[index] : index;
+    let line = 1, lineStart = 0, position = 0;
+    while (offset >= 0 && !budget.check()) {
+      if (matches.length >= caps.maxMatches) { budget.stop('matches'); break; }
+      const start = originalStart(offset), last = originalStart(offset + needle.length - 1);
+      const end = originalOffsets ? last + (text.codePointAt(last) > 0xffff ? 2 : 1) : offset + needle.length;
+      while (position < start) {
+        const char = text[position++];
+        if (char === '\r') { if (text[position] === '\n' && position < start) position++; line++; lineStart = position; }
+        else if (char === '\n') { line++; lineStart = position; }
+      }
+      let lineEnd = text.indexOf('\n', start);
+      if (lineEnd < 0) lineEnd = text.length;
+      const carriage = text.indexOf('\r', start);
+      if (carriage >= 0) lineEnd = Math.min(lineEnd, carriage);
+      const snippetStart = Math.max(lineStart, start - 80), snippetEnd = Math.min(lineEnd, snippetStart + 240);
+      matches.push({ path, line, column: start - lineStart + 1, length: end - start,
+        snippet: text.slice(snippetStart, snippetEnd), snippetColumn: snippetStart - lineStart + 1,
+        snippetTruncated: snippetStart > lineStart || snippetEnd < lineEnd,
+        mtime: Math.round(info.mtimeMs), size: info.size });
+      paths.add(path);
+      offset = haystack.indexOf(needle, offset + needle.length);
     }
   }
-  await walk(root);
-  // 読み取りは8件に制限する。大きなプロジェクトでも同時オープン数を増やさない。
   async function worker() {
-    while (cursor < files.length && !signal?.aborted) {
-      if (bytes >= 256 * MAX_TEXT || Date.now() > deadline) { truncated = true; return; }
+    while (cursor < files.length && !budget.check()) {
+      if (scannedFiles >= caps.maxFiles) { reasons.add('files'); break; }
       const path = files[cursor++];
+      scannedFiles++;
+      let handle;
       try {
-        const full = await insideRoot(root, path);
+        const full = await budget.run(() => insideRoot(root, path));
         if (!full) { skipped++; continue; }
-        const info = await stat(full);
+        const info = await budget.run(() => stat(full));
         const ext = extname(full).toLowerCase();
-        if (!info.isFile() || info.size > MAX_TEXT || IMAGES[ext] || (DOCUMENTS[ext] && !['.csv', '.tsv'].includes(ext))) { skipped++; continue; }
-        if (bytes + info.size > 256 * MAX_TEXT) { truncated = true; continue; }
-        bytes += info.size;
-        const head = await readHead(full, Math.min(info.size, MAX_TEXT));
+        if (!info.isFile() || info.size > caps.maxFileBytes || IMAGES[ext] || (DOCUMENTS[ext] && !['.csv', '.tsv'].includes(ext))) { skipped++; continue; }
+        if (reservedBytes + info.size > caps.maxBytes) { reasons.add('bytes'); cursor = files.length; break; }
+        reservedBytes += info.size;
+        handle = await budget.run(() => open(full, 'r'), late => late.close());
+        const buffer = Buffer.alloc(info.size);
+        const { bytesRead } = await budget.run(() => handle.read(buffer, 0, buffer.length, 0));
+        if (budget.check()) break;
+        bytes += bytesRead;
+        const current = await budget.run(() => handle.stat());
+        if (current.size !== info.size || current.mtimeMs !== info.mtimeMs || bytesRead !== info.size) { skipped++; continue; }
+        const head = buffer.subarray(0, bytesRead);
         if (head.includes(0)) { skipped++; continue; }
         const { text, encoding } = decodeText(head);
         if (encoding.includes('一部')) { skipped++; continue; }
         checked++;
-        if ((caseSensitive ? text : text.toLocaleLowerCase()).includes(needle)) paths.push(path);
-      } catch { skipped++; }
+        findMatches(text, path, info);
+      } catch { if (!budget.check()) skipped++; }
+      finally { if (handle) await budget.run(() => handle.close()).catch(() => { void handle.close().catch(() => {}); }); }
     }
   }
-  await Promise.all(Array.from({ length: 8 }, worker));
-  paths.sort();
-  return { paths, checked, skipped, truncated };
+  try {
+    scan = pool ? await pool.get({ signal: budget.signal, fresh }) : await scanTree(root, { signal: budget.signal, limits: limits.scan });
+    if (scan.truncated) reasons.add(scan.truncationReason);
+    collect(scan.tree);
+    await Promise.all(Array.from({ length: 8 }, worker));
+  } catch (error) { if (!budget.check()) throw error; }
+  finally { budget.close(); }
+  if (budget.reason) reasons.add(budget.reason);
+  matches.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.column - b.column);
+  return { paths: [...paths].sort(), matches, checked, skipped, bytes, scannedFiles,
+    matchedFiles: paths.size, matchCount: matches.length, truncated: reasons.size > 0,
+    truncationReason: budget.reason || [...reasons][0] || null, truncationReasons: [...reasons],
+    elapsedMs: budget.elapsedMs, scan: scan ? scanMetadata(scan) : null };
 }
 
 /** 既定は OS による空きポート割り当て。明示ポートが使用中なら再割り当て（strict なら失敗）。 */
-export async function startServer(root, port = 0, { strict = false, env = process.env, connection = createCoreConnection(root), requestHandler, panelsFactory = createPanels } = {}) {
+export async function startServer(root, port = 0, { strict = false, env = process.env, connection = createCoreConnection(root), requestHandler, panelsFactory = createPanels, scanPoolOptions } = {}) {
   let allowedHosts = new Set();
   let allowedOrigins = new Set();
   const panels = panelsFactory(root, connection.state);
+  const scans = createScanPool(root, scanPoolOptions);
+  const reads = new Set();
+  const cancelReads = () => { for (const controller of reads) controller.abort(); };
+  const closeScans = () => { cancelReads(); scans.close(); };
   // HTML プレビュー用の別オリジン静的サーバー。最初のプレビュー要求で起動し、このサーバーを閉じる時に止める。
   const preview = createPreview(root, () => connection.state().active, { env });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
-    const fail = (status, message) => { res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' }); res.end(message); };
+    const fail = (status, message) => { if (res.destroyed || res.writableEnded) return; res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' }); res.end(message); };
     // DNS リバインディング対策: 127.0.0.1 / localhost 以外の Host 名で来た要求は受けない
     if (!allowedHosts.has(req.headers.host)) return fail(403, 'forbidden host');
     if (req.headers.origin && !allowedOrigins.has(req.headers.origin)) return fail(403, 'forbidden origin');
@@ -255,13 +247,33 @@ export async function startServer(root, port = 0, { strict = false, env = proces
     try {
       if (requestHandler && await requestHandler(req, res, url)) return;
       const json = value => {
+        if (res.destroyed || res.writableEnded) return;
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
         res.end(JSON.stringify(value));
+      };
+      // 消えた画面の待機だけを解除する。共有走査は最後の利用者が離れるまで続ける。
+      const fileWork = async work => {
+        const controller = new AbortController();
+        const cancel = () => controller.abort();
+        reads.add(controller);
+        res.once('close', cancel); req.once('aborted', cancel);
+        try {
+          const result = await work(controller.signal);
+          if (res.destroyed) return;
+          if (controller.signal.aborted) return fail(503, '利用が終了しました。');
+          if (!connection.state().active) return fail(503, '利用が終了しました。');
+          return json(result);
+        } catch (error) {
+          if (!controller.signal.aborted && error?.name !== 'AbortError') throw error;
+          if (!res.destroyed) return fail(503, '利用が終了しました。');
+        }
+        finally { reads.delete(controller); res.off('close', cancel); req.off('aborted', cancel); }
       };
       if (url.pathname === '/api/connection' && req.method === 'GET') return json(connection.state());
       if (['/api/connection/connect', '/api/connection/disconnect', '/api/connection/offline'].includes(url.pathname)) {
         if (req.method !== 'POST') return fail(405, 'POST required');
         req.resume();
+        if (!url.pathname.endsWith('/connect') || connection.state().mode !== 'online') { cancelReads(); scans.invalidate(); }
         return json(url.pathname.endsWith('/disconnect') ? connection.disconnect() : url.pathname.endsWith('/offline') ? connection.offline() : await connection.connect());
       }
       // 画面を隠すだけでなく、未接続時はファイル取得も停止する。
@@ -287,12 +299,9 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (req.method !== 'GET') return fail(405, 'GET required');
         const query = url.searchParams.get('q') || '';
         if (!query || query.length > 256) return fail(400, '検索語は1〜256文字で指定してください。');
-        const controller = new AbortController();
-        res.once('close', () => controller.abort());
-        const result = await grepFiles(root, query, { caseSensitive: url.searchParams.get('case') === '1', signal: controller.signal });
-        if (controller.signal.aborted) return;
-        if (!connection.state().active) return fail(503, '利用が終了しました。');
-        return json(result);
+        return await fileWork(signal => grepFiles(root, query, {
+          caseSensitive: url.searchParams.get('case') === '1', signal, pool: scans, fresh: url.searchParams.get('fresh') === '1',
+        }));
       }
       // HTML/SVG/Markdownは別オリジンのプレビュー、Vueはfrontend_webの開発サーバーの画面
       if (url.pathname === '/api/preview') {
@@ -318,16 +327,16 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
         const value = url.searchParams.get('since'), since = value === null ? null : Number(value);
         if (value !== null && (!value.trim() || !Number.isFinite(since) || since < 0)) return fail(400, 'since は更新日時のミリ秒を指定してください。');
-        const { tree } = await scanTree(root, { filter });
-        return json({ latest: latestFile(tree), files: latestFiles(tree, since) });
+        return await fileWork(async signal => {
+          const result = await scans.get({ filter, signal, fresh: url.searchParams.get('fresh') === '1' });
+          return { latest: latestFile(result.tree), files: latestFiles(result.tree, since), scan: scanMetadata(result),
+            truncated: result.truncated, truncationReason: result.truncationReason };
+        });
       }
       if (url.pathname === '/api/galaxy') {
         const filter = url.searchParams.get('filter');
         if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
-        const body = JSON.stringify(await scanTree(root, { filter }));
-        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-        res.end(body);
-        return;
+        return await fileWork(signal => scans.get({ filter, signal, fresh: url.searchParams.get('fresh') === '1' }));
       }
       if (url.pathname === '/api/file') {
         const result = await describeFile(root, url.searchParams.get('path'));
@@ -402,13 +411,13 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         || req.headers['sec-fetch-site'] === 'cross-site') { socket.destroy(); return; }
     void panels.upgrade(req, socket, head).catch(() => socket.destroy());
   });
-  server.once('close', () => { connection.close(); void panels.close(); void preview.close(); });
+  server.once('close', () => { closeScans(); connection.close(); void panels.close(); void preview.close(); });
   const listen = p => new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(p, '127.0.0.1', () => { server.off('error', reject); resolve(); });
   });
   try { await listen(port); } catch (error) {
-    if (error.code !== 'EADDRINUSE' || strict) { await panels.close(); await preview.close(); connection.close(); throw error; }
+    if (error.code !== 'EADDRINUSE' || strict) { closeScans(); await panels.close(); await preview.close(); connection.close(); throw error; }
     await listen(0);
   }
   const actual = server.address().port;
@@ -417,6 +426,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
   if (forwarded) allowedHosts.add(new URL(forwarded).host);
   allowedOrigins = new Set([`http://127.0.0.1:${actual}`, `http://localhost:${actual}`, ...(forwarded ? [forwarded] : [])]);
   async function close() {
+    closeScans();
     connection.close();
     // upgrade済みの音声ソケットはcloseAllConnectionsでは閉じないため先に破棄する。
     await panels.close();

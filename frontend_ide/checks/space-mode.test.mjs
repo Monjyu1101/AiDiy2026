@@ -1,0 +1,453 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createSpace} from '../src/engines/space.js';
+
+const flush=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
+const reply=value=>({ok:true,json:async()=>structuredClone(value)});
+const directory=(n,f=[],d=[])=>({n,f:f.map(name=>[name,20,1000]),d});
+const snapshot=(tree=directory('project',['root.js'],[
+  directory('src',['main.js'],[directory('nested',['deep.js'])]),directory('別のフォルダ',['資料.txt']),
+]),extra={})=>({root:'/project',tree,truncated:false,...extra});
+const event=(type,values={})=>Object.assign(new Event(type,{cancelable:true}),values);
+
+function space(t,{fetcher=async()=>reply(snapshot()),holdAnimations=false,hash=''}={}) {
+  const old=new Map(),frames=new Map(),timers=new Map(),animations=[],changes=[],requests=[],history=[];
+  const window=new EventTarget(),document=new EventTarget(),canvas=new EventTarget();
+  const classes=new Set(),attributes=new Map(),storage=new Map();
+  let clock=0,id=0,layoutCalls=0,draws=0,captures=0,explorerToggles=0;
+  document.hidden=false;
+  const context=new Proxy({font:'',createRadialGradient:()=>({addColorStop(){}}),measureText:text=>({width:text.length*6}),fillRect(){draws++;}},{get:(object,key)=>key in object?object[key]:()=>{}});
+  Object.assign(canvas,{
+    getContext:()=>context,
+    classList:{add:value=>classes.add(value),remove:value=>classes.delete(value),toggle(value,on){on?classes.add(value):classes.delete(value);}},
+    style:{removeProperty(key){delete this[key];}},setAttribute:(name,value)=>attributes.set(name,value),
+    setPointerCapture(){captures++;},
+    animate(){
+      const done=deferred(),animation={finished:done.promise,cancelled:false,cancel(){this.cancelled=true;done.reject(Error('cancelled'));},finish:done.resolve};
+      animations.push(animation);if(!holdAnimations)done.resolve();return animation;
+    },
+  });
+  document.createElement=()=>({getContext:()=>context});
+  const location={hash};
+  Object.assign(window,{devicePixelRatio:1,history:{pushState(_a,_b,next){history.push(next);location.hash=next;}},
+    requestAnimationFrame:callback=>{frames.set(++id,callback);return id;},cancelAnimationFrame:key=>frames.delete(key)});
+  for(const [key,value] of Object.entries({
+    window,document,location,innerWidth:1280,innerHeight:800,Element:class Element {},
+    localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
+    fetch:(url,options)=>{requests.push({url,...options});return fetcher(url,options);},
+    setTimeout:(callback,ms)=>{timers.set(++id,{callback,ms,due:clock+Math.max(0,ms||0)});return id;},clearTimeout:key=>timers.delete(key),
+  })) {
+    old.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});
+  }
+  t.mock.method(performance,'now',()=>clock);
+  const engine=createSpace(canvas,{tooltip:{}},{change:value=>changes.push(value),layout:()=>{layoutCalls++;return{};},toggleExplorer:()=>explorerToggles++});
+  const pump=async(ms=100)=>{
+    clock+=ms;
+    const callbacks=[...frames.values()];frames.clear();for(const callback of callbacks)callback(clock);
+    const waiting=[...timers.entries()];for(const [key,{callback,due}] of waiting){if(due>clock||!timers.delete(key))continue;callback();}
+    await flush();
+  };
+  const finish=async promise=>{
+    let done=false,result,error;promise.then(value=>{done=true;result=value;},value=>{done=true;error=value;});
+    for(let n=0;n<200&&!done;n++)await pump();
+    assert.equal(done,true,'navigation completes');if(error)throw error;return result;
+  };
+  return {engine,frames,timers,animations,changes,requests,history,window,document,canvas,location,attributes,pump,finish,
+    state:()=>changes.filter(value=>'scan'in value).at(-1),
+    metrics:()=>({layoutCalls,draws,captures,explorerToggles}),
+    visibility(hidden){document.hidden=hidden;document.dispatchEvent(new Event('visibilitychange'));},
+    dispose(){engine.dispose();for(const [key,descriptor] of old)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];},
+  };
+}
+
+test('既定3D: オープニングと軌道飛行は維持し、2D中だけ描画・軌道の進行を止める',async t=>{
+  const h=space(t);
+  try{
+    assert.equal(h.engine.viewMode,'3d');assert.equal(h.frames.size,1);
+    await h.engine.refresh(1);assert.equal(h.state().autoSpin,true);
+    for(let n=0;n<100;n++)await h.pump();
+    assert.ok(h.engine.orbitPath?.length>0);assert.equal(h.frames.size,1);
+    const camera={...h.engine.cam},world=h.engine.world,path=h.engine.orbitPath,phase=h.engine.orbitPhase;
+    h.engine.setViewMode('2d');assert.equal(h.state().driving,false);assert.equal(h.frames.size,0);
+    const before=h.metrics();for(let n=0;n<100;n++)await h.pump();
+    assert.deepEqual(h.metrics(),before);assert.deepEqual(h.engine.cam,camera);assert.equal(h.engine.world,world);
+    assert.equal(h.engine.orbitPath,path);assert.equal(h.engine.orbitPhase,phase);
+    h.engine.setViewMode('3d');assert.equal(h.frames.size,1);assert.equal(h.engine.world,world);assert.deepEqual(h.engine.cam,camera);
+    await h.pump();assert.equal(h.frames.size,1);assert.ok(h.metrics().layoutCalls>before.layoutCalls);
+  }finally{h.dispose();}
+});
+
+test('同階層3D→2D→3D: カメラ・同じworld・grep位置・閲覧履歴・マーク・AI軌跡を保持する',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);h.engine.setAutoSpin(false);
+    const entry={type:'file',path:'root.js',line:7,column:3,query:'日本語',caseSensitive:true,matchMtime:1000,matchLength:3};
+    assert.equal(await h.finish(h.engine.goTo(entry)),true);
+    h.engine.marks({mode:'grep',paths:['src/main.js'],since:null});h.engine.route({mode:'ai',paths:['src/main.js']});
+    const camera={...h.engine.cam},world=h.engine.world,selected=h.engine.selected,journal=h.state().journal;
+    assert.equal(world.galaxies.find(g=>g.name==='src').fresh,1);
+    h.engine.setViewMode('2d');assert.equal(h.engine.viewMode,'2d');assert.equal(h.state().viewMode,'2d');
+    assert.equal(h.engine.selected,selected);assert.equal(h.state().selected,selected);assert.equal(h.state().journal,journal);
+    assert.deepEqual(h.engine.cam,camera);assert.equal(h.engine.world,world);assert.equal(h.timers.size,0);
+    h.engine.setViewMode('3d');assert.equal(h.engine.selected,selected);assert.equal(h.engine.world,world);assert.deepEqual(h.engine.cam,camera);
+    assert.deepEqual(h.engine.routeState,{mode:'ai',paths:['src/main.js']});assert.equal(h.state().autoSpin,false);
+    await h.pump();assert.deepEqual(h.engine.cam,camera);assert.equal(h.frames.size,1);
+    h.engine.setViewMode('invalid');assert.equal(h.engine.viewMode,'3d');
+  }finally{h.dispose();}
+});
+
+test('高速切替とvisibility: 2D/非表示のRAFはゼロ、3D復帰は常に1本、古い予約は復活しない',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);
+    for(let n=0;n<30;n++){
+      const cancelled=[...h.frames.values()];
+      h.engine.setViewMode('2d');h.engine.setViewMode('2d');h.visibility(true);h.visibility(false);h.visibility(false);
+      assert.equal(h.frames.size,0);for(const callback of cancelled)callback(100000);assert.equal(h.frames.size,0);
+      h.engine.setViewMode('3d');h.engine.setViewMode('3d');h.visibility(false);assert.equal(h.frames.size,1);
+      for(const callback of cancelled)callback(100000);assert.equal(h.frames.size,1);
+      await h.pump();assert.equal(h.frames.size,1);
+    }
+    h.visibility(true);h.engine.setViewMode('2d');h.engine.setViewMode('3d');assert.equal(h.frames.size,0);
+    h.visibility(false);assert.equal(h.frames.size,1);h.engine.dispose();assert.equal(h.frames.size,0);
+    h.visibility(false);h.engine.setViewMode('2d');h.engine.setViewMode('3d');assert.equal(h.frames.size,0);
+  }finally{h.dispose();}
+});
+
+test('2D: 初回取得・ファイル/フォルダ・親・ルート・戻る進むはワープなしで同じ選択を通知する',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);h.engine.setFastWarp(true);
+    const camera={...h.engine.cam};
+    const run=h.engine.goTo({type:'file',path:'root.js'});
+    assert.equal(h.engine.selected.path,'root.js','既知ファイルは待機フレームなしで選択する');assert.equal(await run,true);
+    assert.deepEqual(h.engine.cam,camera);
+    await h.engine.goTo({type:'dir',path:'src'});assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);assert.equal(h.location.hash,'#/src');
+    await h.engine.approach(h.engine.world.planets[0]);assert.equal(h.engine.selected.path,'src/main.js');
+    await h.engine.dive(h.engine.world.galaxies[0]);assert.deepEqual(h.engine.trail,['src','nested']);assert.equal(h.engine.selected,null);
+    await h.engine.goTo({type:'file',path:'src/nested/deep.js',line:2,column:4,query:'x',matchMtime:1000});
+    assert.equal(h.engine.selected.line,2);const navigationId=h.engine.selected.navigationId;
+    await h.engine.goTo({type:'file',path:'src/nested/deep.js',line:9,column:1,query:'y'});
+    assert.equal(h.engine.selected.line,9);assert.notEqual(h.engine.selected.navigationId,navigationId);
+    await h.engine.ascend(1);assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);
+    await h.engine.ascend(0);assert.deepEqual(h.engine.trail,[]);assert.equal(h.location.hash,'#/');
+    const pushes=h.history.length;h.location.hash='#/'+encodeURIComponent('別のフォルダ');h.window.dispatchEvent(new Event('popstate'));
+    assert.deepEqual(h.engine.trail,['別のフォルダ']);assert.equal(h.history.length,pushes);
+    await h.engine.goTo({type:'file',path:'別のフォルダ/資料.txt'});assert.equal(h.engine.selected.path,'別のフォルダ/資料.txt');
+    h.location.hash='#/src';h.window.dispatchEvent(new Event('popstate'));assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);
+    await h.engine.flyHome();assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+test('2Dの寄り道: 訪問済みフォルダの3Dカメラをそれぞれ復元する',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);h.engine.setAutoSpin(false);
+    Object.assign(h.engine.cam,{tx:10,ty:-20,tz:30,yaw:1.2,pitch:.25,dist:1500,roll:.1});Object.assign(h.engine.goal,h.engine.cam);
+    const rootCamera={...h.engine.cam};h.engine.setViewMode('2d');await h.engine.goTo({type:'dir',path:'src'});
+    h.engine.setViewMode('3d');Object.assign(h.engine.cam,{tx:-5,ty:80,tz:60,yaw:-.8,pitch:.6,dist:550,roll:-.2});Object.assign(h.engine.goal,h.engine.cam);
+    const srcCamera={...h.engine.cam};h.engine.setViewMode('2d');await h.engine.ascend(0);assert.deepEqual(h.engine.cam,rootCamera);
+    h.engine.setViewMode('3d');assert.deepEqual(h.engine.cam,rootCamera);
+    h.engine.setViewMode('2d');await h.engine.goTo({type:'dir',path:'src'});h.engine.setViewMode('3d');assert.deepEqual(h.engine.cam,srcCamera);
+    assert.equal(h.frames.size,1);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+test('2D手動閲覧中: Canvas・3Dキー・自動追跡はカメラ、選択、取得を変更しない',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);h.engine.setViewMode('2d');await h.engine.goTo({type:'file',path:'src/main.js'});
+    const selected=h.engine.selected,camera={...h.engine.cam},calls=h.requests.length;
+    for(const name of ['pointerdown','pointermove','pointerup','dblclick'])h.canvas.dispatchEvent(event(name,{pointerId:1,clientX:20,clientY:30}));
+    const wheel=event('wheel',{ctrlKey:true,deltaY:100});h.canvas.dispatchEvent(wheel);assert.equal(wheel.defaultPrevented,false);
+    for(const key of ['Escape','Backspace',' ','r','c'])h.window.dispatchEvent(event('keydown',{key}));
+    h.engine.requestFollow(['root.js']);assert.equal(h.engine.canFollow(),false);assert.equal(await h.engine.follow('root.js'),false);
+    assert.equal(await h.engine.goTo({type:'file',path:'root.js'},{automatic:true}),false);
+    for(let n=0;n<100;n++)await h.pump();
+    assert.equal(h.engine.selected,selected);assert.deepEqual(h.engine.trail,['src']);assert.deepEqual(h.engine.cam,camera);
+    assert.equal(h.requests.length,calls);assert.equal(h.metrics().captures,0);assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+    h.window.dispatchEvent(event('keydown',{key:'b',ctrlKey:true}));assert.equal(h.metrics().explorerToggles,1);
+  }finally{h.dispose();}
+});
+
+for(const phase of ['turn','animation'])for(const action of ['2d','clear','dispose'])test(`3D中断 ${phase}/${action}: 待機タイマーとアニメーションを即時解除し、古い選択を開かない`,async t=>{
+  const h=space(t,{holdAnimations:true});
+  try{
+    await h.engine.refresh(1);h.engine.setAutoSpin(false);
+    const navigation=h.engine.goTo({type:'file',path:'src/main.js'});
+    if(phase==='turn')assert.equal(h.timers.size,1);
+    else {for(let n=0;n<100&&!h.animations.length;n++)await h.pump();assert.equal(h.animations.length,1);}
+    if(action==='2d')h.engine.setViewMode('2d');else if(action==='clear')h.engine.clear();else h.engine.dispose();
+    assert.equal(h.timers.size,0);assert.equal(h.attributes.get('aria-busy'),'false');
+    if(action!=='clear')assert.equal(h.frames.size,0);
+    assert.ok(h.animations.every(animation=>animation.cancelled));
+    let done=false;navigation.then(()=>{done=true;});await flush();assert.equal(done,true,'中断後にタイマーを進めなくても移動Promiseが完了する');
+    assert.notEqual(await navigation,true);assert.equal(h.engine.selected,null);
+    for(const animation of h.animations)animation.finish();await flush();assert.equal(h.engine.selected,null);assert.deepEqual(h.engine.trail,[]);
+    if(action==='2d'){h.engine.setViewMode('3d');assert.equal(h.frames.size,1);await h.pump();assert.equal(h.timers.size,0);}
+  }finally{h.dispose();}
+});
+
+test('2D最新/grep: fresh走査で新規階層を開き、grepのメタデータとフィルター外の参照を保持する',async t=>{
+  let data=snapshot();const h=space(t,{fetcher:async()=>reply(data)});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    data=snapshot(directory('project',['root.js'],[directory('new',[],[directory('deep',['created.js'])])]));
+    assert.equal(await h.engine.goTo({type:'file',path:'new/deep/created.js',source:'latest',mtime:2000}),true);
+    assert.deepEqual(h.engine.trail,['new','deep']);assert.equal(h.engine.selected.path,'new/deep/created.js');assert.match(h.requests.at(-1).url,/fresh=1/);
+    await h.engine.goTo({type:'file',path:'new/deep/created.js',source:'grep',line:5,column:2,query:'needle',caseSensitive:true,matchMtime:1000,matchLength:6});
+    await h.engine.refresh();assert.equal(h.engine.selected.line,5);assert.equal(h.engine.selected.matchLength,6);
+    const camera={...h.engine.cam};
+    assert.equal(await h.engine.goTo({type:'file',path:'ignored/hidden.txt',source:'grep',line:8,column:3,query:'needle',mtime:1000}),true);
+    assert.equal(h.engine.selected.unlisted,true);assert.equal(h.engine.selected.path,'ignored/hidden.txt');assert.deepEqual(h.engine.cam,camera);
+    await h.engine.refresh();assert.equal(h.engine.selected.line,8);
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+test('2D最新: 古い共有走査は必要時だけ再取得し、新しいクリックだけを採用する',async t=>{
+  let calls=0;const pending=deferred();
+  const h=space(t,{fetcher:()=>{calls++;return calls===2?pending.promise:Promise.resolve(reply(snapshot(directory('project',calls===1?['root.js']:['root.js','new.js']))));}});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    const background=h.engine.refresh(undefined,{fresh:false}),first=h.engine.goTo({type:'file',path:'lost.js',source:'latest'}),latest=h.engine.goTo({type:'file',path:'new.js',source:'latest'});
+    assert.equal(calls,2);pending.resolve(reply(snapshot(directory('project',['root.js']))));await background;
+    assert.equal(await first,false);assert.equal(await latest,true);assert.equal(calls,3);assert.equal(h.engine.selected.path,'new.js');assert.equal(h.frames.size,0);
+  }finally{h.dispose();}
+});
+
+for(const action of ['selection','clear','filter','session','mode','dispose'])test(`2D最新の古い応答: ${action}後には選択を取り戻さない`,async t=>{
+  let delaying=false;const requests=[];
+  const h=space(t,{fetcher:()=>{if(!delaying)return Promise.resolve(reply(snapshot()));const request=deferred();requests.push(request);return request.promise;}});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);delaying=true;
+    const first=h.engine.goTo({type:'file',path:'new.js',source:'latest'});assert.equal(requests.length,1);
+    let newer;
+    if(action==='selection')newer=h.engine.goTo({type:'file',path:'root.js'});
+    if(action==='clear')h.engine.clear();
+    if(action==='filter')h.engine.setFilter(false);
+    if(action==='session')newer=h.engine.refresh(2);
+    if(action==='mode')h.engine.setViewMode('3d');
+    if(action==='dispose')h.engine.dispose();
+    for(const request of requests)request.resolve(reply(snapshot(directory('project',['root.js','new.js']))));
+    assert.equal(await first,false);if(newer)await newer;
+    assert.notEqual(h.engine.selected?.path,'new.js');if(action==='selection')assert.equal(h.engine.selected.path,'root.js');
+    if(action==='filter'||action==='session'||action==='dispose')assert.equal(h.requests[1].signal.aborted,true);
+    assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);assert.equal(h.frames.size,action==='mode'?1:0);
+  }finally{h.dispose();}
+});
+
+test('2D再走査: 削除ファイルは閉じ、削除・フィルター除外された現在地は存在する親へ戻る',async t=>{
+  let data=snapshot();const h=space(t,{fetcher:async()=>reply(data)});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'file',path:'src/nested/deep.js'});
+    data=snapshot(directory('project',['root.js'],[directory('src',[],[directory('nested')])]));await h.engine.refresh();
+    assert.equal(h.engine.selected,null);assert.deepEqual(h.engine.trail,['src','nested']);
+    data=snapshot(directory('project',['root.js'],[directory('src',['main.js'])]));await h.engine.refresh();
+    assert.deepEqual(h.engine.trail,['src']);assert.equal(h.location.hash,'#/src');assert.equal(h.engine.selected,null);
+    await h.engine.goTo({type:'file',path:'src/main.js'});
+    data=snapshot(directory('project',['root.js']));h.engine.setFilter(false);await flush();
+    assert.deepEqual(h.engine.trail,[]);assert.equal(h.location.hash,'#/');assert.equal(h.engine.selected,null);assert.doesNotMatch(h.requests.at(-1).url,/filter=/);
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+    data=snapshot(directory('project',['later.js']));await h.engine.refresh();await h.engine.goTo({type:'file',path:'later.js'});
+    data=snapshot(directory('project'),{truncated:true});await h.engine.refresh();assert.equal(h.engine.selected.path,'later.js');
+    data=snapshot(directory('project'));await h.engine.refresh();assert.equal(h.engine.selected,null);
+  }finally{h.dispose();}
+});
+
+
+test('2D自動探索: 更新通知から親ページと共有ビューアを開き、待機中のRAF・タイマー・ポーリングはゼロ',async t=>{
+  let data=snapshot();const h=space(t,{fetcher:async()=>reply(data)});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    data=snapshot(directory('project',['root.js'],[directory('generated',[],[directory('deep',['new.js'])])]));
+    h.engine.requestFollow(['generated/deep/new.js']);await flush();
+    assert.deepEqual(h.engine.trail,['generated','deep']);assert.equal(h.engine.selected.path,'generated/deep/new.js');
+    assert.equal(h.state().driving,true);assert.match(h.requests.at(-1).url,/fresh=1/);
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+    const calls=h.requests.length;await h.pump(600000);assert.equal(h.requests.length,calls);
+    h.engine.requestFollow('root.js');await flush();assert.equal(h.engine.selected.path,'root.js');assert.deepEqual(h.engine.trail,[]);
+    assert.equal(h.timers.size,0);assert.equal(h.frames.size,0);
+    h.engine.clear();await flush();assert.equal(h.engine.selected,null);assert.equal(h.state().driving,false);assert.equal(h.timers.size,0);
+    await h.pump(600000);assert.equal(h.engine.selected,null,'閉じた同じ最終更新は勝手に開き直さない');
+  }finally{h.dispose();}
+});
+
+test('2D自動探索: 手動フォルダ移動の1分猶予だけ単発予約し、新しい更新で予約を置き換える',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'dir',path:'src'});
+    h.engine.requestFollow(['root.js']);assert.equal(h.timers.size,1);const oldTimer=[...h.timers.keys()][0];
+    assert.equal([...h.timers.values()][0].ms,60000);const calls=h.requests.length;
+    await h.pump(59999);assert.equal(h.engine.selected,null);assert.equal(h.requests.length,calls);assert.equal(h.timers.size,1);
+    h.engine.requestFollow(['src/nested/deep.js']);assert.equal(h.timers.size,1);assert.equal(h.timers.has(oldTimer),false);
+    assert.equal([...h.timers.values()][0].ms,1);await h.pump(1);
+    assert.equal(h.engine.selected.path,'src/nested/deep.js');assert.deepEqual(h.engine.trail,['src','nested']);
+    assert.ok(h.state().journal.some(value=>value.path==='root.js'),'移動しなかった先行更新の軌跡も残す');
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+    const completedCalls=h.requests.length;await h.pump(600000);assert.equal(h.requests.length,completedCalls);
+  }finally{h.dispose();}
+});
+
+test('2D自動探索: ユーザーのプレビューを保護し、閉じた後も残りの手動猶予を守る',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'file',path:'src/main.js',line:4,column:2,query:'x'});
+    h.engine.requestFollow('root.js');assert.equal(h.timers.size,0);const calls=h.requests.length;
+    await h.pump(10000);assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.engine.selected.line,4);assert.equal(h.requests.length,calls);
+    h.engine.clear();assert.equal(h.timers.size,1);assert.equal([...h.timers.values()][0].ms,50000);
+    await h.pump(49999);assert.equal(h.engine.selected,null);await h.pump(1);assert.equal(h.engine.selected.path,'root.js');
+    await h.engine.goTo({type:'file',path:'src/main.js'});h.engine.requestFollow('src/nested/deep.js');
+    await h.pump(120000);assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.timers.size,0);
+    h.engine.setAutoSpin(false);h.engine.setAutoSpin(true);await flush();assert.equal(h.engine.selected.path,'src/main.js');
+    h.engine.clear();await flush();assert.equal(h.engine.selected.path,'src/nested/deep.js');assert.equal(h.frames.size,0);
+  }finally{h.dispose();}
+});
+
+test('2D自動探索OFF: 予約と実行を止め、手動Latestは引き続き開き、ON時は保護条件を守って再開する',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'dir',path:'src'});
+    h.engine.requestFollow('src/nested/deep.js');assert.equal(h.timers.size,1);
+    h.engine.setAutoSpin(false);assert.equal(h.timers.size,0);const calls=h.requests.length;
+    await h.pump(120000);assert.equal(h.engine.selected,null);assert.equal(h.requests.length,calls);
+    await h.engine.goTo({type:'file',path:'root.js',source:'latest'});assert.equal(h.engine.selected.path,'root.js');assert.equal(h.state().autoSpin,false);
+    h.engine.setAutoSpin(true);await flush();assert.equal(h.engine.selected.path,'root.js','ONにしてもユーザーが開いたファイルを奪わない');
+    h.engine.clear();await flush();assert.equal(h.engine.selected.path,'src/nested/deep.js');
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+test('2D自動探索: 初回走査前の予約と非表示中の更新を、表示復帰時に一度だけ進める',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');h.engine.requestFollow('src/main.js');assert.equal(h.requests.length,0);assert.equal(h.timers.size,0);
+    await h.engine.refresh(1);await flush();assert.equal(h.engine.selected.path,'src/main.js');
+    h.visibility(true);h.engine.requestFollow('src/nested/deep.js');const calls=h.requests.length;
+    await h.pump(120000);assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.requests.length,calls);assert.equal(h.timers.size,0);
+    h.visibility(false);h.visibility(false);await flush();assert.equal(h.engine.selected.path,'src/nested/deep.js');
+    assert.equal(h.requests.length,calls+1);assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+  }finally{h.dispose();}
+});
+
+test('2D自動探索: 進行中の古い一覧へ合流しても新規ファイルを再確認し、連続通知では最後だけ開く',async t=>{
+  const stale=deferred();let calls=0;
+  const h=space(t,{fetcher:()=>{
+    calls++;
+    if(calls===2)return stale.promise;
+    return Promise.resolve(reply(calls===1?snapshot():snapshot(directory('project',['root.js'],[directory('new',['latest.js'])]))));
+  }});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    h.engine.requestFollow('src/main.js');await flush();assert.equal(calls,2);
+    h.engine.requestFollow('new/latest.js');await flush();assert.equal(calls,2,'同時走査を増やさない');
+    stale.resolve(reply(snapshot()));await flush();
+    assert.equal(calls,3);assert.equal(h.engine.selected.path,'new/latest.js');assert.deepEqual(h.engine.trail,['new']);
+    assert.equal(h.changes.some(value=>value.selected?.path==='src/main.js'),false);assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+  }finally{h.dispose();}
+});
+
+for(const action of ['mode','off','manual','filter','session','dispose'])test(`2D自動探索の遅い応答: ${action}で中断し、古いページや3Dワープを開かない`,async t=>{
+  const pending=deferred();let calls=0;
+  const h=space(t,{fetcher:()=>++calls===2?pending.promise:Promise.resolve(reply(snapshot()))});
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);h.engine.requestFollow('src/nested/deep.js');await flush();assert.equal(calls,2);
+    if(action==='mode')h.engine.setViewMode('3d');
+    if(action==='off')h.engine.setAutoSpin(false);
+    if(action==='manual')await h.engine.goTo({type:'file',path:'root.js'});
+    if(action==='filter')h.engine.setFilter(false);
+    if(action==='session')await h.engine.refresh(2);
+    if(action==='dispose')h.engine.dispose();
+    pending.resolve(reply(snapshot()));await flush();
+    assert.notEqual(h.engine.selected?.path,'src/nested/deep.js');assert.deepEqual(h.engine.trail,[]);
+    assert.equal(h.frames.size,action==='mode'?1:0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+    if(action==='mode'){await h.pump();assert.equal(h.timers.size,0);assert.equal(h.engine.selected,null);}
+    if(action==='off'){h.engine.setAutoSpin(true);await flush();assert.equal(h.engine.selected.path,'src/nested/deep.js');}
+    if(action==='manual')assert.equal(h.engine.selected.path,'root.js');
+  }finally{h.dispose();}
+});
+
+for(const action of ['mode','off','dispose'])test(`2D自動探索の猶予タイマー: ${action}で即時解除し、古いコールバックを再利用しない`,async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'dir',path:'src'});h.engine.requestFollow('root.js');
+    assert.equal(h.timers.size,1);const cancelled=[...h.timers.values()][0].callback,calls=h.requests.length;
+    if(action==='mode')h.engine.setViewMode('3d');
+    if(action==='off')h.engine.setAutoSpin(false);
+    if(action==='dispose')h.engine.dispose();
+    assert.equal(h.timers.size,0);cancelled();await flush();assert.equal(h.requests.length,calls);assert.equal(h.engine.selected,null);
+    assert.equal(h.frames.size,action==='mode'?1:0);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+test('2D自動探索の失敗: 欠落パスを無限再試行せず、後続の新しい更新通知で再開する',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);h.engine.requestFollow('missing.js');await flush();
+    assert.equal(h.engine.selected,null);assert.equal(h.timers.size,0);const calls=h.requests.length;
+    await h.pump(600000);assert.equal(h.requests.length,calls);assert.equal(h.frames.size,0);
+    h.engine.requestFollow('src/main.js');await flush();assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.timers.size,0);
+  }finally{h.dispose();}
+});
+
+test('3D自動探索の互換性: 最終更新通知は従来の旋回・ワープで開き、描画ループは1本のまま',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);for(let n=0;n<25;n++)await h.pump();
+    h.engine.requestFollow('src/nested/deep.js');
+    for(let n=0;n<160&&h.engine.selected?.path!=='src/nested/deep.js';n++)await h.pump();
+    assert.equal(h.engine.selected?.path,'src/nested/deep.js');assert.deepEqual(h.engine.trail,['src','nested']);
+    assert.ok(h.animations.length>=4);assert.equal(h.frames.size,1);assert.equal(h.timers.size,0);
+    assert.equal(h.engine.viewMode,'3d');assert.equal(h.state().autoSpin,true);
+  }finally{h.dispose();}
+});
+
+
+test('grepの一覧外ファイル: 2Dは既知の親ページへ移動し、3Dは既存の現在地・カメラを維持する',async t=>{
+  for(const mode of ['2d','3d']){
+    const h=space(t);
+    try{
+      h.engine.setViewMode(mode);await h.engine.refresh(1);const camera={...h.engine.cam};
+      await h.engine.goTo({type:'file',path:'src/filtered-out.txt',source:'grep',line:8,column:2,query:'needle',matchMtime:1000});
+      assert.equal(h.engine.selected.path,'src/filtered-out.txt');assert.equal(h.engine.selected.unlisted,true);assert.equal(h.engine.selected.line,8);
+      assert.deepEqual(h.engine.trail,mode==='2d'?['src']:[]);
+      if(mode==='3d')assert.deepEqual(h.engine.cam,camera);
+      else assert.equal(h.frames.size,0);
+      assert.equal(h.animations.length,0);assert.equal(h.timers.size,0);
+    }finally{h.dispose();}
+  }
+});
+
+
+test('2Dの一覧外AI/履歴/フォルダ: フィルターを勝手に変えず、OFFまたは更新の案内を出す',async t=>{
+  const h=space(t);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    for(const entry of [{type:'file',path:'ignored/result.js',source:'ai'},{type:'file',path:'deleted/old.js'},{type:'dir',path:'ignored'}]){
+      assert.equal(await h.engine.goTo(entry),false);assert.deepEqual(h.engine.trail,[]);assert.equal(h.engine.selected,null);
+      const note=h.changes.filter(value=>value.error).at(-1).error;
+      assert.match(note,/フィルターをOFF/);assert.match(note,/一覧を更新/);assert.match(h.requests.at(-1).url,/filter=backup/);
+    }
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
+  }finally{h.dispose();}
+});
+
+
+test('3Dの直接follow API: frameの自動条件を二重適用せず、従来どおり明示されたファイルへ移動する',async t=>{
+  const h=space(t);
+  try{
+    await h.engine.refresh(1);h.engine.setAutoSpin(false);
+    await h.finish(h.engine.goTo({type:'file',path:'root.js'}));h.engine.setAutoSpin(true);
+    assert.equal(h.engine.canFollow(),false,'手動プレビュー中なのでframeの自動追跡は停止');
+    assert.equal(await h.finish(h.engine.follow('src/main.js')),true);
+    assert.equal(h.engine.selected.path,'src/main.js');assert.deepEqual(h.engine.trail,['src']);
+    assert.ok(h.animations.length>=2);assert.equal(h.frames.size,1);assert.equal(h.timers.size,0);
+  }finally{h.dispose();}
+});

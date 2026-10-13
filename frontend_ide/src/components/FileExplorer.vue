@@ -7,35 +7,48 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AISearchPanel from './AISearchPanel.vue';
 import { latestFiles, createLatestUpdates } from '../latest-file.js';
-const props = defineProps({ tree: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
-const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'route']);
+import { scanWarning } from '../scan-warning.js';
+const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
+const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route']);
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
 // 前回の最新日時以降を更新順で表示する。更新なしなら前回の一覧を保持する。
 const recentUpdates = shallowRef([]);
-let latestRun = 0, updates = createLatestUpdates(), switchingFilter = false, initialSent = false;
+let latestRun = 0, latestController, latestDisposed = false, updates = createLatestUpdates(), switchingFilter = false, initialSent = false;
+const latestScan = shallowRef(null);
+const treeWarning = computed(() => scanWarning(props.scan, '一覧'));
+const latestWarning = computed(() => scanWarning(latestScan.value, '最終更新'));
 function acceptUpdates(files) {
   const baseline = updates.since === null, changed = updates.accept(files);
-  if (!changed.length) return;
+  if (!changed.length) return changed;
   recentUpdates.value = changed;
   if (props.filter && (!initialSent || !baseline)) {
     const initial = !initialSent; initialSent = true;
     emit('latest', { ...changed.at(-1), files: changed, initial });
   }
+  return changed;
 }
 async function pollLatest() {
-  if (document.hidden) return;   // 裏に隠れている間は問い合わせない
-  const run = ++latestRun, forFilter = props.filter;
+  if (latestDisposed || document.hidden || latestController) return;   // 裏に隠れている間と前回取得中は問い合わせない
+  const run = ++latestRun, forFilter = props.filter, request = new AbortController();
+  latestController = request;
   try {
     const params = { ...(forFilter ? { filter: 'backup' } : {}), ...(updates.since === null ? {} : { since: String(updates.since) }) };
-    const response = await fetch('/api/latest?' + new URLSearchParams(params), { cache: 'no-store' });
+    const response = await fetch('/api/latest?' + new URLSearchParams(params), { cache: 'no-store', signal: request.signal });
     if (!response.ok) return;
-    const { files } = await response.json();
-    if (run === latestRun && forFilter === props.filter) { acceptUpdates(files); switchingFilter = false; }
+    const result = await response.json();
+    if (!latestDisposed && run === latestRun && forFilter === props.filter) {
+      latestScan.value = result.scan || result;
+      const changed = acceptUpdates(result.files || []); switchingFilter = false;
+      // 最新の一覧を取り込むことと、自動で移動することは独立させる。
+      if (changed.length) emit('freshness', { files: changed });
+    }
   } catch { /* 次の周期で再試行 */ }
+  finally { if (latestController === request) latestController = null; }
 }
 const latestTimer = setInterval(pollLatest, 60_000);
-watch(() => props.filter, () => { latestRun++; updates = createLatestUpdates(); switchingFilter = true; void pollLatest(); });
+function resetLatest() { latestRun++; latestController?.abort(); latestController = null; updates = createLatestUpdates(); latestScan.value = null; recentUpdates.value = []; switchingFilter = true; }
+watch(() => props.filter, () => { resetLatest(); void pollLatest(); });
 watch(tree, value => { if (!switchingFilter) acceptUpdates(latestFiles(value, updates.since)); }, { immediate: true });
 const latestTime = value => new Date(value.mtime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const expanded = ref(new Set()), cursor = ref(''), mode = ref('since'), since = ref(props.startedAt), preset = ref('start');
@@ -77,6 +90,7 @@ function acceptAI(result,activate=true){
   for(const path of result.route){const parts=path.split('/');for(let i=1;i<parts.length;i++)next.add(parts.slice(0,i).join('/'));}
   expanded.value=next;rootExpanded.value=true;save();
 }
+const grepResults = shallowRef([]), resultQuery = ref(''), resultCase = ref(false);
 const query = ref(''), caseSensitive = ref(false), matches = ref(new Set()), status = ref(''), treeElement = ref();
 const rootExpanded = ref(true), searching = ref(false);
 const leavingRows=new Set();
@@ -137,10 +151,11 @@ function select(row, toggleSelection=false) {
   if(toggleSelection&&!props.navigating&&row.type==='file'&&props.selected===row.path){cursor.value='';emit('clear');return;}
   cursor.value=row.path;
   if(row.type==='dir'){if(row.path==='')rootExpanded.value=true;else expanded.value=new Set([...expanded.value,row.path]);save();}
-  emit('select',{type:row.type,path:row.path});
+  emit('select',{type:row.type,path:row.path,...(row.mtime != null ? {mtime:row.mtime} : {}),...(row.size != null ? {size:row.size} : {}),...(row.source ? {source:row.source} : {}),...(row.line ? {line:row.line,column:row.column,query:row.query,caseSensitive:row.caseSensitive,matchMtime:row.matchMtime,matchLength:row.matchLength} : {})});
 }
 function emitMarks() { emit('marks',{mode:mode.value,since:since.value,paths:mode.value==='ai'?[...aiFiles.value.keys()]:[...matches.value]}); }
-function clearSearch() { cancelSinceExpansion();generation++; controller?.abort();matches.value=new Set();status.value='';searching.value=false;rootExpanded.value=true; }
+function selectMatch(match) { select({type:'file',...match,source:'grep',query:resultQuery.value,caseSensitive:resultCase.value,matchMtime:match.mtime,matchLength:match.length}); }
+function clearSearch() { cancelSinceExpansion();generation++; controller?.abort();matches.value=new Set();grepResults.value=[];resultQuery.value='';status.value='';searching.value=false;rootExpanded.value=true; }
 function scrollToTop() { if(treeElement.value)treeElement.value.scrollTop=0; }
 function expandSinceMatches() {
   // 以前の手動展開を引き継がず、一致ファイルにつながるフォルダだけを開く。
@@ -162,16 +177,18 @@ function chooseDate(value) { since.value=value?new Date(value).getTime():null;pr
 async function grep() {
   clearSearch();expanded.value=new Set();cursor.value='';save();scrollToTop();
   if(!query.value.trim())return;
-  const run=generation;controller=new AbortController();status.value='検索中…';searching.value=true;rootExpanded.value=false;
+  const run=generation, text=query.value, sensitive=caseSensitive.value;controller=new AbortController();status.value='検索中…';searching.value=true;rootExpanded.value=false;
   try {
-    const response=await fetch('/api/grep?'+new URLSearchParams({q:query.value,case:caseSensitive.value?'1':'0'}),{signal:controller.signal});
+    const response=await fetch('/api/grep?'+new URLSearchParams({q:text,case:sensitive?'1':'0'}),{signal:controller.signal});
     if(!response.ok)throw Error(await response.text());const result=await response.json();
     if(run!==generation)return;
     matches.value=new Set(result.paths);
+    grepResults.value=Array.isArray(result.matches)?result.matches:[];resultQuery.value=text;resultCase.value=sensitive;
     const next=new Set();
     for(const path of result.paths){const parts=path.split('/');for(let i=1;i<parts.length;i++)next.add(parts.slice(0,i).join('/'));}
     expanded.value=next;save();
     status.value=`${result.paths.length}ファイル一致（検索 ${result.checked}・対象外 ${result.skipped}）${result.truncated?' ※一部の結果':''}`;
+    if (result.truncated) status.value += ` ${scanWarning(result, '検索')}`;
   }catch(e){if(run===generation)status.value=`検索できません: ${e.message}`;}
   finally{if(run===generation){searching.value=false;rootExpanded.value=true;nextTick(scrollToTop);}}
 }
@@ -188,16 +205,18 @@ function key(event) {
   event.preventDefault();event.stopPropagation();if(rows.value[next]){cursor.value=rows.value[next].path;reveal(cursor.value);}
 }
 watch(()=>props.root,()=>{try{expanded.value=new Set(JSON.parse(localStorage.getItem(`aidiy_ide:explorer:${props.root}`)||'{}').expanded||[]);}catch{expanded.value=new Set();}},{immediate:true});
-watch(()=>props.root,()=>{
+watch(()=>props.root,(value,previous)=>{
+  if(previous !== undefined){clearSearch();resetLatest();initialSent=false;void pollLatest();}
   aiResult.value=null;routeMode.value='view';
   routeListOpen.value=false;
 },{immediate:true});
 watch([routeMode,aiRoute],()=>emit('route',{mode:routeMode.value,paths:aiRoute.value}),{immediate:true});
 watch(()=>[props.selected,props.current,props.open],()=>{if(props.open&&!props.navigating)reveal();});
-watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();since.value=props.startedAt;preset.value='start';});
+watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();initialSent=false;since.value=props.startedAt;preset.value='start';void pollLatest();});
+watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,matches,aiResult],emitMarks,{immediate:true});
-onBeforeUnmount(()=>{cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestRun++;document.removeEventListener('pointerdown',closeRouteList);});
+onBeforeUnmount(()=>{cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
 defineExpose({reveal});
 </script>
 <template>
@@ -215,6 +234,7 @@ defineExpose({reveal});
     </div>
     <aside v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
       <header><button aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="emit('update:open',false)">☰</button><span>エクスプローラー</span><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
+      <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">起点検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>
         <div v-if="mode==='since'"><label>起点 <input type="datetime-local" step="1" :value="dateInput" @change="chooseDate($event.target.value)"></label><div class="since-presets"><button v-for="[value,label] in [['start','起動'],['ten','10分'],['hour','1時間'],['today','今日'],['clear','解除']]" :key="value" :aria-pressed="preset===value" @click="choose(value)">{{ label }}</button></div></div>
@@ -223,6 +243,7 @@ defineExpose({reveal});
           <label><input v-model="caseSensitive" type="checkbox">大文字・小文字を区別</label>
           <div><button type="button" @click="grep">検索</button><button type="button" @click="query='';clearSearch()">解除</button></div>
           <p role="status">{{ status }}</p>
+          <ol v-if="grepResults.length" class="grep-results" aria-label="grep検索の一致箇所"><li v-for="(match,index) in grepResults" :key="`${match.path}:${match.line}:${match.column}:${index}`"><button type="button" :title="`${match.path}:${match.line}:${match.column}`" @click="selectMatch(match)"><span>{{ match.path }}:{{ match.line }}:{{ match.column }}</span><small>{{ match.snippet }}</small></button></li></ol>
         </form>
         <AISearchPanel :key="root" :root="root" v-show="mode==='ai'" @result="acceptAI" />
         <div v-if="mode==='ai'&&aiResult" class="ai-route-results"><p v-if="hiddenAI">{{ hiddenAI }}件は現在の一覧にありません。フィルターをOFFにするか一覧を更新してください。</p><p :title="aiResult.query">{{ aiResult.title || aiResult.query }} · {{ aiRoute.length }}件</p><ol><li v-for="path in aiRoute" :key="path"><button :title="aiFiles.get(path)" @click="select({type:'file',path})">{{ path }}</button><small>{{ aiFiles.get(path) }}</small></li></ol></div>
@@ -236,12 +257,21 @@ defineExpose({reveal});
       </li></TransitionGroup></ul>
       <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
       <footer class="explorer-footer">
+        <p v-if="latestWarning" class="scan-warning" role="status">{{ latestWarning }}</p>
         <small v-if="recentUpdates.length">最終更新 · {{ recentUpdates.length }}件</small>
         <div v-if="recentUpdates.length" class="explorer-latest-list" aria-label="最終更新ファイル一覧">
-          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path})"><span class="file-dot" :style="{color:color(file.name)}">●</span><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
+          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path,mtime:file.mtime,source:'latest'})"><span class="file-dot" :style="{color:color(file.name)}">●</span><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
         </div>
       </footer>
 
     </aside>
   </div>
 </template>
+
+<style scoped>
+.scan-warning{margin:0;padding:6px 8px;color:#ffe28a;font-size:var(--file-font-size,10px);overflow-wrap:anywhere;flex-shrink:0}
+.grep-results{list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto}
+.explorer-panel .grep-results li{display:block;height:auto;padding:0;margin:4px 0}
+.grep-results button{display:block;width:100%;text-align:left;overflow-wrap:anywhere}
+.grep-results small{display:block;white-space:pre-wrap;color:#bac7da;font-family:var(--mono);margin-top:3px}
+</style>

@@ -6,18 +6,26 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 // ピン留めしたファイルの独立ウィンドウ。宇宙パネルの外で、同じIDEのファイルAPIを使って1ファイルを表示する。
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { validConnectionState } from '../connection-state.js';
 import StatusBar from './StatusBar.vue';
 import FileViewer from './FileViewer.vue';
 const props=defineProps({path:String,desktop:Boolean});
 const state=ref({}),error=ref('');
 const name=props.path.split('/').at(-1);
 const file={name,path:props.path,mtime:0};
-let timer,disposed=false,polling=false;
+let timer,disposed=false,polling=false,boundSession='',ended=false;
 const controller=new AbortController();
 // IDEの利用が終わったらファイルAPIは使えないので、状態を見て案内に切り替える（Electron版は子ウィンドウごと閉じる）
 async function status(){
-  if(disposed||polling)return;polling=true;
-  try{const response=await fetch('/api/connection',{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});if(!response.ok)throw Error();const next=await response.json();if(disposed)return;state.value=next;error.value=next.active?'':'IDEの利用が終了しました。';}
+  if(disposed||polling||ended)return;polling=true;
+  try{
+    const response=await fetch('/api/connection',{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});
+    if(!response.ok)throw Error();const next=await response.json();if(disposed)return;
+    if(!validConnectionState(next))throw Error();
+    const key=next.active?`${next.mode}:${next.startedAt}:${next.project?.path||''}`:'';
+    if(!next.active||boundSession&&boundSession!==key){ended=true;state.value={...next,active:false};error.value='ピン留め元のIDEの利用が終了しました。IDEから開き直してください。';return;}
+    boundSession=key;state.value=next;error.value='';
+  }
   catch{if(!disposed)error.value='IDEに接続できません。';}
   finally{polling=false;}
 }
@@ -27,6 +35,7 @@ onBeforeUnmount(()=>{disposed=true;clearInterval(timer);controller.abort();});
 <template>
   <div class="development-app viewer-window" :class="{'desktop-window':desktop}" data-app="viewer">
     <StatusBar :title="`Viewer - ${name}`" status="ピン留め" :connected="state.connected" :mode="state.mode" :desktop="desktop" />
+    <p v-if="state.active&&error" class="input-hint" role="status">{{ error }} 作業を保持して再試行します。</p>
     <FileViewer v-if="state.active" :file="file" :root="state.project?.path||''" pinned />
     <p v-else class="panel-loading">{{ error||'読み込み中…' }}</p>
   </div>

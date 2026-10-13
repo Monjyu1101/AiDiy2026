@@ -13,6 +13,7 @@ import TerminalWelcome from './TerminalWelcome.vue';
 import TerminalProgress from './TerminalProgress.vue';
 import ModalDialog from './ModalDialog.vue';
 import { chatArrival } from '../engines/chat-arrival';
+import { createDraftReceiver } from '../draft-handoff.js';
 const props = defineProps({ base: String, host: Boolean, icon: String, embedded: Boolean, linked: Boolean, desktop: Boolean });
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
@@ -136,10 +137,20 @@ async function deleteHistory() { if (!deleteTarget.value || busy.value || deleti
 function historyDate(value) { const date = new Date(value); if (Number.isNaN(date.getTime())) return ''; const pad = n => String(n).padStart(2, '0'); return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`; }
 function link(event) { const a = event.target.closest('a'); if (a) { event.preventDefault(); transport.link(a.href); } }
 function copyInput(text) { prompt.value = text; nextTick(() => { input.value?.focus(); input.value?.setSelectionRange(text.length, text.length); scroll(); }); }
+const draftReceiver = createDraftReceiver({
+  kind: 'code', project: () => state.作業フォルダ?.パス, scope: () => state.会話ID,
+  ready: () => !disposed && !!state.信頼済み && state.画面接続済み !== false && !pending.value,
+  draft: () => prompt.value, setDraft: value => { prompt.value = value; history.value = false; },
+  label: () => state.履歴.find(item => item.id === state.会話ID)?.題名 || 'Code',
+  focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
+  api: props.desktop && props.linked ? window.aidiyWindow : undefined,
+});
+defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
+watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, state.履歴], () => draftReceiver.publish());
 watch(prompt, text => transport.saveDraft(text));
 watch(offline, () => { picker.value = false; });
-onMounted(() => { prompt.value = transport.draft(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
-onBeforeUnmount(() => { disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
+onMounted(() => { prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
+onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
 </script>
 <template>
   <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel">

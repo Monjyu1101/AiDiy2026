@@ -187,3 +187,34 @@ Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだ
 - `node frontend_ide/scripts/check-launcher.mjs term`: プロンプト復帰、同一プロジェクトの複数起動、幅2/3・高さ1/2、右上への配置、個別終了、待機指定、サーバー終了。
 
 画面確認画像は `temp/term-check/` に日本時間の日時付きで保存します。画面の変更を実行中の配信へ反映する場合は共通Vueの配布ファイルを再生成し、サーバー側を変えた場合は対象アプリを再起動します。PTYの依存は `node-pty`、画面は `@xterm/xterm` / `@xterm/addon-fit`。第三者ライセンスを `scripts/build.mjs` の通知生成へ含めます。新規環境の `npm ci` でPTYのビルドが必要になるOSでは、そのOSのC++ビルド環境も用意してください。
+
+
+## 状態確認・最終更新・下書き連携の境界
+
+- `App.vue` と `ViewerWindow.vue` は `src/connection-state.js` で利用状態の応答を検証します。HTTP失敗・タイムアウト・不完全なJSONを `active:false` に置き換えないでください。Appの状態取得と下書き連携の確認には開始時のrevision・セッションを照合し、終了や再開後の遅延応答を捨てます。Electron側の `desktop-session.cjs` も同じ方針で、子窓監視失敗では破棄せず、終了確認時の不明は確認が必要な作業中として扱います。
+- `FileExplorer.vue` の最終更新通知は、一覧の鮮度更新と自動追跡を分けます。`space.js` の手動latest/未知パス移動は `fresh=1` で再走査し、新しい手動選択・clear・フィルター切替・破棄があれば中断します。進行中の走査を共有した結果が古い場合だけもう一度確認します。自動探索のON/OFFで手動クリックを無効にしないでください。
+- `FileViewer.vue` は `file-reference.js` でgrepの行・列・検索語を現在の内容と照合します。Monacoと簡易表示の双方に位置を伝え、CRLF/CR/LFとUTF-16列を扱います。本文変更や削除で不一致なら再検索の案内にします。
+- `DraftHandoffDialog.vue` は連携先を取得し、複数なら明示選択、1つなら固定します。ゼロ件で自動起動・自動送信はしません。`CodePanel.vue` / `LivePanel.vue` の `draftTarget()` / `insertDraft()` は `src/draft-handoff.js` を共有し、今の下書きに追記します。Codeは合計200,000文字、Liveは20,000文字、選択本文は80,000文字までで、超過は切り詰めず拒否します。
+- Webは `draft-target-registry.js` のマウント固有IDと会話contextIdを再照合します。ピン留めはAppが実際に開いたWindow参照だけを登録し、同じ公開元・IDEセッション・プロジェクトと送信元の生存を確認します。BroadcastChannelやlocalStorageに本文を流さないでください。
+- Electronは `draft-router.cjs` が所有IDE、セッション、窓ID、会話contextId、プロジェクトを検証し、限定したpreloadのIPCへ渡します。受信結果のACKまで待ち、期限切れ・閉じた窓・再配送を扱います。表示名やCodeの配置番号だけで相手を決めないでください。
+- LiveのWebパネルは隠してもマウントを保持し、`visible` でマイク取得待ちを無効化し音声入出力を止めます。会話・下書き・スピーカーの選択を残し、再表示でマイクを自動再開しません。
+
+`viewer/file-scan.mjs` の走査は同じサーバー内でフィルターごとに1秒だけ共有し、同時実行は1本です。明示操作の `fresh=1` は完了済みキャッシュを使わず、進行中の同じ走査は共有します。既定上限は30,000ファイル（backupフィルターは100,000）、10,000フォルダ、200,000項目、128階層、10秒。待機者の個別中断、全待機者の中断、利用終了・切替、サーバー終了を伝播し、中断した走査はキャッシュに残しません。常時watcherは使いません。
+
+`/api/galaxy` は従来のtreeに走査件数・時間・打切り理由を加え、`/api/latest` は同じ情報をscanにも持ちます。`/api/grep` はpathsを維持し、matchesにpath/line/column/length/snippet/mtime/sizeを追加します。grepは1ファイル1MB、合計256MB、候補30,000ファイル、一致1,000件、30秒、最大8並列読み取りです。読み取り中にファイルが変わったらスキップします。UIはtruncatedとtruncationReasonを捨てないでください。
+
+検証では `frontend_ide/checks/monitoring.test.mjs`、`desktop-session.test.mjs`、`draft-handoff.test.mjs`、`draft-target-registry.test.mjs`、`workflow-components.test.mjs`、`explorer-navigation.test.mjs`、`viewer/checks/file-scan.test.mjs`、`grep.test.mjs` を実行します。実画面ではCode複数/Live1つ、対象窓の終了、連携確認中の利用終了、下書きが入力済みの場合、ピン留めとタブ切替、Monaco読込失敗時の簡易表示を確認してください。配布への反映は共通VueとCode/Live bundleの再生成が必要です。
+
+## 3D / 2D の表示部品を変更するとき
+
+- `App.vue` は利用セッションごとの `viewMode` を持ち、開始時は3Dにします。プロジェクト名の直後に3D / 2D、右側にTerm / Code / Liveを配置します。表示モードを `SpaceView` やCode / Live / Termのkeyに含めないでください。
+- `SpaceView.vue` は共通の走査結果・選択・エクスプローラー・読み取り専用ビューアを結びます。`SpaceCanvas.vue` は既存の `createSpace()` を包む薄いライフサイクル部品です。3Dエンジン内の既存の走査・選択・移動管理を共用し、二重取得や別セッションを作りません。
+- `setViewMode('2d')` はRAFとワープの待機・アニメーションを中断し、3Dのキー・ポインター操作を止めます。2Dの最終更新追跡は、共有の自動探索ON/OFF・手動操作後の猶予・手動プレビュー保護を守るイベント駆動です。保留中の更新がある場合だけ猶予終了までの1回タイマーを持ち、OFF・モード変更・フィルター・セッション・非表示・破棄で古い処理を無効にします。`goTo` / `ascend` / ブラウザ履歴は2D中だけ直接階層を切り替えます。3Dへ戻す時は同じworldと現在の選択を保ち、描画予約を必ず1本だけ再開してください。ページ非表示からの復帰でも2DのRAFを再開しません。
+- `FolderPages.vue` は初めて2Dを選んだ時に生成し、その後は部品の記憶を保持します。非表示中は全ツリーの集計や項目DOMを作りません。`folder-pages.js` が直下項目と更新・検索一致数を集計し、ページごとのスクロール・選択行を記憶します。本文や認証情報は保存しません。新しい走査・検索マークで、ユーザーが矢印キーで移したカーソルを開いているファイルへ巻き戻さないでください。
+- 2Dページ切替はCSS回転と折り目の陰影です。`folderPageTurnPlan()` で共通の親への戻りと目的の枝への進行を求め、戻り・進みの方向別に有限回アニメーションを再生します。1階層は300ms、複数階層は1枚180ms、深い経路は共通の親と最終目的地を落とさず最大5枚・900msへまとめ、省略した階層数も表示します。共有の現在地・選択はすぐに最終目的地へ反映し、途中の枚数は視覚効果として扱います。初回表示・モード復帰・同じ階層の更新では再生せず、`prefers-reduced-motion` では止めます。スクロール領域を階層パスでkey付けして、連打では古いDOMと演出を置き換えます。旧ページのanimationend/cancelが新しいページを止めないよう、イベントの要素を照合してください。ページ演出にタイマーや描画ループは追加せず、CSSのiteration/end/cancelだけで後片付けします。背景は `frontend_web/src/assets/menu-common.css` の既存クリーム色（#faf7f2 / #f5f1e8 / #f0ebe0、文字#5a4a3a）を2D専用CSS変数で使い、3Dと共通ビューアの色は変えません。軌跡バーの高さはResizeObserverとresize時だけ測り、狭い画面でパンくずへ重なることを防ぎます。フォルダ移動後は項目リストへフォーカスを戻し、共有ビューアのEscも維持します。
+
+`checks/folder-pages.test.mjs` はページ集計、親・子・ルート、スクロール・カーソル、キー操作、更新・削除、部品再生成の抑止、共通パネル維持、配置構造を検証します。`checks/space-mode.test.mjs` は実エンジンの3D→2D→3D、カメラ・選択・検索位置、履歴、フィルター、遅延応答、連打、非表示時RAF、ワープ中断、破棄を検証します。既存のworkflow / explorer / orbitテストも併せて実行してください。実画面の横長・縦長・狭幅、Code / Live下書き保持、grep位置とピン留めは、自動テストとは別に確認します。
+
+`checks/navigation-parity.test.mjs` はVue部品を実際にマウントし、FileExplorerのイベントからSpaceView・SpaceCanvas・実エンジンを通って、FolderPagesとFileViewerへ選択が届くことを確認します。エクスプローラー、AI結果/軌跡、閲覧軌跡、grep位置、最終更新の手動/自動、新しい深いフォルダ、古い応答、フィルター切替、削除、戻る/進むを確認します。Canvas・API応答・Monacoは試験用で、実ブラウザーや実AIは使いません。
+
+フィルター対象外のgrep参照は、親フォルダが一覧にあれば2Dではそのページへ移動してからプレビューを開きます。親まで一覧にない場合はページを捏造せず、元のページとプレビューを保ち、`unlistedParent` でフィルターOFF・一覧更新・再選択を案内します。AI/履歴の欠落パスもフィルターを自動で変更せず案内してください。3Dの既存の一覧外参照動作は維持します。

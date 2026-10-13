@@ -64,7 +64,7 @@ test('最終更新APIはフィルターON / OFF共通で除外し、ソース更
     assert.equal((await fetch(app.url + 'api/file?' + new URLSearchParams({ path }))).status, 200);
   }
   await put(root, 'src/next.py', 600);
-  assert.equal((await fetch(app.url + 'api/latest?filter=backup').then(response => response.json())).latest.path, 'src/next.py');
+  assert.equal((await fetch(app.url + 'api/latest?filter=backup&fresh=1').then(response => response.json())).latest.path, 'src/next.py');
 });
 
 test('除外フォルダのファイルしかなければ最終更新候補を返さない', async t => {
