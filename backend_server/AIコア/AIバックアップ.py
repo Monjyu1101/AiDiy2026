@@ -169,6 +169,9 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
             and (os.path.basename(root), d) not in _バックアップ除外フォルダ組
         ]
         for file_name in file_names:
+            # Office の一時ロックファイルは、件数判定・差分判定・コピーのすべてから除外する。
+            if file_name.startswith("~$"):
+                continue
             file_path = os.path.join(root, file_name)
 
             # Windows予約デバイス名 + null チェック（削除不可能/問題ファイルのため警告のみ）

@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util';
 import { startDevelopment } from './server.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
+import { spawnDesktop } from './desktop-process.mjs';
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){
  const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='term'?'Term':'Code';
@@ -64,8 +65,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
   try{
    const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind};delete env.ELECTRON_RUN_AS_NODE;
    let executable;try{executable=electronExecutable();}catch{executable=electronExecutable(new URL('./host/package.json',import.meta.url));}
-   // GUI本体は隠さない。Windowsの初回ShowWindowがSW_HIDEを引き継ぐため。
-   desktop=spawn(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,stdio:['ignore','inherit','inherit','ipc'],windowsHide:false});
+   desktop=spawnDesktop(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,background:launcherChild});
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});
    if(shown.existingWindow){await stop();notifyReady({existingWindow:true});console.log('起動済みの画面を前面に表示しました。');return;}
    desktop.once('exit',code=>{if(code)process.exitCode=code;void stop();});

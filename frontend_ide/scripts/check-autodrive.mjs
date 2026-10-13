@@ -23,25 +23,30 @@ writeFileSync(join(project,'first.txt'),'First preview');
 writeFileSync(join(project,'second.txt'),'Second preview');
 writeFileSync(join(project,'nested','next.txt'),'Next preview');
 const baseTime = Date.now()/1000;
+// 文書を開くだけでできる新しいOfficeロックに、自動探索が飛ばないことも確認する。
+for(const path of ['~$報告.docx','nested/~$集計.xlsx']){
+  writeFileSync(join(project,path),'Office lock');utimesSync(join(project,path),baseTime+1000,baseTime+1000);
+}
 utimesSync(join(project,'nested','next.txt'),baseTime-120,baseTime-120);
 utimesSync(join(project,'first.txt'),baseTime-60,baseTime-60);
 utimesSync(join(project,'second.txt'),baseTime-180,baseTime-180);
 const app = await startDevelopment(project);
 const url = app.url;
-const chromePath = [
+const chromePath = process.env.CHROME_PATH || [
   [process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe'],
   [process.env['PROGRAMFILES(X86)'], 'Google/Chrome/Application/chrome.exe'],
   [process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe'],
   [process.env['PROGRAMFILES(X86)'], 'Microsoft/Edge/Application/msedge.exe'],
   [process.env.PROGRAMFILES, 'Microsoft/Edge/Application/msedge.exe'],
 ].filter(([base]) => base).map(([base, tail]) => join(base, tail)).find(existsSync)
-  ?? ['/usr/bin/google-chrome', '/usr/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
+  || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
 if (!chromePath) { console.error('Chrome / Edge が見つかりません。'); process.exit(1); }
 
 const port = 9333 + Math.floor(Math.random() * 500);
 const profile = mkdtempSync(join(tmpdir(), 'aidiy_ide_shot-'));
 const chrome = spawn(chromePath, [
   '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+  ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage', '--no-zygote'] : []),
   '--window-size=1280,800', '--hide-scrollbars', 'about:blank',
 ], { stdio: 'ignore', windowsHide: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -63,6 +68,7 @@ try {
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Page.addScriptToEvaluateOnNewDocument',{source:`
+    const interval=window.setInterval.bind(window);window.setInterval=(fn,ms,...args)=>{if(ms===60000)window.pollLatestTest=()=>fn(...args);return interval(fn,ms,...args);};
     let clock=0,sequence=0;const callbacks=new Map();
     performance.now=()=>clock;
     const timers=new Map(),realTimeout=window.setTimeout.bind(window),realClear=window.clearTimeout.bind(window);let timerId=-1;
@@ -227,8 +233,42 @@ try {
   await advance(95000);assert.equal(await preview(),'');
   await evaluate(`window.aidiyIDE.setAutoSpin(true)`);
   await until(`document.querySelector('.viewer-popup')?.textContent.includes('new.txt')`,'OFF中の予約に追従');
+  // 同じhh:mm:ssの境界を含めて取得し、前回最後のファイルを除いた3件を表示する。
+  const batchTime=Math.floor(baseTime)+10;
+  writeFileSync(join(project,'boundary.py'),'# Previous last');utimesSync(join(project,'boundary.py'),batchTime+.45,batchTime+.45);
+  await evaluate('window.pollLatestTest()');
+  await until(`document.querySelector('.viewer-popup')?.textContent.includes('boundary.py')&&!document.querySelector('.space-canvas').classList.contains('warping')`,'比較の起点ファイルへ到着');
+  await evaluate(`window.aidiyIDE.setAutoSpin(false);document.querySelector('.explorer-toggle')?.click();window.openedPreviews=[];`);
+  const updated=[['updates/first.py',.45],['other/second.py',.6],['updates/last.py',.8]];
+  for(const [path,offset] of updated){mkdirSync(join(project,path.split('/')[0]),{recursive:true});writeFileSync(join(project,path),'# '+path);utimesSync(join(project,path),batchTime+offset,batchTime+offset);}
+  await evaluate('window.pollLatestTest()');
+  const recent=()=>evaluate(`Array.from(document.querySelectorAll('[data-latest-path]')).map(button=>button.dataset.latestPath)`);
+  assert.deepEqual(await recent(),updated.map(([path])=>path),'前回最後のファイルは同じ秒でも再表示しない');
+  const beforeBatch=await view();
+  await evaluate('window.pollLatestTest()');
+  assert.deepEqual(await recent(),updated.map(([path])=>path),'更新なしなら3件を維持');
+  assert.deepEqual(await view(),beforeBatch,'OFF中に勝手に移動しない');
+  await evaluate('window.aidiyIDE.setAutoSpin(true)');
+  await until(`document.querySelector('.viewer-popup')?.textContent.includes('last.py')&&!document.querySelector('.space-canvas').classList.contains('warping')`,'3件の最後だけへ移動');
+  assert.equal(await evaluate(`window.openedPreviews.some(text=>text.includes('first.py')||text.includes('second.py'))`),false,'先の2件は表示しない');
+  const saved=await evaluate(`JSON.parse(localStorage.getItem('aidiy_ide:'+${JSON.stringify(project)}))`);
+  assert.deepEqual(saved.journal.filter(entry=>updated.some(([path])=>path===entry.path)).map(entry=>entry.path),[...updated].reverse().map(([path])=>path));
+  assert.deepEqual(saved.voyages.updates.filter(key=>key.startsWith('f:')),['f:updates/first.py','f:updates/last.py']);
+  assert.ok(saved.voyages.other.includes('f:other/second.py'),'移動しなかった別フォルダの経路も保存');
+  await capture('nn-updates-three-landscape.png');
+  await send('Emulation.setDeviceMetricsOverride',{width:768,height:1000,deviceScaleFactor:1,mobile:false});await advance(1000);await sleep(350);
+  await capture('nn-updates-three-portrait.png');
+  // 3行を超えた場合もツリーを押し出さず、小さいスクロールで全件を辿る。
+  await evaluate('window.aidiyIDE.setAutoSpin(false)');
+  for(let i=0;i<6;i++){const path=join(project,`updates/extra${i}.py`);writeFileSync(path,'# Extra');utimesSync(path,batchTime+.9+i*.001,batchTime+.9+i*.001);}
+  await evaluate('window.pollLatestTest()');
+  assert.equal((await recent()).length,6);
+  assert.equal(await evaluate(`(()=>{const list=document.querySelector('.explorer-latest-list');return list.clientHeight<=78&&list.scrollHeight>list.clientHeight;})()`),true,'更新一覧だけを小さくスクロール');
+  await evaluate(`document.querySelector('.explorer-latest-list').scrollTop=1000`);
+  assert.ok(await evaluate(`document.querySelector('.explorer-latest-list').scrollTop>0`));
+  await capture('nn-updates-scroll.png');
   assert.deepEqual(errors,[]);
-  console.log('AUTODRIVE PASS: 起動時ジャンプ、到着済み重複抑制、手動移動先・ルートで彗星軌道再開、5分消去、新しい更新追従、移動中の予約変更、新規ファイル、OFF中保留');
+  console.log('AUTODRIVE PASS: 起動時ジャンプ、到着済み重複抑制、手動移動先・ルートで彗星軌道再開、5分消去、新しい更新追従、移動中の予約変更、新規ファイル、OFF中保留、秒境界の重複除外、複数更新の保持・経路保存・最後だけ移動・小さいスクロール');
   ws.close();
 } finally {
   chrome.kill();

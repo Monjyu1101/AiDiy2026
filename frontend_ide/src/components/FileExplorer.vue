@@ -6,44 +6,38 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AISearchPanel from './AISearchPanel.vue';
-import { latestFile } from '../latest-file.js';
+import { latestFiles, createLatestUpdates } from '../latest-file.js';
 const props = defineProps({ tree: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'route']);
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
-// _AIDIY・_data・_datas配下を除いた最終更新ファイル（最下部に表示）。
-// 一覧から求めた値に加え、約1分ごとにサーバーへ最新だけを問い合わせて差し替える（一覧そのものは取り直さない）。
-const listLatest = computed(() => latestFile(tree.value));
-const polled = shallowRef(null);
-let latestRun = 0;
+// 前回の最新日時以降を更新順で表示する。更新なしなら前回の一覧を保持する。
+const recentUpdates = shallowRef([]);
+let latestRun = 0, updates = createLatestUpdates(), switchingFilter = false, initialSent = false;
+function acceptUpdates(files) {
+  const baseline = updates.since === null, changed = updates.accept(files);
+  if (!changed.length) return;
+  recentUpdates.value = changed;
+  if (props.filter && (!initialSent || !baseline)) {
+    const initial = !initialSent; initialSent = true;
+    emit('latest', { ...changed.at(-1), files: changed, initial });
+  }
+}
 async function pollLatest() {
   if (document.hidden) return;   // 裏に隠れている間は問い合わせない
   const run = ++latestRun, forFilter = props.filter;
   try {
-    const response = await fetch('/api/latest?' + new URLSearchParams(forFilter ? { filter: 'backup' } : {}), { cache: 'no-store' });
+    const params = { ...(forFilter ? { filter: 'backup' } : {}), ...(updates.since === null ? {} : { since: String(updates.since) }) };
+    const response = await fetch('/api/latest?' + new URLSearchParams(params), { cache: 'no-store' });
     if (!response.ok) return;
-    const { latest } = await response.json();
-    if (run === latestRun && forFilter === props.filter) polled.value = latest ? { ...latest, filter: forFilter } : null;
+    const { files } = await response.json();
+    if (run === latestRun && forFilter === props.filter) { acceptUpdates(files); switchingFilter = false; }
   } catch { /* 次の周期で再試行 */ }
 }
-const latest = computed(() => {
-  const fromList = listLatest.value, fromPoll = polled.value?.filter === props.filter ? polled.value : null;
-  return !fromPoll || (fromList && fromList.mtime >= fromPoll.mtime) ? fromList : fromPoll;
-});
 const latestTimer = setInterval(pollLatest, 60_000);
-// 最終更新を外へ知らせる（視点移動中の「最終更新ファイルの表示」に使う）。フィルター ON の時だけ（OFF はデータベースなどが毎分変わるため）。
-// 起動直後の最初の値（前日などの最終更新でも）と、その後「より新しいファイル」に変わった時に知らせる。フィルター切替直後は基準を覚えるだけ。
-let latestBase = null, initialSent = false;
-watch(latest, value => {
-  if (!value) return;
-  const initial = props.filter && !initialSent;
-  const newer = props.filter && latestBase && latestBase.filter === props.filter && value.mtime > latestBase.mtime;
-  latestBase = { filter: props.filter, mtime: value.mtime };
-  if (initial) initialSent = true;
-  if (initial || newer) emit('latest', { path: value.path, mtime: value.mtime, initial });
-}, { immediate: true });
-watch(() => props.filter, () => { polled.value = null; void pollLatest(); });
-const latestTime = computed(() => latest.value ? new Date(latest.value.mtime).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+watch(() => props.filter, () => { latestRun++; updates = createLatestUpdates(); switchingFilter = true; void pollLatest(); });
+watch(tree, value => { if (!switchingFilter) acceptUpdates(latestFiles(value, updates.since)); }, { immediate: true });
+const latestTime = value => new Date(value.mtime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const expanded = ref(new Set()), cursor = ref(''), mode = ref('since'), since = ref(props.startedAt), preset = ref('start');
 const aiResult=shallowRef(null),routeMode=ref('view');
 const aiFiles=computed(()=>new Map((aiResult.value?.files||[]).map(file=>[file.path,file.reason])));
@@ -240,10 +234,12 @@ defineExpose({reveal});
       <ul ref="treeElement" role="tree" tabindex="0" @keydown="key"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,selected:selected===row.path,cursor:cursor===row.path}" @click="select(row,true)">
         <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><span v-if="row.type==='dir'">{{ row.open?'📂':'📁' }}</span><span v-else class="file-dot" :style="{color:color(row.name)}">●</span><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh">●</span>
       </li></TransitionGroup></ul>
-      <!-- 最下部: 今の一覧で最後に更新されたファイル（フィルターは星空画面の左下） -->
+      <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
       <footer class="explorer-footer">
-        
-        <button v-if="latest" class="explorer-latest" :title="`最終更新: ${latest.path}`" @click="select({type:'file',path:latest.path})"><small>最終更新</small><span class="file-dot" :style="{color:color(latest.name)}">●</span><span class="file-name">{{ latest.name }}</span><span class="file-meta">{{ latestTime }}</span></button>
+        <small v-if="recentUpdates.length">最終更新 · {{ recentUpdates.length }}件</small>
+        <div v-if="recentUpdates.length" class="explorer-latest-list" aria-label="最終更新ファイル一覧">
+          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path})"><span class="file-dot" :style="{color:color(file.name)}">●</span><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
+        </div>
       </footer>
 
     </aside>

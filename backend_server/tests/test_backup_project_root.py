@@ -47,6 +47,39 @@ class BackupProjectRootTest(unittest.TestCase):
         native_loader.start()
         self.addCleanup(native_loader.stop)
 
+    def test_office_lock_files_are_excluded_from_full_and_incremental_backups(self):
+        included = ["報告.docx", "nested/集計.xlsx", "nested/発表.pptx", "~通常.docx"]
+        locks = ["~$報告.docx", "nested/~$集計.xlsx", "nested/~$発表.pptx"]
+        for relative in included + locks:
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(relative, encoding="utf-8")
+        for path in self.root.rglob("*"):
+            if path.is_file():
+                os.utime(path, (1000, 1000))
+        for relative in locks:
+            os.utime(self.root / relative, (9000, 9000))
+        expected = {"src/main.py", "_AIDIY/knowledge/example.md", *included}
+        # 除外後の件数だけで判定し、新しいロックの時刻を保存フォルダ名にも使わない。
+        scanned = self.native._全ファイルスキャン(str(self.root), 最大件数=len(expected) + 1)
+        self.assertEqual({item["パス"] for item in scanned}, expected)
+        full = self.native.バックアップ実行(セッション設定={"CODE_BASE_PATH": str(self.root)}, ログ出力=False)
+        self.assertTrue(full[3])
+        self.assertEqual(set(full[2]), expected)
+        self.assertTrue((Path(full[4]) / "nested/集計.xlsx").is_file())
+        for relative in locks:
+            self.assertFalse((Path(full[4]) / relative).exists())
+        # ロックだけの更新では差分保存を作らない。
+        for relative in locks:
+            os.utime(self.root / relative, (10000, 10000))
+        unchanged = self.native.バックアップ実行(セッション設定={"CODE_BASE_PATH": str(self.root)}, ログ出力=False)
+        self.assertEqual(unchanged[2], [])
+        os.utime(self.root / "nested/集計.xlsx", (1002, 1002))
+        incremental = self.native.バックアップ実行(セッション設定={"CODE_BASE_PATH": str(self.root)}, ログ出力=False)
+        self.assertFalse(incremental[3])
+        self.assertEqual(incremental[2], ["nested/集計.xlsx"])
+        self.assertTrue((Path(incremental[4]) / "nested/集計.xlsx").is_file())
+
     def test_relative_config_and_session_paths_use_backend_directory_not_cwd(self):
         config = types.SimpleNamespace(json={"CODE_BASE_PATH": "../"})
         for cwd in (str(self.root), str(self.root / "_AIDIY")):

@@ -30,7 +30,7 @@ async function pin(file){
 }
 // 最終更新ファイルの表示: 起動直後の最終更新と、その後の新しい最終更新を宇宙へ予約する。
 // 宇宙は自動探索 ON・オープニング後・追いかけてよい状態になってから、そのファイルまでワープして開く。
-function onLatest(file){engine?.requestFollow(file.path);}
+function onLatest(file){engine?.requestFollow(file.files.map(item=>item.path));}
 // フィルター（左下、既定 ON）: 宇宙とエクスプローラーを AiDiy のバックアップ対象だけにする。
 const filter=ref(true);
 watch(filter,on=>engine?.setFilter(on));

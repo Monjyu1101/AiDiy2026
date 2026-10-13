@@ -106,3 +106,9 @@
 .development-app.ide .ai-popup{z-index:50}
 .term-screen .xterm-helper-textarea{min-height:0;max-height:none;resize:none}
 .development-app.term.desktop-window{animation:startup-fade-in .45s ease-out both}
+
+/* 最終更新は3行程度の小さな領域で複数ファイルを辿れる。 */
+.explorer-footer{flex-direction:column;align-items:stretch;gap:4px}
+.explorer-footer>small{color:#8490a8}
+.explorer-latest-list{max-height:78px;overflow-y:auto;min-width:0;scrollbar-width:thin}
+.explorer-panel .explorer-latest{width:100%;min-height:25px;flex:none}

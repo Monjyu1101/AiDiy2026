@@ -86,7 +86,7 @@ class BackupFileLimitTest(unittest.TestCase):
                     copy.assert_called_once()
 
     def test_excluded_files_do_not_count_toward_limit(self):
-        names = ["ignored.pyc", "ignored.log", "package-lock.json", "keep.txt"]
+        names = ["ignored.pyc", "ignored.log", "package-lock.json", "~$報告.docx", "~$集計.xlsx", "~$発表.pptx", "keep.txt"]
         with (
             patch.object(self.native.os, "walk", return_value=[("/project", [], names)]),
             patch.object(self.native.os.path, "getmtime", return_value=1.0),

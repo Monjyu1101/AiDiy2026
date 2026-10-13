@@ -770,13 +770,13 @@ const touch = new Map();
 const touchIdle = () => {
   autoOrbit.interact(performance.now()); followedPath = null;
   // 到着済みの最終更新へは引き戻さず、未到着の新しい対象だけを保留する。
-  pendingFollow = latestFollow !== lastFollowedPath ? latestFollow : null;
+  pendingFollow = updatePaths.length || latestFollow !== lastFollowedPath ? latestFollow : null;
 };
 
 function setAutoSpin(value) {
   const entering = !autoSpin && !!value;
   autoSpin = !!value;
-  if (autoSpin) { autoOrbit.resume(); if (entering) pendingFollow = latestFollow !== lastFollowedPath ? latestFollow : null; }
+  if (autoSpin) { autoOrbit.resume(); if (entering) pendingFollow = updatePaths.length || latestFollow !== lastFollowedPath ? latestFollow : null; }
   else {
     autoOrbit.reset();
     if (!selected && !focus && !diving) Object.assign(goal, cam);
@@ -1160,10 +1160,18 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
 let followSequence = 0, followedPath = null, pendingFollow = null, latestFollow = null, following = false;
 // 自動表示中かどうかと、最後に到着した場所の記憶を分ける。後者は手動操作でも消さない。
 let lastFollowedPath = null, activeFollowPath = null;
+let updatePaths = [];
 /** 移動を予約する（起動直後の最終更新も含む）。すぐ動けない時は、動ける状態になってから frame で始める。 */
 function requestFollow(path) {
+  if (Array.isArray(path)) {
+    // 待機中の追加更新も経路に残し、移動先だけは常に最後のファイルにする。
+    const received = new Set(path);
+    updatePaths = [...updatePaths.filter(value => !received.has(value)), ...received];
+    path = path.at(-1);
+    if (!path) return;
+  }
   latestFollow = path;
-  pendingFollow = path === lastFollowedPath || (following && path === activeFollowPath) ? null : path;
+  pendingFollow = !updatePaths.length && (path === lastFollowedPath || (following && path === activeFollowPath)) ? null : path;
 }
 /** 今追いかけてよいか: 視点移動が ON、手動操作の直後でない、ユーザーが自分で開いたファイルを見ていない。 */
 function canFollow() {
@@ -1171,7 +1179,7 @@ function canFollow() {
     && (!selected || selected.path === followedPath);
 }
 async function follow(path) {
-  if(path === lastFollowedPath)return true;
+  if(path === lastFollowedPath&&!updatePaths.length)return true;
   const parts = path.split('/'), level = parts.slice(0, -1);
   const run = ++followSequence;
   const stale = () => disposed || run !== followSequence || !autoSpin || !!pendingFollow || (latestFollow && latestFollow !== path) || performance.now() < autoOrbit.pausedUntil;
@@ -1182,11 +1190,21 @@ async function follow(path) {
 async function followSteps(path, parts, level, stale) {
   holdProjection(); Object.assign(goal, cam);
   // 開いている自動のビューアは、元へ戻さずに閉じる
-  selected = null; tracking = null; updateSide();
+  if (path !== lastFollowedPath) { selected = null; tracking = null; updateSide(); }
   // 毎回読み直す。直前の走査後に新規作成されたファイルも、予約を失わず表示する。
   await refresh(); if (stale()) return false;
   const node = nodeAt(level);
   if (!node || !node.f.some(file => file[0] === parts.at(-1))) return false;
+  // 先行ファイルには移動・表示せず、階層ごとの経路と閲覧軌跡だけを保存する。
+  const recorded = updatePaths; updatePaths = [];
+  for (const updated of recorded) {
+    const names = updated.split('/'), parent = names.slice(0, -1), directory = nodeAt(parent);
+    if (!directory?.f.some(file => file[0] === names.at(-1))) continue;
+    for (let i = 0; i < parent.length; i++) remember('dir', parent.slice(0, i + 1).join('/'), parent.slice(0, i).join('/'), false);
+    remember('file', updated, parent.join('/'), false);
+  }
+  if (recorded.length) { saveVoyage(); notify(); }
+  if (path === lastFollowedPath) return true;
   // 手動・軌跡・自動追跡で航行規則を共有し、同一星系の接近にはワープしない。
   if (!await goTo({type:'file',path},{automatic:true,valid:()=>!stale()}) || stale()) return false;
   followedPath = path; lastFollowedPath = path;
@@ -1205,13 +1223,13 @@ function loadVoyage() {
     journal = Array.isArray(saved.journal) ? saved.journal : [];
   } catch { voyages = {}; journal = []; }
 }
-function remember(type, path) {
-  const route = voyages[basePath()] ??= [];
+function remember(type, path, base = basePath(), save = true) {
+  const route = voyages[base] ??= [];
   const key = `${type === 'dir' ? 'g' : 'f'}:${path}`;
   if (route.at(-1) !== key) route.push(key);
   if (route.length > 40) route.splice(0, route.length - 40);
   journal = [{ type, path, at: Date.now() }, ...journal.filter(j => !(j.type === type && j.path === path))].slice(0, 80);
-  saveVoyage();
+  if (save) saveVoyage();
 }
 function clearVoyage() {
   delete voyages[basePath()];

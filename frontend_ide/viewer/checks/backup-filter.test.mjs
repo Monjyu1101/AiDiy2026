@@ -9,6 +9,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { scanTree } from '../server.mjs';
+import { latestFiles } from '../../src/latest-file.js';
 
 test('バックアップフィルターは_AIDIYのCode / IDE記録だけを除外し、knowledgeと同名ソースを残す', async t => {
   const root = await mkdtemp(join(tmpdir(), 'aidiy-backup-filter-'));
@@ -29,4 +30,24 @@ test('バックアップフィルターは_AIDIYのCode / IDE記録だけを除�
   assert.deepEqual(filtered.tree.d.find(node => node.n === '_AIDIY').d.map(node => node.n).sort(), ['aidiy_ide_extra', 'knowledge']);
   assert.deepEqual(paths((await scanTree(root)).tree).sort(), [...excluded, ...included].sort());
   for (const folder of ['_AIDIY/aidiy_code', '_AIDIY/aidiy_ide']) assert.equal((await scanTree(join(root, folder), { filter: 'backup' })).files, 0);
+});
+
+test('Officeの~$ロックを全階層で除外し、元文書と通常の~名は残す', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'aidiy-office-lock-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const included = ['報告.docx', 'nested/集計.xlsx', 'nested/発表.pptx', '~通常.docx', '資料~$注記.md'];
+  const locks = ['~$報告.docx', 'nested/~$集計.xlsx', 'nested/~$発表.pptx'];
+  for (const path of [...included, ...locks]) {
+    const parts = path.split('/');
+    await mkdir(join(root, ...parts.slice(0, -1)), { recursive: true });
+    await writeFile(join(root, ...parts), '検証');
+  }
+  function paths(node, prefix = '') {
+    return [...node.f.map(([name]) => prefix + name), ...node.d.flatMap(child => paths(child, `${prefix}${child.n}/`))];
+  }
+  const filtered = await scanTree(root, { filter: 'backup' });
+  assert.equal(filtered.files, included.length);
+  assert.deepEqual(paths(filtered.tree).sort(), [...included].sort());
+  assert.equal(latestFiles(filtered.tree, 0).some(file => locks.includes(file.path)), false, '最終更新・自動探索へロックを渡さない');
+  assert.deepEqual(paths((await scanTree(root)).tree).sort(), [...included, ...locks].sort(), 'フィルターOFFでは通常一覧で確認できる');
 });

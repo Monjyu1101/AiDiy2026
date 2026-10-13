@@ -19,7 +19,7 @@ import { createCoreConnection } from './core-connection.mjs';
 import { createPanels } from './panels.mjs';
 import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
-import { latestFile } from '../src/latest-file.js';
+import { latestFile, latestFiles } from '../src/latest-file.js';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
 // ファイルビューア用の Monaco Editor（`python frontend_ide/viewer/_setup.py` で導入。無ければ画面側が簡易表示にする）
@@ -103,6 +103,7 @@ const WINDOWS_RESERVED = new Set(['con', 'prn', 'aux', 'nul', 'null',
 const MAX_BACKUP_FILES = 100000;   // バックアップがキャンセルする件数と同じ
 const backupDirAllowed = name => !BACKUP_EXCLUDED_DIRS.has(name) && !name.startsWith('.');
 const backupFileAllowed = name => !BACKUP_EXCLUDED_FILES.has(name)
+  && !name.startsWith('~$') // Officeの一時ロック。Pythonの共通バックアップ判定と合わせる。
   && !BACKUP_EXCLUDED_EXTENSIONS.some(ext => name.endsWith(ext))
   && !WINDOWS_RESERVED.has((name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name).toLowerCase());
 
@@ -306,12 +307,14 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));
         return fail(404, 'not found');
       }
-      // エクスプローラー最下部の「最終更新」用。一覧全体は返さず、一番新しく更新されたファイルだけを返す（1分ごとに呼ばれる）。
+      // 最終更新欄。前回の更新日時から、同じ秒も含めて更新候補を返す。
       if (url.pathname === '/api/latest') {
         const filter = url.searchParams.get('filter');
         if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
+        const value = url.searchParams.get('since'), since = value === null ? null : Number(value);
+        if (value !== null && (!value.trim() || !Number.isFinite(since) || since < 0)) return fail(400, 'since は更新日時のミリ秒を指定してください。');
         const { tree } = await scanTree(root, { filter });
-        return json({ latest: latestFile(tree) });
+        return json({ latest: latestFile(tree), files: latestFiles(tree, since) });
       }
       if (url.pathname === '/api/galaxy') {
         const filter = url.searchParams.get('filter');

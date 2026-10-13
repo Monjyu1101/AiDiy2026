@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, utimes, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { latestFile } from '../../src/latest-file.js';
+import { latestFile, latestFiles, createLatestUpdates } from '../../src/latest-file.js';
 import { scanTree, startServer } from '../server.mjs';
 import { createCoreConnection } from '../core-connection.mjs';
 
@@ -73,4 +73,34 @@ test('除外フォルダのファイルしかなければ最終更新候補を�
   await put(root, '_datas/output.txt', 400);
   assert.equal(latestFile((await scanTree(root)).tree), null);
   assert.equal(latestFile(undefined), null);
+});
+
+test('同じ秒を含めて取得し、取得済みの最後のファイルを除いて更新順に複数件を選ぶ', () => {
+  const tracker = createLatestUpdates();
+  const file = (path, mtime) => ({ name: path, path, mtime });
+  const previous = file('previous.py', 123450), old = file('old.py', 123100);
+  assert.deepEqual(tracker.accept([old, previous]), [previous]);
+  assert.deepEqual(tracker.accept([old, previous]), []);
+  const first = file('first.py', 123450), second = file('second.py', 123600), last = file('last.py', 124000);
+  assert.deepEqual(tracker.accept([last, previous, second, first]), [first, second, last]);
+  assert.equal(tracker.since, 124000);
+  assert.deepEqual(tracker.accept([last]), []);
+  assert.deepEqual(tracker.accept([]), []);
+  assert.deepEqual(tracker.accept([file('last.py', 124500)]), [file('last.py', 124500)], '同じパス自体の再更新は拾う');
+});
+
+test('更新APIは秒の境界を含む複数候補を返し、除外・不正な日時の拒否を維持する', async t => {
+  const root = await fixture(t), connection = createCoreConnection(root); connection.offline();
+  const app = await startServer(root, 0, { connection }); t.after(() => app.close());
+  await put(root, 'old.py', 123.1); await put(root, 'previous.py', 123.45);
+  await put(root, 'next.py', 123.6); await put(root, 'last.py', 124);
+  await put(root, '_datas/new.py', 125);
+  for (const suffix of ['', '&filter=backup']) {
+    const data = await fetch(app.url + 'api/latest?since=123450' + suffix).then(r => r.json());
+    assert.deepEqual(data.files.map(file => file.path), ['old.py', 'previous.py', 'next.py', 'last.py']);
+    assert.equal(data.latest.path, 'last.py');
+  }
+  assert.deepEqual(latestFiles((await scanTree(root)).tree).map(file => file.path), ['last.py']);
+  assert.deepEqual((await fetch(app.url + 'api/latest?since=125000').then(r => r.json())).files, []);
+  for (const since of ['', '-1', 'NaN', 'Infinity']) assert.equal((await fetch(app.url + 'api/latest?since=' + since)).status, 400);
 });

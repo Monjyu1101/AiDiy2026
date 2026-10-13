@@ -126,6 +126,8 @@ frontend_avatar/dist-electron/
 .yarn-integrity
 
 # IDEs / Editors
+# Microsoft Office が文書と同じフォルダに作成する一時ロックファイル（全階層）。
+~$*
 .idea/
 .vscode/
 .vscode/*
