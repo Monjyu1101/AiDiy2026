@@ -25,7 +25,7 @@ async def check_startup(decisions):
 
 
 def register_tools(mcp, decisions):
-    # lifespanでチェック後に再登録する。接続と診断は残し、実行ツールだけを止める。
+    # lifespanで実行チェック後に登録する。再登録時も接続と診断は残す。
     for name in ("decisions_config", "decisions_check"):
         if name in mcp._tool_manager._tools:
             mcp.remove_tool(name)
@@ -38,7 +38,10 @@ def register_tools(mcp, decisions):
         return config_result(decisions)
 
     if not status["available"]:
-        logger.warning("aidiy_decisions_check: %s 実行ツールは非公開です。", status["message"])
+        if not decisions.availability:
+            logger.info("aidiy_decisions_check: 起動チェック待ちです。完了後に実行ツールの公開可否を更新します。")
+        else:
+            logger.warning("aidiy_decisions_check: %s 実行ツールは非公開です。", status["message"])
         return
 
     @mcp.tool()
@@ -71,6 +74,9 @@ def register_tools(mcp, decisions):
             raise ToolError("AI判断の入力が不正です: " + json.dumps(errors, ensure_ascii=False)) from None
         except DecisionError as exc:
             raise ToolError(str(exc)) from None
+
+    available_models = [f"{name}/{info['model']}" for name, info in decisions.availability.items() if info.get("ok")]
+    logger.info("aidiy_decisions_check: 実行ツールを公開しました。利用可能: %s", ", ".join(available_models))
 
 def config_result(decisions) -> dict:
     try:

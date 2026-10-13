@@ -11,7 +11,7 @@ from mcp.server.mcpserver import MCPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools_proc.decisions_check import Decision, DecisionError
-from tools_proc.tools_decisions import create_router, register_tools
+from tools_proc.tools_decisions import check_startup, create_router, register_tools
 
 REQUEST = {"model": "openai_decisions/gpt-6-luna", "input": "blue", "questions": [{"name": "blue", "type": "predicate", "instructions": "blue?"}]}
 
@@ -57,6 +57,42 @@ class DecisionHTTPTests(unittest.TestCase):
 
 
 class DecisionMCPTests(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_pending_is_info_and_oauth_success_publishes_execution(self):
+        instance = service()
+        instance.availability = {}
+        mcp = MCPServer("decision-startup")
+        with self.assertLogs("tools_proc.tools_decisions", level="INFO") as pending:
+            register_tools(mcp, instance)
+        self.assertEqual(set(mcp._tool_manager._tools), {"decisions_config"})
+        self.assertTrue(all(record.levelname == "INFO" for record in pending.records))
+        self.assertIn("起動チェック待ち", "\n".join(pending.output))
+        self.assertNotIn("実行ツールは非公開", "\n".join(pending.output))
+
+        async def finish_check(timeout_sec):
+            self.assertEqual(timeout_sec, 15)
+            instance.availability = {
+                "openai_decisions": {"ok": False, "model": "gpt-6-luna", "reason": "APIキーなし"},
+                "openai_oauth": {"ok": True, "model": "gpt-6-luna", "reason": "おはよう → 挨拶 を確認"},
+            }
+            return instance.availability
+
+        with patch.object(instance, "check_availability", side_effect=finish_check), self.assertLogs("tools_proc.tools_decisions", level="INFO") as completed:
+            await check_startup(instance)
+            register_tools(mcp, instance)
+        self.assertIn("decisions_check", mcp._tool_manager._tools)
+        self.assertIn("実行ツールを公開しました", "\n".join(completed.output))
+        self.assertIn("openai_oauth/gpt-6-luna", "\n".join(completed.output))
+        self.assertNotIn("実行ツールは非公開", "\n".join(completed.output))
+
+    async def test_completed_failed_check_still_warns_and_hides_execution(self):
+        instance = service()
+        instance.availability["openai_decisions"]["ok"] = False
+        mcp = MCPServer("decision-unavailable")
+        with self.assertLogs("tools_proc.tools_decisions", level="WARNING") as failed:
+            register_tools(mcp, instance)
+        self.assertIn("実行ツールは非公開", "\n".join(failed.output))
+        self.assertEqual(set(mcp._tool_manager._tools), {"decisions_config"})
+
     async def test_auto_uses_oauth_first_and_native_when_oauth_unavailable(self):
         for oauth_ok in (True, False):
             with self.subTest(oauth_ok=oauth_ok):

@@ -15,9 +15,13 @@ if str(BACKEND_TOOLS_DIR) not in sys.path:
 
 import tools_main  # noqa: E402
 
+# import 時に未確認の公開可否を判定していないことを、起動処理より前に記録する。
+INITIAL_DECISION_TOOLS = set(tools_main.mcp_dj._tool_manager._tools)
+
 
 class PlatformRegistrationTests(unittest.TestCase):
     def test_windows_control_is_only_published_on_windows(self) -> None:
+        self.assertEqual(INITIAL_DECISION_TOOLS, set())
         windows = sys.platform == "win32"
         # 起動時の外部API呼び出しは別の実接続テストで検証する。
         availability = {"openai_decisions": {"ok": True, "model": "gpt-6-luna"}, "openai_oauth": {"ok": False, "model": "gpt-6-luna"}}
@@ -64,6 +68,38 @@ class PlatformRegistrationTests(unittest.TestCase):
             messages = [json.loads(line[5:].strip()) for line in response.text.splitlines() if line.startswith("data:")]
             payload = messages[-1] if messages else response.json()
             self.assertIn("現在利用不可", payload["result"]["instructions"])
+
+
+class DecisionStartupOrderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_check_then_register_then_accept_mcp_sessions(self):
+        from contextlib import asynccontextmanager
+        from mcp.server.mcpserver import MCPServer
+        from tools_proc.decisions_check import Decision
+
+        decisions = Decision(config={})
+        mcp = MCPServer("decision-startup-order")
+        events = []
+
+        async def check(timeout_sec):
+            self.assertEqual(timeout_sec, 15)
+            self.assertEqual(set(mcp._tool_manager._tools), set())
+            events.append("checked")
+            decisions.availability = {"openai_oauth": {"ok": True, "model": "gpt-6-luna", "reason": "おはよう → 挨拶 を確認"}}
+            return decisions.availability
+
+        class Manager:
+            @asynccontextmanager
+            async def run(manager_self):
+                self.assertEqual(set(mcp._tool_manager._tools), {"decisions_config", "decisions_check"})
+                events.append("sessions-started")
+                yield
+                events.append("sessions-stopped")
+
+        with patch.object(tools_main, "decisions", decisions), patch.object(tools_main, "mcp_dj", mcp), patch.object(tools_main, "MCP_MAP", {"aidiy_decisions_check": mcp}), patch.object(tools_main, "_ensure_session_manager", return_value=Manager()), patch.object(decisions, "check_availability", side_effect=check) as checked:
+            async with tools_main._mcp_lifespan(tools_main.app):
+                events.append("serving")
+            checked.assert_awaited_once_with(timeout_sec=15)
+        self.assertEqual(events, ["checked", "sessions-started", "serving", "sessions-stopped"])
 
 
 if __name__ == "__main__":

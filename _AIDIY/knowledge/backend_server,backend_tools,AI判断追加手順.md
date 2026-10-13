@@ -41,6 +41,7 @@ OAuthは既存の `AIチャット_openai._oauth_access_token` を呼び、Hermes
 - APIキーが空欄・空白・`<`始まりのひな形・空引用符（`""` / `“”`等）の場合は、通信せず利用不可にする。OAuthはキーの有無で判定せず実行確認する。
 - 方式ごとに最大15秒、並行してチェックする。認証・課金・通信・JSON形式の失敗、回答拒否、期待結果の不一致は利用不可。失敗しても他MCPの起動を止めない。
 - 起動ログに方式・モデル・利用可能/不可・理由を出す。`decisions_config` とHTTP `/config` の `availability` に `ok/model/reason/answer/checked_at/elapsed_ms`、`available_models` に成功したモデルを返す。未実行時は `availability_checked=false`。
+- モジュールimport時にはAI判断のMCPツールを登録せず、lifespanで実行チェックを完了してから登録し、その後にMCPセッション管理とHTTP受付を開始する。1方式以上が成功すればINFOで「実行ツールを公開しました」、全方式が失敗した場合だけWARNINGで「実行ツールは非公開」と表示する。OAuthログインの可否だけでなく、判断用の既定モデルで実行できるかを確認する。最終状態は `GET /aidiy_decisions_check/config` の `data.availability_checked` / `data.availability` / `data.available` で確認する。
 - 結果は起動チェック時点のモデルについてのスナップショット。認証情報を返したり保存したりしない。設定変更後は再起動で再確認する。
 - 1方式以上が成功した場合だけMCP実行ツール `decisions_check` を公開する。全方式が利用不可（または未確認）の場合は実行ツールを非公開とし、`decisions_config` だけを残す。設定JSON・MCP接続先は維持し、接続初期化の `instructions` と設定取得の `status=NG` / `available=false` / `message` で「現在利用不可」を返す。理由は `availability` で確認できる。
 - 全方式が利用不可の場合、HTTP `/check` も503と `status=NG` を返し、判断APIを呼ばない。HTTP `/config` は200で診断結果を返す。再起動チェックで1方式以上が成功すると実行ツールを再公開する。

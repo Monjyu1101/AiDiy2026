@@ -294,7 +294,7 @@ tools_ffmpeg.register_tools(mcp_ff, ffmpeg_c)
 tools_notification_sounds.register_tools(mcp_ns, ns)
 tools_agents.register_tools(mcp_ca, code_agents)
 tools_chat.register_tools(mcp_cl, chat_llm)
-tools_decisions.register_tools(mcp_dj, decisions)
+# AI判断は lifespan の実行チェック完了後に登録する。
 tools_task_agents.register_tools(mcp_ta, task_agents)
 tools_team_agents.register_tools(mcp_tm, team_agents)
 if sys.platform == "win32":
