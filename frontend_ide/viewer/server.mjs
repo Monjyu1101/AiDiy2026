@@ -374,7 +374,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
         if (!type || !back || back.startsWith('..') || isAbsolute(back)) return fail(404, 'not found');
         let body;
         try { body = await readFile(full); } catch { return fail(404, 'not found'); }
-        res.writeHead(200, { 'content-type': type, 'cache-control': 'max-age=86400' });
+        res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
         res.end(body);
         return;
       }

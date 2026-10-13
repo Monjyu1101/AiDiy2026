@@ -25,7 +25,6 @@ async function loadComparison(){
   try{
     const [value,monaco]=await Promise.all([request({version:selected.value},controller.signal),loadMonaco()]);
     if(closed||run!==revision)return;
-    if(!monaco)throw Error('比較エディターを読み込めませんでした。画面を再読み込みしてください。');
     comparison.value=value;await nextTick();if(closed||run!==revision)return;
     const language=monacoLanguage(props.file.name);
     models=[monaco.editor.createModel(value.original.text,language),monaco.editor.createModel(value.modified.text,language)];

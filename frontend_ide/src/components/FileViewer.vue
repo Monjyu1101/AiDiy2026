@@ -50,7 +50,7 @@ async function load(file){
     if(value.tooLarge){error.value='表示できるサイズの上限を超えています。';return;}
     if(value.kind==='text'){
       if(openHistory)void checkHistory(file,run,controller.signal);
-      await nextTick();const monaco=await loadMonaco();if(run!==revision)return;
+      await nextTick();const monaco=await loadMonaco().catch(()=>null);if(run!==revision)return;
       if(!monaco){fallback.value=true;return;}
       const fontSize=parseFloat(getComputedStyle(host.value).getPropertyValue('--file-font-size'))||10;
       editor=monaco.editor.create(host.value,{value:value.text,language:monacoLanguage(file.name),theme:'aidiy-space',readOnly:true,domReadOnly:true,automaticLayout:true,fontSize,wordWrap:'on',minimap:{enabled:!props.pinned},scrollBeyondLastLine:false,contextmenu:false});

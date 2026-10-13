@@ -20,23 +20,39 @@ export function monacoLanguage(name) {
   const dot = lower.lastIndexOf('.');
   return dot > 0 ? MONACO_LANG[lower.slice(dot + 1)] ?? 'plaintext' : 'plaintext';
 }
-let monacoReady = null;
+let monacoReady = null, failedModules = false;
 export function loadMonaco() {
-  monacoReady ??= new Promise(resolve => {
-    const script = document.createElement('script');
-    script.src = '/monaco/vs/loader.js';
-    script.onload = () => {
-      window.require.config({ paths: { vs: '/monaco/vs' } });
-      window.require(['vs/editor/editor.main'], () => {
-        window.monaco.editor.defineTheme('aidiy-space', {
-          base: 'vs-dark', inherit: true, rules: [],
-          colors: { 'editor.background': '#05070f', 'editorGutter.background': '#070a16', 'minimap.background': '#05070f', 'editorLineNumber.foreground': '#48536f' },
+  monacoReady ??= new Promise((resolve, reject) => {
+    // 同じ画面の並行読込は共有する。失敗したAMDモジュールと古い配信キャッシュは再利用しない。
+    const attempt = Date.now().toString(36);
+    function loadEditor() {
+      try {
+        if (failedModules) window.require.reset();
+        failedModules = false;
+        window.require.config({ paths: { vs: '/monaco/vs' }, urlArgs: `v=${attempt}` });
+        window.require(['vs/editor/editor.main'], () => {
+          try {
+            const monaco = window.monaco;
+            if (!monaco?.editor?.createDiffEditor) throw Error('Monacoのエディターが見つかりません。');
+            monaco.editor.defineTheme('aidiy-space', {
+              base: 'vs-dark', inherit: true, rules: [],
+              colors: { 'editor.background': '#05070f', 'editorGutter.background': '#070a16', 'minimap.background': '#05070f', 'editorLineNumber.foreground': '#48536f' },
+            });
+            resolve(monaco);
+          } catch (error) { reject(error); }
+        }, error => {
+          failedModules = true;
+          const modules = error?.neededBy || error?.requireModules || error?.moduleId;
+          reject(Error('Monacoの表示ライブラリを読み込めませんでした。' + (modules ? `（${Array.isArray(modules) ? modules.join(', ') : modules}）` : '') + '「再試行」で読み直せます。繰り返す場合はfrontend_ide/viewerのセットアップを確認してください。'));
         });
-        resolve(window.monaco);
-      }, () => resolve(null));
-    };
-    script.onerror = () => resolve(null);
+      } catch (error) { reject(error); }
+    }
+    if (typeof window.require?.config === 'function') { loadEditor(); return; }
+    const script = document.createElement('script');
+    script.src = `/monaco/vs/loader.js?v=${attempt}`;
+    script.onload = loadEditor;
+    script.onerror = () => { script.remove(); reject(Error('Monacoのローダーを読み込めませんでした。「再試行」で読み直せます。繰り返す場合はfrontend_ide/viewerのセットアップを確認してください。')); };
     document.head.append(script);
-  });
+  }).catch(error => { monacoReady = null; throw error; });
   return monacoReady;
 }

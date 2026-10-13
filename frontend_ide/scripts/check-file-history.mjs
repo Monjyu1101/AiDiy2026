@@ -18,28 +18,41 @@ writeFileSync(join(project,'backup/20261010/100000.all/src/sample.ts'),lines.joi
 writeFileSync(join(project,'src/backup/20261011/120000/sample.ts'),previous.join('\n'));
 writeFileSync(join(project,'no-history.ts'),'export const empty=true;');
 const app=await startDevelopment(project);await fetch(app.url+'api/connection/offline',{method:'POST'});
-const chromePath=[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).flatMap(base=>['Google/Chrome/Application/chrome.exe','Microsoft/Edge/Application/msedge.exe'].map(tail=>join(base,tail))).find(existsSync);
+const chromePath=process.env.CHROME_PATH||[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).flatMap(base=>['Google/Chrome/Application/chrome.exe','Microsoft/Edge/Application/msedge.exe'].map(tail=>join(base,tail))).find(existsSync)
+ ||['/usr/bin/google-chrome','/usr/bin/chromium','/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
 if(!chromePath)throw Error('Chrome / Edge が見つかりません。');
-const port=9500+Math.floor(Math.random()*400),chrome=spawn(chromePath,['--headless=new',`--remote-debugging-port=${port}`,`--user-data-dir=${profile}`,'--window-size=1280,800','about:blank'],{stdio:'ignore',windowsHide:true});
+const port=9500+Math.floor(Math.random()*400),chrome=spawn(chromePath,['--headless=new',`--remote-debugging-port=${port}`,`--user-data-dir=${profile}`,...(process.platform==='linux'?['--no-sandbox','--disable-dev-shm-usage','--no-zygote']:[]),'--window-size=1280,800','about:blank'],{stdio:'ignore',windowsHide:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));let ws;
 try{
  let target;for(let i=0;i<50&&!target;i++){try{target=(await fetch(`http://127.0.0.1:${port}/json/list`).then(r=>r.json())).find(t=>t.type==='page');}catch{}if(!target)await sleep(200);}
  if(!target)throw Error('検証ブラウザーに接続できません。');
  ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise(r=>ws.addEventListener('open',r,{once:true}));let id=0;const pending=new Map(),errors=[];
- ws.addEventListener('message',event=>{const message=JSON.parse(event.data);if(pending.has(message.id)){pending.get(message.id)(message);pending.delete(message.id);}if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.text);});
+ ws.addEventListener('message',event=>{const message=JSON.parse(event.data);if(pending.has(message.id)){pending.get(message.id)(message);pending.delete(message.id);}if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.exception?.description||message.params.exceptionDetails.text);if(message.method==='Network.responseReceived'&&message.params.response.status>=400)console.error(message.params.response.status,message.params.response.url);if(message.method==='Runtime.consoleAPICalled'&&message.params.type==='error')console.error(message.params.args.map(arg=>arg.value||arg.description).join(' '));});
  const send=(method,params={})=>new Promise(r=>{pending.set(++id,r);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(result.error||result.result.exceptionDetails)throw Error(JSON.stringify(result));return result.result.result.value;};
  async function until(expression,message){for(let i=0;i<200;i++){if(await evaluate(expression))return;await sleep(100);}throw Error(message);}
  const stamp=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date()).replace(/\D/g,'');let number=0;
  async function shot(name){const result=await send('Page.captureScreenshot',{format:'png'});const dir=resolve('temp/file-history-check');mkdirSync(dir,{recursive:true});const path=join(dir,`${stamp}_${String(++number).padStart(2,'0')}_${name}.png`);writeFileSync(path,Buffer.from(result.result.data,'base64'));console.log(path);}
- await send('Runtime.enable');await send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+ await send('Runtime.enable');await send('Network.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+ // モジュール初期化後の比較エディターを検証側だけで捕捉する。
+ await send('Page.addScriptToEvaluateOnNewDocument',{source:`{let api;Object.defineProperty(window,'monaco',{configurable:true,get:()=>api,set:value=>{api=value;if(value?.editor){const create=value.editor.createDiffEditor;value.editor.createDiffEditor=(...args)=>(window.historyDiff=create(...args));}}});}`});
+ // ローダー失敗で簡易表示になっても、履歴の再試行で復旧できることを確認する。
+ await send('Network.setBlockedURLs',{urls:['*/monaco/vs/loader.js*']});
  await send('Page.navigate',{url:app.url+'#viewer=src/sample.ts'});
  await until(`!!document.querySelector('.viewer-history')`,'バックアップありのボタン');
- // Monaco の実インスタンスを検証側だけで捕捉する。
- await until(`!!window.monaco?.editor`,'Monaco準備');
+ await until(`!!document.querySelector('.viewer-code pre')`,'ローダー失敗時の簡易表示');
+ await send('Network.setBlockedURLs',{urls:['*/monaco/vs/editor/editor.main.js*']});
+ await evaluate(`document.querySelector('.viewer-history').click()`);
+ await until(`document.querySelector('.file-history-message.error')?.textContent.includes('表示ライブラリ')`,'比較モジュール失敗の説明');
+ await shot('history-load-error');
+ await send('Network.setBlockedURLs',{urls:[]});
+ await evaluate(`document.querySelector('.file-history-message.error button').click()`);
+ await until(`window.historyDiff?.getLineChanges()?.length>0`,'再試行でMonacoと比較を復旧');
+ assert.equal(await evaluate(`document.querySelector('.file-history-message.error')===null`),true);
+ await evaluate(`document.querySelector('[aria-label="更新履歴を閉じる"]').click();window.historyDiff=null;`);
  // 5分タイマーだけ仮想時計に置き換え、実際のダイアログの操作・破棄を検証する。
  await evaluate(`{const timeout=window.setTimeout.bind(window),clear=window.clearTimeout.bind(window);window.historyClock={now:0,timers:new Map(),id:-1,advance(ms){this.now+=ms;for(const [id,timer] of [...this.timers])if(timer.at<=this.now){this.timers.delete(id);timer.fn();}}};window.setTimeout=(fn,ms,...args)=>{if(ms!==300000)return timeout(fn,ms,...args);const id=historyClock.id--;historyClock.timers.set(id,{at:historyClock.now+ms,fn:()=>fn(...args)});return id;};window.clearTimeout=id=>{if(!historyClock.timers.delete(id))clear(id);};}`);
- await evaluate(`{const create=monaco.editor.createDiffEditor;monaco.editor.createDiffEditor=(...args)=>(window.historyDiff=create(...args));document.querySelector('.viewer-history').click();}`);
+ await evaluate(`document.querySelector('.viewer-history').click()`);
  await until(`window.historyDiff?.getLineChanges()?.length>0`,'差分計算完了');
  assert.equal(await evaluate(`document.querySelectorAll('.file-history-toolbar option').length`),2);
  assert.equal(await evaluate(`historyDiff.getOriginalEditor().getModel().getLineContent(5)`),'// 旧版だけの行');
@@ -58,7 +71,7 @@ try{
  await until(`document.querySelector('.file-history-toolbar')?.textContent.includes('差分はありません')`,'履歴選択を切り替えて同一内容を確認');
  await evaluate(`document.querySelector('[aria-label="更新履歴を閉じる"]').click()`);
  await until(`!document.querySelector('.file-history-dialog')`,'比較を閉じる');
- assert.equal(await evaluate(`monaco.editor.getModels().length`),1,'比較モデルを解放');
+ assert.equal(await evaluate(`monaco.editor.getModels().length`),0,'比較モデルを解放（元のビューアは簡易表示）');
  assert.equal(await evaluate(`historyClock.timers.size`),0,'手動で閉じるとタイマーを解除');
  await evaluate(`document.querySelector('.viewer-history').click()`);
  await until(`!!document.querySelector('.file-history-changes')`,'再表示');
@@ -73,12 +86,12 @@ try{
  assert.equal(await evaluate(`!!document.querySelector('.file-history-dialog[open]')`),true,'再読み込みで5分延長');
  await evaluate(`historyClock.advance(1000)`);
  await until(`!document.querySelector('.file-history-dialog')`,'無操作5分で自動消去');
- assert.equal(await evaluate(`monaco.editor.getModels().length`),1,'自動消去でも比較モデルを解放');
+ assert.equal(await evaluate(`monaco.editor.getModels().length`),0,'自動消去でも比較モデルを解放');
  assert.equal(await evaluate(`historyClock.timers.size`),0,'自動消去後タイマーが残らない');
- await send('Page.navigate',{url:app.url+'#viewer=no-history.ts'});await send('Page.reload');
- await until(`!!document.querySelector('.monaco-editor')`,'履歴なしのソース表示');await sleep(250);
+ await send('Page.navigate',{url:app.url+'?check=no-history#viewer=no-history.ts'});
+ await until(`document.querySelector('.viewer-pinned>header>span')?.textContent==='no-history.ts'&&!!document.querySelector('.monaco-editor')`,'履歴なしのソース表示');await sleep(250);
  assert.equal(await evaluate(`!!document.querySelector('.viewer-history')`),false);
- assert.deepEqual(errors,[]);console.log('FILE HISTORY PASS: 履歴有無・日時選択・左右比較・未変更行の位置合わせ・双方向同期スクロール・縦画面・読み取り専用・破棄');
+ assert.deepEqual(errors,[]);console.log('FILE HISTORY PASS: ローダー失敗・比較モジュール失敗・再試行による復旧・履歴有無・日時選択・左右比較・未変更行の位置合わせ・双方向同期スクロール・縦画面・読み取り専用・破棄');
 }finally{
  ws?.close();chrome.kill();await app.close();await sleep(300);
  for(const path of [project,profile]){if(!resolve(path).startsWith(resolve(tmpdir())+sep))throw Error('一時パスが不正です');try{rmSync(path,{recursive:true,force:true});}catch{}}
