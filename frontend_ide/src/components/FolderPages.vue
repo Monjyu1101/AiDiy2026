@@ -7,7 +7,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import { indexFolderPages, createFolderPageMemory, folderPageTurnPlan } from '../folder-pages.js';
 const props = defineProps({ tree: Object, current: { type: String, default: '' }, selected: String, unlistedParent: String, marks: Object, active: Boolean, color: Function });
-const emit = defineEmits(['select', 'clear', 'refresh', 'toggle-explorer']);
+const emit = defineEmits(['select', 'clear', 'refresh', 'toggle-explorer', 'activity']);
 const pages = computed(() => props.active ? indexFolderPages(props.tree, props.marks) : new Map());
 const page = computed(() => pages.value.get(props.current));
 const entries = computed(() => page.value?.entries || []);
@@ -77,6 +77,9 @@ async function move(index) {
   await nextTick();
   if (!disposed && props.active && path === props.current && cursor.value === entry.path) body.value?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' });
 }
+// 復元・scrollIntoView・レイアウトによるscrollは保存だけ。実際の入力だけを手動操作として伝える。
+function activity() { if (props.active) emit('activity'); }
+function pointerMove(event) { if (event.buttons && event.target === body.value) activity(); }
 function keydown(event) {
   if (!props.active || event.defaultPrevented || event.isComposing) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); event.stopPropagation(); emit('toggle-explorer'); return; }
@@ -86,6 +89,7 @@ function keydown(event) {
   if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); emit('refresh'); return; }
   // パンくずと親ボタンは通常のTab/Enter操作。項目リストだけにロービング選択を適用する。
   if (!body.value?.contains(event.target)) return;
+  if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(event.key)) activity();
   const index = entries.value.findIndex(entry => entry.path === cursor.value);
   if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
     event.preventDefault();
@@ -108,7 +112,7 @@ watch(() => props.selected, selected => {
 onBeforeUnmount(() => { disposed = true; restoration++; memory.clear(); });
 </script>
 <template>
-  <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown">
+  <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown" @wheel.passive="activity" @touchmove.passive="activity" @pointerdown="activity" @pointermove="pointerMove">
     <header class="folder-page-heading">
       <button :disabled="!trail.length" title="親フォルダへ戻る（Backspace）" @click="back">← 親へ</button>
       <nav aria-label="現在のフォルダ">

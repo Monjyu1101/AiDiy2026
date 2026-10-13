@@ -154,7 +154,8 @@ test('遠点で消去、再計算、位置固定の機体回転、表示の順�
    const delta=view.roll-rolls[0],sign=Math.sign(delta),progress=rolls.map(roll=>(roll-rolls[0])*sign);
    const peak=Math.max(...progress),peakIndex=progress.indexOf(peak);
    assert.ok(peak>Math.abs(delta)+1e-5,'目標角度を少し通り過ぎる');
-   assert.ok(peak-Math.abs(delta)<=Math.PI/60+1e-8,'行き過ぎは最大3度');
+   assert.ok(peak-Math.abs(delta)<=Math.abs(delta)*.15+1e-8,'行き過ぎは実際の回転量の15%以内');
+   assert.ok(peak-Math.abs(delta)>Math.abs(delta)*.14,'大きな回転でも3度に頭打ちさせない');
    assert.ok(progress.slice(0,peakIndex+1).every((p,i,a)=>!i||p>=a[i-1]),'目標方向へ滑らかに回転');
    assert.ok(progress.slice(peakIndex).every((p,i,a)=>!i||p<=a[i-1]),'行き過ぎた後は一度だけ戻す');
    assert.equal(rolls.at(-1),view.roll,'水平に戻ってから線を表示し、姿勢を保つ');
@@ -168,4 +169,130 @@ test('遠点で消去、再計算、位置固定の機体回転、表示の順�
   }
  }
  assert.fail('一周して次の軌道へ切り替わる');
+});
+
+// 次の軌道だけを固定乱数で選ぶ。初回の自然な姿勢合わせとは分けて計測する。
+function controlledOrbitChange(side,magnitude,initial=home()) {
+ let calls=0,samples=null,now=0,view={...initial};
+ const orbit=createAutoOrbit(()=>{calls++;return samples?.length?samples.shift():.5;});
+ const advance=dt=>{now+=dt*1000;const next=orbit.step(now,dt,view,4600);if(next)view=next;return next;};
+ for(let i=0;i<10000&&orbit.phase!=='planning';i++)advance(.25);
+ assert.equal(orbit.phase,'planning','遠点で新しい軌道の計算待ちになる');
+ // 近点距離・周期・面内のドリフト、回転方向、回転量の順に固定する。
+ samples=[.5,.5,.5,side,magnitude];
+ return {orbit,advance,get view(){return view;},set view(value){view=value;},get calls(){return calls;},get now(){return now;}};
+}
+const eyeDistance=(a,b)=>Math.hypot(...['x','y','z'].map(key=>cameraPosition(a)[key]-cameraPosition(b)[key]));
+
+for(const [label,side,sign] of [['左',.1,-1],['右',.9,1]]) {
+ for(const magnitude of [0,.2,.5,1]) {
+  test(`遠点の${label}回転は15〜90度の指定乱数に従い、行き過ぎと戻りは実角度の15%: ${magnitude}`,()=>{
+   const run=controlledOrbitChange(side,magnitude),from={...run.view};
+   const expected=sign*(15+75*magnitude)*Math.PI/180;
+   run.advance(0);
+   const calls=run.calls,path=run.orbit.path;
+   assert.equal(run.orbit.phase,'aligning');
+   assert.equal(run.view.roll,from.roll,'再計算の瞬間は姿勢を変えない');
+   assert.ok(eyeDistance(run.view,from)<1e-8,'新しい軌道面へ回しても船体位置を固定する');
+   const samples=[0];
+   for(let i=0;i<370;i++){
+    const before=run.view;
+    run.advance(.01);
+    samples.push((run.view.roll-from.roll)*sign);
+    assert.equal(run.calls,calls,'回転中に乱数を取り直さない');
+    assert.equal(run.orbit.path,path,'回転中に軌道線を作り直さない');
+    assert.ok(eyeDistance(run.view,from)<1e-8,'行き過ぎと戻りでも船体は静止する');
+    assert.ok(Math.abs(run.view.yaw-from.yaw)<1e-9&&Math.abs(run.view.pitch-from.pitch)<1e-9,'中心への視線を固定する');
+    assert.ok(Math.abs(run.view.roll-before.roll)<.012,'微小な時間刻みに連続した姿勢を返す');
+    if(run.orbit.phase==='aligning')assert.equal(run.orbit.visibility,0);
+   }
+   const delta=run.view.roll-from.roll,peak=Math.max(...samples),peakIndex=samples.indexOf(peak);
+   assert.ok(Math.abs(delta-expected)<1e-9,`実際の回転は${expected*180/Math.PI}度（実測 ${delta*180/Math.PI}度）`);
+   assert.ok(Math.abs(delta)>=Math.PI/12-1e-9&&Math.abs(delta)<=Math.PI/2+1e-9,'左右とも絶対量は15〜90度');
+   assert.ok(Math.abs(peak-Math.abs(delta)*1.15)<1e-9,'行き過ぎは小角度でも大角度でも15%');
+   assert.ok(samples.slice(0,peakIndex+1).every((p,i,a)=>!i||p>=a[i-1]-1e-12),'行き過ぎまでは一方向へ回る');
+   assert.ok(samples.slice(peakIndex).every((p,i,a)=>!i||p<=a[i-1]+1e-12),'一度だけ戻して静止する');
+   const settled=run.view.roll;
+   while(run.orbit.phase==='revealing'){
+    run.advance(.1);
+    assert.equal(run.view.roll,settled,'表示が戻る間に姿勢が跳ねない');
+    assert.equal(run.calls,calls,'表示復帰中も乱数を取り直さない');
+   }
+   const [a,,,,,,,,b]=path,normal=[a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x];
+   const right=normal[0]*Math.cos(run.view.yaw)-normal[2]*Math.sin(run.view.yaw);
+   const up=normal[1]*Math.cos(run.view.pitch)-(normal[0]*Math.sin(run.view.yaw)+normal[2]*Math.cos(run.view.yaw))*Math.sin(run.view.pitch);
+   assert.ok(Math.abs(right*Math.cos(settled)+up*Math.sin(settled))/Math.hypot(...normal)<1e-9,'新しい実軌道面に水平を合わせて終わる');
+   run.advance(.001);
+   assert.ok(Math.abs(run.view.roll-settled)<.001,'飛行再開の先頭フレームにも姿勢の段差がない');
+   assert.equal(run.calls,calls);
+  });
+ }
+}
+
+test('±π境界や何周分も累積したロールでも、指定した90度だけで軌道を変える',()=>{
+ for(const [side,sign] of [[.1,-1],[.9,1]]){
+  const run=controlledOrbitChange(side,1,{...home(),pitch:-sign*.35});
+  // 同じ実姿勢を上下反転したEuler表現へ変え、±πの手前を開始位置にする。
+  run.view={...run.view,yaw:run.view.yaw+Math.PI,pitch:Math.PI-run.view.pitch,roll:run.view.roll+sign*Math.PI};
+  const from=run.view.roll;
+  assert.ok(Math.abs(from)<Math.PI&&Math.abs(from)>Math.PI*.9);
+  run.advance(0);
+  for(let i=0;i<20;i++)run.advance(.2);
+  assert.ok(Math.abs(run.view.roll-from-sign*Math.PI/2)<1e-9,'境界で反対回りや一周回転を選ばない');
+  assert.ok(Math.abs(run.view.roll)>Math.PI,'角度表現を±πへ強制的に折り返さない');
+  for(const wraps of [-4,4]){
+   const repeated=controlledOrbitChange(side,1);
+   repeated.view={...repeated.view,roll:repeated.view.roll+wraps*Math.PI*2};
+   const original=repeated.view.roll;
+   repeated.advance(0);for(let i=0;i<20;i++)repeated.advance(.2);
+   assert.ok(Math.abs(repeated.view.roll-original-sign*Math.PI/2)<1e-9,'累積ロールは現在値に近い連続した表現で保持する');
+  }
+ }
+});
+
+test('固定seedは複数周の軌道変更を再現し、遠点以外では乱数を消費しない',()=>{
+ const create=()=>{let seed=981,calls=0;const orbit=createAutoOrbit(()=>{calls++;seed=(seed*1664525+1013904223)>>>0;return seed/2**32;});return{orbit,get calls(){return calls;},view:home()};};
+ const runs=[create(),create()];let changes=0;
+ for(let i=0;i<5000;i++){
+  for(const run of runs){
+   const phase=run.orbit.phase,calls=run.calls;
+   if(phase==='planning')run.turnStart=run.view.roll;
+   run.view=run.orbit.step(i*250,.25,run.view,4600);
+   if(calls!==run.calls){assert.ok(phase==='idle'||phase==='planning');if(run===runs[0]&&phase==='planning')changes++;}
+   if(phase==='aligning'&&run.orbit.phase==='revealing'&&run.turnStart!==undefined){
+    const delta=Math.abs(run.view.roll-run.turnStart);
+    assert.ok(delta>=Math.PI/12-1e-9&&delta<=Math.PI/2+1e-9,'何周後でも実際の変更角は15〜90度に収まる');
+   }
+  }
+  assert.deepEqual(runs[0].view,runs[1].view);
+  assert.equal(runs[0].calls,runs[1].calls);
+  assert.equal(runs[0].orbit.phase,runs[1].orbit.phase);
+ }
+ assert.ok(changes>=3,'複数周の変更を比較する');
+});
+
+test('回転・行き過ぎ・戻り中の中断と連続再開でも、古い角度や軌道を引き継がない',()=>{
+ for(const interruption of [.2,2.7,3.2]){
+  const run=controlledOrbitChange(.9,1);run.advance(0);
+  for(let elapsed=0;elapsed<interruption-1e-9;elapsed+=.1)run.advance(.1);
+  const oldPath=run.orbit.path,calls=run.calls;
+  run.orbit.interact(run.now);
+  assert.equal(run.orbit.phase,'idle');assert.equal(run.orbit.path,null);
+  assert.equal(run.advance(.25),null);assert.equal(run.calls,calls,'停止中には新しい軌道を選ばない');
+  for(let attempt=0;attempt<3;attempt++){
+   const initial={yaw:8+attempt,pitch:4-attempt*.4,roll:-7-attempt,dist:2000+attempt*500,tx:400-attempt*50,ty:-150,tz:70};
+   run.view={...initial};run.orbit.resume();
+   const fresh=createAutoOrbit(()=>.5);let expected={...initial};
+   for(let i=0;i<45;i++){
+    const dt=i===0?0:.1;
+    const actual=run.advance(dt);expected=fresh.step(run.now,dt,expected,4600);
+    assert.deepEqual(actual,expected,'再開は最新視点だけから計算し、途中の古い目標へ戻らない');
+    assert.ok(Object.values(actual).every(Number.isFinite));
+    if(i<2)assert.ok(eyeDistance(actual,initial)<1e-8,'再開直後は新しい船体位置で旋回する');
+   }
+   assert.notEqual(run.orbit.path,oldPath);
+   assert.equal(run.orbit.step(run.now,.25,run.view,4600,true),null);
+   assert.equal(run.orbit.path,null);assert.equal(run.orbit.phase,'idle');
+  }
+ }
 });

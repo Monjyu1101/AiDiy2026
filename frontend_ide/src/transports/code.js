@@ -12,7 +12,7 @@ export function codeTransport({ host = false, base = '', api } = {}, receive) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '接続できません。');
+    if (!response.ok) throw Object.assign(new Error(result.error || '接続できません。'), { status: response.status });
     return result;
   }
   return {

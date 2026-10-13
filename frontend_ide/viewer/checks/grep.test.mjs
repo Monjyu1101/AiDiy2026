@@ -7,11 +7,108 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, mkdir, writeFile, rm, symlink, readdir, realpath, lstat } from 'node:fs/promises';
+import { basename, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { grepFiles, startServer } from '../server.mjs';
 import { createCoreConnection } from '../core-connection.mjs';
+import { scanTree } from '../file-scan.mjs';
+
+// OSの列挙順によらず、除外対象を先に読む条件で実ファイルの走査を検証する。
+function orderedScanFs(onOpen = () => {}) {
+  return { realpath, lstat, opendir: async path => {
+    onOpen(path);
+    const entries = (await readdir(path, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name));
+    let index = 0;
+    return { read: async () => entries[index++] || null, close: async () => {} };
+  } };
+}
+
+async function backupFixture(t) {
+  const root = await mkdtemp(join(tmpdir(), 'aidiy-grep-backup-budget-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'backup', 'archive'), { recursive: true });
+  for (let i = 0; i < 6; i++) await writeFile(join(root, 'backup', 'archive', `${i}.txt`), 'needle');
+  await mkdir(join(root, 'src', 'backup'), { recursive: true });
+  await writeFile(join(root, 'src', 'backup', 'hidden.txt'), 'needle');
+  await writeFile(join(root, 'src', 'current.txt'), 'needle');
+  return root;
+}
+
+test('grepの走査はbackup配下へ入る前に除外し、件数・階層・時間の予算を使わない', async t => {
+  const root = await backupFixture(t);
+  for (const limits of [{ maxFiles: 1 }, { maxDirectories: 2 }, { maxEntries: 5 }, { maxDepth: 1 }, { timeMs: 1000 }]) {
+    const opened = []; let time = 0;
+    const scan = await scanTree(root, { scope: 'grep', limits, now: () => time, fs: orderedScanFs(path => {
+      opened.push(relative(root, path));
+      if (basename(path) === 'backup') time = 1001;
+    }) });
+    assert.equal(scan.truncated, false, JSON.stringify(limits));
+    assert.equal(scan.files, 1); assert.equal(scan.directories, 2); assert.equal(scan.entries, 4);
+    assert.deepEqual(opened, ['', 'src']);
+    assert.deepEqual(scan.tree.d.map(node => node.n), ['src']);
+    assert.deepEqual(scan.tree.d[0].d, []);
+    assert.equal(scan.tree.d[0].f[0][0], 'current.txt');
+  }
+  const ordinary = await scanTree(root, { fs: orderedScanFs() });
+  assert.equal(ordinary.files, 8, '通常の宇宙・ツリー走査はbackupを表示し続ける');
+  assert.deepEqual(ordinary.tree.d.map(node => node.n), ['backup', 'src']);
+});
+
+test('grep APIはbackupで上限に達した通常キャッシュを使わず、対象ファイルを検索する', async t => {
+  const root = await backupFixture(t);
+  for (const limits of [{ maxFiles: 1 }, { maxDirectories: 2 }, { maxEntries: 5 }, { maxDepth: 1 }, { timeMs: 1000 }]) {
+    const connection = createCoreConnection(root); connection.offline();
+    const scopes = [], opened = [];
+    const app = await startServer(root, 0, { connection, scanPoolOptions: { ttlMs: 60000, limits, scan: (root, options) => {
+      scopes.push(options.scope || 'tree');
+      let time = 0;
+      return scanTree(root, { ...options, now: () => time, fs: orderedScanFs(path => {
+        opened.push(relative(root, path));
+        if (basename(path) === 'backup') time = 1001;
+      }) });
+    } } });
+    try {
+      const galaxy = await (await fetch(app.url + 'api/galaxy')).json();
+      assert.equal(galaxy.truncated, true); assert.equal(scopes.length, 1); opened.length = 0;
+      const response = await fetch(app.url + 'api/grep?q=needle');
+      assert.equal(response.status, 200);
+      const grep = await response.json();
+      assert.deepEqual(grep.paths, ['src/current.txt'], JSON.stringify(limits));
+      assert.equal(grep.checked, 1); assert.equal(grep.scannedFiles, 1); assert.equal(grep.truncated, false);
+      assert.equal(grep.scan.files, 1); assert.equal(grep.scan.directories, 2);
+      assert.deepEqual(scopes, ['tree', 'grep']);
+      assert.ok(opened.every(path => !path.split(sep).includes('backup')));
+      assert.deepEqual((await (await fetch(app.url + 'api/grep?q=needle')).json()).paths, grep.paths);
+      assert.equal((await (await fetch(app.url + 'api/galaxy')).json()).truncated, true);
+      assert.equal(scopes.length, 2, '通常・grepの完了キャッシュをそれぞれ再利用する');
+      await fetch(app.url + 'api/grep?q=needle&fresh=1');
+      assert.deepEqual(scopes, ['tree', 'grep', 'grep']);
+    } finally { await app.close(); }
+  }
+});
+
+test('grepを先に実行してもgalaxyはbackupを含む独自のスナップショットを取得する', async t => {
+  const root = await backupFixture(t), connection = createCoreConnection(root); connection.offline();
+  const scopes = [];
+  const app = await startServer(root, 0, { connection, scanPoolOptions: { ttlMs: 60000, scan: (root, options) => {
+    scopes.push(options.scope || 'tree'); return scanTree(root, options);
+  } } }); t.after(() => app.close());
+  const grep = await (await fetch(app.url + 'api/grep?q=needle')).json();
+  assert.deepEqual(grep.paths, ['src/current.txt']); assert.equal(grep.scan.files, 1);
+  const galaxy = await (await fetch(app.url + 'api/galaxy')).json();
+  assert.equal(galaxy.files, 8); assert.deepEqual(galaxy.tree.d.map(node => node.n), ['backup', 'src']);
+  const latest = await (await fetch(app.url + 'api/latest')).json();
+  assert.equal(latest.scan.files, 8);
+  assert.deepEqual(scopes, ['grep', 'tree'], 'latestは通常のgalaxyだけと走査を共有する');
+});
+
+test('直接のgrepもbackupのファイル数を候補走査の上限へ数えない', async t => {
+  const root = await backupFixture(t);
+  const result = await grepFiles(root, 'needle', { limits: { scan: { maxFiles: 1, maxDirectories: 2 } } });
+  assert.deepEqual(result.paths, ['src/current.txt']); assert.equal(result.truncated, false);
+  assert.equal(result.scan.files, 1); assert.equal(result.scan.directories, 2);
+});
 
 test('grep は内容の部分一致で検索し、除外フォルダ・バイナリ・巨大ファイル・外部リンクを読まない', async () => {
   const temp = await mkdtemp(join(tmpdir(), 'aidiy-grep-'));
@@ -108,7 +205,7 @@ test('共有スナップショットを使い、更新内容を再読込し削�
   const root = await mkdtemp(join(tmpdir(), 'aidiy-grep-stale-')); t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, 'changed.txt'), 'old'); await writeFile(join(root, 'deleted.txt'), 'old');
   const pool = createScanPool(root); t.after(() => pool.close());
-  const snapshot = await pool.get();
+  const snapshot = await pool.get({ scope: 'grep' });
   await writeFile(join(root, 'changed.txt'), 'new\n新しい内容'); await rm(join(root, 'deleted.txt'));
   const next = await grepFiles(root, '新しい', { pool });
   assert.deepEqual(next.paths, ['changed.txt']); assert.equal(next.matches[0].line, 2); assert.equal(next.skipped, 1);

@@ -31,7 +31,7 @@ const textOf = node => [node.text || '', ...(node.children || []).map(textOf)].j
 
 // 実際のSFCテンプレートのイベント/propsで全体を接続する。エンジンや選択処理は置き換えない。
 // 描画先だけをメモリ内にし、AI結果は確定済みの通知、Monacoは簡易表示へ置き換える。
-async function workspace(t, { auto = false, fetcher, hash = '' } = {}) {
+async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = {}) {
   const old = new Map(), frames = new Map(), timers = new Map(), intervals = new Map(), storage = new Map();
   const requests = [], warnings = [], states = new Map(), props = new Map(), components = new Map();
   const window = new EventTarget(), document = new EventTarget(), location = { hash, origin: 'http://localhost' };
@@ -66,7 +66,7 @@ async function workspace(t, { auto = false, fetcher, hash = '' } = {}) {
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
     getComputedStyle: () => ({ getPropertyValue: () => '78px' }), matchMedia: () => ({ matches: true }), CSS: { escape: value => value },
     fetch: async (url, options) => {
-      requests.push({ url, ...options });
+      requests.push({ url, at: clock, ...options });
       if (fetcher) { const result = await fetcher(url, options); if (result !== undefined) return result; }
       if (url.startsWith('/api/galaxy')) return reply(snapshot());
       if (url.startsWith('/api/latest')) return reply({ files: [] });
@@ -118,7 +118,7 @@ async function workspace(t, { auto = false, fetcher, hash = '' } = {}) {
     patchProp: (element, key, _previous, value) => { element.props[key] = value; },
     setText: (element, text) => { element.text = text; }, setElementText: (element, text) => { element.text = text; element.children = []; },
   });
-  const root = node('root'), viewProps = vue.reactive({ startedAt: 1, viewMode: '2d' });
+  const root = node('root'), viewProps = vue.reactive({ startedAt: 1, viewMode: mode });
   const app = renderer.createApp({ render: () => vue.h(component('SpaceView'), viewProps) });
   app.config.warnHandler = message => warnings.push(message);
   function dispose() {
@@ -130,6 +130,7 @@ async function workspace(t, { auto = false, fetcher, hash = '' } = {}) {
   const find = predicate => walk(root, predicate);
   return { engine, navigation, root, states, props, viewProps, requests, frames, timers, intervals, warnings, window, document, location, dispose,
     emitAI: value => emitAI(value), find,
+    async frame(ms = 100) { const callbacks = [...frames.values()]; frames.clear(); await this.advance(ms); for (const callback of callbacks) callback(clock); await flush(); },
     async click(predicate) { const element = find(predicate); assert.ok(element, 'rendered control exists'); assert.equal(typeof element.props.onClick, 'function'); element.props.onClick({ target: element, currentTarget: element, stopPropagation() {}, preventDefault() {} }); await flush(); return element; },
     async advance(ms) {
       clock += ms;
@@ -353,6 +354,8 @@ test('2D統合: 一覧外AI結果と削除済み閲覧履歴は既存ページ�
     selected(h, 'src/main.js');
     assert.match(h.states.get('SpaceView').error.value, /フィルターをOFF/);
     assert.match(h.states.get('SpaceView').error.value, /一覧を更新/);
+    assert.equal(!!h.find(node => hasClass(node, 'space-loading')), false, '移動失敗で表示済みページを遮らない');
+    assert.match(textOf(h.find(node => hasClass(node, 'space-notice'))), /フィルターをOFF/);
     await h.click(node => hasClass(node, 'route-choice') && textOf(node) === '閲覧軌跡');
     await h.click(node => node.props?.['data-route-path'] === 'root.js');
     selected(h, 'src/main.js');
@@ -360,5 +363,116 @@ test('2D統合: 一覧外AI結果と削除済み閲覧履歴は既存ページ�
     assert.equal(h.props.get('FileExplorer').filter, true);
     assert.ok(h.requests.filter(request => request.url.startsWith('/api/galaxy')).every(request => /filter=backup/.test(request.url)));
     assert.equal(h.requests.some(request => request.url.includes('ai-search')), false);
+    await h.click(node => node.props?.['aria-label'] === '案内を閉じる');
+    assert.equal(h.find(node => hasClass(node, 'space-notice')), undefined); selected(h, 'src/main.js');
+    await h.engine.goTo({type:'file',path:'missing/again.js'}); await flush();
+    await h.click(node => node.props?.['aria-label'] === '一覧を更新');
+    assert.equal(h.states.get('SpaceView').error.value, ''); selected(h, 'src/main.js');
   } finally { h.dispose(); }
+});
+
+
+for (const input of ['ArrowDown', 'PageDown', 'wheel', 'touchmove', 'pointerdown']) test(`2D統合: ${input}は手動待機を更新し、直前の期限でページを奪わない`, async t => {
+  const h = await workspace(t, {auto:true});
+  try {
+    await h.engine.goTo({type:'dir',path:'src'}); await flush();
+    h.engine.requestFollow('other/second.js'); await h.advance(59_999);
+    const section=h.find(node=>hasClass(node,'folder-pages')),body=h.find(node=>hasClass(node,'folder-page-body'));
+    const event={key:input,target:body,currentTarget:section,buttons:1,preventDefault(){},stopPropagation(){}};
+    const handler=input==='ArrowDown'||input==='PageDown' ? section.props.onKeydown : section.props['on'+input[0].toUpperCase()+input.slice(1)+(input==='wheel'||input==='touchmove'?'Passive':'')];
+    assert.equal(typeof handler,'function',`${input}を実際のテンプレートが購読する`);handler(event);await flush();
+    await h.advance(1);assert.equal(h.engine.trail.join('/'),'src');assert.equal(h.engine.selected,null);
+    await h.advance(59_998);assert.equal(h.engine.trail.join('/'),'src');
+    await h.advance(1);selected(h,'other/second.js');assert.equal(h.frames.size,0);
+  } finally {h.dispose();}
+});
+
+test('2D統合: 復元・検索更新・プログラムによるscrollは手動待機を延長しない', async t => {
+  const h=await workspace(t,{auto:true});
+  try {
+    await h.engine.goTo({type:'dir',path:'src'});await flush();h.engine.requestFollow('other/second.js');
+    await h.advance(59_999);
+    const body=h.find(node=>hasClass(node,'folder-page-body'));body.scrollTop=70;body.props.onScroll({target:body,currentTarget:body});
+    h.states.get('SpaceView').marks.value={mode:'grep',paths:['src/main.js']};await flush();
+    await h.advance(1);selected(h,'other/second.js');assert.equal(h.frames.size,0);
+  } finally {h.dispose();}
+});
+
+for(const mode of ['2d','3d']) test(`${mode}実部品の更新時系列: 通知到着後は追加の1分を待たず、同じファイル監視と手動保護を使う`,async t=>{
+  const data=snapshot();let updates=[];
+  const h=await workspace(t,{mode,auto:true,fetcher:url=>url.startsWith('/api/galaxy')?reply(data):url.startsWith('/api/latest')?reply({files:updates}):undefined});
+  const finish=async predicate=>{for(let n=0;n<200&&!predicate();n++)await h.frame();assert.equal(predicate(),true,'3D演出を含む処理が終わる');};
+  try {
+    await finish(()=>!!h.engine.selected);await finish(()=>h.engine.canFollow());
+    const polling=[...h.intervals.values()];assert.equal(polling.length,1);assert.equal(polling[0].delay,60000,'ファイル監視は共通の60秒。接続監視とは別');
+    data.tree.d.find(dir=>dir.n==='other').f.push(['new.js',30,3000]);updates=[{path:'other/new.js',name:'new.js',mtime:3000}];
+    const before=h.requests.length;await h.advance(59000);assert.notEqual(h.engine.selected?.path,'other/new.js');assert.equal(h.requests.length,before);
+    await h.advance(1000);polling[0].callback();await flush();
+    const arrival=h.requests.find((request,index)=>index>=before&&request.url.startsWith('/api/latest')).at;
+    await finish(()=>h.engine.selected?.path==='other/new.js');await finish(()=>h.engine.canFollow());
+    const started=h.requests.find((request,index)=>index>=before&&request.url.startsWith('/api/galaxy'));
+    assert.ok(started.at-arrival<=100,'通知後2Dは同tick、3Dは次のframeで再走査を始める');
+    assert.equal(h.engine.trail.join('/'),'other');assert.equal(h.frames.size,mode==='2d'?0:1);
+    // 自動で開いたプレビューの次の更新も、別の手動待機へ誤変換しない。
+    updates=[{path:'root.js',name:'root.js',mtime:4000}];data.tree.f[0][2]=4000;
+    await h.states.get('FileExplorer').pollLatest();await finish(()=>h.engine.selected?.path==='root.js');await finish(()=>h.engine.canFollow());
+    // 表示モードの切替だけでは手動待機を作らない。
+    h.viewProps.viewMode=mode==='2d'?'3d':'2d';await flush();assert.equal(h.engine.canFollow(),true);
+    updates=[{path:'other/new.js',name:'new.js',mtime:5000}];data.tree.d.find(dir=>dir.n==='other').f.at(-1)[2]=5000;
+    await h.states.get('FileExplorer').pollLatest();await finish(()=>h.engine.selected?.path==='other/new.js');
+  } finally {h.dispose();}
+});
+
+for(const mode of ['2d','3d'])test(`${mode}実部品の探索枠: 更新候補がなくても開始し、手動待機・非表示・OFFだけで止める`,async t=>{
+  const h=await workspace(t,{auto:true,mode,fetcher:url=>url.startsWith('/api/galaxy')?reply({root:'/project',tree:directory('project'),truncated:false}):undefined});
+  const spinning=()=>hasClass(h.find(node=>node.props?.['aria-label']==='自動探索'),'driving');
+  try {
+    await h.frame();assert.equal(spinning(),true);
+    h.engine.interact();await h.frame();assert.equal(spinning(),false);
+    const calls=h.requests.length;await h.advance(60000);await h.frame();assert.equal(spinning(),true);assert.equal(h.requests.length,calls);
+    h.document.hidden=true;h.document.dispatchEvent(new Event('visibilitychange'));await flush();assert.equal(spinning(),false);assert.equal(h.frames.size,0);
+    h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await h.frame();assert.equal(spinning(),true);
+    await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),false);
+    await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),true);
+    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,0);assert.equal(h.intervals.size,1);
+  } finally {h.dispose();}
+});
+
+const finishFollow=async(h,predicate)=>{for(let n=0;n<220&&!predicate();n++)await h.frame();assert.equal(predicate(),true,'有限のフレームで移動を完了する');};
+function addUpdatedFile(data,path,mtime){const parts=path.split('/');let dir=data.tree;for(const name of parts.slice(0,-1)){let child=dir.d.find(value=>value.n===name);if(!child){child=directory(name);dir.d.push(child);}dir=child;}const file=dir.f.find(value=>value[0]===parts.at(-1));if(file)file[2]=mtime;else dir.f.push([parts.at(-1),40,mtime]);}
+for(const mode of ['2d','3d'])for(const target of ['new','same','deleted'])test(`${mode}更新追跡: 通知より前の走査へ合流した${target}を1回だけ再検証する`,async t=>{
+  let data=snapshot(),updates=[],pending;
+  const h=await workspace(t,{auto:true,mode,fetcher:url=>url.startsWith('/api/galaxy')?(pending?pending.promise:reply(data)):url.startsWith('/api/latest')?reply({files:updates}):undefined});
+  try {
+    await finishFollow(h,()=>!!h.engine.selected&&h.engine.canFollow());
+    const path=target==='same'?h.engine.selected.path:'new/deep/file.js';
+    if(target==='deleted')addUpdatedFile(data,path,2000);
+    const old=structuredClone(data),before=h.requests.filter(request=>request.url.startsWith('/api/galaxy')).length;
+    pending=deferred();const background=h.engine.refresh();await flush();
+    if(target==='deleted')data.tree.d=data.tree.d.filter(dir=>dir.n!=='new');else addUpdatedFile(data,path,5000);
+    updates=[{path,name:path.split('/').at(-1),mtime:5000}];await h.states.get('FileExplorer').pollLatest();await h.frame();
+    const waiting=pending;pending=null;waiting.resolve(reply(old));await background;await flush();
+    if(target==='deleted'){for(let n=0;n<100;n++)await h.frame();assert.notEqual(h.engine.selected?.path,path);}
+    else await finishFollow(h,()=>h.engine.selected?.path===path&&h.engine.selected.mtime===5000&&h.engine.canFollow());
+    const scans=h.requests.filter(request=>request.url.startsWith('/api/galaxy')).slice(before);assert.equal(scans.length,2,'旧走査と追加1回だけ');assert.match(scans.at(-1).url,/fresh=1/);
+    const calls=h.requests.length;await h.advance(120000);await h.frame();assert.equal(h.requests.length,calls,'欠落や同じ更新を際限なく再試行しない');
+  } finally {pending?.resolve(reply(data));await flush();h.dispose();}
+});
+for(const mode of ['2d','3d'])for(const action of ['switch','rapid','deleted','dispose'])test(`${mode}更新追跡中の${action}: 古い航行を中止し、最後のモードで更新先を再検証する`,async t=>{
+  let data=snapshot(),updates=[],pending;
+  const h=await workspace(t,{auto:true,mode,fetcher:url=>url.startsWith('/api/galaxy')?(pending?pending.promise:reply(data)):url.startsWith('/api/latest')?reply({files:updates}):undefined});
+  try {
+    await finishFollow(h,()=>!!h.engine.selected&&h.engine.canFollow());
+    const path='new/deep/file.js';addUpdatedFile(data,path,5000);const old=structuredClone(data);
+    pending=deferred();updates=[{path,name:'file.js',mtime:5000}];await h.states.get('FileExplorer').pollLatest();await h.frame();
+    h.viewProps.viewMode=mode==='2d'?'3d':'2d';await flush();
+    if(action==='rapid'){for(let n=0;n<5;n++){h.viewProps.viewMode=h.viewProps.viewMode==='2d'?'3d':'2d';await flush();await h.frame();}}
+    if(action==='deleted')data.tree.d=data.tree.d.filter(dir=>dir.n!=='new');
+    if(action==='dispose')h.engine.dispose();
+    const waiting=pending;pending=null;waiting.resolve(reply(old));await flush();
+    if(action==='deleted'||action==='dispose'){for(let n=0;n<100;n++)await h.frame();assert.notEqual(h.engine.selected?.path,path);}
+    else {await finishFollow(h,()=>h.engine.selected?.path===path&&h.engine.canFollow());assert.equal(h.engine.trail.join('/'),'new/deep');}
+    const calls=h.requests.length;await h.advance(120000);await h.frame();assert.equal(h.requests.length,calls);
+    assert.equal(h.frames.size,action==='dispose'||h.viewProps.viewMode==='2d'?0:1);
+  } finally {pending?.resolve(reply(data));await flush();h.dispose();}
 });

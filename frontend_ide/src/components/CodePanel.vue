@@ -18,6 +18,8 @@ const props = defineProps({ base: String, host: Boolean, icon: String, embedded:
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
+const changingConversation = ref(false);
+let conversationChange;
 const autoPending = ref(false), deleteTarget = ref(null), deleting = ref(false), catalogReady = ref(false);
 let catalogProvider = '';
 const providers = ref([]), models = ref([]), provider = ref(''), model = ref(''), custom = ref(''), checks = ref(0);
@@ -32,7 +34,7 @@ function scroll() { if (conversation.value) conversation.value.scrollTop = conve
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 const offline = computed(() => state.実行モード === 'offline' || (state.オフライン対応 && !state.接続済み));
-const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value);
+const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value || changingConversation.value);
 const operable = computed(() => state.信頼済み && state.画面接続済み !== false);
 const allowed = computed(() => state.信頼済み && state.画面接続済み !== false && !!state.作業フォルダ && (offline.value || state.接続済み));
 const canSend = computed(() => allowed.value && !busy.value && prompt.value.trim());
@@ -43,19 +45,30 @@ const canApplyModel = computed(() => catalogReady.value && !catalogBusy.value &&
   (model.value === '__custom__' ? !!custom.value.trim() : !offline.value || models.value.some(item => item.id === model.value)));
 const transport = codeTransport(props, receive);
 let disposed = false;
+function confirmsConversationChange(packet) {
+  const change = conversationChange;
+  if (!change || typeof packet.会話ID !== 'string' || !packet.会話ID) return false;
+  if (props.host && (!change.result || change.result.会話ID !== packet.会話ID || change.result.projectPath !== packet.作業フォルダ?.パス)) return false;
+  // VS Codeの新規だけは、固定中の会話とは別のアクティブな作業フォルダへ移れる。
+  if (change.projectPath && change.projectPath !== packet.作業フォルダ?.パス && !(props.host && change.type === 'new')) return false;
+  return change.type === 'selectHistory' ? packet.会話ID === change.id : packet.会話ID !== change.previousId;
+}
 function receive(packet) {
   if (disposed) return;
   if (packet.type === 'state') {
     const first = !state.会話ID;
     const changed = !!state.会話ID && state.会話ID !== packet.会話ID;
+    const confirmed = confirmsConversationChange(packet);
     const previous = state.メッセージ.map(item => `${item.種別}:${item.本文}`);
     if (first || changed) { revision++; arrivals.reset(); }
     const own = revision;
-    Object.assign(state, packet, { 自動接続: packet.自動接続 !== false, 画面接続済み: packet.画面接続済み !== false }); pending.value = false; autoPending.value = false; error.value = packet.接続エラー || '';
+    Object.assign(state, packet, { 自動接続: packet.自動接続 !== false, 画面接続済み: packet.画面接続済み !== false }); pending.value = false; autoPending.value = false;
     if (deleteTarget.value && (packet.実行中 || !state.履歴.some(item => item.id === deleteTarget.value.id))) deleteTarget.value = null;
     if (changed || !packet.実行中 || packet.停止中) stopPending.value = false;
     if (!checksRestored && [0, 1, 2, 3].includes(packet.検証回数)) { checks.value = packet.検証回数; checksRestored = true; }
     if (changed) { prompt.value = ''; progress.value = ''; }
+    if (confirmed) finishConversationChange();
+    error.value = conversationChange?.error || packet.接続エラー || '';
     progress.value = (packet.進捗 || []).map(line => visibleStreamContent(String(line))).filter(Boolean).join('\n');
     const messages = packet.メッセージ || [];
     void nextTick(() => {
@@ -68,6 +81,17 @@ function receive(packet) {
       }
       scroll();
     });
+  } else if (packet.type === 'conversationChangeResult') {
+    const change = conversationChange;
+    if (!props.host || !change || packet.requestId !== change.requestId) return;
+    if (packet.ok === true) {
+      change.result = packet;
+      if (confirmsConversationChange(state)) { finishConversationChange(); error.value = state.接続エラー || ''; }
+    } else if (packet.ok === false) {
+      error.value = packet.message || '会話を切り替えられませんでした。';
+      if (!packet.uncertain) finishConversationChange();
+      else { change.error = `${error.value} 下書きを控えてから画面を再読み込みしてください。`; error.value = change.error; }
+    }
   } else if (packet.type === 'showConversation') { history.value = false; nextTick(scroll); }
   else if (packet.type === 'accepted') { prompt.value = ''; pending.value = false; }
   else if (packet.type === 'modelCatalog') {
@@ -95,10 +119,35 @@ function receive(packet) {
     stream.value?.packet(String(packet.メッセージ内容 || ''));
   }
 }
+function finishConversationChange() {
+  conversationChange = undefined; changingConversation.value = false;
+  draftReceiver.publish();
+}
 async function send(type, data = {}) {
+  if (disposed) return false;
+  const changesConversation = type === 'new' || type === 'selectHistory' || (type === 'deleteHistory' && data.id === state.会話ID) ||
+    (!props.host && type === 'autoConnect' && data.enabled && state.実行モード === 'offline');
+  if (changesConversation && changingConversation.value) return false;
+  if (type === 'selectHistory' && data.id === state.会話ID) return true;
+  let change;
+  if (changesConversation) {
+    change = { type, id: data.id, previousId: state.会話ID, projectPath: state.作業フォルダ?.パス, requestId: props.host ? crypto.randomUUID() : undefined };
+    conversationChange = change; changingConversation.value = true;
+    // Vueの次の描画やHTTP応答より前に、Webの公開APIとElectronの登録を失効させる。
+    draftReceiver.publish();
+  }
   error.value = '';
-  try { await transport.send({ type, ...data }); return true; }
-  catch (e) { error.value = e.message; pending.value = false; catalogBusy.value = false; return false; }
+  try { await transport.send({ type, ...data, ...(change?.requestId ? { requestId: change.requestId } : {}) }); return true; }
+  catch (e) {
+    if (disposed || (change && conversationChange !== change)) return false;
+    error.value = e.message; pending.value = false; catalogBusy.value = false;
+    if (change) {
+      // 実サーバーが変更前に返す拒否だけで復帰する。応答喪失や500は適用済みか不明。
+      if ([400, 401, 403, 404, 409, 413].includes(e.status)) finishConversationChange();
+      else { change.error = `${error.value} 会話の状態を確認できない場合は画面を再読み込みしてください。`; error.value = change.error; }
+    }
+    return false;
+  }
 }
 async function submit() {
   if (!canSend.value) return;
@@ -139,14 +188,14 @@ function link(event) { const a = event.target.closest('a'); if (a) { event.preve
 function copyInput(text) { prompt.value = text; nextTick(() => { input.value?.focus(); input.value?.setSelectionRange(text.length, text.length); scroll(); }); }
 const draftReceiver = createDraftReceiver({
   kind: 'code', project: () => state.作業フォルダ?.パス, scope: () => state.会話ID,
-  ready: () => !disposed && !!state.信頼済み && state.画面接続済み !== false && !pending.value,
+  ready: () => !disposed && !!state.信頼済み && state.画面接続済み !== false && !pending.value && !changingConversation.value,
   draft: () => prompt.value, setDraft: value => { prompt.value = value; history.value = false; },
   label: () => state.履歴.find(item => item.id === state.会話ID)?.題名 || 'Code',
   focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
   api: props.desktop && props.linked ? window.aidiyWindow : undefined,
 });
 defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
-watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, state.履歴], () => draftReceiver.publish());
+watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, changingConversation.value, state.履歴], () => draftReceiver.publish());
 watch(prompt, text => transport.saveDraft(text));
 watch(offline, () => { picker.value = false; });
 onMounted(() => { prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
@@ -159,6 +208,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; ar
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>
     </nav></div>
+    <p v-if="changingConversation" role="status" class="error">会話の切り替えを確認しています。完了しない場合は、下書きを控えてから画面を再読み込みしてください。</p>
     <div v-if="history" class="history-list" role="list">
       <p v-if="!sortedHistory.length" class="history-empty">このフォルダに会話履歴はありません</p>
       <div v-for="item in sortedHistory" :key="item.id" class="history-row" :class="{ active: item.id === state.会話ID }" role="listitem">

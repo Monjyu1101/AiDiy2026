@@ -80,7 +80,7 @@ export function scanMetadata(result) {
 }
 
 /** フォルダの形は従来通り {n,d,f}。ファイル・ディレクトリ・列挙数・深さ・時間を制限する。 */
-export async function scanTree(root, { filter, signal, limits = {}, fs = { opendir, lstat, realpath }, now } = {}) {
+export async function scanTree(root, { filter, scope, signal, limits = {}, fs = { opendir, lstat, realpath }, now } = {}) {
   const backup = filter === 'backup';
   const caps = { ...SCAN_LIMITS, maxFiles: backup ? MAX_BACKUP_FILES : MAX_FILES, ...limits };
   const budget = createBudget({ signal, timeMs: caps.timeMs, now });
@@ -106,6 +106,8 @@ export async function scanTree(root, { filter, signal, limits = {}, fs = { opend
         entries++;
         const path = join(full, entry.name);
         if (entry.isDirectory()) {
+          // grep対象外の保存版は走査前に除外し、候補や時間の上限を消費させない。
+          if (scope === 'grep' && entry.name === 'backup') continue;
           if (backup ? !backupDirAllowed(entry.name) || !backupPathAllowed(path) : IGNORED.has(entry.name)) continue;
           const child = { n: entry.name, d: [], f: [] };
           node.d.push(child);
@@ -140,7 +142,7 @@ export async function scanTree(root, { filter, signal, limits = {}, fs = { opend
   } finally { budget.close(); }
 }
 
-/** サーバー単位の短期スナップショット。フィルターごとに共有し、同時走査は1本に抑える。 */
+/** サーバー単位の短期スナップショット。フィルター・対象範囲ごとに共有し、同時走査は1本に抑える。 */
 export function createScanPool(root, { ttlMs = 1000, scan = scanTree, limits, now = Date.now } = {}) {
   const cache = new Map(), jobs = new Map(), queue = [];
   let active = null, closed = false;
@@ -155,7 +157,7 @@ export function createScanPool(root, { ttlMs = 1000, scan = scanTree, limits, no
     }
     if (!job) return;
     active = job;
-    Promise.resolve().then(() => scan(root, { filter: job.filter, signal: job.controller.signal, limits })).then(result => {
+    Promise.resolve().then(() => scan(root, { filter: job.filter, scope: job.scope, signal: job.controller.signal, limits })).then(result => {
       if (!closed && !job.controller.signal.aborted && jobs.get(job.key) === job && result.truncationReason !== 'cancelled') {
         cache.set(job.key, { result, at: now() });
       }
@@ -179,15 +181,16 @@ export function createScanPool(root, { ttlMs = 1000, scan = scanTree, limits, no
   }
   return {
     invalidate,
-    get({ filter, signal, fresh = false } = {}) {
+    get({ filter, scope, signal, fresh = false } = {}) {
       if (closed || signal?.aborted) return Promise.reject(abortError());
-      const key = filter === 'backup' ? 'backup' : '';
+      const scanFilter = filter === 'backup' ? 'backup' : '', scanScope = scope === 'grep' ? 'grep' : '';
+      const key = `${scanScope}:${scanFilter}`;
       const saved = cache.get(key);
       if (!fresh && saved && now() - saved.at < ttlMs) return Promise.resolve(saved.result);
       if (saved) cache.delete(key);
       let job = jobs.get(key);
       if (!job) {
-        job = { key, filter: key || undefined, consumers: new Set(), controller: new AbortController() };
+        job = { key, filter: scanFilter || undefined, scope: scanScope || undefined, consumers: new Set(), controller: new AbortController() };
         jobs.set(key, job); queue.push(job);
       }
       const promise = new Promise((resolve, reject) => {

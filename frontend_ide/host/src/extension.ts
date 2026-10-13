@@ -218,6 +218,26 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 信頼確認(): void {
     if (!vscode.workspace.isTrusted) throw new Error('ワークスペースを信頼してから実行してください。');
   }
+  private 会話変更(type: 'new' | 'selectHistory' | 'deleteHistory', id: unknown, requestId: unknown): void {
+    const result = (ok: boolean, message = '', uncertain = false) => {
+      if (typeof requestId !== 'string' || !requestId || requestId.length > 128 || requestId.includes('\0')) return;
+      void this.view?.webview.postMessage({ type: 'conversationChangeResult', requestId, ok, message, uncertain,
+        会話ID: this.会話ID, projectPath: this.現在フォルダ()?.uri.fsPath || '' });
+    };
+    const rejection = this.実行中 || this.オフラインジョブ || this.モデル変更中() ? '実行中またはモデル変更中は会話を切り替えられません。'
+      : type !== 'new' && (typeof id !== 'string' || !this.履歴.some(item => item.id === id && item.作業URI === this.現在フォルダ()?.uri.toString())) ? '会話がありません。一覧を確認してください。' : '';
+    if (rejection) { this.通知(); result(false, rejection); return; }
+    try {
+      if (type === 'new') this.新規();
+      else if (type === 'selectHistory') this.履歴選択(id as string);
+      else this.履歴削除(id as string);
+      result(true);
+    } catch (error) {
+      // 変更途中の例外は適用状況を断定せず、受信側に旧会話を再公開させない。
+      result(false, error instanceof Error ? error.message : String(error), true);
+      throw error;
+    }
+  }
   private 作業フォルダ(): vscode.WorkspaceFolder {
     const folder = this.現在フォルダ();
     if (!folder) throw new Error('作業フォルダを VS Code で開いてください。以前のフォルダを閉じた場合は、新しい会話を開始してください。');
@@ -258,9 +278,9 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
           this.停止中 = false; this.通知(); throw new Error('AIコアへ停止要求を送信できません。');
         }
         this.通知(); break;
-      case 'new': this.新規(); break;
-      case 'selectHistory': if (typeof data.id === 'string') this.履歴選択(data.id); break;
-      case 'deleteHistory': if (typeof data.id === 'string') this.履歴削除(data.id); break;
+      case 'new': this.会話変更('new', data.id, data.requestId); break;
+      case 'selectHistory': this.会話変更('selectHistory', data.id, data.requestId); break;
+      case 'deleteHistory': this.会話変更('deleteHistory', data.id, data.requestId); break;
       case 'attach': await this.選択添付(); break;
       case 'removeAttachment': if (!this.実行中) { this.添付 = undefined; this.通知(); } break;
       case 'settings': await vscode.commands.executeCommand('aidiyHermes.settings'); break;

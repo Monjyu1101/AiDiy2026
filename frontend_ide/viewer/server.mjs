@@ -140,7 +140,7 @@ export async function grepFiles(root, query, { caseSensitive = false, signal, po
   function collect(node, prefix = '') {
     if (budget.check()) return;
     for (const [name] of node.f) files.push(prefix + name);
-    for (const child of node.d) if (child.n !== 'backup') collect(child, `${prefix}${child.n}/`);
+    for (const child of node.d) collect(child, `${prefix}${child.n}/`);
   }
   function findMatches(text, path, info) {
     const haystack = caseSensitive ? text : text.toLocaleLowerCase();
@@ -212,7 +212,8 @@ export async function grepFiles(root, query, { caseSensitive = false, signal, po
     }
   }
   try {
-    scan = pool ? await pool.get({ signal: budget.signal, fresh }) : await scanTree(root, { signal: budget.signal, limits: limits.scan });
+    scan = pool ? await pool.get({ scope: 'grep', signal: budget.signal, fresh })
+      : await scanTree(root, { scope: 'grep', signal: budget.signal, limits: limits.scan });
     if (scan.truncated) reasons.add(scan.truncationReason);
     collect(scan.tree);
     await Promise.all(Array.from({ length: 8 }, worker));

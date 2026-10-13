@@ -9,6 +9,7 @@ import {cameraPosition, turnToTarget} from './warp-camera.js';
 import {orbitLevelRoll} from './orbit-guide.js';
 const TAU = Math.PI * 2;
 const LIFT=Math.tan(Math.PI/36),RADIAL_SCALE=Math.hypot(1,LIFT);
+const MIN_ORBIT_TURN=Math.PI/12,MAX_ORBIT_TURN=Math.PI/2,ROLL_OVERSHOOT=.15;
 const dot = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0);
 const unit = v => { const length = Math.hypot(...v); return v.map(x => x / length); };
 const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
@@ -47,7 +48,8 @@ export function createAutoOrbit(random = Math.random) {
       ? unit(cross([0,1,0],farDirection)) : [1,0,0];
     const tangent = previousTangent
       ? unit(previousTangent.map((x,i)=>x-dot(previousTangent,farDirection)*farDirection[i])) : horizontal;
-    const normal = unit(cross(farDirection,tangent)), tilt = between(-0.32,0.32);
+    // 初回は自然な軌道面を選び、次の面は船体位置を固定した視線軸回転で決める。
+    const normal = unit(cross(farDirection,tangent)), tilt = previousLeg?0:between(-0.32,0.32);
     // 最接近を全景の約1/4まで縮め、半径1500の星々の内側を通過する。
     // 開始時に近点より近くにいた時は、近点をその内側へ取り直して、まず近づく区間を残す。
     const near = Math.min(distance*between(0.18,0.26), nearLimit), duration = between(48,64);
@@ -57,7 +59,7 @@ export function createAutoOrbit(random = Math.random) {
     return {u:farDirection,v:unit(tangent.map((x,i)=>x*Math.cos(tilt)+normal[i]*Math.sin(tilt))),entryTangent:tangent,
       far:distance,near,duration:previousLeg?previousLeg.duration*area/previousArea:duration,drift:between(-0.22,0.22),time:0};
   }
-  function reset() { leg = null; start = null; elapsed = 0; path = null; phase='idle';phaseTime=0; }
+  function reset() { leg = null; start = null; elapsed = 0; path = null; phase='idle';phaseTime=0;fromRoll=0; }
   const normal=target=>unit(cross(target.u,target.v)).map(x=>x*(target.liftSign||1));
   function eyeAt(target,time) {
     const ground=position(target,time),height=Math.hypot(...ground)*LIFT,n=normal(target);
@@ -131,7 +133,12 @@ export function createAutoOrbit(random = Math.random) {
         const heldEye=eyeAt(leg,leg.duration),liftSign=leg.liftSign;
         const farDirection=unit(position(leg,leg.duration));
         const tangent=leg.u.map((x,i)=>-x*Math.sin(leg.drift)+leg.v[i]*Math.cos(leg.drift));
-        leg=next(farDirection,leg.far,tangent,leg);leg.liftSign=liftSign;alignEye(heldEye);planPath();
+        leg=next(farDirection,leg.far,tangent,leg);leg.liftSign=liftSign;alignEye(heldEye);
+        // 遠点で左右と15〜90度の量を一度だけ選ぶ。視線軸まわりなら5度の高さと
+        // 船体位置を保ったまま、実際のロール変化量を選んだ角度に一致させられる。
+        const turn=(random()<.5?-1:1)*between(MIN_ORBIT_TURN,MAX_ORBIT_TURN),axis=unit(heldEye.map(x=>-x));
+        for(const key of ['u','v','entryTangent'])leg[key]=rotate(leg[key],axis,turn);
+        planPath();
         phase='aligning';phaseTime=0;fromRoll=view.roll||0;
         return pose();
       }
@@ -143,8 +150,8 @@ export function createAutoOrbit(random = Math.random) {
       if(phase==='aligning') {
         phaseTime+=stepTime;
         const centered=pose(),target=orbitLevelRoll(normal(leg),{...centered,roll:fromRoll});
-        // ゆっくり姿勢を合わせ、最大3度だけ行き過ぎてから一度戻して静止する。
-        const delta=target-fromRoll,overshoot=Math.sign(delta)*Math.min(Math.abs(delta)*.15,Math.PI/60);
+        // 実際の角度変化の15%だけ行き過ぎ、同じ量を一度戻して静止する。
+        const delta=target-fromRoll,overshoot=delta*ROLL_OVERSHOOT;
         centered.roll=phaseTime<2.7
           ?fromRoll+(delta+overshoot)*smoothstep(phaseTime/2.7)
           :target+overshoot*(1-smoothstep((phaseTime-2.7)/.9));

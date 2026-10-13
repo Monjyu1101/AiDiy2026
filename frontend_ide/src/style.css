@@ -132,3 +132,6 @@
 /* 下書きの連携は対象を確認してから。長い日本語パスでもダイアログ内で折り返す。 */
 .draft-source{overflow-wrap:anywhere;color:#a4dce7}.draft-actions{display:flex;gap:8px;flex-wrap:wrap}
 .viewer-code pre mark{background:#605112;color:#fff1a1;scroll-margin-block:30px}
+
+/* 宇宙の暗い背景でもパネルの境界が読める、静かな白い外側の影。2Dの配色には重ねない。 */
+.space-view:not(.mode-2d) :is(.explorer-panel,.viewer-popup,.explorer-routes,.route-file-list){box-shadow:0 0 0 1px rgba(255,255,255,.13),0 0 14px rgba(255,255,255,.16),0 12px 32px #0008}

@@ -74,7 +74,7 @@ test('既定3D: オープニングと軌道飛行は維持し、2D中だけ描�
     for(let n=0;n<100;n++)await h.pump();
     assert.ok(h.engine.orbitPath?.length>0);assert.equal(h.frames.size,1);
     const camera={...h.engine.cam},world=h.engine.world,path=h.engine.orbitPath,phase=h.engine.orbitPhase;
-    h.engine.setViewMode('2d');assert.equal(h.state().driving,false);assert.equal(h.frames.size,0);
+    h.engine.setViewMode('2d');assert.equal(h.state().driving,true);assert.equal(h.frames.size,0);
     const before=h.metrics();for(let n=0;n<100;n++)await h.pump();
     assert.deepEqual(h.metrics(),before);assert.deepEqual(h.engine.cam,camera);assert.equal(h.engine.world,world);
     assert.equal(h.engine.orbitPath,path);assert.equal(h.engine.orbitPhase,phase);
@@ -142,6 +142,7 @@ test('2D: 初回取得・ファイル/フォルダ・親・ルート・戻る進
     await h.engine.goTo({type:'file',path:'別のフォルダ/資料.txt'});assert.equal(h.engine.selected.path,'別のフォルダ/資料.txt');
     h.location.hash='#/src';h.window.dispatchEvent(new Event('popstate'));assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);
     await h.engine.flyHome();assert.deepEqual(h.engine.trail,['src']);assert.equal(h.engine.selected,null);
+    assert.equal(h.timers.size,1,'手動猶予後の探索表示復帰だけを単発予約する');await h.pump(60000);
     assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
   }finally{h.dispose();}
 });
@@ -240,7 +241,7 @@ for(const action of ['selection','clear','filter','session','mode','dispose'])te
     assert.equal(await first,false);if(newer)await newer;
     assert.notEqual(h.engine.selected?.path,'new.js');if(action==='selection')assert.equal(h.engine.selected.path,'root.js');
     if(action==='filter'||action==='session'||action==='dispose')assert.equal(h.requests[1].signal.aborted,true);
-    assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);assert.equal(h.frames.size,action==='mode'?1:0);
+    assert.equal(h.timers.size,['clear','filter','session'].includes(action)?1:0,'猶予終了時の表示復帰だけが残る');assert.equal(h.animations.length,0);assert.equal(h.frames.size,action==='mode'?1:0);
   }finally{h.dispose();}
 });
 
@@ -255,7 +256,7 @@ test('2D再走査: 削除ファイルは閉じ、削除・フィルター除外�
     await h.engine.goTo({type:'file',path:'src/main.js'});
     data=snapshot(directory('project',['root.js']));h.engine.setFilter(false);await flush();
     assert.deepEqual(h.engine.trail,[]);assert.equal(h.location.hash,'#/');assert.equal(h.engine.selected,null);assert.doesNotMatch(h.requests.at(-1).url,/filter=/);
-    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,1);await h.pump(60000);assert.equal(h.timers.size,0);
     data=snapshot(directory('project',['later.js']));await h.engine.refresh();await h.engine.goTo({type:'file',path:'later.js'});
     data=snapshot(directory('project'),{truncated:true});await h.engine.refresh();assert.equal(h.engine.selected.path,'later.js');
     data=snapshot(directory('project'));await h.engine.refresh();assert.equal(h.engine.selected,null);
@@ -275,7 +276,7 @@ test('2D自動探索: 更新通知から親ページと共有ビューアを開�
     const calls=h.requests.length;await h.pump(600000);assert.equal(h.requests.length,calls);
     h.engine.requestFollow('root.js');await flush();assert.equal(h.engine.selected.path,'root.js');assert.deepEqual(h.engine.trail,[]);
     assert.equal(h.timers.size,0);assert.equal(h.frames.size,0);
-    h.engine.clear();await flush();assert.equal(h.engine.selected,null);assert.equal(h.state().driving,false);assert.equal(h.timers.size,0);
+    h.engine.clear();await flush();assert.equal(h.engine.selected,null);assert.equal(h.state().driving,true);assert.equal(h.timers.size,0);
     await h.pump(600000);assert.equal(h.engine.selected,null,'閉じた同じ最終更新は勝手に開き直さない');
   }finally{h.dispose();}
 });
@@ -354,7 +355,7 @@ test('2D自動探索: 進行中の古い一覧へ合流しても新規ファイ�
   }finally{h.dispose();}
 });
 
-for(const action of ['mode','off','manual','filter','session','dispose'])test(`2D自動探索の遅い応答: ${action}で中断し、古いページや3Dワープを開かない`,async t=>{
+for(const action of ['mode','off','manual','filter','session','dispose'])test(`2D自動探索の遅い応答: ${action}で古い航行を中断し、モード変更だけは再検証して続ける`,async t=>{
   const pending=deferred();let calls=0;
   const h=space(t,{fetcher:()=>++calls===2?pending.promise:Promise.resolve(reply(snapshot()))});
   try{
@@ -368,7 +369,7 @@ for(const action of ['mode','off','manual','filter','session','dispose'])test(`2
     pending.resolve(reply(snapshot()));await flush();
     assert.notEqual(h.engine.selected?.path,'src/nested/deep.js');assert.deepEqual(h.engine.trail,[]);
     assert.equal(h.frames.size,action==='mode'?1:0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
-    if(action==='mode'){await h.pump();assert.equal(h.timers.size,0);assert.equal(h.engine.selected,null);}
+    if(action==='mode'){const before=calls;await h.pump();assert.ok(calls>before,'新モードの走査で更新先を再検証する');for(let n=0;n<160&&h.engine.selected?.path!=='src/nested/deep.js';n++)await h.pump();assert.equal(h.engine.selected?.path,'src/nested/deep.js');assert.equal(h.timers.size,0);}
     if(action==='off'){h.engine.setAutoSpin(true);await flush();assert.equal(h.engine.selected.path,'src/nested/deep.js');}
     if(action==='manual')assert.equal(h.engine.selected.path,'root.js');
   }finally{h.dispose();}
@@ -435,6 +436,7 @@ test('2Dの一覧外AI/履歴/フォルダ: フィルターを勝手に変えず
       const note=h.changes.filter(value=>value.error).at(-1).error;
       assert.match(note,/フィルターをOFF/);assert.match(note,/一覧を更新/);assert.match(h.requests.at(-1).url,/filter=backup/);
     }
+    assert.equal(h.timers.size,1);const calls=h.requests.length;await h.pump(60000);assert.equal(h.requests.length,calls);
     assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);assert.equal(h.animations.length,0);
   }finally{h.dispose();}
 });
@@ -450,4 +452,23 @@ test('3Dの直接follow API: frameの自動条件を二重適用せず、従来�
     assert.equal(h.engine.selected.path,'src/main.js');assert.deepEqual(h.engine.trail,['src']);
     assert.ok(h.animations.length>=2);assert.equal(h.frames.size,1);assert.equal(h.timers.size,0);
   }finally{h.dispose();}
+});
+
+test('2D自動探索表示: 3Dと同じ開始・手動待機・OFF・非表示条件で枠を回し、待機解除は単発だけ', async t=>{
+  const h=space(t);
+  try {
+    h.engine.setViewMode('2d');await h.engine.refresh(1);
+    assert.equal(h.state().driving,true,'対象通知を待つ間も自動探索中を示す');
+    assert.equal(h.frames.size,0);assert.equal(h.timers.size,0);
+    await h.engine.goTo({type:'dir',path:'src'});assert.equal(h.state().driving,false);assert.equal(h.timers.size,1);
+    await h.pump(59999);assert.equal(h.state().driving,false);await h.pump(1);assert.equal(h.state().driving,true);
+    assert.equal(h.timers.size,0);assert.equal(h.frames.size,0);
+    h.engine.interact();assert.equal(h.state().driving,false);assert.equal(h.timers.size,1);
+    h.engine.setAutoSpin(false);assert.equal(h.state().driving,false);assert.equal(h.timers.size,0);
+    h.engine.setAutoSpin(true);assert.equal(h.state().driving,true);assert.equal(h.timers.size,0);
+    h.visibility(true);assert.equal(h.state().driving,false);h.visibility(false);assert.equal(h.state().driving,true);
+    await h.engine.goTo({type:'file',path:'root.js'});await h.pump(60000);assert.equal(h.state().driving,false);assert.equal(h.timers.size,0);
+    h.engine.clear();assert.equal(h.state().driving,true);assert.equal(h.frames.size,0);
+    h.engine.dispose();assert.equal(h.timers.size,0);
+  } finally {h.dispose();}
 });

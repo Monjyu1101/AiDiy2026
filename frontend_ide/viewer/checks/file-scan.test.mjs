@@ -46,6 +46,30 @@ test('走査を共有し、TTL・フィルター・明示更新・プロジェ�
   assert.equal((await other.get()).root, '/project-two');
 });
 
+test('grepの対象範囲は通常・backupフィルターの実行中走査とキャッシュから分離する', async t => {
+  const runs = [];
+  const pool = createScanPool('/project', { ttlMs: 60000, scan: (root, options) => {
+    const gate = deferred(); runs.push({ ...gate, options }); return gate.promise;
+  } }); t.after(() => pool.close());
+  const ordinary = pool.get(), grep = pool.get({ scope: 'grep' }), sharedGrep = pool.get({ scope: 'grep', fresh: true });
+  await tick(); assert.equal(runs.length, 1);
+  const ordinaryResult = result('/project', 'ordinary');
+  runs[0].resolve(ordinaryResult); assert.equal(await ordinary, ordinaryResult);
+  await tick(); assert.equal(runs.length, 2, 'grepは通常走査を共有せず、同時走査は1本に保つ');
+  assert.equal(runs[1].options.scope, 'grep');
+  const grepResult = result('/project', 'grep');
+  runs[1].resolve(grepResult); assert.equal(await grep, grepResult); assert.equal(await sharedGrep, grepResult);
+  assert.equal(await pool.get(), ordinaryResult); assert.equal(await pool.get({ scope: 'grep' }), grepResult);
+  const backup = pool.get({ filter: 'backup' }); await tick(); assert.equal(runs.length, 3);
+  assert.equal(runs[2].options.filter, 'backup');
+  const backupResult = result('/project', 'backup'); runs[2].resolve(backupResult); await backup;
+  assert.equal(await pool.get({ filter: 'backup' }), backupResult);
+  assert.equal(await pool.get({ scope: 'grep' }), grepResult);
+  const freshGrep = pool.get({ scope: 'grep', fresh: true }); await tick(); assert.equal(runs.length, 4);
+  const updatedGrep = result('/project', 'updated-grep'); runs[3].resolve(updatedGrep); assert.equal(await freshGrep, updatedGrep);
+  assert.equal(await pool.get(), ordinaryResult); assert.equal(await pool.get({ filter: 'backup' }), backupResult);
+});
+
 test('一方の取消では共有処理を保ち、全員取消後は結果をキャッシュしない', async t => {
   const runs = [];
   const pool = createScanPool('/project', { scan: (root, { signal }) => {

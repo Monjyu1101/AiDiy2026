@@ -340,3 +340,11 @@ test('実マウント: 2DのDOMを外してもページ位置・選択行を保�
     assert.deepEqual(warnings, []);
   } finally { app.unmount(); }
 });
+
+
+test('3Dパネル境界: エクスプローラー・ビューア・閲覧/検索軌跡へ静かな白い影を限定する',()=>{
+  const css=readFileSync(new URL('../src/style.css',import.meta.url),'utf8');
+  const rule=css.match(/\.space-view:not\(\.mode-2d\) :is\(\.explorer-panel,\.viewer-popup,\.explorer-routes,\.route-file-list\)\{([^}]+)\}/);
+  assert.ok(rule,'2D以外の4パネルだけを対象にする');
+  assert.match(rule[1],/box-shadow:[^;]+rgba\(255,255,255,/);assert.doesNotMatch(rule[1],/animation|transition/);
+});

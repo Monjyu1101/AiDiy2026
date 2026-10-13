@@ -111,7 +111,7 @@ onBeforeUnmount(()=>{clearTimeout(previewTimer);pageLayoutObserver?.disconnect()
 <template>
   <section ref="root" class="space-view" :class="{'explorer-open':open,viewing:!!selected,'mode-2d':viewMode==='2d'}" data-component="SpaceView">
     <SpaceCanvas :mode="viewMode" :layout="layout" @ready="ready" @change="change" @toggle-explorer="open=!open" />
-    <FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'" :tree="scan.tree" :current="trail.join('/')" :selected="selected?.path" :unlisted-parent="unlistedParent" :marks="marks" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @clear="engine?.clear()" @refresh="engine?.refresh()" @toggle-explorer="open=!open" />
+    <FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'" :tree="scan.tree" :current="trail.join('/')" :selected="selected?.path" :unlisted-parent="unlistedParent" :marks="marks" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @activity="engine?.interact()" @clear="engine?.clear()" @refresh="engine?.refresh()" @toggle-explorer="open=!open" />
     <div class="space-flight-controls">
       <button v-show="viewMode==='3d'" class="space-motion-toggle space-fast-warp-toggle" role="switch" aria-label="高速ワープ" :aria-checked="fastWarp" title="別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動" @click="fastWarp=!fastWarp"><span>高速ワープ</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ fastWarp?'ON':'OFF' }}</span></button>
       <div class="space-auto-explore">
@@ -125,10 +125,12 @@ onBeforeUnmount(()=>{clearTimeout(previewTimer);pageLayoutObserver?.disconnect()
     <FileViewer v-if="selected" :file="selected" :root="scan?.root" @activity="armPreviewTimer" @close="engine.clear()" @pin="pin" />
     <p v-if="pinError" class="app-error" role="alert">{{ pinError }}</p>
     <nav v-if="scan" v-show="viewMode==='3d'" class="space-breadcrumb"><button @click="engine.ascend(0)">{{ scan.tree.n }}</button><template v-for="(name,i) in trail" :key="i"><span>›</span><button @click="engine.ascend(i+1)">{{ name }}</button></template></nav>
-    <div v-if="loading||error" class="space-loading">{{ error||'読み込み中…' }}</div>
+    <div v-if="!scan&&(loading||error)" class="space-loading">{{ error||'読み込み中…' }}</div>
+    <div v-else-if="error" class="space-notice" role="status"><span>{{ error }}</span><button aria-label="案内を閉じる" @click="error=''">×</button></div>
   </section>
 </template>
 
 <style scoped>
 .space-scan-warning{position:absolute;left:16px;bottom:52px;z-index:35;max-width:min(340px,calc(100vw - 32px));margin:0;padding:6px 8px;color:#ffe28a;background:#080c1af2;font-size:var(--file-font-size,10px)}
+.space-notice{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:45;display:flex;align-items:start;gap:8px;max-width:min(680px,calc(100vw - 32px));padding:8px 10px;background:#251e10f2;color:#ffe5a2;border:1px solid #7c6740;font-size:var(--file-font-size,11px);pointer-events:none}.space-notice button{flex:none;pointer-events:auto;padding:0 5px}.mode-2d .space-notice{background:#f5e8c9;color:#74521f;border-color:#d8c398}
 </style>

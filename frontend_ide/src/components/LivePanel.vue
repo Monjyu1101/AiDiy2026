@@ -183,8 +183,9 @@ async function newChat() {
 }
 function copyInput(item) { if (item.role !== 'user' && !item.type.startsWith('recognition_')) return; prompt.value = item.text; nextTick(() => { input.value.focus(); input.value.setSelectionRange(item.text.length, item.text.length); scroll(); }); }
 watch(prompt, () => nextTick(scroll));
-// Webの別タブでも会話と下書きを保持する。非表示中は音声入出力を止め、マイクは自動再開しない。
+// Webの別タブでも会話と下書きを保持する。非表示中は描画と音声入出力を止め、マイクは自動再開しない。
 watch(() => props.visible, visible => {
+  cloud?.setVisible(visible !== false);
   if (visible === false) { micGeneration++; audio?.stop(); mic.value = false; micBusy.value = false; }
   audio?.mute(audible.value);
   if (connected.value) connection?.send('input', 音声操作(false, audible.value));
@@ -202,7 +203,7 @@ onMounted(async () => {
   draftReceiver.mount();
   const initialRun = generation;
   resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value);
-  cloud = new AudioCloud(canvas.value);
+  cloud = new AudioCloud(canvas.value, props.visible !== false);
   audio = new LiveAudio(base64 => connection.send('audio', 音声入力(base64)), (kind, value) => cloud.level(kind, value), (kind, values) => cloud.spectrum(kind, values), environment.captureUrl, environment.host ? environment.acquireMicrophone : undefined);
   audio.mute(audible.value);
   connection = new LiveConnection(environment.socketUrl, receive, () => { disconnect(!preserveOnConnectionLost); error.value = '接続が切れました。接続ボタンで開始してください。'; }, environment.socket);
@@ -223,7 +224,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
 </script>
 <template>
   <section class="ai-component live-component" :class="{ 'desktop-window': desktop, connected }" data-component="LivePanel">
-    <StatusBar :title="linked ? 'AiDiy IDE / Live' : 'AiDiy Live'" :connected="connected" :busy="busy" :active="mic" :status="changing ? '再接続中' : connected && mic ? '会話中' : undefined" :desktop="desktop" clock-pulse />
+    <StatusBar :title="linked ? 'AiDiy IDE / Live' : 'AiDiy Live'" :connected="connected" :busy="busy" :active="mic" :status="changing ? '再接続中' : connected && mic ? '会話中' : undefined" :desktop="desktop" :clock-pulse="visible !== false" />
     <div class="component-toolbar"><span :title="project?.パス">プロジェクト: {{ project?.名前 || '未選択' }}</span><nav><button :disabled="blocked || modelLoading" @click="newChat">新しい会話</button><button class="live-connect" :class="{ awaiting: !connected && !busy }" :disabled="blocked || modelLoading" @click="connected ? disconnect() : connect()">{{ busy ? '接続中…' : connected ? '切断' : '接続' }}</button></nav></div>
     <canvas ref="canvas" class="audio-cloud"></canvas>
     <div class="audio-actions"><button class="audio-button" :disabled="!connected || blocked" :aria-pressed="connected && speaker" :aria-label="`スピーカー ${connected && speaker ? 'ON' : 'OFF'}`" @click="sound"><span class="symbol speaker-symbol" :style="{ '--symbol-image': `url('${speakerIcon}')` }"></span><strong>{{ connected && speaker ? 'ON' : 'OFF' }}</strong></button><button class="audio-button microphone" :disabled="!connected || blocked || micBusy" :aria-pressed="mic" :aria-busy="micBusy" :aria-label="micBusy ? 'マイク準備中' : `マイク ${mic ? 'ON' : 'OFF'}`" @click="microphone"><span class="symbol" :style="{ '--symbol-image': `url('${microphoneIcon}')` }"></span><strong>{{ mic ? 'ON' : 'OFF' }}</strong></button></div>

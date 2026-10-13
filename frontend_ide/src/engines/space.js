@@ -794,6 +794,13 @@ const touchIdle = () => {
   pendingFollow = updatePaths.length || latestFollow !== lastFollowedPath ? latestFollow : null;
 };
 
+function interact() {
+  if (disposed) return;
+  touchIdle();
+  if (following) invalidateNavigation();
+  notify();
+}
+
 function setAutoSpin(value) {
   const entering = !autoSpin && !!value;
   autoSpin = !!value;
@@ -1209,6 +1216,8 @@ function enterFolderDirect(next, { history = true } = {}) {
 }
 function setViewMode(value) {
   if (disposed || (value !== '2d' && value !== '3d') || value === viewMode) return;
+  // 描画・古い航行だけを止める。受信済みの更新は新モードで再検証して続ける。
+  if (following) { pendingFollow ??= activeFollowPath; ++followRevision; }
   invalidateNavigation();
   if (value === '2d') rememberView();
   viewMode = value;
@@ -1321,7 +1330,7 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
 // ---------------------------------------------------------------- 最終更新ファイルへの自動移動
 // 視点移動（自動飛行）中にエクスプローラーの最終更新が変わったら、そのファイルまで1階層ずつワープして開く。
 // この流れで開いたファイルは、閉じても元の階層へ戻らず、その場で自動飛行に戻る。
-let followSequence = 0, followedPath = null, pendingFollow = null, latestFollow = null, following = false;
+let followSequence = 0, followRevision = 0, followedPath = null, pendingFollow = null, latestFollow = null, following = false;
 // 自動表示中かどうかと、最後に到着した場所の記憶を分ける。後者は手動操作でも消さない。
 let lastFollowedPath = null, activeFollowPath = null;
 let updatePaths = [];
@@ -1330,23 +1339,24 @@ function cancelScheduledFollow() {
   ++followSchedule;
   clearTimeout(followTimer); followTimer = 0;
 }
-/** 2D は更新通知と状態変化だけで追跡する。実際の予約が手動操作の猶予を待つ時だけ単発タイマーを使う。 */
+/** 2D は更新通知と状態変化だけで追跡する。手動猶予の終了時だけ単発で起き、枠の探索表示も3Dと揃える。 */
 function scheduleFollow2D() {
   cancelScheduledFollow();
-  if (disposed || viewMode !== '2d' || !pendingFollow || !autoSpin || !world || following || diving || dragging || document.hidden
+  if (disposed || viewMode !== '2d' || !autoSpin || !world || following || diving || dragging || document.hidden
     || (selected && selected.path !== followedPath)) return;
   const sequence = followSchedule;
   const start = () => {
     if (sequence !== followSchedule) return;
     followTimer = 0;
-    if (!pendingFollow || !canFollow()) return;
+    if (!canFollow()) return;
+    if (!pendingFollow) { notify(); return; }
     // 開始時に予約を消費する。取得失敗・欠落パスでも notify から即時再試行を繰り返さない。
     const path = pendingFollow; pendingFollow = null;
     void follow(path);
   };
   const delay = autoOrbit.pausedUntil - performance.now();
   if (delay > 0) followTimer = setTimeout(start, delay);
-  else queueMicrotask(start);
+  else if (pendingFollow) queueMicrotask(start);
 }
 /** 移動を予約する（起動直後の最終更新も含む）。3D は frame、2D は更新通知から直接開始する。 */
 function requestFollow(path) {
@@ -1358,6 +1368,7 @@ function requestFollow(path) {
     path = path.at(-1);
     if (!path) return;
   }
+  ++followRevision;
   latestFollow = path;
   pendingFollow = !updatePaths.length && (path === lastFollowedPath || (following && path === activeFollowPath)) ? null : path;
   if (viewMode === '2d' && following && pendingFollow) invalidateNavigation();
@@ -1390,10 +1401,12 @@ async function followSteps(path, parts, level, stale) {
   if (path !== lastFollowedPath) { selected = null; tracking = null; updateSide(); }
   // 毎回読み直す。直前の走査後に新規作成されたファイルも、予約を失わず表示する。
   const joinedEarlierRequest = !!refreshPending;
+  const predatesUpdate = refreshPending && refreshPending.followRevision < followRevision;
   if (!await refresh(undefined,{fresh:viewMode==='2d'}) || stale()) return false;
   const exists = () => nodeAt(level)?.f.some(file => file[0] === parts.at(-1));
-  // 先行する一覧取得へ合流した場合も、新規ファイルの更新通知を古い結果で失わない。
-  if (viewMode === '2d' && joinedEarlierRequest && !exists()) {
+  // 更新通知より前の走査は、既存・削除ファイルも含め1回だけ再確認する。
+  // freshness通知後の同じ走査は共有し、モードに関係なく古い一覧で更新を失わない。
+  if (predatesUpdate || (joinedEarlierRequest && !exists())) {
     if (!await refresh(undefined,{fresh:true}) || stale()) return false;
   }
   if (!exists()) return false;
@@ -1482,7 +1495,6 @@ let driving = false, notifiedOrbitPhase = 'idle';
 function isDriving(now) {
   if (!autoSpin || !world || document.hidden) return false;
   if (following) return true;
-  if (viewMode === '2d') return !!selected && selected.path === followedPath;
   return !dragging && !diving && now >= autoOrbit.pausedUntil && (!selected || selected.path === followedPath);
 }
 function notify() {
@@ -1521,7 +1533,7 @@ function refresh(startedAt, {fresh=true}={}) {
   }
   // 同じ条件の読み込みを重ねず、手動選択と更新通知は同じ結果を待つ。
   if(refreshPending?.filter===fileFilter)return refreshPending.promise;
-  const run=++loadGeneration, request={filter:fileFilter,controller:new AbortController(),promise:null};
+  const run=++loadGeneration, request={filter:fileFilter,followRevision,controller:new AbortController(),promise:null};
   refreshPending=request;
   request.promise=(async()=>{
     try {
@@ -1581,12 +1593,12 @@ listen(document, 'visibilitychange', () => {
     if (driving) { driving = false; notify(); }
   } else {
     requestAnimationFrame(frame);
-    scheduleFollow2D();
+    if (viewMode === '2d') notify();
   }
 });
 requestAnimationFrame(frame);
 return {
-  refresh, goTo, ascend, flyHome, dive, approach, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  refresh, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
   get viewMode() { return viewMode; }, get selected() { return selected; },
   get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,
   get projection() { return { x: CX, y: CY }; },

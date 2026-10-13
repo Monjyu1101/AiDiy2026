@@ -22,19 +22,21 @@ export class AudioCloud {
   };
   private width = 0;
   private height = 0;
-  private frame = 0;
+  private frame: number | null = null;
   private last = 0;
   private time = 0;
   private disposed = false;
   private observer: ResizeObserver;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  constructor(private canvas: HTMLCanvasElement, private visible = true) {
     this.context = canvas.getContext('2d');
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     document.addEventListener('visibilitychange', this.visibility);
-    this.resize(); this.visibility();
+    this.resize();
   }
+  // 会話・音声の寿命とは分け、IDEの非表示タブでも描画だけを休止する。
+  setVisible(visible: boolean) { this.visible = visible; this.visibility(); }
   level(kind: Channel, value: number) { this.channels[kind].level = value; }
   spectrum(kind: Channel, values: Uint8Array) {
     const cloud = this.channels[kind];
@@ -45,19 +47,24 @@ export class AudioCloud {
     }
   }
   private resize() {
+    if (this.disposed) return;
     const bounds = this.canvas.getBoundingClientRect();
     this.width = bounds.width; this.height = bounds.height;
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(this.width * ratio); this.canvas.height = Math.round(this.height * ratio);
     this.context?.setTransform(ratio, 0, 0, ratio, 0, 0);
+    this.visibility();
   }
+  private canDraw() { return !this.disposed && this.visible && !document.hidden && !!this.context && this.width > 0 && this.height > 0; }
   private visibility = () => {
-    if (this.frame) cancelAnimationFrame(this.frame);
-    this.frame = 0; this.last = 0;
-    if (!document.hidden && !this.disposed && this.context) this.frame = requestAnimationFrame(this.draw);
+    if (!this.canDraw()) {
+      if (this.frame !== null) cancelAnimationFrame(this.frame);
+      this.frame = null; this.last = 0;
+    } else if (this.frame === null) this.frame = requestAnimationFrame(this.draw);
   };
   private draw = (stamp: number) => {
-    if (this.disposed || !this.context) return;
+    this.frame = null;
+    if (!this.canDraw() || !this.context) { this.last = 0; return; }
     const delta = this.last ? Math.min(.05, (stamp - this.last) / 1000) : 1 / 60;
     this.last = stamp;
     // OS の「動きを減らす」設定には従わず、Windows / macOS / Linux で同じ動きにする。
@@ -102,11 +109,11 @@ export class AudioCloud {
       ctx.shadowBlur = 0;
     }
     ctx.globalCompositeOperation = 'source-over';
-    this.frame = requestAnimationFrame(this.draw);
+    this.visibility();
   };
   dispose() {
     this.disposed = true;
-    if (this.frame) cancelAnimationFrame(this.frame);
+    this.visibility();
     this.observer.disconnect(); document.removeEventListener('visibilitychange', this.visibility);
   }
 }

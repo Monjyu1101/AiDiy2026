@@ -74,7 +74,7 @@ async function liveFixture(t,{socketFactory,props={}}={}) {
       '../transports/live':{LiveEnvironment:Environment},
       '../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
       '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(value){audioMutes.push(value);}stop(){}}},
-      '../../host/aidiy_live/src/visualizer':{AudioCloud:class {dispose(){}}},
+      '../../host/aidiy_live/src/visualizer':{AudioCloud:class {setVisible(){}dispose(){}}},
       '../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
       '../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
       './StatusBar.vue':{},'./TerminalWelcome.vue':{},'./ModalDialog.vue':{},
