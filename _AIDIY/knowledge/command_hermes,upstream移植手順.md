@@ -56,8 +56,8 @@ cd command_hermes
 findstr /S /N /C:"AiDiy" /C:"aidiy" *.py
 ```
 
-`skills/`、`optional-skills/`、`optional-mcps/` を除くと 15 ファイル程度に収まります。
-このリストが Step 4 の再適用対象です（最新の一覧は `_verify.py` の `AIDIY_LAYER` 定数が持っています）。
+表示名・スキル説明も AiDiy Hermes に揃えているため、該当ファイルは広範囲にあります。
+実装上の主要な再適用箇所は `_verify.py` の `AIDIY_LAYER` 定数、表記統一は下記「製品名と自己認識」で確認します。
 
 ### Step 3. upstream を丸ごと展開
 
@@ -239,3 +239,17 @@ Windows の既定が `~/.hermes` から `%LOCALAPPDATA%\hermes` へ変更され�
 | Windows 対応の規則 | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 | provider 一覧と選択ロジック | [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) |
 | 起動・運用確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
+
+
+## 製品名と自己認識
+
+- 表示名・自己紹介は `AiDiy Hermes` または `AiDiy_hermes`、実行コマンドは `aidiy_hermes` とする。
+- `core/prompt_builder.py` の既定人格、`hermes_cli/default_soul.py` の初期人格、配布元 `SOUL.md` を同じ文面に保つ。`scripts/install.sh` / `install.ps1` の初期人格も追従する。
+- `core/system_prompt.py` は `AIDIY_RUNTIME_IDENTITY` を人格の後に必ず追加する。利用者の人格・古い記憶を保持しつつ、実行中の製品名を明記する。
+- 既存 `HERMES_HOME/SOUL.md` は、既知の未編集テンプレートと完全一致した場合だけ起動時に更新する。独自の追記・人格設定や会話履歴を一括置換しない。
+- 自己機能の説明は `command_hermes/AGENTS.md`、AiDiyのナレッジ、現行コードを優先する。`skills/autonomous-ai-agents/hermes-agent/SKILL.md` の冒頭にもこの区別を残す。
+- `hermes-agent` のスキルID、Python import、`HERMES_*`、上流URL、パッケージ名は互換性のため維持する。著作者・ライセンス・NOTICE、旧形式の検出文字列も表記統一の対象外。これらの残存を自己紹介への注入と混同しない。
+- 上流再取り込み後は `rg -n -i "hermes agent" command_hermes` でソース・同梱スキル・表示資産を確認する。仮想環境、実行記録、バックアップは編集しない。置換時は `.lower()` との比較、旧設定の検出、外部サービスの既存互換処理を確認する。
+- 既存会話は古いシステムプロンプトを保持する場合がある。反映確認にはプロセスを再起動して新しい会話を開始する。
+
+検証は `command_hermes/.venv/Scripts/python.exe -B -m unittest command_hermes.tests.test_aidiy_identity`。既定人格の一致、旧SOUL移行、独自人格の保持、人格の有無に関係なく実プロンプトへ製品名が入ること、スキルIDと著者表記の互換性を確認する。外部LLMへ問い合わせずに実行できる。

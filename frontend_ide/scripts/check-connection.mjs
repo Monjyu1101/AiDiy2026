@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 
-// 模擬コアと実ブラウザで、10秒間隔の確認中も接続済み表示を維持することを確認する。
+// 模擬toolsと実ブラウザで、10秒間隔の確認中も接続済み表示を維持することを確認する。
 // ルートから node frontend_ide/scripts/check-connection.mjs。CHROME_PATHでブラウザを指定可能。
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -25,14 +25,15 @@ const project = join(temporary, 'project'); mkdirSync(project);
 writeFileSync(join(project, 'README.md'), '# 接続表示の検証\n', 'utf8');
 const calls = [], replies = new Set(); let healthy = true;
 const core = createServer((req, res) => {
+  assert.equal(req.url, '/aidiy_code_agents/ping'); assert.equal(req.method, 'GET');
   calls.push(Date.now()); req.resume();
   const reply = () => {
     if (res.destroyed) return;
     res.writeHead(healthy ? 200 : 503, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ status: healthy ? 'OK' : 'NG', data: { available_models: {}, モデル設定: {} } }));
+    res.end(JSON.stringify({ status: healthy ? 'ok' : 'error', name: 'aidiy_code_agents' }));
   };
   if (calls.length === 1 || !healthy) reply();
-  else { const timer = setTimeout(() => { replies.delete(timer); reply(); }, 1500); replies.add(timer); }
+  else { const timer = setTimeout(() => { replies.delete(timer); reply(); }, 800); replies.add(timer); }
 });
 await new Promise(done => core.listen(0, '127.0.0.1', done));
 const connection = createCoreConnection(project, { target: `http://127.0.0.1:${core.address().port}` });
@@ -62,6 +63,7 @@ try {
     return result.result?.result?.value;
   };
   await send('Runtime.enable');
+  await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `window.connectionPolls=[];const nativeFetch=window.fetch;window.fetch=(input,...args)=>{if(new URL(input,location.href).pathname==='/api/connection')window.connectionPolls.push(performance.now());return nativeFetch(input,...args);};` });
   await send('Page.navigate', { url: app.url });
@@ -86,9 +88,9 @@ try {
   assert.deepEqual(await evaluate('window.connectionLabels'), []);
   const polls = await evaluate('window.connectionPolls');
   for (let i = 1; i < polls.length; i++) assert.ok(polls[i] - polls[i - 1] >= 9800, `状態取得が頻繁です: ${polls}`);
-  for (let i = 1; i < calls.length; i++) assert.ok(calls[i] - calls[i - 1] >= 9800, `コア確認が頻繁です: ${calls}`);
+  for (let i = 1; i < calls.length; i++) assert.ok(calls[i] - calls[i - 1] >= 9800, `tools確認が頻繁です: ${calls}`);
   healthy = false;
-  await until(async () => !connection.state().connected && (await evaluate(label)) === '未接続', 'コア停止');
+  await until(async () => !connection.state().connected && (await evaluate(label)) === '未接続', 'tools停止');
   assert.equal(connection.state().active, true); assert.equal(connection.state().startedAt, startedAt);
   await capture('02_disconnected');
   healthy = true;

@@ -47,7 +47,7 @@ def codex_cloudflare_headers(
     crash at client construction.
     """
     headers = {
-        "User-Agent": "codex_cli_rs/0.0.0 (Hermes Agent)",
+        "User-Agent": "codex_cli_rs/0.0.0 (AiDiy Hermes)",
         "originator": "codex_cli_rs",
     }
     if is_official_codex_base_url(base_url):

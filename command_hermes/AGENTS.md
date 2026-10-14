@@ -22,7 +22,8 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 ## 概要
 
-`command_hermes` は AiDiy に統合された on-demand のコードエージェント CLI です。
+`command_hermes` は AiDiy に統合された on-demand のコードエージェント CLI **AiDiy Hermes（AiDiy_hermes）** です。
+自己紹介・利用者向け表示にはこの製品名、実行コマンドには `aidiy_hermes` を使います。上流由来のモジュール名・スキルID・環境変数と製品名を区別します。
 upstream の `hermes-agent` 0.21 系を取り込み、AiDiy 固有のレイヤだけを重ねています。
 
 - 常駐 HTTP サーバーではない。
@@ -119,6 +120,7 @@ upstream のレイアウトを次の 3 点だけ読み替えています。
 | 対象 | 内容 |
 |------|------|
 | `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック / `_aidiy_*` メソッド群 / `chat()` の外部 CLI ディスパッチ / `/model` フック / quiet ワンショットの stderr 進捗 / 長文入力用 `--oneshot-stdin` / `cli_entry` argparse エントリ |
+| 自己認識 | `core/prompt_builder.py` の `AIDIY_RUNTIME_IDENTITY` / 既定人格 / 自己機能案内、`core/system_prompt.py` の製品名挿入、`hermes_cli/default_soul.py` と `SOUL.md`、同梱スキル・表示文言 |
 | ブランディング | `cli_main.py` の `_AIDIY_RESPONSE_LABEL` / `_AIDIY_WELCOME_TEXT` / `_build_compact_banner()`、`hermes_cli/banner.py` の `HERMES_AGENT_LOGO`（AIDIY-HERMES ワードマーク）と `format_banner_version_label()`、`hermes_cli/_startup_fast.py`、`acp_adapter/server.py` |
 | `tools/mcp_tool.py` | `_load_aidiy_mcp_servers()` と `_load_mcp_config()` へのマージ |
 | OpenAI サブスク対応 | `cli_main.py` の `openai_oauth` provider（upstream `openai-codex` / ChatGPT OAuth）。`auth_runtime` フラグ、`_openai_oauth_model_ids()`、`_ensure_openai_oauth_auth()` |

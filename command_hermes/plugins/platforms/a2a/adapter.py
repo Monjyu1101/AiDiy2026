@@ -542,11 +542,11 @@ class A2AAdapter(BasePlatformAdapter):
         # Scope-aware for the same reason as port/toolsets above: a secondary
         # profile must not inherit the default profile's A2A_AGENT_DESCRIPTION.
         default_desc = (
-            "Hermes Agent — a general-purpose agent reachable over A2A."
+            "AiDiy Hermes — a general-purpose agent reachable over A2A."
             if _profile_scoped()
             else os.getenv(
                 "A2A_AGENT_DESCRIPTION",
-                "Hermes Agent — a general-purpose agent reachable over A2A.",
+                "AiDiy Hermes — a general-purpose agent reachable over A2A.",
             )
         )
         agents[""] = {
@@ -652,7 +652,7 @@ class A2AAdapter(BasePlatformAdapter):
         return protocol.build_agent_card(
             name=agent.get("name") or self.agent_name,
             url=url,
-            description=agent.get("description") or "Hermes Agent — a general-purpose agent reachable over A2A.",
+            description=agent.get("description") or "AiDiy Hermes — a general-purpose agent reachable over A2A.",
             skills=self._advertised_skills(agent),
             streaming=bool(agent.get("local", True)),
             push_notifications=True,

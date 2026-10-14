@@ -13,7 +13,7 @@ export function folderPageDirection(previous, next) {
   return !next || previous.startsWith(`${next}/`) ? 'back' : 'forward';
 }
 
-// ワープと同じく共通の親まで戻ってから目的の枝へ進む。深い移動も最大5枚・全体約1000msにまとめる。
+// ワープと同じく共通の親まで戻ってから目的の枝へ進む。深い移動も最大5枚・全体約800msにまとめる。
 export function folderPageTurnPlan(previous, next, limit = 5) {
   const from = previous.split('/').filter(Boolean), to = next.split('/').filter(Boolean);
   let common = 0;

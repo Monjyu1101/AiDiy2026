@@ -52,7 +52,10 @@ class ViewerSetupTests(unittest.TestCase):
         self.assertTrue(viewer.setup())
         npm = self.run.call_args_list[0]
         self.assertEqual(npm.args[0][1], 'ci')
-        self.assertEqual(npm.kwargs['env']['ELECTRON_SKIP_BINARY_DOWNLOAD'], '1')
+        update = self.run.call_args_list[1]
+        self.assertEqual(update.args[0], ['npm.cmd', 'update', 'electron', '--include=dev', '--no-fund', '--no-audit'])
+        for call in (npm, update):
+            self.assertEqual(call.kwargs['env']['ELECTRON_SKIP_BINARY_DOWNLOAD'], '1')
         self.assertEqual(self.run.call_args_list[-1].args[0], ['npm.cmd', 'run', 'build'])
         self.launcher.assert_called_once_with(self.target)
         self.download.assert_not_called()
@@ -77,7 +80,38 @@ class ViewerSetupTests(unittest.TestCase):
     def test_binary_failure_stops_before_build_and_launcher(self):
         with patch.object(viewer, 'prepare_electron_binary', return_value=False):
             self.assertFalse(viewer.setup())
-        self.assertEqual(self.run.call_count, 1)
+        self.assertEqual(self.run.call_count, 2)
+        self.launcher.assert_not_called()
+
+    def test_locked_old_version_updates_before_reusing_newer_cache(self):
+        self.cache.mkdir(parents=True)
+        with patch.object(common.platform, 'machine', return_value='AMD64'):
+            for version in ('44.7.0', '44.7.2'):
+                with zipfile.ZipFile(self.cache / f'electron-v{version}-win32-x64.zip', 'w') as archive:
+                    archive.writestr('electron.exe', version.encode())
+                    archive.writestr('version', version)
+            before = {path.name: path.read_bytes() for path in self.cache.iterdir()}
+
+            def npm_run(command, **kwargs):
+                if command[1] == 'ci':
+                    version = '44.7.0'
+                elif command[1:3] == ['update', 'electron']:
+                    version = '44.7.2'
+                else:
+                    return
+                (self.electron / 'package.json').write_text(json.dumps({'version': version}), encoding='utf-8')
+
+            self.run.side_effect = npm_run
+            self.assert_installed()
+            self.assertEqual((self.electron / 'dist/version').read_text(encoding='utf-8'), '44.7.2')
+            self.assertEqual({path.name: path.read_bytes() for path in self.cache.iterdir()}, before)
+
+    def test_update_failure_does_not_download_locked_old_binary(self):
+        self.run.side_effect = [None, subprocess.CalledProcessError(1, 'npm update electron')]
+        with patch.object(viewer, 'prepare_electron_binary') as prepare:
+            self.assertFalse(viewer.setup())
+            prepare.assert_not_called()
+        self.download.assert_not_called()
         self.launcher.assert_not_called()
 
     def test_web_and_explicit_skip_do_not_prepare_binary(self):

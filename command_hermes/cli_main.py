@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Hermes Agent CLI - Interactive Terminal Interface
+AiDiy Hermes CLI - Interactive Terminal Interface
 
-A beautiful command-line interface for the Hermes Agent, inspired by Claude Code.
+A beautiful command-line interface for the AiDiy Hermes, inspired by Claude Code.
 Features ASCII art branding, interactive REPL, toolset selection, and rich formatting.
 
 Usage:
@@ -5001,8 +5001,8 @@ def _looks_like_slash_command(text: str) -> bool:
 # ============================================================================
 
 # Response box / welcome branding — AiDiy always shows its own text, never the skin's.
-_AIDIY_RESPONSE_LABEL = "AiDiy,Hermes"
-_AIDIY_WELCOME_TEXT = "Welcome to AiDiy,Hermes! Type your message or /help for commands."
+_AIDIY_RESPONSE_LABEL = "AiDiy Hermes"
+_AIDIY_WELCOME_TEXT = "Welcome to AiDiy Hermes! Type your message or /help for commands."
 
 _AIDIY_CONFIG_DIR = _PROJECT_ROOT.parent / "_config"
 _AIDIY_KEY_JSON = _AIDIY_CONFIG_DIR / "AiDiy_key.json"
@@ -5671,7 +5671,7 @@ def _should_seed_interactive(query, image, quiet: bool, oneshot: bool) -> bool:
 
 class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     """
-    Interactive CLI for the Hermes Agent.
+    Interactive CLI for the AiDiy Hermes.
     
     Provides a REPL interface with rich formatting, command history,
     and tool execution capabilities.
@@ -9640,7 +9640,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             self._console_print()
             self._console_print(
                 "[bold yellow]⚠  Nous Research Hermes 3 & 4 models are NOT agentic and are not "
-                "designed for use with Hermes Agent.[/]"
+                "designed for use with AiDiy Hermes.[/]"
             )
             self._console_print(
                 "[dim]   They lack tool-calling capabilities required for agent workflows. "
@@ -12694,7 +12694,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # CLI providers (claude-code / antigravity-cli / copilot-cli /
         # codex-cli / opencode / grok-cli) are handled by spawning the external
         # CLI binary directly,
-        # rather than by routing through the Hermes agent loop. Mirrors the
+        # rather than by routing through the AiDiy Hermes loop. Mirrors the
         # dispatch pattern used by backend_server/AIコア/AIコード_cli.py.
         import subprocess as _subprocess
 
@@ -12861,7 +12861,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         final = "\n".join(output_lines).strip() or "(no output)"
 
-        # Render the collected stdout inside the standard AiDiy,Hermes response
+        # Render the collected stdout inside the standard AiDiy Hermes response
         # box so CLI output appears in the same shape as agent/chat responses.
         # Real-time stdout/stderr above is preserved; this is an additional
         # consolidated rendering that the agent layer (history, /save, etc.)
@@ -18366,7 +18366,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # register secure secret capture here as well.
         set_secret_capture_callback(self._secret_capture_callback)
 
-        # CLI provider dispatch — bypass the Hermes agent loop entirely and
+        # CLI provider dispatch — bypass the AiDiy Hermes loop entirely and
         # forward the user message to the selected external CLI subprocess
         # (claude / antigravity / copilot / codex / opencode / grok). Mirrors how
         # backend_server/AIコア/AIコード_cli.py runs these CLIs from AiDiy.
@@ -21041,7 +21041,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             import signal as _sig
             from prompt_toolkit.application import run_in_terminal
             from hermes_cli.skin_engine import get_active_skin
-            agent_name = get_active_skin().get_branding("agent_name", "Hermes Agent")
+            agent_name = get_active_skin().get_branding("agent_name", "AiDiy Hermes")
             msg = f"\n{agent_name} has been suspended. Run `fg` to bring {agent_name} back."
             def _suspend():
                 os.write(1, msg.encode())
@@ -23388,7 +23388,7 @@ def main(
     ignore_rules: bool = False,
 ):
     """
-    Hermes Agent CLI - Interactive AI Assistant
+    AiDiy Hermes CLI - Interactive AI Assistant
     
     Args:
         query: Query to run. On a real TTY this seeds an interactive session

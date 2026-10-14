@@ -37,7 +37,7 @@ Configuration in config.yaml::
           redirect_port: 0                      # 0 = auto-pick free port
           redirect_uri: "https://proxy/callback"  # default: loopback callback
           redirect_host: "localhost"            # loopback hostname (WAF-safe)
-          client_name: "My Custom Client"       # default: "Hermes Agent"
+          client_name: "My Custom Client"       # default: "AiDiy Hermes"
           client_metadata_url: "https://me/cimd.json"  # self-hosted CIMD
           cimd: false                           # force DCR for this server
 """
@@ -1700,7 +1700,7 @@ def _build_client_metadata(cfg: dict) -> "OAuthClientMetadata":
         )
     if OAuthClientMetadata is None:
         _ensure_sdk_loaded()
-    client_name = cfg.get("client_name", "Hermes Agent")
+    client_name = cfg.get("client_name", "AiDiy Hermes")
     scope = cfg.get("scope")
     redirect_uri = _resolve_redirect_uri(cfg, port)
 

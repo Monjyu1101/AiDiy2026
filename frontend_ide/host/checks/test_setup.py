@@ -160,7 +160,7 @@ class ElectronSetupTest(unittest.TestCase):
                     self.assertTrue(common.electron_binary_ready(root))
                     self.assertIn(f'electron-v44.5.1-{platform_name}-x64.zip', download.call_args.args[0])
 
-    def test_latest_download_removes_old_cache_on_each_platform(self):
+    def test_latest_download_keeps_old_cache_on_each_platform(self):
         for plat in ('win32', 'linux', 'darwin'):
             with self.subTest(platform=plat), patch.object(common.sys, 'platform', plat), patch.object(
                 common.platform, 'machine', return_value='AMD64'
@@ -169,11 +169,11 @@ class ElectronSetupTest(unittest.TestCase):
                 old = self.make_cached_zip('44.5.1')
                 with patch.object(common.urllib.request, 'urlopen', return_value=self.response('44.7.0')):
                     self.assertTrue(common.prepare_electron_binary(root, 'test'))
-                self.assertFalse(old.exists())
+                self.assertTrue(old.exists())
                 self.assertTrue((self.cache / f'electron-v44.7.0-{plat}-x64.zip').exists())
                 self.assertTrue(common.electron_binary_ready(root))
 
-    def test_existing_and_repaired_binary_prune_cache_without_network(self):
+    def test_existing_and_repaired_binary_keep_all_caches_without_network(self):
         self.make_ready()
         for repair in (False, True):
             with self.subTest(repair=repair):
@@ -185,11 +185,11 @@ class ElectronSetupTest(unittest.TestCase):
                 with patch.object(common.urllib.request, 'urlopen') as download:
                     self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
                     download.assert_not_called()
-                self.assertFalse(old.exists())
-                self.assertFalse(middle.exists())
+                self.assertTrue(old.exists())
+                self.assertTrue(middle.exists())
                 self.assertTrue(latest.exists())
 
-    def test_peer_reuse_also_prunes_old_cache(self):
+    def test_peer_reuse_keeps_old_cache(self):
         peer = self.make_app('frontend_avatar')
         self.make_ready(peer)
         old = self.make_cached_zip('44.5.0')
@@ -197,19 +197,19 @@ class ElectronSetupTest(unittest.TestCase):
         with patch.object(common.urllib.request, 'urlopen') as download:
             self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
             download.assert_not_called()
-        self.assertFalse(old.exists())
+        self.assertTrue(old.exists())
         self.assertTrue(latest.exists())
 
-    def test_cached_latest_is_reused_and_old_cache_is_pruned(self):
+    def test_cached_latest_is_reused_and_old_cache_is_kept(self):
         old = self.make_cached_zip('44.5.0')
         latest = self.make_cached_zip('44.5.1')
         with patch.object(common.urllib.request, 'urlopen') as download:
             self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
             download.assert_not_called()
-        self.assertFalse(old.exists())
+        self.assertTrue(old.exists())
         self.assertTrue(latest.exists())
 
-    def test_cleanup_preserves_other_platform_arch_and_unrelated_files(self):
+    def test_setup_preserves_other_platform_arch_and_unrelated_files(self):
         with patch.object(common.sys, 'platform', 'win32'), patch.object(common.platform, 'machine', return_value='AMD64'):
             self.make_ready()
             old = self.make_cached_zip('44.5.0')
@@ -222,7 +222,7 @@ class ElectronSetupTest(unittest.TestCase):
             for path in preserved:
                 path.write_bytes(b'other cache')
             self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
-            self.assertFalse(old.exists())
+            self.assertTrue(old.exists())
             self.assertTrue(latest.exists())
             self.assertTrue(all(path.exists() for path in preserved))
 
@@ -241,14 +241,14 @@ class ElectronSetupTest(unittest.TestCase):
         self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
         self.assertTrue(common._archive_ready(old, '44.5.1'))
 
-    def test_cache_deletion_failure_is_reported_without_failing_binary_setup(self):
+    def test_setup_does_not_attempt_to_delete_cache(self):
         self.make_ready()
         self.make_cached_zip('44.5.0')
         self.make_cached_zip('44.5.1')
         info = Mock()
-        with patch.object(Path, 'unlink', side_effect=PermissionError('in use')):
+        with patch.object(Path, 'unlink', side_effect=AssertionError('cache must be retained')) as unlink:
             self.assertTrue(common.prepare_electron_binary(self.root, 'test', info=info))
-        self.assertIn('削除できませんでした', info.call_args.args[0])
+        unlink.assert_not_called()
         self.assertTrue(common.electron_binary_ready(self.root))
 
     def test_corrupt_cached_zip_is_replaced(self):
@@ -260,6 +260,22 @@ class ElectronSetupTest(unittest.TestCase):
                 self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
                 download.assert_called_once()
             self.assertTrue(common._archive_ready(archive, '44.5.1'))
+
+    def test_failed_replacement_keeps_existing_zip(self):
+        archive = self.make_cached_zip('44.5.1')
+        archive.write_bytes(b'broken ZIP')
+        with patch.object(common.urllib.request, 'urlopen', side_effect=OSError('offline')):
+            self.assertFalse(common.prepare_electron_binary(self.root, 'test'))
+        self.assertEqual(archive.read_bytes(), b'broken ZIP')
+
+    def test_old_version_setup_keeps_newer_cached_zip(self):
+        old = self.make_cached_zip('44.5.1')
+        newer = self.make_cached_zip('44.7.2')
+        before = {path.name: path.read_bytes() for path in (old, newer)}
+        with patch.object(common.urllib.request, 'urlopen') as download:
+            self.assertTrue(common.prepare_electron_binary(self.root, 'test'))
+            download.assert_not_called()
+        self.assertEqual({path.name: path.read_bytes() for path in self.cache.iterdir()}, before)
 
     def test_failed_download_is_not_retried_or_cached(self):
         with patch.object(common.urllib.request, 'urlopen', side_effect=OSError('offline')) as download:

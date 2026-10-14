@@ -132,7 +132,7 @@ test('Code / Liveの種別ごとの既存窓再利用を維持する',async t=>{
 
 test('IDE並行サーバー: 自動ポート・走査キャッシュ・接続・終了をプロジェクト間で共有しない',async t=>{
  const {one,two}=folders(t);writeFileSync(join(one,'one.txt'),'ONE');writeFileSync(join(two,'two.txt'),'TWO');
- const connections=[one,two].map(project=>createCoreConnection(project,{target:'http://127.0.0.1:1',fetcher:async()=>({ok:true,json:async()=>({status:'OK',data:{available_models:[],モデル設定:{}}})})}));
+ const connections=[one,two].map(project=>createCoreConnection(project,{target:'http://127.0.0.1:1',fetcher:async()=>({ok:true,json:async()=>({status:'ok',name:'aidiy_code_agents'})})}));
  const a=await startDevelopment(one,{connection:connections[0]}),b=await startDevelopment(two,{connection:connections[1]});
  t.after(async()=>{await a.close();await b.close();});
  assert.notEqual(a.url,b.url);

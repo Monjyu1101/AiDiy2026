@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { toolsTarget } from '../ai-search.mjs';
 
 // Live と同じ規則: AiDiy 配置先を優先し、共通設定から PORT_CORE だけを使う。
 export function coreTarget(...folders) {
@@ -33,8 +34,9 @@ export function coreTarget(...folders) {
   return 'http://127.0.0.1:8091';
 }
 
-export function createCoreConnection(project, { target, fetcher = fetch, interval = 10000, timeout = 4000 } = {}) {
+export function createCoreConnection(project, { target, fetcher = fetch, interval = 10000, timeout = 1500 } = {}) {
   let backend, configError;
+  // backend は Code / Live 子パネルの接続先。IDE の疎通確認先とは分ける。
   try { backend = target || coreTarget(fileURLToPath(new URL('.', import.meta.url)), project); }
   catch (error) { configError = error.message; }
   let startedAt = null;
@@ -47,29 +49,31 @@ export function createCoreConnection(project, { target, fetcher = fetch, interva
     if (pending) return pending;
     const run = generation;
     controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
     pending = (async () => {
       try {
         if (configError) throw new Error(configError);
-        // Live と同じ読み取り API で AiDiy コアの応答を確認する。AI会話や音声は開始しない。
-        const response = await fetcher(new URL('/core/AIコア/モデル情報/取得', backend), {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ セッションID: '' }),
-          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]),
+        // Term と同じ tools ポートの軽量 ping で確認する。
+        const tools = target || await toolsTarget(project);
+        signal.throwIfAborted();
+        const response = await fetcher(new URL('/aidiy_code_agents/ping', tools), {
+          signal,
         });
-        if (!response.ok) throw new Error(`AiDiy コアが応答エラーを返しました（HTTP ${response.status}）。`);
+        if (!response.ok) throw new Error(`AiDiy tools が応答エラーを返しました（HTTP ${response.status}）。`);
         const result = await response.json();
-        if (result.status !== 'OK' || !result.data?.available_models || !result.data?.モデル設定) {
-          throw new Error('AiDiy コアの接続確認に失敗しました。');
+        if (result.status !== 'ok' || result.name !== 'aidiy_code_agents') {
+          throw new Error('AiDiy tools の接続確認に失敗しました。');
         }
         if (run === generation && wanted) { if (startedAt === null) startedAt = Date.now(); connected = true; message = ''; }
       } catch (error) {
         if (run === generation && wanted) {
           connected = false;
-          // 利用開始後のコア停止は接続状態だけを変える。作業・Code子窓の寿命とは分ける。
+          // 利用開始後の tools 停止は接続状態だけを変える。作業・Code子窓の寿命とは分ける。
           if (startedAt === null) {
             mode = 'initial'; wanted = false;
             clearInterval(timer); timer = undefined;
           }
-          message = configError || (error.name === 'TimeoutError' ? 'AiDiy コアの応答がタイムアウトしました。' : 'AiDiy コアに接続できません。AiDiy を起動してください。');
+          message = configError || (error.name === 'TimeoutError' ? 'AiDiy tools の応答がタイムアウトしました。' : 'AiDiy tools に接続できません。AiDiy を起動してください。');
         }
       }
       return state();

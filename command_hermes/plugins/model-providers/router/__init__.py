@@ -1,4 +1,4 @@
-"""Ramp Router (router.com) provider plugin for Hermes Agent.
+"""Ramp Router (router.com) provider plugin for AiDiy Hermes.
 
 Provider profile for `Ramp Router <https://docs.router.com>`_, Ramp's LLM
 gateway: one OpenAI Responses-compatible endpoint at

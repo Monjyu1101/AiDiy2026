@@ -1,4 +1,4 @@
-"""Meta Model API (Muse Spark) provider plugin for Hermes Agent.
+"""Meta Model API (Muse Spark) provider plugin for AiDiy Hermes.
 
 Provider profile for Meta Superintelligence Labs' Muse Spark family, served
 via the OpenAI-compatible Meta Model API at ``https://api.meta.ai/v1``.

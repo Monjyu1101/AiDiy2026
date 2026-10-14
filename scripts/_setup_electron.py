@@ -8,7 +8,6 @@
 import json
 import os
 import platform
-import re
 import shutil
 import subprocess
 import sys
@@ -83,27 +82,6 @@ def _archive_ready(archive: Path, version: str) -> bool:
         return False
 
 
-def _prune_cached_archives(label: str, info) -> None:
-    """同じ OS・CPU の正常な最新 ZIP を残し、旧バージョンを削除する。"""
-    plat, arch = _electron_platform_arch()
-    pattern = re.compile(rf"electron-v(\d+)\.(\d+)\.(\d+)-{plat}-{arch}\.zip")
-    archives = []
-    for archive in CACHE_DIR.glob(f"electron-v*-{plat}-{arch}.zip"):
-        match = pattern.fullmatch(archive.name)
-        if match and archive.is_file():
-            archives.append((tuple(map(int, match.groups())), archive))
-    if len(archives) < 2:
-        return
-    latest_version, latest_archive = max(archives)
-    # 最新 ZIP が壊れている場合、復旧に使える旧 ZIP を先に消さない。
-    if not _archive_ready(latest_archive, ".".join(map(str, latest_version))):
-        return
-    for version, archive in archives:
-        if version < latest_version:
-            archive.unlink(missing_ok=True)
-            info(f"{label}: 古い Electron ZIP を削除しました: {archive.name}")
-
-
 def _download_archive(archive: Path, version: str, label: str, info) -> None:
     url = f"https://github.com/electron/electron/releases/download/v{version}/{archive.name}"
     info(f"{label}: Electron をダウンロードします: {archive.name}")
@@ -148,18 +126,7 @@ def _place_dist(source: Path, frontend_dir: Path, *, move: bool = False) -> None
 
 
 def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error=print) -> bool:
-    ready = _prepare_electron_binary(frontend_dir, label, info=info, error=error)
-    if ready:
-        try:
-            # 配置済み・他方からのコピーでも、既存の古いキャッシュを整理する。
-            _prune_cached_archives(label, info)
-        except OSError as exc:
-            info(f"{label}: 古い Electron ZIP を削除できませんでした: {exc}")
-    return ready
-
-
-def _prepare_electron_binary(frontend_dir: Path, label: str, *, info, error) -> bool:
-    """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備する。"""
+    """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備し、ZIP は保持する。"""
     try:
         version = get_electron_version(frontend_dir)
         if electron_binary_ready(frontend_dir):
@@ -189,7 +156,7 @@ def _prepare_electron_binary(frontend_dir: Path, label: str, *, info, error) -> 
         if _archive_ready(archive, version):
             info(f"{label}: 保存済み ZIP を再利用します: {archive.name}")
         else:
-            archive.unlink(missing_ok=True)
+            # 既存 ZIP は先に削除せず、取得・検証が成功した時だけ置き換える。
             _download_archive(archive, version, label, info)
 
         with tempfile.TemporaryDirectory(prefix="extract-", dir=CACHE_DIR) as temporary:

@@ -95,7 +95,7 @@ test('Liveの設定とWebSocketをIDEの公開元で中継し、切断すると�
   const sockets = new Set();
   const core = createServer((req, res) => {
     req.resume(); res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ status: 'OK', data: { available_models: {}, モデル設定: {} } }));
+    res.end(JSON.stringify(req.url === '/aidiy_code_agents/ping' ? { status: 'ok', name: 'aidiy_code_agents' } : { status: 'OK', data: { available_models: {}, モデル設定: {} } }));
   });
   core.on('upgrade', (req, socket) => {
     sockets.add(socket); socket.on('close', () => sockets.delete(socket)); socket.on('error', () => {});

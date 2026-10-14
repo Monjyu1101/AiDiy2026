@@ -1,6 +1,6 @@
 ---
 name: hermes-agent
-description: "Use, configure, theme, extend, and orchestrate Hermes Agent."
+description: "Use, configure, theme, extend, and orchestrate AiDiy Hermes."
 version: 3.2.0
 author: Hermes Agent + Teknium
 license: MIT
@@ -12,9 +12,17 @@ metadata:
     related_skills: [claude-code, codex, opencode]
 ---
 
-# Hermes Agent
+## AiDiy での利用
 
-Hermes Agent is an open-source AI agent framework by Nous Research that runs in your terminal, a native desktop app, messaging platforms, and IDEs. It's in the same category as Claude Code (Anthropic), Codex (OpenAI), and OpenClaw — autonomous coding and task-execution agents that use tool calling to interact with your system. Hermes works with any LLM provider (OpenRouter, Anthropic, OpenAI, Google, DeepSeek, xAI, local models, and 20+ others) and runs on Linux, macOS, Windows, and WSL.
+この配布版の製品名は **AiDiy Hermes（AiDiy_hermes）**、実行コマンドは `aidiy_hermes` です。
+`hermes-agent` は上流互換のスキルIDであり、自己紹介に使う製品名ではありません。
+設定・起動・機能を説明する際は `command_hermes/AGENTS.md` と `_AIDIY/knowledge/`、現行コードを優先してください。
+この文書中の上流URL・`hermes` コマンド例は上流仕様の参考です。AiDiyでは対応する実装と起動入口を確認してください。
+
+
+# AiDiy Hermes
+
+AiDiy Hermes (AiDiy_hermes) is the AiDiy-integrated distribution of the open-source hermes-agent framework by Nous Research that runs in your terminal, a native desktop app, messaging platforms, and IDEs. It's in the same category as Claude Code (Anthropic), Codex (OpenAI), and OpenClaw — autonomous coding and task-execution agents that use tool calling to interact with your system. Hermes works with any LLM provider (OpenRouter, Anthropic, OpenAI, Google, DeepSeek, xAI, local models, and 20+ others) and runs on Linux, macOS, Windows, and WSL.
 
 What makes Hermes different:
 

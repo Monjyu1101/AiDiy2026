@@ -213,14 +213,14 @@ def _check_metadata_block(frontmatter: Dict[str, Any]) -> List[LintFinding]:
                 )
             )
     author = str(frontmatter.get("author", ""))
-    if author and author.strip().lower() in ("hermes", "agent", "hermes agent") and (
-        author != "Hermes Agent"
+    if author and author.strip().lower() in ("hermes", "agent", "hermes agent", "aidiy hermes", "aidiy_hermes") and (
+        author not in ("Hermes Agent", "AiDiy Hermes", "AiDiy_hermes")
     ):
         findings.append(
             LintFinding(
                 WARNING,
                 "author-caps",
-                f"author '{author}' should be 'Hermes Agent' (proper caps) "
+                f"author '{author}' should be 'AiDiy Hermes' (proper caps) "
                 f"or a real contributor name.",
             )
         )

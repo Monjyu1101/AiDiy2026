@@ -80,6 +80,9 @@ def setup(choices=None) -> bool:
         if browser_only:
             print_info("Web 起動環境のため Electron 本体のダウンロードは省略します。")
         subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        # ロック済みの旧版バイナリを取得する前に、宣言範囲内の最新版へ更新する。
+        print_info(f"実行中: {npm} update electron --include=dev --no-fund --no-audit")
+        subprocess.run([npm, "update", "electron", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
             if not prepare_electron_binary(THIS_DIR, 'AiDiy IDE', info=print_info, error=print_error):
                 return False

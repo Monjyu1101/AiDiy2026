@@ -16,7 +16,7 @@ const trail = computed(() => props.current.split('/').filter(Boolean));
 const memory = createFolderPageMemory(), body = ref(), cursor = ref(''), turn = shallowRef(null);
 const pageTurn = computed(() => turn.value?.direction || '');
 const turnPath = computed(() => turn.value?.incoming.path || ''), turnSkipped = computed(() => turn.value?.skipped || 0);
-const turnDuration = ref(1000);
+const turnDuration = ref(800);
 let turnSteps = [], turnSerial = 0, pointerTurn = false;
 const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 function motionChanged(event) { if (event.matches) cancelTurns(); }
@@ -76,8 +76,8 @@ function showNextTurn(outgoing) {
 function startTurns(previous, path, enabled) {
   cancelTurns();
   turnSteps = enabled ? folderPageTurnPlan(previous, path) : [];
-  // 実際に重ねる枚数へ総時間を配り、1枚でも深い移動でも全体を約1秒に揃える。
-  turnDuration.value = 1000 / Math.max(1, turnSteps.length);
+  // 実際に重ねる枚数へ総時間を配り、1枚でも深い移動でも全体を約0.8秒に揃える。
+  turnDuration.value = 800 / Math.max(1, turnSteps.length);
   if (turnSteps.length) showNextTurn(snapshot(previous, true));
 }
 function finishTurn(event, id) {

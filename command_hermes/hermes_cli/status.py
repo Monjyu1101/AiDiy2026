@@ -1,7 +1,7 @@
 """
 Status command for hermes CLI.
 
-Shows the status of all Hermes Agent components.
+Shows the status of all AiDiy Hermes components.
 """
 
 import os
@@ -130,12 +130,12 @@ def _estop_status_line():
 
 
 def show_status(args):
-    """Show status of all Hermes Agent components."""
+    """Show status of all AiDiy Hermes components."""
     deep = getattr(args, 'deep', False)
 
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.CYAN))
-    print(color("│                 ⚕ Hermes Agent Status                  │", Colors.CYAN))
+    print(color("│                 ⚕ AiDiy Hermes Status                  │", Colors.CYAN))
     print(color("└─────────────────────────────────────────────────────────┘", Colors.CYAN))
 
     _paused_line = _estop_status_line()

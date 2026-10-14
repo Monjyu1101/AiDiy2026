@@ -238,7 +238,7 @@ def _browser_controller_ws_sender(ws, loop, *, wait_timeout: float = 10.0):
 
 
 def _hermes_version() -> str:
-    """Return the canonical Hermes Agent version string.
+    """Return the canonical AiDiy Hermes version string.
 
     ``hermes_cli.__version__`` is the runtime source of truth used by the CLI,
     dashboard, portal tags, and release script. Prefer it over installed
@@ -7274,7 +7274,7 @@ class APIServerAdapter(BasePlatformAdapter):
                         "id": f"fc_{uuid.uuid4().hex[:24]}",
                         "type": "function_call",
                         # These calls were already executed server-side by the
-                        # Hermes agent; they are replayed for structured tool
+                        # AiDiy Hermes; they are replayed for structured tool
                         # UI only.  Mark them completed (matching the SSE
                         # streaming path) so OpenAI clients don't interpret
                         # them as pending calls the client must execute.

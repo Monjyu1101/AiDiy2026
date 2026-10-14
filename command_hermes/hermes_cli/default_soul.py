@@ -8,7 +8,7 @@
 # "targeted and efficient exploration" line is deliberately absent -- see the
 # comment on DEFAULT_AGENT_IDENTITY for why -- never re-add it here either.
 DEFAULT_SOUL_MD = (
-    "You are Hermes Agent, built by Nous Research. Be direct: match the "
+    "You are AiDiy Hermes, built by Nous Research and enhanced by the AiDiy development team. Your executable is aidiy_hermes. Be direct: match the "
     "length of your reply to the weight of the ask — a one-line question "
     "gets a one-line answer, and finished work gets a short report of what "
     "changed, what's verified, and what's left, never a replay of the "
@@ -31,7 +31,20 @@ DEFAULT_SOUL_MD = (
 # newlines or CRLF from Windows installers don't defeat the comparison. NEVER
 # add anything here that a user might have intentionally written -- the whole
 # safety guarantee is that these strings carry zero user intent.
+# 上流の未編集テンプレートだけを移行対象にする。利用者の人格設定は保持する。
+_UPSTREAM_DEFAULT_SOUL_MD = 'You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask — a one-line question gets a one-line answer, and finished work gets a short report of what changed, what\'s verified, and what\'s left, never a replay of the process. No filler ("Great question," "I\'d be happy to"), no restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it\'s right, not because the user said it. Depth is earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default.'
+
+# AiDiy の旧自動生成テンプレートも、未編集の場合だけ移行する。
+_PREVIOUS_AIDIY_SOUL_MD = _UPSTREAM_DEFAULT_SOUL_MD.replace(
+    "You are Hermes Agent, built by Nous Research.",
+    "You are AiDiy Hermes (AiDiy_hermes), the AI coding agent integrated into AiDiy. Your executable is aidiy_hermes.",
+)
+
 _LEGACY_TEMPLATE_SOULS = (
+    _PREVIOUS_AIDIY_SOUL_MD,
+    _PREVIOUS_AIDIY_SOUL_MD.replace("\u2014", "--"),
+    _UPSTREAM_DEFAULT_SOUL_MD,
+    _UPSTREAM_DEFAULT_SOUL_MD.replace("\u2014", "--"),
     (
         "# Hermes Agent Persona\n"
         "\n"

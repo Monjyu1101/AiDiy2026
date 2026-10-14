@@ -87,7 +87,7 @@ def build_relay_command_manifest() -> List[Dict[str, Any]]:
         {"name": "undo", "description": "Remove the last exchange"},
         {"name": "status", "description": "Show Hermes session status"},
         {"name": "sethome", "description": "Set this chat as the home channel"},
-        {"name": "stop", "description": "Stop the running Hermes agent"},
+        {"name": "stop", "description": "Stop the running AiDiy Hermes"},
         {
             "name": "steer",
             "description": "Inject a message after the next tool call (no interrupt)",
@@ -113,7 +113,7 @@ def build_relay_command_manifest() -> List[Dict[str, Any]]:
             "description": "Re-scan skills for new or removed entries",
         },
         {"name": "voice", "description": "Toggle voice reply mode"},
-        {"name": "update", "description": "Update Hermes Agent to the latest version"},
+        {"name": "update", "description": "Update AiDiy Hermes to the latest version"},
         {"name": "restart", "description": "Gracefully restart the Hermes gateway"},
         {
             "name": "approve",

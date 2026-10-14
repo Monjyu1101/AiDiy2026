@@ -6461,7 +6461,7 @@ class SlackAdapter(BasePlatformAdapter):
 
         # Some Slack bot posts arrive as ordinary-looking message events with a
         # bot *user* id but without ``bot_id``/``subtype=bot_message``.  This is
-        # the shape produced by peer Hermes agents in Socket Mode on some
+        # the shape produced by peer AiDiy Hermes agents in Socket Mode on some
         # workspaces.  If we let those fall through as human users, an old
         # thread mention or active session will re-trigger the target agent on
         # every peer status/error/ack message, causing agent-agent loops.  Apply
@@ -9759,7 +9759,7 @@ def interactive_setup() -> None:
 
             manifest = _build_full_manifest(
                 bot_name="Hermes",
-                bot_description="Your Hermes agent on Slack",
+                bot_description="Your AiDiy Hermes on Slack",
             )
             target = Path(get_hermes_home()) / "slack-manifest.json"
             target.parent.mkdir(parents=True, exist_ok=True)

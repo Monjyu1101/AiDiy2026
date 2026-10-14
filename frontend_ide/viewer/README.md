@@ -63,12 +63,12 @@ node frontend_ide/viewer\launch.mjs . --no-open   # サーバーだけ起動
 ## AiDiyへの接続
 
 - 初期画面で「AiDiy接続利用」「オフライン利用」のどちらかを選びます。自動開始はせず、初回接続失敗も手動で再試行します。利用前はファイルビューアを隠し、ファイル取得 API を 503 で停止します。
-- 接続先は AiDiy 配置先を優先して `_config/AiDiy_key.json` の `PORT_CORE` を読み、ホストは `127.0.0.1` に固定します。設定がなければ 8091 です。設定ファイルのキー情報は画面へ返しません。
-- 現段階のIDEは、Liveと同じ `POST /core/AIコア/モデル情報/取得` で連携先の稼働を確認します。AI会話や音声セッションは開始しません。
-- AiDiy接続利用: コアの応答を確認して開始し、上部のシアンバーが Live と同じ4.5秒周期で明滅します。10秒ごとにコアを確認（応答期限4秒）します。コア停止中もファイル表示・ファイル API・Code子窓・作業起点を維持し、復帰時に同じセッションで再接続します。
-- オフライン利用: コアに接続せずファイルビューアを利用でき、同じバーが赤で明滅します。コアの状態確認も行いません。
+- 接続先は AiDiy 配置先を優先して `_config/AiDiy_key.json` の `PORT_TOOLS` を読み、ホストは `127.0.0.1` に固定します。設定がなければ 8095 です。設定ファイルのキー情報は画面へ返しません。
+- IDEはTermと同じ `GET /aidiy_code_agents/ping` で稼働を確認し、`status: "ok"` と `name: "aidiy_code_agents"` を確認します。Code / Live 子パネルの接続先は従来どおり `PORT_CORE` です。
+- AiDiy接続利用: toolsの応答を確認して開始し、上部のシアンバーが Live と同じ4.5秒周期で明滅します。10秒ごとにtoolsを確認（応答期限1.5秒）します。tools停止中もファイル表示・ファイル API・Code子窓・作業起点を維持し、復帰時に同じセッションで再接続します。
+- オフライン利用: コアに接続せずファイルビューアを利用でき、同じバーが赤で明滅します。toolsの状態確認も行いません。
 - 「終了」（Web版は「利用終了」）でCode / Liveを停止して起動画面に戻り、利用方法を選び直せます。Electron版のタイトルバーの×は、利用中だけ「AiDiy IDE を終了しますか？」の確認後にIDE全体を終了します。初期画面・起動画面へ戻った後は確認せずに終了します。
-- Codespaces でもコアは IDE サーバーと同じ環境で起動します。ブラウザは IDE サーバーの転送ポートに接続するため、ブラウザ側からコアの localhost へ接続する必要はありません。
+- Codespaces でもtoolsは IDE サーバーと同じ環境で起動します。ブラウザは IDE サーバーの転送ポートに接続するため、ブラウザ側からtoolsの localhost へ接続する必要はありません。
 
 ## Code / Live パネル
 
@@ -93,7 +93,7 @@ VS Code の [Office Viewer](https://github.com/cweijan/vscode-office) が採用�
 - `_setup.py` / `_start.py` / `_cleanup.py` / `launcher.py`: セットアップ・起動・クリーンアップと `aidiy_ide` コマンド
 - `launch.mjs` / `launch-options.mjs`: プロジェクト指定、Electron / Web の選択、終了処理
 - `desktop.cjs` / `preload.cjs`: Electron ウィンドウと画面環境の通知（Node integration 無効、context isolation / sandbox 有効）
-- `core-connection.mjs` / `web/connection.js` / `web/connection.css`: AiDiy コアの接続確認、接続画面とシアンバー
+- `core-connection.mjs` / `web/connection.js` / `web/connection.css`: AiDiy toolsの接続確認、接続画面とシアンバー
 - `server.mjs`: フォルダ走査（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`）、Monaco と画面の配信
 - `web/`: 画面（Canvas 2D）。開発者ツールの `aidiyIDE` から状態を覗けます。
 - `web/office.html` / `office.js` / `office.css`: 独立した iframe 内で表示する文書ビューア。

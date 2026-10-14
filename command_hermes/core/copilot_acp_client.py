@@ -634,7 +634,7 @@ class CopilotACPClient:
                     },
                     "clientInfo": {
                         "name": "hermes-agent",
-                        "title": "Hermes Agent",
+                        "title": "AiDiy Hermes",
                         "version": "0.0.0",
                     },
                 },

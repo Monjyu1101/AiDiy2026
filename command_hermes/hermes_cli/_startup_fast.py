@@ -202,7 +202,7 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
         from hermes_cli import __release_date__, __version__
 
         # AiDiy branding — mirrors banner.format_banner_version_label().
-        print(f"AiDiy,Hermes v{__version__} ({__release_date__})")
+        print(f"AiDiy Hermes v{__version__} ({__release_date__})")
 
     print(f"Install directory: {project_root_str()}")
 

@@ -27,7 +27,7 @@ test('文書API・依存配信・アクセス境界', async t => {
     await writeFile(join(root, 'sample.pptx'), 'format routing fixture');
     const large = await open(join(root, 'large.pdf'), 'w');
     await large.truncate(50 * 1024 * 1024 + 1); await large.close();
-    const connection = createCoreConnection(root, { target: 'http://127.0.0.1:8091', fetcher: async () => ({ ok: true, json: async () => ({ status: 'OK', data: { available_models: {}, モデル設定: {} } }) }) });
+    const connection = createCoreConnection(root, { target: 'http://127.0.0.1:8091', fetcher: async () => ({ ok: true, json: async () => ({ status: 'ok', name: 'aidiy_code_agents' }) }) });
     await connection.connect();
     const started = await startServer(root, 0, { connection }); server = started.server;
     const get = (path, headers = {}) => new Promise((done, reject) => {

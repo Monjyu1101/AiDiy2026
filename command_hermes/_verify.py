@@ -69,6 +69,10 @@ SKIP_PARTS = {".venv", "__pycache__", "temp", ".git", "node_modules", ".pytest_c
 
 # AiDiy レイヤの再適用チェック。ファイル → そこに必ず残っているべき目印。
 AIDIY_LAYER = {
+    "core/prompt_builder.py": ["AIDIY_RUNTIME_IDENTITY", "AiDiy_hermes"],
+    "core/system_prompt.py": ["stable_parts.append(AIDIY_RUNTIME_IDENTITY)"],
+    "hermes_cli/default_soul.py": ["AiDiy_hermes", "_UPSTREAM_DEFAULT_SOUL_MD"],
+    "SOUL.md": ["AiDiy Hermes", "AiDiy development team", "aidiy_hermes"],
     "cli_main.py": [
         'sys.modules["agent"] = _agent_package',      # layout shim
         '_sys.modules.setdefault("cli"',              # cli エイリアス
@@ -101,12 +105,12 @@ AIDIY_LAYER = {
     "hermes_cli/main.py": ["Node/TypeScript TUI"],
     "hermes_cli/auth.py": ["device_url_with_code"],
     "hermes_cli/banner.py": [
-        "AiDiy branding", 'base = f"AiDiy,Hermes v',
+        "AiDiy branding", 'base = f"AiDiy Hermes v',
         "_has_aidiy_mcp",                             # バナーの MCP セクション
     ],
-    "hermes_cli/_startup_fast.py": ['print(f"AiDiy,Hermes v'],
+    "hermes_cli/_startup_fast.py": ['print(f"AiDiy Hermes v'],
     "hermes_cli/_parser.py": ["AiDiy Python TUI build"],
-    "acp_adapter/server.py": ['return f"AiDiy,Hermes v'],
+    "acp_adapter/server.py": ['return f"AiDiy Hermes v'],
 }
 
 # AiDiy 専用ファイル（upstream には対応物が無い）

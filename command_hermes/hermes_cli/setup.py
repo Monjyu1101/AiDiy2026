@@ -1,5 +1,5 @@
 """
-Interactive setup wizard for Hermes Agent.
+Interactive setup wizard for AiDiy Hermes.
 
 Modular wizard with independently-runnable sections:
   1. Model & Provider — choose your AI provider and model
@@ -3227,7 +3227,7 @@ def _run_setup_wizard_impl(args):
     )
     print(
         color(
-            "│             ⚕ Hermes Agent Setup Wizard                │", Colors.MAGENTA
+            "│             ⚕ AiDiy Hermes Setup Wizard                │", Colors.MAGENTA
         )
     )
     print(
@@ -3238,7 +3238,7 @@ def _run_setup_wizard_impl(args):
     )
     print(
         color(
-            "│  Let's configure your Hermes Agent installation.       │", Colors.MAGENTA
+            "│  Let's configure your AiDiy Hermes installation.       │", Colors.MAGENTA
         )
     )
     print(

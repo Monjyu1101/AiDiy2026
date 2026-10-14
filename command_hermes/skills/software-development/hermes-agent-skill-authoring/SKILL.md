@@ -81,9 +81,9 @@ Bad: `Use when a user asks to monitor named competitors or companies for product
 
 ### `author` rules
 
-- Credit the **human first**, then "Hermes Agent" as secondary collaborator: `Ben Barclay (benbarclay), Hermes Agent`.
-- Never `author: Hermes Agent` alone for contributed skills — credit the human, not the tool, even (especially) when an agent drafted the text.
-- Maintainer-authored skills: `Teknium (teknium1), Hermes Agent`.
+- Credit the **human first**, then "AiDiy Hermes" as secondary collaborator: `Ben Barclay (benbarclay), AiDiy Hermes`.
+- Never `author: AiDiy Hermes` alone for contributed skills — credit the human, not the tool, even (especially) when an agent drafted the text.
+- Maintainer-authored skills: `Teknium (teknium1), AiDiy Hermes`.
 
 ### `related_skills` rules
 
@@ -185,7 +185,7 @@ A skill exists to make the agent's process more predictable — the agent reliab
 
 1. **Using `skill_manage(action='create')` for an in-repo skill.** It writes to `~/.hermes/skills/`, not the repo tree. Use `write_file`.
 2. **Trusting the validator's limits as the standard.** The validator allows 1024-char descriptions; review rejects anything over 60. The validator doesn't check `platforms:`, author format, tests, or docs — review does.
-3. **`author: Hermes Agent` on a contributed skill.** Credit the human first.
+3. **`author: AiDiy Hermes` on a contributed skill.** Credit the human first.
 4. **Leading whitespace before `---`.** Validation fails on any leading blank line or BOM.
 5. **Description too generic or trigger buried past char 57.**
 6. **`related_skills` pointing at skills that don't exist in-repo** (user-local, planned, or in a sibling PR).

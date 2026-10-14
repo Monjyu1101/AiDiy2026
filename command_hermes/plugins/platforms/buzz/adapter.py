@@ -1,9 +1,9 @@
 """
-Buzz Platform Adapter for Hermes Agent.
+Buzz Platform Adapter for AiDiy Hermes.
 
 A plugin-based gateway adapter that connects to a Buzz community relay
 (Block's open-source human+agent collaboration platform, built on the
-Nostr protocol) and relays messages to/from the Hermes agent.
+Nostr protocol) and relays messages to/from the AiDiy Hermes.
 
 The adapter does not speak Nostr itself — it shells out to the ``buzz``
 CLI binary ("JSON in, JSON out") via ``asyncio.create_subprocess_exec``.
