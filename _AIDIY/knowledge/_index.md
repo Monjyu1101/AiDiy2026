@@ -95,6 +95,8 @@
 
 | 症状・依頼 | 最初に見るファイル |
 |-----------|------------------|
+| 今後の改善提案を比較し、採用条件を検討する | [`共通,明日のために,改善提案.md`](./共通,明日のために,改善提案.md) |
+| 未解決の改善課題と再現条件・検証限界を確認する | [`共通,明日のために,改善課題.md`](./共通,明日のために,改善課題.md) |
 | AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
 | DB スキーマ差分、起動時のカラム不足 | [`backend_server,スキーマ変更手順.md`](./backend_server,スキーマ変更手順.md) |
 | M / T / V / S 系の追加、登録漏れ | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md)、[`backend_server,T系トランザクション追加手順.md`](./backend_server,T系トランザクション追加手順.md)、[`backend_server,V系エンドポイント追加手順.md`](./backend_server,V系エンドポイント追加手順.md)、[`backend_server,S系スケジューラ追加手順.md`](./backend_server,S系スケジューラ追加手順.md) |
@@ -284,6 +286,11 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 | GitHub issue を確認・close する | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
 | バグ修正と整理案を区別して提案する | [`共通,変更提案時の区別.md`](./共通,変更提案時の区別.md) |
 
+## 明日のための改善検討
+
+- [共通,明日のために,改善提案.md](./共通,明日のために,改善提案.md): 既存機能を踏まえた改善提案10件、判断基準と検証方法。
+- [共通,明日のために,改善課題.md](./共通,明日のために,改善課題.md): 再現条件・影響・検証限界を伴う主な課題10件と予備候補。
+
 ## 記録ルール
 
 - ファイル名は `モジュール,トピック名.md` 形式にする（上記「ファイル命名規則」参照）。
@@ -294,3 +301,4 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 - `_AIDIY/knowledge` 更新とアプリ本体の仕様変更は混同しない。
 
 - [frontend_ide,Vue共通画面変更手順.md](./frontend_ide,Vue共通画面変更手順.md) — Vue部品、起動互換、配布・確認。
+
