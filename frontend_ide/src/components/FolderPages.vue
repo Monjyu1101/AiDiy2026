@@ -16,7 +16,7 @@ const trail = computed(() => props.current.split('/').filter(Boolean));
 const memory = createFolderPageMemory(), body = ref(), cursor = ref(''), turn = shallowRef(null);
 const pageTurn = computed(() => turn.value?.direction || '');
 const turnPath = computed(() => turn.value?.incoming.path || ''), turnSkipped = computed(() => turn.value?.skipped || 0);
-const turnDuration = ref(1500);
+const turnDuration = ref(1000);
 let turnSteps = [], turnSerial = 0, pointerTurn = false;
 const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 function motionChanged(event) { if (event.matches) cancelTurns(); }
@@ -76,8 +76,8 @@ function showNextTurn(outgoing) {
 function startTurns(previous, path, enabled) {
   cancelTurns();
   turnSteps = enabled ? folderPageTurnPlan(previous, path) : [];
-  // 実際に重ねる枚数へ総時間を配り、1枚でも深い移動でも全体を約1.5秒に揃える。
-  turnDuration.value = 1500 / Math.max(1, turnSteps.length);
+  // 実際に重ねる枚数へ総時間を配り、1枚でも深い移動でも全体を約1秒に揃える。
+  turnDuration.value = 1000 / Math.max(1, turnSteps.length);
   if (turnSteps.length) showNextTurn(snapshot(previous, true));
 }
 function finishTurn(event, id) {
@@ -134,7 +134,7 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
 <template>
   <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown" @wheel.passive="activity" @touchmove.passive="activity" @pointerdown="activity" @pointermove="pointerMove">
     <header class="folder-page-heading">
-      <button :disabled="!trail.length" title="親フォルダへ戻る（Backspace）" @click="back">← 親へ</button>
+      <button v-if="trail.length" title="親フォルダへ戻る（Backspace）" @click="back">← 親へ</button>
       <nav aria-label="現在のフォルダ">
         <button :aria-current="!trail.length ? 'location' : undefined" @click="navigate('')">{{ tree?.n }}</button>
         <template v-for="(name, index) in trail" :key="index"><span aria-hidden="true">›</span><button :aria-current="index===trail.length-1 ? 'location' : undefined" @click="navigate(trail.slice(0,index+1).join('/'))">{{ name }}</button></template>
@@ -146,11 +146,11 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
     <div class="folder-page-stack" :style="{'--page-turn-duration':turnDuration+'ms'}" @pointerdown.capture="pointerStart" @pointercancel.capture="pointerCancel" @click.capture="settleClick" @wheel.capture.passive="cancelTurns" @touchmove.capture.passive="cancelTurns">
       <div v-for="layer in layers" :key="layer.id" :ref="element => bindBody(element,layer)" class="folder-page-body" :class="layer.live ? '' : ['folder-page-sheet',layer.outgoing ? 'page-turn-'+pageTurn : 'folder-page-underlay']" :data-page-path="layer.path" :data-page-layer="layer.live ? 'live' : layer.outgoing ? 'outgoing' : 'incoming'" :tabindex="layer.live ? 0 : undefined" :role="layer.live ? 'listbox' : undefined" :aria-label="layer.live ? 'フォルダとファイル' : undefined" :aria-hidden="layer.live ? undefined : true" :inert="!layer.live" :aria-activedescendant="layer.live && cursor ? 'folder-page-entry-'+entries.findIndex(entry=>entry.path===cursor) : undefined" @scroll="layer.live && layer.path===current && save(layer.path)" @animationend="finishTurn($event,layer.id)" @animationcancel="finishTurn($event,layer.id)">
         <div class="folder-page-items">
-          <div v-for="(entry,index) in layer.entries" :id="layer.live ? 'folder-page-entry-'+index : undefined" :key="entry.path" class="folder-page-entry" :class="{folder:entry.type==='dir',marked:!!entry.marked,selected:layer.selected===entry.path}" :data-cursor="layer.cursor===entry.path" :role="layer.live ? 'option' : undefined" :aria-selected="layer.live ? cursor===entry.path : undefined" :aria-label="layer.live ? entry.name+(entry.type==='dir'?' フォルダ':' ファイル') : undefined" :title="entry.path" @click="layer.live && select(entry)">
+          <div v-for="(entry,index) in layer.entries" :id="layer.live ? 'folder-page-entry-'+index : undefined" :key="entry.path" class="folder-page-entry" :class="{folder:entry.type==='dir',striped:!!entry.striped,marked:!!entry.marked,selected:layer.selected===entry.path}" :data-cursor="layer.cursor===entry.path" :role="layer.live ? 'option' : undefined" :aria-selected="layer.live ? cursor===entry.path : undefined" :aria-label="layer.live ? entry.name+(entry.type==='dir'?' フォルダ':' ファイル') : undefined" :title="entry.path" @click="layer.live && select(entry)">
             <span class="folder-page-icon" aria-hidden="true"><FileTypeIcon :name="entry.name" :directory="entry.type==='dir'" /></span>
             <span class="folder-page-name">{{ entry.name }}</span>
             <span v-if="entry.type==='dir'" class="folder-page-meta">{{ entry.count }} ファイル<span v-if="entry.marked" class="folder-page-mark"> · 対象 {{ entry.marked }}</span></span>
-            <span v-else class="folder-page-meta">{{ formatSize(entry.size) }}<time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
+            <span v-else class="folder-page-meta"><span class="folder-page-size">{{ formatSize(entry.size) }}</span><time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
           </div>
           <p v-if="!layer.entries.length" class="folder-page-empty">この階層に表示できるフォルダ・ファイルはありません</p>
         </div>

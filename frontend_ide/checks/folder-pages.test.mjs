@@ -55,6 +55,20 @@ test('2Dページ: 直下だけをフォルダ先・自然順で表示し、深�
   assert.equal(folderPages.indexFolderPages(tree(), { mode: 'since', since: null }).get('').marked, 0);
 });
 
+test('2Dゼブラ: 自然順のファイルだけを交互に塗り、フォルダ数・検索・絞り込みで縞を乱さない', () => {
+  const data = tree(); data.f.push(['root1.txt', 1, 1000], ['root3.txt', 3, 3000]);
+  const stripes = (source, marks) => folderPages.indexFolderPages(source, marks).get('');
+  const expected = [['root1.txt', false], ['root2.js', true], ['root3.txt', false], ['root10.md', true]];
+  for (const count of [0, 1, 2]) {
+    const page = stripes({ ...data, d: data.d.slice(0, count) }, { mode: 'grep', paths: ['root2.js'] });
+    assert.deepEqual(page.files.map(file => [file.name, file.striped]), expected);
+    assert.ok(page.folders.every(folder => folder.striped === undefined));
+    assert.equal(page.files.find(file => file.name === 'root2.js').marked, true);
+  }
+  const filtered = stripes({ ...data, f: data.f.filter(([name]) => name !== 'root1.txt') });
+  assert.deepEqual(filtered.files.map(file => [file.name, file.striped]), [['root2.js', false], ['root3.txt', true], ['root10.md', false]]);
+});
+
 test('2Dページ記憶: 親へ戻ると位置と選択行を復元し、削除・フィルター外は残さない', () => {
   const memory = folderPages.createFolderPageMemory(), entries = folderPages.indexFolderPages(tree()).get('').entries;
   memory.save('', { scrollTop: 360, cursor: 'src' }); memory.save('src', { scrollTop: 50, cursor: 'src/main.js' });
@@ -127,7 +141,7 @@ test('ページをめくる演出: 旧ページの下に移動先を用意し、
     h.props.current = 'src'; await flush(); assert.equal(h.state.pageTurn.value, 'forward');
     assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src', '']);
     assert.equal(h.state.turn.value.outgoing.scrollTop, 275); assert.equal(h.state.turn.value.outgoing.cursor, 'src');
-    assert.equal(h.state.turn.value.incoming.path, 'src'); assert.equal(h.state.turnDuration.value, 1500);
+    assert.equal(h.state.turn.value.incoming.path, 'src'); assert.equal(h.state.turnDuration.value, 1000);
     const id = h.state.turn.value.id;
     h.state.finishTurn({ target: {}, currentTarget: {}, animationName: 'folder-page-forward' }, id);
     assert.equal(h.state.pageTurn.value, 'forward', '子のanimationendを使わない');
@@ -163,7 +177,7 @@ test('複数ページ演出: 戻る→進むの実ページを順に重ね、連
   };
   try {
     await h.mount(); h.props.current = 'src/nested'; await flush();
-    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnDuration.value, 750);
+    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnDuration.value, 500);
     assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src/nested', 'src', '']);
     assert.equal(h.state.turn.value.incoming.entries[0].path, 'src/nested');
     const old = h.state.turn.value.id;
@@ -305,7 +319,7 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.equal((view.match(/<FileViewer /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
   assert.match(view, /<SpaceCanvas :mode="viewMode"/); assert.match(view, /<FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'"/);
   assert.match(view, /<FileViewer v-if="selected"/); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
-  assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,1500ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,1500ms\)/);
+  assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,1000ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,1000ms\)/);
   assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:polygon\(/);
   assert.match(css, /@keyframes folder-page-back\{from\{clip-path:polygon\(/);
   assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:calc\(0% - var\(--page-turn-slant\)\)\}/);
@@ -322,7 +336,7 @@ test('2Dページの斜線: 切り抜きと同じ時間/イージングで動き
   for (const direction of ['forward', 'back']) {
     const sheet = values('.folder-page-sheet.page-turn-' + direction), edge = values('.folder-page-turn-edge.page-turn-' + direction);
     assert.equal(sheet.animation.replace('folder-page-' + direction, ''), edge.animation.replace('folder-page-edge-' + direction, ''));
-    assert.equal(sheet.animation, `folder-page-${direction} var(--page-turn-duration,1500ms) var(--page-turn-curve) both`);
+    assert.equal(sheet.animation, `folder-page-${direction} var(--page-turn-duration,1000ms) var(--page-turn-curve) both`);
   }
   assert.equal(values('.folder-page-stack').position, 'relative'); assert.equal(values('.folder-page-stack').isolation, 'isolate');
   assert.equal(values('.folder-page-stack')['min-height'], '96px'); assert.equal(values('.folder-page-stack').overflow, 'hidden');
@@ -470,6 +484,59 @@ test('2D文字の折り返し: ページ幅で日時を次行へ送り、長い�
   assert.ok(queries.includes('folder-page (max-height:360px)'), 'プレビューを除いた高さで補足欄を抑える');
 });
 
+test('2D行間: 16pxのサイズ・日時2行をフォルダと同じ48pxへ収め、狭幅は省略せず折り返す', () => {
+  // CSS値から通常行の必要高さを計算する。実ブラウザーのレイアウト測定ではない。
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const values = (selector, parent = 'root') => {
+    const result = {};
+    css.walkRules(rule => { if (rule.selector === selector && (parent === 'root' ? rule.parent.type === 'root' : rule.parent.name === parent)) rule.walkDecls(decl => result[decl.prop] = decl.value); });
+    return result;
+  };
+  const row = values('.folder-page-entry'), meta = values('.folder-page-meta'), date = values('.folder-page-meta time');
+  const minHeight = parseFloat(row['min-height']), border = parseFloat(row['border-bottom']);
+  const font = parseFloat(values('.folder-pages')['font-size']), nameHeight = font * Number(values('.folder-pages')['line-height']);
+  const metaHeight = parseFloat(meta['font-size']) * Number(meta['line-height']);
+  assert.equal(date['margin-top'], '0'); assert.equal(date.display, 'block');
+  for (const padding of [row.padding, values('.folder-page-entry', 'media').padding]) {
+    const outside = parseFloat(padding) * 2 + border;
+    assert.equal(Math.max(minHeight, nameHeight + outside, metaHeight + outside), 48, 'フォルダ通常行');
+    assert.equal(Math.max(minHeight, nameHeight + outside, metaHeight * 2 + outside), 48, 'ファイル補足2行');
+  }
+  const narrow = values('.folder-page-meta', 'container');
+  assert.equal(narrow.display, 'flex'); assert.equal(narrow['flex-wrap'], 'wrap'); assert.equal(narrow['column-gap'], '12px');
+  assert.equal(values('.folder-page-entry', 'container')['row-gap'], '0');
+  for (const selector of ['.folder-page-entry', '.folder-page-meta', '.folder-page-meta time']) {
+    assert.equal(values(selector).height, undefined); assert.equal(values(selector).overflow, undefined, '長い内容は切り捨てない');
+  }
+});
+
+test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし、操作状態と文字の判読性を優先する', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const rules = new Map();
+  css.walkRules(rule => { if (rule.parent.type === 'root') rules.set(rule.selector, Object.fromEntries(rule.nodes.map(decl => [decl.prop, decl.value]))); });
+  const folder = '.mode-2d .folder-page-entry.folder', stripe = '.mode-2d .folder-page-entry.striped';
+  assert.equal(rules.get(folder).background, '#eae2d5'); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
+  assert.equal(rules.get(folder)['border-color'], '#d8d0c4');
+  const selectors = [...rules.keys()];
+  for (const state of [':hover', '[data-cursor=true]', '.selected']) {
+    const selector = '.mode-2d .folder-page-entry' + state;
+    assert.ok(selectors.indexOf(selector) > selectors.indexOf(folder)); assert.ok(selectors.indexOf(selector) > selectors.indexOf(stripe));
+  }
+  assert.ok(selectors.indexOf('.mode-2d .folder-page-entry.selected') > selectors.indexOf('.mode-2d .folder-page-entry[data-cursor=true]'));
+  assert.equal(rules.get('.mode-2d .folder-page-entry[data-cursor=true]')['box-shadow'], 'inset 3px 0 #856848');
+  assert.equal(rules.get('.mode-2d .folder-page-entry.marked,.mode-2d .folder-page-mark').color, '#7a4908');
+  assert.equal(rules.get('.mode-2d .folder-page-body:focus-visible,.mode-2d .folder-page-heading button:focus-visible').outline, '2px solid #856848');
+  const luminance = hex => [1, 3, 5].reduce((sum, index, component) => {
+    const value = parseInt(hex.slice(index, index + 2), 16) / 255;
+    return sum + [.2126, .7152, .0722][component] * (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  }, 0);
+  const backgrounds = ['#faf7f2', '#f5f1e8', rules.get(folder).background, ...[':hover', '[data-cursor=true]', '.selected'].map(state => rules.get('.mode-2d .folder-page-entry' + state).background)];
+  for (const background of backgrounds) for (const foreground of ['#5a4a3a', rules.get('.mode-2d .folder-page-meta').color, '#7a4908']) {
+    assert.ok((luminance(background) + .05) / (luminance(foreground) + .05) >= 4.5, `${foreground} on ${background}`);
+  }
+  assert.ok(luminance(rules.get(folder).background) < luminance('#f5f1e8'), 'フォルダとファイルの境目を区別する');
+});
+
 test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の戻る抑止・軌跡バー高さ追従', async () => {
   const calls = [], styles = [], observers = []; let bottom = 208;
   const h = setup('components/SpaceView', { props: { viewMode: '3d', startedAt: 1 }, globals: {
@@ -534,6 +601,53 @@ async function mountedPages(globals = {}) {
   return { app, root, props, emitted, warnings, walk, find };
 }
 
+test('実マウント: 先頭ページは親ボタンを出さず、子から戻る操作とルートのパンくずは保つ', async () => {
+  const { app, root, props, emitted, walk, find, warnings } = await mountedPages();
+  const parent = () => walk(root, element => element.props.title?.startsWith('親フォルダ'));
+  try {
+    assert.equal(parent(), undefined);
+    const rootCrumb = walk(find('folder-page-heading'), element => element.type === 'button' && element.text === 'project');
+    assert.equal(rootCrumb.props['aria-current'], 'location');
+    const count = emitted.length;
+    find('folder-pages').props.onKeydown({ key: 'Backspace', preventDefault() {}, stopPropagation() {} });
+    assert.equal(emitted.length, count, 'ルートより上へ移動しない');
+    walk(root, element => element.props.title === 'src').props.onClick(); await flush();
+    assert.ok(parent()); assert.equal(parent().props.disabled, undefined);
+    parent().props.onClick(); await flush();
+    assert.equal(props.current, ''); assert.equal(parent(), undefined);
+    assert.equal(rootCrumb.props['aria-current'], 'location'); assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+test('実マウント: ファイルの縞とメタデータを通常・旧・経由ページへ共通表示し、検索と選択を保つ', async () => {
+  const { app, root, props, walk, warnings } = await mountedPages();
+  const all = (node, predicate) => [...(predicate(node) ? [node] : []), ...(node.children || []).flatMap(child => all(child, predicate))];
+  const assertRows = layer => {
+    const rows = all(layer, element => element.props.class?.split(' ').includes('folder-page-entry'));
+    let fileIndex = 0;
+    for (const row of rows) {
+      const classes = row.props.class.split(' ');
+      if (classes.includes('folder')) { assert.equal(classes.includes('striped'), false); continue; }
+      assert.equal(classes.includes('striped'), fileIndex++ % 2 === 1);
+      assert.ok(walk(row, element => element.props.class === 'folder-page-size').text);
+      assert.ok(walk(row, element => element.type === 'time').props.datetime);
+    }
+  };
+  try {
+    props.tree.d[0].f.push(['other.txt', 42, 4000]); props.marks = { mode: 'grep', paths: ['root10.md'] }; await flush();
+    const file = walk(root, element => element.props.title === 'root10.md');
+    file.props.onClick(); await flush();
+    assert.ok(['striped', 'marked', 'selected'].every(name => file.props.class.split(' ').includes(name)));
+    props.current = 'src/nested'; await flush();
+    const layers = all(root, element => element.props['data-page-layer']); assert.equal(layers.length, 3);
+    for (const layer of layers) assertRows(layer);
+    const outgoing = layers.find(layer => layer.props['data-page-layer'] === 'outgoing');
+    const previousFile = walk(outgoing, element => element.props.title === 'root10.md');
+    assert.ok(['striped', 'marked', 'selected'].every(name => previousFile.props.class.split(' ').includes(name)));
+    assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
 test('実マウント: 2DのDOMを外してもページ位置・選択行を保持し、同じ部品で復帰する', async () => {
   const { app, root, props, warnings, walk, find } = await mountedPages();
   try {
@@ -596,7 +710,7 @@ test('実マウント: 移動先を下に保ち、旧ページの内容/位置�
     assert.equal(edge.props['aria-hidden'], 'true'); assert.equal(edge.props.focusable, 'false');
     assert.deepEqual([line.props.x1, line.props.y1, line.props.x2, line.props.y2], ['100', '0', '0', '100']);
     assert.equal(line.props['vector-effect'], 'non-scaling-stroke');
-    assert.equal(find('folder-page-stack').props.style['--page-turn-duration'], '1500ms');
+    assert.equal(find('folder-page-stack').props.style['--page-turn-duration'], '1000ms');
     finish(first); await flush(); assert.equal(layer('outgoing'), undefined); assert.equal(find('folder-page-turn-edge'), undefined);
     assert.equal(layer('live'), destination, '演出終了で移動先のDOM/フォーカス/スクロールを作り直さない');
     destination.scrollTop = 76; destination.props.onScroll(); click('src/main.js'); await flush();
@@ -645,7 +759,7 @@ test('実マウント: 一覧更新・外部選択・移動が同じtickでも�
   } finally { app.unmount(); }
 });
 
-test('実マウント: 1〜5枚と省略あり・戻る・別の枝でもCSS演出の合計を1500msに揃える', async () => {
+test('実マウント: 1〜5枚と省略あり・戻る・別の枝でもCSS演出の合計を1000msに揃える', async () => {
   const { app, root, props, warnings, walk, find } = await mountedPages();
   const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
   const path = depth => Array.from({ length: depth }, (_value, i) => 'd' + i).join('/');
@@ -655,12 +769,12 @@ test('実マウント: 1〜5枚と省略あり・戻る・別の枝でもCSS演�
     while (layer('outgoing')) {
       assert.ok(++count <= expectedSteps);
       const milliseconds = parseFloat(find('folder-page-stack').props.style['--page-turn-duration']);
-      assert.equal(milliseconds, 1500 / expectedSteps); duration += milliseconds;
+      assert.equal(milliseconds, 1000 / expectedSteps); duration += milliseconds;
       const sheet = layer('outgoing'), direction = sheet.props.class.includes('page-turn-back') ? 'back' : 'forward';
       sheet.props.onAnimationend({ type: 'animationend', target: sheet, currentTarget: sheet, animationName: 'folder-page-' + direction });
       await flush(); assert.equal(layer('live'), destination);
     }
-    assert.equal(count, expectedSteps); assert.equal(duration, 1500);
+    assert.equal(count, expectedSteps); assert.equal(duration, 1000);
     assert.equal(layer('live').props['data-page-path'], target); assert.equal(find('folder-page-turn-edge'), undefined);
   };
   try {
@@ -676,7 +790,7 @@ test('実マウント: 1〜5枚と省略あり・戻る・別の枝でもCSS演�
   } finally { app.unmount(); }
 });
 
-test('実マウント: 深い移動は経由ページを順に入れ替え、最大5枚・1500msで最終ページへ到着する', async () => {
+test('実マウント: 深い移動は経由ページを順に入れ替え、最大5枚・1000msで最終ページへ到着する', async () => {
   const { app, root, props, warnings, walk, find } = await mountedPages();
   const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
   const finish = sheet => sheet.props.onAnimationend({ type: 'animationend', target: sheet, currentTarget: sheet, animationName: 'folder-page-forward' });
@@ -694,12 +808,12 @@ test('実マウント: 深い移動は経由ページを順に入れ替え、最
       assert.ok(walk(incoming, element => element.props.title === prior + '/file' + (prior.split('/').length - 1) + '.js'));
       assert.equal(layer('live'), destination); assert.ok(++count <= 5);
       const milliseconds = parseFloat(find('folder-page-stack').props.style['--page-turn-duration']);
-      assert.equal(milliseconds, 300); duration += milliseconds;
+      assert.equal(milliseconds, 200); duration += milliseconds;
       finish(outgoing); await flush();
       if (layer('outgoing')) { const current = layer('outgoing'); finish(outgoing); await flush(); assert.equal(layer('outgoing'), current); }
     }
     assert.equal(count, 5); assert.equal(prior, path); assert.equal(layer('live'), destination);
-    assert.equal(duration, 1500);
+    assert.equal(duration, 1000);
     assert.equal(layer('incoming'), undefined); assert.deepEqual(warnings, []);
   } finally { app.unmount(); }
 });
@@ -762,7 +876,7 @@ test('2Dアイコン: 24px表示は既存32px列内に収まり、クリーム�
   const manifest = JSON.parse(readFileSync(new URL('../public/assets/catppuccin_icons/manifest.json', import.meta.url), 'utf8'));
   const rgb = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
   const luminance = channels => channels.reduce((value, channel, index) => value + [.2126, .7152, .0722][index] * (channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4), 0);
-  const backgrounds = ['#faf7f2', '#f5f1e8', '#f0ebe0', '#eee6d8', '#e6d5b7', '#ddcfb5'];
+  const backgrounds = ['#faf7f2', '#f5f1e8', '#f0ebe0', '#eae2d5', '#eee6d8', '#e6d5b7', '#ddcfb5'];
   for (const file of manifest.files) {
     const svg = readFileSync(new URL('../public/assets/catppuccin_icons/' + file.path, import.meta.url), 'utf8');
     for (const [hex] of svg.matchAll(/#[0-9a-fA-F]{6}/g)) {

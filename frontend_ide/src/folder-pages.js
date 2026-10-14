@@ -13,7 +13,7 @@ export function folderPageDirection(previous, next) {
   return !next || previous.startsWith(`${next}/`) ? 'back' : 'forward';
 }
 
-// ワープと同じく共通の親まで戻ってから目的の枝へ進む。深い移動も最大5枚・全体約1500msにまとめる。
+// ワープと同じく共通の親まで戻ってから目的の枝へ進む。深い移動も最大5枚・全体約1000msにまとめる。
 export function folderPageTurnPlan(previous, next, limit = 5) {
   const from = previous.split('/').filter(Boolean), to = next.split('/').filter(Boolean);
   let common = 0;
@@ -47,6 +47,8 @@ export function indexFolderPages(tree, marks = {}) {
       const filePath = join(path, name);
       return { type: 'file', name, path: filePath, size, mtime, marked: marked(filePath, mtime) };
     }).sort(byName);
+    // フォルダの件数に左右されず、表示するファイルだけを自然順で交互に塗る。
+    files.forEach((file, index) => { file.striped = index % 2 === 1; });
     const totals = {
       count: files.length + folders.reduce((sum, child) => sum + child.count, 0),
       marked: files.filter(file => file.marked).length + folders.reduce((sum, child) => sum + child.marked, 0),
