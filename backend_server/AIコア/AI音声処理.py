@@ -97,6 +97,8 @@ async def _send_cancel_audio_user(接続):
 
 async def 音声入力データ処理(接続, 音声データ: bytes):
     """音声入力データの処理（旧実装寄せ）"""
+    if not getattr(接続, "voice_enabled", True) or not getattr(接続, "audio_data", None):
+        return
     try:
         current_time = time.time()
         data = 接続.audio_data["音声入力データ"]
@@ -133,7 +135,7 @@ async def 音声入力データ処理(接続, 音声データ: bytes):
 async def 統合音声分離ワーカー(接続):
     """入力/出力のバッファ監視（旧実装寄せ）"""
     try:
-        while 接続 and 接続.is_connected:
+        while 接続 and getattr(接続, "voice_enabled", True) and 接続.is_connected:
             try:
                 current_time = time.time()
 

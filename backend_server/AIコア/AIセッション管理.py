@@ -192,8 +192,11 @@ class SessionConnection:
     4: エージェント4出力チャンネル
     """
 
-    def __init__(self, セッションID: str):
+    def __init__(self, セッションID: str, voice_enabled: bool = True):
+        if not isinstance(voice_enabled, bool):
+            raise ValueError("voiceはtrueまたはfalseで指定してください。")
         self.セッションID = セッションID
+        self.voice_enabled = voice_enabled
         # セッション内ランタイム初期化の多重実行を防止
         self.初期化ロック = asyncio.Lock()
         self.sockets: Dict[str, Optional[WebSocketConnection]] = {
@@ -218,7 +221,7 @@ class SessionConnection:
         self.streaming_processor: Optional[StreamingProcessor] = None
         self.recognition_processor = None
         self.audio_split_task: Optional[asyncio.Task] = None
-        self.audio_data = 初期化_音声データ()
+        self.audio_data = 初期化_音声データ() if self.voice_enabled else None
 
         self.チャンネル別キュー: Dict[str, asyncio.Queue] = {}
         self.チャンネル別処理中: Dict[str, bool] = {}
@@ -360,47 +363,67 @@ class SessionConnection:
         if manager:
             manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
-    async def stop_runtime_processors(self):
-        """WebSocket切断後に残る実行系プロセッサを停止（セッション状態は保持）"""
-        if hasattr(self, "live_processor") and self.live_processor:
-            try:
-                await self.live_processor.終了()
-            except Exception:
-                pass
-        if hasattr(self, "chat_processor") and self.chat_processor:
-            try:
-                await self.chat_processor.終了()
-            except Exception:
-                pass
-        if hasattr(self, "code_agent_processors") and self.code_agent_processors:
-            for agent in self.code_agent_processors:
-                try:
-                    await agent.終了()
-                except Exception:
-                    pass
+    async def _cancel_runtime_task(self, task):
+        """完了済みの例外も回収し、実行中のタスクは停止を待つ。"""
+        if task is None or task is asyncio.current_task():
+            return
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception(f"ランタイムタスク終了時エラー: {self.セッションID}")
 
-    async def close(self):
-        """セッション全体をクローズ"""
-        await self.stop_runtime_processors()
+    async def _stop_runtime_processors_locked(self):
+        """初期化ロック取得済みの呼出元用。会話を保持して実行系だけ停止する。"""
+        # ストリーミングからLive/Codeが再開されないよう、最初に停止する。
         if self.streaming_processor:
-            await self.streaming_processor.stop()
+            try:
+                await self.streaming_processor.stop()
+            except Exception:
+                logger.exception(f"ストリーミング停止エラー: {self.セッションID}")
+            await self._cancel_runtime_task(getattr(self.streaming_processor, "task", None))
             self.streaming_processor = None
+
+        await self._cancel_runtime_task(self.audio_split_task)
+        self.audio_split_task = None
         if self.recognition_processor:
             try:
                 await self.recognition_processor.終了()
             except Exception:
-                pass
+                logger.exception(f"音声認識停止エラー: {self.セッションID}")
+            await self._cancel_runtime_task(getattr(self.recognition_processor, "worker_task", None))
             self.recognition_processor = None
-        if self.audio_split_task and not self.audio_split_task.done():
-            self.audio_split_task.cancel()
-            try:
-                await self.audio_split_task
-            except asyncio.CancelledError:
-                pass
-        self.audio_split_task = None
-        self.audio_data = 初期化_音声データ()
 
-        for チャンネル, キュー in self.チャンネル別キュー.items():
+        # Chat/Code/Liveのオブジェクトは、会話履歴を再接続へ引き継ぐため保持する。
+        if getattr(self, "live_processor", None):
+            try:
+                await self.live_processor.終了()
+            except Exception:
+                logger.exception(f"Live停止エラー: {self.セッションID}")
+        if getattr(self, "chat_processor", None):
+            try:
+                await self.chat_processor.終了()
+            except Exception:
+                logger.exception(f"Chat停止エラー: {self.セッションID}")
+        for agent in getattr(self, "code_agent_processors", ()) or ():
+            try:
+                await agent.終了()
+            except Exception:
+                logger.exception(f"Code停止エラー: {self.セッションID}")
+        self.audio_data = 初期化_音声データ() if self.voice_enabled else None
+        self.output_audio_paused = False
+
+    async def stop_runtime_processors(self):
+        """WebSocket切断後に残る実行系を、接続・初期化と排他して停止する。"""
+        async with self.初期化ロック:
+            await self._stop_runtime_processors_locked()
+
+    async def _close_locked(self):
+        await self._stop_runtime_processors_locked()
+        for キュー in self.チャンネル別キュー.values():
             while not キュー.empty():
                 try:
                     キュー.get_nowait()
@@ -413,6 +436,11 @@ class SessionConnection:
             if connection:
                 await connection.close()
                 self.sockets[socket_no] = None
+
+    async def close(self):
+        """セッション全体を、接続・初期化と排他してクローズする。"""
+        async with self.初期化ロック:
+            await self._close_locked()
 
 
 class WebSocketManager:
@@ -447,7 +475,7 @@ class WebSocketManager:
             logger.info(f"新規セッション初期CODE_BASE_PATH: {code_base_path} (session={セッションID})")
         return model_settings
 
-    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None, live_model_settings: Optional[dict] = None) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None, live_model_settings: Optional[dict] = None, voice: Optional[bool] = None) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
@@ -459,6 +487,9 @@ class WebSocketManager:
         Returns:
             セッションID: 使用するセッションID
         """
+        if voice is not None and not isinstance(voice, bool):
+            raise ValueError("voiceはtrueまたはfalseで指定してください。")
+
         # クライアント指定は Live のモデル・音声だけを初期設定へ反映する。
         live_settings = {}
         if live_model_settings is not None:
@@ -473,11 +504,6 @@ class WebSocketManager:
                     live_settings[key] = value.strip()
             if "LIVE_AI_NAME" in live_settings and live_settings["LIVE_AI_NAME"] not in {"gemini_live", "freeai_live", "openai_live"}:
                 raise ValueError("指定されたライブAIに対応していません。")
-            existing = self.sessions.get(セッションID)
-            saved = self.session_states.get(セッションID, {})
-            current = existing.モデル設定 if existing else saved.get("モデル設定")
-            if current is not None and any(current.get(key) != value for key, value in live_settings.items()):
-                raise ValueError("セッションのライブモデルが一致しません。新しい会話で接続してください。")
 
         # フォルダを初期化通知・AI起動より先に確定する。
         project_path = None
@@ -487,90 +513,92 @@ class WebSocketManager:
             project_path = コードベース絶対パス取得(セッション設定={"CODE_BASE_PATH": code_base_path})
             if not os.path.isdir(project_path):
                 raise ValueError("プロジェクトフォルダをバックエンドから参照できません。フォルダの場所を確認してください。")
-            existing = self.sessions.get(セッションID)
-            saved = self.session_states.get(セッションID, {})
-            settings = existing.モデル設定 if existing else saved.get("モデル設定")
-            if settings is not None:
-                current_path = コードベース絶対パス取得(アプリ設定=app_conf, セッション設定=settings)
-                if os.path.normcase(current_path) != os.path.normcase(project_path):
-                    raise ValueError("セッションのプロジェクトフォルダが一致しません。新しい会話で接続してください。")
 
-        # セッションID決定
-        if セッションID and セッションID in self.sessions:
-            logger.debug(f"既存セッション再接続: {セッションID}")
-        else:
-            セッションID = セッションID if セッションID else self.セッションID生成()
-            logger.debug(f"新規セッション作成: {セッションID}")
+        セッションID = セッションID if セッションID else self.セッションID生成()
+        session = self.sessions.get(セッションID)
+        if session is None:
+            saved_state = self.session_states.get(セッションID)
+            saved_settings = saved_state.get("モデル設定") if saved_state else None
+            self._接続設定照合(saved_settings, live_settings, project_path, app_conf)
+            voice_enabled = voice if voice is not None else (saved_state or {}).get("voice", True)
+            if socket_no == "audio" and not voice_enabled:
+                raise ValueError("音声無効のセッションにはaudioソケットを接続できません。")
 
-        # セッション作成または取得
-        if セッションID not in self.sessions:
-            session = SessionConnection(セッションID)
-
-            # セッション状態を復元または初期化
-            if セッションID in self.session_states:
-                saved_state = self.session_states[セッションID]
-                session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
+            # 作成・最初のvoice確定・登録まではawaitしない。同時接続も同じロックを使う。
+            session = SessionConnection(セッションID, voice_enabled=voice_enabled)
+            if saved_state is not None:
+                session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態).copy()
                 session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
-                logger.debug(f"セッション状態を復元: {セッションID}")
             else:
                 session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
-                if session.モデル設定:
-                    logger.debug(f"app.confからモデル設定をコピー: {セッションID}")
-
-                self.session_states[セッションID] = {
-                    "ボタン": session.ボタン状態.copy(),
-                    "モデル設定": session.モデル設定.copy(),
-                    "ソース最終更新日時": session.ソース最終更新日時
-                }
+            if live_settings:
+                session.モデル設定.update(live_settings)
+            if project_path is not None:
+                session.モデル設定["CODE_BASE_PATH"] = project_path
             self.sessions[セッションID] = session
-        else:
-            session = self.sessions[セッションID]
 
-        if project_path is not None:
-            session.モデル設定["CODE_BASE_PATH"] = project_path
-        if live_settings:
-            session.モデル設定.update(live_settings)
-        if project_path is not None or live_settings:
-            self.save_session_state(セッションID, ボタン=session.ボタン状態, モデル設定=session.モデル設定, ソース最終更新日時=session.ソース最終更新日時)
+        async with session.初期化ロック:
+            self._接続設定照合(session.モデル設定, live_settings, project_path, app_conf)
+            voice_enabled = session.voice_enabled if voice is None else voice
+            if voice_enabled != session.voice_enabled and session.is_connected:
+                raise ValueError("接続中のセッションのvoice設定は変更できません。新しい会話で接続してください。")
+            if socket_no == "audio" and not voice_enabled:
+                raise ValueError("音声無効のセッションにはaudioソケットを接続できません。")
+            if voice_enabled != session.voice_enabled:
+                # 既存タスクが音声データを参照し終えるまで能力を切り替えない。
+                await session._stop_runtime_processors_locked()
+                session.voice_enabled = voice_enabled
+                session.audio_data = 初期化_音声データ() if voice_enabled else None
+                if not voice_enabled and hasattr(session, "live_processor"):
+                    session.live_processor = None
+            if project_path is not None:
+                session.モデル設定["CODE_BASE_PATH"] = project_path
+            if live_settings:
+                session.モデル設定.update(live_settings)
+            self.save_session_state(セッションID, session.ボタン状態, session.モデル設定, session.ソース最終更新日時)
 
-        logger.debug(f"セッションに接続: {セッションID}")
+            # 差し替えをロック内で完了し、旧接続のfinallyには所有者照合をさせる。
+            old_conn = session.get_socket(socket_no)
+            if old_conn:
+                await old_conn.close()
+            connection = WebSocketConnection(websocket, セッションID, socket_no)
+            if accept_in_connect:
+                await connection.accept()
+            else:
+                connection.is_connected = True
+            session.set_socket(socket_no, connection)
 
-        # 既存の同一ソケットがあれば切断
-        old_conn = session.get_socket(socket_no)
-        if old_conn:
-            logger.debug(f"既存接続を切断: session={セッションID} socket={socket_no}")
-            await old_conn.close()
-
-        # 接続を作成
-        connection = WebSocketConnection(websocket, セッションID, socket_no)
-        if accept_in_connect:
-            await connection.accept()
-        else:
-            connection.is_connected = True
-        session.set_socket(socket_no, connection)
-
-        # 初期化メッセージを送信（各ソケット共通）
-        init_payload = {
-            "セッションID": セッションID,
-            "ソケット番号": socket_no,
-            "チャンネル": socket_no,
-            "メッセージ識別": "init",
-            "メッセージ内容": {}
-        }
-        if socket_no == "core":
-            init_payload["メッセージ内容"] = {
-                "ボタン": session.ボタン状態.copy(),
-                "モデル設定": session.モデル設定
+            init_payload = {
+                "セッションID": セッションID,
+                "ソケット番号": socket_no,
+                "チャンネル": socket_no,
+                "メッセージ識別": "init",
+                "メッセージ内容": {}
             }
-        if getattr(websocket, "application_state", None) == WebSocketState.CONNECTED:
-            await connection.send_json(init_payload)
-        else:
-            connection.is_connected = False
-            logger.debug(f"初期化メッセージ送信をスキップ(未接続): session={セッションID} socket={socket_no}")
+            if socket_no == "core":
+                init_payload["メッセージ内容"] = {
+                    "ボタン": session.ボタン状態.copy(),
+                    "モデル設定": session.モデル設定
+                }
+            if getattr(websocket, "application_state", None) == WebSocketState.CONNECTED:
+                await connection.send_json(init_payload)
+            else:
+                connection.is_connected = False
+                logger.debug(f"初期化メッセージ送信をスキップ(未接続): session={セッションID} socket={socket_no}")
 
         logger.info(self._fmt_log(ch=socket_no, 内容="接続登録", セッションID=セッションID))
         return セッションID
+
+    def _接続設定照合(self, settings, live_settings, project_path, app_conf):
+        if settings is None:
+            return
+        if any(settings.get(key) != value for key, value in live_settings.items()):
+            raise ValueError("セッションのライブモデルが一致しません。新しい会話で接続してください。")
+        if project_path is not None:
+            current_path = コードベース絶対パス取得(アプリ設定=app_conf, セッション設定=settings)
+            if os.path.normcase(current_path) != os.path.normcase(project_path):
+                raise ValueError("セッションのプロジェクトフォルダが一致しません。新しい会話で接続してください。")
 
     def ensure_session(self, セッションID: Optional[str] = None, app_conf=None) -> str:
         """
@@ -583,28 +611,27 @@ class WebSocketManager:
         if セッションID in self.sessions:
             return セッションID
 
-        session = SessionConnection(セッションID)
+        saved_state = self.session_states.get(セッションID, {})
+        session = SessionConnection(セッションID, voice_enabled=saved_state.get("voice", True))
         if セッションID in self.session_states:
             saved_state = self.session_states[セッションID]
-            session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態)
+            session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態).copy()
             session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
         else:
             session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
-            self.session_states[セッションID] = {
-                "ボタン": session.ボタン状態.copy(),
-                "モデル設定": session.モデル設定.copy(),
-                "ソース最終更新日時": session.ソース最終更新日時
-            }
         self.sessions[セッションID] = session
+        self.save_session_state(セッションID, session.ボタン状態, session.モデル設定, session.ソース最終更新日時)
         logger.info(f"セッションを作成(ensure): {セッションID}")
         return セッションID
 
     def save_session_state(self, セッションID: str, ボタン: dict, モデル設定: dict = None, ソース最終更新日時: Optional[str] = None):
         """セッション状態を保存"""
-        state = {
-            "ボタン": ボタン.copy()
-        }
+        state = self.session_states.get(セッションID, {}).copy()
+        state["ボタン"] = ボタン.copy()
+        session = self.sessions.get(セッションID)
+        state["voice"] = session.voice_enabled if session else state.get("voice", True)
+        state.setdefault("ソース最終更新日時", None)
         if モデル設定 is not None:
             state["モデル設定"] = モデル設定正規化(モデル設定)
         if ソース最終更新日時 is not None:
@@ -613,7 +640,7 @@ class WebSocketManager:
         self.session_states[セッションID] = state
         logger.debug(f"セッション状態保存: {セッションID}")
 
-    async def disconnect(self, セッションID: str, socket_no: Optional[str] = None, keep_session: bool = True):
+    async def disconnect(self, セッションID: str, socket_no: Optional[str] = None, keep_session: bool = True, websocket: Optional[WebSocket] = None):
         """
         WebSocket接続を切断（セッション内のソケット単位）
 
@@ -625,24 +652,26 @@ class WebSocketManager:
         if not session:
             return
 
-        if keep_session:
-            self.save_session_state(
-                セッションID,
-                session.ボタン状態,
-                session.モデル設定,
-                session.ソース最終更新日時
-            )
+        async with session.初期化ロック:
+            if socket_no is not None:
+                connection = session.get_socket(socket_no)
+                if websocket is not None and (connection is None or connection.websocket is not websocket):
+                    # 差し替え前のソケットのfinallyで、新しい接続を切断しない。
+                    return
+            if keep_session:
+                self.save_session_state(
+                    セッションID, session.ボタン状態, session.モデル設定, session.ソース最終更新日時
+                )
 
-        if socket_no is None:
-            await session.close()
-        else:
-            connection = session.get_socket(socket_no)
-            if connection:
-                await connection.close()
-                session.set_socket(socket_no, None)
-            # セッションは保持しても、接続がゼロなら実行系ループは停止
-            if not session.is_connected:
-                await session.stop_runtime_processors()
+            if socket_no is None:
+                await session._close_locked()
+            else:
+                connection = session.get_socket(socket_no)
+                if connection:
+                    await connection.close()
+                    session.set_socket(socket_no, None)
+                if not session.is_connected:
+                    await session._stop_runtime_processors_locked()
 
         ch = socket_no if socket_no is not None else "-99"
         logger.info(self._fmt_log(ch=ch, 内容="接続切断", セッションID=セッションID))

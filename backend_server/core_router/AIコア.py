@@ -741,9 +741,12 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                 "message": "有効な設定項目がありません"
             }
 
-        # ソケットのモデル設定を更新（セッション内のみ、ファイル保存はしない）
-        if 許可設定:
-            接続.update_model_settings(許可設定, manager=AIセッション管理)
+        # Codeだけの設定変更や同値の再送ではLive接続を作り直さない。
+        Live設定変更 = any(
+            (key.startswith("LIVE_") or key == "CODE_BASE_PATH")
+            and 接続.モデル設定.get(key) != value
+            for key, value in 許可設定.items()
+        )
 
         # save=True またはリセットの場合は AiDiy_key.json へ書き込む
         設定保存済み = False
@@ -773,6 +776,10 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                     "status": "NG",
                     "message": f"AiDiy_key.json保存エラー: {str(e)}"
                 }
+
+        # 保存だけの場合はセッションへ適用しない。後の「適用」で変更を正しく判定する。
+        if 許可設定:
+            接続.update_model_settings(許可設定, manager=AIセッション管理)
 
         # 既存プロセッサに反映（即時反映、設定変更がある場合のみ）
         if 許可設定:
@@ -813,37 +820,41 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                             agent.AIモジュール = agent._select_ai_module()
                         agent.AIインスタンス = None
 
-                if hasattr(接続, "live_processor") and 接続.live_processor:
-                    live_ai = 接続.モデル設定.get("LIVE_AI_NAME", "")
-                    live_model = ""
-                    live_voice = ""
-                    if live_ai in ("gemini_live", "freeai_live"):
-                        model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
-                        voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
-                        live_model = 接続.モデル設定.get(model_key, "")
-                        live_voice = 接続.モデル設定.get(voice_key, "")
-                    elif live_ai == "openai_live":
-                        live_model = 接続.モデル設定.get("LIVE_OPENAI_MODEL", "")
-                        live_voice = 接続.モデル設定.get("LIVE_OPENAI_VOICE", "")
-                    接続.live_processor.AI_NAME = live_ai
-                    接続.live_processor.AI_MODEL = live_model
-                    接続.live_processor.AI_VOICE = live_voice
-                    接続.live_processor.絶対パス = 実行パス
-                    if hasattr(接続.live_processor, "_select_ai_module"):
-                        接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
-                    # プロジェクト切り替え時はシステム指示を再構築
-                    if hasattr(接続.live_processor, "システム指示更新"):
-                        code_base_path = str(接続.モデル設定.get("CODE_BASE_PATH", ""))
-                        接続.live_processor.システム指示更新(code_base_path)
-                    if getattr(接続.live_processor, "AIインスタンス", None) or getattr(接続.live_processor, "is_alive", False):
-                        try:
-                            await 接続.live_processor.終了()
-                        except Exception:
-                            logger.exception("LiveAI停止に失敗しました")
-                    try:
-                        await 接続.live_processor.開始()
-                    except Exception:
-                        logger.exception("LiveAI再開始に失敗しました")
+                if Live設定変更:
+                    async with 接続.初期化ロック:
+                        if 接続.voice_enabled and getattr(接続, "live_processor", None):
+                            live_ai = 接続.モデル設定.get("LIVE_AI_NAME", "")
+                            live_model = ""
+                            live_voice = ""
+                            if live_ai in ("gemini_live", "freeai_live"):
+                                model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+                                voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+                                live_model = 接続.モデル設定.get(model_key, "")
+                                live_voice = 接続.モデル設定.get(voice_key, "")
+                            elif live_ai == "openai_live":
+                                live_model = 接続.モデル設定.get("LIVE_OPENAI_MODEL", "")
+                                live_voice = 接続.モデル設定.get("LIVE_OPENAI_VOICE", "")
+                            接続.live_processor.AI_NAME = live_ai
+                            接続.live_processor.AI_MODEL = live_model
+                            接続.live_processor.AI_VOICE = live_voice
+                            接続.live_processor.絶対パス = 実行パス
+                            if hasattr(接続.live_processor, "_select_ai_module"):
+                                接続.live_processor.AIモジュール = 接続.live_processor._select_ai_module()
+                            # プロジェクト切り替え時はシステム指示を再構築
+                            if hasattr(接続.live_processor, "システム指示更新"):
+                                code_base_path = str(接続.モデル設定.get("CODE_BASE_PATH", ""))
+                                接続.live_processor.システム指示更新(code_base_path)
+                            if getattr(接続.live_processor, "AIインスタンス", None) or getattr(接続.live_processor, "is_alive", False):
+                                try:
+                                    await 接続.live_processor.終了()
+                                except Exception:
+                                    logger.exception("LiveAI停止に失敗しました")
+                            音声接続 = 接続.get_socket("audio")
+                            if 音声接続 and 音声接続.is_connected:
+                                try:
+                                    await 接続.live_processor.開始()
+                                except Exception:
+                                    logger.exception("LiveAI再開始に失敗しました")
             except Exception:
                 logger.exception("モデル設定の反映に失敗しました")
 
@@ -972,7 +983,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 app_conf=getattr(WebSocket接続.app, "conf", None),
                 accept_in_connect=False,
                 code_base_path=初期データ.get("CODE_BASE_PATH"),
-                live_model_settings=初期データ.get("モデル設定")
+                live_model_settings=初期データ.get("モデル設定"),
+                voice=初期データ.get("voice")
             )
         except ValueError as e:
             await WebSocket接続.send_json({"メッセージ識別": "error", "メッセージ内容": str(e)})
@@ -1001,12 +1013,16 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
         # セッション内の初期化は1回ずつ直列化（複数ソケット同時接続での重複起動防止）
         async with セッション.初期化ロック:
+            # 同じ番号で接続し直した旧ハンドラーは、新しい接続を初期化しない。
+            登録接続 = セッション.get_socket(ソケット番号)
+            if not 登録接続 or 登録接続.websocket is not WebSocket接続:
+                return
             # 初回のみプロセッサを起動
             if セッション.streaming_processor is None and ソケット番号 == "core":
                 セッション.streaming_processor = StreamingProcessor(セッションID, セッション)
                 await セッション.streaming_processor.start()
 
-            if セッション.recognition_processor is None:
+            if セッション.voice_enabled and セッション.recognition_processor is None:
                 セッション.recognition_processor = Recognition(セッションID, セッション, 保存_会話履歴)
                 await セッション.recognition_processor.開始()
 
@@ -1084,66 +1100,67 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 from AIコア.AI内部ツール import Tools
                 セッション.tools_instance = Tools(セッション=セッション)
 
-            live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
-            live_model = ""
-            live_voice = ""
-            if live_ai in ("gemini_live", "freeai_live"):
-                model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
-                voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
-                live_model = セッション.モデル設定.get(model_key, "")
-                live_voice = セッション.モデル設定.get(voice_key, "")
-            elif live_ai == "openai_live":
-                live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
-                live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
+            if セッション.voice_enabled:
+                live_ai = セッション.モデル設定.get("LIVE_AI_NAME", "")
+                live_model = ""
+                live_voice = ""
+                if live_ai in ("gemini_live", "freeai_live"):
+                    model_key = "LIVE_FREEAI_MODEL" if live_ai == "freeai_live" else "LIVE_GEMINI_MODEL"
+                    voice_key = "LIVE_FREEAI_VOICE" if live_ai == "freeai_live" else "LIVE_GEMINI_VOICE"
+                    live_model = セッション.モデル設定.get(model_key, "")
+                    live_voice = セッション.モデル設定.get(voice_key, "")
+                elif live_ai == "openai_live":
+                    live_model = セッション.モデル設定.get("LIVE_OPENAI_MODEL", "")
+                    live_voice = セッション.モデル設定.get("LIVE_OPENAI_VOICE", "")
 
-            if not hasattr(セッション, "live_processor"):
-                セッション.live_processor = Live(
-                    親=WebSocket接続.app,
-                    セッションID=セッションID,
-                    チャンネル="0",
-                    絶対パス=実行パス,
-                    AI_NAME=live_ai,
-                    AI_MODEL=live_model,
-                    AI_VOICE=live_voice,
-                    接続=セッション,
-                    保存関数=保存_会話履歴,
-                )
-            else:
-                セッション.live_processor.AI_NAME = live_ai
-                セッション.live_processor.AI_MODEL = live_model
-                セッション.live_processor.AI_VOICE = live_voice
-                セッション.live_processor.絶対パス = 実行パス
-                if hasattr(セッション.live_processor, "_select_ai_module"):
-                    セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
-                # リロード再接続時もCODE_BASE_PATHに応じたコンテキストを毎回再構築
-                if hasattr(セッション.live_processor, "システム指示更新"):
-                    code_base_path = str(セッション.モデル設定.get("CODE_BASE_PATH", ""))
-                    セッション.live_processor.システム指示更新(code_base_path)
+                if not getattr(セッション, "live_processor", None):
+                    セッション.live_processor = Live(
+                        親=WebSocket接続.app,
+                        セッションID=セッションID,
+                        チャンネル="0",
+                        絶対パス=実行パス,
+                        AI_NAME=live_ai,
+                        AI_MODEL=live_model,
+                        AI_VOICE=live_voice,
+                        接続=セッション,
+                        保存関数=保存_会話履歴,
+                    )
+                else:
+                    セッション.live_processor.AI_NAME = live_ai
+                    セッション.live_processor.AI_MODEL = live_model
+                    セッション.live_processor.AI_VOICE = live_voice
+                    セッション.live_processor.絶対パス = 実行パス
+                    if hasattr(セッション.live_processor, "_select_ai_module"):
+                        セッション.live_processor.AIモジュール = セッション.live_processor._select_ai_module()
+                    # リロード再接続時もCODE_BASE_PATHに応じたコンテキストを毎回再構築
+                    if hasattr(セッション.live_processor, "システム指示更新"):
+                        code_base_path = str(セッション.モデル設定.get("CODE_BASE_PATH", ""))
+                        セッション.live_processor.システム指示更新(code_base_path)
 
-            # 画面リフレッシュ再接続時はLive接続を張り直し、コンテキスト反映漏れを防ぐ
-            if (
-                ソケット番号 == "audio"
-                and 既存セッション再接続
-                and hasattr(セッション, "live_processor")
-                and セッション.live_processor
-                and (getattr(セッション.live_processor, "AIインスタンス", None) or getattr(セッション.live_processor, "is_alive", False))
-            ):
-                try:
-                    await セッション.live_processor.終了()
-                    _ws_log(ch=ソケット番号, 内容="Live接続をリセット", セッションID=セッションID)
-                except Exception:
-                    logger.exception("Live接続リセットに失敗しました")
+                # 画面リフレッシュ再接続時はLive接続を張り直し、コンテキスト反映漏れを防ぐ
+                if (
+                    ソケット番号 == "audio"
+                    and 既存セッション再接続
+                    and hasattr(セッション, "live_processor")
+                    and セッション.live_processor
+                    and (getattr(セッション.live_processor, "AIインスタンス", None) or getattr(セッション.live_processor, "is_alive", False))
+                ):
+                    try:
+                        await セッション.live_processor.終了()
+                        _ws_log(ch=ソケット番号, 内容="Live接続をリセット", セッションID=セッションID)
+                    except Exception:
+                        logger.exception("Live接続リセットに失敗しました")
 
-            # LiveAIは音声チャンネル(audio)接続時にのみ起動
-            if ソケット番号 == "audio" and not getattr(セッション.live_processor, "is_alive", False):
-                await セッション.live_processor.開始()
+                # LiveAIは音声チャンネル(audio)接続時にのみ起動
+                if ソケット番号 == "audio" and not getattr(セッション.live_processor, "is_alive", False):
+                    await セッション.live_processor.開始()
 
-            # audioチャンネル接続時にLiveAIのAPIキー確認結果をwelcome_textでch0に送信
-            if ソケット番号 == "audio" and hasattr(セッション, "live_processor") and セッション.live_processor:
-                asyncio.create_task(セッション.live_processor.接続時welcome送信())
+                # audioチャンネル接続時にLiveAIのAPIキー確認結果をwelcome_textでch0に送信
+                if ソケット番号 == "audio" and hasattr(セッション, "live_processor") and セッション.live_processor:
+                    asyncio.create_task(セッション.live_processor.接続時welcome送信())
 
-            if セッション.audio_split_task is None or セッション.audio_split_task.done():
-                セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
+                if セッション.audio_split_task is None or セッション.audio_split_task.done():
+                    セッション.audio_split_task = asyncio.create_task(統合音声分離ワーカー(セッション))
 
         # init はソケット登録だけを示す。要求したクライアントにはProviderの準備完了も通知する。
         if ソケット番号 == "audio" and 初期データ.get("Live準備確認") is True:
@@ -1395,7 +1412,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                                     if os.path.exists(_絶対パス):
                                         _lp = getattr(セッション, "live_processor", None)
-                                        if _lp and getattr(getattr(_lp, "AIインスタンス", None), "is_alive", False):
+                                        if セッション.voice_enabled and _lp and getattr(getattr(_lp, "AIインスタンス", None), "is_alive", False):
                                             _fmt = "jpeg" if _拡張子 in (".jpg", ".jpeg") else _拡張子.lstrip(".")
                                             with open(_絶対パス, "rb") as _f:
                                                 _画像データ = _f.read()
@@ -1568,7 +1585,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         elif チャンネル == "input" or 送信モード == "Live":
                             # ライブAI（AIイメージ.vue: チャンネルinput / AIチャット.vue: 送信モードLive）
                             logger.info(f"input_text: LiveAIへルーティング (チャンネル={チャンネル}, 送信モード={送信モード}) socket={セッションID}")
-                            if hasattr(セッション, "live_processor") and セッション.live_processor:
+                            if セッション.voice_enabled and getattr(セッション, "live_processor", None):
                                 送信成功 = await セッション.live_processor.テキスト送信(メッセージ内容)
                                 if 送信成功:
                                     logger.info(f"LiveAIテキスト送信完了: socket={セッションID}")
@@ -1726,7 +1743,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     # チャンネル0: 画像の場合はライブAIへ送信
                     if セッション and 出力先チャンネル == "0" and サムネイル_base64 and Base64ペイロード:
                         try:
-                            if hasattr(セッション, "live_processor") and セッション.live_processor:
+                            if セッション.voice_enabled and getattr(セッション, "live_processor", None):
                                 画像形式 = "png"
                                 if ファイル名 and "." in ファイル名:
                                     拡張子 = ファイル名.rsplit(".", 1)[1].lower()
@@ -1737,6 +1754,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             logger.warning(f"LiveAI画像送信エラー(input_file): {e}")
 
                 elif メッセージ識別 == "input_audio":
+                    if not セッション.voice_enabled:
+                        continue
                     try:
                         base64_audio = 受信データ.get("ファイル名") or ""
                         mime_type = 受信データ.get("メッセージ内容", "audio/pcm")
@@ -1755,6 +1774,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         logger.warning(f"音声入力処理エラー: {e}")
 
                 elif メッセージ識別 == "cancel_audio":
+                    if not セッション.voice_enabled:
+                        continue
                     try:
                         if セッション:
                             セッション.output_audio_paused = True
@@ -1783,6 +1804,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         logger.warning(f"cancel_run処理エラー: {e}")
 
                 elif メッセージ識別 == "input_image":
+                    if not セッション.voice_enabled:
+                        continue
                     try:
                         base64_image = 受信データ.get("ファイル名") or ""
                         mime_type = 受信データ.get("メッセージ内容", "image/png")
@@ -1811,7 +1834,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                             continue
                         # LiveAIへ画像送信（大きい画像はLive側でリサイズ）
                         try:
-                            if セッション and getattr(セッション, "live_processor", None):
+                            if セッション and セッション.voice_enabled and getattr(セッション, "live_processor", None):
                                 画像形式 = "png"
                                 if isinstance(mime_type, str) and "/" in mime_type:
                                     画像形式 = mime_type.split("/", 1)[1].strip() or "png"
@@ -1852,5 +1875,5 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
     finally:
         if セッションID is not None:
             _ws_log(ch=ソケット番号, 内容="接続切断", セッションID=セッションID)
-            await AIセッション管理.disconnect(セッションID, socket_no=ソケット番号)
+            await AIセッション管理.disconnect(セッションID, socket_no=ソケット番号, websocket=WebSocket接続)
             logger.debug(f"クリーンアップ完了: {セッションID}")

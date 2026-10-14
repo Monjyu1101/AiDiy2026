@@ -159,7 +159,8 @@ export class CodeConnection {
       this.pending.add(cancel);
       socket.onopen = () => {
         if (generation !== this.generation) return;
-        socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel, CODE_BASE_PATH: this.project }));
+        // 独立した Code セッションでは、初回・再接続とも音声処理を作らない。
+        socket.send(JSON.stringify({ type: 'connect', セッションID: session || null, ソケット番号: channel, CODE_BASE_PATH: this.project, voice: false }));
       };
       socket.onmessage = event => {
         if (generation !== this.generation) return;

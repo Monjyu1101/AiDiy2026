@@ -155,7 +155,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
         endpoint = next(node for node in tree.body if getattr(node, 'name', '') == 'websocket_endpoint')
         endpoint.decorator_list = []
         session = types.SimpleNamespace(
-            初期化ロック=asyncio.Lock(), モデル設定={}, streaming_processor=None,
+            初期化ロック=asyncio.Lock(), モデル設定={}, streaming_processor=None, voice_enabled=True,
             recognition_processor=object(), chat_processor=types.SimpleNamespace(is_alive=True),
             code_agent_processors=[types.SimpleNamespace(is_alive=True) for _ in range(6)],
             tools_instance=object(), live_processor=types.SimpleNamespace(is_alive=True,
@@ -167,6 +167,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
             disconnect=AsyncMock())
         socket = types.SimpleNamespace(app=types.SimpleNamespace(conf=None), accept=AsyncMock(),
             receive_json=AsyncMock(side_effect=[*packets, WebSocketDisconnect()]), send_json=AsyncMock())
+        session.get_socket = Mock(return_value=types.SimpleNamespace(websocket=socket, is_connected=True))
         logger = Mock()
         audio = AsyncMock()
         namespace = {
@@ -193,7 +194,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual({'type': 'pong', 'セッションID': 'bound-session'}, call.args[0])
         audio.assert_awaited_once_with(session, pcm)
         logger.error.assert_not_called()
-        manager.disconnect.assert_awaited_once_with('bound-session', socket_no='input')
+        manager.disconnect.assert_awaited_once_with('bound-session', socket_no='input', websocket=socket)
 
     async def test_audio_socket_waits_for_provider_ready_and_rejection_is_not_success(self):
         for rejected in (False, True):
@@ -223,7 +224,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
                     if rejected:
                         self.assertEqual('APIクレジットがありません', packet['メッセージ内容'])
                     logger.error.assert_not_called()
-                    manager.disconnect.assert_awaited_once_with('bound-session', socket_no='audio')
+                    manager.disconnect.assert_awaited_once_with('bound-session', socket_no='audio', websocket=socket)
                 finally:
                     release.set()
                     if not task.done():

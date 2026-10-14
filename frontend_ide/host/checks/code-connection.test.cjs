@@ -34,6 +34,7 @@ test('Code 接続: inputのinit・モデル設定後に出力ソケットを開�
     assert.equal(backend.requests.at(-1).body.モデル設定.CODE_AI1_MODEL,'gpt-6-sol');
     assert.equal(backend.requests.at(-1).body.save,false);
     assert.ok(backend.sockets.every(s=>s.sent[0].CODE_BASE_PATH==='/project'));
+    for (const socket of backend.sockets) assert.equal(socket.sent[0].voice,false,'Code専用セッションはJSON booleanのfalseで音声を無効にする');
     assert.ok(client.send({メッセージ識別:'input_text',メッセージ内容:'依頼'})); await flush();
     assert.equal(backend.sockets[0].sent.at(-1).チャンネル,'1');
     assert.ok(packets.some(p=>p.メッセージ識別==='output_text'));
@@ -63,6 +64,10 @@ test('Code 接続: 切断から10秒後に再接続し、同じセッション�
     assert.deepEqual(states.slice(-2),[{connected:false,connecting:true},{connected:true,connecting:false}]);
     assert.equal(client.connected,true); assert.equal(client.session,session);
     assert.equal(backend.sockets.length,4);
+    for (const socket of backend.sockets.slice(2)) {
+      assert.equal(socket.sent[0].voice,false,'再接続でも音声を有効にしない');
+      assert.equal(socket.sent[0].セッションID,session);
+    }
     assert.equal(packets.filter(p=>p.メッセージ識別==='output_text').length,count,'履歴再送で回答が二重にならない');
     assert.equal(backend.requests.filter(r=>r.path.endsWith('設定')).length,settings,'同じ設定の再接続でAIインスタンスをリセットしない');
     old.onclose({}); old.emit({メッセージ識別:'output_text',メッセージ内容:'古い回答'});
@@ -70,6 +75,24 @@ test('Code 接続: 切断から10秒後に再接続し、同じセッション�
     client.disconnect(); t.mock.timers.tick(20000); await flush();
     assert.equal(client.connected,false); assert.equal(backend.sockets.length,4);
   } finally { client.dispose(); t.mock.timers.reset(); }
+});
+
+test('Code 接続: 保存済みセッションを再開するときも両ソケットで音声を無効にする', async () => {
+  const backend = core(), {client} = connection(backend);
+  try {
+    client.start('/project',{provider:'',model:''},'saved-session'); await flush();
+    assert.equal(client.connected,true);
+    assert.equal(client.session,'saved-session');
+    assert.deepEqual(backend.sockets.map(socket=>socket.sent[0]),['input','1'].map(channel=>({
+      type:'connect', セッションID:'saved-session', ソケット番号:channel, CODE_BASE_PATH:'/project', voice:false,
+    })));
+    await client.setModel({provider:'copilot_cli',model:'gpt-6-sol'});
+    assert.equal(client.connected,true);
+    assert.equal(backend.sockets.length,2,'モデル変更で接続を作り直さない');
+    assert.deepEqual(backend.requests.at(-1).body,{
+      セッションID:'saved-session', モデル設定:{CODE_AI1_NAME:'copilot_cli',CODE_AI1_MODEL:'gpt-6-sol'}, save:false,
+    });
+  } finally {client.dispose();}
 });
 
 test('Code 接続: 初回失敗も10秒間隔で再試行し、破棄・接続変更で途中の処理を終了する', async t => {

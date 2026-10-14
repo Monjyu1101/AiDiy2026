@@ -34,6 +34,7 @@
 ## 実装上の維持事項
 
 - Code / Live は既存AIコアのWebSocketとモデル情報APIを使う。Code の接続は `src/code-connection.ts` が input → セッション設定API → 出力1 の順に行い、両init完了後にAIコアへ送信する。未接続中のCode送信はHermesの直接実行へ渡す。
+- 独立した Code セッションの input／1 の `connect` には JSON boolean の `voice: false` を送る。新規接続・保存済み会話の再開・自動再接続のすべてで維持し、`checks/code-connection.test.cjs` で実際の送信 packet を確認する。Live の `LiveConnection` と、Web／Avatar 内で音声セッションを共有するコード画面には、この指定を追加しない。
 - Code / Live は別々の拡張 ID・コマンド・設定・VSIX を維持し、`extensionDependencies` / `extensionPack` で相互依存させない。片方の非導入・無効化で他方が起動できることを確認する。
 - Live の Windows マイクは Webview の権限に依存せず、拡張ホストの Python 標準ライブラリ補助で取り込む。音声処理と自動減衰はスタンドアロンと共有し、非表示・切断・無効化でマイクを終了する。
 - CLI は `shell: false` で起動し、要求本文は標準入力で渡す。要求文をコマンドライン引数へ埋め込まない。

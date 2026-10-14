@@ -135,28 +135,25 @@ class StreamingProcessor:
 
     async def _process_chat_ai(self):
         """チャットAI処理"""
-        # マイクが有効な場合、LiveAIプロセッサをアクティブに保つ
         if self.connection.ボタン状態.get("マイク", False):
-            live_processor = getattr(self.connection, "live_processor", None)
-            if live_processor:
-                try:
-                    # AIインスタンスがなければ開始を試みる
-                    if not getattr(live_processor, "AIインスタンス", None):
-                        logger.info("マイクONのため、LiveAIを開始します。")
-                        await live_processor.開始()
-                except Exception as e:
-                    logger.error(f"LiveAIの開始に失敗しました: {e}")
+            await self._ensure_live_ai("マイク")
 
     async def _process_image_ai(self):
         """イメージAI処理"""
-        # イメージが有効な場合、LiveAIプロセッサをアクティブに保つ
         if self.connection.ボタン状態.get("イメージ", False):
+            await self._ensure_live_ai("イメージ")
+
+    async def _ensure_live_ai(self, ボタン名: str):
+        """音声有効かつ接続中の場合だけLiveを起動する。"""
+        async with self.connection.初期化ロック:
+            音声接続 = self.connection.get_socket("audio")
+            if not self.connection.voice_enabled or not 音声接続 or not 音声接続.is_connected:
+                return
             live_processor = getattr(self.connection, "live_processor", None)
             if live_processor:
                 try:
-                    # AIインスタンスがなければ開始を試みる
                     if not getattr(live_processor, "AIインスタンス", None):
-                        logger.info("イメージONのため、LiveAIを開始します。")
+                        logger.info(f"{ボタン名}ONのため、LiveAIを開始します。")
                         await live_processor.開始()
                 except Exception as e:
                     logger.error(f"LiveAIの開始に失敗しました: {e}")
@@ -199,6 +196,8 @@ class StreamingProcessor:
             mime_type: MIMEタイプ（デフォルト: audio/pcm）
             チャンネル: 送信先チャンネル（デフォルト: "audio"）
         """
+        if not self.connection.voice_enabled:
+            return
         # 音声出力が一時停止中（人間の音声入力中）はスキップ
         if self.connection.output_audio_paused:
             logger.debug(f"音声出力スキップ（一時停止中）: {self.セッションID}")

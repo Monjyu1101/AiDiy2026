@@ -26,11 +26,31 @@
 | `audio` | `AIコア.vue` | `input_audio` 送信、`output_audio` / `cancel_audio` 受信 |
 | `chat` / `file` / `code1`〜`code6` | 各パネル | パネル別の出力受信 |
 
-接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH?, モデル設定? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
+接続時は WebSocket open 後に `{ type: "connect", セッションID, ソケット番号, CODE_BASE_PATH?, モデル設定?, voice? }` を送信し、サーバーから `{ メッセージ識別: "init", セッションID: "<確定ID>" }` を受けて sessionId が確定する。`connect()` を await せずに送信しない。
 
 Avatar / Web の音声接続は、core ソケットの `init` に含まれるモデル設定と `CODE_BASE_PATH` が反映されてから開始する。WebSocket の `open` だけで入力接続済みにすると、既存セッションの復元時に空のフォルダ指定で音声接続し、設定受信後に再接続するため、Live の準備通知が二重になる。
 
 接続待ちの音声ソケットも保持し、フォルダ変更・切断・画面破棄時に閉じる。旧ソケットの遅延イベントで新しい接続状態を上書きしない。接続順序と競合の検証は、Avatar の依存関係を導入した環境で `node --test frontend_avatar/checks/audio-connection.test.cjs` を実行する（リポジトリルートから）。
+
+## セッション単位の音声利用
+
+独立した AiDiy (Code) の `input` / `1` 接続は、`connect.voice: false`（JSON の真偽値）を送信する。バックエンドはこのセッションで Live / Recognition / 音声バッファ / 音声分離タスクを作らず、音声入力と Live 起動も行わない。コード要求と会話履歴はそのまま利用する。
+
+- 新規接続で `voice` を省略すると従来どおり有効になる。既存セッションでは省略時に保存済みの値を引き継ぐ。
+- 接続中のセッションへ異なる値を指定した場合、`error` と切断コード `1008` で拒否する。後から接続したソケットで Web / Avatar の共有音声を止めない。
+- 全ソケットが切断済みの場合だけ、実行中タスクを停止して明示指定へ切り替えられる。セッションID、ボタン、モデル設定、会話履歴は引き継ぐため、以前の Code 会話も継続できる。
+- 音声無効セッションの `audio` ソケットは受け付けない。音声利用を再開する場合は、全接続を閉じて `voice: true` で接続するか、新しいセッションを作る。
+- Web / Avatar 内のコード画面は音声セッションを共有するので、このフラグを変更しない。Live および Discord の Live 接続も従来の省略時動作を維持する。
+
+モデル設定APIは、Liveモデル・音声・プロジェクトフォルダが実際に変更され、音声が有効かつ `audio` が接続中の場合だけ Live を再開始する。Code設定だけの変更や同値の再送では Live を再起動しない。「保存(json書換)」だけの場合は実行中のセッションへ適用せず、その後の「適用」で変更を反映する。最後のソケット切断では音声認識・音声分離・ストリーミングのタスクも停止し、再接続時に再作成する。旧ソケットの切断通知は置き換え済みの新ソケットに適用しない。
+
+ローカル回帰確認（外部AIへの接続なし）:
+
+```bash
+backend_server/.venv/bin/python -m unittest discover -s backend_server/tests -p 'test_*voice*.py'
+backend_server/.venv/bin/python -m unittest discover -s backend_server/tests -p 'test_live_project_connection.py'
+node --test frontend_ide/host/checks/code-connection.test.cjs
+```
 
 ## 主要メッセージ形式
 
