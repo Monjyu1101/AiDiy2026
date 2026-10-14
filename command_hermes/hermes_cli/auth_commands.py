@@ -35,7 +35,7 @@ from hermes_cli.secret_prompt import masked_secret_prompt
 
 
 # Providers that support OAuth login in addition to API keys.
-_OAUTH_CAPABLE_PROVIDERS = {"anthropic", "nous", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth"}
+_OAUTH_CAPABLE_PROVIDERS = {"nous", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth"}
 
 
 def _get_custom_provider_entries() -> list[dict]:
@@ -247,12 +247,6 @@ def _format_exhausted_status(entry) -> str:
 
 def auth_add_command(args) -> None:
     provider = _normalize_provider(getattr(args, "provider", ""))
-    configured_provider = _configured_provider_entry(provider)
-    if not _is_known_provider(provider, configured_provider):
-        raise SystemExit(f"Unknown provider: {provider}")
-    if configured_provider is not None:
-        _migrate_legacy_custom_pool_key(provider, configured_provider["pool_key"])
-
     requested_type = str(getattr(args, "auth_type", "") or "").strip().lower()
     if requested_type in {AUTH_TYPE_API_KEY, "api-key"}:
         requested_type = AUTH_TYPE_API_KEY
@@ -261,6 +255,30 @@ def auth_add_command(args) -> None:
             requested_type = AUTH_TYPE_API_KEY
         else:
             requested_type = AUTH_TYPE_OAUTH if provider in _OAUTH_CAPABLE_PROVIDERS else AUTH_TYPE_API_KEY
+
+    # Reject Anthropic OAuth before reading or changing any credential store.
+    if provider == "anthropic" and requested_type != AUTH_TYPE_API_KEY:
+        raise SystemExit(
+            "Anthropic OAuth is not supported. Use an Anthropic API key "
+            "with 'hermes auth add anthropic --type api_key'."
+        )
+    anthropic_api_key = ""
+    if provider == "anthropic":
+        from agent.anthropic_credentials import _is_oauth_token
+
+        anthropic_api_key = (getattr(args, "api_key", None) or "").strip()
+        if not anthropic_api_key:
+            anthropic_api_key = masked_secret_prompt("Paste your Anthropic API key: ").strip()
+        if not anthropic_api_key:
+            raise SystemExit("No API key provided.")
+        if _is_oauth_token(anthropic_api_key):
+            raise SystemExit("Claude OAuth/setup tokens are not supported. Use an Anthropic API key.")
+
+    configured_provider = _configured_provider_entry(provider)
+    if not _is_known_provider(provider, configured_provider):
+        raise SystemExit(f"Unknown provider: {provider}")
+    if configured_provider is not None:
+        _migrate_legacy_custom_pool_key(provider, configured_provider["pool_key"])
 
     pool = load_pool(provider)
 
@@ -282,7 +300,7 @@ def auth_add_command(args) -> None:
             pass
 
     if requested_type == AUTH_TYPE_API_KEY:
-        token = (getattr(args, "api_key", None) or "").strip()
+        token = anthropic_api_key or (getattr(args, "api_key", None) or "").strip()
         if not token:
             token = masked_secret_prompt("Paste your API key: ").strip()
         if not token:
@@ -306,32 +324,6 @@ def auth_add_command(args) -> None:
         )
         pool.add_entry(entry)
         print(f'Added {provider} credential #{len(pool.entries())}: "{label}"')
-        return
-
-    if provider == "anthropic":
-        from agent import anthropic_adapter as anthropic_mod
-
-        creds = anthropic_mod.run_hermes_oauth_login_pure()
-        if not creds:
-            raise SystemExit("Anthropic OAuth login did not return credentials.")
-        label = (getattr(args, "label", None) or "").strip() or label_from_token(
-            creds["access_token"],
-            _oauth_default_label(provider, len(pool.entries()) + 1),
-        )
-        entry = PooledCredential(
-            provider=provider,
-            id=uuid.uuid4().hex[:6],
-            label=label,
-            auth_type=AUTH_TYPE_OAUTH,
-            priority=0,
-            source=f"{SOURCE_MANUAL}:hermes_pkce",
-            access_token=creds["access_token"],
-            refresh_token=creds.get("refresh_token"),
-            expires_at_ms=creds.get("expires_at_ms"),
-            base_url=_provider_base_url(provider),
-        )
-        pool.add_entry(entry)
-        print(f'Added {provider} OAuth credential #{len(pool.entries())}: "{entry.label}"')
         return
 
     if provider == "nous":

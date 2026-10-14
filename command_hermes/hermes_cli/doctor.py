@@ -2034,7 +2034,7 @@ def run_doctor(args):
             soul_path.write_text(
                 "# AiDiy Hermes Persona\n\n"
                 "<!-- Edit this file to customize how Hermes communicates. -->\n\n"
-                "You are AiDiy Hermes, built by Nous Research and enhanced by the AiDiy development team.\n",
+                "You are AiDiy Hermes, based on Hermes Agent by Nous Research and enhanced by the AiDiy development team.\n",
                 encoding="utf-8",
             )
             check_ok(f"Created {_DHH}/SOUL.md with basic template")

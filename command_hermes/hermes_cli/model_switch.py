@@ -2691,6 +2691,15 @@ def _scoped_key_env(name: str) -> str:
         return ""
 
 
+def _has_anthropic_api_key_for_listing() -> bool:
+    """Only configured API keys make native Anthropic available in pickers."""
+    try:
+        from hermes_cli.auth import get_auth_status
+        return bool(get_auth_status("anthropic").get("logged_in"))
+    except Exception:
+        return False
+
+
 # --- Parallel prefetch for provider model catalogs -----------------------
 #
 # When the 1h disk cache lapses (or on first cold open), list_authenticated_providers()
@@ -2837,6 +2846,8 @@ def _collect_authed_provider_slugs(
         pdata = models_dev_data.get(mdev_id)
         if not isinstance(pdata, dict):
             continue
+        if hermes_id == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         pconfig = PROVIDER_REGISTRY.get(hermes_id)
         if pconfig and pconfig.auth_type != "api_key":
             continue
@@ -2872,6 +2883,8 @@ def _collect_authed_provider_slugs(
         if pid.lower() in seen:
             continue
         hermes_slug = _mdev_to_hermes.get(pid, pid)
+        if hermes_slug == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         if hermes_slug.lower() in seen:
             continue
         if pid.lower() in _excluded_set or hermes_slug.lower() in _excluded_set:
@@ -2916,6 +2929,8 @@ def _collect_authed_provider_slugs(
 
     # --- Section 2b: Canonical providers cross-check ---
     for _cp in CANONICAL_PROVIDERS:
+        if _cp.slug == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         if _cp.slug.lower() in seen:
             continue
         if _cp.slug.lower() in _excluded_set:
@@ -3237,6 +3252,8 @@ def list_authenticated_providers(
         # Prefer auth.py PROVIDER_REGISTRY for env var names — it's our
         # source of truth.  models.dev can have wrong mappings (e.g.
         # minimax-cn → MINIMAX_API_KEY instead of MINIMAX_CN_API_KEY).
+        if hermes_id == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         pconfig = PROVIDER_REGISTRY.get(hermes_id)
         # Skip non-API-key auth providers here — they are handled in
         # section 2 (HERMES_OVERLAYS) with proper auth store checking.
@@ -3331,6 +3348,8 @@ def list_authenticated_providers(
 
         # Resolve Hermes slug — e.g. "github-copilot" → "copilot"
         hermes_slug = _mdev_to_hermes.get(pid, pid)
+        if hermes_slug == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         if hermes_slug.lower() in seen_slugs:
             continue
         if pid.lower() in _excluded or hermes_slug.lower() in _excluded:
@@ -3378,9 +3397,7 @@ def list_authenticated_providers(
             except Exception as exc:
                 logger.debug("External-process check failed for %s: %s", pid, exc)
         # Check auth store and credential pool for non-env-var credentials.
-        # This applies to OAuth providers AND api_key providers that also
-        # support OAuth (e.g. anthropic supports both API key and Claude Code
-        # OAuth via external credential files).
+        # Anthropic has already passed its API-key-only gate above.
         if not has_creds:
             try:
                 from hermes_cli.auth import _load_auth_store
@@ -3414,26 +3431,6 @@ def list_authenticated_providers(
                         pass
             except Exception as exc:
                 logger.debug("Credential pool check failed for %s: %s", hermes_slug, exc)
-        # Fallback: check external credential files directly.
-        # The credential pool gates anthropic behind
-        # is_provider_explicitly_configured() to prevent auxiliary tasks
-        # from silently consuming Claude Code tokens (PR #4210).
-        # But the /model picker is discovery-oriented — we WANT to show
-        # providers the user can switch to, even if they aren't currently
-        # configured.
-        if not has_creds and hermes_slug == "anthropic":
-            try:
-                from agent.anthropic_adapter import (
-                    read_claude_code_credentials,
-                    read_hermes_oauth_credentials,
-                )
-                hermes_creds = read_hermes_oauth_credentials()
-                cc_creds = read_claude_code_credentials()
-                if (hermes_creds and hermes_creds.get("accessToken")) or \
-                   (cc_creds and cc_creds.get("accessToken")):
-                    has_creds = True
-            except Exception as exc:
-                logger.debug("Anthropic external creds check failed: %s", exc)
         if not has_creds:
             continue
 
@@ -3542,6 +3539,8 @@ def list_authenticated_providers(
         _canon_provs = []
 
     for _cp in _canon_provs:
+        if _cp.slug == "anthropic" and not _has_anthropic_api_key_for_listing():
+            continue
         if _cp.slug.lower() in seen_slugs:
             continue
         if _cp.slug.lower() in _excluded:

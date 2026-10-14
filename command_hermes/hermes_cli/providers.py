@@ -101,7 +101,7 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
     ),
     "anthropic": HermesOverlay(
         transport="anthropic_messages",
-        extra_env_vars=("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"),
+        extra_env_vars=("ANTHROPIC_API_KEY",),
     ),
     "zai": HermesOverlay(
         transport="openai_chat",
@@ -523,7 +523,8 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
         base_url_override = overlay.base_url_override if overlay else ""
 
         # Combine env vars: models.dev env + hermes extra
-        env_vars = list(mdev_info.env)
+        # Catalog metadata must not re-enable Claude OAuth discovery.
+        env_vars = ["ANTHROPIC_API_KEY"] if canonical == "anthropic" else list(mdev_info.env)
         if overlay and overlay.extra_env_vars:
             for ev in overlay.extra_env_vars:
                 if ev not in env_vars:

@@ -6,18 +6,9 @@ comes from* and *how a rotated one is committed*. Keeping the two apart means
 the refresh transaction has a single home instead of being interleaved with
 request building.
 
-Sources, in the order ``resolve_anthropic_token()`` consults them:
-
-1. ``ANTHROPIC_TOKEN`` / ``CLAUDE_CODE_OAUTH_TOKEN`` (explicit OAuth env)
-2. ``ANTHROPIC_API_KEY`` (explicit API key)
-3. ``~/.hermes/.anthropic_oauth.json`` (Hermes PKCE login)
-4. ``~/.claude/.credentials.json`` / macOS Keychain (Claude Code)
-5. the credential pool in ``auth.json``
-
-Sources 3 and 4 are *singletons*: ``credential_pool._seed_from_singletons()``
-re-reads them on every ``load_pool()`` and writes what it finds over the pool
-row, which is why a failed write here is a failed refresh (see
-``CredentialPersistError``) rather than a best-effort cache miss.
+AiDiy の Anthropic 実行経路は設定された API キーだけを使う。
+OAuth 環境変数、Claude Code の認証ファイル、OAuth プールは自動取得しない。
+上流互換の OAuth 管理関数は残すが、通常の token resolver は API キー専用。
 
 ``agent.anthropic_adapter`` re-exports every public name below, so existing
 ``from agent.anthropic_adapter import resolve_anthropic_token`` imports keep
@@ -786,62 +777,31 @@ def _resolve_anthropic_pool_token() -> Optional[str]:
     return None
 
 
+ANTHROPIC_API_KEY_REQUIRED = (
+    "AiDiy Hermes requires an Anthropic API key. Set claude_key_id in "
+    "AiDiy_key.json, pass --api-key, or set ANTHROPIC_API_KEY. "
+    "Claude OAuth credentials are not used."
+)
+
+
+def resolve_anthropic_api_key(
+    explicit_api_key: Optional[str] = None, *, required: bool = False,
+) -> Optional[str]:
+    """設定された API キーだけを返す。OAuth の探索・更新は行わない。"""
+    key = str(explicit_api_key or "").strip() or _getenv("ANTHROPIC_API_KEY").strip()
+    if key and _is_oauth_token(key):
+        raise ValueError(
+            "AiDiy Hermes does not support Anthropic OAuth tokens. "
+            "Configure an Anthropic API key instead."
+        )
+    if not key and required:
+        raise ValueError(ANTHROPIC_API_KEY_REQUIRED)
+    return key or None
+
+
 def resolve_anthropic_token() -> Optional[str]:
-    """Resolve an Anthropic token from all available sources.
-
-    Priority:
-      1. ANTHROPIC_TOKEN env var (OAuth/setup token saved by Hermes)
-      2. CLAUDE_CODE_OAUTH_TOKEN env var
-      3. ANTHROPIC_API_KEY env var (explicit regular API key)
-      4. Claude Code credentials (~/.claude.json or ~/.claude/.credentials.json)
-         — with automatic refresh if expired and a refresh token is available
-      5. Anthropic credential_pool OAuth entry (~/.hermes/auth.json)
-
-    Returns the token string or None.
-    """
-    creds: Optional[Dict[str, Any]] = None
-    creds_loaded = False
-
-    def _read_creds() -> Optional[Dict[str, Any]]:
-        nonlocal creds, creds_loaded
-        if not creds_loaded:
-            creds = read_claude_code_credentials()
-            creds_loaded = True
-        return creds
-
-    # 1. Hermes-managed OAuth/setup token env var
-    token = _getenv("ANTHROPIC_TOKEN").strip()
-    if token:
-        preferred = _prefer_refreshable_claude_code_token(token, _read_creds())
-        if preferred:
-            return preferred
-        return token
-
-    # 2. CLAUDE_CODE_OAUTH_TOKEN (used by Claude Code for setup-tokens)
-    cc_token = _getenv("CLAUDE_CODE_OAUTH_TOKEN").strip()
-    if cc_token:
-        preferred = _prefer_refreshable_claude_code_token(cc_token, _read_creds())
-        if preferred:
-            return preferred
-        return cc_token
-
-    # 3. Regular API key. An explicit user-configured key must not be shadowed
-    # by auto-discovered Claude Code or credential-pool OAuth credentials.
-    api_key = _getenv("ANTHROPIC_API_KEY").strip()
-    if api_key:
-        return api_key
-
-    # 4. Claude Code credential file
-    resolved_claude_token = _resolve_claude_code_token_from_credentials(_read_creds())
-    if resolved_claude_token:
-        return resolved_claude_token
-
-    # 5. Hermes credential_pool OAuth entry.
-    resolved_pool_token = _resolve_anthropic_pool_token()
-    if resolved_pool_token:
-        return resolved_pool_token
-
-    return None
+    """上流互換の入口。AiDiy では Anthropic API キーだけを解決する。"""
+    return resolve_anthropic_api_key()
 
 
 def run_oauth_setup_token() -> Optional[str]:

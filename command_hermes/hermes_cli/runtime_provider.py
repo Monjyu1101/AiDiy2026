@@ -540,7 +540,8 @@ def _resolve_runtime_from_pool_entry(
             cfg_base_url = str(model_cfg.get("base_url") or "").strip().rstrip("/")
             if not _anthropic_base_url_override_ok(cfg_base_url):
                 cfg_base_url = ""
-        base_url = cfg_base_url or base_url or "https://api.anthropic.com"
+        # Keep a manually stored key paired with its configured endpoint.
+        base_url = base_url or cfg_base_url or "https://api.anthropic.com"
     elif provider == "openrouter":
         base_url = base_url or OPENROUTER_BASE_URL
     elif provider == "xai":
@@ -1801,16 +1802,12 @@ def _resolve_explicit_runtime(
             if not _anthropic_base_url_override_ok(cfg_base_url):
                 cfg_base_url = ""
         base_url = explicit_base_url or cfg_base_url or "https://api.anthropic.com"
-        api_key = explicit_api_key
-        if not api_key:
-            from agent.anthropic_adapter import resolve_anthropic_token
+        from agent.anthropic_credentials import resolve_anthropic_api_key
 
-            api_key = resolve_anthropic_token()
-            if not api_key:
-                raise AuthError(
-                    "No Anthropic credentials found. Set ANTHROPIC_TOKEN or ANTHROPIC_API_KEY, "
-                    "run 'claude setup-token', or authenticate with 'claude /login'."
-                )
+        try:
+            api_key = resolve_anthropic_api_key(explicit_api_key, required=True)
+        except ValueError as exc:
+            raise AuthError(str(exc)) from exc
         return {
             "provider": "anthropic",
             "api_mode": "anthropic_messages",
@@ -2183,6 +2180,10 @@ def resolve_runtime_provider(
         return explicit_runtime
 
     should_use_pool = provider != "openrouter"
+    if provider == "anthropic":
+        # An explicitly configured environment key also takes precedence over
+        # stored keys. Anthropic load_pool exposes only manually added API keys.
+        should_use_pool = not bool(_getenv("ANTHROPIC_API_KEY", "").strip())
     if provider == "openrouter":
         cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
         cfg_base_url = str(model_cfg.get("base_url") or "").strip()
@@ -2391,7 +2392,7 @@ def resolve_runtime_provider(
             cfg_base_url = (model_cfg.get("base_url") or "").strip().rstrip("/")
             if not _anthropic_base_url_override_ok(cfg_base_url):
                 cfg_base_url = ""
-        base_url = cfg_base_url or "https://api.anthropic.com"
+        base_url = cfg_base_url or _getenv("ANTHROPIC_BASE_URL", "").strip().rstrip("/") or "https://api.anthropic.com"
 
         # For Microsoft Foundry endpoints, use ANTHROPIC_API_KEY directly —
         # Claude Code OAuth tokens (sk-ant-oat01) are not accepted by Azure.
@@ -2433,13 +2434,11 @@ def resolve_runtime_provider(
                     "config.yaml model section at a custom env var."
                 )
         else:
-            from agent.anthropic_adapter import resolve_anthropic_token
-            token = resolve_anthropic_token()
-            if not token:
-                raise AuthError(
-                    "No Anthropic credentials found. Set ANTHROPIC_TOKEN or ANTHROPIC_API_KEY, "
-                    "run 'claude setup-token', or authenticate with 'claude /login'."
-                )
+            from agent.anthropic_credentials import resolve_anthropic_api_key
+            try:
+                token = resolve_anthropic_api_key(required=True)
+            except ValueError as exc:
+                raise AuthError(str(exc)) from exc
         return {
             "provider": "anthropic",
             "api_mode": "anthropic_messages",

@@ -1059,34 +1059,16 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
 
     ``strict_profile_scope``: the caller has bound a NAMED profile's home and
     secret scope and wants an answer for that profile only — launch-process
-    env and host-wide fallbacks (gh auth, Claude Code credentials) must not
+    env and host-wide fallbacks (gh auth) must not
     make it appear ready. Unscoped callers keep the legacy behavior.
     """
     from hermes_cli.config import get_env_path, get_hermes_home, load_config
     from hermes_cli.auth import get_auth_status
 
-    # Determine whether Hermes itself has been explicitly configured (model
-    # in config that isn't the hardcoded default). Used below to gate external
-    # tool credentials (Claude Code, Codex CLI) that shouldn't silently skip
-    # the setup wizard on a fresh install.
-    from hermes_cli.config import DEFAULT_CONFIG
+    from agent.anthropic_credentials import _is_oauth_token
 
-    _DEFAULT_MODEL = DEFAULT_CONFIG.get("model", "")
     cfg = load_config()
     model_cfg = cfg.get("model")
-    if isinstance(model_cfg, dict):
-        _default = model_cfg.get("default")
-        if isinstance(_default, dict):
-            from hermes_cli.config import split_model_config_default
-            _model_name, _ = split_model_config_default(_default)
-        else:
-            _model_name = (_default or "")
-        _model_name = (str(_model_name) if not isinstance(_model_name, str) else _model_name).strip()
-    elif isinstance(model_cfg, str):
-        _model_name = model_cfg.strip()
-    else:
-        _model_name = ""
-    _has_hermes_config = _model_name and _model_name != _DEFAULT_MODEL
 
     # Check env vars (may be set by .env or shell).
     # OPENAI_BASE_URL alone counts — local models (vLLM, llama.cpp, etc.)
@@ -1098,7 +1080,6 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
         "OPENROUTER_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
-        "ANTHROPIC_TOKEN",
         "OPENAI_BASE_URL",
     }
     for pconfig in PROVIDER_REGISTRY.values():
@@ -1110,7 +1091,11 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
         read_provider_env = (current_secret_scope() or {}).get
     else:
         read_provider_env = os.getenv
-    if any(read_provider_env(v) for v in provider_env_vars):
+    if any(
+        (value := read_provider_env(v))
+        and (v != "ANTHROPIC_API_KEY" or not _is_oauth_token(str(value).strip()))
+        for v in provider_env_vars
+    ):
         return True
 
     # Check .env file for keys
@@ -1125,7 +1110,10 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
                     line = line[7:]
                 key, _, val = line.partition("=")
                 val = val.strip().strip("'\"")
-                if key.strip() in provider_env_vars and val:
+                if (
+                    key.strip() in provider_env_vars and val
+                    and (key.strip() != "ANTHROPIC_API_KEY" or not _is_oauth_token(val))
+                ):
                     return True
         except Exception:
             pass
@@ -1160,7 +1148,10 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
         cfg_provider = (model_cfg.get("provider") or "").strip()
         cfg_base_url = (model_cfg.get("base_url") or "").strip()
         cfg_api_key = (model_cfg.get("api_key") or "").strip()
-        if cfg_provider or cfg_base_url or cfg_api_key:
+        if cfg_provider.lower() in {"anthropic", "claude", "claude-code"}:
+            if cfg_api_key and not _is_oauth_token(cfg_api_key):
+                return True
+        elif cfg_provider or cfg_base_url or cfg_api_key:
             return True
 
     # Check provider-specific auth fallbacks (for example, Copilot via gh auth).
@@ -1172,24 +1163,6 @@ def _has_any_provider_configured(*, strict_profile_scope: bool = False) -> bool:
                 status = get_auth_status(provider_id)
                 if status.get("logged_in"):
                     return True
-        except Exception:
-            pass
-
-    # Check for Claude Code OAuth credentials (~/.claude/.credentials.json)
-    # Only count these if Hermes has been explicitly configured — Claude Code
-    # being installed doesn't mean the user wants Hermes to use their tokens.
-    if _has_hermes_config and not strict_profile_scope:
-        try:
-            from agent.anthropic_adapter import (
-                read_claude_code_credentials,
-                is_claude_code_token_valid,
-            )
-
-            creds = read_claude_code_credentials()
-            if creds and (
-                is_claude_code_token_valid(creds) or creds.get("refreshToken")
-            ):
-                return True
         except Exception:
             pass
 
@@ -5548,97 +5521,9 @@ def _stepfun_base_url_for_region(region: str) -> str:
 
 
 def _run_anthropic_oauth_flow(save_env_value):
-    """Run the Claude OAuth setup-token flow. Returns True if credentials were saved."""
-    from agent.anthropic_adapter import (
-        run_oauth_setup_token,
-        read_claude_code_credentials,
-        is_claude_code_token_valid,
-    )
-    from hermes_cli.config import (
-        save_anthropic_oauth_token,
-        use_anthropic_claude_code_credentials,
-    )
-
-    def _activate_claude_code_credentials_if_available() -> bool:
-        try:
-            creds = read_claude_code_credentials()
-        except Exception:
-            creds = None
-        if creds and (
-            is_claude_code_token_valid(creds) or bool(creds.get("refreshToken"))
-        ):
-            use_anthropic_claude_code_credentials(save_fn=save_env_value)
-            print("  ✓ Claude Code credentials linked.")
-            from hermes_constants import display_hermes_home as _dhh_fn
-
-            print(
-                f"    Hermes will use Claude's credential store directly instead of copying a setup-token into {_dhh_fn()}/.env."
-            )
-            return True
-        return False
-
-    try:
-        print()
-        print("  Running 'claude setup-token' — follow the prompts below.")
-        print("  A browser window will open for you to authorize access.")
-        print()
-        token = run_oauth_setup_token()
-        if token:
-            if _activate_claude_code_credentials_if_available():
-                return True
-            save_anthropic_oauth_token(token, save_fn=save_env_value)
-            print("  ✓ OAuth credentials saved.")
-            return True
-
-        # Subprocess completed but no token auto-detected — ask user to paste
-        print()
-        print("  If the setup-token was displayed above, paste it here:")
-        print()
-        from hermes_cli.secret_prompt import masked_secret_prompt
-
-        try:
-            manual_token = masked_secret_prompt(
-                "  Paste setup-token (or Enter to cancel): "
-            ).strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            return False
-        if manual_token:
-            save_anthropic_oauth_token(manual_token, save_fn=save_env_value)
-            print("  ✓ Setup-token saved.")
-            return True
-
-        print("  ⚠ Could not detect saved credentials.")
-        return False
-
-    except FileNotFoundError:
-        # Claude CLI not installed — guide user through manual setup
-        print()
-        print("  The 'claude' CLI is required for OAuth login.")
-        print()
-        print("  To install and authenticate:")
-        print()
-        print("    1. Install Claude Code:  npm install -g @anthropic-ai/claude-code")
-        print("    2. Run:                  claude setup-token")
-        print("    3. Follow the browser prompts to authorize")
-        print("    4. Re-run:               hermes model")
-        print()
-        print("  Or paste an existing setup-token now (sk-ant-oat-...):")
-        print()
-        from hermes_cli.secret_prompt import masked_secret_prompt
-
-        try:
-            token = masked_secret_prompt("  Setup-token (or Enter to cancel): ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            return False
-        if token:
-            save_anthropic_oauth_token(token, save_fn=save_env_value)
-            print("  ✓ Setup-token saved.")
-            return True
-        print("  Cancelled — install Claude Code and try again.")
-        return False
-
+    """Compatibility entry point: native Anthropic OAuth is disabled."""
+    print("  Anthropic OAuth is not supported. Configure an Anthropic API key instead.")
+    return False
 
 
 

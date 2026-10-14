@@ -395,16 +395,8 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         name="Anthropic",
         auth_type="api_key",
         inference_base_url="https://api.anthropic.com",
-        # CLAUDE_CODE_OAUTH_TOKEN is NOT an API key, despite auth_type="api_key"
-        # and its place in this tuple (#82154). `claude setup-token` yields an
-        # `sk-ant-oat01…` OAuth token: sent as `x-api-key` it 401s, and sent as a
-        # bare Bearer it 429s. It is listed here because this tuple doubles as the
-        # credential-DISCOVERY list (agent/credential_pool.py builds its env scan
-        # from it), so removing it would stop Hermes finding a setup-token
-        # credential at all. The adapter routes such a value down the OAuth path
-        # on the strength of its prefix, not on this entry. Only ANTHROPIC_API_KEY
-        # and ANTHROPIC_TOKEN are usable as literal API keys.
-        api_key_env_vars=("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"),
+        # Native Anthropic requests use explicitly configured API keys only.
+        api_key_env_vars=("ANTHROPIC_API_KEY",),
         base_url_env_var="ANTHROPIC_BASE_URL",
     ),
     "alibaba": ProviderConfig(
@@ -629,23 +621,17 @@ except Exception:
 # =============================================================================
 
 def get_anthropic_key() -> str:
-    """Return the first usable Anthropic credential, or ``""``.
+    """Return the configured Anthropic API key, never an OAuth/setup token.
 
-    Checks both the ``.env`` file and the process environment, preferring
-    ``~/.hermes/.env`` so a deliberate key rotation isn't shadowed by a stale
-    shell export (matches the api-key resolution path — see #20591).  The
-    order mirrors the ``PROVIDER_REGISTRY["anthropic"].api_key_env_vars``
-    tuple:
-
-        ANTHROPIC_API_KEY -> ANTHROPIC_TOKEN -> CLAUDE_CODE_OAUTH_TOKEN
+    Preserve the explicit .env-over-process precedence used for key rotation.
+    Claude Code credentials and legacy token environment variables are ignored.
     """
     from hermes_cli.config import get_env_value_prefer_dotenv
+    from agent.anthropic_credentials import _is_oauth_token
 
-    for var in PROVIDER_REGISTRY["anthropic"].api_key_env_vars:
-        value = get_env_value_prefer_dotenv(var) or ""
-        if value:
-            return value
-    return ""
+    value = (get_env_value_prefer_dotenv("ANTHROPIC_API_KEY") or "").strip()
+    return value if value and not _is_oauth_token(value) else ""
+
 
 
 # =============================================================================
@@ -772,6 +758,10 @@ def _resolve_api_key_provider_secret(
         val = (get_env_value_prefer_dotenv(env_var) or "").strip()
         if not has_usable_secret(val):
             continue
+        if provider_id == "anthropic":
+            from agent.anthropic_credentials import _is_oauth_token
+            if _is_oauth_token(val):
+                continue
         if not _secret_matches_declared_prefix(provider_id, val):
             # A provably malformed key (declared prefix mismatch) must not
             # shadow a valid credential-pool entry (#93593). Warn and keep

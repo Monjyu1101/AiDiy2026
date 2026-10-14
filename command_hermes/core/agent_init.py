@@ -779,12 +779,20 @@ def init_agent(
         else:
             agent.api_mode = "chat_completions"
 
+    # Explicit api_mode can bypass the provider-detection elif chain above.
+    # The actual native endpoint still obeys Anthropic's API-key-only policy.
+    if agent.api_mode == "anthropic_messages" and agent._base_url_hostname == "api.anthropic.com":
+        agent.provider = "anthropic"
+
     # Credential-pool validation runs AFTER provider auto-detection so
     # a pool scoped to e.g. "anthropic" is not rejected when the agent
     # was constructed with provider=None and an anthropic.com URL.
     # Regression from #63048 which placed this check before the
     # URL-based auto-detection block above (fixed #63425).
-    if credential_pool is not None:
+    if agent.provider == "anthropic":
+        # API キーを固定し、401/429 で別の認証情報へ切り替えない。
+        agent._credential_pool = None
+    elif credential_pool is not None:
         try:
             from agent.credential_pool import credential_pool_matches_provider
 
@@ -1164,7 +1172,7 @@ def init_agent(
     _provider_timeout = get_provider_request_timeout(agent.provider, agent.model)
 
     if agent.api_mode == "anthropic_messages":
-        from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token
+        from agent.anthropic_adapter import build_anthropic_client
         # Bedrock + Claude → use AnthropicBedrock SDK for full feature parity
         # (prompt caching, thinking budgets, adaptive thinking).
         _is_bedrock_anthropic = agent.provider == "bedrock"
@@ -1183,11 +1191,11 @@ def init_agent(
             if not agent.quiet_mode:
                 print(f"🤖 AI Agent initialized with model: {agent.model} (AWS Bedrock + AnthropicBedrock SDK, {_br_region})")
         else:
-            # Only fall back to ANTHROPIC_TOKEN when the provider is actually Anthropic.
-            # Other anthropic_messages providers (MiniMax, Alibaba, etc.) must use their own API key.
-            # Falling back would send Anthropic credentials to third-party endpoints (Fixes #1739, #minimax-401).
+            # Native Anthropic is API-key-only; protocol-compatible providers
+            # retain their own credential handling (including MiniMax OAuth).
+            from agent.anthropic_credentials import resolve_anthropic_api_key
             _is_native_anthropic = agent.provider == "anthropic"
-            effective_key = (api_key or resolve_anthropic_token() or "") if _is_native_anthropic else (api_key or "")
+            effective_key = resolve_anthropic_api_key(api_key, required=True) if _is_native_anthropic else (api_key or "")
 
             # MiniMax OAuth issues short-lived (~15-min) access tokens. The
             # Anthropic SDK caches ``api_key`` as a static string at client

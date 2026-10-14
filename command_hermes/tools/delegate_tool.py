@@ -4717,6 +4717,8 @@ def _resolve_child_credential_pool(
     ``custom:<name>`` pool key derived from the base_url) and only share the
     parent's pool when both resolve to the *same* custom endpoint.
     """
+    if (effective_provider or getattr(parent_agent, "provider", "")) == "anthropic":
+        return None  # The child inherits the fixed configured API key.
     if not effective_provider:
         return getattr(parent_agent, "_credential_pool", None)
 

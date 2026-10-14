@@ -4918,24 +4918,25 @@ def remove_env_value(key: str) -> bool:
 
 
 def save_anthropic_oauth_token(value: str, save_fn=None):
-    """Persist an Anthropic OAuth/setup token and clear the API-key slot."""
-    writer = save_fn or save_env_value
-    writer("ANTHROPIC_TOKEN", value)
-    writer("ANTHROPIC_API_KEY", "")
+    """Compatibility entry point: native Anthropic OAuth is disabled."""
+    raise ValueError("Anthropic OAuth is not supported. Configure an Anthropic API key instead.")
 
 
 def use_anthropic_claude_code_credentials(save_fn=None):
-    """Use Claude Code's own credential files instead of persisting env tokens."""
-    writer = save_fn or save_env_value
-    writer("ANTHROPIC_TOKEN", "")
-    writer("ANTHROPIC_API_KEY", "")
+    """Compatibility entry point: Claude Code credential import is disabled."""
+    raise ValueError("Claude Code credential import is not supported. Configure an Anthropic API key instead.")
 
 
 def save_anthropic_api_key(value: str, save_fn=None):
-    """Persist an Anthropic API key and clear the OAuth/setup-token slot."""
+    """Persist an explicit API key without changing existing OAuth sessions."""
+    from agent.anthropic_credentials import _is_oauth_token
+
+    value = str(value or "").strip()
+    if not value or _is_oauth_token(value):
+        raise ValueError("An Anthropic API key is required; OAuth/setup tokens are not supported.")
     writer = save_fn or save_env_value
     writer("ANTHROPIC_API_KEY", value)
-    writer("ANTHROPIC_TOKEN", "")
+
 
 
 def save_env_value_secure(key: str, value: str) -> Dict[str, Any]:

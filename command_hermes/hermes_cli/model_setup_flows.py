@@ -12,7 +12,7 @@ explicit import) so existing call sites — and test monkeypatches that target
 ``hermes_cli.main._model_flow_*`` — keep resolving against main.py's namespace.
 
 main.py-internal helpers the flows call (``_prompt_api_key``, ``_save_custom_provider``,
-the reasoning-effort/stepfun/qwen helpers, ``_run_anthropic_oauth_flow``, …) are
+the reasoning-effort/stepfun/qwen helpers, …) are
 imported lazily inside the flows (``from hermes_cli.main import ...`` resolves at
 call time, when main.py is fully loaded) so this module never imports
 ``hermes_cli.main`` at import time -> no import cycle.
@@ -3162,12 +3162,12 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
         print("No change.")
 
 def _model_flow_anthropic(config, current_model=""):
-    """Flow for Anthropic provider — OAuth subscription, API key, or Claude Code creds."""
-    from hermes_cli.main import _run_anthropic_oauth_flow
+    """Configure native Anthropic using an API key only."""
     from hermes_cli.auth import (
         _prompt_model_selection,
         _save_model_choice,
         deactivate_provider,
+        get_anthropic_key,
     )
     from hermes_cli.config import (
         save_env_value,
@@ -3177,103 +3177,43 @@ def _model_flow_anthropic(config, current_model=""):
     )
     from hermes_cli.models import _PROVIDER_MODELS
 
-    # Check ALL credential sources
-    from hermes_cli.auth import get_anthropic_key
-
     existing_key = get_anthropic_key()
-    cc_available = False
-    try:
-        from agent.anthropic_adapter import (
-            read_claude_code_credentials,
-            is_claude_code_token_valid,
-            _is_oauth_token,
-        )
+    needs_auth = not bool(existing_key)
+    if existing_key:
+        from hermes_cli.env_loader import format_secret_source_suffix
 
-        cc_creds = read_claude_code_credentials()
-        if cc_creds and is_claude_code_token_valid(cc_creds):
-            cc_available = True
-    except Exception:
-        pass
-
-    # Stale-OAuth guard: if the only existing cred is an expired OAuth token
-    # (no valid cc_creds to fall back on), treat it as missing so the re-auth
-    # path is offered instead of silently accepting a broken token.
-    existing_is_stale_oauth = False
-    if existing_key and _is_oauth_token(existing_key) and not cc_available:
-        existing_is_stale_oauth = True
-
-    has_creds = (bool(existing_key) and not existing_is_stale_oauth) or cc_available
-    needs_auth = not has_creds
-
-    if has_creds:
-        # Show what we found
-        if existing_key:
-            from hermes_cli.env_loader import format_secret_source_suffix
-            from hermes_cli.auth import PROVIDER_REGISTRY
-
-            # Surface which env var supplied the key so users with
-            # Bitwarden see "(from Bitwarden)" — without this, a detected
-            # BSM key looks identical to a key in .env and users assume
-            # nothing is wired up.
-            source_suffix = ""
-            for var in PROVIDER_REGISTRY["anthropic"].api_key_env_vars:
-                if os.getenv(var, "").strip() == existing_key:
-                    source_suffix = format_secret_source_suffix(var)
-                    if source_suffix:
-                        break
-            print(
-                f"  Anthropic credentials: {existing_key[:12]}... ✓{source_suffix}"
-            )
-        elif cc_available:
-            print("  Claude Code credentials: ✓ (auto-detected)")
+        source_suffix = ""
+        if os.getenv("ANTHROPIC_API_KEY", "").strip() == existing_key:
+            source_suffix = format_secret_source_suffix("ANTHROPIC_API_KEY")
+        print(f"  Anthropic API key: {existing_key[:12]}... ✓{source_suffix}")
         print()
-        choice = _prompt_auth_credentials_choice("Anthropic credentials:")
-
+        choice = _prompt_auth_credentials_choice("Anthropic API key:")
         if choice == "reauth":
             needs_auth = True
         elif choice == "cancel":
             return
-        # choice == "use" or default: use existing, proceed to model selection
 
     if needs_auth:
-        # Show auth method choice
         print()
-        print("  Choose authentication method:")
+        print("  Anthropic requires an API key. Claude OAuth is not supported.")
+        print("  Get an API key at: https://platform.claude.com/settings/keys")
         print()
-        print("    1. Claude Pro/Max subscription (OAuth login)")
-        print("    2. Anthropic API key (pay-per-token)")
-        print("    3. Cancel")
-        print()
+        from hermes_cli.secret_prompt import masked_secret_prompt
+        from agent.anthropic_credentials import _is_oauth_token
+
         try:
-            choice = input("  Choice [1/2/3]: ").strip()
+            api_key = masked_secret_prompt("  API key (or Enter to cancel): ").strip()
         except (KeyboardInterrupt, EOFError):
             print()
             return
-
-        if choice == "1":
-            if not _run_anthropic_oauth_flow(save_env_value):
-                return
-
-        elif choice == "2":
-            print()
-            print("  Get an API key at: https://platform.claude.com/settings/keys")
-            print()
-            from hermes_cli.secret_prompt import masked_secret_prompt
-
-            try:
-                api_key = masked_secret_prompt("  API key (sk-ant-...): ").strip()
-            except (KeyboardInterrupt, EOFError):
-                print()
-                return
-            if not api_key:
-                print("  Cancelled.")
-                return
-            save_anthropic_api_key(api_key, save_fn=save_env_value)
-            print("  ✓ API key saved.")
-
-        else:
-            print("  No change.")
+        if not api_key:
+            print("  Cancelled.")
             return
+        if _is_oauth_token(api_key):
+            print("  Claude OAuth/setup tokens are not supported. Use an Anthropic API key.")
+            return
+        save_anthropic_api_key(api_key, save_fn=save_env_value)
+        print("  ✓ API key saved.")
     print()
 
     # Model selection

@@ -859,6 +859,10 @@ def build_anthropic_client(
     # key whenever we intentionally authenticated via auth_token alone.
     if "auth_token" in kwargs and "api_key" not in kwargs:
         client.api_key = None
+    elif "api_key" in kwargs and "auth_token" not in kwargs:
+        # The SDK also auto-loads ANTHROPIC_AUTH_TOKEN. An explicit API-key
+        # client must never send that ambient Claude bearer alongside its key.
+        client.auth_token = None
     return client
 
 
@@ -942,7 +946,7 @@ def build_anthropic_kwargs(
     (see parse_available_output_tokens_from_error + _ephemeral_max_output_tokens).
 
     When *is_oauth* is True, applies Claude Code compatibility transforms:
-    system prompt prefix, tool name prefixing, and prompt sanitization.
+    system prompt prefix and tool-name normalization (including prose aliases).
 
     When *preserve_dots* is True, model name dots are not converted to hyphens
     (for Alibaba/DashScope anthropic-compatible endpoints: qwen3.5-plus).
@@ -993,15 +997,12 @@ def build_anthropic_kwargs(
         else:
             system = [cc_block]
 
-        # 2. Sanitize system prompt — replace product name references
-        #    to avoid Anthropic's server-side content filters.
+        # 2. Keep tool references aligned with their wire aliases. The
+        #    compatibility prefix above must not rewrite product authorship,
+        #    upstream skill IDs, or the user's persona and memory text.
         for block in system:
             if isinstance(block, dict) and block.get("type") == "text":
                 text = block.get("text", "")
-                text = text.replace("Hermes Agent", "Claude Code")
-                text = text.replace("Hermes agent", "Claude Code")
-                text = text.replace("hermes-agent", "claude-code")
-                text = text.replace("Nous Research", "Anthropic")
                 text = _apply_oauth_prose_aliases(text)
                 block["text"] = text
 

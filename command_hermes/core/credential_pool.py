@@ -3792,6 +3792,35 @@ def _seed_custom_pool(pool_key: str, entries: List[PooledCredential]) -> Tuple[b
 
 def load_pool(provider: str) -> CredentialPool:
     provider = (provider or "").strip().lower()
+    if provider == "anthropic":
+        # AiDiy: 保存済みの明示 API キーだけを読み取り、Claude OAuth の
+        # 探索・更新・移行・削除を行わない。既存 OAuth 行はディスクに残す。
+        from agent.anthropic_credentials import _is_oauth_token
+
+        entries = []
+        raw_entries = read_credential_pool(provider)
+        for payload in raw_entries:
+            if not isinstance(payload, dict):
+                continue
+            token = str(payload.get("access_token") or "").strip()
+            source = str(payload.get("source") or "")
+            if (
+                payload.get("auth_type") == AUTH_TYPE_API_KEY
+                and token
+                and not _is_oauth_token(token)
+                and not payload.get("refresh_token")
+                and (source == SOURCE_MANUAL or source.startswith(SOURCE_MANUAL + ":api_key"))
+            ):
+                entries.append(PooledCredential.from_dict(provider, payload))
+        pool = CredentialPool(provider, entries)
+        if not _profile_owns_pool_provider(provider):
+            # Preserve profile ownership bookkeeping even when every borrowed
+            # root row was OAuth and filtered out. auth add must save locally.
+            pool._borrowed_root_ids = {
+                payload["id"] for payload in raw_entries
+                if isinstance(payload, dict) and payload.get("id")
+            }
+        return pool
     if provider == "openai-codex":
         # Keep a per-process view for the existing pool API; never persist a
         # second copy of Codex OAuth credentials in Hermes auth.json.

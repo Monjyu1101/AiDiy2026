@@ -82,9 +82,16 @@ def setup(choices=None) -> bool:
         subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         # ロック済みの旧版バイナリを取得する前に、宣言範囲内の最新版へ更新する。
         print_info(f"実行中: {npm} update electron --include=dev --no-fund --no-audit")
-        subprocess.run([npm, "update", "electron", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        updated = True
+        try:
+            subprocess.run([npm, "update", "electron", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            updated = False
+            print_info(f"Electron の更新に失敗しました（最新版は未確認）: {exc}")
         if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
-            if not prepare_electron_binary(THIS_DIR, 'AiDiy IDE', info=print_info, error=print_error):
+            if not updated:
+                print_info("導入済みバージョンに一致する配置済み本体・共有 ZIP から復旧します（ダウンロードなし）。")
+            if not prepare_electron_binary(THIS_DIR, 'AiDiy IDE', allow_download=updated, info=print_info, error=print_error):
                 return False
         vue = THIS_DIR.parent.parent / 'frontend_ide'
         if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):

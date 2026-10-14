@@ -1131,6 +1131,9 @@ def recover_with_credential_pool(
     instead of the one-hour billing bench — the same 400 can be a
     content-filter rejection that leaves the credential healthy.
     """
+    # Anthropic の API キーはエラー時も固定し、古い OAuth プールを使わない。
+    if getattr(agent, "provider", "") == "anthropic":
+        return False, has_retried_429
     pool = agent._credential_pool
     if pool is None:
         return False, has_retried_429
@@ -1697,8 +1700,8 @@ def restore_primary_runtime(agent) -> bool:
             primary_provider,
             primary_runtime_base_url,
         )
-        pool = getattr(agent, "_credential_pool", None)
-        if not credential_pool_matches_provider(
+        pool = None if primary_provider == "anthropic" else getattr(agent, "_credential_pool", None)
+        if primary_provider != "anthropic" and not credential_pool_matches_provider(
             pool,
             primary_provider,
             base_url=primary_runtime_base_url,
@@ -1842,6 +1845,9 @@ def restore_primary_runtime(agent) -> bool:
             primary_provider,
             primary_runtime_base_url,
         )
+        if primary_provider == "anthropic":
+            agent._credential_pool = None
+            agent._credential_pool_entry_id = None
         pool = getattr(agent, "_credential_pool", None)
         pool_provider = str(getattr(pool, "provider", "") or "").strip().lower()
         pool_matches_primary = credential_pool_matches_provider(
@@ -3187,7 +3193,7 @@ def switch_model(
             agent._credential_pool_entry_id = None
             try:
                 from agent.credential_pool import load_pool
-                agent._credential_pool = load_pool(new_provider)
+                agent._credential_pool = load_pool(new_provider) if new_norm != "anthropic" else None
             except Exception as _pool_exc:  # noqa: BLE001
                 logger.warning(
                     "switch_model: credential pool reload failed for %s (%s); "
@@ -3217,14 +3223,13 @@ def switch_model(
         elif api_mode == "anthropic_messages":
             from agent.anthropic_adapter import (
                 build_anthropic_client,
-                resolve_anthropic_token,
                 _is_oauth_token,
             )
-            # Only fall back to ANTHROPIC_TOKEN when the provider is actually Anthropic.
-            # Other anthropic_messages providers (MiniMax, Alibaba, etc.) must use their own
-            # API key — falling back would send Anthropic credentials to third-party endpoints.
+            from agent.anthropic_credentials import resolve_anthropic_api_key
             _is_native_anthropic = new_provider == "anthropic"
-            effective_key = (api_key or agent.api_key or resolve_anthropic_token() or "") if _is_native_anthropic else (api_key or agent.api_key or "")
+            # A provider switch must not inherit the previous provider's key.
+            native_key = api_key or (agent.api_key if old_norm == new_norm else None)
+            effective_key = resolve_anthropic_api_key(native_key, required=True) if _is_native_anthropic else (api_key or agent.api_key or "")
 
             # MiniMax OAuth: swap static string for a per-request callable token
             # provider so the rebuilt client survives 15-min token expiry. See

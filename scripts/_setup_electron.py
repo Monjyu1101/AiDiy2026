@@ -125,8 +125,11 @@ def _place_dist(source: Path, frontend_dir: Path, *, move: bool = False) -> None
     (electron_dir / "path.txt").write_bytes(electron_executable_name().encode("utf-8"))
 
 
-def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error=print) -> bool:
-    """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備し、ZIP は保持する。"""
+def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: bool = True, info=print, error=print) -> bool:
+    """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備し、ZIP は保持する。
+
+    allow_download=False のときは導入済み npm パッケージと同じ版のローカル資産だけを使う。
+    """
     try:
         version = get_electron_version(frontend_dir)
         if electron_binary_ready(frontend_dir):
@@ -156,6 +159,9 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, info=print, error
         if _archive_ready(archive, version):
             info(f"{label}: 保存済み ZIP を再利用します: {archive.name}")
         else:
+            if not allow_download:
+                error(f"{label}: Electron v{version} に一致する配置済みバイナリ・共有 ZIP がありません。")
+                return False
             # 既存 ZIP は先に削除せず、取得・検証が成功した時だけ置き換える。
             _download_archive(archive, version, label, info)
 

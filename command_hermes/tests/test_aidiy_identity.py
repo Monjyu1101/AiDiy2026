@@ -20,7 +20,7 @@ class AiDiyIdentityTest(unittest.TestCase):
         self.assertEqual(soul.read_text(encoding="utf-8").strip(), default_soul.DEFAULT_SOUL_MD)
         self.assertEqual(default_soul.DEFAULT_SOUL_MD, prompt_builder.DEFAULT_AGENT_IDENTITY)
         self.assertTrue(default_soul.DEFAULT_SOUL_MD.startswith(
-            "You are AiDiy Hermes, built by Nous Research and enhanced by the AiDiy development team."
+            "You are AiDiy Hermes, based on Hermes Agent by Nous Research and enhanced by the AiDiy development team."
         ))
         self.assertIn("aidiy_hermes", default_soul.DEFAULT_SOUL_MD)
 

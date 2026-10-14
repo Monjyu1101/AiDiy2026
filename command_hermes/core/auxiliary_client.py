@@ -4382,28 +4382,23 @@ def _try_azure_foundry(
     return client, final_model
 
 
-def _try_anthropic(explicit_api_key: str = None) -> Tuple[Optional[Any], Optional[str]]:
+def _try_anthropic(
+    explicit_api_key: str = None, explicit_base_url: str = None,
+) -> Tuple[Optional[Any], Optional[str]]:
     try:
-        from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token
+        from agent.anthropic_adapter import build_anthropic_client
+        from agent.anthropic_credentials import resolve_anthropic_api_key
     except ImportError:
         return None, None
 
-    pool_present, entry = _select_pool_entry("anthropic")
-    if pool_present and entry is not None:
-        token = explicit_api_key or _pool_runtime_api_key(entry)
-    else:
-        # Pool absent, OR pool present but no usable entry (expired token +
-        # stale refresh_token, all entries exhausted, etc). Fall through to the
-        # legacy resolver instead of hard-failing: a temporarily dead pool
-        # entry must not wedge auxiliary tasks when a valid standalone
-        # credential (ANTHROPIC_TOKEN, credentials file, API key) exists. This
-        # matches the openrouter and codex paths, which already fall back to
-        # their env/auth-store credential on (True, None). Without this, the
-        # goal judge and every other Anthropic-routed side channel died with
-        # "no auxiliary client configured" while the main session stayed
-        # healthy (it resolves the env token directly).
-        entry = None
-        token = explicit_api_key or resolve_anthropic_token()
+    token = resolve_anthropic_api_key(explicit_api_key)
+    entry = None
+    if not token:
+        # Static manually configured keys retain their own endpoint. No OAuth
+        # entries, singleton discovery, refresh, or persisted pool edits.
+        entries = load_pool("anthropic").entries()
+        entry = entries[0] if entries else None
+        token = _pool_runtime_api_key(entry) if entry is not None else None
     if not token:
         return None, None
 
@@ -4417,14 +4412,20 @@ def _try_anthropic(explicit_api_key: str = None) -> Tuple[Optional[Any], Optiona
     # would have every auxiliary side-channel call (memory extractors,
     # reflection, vision, title generation) 401 from the foreign host —
     # see issue #52608.
-    base_url = _pool_runtime_base_url(entry, _ANTHROPIC_DEFAULT_BASE_URL) if pool_present else _ANTHROPIC_DEFAULT_BASE_URL
+    # A selected pool key and its endpoint are inseparable; a URL-only
+    # override cannot redirect a stored credential to another service.
+    base_url = _pool_runtime_base_url(entry, _ANTHROPIC_DEFAULT_BASE_URL)
+    if entry is None and explicit_base_url:
+        base_url = explicit_base_url.strip().rstrip("/")
+    elif entry is None and not explicit_api_key:
+        base_url = _scoped_key_env("ANTHROPIC_BASE_URL").rstrip("/") or base_url
     try:
         from hermes_cli.config import load_config_readonly
         cfg = load_config_readonly()
         model_cfg = cfg.get("model")
         if isinstance(model_cfg, dict):
             cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
-            if cfg_provider == "anthropic":
+            if cfg_provider == "anthropic" and not explicit_base_url and entry is None:
                 cfg_base_url = (model_cfg.get("base_url") or "").strip().rstrip("/")
                 if cfg_base_url and _is_anthropic_compatible_host(cfg_base_url):
                     base_url = cfg_base_url
@@ -5222,6 +5223,8 @@ def _recover_provider_pool(provider: str, exc: Exception, *, failed_api_key: str
     would leave current() as None, causing the wrong entry to be marked).
     """
     normalized = _normalize_aux_provider(provider)
+    if normalized == "anthropic":
+        return False  # Keep the configured API key, including after 401/429.
     try:
         pool = load_pool(normalized)
     except Exception as load_exc:
@@ -5451,16 +5454,7 @@ def _refresh_provider_credentials(provider: str) -> bool:
             _evict_cached_clients(normalized)
             return True
         if normalized == "anthropic":
-            from agent.anthropic_credentials import read_claude_code_credentials, _refresh_oauth_token, resolve_anthropic_token
-
-            creds = read_claude_code_credentials()
-            token = _refresh_oauth_token(creds) if isinstance(creds, dict) and creds.get("refreshToken") else None
-            if not str(token or "").strip():
-                token = resolve_anthropic_token()
-            if not str(token or "").strip():
-                return False
-            _evict_cached_clients(normalized)
-            return True
+            return False  # AiDiy does not acquire or refresh Claude OAuth.
         if normalized == "xai-oauth":
             # Preference: pool-level refresh (uses refresh_token from pool entry),
             # then fall back to singleton auth-store resolver.
@@ -7405,7 +7399,9 @@ def resolve_provider_client(
 
     if pconfig.auth_type == "api_key":
         if provider == "anthropic":
-            client, default_model = _try_anthropic(explicit_api_key=explicit_api_key)
+            client, default_model = _try_anthropic(
+                explicit_api_key=explicit_api_key, explicit_base_url=explicit_base_url,
+            )
             if client is None:
                 logger.warning("resolve_provider_client: anthropic requested but no Anthropic credentials found")
                 return None, None

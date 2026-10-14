@@ -34,6 +34,16 @@ AiDiy の選択画面（aidiy_code / Discord のコードモデル候補も `fro
 
 API キーのプロバイダ（`openai` / `ollama` / `openrt` / `gemini` / `freeai`）の候補は `_fetch_aidiy_provider_model_labels` が各 API の `/models` から取得します。`cli_main.py` はモジュール先頭で `urllib` を読み込まないため、同関数内で `import urllib.request` します。これが無いと `NameError` を `except` が握りつぶし、候補が既定モデル1件（`yyyy/mm/dd - 既定モデル`）になります。どのプロバイダも「作成から240日以内の対話モデル」に揃えます。`_AIDIY_NON_CHAT_MODEL` で画像・音声・動画（veo）・音楽（lyria）・埋め込み・リアルタイム・文字起こし・検索・deep-research・antigravity・バッチ専用（`:batch`）などの対話以外のモデルを名前で除き、作成日を返す API（OpenAI / OpenRouter / Ollama）は240日以内だけを新しい順に出します（最大50件、240日以内なら旧世代も残る）。作成日を返さない API（Gemini / FreeAI。OpenAI 互換・ネイティブとも日付なし）は240日で絞れないため、`_aidiy_newest_generation_only` で gemini / gemma の系列ごとに最大の主版（例：最新が 3.8 なら 3.x）だけを残し、版の無い別名（`gemini-flash-latest` など）は残します。OpenRouter のキー（`openrt_key_id`）が使えるときは、`openai` / `gemini` / `freeai` の候補を OpenRouter の `/models` と照合して絞り込みます（`_fetch_aidiy_openrouter_model_meta`、OpenRouter の `openai/` / `google/` の名前を `:free` / `:batch` などの付記を除いて照合）。OpenRouter に無いモデルと、出力がテキストだけではないモデル（`architecture.output_modalities`）を除き、作成日の無い Gemini にも OpenRouter の作成日を使って240日の判定をします。キーが無い・取得できないときは上の従来の判定に戻ります。`frontend_ide/host/scripts/model-catalog.py` は `cli_main.py` の picker メソッドを名前で拾うため、`_fetch_aidiy_*` を追加したら同スクリプトの `Picker` にも加えます。`openai_oauth` は `_fetch_aidiy_codex_model_labels` で `_AIDIY_OPENAI_OAUTH_CURRENT_MODEL`（gpt-6 系）だけに絞り、該当が無いときは取得した一覧をそのまま使います。確認は `command_hermes/.venv` の Python で `frontend_ide/host/scripts/model-catalog.py command_hermes/cli_main.py <provider>` を実行して候補を見ます。
 
+## Anthropic の API キー専用運用
+
+AiDiy の Anthropic 接続は `claude_key_id`、明示した `--api-key`、`ANTHROPIC_API_KEY` を使います。
+直接の Hermes 管理コマンドで明示登録した API キーも対象ですが、選択したキーはリクエスト前や 401 / 429 の再試行で別の認証情報へ差し替えません。
+API キーが無い場合は設定を案内して停止し、`ANTHROPIC_TOKEN`、`CLAUDE_CODE_OAUTH_TOKEN`、Claude Code の保存済み OAuth を借用しません。
+既存の OAuth ファイルやセッション履歴は削除・移行しません。Anthropic の setup / auth add は API キー方式のみで、外部 `claude-code` CLI bridge、OpenAI / xAI など他 provider の認証方式は別扱いです。
+
+実装入口は `core/anthropic_credentials.py`、`core/credential_pool.py`、`hermes_cli/runtime_provider.py`、`base/run_agent.py`。
+オフライン確認は `python -m unittest discover -s command_hermes/tests -p 'test_anthropic_*.py'`。偽キーで初期化・通常要求・認証失敗・モデル切替・直接 CLI の設定経路を確認します。実 API 接続は別途行います。
+
 ## Provider Overlay 一覧
 
 `hermes_cli/providers.py` の `HERMES_OVERLAYS` で 32 の provider が定義されています。各 overlay は transport、auth type、env var を指定します。
