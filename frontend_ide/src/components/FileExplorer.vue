@@ -6,6 +6,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AISearchPanel from './AISearchPanel.vue';
+import FileTypeIcon from './FileTypeIcon.vue';
 import { latestFiles, createLatestUpdates } from '../latest-file.js';
 import { scanWarning } from '../scan-warning.js';
 const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
@@ -250,17 +251,17 @@ defineExpose({reveal});
       </section>
       <div class="explorer-root" :title="root">
         <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
-        <button class="explorer-root-name" :disabled="searching" @click="select({type:'dir',path:''})"><span aria-hidden="true">{{ rootExpanded?'📂':'📁' }}</span><span class="file-name">{{ tree?.n }}</span></button>
+        <button class="explorer-root-name" :disabled="searching" @click="select({type:'dir',path:''})"><FileTypeIcon :name="tree?.n" directory :open="rootExpanded" /><span class="file-name">{{ tree?.n }}</span></button>
       </div>
       <ul ref="treeElement" role="tree" tabindex="0" @keydown="key"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,selected:selected===row.path,cursor:cursor===row.path}" @click="select(row,true)">
-        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><span v-if="row.type==='dir'">{{ row.open?'📂':'📁' }}</span><span v-else class="file-dot" :style="{color:color(row.name)}">●</span><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh">●</span>
+        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh">●</span>
       </li></TransitionGroup></ul>
       <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
       <footer class="explorer-footer">
         <p v-if="latestWarning" class="scan-warning" role="status">{{ latestWarning }}</p>
         <small v-if="recentUpdates.length">最終更新 · {{ recentUpdates.length }}件</small>
         <div v-if="recentUpdates.length" class="explorer-latest-list" aria-label="最終更新ファイル一覧">
-          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path,mtime:file.mtime,source:'latest'})"><span class="file-dot" :style="{color:color(file.name)}">●</span><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
+          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path,mtime:file.mtime,source:'latest'})"><FileTypeIcon :name="file.name" /><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
         </div>
       </footer>
 

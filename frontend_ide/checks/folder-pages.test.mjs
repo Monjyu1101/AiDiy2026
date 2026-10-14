@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import * as folderPages from '../src/folder-pages.js';
+import { fileIcon, catppuccinAsset } from '../src/file-icons.js';
 import { validConnectionState } from '../src/connection-state.js';
 import { createDraftTargetRegistry } from '../src/draft-target-registry.js';
 const require = createRequire(import.meta.url), vue = require('vue');
@@ -409,17 +410,17 @@ test('2D配色: 既存AiDiyメニューのクリーム色を専用変数で使�
   assert.match(css, /\.mode-2d \.folder-pages,\.mode-2d \.folder-page-body,\.mode-2d \.space-loading\{background:var\(--aidiy-cream-light\)/);
 });
 
-test('2D文字: ページ本文は16px、日時・件数・補足は14pxで共通ビューアの文字設定を変えない', () => {
+test('2D文字: ページ本文は18px、日時・件数・補足は16pxで共通ビューアの文字設定を変えない', () => {
   const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
   const rules = selector => {
     const found = []; css.walkRules(rule => { if (rule.selector === selector) found.push(rule); }); return found;
   };
   const values = (selector, property) => rules(selector).flatMap(rule => rule.nodes.filter(node => node.prop === property).map(node => node.value));
-  assert.deepEqual(values('.folder-pages', 'font-size'), ['16px']);
+  assert.deepEqual(values('.folder-pages', 'font-size'), ['18px']);
   assert.deepEqual(values('.folder-pages', 'line-height'), ['1.5']);
   assert.deepEqual(values('.folder-page-heading button', 'min-height'), ['36px']);
   for (const selector of ['.folder-page-summary', '.folder-page-meta', '.folder-page-reference-note', '.folder-pages footer']) {
-    assert.deepEqual(values(selector, 'font-size'), ['14px'], selector);
+    assert.deepEqual(values(selector, 'font-size'), ['16px'], selector);
   }
   assert.deepEqual(values('.folder-page-meta time', 'font-size'), ['inherit']);
   assert.deepEqual(values('.folder-page-meta time', 'display'), ['block'], '狭幅でも日時を隠さない');
@@ -428,7 +429,7 @@ test('2D文字: ページ本文は16px、日時・件数・補足は14pxで共�
   css.walkRules(rule => {
     if (!rule.selector.includes('folder-page')) return;
     for (const declaration of rule.nodes) {
-      if (declaration.prop === 'font-size' && declaration.value.endsWith('px')) assert.ok(parseFloat(declaration.value) >= 14, `${rule.selector}: ${declaration.value}`);
+      if (declaration.prop === 'font-size' && declaration.value.endsWith('px')) assert.ok(parseFloat(declaration.value) >= 16, `${rule.selector}: ${declaration.value}`);
     }
   });
 });
@@ -494,11 +495,18 @@ test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の�
 });
 
 async function mountedPages(globals = {}) {
+  // アイコンも実際のSFCをコンパイルし、旧ページ・経由ページを含む表示を検証する。
+  const iconSource = parse(readFileSync(new URL('../src/components/FileTypeIcon.vue', import.meta.url), 'utf8')).descriptor;
+  const iconScript = compileScript(iconSource, { id: 'mounted-icon', genDefaultAs: 'component', inlineTemplate: true });
+  const iconModule = { exports: {} };
+  vm.runInNewContext(transformSync(iconScript.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
+    module: iconModule, require: id => id === 'vue' ? vue : { fileIcon },
+  });
   const { descriptor } = parse(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'mounted-pages', genDefaultAs: 'component', inlineTemplate: true });
   const module = { exports: {} };
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, Date, require: id => id === 'vue' ? vue : folderPages, ...globals,
+    module, Date, require: id => id === 'vue' ? vue : id.endsWith('FileTypeIcon.vue') ? iconModule.exports : folderPages, ...globals,
   });
   const walk = (element, predicate) => predicate(element) ? element : (element.children || []).map(child => walk(child, predicate)).find(Boolean);
   const node = type => ({ type, children: [], props: {}, scrollTop: 0,
@@ -702,4 +710,69 @@ test('3Dパネル境界: エクスプローラー・ビューア・閲覧/検索
   const rule=css.match(/\.space-view:not\(\.mode-2d\) :is\(\.explorer-panel,\.viewer-popup,\.explorer-routes,\.route-file-list\)\{([^}]+)\}/);
   assert.ok(rule,'2D以外の4パネルだけを対象にする');
   assert.match(rule[1],/box-shadow:[^;]+rgba\(255,255,255,/);assert.doesNotMatch(rule[1],/animation|transition/);
+});
+
+
+test('2Dアイコン: 通常・旧・経由ページが同じ同梱SVGと共通部品を使い、選択操作を変えない', async () => {
+  const { app, root, props, emitted, warnings, walk, find } = await mountedPages();
+  const all = (node, predicate) => [...(predicate(node) ? [node] : []), ...(node.children || []).flatMap(child => all(child, predicate))];
+  const assertIcons = layer => {
+    const rows = all(layer, element => element.props.class?.split(' ').includes('folder-page-entry'));
+    assert.ok(rows.length);
+    for (const row of rows) {
+      const name = row.props.title.split('/').at(-1), directory = row.props.class.split(' ').includes('folder');
+      const icon = walk(row, element => element.type === 'img');
+      assert.ok(icon); assert.equal(icon.props.src, `/development/assets/catppuccin_icons/mocha/${fileIcon(name, { directory })}.svg`);
+      assert.ok(catppuccinAsset(icon.props.src.slice('/development/'.length)));
+      assert.equal(icon.props.alt, ''); assert.equal(icon.props['aria-hidden'], 'true');
+      assert.equal(icon.props.draggable, 'false'); assert.equal(icon.props.innerHTML, undefined);
+    }
+  };
+  try {
+    assertIcons(find('folder-page-body'));
+    const row = walk(root, element => element.props.title === 'root2.js'); row.props.onClick(); await flush();
+    assert.equal(emitted.at(-1).path, 'root2.js'); assert.equal(props.selected, 'root2.js');
+    props.current = 'src/nested'; await flush();
+    const layers = all(root, element => element.props['data-page-layer']);
+    assert.equal(layers.length, 3);
+    for (const layer of layers) {
+      assertIcons(layer);
+      if (layer.props['data-page-layer'] !== 'live') { assert.equal(layer.props.inert, true); assert.equal(layer.props['aria-hidden'], true); }
+    }
+    const old = layers.find(layer => layer.props['data-page-layer'] === 'outgoing');
+    const selected = emitted.length; walk(old, element => element.props.title === 'src').props.onClick(); await flush();
+    assert.equal(emitted.length, selected, '表示用の旧ページのアイコン行から移動させない');
+    props.current = ''; await flush(); assertIcons(find('folder-page-body'));
+    assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+test('2Dアイコン: 24px表示は既存32px列内に収まり、クリーム背景の選択状態でも色を識別できる', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const declaration = (selector, property) => {
+    let value; css.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(property, decl => value = decl.value); }); return value;
+  };
+  assert.equal(declaration('.folder-page-icon', '--file-type-icon-size'), '24px');
+  assert.equal(declaration('.folder-page-icon', 'width'), '32px');
+  assert.equal(declaration('.folder-page-icon', 'display'), 'grid');
+  assert.equal(declaration('.folder-page-icon', 'place-items'), 'center');
+  assert.equal(declaration('.mode-2d .folder-page-icon', 'filter'), 'brightness(.5) saturate(.9)');
+  assert.match(readFileSync(new URL('../src/components/FileTypeIcon.vue', import.meta.url), 'utf8'), /width:var\(--file-type-icon-size,16px\);height:var\(--file-type-icon-size,16px\)/);
+  // 元SVGは増やさず、2DのCSSフィルターだけで暗くする。計算は実描画の検証とは別。
+  const manifest = JSON.parse(readFileSync(new URL('../public/assets/catppuccin_icons/manifest.json', import.meta.url), 'utf8'));
+  const rgb = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+  const luminance = channels => channels.reduce((value, channel, index) => value + [.2126, .7152, .0722][index] * (channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4), 0);
+  const backgrounds = ['#faf7f2', '#f5f1e8', '#f0ebe0', '#eee6d8', '#e6d5b7', '#ddcfb5'];
+  for (const file of manifest.files) {
+    const svg = readFileSync(new URL('../public/assets/catppuccin_icons/' + file.path, import.meta.url), 'utf8');
+    for (const [hex] of svg.matchAll(/#[0-9a-fA-F]{6}/g)) {
+      const bright = rgb(hex).map(value => value * .5);
+      const gray = bright.reduce((sum, value, index) => sum + value * [.213, .715, .072][index], 0);
+      const foreground = luminance(bright.map(value => value * .9 + gray * .1));
+      for (const background of backgrounds) {
+        const [low, high] = [foreground, luminance(rgb(background))].sort((a, b) => a - b);
+        assert.ok((high + .05) / (low + .05) >= 3, `${file.path}: ${hex} on ${background}`);
+      }
+    }
+  }
 });

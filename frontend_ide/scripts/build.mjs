@@ -7,8 +7,11 @@ import { build } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { mkdir, readFile, readdir, writeFile, cp } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, cp, rm } from 'node:fs/promises';
+import { catppuccinNotice } from './icon-notices.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
+// Viteがpublicの原文SVGを外部ファイルのままコピーする。旧選択分は残さない。
+await rm(join(root,'dist/assets/catppuccin_icons'),{recursive:true,force:true});
 await build({root,plugins:[vue()],define:{'process.env.NODE_ENV':JSON.stringify('production'),__VUE_OPTIONS_API__:true,__VUE_PROD_DEVTOOLS__:false,__VUE_PROD_HYDRATION_MISMATCH_DETAILS__:false},build:{emptyOutDir:false,lib:{entry:join(root,'src/main.js'),formats:['iife'],name:'AiDiyDevelopment',fileName:()=> 'app.js',cssFileName:'app'},rollupOptions:{output:{banner:'/*! COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors. Licensed under "AiDiy 公開利用ライセンス v1.1". Commercial use requires prior written consent from all copyright holders. See LICENSE for full terms. Thank you for keeping the rules. https://github.com/monjyu1101/AiDiy2026 */'}}}});
 const template=await readFile(join(root,'index.html'),'utf8');
 await writeFile(join(root,'dist/index.html'),template.replace('<script type="module" src="/src/main.js"></script>','<link rel="stylesheet" href="/development/app.css"><script src="/development/app.js" defer></script>'));
@@ -17,6 +20,8 @@ for(const name of ['@xterm/xterm','@xterm/addon-fit','node-pty','node-addon-api'
  const folder=join(root,'node_modules',name);let metadata;try{metadata=JSON.parse(await readFile(join(folder,'package.json'),'utf8'));}catch{continue;}
  for(const file of (await readdir(folder)).filter(name=>/^licen[sc]e/i.test(name)))notices.push(`${name} ${metadata.version}\n${await readFile(join(folder,file),'utf8')}`);
 }
+const icons=await catppuccinNotice();
+notices.push(`${icons.name} ${icons.version} — ${icons.license}\n${icons.source}\n`+icons.files.map(file=>`\n--- ${file.name} ---\n${file.text}`).join('\n'));
 await writeFile(join(root,'dist/THIRD_PARTY_NOTICES.txt'),notices.join('\n\n'));
 await cp(join(root,'LICENSE'),join(root,'dist/LICENSE'));
 // 拡張には同じVue bundleを収録する。IDE専用の拡張は作らない。
@@ -24,5 +29,7 @@ const chatImages = ['sending.png', 'abort.png', 'speaker.png', 'microphone.png']
 for (const file of chatImages) await cp(join(root, ['speaker.png', 'microphone.png'].includes(file) ? 'host/aidiy_live/media' : 'host/media', file), join(root, 'dist', file));
 for(const target of ['../host/dist/development','../host/aidiy_live/dist/development']){
  const output=fileURLToPath(new URL(target+'/',import.meta.url));await mkdir(output,{recursive:true});
+ await rm(join(output,'assets/catppuccin_icons'),{recursive:true,force:true});
+ await cp(join(root,'dist/assets/catppuccin_icons'),join(output,'assets/catppuccin_icons'),{recursive:true});
  for(const file of ['app.js','app.css','AiDiy.png',...chatImages,'THIRD_PARTY_NOTICES.txt','LICENSE'])await cp(join(root,'dist',file),join(output,file));
 }

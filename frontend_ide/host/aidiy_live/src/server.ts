@@ -20,6 +20,7 @@ import { ライブモデル読込, ライブモデル保存, モデル保存先 
 import { ローカル接続先 } from '../local-backend.cjs';
 import { 接続エラー詳細 } from './connection-error';
 import { 接続元許可 } from '../../src/forwarded-origin';
+import { catppuccinAsset } from '../../../src/file-icons.js';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
 export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
@@ -77,14 +78,17 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     if (packaged && path === '' && req.method === 'GET') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'");
-      res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="development/app.css"><script id="development-config" type="application/json">{"kind":"live","host":false,"base":"./","icon":"AiDiy.png"}</script><div id="app"></div><script src="development/app.js" defer></script></html>');
+      res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="development/app.css"><script id="development-config" type="application/json">{"kind":"live","host":false,"base":"./","icon":"AiDiy.png","iconAssets":"development/assets/catppuccin_icons/"}</script><div id="app"></div><script src="development/app.js" defer></script></html>');
       return;
     }
-    if (path !== null && assets[path] && req.method === 'GET') {
+    const iconAsset = path?.startsWith('development/') ? catppuccinAsset(path.slice('development/'.length)) : undefined;
+    const asset = path !== null && Object.hasOwn(assets, path) ? assets[path] : iconAsset ? [join(root, 'dist/development', iconAsset[0]), iconAsset[1]] : undefined;
+    if (asset && req.method === 'GET') {
       try {
-        res.setHeader('Content-Type', assets[path][1]);
+        res.setHeader('Content-Type', asset[1]);
         res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
-        res.end(readFileSync(assets[path][0]));
+        if (iconAsset) res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        res.end(readFileSync(asset[0]));
       } catch { res.writeHead(500).end('画面ファイルを読み込めません。live:compile を実行してください。'); }
       return;
     }

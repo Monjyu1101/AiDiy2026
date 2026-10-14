@@ -14,6 +14,7 @@ import { createAISearch } from './ai-search.mjs';
 import { createFileAnalysis } from './file-analysis.mjs';
 import { startTerminal } from './terminal.mjs';
 import { createFileHistory } from './file-history.mjs';
+import { catppuccinAsset } from './src/file-icons.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){
  if(!['code','live','ide','term'].includes(kind))throw Error('アプリはcode / live / ide / termから指定してください。');
@@ -32,10 +33,11 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
    if(url.pathname==='/development/config'){
     res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,icon:'/development/AiDiy.png'}));return true;
    }
-   const asset=files[url.pathname];if(!asset)return false;
+   const iconAsset=url.pathname.startsWith('/development/')?catppuccinAsset(url.pathname.slice('/development/'.length)):undefined;
+   const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset)return false;
    if(req.method!=='GET'){res.writeHead(405).end();return true;}
    const content=await readFile(join(root,'dist',asset[0]));
-   res.writeHead(200,{'content-type':asset[1],'cache-control':'no-store','x-content-type-options':'nosniff'}).end(content);return true;
+   res.writeHead(200,{'content-type':asset[1],'cache-control':'no-store','x-content-type-options':'nosniff',...(iconAsset?{'content-security-policy':"default-src 'none'; sandbox"}:{})}).end(content);return true;
   },
   panelsFactory:(project,state)=>createPanels(project,state,async(type,folder,snapshot)=>{
    if(kind!=='ide'&&type!==kind)throw Error('このアプリでは利用できません。');

@@ -5,6 +5,7 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { computed, ref, shallowRef, watch, nextTick, onBeforeUnmount } from 'vue';
+import FileTypeIcon from './FileTypeIcon.vue';
 import { indexFolderPages, createFolderPageMemory, folderPageTurnPlan } from '../folder-pages.js';
 const props = defineProps({ tree: Object, current: { type: String, default: '' }, selected: String, unlistedParent: String, marks: Object, active: Boolean, color: Function });
 const emit = defineEmits(['select', 'clear', 'refresh', 'toggle-explorer', 'activity']);
@@ -146,7 +147,7 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
       <div v-for="layer in layers" :key="layer.id" :ref="element => bindBody(element,layer)" class="folder-page-body" :class="layer.live ? '' : ['folder-page-sheet',layer.outgoing ? 'page-turn-'+pageTurn : 'folder-page-underlay']" :data-page-path="layer.path" :data-page-layer="layer.live ? 'live' : layer.outgoing ? 'outgoing' : 'incoming'" :tabindex="layer.live ? 0 : undefined" :role="layer.live ? 'listbox' : undefined" :aria-label="layer.live ? 'フォルダとファイル' : undefined" :aria-hidden="layer.live ? undefined : true" :inert="!layer.live" :aria-activedescendant="layer.live && cursor ? 'folder-page-entry-'+entries.findIndex(entry=>entry.path===cursor) : undefined" @scroll="layer.live && layer.path===current && save(layer.path)" @animationend="finishTurn($event,layer.id)" @animationcancel="finishTurn($event,layer.id)">
         <div class="folder-page-items">
           <div v-for="(entry,index) in layer.entries" :id="layer.live ? 'folder-page-entry-'+index : undefined" :key="entry.path" class="folder-page-entry" :class="{folder:entry.type==='dir',marked:!!entry.marked,selected:layer.selected===entry.path}" :data-cursor="layer.cursor===entry.path" :role="layer.live ? 'option' : undefined" :aria-selected="layer.live ? cursor===entry.path : undefined" :aria-label="layer.live ? entry.name+(entry.type==='dir'?' フォルダ':' ファイル') : undefined" :title="entry.path" @click="layer.live && select(entry)">
-            <span class="folder-page-icon" :style="{color:entry.type==='dir' ? undefined : color?.(entry.name)}" aria-hidden="true">{{ entry.type==='dir' ? '▸ 📁' : '●' }}</span>
+            <span class="folder-page-icon" aria-hidden="true"><FileTypeIcon :name="entry.name" :directory="entry.type==='dir'" /></span>
             <span class="folder-page-name">{{ entry.name }}</span>
             <span v-if="entry.type==='dir'" class="folder-page-meta">{{ entry.count }} ファイル<span v-if="entry.marked" class="folder-page-mark"> · 対象 {{ entry.marked }}</span></span>
             <span v-else class="folder-page-meta">{{ formatSize(entry.size) }}<time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
