@@ -9,7 +9,7 @@
 // -------------------------------------------------------------------------
 
 // AiDiy IDE 星図ビューア。いつも1階層だけを宇宙として描く。
-//  - 直下のフォルダ → 銀河（星の数 = 配下の全ファイル数）
+//  - 直下のフォルダ → 銀河（直下ファイルは個別の星、それより深い各フォルダは代表星）
 //  - 直下のファイル → 名前で決まる位置の自由惑星
 // 銀河をダブルクリックすると、そのフォルダを新しい宇宙として突入する。
 // 依存なしの Canvas 2D。名前のハッシュから3D座標を作り、透視投影して描く。
@@ -21,6 +21,11 @@ import { aiRouteTargets } from './ai-route.js';
 import { createTextWidthCache } from './text-width-cache.js';
 
 export const ORBIT_PATH_SCALE = .9;
+// 容量・種類による補正前の通常星を基準に、代表星の直径を実ファイル数で1〜3倍にする。
+export const BASE_STAR_MAG = 1;
+export function representativeStarScale(fileCount) {
+  return Math.min(3, 1 + Math.log10(Math.max(1, fileCount)));
+}
 
 // メディアは従来サイズ。その他は20KB以下で半分、100KB以上で3倍にする。
 export function fileSizeScale(name, size) {
@@ -141,12 +146,22 @@ const galaxyRadius = 160;
 
 // 起点日時以降に更新したファイル（AI が触ったファイルを見つける目印）
 let markMode = 'since', grepMatches = new Set(), grepController, grepRevision = 0;
-const isFresh = file => markMode === 'grep' || markMode === 'ai' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
+// 代表星の更新・検索件数は一覧/条件変更時に集計し、描画中に配下を走査しない。
+const isFresh = file => file.isDirectory ? file.fresh > 0 : markMode === 'grep' || markMode === 'ai' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
 const fastBlink = t => 0.5 + 0.5 * Math.sin(t * 1.8);          // ファイル: 約3.5秒周期で穏やかに明滅
 const slowBlink = t => 0.5 + 0.5 * Math.sin(t * 1.4 - 1.2);    // フォルダ: 約4.5秒周期
-function recountFresh() {
-  if (!world) return;
-  for (const g of world.galaxies) g.fresh = g.stars.reduce((n, s) => n + (isFresh(s) ? 1 : 0), 0);
+function recountFresh(current = world) {
+  if (!current) return;
+  for (const g of current.galaxies) {
+    g.fresh = 0;
+    for (const folder of g.representatives.values()) folder.fresh = 0;
+    for (const file of g.files) {
+      if (!isFresh(file)) continue;
+      g.fresh++;
+      const folder = g.representatives.get(file.representativePath);
+      if (folder) folder.fresh++;
+    }
+  }
 }
 
 function collectFiles(node, prefix, out = []) {
@@ -173,21 +188,41 @@ function buildWorld() {
   const fileInfo = (file, rng) => {
     const ageDays = Math.max(0, (now - file.mtime) / 86400000);
     return {
-      ...file, kind: kindOf(file.name), ageDays,
-      mag: (1 + Math.log10(file.size + 1) * 0.55) * fileSizeScale(file.name, file.size),
+      ...file, kind: file.isDirectory ? file.kind : kindOf(file.name), ageDays,
+      mag: file.isDirectory ? BASE_STAR_MAG * representativeStarScale(file.fileCount) : (BASE_STAR_MAG + Math.log10(file.size + 1) * 0.55) * fileSizeScale(file.name, file.size),
       glow: 0.5 + 0.5 * Math.exp(-ageDays / 90),
       phase: rng() * Math.PI * 2, speed: 0.6 + rng() * 1.8,
-      born: knownPaths && !knownPaths.has(file.path) ? now : 0,
+      born: file.isDirectory ? file.born : knownPaths && !knownPaths.has(file.path) ? now : 0,
       x: 0, y: 0, z: 0,
     };
   };
 
   // 名前のハッシュを、件数に左右されない球内の3D座標へ対応させる。
-  const galaxies = node.d.map(child => ({
-    name: child.n, path: prefix ? `${prefix}/${child.n}` : child.n,
-    files: collectFiles(child, prefix ? `${prefix}/${child.n}` : child.n),
-    sub: child.d.length, R: galaxyRadius, ...spacePosition(child.n),
-  }));
+  const galaxies = node.d.map(child => {
+    const path = prefix ? `${prefix}/${child.n}` : child.n;
+    // 全ファイルの軽量メタデータは件数・検索・更新に残し、3D天体とは分離する。
+    const files = collectFiles(child, path), direct = [], kinds = new Array(KINDS.length).fill(0);
+    const folders = new Map(child.d.map(folder => [`${path}/${folder.n}`, {
+      name: folder.n, path: `${path}/${folder.n}`, isDirectory: true,
+      fileCount: 0, size: 0, mtime: 0, born: 0, kinds: new Array(KINDS.length).fill(0),
+    }]));
+    for (const file of files) {
+      const kind = kindOf(file.name);
+      kinds[kind]++;
+      const relative = file.path.slice(path.length + 1), slash = relative.indexOf('/');
+      if (slash < 0) { direct.push(file); continue; }
+      file.representativePath = `${path}/${relative.slice(0, slash)}`;
+      const folder = folders.get(file.representativePath);
+      folder.fileCount++; folder.size += file.size;
+      folder.mtime = Math.max(folder.mtime, file.mtime); folder.kinds[kind]++;
+      if (knownPaths && !knownPaths.has(file.path)) folder.born = now;
+    }
+    for (const folder of folders.values()) folder.kind = folder.fileCount ? folder.kinds.indexOf(Math.max(...folder.kinds)) : OTHER;
+    return {
+      name: child.n, path, files, kinds, entries: [...direct, ...folders.values()],
+      sub: child.d.length, R: galaxyRadius, ...spacePosition(child.n),
+    };
+  });
 
   // 銀河の星（名前で決まる球内の固定3D位置）
   const stars = [];
@@ -197,10 +232,9 @@ function buildWorld() {
     g.tilt = (rng() - 0.5) * 1.6;
     g.turn = rng() * Math.PI * 2;
     g.ct = Math.cos(g.tilt); g.st = Math.sin(g.tilt); g.cs = Math.cos(g.turn); g.ss = Math.sin(g.turn);
-    g.kinds = new Array(KINDS.length).fill(0);
     g.stars = [];
-    g.fresh = 0;
-    for (const file of g.files) {
+    g.representatives = new Map();
+    for (const file of g.entries) {
       const s = rngFor(file.path);
       const star = fileInfo(file, s);
       star.galaxy = g;
@@ -211,11 +245,11 @@ function buildWorld() {
       star.lr = Math.hypot(local.x, local.y, local.z);
       const [wx, wy, wz] = rotateLocal(g, local.x, local.y, local.z);
       star.x = g.x + wx; star.y = g.y + wy; star.z = g.z + wz;
-      g.kinds[star.kind]++;
-      if (isFresh(star)) g.fresh++;
+      if (star.isDirectory) g.representatives.set(star.path, star);
       g.stars.push(star);
       stars.push(star);
     }
+    delete g.entries;
     g.kind = g.kinds.indexOf(Math.max(...g.kinds));
     // 円盤の法線（見かけの楕円を描くため）
     g.normal = rotateLocal(g, 0, 1, 0);
@@ -240,7 +274,9 @@ function buildWorld() {
     x: 0, y: 0, z: 0, R: 60,
     name: node.n,
   };
-  return { galaxies, stars, planets, radius, byPath, gate };
+  const result = { galaxies, stars, planets, radius, byPath, gate };
+  recountFresh(result);
+  return result;
 }
 
 function rotateLocal(g, x, y, z) {
@@ -514,6 +550,7 @@ const dimmed = g => focus && g !== focus;
 function drawGalaxies(t, now) {
   const { galaxies } = world;
   const intro = (now - introAt) / 1000;
+  const wallNow = Date.now();
   bodies = [];
   galaxyHits = [];
   let p = 0;
@@ -563,12 +600,14 @@ function drawGalaxies(t, now) {
       if (appear <= 0) continue;
       let alpha = s.glow * (0.78 + 0.22 * Math.sin(t * s.speed + s.phase)) * appear * dim;
       let size = s.mag * P.k * 4;
-      const bornAge = s.born ? (now - s.born) / 1000 : 99;
-      if (bornAge < 6) { alpha = 1; size *= 1 + 3 * (1 - bornAge / 6); }
+      const bornAge = s.born ? ((s.isDirectory ? wallNow : now) - s.born) / 1000 : 99;
+      // 代表星は件数に応じた直径を保ち、新規・更新の強調は明るさと光輪だけにする。
+      // born は実時刻なので代表星の6秒の演出も同じ時計で判定する。
+      if (bornAge < 6) { alpha = 1; if (!s.isDirectory) size *= 1 + 3 * (1 - bornAge / 6); }
       // 更新・検索対象は穏やかに明滅。選択中は白飛びを抑える。
       const fresh = isFresh(s);
       const blink = fresh ? fastBlink(t) : 0;
-      if (fresh) { alpha = Math.min(s === selected ? 0.65 : 0.8, Math.max(alpha, (0.35 + 0.25 * blink) * appear)); size *= 1 + 0.08 * blink; }
+      if (fresh) { alpha = Math.min(s === selected ? 0.65 : 0.8, Math.max(alpha, (0.35 + 0.25 * blink) * appear)); if (!s.isDirectory) size *= 1 + 0.08 * blink; }
       if (P.x < -size || P.x > W + size || P.y < -size || P.y > H + size) continue;
       // 明るさの下限は距離で減光する前に適用し、遠近差を残す。
       // 古い星も微かに瞬き、出現・フォーカス・至近距離では従来どおりフェードする。
@@ -671,7 +710,14 @@ function drawGate(t) {
 function voyageTargets() {
   if(routeMode==='ai')return aiRouteTargets(aiRoute,trail,world);
   return (voyages[basePath()] || [])
-    .map(key => key[0] === 'g' ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2)))
+    .map(key => {
+      const path = key.slice(2);
+      const body = world.byPath.get(path);
+      if (key[0] === 'g') return world.galaxies.find(g => g.path === path) || (body?.isDirectory ? body : null);
+      if (body && !body.isDirectory) return body;
+      // 過去の深いファイルへの航路は代表星で表す。削除済みのパスは復活させない。
+      if (knownPaths?.has(path)) return world.byPath.get(path.split('/').slice(0, trail.length + 2).join('/'));
+    })
     .filter(Boolean);
 }
 function drawVoyage(t) {
@@ -757,11 +803,12 @@ function drawLabels(t) {
     const near = !b.isPlanet && projected[o + 2] >= 22 && (!focus || b.galaxy === focus);
     if (!b.isPlanet && !near) continue;
     const x = projected[o] + projected[o + 2] * (b.isPlanet ? 0.55 : 0.22) + 4, y = projected[o + 1];
-    const w = textWidths.measure(b.name) + 6;
+    const name = b.isDirectory ? `${b.name}/` : b.name;
+    const w = textWidths.measure(name) + 6;
     if (!placed({ x, y: y - 8, w, h: 16 })) continue;
     ctx.globalAlpha = b.isPlanet ? Math.min(0.9, Math.max(0, intro - 1.4)) * (focus ? 0.4 : 1) : Math.min(0.85, (projected[o + 2] - 22) / 20);
     ctx.fillStyle = b.isPlanet ? 'rgba(215,225,250,1)' : 'rgba(200,212,240,1)';
-    ctx.fillText(b.name, x, y);
+    ctx.fillText(name, x, y);
   }
   // 選択中・マウス下の照準
   for (const target of [selected, hovered]) {
@@ -921,6 +968,7 @@ function updateHover(mx, my) {
   };
   if (hoveredGate) show(world.gate.name, trail.length ? '現在のフォルダ ・ ダブルクリックで1つ上のフォルダへ' : '現在のフォルダ ・ ルート');
   // 星（ファイル）はファイル名だけを見せる（フォルダ名は出さない。場所はパンくずとプレビューで分かる）
+  else if (hovered?.isDirectory) show(hovered.path, `フォルダ ・ ファイル ${hovered.fileCount} ・ クリックで開く`);
   else if (hovered) show(hovered.name, `${formatSize(hovered.size)} ・ ${formatAge(hovered.mtime)} ・ クリックでズームとプレビュー`);
   else if (hoveredGalaxy) show(hoveredGalaxy.path, `ファイル ${hoveredGalaxy.files.length} ・ サブフォルダ ${hoveredGalaxy.sub} ・ ダブルクリックで開く`);
   else tip.hidden = true;
@@ -1318,7 +1366,7 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
     const body = world.byPath.get(entry.path);
     if (!body || !await travelTo([...trail], { target: body, file: body, transition: false, valid: () => !stale() }) || stale()) return;
   } else {
-    remember('dir', entry.path); revealCurrent();
+    remember('dir', entry.path); revealCurrent(); notify();
   }
   applyLocation(entry,run);
   warpProjection = null;
@@ -1455,6 +1503,7 @@ const tail = (text, max = 44) => (text.length > max ? `…${text.slice(-(max - 1
 const parentOf = path => path.split('/').slice(0, -1).join('/');
 
 function selectBody(body, { record = true, zoom = true } = {}) {
+  if (body?.isDirectory) return goTo({ type: 'dir', path: body.path });
   // 星の直接選択も、自動追跡やエクスプローラーと同じ旋回・前進へ統一する。
   if (body && zoom) return goTo({ type: 'file', path: body.path });
   if (!body) {

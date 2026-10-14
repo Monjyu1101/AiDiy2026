@@ -111,29 +111,36 @@ test('2D部品: フォルダを開く・親へ戻る・ルート・空フォル�
     h.state.navigate('src'); h.props.current = 'src'; await flush();
     assert.equal(h.body.scrollTop, 62); assert.equal(h.state.cursor.value, 'src/main.js');
     h.props.current = 'empty'; await flush(); assert.equal(h.state.entries.value.length, 0); assert.equal(h.state.cursor.value, '');
-    h.key('Enter'); assert.equal(h.emitted.at(-1)[1].path, 'src');
+    h.key('Enter'); assert.equal(h.emitted.filter(([name]) => name === 'select').at(-1)[1].path, 'src');
   } finally { h.dispose(); }
 });
 
-test('ページをめくる演出: 初回/更新/モード復帰は静止、親は逆、連打の旧イベントは無視', async () => {
+test('ページをめくる演出: 旧ページの下に移動先を用意し、初回/更新/モード復帰は静止する', async () => {
   const h = pageFixture();
+  const finish = (id = h.state.turn.value?.id, name = h.state.pageTurn.value, type = 'animationend') => {
+    const sheet = {}; h.state.finishTurn({ target: sheet, currentTarget: sheet, animationName: 'folder-page-' + name, type }, id);
+  };
   try {
     await h.mount(); assert.equal(h.state.pageTurn.value, '');
+    h.body.scrollTop = 275; h.state.cursor.value = 'src';
     h.props.current = 'src'; await flush(); assert.equal(h.state.pageTurn.value, 'forward');
-    h.state.finishTurn({ target: {}, currentTarget: {}, animationName: 'folder-page-forward' });
-    assert.equal(h.state.pageTurn.value, 'forward');
-    h.state.finishTurn({ target: h.state.body.value, currentTarget: h.state.body.value, animationName: 'folder-page-forward' });
-    assert.equal(h.state.pageTurn.value, '');
+    assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src', '']);
+    assert.equal(h.state.turn.value.outgoing.scrollTop, 275); assert.equal(h.state.turn.value.outgoing.cursor, 'src');
+    assert.equal(h.state.turn.value.incoming.path, 'src'); assert.equal(h.state.turnDuration.value, 300);
+    const id = h.state.turn.value.id;
+    h.state.finishTurn({ target: {}, currentTarget: {}, animationName: 'folder-page-forward' }, id);
+    assert.equal(h.state.pageTurn.value, 'forward', '子のanimationendを使わない');
+    finish(); assert.equal(h.state.pageTurn.value, '');
     h.props.tree = tree(); await flush(); assert.equal(h.state.pageTurn.value, '');
     h.props.current = 'src/nested'; await flush(); assert.equal(h.state.pageTurn.value, 'forward');
     h.props.current = 'src'; await flush(); assert.equal(h.state.pageTurn.value, 'back');
-    h.state.finishTurn({ target: h.state.body.value, currentTarget: h.state.body.value, animationName: 'folder-page-forward' });
-    assert.equal(h.state.pageTurn.value, 'back');
-    h.props.active = false; await flush(); assert.equal(h.state.pageTurn.value, '');
+    finish(id, 'forward'); assert.equal(h.state.pageTurn.value, 'back');
+    h.props.active = false; await flush(); assert.equal(h.state.pageTurn.value, ''); assert.equal(h.state.layers.value.length, 1);
     h.props.active = true; await flush(); assert.equal(h.state.pageTurn.value, '');
     h.props.current = ''; await flush(); assert.equal(h.state.pageTurn.value, 'back');
+    const last = h.state.turn.value.id;
     h.props.current = 'src'; h.props.current = 'src/nested'; h.props.current = ''; await flush();
-    assert.equal(h.state.pageTurn.value, 'back', '同じ最終パスへ戻る連打で新しい演出を追加しない');
+    assert.equal(h.state.turn.value.id, last, '同じ最終パスへ戻る連打で新しい演出を追加しない');
   } finally { h.dispose(); }
 });
 
@@ -148,26 +155,79 @@ test('ページ演出: reduce-motionではアニメーション状態を残さ�
   } finally { h.dispose(); }
 });
 
-test('複数ページ演出: 戻る→進むの各枚数と経由表示、連打・キャンセル・モード切替は最後を優先する', async () => {
+test('複数ページ演出: 戻る→進むの実ページを順に重ね、連打・キャンセルは最終目的地を優先する', async () => {
   const h = pageFixture();
-  const event = (name, type = 'animationend', target = h.state.body.value) => ({ type, target, currentTarget: target, animationName: 'folder-page-' + name });
+  const finish = (type = 'animationend', id = h.state.turn.value?.id, direction = h.state.pageTurn.value) => {
+    const target = {}; h.state.finishTurn({ type, target, currentTarget: target, animationName: 'folder-page-' + direction }, id);
+  };
   try {
     await h.mount(); h.props.current = 'src/nested'; await flush();
-    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnCount.value, 2); assert.equal(h.state.turnDuration.value, 180);
-    assert.equal(h.state.turnPath.value, 'src'); h.state.nextTurn(event('forward', 'animationiteration')); assert.equal(h.state.turnPath.value, 'src/nested');
-    h.state.finishTurn(event('forward')); assert.equal(h.state.pageTurn.value, '');
+    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnDuration.value, 180);
+    assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src/nested', 'src', '']);
+    assert.equal(h.state.turn.value.incoming.entries[0].path, 'src/nested');
+    const old = h.state.turn.value.id;
+    finish(); assert.equal(h.state.turnPath.value, 'src/nested');
+    assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src/nested', 'src']);
+    finish('animationend', old, 'forward'); assert.equal(h.state.turnPath.value, 'src/nested', '同じ方向の旧要素も無視');
+    finish(); assert.equal(h.state.pageTurn.value, '');
     h.props.current = 'empty'; await flush();
-    assert.equal(h.state.pageTurn.value, 'back'); assert.equal(h.state.turnCount.value, 2);
-    h.state.nextTurn(event('back', 'animationiteration')); assert.equal(h.state.turnPath.value, '');
-    h.state.finishTurn(event('back')); assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnCount.value, 1); assert.equal(h.state.turnPath.value, 'empty');
-    h.state.finishTurn(event('back')); assert.equal(h.state.pageTurn.value, 'forward', '古い戻り演出の終了を再適用しない');
+    assert.equal(h.state.pageTurn.value, 'back'); assert.equal(h.state.turnPath.value, 'src');
+    finish(); assert.equal(h.state.turnPath.value, ''); assert.equal(h.state.turn.value.outgoing.path, 'src');
+    const returning = h.state.turn.value.id;
+    finish(); assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnPath.value, 'empty');
+    assert.equal(h.state.turn.value.outgoing.path, ''); assert.equal(h.state.turn.value.incoming.entries.length, 0);
+    finish('animationend', returning, 'back'); assert.equal(h.state.pageTurn.value, 'forward');
     h.props.current = 'src/main'; h.props.current = 'src/nested'; await flush();
-    assert.equal(h.state.pageTurn.value, 'back'); assert.equal(h.state.turnPath.value, '');
-    h.state.finishTurn(event('back', 'animationcancel')); assert.equal(h.state.pageTurn.value, '');
-    h.props.current = ''; await flush(); assert.equal(h.state.turnCount.value, 2);
-    h.props.active = false; await flush(); h.state.finishTurn(event('back')); assert.equal(h.state.pageTurn.value, '');
+    assert.equal(h.state.turnPath.value, ''); assert.equal(h.state.layers.value[0].path, 'src/nested');
+    finish('animationcancel'); assert.equal(h.state.pageTurn.value, ''); assert.equal(h.state.layers.value.length, 1);
+    h.props.current = ''; await flush(); assert.equal(h.state.turnPath.value, 'src');
+    h.props.active = false; await flush(); finish(); assert.equal(h.state.pageTurn.value, '');
     h.props.active = true; await flush(); assert.equal(h.state.pageTurn.value, '');
   } finally { h.dispose(); }
+});
+
+test('ページ演出: 同方向の新しい移動・入力・一覧更新で古いシートを残さない', async () => {
+  const h = pageFixture();
+  try {
+    await h.mount(); h.props.current = 'src'; await flush(); const old = h.state.turn.value.id;
+    h.props.current = 'src/nested'; await flush(); const latest = h.state.turn.value.id;
+    const target = {};
+    for (const type of ['animationend', 'animationcancel']) h.state.finishTurn({ type, target, currentTarget: target, animationName: 'folder-page-forward' }, old);
+    assert.equal(h.state.turn.value.id, latest); assert.equal(h.state.layers.value[0].path, 'src/nested');
+    h.key('Home'); await flush(); assert.equal(h.state.turn.value, null); assert.equal(h.state.cursor.value, 'src/nested/deep.js');
+    h.props.current = 'src'; await flush(); h.props.tree = tree(); await flush(); assert.equal(h.state.turn.value, null);
+    h.props.current = ''; await flush(); h.props.marks = { mode: 'grep', paths: ['root2.js'] }; await flush();
+    assert.equal(h.state.turn.value, null); assert.equal(h.state.entries.value.find(entry => entry.path === 'root2.js').marked, true);
+  } finally { h.dispose(); }
+});
+
+test('ページ演出: 表示途中の決定キーは演出だけを終え、隠れた項目を開かない', async () => {
+  const h = pageFixture();
+  try {
+    await h.mount();
+    for (const key of ['Enter', ' ', 'ArrowRight']) {
+      h.props.current = ''; await flush(); h.props.current = 'src'; await flush();
+      const count = h.emitted.filter(([name]) => name === 'select').length; assert.equal(h.key(key).prevented, true);
+      assert.equal(h.state.turn.value, null); assert.equal(h.emitted.filter(([name]) => name === 'select').length, count);
+      assert.equal(h.emitted.at(-1)[0], 'activity', '決定キーで演出を止めた時も自動探索の手動待機へ入る');
+      h.key(key); assert.equal(h.emitted.at(-1)[1].path, 'src/nested');
+    }
+  } finally { h.dispose(); }
+});
+
+test('ページ演出: 動きを減らす設定の途中変更は即時確定し、購読と演出を破棄する', async () => {
+  const query = new EventTarget(); query.matches = false;
+  const removed = [], remove = query.removeEventListener.bind(query);
+  query.removeEventListener = (...args) => { removed.push(args[0]); remove(...args); };
+  const h = pageFixture({ matchMedia: () => query });
+  try {
+    await h.mount(); h.props.current = 'src/nested'; await flush(); assert.ok(h.state.turn.value);
+    query.matches = true; const changed = new Event('change'); changed.matches = true; query.dispatchEvent(changed);
+    assert.equal(h.state.turn.value, null); assert.equal(h.state.layers.value[0].path, 'src/nested');
+    h.props.current = ''; await flush(); assert.equal(h.state.turn.value, null);
+    query.matches = false; h.props.current = 'src'; await flush(); assert.ok(h.state.turn.value);
+    h.dispose(); assert.equal(h.state.turn.value, null); assert.deepEqual(removed, ['change']);
+  } finally { if (!removed.length) h.dispose(); }
 });
 
 test('2D部品: 新規・削除・検索マーク・外部選択・フィルター変更をイベントだけで反映する', async () => {
@@ -243,12 +303,32 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.doesNotMatch(app, /<SpaceView[^>]*:key="[^"\n]*viewMode/);
   assert.equal((view.match(/<FileViewer /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
   assert.match(view, /<SpaceCanvas :mode="viewMode"/); assert.match(view, /<FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'"/);
-  assert.match(view, /<FileViewer v-if="selected"/); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-body:is\(\.page-turn-forward,\.page-turn-back\)\{animation:none/);
+  assert.match(view, /<FileViewer v-if="selected"/); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
   assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,300ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,300ms\)/);
-  assert.match(css, /var\(--page-turn-count,1\)/);
-  assert.match(css, /@keyframes folder-page-forward\{from\{[^}]+rotateY\(65deg\)/);
-  assert.match(css, /@keyframes folder-page-back\{from\{[^}]+rotateY\(-65deg\)/);
+  assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:inset\(0 0 0 0\)\}to\{clip-path:inset\(0 100% 0 0\)/);
+  assert.match(css, /@keyframes folder-page-back\{from\{clip-path:inset\(0 0 0 0\)\}to\{clip-path:inset\(0 0 0 100%\)/);
+  assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:0%\}/);
+  assert.match(css, /@keyframes folder-page-edge-back\{from\{left:0%\}to\{left:100%\}/);
+  assert.doesNotMatch(css, /rotateY\(/);
   assert.doesNotMatch(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval|setTimeout/);
+});
+
+test('2Dページの縦線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const values = selector => {
+    const result = {}; css.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(declaration => result[declaration.prop] = declaration.value); }); return result;
+  };
+  for (const direction of ['forward', 'back']) {
+    const sheet = values('.folder-page-sheet.page-turn-' + direction), edge = values('.folder-page-turn-edge.page-turn-' + direction);
+    assert.equal(sheet.animation.replace('folder-page-' + direction, ''), edge.animation.replace('folder-page-edge-' + direction, ''));
+  }
+  assert.equal(values('.folder-page-stack').position, 'relative'); assert.equal(values('.folder-page-stack').isolation, 'isolate');
+  assert.equal(values('.folder-page-stack')['min-height'], '96px'); assert.equal(values('.folder-page-stack').overflow, 'hidden');
+  assert.equal(values('.folder-page-body').position, 'absolute'); assert.equal(values('.folder-page-body').inset, '0');
+  assert.equal(values('.folder-page-sheet')['z-index'], '2'); assert.equal(values('.folder-page-underlay')['z-index'], '1');
+  assert.equal(values('.folder-page-turn-edge')['z-index'], '3'); assert.equal(values('.folder-page-turn-edge').width, '2px');
+  assert.equal(values('.folder-page-turn-edge').top, '0'); assert.equal(values('.folder-page-turn-edge').bottom, '0');
+  assert.equal(values('.folder-page-sheet')['pointer-events'], 'none');
 });
 
 test('2D配色: 既存AiDiyメニューのクリーム色を専用変数で使い、3Dの黒を維持する', () => {
@@ -258,6 +338,66 @@ test('2D配色: 既存AiDiyメニューのクリーム色を専用変数で使�
   assert.match(css, /\.space-view\.mode-2d\{--aidiy-cream-light:/);
   assert.match(css, /\.space-view\{height:100%;background:#000\}/);
   assert.match(css, /\.mode-2d \.folder-pages,\.mode-2d \.folder-page-body,\.mode-2d \.space-loading\{background:var\(--aidiy-cream-light\)/);
+});
+
+test('2D文字: ページ本文は16px、日時・件数・補足は14pxで共通ビューアの文字設定を変えない', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const rules = selector => {
+    const found = []; css.walkRules(rule => { if (rule.selector === selector) found.push(rule); }); return found;
+  };
+  const values = (selector, property) => rules(selector).flatMap(rule => rule.nodes.filter(node => node.prop === property).map(node => node.value));
+  assert.deepEqual(values('.folder-pages', 'font-size'), ['16px']);
+  assert.deepEqual(values('.folder-pages', 'line-height'), ['1.5']);
+  assert.deepEqual(values('.folder-page-heading button', 'min-height'), ['36px']);
+  for (const selector of ['.folder-page-summary', '.folder-page-meta', '.folder-page-reference-note', '.folder-pages footer']) {
+    assert.deepEqual(values(selector, 'font-size'), ['14px'], selector);
+  }
+  assert.deepEqual(values('.folder-page-meta time', 'font-size'), ['inherit']);
+  assert.deepEqual(values('.folder-page-meta time', 'display'), ['block'], '狭幅でも日時を隠さない');
+  assert.deepEqual(values(':root', '--file-font-size'), ['10px']);
+  css.walkDecls('--file-font-size', declaration => assert.equal(declaration.parent.selector, ':root', 'ページ用拡大を共通パネルへ継承しない'));
+  css.walkRules(rule => {
+    if (!rule.selector.includes('folder-page')) return;
+    for (const declaration of rule.nodes) {
+      if (declaration.prop === 'font-size' && declaration.value.endsWith('px')) assert.ok(parseFloat(declaration.value) >= 14, `${rule.selector}: ${declaration.value}`);
+    }
+  });
+});
+
+test('2D文字の折り返し: ページ幅で日時を次行へ送り、長い名前と補足を省略せずスクロールできる', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const value = (selector, property, parent = 'root') => {
+    let result;
+    css.walkRules(rule => {
+      if (rule.selector === selector && (parent === 'root' ? rule.parent.type === 'root' : rule.parent.name === parent)) {
+        rule.walkDecls(property, declaration => result = declaration.value);
+      }
+    });
+    return result;
+  };
+  assert.equal(value('.folder-pages', 'container'), 'folder-page / size');
+  assert.equal(value('.folder-pages', 'overflow'), 'auto');
+  assert.equal(value('.folder-page-entry', 'display'), 'grid');
+  assert.equal(value('.folder-page-entry', 'min-height'), '48px');
+  assert.equal(value('.folder-page-entry', 'grid-template-columns'), '32px minmax(0,1fr) minmax(0,42%)');
+  assert.equal(value('.folder-page-entry', 'grid-template-columns', 'container'), '32px minmax(0,1fr)');
+  assert.equal(value('.folder-page-meta', 'grid-column', 'container'), '2');
+  assert.equal(value('.folder-page-meta', 'text-align', 'container'), 'left');
+  for (const selector of ['.folder-page-name', '.folder-page-meta', '.folder-page-reference-note', '.folder-pages footer']) {
+    assert.equal(value(selector, 'overflow-wrap'), 'anywhere', selector);
+    assert.equal(value(selector, 'text-overflow'), undefined, selector);
+  }
+  for (const selector of ['.folder-page-body', '.folder-page-heading nav', '.folder-page-reference-note', '.folder-pages footer']) {
+    assert.equal(value(selector, 'overflow'), 'auto', selector);
+  }
+  assert.equal(value('.folder-page-body', 'min-height'), '96px', '窮屈な高さでも一覧を潰さない');
+  assert.equal(value('.folder-page-heading nav', 'max-height', 'container'), '36px');
+  const compact = '.folder-page-summary,.folder-page-reference-note,.folder-pages footer';
+  assert.equal(value(compact, 'max-height', 'container'), '30px');
+  assert.equal(value(compact, 'overflow', 'container'), 'auto');
+  const queries = []; css.walkAtRules('container', rule => queries.push(rule.params));
+  assert.ok(queries.includes('folder-page (max-width:520px)'), '画面全体でなくページの実幅を使う');
+  assert.ok(queries.includes('folder-page (max-height:360px)'), 'プレビューを除いた高さで補足欄を抑える');
 });
 
 test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の戻る抑止・軌跡バー高さ追従', async () => {
@@ -284,12 +424,12 @@ test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の�
   assert.equal(calls.at(-1), 'disconnect');
 });
 
-test('実マウント: 2DのDOMを外してもページ位置・選択行を保持し、同じ部品で復帰する', async () => {
+async function mountedPages(globals = {}) {
   const { descriptor } = parse(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'mounted-pages', genDefaultAs: 'component', inlineTemplate: true });
   const module = { exports: {} };
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, Date, require: id => id === 'vue' ? vue : folderPages,
+    module, Date, require: id => id === 'vue' ? vue : folderPages, ...globals,
   });
   const walk = (element, predicate) => predicate(element) ? element : (element.children || []).map(child => walk(child, predicate)).find(Boolean);
   const node = type => ({ type, children: [], props: {}, scrollTop: 0,
@@ -314,6 +454,11 @@ test('実マウント: 2DのDOMを外してもページ位置・選択行を保�
   const warnings = []; app.config.warnHandler = message => warnings.push(message);
   app.mount(root); await flush();
   const find = className => walk(root, element => element.props.class?.split(' ').includes(className));
+  return { app, root, props, emitted, warnings, walk, find };
+}
+
+test('実マウント: 2DのDOMを外してもページ位置・選択行を保持し、同じ部品で復帰する', async () => {
+  const { app, root, props, warnings, walk, find } = await mountedPages();
   try {
     const body = find('folder-page-body'); body.scrollTop = 180; body.props.onScroll();
     assert.doesNotMatch(body.props.class, /page-turn-/);
@@ -326,18 +471,119 @@ test('実マウント: 2DのDOMを外してもページ位置・選択行を保�
     assert.equal(walk(root, element => element.props.title === 'root2.js').props['aria-selected'], true);
     walk(root, element => element.props.title === 'src').props.onClick(); await flush();
     assert.equal(props.current, 'src'); assert.equal(find('folder-page-body').scrollTop, 0);
-    const childBody = find('folder-page-body'); assert.notEqual(childBody, body); assert.match(childBody.props.class, /page-turn-forward/);
+    const childBody = find('folder-page-body'); assert.notEqual(childBody, body); assert.match(find('folder-page-sheet').props.class, /page-turn-forward/);
     walk(root, element => element.props.title === 'src/nested').props.onClick(); await flush();
-    const nestedBody = find('folder-page-body'); assert.notEqual(nestedBody, childBody); assert.match(nestedBody.props.class, /page-turn-forward/);
+    const nestedBody = find('folder-page-body'); assert.notEqual(nestedBody, childBody); assert.match(find('folder-page-sheet').props.class, /page-turn-forward/);
     childBody.props.onAnimationend({ target: childBody, currentTarget: childBody, animationName: 'folder-page-forward' }); await flush();
-    assert.match(find('folder-page-body').props.class, /page-turn-forward/);
+    assert.match(find('folder-page-sheet').props.class, /page-turn-forward/);
     walk(root, element => element.props.title?.startsWith('親フォルダ')).props.onClick(); await flush();
-    assert.equal(props.current, 'src'); assert.match(find('folder-page-body').props.class, /page-turn-back/);
+    assert.equal(props.current, 'src'); assert.match(find('folder-page-sheet').props.class, /page-turn-back/);
     walk(root, element => element.props.title?.startsWith('親フォルダ')).props.onClick(); await flush();
     assert.equal(props.current, ''); assert.equal(find('folder-page-body').scrollTop, 180);
     assert.equal(walk(root, element => element.props.title === 'src').props['aria-selected'], true);
-    assert.equal(find('folder-page-body').focused, true); assert.match(find('folder-page-body').props.class, /page-turn-back/);
+    assert.equal(find('folder-page-body').focused, true); assert.match(find('folder-page-sheet').props.class, /page-turn-back/);
+    const longName = '長い日本語ファイル名と空白なしの名前'.repeat(12) + '.txt';
+    props.tree.f.push([longName, 2048, 1000]); await flush();
+    const longEntry = walk(root, element => element.props.title === longName);
+    assert.equal(walk(longEntry, element => element.props.class === 'folder-page-name').text, longName);
+    assert.equal(walk(longEntry, element => element.type === 'time').props.datetime, new Date(1000).toISOString());
+    longEntry.props.onClick(); await flush(); assert.equal(props.selected, longName);
     assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+
+test('実マウント: 移動先を下に保ち、旧ページの内容/位置・縦線・単一の操作リストを検証する', async () => {
+  const { app, root, props, emitted, warnings, walk, find } = await mountedPages();
+  const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
+  const click = path => walk(layer('live'), element => element.props.title === path).props.onClick();
+  const finish = (sheet, type = 'animationend') => sheet.props[type === 'animationcancel' ? 'onAnimationcancel' : 'onAnimationend']({ type, target: sheet, currentTarget: sheet, animationName: 'folder-page-' + (sheet.props.class.includes('page-turn-back') ? 'back' : 'forward') });
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  try {
+    const original = layer('live'); original.scrollTop = 240; original.props.onScroll();
+    click('src'); await flush();
+    const first = layer('outgoing'), destination = layer('live');
+    assert.equal(destination.props['data-page-path'], 'src'); assert.equal(destination.scrollTop, 0); assert.equal(destination.focused, true);
+    assert.equal(first.props['data-page-path'], ''); assert.equal(first.scrollTop, 240);
+    assert.equal(walk(first, element => element.props.title === 'src').props['data-cursor'], true);
+    assert.equal(walk(first, element => element.props.title === 'root2.js').props.role, undefined);
+    assert.equal(walk(destination, element => element.props.title === 'src/main.js').props.role, 'option');
+    assert.equal(first.props['aria-hidden'], true); assert.equal(first.props.inert, true); assert.equal(first.props.tabindex, undefined);
+    assert.equal(descendants(first).filter(element => element.props.id).length, 0, '表示専用シートはIDを複製しない');
+    assert.equal(descendants(root).filter(element => element.props.role === 'listbox').length, 1);
+    const count = emitted.length; walk(first, element => element.props.title === 'root2.js').props.onClick();
+    assert.equal(emitted.length, count, '表示専用シートから選択を送信しない');
+    assert.ok(find('folder-page-turn-edge').props.class.includes('page-turn-forward'));
+    finish(first); await flush(); assert.equal(layer('outgoing'), undefined); assert.equal(find('folder-page-turn-edge'), undefined);
+    assert.equal(layer('live'), destination, '演出終了で移動先のDOM/フォーカス/スクロールを作り直さない');
+    destination.scrollTop = 76; destination.props.onScroll(); click('src/main.js'); await flush();
+    props.current = ''; props.selected = ''; await flush();
+    assert.equal(layer('live').scrollTop, 240); assert.equal(layer('outgoing').scrollTop, 76);
+    assert.ok(find('folder-page-turn-edge').props.class.includes('page-turn-back'));
+    find('folder-page-stack').props.onWheelCapturePassive(); await flush();
+    assert.equal(layer('outgoing'), undefined); assert.equal(layer('live').scrollTop, 240, '手動スクロールで演出だけを終える');
+    click('src'); await flush(); assert.equal(layer('live').scrollTop, 76);
+    const stale = layer('outgoing'); click('src/nested'); await flush(); const latest = layer('outgoing');
+    assert.notEqual(stale, latest); finish(stale); finish(stale, 'animationcancel'); await flush();
+    assert.equal(layer('outgoing'), latest); assert.equal(layer('live').props['data-page-path'], 'src/nested');
+    find('folder-page-stack').props.onPointerdownCapture(); finish(latest); await flush();
+    assert.equal(layer('outgoing'), undefined, '押してから離すまでに演出が終了した場合');
+    const clickEvent = { preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+    find('folder-page-stack').props.onClickCapture(clickEvent); await flush();
+    assert.equal(clickEvent.prevented, true); assert.equal(clickEvent.stopped, true, '隠れた移動先の行へクリックを伝えない');
+    assert.equal(layer('outgoing'), undefined); assert.equal(find('folder-page-turn-edge'), undefined);
+    const visibleClick = { preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+    find('folder-page-stack').props.onPointerdownCapture();
+    find('folder-page-stack').props.onClickCapture(visibleClick); assert.equal(visibleClick.stopped, undefined);
+    props.current = 'src'; await flush(); find('folder-page-stack').props.onPointerdownCapture();
+    find('folder-page-stack').props.onPointercancelCapture(); finish(layer('outgoing')); await flush();
+    find('folder-page-stack').props.onClickCapture(visibleClick); assert.equal(visibleClick.stopped, undefined, '取り消したポインターを次のクリックへ持ち越さない');
+    assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+test('実マウント: 一覧更新・外部選択・移動が同じtickでも旧ページのカーソルを上書きしない', async () => {
+  const { app, root, props, warnings, walk } = await mountedPages();
+  const live = () => walk(root, element => element.props['data-page-layer'] === 'live');
+  const selected = () => walk(live(), element => element.props['data-cursor'] === true)?.props.title;
+  try {
+    for (const dataFirst of [true, false]) {
+      walk(live(), element => element.props.title === 'root10.md').props.onClick(); await flush();
+      live().scrollTop = 220; live().props.onScroll();
+      if (dataFirst) { props.tree = tree(); props.selected = 'src/main.js'; props.current = 'src'; }
+      else { props.current = 'src'; props.selected = 'src/main.js'; props.tree = tree(); }
+      await flush();
+      assert.equal(selected(), 'src/main.js'); assert.equal(live().scrollTop, 0);
+      assert.equal(walk(root, element => element.props['data-page-layer'] === 'outgoing'), undefined, '同時更新では古い一覧を重ねない');
+      props.selected = ''; props.current = ''; await flush();
+      assert.equal(selected(), 'root10.md', '移動先のカーソルを旧ページの記憶へ保存しない'); assert.equal(live().scrollTop, 220);
+    }
+    assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+test('実マウント: 深い移動は経由ページを順に入れ替え、最大5枚で最終ページへ到着する', async () => {
+  const { app, root, props, warnings, walk } = await mountedPages();
+  const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
+  const finish = sheet => sheet.props.onAnimationend({ type: 'animationend', target: sheet, currentTarget: sheet, animationName: 'folder-page-forward' });
+  try {
+    const deepTree = tree(); let node = deepTree;
+    for (let index = 0; index < 20; index++) { const child = { n: 'd' + index, f: [['file' + index + '.js', 1, 1000]], d: [] }; node.d.push(child); node = child; }
+    props.tree = deepTree; await flush();
+    const path = Array.from({ length: 20 }, (_value, i) => 'd' + i).join('/');
+    props.current = path; await flush(); const destination = layer('live');
+    assert.equal(destination.props['data-page-path'], path); assert.ok(layer('incoming'));
+    let count = 0, prior = '';
+    while (layer('outgoing')) {
+      const incoming = layer('incoming') || destination, outgoing = layer('outgoing');
+      assert.equal(outgoing.props['data-page-path'], prior); prior = incoming.props['data-page-path'];
+      assert.ok(walk(incoming, element => element.props.title === prior + '/file' + (prior.split('/').length - 1) + '.js'));
+      assert.equal(layer('live'), destination); assert.ok(++count <= 5);
+      finish(outgoing); await flush();
+      if (layer('outgoing')) { const current = layer('outgoing'); finish(outgoing); await flush(); assert.equal(layer('outgoing'), current); }
+    }
+    assert.equal(count, 5); assert.equal(prior, path); assert.equal(layer('live'), destination);
+    assert.equal(layer('incoming'), undefined); assert.deepEqual(warnings, []);
   } finally { app.unmount(); }
 });
 

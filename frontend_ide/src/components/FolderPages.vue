@@ -4,7 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue';
+import { computed, ref, shallowRef, watch, nextTick, onBeforeUnmount } from 'vue';
 import { indexFolderPages, createFolderPageMemory, folderPageTurnPlan } from '../folder-pages.js';
 const props = defineProps({ tree: Object, current: { type: String, default: '' }, selected: String, unlistedParent: String, marks: Object, active: Boolean, color: Function });
 const emit = defineEmits(['select', 'clear', 'refresh', 'toggle-explorer', 'activity']);
@@ -12,10 +12,26 @@ const pages = computed(() => props.active ? indexFolderPages(props.tree, props.m
 const page = computed(() => pages.value.get(props.current));
 const entries = computed(() => page.value?.entries || []);
 const trail = computed(() => props.current.split('/').filter(Boolean));
-const memory = createFolderPageMemory(), body = ref(), cursor = ref(''), pageTurn = ref('');
-const turnCount = ref(1), turnDuration = ref(300), turnPath = ref(''), turnSkipped = ref(0);
-let turnGroups = [], turnGroup = 0, turnIndex = 0;
-let disposed = false, restoration = 0, pendingFocus = false;
+const memory = createFolderPageMemory(), body = ref(), cursor = ref(''), turn = shallowRef(null);
+const pageTurn = computed(() => turn.value?.direction || '');
+const turnPath = computed(() => turn.value?.incoming.path || ''), turnSkipped = computed(() => turn.value?.skipped || 0);
+const turnDuration = ref(300);
+let turnSteps = [], turnSerial = 0, pointerTurn = false;
+const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+function motionChanged(event) { if (event.matches) cancelTurns(); }
+motionQuery?.addEventListener?.('change', motionChanged);
+// 操作・現在地は常に最終目的地。重ねる経由ページと旧ページは表示専用にする。
+const layers = computed(() => {
+  const live = { id: `live:${props.current}`, path: props.current, entries: entries.value, cursor: cursor.value, selected: props.selected, live: true };
+  if (!turn.value) return [live];
+  const { id, incoming, outgoing } = turn.value;
+  return [live, ...(incoming.path === props.current ? [] : [{ ...incoming, id: `${id}:incoming` }]), { ...outgoing, id, outgoing: true }];
+});
+function bindBody(element, layer) {
+  if (layer.live) body.value = element;
+  else if (element) element.scrollTop = layer.scrollTop;
+}
+let disposed = false, restoration = 0, pendingFocus = false, presentedPath = props.current;
 const formatSize = size => size < 1024 ? `${size} B` : size < 1024 ** 2 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
 const formatDate = mtime => new Date(mtime).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 function save(path = props.current) {
@@ -38,36 +54,35 @@ function select(entry) {
 }
 function navigate(path) { save(); emit('select', { type: 'dir', path, source: 'page' }); }
 function back() { if (trail.value.length) navigate(trail.value.slice(0, -1).join('/')); }
-function turnLabel() {
-  const step = turnGroups[turnGroup]?.[turnIndex];
-  turnPath.value = step?.path || ''; turnSkipped.value = step?.skipped || 0;
+function snapshot(path, visible = false) {
+  const items = pages.value.get(path)?.entries || [];
+  const state = visible ? { cursor: cursor.value, scrollTop: body.value?.scrollTop || 0 } : memory.restore(path, items);
+  return { path, entries: items.map(entry => ({ ...entry })), ...state, selected: props.selected };
 }
-function showTurnGroup() {
-  const group = turnGroups[turnGroup]; turnIndex = 0;
-  pageTurn.value = group?.[0].direction || ''; turnCount.value = group?.length || 1; turnLabel();
+function cancelTurns() { turnSteps = []; turn.value = null; }
+function pointerStart() { pointerTurn = !!turn.value; }
+function pointerCancel() { pointerTurn = false; }
+function settleClick(event) {
+  const covered = pointerTurn || !!turn.value; pointerTurn = false;
+  if (!covered) return;
+  // 旧ページに見える行へのクリックで、下に隠れた別の項目を開かない。
+  cancelTurns(); event.preventDefault(); event.stopPropagation();
+}
+function showNextTurn(outgoing) {
+  const step = turnSteps.shift();
+  turn.value = step ? { ...step, id: ++turnSerial, outgoing, incoming: snapshot(step.path) } : null;
 }
 function startTurns(previous, path, enabled) {
-  const steps = enabled ? folderPageTurnPlan(previous, path) : [];
-  turnGroups = []; turnGroup = 0;
-  for (const step of steps) {
-    if (turnGroups.at(-1)?.[0].direction !== step.direction) turnGroups.push([]);
-    turnGroups.at(-1).push(step);
-  }
-  turnDuration.value = steps.length > 1 ? 180 : 300;
-  showTurnGroup();
+  cancelTurns();
+  turnSteps = enabled ? folderPageTurnPlan(previous, path) : [];
+  turnDuration.value = turnSteps.length > 1 ? 180 : 300;
+  if (turnSteps.length) showNextTurn(snapshot(previous, true));
 }
-function isCurrentTurn(event) {
-  return event.target === body.value && event.currentTarget === body.value && event.animationName === `folder-page-${pageTurn.value}`;
-}
-function nextTurn(event) {
-  if (!isCurrentTurn(event)) return;
-  turnIndex = Math.min(turnIndex + 1, (turnGroups[turnGroup]?.length || 1) - 1); turnLabel();
-}
-function finishTurn(event) {
-  // 連続移動で消えた前ページのanimationend/cancelは、次ページの演出を終了させない。
-  if (!isCurrentTurn(event)) return;
-  if (event.type === 'animationcancel') turnGroups = [];
-  turnGroup++; showTurnGroup();
+function finishTurn(event, id) {
+  // 同じ方向の連打や経由ページでも、破棄済みの旧要素から届く終了通知を再適用しない。
+  if (!turn.value || id !== turn.value.id || event.target !== event.currentTarget || event.animationName !== `folder-page-${pageTurn.value}`) return;
+  if (event.type === 'animationcancel') cancelTurns();
+  else showNextTurn(turn.value.incoming);
 }
 async function move(index) {
   const entry = entries.value[Math.max(0, Math.min(entries.value.length - 1, index))];
@@ -79,7 +94,7 @@ async function move(index) {
 }
 // 復元・scrollIntoView・レイアウトによるscrollは保存だけ。実際の入力だけを手動操作として伝える。
 function activity() { if (props.active) emit('activity'); }
-function pointerMove(event) { if (event.buttons && event.target === body.value) activity(); }
+function pointerMove(event) { if (event.buttons && event.target === body.value) { cancelTurns(); activity(); } }
 function keydown(event) {
   if (!props.active || event.defaultPrevented || event.isComposing) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); event.stopPropagation(); emit('toggle-explorer'); return; }
@@ -89,6 +104,8 @@ function keydown(event) {
   if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); emit('refresh'); return; }
   // パンくずと親ボタンは通常のTab/Enter操作。項目リストだけにロービング選択を適用する。
   if (!body.value?.contains(event.target)) return;
+  if (turn.value && ['Enter', ' ', 'ArrowRight'].includes(event.key)) { event.preventDefault(); cancelTurns(); activity(); return; }
+  cancelTurns();
   if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(event.key)) activity();
   const index = entries.value.findIndex(entry => entry.path === cursor.value);
   if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
@@ -98,18 +115,19 @@ function keydown(event) {
   else if (event.key === 'ArrowRight' && entries.value[index]?.type === 'dir') { event.preventDefault(); select(entries.value[index]); }
   else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (entries.value[index]) select(entries.value[index]); }
 }
-watch([() => props.current, () => props.active], ([path, active], [previous, wasActive]) => {
-  // パス変更とモード切替が同じtickでも、まだ描画されている旧ページへ位置を保存する。
-  if (wasActive) save(previous);
-  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  startTurns(previous || '', path, active && wasActive && !reduced);
-  if (active) void restore(true, true);
+watch([() => props.current, () => props.active, pages], ([path, active, index], [previous, wasActive, previousIndex]) => {
+  // 一覧更新と移動が同じtickでも、旧ページのカーソルを保存してから一度だけ復元する。
+  const moved = path !== previous || active !== wasActive;
+  if (moved && wasActive) save(previous);
+  if (moved) startTurns(previous || '', path, active && wasActive && index === previousIndex && !motionQuery?.matches);
+  else cancelTurns();
+  presentedPath = path;
+  if (active) void restore(moved, moved);
 }, { immediate: true });
-watch(entries, () => { if (props.active) void restore(); });
 watch(() => props.selected, selected => {
-  if (entries.value.some(entry => entry.path === selected)) { cursor.value = selected; memory.save(props.current, { cursor: selected }); }
+  if (presentedPath === props.current && entries.value.some(entry => entry.path === selected)) { cursor.value = selected; memory.save(props.current, { cursor: selected }); }
 });
-onBeforeUnmount(() => { disposed = true; restoration++; memory.clear(); });
+onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQuery?.removeEventListener?.('change', motionChanged); memory.clear(); });
 </script>
 <template>
   <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown" @wheel.passive="activity" @touchmove.passive="activity" @pointerdown="activity" @pointermove="pointerMove">
@@ -123,16 +141,19 @@ onBeforeUnmount(() => { disposed = true; restoration++; memory.clear(); });
     </header>
     <p v-if="unlistedParent!==undefined" class="folder-page-reference-note" role="status">検索ファイルの親フォルダ「{{ unlistedParent || '/' }}」は現在の一覧にありません。プレビューは開いたままです。該当ページへ移動するには、フィルターをOFFにして一覧を更新し、検索結果を選び直してください。</p>
     <div class="folder-page-summary" role="status">{{ page?.folders.length || 0 }} フォルダ · {{ page?.files.length || 0 }} ファイル<span v-if="pageTurn" class="folder-page-turn-status" aria-hidden="true">ページ移動 {{ turnPath || '/' }}{{ turnSkipped ? '（'+turnSkipped+'階層省略）' : '' }}</span><span v-else>この階層の直下</span></div>
-    <div :key="current" ref="body" class="folder-page-body" :class="pageTurn ? 'page-turn-'+pageTurn : ''" :style="{'--page-turn-count':turnCount,'--page-turn-duration':turnDuration+'ms'}" tabindex="0" role="listbox" aria-label="フォルダとファイル" :aria-activedescendant="cursor ? 'folder-page-entry-'+entries.findIndex(entry=>entry.path===cursor) : undefined" @scroll="save()" @animationiteration="nextTurn" @animationend="finishTurn" @animationcancel="finishTurn">
-      <div class="folder-page-items">
-        <div v-for="(entry,index) in entries" :id="'folder-page-entry-'+index" :key="entry.path" class="folder-page-entry" :class="{folder:entry.type==='dir',marked:!!entry.marked,selected:selected===entry.path}" :data-cursor="cursor===entry.path" role="option" :aria-selected="cursor===entry.path" :aria-label="entry.name+(entry.type==='dir'?' フォルダ':' ファイル')" :title="entry.path" @click="select(entry)">
-          <span class="folder-page-icon" :style="{color:entry.type==='dir' ? undefined : color?.(entry.name)}" aria-hidden="true">{{ entry.type==='dir' ? '▸ 📁' : '●' }}</span>
-          <span class="folder-page-name">{{ entry.name }}</span>
-          <span v-if="entry.type==='dir'" class="folder-page-meta">{{ entry.count }} ファイル<span v-if="entry.marked" class="folder-page-mark"> · 対象 {{ entry.marked }}</span></span>
-          <span v-else class="folder-page-meta">{{ formatSize(entry.size) }}<time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
+    <div class="folder-page-stack" :style="{'--page-turn-duration':turnDuration+'ms'}" @pointerdown.capture="pointerStart" @pointercancel.capture="pointerCancel" @click.capture="settleClick" @wheel.capture.passive="cancelTurns" @touchmove.capture.passive="cancelTurns">
+      <div v-for="layer in layers" :key="layer.id" :ref="element => bindBody(element,layer)" class="folder-page-body" :class="layer.live ? '' : ['folder-page-sheet',layer.outgoing ? 'page-turn-'+pageTurn : 'folder-page-underlay']" :data-page-path="layer.path" :data-page-layer="layer.live ? 'live' : layer.outgoing ? 'outgoing' : 'incoming'" :tabindex="layer.live ? 0 : undefined" :role="layer.live ? 'listbox' : undefined" :aria-label="layer.live ? 'フォルダとファイル' : undefined" :aria-hidden="layer.live ? undefined : true" :inert="!layer.live" :aria-activedescendant="layer.live && cursor ? 'folder-page-entry-'+entries.findIndex(entry=>entry.path===cursor) : undefined" @scroll="layer.live && layer.path===current && save(layer.path)" @animationend="finishTurn($event,layer.id)" @animationcancel="finishTurn($event,layer.id)">
+        <div class="folder-page-items">
+          <div v-for="(entry,index) in layer.entries" :id="layer.live ? 'folder-page-entry-'+index : undefined" :key="entry.path" class="folder-page-entry" :class="{folder:entry.type==='dir',marked:!!entry.marked,selected:layer.selected===entry.path}" :data-cursor="layer.cursor===entry.path" :role="layer.live ? 'option' : undefined" :aria-selected="layer.live ? cursor===entry.path : undefined" :aria-label="layer.live ? entry.name+(entry.type==='dir'?' フォルダ':' ファイル') : undefined" :title="entry.path" @click="layer.live && select(entry)">
+            <span class="folder-page-icon" :style="{color:entry.type==='dir' ? undefined : color?.(entry.name)}" aria-hidden="true">{{ entry.type==='dir' ? '▸ 📁' : '●' }}</span>
+            <span class="folder-page-name">{{ entry.name }}</span>
+            <span v-if="entry.type==='dir'" class="folder-page-meta">{{ entry.count }} ファイル<span v-if="entry.marked" class="folder-page-mark"> · 対象 {{ entry.marked }}</span></span>
+            <span v-else class="folder-page-meta">{{ formatSize(entry.size) }}<time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
+          </div>
+          <p v-if="!layer.entries.length" class="folder-page-empty">この階層に表示できるフォルダ・ファイルはありません</p>
         </div>
-        <p v-if="!entries.length" class="folder-page-empty">この階層に表示できるフォルダ・ファイルはありません</p>
       </div>
+      <div v-if="turn" :key="'edge:'+turn.id" class="folder-page-turn-edge" :class="'page-turn-'+pageTurn" aria-hidden="true"></div>
     </div>
     <footer>フォルダを開くと次のページへ · ↑↓ 選択 · Enter 開く · Backspace 親へ</footer>
   </section>
