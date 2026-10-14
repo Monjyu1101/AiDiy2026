@@ -28,9 +28,15 @@ button:focus-visible, select:focus-visible { outline: 2px solid #4c88dd; outline
 #notice { padding: 8px 12px; background: #fff5d7; border-bottom: 1px solid #e8d9a7; overflow-wrap: anywhere; }
 #notice.error { color: #8e2626; background: #ffeded; }
 #content { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
-#content.canvas-view { display: flex; flex-direction: column; align-items: flex-start; }
+#content.canvas-view #document-page { display: flex; flex-direction: column; align-items: flex-start; min-width: 100%; }
+.page-navigation { display: flex; justify-content: flex-end; position: sticky; left: 0; width: 100%; }
+#page-top { padding-bottom: 10px; }
+#page-bottom { padding-top: 10px; }
+.page-navigation button { min-height: 32px; padding: 6px 12px; border-color: #587bac; color: #17477d; }
+#content.sheet-view .page-navigation { padding: 8px 12px; background: #f5f7fa; }
 #content canvas { display: block; flex: none; margin: 0 auto; background: white; box-shadow: 0 2px 10px #24324b30; max-width: none; }
 #content.word-view { padding: 0; }
+#content.word-view .page-navigation { padding: 8px 12px; }
 .word-pages { transform-origin: top left; }
 .word-pages .docx-wrapper { padding: 12px; background: transparent; }
 .word-pages .docx-wrapper > section.docx { margin-bottom: 12px; }

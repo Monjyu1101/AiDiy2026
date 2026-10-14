@@ -12,6 +12,7 @@ import { createSpace } from '../src/engines/space.js';
 import * as latest from '../src/latest-file.js';
 import * as pages from '../src/folder-pages.js';
 import * as references from '../src/file-reference.js';
+import * as fileActions from '../src/file-actions.js';
 import { scanWarning } from '../src/scan-warning.js';
 import { fileIcon } from '../src/file-icons.js';
 
@@ -84,7 +85,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
     '../engines/space.js': { createSpace(...args) { engine = createSpace(...args); navigation = t.mock.method(engine, 'goTo'); engine.setAutoSpin(auto); return engine; } },
-    '../latest-file.js': latest, '../folder-pages.js': pages, '../file-reference.js': references,
+    '../latest-file.js': latest, '../folder-pages.js': pages, '../file-reference.js': references, '../file-actions.js': fileActions,
     '../file-icons.js': { fileIcon }, '../scan-warning.js': { scanWarning }, '../engines/monaco.js': { loadMonaco: async () => null, monacoLanguage: () => 'javascript' },
   };
   const aiPanel = { props: ['root'], emits: ['result'], setup(_props, { emit }) { emitAI = result => emit('result', result); return () => null; } };

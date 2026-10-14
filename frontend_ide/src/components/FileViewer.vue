@@ -7,11 +7,14 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import { ref, computed, inject, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { loadMonaco, monacoLanguage } from '../engines/monaco.js';
 import { searchReference, fileDraftReference } from '../file-reference.js';
+import { copyBrowserText, fullFilePath } from '../file-actions.js';
 // pinned: 右側のプレビューではなく、ピン留めした独立ウィンドウの中身として全面に表示する
 const props=defineProps({file:Object,root:String,pinned:Boolean});const emit=defineEmits(['close','pin','activity']);
 const openAnalysis=inject('openFileAnalysis',null),openDraft=inject('openFileDraft',null);
 const openHistory=inject('openFileHistory',null),hasHistory=ref(false),historyError=ref('');
 const data=ref(),error=ref(''),host=ref(),fallback=ref(false),copied=ref(false),stamp=ref(Date.now()),reloading=ref(false);
+const actionError=ref(''),actionBusy=ref(''),canOpenFile=typeof window.aidiyWindow?.openFile==='function';
+let actionRevision=0,copyTimer;
 let controller,editor,scrollSubscription,revision=0,frameCleanup;
 const viewer=ref(),fallbackHost=ref(),fallbackMatch=ref(),jump=ref(null),jumpNote=ref('');
 const fallbackParts=computed(()=>{const text=data.value?.text||'',at=jump.value;return at&&!at.stale?{before:text.slice(0,at.start),match:text.slice(at.start,at.start+at.length),after:text.slice(at.start+at.length)}:null;});
@@ -73,8 +76,30 @@ async function load(file){
 watch(()=>props.file,file=>{previewRun++;stamp.value=Date.now();routeIndex.value=0;preview.value=null;mode.value=file?.line?'code':previewKind.value?readMode(previewKind.value):'code';void load(file);if(mode.value==='view')void loadPreview();},{immediate:true});
 // 画像・Office文書は URL の v を変えて読み直させる。テキストは Monaco を作り直す。表示中のページは iframe を作り直す。
 async function refresh(){if(reloading.value)return;reloading.value=true;stamp.value=Date.now();try{await Promise.all([load(props.file),mode.value==='view'?loadPreview():null]);}finally{reloading.value=false;}}
-const fullPath=computed(()=>{const root=props.root||'';const separator=root.includes('\\')?'\\':'/';return (root?root.replace(/[\\/]+$/,'')+separator:'')+(props.file?.path||'').replaceAll('/',separator);});
-async function copy(){try{await navigator.clipboard.writeText(fullPath.value);copied.value=true;setTimeout(()=>copied.value=false,1500);}catch{error.value='パスをコピーできません。';}}
+const fullPath=computed(()=>fullFilePath(props.root||'',props.file?.path||''));
+function resetActions(){actionRevision++;clearTimeout(copyTimer);copied.value=false;actionBusy.value='';actionError.value='';}
+watch(()=>[props.file,props.root],resetActions,{flush:'sync'});
+async function copy(){
+  if(actionBusy.value||!props.file?.path)return;
+  const run=++actionRevision,path=props.file.path,text=fullPath.value;
+  clearTimeout(copyTimer);copied.value=false;actionBusy.value='copy';actionError.value='';
+  try{
+    if(typeof window.aidiyWindow?.copyFilePath==='function'){
+      const result=await window.aidiyWindow.copyFilePath(path);
+      if(!result?.ok)throw Error(result?.error||'パスをコピーできませんでした。');
+    }else await copyBrowserText(text,{isCurrent:()=>run===actionRevision});
+    if(run!==actionRevision)return;
+    copied.value=true;copyTimer=setTimeout(()=>{if(run===actionRevision)copied.value=false;},1500);
+  }catch(e){if(run===actionRevision)actionError.value='パスをコピーできませんでした。表示されたパスを選択してコピーしてください。';}
+  finally{if(run===actionRevision)actionBusy.value='';}
+}
+async function openFile(){
+  if(!canOpenFile||actionBusy.value||!props.file?.path)return;
+  const run=++actionRevision,path=props.file.path;clearTimeout(copyTimer);copied.value=false;actionBusy.value='open';actionError.value='';
+  try{const result=await window.aidiyWindow.openFile(path);if(!result?.ok&&!result?.cancelled)throw Error(result?.error||'関連付けられたアプリで開けませんでした。');}
+  catch(e){if(run===actionRevision)actionError.value=e.message||'関連付けられたアプリで開けませんでした。';}
+  finally{if(run===actionRevision)actionBusy.value='';}
+}
 function selectedReference(){
   if(mode.value==='view'||data.value?.kind!=='text')return null;
   const selection=editor?.getSelection();
@@ -92,7 +117,7 @@ function handoff(){
   try{const selection=selectedReference();openDraft({projectPath:props.root,path:props.file.path,name:props.file.name,text:fileDraftReference(props.file,selection),selection:!!selection});}
   catch(e){error.value=e.message;}
 }
-onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor();frameCleanup?.();window.removeEventListener('message',frameActivity);});
+onBeforeUnmount(()=>{resetActions();revision++;previewRun++;controller?.abort();disposeEditor();frameCleanup?.();window.removeEventListener('message',frameActivity);});
 </script>
 <template>
   <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
@@ -102,7 +127,8 @@ onBeforeUnmount(()=>{revision++;previewRun++;controller?.abort();disposeEditor()
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
       <!-- 右端は ⟳ 📌 × の順。右端へ寄せる役目は先頭の ⟳ が持つ -->
       <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" title="ピン留め（別ウィンドウで開く）" aria-label="ピン留め" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')">×</button></header>
-    <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><button class="viewer-copy" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
+    <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><div class="viewer-path-actions"><button class="viewer-copy" :disabled="!!actionBusy" aria-live="polite" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button><button v-if="canOpenFile" class="viewer-open-app" :disabled="!!actionBusy" @click="openFile">{{ actionBusy==='open'?'開いています…':'アプリで開く' }}</button></div></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
+    <p v-if="actionError" class="error viewer-action-error" role="status">{{ actionError }}</p>
     <p v-if="file.unlisted" class="input-hint">現在の一覧に含まれない検索結果を直接表示しています。</p>
     <p v-if="jumpNote" class="input-hint" role="status">{{ jumpNote }}</p>
     <p v-if="historyError" class="input-hint">{{ historyError }}</p>

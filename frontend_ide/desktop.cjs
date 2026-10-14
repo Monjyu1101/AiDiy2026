@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-const {app,BrowserWindow,ipcMain,shell,session,screen,dialog}=require('electron');
+const {app,BrowserWindow,ipcMain,shell,clipboard,session,screen,dialog}=require('electron');
 const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./project-profile.cjs');
@@ -32,6 +32,8 @@ const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
 const {createDraftRouter}=require('./draft-router.cjs');
 const {readDevelopmentState}=require('./desktop-session.cjs');
 const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
+const {createNativePreviewActions}=require('./native-preview-actions.cjs');
+const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false;
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
@@ -108,9 +110,9 @@ async function createWindow(kind,url,server,owner,linkKey){
   });
  }
  const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);});
- contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame&&!isInPlace)draftRouter.invalidate(record);});
- contents.on('render-process-gone',()=>draftRouter.invalidate(record));
+ window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);});
+ contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame){nativePreviewActions.invalidate(record);if(!isInPlace)draftRouter.invalidate(record);}});
+ contents.on('render-process-gone',()=>{draftRouter.invalidate(record);nativePreviewActions.invalidate(record);});
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
  contents.on('will-redirect',event=>event.preventDefault());contents.on('will-attach-webview',event=>event.preventDefault());
  contents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//i.test(url))void shell.openExternal(url);return{action:'deny'};});
@@ -148,6 +150,8 @@ app.whenReady().then(async()=>{
   if(action==='maximize'||action==='isMaximized')return record.window.isMaximized();
  });
  ipcMain.handle('development:draft-target-register',(event,value)=>draftRouter.register(trustedEvent(event),value));
+ ipcMain.handle('development:copy-file-path',(event,path)=>nativePreviewActions.copyFilePath(event,path));
+ ipcMain.handle('development:open-file',(event,path)=>nativePreviewActions.openFile(event,path));
  ipcMain.handle('development:draft-targets',event=>draftRouter.list(trustedEvent(event)));
  ipcMain.handle('development:draft-insert',(event,value)=>draftRouter.insert(trustedEvent(event),value));
  ipcMain.on('development:draft-result',(event,value)=>draftRouter.acknowledge(trustedEvent(event),value));

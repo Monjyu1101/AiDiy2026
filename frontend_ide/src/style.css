@@ -104,7 +104,7 @@
 
 :is(.viewer-popup,.viewer-pinned) header{flex-wrap:wrap}
 .viewer-analysis{display:inline-flex;align-items:center;gap:5px}.viewer-analysis img{display:block;width:20px;height:20px;object-fit:contain}
-.viewer-path-row{display:flex;align-items:center;gap:8px;min-width:0}.viewer-path-row .viewer-path{flex:1;min-width:0}.viewer-copy{flex:none;white-space:nowrap}
+.viewer-path-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-width:0}.viewer-path-row .viewer-path{flex:1 1 120px;min-width:0;user-select:text}.viewer-path-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;margin-left:auto}.viewer-path-actions button{flex:none;white-space:nowrap}.viewer-action-error{margin:0 0 6px;overflow-wrap:anywhere}
 .file-history-dialog{color:#dce8fa;background:#090e1b;border:1px solid #405575;border-radius:0;width:calc(100vw - 32px);max-width:1600px;height:calc(100dvh - 40px);max-height:calc(100dvh - 40px);padding:0;font:var(--file-font-size,10px) var(--mono);overflow:hidden}
 .file-history-dialog[open]{display:flex;flex-direction:column;transform-origin:50% 55%;animation:history-unfold 480ms cubic-bezier(.22,.72,.2,1) both}.file-history-dialog::backdrop{background:#000b;animation:history-backdrop 400ms ease-out both}
 @keyframes history-unfold{0%{opacity:0;transform:translateY(18px) scale(.84,.65)}72%{opacity:1;transform:translateY(-2px) scale(1.008,1.012)}100%{opacity:1;transform:none}}

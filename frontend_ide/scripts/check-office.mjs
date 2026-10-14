@@ -80,10 +80,17 @@ try {
   await open('sample.js');
   await until(() => evaluate('!!document.querySelector(".monaco-editor")&&!!window.monaco?.editor'), 'Monaco');
   await open('日本語文書.docx');
-  await until(() => child(`document.querySelectorAll('section.docx').length===2&&document.getElementById('content').textContent.includes('Wordの日本語')`), 'Word日本語とページ区切り');
+  await until(() => child(`document.querySelectorAll('section.docx').length===2&&document.getElementById('page-status').textContent==='1 / 2'&&[...document.querySelectorAll('section.docx')].filter(page=>!page.hidden).length===1&&document.querySelector('section.docx:not([hidden])')?.textContent.includes('Wordの日本語')`), 'Word日本語と先頭ページ');
   assert.equal(await healthy(), true);
   assert.equal(await evaluate(`!!window.monaco?.editor&&typeof document.querySelector('iframe').contentWindow.require==='undefined'`), true, 'Office iframeはAMDローダーを共有しない');
+  assert.equal(await child(`document.getElementById('page-top').hidden&&!document.getElementById('page-bottom').hidden`), true, 'Word先頭は次ページだけ案内');
   await capture(browser, 'word');
+  await child(`document.getElementById('page-next').click();true`);
+  await until(() => child(`document.getElementById('page-status').textContent==='2 / 2'&&document.querySelector('section.docx:not([hidden])')?.textContent.includes('2ページ目')`), 'Word次ページ');
+  assert.equal(await child(`!document.getElementById('page-top').hidden&&document.getElementById('page-bottom').hidden&&document.getElementById('content').scrollTop===0`), true, 'Word最終ページは前ページだけ案内');
+  await capture(browser, 'word-page2');
+  await child(`document.getElementById('page-previous').click();true`);
+  await until(() => child(`document.getElementById('page-status').textContent==='1 / 2'&&document.querySelector('section.docx:not([hidden])')?.textContent.includes('Wordの日本語')`), 'Word前ページ');
   await child(`document.getElementById('zoom').value='1.5';document.getElementById('zoom').dispatchEvent(new Event('change'));true`);
   await until(() => child(`document.querySelector('.word-pages').style.zoom==='1.5'`), 'Word倍率');
   // ファイルを一時プロジェクトでだけ書き換え、親ビューアの⟳で新しい本文を確認する。
@@ -139,7 +146,7 @@ try {
   await evaluate(`document.querySelector('[aria-label="プレビューを閉じる"]').click()`);
   await until(() => evaluate('!document.querySelector("iframe")'), 'Office iframeの破棄');
   assert.deepEqual(errors, []);
-  console.log('OFFICE PASS: Word日本語・ページ区切り・倍率・再読込、Excel計算結果・シート・行送り・結合・CSV、PDF/PPTページ送り・倍率・縦横、Monaco切替・壊れた文書・復旧・破棄');
+  console.log('OFFICE PASS: Word日本語・上下ページ送り・ページ区切り・倍率・再読込、Excel計算結果・シート・行送り・結合・CSV、PDF/PPTページ送り・倍率・縦横、Monaco切替・壊れた文書・復旧・破棄');
 } finally {
   for (const socket of sockets) socket.close(); chrome.kill(); await app.close();
   if (chrome.exitCode === null) await once(chrome, 'exit');

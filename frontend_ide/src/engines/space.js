@@ -16,7 +16,7 @@
 
 import { spacePosition, WORLD_RADIUS, HOME_VIEW, warpMotion } from '../../viewer/web/layout.js';
 import { createAutoOrbit } from './auto-orbit.js';
-import { turnToTarget, cameraPosition, orbitAround, interpolateCamera, cockpitLook, framingDistance, WARP_APPROACH_WIDTH, WARP_PEAK_WIDTH } from './warp-camera.js';
+import { turnToTarget, cameraPosition, orbitAround, interpolateOrbit, interpolateCamera, cockpitLook, framingDistance, WARP_APPROACH_WIDTH, WARP_PEAK_WIDTH } from './warp-camera.js';
 import { aiRouteTargets } from './ai-route.js';
 import { createTextWidthCache } from './text-width-cache.js';
 
@@ -384,9 +384,9 @@ function frame(now) {
       cam.dist = Math.exp(Math.log(introFlight.from) * (1 - k) + Math.log(goal.dist) * k);
       if (progress >= 1) introFlight = null;
     } else if (manualOrbit) {
-      Object.assign(cam,orbitAround(cam,orbitPivot,(goal.yaw-cam.yaw)*ease,(goal.pitch-cam.pitch)*ease));
+      Object.assign(cam,interpolateOrbit(cam,goal,orbitPivot,ease));
       cam.dist+=(goal.dist-cam.dist)*ease;
-      if(!dragging && Math.abs(cam.yaw-goal.yaw)+Math.abs(cam.pitch-goal.pitch)<1e-6)manualOrbit=false;
+      if(!dragging && Math.abs(cam.yaw-goal.yaw)+Math.abs(cam.pitch-goal.pitch)+Math.abs(cam.roll-goal.roll)<1e-6)manualOrbit=false;
     } else if (Object.keys(cam).some(key=>Math.abs(goal[key]-cam[key])>1e-9)) {
       Object.assign(cam,interpolateCamera(cam,goal,ease));
     }
@@ -850,8 +850,8 @@ listen(canvas, 'pointermove', e => {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
     dragMoved += Math.abs(dx) + Math.abs(dy);
-    // ドラッグだけは中心を軸に回り込む。以後はその実位置を船の出発地点にする。
-    Object.assign(goal,orbitAround(goal,orbitPivot,dx*.005,-dy*.005));
+    // 傾いた姿勢でも画面の方向で球を回す。以後はその実位置を船の出発地点にする。
+    Object.assign(goal,orbitAround(goal,orbitPivot,dx*.005,-dy*.005,look));
     touchIdle();
     return;
   }

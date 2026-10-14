@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import * as fileReference from '../src/file-reference.js';
+import * as fileActions from '../src/file-actions.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
@@ -21,7 +22,7 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
     module,window,AbortController,AbortSignal,URLSearchParams,Response,Date,
     localStorage:{getItem:()=>null,setItem(){}},getComputedStyle:()=>({getPropertyValue:()=>10}),
     setTimeout:()=>0,clearTimeout(){},
-    require:id=>id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:modules[id]||{},
+    require:id=>id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../file-actions.js'?fileActions:modules[id]||{},
     ...globals,
   });
   const scope=vue.effectScope(),reactive=vue.reactive(props);

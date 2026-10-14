@@ -36,7 +36,15 @@
     </label>
   </header>
   <div id="notice" role="status">読み込み中…</div>
-  <main id="content"></main>
+  <main id="content">
+    <nav id="page-top" class="page-navigation" aria-label="ページ先頭の操作" hidden>
+      <button id="page-previous" type="button" aria-controls="document-page">前のページへ</button>
+    </nav>
+    <div id="document-page"></div>
+    <nav id="page-bottom" class="page-navigation" aria-label="ページ末尾の操作" hidden>
+      <button id="page-next" type="button" aria-controls="document-page">次のページへ</button>
+    </nav>
+  </main>
   <nav id="sheets" aria-label="シート" hidden></nav>
   <script type="module" src="/office.js"></script>
 </body>

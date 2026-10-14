@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraPosition,turnToTarget,cameraAt,interpolateCamera,cockpitLook,orbitAround} from '../src/engines/warp-camera.js';
+import {cameraPosition,turnToTarget,cameraAt,interpolateCamera,cockpitLook,orbitAround,interpolateOrbit} from '../src/engines/warp-camera.js';
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const target={x:1200,y:-600,z:350};
 for(const pitch of [.35,Math.PI+0.2,-Math.PI*2-.4])test(`旋回中の船体位置を固定し、完了後の前進は目的地への直線になる: ${pitch}`,()=>{
@@ -73,4 +73,54 @@ test('ドラッグは中心星を周回し、その後の航行は回り込ん�
     const turned=turnToTarget(view,target,progress);
     for(const key of ['x','y','z'])near(cameraPosition(turned)[key],departure[key]);
   }
+});
+
+// space.js と同じ透視投影で確認する。カメラのyawの増減と、星が画面を動く方向は区別する。
+function project(view,point,look=cockpitLook(0,0,800)) {
+  const x=point.x-view.tx,y=point.y-view.ty,z=point.z-view.tz;
+  const right=x*Math.cos(view.yaw)-z*Math.sin(view.yaw),ahead=x*Math.sin(view.yaw)+z*Math.cos(view.yaw);
+  const up=y*Math.cos(view.pitch)-ahead*Math.sin(view.pitch),depth=y*Math.sin(view.pitch)+ahead*Math.cos(view.pitch)+view.dist;
+  const roll=view.roll||0,[rx,ry,rz]=look(right*Math.cos(roll)+up*Math.sin(roll),-right*Math.sin(roll)+up*Math.cos(roll),depth);
+  return [800*rx/rz,-800*ry/rz,rz];
+}
+const pivot={x:150,y:-230,z:80};
+for(const pitch of [0,.8,Math.PI/2-1e-7,Math.PI/2,Math.PI/2+1e-7,Math.PI+.3,-Math.PI*2-.4]) {
+  for(const roll of [0,Math.PI/2,Math.PI,-Math.PI/2,7.5]) {
+    test(`球をつかむドラッグ: pitch=${pitch}, roll=${roll}でも前側の星が画面の指と同方向へ動く`,()=>{
+      for(const yaw of [-7,0,2.4])for(const [ox,oy] of [[0,0],[-240,-180]])for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1]]){
+        const from={tx:pivot.x,ty:pivot.y,tz:pivot.z,dist:2500,yaw,pitch,roll},eye=cameraPosition(from);
+        const front=Object.fromEntries(['x','y','z'].map(key=>[key,pivot[key]+(eye[key]-pivot[key])*.3]));
+        const look=cockpitLook(ox,oy,800),before=project(from,front,look),center=project(from,pivot,look);
+        const end=orbitAround(from,pivot,dx*.06,-dy*.06,look);
+        for(const amount of [.01,.2,.5,1]) {
+          const view=interpolateOrbit(from,end,pivot,amount),screen=project(view,front,look),anchored=project(view,pivot,look),position=cameraPosition(view);
+          if(dx)assert.ok((screen[0]-before[0])*dx>0,'前側の星の左右がドラッグと一致する');
+          if(dy)assert.ok((screen[1]-before[1])*dy>0,'前側の星の上下がドラッグと一致する');
+          for(let n=0;n<3;n++)near(anchored[n],center[n]);
+          near(Math.hypot(position.x-pivot.x,position.y-pivot.y,position.z-pivot.z),2500);
+          near(view.dist,from.dist);
+          if(amount===1)for(let n=0;n<3;n++)near(screen[n],project(end,front,look)[n]);
+        }
+      }
+    });
+  }
+}
+
+test('周回は注視点と別の中心にも使え、連続・逆方向のドラッグとロール境界で中心や距離が漂わない',()=>{
+  const from={tx:300,ty:20,tz:-40,dist:3000,yaw:6.2,pitch:1.4,roll:3.1};
+  const look=cockpitLook(-220,100,800),center=project(from,pivot,look),start=cameraPosition(from);
+  let view={...from};
+  for(let n=0;n<120;n++){
+    const end=orbitAround(view,pivot,-.06,.02,look);
+    let eased={...view};
+    for(let frame=0;frame<80;frame++)eased=interpolateOrbit(eased,end,pivot,.3);
+    for(let i=0;i<3;i++)near(project(eased,pivot,look)[i],center[i]);
+    const eye=cameraPosition(eased);
+    near(Math.hypot(eye.x-pivot.x,eye.y-pivot.y,eye.z-pivot.z),Math.hypot(start.x-pivot.x,start.y-pivot.y,start.z-pivot.z));
+    for(const key of ['x','y','z'])near(eye[key],cameraPosition(end)[key]);
+    view=end;
+  }
+  for(let n=0;n<120;n++)view=orbitAround(view,pivot,.06,-.02,look);
+  for(const key of ['x','y','z'])near(cameraPosition(view)[key],start[key]);
+  for(const point of [pivot,target])for(let n=0;n<3;n++)near(project(view,point,look)[n],project(from,point,look)[n]);
 });

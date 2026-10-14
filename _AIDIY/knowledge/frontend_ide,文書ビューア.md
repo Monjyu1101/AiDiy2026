@@ -29,6 +29,14 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 
 ## 導入と検証
 
+### パスのコピーと関連アプリ
+
+- 共通の `FileViewer.vue` は通常プレビュー・ピン留めの両方で同じ操作を使う。Electronでは限定した `aidiyWindow.copyFilePath` / `openFile` IPCを使い、Webでは「アプリで開く」を表示しない。HTTPにOSのアプリ起動APIを追加しない。
+- コピーはElectronのネイティブクリップボードを優先する。WebはClipboard API、非対応・権限拒否時は選択用textareaによるコピーを試し、元のフォーカス・選択を復元する。失敗を成功扱いせず、表示されたパスの手動コピーを案内する。操作エラーで文書本文を隠さない。
+- `native-preview-actions.cjs` はIDEの信頼済みメインフレーム・所有者・稼働セッション・相対パス・実ファイルとリンク先のプロジェクト内境界を検証する。ピン留めはその窓の対象ファイルに限定する。状態取得や確認の待ち時間にもセッションとファイルを再検証する。
+- 「アプリで開く」は明示クリック時だけ関連アプリへ渡す。実行形式・スクリプト・ショートカット等にはキャンセルを既定とする警告を表示する。連打・対象切替・閉じる際の遅い応答で、別ファイルへ成功やエラーを表示しない。
+- `checks/file-actions.test.mjs` と `checks/preview-actions.test.mjs` はパス・Web代替コピー・実Vueテンプレートの表示とクリックを、`checks/native-preview-actions.test.mjs` はネイティブ境界を検証する。OSのクリップボード・関連アプリの実動作と狭い画面の配置は、実機で別途確認する。
+
 ### Markdownプレビュー
 
 - 共通画面の `frontend_ide/src/components/FileViewer.vue` は `.md` / `.markdown` を既定でプレビュー表示し、「コード / プレビュー」を切り替える。最後に選んだ表示をMarkdown全体で記憶し、ピン留め窓でも共用する。
@@ -60,6 +68,14 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 `checks/fixtures.mjs` の `createFixtures(root)` で、指定した一時ディレクトリに Word / Excel / PDF / CSV / 壊れた文書 / コードの検証用ファイルを生成できる。PowerPoint は既存の `AiDiy概要.pptx` などを読み取り用の一時フォルダへコピーして使用する。原本は更新しない。
 
 実画面の一括確認は、ルートから `node frontend_ide/scripts/check-office.mjs` を実行する。Chrome / Edgeが自動検出できない場合は `CHROME_PATH` で実行ファイルを指定する。専用の一時プロジェクトでWord日本語・ページ区切り・倍率・更新後の再読込、Excel計算結果・シート切替・行送り・結合セル・CSV、PDF / PowerPointのページ送り・倍率・縦横表示、Monacoとの切替、壊れた文書のエラーとその後の復旧、iframeの破棄を確認する。Monacoを親画面に読み込んだ状態でOfficeを開き、AMDローダーが文書へ持ち込まれないことも確認する。日時・連番付き画像は `temp/office-viewer-check/` に保存する。
+
+### 文書のページ送り
+
+- Word・Excel・PDF・PowerPointは、表示中ページの先頭右側に2ページ目以降だけ「前のページへ」、本文末尾に最終ページ以外だけ「次のページへ」を表示する。既存ツールバー・左右キー・PageUp / PageDownと同じ `move()` を使う。空・1ページの文書では両方を隠す。テキストの先頭1MB制限をページ送りと混同しない。
+- Wordはdocx-previewが改ページ・セクション情報等から生成する `section.docx` を1ページずつ表示する。文字数や画面高さで独自に分割しない。文書全体のスタイル・ヘッダー・フッター・脚注を保持し、VML等の計測フレームを待ってからページを切り替える。文書内のブックマークは対象ページを表示して位置へ移動し、外部リンクは引き続き開かない。Wordアプリの自動改ページと完全一致するページ数を保証するものではない。
+- 内容とページ番号・シート選択・上下ボタンは、描画に成功してからまとめて確定する。連打・倍率・リサイズ・シート切替の古い結果を捨て、失敗時は表示済みページを残して再試行できるようにする。ページ送りの成功時だけ本文先頭へ戻し、倍率変更だけではスクロールを戻さない。
+- PowerPointはPptxViewJSが保持する描画canvasを固定し、完成したスナップショットを本文へ差し替える。遅延グラフの再描画も共通の直列処理を通す。別ファイル・閉じる際はiframeごと破棄し、pagehideで通信・監視・文書ライブラリを片付ける。
+- `viewer/checks/office-pagination.test.mjs` は実Officeスクリプトの操作・描画寿命を模擬DOMで検証する。画面幅・横スクロール・倍率・先頭と末尾の配置は `scripts/check-office.mjs` 等で別途実画面確認する。
 
 ## 制限と切り分け
 
