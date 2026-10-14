@@ -5,20 +5,25 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {app,BrowserWindow,ipcMain,shell,session,screen,dialog}=require('electron');
 const {join}=require('node:path');
-const {mkdtempSync,rmSync}=require('node:fs');
+const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
+const {projectProfile}=require('./project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
 if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
-app.setName(`aidiy_${kind}`);app.setPath('userData',join(app.getPath('appData'),`aidiy_${kind}_vue`));
+app.setName(`aidiy_${kind}`);
+// ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
+const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
+if(kind==='ide')mkdirSync(profile,{recursive:true});
+app.setPath('userData',profile);
+if(kind==='ide')app.setPath('sessionData',profile);
 if(kind==='term'){
  const temporaryProfile=mkdtempSync(join(app.getPath('temp'),'aidiy-term-profile-'));
  app.setPath('userData',temporaryProfile);
  app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
 }
-const {windowBounds}=require('./window-layout.cjs');
+const {windowBounds,windowMinimumSize}=require('./window-layout.cjs');
 const {reserveTermSlot}=require('./term-window-slot.cjs');
-const chatSize=require('./host/scripts/window-size.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
-// Code / Live / IDEは既存の単独ウィンドウを再利用し、Termは別プロセスで複数起動する。
+// IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
 if(kind!=='term'&&!app.requestSingleInstanceLock()){
  if(process.send)process.send({existingWindow:true},()=>app.exit(0));else app.exit(0);
  return;
@@ -76,7 +81,7 @@ async function createWindow(kind,url,server,owner,linkKey){
  const bounds=windowBounds(kind,area,ownerBounds,slot);
  const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?'Code':kind==='term'?'Term':'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,minWidth:Math.min(kind==='ide'?400:chatSize.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:chatSize.会話最小高さ,bounds.height),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。

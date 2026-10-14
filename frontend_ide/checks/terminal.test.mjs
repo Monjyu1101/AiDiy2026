@@ -73,6 +73,29 @@ test('tools確認OFF後の遅れた成功応答でオンラインに戻らない
     assert.ok(!client.messages.some(m => m.type === 'tools' && m.online));
   } finally { ws?.terminate(); await app.close(); }
 });
+test('小さい端末: 1〜5行の起動・縮小・復元をPTYへそのまま渡し、0行・小数は拒否する',async()=>{
+ const starts=[],sizes=[];let killed=0;
+ const app=await startTerminal(tmpdir(),{checkTools:async()=>false,spawnTerminal:(_shell,_args,options)=>{
+  starts.push([options.cols,options.rows]);return{onData:()=>({dispose(){}}),onExit:()=>({dispose(){}}),resize:(...size)=>sizes.push(size),kill:()=>killed++};
+ }});
+ try{
+  for(const rows of [1,3,4,5]){
+   const client=await connect(app.url,new URL(app.url).origin);
+   client.send({type:'start',cols:40,rows});await until(()=>client.messages.some(message=>message.type==='ready'));
+   assert.deepEqual(starts.at(-1),[40,rows]);
+   const before=sizes.length;
+   for(const height of [1,3,5,30,4])client.send({type:'resize',cols:40,rows:height});
+   await until(()=>sizes.length===before+5);assert.deepEqual(sizes.slice(before),[[40,1],[40,3],[40,5],[40,30],[40,4]]);
+   const closed=once(client.ws,'close');client.send({type:'resize',cols:40,rows:rows===1?0:1.5});await closed;
+  }
+  await until(()=>killed===4);
+  for(const rows of [0,-1,1.5]){
+   const client=await connect(app.url,new URL(app.url).origin),closed=once(client.ws,'close');
+   client.send({type:'start',cols:40,rows});await closed;
+  }
+  assert.equal(starts.length,4);
+ }finally{await app.close();}
+});
 test('IDEのTerm: 実PTYで日本語・作業フォルダ・リサイズ・Ctrl+C・セッション終了', { timeout: 30000 }, async () => {
   const project = await mkdtemp(join(tmpdir(), 'aidiy-term-'));
   const app = await startDevelopment(project); let ws;
@@ -88,6 +111,11 @@ test('IDEのTerm: 実PTYで日本語・作業フォルダ・リサイズ・Ctrl+
     client.send({ type: 'resize', cols: 110, rows: 32 });
     client.send({ type: 'input', data: windows ? "Write-Output ('SIZE_'+$Host.UI.RawUI.WindowSize.Width)\r" : "printf 'SIZE_'; stty size\r" });
     await until(() => client.text().includes(windows ? 'SIZE_110' : '32 110'));
+    for(const rows of [3,1,4,30]){
+      client.send({type:'resize',cols:60,rows});
+      client.send({type:'input',data:windows?`Write-Output ('COMPACT_'+$Host.UI.RawUI.WindowSize.Height+'x'+$Host.UI.RawUI.WindowSize.Width)\r`:"printf 'COMPACT_'; stty size\r"});
+      await until(()=>client.text().includes(windows?`COMPACT_${rows}x60`:`COMPACT_${rows} 60`));
+    }
     client.send({ type: 'input', data: windows ? 'Start-Sleep -Seconds 30\r' : 'sleep 30\r' }); await delay(500);
     client.send({ type: 'input', data: '\u0003' }); await delay(300);
     client.send({ type: 'input', data: windows ? "Write-Output ('INTERRUPT_'+'OK')\r" : "printf 'INTERRUPT_%s\\n' OK\r" });

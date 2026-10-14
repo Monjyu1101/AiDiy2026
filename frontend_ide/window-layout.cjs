@@ -5,6 +5,10 @@
 // https://github.com/monjyu1101/AiDiy2026
 // ElectronのworkArea（タスクバーを除いた論理座標）に収める。
 const size=require('./host/scripts/window-size.cjs');
+// Termは操作バーと端末の数行を残せればよい。初期配置・会話画面の最小寸法とは分ける。
+function windowMinimumSize(kind,bounds){
+ return{minWidth:Math.min(kind==='ide'?400:size.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:kind==='term'?180:size.会話最小高さ,bounds.height)};
+}
 function windowBounds(kind,area,owner,slot=0){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
@@ -30,4 +34,4 @@ function windowBounds(kind,area,owner,slot=0){
  const y=base.y+(owner?36:0)+offset;
  return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
 }
-module.exports={windowBounds};
+module.exports={windowBounds,windowMinimumSize};

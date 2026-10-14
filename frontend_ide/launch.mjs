@@ -12,6 +12,8 @@ import { startDevelopment } from './server.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
 import { spawnDesktop } from './desktop-process.mjs';
+import projectProfiles from './project-profile.cjs';
+const {projectIdentity}=projectProfiles;
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){
  const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='term'?'Term':'Code';
@@ -35,7 +37,8 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  const kind=values.app||defaultKind;
  if(!['code','live','ide','term'].includes(kind))throw Error('--app はcode / live / ide / termから指定してください。');
  if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port] [--provider 名前] [--model モデル]${kind==='code'?' [--offline]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
- const project=projectFolder(positionals,values.project),port=values.port===undefined?0:Number(values.port);
+ const requestedProject=projectFolder(positionals,values.project);
+ const project=kind==='ide'?projectIdentity(requestedProject).path:requestedProject,port=values.port===undefined?0:Number(values.port);
  if(!Number.isInteger(port)||port<0||port>65535)throw Error('--port は0〜65535で指定してください。');
  if(values.offline&&kind==='live')throw Error('LiveはAiDiy接続が必要です。');
  let provider=values.provider?.trim(),model=values.model?.trim();
@@ -63,7 +66,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  let browser=values.browser||useBrowser();
  if(!browser){
   try{
-   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind};delete env.ELECTRON_RUN_AS_NODE;
+   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project};delete env.ELECTRON_RUN_AS_NODE;
    let executable;try{executable=electronExecutable();}catch{executable=electronExecutable(new URL('./host/package.json',import.meta.url));}
    desktop=spawnDesktop(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,background:launcherChild});
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});

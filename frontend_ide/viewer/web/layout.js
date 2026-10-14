@@ -53,14 +53,14 @@ export function panOffset(yaw, pitch, dx, dy, scale) {
 }
 
 /** フォルダ移動の2段階ワープ。拡縮・フェード・ぼかしを組み合わせる。 */
-export function warpMotion(direction) {
+export function warpMotion(direction, { inwardScale = 2.6 } = {}) {
   const inward = direction !== 'out';
   return {
     exit: {
       duration: 850,
       frames: [
         { opacity: 1, transform: 'scale(1)', filter: 'blur(0px)' },
-        { opacity: 0, transform: `scale(${inward ? 2.6 : 0.38})`, filter: `blur(7px)` },
+        { opacity: 0, transform: `scale(${inward ? inwardScale : 0.38})`, filter: `blur(7px)` },
       ],
     },
     entry: {

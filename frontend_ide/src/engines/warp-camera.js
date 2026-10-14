@@ -7,6 +7,14 @@
 const forward = ({yaw,pitch}) => ({x:Math.sin(yaw)*Math.cos(pitch),y:Math.sin(pitch),z:Math.cos(yaw)*Math.cos(pitch)});
 const nearAngle = (angle,reference) => reference+Math.atan2(Math.sin(angle-reference),Math.cos(angle-reference));
 
+export const WARP_APPROACH_WIDTH = 0.25;
+export const WARP_PEAK_WIDTH = 0.5;
+
+/** 中心の天体を画面幅の指定比率に収める距離。操縦席の見回しによる奥行きの減少も補正する。 */
+export function framingDistance(diameter, width, focal, offsetX = 0, offsetY = 0, fraction = WARP_APPROACH_WIDTH) {
+  return diameter * Math.hypot(focal, offsetX, offsetY) / (width * fraction);
+}
+
 /** 注視点と距離で表しているカメラの、実際の宇宙内の位置。 */
 export function cameraPosition(view) {
   const direction=forward(view);

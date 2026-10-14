@@ -15,7 +15,7 @@ const trail = computed(() => props.current.split('/').filter(Boolean));
 const memory = createFolderPageMemory(), body = ref(), cursor = ref(''), turn = shallowRef(null);
 const pageTurn = computed(() => turn.value?.direction || '');
 const turnPath = computed(() => turn.value?.incoming.path || ''), turnSkipped = computed(() => turn.value?.skipped || 0);
-const turnDuration = ref(300);
+const turnDuration = ref(1500);
 let turnSteps = [], turnSerial = 0, pointerTurn = false;
 const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 function motionChanged(event) { if (event.matches) cancelTurns(); }
@@ -75,7 +75,8 @@ function showNextTurn(outgoing) {
 function startTurns(previous, path, enabled) {
   cancelTurns();
   turnSteps = enabled ? folderPageTurnPlan(previous, path) : [];
-  turnDuration.value = turnSteps.length > 1 ? 180 : 300;
+  // 実際に重ねる枚数へ総時間を配り、1枚でも深い移動でも全体を約1.5秒に揃える。
+  turnDuration.value = 1500 / Math.max(1, turnSteps.length);
   if (turnSteps.length) showNextTurn(snapshot(previous, true));
 }
 function finishTurn(event, id) {
@@ -153,7 +154,7 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
           <p v-if="!layer.entries.length" class="folder-page-empty">この階層に表示できるフォルダ・ファイルはありません</p>
         </div>
       </div>
-      <div v-if="turn" :key="'edge:'+turn.id" class="folder-page-turn-edge" :class="'page-turn-'+pageTurn" aria-hidden="true"></div>
+      <svg v-if="turn" :key="'edge:'+turn.id" class="folder-page-turn-edge" :class="'page-turn-'+pageTurn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line x1="100" y1="0" x2="0" y2="100" vector-effect="non-scaling-stroke" /></svg>
     </div>
     <footer>フォルダを開くと次のページへ · ↑↓ 選択 · Enter 開く · Backspace 親へ</footer>
   </section>

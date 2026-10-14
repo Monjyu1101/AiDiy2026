@@ -126,7 +126,7 @@ test('ページをめくる演出: 旧ページの下に移動先を用意し、
     h.props.current = 'src'; await flush(); assert.equal(h.state.pageTurn.value, 'forward');
     assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src', '']);
     assert.equal(h.state.turn.value.outgoing.scrollTop, 275); assert.equal(h.state.turn.value.outgoing.cursor, 'src');
-    assert.equal(h.state.turn.value.incoming.path, 'src'); assert.equal(h.state.turnDuration.value, 300);
+    assert.equal(h.state.turn.value.incoming.path, 'src'); assert.equal(h.state.turnDuration.value, 1500);
     const id = h.state.turn.value.id;
     h.state.finishTurn({ target: {}, currentTarget: {}, animationName: 'folder-page-forward' }, id);
     assert.equal(h.state.pageTurn.value, 'forward', '子のanimationendを使わない');
@@ -162,7 +162,7 @@ test('複数ページ演出: 戻る→進むの実ページを順に重ね、連
   };
   try {
     await h.mount(); h.props.current = 'src/nested'; await flush();
-    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnDuration.value, 180);
+    assert.equal(h.state.pageTurn.value, 'forward'); assert.equal(h.state.turnDuration.value, 750);
     assert.deepEqual(Array.from(h.state.layers.value, layer => layer.path), ['src/nested', 'src', '']);
     assert.equal(h.state.turn.value.incoming.entries[0].path, 'src/nested');
     const old = h.state.turn.value.id;
@@ -304,16 +304,16 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.equal((view.match(/<FileViewer /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
   assert.match(view, /<SpaceCanvas :mode="viewMode"/); assert.match(view, /<FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'"/);
   assert.match(view, /<FileViewer v-if="selected"/); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
-  assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,300ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,300ms\)/);
-  assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:inset\(0 0 0 0\)\}to\{clip-path:inset\(0 100% 0 0\)/);
-  assert.match(css, /@keyframes folder-page-back\{from\{clip-path:inset\(0 0 0 0\)\}to\{clip-path:inset\(0 0 0 100%\)/);
-  assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:0%\}/);
-  assert.match(css, /@keyframes folder-page-edge-back\{from\{left:0%\}to\{left:100%\}/);
+  assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,1500ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,1500ms\)/);
+  assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:polygon\(/);
+  assert.match(css, /@keyframes folder-page-back\{from\{clip-path:polygon\(/);
+  assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:calc\(0% - var\(--page-turn-slant\)\)\}/);
+  assert.match(css, /@keyframes folder-page-edge-back\{from\{left:calc\(0% - var\(--page-turn-slant\)\)\}to\{left:100%\}/);
   assert.doesNotMatch(css, /rotateY\(/);
   assert.doesNotMatch(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval|setTimeout/);
 });
 
-test('2Dページの縦線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
+test('2Dページの斜線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
   const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
   const values = selector => {
     const result = {}; css.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(declaration => result[declaration.prop] = declaration.value); }); return result;
@@ -321,14 +321,83 @@ test('2Dページの縦線: 切り抜きと同じ時間/イージングで動き
   for (const direction of ['forward', 'back']) {
     const sheet = values('.folder-page-sheet.page-turn-' + direction), edge = values('.folder-page-turn-edge.page-turn-' + direction);
     assert.equal(sheet.animation.replace('folder-page-' + direction, ''), edge.animation.replace('folder-page-edge-' + direction, ''));
+    assert.equal(sheet.animation, `folder-page-${direction} var(--page-turn-duration,1500ms) var(--page-turn-curve) both`);
   }
   assert.equal(values('.folder-page-stack').position, 'relative'); assert.equal(values('.folder-page-stack').isolation, 'isolate');
   assert.equal(values('.folder-page-stack')['min-height'], '96px'); assert.equal(values('.folder-page-stack').overflow, 'hidden');
   assert.equal(values('.folder-page-body').position, 'absolute'); assert.equal(values('.folder-page-body').inset, '0');
   assert.equal(values('.folder-page-sheet')['z-index'], '2'); assert.equal(values('.folder-page-underlay')['z-index'], '1');
-  assert.equal(values('.folder-page-turn-edge')['z-index'], '3'); assert.equal(values('.folder-page-turn-edge').width, '2px');
+  assert.equal(values('.folder-page-turn-edge')['z-index'], '3'); assert.equal(values('.folder-page-turn-edge').width, 'var(--page-turn-slant)');
+  assert.equal(values('.folder-page-turn-edge').height, '100%'); assert.equal(values('.folder-page-turn-edge')['stroke-width'], '2px');
+  assert.equal(values('.folder-page-turn-edge').overflow, 'visible'); assert.equal(values('.folder-page-turn-edge')['pointer-events'], 'none');
   assert.equal(values('.folder-page-turn-edge').top, '0'); assert.equal(values('.folder-page-turn-edge').bottom, '0');
   assert.equal(values('.folder-page-sheet')['pointer-events'], 'none');
+});
+
+test('2D斜線の幾何: 進む/戻るの上下端を切り抜きと揃え、狭幅・横長・低いページでも四隅まで覆う', () => {
+  const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
+  const rules = {}, frames = {};
+  css.walkRules(rule => { if (rule.parent.type === 'root') rules[rule.selector] = Object.fromEntries(rule.nodes.map(node => [node.prop, node.value])); });
+  css.walkAtRules('keyframes', rule => { frames[rule.params] = Object.fromEntries(rule.nodes.map(frame => [frame.selector, Object.fromEntries(frame.nodes.map(node => [node.prop, node.value]))])); });
+  const interpolate = (from, to, progress) => from + (to - from) * progress;
+  for (const [width, height] of [[240, 640], [390, 96], [800, 480], [1600, 96], [2560, 1080]]) {
+    const length = (source, axis = width) => {
+      if (source.includes('var(--page-turn-slant)')) return length(source.replaceAll('var(--page-turn-slant)', rules['.folder-page-stack']['--page-turn-slant']), axis);
+      if (source.startsWith('calc(')) {
+        const [, left, operator, right] = /^calc\((.+) ([+-]) (.+)\)$/.exec(source);
+        return length(left, axis) + (operator === '+' ? 1 : -1) * length(right, axis);
+      }
+      if (source.startsWith('min(')) return Math.min(...source.slice(4, -1).split(',').map(value => length(value, axis)));
+      const match = /^(-?[\d.]+)(%|px)?$/.exec(source); assert.ok(match, source);
+      return Number(match[1]) * (match[2] === '%' ? axis / 100 : 1);
+    };
+    const polygon = source => source.slice('polygon('.length, -1).split(',').map(point => {
+      const index = point.lastIndexOf(' ');
+      return [length(point.slice(0, index)), length(point.slice(index + 1), height)];
+    });
+    const slant = length(rules['.folder-page-turn-edge'].width);
+    assert.ok(slant > 0 && slant <= 160 && slant <= width * .2);
+    for (const direction of ['forward', 'back']) {
+      const sheet = frames['folder-page-' + direction], edge = frames['folder-page-edge-' + direction];
+      const from = polygon(sheet.from['clip-path']), to = polygon(sheet.to['clip-path']);
+      const topIndex = direction === 'forward' ? 1 : 0, bottomIndex = direction === 'forward' ? 2 : 3;
+      let previousVisible = width * height;
+      for (let step = 0; step <= 20; step++) {
+        const progress = step / 20, left = interpolate(length(edge.from.left), length(edge.to.left), progress);
+        const points = from.map((point, index) => point.map((value, axis) => interpolate(value, to[index][axis], progress)));
+        const top = points[topIndex], bottom = points[bottomIndex];
+        assert.ok(Math.abs(top[0] - left - slant) < 1e-8); assert.ok(Math.abs(bottom[0] - left) < 1e-8);
+        assert.equal(top[1], 0); assert.equal(bottom[1], height); assert.ok(top[0] > bottom[0], '戻る時も上端が右へ傾く');
+        let visible = 0;
+        for (let row = 0; row <= 20; row++) {
+          const boundary = interpolate(top[0], bottom[0], row / 20);
+          const outgoing = direction === 'forward' ? Math.max(0, Math.min(width, boundary)) : width - Math.max(0, Math.min(width, boundary));
+          if (step === 0) assert.ok(Math.abs(outgoing - width) < 1e-8, '四隅を含め初めは旧ページ全面');
+          if (step === 20) assert.ok(outgoing < 1e-8, '最後は四隅を含め移動先全面');
+          visible += outgoing * height / 21;
+        }
+        assert.ok(visible <= previousVisible + 1e-8, '露出済みの内容を再び覆わない'); previousVisible = visible;
+      }
+    }
+  }
+});
+
+test('2D斜線の速度: CSS曲線はゆっくり始まり、終点まで徐々に加速する', () => {
+  const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const curve = /--page-turn-curve:cubic-bezier\(([^)]+)\)/.exec(css)[1].split(',').map(Number);
+  const [x1, y1, x2, y2] = curve;
+  const bezier = (u, first, second) => 3 * (1 - u) ** 2 * u * first + 3 * (1 - u) * u ** 2 * second + u ** 3;
+  const progress = time => {
+    let low = 0, high = 1;
+    for (let index = 0; index < 60; index++) { const u = (low + high) / 2; if (bezier(u, x1, x2) < time) low = u; else high = u; }
+    return bezier((low + high) / 2, y1, y2);
+  };
+  assert.ok(progress(.25) < .15); assert.ok(Math.abs(progress(0)) < 1e-8); assert.ok(Math.abs(progress(1) - 1) < 1e-8);
+  let previousSpeed = 0;
+  for (let step = 1; step <= 20; step++) {
+    const speed = progress(step / 20) - progress((step - 1) / 20);
+    assert.ok(speed > previousSpeed, '等時間の移動距離が最後まで増える'); previousSpeed = speed;
+  }
 });
 
 test('2D配色: 既存AiDiyメニューのクリーム色を専用変数で使い、3Dの黒を維持する', () => {
@@ -493,7 +562,7 @@ test('実マウント: 2DのDOMを外してもページ位置・選択行を保�
 });
 
 
-test('実マウント: 移動先を下に保ち、旧ページの内容/位置・縦線・単一の操作リストを検証する', async () => {
+test('実マウント: 移動先を下に保ち、旧ページの内容/位置・斜線・単一の操作リストを検証する', async () => {
   const { app, root, props, emitted, warnings, walk, find } = await mountedPages();
   const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
   const click = path => walk(layer('live'), element => element.props.title === path).props.onClick();
@@ -514,6 +583,12 @@ test('実マウント: 移動先を下に保ち、旧ページの内容/位置�
     const count = emitted.length; walk(first, element => element.props.title === 'root2.js').props.onClick();
     assert.equal(emitted.length, count, '表示専用シートから選択を送信しない');
     assert.ok(find('folder-page-turn-edge').props.class.includes('page-turn-forward'));
+    const edge = find('folder-page-turn-edge'), line = walk(edge, element => element.type === 'line');
+    assert.equal(edge.type, 'svg'); assert.equal(edge.props.viewBox, '0 0 100 100'); assert.equal(edge.props.preserveAspectRatio, 'none');
+    assert.equal(edge.props['aria-hidden'], 'true'); assert.equal(edge.props.focusable, 'false');
+    assert.deepEqual([line.props.x1, line.props.y1, line.props.x2, line.props.y2], ['100', '0', '0', '100']);
+    assert.equal(line.props['vector-effect'], 'non-scaling-stroke');
+    assert.equal(find('folder-page-stack').props.style['--page-turn-duration'], '1500ms');
     finish(first); await flush(); assert.equal(layer('outgoing'), undefined); assert.equal(find('folder-page-turn-edge'), undefined);
     assert.equal(layer('live'), destination, '演出終了で移動先のDOM/フォーカス/スクロールを作り直さない');
     destination.scrollTop = 76; destination.props.onScroll(); click('src/main.js'); await flush();
@@ -562,8 +637,39 @@ test('実マウント: 一覧更新・外部選択・移動が同じtickでも�
   } finally { app.unmount(); }
 });
 
-test('実マウント: 深い移動は経由ページを順に入れ替え、最大5枚で最終ページへ到着する', async () => {
-  const { app, root, props, warnings, walk } = await mountedPages();
+test('実マウント: 1〜5枚と省略あり・戻る・別の枝でもCSS演出の合計を1500msに揃える', async () => {
+  const { app, root, props, warnings, walk, find } = await mountedPages();
+  const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
+  const path = depth => Array.from({ length: depth }, (_value, i) => 'd' + i).join('/');
+  const navigate = async (target, expectedSteps) => {
+    props.current = target; await flush(); const destination = layer('live');
+    let count = 0, duration = 0;
+    while (layer('outgoing')) {
+      assert.ok(++count <= expectedSteps);
+      const milliseconds = parseFloat(find('folder-page-stack').props.style['--page-turn-duration']);
+      assert.equal(milliseconds, 1500 / expectedSteps); duration += milliseconds;
+      const sheet = layer('outgoing'), direction = sheet.props.class.includes('page-turn-back') ? 'back' : 'forward';
+      sheet.props.onAnimationend({ type: 'animationend', target: sheet, currentTarget: sheet, animationName: 'folder-page-' + direction });
+      await flush(); assert.equal(layer('live'), destination);
+    }
+    assert.equal(count, expectedSteps); assert.equal(duration, 1500);
+    assert.equal(layer('live').props['data-page-path'], target); assert.equal(find('folder-page-turn-edge'), undefined);
+  };
+  try {
+    const deepTree = tree(); let node = deepTree;
+    for (let index = 0; index < 20; index++) { const child = { n: 'd' + index, f: [], d: [] }; node.d.push(child); node = child; }
+    props.tree = deepTree; await flush();
+    for (const depth of [1, 2, 3, 4, 5, 20]) {
+      await navigate(path(depth), Math.min(depth, 5));
+      await navigate('', Math.min(depth, 5));
+    }
+    await navigate('src/nested', 2); await navigate(path(5), 5);
+    assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
+});
+
+test('実マウント: 深い移動は経由ページを順に入れ替え、最大5枚・1500msで最終ページへ到着する', async () => {
+  const { app, root, props, warnings, walk, find } = await mountedPages();
   const layer = kind => walk(root, element => element.props['data-page-layer'] === kind);
   const finish = sheet => sheet.props.onAnimationend({ type: 'animationend', target: sheet, currentTarget: sheet, animationName: 'folder-page-forward' });
   try {
@@ -573,16 +679,19 @@ test('実マウント: 深い移動は経由ページを順に入れ替え、最
     const path = Array.from({ length: 20 }, (_value, i) => 'd' + i).join('/');
     props.current = path; await flush(); const destination = layer('live');
     assert.equal(destination.props['data-page-path'], path); assert.ok(layer('incoming'));
-    let count = 0, prior = '';
+    let count = 0, prior = '', duration = 0;
     while (layer('outgoing')) {
       const incoming = layer('incoming') || destination, outgoing = layer('outgoing');
       assert.equal(outgoing.props['data-page-path'], prior); prior = incoming.props['data-page-path'];
       assert.ok(walk(incoming, element => element.props.title === prior + '/file' + (prior.split('/').length - 1) + '.js'));
       assert.equal(layer('live'), destination); assert.ok(++count <= 5);
+      const milliseconds = parseFloat(find('folder-page-stack').props.style['--page-turn-duration']);
+      assert.equal(milliseconds, 300); duration += milliseconds;
       finish(outgoing); await flush();
       if (layer('outgoing')) { const current = layer('outgoing'); finish(outgoing); await flush(); assert.equal(layer('outgoing'), current); }
     }
     assert.equal(count, 5); assert.equal(prior, path); assert.equal(layer('live'), destination);
+    assert.equal(duration, 1500);
     assert.equal(layer('incoming'), undefined); assert.deepEqual(warnings, []);
   } finally { app.unmount(); }
 });

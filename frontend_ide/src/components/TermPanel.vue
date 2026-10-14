@@ -114,19 +114,28 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
     <StatusBar :title="linked ? 'AiDiy IDE / Term' : 'AiDiy Term'" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">再起動</button></nav></div>
     <div v-if="!inputStarted" class="term-welcome"><TerminalWelcome kind="term" :icon="icon || '/development/AiDiy.png'" /></div>
-    <div ref="container" class="term-screen" aria-label="ターミナル"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div>
+    <div class="term-screen" aria-label="ターミナル"><div ref="container" class="term-viewport"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
     <div class="term-meta"><span :title="completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell} · ${status}` }}</span><span :title="'toolsサーバーの稼働状態'">tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>
     <p v-if="error" class="term-error" role="alert">{{ error }}</p>
   </section>
 </template>
 <style scoped>
-.term-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#080b10;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif)}
+.term-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#080b10;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif);container:term-panel / size}
 .component-toolbar button{padding:2px 7px;border-color:var(--border);font-size:11px;line-height:1.4;background:transparent}
 .term-welcome{flex:1;min-height:0;overflow:auto;background:var(--surface);container-type:size}
 .term-waiting .term-screen{flex:none;height:84px;max-height:30%;border-top:1px solid var(--border)}
 .term-meta{display:flex;justify-content:space-between;gap:8px;flex:none;padding:2px 8px;color:var(--muted);font-size:10px;border-top:1px solid var(--border)}
+.term-meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.term-meta>span:last-child{flex:none;white-space:nowrap}
 .term-screen{position:relative;flex:1;min-height:0;min-width:0;padding:8px;overflow:hidden}.term-error{color:#ffbac3;margin:6px 10px;font-size:12px}
+/* FitAddonには余白を除いた領域を渡し、小さな画面でも最後の入力行を切らない。 */
+.term-viewport{position:relative;width:100%;height:100%;min-width:0;min-height:0}
 .term-completion{pointer-events:none}.term-ghost-row{position:absolute;z-index:4;white-space:pre;overflow:hidden;font:14px Consolas,"Noto Sans Mono",monospace;color:#77818f;background:#080b10}
+/* 単独窓・IDE内タブとも、低い時は起動案内より端末の数行を優先する。 */
+@container term-panel (max-height:240px){
+ .term-welcome{display:none}
+ .term-waiting .term-screen{flex:1;height:auto;max-height:none;border-top:0}
+ .term-error{flex:none;max-height:1.65em;overflow:auto;margin:2px 8px;overflow-wrap:anywhere}
+}
 @container (max-height:240px){
  .term-welcome :deep(.terminal-welcome){padding:4px 0}
  .term-welcome :deep(.welcome-mark){width:36px;height:36px;margin-bottom:6px}

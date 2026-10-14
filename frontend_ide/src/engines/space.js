@@ -16,7 +16,7 @@
 
 import { spacePosition, WORLD_RADIUS, HOME_VIEW, warpMotion } from '../../viewer/web/layout.js';
 import { createAutoOrbit } from './auto-orbit.js';
-import { turnToTarget, cameraPosition, orbitAround, interpolateCamera, cockpitLook } from './warp-camera.js';
+import { turnToTarget, cameraPosition, orbitAround, interpolateCamera, cockpitLook, framingDistance, WARP_APPROACH_WIDTH, WARP_PEAK_WIDTH } from './warp-camera.js';
 import { aiRouteTargets } from './ai-route.js';
 import { createTextWidthCache } from './text-width-cache.js';
 
@@ -143,6 +143,7 @@ let world = null;           // { galaxies, stars, planets, radius }
 let knownPaths = null;      // 前回観測した全パス（新しく生まれた星の判定用）
 
 const galaxyRadius = 160;
+const GATE_RING_STROKE = 0.07;
 
 // 起点日時以降に更新したファイル（AI が触ったファイルを見つける目印）
 let markMode = 'since', grepMatches = new Set(), grepController, grepRevision = 0;
@@ -683,7 +684,7 @@ function drawGate(t) {
   gateHit = [P.x, P.y, r];
   ctx.globalAlpha = alpha * 0.8;
   ctx.drawImage(DISK[1], P.x - r * 2.4, P.y - r * 2.4, r * 4.8, r * 4.8);
-  ctx.lineWidth = Math.max(1.2, r * 0.07);
+  ctx.lineWidth = Math.max(1.2, r * GATE_RING_STROKE);
   for (let i = 0; i < 4; i++) {
     const rr = r * (1 - i * 0.2), spin = t * (0.8 + i * 0.5) * (i % 2 ? -1 : 1);
     ctx.globalAlpha = alpha * (0.9 - i * 0.15);
@@ -1052,7 +1053,8 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
   dragging = false; touch.clear(); canvas.classList.remove('dragging');
   $('tooltip').hidden = true;
   target ??= direction === 'out' ? world.gate : world.galaxies.find(g => g.path === next.slice(0, trail.length + 1).join('/'));
-  const motion = warpMotion(target ? 'in' : direction);
+  const frameGate = transition && target === world.gate && arrivalDistance === null;
+  const motion = warpMotion(target ? 'in' : direction, frameGate ? { inwardScale: WARP_PEAK_WIDTH / WARP_APPROACH_WIDTH } : {});
   const play = stage => new Promise(resolve => {
     sceneAnimation = canvas.animate(stage.frames, {
       duration: stage.duration, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards',
@@ -1091,10 +1093,15 @@ async function travelTo(next, { direction = 'in', target = null, history = true,
       Object.assign(goal, cam);
       turnFlight = { from: { ...cam }, target, start: performance.now(), duration: 1100 };
       if (!await settle(() => !turnFlight, Infinity) || !valid()) return;
-      // 2. 向きを固定したまま前進する。目的地は常に画面中央に留まる。
-      const distance = arrivalDistance ?? (file ? (file.isPlanet ? Math.max(180, file.R * 22) : 170) : Math.max(30, (target.R || 60) * 1.1));
-      goal.dist = Math.min(cam.dist, distance * (F / Math.min(W, H)));
-      if (!await settle(() => Math.abs(Math.log(cam.dist / goal.dist)) < 0.06, 1600) || !valid()) return;
+      // 2. 帰還時だけ、現在フォルダ中央の星を外周リングごと画面幅の約1/4へ収める。
+      // 中心球だけを基準にするとリングが画面を覆う。既に近い場合も滑らかに適正距離へ戻す。
+      if (frameGate) {
+        goal.dist = framingDistance(target.R * (2 + GATE_RING_STROKE), W, F, CX - W / 2, CY - H / 2);
+      } else {
+        const distance = arrivalDistance ?? (file ? (file.isPlanet ? Math.max(180, file.R * 22) : 170) : Math.max(30, (target.R || 60) * 1.1));
+        goal.dist = Math.min(cam.dist, distance * (F / Math.min(W, H)));
+      }
+      if (!await settle(() => Math.abs(Math.log(cam.dist / goal.dist)) < (frameGate ? 0.01 : 0.06), 1600) || !valid()) return;
     }
     if (!transition) {
       // 同じフォルダ内は旋回と直進だけ。拡縮・暗転・再出現を再生しない。
