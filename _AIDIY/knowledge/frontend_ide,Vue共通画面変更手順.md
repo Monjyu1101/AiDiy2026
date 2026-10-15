@@ -267,3 +267,18 @@ FileExplorerは検索明細をrouteイベントの `records` として送り、S
 IDE連携CodeのOSタイトルは、既存の窓配置番号 `record.slot + 1` から `AiDiy IDE / Code n` とします。連携先一覧も同じslotを使い、別の連番を採番しません。`preload.cjs` の限定した `title()` は、信頼済みの送信元自身のOSタイトルだけを返し、`CodePanel.vue` の見出しへ反映します。単独Codeのタイトルは従来どおりです。窓を閉じてslotが再利用されても、受け渡しの窓IDと会話IDは別に照合します。
 
 `node --test frontend_ide/checks/draft-handoff.test.mjs frontend_ide/checks/draft-target-selection.test.mjs frontend_ide/checks/code-window-title.test.mjs` で、フォーカス順と作成順の違い、対象外窓、閉鎖・最小化・未登録・新規窓、初回・再表示の最前面選択、再選択と明示選択、1件・不明候補、連打・遅延応答・取得失敗、追加なし、Webピン留め・利用再開、Code追加・閉鎖・番号再利用を確認します。ダイアログは実Vueテンプレートをメモリ内へマウントし、App・Codeは実setup、Electronは実createWindowと模擬OSを使います。実OSの重なり順、横長・狭幅の見た目、タイトル表示は実画面で別途確認してください。
+
+
+## IDE連携Termの番号付きタイトル
+
+IDEから開いたTermは、既存の `reserveTermSlot()` が確保した配置番号 `record.slot + 1` を使って `AiDiy IDE / Term n` と表示します。OSタイトルと `TermPanel.vue` の見出しは、Codeと同じ限定 `title()` IPCで一致させます。番号用の別カウンターは追加しません。配置slotは単独Termや別IDEとも共有するため、使用中のslotがあれば番号は1から始まらない場合があります。閉鎖されたslotは再利用し、単独TermとWeb内Termの表示、初期サイズ・位置は維持します。
+
+`node --test frontend_ide/checks/code-window-title.test.mjs frontend_ide/checks/term-window-title.test.mjs frontend_ide/checks/window-layout.test.mjs` で、複数起動、単独Termとのslot共有、閉鎖・再起動、OSタイトルの維持、送信元照合、Vue見出しへの反映、取得失敗、破棄後の遅延応答、配置の回帰を確認します。Electronと端末接続は模擬環境、Vueは実setup・実テンプレートをコンパイルして検証します。実OSでのタイトル表示やDPIは別途実画面で確認してください。
+
+## Codeの入力枠モーションとストリーム表示
+
+入力枠の上下の光は `CodePanel.vue` の `waitingForStream` と `form.running` で制御します。実行中で、制御文字を除いた `state.進捗` に空白以外の本文がまだない間だけ従来の光を表示します。本文が届いた後は既存の `TerminalProgress` 表示を使い、入力欄の下書きや停止ボタンの実行状態は変えません。`hasStreamContent` を依頼中保持し、進捗の直近100件が空白だけになっても入力枠の光へ戻しません。開始・終了制御、改行・空白、heartbeatだけでは切り替えません。
+
+判定にはホストが同時に通知する実行状態と進捗を使います。単独版 `host/aidiy_code/src/server.ts` と拡張版 `host/src/extension.ts` は依頼開始時に進捗を空にします。生の `output_stream` パケットだけで待機判定を更新すると、終了後や次の依頼へ移った後の遅延通知を前回から持ち越すので避けてください。保存済み進捗を伴う実行中のstateを復元した場合は、本文ありとして表示します。判定のリセットはstate受信中に同期で行い、終了→開始が同じ描画周期に届いても区別します。会話変更、実行終了、新しい依頼、ホストの非空進捗→空進捗への初期化でリセットしてください。
+
+`node --test frontend_ide/checks/code-progress-motion.test.mjs` で実Vueスクリプトとテンプレートを使い、最初の本文・後続本文・非ストリーム・空白/制御通知・完了/停止/エラー・次の依頼/会話・再接続・Provider共通動作・入力と停止の維持を確認します。これはコンポーネント回帰テストであり、実Providerの接続や画面撮影の代わりにはなりません。

@@ -26,6 +26,7 @@ let catalogProvider = '';
 const providers = ref([]), models = ref([]), provider = ref(''), model = ref(''), custom = ref(''), checks = ref(0);
 const conversation = ref(), input = ref(), sendButton = ref(), progress = ref('');
 const stream = ref();
+const hasStreamContent = ref(false);
 const sendIcon = computed(() => new URL('sending.png', new URL(props.icon || '/development/AiDiy.png', location.href)).href);
 const stopIcon = computed(() => new URL('abort.png', sendIcon.value).href);
 const rows = new Map();
@@ -36,6 +37,8 @@ const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 const offline = computed(() => state.実行モード === 'offline' || (state.オフライン対応 && !state.接続済み));
 const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value || changingConversation.value);
+// 一度本文が届いた依頼では、進捗100件の窓から本文が消えても待機演出へ戻さない。
+const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value);
 const operable = computed(() => state.信頼済み && state.画面接続済み !== false);
 const allowed = computed(() => state.信頼済み && state.画面接続済み !== false && !!state.作業フォルダ && (offline.value || state.接続済み));
 const canSend = computed(() => allowed.value && !busy.value && prompt.value.trim());
@@ -63,6 +66,10 @@ function receive(packet) {
     const previous = state.メッセージ.map(item => `${item.種別}:${item.本文}`);
     if (first || changed) { revision++; arrivals.reset(); }
     const own = revision;
+    // ホストは新しい依頼の開始時に進捗を空へ戻す。watchではなく受信順に判定し、
+    // 同じ描画周期に終了→次の開始が届いても前の依頼の判定を持ち越さない。
+    if (first || changed || !state.実行中 || !packet.実行中 ||
+        (state.進捗.length > 0 && (packet.進捗 || []).length === 0)) hasStreamContent.value = false;
     Object.assign(state, packet, { 自動接続: packet.自動接続 !== false, 画面接続済み: packet.画面接続済み !== false }); pending.value = false; autoPending.value = false;
     if (deleteTarget.value && (packet.実行中 || !state.履歴.some(item => item.id === deleteTarget.value.id))) deleteTarget.value = null;
     if (changed || !packet.実行中 || packet.停止中) stopPending.value = false;
@@ -71,6 +78,7 @@ function receive(packet) {
     if (confirmed) finishConversationChange();
     error.value = conversationChange?.error || packet.接続エラー || '';
     progress.value = (packet.進捗 || []).map(line => visibleStreamContent(String(line))).filter(Boolean).join('\n');
+    if (packet.実行中 && progress.value.trim()) hasStreamContent.value = true;
     const messages = packet.メッセージ || [];
     void nextTick(() => {
       if (disposed || own !== revision) return;
@@ -152,7 +160,7 @@ async function send(type, data = {}) {
 }
 async function submit() {
   if (!canSend.value) return;
-  pending.value = true;
+  pending.value = true; hasStreamContent.value = false;
   arrivals.reserve(input.value, prompt.value, state.メッセージ.length);
   if (!await send('input_text', { メッセージ識別: 'input_text', メッセージ内容: prompt.value, self_check_loop: offline.value ? 0 : Number(checks.value) })) arrivals.cancelReservation();
 }
@@ -231,7 +239,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; ar
     <footer v-show="!history" class="composer">
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" @click="send('removeAttachment')">×</button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form :class="{ running: state.実行中 }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する…" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea></div>
+      <form :class="{ running: waitingForStream }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する…" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
           <div class="verification-options"><label>検証</label><select :value="offline ? 0 : checks" :disabled="offline" aria-label="検証回数" @change="checks = Number($event.target.value); checksRestored = true; send('setSelfCheckLoop', { count: checks })"><option v-for="n in [0,1,2,3]" :key="n" :value="n">{{ n }}回</option></select><span class="verification-hint">0回:バックアップ・検証無</span></div>
           <button v-if="state.実行中" type="button" class="stop" :disabled="!canStop" aria-label="実行を停止" title="実行を停止" @click="stop"><img class="stop-icon" :src="stopIcon" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button>

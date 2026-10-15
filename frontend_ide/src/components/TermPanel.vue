@@ -12,6 +12,7 @@ import StatusBar from './StatusBar.vue';
 import TerminalWelcome from './TerminalWelcome.vue';
 import { terminalCompletion, cliCompletions } from '../terminal-completion.js';
 const props = defineProps({ base: String, icon: String, desktop: Boolean, linked: Boolean, visible: { type: Boolean, default: true } });
+const windowTitle = ref('');
 const container = ref(null), connected = ref(false), status = ref('起動中'), project = ref(''), shell = ref(''), error = ref('');
 const completion = ref(''), toolsOnline = ref(false);
 const toolsEnabled = ref(true), toolsChanging = ref(false), socketReady = ref(false);
@@ -86,6 +87,7 @@ function connect() {
 }
 watch(() => props.visible, async visible => { if (visible) { await nextTick(); fitTerminal(); terminal?.focus(); } });
 onMounted(() => {
+  if (props.desktop && props.linked) void window.aidiyWindow?.title?.().then(title => { if (!disposed && typeof title === 'string') windowTitle.value = title; }).catch(() => {});
   terminal = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: 'Consolas, "Noto Sans Mono", monospace', scrollback: 5000,
     theme: { background: '#080b10', foreground: '#dce6f2', cursor: '#81e4e8', selectionBackground: '#365b78' } });
   fit = new FitAddon(); terminal.loadAddon(fit); terminal.open(container.value); fitTerminal();
@@ -111,7 +113,7 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
 </script>
 <template>
   <section class="term-component" :class="{ 'desktop-window': desktop, 'term-waiting': !inputStarted }">
-    <StatusBar :title="linked ? 'AiDiy IDE / Term' : 'AiDiy Term'" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
+    <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Term' : 'AiDiy Term')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">再起動</button></nav></div>
     <div v-if="!inputStarted" class="term-welcome"><TerminalWelcome kind="term" :icon="icon || '/development/AiDiy.png'" /></div>
     <div class="term-screen" aria-label="ターミナル"><div ref="container" class="term-viewport"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
@@ -145,3 +147,4 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
  .term-welcome :deep(.welcome-caption){font-size:9px;line-height:1.4}
 }
 </style>
+

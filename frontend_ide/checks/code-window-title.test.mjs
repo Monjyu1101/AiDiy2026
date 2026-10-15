@@ -12,6 +12,7 @@ import routerModule from '../draft-router.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 async function desktopFixture(){
+ const reserved=new Set();
  const handlers=new Map(),state={active:true,mode:'online',startedAt:10,project:{path:'/project'}};
  class Window extends EventEmitter{
   constructor(options){super();this.options=options;this.title=options.title;this.bounds=options;this.webContents=new EventEmitter();this.webContents.mainFrame={url:''};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};}
@@ -31,7 +32,7 @@ async function desktopFixture(){
  const modules={
   electron:{app,BrowserWindow:Window,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{}}),getDisplayNearestPoint:()=>({workArea:{}}),getCursorScreenPoint:()=>({})},dialog:{}},
   'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){}},
-  './project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./term-window-slot.cjs':{},
+  './project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
   './draft-router.cjs':routerModule,'./desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
   './native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
@@ -65,4 +66,27 @@ test('preloadタイトル: 任意IPCを公開せずホストの同一ウィン�
  let api;const calls=[];
  vm.runInNewContext(readFileSync(new URL('../preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld(_name,value){api=value;}},ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve('AiDiy IDE / Code 2');}}})});
  assert.equal(await api.title(),'AiDiy IDE / Code 2');assert.deepEqual(calls,[['development:window','title']]);assert.equal(api.invoke,undefined);
+});
+
+
+test('IDE Term番号: 共有配置slot・タイトルIPC・閉鎖後の再利用が一致し、単独Termは従来タイトルを保つ',async()=>{
+ const f=await desktopFixture();
+ const create=async owner=>{const window=await f.createWindow('term','http://127.0.0.1:6789/',undefined,owner,'online:10');return f.windows.get(window.webContents);};
+ const standalone=await create();assert.equal(standalone.slot,0);assert.equal(standalone.window.getTitle(),'AiDiy Term');
+ const terms=await Promise.all([create(f.owner),create(f.owner),create(f.owner)]);
+ assert.deepEqual(terms.map(record=>record.slot),[1,2,3]);
+ const verify=record=>{
+  const title=`AiDiy IDE / Term ${record.slot+1}`;
+  assert.equal(record.window.getTitle(),title);
+  assert.equal(f.handlers.get('development:window')(f.event(record),'title'),title);
+  let prevented=false;record.window.title='shell title';record.window.webContents.emit('page-title-updated',{preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);assert.equal(record.window.getTitle(),title);
+ };
+ terms.forEach(verify);
+ terms[1].window.destroy();const reopened=await create(f.owner);assert.equal(reopened.slot,2);verify(reopened);
+ standalone.window.destroy();const first=await create(f.owner);assert.equal(first.slot,0);verify(first);
+ assert.equal(f.handlers.get('development:window')({...f.event(first),senderFrame:{url:first.url}},'title'),undefined);
+ for(const record of [...terms,reopened,first])if(!record.window.isDestroyed())record.window.destroy();
+ const restarted=await create(f.owner);assert.equal(restarted.slot,0);verify(restarted);
+ restarted.window.destroy();
 });
