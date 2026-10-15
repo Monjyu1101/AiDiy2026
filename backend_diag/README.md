@@ -15,7 +15,7 @@ aidiy_diag --foreground     # Electron を foreground で起動（ログ・Ctrl+
 aidiy_diag --wait           # --foreground と同じ
 ```
 
-`python backend_diag/_setup.py` または全体の `python _setup.py` の最初の項目（既定 `[y]/n`、a=auto も対象）で `~/.local/bin` にランチャーを作成します。Windows は `aidiy_diag.cmd` です。リポジトリ直下の `./aidiy_diag` / `aidiy_diag.cmd` からも起動できます。
+`python backend_diag/_setup.py` または全体の `python _setup.py` の最初の項目（既定 `[y]/n`、a=auto も対象）で `~/.local/bin` にランチャーを作成します。Windows は `aidiy_diag.cmd` です。`backend_diag/aidiy_diag` / `backend_diag/aidiy_diag.cmd` からも直接起動できます。
 
 上部は Term と同じ高さのタイトルバー・ウィンドウ操作・接続バーです。シアンの線は Tools の接続成功、黒は未接続、赤は確認OFFを示します。診断自体の接続とは別です。Tools は `_config/AiDiy_key.json` の `PORT_TOOLS`（省略時8095）に対して、固定 loopback の `/aidiy_code_agents/ping` だけを10秒間隔で確認します。キー・モデル・エージェントの実行は行いません。確認OFF・切断・画面破棄で確認を停止します。
 
