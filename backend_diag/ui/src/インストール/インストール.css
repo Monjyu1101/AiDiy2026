@@ -1,0 +1,8 @@
+/* インストール一覧・詳細専用。共通レイアウトと状態バッジは ../style.css。 */
+.item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:none;text-align:left;border-radius:5px;padding:11px 10px}
+.item.selected{background:#25403d;color:#b0eee2}
+.welcome{padding-top:45px;max-width:650px}
+@media(max-width:700px){.welcome{padding-top:0}}
+#list > details > summary{font-size:15px;color:#c2e6df}
+#list > details > details{margin-left:10px}
+.item>.badge{min-width:60px}

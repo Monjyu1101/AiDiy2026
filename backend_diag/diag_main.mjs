@@ -6,11 +6,13 @@ import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { catalog, scan, cancelProbes } from './probes.mjs';
+import {getToolsStatus} from './tools_status.mjs';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from './desktop.mjs';
 import {createPublicModelCache} from './public_models.mjs';
 import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './key_status.mjs';
 import {verify as verifyUi} from './ui/verify.mjs';
 import {stopRevision,watchStop} from './lifecycle.mjs';
+import {launchDetached} from './launch.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -40,7 +42,8 @@ export function parseArgs(args) {
   for (let i=0;i<args.length;i++) {
     const arg = args[i];
     if (arg === '--browser') {options.browser = true;continue;}
-    if (arg === '--no-open') options.noOpen = true;
+    if (arg === '--foreground' || arg === '--wait') options.foreground = true;
+    else if (arg === '--no-open') options.noOpen = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else if (arg === '--port') { const value = args[++i]; if (!/^\d+$/.test(value || '') || Number(value)>65535) throw new Error('port は 0〜65535 で指定してください。'); options.port=Number(value); }
     else if (arg === '--base-path') options.prefix = basePath(args[++i] || '');
@@ -48,7 +51,7 @@ export function parseArgs(args) {
   }
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache()}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache()}) {
   let results = [], busy = false, keyBusy = false;
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']]]);
@@ -68,6 +71,12 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if (req.method === 'GET' && route === 'api/tools-status') {
+        const controller=new AbortController();
+        const abort=()=>controller.abort();res.once('close',abort);
+        try {const state=await toolsStatusFn({signal:controller.signal});return reply(200,{online:state.online===true});}
+        finally {res.removeListener('close',abort);}
+      }
       if (req.method === 'GET' && route === 'api/一覧') return reply(200,{項目:entries,結果:results,調査:coverage});
       if (req.method === 'GET' && route === 'api/キー設定') return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});
       if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
@@ -116,10 +125,15 @@ function openBrowser(url) {
   child.on('error',()=>console.log('自動で開けない場合は、上の URL をブラウザで開いてください。')); child.unref();
 }
 export async function main(args=process.argv.slice(2)) {
+  const launcherChild=process.env.AIDIY_DIAG_LAUNCHER_CHILD==='1' && !!process.send;
+  // 検証・読込中に起動元が消えた場合も、常駐処理へ進まない。
+  const startupDisconnect=()=>process.exit(1);
+  if(launcherChild){if(!process.connected)throw startupError('DESKTOP');process.once('disconnect',startupDisconnect);}
   let options;try {options=parseArgs(args);}catch {throw startupError('ARGUMENTS');}
-  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--port 8097] [--base-path /proxy/8097/]'); return; }
+  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--foreground | --wait] [--port 8097] [--base-path /proxy/8097/]'); return; }
   if (!await verifyUi()) throw startupError('UI');
   const useBrowser=browserMode(options);
+  if (!useBrowser && !options.foreground) return launchDetached(args);
   let executable;
   if (!useBrowser) {
     try {executable=await desktopBinary();}
@@ -136,19 +150,33 @@ export async function main(args=process.argv.slice(2)) {
   // 公開一覧だけを起動時に取得。キー設定や他 provider の API は自動で呼ばない。
   void publicCache.refresh();
   const url=publicUrl(server.address().port,options.prefix)+'#token='+token;
-  let stopWatching=()=>{}, desktop;
-  const close=()=>{stopWatching();cancelProbes();cancelKeyProbes();closeDesktop(desktop);server.close();server.closeAllConnections();};
+  let stopWatching=()=>{}, desktop, closed=false, ready=false;
+  const onRelease=message=>{if(message?.type==='diag-launch-release' && ready)process.off('disconnect',close);};
+  const close=()=>{
+    if(closed)return;closed=true;
+    stopWatching();cancelProbes();cancelKeyProbes();closeDesktop(desktop);server.close();server.closeAllConnections();
+    process.off('SIGINT',close);process.off('SIGTERM',close);process.off('disconnect',close);process.off('message',onRelease);
+    if(launcherChild && process.connected) {
+      if(!ready)process.send({type:'diag-launch-error',code:'DESKTOP'},()=>{if(process.connected)process.disconnect();});
+      else process.disconnect();
+    }
+  };
+  const notifyReady=()=>{
+    if(closed || ready)return;ready=true;
+    if(launcherChild && process.connected)process.send({type:'diag-launch-ready'},error=>{if(error)close();});
+  };
+  if(launcherChild){process.off('disconnect',startupDisconnect);process.once('disconnect',close);process.on('message',onRelease);}
+  process.once('SIGINT',close);process.once('SIGTERM',close);
   if (useBrowser) {
     console.log('AiDiy 診断: '+url);
     console.log('この起動中のみ有効な認証 URL です。共有せず、転送ポートは非公開にしてください。Ctrl+C で終了。');
     if (!options.noOpen && process.env.CODESPACES !== 'true') openBrowser(url);
   } else {
     console.log('AiDiy 診断: Electron ウィンドウを開きます。Ctrl+C で終了。');
-    try {desktop=openDesktop(executable,url,close);} catch {close();throw startupError('DESKTOP');}
+    try {desktop=openDesktop(executable,url,close,undefined,undefined,notifyReady);} catch {close();throw startupError('DESKTOP');}
   }
   stopWatching=watchStop(initialStop,close);
   server.once('close',()=>stopWatching());
-  process.once('SIGINT',close);process.once('SIGTERM',close);
   return server;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(error=>{console.error(startupMessage(error));process.exitCode=1;});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(error=>{console.error(startupMessage(error));process.exitCode=1;if(process.env.AIDIY_DIAG_LAUNCHER_CHILD==='1' && process.connected)process.send({type:'diag-launch-error',code:error.diagCode || error.code},()=>process.disconnect());});

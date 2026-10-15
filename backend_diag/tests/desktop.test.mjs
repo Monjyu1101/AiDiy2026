@@ -12,13 +12,13 @@ const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
 async function mainFixture(){
  const source=await readFile(new URL('../electron-main.cjs',import.meta.url),'utf8');
- const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[];
+ const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={};
  Object.assign(proc,{stdin,pid:42,platform:'win32',connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
  let options,win,loaded;app.whenReady=async()=>{};app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;}}
- vm.runInNewContext(source,{require:()=>({app,BrowserWindow:Window,session}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
- return {stdin,proc,app,policy,sent,exits,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return false;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;}}
+ vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:({app,BrowserWindow:Window,session,ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
+ return {stdin,proc,app,policy,sent,exits,handlers,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
 test('desktop default; explicit browser, Codespaces, headless remain Node-only',()=>{
  assert.equal(browserMode({}, {DISPLAY:':1'},'linux'),false);assert.equal(browserMode({}, {},'win32'),false);
@@ -88,4 +88,16 @@ test('mixed-case Windows Node bootstrap environment cannot change Electron mode'
  const names=['electron_run_as_node','Node_Options','node_path'],saved=names.map(name=>process.env[name]);
  try{for(const name of names)process.env[name]='untrusted';let options;const child=childFixture();openDesktop('/fixture',url,()=>{},(_exe,_args,value)=>{options=value;return child;});for(const name of names)assert.equal(options.env[name],undefined);child.diagClosing=true;child.emit('exit',0,null);}
  finally{names.forEach((name,index)=>{if(saved[index]===undefined)delete process.env[name];else process.env[name]=saved[index];});}
+});
+
+test('frameless controls are fixed, main-frame-only and preserve sandbox',async()=>{
+ const f=await mainFixture();f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ assert.equal(f.options.frame,false);assert.equal(f.options.webPreferences.preload,'/fixture/preload.cjs');
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ control({...event,senderFrame:{}},'close');assert.equal(f.win.closed,undefined);
+ control({...event,sender:{}},'close');assert.equal(f.win.closed,undefined);
+ control(event,'openFile');assert.equal(f.win.closed,undefined);
+ control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');assert.equal(f.win.closed,true);
+ const exposed={};vm.runInNewContext(await readFile(new URL('../preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','isMaximized','maximize','minimize']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
 });

@@ -5,6 +5,12 @@ import {fileURLToPath} from 'node:url';
 import https from 'node:https';
 import {openrouterCatalog,googleCatalog,openaiCatalog,claudeCatalog,ollamaCatalog,pythonString,type Catalog} from './model_catalog';
 export const CONFIG_LIMIT=128*1024, RESPONSE_LIMIT=1024*1024;
+// 公開一覧は説明・価格などを含む。受信上限だけを分離し、整形後の出力上限は維持する。
+export const PUBLIC_RESPONSE_LIMIT=16*1024*1024;
+export function publicFailureDescription(code:unknown):string {
+ const reasons:Record<string,string>={size:"公開一覧の受信サイズが上限を超えました。",output:"整形した公開一覧が出力上限を超えました。",timeout:"公開一覧の通信がタイムアウトしました。",dns:"公開一覧サーバーの名前解決に失敗しました。",tls:"公開一覧サーバーのTLS証明書を検証できませんでした。",http:"公開一覧サーバーが正常なHTTP応答を返しませんでした。",json:"公開一覧の応答をJSONとして読み取れませんでした。",shape:"公開一覧のデータ形式が想定と異なります。",network:"公開一覧サーバーへ接続できませんでした。ネットワークやプロキシ設定を確認してください。",response:"公開一覧の受信が途中で切断されました。",stopped:"公開一覧の取得を中止しました。",busy:"別のモデル確認が実行中です。"};
+ return typeof code==='string'&&Object.hasOwn(reasons,code)?reasons[code]:"公開一覧の取得処理に失敗しました。";
+}
 const CONFIG_PATH=fileURLToPath(new URL('../../_config/AiDiy_key.json',import.meta.url));
 export const KEY_PROVIDERS=Object.freeze([
  ['gemini','Gemini','gemini_key_id','google'],['freeai','FreeAI（Gemini）','freeai_key_id','google'],
@@ -54,18 +60,24 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
  let pathname=endpoint[1];
  if(pageToken){if(provider!=='google'||typeof pageToken!=='string'||pageToken.length>4096)return reject(new Error('pagination'));pathname+='?'+new URLSearchParams({pageToken});}
  if(signal?.aborted)return reject(new Error('stopped'));
+ const responseLimit=provider==='openrouter'&&Object.keys(headers).length===0?PUBLIC_RESPONSE_LIMIT:RESPONSE_LIMIT;
  let settled=false,size=0;const chunks:Buffer[]=[];
  // 専用 Agent を使わず agent:false。環境 proxy・globalAgent・redirect にキーを渡さない。
  const request=https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},response=>{
   if(!response.statusCode||response.statusCode<200||response.statusCode>=300){response.destroy();return finish(new Error('http'));}
-  response.on('data',(chunk:Buffer)=>{size+=chunk.length;if(size>RESPONSE_LIMIT)return finish(new Error('size'));chunks.push(chunk);});
+  response.on('data',(chunk:Buffer)=>{if(settled)return;size+=chunk.length;if(size>responseLimit)return finish(new Error('size'));chunks.push(chunk);});
   response.on('error',()=>finish(new Error('response')));
-  response.on('end',()=>{try{const body:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!record(body))throw new Error('shape');finish(undefined,body);}catch{finish(new Error('json'));}});
+  response.on('aborted',()=>finish(new Error('response')));
+  response.on('end',()=>{if(settled)return;try{const body:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!record(body))return finish(new Error('shape'));finish(undefined,body);}catch{finish(new Error('json'));}});
  });
  const cancel=()=>finish(new Error('stopped'));
  const timer=setTimeout(()=>finish(new Error('timeout')),8000);
  function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request.destroy();if(error)reject(error);else resolve(value!);}
- signal?.addEventListener('abort',cancel,{once:true});request.on('error',()=>finish(new Error('network')));request.end();
+ signal?.addEventListener('abort',cancel,{once:true});request.on('error',(error:NodeJS.ErrnoException)=>{
+  const code=error.code??'';
+  const reason=['ENOTFOUND','EAI_AGAIN'].includes(code)?'dns':['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','ERR_TLS_CERT_ALTNAME_INVALID'].includes(code)?'tls':'network';
+  finish(new Error(reason));
+ });request.end();
 });
 export function safeDetails(models:Dictionary,secrets:string[],limit:number|null=500) {
  const result:Record<string,string|null>[]=[];
@@ -87,8 +99,12 @@ export async function publicCatalog({fetch=fetchMetadata,now,signal}:{fetch?:Fet
   const body=await fetch('openrouter',{},undefined,signal);if(!Array.isArray(body.data))throw new Error('shape');
   const details=safeDetails(openrouterCatalog(body,now),[],null);
   const result={状態:'OK',公開モデル:Object.fromEntries(details.map(item=>[item.model_id,item])),確認日時:timestamp,説明:'公開OpenRouter一覧の匿名取得成功。キーの有効性は未確認です。'};
-  if(Buffer.byteLength(JSON.stringify(result))>RESPONSE_LIMIT)throw new Error('size');return result;
- }catch{return {状態:'NG',公開モデル:{},確認日時:timestamp,説明:'公開OpenRouter一覧を取得できませんでした。'};}
+  if(Buffer.byteLength(JSON.stringify(result))>RESPONSE_LIMIT)throw new Error('output');return result;
+ }catch(error){
+  const candidate=error instanceof Error?error.message:'';
+  const code=['size','output','timeout','dns','tls','http','json','network','response','stopped'].includes(candidate)?candidate:'shape';
+  return {状態:'NG',公開モデル:{},確認日時:timestamp,失敗理由:code,説明:publicFailureDescription(code)};
+ }
 }
 export async function probe(id:string,{reader,fetch=fetchMetadata,now,cache,signal}:{reader?:Reader;fetch?:Fetch;now?:Date;cache?:unknown;signal?:AbortSignal}={}) {
  const output={id,状態:'未実施',説明:'未対応の項目です。',モデル:[] as string[],モデル詳細:[] as Record<string,string|null>[],確認日時:null as string|null,警告:[] as string[]};

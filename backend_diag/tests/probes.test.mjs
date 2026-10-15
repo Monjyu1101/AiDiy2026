@@ -79,9 +79,9 @@ test('menu classification keeps base minimal and all source evidence',async()=>{
  assert.equal(entries.filter(e=>e.usageTier==='integration').length,6);
 });
 
-test('NG version requirement and ERR execution failures are distinct',async()=>{
+test('version warning, NG command failure and ERR execution failures are distinct',async()=>{
  const tooOld=await probe({id:'fixture',version_args:['--version'],minimumVersion:'999.0'}, {resolve:async()=>process.execPath});
- assert.equal(tooOld.状態,'NG');assert.match(tooOld.説明,/要件/);
+ assert.equal(tooOld.状態,'注意');assert.equal(tooOld.バージョン,process.versions.node);assert.equal(tooOld.パス,process.execPath);assert.match(tooOld.説明,/要件/);
  const broken=await probe({id:'fixture',version_args:['--version']},{resolve:async()=>'/no-such-diag-executable'});assert.equal(broken.状態,'ERR');
  assert.equal((await fixture('setInterval(()=>{},1000)')).状態,'ERR');
  assert.equal((await fixture('process.stdout.write("x".repeat(1000000))')).状態,'ERR');

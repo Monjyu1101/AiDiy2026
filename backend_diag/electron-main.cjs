@@ -1,5 +1,6 @@
 'use strict';
-const {app,BrowserWindow,session}=require('electron');
+const {app,BrowserWindow,session,ipcMain}=require('electron');
+const path=require('node:path');
 let window, failed=false;
 function fail(code) {
   if(failed)return;failed=true;
@@ -17,15 +18,23 @@ function validUrl(value) {
 async function start(value) {
   let url;try{url=validUrl(value);}catch{fail('URL');return;}
   await app.whenReady();
-  // 非永続 session、preload/Node公開なし。外部遷移・権限要求は許可しない。
+  // 非永続 session。preload は固定ウィンドウ操作だけ公開し、Node・任意IPCは公開しない。
   const isolated=session.fromPartition('aidiy-diag-'+process.pid,{cache:false});
   isolated.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
   isolated.setPermissionCheckHandler(()=>false);
   isolated.webRequest.onBeforeRequest((details,callback)=>{
     try {const target=new URL(details.url);callback({cancel:target.origin!==url.origin});} catch {callback({cancel:true});}
   });
-  window=new BrowserWindow({width:1160,height:820,title:'AiDiy 診断',show:false,webPreferences:{session:isolated,nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+  window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
+  ipcMain.handle('diag:window',(event,action)=>{
+    if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
+    if(action==='isMaximized')return window.isMaximized();
+    if(action==='minimize')window.minimize();
+    else if(action==='maximize'){if(window.isMaximized())window.unmaximize();else window.maximize();}
+    else if(action==='close')window.close();
+    return false;
+  });
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.on('will-redirect',event=>event.preventDefault());

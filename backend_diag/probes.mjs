@@ -1,10 +1,11 @@
 // 読み取り専用の外部プログラム診断。任意コマンド・設定ファイルは受け付けない。
-import { access, readFile, mkdtemp, rm, stat } from 'node:fs/promises';
+import { access, readFile, mkdtemp, rm, stat, opendir } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {recordProbeFailure} from './desktop-log.mjs';
 
 const activeProbes = new Set();
 let shuttingDown = false;
@@ -16,11 +17,31 @@ export const CATALOG_PATH = fileURLToPath(new URL('./catalog.json', import.meta.
 export async function catalog() { return JSON.parse(await readFile(CATALOG_PATH, 'utf8')); }
 const versionPattern = /(?:^|[^\w.])v?(\d+\.\d+(?:\.\d+){0,3}(?:[-+][\w.-]+)?)(?![\w.])/;
 
-export function expandPath(value, env = process.env, home = os.homedir()) {
+export function expandPath(value, env = process.env, home = os.homedir(), platform = process.platform) {
   let missing = false;
-  const expanded = value.replace(/^~(?=[/\\]|$)/, home).replace(/\$\{([\w()]+)\}|\$(\w+)|%([\w()]+)%/g, (_, a, b, c) => { const found=env[a || b || c]; if (!found) missing=true; return found || ''; });
+  const expanded = value.replace(/^~(?=[/\\]|$)/, home).replace(/\$\{([\w()]+)\}|\$(\w+)|%([\w()]+)%/g, (_, a, b, c) => { const key=a || b || c; const found=env[key] || (platform === 'win32' ? Object.entries(env).find(([name]) => name.toUpperCase() === key.toUpperCase())?.[1] : undefined); if (!found) missing=true; return found || ''; });
   return missing ? null : expanded;
 }
+// python.org の既定配置のみ、一階層・最大256件ずつ確認する。全ドライブ探索はしない。
+async function windowsPythonPaths(env) {
+  const candidates = [];
+  for (const template of ['$LOCALAPPDATA/Programs/Python', '$ProgramFiles', '${ProgramFiles(x86)}']) {
+    const root = expandPath(template, env, undefined, 'win32');
+    if (!root) continue;
+    const names = [];
+    try {
+      const directory = await opendir(root); let count = 0;
+      for await (const item of directory) {
+        if (item.isDirectory() && /^Python(?:3\d+| 3\.\d+)(?:-(?:32|64|arm64))?$/i.test(item.name)) names.push(item.name);
+        if (++count >= 256) break;
+      }
+    } catch {}
+    names.sort((a,b) => b.localeCompare(a, 'en', {numeric:true}));
+    for (const name of names) candidates.push(path.join(root, name, 'python.exe'));
+  }
+  return candidates;
+}
+
 export async function resolveProgram(entry, options = {}) {
   const platform = options.platform || process.platform, env = options.env || process.env;
   // 自分の Node は PATH に無くても、起動済み実行ファイルとして検出する。
@@ -32,13 +53,14 @@ export async function resolveProgram(entry, options = {}) {
   for (const command of entry.commands) for (const directory of directories) for (const extension of (/\.(exe|com|cmd|bat)$/i.test(command) ? [''] : extensions)) {
     candidates.push(path.join(directory.replace(/^"(.*)"$/, '$1'), command + extension));
   }
-  for (const value of entry.paths?.[platform] || []) { const expanded=expandPath(value,env); if(expanded) candidates.push(expanded); }
+  for (const value of entry.paths?.[platform] || []) { const expanded=expandPath(value,env,undefined,platform); if(expanded) candidates.push(expanded); }
   for (const value of entry.project_paths?.[platform] || []) candidates.push(path.resolve(REPO_ROOT, value));
   // Store の実行エイリアスは起動せず、実体・venv・従来の py launcher を探す。
   if (entry.id === 'python' && platform === 'win32') {
+    candidates.push(...await windowsPythonPaths(env));
     for (const directory of directories) candidates.push(path.join(directory.replace(/^"(.*)"$/, '$1'), 'py.exe'));
     for (const value of ['$LOCALAPPDATA/Programs/Python/Launcher/py.exe', '$SystemRoot/py.exe']) {
-      const expanded = expandPath(value, env); if (expanded) candidates.push(expanded);
+      const expanded = expandPath(value, env, undefined, platform); if (expanded) candidates.push(expanded);
     }
   }
   for (const candidate of [...new Set(candidates)]) {
@@ -64,7 +86,9 @@ function safeCode(value) { return typeof value === 'string' && /^[A-Z][A-Z0-9_]{
 function logProbeFailure(id, reason, details = {}) {
   // 外部プログラムの出力・ファイルパス・環境値は秘密を含み得るので記録しない。
   const item = typeof id === 'string' && /^[a-z0-9_-]{1,40}$/.test(id) ? id : 'unknown';
-  process.stderr.write(`[aidiy-diag:probe] ${JSON.stringify({id:item, reason, ...details})}\n`);
+  const record={id:item, reason, ...(reason === 'below_minimum_version' ? {severity:'warning'} : {}), ...details};
+  if(process.env.AIDIY_DIAG_LAUNCHER_CHILD==='1')recordProbeFailure(record);
+  process.stderr.write(`[aidiy-diag:probe] ${JSON.stringify(record)}\n`);
 }
 
 export function runVersion(executable, args, directory, options = {}) {
@@ -148,7 +172,7 @@ export async function probe(entry, options = {}) {
       const required = entry.minimumVersion.split('.').map(Number);
       for (let index=0; index<Math.max(found.length,required.length); index++) {
         const actual=found[index] || 0, minimum=required[index] || 0;
-        if (actual < minimum) { logProbeFailure(entry.id, 'below_minimum_version'); return {...checked,状態:'NG',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`}; }
+        if (actual < minimum) { logProbeFailure(entry.id, 'below_minimum_version'); return {...checked,状態:'注意',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`}; }
         if (actual > minimum) break;
       }
     }

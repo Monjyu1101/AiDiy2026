@@ -20,3 +20,9 @@ test('failure invalidates old success and explicit retry can recover',async()=>{
 test('malformed or failed data never shows successful acquisition',async()=>{
  for(const result of [{data:{状態:'NG',公開モデル:{}}},{data:{状態:'OK',公開モデル:[]}},{data:{状態:'OK'}}]){const cache=createPublicModelCache({run:async()=>result});await cache.refresh();assert.equal(cache.snapshot().状態,'失敗');}
 });
+test('public cache ignores arbitrary error details in output and diagnostic logs',async()=>{
+ for(const result of [{error:'synthetic-secret'},{data:{状態:'NG',失敗理由:'synthetic-secret',説明:'synthetic-secret'}}]){
+  const logs=[];const cache=createPublicModelCache({run:async()=>result,warn:message=>logs.push(message)});
+  await cache.refresh();assert.equal(cache.snapshot().状態,'失敗');assert.ok(!JSON.stringify([cache.snapshot(),logs]).includes('synthetic-secret'));
+ }
+});

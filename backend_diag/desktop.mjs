@@ -3,6 +3,7 @@ import {constants} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
+import {recordDesktopFailure} from './desktop-log.mjs';
 export function browserMode(options, env=process.env, platform=process.platform) {
   return options.browser || options.noOpen || env.CODESPACES==='true' || env.CI==='true' || (platform==='linux' && !env.DISPLAY && !env.WAYLAND_DISPLAY);
 }
@@ -21,15 +22,16 @@ const failures={
   LOAD:'診断画面を読み込めません。',
   RENDERER:'画面プロセスが終了しました。',
 };
-export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000) {
+export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000, onReady=()=>{}) {
   // Windows Electron の stdin は常に EOF。IDE と同じ専用 IPC を使い、秘密 URL は argv/env/log に出さない。
   const env={...process.env};
   for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH)$/i.test(key))delete env[key];
-  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:false,detached:process.platform!=='win32'});
+  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:true,detached:process.platform!=='win32'});
   let ended=false, sent=false, shown=false, reported=false, disconnectTimer;
   const finish=()=>{if(ended)return;ended=true;clearTimeout(timer);clearTimeout(disconnectTimer);onClose();};
   const report=(code,detail='')=>{
     if(reported || child.diagClosing)return;reported=true;process.exitCode=1;
+    if(process.env.AIDIY_DIAG_LAUNCHER_CHILD==='1')recordDesktopFailure(Object.hasOwn(failures,code)?code:['SPAWN','EXIT'].includes(code)?code:'EXIT');
     console.error(`Electron: ${failures[code] || '異常終了しました。'}${detail} セットアップまたは実行環境を確認してください。--browser でも起動できます。`);
   };
   const abort=code=>{report(code);closeDesktop(child);finish();};
@@ -47,7 +49,7 @@ export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=150
     if(message?.type==='diag-ready' && !sent){
       sent=true;
       try {child.send({type:'diag-start',url},error=>{if(error && !ended)abort('IPC');});}catch{abort('IPC');}
-    }else if(message?.type==='diag-shown' && sent){shown=true;clearTimeout(timer);}
+    }else if(message?.type==='diag-shown' && sent){if(!shown){shown=true;clearTimeout(timer);onReady();}}
     else if(message?.type==='diag-failed' && Object.hasOwn(failures,message.code)){report(message.code);}
   });
   child.once('disconnect',()=>{

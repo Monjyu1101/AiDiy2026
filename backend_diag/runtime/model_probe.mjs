@@ -1,10 +1,10 @@
-// ../runtime/model_probe.ts
+// backend_diag/runtime/model_probe.ts
 import { open, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
 import https from "node:https";
 
-// ../runtime/model_catalog.ts
+// backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {
@@ -126,9 +126,14 @@ function ollamaCatalog(body, now = /* @__PURE__ */ new Date()) {
   return out;
 }
 
-// ../runtime/model_probe.ts
+// backend_diag/runtime/model_probe.ts
 var CONFIG_LIMIT = 128 * 1024;
 var RESPONSE_LIMIT = 1024 * 1024;
+var PUBLIC_RESPONSE_LIMIT = 16 * 1024 * 1024;
+function publicFailureDescription(code) {
+  const reasons = { size: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u30B5\u30A4\u30BA\u304C\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", output: "\u6574\u5F62\u3057\u305F\u516C\u958B\u4E00\u89A7\u304C\u51FA\u529B\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", timeout: "\u516C\u958B\u4E00\u89A7\u306E\u901A\u4FE1\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002", dns: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u306E\u540D\u524D\u89E3\u6C7A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", tls: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u306ETLS\u8A3C\u660E\u66F8\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", http: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u304C\u6B63\u5E38\u306AHTTP\u5FDC\u7B54\u3092\u8FD4\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002", json: "\u516C\u958B\u4E00\u89A7\u306E\u5FDC\u7B54\u3092JSON\u3068\u3057\u3066\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002", shape: "\u516C\u958B\u4E00\u89A7\u306E\u30C7\u30FC\u30BF\u5F62\u5F0F\u304C\u60F3\u5B9A\u3068\u7570\u306A\u308A\u307E\u3059\u3002", network: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u3078\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3084\u30D7\u30ED\u30AD\u30B7\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", response: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u304C\u9014\u4E2D\u3067\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002", stopped: "\u516C\u958B\u4E00\u89A7\u306E\u53D6\u5F97\u3092\u4E2D\u6B62\u3057\u307E\u3057\u305F\u3002", busy: "\u5225\u306E\u30E2\u30C7\u30EB\u78BA\u8A8D\u304C\u5B9F\u884C\u4E2D\u3067\u3059\u3002" };
+  return typeof code === "string" && Object.hasOwn(reasons, code) ? reasons[code] : "\u516C\u958B\u4E00\u89A7\u306E\u53D6\u5F97\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002";
+}
 var CONFIG_PATH = fileURLToPath(new URL("../../_config/AiDiy_key.json", import.meta.url));
 var KEY_PROVIDERS = Object.freeze([
   ["gemini", "Gemini", "gemini_key_id", "google"],
@@ -197,6 +202,7 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
     pathname += "?" + new URLSearchParams({ pageToken });
   }
   if (signal?.aborted) return reject(new Error("stopped"));
+  const responseLimit = provider === "openrouter" && Object.keys(headers).length === 0 ? PUBLIC_RESPONSE_LIMIT : RESPONSE_LIMIT;
   let settled = false, size = 0;
   const chunks = [];
   const request = https.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, (response) => {
@@ -205,15 +211,18 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
       return finish(new Error("http"));
     }
     response.on("data", (chunk) => {
+      if (settled) return;
       size += chunk.length;
-      if (size > RESPONSE_LIMIT) return finish(new Error("size"));
+      if (size > responseLimit) return finish(new Error("size"));
       chunks.push(chunk);
     });
     response.on("error", () => finish(new Error("response")));
+    response.on("aborted", () => finish(new Error("response")));
     response.on("end", () => {
+      if (settled) return;
       try {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        if (!record(body)) throw new Error("shape");
+        if (!record(body)) return finish(new Error("shape"));
         finish(void 0, body);
       } catch {
         finish(new Error("json"));
@@ -232,7 +241,11 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
     else resolve(value);
   }
   signal?.addEventListener("abort", cancel, { once: true });
-  request.on("error", () => finish(new Error("network")));
+  request.on("error", (error) => {
+    const code = error.code ?? "";
+    const reason = ["ENOTFOUND", "EAI_AGAIN"].includes(code) ? "dns" : ["CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code) ? "tls" : "network";
+    finish(new Error(reason));
+  });
   request.end();
 });
 function safeDetails(models, secrets, limit = 500) {
@@ -261,10 +274,12 @@ async function publicCatalog({ fetch = fetchMetadata, now, signal } = {}) {
     if (!Array.isArray(body.data)) throw new Error("shape");
     const details = safeDetails(openrouterCatalog(body, now), [], null);
     const result = { \u72B6\u614B: "OK", \u516C\u958B\u30E2\u30C7\u30EB: Object.fromEntries(details.map((item) => [item.model_id, item])), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "\u516C\u958BOpenRouter\u4E00\u89A7\u306E\u533F\u540D\u53D6\u5F97\u6210\u529F\u3002\u30AD\u30FC\u306E\u6709\u52B9\u6027\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
-    if (Buffer.byteLength(JSON.stringify(result)) > RESPONSE_LIMIT) throw new Error("size");
+    if (Buffer.byteLength(JSON.stringify(result)) > RESPONSE_LIMIT) throw new Error("output");
     return result;
-  } catch {
-    return { \u72B6\u614B: "NG", \u516C\u958B\u30E2\u30C7\u30EB: {}, \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "\u516C\u958BOpenRouter\u4E00\u89A7\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002" };
+  } catch (error) {
+    const candidate = error instanceof Error ? error.message : "";
+    const code = ["size", "output", "timeout", "dns", "tls", "http", "json", "network", "response", "stopped"].includes(candidate) ? candidate : "shape";
+    return { \u72B6\u614B: "NG", \u516C\u958B\u30E2\u30C7\u30EB: {}, \u78BA\u8A8D\u65E5\u6642: timestamp, \u5931\u6557\u7406\u7531: code, \u8AAC\u660E: publicFailureDescription(code) };
   }
 }
 async function probe(id, { reader, fetch = fetchMetadata, now, cache, signal } = {}) {
@@ -326,11 +341,13 @@ async function probe(id, { reader, fetch = fetchMetadata, now, cache, signal } =
 export {
   CONFIG_LIMIT,
   KEY_PROVIDERS,
+  PUBLIC_RESPONSE_LIMIT,
   RESPONSE_LIMIT,
   configured,
   fetchMetadata,
   probe,
   publicCatalog,
+  publicFailureDescription,
   readConfig,
   safeDetails,
   status,

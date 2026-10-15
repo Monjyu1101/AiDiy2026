@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, writeFile, rm, stat, symlink} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, rm, stat, symlink, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {probe, resolveProgram, versionInvocation} from '../probes.mjs';
+import {recordProbeFailure} from '../desktop-log.mjs';
 
 async function withTree(fn) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'diag-win & spaces-'));
@@ -101,4 +102,45 @@ test('failure stderr logs contain OS codes and bounded reasons, never child outp
   assert.equal(logs[1].exitCode,7); assert.equal(logs[1].signal,null);
   assert.ok(lines.every(line=>line.length<300 && line.split('\n').length===2));
   assert.ok(!lines.join('').includes('private')); assert.ok(!lines.join('').includes('Authorization')); assert.ok(!lines.join('').includes('https:'));
+}));
+
+test('Python finds python.org per-user install without PATH or launcher and handles environment casing', async () => withTree(async root => {
+  const install = path.join(root, 'Programs', 'Python', 'Python313');
+  await mkdir(install, {recursive:true}); await writeFile(path.join(install,'python.exe'), 'fixture');
+  assert.equal(await resolveProgram(entry('python'), {platform:'win32', env:{localappdata:root}}), path.join(install,'python.exe'));
+}));
+
+test('Python finds all-user install, prefers newer standard folders, and never recursively scans other folders', async () => withTree(async root => {
+  for (const name of ['Python 3.9','Python 3.13','Other/Python 3.99']) {
+    const install = path.join(root, name); await mkdir(install,{recursive:true}); await writeFile(path.join(install,'python.exe'),'fixture');
+  }
+  assert.equal(await resolveProgram(entry('python'), {platform:'win32', env:{PROGRAMFILES:root}}),path.join(root,'Python 3.13','python.exe'));
+  await rm(path.join(root,'Python 3.13'),{recursive:true}); await rm(path.join(root,'Python 3.9'),{recursive:true});
+  assert.equal(await resolveProgram(entry('python'), {platform:'win32', env:{PROGRAMFILES:root}}),null);
+}));
+
+test('Python explicit PATH remains preferred over standard installs', async () => withTree(async root => {
+  const install = path.join(root,'Programs','Python','Python313'); await mkdir(install,{recursive:true});
+  await writeFile(path.join(install,'python.exe'),'fixture'); await writeFile(path.join(root,'python.exe'),'fixture');
+  assert.equal(await resolveProgram(entry('python'), {platform:'win32', env:{PATH:root,LOCALAPPDATA:root}}),path.join(root,'python.exe'));
+}));
+
+test('Python standard launcher path handles case-insensitive Windows variables', async () => withTree(async root => {
+  await writeFile(path.join(root,'py.exe'),'fixture');
+  assert.equal(await resolveProgram(entry('python'), {platform:'win32', env:{SYSTEMROOT:root}}),path.join(root,'py.exe'));
+}));
+
+
+test('minimum-version warnings keep safe warning severity and do not expose raw output', async () => withTree(async root => {
+  const original = process.stderr.write; const lines = [];
+  process.stderr.write = function(chunk) { lines.push(String(chunk)); return true; };
+  try {
+    const result = await probe({id:'python',version_args:['--version'],minimumVersion:'999.0'}, {resolve:async()=>process.execPath});
+    assert.equal(result.状態,'注意'); assert.equal(result.バージョン,process.versions.node);
+  } finally { process.stderr.write = original; }
+  const record = JSON.parse(lines[0].replace(/^\[aidiy-diag:probe\] /,''));
+  assert.equal(record.reason,'below_minimum_version'); assert.equal(record.severity,'warning');
+  const file=path.join(root,'warning.log'); assert.equal(recordProbeFailure(record,file),true);
+  assert.match(await readFile(file,'utf8'), /"severity":"warning"/);
+  assert.ok(!lines.join('').includes(process.execPath));
 }));

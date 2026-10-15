@@ -20,10 +20,13 @@ test('LF and Windows CRLF checkouts verify without rebuilding; actual edits stil
  const root=await fixture(),ui=path.join(root,'ui');
  try {
   assert.equal(await verify(ui),true);const lf=await manifest(ui);
+  assert.ok(Object.hasOwn(lf, 'src/インストール/インストールパネル.vue'));
+  assert.deepEqual(Object.keys(lf), Object.keys(lf).sort());
+  assert.ok(!Object.keys(lf).some(name => name.includes('/tests/')));
   await convert(root);assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
   const manifestFile=path.join(root,'static/build-manifest.json');
   await writeFile(manifestFile,JSON.stringify(Object.fromEntries(Object.entries(lf).reverse())));assert.equal(await verify(ui),true);
-  for(const relative of ['ui/src/App.vue','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
+  for(const relative of ['ui/src/App.vue','ui/src/インストール/インストールパネル.vue','ui/src/インストール/インストール状態.mjs','ui/src/インストール/インストール表示.mjs','ui/src/インストール/インストール.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
    const file=path.join(root,relative),before=await readFile(file);await writeFile(file,Buffer.concat([before,Buffer.from('\nchanged')]));assert.equal(await verify(ui),false,relative);await writeFile(file,before);
   }
   await rm(path.join(root,'static/app.js'));assert.equal(await verify(ui),false);
