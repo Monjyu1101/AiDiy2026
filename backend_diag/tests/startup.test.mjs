@@ -14,7 +14,7 @@ async function fixture(){
 }
 async function convert(dir){for(const entry of await readdir(dir,{withFileTypes:true})){
  const name=path.join(dir,entry.name);if(entry.isDirectory())await convert(name);
- else if(/\.(?:vue|m?js|css|html|json)$/.test(name))await writeFile(name,(await readFile(name,'utf8')).replace(/\r?\n/g,'\r\n'));
+ else if(/\.(?:vue|ts|m?js|css|html|json)$/.test(name))await writeFile(name,(await readFile(name,'utf8')).replace(/\r?\n/g,'\r\n'));
 }}
 test('LF and Windows CRLF checkouts verify without rebuilding; actual edits still fail',async()=>{
  const root=await fixture(),ui=path.join(root,'ui');
@@ -23,7 +23,7 @@ test('LF and Windows CRLF checkouts verify without rebuilding; actual edits stil
   await convert(root);assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
   const manifestFile=path.join(root,'static/build-manifest.json');
   await writeFile(manifestFile,JSON.stringify(Object.fromEntries(Object.entries(lf).reverse())));assert.equal(await verify(ui),true);
-  for(const relative of ['ui/src/App.vue','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
+  for(const relative of ['ui/src/App.vue','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
    const file=path.join(root,relative),before=await readFile(file);await writeFile(file,Buffer.concat([before,Buffer.from('\nchanged')]));assert.equal(await verify(ui),false,relative);await writeFile(file,before);
   }
   await rm(path.join(root,'static/app.js'));assert.equal(await verify(ui),false);

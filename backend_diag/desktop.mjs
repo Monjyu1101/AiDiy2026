@@ -13,16 +13,55 @@ export async function desktopBinary(root=fileURLToPath(new URL('.',import.meta.u
   if ((await readFile(path.join(electron,'dist','version'),'utf8')).trim().replace(/^v/,'')!==metadata.version || (await readFile(path.join(electron,'path.txt'),'utf8'))!==suffix) throw new Error('Electron not ready');
   const executable=path.join(electron,'dist',suffix);await access(executable,platform==='win32'?constants.F_OK:constants.X_OK);return executable;
 }
-export function openDesktop(executable, url, onClose, spawnFn=spawn) {
-  // URL/token は argv・環境変数・ログへ書かず、単発 stdin pipe で main process へ渡す。
-  const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;delete env.NODE_PATH;
-  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['pipe','ignore','ignore'],env,windowsHide:false,detached:process.platform!=='win32'});
-  child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({url}));
-  child.once('error',()=>{console.error('Electron を起動できません。セットアップを確認するか --browser を指定してください。');process.exitCode=1;onClose();});
+const failures={
+  IPC:'親子プロセス間通信に失敗しました。',
+  TIMEOUT:'起動確認がタイムアウトしました。',
+  URL:'起動情報を確認できません。',
+  WINDOW:'ウィンドウを作成できません。',
+  LOAD:'診断画面を読み込めません。',
+  RENDERER:'画面プロセスが終了しました。',
+};
+export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000) {
+  // Windows Electron の stdin は常に EOF。IDE と同じ専用 IPC を使い、秘密 URL は argv/env/log に出さない。
+  const env={...process.env};
+  for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH)$/i.test(key))delete env[key];
+  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:false,detached:process.platform!=='win32'});
+  let ended=false, sent=false, shown=false, reported=false, disconnectTimer;
+  const finish=()=>{if(ended)return;ended=true;clearTimeout(timer);clearTimeout(disconnectTimer);onClose();};
+  const report=(code,detail='')=>{
+    if(reported || child.diagClosing)return;reported=true;process.exitCode=1;
+    console.error(`Electron: ${failures[code] || '異常終了しました。'}${detail} セットアップまたは実行環境を確認してください。--browser でも起動できます。`);
+  };
+  const abort=code=>{report(code);closeDesktop(child);finish();};
+  const timer=setTimeout(()=>abort('TIMEOUT'),timeout);timer.unref();
+  // 生の stderr は URL・ローカル情報を含み得るため表示しない。既知の起動原因だけを分類する。
+  let diagnostic='';
+  child.stderr?.on('data',chunk=>{
+    diagnostic=(diagnostic+String(chunk)).slice(-4096);
+    if(/error while loading shared libraries/i.test(diagnostic))child.diagNativeReason=' 共有ライブラリが不足しています。';
+    else if(/No usable sandbox|Running as root without --no-sandbox/i.test(diagnostic))child.diagNativeReason=' OS の sandbox 実行条件を確認してください。';
+    else if(/Missing X server|cannot open display|Failed to connect to Wayland display/i.test(diagnostic))child.diagNativeReason=' GUI ディスプレイへ接続できません。';
+  });
+  child.on('message',message=>{
+    if(ended || child.diagClosing)return;
+    if(message?.type==='diag-ready' && !sent){
+      sent=true;
+      try {child.send({type:'diag-start',url},error=>{if(error && !ended)abort('IPC');});}catch{abort('IPC');}
+    }else if(message?.type==='diag-shown' && sent){shown=true;clearTimeout(timer);}
+    else if(message?.type==='diag-failed' && Object.hasOwn(failures,message.code)){report(message.code);}
+  });
+  child.once('disconnect',()=>{
+    // 正常終了でも IPC は exit より先に閉じる。終了イベントを待ち、残存した子だけ停止する。
+    if(!ended && !child.diagClosing){disconnectTimer=setTimeout(()=>abort('IPC'),1000);disconnectTimer.unref();}
+  });
+  child.once('error',error=>{
+    const code=['ENOENT','EACCES','EPERM'].includes(error?.code)?` (${error.code})`:'';
+    report('SPAWN',code);closeDesktop(child);finish();
+  });
   child.once('exit',(code,signal)=>{
-    if (!child.diagClosing && (code !== 0 || signal)) {console.error('Electron が異常終了しました。実行環境を確認するか --browser を指定してください。');process.exitCode=1;}
-    if (process.platform!=='win32' && child.pid) {try {process.kill(-child.pid,'SIGKILL');} catch {}}
-    onClose();
+    if(!shown || code!==0 || signal)report('EXIT',` (exit=${Number.isInteger(code)?code:'none'}, signal=${['SIGTERM','SIGKILL','SIGABRT','SIGSEGV'].includes(signal)?signal:'none'})${child.diagNativeReason || ''}`);
+    if(process.platform!=='win32' && child.pid){try{process.kill(-child.pid,'SIGKILL');}catch{}}
+    finish();
   });return child;
 }
 

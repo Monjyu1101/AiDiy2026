@@ -1,6 +1,6 @@
 // 起動中だけ保持する匿名公開メタデータ。キー設定・認証試験結果とは別管理。
-import {runPython} from './key_status.mjs';
-export function createPublicModelCache({run=runPython}={}) {
+import {runModels} from './key_status.mjs';
+export function createPublicModelCache({run=runModels}={}) {
  let state='未取得',models={},checked=null,message='公開モデルはまだ取得していません。',revision=0,pending=null;
  const snapshot=()=>({状態:state,件数:Object.keys(models).length,確認日時:checked,説明:message,世代:revision});
  const input=()=>({公開モデル:state==='取得済'?models:{},公開状態:state,確認日時:checked});

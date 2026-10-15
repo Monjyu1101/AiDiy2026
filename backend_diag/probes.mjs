@@ -25,15 +25,24 @@ export async function resolveProgram(entry, options = {}) {
   const platform = options.platform || process.platform, env = options.env || process.env;
   // 自分の Node は PATH に無くても、起動済み実行ファイルとして検出する。
   if (entry.id === 'node' && !options.env) return process.execPath;
-  const extensions = platform === 'win32' ? ['', '.exe', '.cmd', '.bat', '.com'] : [''];
-  const directories = (env.PATH || '').split(platform === 'win32' ? ';' : ':').filter(Boolean);
+  const extensions = platform === 'win32' ? ['.exe', '.com', '.cmd', '.bat'] : [''];
+  const pathValue = env.PATH || (platform === 'win32' ? Object.entries(env).find(([key]) => key.toUpperCase() === 'PATH')?.[1] : '') || '';
+  const directories = pathValue.split(platform === 'win32' ? ';' : ':').filter(Boolean);
   const candidates = [];
-  for (const command of entry.commands) for (const directory of directories) for (const extension of extensions) {
-    candidates.push(path.join(directory, command + extension));
+  for (const command of entry.commands) for (const directory of directories) for (const extension of (/\.(exe|com|cmd|bat)$/i.test(command) ? [''] : extensions)) {
+    candidates.push(path.join(directory.replace(/^"(.*)"$/, '$1'), command + extension));
   }
   for (const value of entry.paths?.[platform] || []) { const expanded=expandPath(value,env); if(expanded) candidates.push(expanded); }
   for (const value of entry.project_paths?.[platform] || []) candidates.push(path.resolve(REPO_ROOT, value));
+  // Store の実行エイリアスは起動せず、実体・venv・従来の py launcher を探す。
+  if (entry.id === 'python' && platform === 'win32') {
+    for (const directory of directories) candidates.push(path.join(directory.replace(/^"(.*)"$/, '$1'), 'py.exe'));
+    for (const value of ['$LOCALAPPDATA/Programs/Python/Launcher/py.exe', '$SystemRoot/py.exe']) {
+      const expanded = expandPath(value, env); if (expanded) candidates.push(expanded);
+    }
+  }
   for (const candidate of [...new Set(candidates)]) {
+    if (entry.id === 'python' && platform === 'win32' && /[\\/]Microsoft[\\/]WindowsApps[\\/]/i.test(candidate)) continue;
     // Windows 標準 convert.exe はディスク変換ツールで ImageMagick ではない。
     if (entry.id === 'convert' && platform === 'win32' && /[\\/](System32|SysWOW64)[\\/]convert(?:\.exe)?$/i.test(candidate)) continue;
     try { await access(candidate, platform === 'win32' ? constants.F_OK : constants.X_OK); if ((await stat(candidate)).isFile()) return path.resolve(candidate); } catch {}
@@ -43,9 +52,19 @@ export async function resolveProgram(entry, options = {}) {
 
 function childEnvironment(directory) {
   const env = {};
-  for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'LANG', 'LC_ALL']) if (process.env[key]) env[key] = process.env[key];
+  for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'LANG', 'LC_ALL']) {
+    const source = Object.keys(process.env).find(name => name.toUpperCase() === key.toUpperCase());
+    if (source) env[key] = process.env[source];
+  }
   return { ...env, HOME:directory, USERPROFILE:directory, XDG_CONFIG_HOME:directory, XDG_CACHE_HOME:directory,
     TEMP:directory, TMP:directory, TMPDIR:directory, NO_COLOR:'1', CI:'1', DO_NOT_TRACK:'1' };
+}
+
+function safeCode(value) { return typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,39}$/.test(value) ? value : null; }
+function logProbeFailure(id, reason, details = {}) {
+  // 外部プログラムの出力・ファイルパス・環境値は秘密を含み得るので記録しない。
+  const item = typeof id === 'string' && /^[a-z0-9_-]{1,40}$/.test(id) ? id : 'unknown';
+  process.stderr.write(`[aidiy-diag:probe] ${JSON.stringify({id:item, reason, ...details})}\n`);
 }
 
 export function runVersion(executable, args, directory, options = {}) {
@@ -56,9 +75,12 @@ export function runVersion(executable, args, directory, options = {}) {
       if (!child?.pid) return;
       try { if (process.platform !== 'win32') process.kill(-child.pid, 'SIGKILL'); else child.kill('SIGKILL'); } catch {}
     };
-    const finish = result => {
+    const finish = (result, reason, details = {}) => {
       if (ended) return;
       ended = true; clearTimeout(timer); activeProbes.delete(cancel); killGroup();
+      if (reason) logProbeFailure(options.probeId, reason, {
+        args:args.filter(arg => ['--version', '-version', '-3'].includes(arg)), ...details
+      });
       child?.stdout?.destroy(); child?.stderr?.destroy(); child?.unref();
       resolve(result);
     };
@@ -67,21 +89,21 @@ export function runVersion(executable, args, directory, options = {}) {
     try {
       child = spawn(executable, args, { shell:false, cwd:directory, env:childEnvironment(directory),
         stdio:['ignore','pipe','pipe'], detached:process.platform !== 'win32', windowsHide:true });
-    } catch { return finish({状態:'ERR', 説明:'ファイルはありますが、起動できませんでした。'}); }
-    timer = setTimeout(() => finish({状態:'ERR', 説明:'バージョン確認がタイムアウトしました。'}), options.timeout ?? TIMEOUT);
+    } catch (error) { const errorCode = safeCode(error.code); return finish({状態:'ERR', 説明:`ファイルはありますが、起動できませんでした${errorCode ? ` (${errorCode})` : ''}。`}, 'spawn_error', {errorCode}); }
+    timer = setTimeout(() => finish({状態:'ERR', 説明:'バージョン確認がタイムアウトしました。'}, 'timeout'), options.timeout ?? TIMEOUT);
     const read = chunk => {
       if (ended) return;
       bytes += chunk.length;
-      if (bytes > (options.outputLimit ?? OUTPUT_LIMIT)) return finish({状態:'ERR', 説明:'バージョン出力の上限を超えました。'});
+      if (bytes > (options.outputLimit ?? OUTPUT_LIMIT)) return finish({状態:'ERR', 説明:'バージョン出力の上限を超えました。'}, 'output_limit');
       chunks.push(chunk);
     };
     child.stdout.on('data', read); child.stderr.on('data', read);
-    child.on('error', () => finish({状態:'ERR', 説明:'ファイルはありますが、起動できませんでした。'}));
+    child.on('error', error => { const errorCode = safeCode(error.code); finish({状態:'ERR', 説明:`ファイルはありますが、起動できませんでした${errorCode ? ` (${errorCode})` : ''}。`}, 'spawn_error', {errorCode}); });
     // 親が先に終了しても同じ POSIX group の子を停止。pipe close を無期限に待たない。
     child.on('exit', killGroup);
-    child.on('close', code => {
+    child.on('close', (code, signal) => {
       if (ended) return;
-      if (code !== 0) return finish({状態:code === null ? 'ERR' : 'NG', 説明:`ファイルはありますが正常終了しませんでした (終了コード ${code})。`});
+      if (code !== 0) return finish({状態:code === null ? 'ERR' : 'NG', 説明:`ファイルはありますが正常終了しませんでした (終了コード ${code}${safeCode(signal) ? ` / ${safeCode(signal)}` : ''})。`}, 'nonzero_exit', {exitCode:code, signal:safeCode(signal)});
       const match = Buffer.concat(chunks).toString('utf8').match(versionPattern);
       finish({状態:'OK', バージョン:match?.[1] || null,
         説明:match ? 'バージョンコマンドが正常終了しました。' : '正常終了しましたが、バージョン番号を抽出できませんでした。'});
@@ -89,30 +111,49 @@ export function runVersion(executable, args, directory, options = {}) {
   });
 }
 
+// Windows npm/npx の .cmd / POSIX シムを実行せず、同じ配置の固定 JS CLI を使う。
+// シムの内容は解釈しない。任意コマンドや shell:true へのフォールバックは禁止。
+export async function versionInvocation(entry, executable, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform === 'win32' && (entry.id === 'npm' || entry.id === 'npx')) {
+    const cli = path.join(path.dirname(executable), 'node_modules', 'npm', 'bin', `${entry.id}-cli.js`);
+    try { if ((await stat(cli)).isFile()) return {executable:process.execPath, args:[cli, '--version']}; } catch {}
+    return null;
+  }
+  if (platform === 'win32' && entry.id === 'python' && /(?:^|[\\/])py\.exe$/i.test(executable)) {
+    return {executable, args:['-3', '--version']};
+  }
+  return {executable, args:entry.version_args};
+}
+
 export async function probe(entry, options = {}) {
   const result = {id:entry.id, 状態:'未検出', パス:null, バージョン:null, 説明:'PATH / 標準配置先に見つかりません。', 確認日時:new Date().toISOString()};
   if (entry.platforms?.length && !entry.platforms.includes(options.platform || process.platform)) return {...result,状態:'未確認',説明:'対象外: この OS では使用しないため確認していません。'};
   let executable;
   try { executable = await (options.resolve || resolveProgram)(entry, options); }
-  catch { return {...result,状態:'ERR',説明:'実行ファイルの探索に失敗しました。'}; }
+  catch (error) { logProbeFailure(entry.id, 'resolve_error', {errorCode:safeCode(error.code)}); return {...result,状態:'ERR',説明:'実行ファイルの探索に失敗しました。'}; }
   if (!executable) return result;
   result.パス = executable;
-  if (entry.allow_version === false || !entry.version_args || /\.(cmd|bat|ps1)$/i.test(executable) || /[\\/]Microsoft[\\/]WindowsApps[\\/]python[^\\/]*\.exe$/i.test(executable)) return {...result,状態:'OK',説明:'起動・副作用を避けるため、ファイルの存在のみ確認しました。'};
+  if (entry.allow_version === false || !entry.version_args) return {...result,状態:'OK',説明:'起動・副作用を避けるため、ファイルの存在のみ確認しました。'};
+  if (entry.id === 'python' && /[\\/]Microsoft[\\/]WindowsApps[\\/]/i.test(executable)) return {...result,状態:'未確認',説明:'Windows の実行エイリアスのみ検出しました。Python 本体のバージョンは確認できません。'};
+  const invocation = await versionInvocation(entry, executable, options);
+  if (!invocation) { logProbeFailure(entry.id, 'npm_cli_missing'); return {...result,状態:'ERR',説明:'npm の JS CLI 本体が同じ配置先に見つからず、バージョンを確認できません。再インストール前に Node.js / npm の配置を確認してください。'}; }
+  if (/\.(cmd|bat|ps1)$/i.test(invocation.executable)) return {...result,状態:'OK',説明:'起動・副作用を避けるため、ファイルの存在のみ確認しました。'};
   let directory;
   try {
     directory = await mkdtemp(path.join(os.tmpdir(), 'aidiy-diag-'));
-    const checked = {...result, ...await runVersion(executable, entry.version_args, directory, options)};
+    const checked = {...result, ...await runVersion(invocation.executable, invocation.args, directory, {...options, probeId:entry.id})};
     if (checked.状態 === 'OK' && checked.バージョン && entry.minimumVersion) {
       const found = checked.バージョン.split(/[.-]/).slice(0,3).map(Number);
       const required = entry.minimumVersion.split('.').map(Number);
       for (let index=0; index<Math.max(found.length,required.length); index++) {
         const actual=found[index] || 0, minimum=required[index] || 0;
-        if (actual < minimum) return {...checked,状態:'NG',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`};
+        if (actual < minimum) { logProbeFailure(entry.id, 'below_minimum_version'); return {...checked,状態:'NG',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`}; }
         if (actual > minimum) break;
       }
     }
     return checked;
-  } catch { return {...result,状態:'ERR',説明:'確認用の一時領域を準備できませんでした。'}; }
+  } catch (error) { logProbeFailure(entry.id, 'probe_setup_error', {errorCode:safeCode(error.code)}); return {...result,状態:'ERR',説明:'確認用の一時領域を準備できませんでした。'}; }
   finally { if (directory) await rm(directory, {recursive:true,force:true,maxRetries:0}).catch(() => {}); }
 }
 

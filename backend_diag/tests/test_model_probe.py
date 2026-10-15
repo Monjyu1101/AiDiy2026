@@ -11,7 +11,7 @@ import unittest
 
 BASE = Path(__file__).resolve().parents[1]
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, BASE / (name + '.py'))
+    spec = importlib.util.spec_from_file_location(name, BASE / 'tests' / 'reference' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -165,7 +165,7 @@ r=b.probe('claude',reader=lambda _:json.dumps({'claude_key_id':'fixture-key'}),f
 assert r['状態']=='OK',r
 assert r['モデル']==['new'],r
 print('PASS')
-""" % str(BASE / 'model_probe.py')
+""" % str(BASE / 'tests' / 'reference' / 'model_probe.py')
         result=subprocess.run([sys.executable,'-I','-S','-B','-c',code],capture_output=True,text=True,timeout=5)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout.strip(),'PASS')

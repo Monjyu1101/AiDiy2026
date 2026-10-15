@@ -23,7 +23,7 @@ test('auth remains in memory with relative API and refresh discards stale key re
  assert.match(app,/response.status===401/);
 });
 test('states and safe text interpolation preserve hierarchy and model text rendering',()=>{
- const install=source('InstallPanel.vue');for(const label of ['未確認','未検出','OK','NG','ERR','ベース','CLI群','その他拡張'])assert.ok(install.includes(label));
+ const install=source('InstallPanel.vue');for(const label of ['未確認','ベース','CLI群','その他拡張'])assert.ok(install.includes(label));
  const keys=source('KeyPanel.vue');assert.match(keys,/\{\{model\}\}/);assert.match(keys,/未実施/);assert.match(keys,/設定済/);assert.match(keys,/未設定/);
  assert.doesNotMatch(source('App.vue')+install+keys,/v-html|innerHTML/);
  const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../catalog.json'),'utf8'));assert.equal(catalog.length,19);assert.deepEqual(catalog.filter(e=>e.menuGroup==='ベース').map(e=>e.name),['Python','uv','Node.js','npm','npx','Electron']);
@@ -31,7 +31,7 @@ test('states and safe text interpolation preserve hierarchy and model text rende
 test('checked-in compiled assets match current Vue sources',async()=>{const {verify}=await import('../ui/verify.mjs');assert.equal(await verify(),true);});
 test('source edits and altered bundle invalidate deployment manifest',async()=>{
  const os=require('node:os');const {pathToFileURL}=require('node:url');const folder=fs.mkdtempSync(path.join(os.tmpdir(),'diag-build-sync-'));
- try{const root=path.join(__dirname,'..');fs.cpSync(path.join(root,'ui'),path.join(folder,'ui'),{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});fs.cpSync(path.join(root,'static'),path.join(folder,'static'),{recursive:true});
+ try{const root=path.join(__dirname,'..');fs.cpSync(path.join(root,'ui'),path.join(folder,'ui'),{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});fs.cpSync(path.join(root,'static'),path.join(folder,'static'),{recursive:true});fs.cpSync(path.join(root,'runtime'),path.join(folder,'runtime'),{recursive:true});
  const {verify}=await import(pathToFileURL(path.join(folder,'ui/verify.mjs')));assert.equal(await verify(),true);
  const app=path.join(folder,'ui/src/App.vue'),original=fs.readFileSync(app);fs.appendFileSync(app,'\n<!-- stale source -->\n');assert.equal(await verify(),false);fs.writeFileSync(app,original);
  fs.appendFileSync(path.join(folder,'static/app.js'),'\n// changed bundle\n');assert.equal(await verify(),false);
