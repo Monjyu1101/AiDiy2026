@@ -11,7 +11,7 @@ const fail=error=>({ok:false,error});
 // IDE所有者・利用セッション・正確な窓IDを照合して、一つの入力欄だけへ渡す。
 // 通信権限の確認（メインフレームとURL）は呼び出し側のtrustedEventで行う。
 function createDraftRouter({records,readState,sessionKey,focusWindow,isQuitting=()=>false,timeout=4000,now=Date.now,uuid=randomUUID,setTimer=setTimeout,clearTimer=clearTimeout}){
- const pending=new Map();
+ const pending=new Map(),focusOrder=new WeakMap();let focusSequence=0;
  const alive=record=>!!record&&!record.window.isDestroyed()&&[...records.values()].includes(record);
  function ownerOf(source){
   if(!alive(source))return null;
@@ -23,6 +23,10 @@ function createDraftRouter({records,readState,sessionKey,focusWindow,isQuitting=
  }
  function currentTarget(target,owner,state){
   return alive(target)&&target.owner===owner&&target.linkKey===sessionKey(state)&&Object.hasOwn(limits,target.kind)&&(target.kind!=='live'||state.mode==='online')&&target.draftTarget?.projectPath===state.project.path;
+ }
+ // OSのfocusイベントだけを記録する。IDE・ビューア・登録更新では順番を変えない。
+ function focused(record){
+  if(alive(record)&&record.owner&&Object.hasOwn(limits,record.kind))focusOrder.set(record,++focusSequence);
  }
  function register(record,value){
   if(!alive(record)||!record.owner||!Object.hasOwn(limits,record.kind))return fail('この画面は渡し先として登録できません。');
@@ -39,7 +43,8 @@ function createDraftRouter({records,readState,sessionKey,focusWindow,isQuitting=
    const state=await readState(owner);
    if(!linked(source,owner,state,revision))return fail('IDEの利用状態が変わりました。');
    const targets=[...records.values()].filter(target=>currentTarget(target,owner,state)).map(target=>({id:target.draftId,kind:target.kind,label:`${target.kind==='code'?`Code ${target.slot+1}`:'Live'}${target.draftTarget.label&&!['Code','Live'].includes(target.draftTarget.label)?` · ${target.draftTarget.label}`:''}`,contextId:target.draftTarget.contextId,projectPath:state.project.path,maxLength:limits[target.kind]}));
-   return{ok:true,sessionKey:sessionKey(state),projectPath:state.project.path,mode:state.mode,targets};
+   const frontmost=[...records.values()].filter(target=>currentTarget(target,owner,state)&&focusOrder.has(target)&&target.window.isMinimized?.()!==true&&target.window.isVisible?.()!==false).sort((a,b)=>focusOrder.get(b)-focusOrder.get(a))[0];
+   return{ok:true,sessionKey:sessionKey(state),projectPath:state.project.path,mode:state.mode,targets,frontmostTargetId:frontmost?.draftId||''};
   }catch{return fail('IDEの利用状態を確認できません。');}
  }
  async function insert(source,data){
@@ -77,6 +82,6 @@ function createDraftRouter({records,readState,sessionKey,focusWindow,isQuitting=
   if(record)record.draftTarget=null;
   for(const [id,item] of pending)if(item.source===record||item.target===record||item.owner===record)finish(id,fail('受け渡し中に画面が閉じたか、利用が終了しました。'));
  }
- return{register,list,insert,acknowledge,invalidate};
+ return{register,list,insert,acknowledge,invalidate,focused};
 }
 module.exports={createDraftRouter};

@@ -204,9 +204,9 @@ Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだ
 - `App.vue` と `ViewerWindow.vue` は `src/connection-state.js` で利用状態の応答を検証します。HTTP失敗・タイムアウト・不完全なJSONを `active:false` に置き換えないでください。Appの状態取得と下書き連携の確認には開始時のrevision・セッションを照合し、終了や再開後の遅延応答を捨てます。Electron側の `desktop-session.cjs` も同じ方針で、子窓監視失敗では破棄せず、終了確認時の不明は確認が必要な作業中として扱います。
 - `FileExplorer.vue` の最終更新通知は、一覧の鮮度更新と自動追跡を分けます。`space.js` の手動latest/未知パス移動は `fresh=1` で再走査し、新しい手動選択・clear・フィルター切替・破棄があれば中断します。進行中の走査を共有した結果が古い場合だけもう一度確認します。自動探索のON/OFFで手動クリックを無効にしないでください。
 - `FileViewer.vue` は `file-reference.js` でgrepの行・列・検索語を現在の内容と照合します。Monacoと簡易表示の双方に位置を伝え、CRLF/CR/LFとUTF-16列を扱います。本文変更や削除で不一致なら再検索の案内にします。
-- `DraftHandoffDialog.vue` は連携先を取得し、複数なら明示選択、1つなら固定します。ゼロ件で自動起動・自動送信はしません。`CodePanel.vue` / `LivePanel.vue` の `draftTarget()` / `insertDraft()` は `src/draft-handoff.js` を共有し、今の下書きに追記します。Codeは合計200,000文字、Liveは20,000文字、選択本文は80,000文字までで、超過は切り詰めず拒否します。Codeの新規・履歴切替など会話変更操作では、要求を送る前に連携先を同期的に無効化します。途中の旧会話stateやHTTP成功だけで復帰させず、要求先の会話stateまたは変更前の確定拒否を待ちます。VS CodeはrequestId付きのconversationChangeResultと会話stateを照合し、実行中・モデル変更中・消えた履歴の拒否でも安全に復帰します。マルチルートの新規だけは、ホストが成功応答で確認した別の作業フォルダへ移れます。履歴選択は要求した会話ID・元のプロジェクトを維持します。応答喪失や500は適用済みか判断できないので、旧下書きのまま連携を停止し再読み込みを案内します。`checks/code-transition-handoff.test.mjs` は実テンプレートのクリックとHTTP/SSE・VS Code経路を検証します。
+- `DraftHandoffDialog.vue` は連携先を取得し、複数なら明示選択、1つなら固定します。連携先行の「最前面を再選択」は候補を取り直し、`frontmostTargetId` を選び直します。通常の候補更新では有効な手動選択を保持し、再選択だけで下書きを追加しません。再選択時に最前面を特定できなければ1件でも未選択として案内し、一覧での明示選択を残します。ゼロ件で自動起動・自動送信はしません。`CodePanel.vue` / `LivePanel.vue` の `draftTarget()` / `insertDraft()` は `src/draft-handoff.js` を共有し、今の下書きに追記します。Codeは合計200,000文字、Liveは20,000文字、選択本文は80,000文字までで、超過は切り詰めず拒否します。Codeの新規・履歴切替など会話変更操作では、要求を送る前に連携先を同期的に無効化します。途中の旧会話stateやHTTP成功だけで復帰させず、要求先の会話stateまたは変更前の確定拒否を待ちます。VS CodeはrequestId付きのconversationChangeResultと会話stateを照合し、実行中・モデル変更中・消えた履歴の拒否でも安全に復帰します。マルチルートの新規だけは、ホストが成功応答で確認した別の作業フォルダへ移れます。履歴選択は要求した会話ID・元のプロジェクトを維持します。応答喪失や500は適用済みか判断できないので、旧下書きのまま連携を停止し再読み込みを案内します。`checks/code-transition-handoff.test.mjs` は実テンプレートのクリックとHTTP/SSE・VS Code経路を検証します。
 - Webは `draft-target-registry.js` のマウント固有IDと会話contextIdを再照合します。ピン留めはAppが実際に開いたWindow参照だけを登録し、同じ公開元・IDEセッション・プロジェクトと送信元の生存を確認します。BroadcastChannelやlocalStorageに本文を流さないでください。
-- Electronは `draft-router.cjs` が所有IDE、セッション、窓ID、会話contextId、プロジェクトを検証し、限定したpreloadのIPCへ渡します。受信結果のACKまで待ち、期限切れ・閉じた窓・再配送を扱います。表示名やCodeの配置番号だけで相手を決めないでください。
+- Electronは `draft-router.cjs` が所有IDE、セッション、窓ID、会話contextId、プロジェクトを検証し、限定したpreloadのIPCへ渡します。受信結果のACKまで待ち、期限切れ・閉じた窓・再配送を扱います。表示名やCodeの配置番号だけで相手を決めないでください。最前面候補はホストのウィンドウfocus順を記録し、現在の所有IDE・セッション・登録に一致する表示中のCode / Liveだけから選びます。IDE・ビューア・ダイアログへのフォーカスや登録情報の更新では順番を変えず、閉鎖・最小化・非表示の窓は最前面候補から除外します。Webは最後に表示したCode / Live種別をマウント固有IDへ変換し、Term・ダイアログを候補にせず、利用再開時に記録を消します。
 - LiveのWebパネルは隠してもマウントを保持し、`visible` でマイク取得待ちを無効化し音声入出力を止めます。会話・下書き・スピーカーの選択を残し、再表示でマイクを自動再開しません。
 
 `viewer/file-scan.mjs` の走査は同じサーバー内でフィルターと走査範囲（通常/grep）ごとに1秒だけ共有し、同時実行は1本です。grepのbackup除外は走査前に行い、対象外の保存版で候補・フォルダ・深さ・時間上限を消費しないようにします。通常のgalaxy/latestとは進行中の要求・キャッシュを分離し、通常一覧のbackup表示条件は維持します。明示操作の `fresh=1` は完了済みキャッシュを使わず、進行中の同じ走査は共有します。既定上限は30,000ファイル（backupフィルターは100,000）、10,000フォルダ、200,000項目、128階層、10秒。待機者の個別中断、全待機者の中断、利用終了・切替、サーバー終了を伝播し、中断した走査はキャッシュに残しません。常時watcherは使いません。
@@ -260,3 +260,10 @@ FileExplorerは検索明細をrouteイベントの `records` として送り、S
 フォルダは親階層の点です。2D / 3Dの `goTo({type:'dir', ...})` は共に `parentOf(path)` の航路へ記録し、そのフォルダ自身の子階層へ混ぜません。ルート移動では空パスの点を追加しません。
 
 確認コマンドは `node --test frontend_ide/checks/route-records.test.mjs frontend_ide/checks/search-route-records.test.mjs frontend_ide/checks/star-depth.test.mjs frontend_ide/checks/space-mode.test.mjs` です。同一点・往復・分岐・旧データ・保存再開・40件超・途中点削除・2D/3Dのフォルダ記録・検索結果の返却/保存/再読込・旧検索履歴の補完・Explorer通知からengineへの明細受渡を確認します。Explorer通知の検証は実ソースの通知コールバックを実行しますが、Vue全体のマウント検証ではありません。これらはCanvas/APIを置き換えた実エンジン検証で、実ブラウザーの描画品質やElectron保存容量は別途確認が必要です。
+
+
+## 下書き連携先の再選択とCode番号
+
+IDE連携CodeのOSタイトルは、既存の窓配置番号 `record.slot + 1` から `AiDiy IDE / Code n` とします。連携先一覧も同じslotを使い、別の連番を採番しません。`preload.cjs` の限定した `title()` は、信頼済みの送信元自身のOSタイトルだけを返し、`CodePanel.vue` の見出しへ反映します。単独Codeのタイトルは従来どおりです。窓を閉じてslotが再利用されても、受け渡しの窓IDと会話IDは別に照合します。
+
+`node --test frontend_ide/checks/draft-handoff.test.mjs frontend_ide/checks/draft-target-selection.test.mjs frontend_ide/checks/code-window-title.test.mjs` で、フォーカス順と作成順の違い、対象外窓、閉鎖・最小化・未登録・新規窓、再選択と明示選択、連打・遅延応答・取得失敗、追加なし、Webピン留め・利用再開、Code追加・閉鎖・番号再利用を確認します。ダイアログは実Vueテンプレートをメモリ内へマウントし、App・Codeは実setup、Electronは実createWindowと模擬OSを使います。実OSの重なり順、横長・狭幅の見た目、タイトル表示は実画面で別途確認してください。

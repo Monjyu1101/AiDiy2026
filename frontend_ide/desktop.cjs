@@ -81,7 +81,7 @@ async function createWindow(kind,url,server,owner,linkKey){
  if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
  let slot=placement?.slot||0;if(owner&&(kind==='code'||kind==='viewer'))while(used.has(slot))slot++;
  const bounds=windowBounds(kind,area,ownerBounds,slot);
- const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?'Code':kind==='term'?'Term':'Live'}`;
+ const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?'Term':'Live'}`;
  let window;
  try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
@@ -93,6 +93,7 @@ async function createWindow(kind,url,server,owner,linkKey){
  const contents=window.webContents;
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,revision:0,pending:new Map()};windows.set(contents,record);
+ window.on('focus',()=>draftRouter.focused(record));
  // IDEの×・Alt+F4は、利用中（接続利用・オフライン利用の開始後）だけ確認してから全体を閉じる。
  // 初期画面と「終了」で起動画面へ戻った後は、守る作業がないので確認しない（状態が不明な時は作業を守るため確認する）。利用終了は子窓だけを閉じる。
  if(kind==='ide'){
@@ -147,6 +148,7 @@ app.whenReady().then(async()=>{
   const record=trustedEvent(event);if(!record)return;
   if(action==='minimize')record.window.minimize();else if(action==='close')record.window.close();
   else if(action==='maximize'){if(record.window.isMaximized())record.window.unmaximize();else record.window.maximize();}
+  if(action==='title')return record.window.getTitle();
   if(action==='maximize'||action==='isMaximized')return record.window.isMaximized();
  });
  ipcMain.handle('development:draft-target-register',(event,value)=>draftRouter.register(trustedEvent(event),value));

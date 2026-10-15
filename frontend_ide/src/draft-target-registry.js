@@ -22,5 +22,9 @@ export function createDraftTargetRegistry() {
     if (!target || target.contextId !== request.contextId || target.projectPath !== request.projectPath) return { ok: false, error: '連携先が閉じられたか会話が変わりました。連携先を選び直してください。' };
     return panel.insertDraft(request);
   }
-  return { targets, insert };
+  function snapshot(panels, projectPath, frontmostKind) {
+    const current = targets(panels, projectPath);
+    return { targets: current, frontmostTargetId: current.find(item => item.kind === frontmostKind)?.id || '' };
+  }
+  return { targets, insert, snapshot };
 }

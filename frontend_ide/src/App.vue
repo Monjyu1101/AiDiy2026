@@ -20,6 +20,7 @@ import { createDraftTargetRegistry } from './draft-target-registry.js';
 const analysis=ref(null);
 const history=ref(null),draftRequest=ref(null),codePanel=ref(),livePanel=ref();
 const draftRegistry=createDraftTargetRegistry(),pinnedViewers=new Map();
+let lastDraftKind='';
 provide('openFileDraft',request=>{draftRequest.value=request;});
 provide('registerPinnedViewer',opened=>{if(opened&&state.value.active)pinnedViewers.set(opened,{sessionKey:session,projectPath:state.value.project?.path});});
 provide('openFileHistory',(file,root)=>{history.value={file:{path:file.path,name:file.name},root};});
@@ -51,7 +52,7 @@ async function status(){
 function update(data){
   if(disposed)return;
   const next=data.active?`${data.mode}:${data.startedAt}:${data.project?.path||''}`:'';
-  if(next!==session){analysis.value=null;history.value=null;draftRequest.value=null;pinnedViewers.clear();for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';base.term='';panelOpen.value=false;tab.value='code';liveOpen.value=false;viewMode.value='3d';}
+  if(next!==session){lastDraftKind='';analysis.value=null;history.value=null;draftRequest.value=null;pinnedViewers.clear();for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';base.term='';panelOpen.value=false;tab.value='code';liveOpen.value=false;viewMode.value='3d';}
   state.value=data;error.value=data.message||'';
 }
 async function start(action){
@@ -71,6 +72,7 @@ async function openPanel(kind){
   if(config.kind==='ide'&&!state.value.active)return;
   if(kind==='live'&&config.kind==='ide'&&state.value.mode!=='online')return;
   tab.value=kind;panelOpen.value=true;
+  if(kind==='code'||kind==='live')lastDraftKind=kind;
   if(base[kind])return;
   const own=session;
   try{
@@ -103,7 +105,7 @@ async function loadDraftTargets(request){
   if(desktop){const result=await window.aidiyWindow.draftTargets();if(result?.projectPath!==request.projectPath)throw Error('連携先のプロジェクトが一致しません。');return result;}
   if(viewerPath)return parentDraftAPI().list(window,request);
   const current=await confirmDraftSession(request);await nextTick();
-  return{ok:true,...current,targets:draftRegistry.targets(panels(),current.projectPath)};
+  return{ok:true,...current,...draftRegistry.snapshot(panels(),current.projectPath,lastDraftKind)};
 }
 async function insertFileDraft(request,sourceGuard=()=>{}){
   if(desktop)return window.aidiyWindow.insertDraft(request);
@@ -111,7 +113,7 @@ async function insertFileDraft(request,sourceGuard=()=>{}){
   const current=await confirmDraftSession(request,request.sessionKey);
   sourceGuard();
   const result=draftRegistry.insert(panels(),current,request);
-  if(result.ok){const chosen=draftRegistry.targets(panels(),current.projectPath).find(item=>item.id===request.targetId);tab.value=chosen.kind;panelOpen.value=true;}
+  if(result.ok){const chosen=draftRegistry.targets(panels(),current.projectPath).find(item=>item.id===request.targetId);tab.value=chosen.kind;lastDraftKind=chosen.kind;panelOpen.value=true;}
   return result;
 }
 async function launchDraftTarget(kind,request){
@@ -123,7 +125,7 @@ async function launchDraftTarget(kind,request){
   return base[kind]?{ok:true}:{ok:false,error:error.value||'画面を開けません。'};
 }
 const draftLink={
-  async list(sender,request){const linked=verifyPinned(sender,request);const current=await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return{ok:true,...current,targets:draftRegistry.targets(panels(),current.projectPath)};},
+  async list(sender,request){const linked=verifyPinned(sender,request);const current=await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return{ok:true,...current,...draftRegistry.snapshot(panels(),current.projectPath,lastDraftKind)};},
   async insert(sender,request){verifyPinned(sender,request);return insertFileDraft(request,()=>verifyPinned(sender,request));},
   async launch(sender,kind,request){const linked=verifyPinned(sender,request);await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return launchDraftTarget(kind,{...request,sessionKey:linked.sessionKey});},
 };

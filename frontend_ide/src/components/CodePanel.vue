@@ -15,6 +15,7 @@ import ModalDialog from './ModalDialog.vue';
 import { chatArrival } from '../engines/chat-arrival';
 import { createDraftReceiver } from '../draft-handoff.js';
 const props = defineProps({ base: String, host: Boolean, icon: String, embedded: Boolean, linked: Boolean, desktop: Boolean });
+const windowTitle = ref('');
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
@@ -198,12 +199,14 @@ defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.ins
 watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, changingConversation.value, state.履歴], () => draftReceiver.publish());
 watch(prompt, text => transport.saveDraft(text));
 watch(offline, () => { picker.value = false; });
-onMounted(() => { prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
+onMounted(() => {
+  if (props.desktop && props.linked) void window.aidiyWindow?.title?.().then(title => { if (!disposed && typeof title === 'string') windowTitle.value = title; }).catch(() => {});
+  prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
 onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
 </script>
 <template>
   <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel">
-    <StatusBar :title="linked ? 'AiDiy IDE / Code' : 'AiDiy Code'" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
+    <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>

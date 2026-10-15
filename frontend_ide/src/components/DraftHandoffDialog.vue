@@ -12,11 +12,14 @@ const snapshot=ref(null),selected=ref(''),busy=ref(false),error=ref('');
 let generation=0,disposed=false;
 const targets=computed(()=>snapshot.value?.targets||[]);
 const target=computed(()=>targets.value.find(item=>item.id===selected.value));
-async function refresh(){
+async function refresh(reselect=false){
   if(busy.value)return;const run=++generation;busy.value=true;error.value='';
   try{const result=await props.loadTargets(props.request);if(disposed||run!==generation)return;if(!result?.ok)throw Error(result?.error||'連携先を確認できません。');
     snapshot.value=result;
-    selected.value=result.targets.length===1?result.targets[0].id:result.targets.some(item=>item.id===selected.value)?selected.value:'';
+    selected.value=reselect
+      ?result.targets.find(item=>item.id===result.frontmostTargetId)?.id||''
+      :result.targets.some(item=>item.id===selected.value)?selected.value:result.targets.length===1?result.targets[0].id:'';
+    if(reselect&&result.targets.length&&!selected.value)error.value='最前面の連携先を確認できません。Code / Live を前面にして再選択するか、一覧から選んでください。';
   }catch(e){if(!disposed&&run===generation){snapshot.value=null;selected.value='';error.value=e.message;}}
   finally{if(!disposed&&run===generation)busy.value=false;}
 }
@@ -41,17 +44,25 @@ onMounted(refresh);onBeforeUnmount(()=>{disposed=true;generation++;});
     <h3>Code / Live の下書きへ追加</h3>
     <p class="draft-source">{{ request.path }}{{ request.selection?'（選択範囲）':'' }}</p>
     <p>起動中の連携先の入力欄へ追加します。既存の下書きを残し、送信はその画面で行います。</p>
-    <label v-if="targets.length>1">連携先<select v-model="selected" :disabled="busy" aria-label="下書きの連携先"><option disabled value="">連携先を選択してください</option><option v-for="item in targets" :key="item.id" :value="item.id">{{ item.label }}</option></select></label>
-    <p v-else-if="targets.length===1">連携先: {{ targets[0].label }}</p>
-    <p v-else-if="!busy&&!error">起動中のCode / Liveがありません。IDEの「＋ Code」または「＋ Live」から起動してください。</p>
+    <div class="draft-target-row">
+      <label v-if="targets.length>1||(targets.length===1&&!selected)">連携先<select v-model="selected" :disabled="busy" aria-label="下書きの連携先"><option disabled value="">連携先を選択してください</option><option v-for="item in targets" :key="item.id" :value="item.id">{{ item.label }}</option></select></label>
+      <span v-else>連携先: {{ targets[0]?.label || '未選択' }}</span>
+      <button :disabled="busy" @click="refresh(true)">最前面を再選択</button>
+    </div>
+    <p v-if="!targets.length&&!busy&&!error">起動中のCode / Liveがありません。IDEの「＋ Code」または「＋ Live」から起動してください。</p>
     <p v-if="target&&request.text.length>target.maxLength" class="error">選択範囲が連携先の入力上限を超えています。範囲を短くしてください。</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="busy" role="status">確認中…</p>
     <div class="dialog-actions draft-actions">
       <template v-if="!targets.length&&snapshot&&launchTarget"><button :disabled="busy" @click="launch('code')">＋ Code を起動</button><button v-if="snapshot.mode==='online'" :disabled="busy" @click="launch('live')">＋ Live を起動</button></template>
-      <button :disabled="busy" @click="refresh">連携先を再確認</button>
       <button :disabled="busy||!target||request.text.length>target.maxLength" @click="insert">下書きへ追加</button>
       <button :disabled="busy" @click="emit('close')">キャンセル</button>
     </div>
   </ModalDialog>
 </template>
+<style scoped>
+.draft-target-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.draft-target-row label{display:flex;align-items:center;gap:8px;min-width:0;flex:1;flex-wrap:wrap}
+.draft-target-row select{min-width:0;max-width:100%;flex:1}
+.draft-target-row button{flex-shrink:0}
+</style>

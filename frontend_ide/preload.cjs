@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
+ title:()=>ipcRenderer.invoke('development:window','title'),
  copyFilePath:path=>ipcRenderer.invoke('development:copy-file-path',path),
  openFile:path=>ipcRenderer.invoke('development:open-file',path),
  draftTargets:()=>ipcRenderer.invoke('development:draft-targets'),

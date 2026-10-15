@@ -134,3 +134,48 @@ test('preload: IPC eventを公開せず、限定された受信と結果ACKだ�
  stop();assert.equal(listeners.size,0);
  assert.equal(Object.hasOwn(api,'send'),false);assert.equal(Object.hasOwn(api,'invoke'),false);
 });
+
+test('最前面: 作成順・登録更新ではなく対象窓のfocus順で選び、IDEとビューアは除外する',async()=>{
+ const f=routerFixture();
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,'');
+ f.router.focused(f.live);f.router.focused(f.code1);f.router.focused(f.viewer);f.router.focused(f.owner);
+ f.router.register(f.code2,{kind:'code',contextId:'updated',projectPath:'/project',label:'更新'});
+ const result=await f.router.list(f.viewer);
+ assert.equal(result.frontmostTargetId,f.code1.draftId);
+ assert.deepEqual(result.targets.map(item=>item.id),[f.code1.draftId,f.code2.draftId,f.live.draftId]);
+ f.router.focused(f.code2);assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code2.draftId);
+ f.code2.window.isMinimized=()=>true;assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ f.code2.window.isMinimized=()=>false;f.code2.window.isVisible=()=>false;assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ assert.equal(f.delivered.length,0);assert.equal(f.focused.length,0);
+});
+
+test('最前面: 閉鎖・未登録・古いセッション・別IDE・別プロジェクト・offline Liveを除外する',async()=>{
+ const f=routerFixture();f.router.focused(f.code1);f.router.focused(f.code2);f.code2.window.destroyed=true;
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ for(const [kind,owner,key,path] of [['code',f.owner,'old','/project'],['code',f.add('ide'),'online:10','/project'],['code',f.owner,'online:10','/other']]){
+  const record=f.add(kind,owner,key);f.router.register(record,{kind,contextId:'excluded',projectPath:path,label:''});f.router.focused(record);
+  assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ }
+ const unready=f.add('code',f.owner);f.router.focused(unready);
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ f.router.focused(f.live);f.state.mode='offline';f.code1.linkKey='offline:10';f.live.linkKey='offline:10';
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.code1.draftId);
+ f.router.invalidate(f.code1);assert.equal((await f.router.list(f.owner)).frontmostTargetId,'');
+});
+
+test('最前面: 新規窓の登録前focusを保持し、非同期一覧取得中の最新focusと閉鎖を反映する',async()=>{
+ const f=routerFixture();f.router.focused(f.code1);
+ const newlyOpened=f.add('code',f.owner);f.router.focused(newlyOpened);
+ f.router.register(newlyOpened,{kind:'code',contextId:'new',projectPath:'/project',label:'新規'});
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,newlyOpened.draftId);
+ f.readHook(()=>{newlyOpened.window.destroyed=true;f.router.focused(f.live);});
+ assert.equal((await f.router.list(f.owner)).frontmostTargetId,f.live.draftId);
+ assert.equal(f.delivered.length,0);
+});
+
+test('Electron配線: 各窓のfocusを信頼済みホストで記録する',()=>{
+ const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
+ assert.match(source,/window\.on\('focus',\(\)=>draftRouter\.focused\(record\)\)/);
+ const preload=readFileSync(new URL('../preload.cjs',import.meta.url),'utf8');
+ assert.doesNotMatch(preload,/draftRouter\.focused|frontmostTargetId/);
+});
