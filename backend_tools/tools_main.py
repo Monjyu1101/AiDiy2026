@@ -428,6 +428,9 @@ app = FastAPI(
     generate_unique_id_function=_unique_op_id,
     lifespan=_mcp_lifespan,
 )
+from tools_proc.live_model_check import register_live_model_check
+register_live_model_check(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

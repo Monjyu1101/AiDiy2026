@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { catalog, scan, cancelProbes } from './診断/probes.mjs';
 import {getToolsStatus} from './診断/tools_status.mjs';
+import {createModelTrials} from './モデル試行/trials.mjs';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from './起動/desktop.mjs';
 import {createPublicModelCache} from './モデル情報/public_models.mjs';
 import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './モデル情報/key_status.mjs';
@@ -56,7 +57,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, modelTrials=createModelTrials()}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
@@ -67,7 +68,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       const content = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
       res.writeHead(status, {'Content-Type':type,'Content-Length':content.length,'Cache-Control':'no-store',
         'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-        'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"});
+        'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"});
       res.end(content);
     };
     let route;
@@ -77,6 +78,27 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if (req.method==='GET' && route?.startsWith('api/モデル試行/音声/')) {
+        const id=route.slice('api/モデル試行/音声/'.length);
+        if(!/^[a-f0-9]{32}$/.test(id))return reply(404,{エラー:'音声が見つかりません。'});
+        const bytes=await modelTrials.audio(id);
+        return bytes?reply(200,bytes,'audio/wav'):reply(404,{エラー:'音声の保存期限が切れたか、音声が見つかりません。'});
+      }
+      if (route === 'api/モデル試行' && req.method === 'GET') return reply(200,await modelTrials.snapshot());
+      if (route?.startsWith('api/モデル試行/') && ['POST','DELETE'].includes(req.method)) {
+        if (hasBody(req)) return reply(400,{エラー:'モデル試行への引数は指定できません。'});
+        const parts=route.split('/').slice(2);
+        const controller=new AbortController();
+        const abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
+        try {
+          if(req.method==='POST' && parts.length===1 && parts[0]==='開始')return reply(200,await modelTrials.start({signal:controller.signal}));
+          if(!/^[a-f0-9]{32}$/.test(parts[0]))return reply(404,{エラー:'試行が見つかりません。'});
+          if(req.method==='DELETE' && parts.length===1)return reply(200,modelTrials.cancel(parts[0]));
+          if(req.method==='POST' && parts.length===2 && /^(CHAT|LIVE|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.next(parts[0],parts[1],{signal:controller.signal}));
+          return reply(404,{エラー:'試行が見つかりません。'});
+        } catch(error) {return reply(error?.status || 500,{エラー:error?.status ? error.message : 'モデル試行に失敗しました。'});}
+        finally {res.removeListener('close',abort);}
+      }
       if (req.method === 'GET' && route === 'api/tools-status') {
         const controller=new AbortController();
         const abort=()=>controller.abort();res.once('close',abort);
@@ -137,10 +159,12 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   };
 }
 export function createServer(options) {
-  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},createHandler(options));
+  const modelTrials=options.modelTrials || createModelTrials();
+  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},createHandler({...options,modelTrials}));
+  server.once('close',()=>modelTrials.close());
   server.maxConnections=16; server.maxRequestsPerSocket=20; server.keepAliveTimeout=2000;
   // 診断は最大 4 並列 × 登録数分。slow connection は下の期限で切断する。
-  server.setTimeout(Math.max(10000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());
+  server.setTimeout(Math.max(95000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());
   server.on('clientError',(_err,socket)=>socket.destroy());
   return server;
 }

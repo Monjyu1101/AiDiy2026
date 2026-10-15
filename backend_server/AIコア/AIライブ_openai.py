@@ -66,19 +66,25 @@ class LiveAI:
 
     def __init__(self, セッションID: str, parent_manager=None, 
                  live_ai: str = "openai", live_model: str = "gpt-realtime-2.1-mini", live_voice: str = "marin", 
-                 api_key: str = None, organization: str = None, system_instruction: str = None):
+                 api_key: str = None, organization: str = None, system_instruction: str = None, diagnostic: bool = False):
         """初期化"""
 
         # セッションID
         self.セッションID = セッションID
 
         # 親参照（セッションマネージャー）
+        # 診断例外の SDK 詳細を通常ログへ流さない（他セッションは変更しない）。
+        import logging
+        self._logger = logging.Logger("diag-live", level=logging.CRITICAL + 1) if diagnostic else logger
+        if diagnostic:
+            self._logger.addHandler(logging.NullHandler())
+        self.diagnostic = diagnostic
         self.parent_manager = parent_manager
 
         # apiキー設定
         self.api_key = api_key
         if not self.api_key or self.api_key.startswith('<'):
-            logger.error("LiveAI初期化:apiキーなし")
+            self._logger.error("LiveAI初期化:apiキーなし")
             self.api_key = None
 
         # モデル・音声設定（confの設定値をそのまま利用）
@@ -147,12 +153,12 @@ class LiveAI:
                 セッション = AIセッション管理.get_session(self.セッションID)
                 if セッション and hasattr(セッション, "tools_instance"):
                     self.tool_instance = セッション.tools_instance
-                    logger.info("セッションからツールインスタンスを取得しました")
+                    self._logger.info("セッションからツールインスタンスを取得しました")
                 else:
                     self.tool_instance = None
-                    logger.warning("セッションにツールインスタンスがありません")
+                    self._logger.warning("セッションにツールインスタンスがありません")
             except Exception as e:
-                logger.error(f"セッションからツール取得失敗: {e}")
+                self._logger.error(f"セッションからツール取得失敗: {e}")
                 self.tool_instance = None
     
     def _エラーフラグ制限設定(self, reason: str = ""):
@@ -173,7 +179,7 @@ class LiveAI:
         # 15秒経過済みの場合のみ設定
         self.エラーフラグ = True
         self.エラータイム = current_time
-        logger.warning(f"エラーフラグ設定: {reason}")
+        self._logger.warning(f"エラーフラグ設定: {reason}")
         return True
     
     
@@ -200,7 +206,7 @@ class LiveAI:
         try:
             # apiキー確認
             if not self.api_key:
-                logger.error("開始:Liveapi開始失敗（OpenAI apiキーなし）")
+                self._logger.error("開始:Liveapi開始失敗（OpenAI apiキーなし）")
                 return False
 
             # 既存のWebSocket接続と全状態を完全クリア（再起動対応）
@@ -234,17 +240,17 @@ class LiveAI:
             self.テキスト受信Ｑ = テキスト受信処理Ｑ
 
             # ツールインスタンス初期化
-            if self.tool_instance is None:
+            if self.tool_instance is None and not self.diagnostic:
                 self.関数インスタンス設定()
 
             # ライブセッションワーカーをバックグラウンドで開始
             self._background_task = asyncio.create_task(self._ライブセッションワーカー())
 
-            logger.info(f"LiveAIセッション開始完了")
+            self._logger.info(f"LiveAIセッション開始完了")
             return True
 
         except Exception as e:
-            logger.error(f"開始:エラー発生 {type(e).__name__}: {str(e)}")
+            self._logger.error(f"開始:エラー発生 {type(e).__name__}: {str(e)}")
             self.エラーフラグ = True
             return False
     
@@ -268,7 +274,7 @@ class LiveAI:
             return True
 
         except Exception as e:
-            logger.error(f"終了:エラー({e})")
+            self._logger.error(f"終了:エラー({e})")
             return False
     
     # ===== 送信メソッド =====
@@ -284,7 +290,7 @@ class LiveAI:
         try:
             # データ存在チェック
             if not (text and text.strip()):
-                logger.error(f"テキスト送信:データなし text='{text}' length={len(text) if text else 0}")
+                self._logger.error(f"テキスト送信:データなし text='{text}' length={len(text) if text else 0}")
                 return False
             
             # 【ログ追加】３）openaiテキスト投入口、テキスト
@@ -305,12 +311,12 @@ class LiveAI:
             # セッション状態確認
             # OpenAIはws_sessionを直接利用するため、接続可否はws_sessionで判定
             if not self.ws_session or not (text and text.strip()):
-                logger.warning(f"テキスト送信:条件不適合: live_session={self.live_session is not None} text={text[:30] if text else 'None'}")
+                self._logger.warning(f"テキスト送信:条件不適合: live_session={self.live_session is not None} text={text[:30] if text else 'None'}")
                 if not self.ws_session:
-                    logger.error(f"テキスト送信:ws_sessionが初期化されていません")
-                    logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
-                    logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
-                    logger.error("  - 解決方法: 開始()後、接続確立(ログ: セッション維持ループ開始)を待ってから送信してください、またはAPIキーを確認してください")
+                    self._logger.error(f"テキスト送信:ws_sessionが初期化されていません")
+                    self._logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
+                    self._logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
+                    self._logger.error("  - 解決方法: 開始()後、接続確立(ログ: セッション維持ループ開始)を待ってから送信してください、またはAPIキーを確認してください")
                 return False
             
             # live_lasttimeを先に更新
@@ -334,7 +340,7 @@ class LiveAI:
             return True
             
         except Exception as e:
-            logger.error(f"テキスト送信:エラー text={text[:30] if text else 'None'} error={e}")
+            self._logger.error(f"テキスト送信:エラー text={text[:30] if text else 'None'} error={e}")
             self._エラーフラグ制限設定(f"テキスト送信エラー: {e}")
             return False
     
@@ -348,7 +354,7 @@ class LiveAI:
         try:
             # データ存在チェック
             if not bytes_data:
-                logger.error("音声送信:データなし")
+                self._logger.error("音声送信:データなし")
                 return False
 
             # 【ログ追加】１）openai音声入力の投入口。バイト数
@@ -383,7 +389,7 @@ class LiveAI:
             return True
 
         except Exception as e:
-            logger.error(f"音声送信:エラー({e})")
+            self._logger.error(f"音声送信:エラー({e})")
             self._エラーフラグ制限設定(f"音声送信エラー: {e}")
             return False
     
@@ -443,7 +449,7 @@ class LiveAI:
                 return resized_base64
                 
         except Exception as e:
-            logger.error(f"画像リサイズエラー: {e}")
+            self._logger.error(f"画像リサイズエラー: {e}")
             # エラーの場合は元のデータを返す
             return base64_data
 
@@ -494,7 +500,7 @@ class LiveAI:
             return True
 
         except Exception as e:
-            logger.error(f"画像送信:エラー({e})")
+            self._logger.error(f"画像送信:エラー({e})")
             self._エラーフラグ制限設定(f"画像送信エラー: {e}")
             return False
     
@@ -506,7 +512,8 @@ class LiveAI:
         # to_threadのキャンセルだけでは接続中のスレッドは止まらない。
         # 遅れて接続したソケットも回収してから終了する。
         connecting = asyncio.create_task(asyncio.to_thread(
-            websocket.create_connection, url, header=headers, timeout=LIVEAI_TIMEOUT,
+            websocket.create_connection, url, header=headers,
+            timeout=min(2, LIVEAI_TIMEOUT) if self.diagnostic else LIVEAI_TIMEOUT,
         ))
         try:
             return await asyncio.shield(connecting)
@@ -522,12 +529,12 @@ class LiveAI:
     async def _ライブセッションワーカー(self):
         """ライブセッションワーカー（OpenAI WebSocketパターン）"""
         try:
-            logger.info(f"ライブセッションワーカー:開始 中断停止フラグ={self.中断停止フラグ}")
+            self._logger.info(f"ライブセッションワーカー:開始 中断停止フラグ={self.中断停止フラグ}")
             pass
 
             # 復旧用メインループ（中断停止フラグのみで制御）
             while not self.中断停止フラグ:
-                logger.info(f"ライブセッションワーカー:メインループ開始 中断停止フラグ={self.中断停止フラグ}")
+                self._logger.info(f"ライブセッションワーカー:メインループ開始 中断停止フラグ={self.中断停止フラグ}")
                 pass
                 # logger.info(f"  api_key存在: {self.api_key is not None}")
                 pass
@@ -540,7 +547,7 @@ class LiveAI:
 
                 # 再接続試行回数チェック
                 if self.再接続試行回数 >= MAX_RETRY_COUNT:
-                    logger.error(f"再接続試行回数が上限({MAX_RETRY_COUNT}回)に達しました。LiveAIセッションワーカーを停止します。")
+                    self._logger.error(f"再接続試行回数が上限({MAX_RETRY_COUNT}回)に達しました。LiveAIセッションワーカーを停止します。")
                     self.中断停止フラグ = True
                     break
 
@@ -565,7 +572,7 @@ class LiveAI:
                         headers.append(f"OpenAI-Organization: {self.organization}")
 
                     # WebSocket接続（同期処理、別スレッドで実行）
-                    logger.info(f"OpenAI WebSocket接続開始 (model={self.LIVE_MODEL})")
+                    self._logger.info(f"OpenAI WebSocket接続開始 (model={self.LIVE_MODEL})")
                     pass
 
                     # ヘッダーはmonjyu実装に合わせてdict形式も許容
@@ -580,7 +587,7 @@ class LiveAI:
                     try:
                         self.ws_session = await self._WebSocket接続(ws_url, headers_dict)
                     except Exception as e:
-                        logger.warning(f"WebSocket接続(ヘッダdict)失敗: {type(e).__name__}; ヘッダ配列で再試行")
+                        self._logger.warning(f"WebSocket接続(ヘッダdict)失敗: {type(e).__name__}; ヘッダ配列で再試行")
                         headers_list = [
                             f"Authorization: Bearer {self.api_key}",
                         ]
@@ -598,8 +605,8 @@ class LiveAI:
                         self.is_alive = True
                         self.live_lasttime = time.time()
                         self.再接続試行回数 = 0  # 接続成功時にリセット
-                        logger.info(f"OpenAI WebSocket接続成功 (ID:{self.セッションID_internal})")
-                        logger.info(f"セッション維持ループ開始 (ID:{self.セッションID_internal})")
+                        self._logger.info(f"OpenAI WebSocket接続成功 (ID:{self.セッションID_internal})")
+                        self._logger.info(f"セッション維持ループ開始 (ID:{self.セッションID_internal})")
                         # logger.info(f"live_session設定完了: {self.live_session is not None}")  # 通常時はコメント化
                         # logger.info(f"live_sessionタイプ: {type(self.live_session)}")  # 通常時はコメント化
                         pass
@@ -648,18 +655,18 @@ class LiveAI:
                                 # logger.info(f"セッション維持ループ正常終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒)")
                                 pass
                             else:
-                                logger.error(f"セッション維持ループ終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
-                                logger.error(f"async withブロック終了直前 - live_session破棄予定")
+                                self._logger.error(f"セッション維持ループ終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
+                                self._logger.error(f"async withブロック終了直前 - live_session破棄予定")
                     else:
                         self.再接続試行回数 += 1  # エラー時にカウンタ増加
-                        logger.error(f"OpenAI WebSocket接続失敗: ws_sessionがNone (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT})")
+                        self._logger.error(f"OpenAI WebSocket接続失敗: ws_sessionがNone (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT})")
                         self.エラーフラグ = True
                         continue  # 再接続ループに戻る
 
                 except Exception as e:
                     self.再接続試行回数 += 1  # エラー時にカウンタ増加
-                    logger.error(f"セッション接続エラー詳細 (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT}):")
-                    logger.error(f"  エラータイプ: {type(e).__name__}")
+                    self._logger.error(f"セッション接続エラー詳細 (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT}):")
+                    self._logger.error(f"  エラータイプ: {type(e).__name__}")
                     await self._接続エラー通知(e)
                     # logger.error(f"  api Key設定: {'***設定済み***' if self.api_key else '未設定'}")  # パフォーマンス最適化
                     # logger.error(f"  モデル: {self.LIVE_MODEL}")  # パフォーマンス最適化
@@ -685,7 +692,7 @@ class LiveAI:
                     await asyncio.sleep(RETRY_WAIT_TIME)
 
         except Exception as e:
-            logger.error(f"ライブセッションワーカーエラー: {e}")
+            self._logger.error(f"ライブセッションワーカーエラー: {e}")
         finally:
             # TaskGroupのキャンセルでも通常ループ末尾を通らず終了するため、ここで回収する。
             socket = self.ws_session
@@ -701,7 +708,7 @@ class LiveAI:
                     pass
             # 正常終了の場合はログ出力を抑制（パフォーマンス最適化）
             if not self.中断停止フラグ or self.エラーフラグ:
-                logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")
+                self._logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")
             # logger.info("ライブセッションワーカー:終了")
             pass
 
@@ -739,7 +746,7 @@ class LiveAI:
             detail = re.sub(r"(?i)Bearer\s+[^\s\"'<>]+", "Bearer [REDACTED]", detail)
             message = f"OpenAI Realtime API エラー: {detail[:1000]}"
         self.最終エラー = f"{message} ({code})"
-        logger.error(self.最終エラー)
+        self._logger.error(self.最終エラー)
         if self.テキスト受信Ｑ is not None:
             await self.テキスト受信Ｑ.put({"error": self.最終エラー, "code": code})
         if code == "credit_balance_exhausted" or error.get("type") == "insufficient_quota" or code == "insufficient_quota":
@@ -784,7 +791,7 @@ class LiveAI:
                                     # VADの自動応答と送信が競合した場合は、終了イベントを待つ。
                                     self._応答中 = True
                                     self._応答生成待ち = True
-                                    logger.info("OpenAI応答生成を現在の応答終了まで延期します。")
+                                    self._logger.info("OpenAI応答生成を現在の応答終了まで延期します。")
                                     continue
                                 await self._APIエラー通知(res_err if isinstance(res_err, dict) else {"message": err_msg})
                                 self.エラーフラグ = True
@@ -811,7 +818,7 @@ class LiveAI:
                                     try:
                                         await self.音声受信Ｑ.put(audio_data)
                                     except Exception as e:
-                                        logger.warning(f"音声送信エラー: {e}")
+                                        self._logger.warning(f"音声送信エラー: {e}")
 
                             # 音声テキスト完了（音声出力の字幕）
                             # GA: response.output_audio_transcript.done / Beta: response.audio_transcript.done
@@ -829,7 +836,7 @@ class LiveAI:
                                     try:
                                         await self.テキスト受信Ｑ.put(text_data)
                                     except Exception as e:
-                                        logger.warning(f"テキスト送信エラー: {e}")
+                                        self._logger.warning(f"テキスト送信エラー: {e}")
 
                             # テキスト出力（textモダリティ）
                             elif msg_type in ("response.output_text.delta", "response.text.delta"):
@@ -841,7 +848,7 @@ class LiveAI:
                                     try:
                                         await self.テキスト受信Ｑ.put({"text": text_buffer})
                                     except Exception as e:
-                                        logger.warning(f"テキスト送信エラー(done): {e}")
+                                        self._logger.warning(f"テキスト送信エラー(done): {e}")
                                 text_buffer = ""
 
                             # ユーザー音声認識完了
@@ -857,6 +864,8 @@ class LiveAI:
                                 self._応答中 = False
                                 text_buffer = ""
                                 response = response_data.get("response") or {}
+                                if self.diagnostic and self.テキスト受信Ｑ is not None:
+                                    await self.テキスト受信Ｑ.put({"diagnostic_turn_complete": response.get("status") == "completed"})
                                 if response.get("status") == "failed":
                                     self._応答生成待ち = False
                                     details = response.get("status_details") or {}
@@ -898,7 +907,7 @@ class LiveAI:
                             ]:
                                 pass  # 正常な応答タイプはログ出力しない
                             else:
-                                logger.warning(f"未知の応答タイプ: {msg_type}")
+                                self._logger.warning(f"未知の応答タイプ: {msg_type}")
 
                         self.live_lasttime = time.time()
 
@@ -924,9 +933,9 @@ class LiveAI:
                         break
 
                     # その他のエラー → 詳細ログとエラーフラグ設定
-                    logger.error(f"受信エラー詳細:")
-                    logger.error(f"  エラータイプ: {type(e).__name__}")
-                    logger.error(f"  エラーメッセージ: {str(e)}")
+                    self._logger.error(f"受信エラー詳細:")
+                    self._logger.error(f"  エラータイプ: {type(e).__name__}")
+                    self._logger.error(f"  エラーメッセージ: {str(e)}")
                     # logger.error(f"  ループ回数: {loop_count}")  # パフォーマンス最適化
                     # logger.error(f"  セッション存在: {self.live_session is not None}")  # パフォーマンス最適化
                     # logger.error(f"  中断停止フラグ: {self.中断停止フラグ}")  # パフォーマンス最適化
@@ -934,9 +943,9 @@ class LiveAI:
                     break
 
         except Exception as e:
-            logger.error(f"受信ワーカーエラー詳細:")
-            logger.error(f"  エラータイプ: {type(e).__name__}")
-            logger.error(f"  エラーメッセージ: {str(e)}")
+            self._logger.error(f"受信ワーカーエラー詳細:")
+            self._logger.error(f"  エラータイプ: {type(e).__name__}")
+            self._logger.error(f"  エラーメッセージ: {str(e)}")
             # logger.error(f"  総ループ数: {loop_count}")  # パフォーマンス最適化
             self.エラーフラグ = True
         finally:
@@ -948,7 +957,7 @@ class LiveAI:
             else:
                 # エラー終了の場合のみエラーログ
                 session_duration = time.time() - self.session_start_time
-                logger.error(f"受信ワーカー:終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
+                self._logger.error(f"受信ワーカー:終了 (ID:{self.セッションID_internal}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
             pass
 
     async def _設定構成作成(self):
@@ -973,7 +982,7 @@ class LiveAI:
                         # logger.info(f"システム設計追加: {len(システム設計内容)}文字")
                         pass
                 except Exception as e:
-                    logger.warning(f"システム設計取得エラー: {e}")
+                    self._logger.warning(f"システム設計取得エラー: {e}")
 
             # 過去の会話履歴を取得してシステム指示に追加
             if self.parent_manager and hasattr(self.parent_manager, '_履歴データ取得'):
@@ -1000,7 +1009,7 @@ class LiveAI:
                         # logger.info(f"会話履歴追加: {len(履歴データ)}件")
                         pass
                 except Exception as e:
-                    logger.warning(f"会話履歴取得エラー: {e}")
+                    self._logger.warning(f"会話履歴取得エラー: {e}")
 
             # logger.info(f"システム指示長: {len(instructions)} 文字")
             pass
@@ -1052,16 +1061,16 @@ class LiveAI:
                         # logger.info(f"ツール定義追加: {len(tools)}個")
                         pass
                 except Exception as e:
-                    logger.warning(f"ツール呼び出し機能取得エラー: {e}")
+                    self._logger.warning(f"ツール呼び出し機能取得エラー: {e}")
 
             # logger.info("設定構成作成完了")
             pass
             return session_config
 
         except Exception as e:
-            logger.error(f"設定構成作成エラー: {type(e).__name__}: {e}")
+            self._logger.error(f"設定構成作成エラー: {type(e).__name__}: {e}")
             # エラー時は最小設定で復旧を試行
-            logger.warning("最小設定で復旧試行")
+            self._logger.warning("最小設定で復旧試行")
             return {
                 "type": "realtime",
                 "output_modalities": ["audio"],
@@ -1117,7 +1126,7 @@ class LiveAI:
         try:
             await self._応答生成送信()
         except Exception as e:
-            logger.error(f"ツール応答生成エラー: {e}")
+            self._logger.error(f"ツール応答生成エラー: {e}")
             self._エラーフラグ制限設定(f"ツール応答生成エラー: {e}")
 
     async def _openai_function_call処理(self, response_data: dict) -> bool:
@@ -1146,14 +1155,14 @@ class LiveAI:
                 try:
                     result = await self.tool_instance.execute_tool_call(f_name, f_args_dict)
                 except Exception as e:
-                    logger.error(f"ツール実行エラー[{f_name}]: {e}")
+                    self._logger.error(f"ツール実行エラー[{f_name}]: {e}")
                     result = json.dumps({"error": "ツールの実行に失敗しました。"}, ensure_ascii=False)
 
                 # リアルタイム処理最適化：ツール名を行内に埋め込み、パラメータ・結果を別行表示
                 result_escaped = str(result).replace('\n', '\\n').replace('\r', '\\r')
                 result_short = result_escaped[:20] + ("..." if len(result_escaped) > 20 else "")
-                logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
-                logger.info(f"Tool[{f_name}] Result: {result_short}")
+                self._logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
+                self._logger.info(f"Tool[{f_name}] Result: {result_short}")
 
                 # 結果送信（WebSocket送信を非同期化）
                 result_msg = {
@@ -1169,7 +1178,7 @@ class LiveAI:
                 return True
 
         except Exception as e:
-            logger.error(f"ツール呼び出し処理エラー: {e}")
+            self._logger.error(f"ツール呼び出し処理エラー: {e}")
             self._エラーフラグ制限設定(f"ツール結果送信エラー: {e}")
         return False
 
@@ -1194,10 +1203,10 @@ class LiveAI:
 
                 # キープアライブ送信
                 await self.音声送信(noise_bytes)
-                logger.info(f"キープアライブ送信: 無通信{time_since_last_communicate:.1f}秒")
+                self._logger.info(f"キープアライブ送信: 無通信{time_since_last_communicate:.1f}秒")
 
             except Exception as e:
-                logger.error(f"キープアライブエラー: {e}")
+                self._logger.error(f"キープアライブエラー: {e}")
                 # キープアライブ送信失敗は接続断を意味するため、エラーフラグを設定して再接続を促す
                 self.エラーフラグ = True
         else:

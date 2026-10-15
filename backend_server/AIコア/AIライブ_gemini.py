@@ -112,13 +112,19 @@ class LiveAI:
 
     def __init__(self, セッションID: str, parent_manager=None,
                  live_ai: str = "gemini", live_model: str = "gemini-live-2.5-flash-preview", live_voice: str = "Zephyr",
-                 api_key: str = None, system_instruction: str = None):
+                 api_key: str = None, system_instruction: str = None, diagnostic: bool = False):
         """初期化"""
         
         # セッションID
         self.セッションID = セッションID
         
         # 親参照（セッションマネージャー）
+        # 診断例外の SDK 詳細を通常ログへ流さない（他セッションは変更しない）。
+        import logging
+        self._logger = logging.Logger("diag-live", level=logging.CRITICAL + 1) if diagnostic else logger
+        if diagnostic:
+            self._logger.addHandler(logging.NullHandler())
+        self.diagnostic = diagnostic
         self.parent_manager = parent_manager
 
         # apiキー設定（gemini/freeai相互補完）
@@ -136,23 +142,23 @@ class LiveAI:
                         self.api_key = gemini_key
                     elif freeai_key and not freeai_key.startswith('<'):
                         self.api_key = freeai_key
-                        logger.info("LiveAI(gemini): gemini_keyが未設定のため、freeai_keyを使用します")
+                        self._logger.info("LiveAI(gemini): gemini_keyが未設定のため、freeai_keyを使用します")
                     else:
-                        logger.warning("LiveAI(gemini): gemini_key・freeai_keyともに未設定です")
+                        self._logger.warning("LiveAI(gemini): gemini_key・freeai_keyともに未設定です")
                 elif live_ai.lower() == "freeai":
                     # freeai選択時: freeai_key → gemini_key
                     if freeai_key and not freeai_key.startswith('<'):
                         self.api_key = freeai_key
                     elif gemini_key and not gemini_key.startswith('<'):
                         self.api_key = gemini_key
-                        logger.info("LiveAI(freeai): freeai_keyが未設定のため、gemini_keyを使用します")
+                        self._logger.info("LiveAI(freeai): freeai_keyが未設定のため、gemini_keyを使用します")
                     else:
-                        logger.warning("LiveAI(freeai): freeai_key・gemini_keyともに未設定です")
+                        self._logger.warning("LiveAI(freeai): freeai_key・gemini_keyともに未設定です")
 
             # APIキー未設定チェック
             if not self.api_key or self.api_key.startswith('<'):
                 self.api_key = None
-                logger.error("LiveAI初期化: apiキーなし")
+                self._logger.error("LiveAI初期化: apiキーなし")
         
         # モデル・音声設定（confの設定値をそのまま利用）
         self.LIVE_AI = live_ai
@@ -174,10 +180,10 @@ class LiveAI:
                 if "no running event loop" in str(e):
                     self.client = None
                 else:
-                    logger.error(f"GeminiClient:エラー({e})")
+                    self._logger.error(f"GeminiClient:エラー({e})")
                     self.client = None
             except Exception as e:
-                logger.error(f"GeminiClient:エラー({e})")
+                self._logger.error(f"GeminiClient:エラー({e})")
                 self.client = None
         
         # WebSocket音声処理設定
@@ -224,12 +230,12 @@ class LiveAI:
                 セッション = AIセッション管理.get_session(self.セッションID)
                 if セッション and hasattr(セッション, "tools_instance"):
                     self.tool_instance = セッション.tools_instance
-                    logger.info("セッションからツールインスタンスを取得しました")
+                    self._logger.info("セッションからツールインスタンスを取得しました")
                 else:
                     self.tool_instance = None
-                    logger.warning("セッションにツールインスタンスがありません")
+                    self._logger.warning("セッションにツールインスタンスがありません")
             except Exception as e:
-                logger.error(f"セッションからツール取得失敗: {e}")
+                self._logger.error(f"セッションからツール取得失敗: {e}")
                 self.tool_instance = None
     
     def _エラーフラグ制限設定(self, reason: str = ""):
@@ -250,7 +256,7 @@ class LiveAI:
         # 15秒経過済みの場合のみ設定
         self.エラーフラグ = True
         self.エラータイム = current_time
-        logger.warning(f"エラーフラグ設定: {reason}")
+        self._logger.warning(f"エラーフラグ設定: {reason}")
         return True
     
     
@@ -288,11 +294,11 @@ class LiveAI:
                     # logger.info("開始:GeminiClient初期化成功")
                     pass
                 except Exception as e:
-                    logger.error(f"開始:GeminiClient初期化エラー {type(e).__name__}: {str(e)}")
+                    self._logger.error(f"開始:GeminiClient初期化エラー {type(e).__name__}: {str(e)}")
                     return False
             
             if not self.client:
-                logger.error("開始:Liveapi開始失敗（クライアント未初期化）")
+                self._logger.error("開始:Liveapi開始失敗（クライアント未初期化）")
                 return False
             
             # フラグ初期化
@@ -305,17 +311,17 @@ class LiveAI:
             self.テキスト受信Ｑ = テキスト受信処理Ｑ
             
             # ツールインスタンス初期化
-            if self.tool_instance is None:
+            if self.tool_instance is None and not self.diagnostic:
                 self.関数インスタンス設定()
             
             # ライブセッションワーカーをバックグラウンドで開始
             self._background_task = asyncio.create_task(self._ライブセッションワーカー())
             
-            logger.info(f"LiveAIセッション開始完了")
+            self._logger.info(f"LiveAIセッション開始完了")
             return True
             
         except Exception as e:
-            logger.error(f"開始:エラー発生 {type(e).__name__}: {str(e)}")
+            self._logger.error(f"開始:エラー発生 {type(e).__name__}: {str(e)}")
             self.エラーフラグ = True
             return False
     
@@ -339,7 +345,7 @@ class LiveAI:
             return True
             
         except Exception as e:
-            logger.error(f"終了:エラー({e})")
+            self._logger.error(f"終了:エラー({e})")
             return False
     
     # ===== 送信メソッド =====
@@ -355,7 +361,7 @@ class LiveAI:
         try:
             # データ存在チェック
             if not (text and text.strip()):
-                logger.error(f"テキスト送信:データなし text='{text}' length={len(text) if text else 0}")
+                self._logger.error(f"テキスト送信:データなし text='{text}' length={len(text) if text else 0}")
                 return False
             
             # 【ログ追加】３）geminiテキスト投入口、テキスト
@@ -375,14 +381,14 @@ class LiveAI:
 
             # セッション状態確認
             if not self.live_session or not (text and text.strip()):
-                logger.warning(f"テキスト送信:条件不適合: live_session={self.live_session is not None} text={text[:30] if text else 'None'}")
+                self._logger.warning(f"テキスト送信:条件不適合: live_session={self.live_session is not None} text={text[:30] if text else 'None'}")
                 if not self.live_session:
-                    logger.error(f"テキスト送信:live_sessionが初期化されていません")
-                    logger.error(f"  - クライアント状態: {self.client is not None}")
-                    logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
-                    logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
+                    self._logger.error(f"テキスト送信:live_sessionが初期化されていません")
+                    self._logger.error(f"  - クライアント状態: {self.client is not None}")
+                    self._logger.error(f"  - エラーフラグ: {self.エラーフラグ}")
+                    self._logger.error(f"  - 待機時間: {elapsed_time:.1f}秒")
                     # logger.error(f"  - 中断停止フラグ: {self.中断停止フラグ}")  # パフォーマンス最適化
-                    logger.error("  - 解決方法: 開始()メソッドが正常に実行されているか、APIキーが正しいか確認してください")
+                    self._logger.error("  - 解決方法: 開始()メソッドが正常に実行されているか、APIキーが正しいか確認してください")
                 return False
             
             # live_lasttimeを先に更新
@@ -399,7 +405,7 @@ class LiveAI:
             return True
             
         except Exception as e:
-            logger.error(f"テキスト送信:エラー text={text[:30] if text else 'None'} error={e}")
+            self._logger.error(f"テキスト送信:エラー text={text[:30] if text else 'None'} error={e}")
             self._エラーフラグ制限設定(f"テキスト送信エラー: {e}")
             return False
     
@@ -413,7 +419,7 @@ class LiveAI:
         try:
             # データ存在チェック
             if not bytes_data:
-                logger.error("音声送信:データなし")
+                self._logger.error("音声送信:データなし")
                 return False
             
             # 【ログ追加】１）gemini音声入力の投入口。バイト数
@@ -455,7 +461,7 @@ class LiveAI:
             return True
             
         except Exception as e:
-            logger.error(f"音声送信:エラー({e})")
+            self._logger.error(f"音声送信:エラー({e})")
             self._エラーフラグ制限設定(f"音声送信エラー: {e}")
             return False
     
@@ -515,7 +521,7 @@ class LiveAI:
                 return resized_base64
                 
         except Exception as e:
-            logger.error(f"画像リサイズエラー: {e}")
+            self._logger.error(f"画像リサイズエラー: {e}")
             # エラーの場合は元のデータを返す
             return base64_data
 
@@ -564,7 +570,7 @@ class LiveAI:
             return True
             
         except Exception as e:
-            logger.error(f"画像送信:エラー({e})")
+            self._logger.error(f"画像送信:エラー({e})")
             self._エラーフラグ制限設定(f"画像送信エラー: {e}")
             return False
     
@@ -593,7 +599,7 @@ class LiveAI:
                 
                 # 再接続試行回数チェック
                 if self.再接続試行回数 >= MAX_RETRY_COUNT:
-                    logger.error(f"再接続試行回数が上限({MAX_RETRY_COUNT}回)に達しました。LiveAIセッションワーカーを停止します。")
+                    self._logger.error(f"再接続試行回数が上限({MAX_RETRY_COUNT}回)に達しました。LiveAIセッションワーカーを停止します。")
                     self.中断停止フラグ = True
                     break
 
@@ -621,7 +627,7 @@ class LiveAI:
                         self.is_alive = True  # live_session確立時にTrueに設定
                         self.live_lasttime = time.time()  # セッション開始時にlive_lasttime更新
                         self.再接続試行回数 = 0  # 接続成功時にリセット
-                        logger.info(f"セッション維持ループ開始 (ID:{セッションID})")
+                        self._logger.info(f"セッション維持ループ開始 (ID:{セッションID})")
                         # logger.info(f"live_session設定完了: {self.live_session is not None}")  # 通常時はコメント化
                         # logger.info(f"live_sessionタイプ: {type(self.live_session)}")  # 通常時はコメント化
                         pass
@@ -648,14 +654,14 @@ class LiveAI:
                                 pass
                         
                         session_duration = time.time() - session_start_time
-                        logger.error(f"セッション維持ループ終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
-                        logger.error(f"async withブロック終了直前 - live_session破棄予定")
+                        self._logger.error(f"セッション維持ループ終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
+                        self._logger.error(f"async withブロック終了直前 - live_session破棄予定")
                         
                 except Exception as e:
                     self.再接続試行回数 += 1  # エラー時にカウンタ増加
-                    logger.error(f"セッション接続エラー詳細 (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT}):")
-                    logger.error(f"  エラータイプ: {type(e).__name__}")
-                    logger.error(f"  エラーメッセージ: {str(e)}")
+                    self._logger.error(f"セッション接続エラー詳細 (試行回数:{self.再接続試行回数}/{MAX_RETRY_COUNT}):")
+                    self._logger.error(f"  エラータイプ: {type(e).__name__}")
+                    self._logger.error(f"  エラーメッセージ: {str(e)}")
                     # logger.error(f"  api Key設定: {'***設定済み***' if self.api_key else '未設定'}")  # パフォーマンス最適化
                     # logger.error(f"  モデル: {self.LIVE_MODEL}")  # パフォーマンス最適化
 
@@ -672,12 +678,12 @@ class LiveAI:
                     await asyncio.sleep(RETRY_WAIT_TIME)
                     
         except Exception as e:
-            logger.error(f"ライブセッションワーカーエラー: {e}")
+            self._logger.error(f"ライブセッションワーカーエラー: {e}")
         finally:
             self.live_session = None
             self.task_group = None
             self.is_alive = False  # ワーカー終了時にFalseに設定
-            logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")
+            self._logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")
             # logger.info("ライブセッションワーカー:終了")
             pass
     
@@ -723,9 +729,9 @@ class LiveAI:
                         
                 except Exception as e:
                     # 受信エラー → 詳細ログとエラーフラグ設定
-                    logger.error(f"受信エラー詳細:")
-                    logger.error(f"  エラータイプ: {type(e).__name__}")
-                    logger.error(f"  エラーメッセージ: {str(e)}")
+                    self._logger.error(f"受信エラー詳細:")
+                    self._logger.error(f"  エラータイプ: {type(e).__name__}")
+                    self._logger.error(f"  エラーメッセージ: {str(e)}")
                     # logger.error(f"  ループ回数: {loop_count}")  # パフォーマンス最適化
                     # logger.error(f"  セッション存在: {self.live_session is not None}")  # パフォーマンス最適化
                     # logger.error(f"  中断停止フラグ: {self.中断停止フラグ}")  # パフォーマンス最適化
@@ -733,14 +739,14 @@ class LiveAI:
                     break
                 
         except Exception as e:
-            logger.error(f"受信ワーカーエラー詳細:")
-            logger.error(f"  エラータイプ: {type(e).__name__}")
-            logger.error(f"  エラーメッセージ: {str(e)}")
+            self._logger.error(f"受信ワーカーエラー詳細:")
+            self._logger.error(f"  エラータイプ: {type(e).__name__}")
+            self._logger.error(f"  エラーメッセージ: {str(e)}")
             # logger.error(f"  総ループ数: {loop_count}")  # パフォーマンス最適化
             self.エラーフラグ = True
         finally:
             session_duration = time.time() - session_start_time
-            logger.error(f"受信ワーカー:終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
+            self._logger.error(f"受信ワーカー:終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
             pass
     
     async def _設定構成作成(self):
@@ -765,7 +771,7 @@ class LiveAI:
                         # logger.info(f"システム設計追加: {len(システム設計内容)}文字")
                         pass
                 except Exception as e:
-                    logger.warning(f"システム設計取得エラー: {e}")
+                    self._logger.warning(f"システム設計取得エラー: {e}")
             
             # 過去の会話履歴を取得してシステム指示に追加
             if self.parent_manager and hasattr(self.parent_manager, '_履歴データ取得'):
@@ -792,7 +798,7 @@ class LiveAI:
                         # logger.info(f"会話履歴追加: {len(履歴データ)}件")
                         pass
                 except Exception as e:
-                    logger.warning(f"会話履歴取得エラー: {e}")
+                    self._logger.warning(f"会話履歴取得エラー: {e}")
             
             # logger.info(f"システム指示長: {len(instructions)} 文字")
             pass
@@ -800,9 +806,7 @@ class LiveAI:
             # ツール設定
             # code_execution は native-audio 系 Live モデルが非対応
             # （"Code Execution tool is not supported for this model." で 1007 切断される）ため付けない。
-            tools = [
-                {"google_search": {}},
-            ]
+            tools = [] if self.diagnostic else [{"google_search": {}}]
             
             # ツール呼び出し機能を追加
             if self.tool_instance is not None:
@@ -821,7 +825,7 @@ class LiveAI:
                     # logger.info(f"ツール呼び出し機能追加: {len(function_declarations)} 個")
                     pass
                 except Exception as e:
-                    logger.warning(f"ツール呼び出し機能取得エラー: {e}")
+                    self._logger.warning(f"ツール呼び出し機能取得エラー: {e}")
             else:
                 # logger.info("ツールインスタンスが存在しません")
                 pass
@@ -856,9 +860,9 @@ class LiveAI:
                 return config
 
             except Exception as e:
-                logger.error(f"設定構成作成エラー: {type(e).__name__}: {e}")
+                self._logger.error(f"設定構成作成エラー: {type(e).__name__}: {e}")
                 # エラー時は最小設定で復旧を試行
-                logger.warning("最小設定で復旧試行")
+                self._logger.warning("最小設定で復旧試行")
                 return types.LiveConnectConfig(
                     response_modalities=["AUDIO"],
                     output_audio_transcription=types.AudioTranscriptionConfig(),
@@ -870,7 +874,7 @@ class LiveAI:
                 )
                 
         except Exception as e:
-            logger.error(f"設定構成作成で予期しないエラー: {e}")
+            self._logger.error(f"設定構成作成で予期しないエラー: {e}")
             raise e
     
     async def _キープアライブ確認(self):
@@ -893,10 +897,10 @@ class LiveAI:
 
                 # キープアライブ送信
                 await self.音声送信(noise_bytes)
-                logger.info(f"キープアライブ送信: 無通信{time_since_last_communicate:.1f}秒")
+                self._logger.info(f"キープアライブ送信: 無通信{time_since_last_communicate:.1f}秒")
 
             except Exception as e:
-                logger.error(f"キープアライブエラー: {e}")
+                self._logger.error(f"キープアライブエラー: {e}")
                 # キープアライブ送信失敗は接続断を意味するため、エラーフラグを設定して再接続を促す
                 self.エラーフラグ = True
         else:
@@ -944,7 +948,7 @@ class LiveAI:
                 if hasattr(response, 'go_away') and response.go_away:
                     pass  # go_away通知は正常終了、ログ出力しない
                 else:
-                    logger.warning(f"LiveAI未知レスポンス")
+                    self._logger.warning(f"LiveAI未知レスポンス")
                     self._エラーフラグ制限設定("LiveAI未知レスポンス")
             
             # logger.info("=== レスポンス処理終了 ===\n")
@@ -988,7 +992,7 @@ class LiveAI:
                             try:
                                 await self.テキスト受信Ｑ.put(text_data)
                             except Exception as e:
-                                logger.warning(f"テキスト送信エラー: {e}")
+                                self._logger.warning(f"テキスト送信エラー: {e}")
                         
                     elif part.inline_data is not None:
                         # inline_dataの種類を判定して処理
@@ -1013,7 +1017,7 @@ class LiveAI:
                                 try:
                                     await self.音声受信Ｑ.put(audio_data)
                                 except Exception as e:
-                                    logger.warning(f"音声送信エラー: {e}")
+                                    self._logger.warning(f"音声送信エラー: {e}")
                                     
                         
             # 1ターンの字幕をまとめ、音声停止時も聞こえた部分を表示する。
@@ -1021,6 +1025,8 @@ class LiveAI:
                 if self._出力字幕 and self.テキスト受信Ｑ is not None:
                     await self.テキスト受信Ｑ.put({"text": self._出力字幕})
                 self._出力字幕 = ""
+                if self.diagnostic and self.テキスト受信Ｑ is not None:
+                    await self.テキスト受信Ｑ.put({"diagnostic_turn_complete": bool(turn_complete and not interrupted)})
                 
         except Exception as e:
             # サーバーコンテンツ処理エラーも15秒制限付きエラー処理
@@ -1089,14 +1095,14 @@ class LiveAI:
                         # リアルタイム処理最適化：ツール名を行内に埋め込み、パラメータ・結果を別行表示
                         result_escaped = result.replace('\n', '\\n').replace('\r', '\\r')
                         result_short = result_escaped[:20] + ("..." if len(result_escaped) > 20 else "")
-                        logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
-                        logger.info(f"Tool[{f_name}] Result: {result_short}")
+                        self._logger.info(f"Tool[{f_name}] Request: {f_kwargs_short}")
+                        self._logger.info(f"Tool[{f_name}] Result: {result_short}")
                         
                     except Exception as e:
-                        logger.error(f"ツール実行エラー: {e}")
+                        self._logger.error(f"ツール実行エラー: {e}")
                         result = f"エラーが発生しました: {str(e)}"
                 else:
-                    logger.error(f"ツールインスタンスが利用できません: {f_name}")
+                    self._logger.error(f"ツールインスタンスが利用できません: {f_name}")
                     result = f"ツール呼び出し機能が利用できません: {f_name}"
                 
                 # ツール結果を外部queueに送信
@@ -1113,7 +1119,7 @@ class LiveAI:
                     try:
                         await self.テキスト受信Ｑ.put(tool_result)
                     except Exception as e:
-                        logger.warning(f"ツール結果送信エラー: {e}")
+                        self._logger.warning(f"ツール結果送信エラー: {e}")
 
                 # Geminiに結果を返送
                 if self.live_session:
@@ -1127,10 +1133,10 @@ class LiveAI:
                             )]
                         )
                     except Exception as e:
-                        logger.warning(f"Gemini結果返送エラー: {e}")
+                        self._logger.warning(f"Gemini結果返送エラー: {e}")
                         
         except Exception as e:
-            logger.error(f"ツール呼び出し処理エラー: {e}")
+            self._logger.error(f"ツール呼び出し処理エラー: {e}")
     
     
     

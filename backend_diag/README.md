@@ -124,7 +124,7 @@ Python/Node のライブラリ、内部スクリプト、shell builtin、Git sub
 
 「キー設定状況」は診断サーバーの TypeScript 実装から固定ファイル `_config/AiDiy_key.json` の既知キーだけを読み取り、設定済 / 未設定を表示します。設定 JSON の値、長さ、末尾、ハッシュはブラウザに返しません。ファイル未作成は未設定、JSON 不正や読込不可は確認不可です。既存 conf クラスの初期化・設定変更は行いません。
 
-一覧は既存 config の固定キー順（Gemini、FreeAI、Claude、OpenAI、OpenAI OAuth、Grok（xAI）、OpenRouter、Ollama（ローカル）、ローカル（backend_local）、Hugging Face 読取・書込、Discord）です。Azure OpenAI と GitHub Copilot はモデル一覧の確認に対応しないため画面に表示しません（サーバーの登録とモデル名からのキー値秘匿の対象には残します）。表示対象外の設定項目は省き、JSON の任意の並べ替えには追従しません。左側でキーを選択し、右側で説明・テスト結果・モデル一覧を確認できます。キーの存在だけでは OK にしません。起動時には匿名の公開 OpenRouter 一覧だけを取得します。タブ移動・全テストから個別キーの API は呼びません。各行の「テスト」は明示操作時だけ固定プロバイダーのモデル一覧 API を読み取ります。生成リクエスト、MCP の挨拶、CLI 試行は未実装です。
+一覧は既存 config の固定キー順（Gemini、FreeAI、Claude、OpenAI、OpenAI OAuth、Grok（xAI）、OpenRouter、Ollama（ローカル）、ローカル（backend_local）、Hugging Face 読取・書込、Discord）です。Azure OpenAI と GitHub Copilot はモデル一覧の確認に対応しないため画面に表示しません（サーバーの登録とモデル名からのキー値秘匿の対象には残します）。表示対象外の設定項目は省き、JSON の任意の並べ替えには追従しません。左側でキーを選択し、右側で説明・テスト結果・モデル一覧を確認できます。キーの存在だけでは OK にしません。起動時には匿名の公開 OpenRouter 一覧だけを取得します。タブ移動・全テストから個別キーの API は呼びません。各行の「テスト」は明示操作時だけ固定プロバイダーのモデル一覧 API を読み取ります。会話生成は別の「configモデル試行」で明示操作した場合だけです。
 
 - キー試験の表示は未実施 / OK / NG。未設定・未対応の項目は未実施で、理由を表示します。OpenRouter の個別テストは設定キーを固定 GET `https://openrouter.ai/api/v1/key` で確認し、成功時だけ公開キャッシュから候補を表示します。公開 `/models` の応答だけでは認証成功にしません。キー未設定は未実施、認証・通信・応答形式の確認失敗は NG です。起動時・明示再取得の公開要求にはキーを送りません。
 - OK はモデル一覧 API の応答確認であり、生成可能性・課金状態の保証ではありません。公開モデル一覧の場合はキー有効性の検証にもなりません。
@@ -196,7 +196,7 @@ Python、uv を先頭に表示します。CLI や拡張は利用する機能に�
 旧静的調査の抽出候補 246 件から 227 件を除き、現在の確認対象を 19 件に絞っています。AiDiy 起動コマンド群、Hermes 本体・専用プラグイン・スキル・補助依存、macOS 音声再生（afplay）、GStreamer、Edge、Brave、OS 補助・シェル・開発・導入・配置用の補助ツール（Git / pip 等）は診断カタログに含めません。任意項目を再表示するチェックもありません。
 実際のプログラムや機能を削除する変更ではありません。共通依存は非 Hermes の利用根拠で保持し、Hermes 専用の探索パスも除外します。
 対象ソース・設定 3,333 件の調査履歴・マニフェストは保持します。調査範囲と今回の診断対象は異なり、除外内容は 診断/coverage.json の catalogSelection に記録しています。
-モデルキー設定と外部連携設定は上部の独立タブです。MCP・CLI の試行は未実装です。
+モデルキー設定と外部連携設定は上部の独立タブです。「configモデル試行」は Tools 接続中だけ表示します。
 
 ## 状態インジケーター
 
@@ -228,5 +228,17 @@ Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環�
 - live 全体が空の場合だけ、`freeai_live` の `gemini-2.5-flash-native-audio-preview-12-2025` を1件、code 全体が空の場合だけ、`aidiy_hermes` の `auto` を1件、「仮設定（未検証）」として入れます。設定ファイルに依存せず、`AiDiy_key.json` が未作成でも同じ結果になります。
 - 仮補完は表示候補であり、認証・CLI 導入・生成可否を保証しません。通常候補が1件でもあればその区分の仮補完は行いません。キー値は出力せず、認証済みの音声候補も増やしません。
 - Live の仮モデルは既存 Gemini 側の既定と同じです。既存 FreeAI 側の09-2025既定は変更しません。[公式モデル資料](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-native-audio-preview-12-2025)で Live 対応を確認しました。[廃止予定](https://ai.google.dev/gemini-api/docs/deprecations)では最短終了予定が2026-11-17、後継が `gemini-3.8-live` です（2026-10-15確認）。後継への実動作移行は別途確認してください。
-- 認証方式の参照: [OpenRouter Get current API key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key)。診断は GET のみで、生成・課金操作を行いません。
+- 認証方式の参照: [OpenRouter Get current API key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key)。キー確認は GET のみです。別タブの config モデル試行は会話生成・課金が発生し得ます。
 - `checks/node-only-startup.check.mjs` は隔離フォルダに設定ファイルを作らず、本物の `diag_main.mjs --headless` を実行します。HOME と PATH を隔離し、通信をオフライン mock にして同梱公開キャッシュを使い、local 4件・FreeAI Live 1件・Hermes auto 1件と、設定ファイル未作成の維持を確認します。
+
+## configモデル試行（手動のみ）
+
+Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の現在の CHAT / LIVE / CODE1〜6 / TASK plan・do・check / TEAM plan・do・check の14行へ、固定の「おはよう」を順番に送ります。設定ファイルは読み取りだけで、既存 conf クラスの初期化・補完保存は行いません。CODE2〜6 の NAME=auto は CODE1 の NAME と MODEL を継承します。モデルや音声だけを表示し、キーや作業パスは返しません。
+
+- Chat は `chat_llms_run`、Code と Task / Team の選択モデルは `code_agents_run` を実際の MCP Streamable HTTP で呼びます。Task / Team の業務実行・投入は行いません。既存の通常 MCP 契約を使い、診断専用の CLI・認証・provider モードは追加しません。Code の権限は設定値を渡し、バックアップ検証ループは挨拶試行では実行しません。接続先 MCP の実際の利用可否と応答で結果を判定します。
+- Live は Tools の非公開 `POST /internal/live_model_check` で固定メッセージに対する実際の応答を確認します。接続準備は最大20秒、準備完了後に10秒の安定待ちを挟み、固定テキストを送信して最大30秒応答を待ちます。終了処理の余裕を含め HTTP は75秒、1行は90秒、全実行は30分に制限します。音声セッションの接続成功だけを OK にしません。実際に返った PCM16・mono・24kHz の音声が1秒以上ある場合は保存・再生でき、テキストがなくても音声応答として OK にします。通常の有効なテキスト応答も引き続き OK です。音声が1秒未満の場合は保存しません。
+- 返された音声は最大30秒・1,440,044バイトの WAV に限り、`_temp/aidiy-diag-audio-*` の専用一時フォルダへ保存します。フォルダは700、ファイルは600で作成し、外部指定パスを受け付けず、登録した通常ファイルだけを開きます。保存は最大16件・10分です。完了後は再生でき、次の開始・実行中の取消・設定変更・終了時に削除します。音声取得は認証付き同一 origin の GET `/api/モデル試行/音声/{音声ID}` のみで、画面へローカルパスやbase64は渡しません。画面の明示的な読み込み・再生操作で聴き、自動再生しません。
+- 同じ実行内で transport・プロバイダ・モデル・音声と設定版が同じ行だけ結果を共有します。Chat と Live は共有しません。auto は動的選択のまま渡し、実行モデルが返らなければ未確認として表示します。
+- 空応答・エラー・未設定・未対応は OK にしません。API キーの利用と料金が発生する場合があります。開始は利用者の明示操作だけで、起動・タブ表示・headless・既存「全テスト」から実行しません。
+- 認証付き GET `/api/モデル試行` は表示情報だけ、POST `/api/モデル試行/開始` は一時実行を作成し、POST `/api/モデル試行/{実行ID}/{行ID}` は順序を確認して1行だけ実行します。いずれも利用者指定の本文・URL・プロンプトを受け付けません。DELETE `/api/モデル試行/{実行ID}`、画面切断、タイムアウトで中止し、MCP セッションを破棄します。設定変更時は結果を流用せず再開始します。
+- 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。14行、継承、重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
