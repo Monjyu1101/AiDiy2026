@@ -38,8 +38,9 @@ class StartupTest(unittest.TestCase):
     def test_prompt_order_and_defaults(self):
         with patch.object(start, 'prompt_choice', side_effect=lambda text, default_yes: default_yes) as ask:
             flags = start.collect_startup_choices()
-        self.assertEqual(flags, (False, True, True, True, True, False, False, False, False, False, False))
-        self.assertEqual([c.args[0] for c in ask.call_args_list][-5:], [
+        self.assertEqual(flags, (False, True, True, True, True, False, False, False, False, False, False, False))
+        self.assertEqual([c.args[0] for c in ask.call_args_list][-6:], [
+            '  Diag      : 起動しますか?',
             '  Term      : 起動しますか?',
             '  Code      : 起動しますか?',
             '  Live      : 起動しますか?',
@@ -120,7 +121,7 @@ class StartupTest(unittest.TestCase):
         module.kill_ports.assert_not_called()
 
     def test_main_passes_code_live_selections_to_validation_and_launch(self):
-        with patch.object(start, '_init_modules'), patch.object(start, 'collect_startup_choices', return_value=(False, False, False, False, False, False, True, True, True, False, False)), patch.object(start, 'validate_initial_environment', return_value=(True, None)) as validate, patch.object(start, 'start_initial_services', return_value={}) as launch, patch.object(start, 'monitor_and_restart', side_effect=KeyboardInterrupt), patch.object(start, 'stop_processes'), patch.object(start, 'stop_all_tasks'), patch.object(start.time, 'sleep'), patch.object(start.sys, 'platform', 'linux'):
+        with patch.object(start, '_init_modules'), patch.object(start, 'collect_startup_choices', return_value=(False, False, False, False, False, False, False, True, True, True, False, False)), patch.object(start, 'validate_initial_environment', return_value=(True, None)) as validate, patch.object(start, 'start_initial_services', return_value={}) as launch, patch.object(start, 'monitor_and_restart', side_effect=KeyboardInterrupt), patch.object(start, 'stop_processes'), patch.object(start, 'stop_all_tasks'), patch.object(start.time, 'sleep'), patch.object(start.sys, 'platform', 'linux'):
             start.main()
         for invocation in (validate.call_args, launch.call_args):
             self.assertTrue(invocation.kwargs['term_enabled'])

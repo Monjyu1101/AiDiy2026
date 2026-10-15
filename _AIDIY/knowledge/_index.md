@@ -304,3 +304,6 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 
 
 - [frontend_ide,初期ウィンドウ配置.md](./frontend_ide,初期ウィンドウ配置.md) — Code / Liveの画面隅、Codeの複数窓、Termの縦横別サイズ。
+
+
+- [backend_diag,環境診断運用.md](./backend_diag,環境診断運用.md) — Node.js / Python を優先した外部プログラム確認、ブラウザ・Codespaces 起動。

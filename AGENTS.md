@@ -37,6 +37,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 |--------------|------|
 | [_AIDIY.md](./_AIDIY.md) | AI エージェント向け最小入口 |
 | [CLAUDE.md](./CLAUDE.md) | `_AIDIY.md` と同一内容の最小入口（Claude Code 向け） |
+| [backend_diag/AGENTS.md](./backend_diag/AGENTS.md) | Node.js 標準モジュールによる読み取り専用環境診断・ブラウザ起動 |
 | [backend_server/AGENTS.md](./backend_server/AGENTS.md) | FastAPI + SQLAlchemy + SQLite の実装詳細 |
 | [command_hermes/AGENTS.md](./command_hermes/AGENTS.md) | `aidiy_hermes` CLI 基盤の実装詳細 |
 | [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) | MCP サーバー群の実装詳細 |
@@ -91,6 +92,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 
 | コンポーネント | 役割 | 主なポート |
 |----------------|------|------------|
+| `backend_diag/diag_main.mjs` | 外部プログラムの導入状態を確認する任意起動の診断 UI / API（`aidiy_diag`） | 自動割り当て・loopback |
 | `backend_server/core_main.py` | C系、A系、認証、AIコア | 8091 |
 | `backend_server/apps_main.py` | M系、T系、V系、S系 | 8098 |
 | `backend_tools/tools_main.py` | MCP サーバー群 | 8095 |
@@ -110,6 +112,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 
 | ディレクトリ | 内容 |
 |--------------|------|
+| `backend_diag/` | Node.js のみで起動する環境診断。カテゴリ別一覧と詳細、認証付き読み取り専用チェック |
 | `backend_server/` | FastAPI サーバー、SQLAlchemy モデル、CRUD、Router、AIコア |
 | `command_hermes/` | `aidiy_hermes` CLI |
 | `backend_tools/` | Windows では 20 個、Linux / macOS では 19 個の MCP（Chrome DevTools、Desktop Capture、SQLite、PostgreSQL、Logs、Code Check、Backup、Image / Movie Generation、Speech-to-Text、Text-to-Speech、OBS Studio Control、FFmpeg Control、Notification Sounds、Code Agents、Chat LLM、Decisions Check、Task Agents、Team Agents、Windows 限定の Windows Control）と OpenAI / Ollama 互換 Chat Completions |

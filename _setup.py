@@ -136,6 +136,7 @@ def _load_folder_module(folder: str):
 
 # `_setup.py` を import するフォルダ（= `__pycache__` が生成される）。
 IMPORT_CACHE_FOLDERS = (
+    "backend_diag",
     "backend_local",
     "backend_tools",
     "backend_server",
@@ -650,10 +651,12 @@ def collect_setup_choices() -> dict | None:
         "avatar":                False,
         "hermes":                False,
         "ide":                   False,
+        "diag":                  False,
         "discord":               False,
         "continue_on_error":     False,
     }
 
+    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャーをセットアップしますか？", default="y")
     choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
@@ -693,6 +696,7 @@ def main():
     print_header("プロジェクト セットアップ")
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
+    print_info("  0. 環境診断(Diag)")
     print_info("  1. 共通")
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")
@@ -715,6 +719,14 @@ def main():
     print_header("一括実行開始")
     continue_on_error = choices["continue_on_error"]
     error_locations: list[str] = []
+
+    print()
+    if choices.get("diag"):
+        if not _load_folder_module("backend_diag").setup(choices):
+            error_locations.append("環境診断(Diag)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
 
     print()
     if choices["common"]:
@@ -855,6 +867,7 @@ def main():
     print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
     print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
+    print_info("    Diag起動   : aidiy_diag --browser")
     print_info("    Hermes起動 : aidiy_hermes")
     print_info("    Term起動   : aidiy_term")
     print_info("    Code起動   : aidiy_code")

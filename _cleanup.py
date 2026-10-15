@@ -209,7 +209,7 @@ SERVICE_CLEANUP_TARGETS = (
 # `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
 IMPORT_CACHE_FOLDERS = tuple(
     folder for _choice_key, folder, _description, _service_names in SERVICE_CLEANUP_TARGETS
-) + (BACKEND_HERMES_PATH, "frontend_ide", "frontend_ide/host")
+) + ("backend_diag", BACKEND_HERMES_PATH, "frontend_ide", "frontend_ide/host")
 
 # フォルダ別 `_cleanup.py` の担当外になる、ルート側の Python キャッシュ。
 ROOT_CACHE_SCAN_PATHS = ("scripts",)
@@ -225,7 +225,7 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
             if _folder not in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord")
             for service_name in service_names
-        ] + ["フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
+        ] + ["フロントエンド(diag)", "フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,
@@ -587,6 +587,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "hermes_temp":    None,
     }
 
+    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャーを解除しますか？", default="y")
     choices["npm_uninstall"] = ask_yes_no(
         "グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n",
     )
@@ -671,6 +672,10 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     cleanup_errors: list[str] = []
 
     stop_all_services(choices)
+
+    if choices.get("diag"):
+        if not _run_folder_cleanup("backend_diag", choices):
+            cleanup_errors.append("環境診断(Diag)")
 
     if choices["npm_uninstall"]:
         uninstall_global_npm_tools()

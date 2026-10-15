@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AiDiy 診断</title><link rel="stylesheet" href="style.css"></head>
+<body><header><div><span class="eyebrow">AIDIY • ENVIRONMENT</span><h1>環境診断</h1></div><button id="run" disabled>診断を開始</button></header>
+<section id="login" class="login"><label for="token">起動したターミナルの認証 URL を開くか、認証キーを入力してください。</label><div><input id="token" type="password" autocomplete="off" placeholder="起動中のみ有効な認証キー"><button id="connect">接続</button></div></section>
+<p id="message" role="status" aria-live="polite">ローカル環境の外部プログラムを確認します。</p>
+<main><aside aria-label="診断項目"><div class="filters"><input id="search" type="search" placeholder="プログラムを検索" aria-label="プログラムを検索"><select id="status" aria-label="状態で絞り込む"><option value="">すべての状態</option><option>未確認</option><option>導入済み</option><option>存在確認</option><option>未検出</option><option>確認失敗</option><option>対象外</option></select></div><nav id="list"></nav><p id="empty" hidden>一致する項目がありません。</p></aside><article id="detail" aria-live="polite"><div class="welcome"><span class="eyebrow">READ-ONLY DIAGNOSTICS</span><h2>まずは、実行環境を知る。</h2><p>左の一覧からプログラムを選択すると、利用箇所と検出結果を表示します。</p><p>「診断を開始」でパスとバージョンを確認します。インストール、ログイン、AI への問い合わせは行いません。</p><p>ブラウザを開いている端末ではなく、この診断サーバーを動かしている環境が対象です。</p></div></article></main>
+<footer><p id="coverage">ソース調査情報は接続後に表示します。</p>検出範囲: PATH と登録済みの標準配置先。存在確認は動作・認証・接続の保証ではありません。</footer><script type="module" src="app.js"></script></body></html>
