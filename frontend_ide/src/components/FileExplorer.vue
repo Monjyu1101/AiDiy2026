@@ -211,7 +211,7 @@ watch(()=>props.root,(value,previous)=>{
   aiResult.value=null;routeMode.value='view';
   routeListOpen.value=false;
 },{immediate:true});
-watch([routeMode,aiRoute],()=>emit('route',{mode:routeMode.value,paths:aiRoute.value}),{immediate:true});
+watch([routeMode,aiRoute],()=>emit('route',{mode:routeMode.value,paths:aiRoute.value,records:aiResult.value?.routeRecords}),{immediate:true});
 watch(()=>[props.selected,props.current,props.open],()=>{if(props.open&&!props.navigating)reveal();});
 watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();initialSent=false;since.value=props.startedAt;preset.value='start';void pollLatest();});
 watch(()=>props.filter,clearSearch);
@@ -276,3 +276,4 @@ defineExpose({reveal});
 .grep-results button{display:block;width:100%;text-align:left;overflow-wrap:anywhere}
 .grep-results small{display:block;white-space:pre-wrap;color:#bac7da;font-family:var(--mono);margin-top:3px}
 </style>
+

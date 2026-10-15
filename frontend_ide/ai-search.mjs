@@ -8,6 +8,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createSearchHistory } from './ai-search-history.mjs';
+import { searchRouteRecords } from './src/engines/route-records.js';
 
 const MAX_RESULT = 1024 * 1024;
 const within = (root, path) => { const back=relative(root,path); return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back); };
@@ -57,7 +58,7 @@ export async function validateSearchResult(root, data, job, {checkFiles=true}={}
     seen.add(file.path);files.push({path:file.path,reason:file.reason});
   }
   if(data.route.length!==files.length||new Set(data.route).size!==files.length||data.route.some(path=>!seen.has(path)))throw Error('routeにはfilesの各パスを辿る順番で1回ずつ指定してください。');
-  return {title,query:job.query,files,route:data.route};
+  return {title,query:job.query,files,route:data.route,routeRecords:searchRouteRecords(data.route)};
 }
 
 function makePrompt(job,project) {
@@ -152,3 +153,4 @@ export function createAISearch(project,{state,runAgent=runSearchAgent,now=Date.n
     },
   };
 }
+

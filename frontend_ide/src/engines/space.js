@@ -17,7 +17,8 @@
 import { spacePosition, WORLD_RADIUS, HOME_VIEW, warpMotion } from '../../viewer/web/layout.js';
 import { createAutoOrbit } from './auto-orbit.js';
 import { turnToTarget, cameraPosition, orbitAround, interpolateOrbit, interpolateCamera, cockpitLook, framingDistance, WARP_APPROACH_WIDTH, WARP_PEAK_WIDTH } from './warp-camera.js';
-import { aiRouteTargets } from './ai-route.js';
+import { aiRouteRecords, aiRouteTargets } from './ai-route.js';
+import { restoreRoute, visitPoint, searchRouteRecords } from './route-records.js';
 import { createTextWidthCache } from './text-width-cache.js';
 
 export const ORBIT_PATH_SCALE = .9;
@@ -329,9 +330,10 @@ let orbitPivot = {x:0,y:0,z:0};
 let hoveredGate = false;
 let gateHit = null;          // 帰還ゲートの画面上の [x, y, 半径]
 let since = null;            // 起点日時（ms）。これ以降に更新したファイルを明滅させる。null なら明滅なし
-let voyages = {};            // 階層ごとの航路 { 階層パス: ['g:フォルダ' | 'f:ファイル', ...] }
+let voyages = {};            // 階層ごとの航路 { 階層パス: [{ from, to }, ...] }
+let voyageCurrent = {};       // 再訪は明細を増やさず、この現在点だけを更新する
 let journal = [];            // 航海日誌（新しい順） [{ type, path, at }]
-let routeMode = 'view', aiRoute = [];
+let routeMode = 'view', aiRoute = [], aiRecords = [];
 
 // ---------------------------------------------------------------- 描画
 function resize() {
@@ -670,32 +672,42 @@ function drawGate(t) {
   ctx.globalAlpha = 1;
 }
 
-/** 航路: この宇宙で訪れた銀河・星を訪れた順に結ぶ。古い区間ほど薄い。 */
+/** 各明細の出発点と到着点を結ぶ。再訪後の分岐を配列順で繋ぎ直さない。 */
 function voyageTargets() {
-  if(routeMode==='ai')return aiRouteTargets(aiRoute,trail,world);
-  return (voyages[basePath()] || [])
-    .map(key => key[0] === 'g' ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2)))
-    .filter(Boolean);
+  if(routeMode==='ai')return aiRouteRecords(aiRecords,trail,world);
+  const resolve = key => key === null ? null : key[0] === 'g'
+    ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2));
+  return (voyages[basePath()] || []).map(({from,to}) => ({from:resolve(from),to:resolve(to)}));
 }
 function drawVoyage(t) {
-  const points = voyageTargets().map(p => (project(p.x, p.y, p.z) ? [P.x, P.y] : null));
+  const records = voyageTargets();
+  const screen = p => p && project(p.x,p.y,p.z) ? [P.x,P.y] : null;
+  const points = records.map(({from,to}) => ({from:screen(from),to:screen(to)}));
   if (!points.length) return;
   const n = points.length;
   ctx.lineWidth = 1.4;
   ctx.strokeStyle = routeMode==='ai'?'#83e5ee':'#ffd98c';
   ctx.setLineDash([5, 7]);
   ctx.lineDashOffset = -t * 18;
-  for (let i = 1; i < n; i++) {
-    const a = points[i - 1], b = points[i];
-    if (!a || !b) continue;
-    ctx.globalAlpha = 0.15 + 0.65 * (i / (n - 1));
+  points.forEach(({from:a,to:b},i) => {
+    if (!a || !b) return;
+    ctx.globalAlpha = 0.15 + 0.65 * ((i+1) / n);
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-  }
+  });
   ctx.setLineDash([]);
   ctx.fillStyle = routeMode==='ai'?'#a7f6ff':'#ffe2a0';
-  points.forEach((s, i) => {
-    if (!s) return;
-    const latest = i === n - 1;
+  const marked = new Set();
+  // 線の重複を除いても、検索の最後の参照点は元の順序から求める。
+  const aiCurrent = routeMode==='ai' ? aiRouteTargets(aiRoute,trail,world).at(-1) : null;
+  const markers=records.flatMap((record,i)=>[
+    {point:record.from,screen:points[i].from,index:i},
+    {point:record.to,screen:points[i].to,index:i},
+  ]);
+  markers.forEach(({point,screen:s,index:i}) => {
+    if (!s || marked.has(point)) return;
+    marked.add(point);
+    const current = voyageCurrent[basePath()];
+    const latest = routeMode==='ai' ? point===aiCurrent : point && point.path === current?.slice(2);
     const r = latest ? 5 + Math.sin(t * 3) * 1.2 : 3;
     ctx.globalAlpha = latest ? 0.95 : 0.25 + 0.5 * (i / n);
     ctx.beginPath();
@@ -1327,7 +1339,8 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
     const body = world.byPath.get(entry.path);
     if (!body || !await travelTo([...trail], { target: body, file: body, transition: false, valid: () => !stale() }) || stale()) return;
   } else {
-    remember('dir', entry.path); revealCurrent(); notify();
+    if (entry.path) remember('dir', entry.path, parentOf(entry.path));
+    revealCurrent(); notify();
   }
   applyLocation(entry,run);
   warpProjection = null;
@@ -1438,25 +1451,31 @@ async function followSteps(path, parts, level, stale) {
 // ---------------------------------------------------------------- 航路と航海日誌（ブラウザに保存）
 const storeKey = () => `aidiy_ide:${scan.root}`;
 function saveVoyage() {
-  try { localStorage.setItem(storeKey(), JSON.stringify({ voyages, journal })); } catch { /* 保存できない環境 */ }
+  try { localStorage.setItem(storeKey(), JSON.stringify({ version: 2, voyages, voyageCurrent, journal })); } catch { /* 保存できない環境 */ }
 }
 function loadVoyage() {
   try {
     const saved = JSON.parse(localStorage.getItem(storeKey()) || '{}');
-    voyages = saved.voyages && typeof saved.voyages === 'object' ? saved.voyages : {};
+    voyages = Object.create(null); voyageCurrent = Object.create(null);
+    for (const [base, value] of Object.entries(saved.voyages && typeof saved.voyages === 'object' ? saved.voyages : {})) {
+      const restored = restoreRoute(value, saved.voyageCurrent?.[base]);
+      voyages[base] = restored.records; voyageCurrent[base] = restored.current;
+    }
+    // journal は閲覧日時一覧。旧版の最近順を保ち、航路の形は voyages だけで管理する。
     journal = Array.isArray(saved.journal) ? saved.journal : [];
-  } catch { voyages = {}; journal = []; }
+  } catch { voyages = Object.create(null); voyageCurrent = Object.create(null); journal = []; }
 }
 function remember(type, path, base = basePath(), save = true) {
   const route = voyages[base] ??= [];
   const key = `${type === 'dir' ? 'g' : 'f'}:${path}`;
-  if (route.at(-1) !== key) route.push(key);
-  if (route.length > 40) route.splice(0, route.length - 40);
+  const visit = visitPoint(route, voyageCurrent[base], key);
+  voyageCurrent[base] = visit.current;
+  // 航路は末尾追加。閲覧日時一覧は同じ項目を更新し、別の航路明細を作らない。
   journal = [{ type, path, at: Date.now() }, ...journal.filter(j => !(j.type === type && j.path === path))].slice(0, 80);
   if (save) saveVoyage();
 }
 function clearVoyage() {
-  delete voyages[basePath()];
+  delete voyages[basePath()]; delete voyageCurrent[basePath()];
   saveVoyage();
 }
 
@@ -1615,9 +1634,17 @@ return {
   get orbitPhase() { return autoOrbit.phase; },
   get orbitVisibility() { return autoOrbit.visibility; },
   color: name => KINDS[kindOf(name)].color,
-  route(value) { routeMode=value.mode; aiRoute=[...(value.paths||[])]; },
+  route(value) {
+    routeMode=value.mode; aiRoute=[...(value.paths||[])];
+    const expected=searchRouteRecords(aiRoute);
+    // 旧UIのpathsだけでも補完。外から渡す明細は検索順・両端が一致するものだけを採用する。
+    aiRecords=Array.isArray(value.records)&&value.records.length===expected.length&&value.records.every((r,i)=>r?.from===expected[i].from&&r?.to===expected[i].to)
+      ? value.records.map(({from,to})=>({from,to})) : expected;
+  },
+  get searchRouteRecords() { return aiRecords.map(record=>({...record})); },
   get routeState() { return {mode:routeMode,paths:[...aiRoute]}; },
   marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
   dispose() { disposed = true; cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
 };
 }
+

@@ -8,6 +8,9 @@ import { join, relative, isAbsolute, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ideDataFolder } from './ide-data.mjs';
 
+// 入力結果は1MiBのまま。派生from/toが各パスを最大2回追加する分とメタデータを含め、履歴は3MiBに制限する。
+export const MAX_SEARCH_HISTORY_BYTES=3*1024*1024;
+
 const validId=id=>typeof id==='string'&&/^[a-f0-9-]{36}$/.test(id);
 const within=(root,path)=>{const back=relative(root,path);return back!=='..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back);};
 export function createSearchHistory(project,validate) {
@@ -17,7 +20,7 @@ export function createSearchHistory(project,validate) {
   async function read(id){
     if(!validId(id))throw Error('検索履歴IDが不正です。');
     const directory=await folder(),path=await realpath(join(directory,id+'.json'));
-    if(!within(directory,path)||(await stat(path)).size>1100000)throw Error('検索履歴を読み取れません。');
+    if(!within(directory,path)||(await stat(path)).size>MAX_SEARCH_HISTORY_BYTES)throw Error('検索履歴を読み取れません。');
     const entry=JSON.parse(await readFile(path,'utf8'));
     if(entry.id!==id)throw Error('検索履歴IDが一致しません。');
     if(entry.deleted)return entry;
@@ -26,10 +29,12 @@ export function createSearchHistory(project,validate) {
   }
   async function save(entry,{replace=false}={}){
     if(!validId(entry.id))throw Error('検索履歴IDが不正です。');
+    const serialized=JSON.stringify(entry);
+    if(Buffer.byteLength(serialized,'utf8')>MAX_SEARCH_HISTORY_BYTES)throw Error('検索履歴は3MB以下にしてください。');
     const directory=await folder(),target=join(directory,entry.id+'.json');
     if(!replace&&await stat(target).catch(()=>null))return;
     const temp=join(directory,randomUUID()+'.tmp');
-    await writeFile(temp,JSON.stringify(entry),{encoding:'utf8',flag:'wx'});await rename(temp,target);
+    await writeFile(temp,serialized,{encoding:'utf8',flag:'wx'});await rename(temp,target);
   }
   async function importPrevious(){
     // 旧版が作成した依頼付きの結果だけを取り込む。削除済みIDの記録は残して再取込を防ぐ。
@@ -65,3 +70,4 @@ export function createSearchHistory(project,validate) {
     async remove(id){await ready();await read(id);await save({id,deleted:true},{replace:true});},
   };
 }
+

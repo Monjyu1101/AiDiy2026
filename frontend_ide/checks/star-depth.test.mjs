@@ -5,6 +5,8 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { createSpace, fileSizeScale } from '../src/engines/space.js';
 
 const flush = async () => { for (let n = 0; n < 20; n++) await Promise.resolve(); };
@@ -18,13 +20,14 @@ const event = (type, values = {}) => Object.assign(new Event(type, { cancelable:
 
 // 実エンジンを使い、Canvas/API/時計だけをメモリ内へ置き換える。ブラウザ・AI・ソケットは使わない。
 function space(t, initial = fixture()) {
-  const old = new Map(), frames = new Map(), timers = new Map(), changes = [], requests = [], draws = [], arcs = [], texts = [], routeLines = [], storage = new Map();
+  const old = new Map(), frames = new Map(), timers = new Map(), changes = [], requests = [], draws = [], arcs = [], texts = [], routeLines = [], routeMarkers = [], storage = new Map();
   const window = new EventTarget(), document = new EventTarget(), canvas = new EventTarget(), location = { hash: '' };
   let data = initial, clock = 0, id = 0, busy = false, dash = [];
   document.hidden = false;
   const context = new Proxy({ font: '', createRadialGradient: () => ({ addColorStop() {} }),
     measureText: text => ({ width: text.length * 6 }), drawImage: (...args) => draws.push(args), fillText: (...args) => texts.push(args),
     arc: (...args) => arcs.push({ args, fill: context.fillStyle, alpha: context.globalAlpha, composite: context.globalCompositeOperation }),
+    moveTo: (...args) => { if (!dash.length && ['#a7f6ff','#ffe2a0'].includes(context.fillStyle)) routeMarkers.push({args,alpha:context.globalAlpha}); },
     setLineDash: value => { dash = value; }, lineTo: (...args) => { if (dash.join(',') === '5,7') routeLines.push(args); },
   }, { get: (object, key) => key in object ? object[key] : () => {} });
   const tipNodes = { '.t-name': {}, '.t-sub': {} };
@@ -63,7 +66,7 @@ function space(t, initial = fixture()) {
     Promise.resolve(promise).then(value => { result = value; done = true; }, value => { error = value; done = true; });
     await until(() => done); if (error) throw error; return result;
   };
-  return { engine, canvas, window, location, draws, arcs, texts, routeLines, requests, tooltip, tipNodes, storage, frames, pump, until, finish,
+  return { engine, canvas, window, location, draws, arcs, texts, routeLines, routeMarkers, requests, tooltip, tipNodes, storage, frames, pump, until, finish,
     data: value => { data = value; }, state: () => changes.filter(value => 'scan' in value).at(-1),
     errors: () => changes.filter(value => value.error).map(value => value.error), idle: () => !busy,
     async ready() { await engine.refresh(150); for (let n = 0; n < 30; n++) { draws.length = arcs.length = texts.length = 0; await pump(); } },
@@ -372,4 +375,117 @@ test('古い深い星: 削除後は移動せず、航行中の新しいファイ
     assert.deepEqual(h.engine.trail, []); assert.equal(h.engine.selected.path, 'root.js');
     for (let n = 0; n < 20; n++) await h.pump(); assert.equal(h.engine.selected.path, 'root.js');
   } finally { h.dispose(); }
+});
+
+
+test('閲覧の分岐: 再訪で明細を増やさず、現在点を保存して再開する', async t => {
+  const data=snapshot(dir('project',['A','B','C','D'],[dir('child',['A','B'])]));
+  const h=space(t,data);let saved;
+  try {
+    await h.ready();h.engine.setViewMode('2d');
+    for(const path of ['A','B','B','A','C','A'])await h.engine.goTo({type:'file',path});
+    saved=JSON.parse(h.storage.get('aidiy_ide:/project'));
+    assert.deepEqual(saved.voyages[''],[{from:null,to:'f:A'},{from:'f:A',to:'f:B'},{from:'f:A',to:'f:C'}]);
+    assert.equal(saved.voyageCurrent[''],'f:A');
+    await h.engine.goTo({type:'file',path:'child/A'});await h.engine.goTo({type:'file',path:'child/B'});
+    const childSaved=JSON.parse(h.storage.get('aidiy_ide:/project'));
+    assert.deepEqual(childSaved.voyages.child,[{from:null,to:'f:child/A'},{from:'f:child/A',to:'f:child/B'}]);
+    assert.deepEqual(childSaved.voyages[''],saved.voyages['']);
+  } finally {h.dispose();}
+  const reopened=space(t,data);
+  try {
+    reopened.storage.set('aidiy_ide:/project',JSON.stringify(saved));
+    await reopened.ready();reopened.engine.setViewMode('2d');
+    await reopened.engine.goTo({type:'file',path:'D'});
+    const after=JSON.parse(reopened.storage.get('aidiy_ide:/project'));
+    assert.deepEqual(after.voyages[''].at(-1),{from:'f:A',to:'f:D'});
+    assert.equal(after.voyages[''].length,4);
+  } finally {reopened.dispose();}
+});
+
+test('分岐の描画: 明細間を連結せず、途中の削除点を飛び越す線も作らない',async t=>{
+  const h=space(t,snapshot(dir('project',['A','B','C','D'])));
+  try {
+    h.storage.set('aidiy_ide:/project',JSON.stringify({version:2,voyages:{'':[
+      {from:null,to:'f:A'},{from:'f:A',to:'f:B'},
+      {from:'f:A',to:'f:C'},{from:'f:deleted',to:'f:D'},
+    ]},voyageCurrent:{'':'f:A'},journal:[]}));
+    await h.ready();h.engine.marks({mode:'since',since:null});
+    for(const [i,path] of ['A','B','C','D'].entries())Object.assign(h.engine.world.byPath.get(path),{x:i*100-200,y:0,z:0});
+    h.camera();h.routeLines.length=0;await h.pump();
+    assert.equal(h.routeLines.length,2,'A→B と A→C のみ。C→D で穴を埋めない');
+  } finally {h.dispose();}
+});
+
+for(const mode of ['2d','3d'])test(`${mode}のフォルダ移動: 親階層の点として記録し、子階層の現在点へ混ぜない`,async t=>{
+  const h=space(t,snapshot(dir('project',['A'],[dir('child',['B'])])));
+  try{
+    await h.ready();h.engine.setViewMode(mode);
+    await h.finish(h.engine.goTo({type:'file',path:'A'}));
+    await h.finish(h.engine.goTo({type:'dir',path:'child'}));
+    let saved=JSON.parse(h.storage.get('aidiy_ide:/project'));
+    assert.deepEqual(saved.voyages[''],[{from:null,to:'f:A'},{from:'f:A',to:'g:child'}]);
+    assert.equal(saved.voyageCurrent[''],'g:child');assert.equal(saved.voyages.child,undefined);
+    await h.finish(h.engine.goTo({type:'file',path:'child/B'}));
+    saved=JSON.parse(h.storage.get('aidiy_ide:/project'));
+    assert.deepEqual(saved.voyages.child,[{from:null,to:'f:child/B'}]);
+    await h.finish(h.engine.goTo({type:'dir',path:''}));
+    assert.equal(h.state().trail.length,0);
+    assert.equal(JSON.parse(h.storage.get('aidiy_ide:/project')).voyages[''].length,2,'ルート自身の不正な点を追加しない');
+  }finally{h.dispose();}
+});
+
+test('検索の再登場点: A→B→Aでも最後の到着点の強調を落とさない',async t=>{
+  const h=space(t,snapshot(dir('project',[],[dir('src',['A','C']),dir('other',['B'])])));
+  try {
+    await h.ready();h.engine.marks({mode:'since',since:null});
+    h.engine.route({mode:'ai',paths:['src/A','other/B','src/C']});
+    for(const [i,galaxy] of h.engine.world.galaxies.entries())Object.assign(galaxy,{x:i*200-100,y:0,z:0});
+    h.camera();h.routeMarkers.length=0;h.routeLines.length=0;await h.pump();
+    assert.equal(h.routeLines.length,2,'src→other と other→src は同じ線として1本だけ描く');
+    assert.equal(h.routeMarkers.filter(marker=>marker.alpha===.95).length,1,'再登場した最終点srcを強調する');
+  } finally {h.dispose();}
+});
+
+test('検索明細のUI受渡: Explorerのroute通知からengine保持・描画へ渡し、旧通知も補完する',async t=>{
+  const h=space(t,snapshot(dir('project',['A','B'])));
+  try {
+    await h.ready();
+    const records=[{from:null,to:'f:A'},{from:'f:A',to:'f:B'}];
+    const source=readFileSync(new URL('../src/components/FileExplorer.vue',import.meta.url),'utf8');
+    const notification=source.split('\n').find(line=>line.startsWith('watch([routeMode,aiRoute]'));
+    assert.ok(notification);
+    const dispatch=result=>runInNewContext(notification,{
+      watch:(_sources,callback)=>callback(),routeMode:{value:'ai'},aiRoute:{value:['A','B']},
+      aiResult:{value:result},emit:(event,value)=>{assert.equal(event,'route');h.engine.route(value);},
+    });
+    dispatch({routeRecords:records});
+    assert.deepEqual(structuredClone(h.engine.searchRouteRecords),records);
+    records[0].to='f:changed';
+    assert.equal(h.engine.searchRouteRecords[0].to,'f:A','外部配列から切り離して保持する');
+    dispatch({});
+    assert.deepEqual(structuredClone(h.engine.searchRouteRecords),[{from:null,to:'f:A'},{from:'f:A',to:'f:B'}]);
+    h.engine.marks({mode:'since',since:null});
+    Object.assign(h.engine.world.byPath.get('A'),{x:-100,y:0,z:0});
+    Object.assign(h.engine.world.byPath.get('B'),{x:100,y:0,z:0});
+    h.camera();h.routeLines.length=0;await h.pump();
+    assert.equal(h.routeLines.length,2,'中心→A→Bを保持した明細から描く');
+  } finally {h.dispose();}
+});
+
+
+test('始点行なしの逆辺復元: from側の現在点にもマーカーを残す',async t=>{
+  const h=space(t,snapshot(dir('project',['A','B'])));
+  try {
+    h.storage.set('aidiy_ide:/project',JSON.stringify({voyages:{'':[
+      {from:'f:A',to:'f:B'},{from:'f:B',to:'f:A'},
+    ]},journal:[]}));
+    await h.ready();h.engine.marks({mode:'since',since:null});
+    Object.assign(h.engine.world.byPath.get('A'),{x:-100,y:0,z:0});
+    Object.assign(h.engine.world.byPath.get('B'),{x:100,y:0,z:0});
+    h.camera();h.routeMarkers.length=0;h.routeLines.length=0;await h.pump();
+    assert.equal(h.routeLines.length,1,'往復は同じ経路1本');
+    assert.equal(h.routeMarkers.length,2,'from/toの両端を示す');
+    assert.equal(h.routeMarkers.filter(marker=>marker.alpha===.95).length,1,'現在点Aも強調する');
+  }finally{h.dispose();}
 });
