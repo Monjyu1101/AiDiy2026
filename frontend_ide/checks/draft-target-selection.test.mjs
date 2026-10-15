@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import {createDraftTargetRegistry} from '../src/draft-target-registry.js';
+import {createDraftTargetRegistry} from '../src/下書き連携/連携先登録.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let n=0;n<30;n++)await Promise.resolve();};
@@ -37,7 +37,7 @@ function compile(path,{modules={},globals={},scriptOnly=false,vueApi=vue}={}){
 function dialogFixture(initial,{load,launch,frontmost=initial.length===1?initial[0].id:''}={}){
  let current=initial,preferred=frontmost,calls=0,apiResult={ok:true},state;
  const inserted=[],emitted=[];
- const component=compile('../src/components/DraftHandoffDialog.vue',{modules:{'./ModalDialog.vue':vue.defineComponent({setup(_props,{slots}){return()=>vue.h('section',slots.default?.());}})}});
+ const component=compile('../src/下書き連携/下書き連携ダイアログ.vue',{modules:{'../共通表示/共通ダイアログ.vue':vue.defineComponent({setup(_props,{slots}){return()=>vue.h('section',slots.default?.());}})}});
  const setup=component.setup;component.setup=(props,context)=>{state=setup(props,{...context,emit:(...args)=>emitted.push(args)});return state;};
  const root=node('root'),app=renderer.createApp(component,{request:{path:'file',projectPath:'/project',text:'reference'},
   loadTargets:async()=>{calls++;return load?load():{ok:true,sessionKey:'session',projectPath:'/project',mode:'online',targets:current,frontmostTargetId:preferred};},
@@ -99,7 +99,7 @@ test('Web候補: 表示した種別とマウント固有IDを使い、閉鎖・�
 test('Web App実setup: Code/Live表示・Term・ピン留め・追加後・利用再開で最前面候補を同期する',async()=>{
  const current={active:true,mode:'online',startedAt:1,project:{path:'/project'}},provided=new Map();
  const component=compile('../src/App.vue',{scriptOnly:true,vueApi:{...vue,onMounted(){},onBeforeUnmount(){},provide:(key,value)=>provided.set(key,value)},
-  modules:{'./draft-target-registry.js':{createDraftTargetRegistry},'./connection-state.js':{validConnectionState:()=>true}},
+  modules:{'./下書き連携/連携先登録.js':{createDraftTargetRegistry},'./共通表示/接続状態.js':{validConnectionState:()=>true}},
   globals:{window:{},location:{hash:'',origin:'http://localhost'},fetch:async url=>new Response(JSON.stringify(url.startsWith('/api/panels/')?{url:'/panel/'+url.split('/').at(-1)}:current))}});
  const scope=vue.effectScope(),s=scope.run(()=>component.setup({config:{kind:'ide'}},{expose(){}})),request={projectPath:'/project'};
  const panel=kind=>({draftTarget:()=>target(kind,kind),insertDraft:()=>({ok:true})});
@@ -118,14 +118,14 @@ test('Web App実setup: Code/Live表示・Term・ピン留め・追加後・利�
 test('Codeパネル実setup: ホストが返したCode番号付きタイトルを使い、破棄後の遅い応答は反映しない',async()=>{
  for(const late of [false,true]){
   const mounted=[],unmounted=[];let resolve;
-  const component=compile('../src/components/CodePanel.vue',{scriptOnly:true,vueApi:{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)},
-   modules:{'markdown-it':class{constructor(){this.renderer={rules:{}};this.utils={escapeHtml:x=>x};}},'../transports/code.js':{codeTransport:()=>({draft:()=>'',start(){},dispose(){}})},'../engines/chat-arrival':{chatArrival:()=>({dispose(){}})},'../draft-handoff.js':{createDraftReceiver:()=>({target(){},insert(){},publish(){},mount(){},dispose(){}})}},
+  const component=compile('../src/コード/コードパネル.vue',{scriptOnly:true,vueApi:{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)},
+   modules:{'markdown-it':class{constructor(){this.renderer={rules:{}};this.utils={escapeHtml:x=>x};}},'../コード/コード通信.js':{codeTransport:()=>({draft:()=>'',start(){},dispose(){}})},'../コード/会話到着演出':{chatArrival:()=>({dispose(){}})},'../下書き連携/下書き受け渡し.js':{createDraftReceiver:()=>({target(){},insert(){},publish(){},mount(){},dispose(){}})}},
    globals:{window:{aidiyWindow:{title:()=>new Promise(done=>{resolve=done;})}},location:{href:'http://localhost/'},ResizeObserver:class{observe(){}disconnect(){}}}});
   const scope=vue.effectScope(),s=scope.run(()=>component.setup({desktop:true,linked:true},{expose(){}}));
   for(const fn of mounted)fn();if(late)for(const fn of unmounted)fn();resolve('AiDiy IDE / Code 3');await flush();assert.equal(s.windowTitle.value,late?'':'AiDiy IDE / Code 3');
   if(!late)for(const fn of unmounted)fn();scope.stop();
  }
- const source=readFileSync(new URL('../src/components/CodePanel.vue',import.meta.url),'utf8');assert.match(source,/<StatusBar :title="windowTitle \|\|/);
+ const source=readFileSync(new URL('../src/コード/コードパネル.vue',import.meta.url),'utf8');assert.match(source,/<StatusBar :title="windowTitle \|\|/);
 });
 
 

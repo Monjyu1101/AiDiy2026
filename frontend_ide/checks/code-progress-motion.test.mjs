@@ -15,7 +15,7 @@ const flush = async () => { for (let n = 0; n < 10; n++) await Promise.resolve()
 const streamModule = { exports: {} };
 vm.runInNewContext(transformSync(readFileSync(new URL('../host/src/stream-control.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, { module: streamModule });
 function fixture(provider = 'aidiy_hermes', host = false) {
-  const source = readFileSync(new URL('../src/components/CodePanel.vue', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/コード/コードパネル.vue', import.meta.url), 'utf8');
   const { descriptor, errors } = parse(source); assert.deepEqual(errors, []);
   const script = compileScript(descriptor, { id: 'code', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, filename: 'CodePanel.vue', id: 'code', compilerOptions: { bindingMetadata: script.bindings } });
@@ -27,10 +27,10 @@ function fixture(provider = 'aidiy_hermes', host = false) {
     module, URL, location: { href: 'http://localhost/' }, console,
     require: id => id === 'vue' ? { ...vue, withDirectives: node => node, onMounted: noop, onBeforeUnmount: fn => unmounted.push(fn) }
       : id === 'markdown-it' ? class { renderer = { rules: {} }; utils = { escapeHtml: text => text }; render(text) { return text; } }
-      : id === '../transports/code.js' ? { codeTransport: (_props, fn) => { receive = fn; return { send: async packet => calls.push(packet), saveDraft: noop, dispose: noop }; } }
+      : id === '../コード/コード通信.js' ? { codeTransport: (_props, fn) => { receive = fn; return { send: async packet => calls.push(packet), saveDraft: noop, dispose: noop }; } }
       : id === '../../host/src/stream-control' ? streamModule.exports
-      : id === '../engines/chat-arrival' ? { chatArrival: () => ({ reserve: noop, reset: noop, show: noop, cancelReservation: noop, dispose: noop }) }
-      : id === '../draft-handoff.js' ? { createDraftReceiver: () => ({ publish: noop, dispose: noop }) } : {},
+      : id === '../コード/会話到着演出' ? { chatArrival: () => ({ reserve: noop, reset: noop, show: noop, cancelReservation: noop, dispose: noop }) }
+      : id === '../下書き連携/下書き受け渡し.js' ? { createDraftReceiver: () => ({ publish: noop, dispose: noop }) } : {},
   });
   const scope = vue.effectScope(), component = module.exports, props = { host };
   const data = scope.run(() => component.setup(props, { expose() {} }));

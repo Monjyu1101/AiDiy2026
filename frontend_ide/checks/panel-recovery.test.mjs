@@ -3,6 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import { componentPaths, componentName } from './component-paths.mjs';
 // 実際のVue SFCをコンパイルし、通信と画面資源だけを置き換えて失敗時の状態を確認する。
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,13 +11,13 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as draftHandoff from '../src/draft-handoff.js';
+import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const MarkdownIt=require('markdown-it');
 
 function setupComponent(name,{props={},modules={},globals={}}={}) {
-  const source=readFileSync(new URL(`../src/components/${name}.vue`,import.meta.url),'utf8');
+  const source=readFileSync(new URL(`../src/${componentPaths[name]}`,import.meta.url),'utf8');
   const {descriptor}=parse(source);
   const script=compileScript(descriptor,{id:name,genDefaultAs:'component'});
   const {code}=transformSync(`${script.content}\nmodule.exports=component;`,{format:'cjs'});
@@ -32,7 +33,7 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
     require(id){
       if(id==='vue')return {...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};
       if(id==='markdown-it')return MarkdownIt;
-      if(id==='../draft-handoff.js')return draftHandoff;
+      if(id==='../下書き連携/下書き受け渡し.js')return draftHandoff;
       if(Object.hasOwn(modules,id))return modules[id];
       throw Error(`予期しない依存: ${id}`);
     },...globals,
@@ -71,14 +72,14 @@ async function liveFixture(t,{socketFactory,props={}}={}) {
   }
   const fixture=setupComponent('LivePanel',{
     props:Object.assign(props,{config:{}}),modules:{
-      '../transports/live':{LiveEnvironment:Environment},
+      '../ライブ/ライブ通信':{LiveEnvironment:Environment},
       '../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
       '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(value){audioMutes.push(value);}stop(){}}},
       '../../host/aidiy_live/src/visualizer':{AudioCloud:class {setVisible(){}dispose(){}}},
       '../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
       '../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
-      './StatusBar.vue':{},'./TerminalWelcome.vue':{},'./ModalDialog.vue':{},
-      '../engines/chat-arrival':{chatArrival:()=>({reset(){},dispose(){},show(){}})},
+      '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../共通表示/共通ダイアログ.vue':{},
+      '../コード/会話到着演出':{chatArrival:()=>({reset(){},dispose(){},show(){}})},
     },
   });
   t.after(()=>fixture.dispose());await fixture.mount();
@@ -276,10 +277,10 @@ test('Live: パネルを隠しても下書きは保ち、マイクは停止し�
 async function codeFixture(t){
   let receive;const sent=[],saved=[];
   const fixture=setupComponent('CodePanel',{modules:{
-    '../transports/code.js':{codeTransport(_props,callback){receive=callback;return{draft:()=>'',saveDraft:value=>saved.push(value),start(){},dispose(){},async send(message){sent.push(message);}};}},
+    '../コード/コード通信.js':{codeTransport(_props,callback){receive=callback;return{draft:()=>'',saveDraft:value=>saved.push(value),start(){},dispose(){},async send(message){sent.push(message);}};}},
     '../../host/src/stream-control':{visibleStreamContent:value=>value},
-    './StatusBar.vue':{},'./TerminalWelcome.vue':{},'./TerminalProgress.vue':{},'./ModalDialog.vue':{},
-    '../engines/chat-arrival':{chatArrival:()=>({reset(){},dispose(){},show(){},reserve(){},cancelReservation(){}})},
+    '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/進捗表示.vue':{},'../共通表示/共通ダイアログ.vue':{},
+    '../コード/会話到着演出':{chatArrival:()=>({reset(){},dispose(){},show(){},reserve(){},cancelReservation(){}})},
   }});
   t.after(()=>fixture.dispose());await fixture.mount();
   const state={type:'state',会話ID:'conversation-1',メッセージ:[],履歴:[{id:'conversation-1',題名:'最初の会話'}],進捗:[],信頼済み:true,画面接続済み:true,オフライン対応:true,作業フォルダ:{名前:'fixture',パス:'/fixture'}};

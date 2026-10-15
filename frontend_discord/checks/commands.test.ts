@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { コマンド解析, 利用許可, 会話キー, 本文分割, メンション禁止 } from '../src/commands';
+import { コマンド解析, 利用許可, 会話キー, 本文分割, メンション禁止 } from '../src/接続/コマンド処理';
 import { config, guildId, textId, userId, botId } from './helpers';
 
 test('通常の文章をチャットにし、明示したprefix / Botメンションの操作も解釈する', () => {

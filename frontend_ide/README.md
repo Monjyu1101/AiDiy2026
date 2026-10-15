@@ -173,16 +173,16 @@ AiDiy検索の「履歴」から、検索日時・検索文・件数を確認し
 
 | 部品 | 責務 |
 |---|---|
-| `CodePanel.vue` | チャット・モデル・履歴・停止・下書き。VS Codeと単独版で共用 |
-| `LivePanel.vue` | 音声・文字会話・モデル。VS Codeと単独版で共用 |
-| `FileExplorer.vue` | バーガー、階層ツリー、起点検索、grep検索、マーク。`select` / `marks` イベントで外側と連携 |
-| `SpaceView.vue` | 表示モード・エクスプローラー・共通プレビューの配置と選択連動 |
-| `SpaceCanvas.vue` | 従来3Dエンジンの生成・停止/再開・破棄。モード切替では再生成しない |
-| `FolderPages.vue` | 2Dの直下フォルダページ、パンくず、選択行・スクロール復元 |
-| `FileViewer.vue` | 読み取り専用のコード・画像・Markdown・Office/PDFプレビュー |
-| `StatusBar.vue` / `TerminalWelcome.vue` | 接続表示・ウィンドウ操作・初期ターミナル演出 |
+| `コードパネル.vue` | チャット・モデル・履歴・停止・下書き。VS Codeと単独版で共用 |
+| `ライブパネル.vue` | 音声・文字会話・モデル。VS Codeと単独版で共用 |
+| `ファイル一覧.vue` | バーガー、階層ツリー、起点検索、grep検索、マーク。`select` / `marks` イベントで外側と連携 |
+| `開発スペース.vue` | 表示モード・エクスプローラー・共通プレビューの配置と選択連動 |
+| `宇宙キャンバス.vue` | 従来3Dエンジンの生成・停止/再開・破棄。モード切替では再生成しない |
+| `フォルダページ.vue` | 2Dの直下フォルダページ、パンくず、選択行・スクロール復元 |
+| `ファイルビューア.vue` | 読み取り専用のコード・画像・Markdown・Office/PDFプレビュー |
+| `状態バー.vue` / `開始表示.vue` | 接続表示・ウィンドウ操作・初期ターミナル演出 |
 
-Canvas描画は `src/engines/space.js`、通信は `src/transports/` に分離します。Web版IDEのCode / LiveはVue部品を直接配置し、Electron版は同じVue部品を別ウィンドウに表示します。Office表示だけは既存の専用iframeを使用します。
+Canvas描画は `src/開発スペース/宇宙描画.js`、通信は `src/コード/コード通信.js` と `src/ライブ/ライブ通信.ts` に分離します。Web版IDEのCode / LiveはVue部品を直接配置し、Electron版は同じVue部品を別ウィンドウに表示します。Office表示だけは既存の専用iframeを使用します。
 
 ファイルAPI・Office依存物は `viewer/`、Code/Hermes・LiveプロトコルとVS Code拡張ホストは `host/` に統合しています。画面と実行基盤はこの `frontend_ide/` 内で管理します。AIコア・Hermes・共通設定は引き続きプロジェクト共通のものを利用します。
 

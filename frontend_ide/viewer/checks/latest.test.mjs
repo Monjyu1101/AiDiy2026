@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, utimes, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { latestFile, latestFiles, createLatestUpdates } from '../../src/latest-file.js';
+import { latestFile, latestFiles, createLatestUpdates } from '../../src/ファイル閲覧/最新ファイル.js';
 import { scanTree, startServer } from '../server.mjs';
 import { createCoreConnection } from '../core-connection.mjs';
 

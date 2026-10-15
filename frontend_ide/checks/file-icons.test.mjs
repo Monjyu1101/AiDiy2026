@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { fileIcon, catppuccinAsset, ICON_NAMES, CATPPUCCIN_ROOT } from '../src/file-icons.js';
+import { fileIcon, catppuccinAsset, ICON_NAMES, CATPPUCCIN_ROOT } from '../src/ファイル閲覧/ファイルアイコン.js';
 import { startDevelopment } from '../server.mjs';
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc'), { transformSync } = require('esbuild');
@@ -136,7 +136,7 @@ test('VS Code: webview URIを起動設定へ渡し、img-srcは既存CSPだけ�
 });
 
 test('実Vue部品: 名前の変更・フォルダ開閉だけで安全な16px imgを再利用する', async () => {
-  const filename = new URL('src/components/FileTypeIcon.vue', root).pathname;
+  const filename = fileURLToPath(new URL('src/ファイル閲覧/ファイル種別アイコン.vue', root));
   const { descriptor } = parse(readFileSync(filename, 'utf8'));
   const script = compileScript(descriptor, { id: 'file-icon', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, id: 'file-icon', filename, compilerOptions: { bindingMetadata: script.bindings } });

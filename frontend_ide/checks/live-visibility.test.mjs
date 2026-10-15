@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as draftHandoff from '../src/draft-handoff.js';
+import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc'), { transformSync } = require('esbuild');
@@ -80,17 +80,17 @@ async function livePanel(t, { visible = true, host = true, ...options } = {}) {
     send(...args) { packets.push(args); return true; }
   }
   const modules = {
-    '../transports/live': { LiveEnvironment: Environment },
+    '../ライブ/ライブ通信': { LiveEnvironment: Environment },
     '../../host/aidiy_live/src/protocol': { LiveConnection: Connection, 入力レート: () => 16000, 音声入力: value => value, 音声操作: (mic, speaker) => ({ mic, speaker }) },
     '../../host/aidiy_live/src/audio': { LiveAudio: class { async unlock() {} mute() {} stop() {} close() { resources.audioCloses++; } } },
     '../../host/aidiy_live/src/visualizer': { AudioCloud: graphic.AudioCloud },
     '../../host/aidiy_live/src/model-catalog': { ライブ選択エラー: () => '' },
     '../../host/aidiy_live/src/microphone-error': { microphoneError: error => error.message },
-    '../draft-handoff.js': draftHandoff,
-    '../engines/chat-arrival': { chatArrival: () => ({ reset() {}, dispose() {}, show() {} }) },
-    './StatusBar.vue': {}, './TerminalWelcome.vue': {}, './ModalDialog.vue': {},
+    '../下書き連携/下書き受け渡し.js': draftHandoff,
+    '../コード/会話到着演出': { chatArrival: () => ({ reset() {}, dispose() {}, show() {} }) },
+    '../共通表示/状態バー.vue': {}, '../ターミナル/開始表示.vue': {}, '../共通表示/共通ダイアログ.vue': {},
   };
-  const { descriptor } = parse(readFileSync(new URL('../src/components/LivePanel.vue', import.meta.url), 'utf8'));
+  const { descriptor } = parse(readFileSync(new URL('../src/ライブ/ライブパネル.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'LivePanel', genDefaultAs: 'component' });
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
     ...graphic.globals, module, URL, location: { href: 'http://localhost/' },
@@ -129,7 +129,7 @@ async function livePanel(t, { visible = true, host = true, ...options } = {}) {
 test('Live: 実テンプレートの可視状態で接続バーの50ms更新だけを止め、20秒の接続pingを保つ', async t => {
   const fixture = await livePanel(t, { host: false });
   await fixture.state.connect();
-  const { descriptor } = parse(readFileSync(new URL('../src/components/StatusBar.vue', import.meta.url), 'utf8'));
+  const { descriptor } = parse(readFileSync(new URL('../src/共通表示/状態バー.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'StatusBar', genDefaultAs: 'component' });
   const module = { exports: {} }, mounted = [], unmounted = [], props = vue.reactive(fixture.statusProps());
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {

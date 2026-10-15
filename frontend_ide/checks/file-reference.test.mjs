@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { searchReference, fileDraftReference } from '../src/file-reference.js';
+import { searchReference, fileDraftReference } from '../src/ファイル閲覧/ファイル参照.js';
 
 test('grep参照は日本語・CRLF・UTF-16の行列を照合する', () => {
   const reference = searchReference('先頭\r\n😀日本語 Test\r\n末尾', { line: 2, column: 7, query: 'test', matchLength: 4 });

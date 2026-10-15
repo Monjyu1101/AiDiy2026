@@ -5,8 +5,8 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSpace} from '../src/engines/space.js';
-import {cockpitLook,framingDistance,WARP_APPROACH_WIDTH,WARP_PEAK_WIDTH} from '../src/engines/warp-camera.js';
+import {createSpace} from '../src/開発スペース/宇宙描画.js';
+import {cockpitLook,framingDistance,WARP_APPROACH_WIDTH,WARP_PEAK_WIDTH} from '../src/開発スペース/ワープ視点.js';
 import {warpMotion} from '../viewer/web/layout.js';
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const flush=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};

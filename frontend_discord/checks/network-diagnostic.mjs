@@ -15,7 +15,7 @@ import { register } from 'tsx/esm/api';
 import { request } from 'undici';
 import { WebSocket } from 'ws';
 register();
-const { Discord通信 } = await import('../src/network.ts');
+const { Discord通信 } = await import('../src/接続/ネットワーク接続.ts');
 
 const keys = ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'NODE_USE_ENV_PROXY'];
 console.log('プロキシ環境変数（値は表示しません）:', Object.fromEntries(keys.map(key => [key, Boolean(process.env[key])])));

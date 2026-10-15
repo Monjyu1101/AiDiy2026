@@ -15,9 +15,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Discordパネル } from '../src/panel';
-import { type モデル初期情報 } from '../src/model-info';
-import { type Discord設定 } from '../src/config';
+import { Discordパネル } from '../src/接続パネル/パネル操作';
+import { type モデル初期情報 } from '../src/モデル情報/モデル情報';
+import { type Discord設定 } from '../src/接続/接続設定';
 import { config, waitFor } from './helpers';
 
 const selection = { LIVE_AI_NAME: 'openai_live', LIVE_OPENAI_MODEL: 'test-live-model', LIVE_OPENAI_VOICE: 'marin' };

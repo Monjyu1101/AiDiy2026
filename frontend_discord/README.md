@@ -136,6 +136,23 @@ Code の会話は「サーバー・テキストチャンネル・ユーザー」
 
 Live は指定ユーザーが指定ボイスチャンネルへ入室すると自動接続します。Bot 起動時も参加状態を確認します。音声の文字起こしはパネルに表示し、指定テキストチャンネルには AI の応答が終わるごとに「あなたの最後の発言＋AI の応答」を1件にまとめて送ります。指定ユーザーの退出、Discord / AIコアの切断で終了します。別のユーザーやチャンネルでは開始しません。接続失敗時はボイスチャンネルに入り直してください。DM、Stage チャンネル、画面共有・映像には対応しません。
 
+## 接続パネルの Vue ソースと配布物
+
+Electron とブラウザ版は同じ Vue 3 画面を使います。`panel/画面/接続パネル.vue` が画面、`機能切替.vue` が共通トグル、`panel/接続/パネル状態.js` が接続状態・モデル選択・コード・ライブの状態管理、`panel/ライブ/音声表示.js` が描画を担当します。画面内部は「接続状態」「コードAI」「ライブAI」「ライブモデル」「音声」「ウィンドウ操作」などの日本語で追えます。IPC、`LIVE_*`、保存済み JSON のキーは互換性のため変更しません。
+
+`panel/view.js` は事前コンパイルした配布物としてリポジトリへ同梱します。通常起動・セットアップにビルドや CDN 接続は不要です。`index.html`、`view.js`、`visualizer.js`、`style.css` の公開 URL、Electron preload と WebSocket の API は維持しています。`visualizer.js` は互換 URL のための小さな入口で、描画本体は Vue バンドルに含まれます。
+
+画面ソース・依存関係を変更して配布物を更新する場合だけ、次を実行します。
+
+```powershell
+npm ci
+npm run build:panel
+npm run check
+npm test
+```
+
+`npm run check` は TypeScript と `panel/build-manifest.json` のソース・配布物一致を確認します。生成された `view.js`、manifest と Vue の MIT 表記を含む `THIRD_PARTY_NOTICES.txt` を一緒に保存します。`checks/panel-vue.test.ts` は実バンドルを模擬 DOM・IPC・音声で操作し、選択と保存、接続・再接続、連打、保存失敗、モニター OFF 初期化、遅延応答、画面終了時の後始末を検証します。これは実 Discord 通話・OS 上の描画確認の代わりにはなりません。
+
 ## 検証・音声仕様
 
 ```powershell

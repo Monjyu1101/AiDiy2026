@@ -5,8 +5,8 @@
 // https://github.com/monjyu1101/AiDiy2026
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createAutoOrbit,MANUAL_PAUSE_MS} from '../src/engines/auto-orbit.js';
-import {cameraPosition} from '../src/engines/warp-camera.js';
+import {createAutoOrbit,MANUAL_PAUSE_MS} from '../src/開発スペース/自動周回.js';
+import {cameraPosition} from '../src/開発スペース/ワープ視点.js';
 const radius=v=>Math.hypot(...Object.values(cameraPosition(v)));
 const home = () => ({yaw:.6,pitch:.35,dist:4600,tx:0,ty:0,tz:0});
 const direction = v => [Math.sin(v.yaw)*Math.cos(v.pitch),Math.sin(v.pitch),Math.cos(v.yaw)*Math.cos(v.pitch)];

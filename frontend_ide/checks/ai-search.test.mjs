@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, writeFile, rename, rm, symlink } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createAISearch, validateSearchResult } from '../ファイル機能/ai-search.mjs';
-import { aiRouteTargets } from '../src/engines/ai-route.js';
+import { aiRouteTargets } from '../src/開発スペース/検索経路.js';
 import { startDevelopment } from '../server.mjs';
 
 async function fixture(t){

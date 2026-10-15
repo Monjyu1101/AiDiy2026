@@ -10,10 +10,10 @@
  * -------------------------------------------------------------------------
  */
 
-import { 設定読込 } from './config';
-import { DiscordBot } from './bot';
-import { 起動解決 } from './vscode';
-import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './connection-error';
+import { 設定読込 } from './接続/接続設定';
+import { DiscordBot } from './接続/Bot接続';
+import { 起動解決 } from './共通連携/IDE連携';
+import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './接続/接続エラー';
 
 let bot: DiscordBot | undefined;
 let stage: 接続段階 = '設定読込';

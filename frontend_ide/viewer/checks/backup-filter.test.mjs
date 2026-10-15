@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { scanTree } from '../server.mjs';
-import { latestFiles } from '../../src/latest-file.js';
+import { latestFiles } from '../../src/ファイル閲覧/最新ファイル.js';
 
 test('バックアップフィルターは_AIDIYのCode / IDE記録だけを除外し、knowledgeと同名ソースを残す', async t => {
   const root = await mkdtemp(join(tmpdir(), 'aidiy-backup-filter-'));

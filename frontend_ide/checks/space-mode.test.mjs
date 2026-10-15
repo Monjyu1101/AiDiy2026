@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSpace} from '../src/engines/space.js';
+import {createSpace} from '../src/開発スペース/宇宙描画.js';
 
 const flush=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};

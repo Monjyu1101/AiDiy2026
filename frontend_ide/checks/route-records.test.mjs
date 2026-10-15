@@ -5,8 +5,8 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {linearRoute,restoreRoute,visitPoint,sameRoute,uniqueRouteRecords,searchRouteRecords} from '../src/engines/route-records.js';
-import {aiRouteRecords} from '../src/engines/ai-route.js';
+import {linearRoute,restoreRoute,visitPoint,sameRoute,uniqueRouteRecords,searchRouteRecords} from '../src/開発スペース/経路記録.js';
+import {aiRouteRecords} from '../src/開発スペース/検索経路.js';
 
 test('閲覧明細: 同一点・往復は現在点だけ変更し、再訪先から枝を末尾追加する',()=>{
   const records=[];let current=null;

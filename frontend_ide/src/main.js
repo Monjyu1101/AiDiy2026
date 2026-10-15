@@ -6,7 +6,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import './style.css';
-import './chat-presentation.css';
+import './共通表示/会話表示.css';
 async function main(){
   const embedded=document.getElementById('development-config');
   const config=embedded?JSON.parse(embedded.textContent):await fetch('/development/config').then(r=>{if(!r.ok)throw Error('起動設定を取得できません。');return r.json();});

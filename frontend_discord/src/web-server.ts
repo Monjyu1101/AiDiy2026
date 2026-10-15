@@ -17,14 +17,14 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Socket } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
-import { パネルサービス, type パネル通知 } from './panel-service';
-import { プロジェクトルート } from './config';
-import { 接続元許可 } from './vscode';
+import { パネルサービス, type パネル通知 } from './接続パネル/パネル中継';
+import { プロジェクトルート } from './接続/接続設定';
+import { 接続元許可 } from './共通連携/IDE連携';
 import instanceLock from '../../frontend_ide/host/scripts/single-instance.cjs';
 
 // ブラウザ版パネル（GitHub Codespaces・画面のない Linux 用）。画面は Electron 版と同じ panel/ のファイルを使い、
 // IPC の代わりに WebSocket で panel-service.ts へ中継する。接続元の確認は aidiy_code / aidiy_live と共通。
-const panelRoot = fileURLToPath(new URL('../panel/', import.meta.url));
+const panelRoot = fileURLToPath(new URL('../panel', import.meta.url));
 const assets: Record<string, string> = {
   'style.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
 };

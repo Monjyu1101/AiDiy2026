@@ -16,7 +16,7 @@ import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import WebSocket from 'ws';
 import { パネルWeb起動, ブラウザ用HTML } from '../src/web-server';
-import type { パネルサービス } from '../src/panel-service';
+import type { パネルサービス } from '../src/接続パネル/パネル中継';
 
 // panel-service の代わりに、要求と通知の中継だけを確認する模擬サービス。
 function fakeService() {
@@ -51,7 +51,7 @@ test('ブラウザ版サーバー: 許可した接続元の要求だけを中継
     assert.equal((await fetch(new URL('style.css', app.url))).status, 200);
     assert.equal((await fetch(app.url, { headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal((await fetch(new URL('/wrong/', app.url))).status, 404);
-    assert.equal((await fetch(new URL('../src/config.ts', app.url))).status, 404);
+    assert.equal((await fetch(new URL('../src/接続/接続設定.ts', app.url))).status, 404);
 
     const wsUrl = new URL('ws', app.url); wsUrl.protocol = 'ws:';
     const rejected = new WebSocket(wsUrl, { origin: 'https://evil.example' });

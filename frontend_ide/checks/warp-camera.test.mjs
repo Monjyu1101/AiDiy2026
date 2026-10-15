@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraPosition,turnToTarget,cameraAt,interpolateCamera,cockpitLook,orbitAround,interpolateOrbit} from '../src/engines/warp-camera.js';
+import {cameraPosition,turnToTarget,cameraAt,interpolateCamera,cockpitLook,orbitAround,interpolateOrbit} from '../src/開発スペース/ワープ視点.js';
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const target={x:1200,y:-600,z:350};
 for(const pitch of [.35,Math.PI+0.2,-Math.PI*2-.4])test(`旋回中の船体位置を固定し、完了後の前進は目的地への直線になる: ${pitch}`,()=>{

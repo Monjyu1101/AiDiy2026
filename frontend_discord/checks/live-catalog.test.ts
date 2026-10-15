@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ライブ候補読込, ライブ初期値 } from '../src/live-catalog';
+import { ライブ候補読込, ライブ初期値 } from '../src/ライブ/ライブモデル候補';
 
 test('合成ファイル未生成時は空になり、旧JSONの音声候補は使わない', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aidiy-live-catalog-'));

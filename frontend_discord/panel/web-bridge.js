@@ -12,7 +12,7 @@
 
 'use strict';
 // ブラウザ版パネル用。Electron 版の preload.cjs と同じ window.discordPanel を WebSocket で提供する。
-// view.js / visualizer.js は Electron 版と共通で、変更しない。
+// Vue の view.js は Electron 版と共通。購読は画面の終了時に解除する。
 (() => {
   document.documentElement.classList.add('browser-mode');
   const listeners = { state: [], activity: [], meter: [], audio: [] };
@@ -43,13 +43,18 @@
   connect();
   const request = async (action, value) => {
     await opened;
+    if (socket.readyState !== WebSocket.OPEN) throw new Error('パネルのサーバーとの接続が切れています。');
     return new Promise((resolve, reject) => {
       const id = ++sequence;
       pending.set(id, { resolve, reject });
-      socket.send(JSON.stringify({ id, action, value }));
+      try { socket.send(JSON.stringify({ id, action, value })); }
+      catch (error) { pending.delete(id); reject(error); }
     });
   };
-  const on = type => callback => { listeners[type].push(callback); };
+  const on = type => callback => {
+    listeners[type].push(callback);
+    return () => { listeners[type] = listeners[type].filter(item => item !== callback); };
+  };
   window.discordPanel = {
     initial: () => request('initial'),
     select: value => request('select', value),

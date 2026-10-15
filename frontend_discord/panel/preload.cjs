@@ -11,6 +11,11 @@
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
+const 購読 = (channel, callback) => {
+  const listener = (_event, value) => callback(value);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+};
 contextBridge.exposeInMainWorld('discordPanel', {
   initial: () => ipcRenderer.invoke('discord:request', 'initial'),
   select: value => ipcRenderer.invoke('discord:request', 'select', value),
@@ -21,8 +26,8 @@ contextBridge.exposeInMainWorld('discordPanel', {
   stop: () => ipcRenderer.invoke('discord:request', 'stop'),
   monitor: on => ipcRenderer.invoke('discord:request', 'monitor', on),
   window: action => ipcRenderer.invoke('discord:window', action),
-  onState: callback => { ipcRenderer.on('discord:state', (_event, state) => callback(state)); },
-  onAudio: callback => { ipcRenderer.on('discord:audio', (_event, audio) => callback(audio)); },
-  onMeter: callback => { ipcRenderer.on('discord:meter', (_event, meter) => callback(meter)); },
-  onActivity: callback => { ipcRenderer.on('discord:activity', (_event, activity) => callback(activity)); },
+  onState: callback => 購読('discord:state', callback),
+  onAudio: callback => 購読('discord:audio', callback),
+  onMeter: callback => 購読('discord:meter', callback),
+  onActivity: callback => 購読('discord:activity', callback),
 });

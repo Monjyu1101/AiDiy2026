@@ -3,18 +3,20 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import { fileURLToPath } from 'node:url';
+import { componentPaths, componentName } from './component-paths.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import { createSpace } from '../src/engines/space.js';
-import * as latest from '../src/latest-file.js';
-import * as pages from '../src/folder-pages.js';
-import * as references from '../src/file-reference.js';
-import * as fileActions from '../src/file-actions.js';
-import { scanWarning } from '../src/scan-warning.js';
-import { fileIcon } from '../src/file-icons.js';
+import { createSpace } from '../src/開発スペース/宇宙描画.js';
+import * as latest from '../src/ファイル閲覧/最新ファイル.js';
+import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
+import * as references from '../src/ファイル閲覧/ファイル参照.js';
+import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import { scanWarning } from '../src/ファイル閲覧/走査警告.js';
+import { fileIcon } from '../src/ファイル閲覧/ファイルアイコン.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -84,15 +86,15 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
-    '../engines/space.js': { createSpace(...args) { engine = createSpace(...args); navigation = t.mock.method(engine, 'goTo'); engine.setAutoSpin(auto); return engine; } },
-    '../latest-file.js': latest, '../folder-pages.js': pages, '../file-reference.js': references, '../file-actions.js': fileActions,
-    '../file-icons.js': { fileIcon }, '../scan-warning.js': { scanWarning }, '../engines/monaco.js': { loadMonaco: async () => null, monacoLanguage: () => 'javascript' },
+    '../開発スペース/宇宙描画.js': { createSpace(...args) { engine = createSpace(...args); navigation = t.mock.method(engine, 'goTo'); engine.setAutoSpin(auto); return engine; } },
+    '../ファイル閲覧/最新ファイル.js': latest, '../ファイル閲覧/フォルダページ構成.js': pages, '../ファイル閲覧/ファイル参照.js': references, '../ファイル閲覧/ファイル操作.js': fileActions,
+    '../ファイル閲覧/ファイルアイコン.js': { fileIcon }, '../ファイル閲覧/走査警告.js': { scanWarning }, '../ファイル閲覧/コード表示.js': { loadMonaco: async () => null, monacoLanguage: () => 'javascript' },
   };
   const aiPanel = { props: ['root'], emits: ['result'], setup(_props, { emit }) { emitAI = result => emit('result', result); return () => null; } };
   const runtime = { ...vue, TransitionGroup: { inheritAttrs: false, setup(_props, { slots }) { return () => slots.default?.(); } } };
   function component(name) {
     if (components.has(name)) return components.get(name);
-    const filename = new URL(`../src/components/${name}.vue`, import.meta.url).pathname;
+    const filename = fileURLToPath(new URL(`../src/${componentPaths[name]}`, import.meta.url));
     const { descriptor } = parse(readFileSync(filename, 'utf8'));
     const script = compileScript(descriptor, { id: name, genDefaultAs: 'component' });
     const template = compileTemplate({ source: descriptor.template.content, id: name, filename, compilerOptions: { bindingMetadata: script.bindings } });
@@ -100,8 +102,8 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
     const module = { exports: {} };
     vm.runInNewContext(transformSync(`${script.content}\n${template.code}\ncomponent.render=render;module.exports=component;`, { format: 'cjs' }).code, {
       ...globals, module, Date, console, AbortController, AbortSignal, URLSearchParams,
-      require: id => id === 'vue' ? runtime : id === './AISearchPanel.vue' ? aiPanel
-        : id.endsWith('.vue') ? component(id.slice(2, -4)) : moduleMap[id] || assert.fail(`Unexpected import: ${id}`),
+      require: id => id === 'vue' ? runtime : id === '../ファイル検索/AI検索パネル.vue' ? aiPanel
+        : id.endsWith('.vue') ? component(componentName(id)) : moduleMap[id] || assert.fail(`Unexpected import: ${id}`),
     });
     const result = module.exports, setup = result.setup;
     result.setup = (input, context) => { props.set(name, input); const state = setup(input, context); states.set(name, state); return state; };

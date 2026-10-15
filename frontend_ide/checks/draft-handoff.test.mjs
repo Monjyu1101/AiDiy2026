@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import {appendDraft,createDraftReceiver,DRAFT_LIMITS} from '../src/draft-handoff.js';
+import {appendDraft,createDraftReceiver,DRAFT_LIMITS} from '../src/下書き連携/下書き受け渡し.js';
 import routerModule from '../デスクトップ/draft-router.cjs';
 const {createDraftRouter}=routerModule;
 const tick=()=>new Promise(resolve=>setImmediate(resolve));

@@ -10,7 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
-import { パネルサービス } from './panel-service';
+import { パネルサービス } from './接続パネル/パネル中継';
 
 // Electron 版の worker。操作は panel-service.ts と共通で、ここは IPC の中継だけを受け持つ。
 const send = (data: object) => { if (process.connected) process.send?.(data); };

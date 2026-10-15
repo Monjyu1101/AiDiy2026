@@ -4,7 +4,7 @@
  */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {モデル情報取得} from '../src/model-info';
+import {モデル情報取得} from '../src/モデル情報/モデル情報';
 
 test('APIはセッションを作らず初期値と候補を取得し、通信・形式エラーはファイル参照へ戻す',async()=>{
  const data={モデル設定:{LIVE_AI_NAME:'freeai_live'},available_models:{live_models:{freeai_live:{model:'Model'}},live_voices:{freeai_live:{Zephyr:'Voice'}},chat_models:{},code_models:{}}};

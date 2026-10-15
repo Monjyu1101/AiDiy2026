@@ -17,6 +17,7 @@
 | モジュール名 | 対象 |
 |-------------|------|
 | `共通` | プロジェクト全体、横断的な話題 |
+| `backend_diag` | Diag の環境診断・モデル情報・Vue 画面 |
 | `backend_server` | FastAPI サーバー（core_main / apps_main） |
 | `command_hermes` | `aidiy_hermes` CLI 基盤 |
 | `backend_tools` | MCP サーバー群 |
@@ -25,7 +26,7 @@
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
 | `frontend_discord` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
-| `frontend_ide` | Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
+| `frontend_ide` | Term / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
 
 例:
 
@@ -205,9 +206,25 @@
 | Electron ウィンドウの位置・サイズ・IPC・ライフサイクルを変更する | [`frontend_avatar,Electronウィンドウ管理.md`](./frontend_avatar,Electronウィンドウ管理.md) |
 | 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) |
 
+## Diag 環境診断
+
+| 目的 | 参照ファイル |
+|------|--------------|
+| Diag の診断・Vue 画面・配布物・起動を変更・検証する | [`backend_diag,環境診断運用.md`](./backend_diag,環境診断運用.md) |
+
 ## Frontend IDE
 
-AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide,文書ビューア.md`](./frontend_ide,文書ビューア.md) を参照してください。
+| 目的 | 参照ファイル |
+|------|--------------|
+| Term / Code / Live / IDE の日本語機能フォルダ・共通 Vue 部品・配布・検証を確認する | [`frontend_ide,Vue共通画面変更手順.md`](./frontend_ide,Vue共通画面変更手順.md) |
+| Code / Live の画面隅・複数窓、Term の縦横別サイズを調整する | [`frontend_ide,初期ウィンドウ配置.md`](./frontend_ide,初期ウィンドウ配置.md) |
+| IDE の文書表示（Word / Excel / PowerPoint / PDF）を変更する | [`frontend_ide,文書ビューア.md`](./frontend_ide,文書ビューア.md) |
+
+## Frontend Discord
+
+| 目的 | 参照ファイル |
+|------|--------------|
+| Discord の Code / Live 接続・Vue パネル・配布物を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
 
 ## Frontend VS Code
 
@@ -299,11 +316,3 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 - 日付つき履歴、担当者メモ、経緯説明、完了報告、編集対象の列挙だけの記録は残さない。
 - 現行実装と同期が必要な値は、同期元のファイルパスを併記する。
 - `_AIDIY/knowledge` 更新とアプリ本体の仕様変更は混同しない。
-
-- [frontend_ide,Vue共通画面変更手順.md](./frontend_ide,Vue共通画面変更手順.md) — Vue部品、起動互換、配布・確認。
-
-
-- [frontend_ide,初期ウィンドウ配置.md](./frontend_ide,初期ウィンドウ配置.md) — Code / Liveの画面隅、Codeの複数窓、Termの縦横別サイズ。
-
-
-- [backend_diag,環境診断運用.md](./backend_diag,環境診断運用.md) — Node.js / Python を優先した外部プログラム確認、ブラウザ・Codespaces 起動。

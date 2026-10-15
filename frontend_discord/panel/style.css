@@ -123,3 +123,5 @@ body.live-view #features{display:flex}
 @keyframes chip-pulse{0%,100%{opacity:1}50%{opacity:.45}}
 /* Live OFF の間は音声インジケーター・モニターを出さない。 */
 body.live-off #audio-cloud,body.live-off #monitor{display:none!important}
+
+#app{display:contents}

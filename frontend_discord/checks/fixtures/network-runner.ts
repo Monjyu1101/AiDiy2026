@@ -20,9 +20,9 @@ import { Client, Events, type VoiceChannel } from 'discord.js';
 import type { DiscordGatewayAdapterLibraryMethods } from '@discordjs/voice';
 import { WebSocket, WebSocketServer } from 'ws';
 import { request, Agent } from 'undici';
-import { Discord通信, Gateway戦略 } from '../../src/network';
-import { DiscordBot } from '../../src/bot';
-import { Live接続 } from '../../src/live';
+import { Discord通信, Gateway戦略 } from '../../src/接続/ネットワーク接続';
+import { DiscordBot } from '../../src/接続/Bot接続';
+import { Live接続 } from '../../src/ライブ/ライブ会話';
 import { config, waitFor } from '../helpers';
 
 const tls = { key: readFileSync(new URL('./network-key.fixture', import.meta.url)), cert: readFileSync(new URL('./network-cert.fixture', import.meta.url)) };

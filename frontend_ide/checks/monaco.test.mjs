@@ -24,7 +24,7 @@ async function fixture(t) {
   require.reset = () => { resets++; failure = false; };
   globalThis.window = {};
   globalThis.document = { createElement: () => ({ remove() { this.removed = true; } }), head: { append: script => scripts.push(script) } };
-  const { loadMonaco } = await import(new URL(`../src/engines/monaco.js?test=${++sequence}`, import.meta.url));
+  const { loadMonaco } = await import(new URL(`../src/ファイル閲覧/コード表示.js?test=${++sequence}`, import.meta.url));
   return { scripts, configs, loadMonaco, monaco, install: () => { window.require = require; }, fail: () => { failure = true; }, get calls() { return calls; }, get resets() { return resets; } };
 }
 

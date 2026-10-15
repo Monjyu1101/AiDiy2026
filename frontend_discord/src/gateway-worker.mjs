@@ -13,7 +13,7 @@
 import { register } from 'tsx/esm/api';
 import { WorkerBootstrapper } from '@discordjs/ws';
 register();
-const { Discord通信 } = await import('./network.ts');
+const { Discord通信 } = await import('./接続/ネットワーク接続.ts');
 const network = new Discord通信();
 network.Gateway開始();
 // Gateway用agentとソケットはこのworkerだけが所有する。SDKのstrategy.destroy

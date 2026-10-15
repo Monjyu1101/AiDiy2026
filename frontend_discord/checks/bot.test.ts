@@ -15,9 +15,9 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { ChannelType, Events, type Client, type Message, type VoiceChannel } from 'discord.js';
 import { fileURLToPath } from 'node:url';
-import { DiscordBot, 回答送信 } from '../src/bot';
-import { Code接続 } from '../src/code';
-import { ライブ接続エラー } from '../src/connection-error';
+import { DiscordBot, 回答送信 } from '../src/接続/Bot接続';
+import { Code接続 } from '../src/コード/コード会話';
+import { ライブ接続エラー } from '../src/接続/接続エラー';
 import { config, guildId, textId, voiceId, userId, botId, waitFor } from './helpers';
 
 function fixture(inVoice = true) {

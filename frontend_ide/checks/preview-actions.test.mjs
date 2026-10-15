@@ -3,13 +3,14 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as references from '../src/file-reference.js';
-import * as actions from '../src/file-actions.js';
+import * as references from '../src/ファイル閲覧/ファイル参照.js';
+import * as actions from '../src/ファイル閲覧/ファイル操作.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -42,7 +43,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     patchProp: (element, key, _old, value) => { element.props[key] = value; },
     setText: (element, text) => { element.text = text; }, setElementText: (element, text) => { element.text = text; element.children = []; },
   });
-  const filename = new URL('../src/components/FileViewer.vue', import.meta.url).pathname;
+  const filename = fileURLToPath(new URL('../src/ファイル閲覧/ファイルビューア.vue', import.meta.url));
   const { descriptor } = parse(readFileSync(filename, 'utf8'));
   const script = compileScript(descriptor, { id: 'FileViewer', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, id: 'FileViewer', filename, compilerOptions: { bindingMetadata: script.bindings } });
@@ -53,9 +54,9 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     localStorage: { getItem: () => null },
     fetch: async () => ({ ok: true, json: async () => ({ kind: 'text', text: '本文は消えません', size: 24 }) }),
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
-    require: id => id === 'vue' ? vue : id === '../file-reference.js' ? references
-      : id === '../file-actions.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
-        : id === '../engines/monaco.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
+    require: id => id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
+      : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
+        : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });
   const component = module.exports, setup = component.setup;
   component.setup = (props, context) => { state = setup(props, context); return state; };

@@ -10,15 +10,15 @@ import vm from 'node:vm';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from '../起動/desktop.mjs';
 const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
-async function mainFixture(){
+async function mainFixture({opening,load}={}){
  const source=await readFile(new URL('../起動/electron-main.cjs',import.meta.url),'utf8');
- const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={};
+ const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={},scripts=[],openings=[];
  Object.assign(proc,{stdin,pid:42,platform:'win32',connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
  let options,win,loaded;app.whenReady=async()=>{};app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return false;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;}}
- vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:({app,BrowserWindow:Window,session,ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
- return {stdin,proc,app,policy,sent,exits,handlers,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
+ vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
+ return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
 test('desktop default; explicit browser, Codespaces, headless remain Node-only',()=>{
  assert.equal(browserMode({}, {DISPLAY:':1'},'linux'),false);assert.equal(browserMode({}, {},'win32'),false);
@@ -40,7 +40,7 @@ test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',as
  assert.equal(f.options.webPreferences.nodeIntegration,false);assert.equal(f.options.webPreferences.contextIsolation,true);assert.equal(f.options.webPreferences.sandbox,true);assert.equal(f.loaded,url);
  const {policy,win}=f;assert.equal(policy.check(),false);policy.permission(null,'camera',allowed=>assert.equal(allowed,false));assert.equal(policy.window().action,'deny');
  let blocked=false;win.webContents.emit('will-navigate',{preventDefault(){blocked=true;}});assert.ok(blocked);policy.request({url:'https://outside.test/'},value=>assert.equal(value.cancel,true));
- win.emit('ready-to-show');assert.equal(win.shown,true);assert.equal(f.sent.at(-1).type,'diag-shown');
+ assert.equal(f.openings.length,1);assert.equal(win.shown,true);assert.equal(f.sent.at(-1).type,'diag-shown');
  f.proc.emit('disconnect');assert.equal(f.app.quitting,true);
 });
 test('Electron invalid message / URL and page failure emit fixed secret-free causes',async()=>{
@@ -100,4 +100,30 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');assert.equal(f.win.closed,true);
  const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
  assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','isMaximized','maximize','minimize']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+});
+
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+test('Diag waits for load and shared expansion before revealing content and reporting shown',async()=>{
+ let loaded,expanded;const f=await mainFixture({load:()=>new Promise(resolve=>loaded=resolve),opening:window=>new Promise(resolve=>expanded=()=>{window.show();resolve(true);})});
+ f.proc.emit('message',{type:'diag-start',url});await flush();
+ f.win.emit('ready-to-show');assert.equal(f.win.shown,undefined);assert.equal(f.openings.length,0);
+ loaded();await flush();assert.equal(f.openings.length,1);assert.equal(f.openings[0].window,f.win);assert.equal(f.openings[0].options.background,f.options.backgroundColor);
+ assert.match(f.scripts[0],/classList.add\('desktop-opening','desktop-window'\)/);assert.equal(f.sent.some(m=>m.type==='diag-shown'),false);
+ expanded();await flush();assert.match(f.scripts.at(-1),/classList.remove\('desktop-opening'\)/);assert.equal(f.sent.filter(m=>m.type==='diag-shown').length,1);
+ f.win.emit('ready-to-show');assert.equal(f.openings.length,1);
+});
+test('closed window or renderer failure during expansion never reports shown',async()=>{
+ for(const failure of ['closed','renderer']){
+  let finish;const f=await mainFixture({opening:()=>new Promise(resolve=>finish=resolve)});
+  f.proc.emit('message',{type:'diag-start',url});await flush();
+  if(failure==='closed')f.win.destroyed=true;else f.win.webContents.emit('render-process-gone');
+  finish(failure!=='closed');await flush();assert.equal(f.sent.some(m=>m.type==='diag-shown'),false);assert.equal(f.scripts.length,1);
+ }
+});
+test('load failure skips expansion and content fade is desktop-only with reduced-motion override',async()=>{
+ const f=await mainFixture({load:async()=>{throw Error('SECRET');}});f.proc.emit('message',{type:'diag-start',url});await flush();assert.equal(f.openings.length,0);assert.equal(f.sent.at(-1).code,'LOAD');
+ const css=await readFile(new URL('../ui/src/style.css',import.meta.url),'utf8');
+ assert.match(css,/\.desktop-window #app\{animation:startup-fade-in \.45s ease-out both\}/);
+ assert.match(css,/\.desktop-opening #app\{opacity:0;animation:none\}/);
+ assert.match(css,/@media\(prefers-reduced-motion:reduce\)\{\.desktop-window #app\{animation:none\}\}/);
 });

@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyBrowserText, fullFilePath } from '../src/file-actions.js';
+import { copyBrowserText, fullFilePath } from '../src/ファイル閲覧/ファイル操作.js';
 
 test('パス: Windowsドライブ・UNC・日本語・空白・記号とPOSIXのルートを保持する', () => {
   for (const [root, path, expected] of [

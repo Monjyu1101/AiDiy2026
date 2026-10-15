@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { createSpace, fileSizeScale } from '../src/engines/space.js';
+import { createSpace, fileSizeScale } from '../src/開発スペース/宇宙描画.js';
 
 const flush = async () => { for (let n = 0; n < 20; n++) await Promise.resolve(); };
 const dir = (n, f = [], d = []) => ({ n, f: f.map(file => Array.isArray(file) ? file : [file, 40, 100]), d });
@@ -452,7 +452,7 @@ test('検索明細のUI受渡: Explorerのroute通知からengine保持・描画
   try {
     await h.ready();
     const records=[{from:null,to:'f:A'},{from:'f:A',to:'f:B'}];
-    const source=readFileSync(new URL('../src/components/FileExplorer.vue',import.meta.url),'utf8');
+    const source=readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),'utf8');
     const notification=source.split('\n').find(line=>line.startsWith('watch([routeMode,aiRoute]'));
     assert.ok(notification);
     const dispatch=result=>runInNewContext(notification,{

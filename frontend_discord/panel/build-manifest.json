@@ -1,0 +1,16 @@
+{
+  "package-lock.json": "845b3fa4916a0ba1a322690ae5aabcbd61b124640d22f165ab229ccd0ad5416b",
+  "package.json": "a31006abc78a8118e8cdcad3ef1780da9b6290b72127af9c376f93bca2286ae9",
+  "panel/THIRD_PARTY_NOTICES.txt": "991f108cf9b45856e7f9864d918cb66c1f6f9ab41f18dd885f0c95bf8aa10d12",
+  "panel/index.html": "a6bd2ff29d8416ec53d3b3b0f572d4278b75a3be8ad24c8cbb3459df520bfe74",
+  "panel/main.js": "616f09741642b2e3598fa0677e7fef28ca2b2f9528ec364fe28c161391c83c8c",
+  "panel/style.css": "18f45a60ce6a84fede5b52aa619108296f0b7dbf98efd038854694051317ce20",
+  "panel/view.js": "43d2383bb27f84e310a698166bd4d22494116870f3592e08e279d0768760a8fd",
+  "panel/visualizer.js": "4ff5202bee0fe0c85fa74fa628b9a00d4cd6c00fdfef88bb0ccbff6dbaeec8d7",
+  "panel/ライブ/音声表示.js": "adfbfb27e5d1a454645afde3cf8297057b887be067a92915ff56045fbcf26987",
+  "panel/接続/パネル状態.js": "4bdac86997ad6d954bef0856effd33fe02a157de7afa81afe1b9efcd40898ece",
+  "panel/画面/接続パネル.vue": "212532bf01d3c8cf365088d37d3193cbec868ce8cf95b0b0e522029db5e5685f",
+  "panel/画面/機能切替.vue": "1cd911c0dac6c2f3fc14c810c5c4bcbdb8d54e0f02959b3d65b0a7fa459051f2",
+  "scripts/build-panel.mjs": "187a9c9a943f5f226e0bc17bc8130da8ce852c3c2b524f216c6b5327b1afe973",
+  "scripts/verify-panel.mjs": "f72938b77e1de0e95ebd0e8e25beb7048912f76fe8b47c77b36653de2927ce91"
+}

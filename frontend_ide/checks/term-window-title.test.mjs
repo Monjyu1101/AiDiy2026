@@ -13,7 +13,7 @@ const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transf
 const flush=async()=>{for(let n=0;n<10;n++)await Promise.resolve();};
 function fixture({desktop=true,linked=true,title=()=>Promise.resolve('AiDiy IDE / Term 3')}={}){
  const mounted=[],unmounted=[];let calls=0;
- const source=readFileSync(new URL('../src/components/TermPanel.vue',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8');
  const {descriptor,errors}=parse(source);assert.deepEqual(errors,[]);
  const script=compileScript(descriptor,{id:'term',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'TermPanel.vue',id:'term',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
@@ -22,7 +22,7 @@ function fixture({desktop=true,linked=true,title=()=>Promise.resolve('AiDiy IDE 
  const module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{
   module,console,URL,window:{aidiyWindow:{title:()=>{calls++;return title();}}},location:{href:'http://localhost/'},ResizeObserver:class{observe(){}disconnect(){}},WebSocket:class{close(){}},
-  require:id=>id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../terminal-completion.js'?{cliCompletions:{}}:{},
+  require:id=>id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../ターミナル/コマンド補完.js'?{cliCompletions:{}}:{},
  });
  const scope=vue.effectScope(),component=module.exports,props={desktop,linked,visible:true,base:'/term/'};
  const state=scope.run(()=>component.setup(props,{expose(){}}));state.container.value={addEventListener:noop,removeEventListener:noop};

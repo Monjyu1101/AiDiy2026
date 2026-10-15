@@ -3,18 +3,19 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import { componentPaths, componentName } from './component-paths.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as fileReference from '../src/file-reference.js';
-import * as fileActions from '../src/file-actions.js';
+import * as fileReference from '../src/ファイル閲覧/ファイル参照.js';
+import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 function component(name,{props={},modules={},globals={},provided={}}={}){
-  const {descriptor}=parse(readFileSync(new URL(`../src/components/${name}.vue`,import.meta.url),'utf8'));
+  const {descriptor}=parse(readFileSync(new URL(`../src/${componentPaths[name]}`,import.meta.url),'utf8'));
   const {content}=compileScript(descriptor,{id:name,genDefaultAs:'component'});
   const mounted=[],unmounted=[],emitted=[],module={exports:{}};
   const window=new EventTarget();
@@ -22,7 +23,7 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
     module,window,AbortController,AbortSignal,URLSearchParams,Response,Date,
     localStorage:{getItem:()=>null,setItem(){}},getComputedStyle:()=>({getPropertyValue:()=>10}),
     setTimeout:()=>0,clearTimeout(){},
-    require:id=>id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../file-actions.js'?fileActions:modules[id]||{},
+    require:id=>id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../ファイル閲覧/ファイル操作.js'?fileActions:modules[id]||{},
     ...globals,
   });
   const scope=vue.effectScope(),reactive=vue.reactive(props);
@@ -32,7 +33,7 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
 function viewerFixture({fetcher,fallback=false,file={name:'sample.md',path:'sample.md',line:2,column:1,query:'日本語'}}={}){
   const revealed=[],selections=[],drafts=[],requests=[];let selected=null;
   const editor={getModel:()=>({dispose(){},getValueInRange:()=>selected?.text||''}),dispose(){},onDidScrollChange:()=>({dispose(){}}),setSelection:range=>selections.push(range),revealLineInCenter:line=>revealed.push(line),getSelection:()=>selected};
-  const fixture=component('FileViewer',{props:{root:'/same',file},modules:{'../file-reference.js':fileReference,'../engines/monaco.js':{loadMonaco:async()=>{if(fallback)throw Error();return{editor:{create:()=>editor}};},monacoLanguage:()=> 'text'}},provided:{openFileDraft:value=>drafts.push(value)},globals:{fetch:async(url,options)=>{requests.push(url);return fetcher?fetcher(url,options):new Response(JSON.stringify({kind:'text',text:'start\n日本語の行\nend',size:30}));}}});
+  const fixture=component('FileViewer',{props:{root:'/same',file},modules:{'../ファイル閲覧/ファイル参照.js':fileReference,'../ファイル閲覧/コード表示.js':{loadMonaco:async()=>{if(fallback)throw Error();return{editor:{create:()=>editor}};},monacoLanguage:()=> 'text'}},provided:{openFileDraft:value=>drafts.push(value)},globals:{fetch:async(url,options)=>{requests.push(url);return fetcher?fetcher(url,options):new Response(JSON.stringify({kind:'text',text:'start\n日本語の行\nend',size:30}));}}});
   return{...fixture,revealed,selections,drafts,requests,select:text=>{selected={text,startLineNumber:2,endLineNumber:2,isEmpty:()=>false};}};
 }
 test('ビューア: grepクリックはプレビュー設定よりコード表示を優先し、照合した行へ移動する',async()=>{

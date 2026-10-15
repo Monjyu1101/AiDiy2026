@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as folderPages from '../src/folder-pages.js';
-import { fileIcon, catppuccinAsset } from '../src/file-icons.js';
-import { validConnectionState } from '../src/connection-state.js';
-import { createDraftTargetRegistry } from '../src/draft-target-registry.js';
+import * as folderPages from '../src/ファイル閲覧/フォルダページ構成.js';
+import { fileIcon, catppuccinAsset } from '../src/ファイル閲覧/ファイルアイコン.js';
+import { validConnectionState } from '../src/共通表示/接続状態.js';
+import { createDraftTargetRegistry } from '../src/下書き連携/連携先登録.js';
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc'), { transformSync } = require('esbuild');
 const flush = async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); };
@@ -31,9 +31,9 @@ function setup(path, { props = {}, modules = {}, globals = {} } = {}) {
     module, window, location: { hash: '' }, AbortController, AbortSignal, URLSearchParams, Date,
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1, clearTimeout() {},
     require: id => id === 'vue' ? { ...vue, provide() {}, inject: (_key, fallback) => fallback, onMounted: callback => mounted.push(callback), onBeforeUnmount: callback => unmounted.push(callback) }
-      : id.endsWith('/folder-pages.js') ? folderPages
-      : id.endsWith('/connection-state.js') ? { validConnectionState }
-      : id.endsWith('/draft-target-registry.js') ? { createDraftTargetRegistry } : modules[id] || {},
+      : id.endsWith('/フォルダページ構成.js') ? folderPages
+      : id.endsWith('/接続状態.js') ? { validConnectionState }
+      : id.endsWith('/連携先登録.js') ? { createDraftTargetRegistry } : modules[id] || {},
     ...globals,
   });
   const scope = vue.effectScope(), reactive = vue.reactive(props);
@@ -102,7 +102,7 @@ test('複数ページ: 共通の親経由で戻して進み、深い移動も5�
 });
 
 function pageFixture(globals = {}) {
-  const h = setup('components/FolderPages', { props: { tree: tree(), current: '', selected: '', marks: { mode: 'since', since: 1 }, active: true, color: () => '#fff' }, globals });
+  const h = setup('ファイル閲覧/フォルダページ', { props: { tree: tree(), current: '', selected: '', marks: { mode: 'since', since: 1 }, active: true, color: () => '#fff' }, globals });
   const actions = [], body = { scrollTop: 0, focus: options => actions.push(['focus', options]), contains: target => target === body, querySelector: () => ({ scrollIntoView: options => actions.push(['scroll', options]) }) };
   h.state.body.value = body;
   const key = (key, extra = {}) => { const event = { key, target: body, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; }, ...extra }; h.state.keydown(event); return event; };
@@ -283,7 +283,7 @@ test('2D部品: キーボードと戻る、入力中/非表示の無効化、連
 
 test('3Dラッパー: モード切替は同じengineへ停止/再開を伝え、再生成せず破棄を1回行う', async () => {
   const modes = [], engines = [], disposed = [];
-  const h = setup('components/SpaceCanvas', { props: { mode: '3d', layout: () => ({}) }, modules: { '../engines/space.js': { createSpace(_canvas, _elements, callbacks) { const engine = { setViewMode: mode => modes.push(mode), dispose: () => disposed.push(engine), callbacks }; engines.push(engine); return engine; } } } });
+  const h = setup('開発スペース/宇宙キャンバス', { props: { mode: '3d', layout: () => ({}) }, modules: { '../開発スペース/宇宙描画.js': { createSpace(_canvas, _elements, callbacks) { const engine = { setViewMode: mode => modes.push(mode), dispose: () => disposed.push(engine), callbacks }; engines.push(engine); return engine; } } } });
   await h.mount(); assert.equal(engines.length, 1); assert.equal(h.emitted[0][0], 'ready');
   for (const mode of ['2d', '3d', '2d', '3d']) h.props.mode = mode;
   assert.deepEqual(modes, ['3d', '2d', '3d', '2d', '3d']); assert.equal(engines.length, 1);
@@ -309,7 +309,7 @@ test('IDE: 3Dが既定。2D切替で利用状態・Term/Code/Live・下書き対
 
 test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Live、共通機能はモード外', () => {
   const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8');
-  const view = readFileSync(new URL('../src/components/SpaceView.vue', import.meta.url), 'utf8');
+  const view = readFileSync(new URL('../src/開発スペース/開発スペース.vue', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
   assert.ok(app.indexOf('class="ide-project-name"') < app.indexOf('class="ide-view-modes"'));
   assert.ok(app.indexOf('class="ide-view-modes"') < app.indexOf('class="ide-toolbar-right"'));
@@ -325,7 +325,7 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:calc\(0% - var\(--page-turn-slant\)\)\}/);
   assert.match(css, /@keyframes folder-page-edge-back\{from\{left:calc\(0% - var\(--page-turn-slant\)\)\}to\{left:100%\}/);
   assert.doesNotMatch(css, /rotateY\(/);
-  assert.doesNotMatch(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval|setTimeout/);
+  assert.doesNotMatch(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval|setTimeout/);
 });
 
 test('2Dページの斜線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
@@ -539,7 +539,7 @@ test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし�
 
 test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の戻る抑止・軌跡バー高さ追従', async () => {
   const calls = [], styles = [], observers = []; let bottom = 208;
-  const h = setup('components/SpaceView', { props: { viewMode: '3d', startedAt: 1 }, globals: {
+  const h = setup('開発スペース/開発スペース', { props: { viewMode: '3d', startedAt: 1 }, globals: {
     getComputedStyle: () => ({ getPropertyValue: () => '78px' }),
     ResizeObserver: class { constructor(callback) { this.callback = callback; observers.push(this); } observe() {} disconnect() { calls.push('disconnect'); } },
   } });
@@ -563,17 +563,17 @@ test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の�
 
 async function mountedPages(globals = {}) {
   // アイコンも実際のSFCをコンパイルし、旧ページ・経由ページを含む表示を検証する。
-  const iconSource = parse(readFileSync(new URL('../src/components/FileTypeIcon.vue', import.meta.url), 'utf8')).descriptor;
+  const iconSource = parse(readFileSync(new URL('../src/ファイル閲覧/ファイル種別アイコン.vue', import.meta.url), 'utf8')).descriptor;
   const iconScript = compileScript(iconSource, { id: 'mounted-icon', genDefaultAs: 'component', inlineTemplate: true });
   const iconModule = { exports: {} };
   vm.runInNewContext(transformSync(iconScript.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
     module: iconModule, require: id => id === 'vue' ? vue : { fileIcon },
   });
-  const { descriptor } = parse(readFileSync(new URL('../src/components/FolderPages.vue', import.meta.url), 'utf8'));
+  const { descriptor } = parse(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'mounted-pages', genDefaultAs: 'component', inlineTemplate: true });
   const module = { exports: {} };
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, Date, require: id => id === 'vue' ? vue : id.endsWith('FileTypeIcon.vue') ? iconModule.exports : folderPages, ...globals,
+    module, Date, require: id => id === 'vue' ? vue : id.endsWith('ファイル種別アイコン.vue') ? iconModule.exports : folderPages, ...globals,
   });
   const walk = (element, predicate) => predicate(element) ? element : (element.children || []).map(child => walk(child, predicate)).find(Boolean);
   const node = type => ({ type, children: [], props: {}, scrollTop: 0,
@@ -871,7 +871,7 @@ test('2Dアイコン: 24px表示は既存32px列内に収まり、クリーム�
   assert.equal(declaration('.folder-page-icon', 'display'), 'grid');
   assert.equal(declaration('.folder-page-icon', 'place-items'), 'center');
   assert.equal(declaration('.mode-2d .folder-page-icon', 'filter'), 'brightness(.5) saturate(.9)');
-  assert.match(readFileSync(new URL('../src/components/FileTypeIcon.vue', import.meta.url), 'utf8'), /width:var\(--file-type-icon-size,16px\);height:var\(--file-type-icon-size,16px\)/);
+  assert.match(readFileSync(new URL('../src/ファイル閲覧/ファイル種別アイコン.vue', import.meta.url), 'utf8'), /width:var\(--file-type-icon-size,16px\);height:var\(--file-type-icon-size,16px\)/);
   // 元SVGは増やさず、2DのCSSフィルターだけで暗くする。計算は実描画の検証とは別。
   const manifest = JSON.parse(readFileSync(new URL('../public/assets/catppuccin_icons/manifest.json', import.meta.url), 'utf8'));
   const rgb = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);

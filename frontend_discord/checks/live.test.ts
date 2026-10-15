@@ -18,7 +18,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import OpusScript from 'opusscript';
 import { VoiceConnectionStatus, type VoiceConnection, type AudioPlayer } from '@discordjs/voice';
 import type { VoiceChannel } from 'discord.js';
-import { Live接続 } from '../src/live';
+import { Live接続 } from '../src/ライブ/ライブ会話';
 import { config, userId, guildId, voiceId, waitFor } from './helpers';
 
 async function fixture(rejectChannel = '', provider = 'openai_live', selectedProvider = provider,

@@ -1,6 +1,7 @@
 'use strict';
 const {app,BrowserWindow,session,ipcMain}=require('electron');
 const path=require('node:path');
+const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
 let window, failed=false;
 function fail(code) {
   if(failed)return;failed=true;
@@ -39,10 +40,15 @@ async function start(value) {
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.on('will-redirect',event=>event.preventDefault());
   window.webContents.on('will-attach-webview',event=>event.preventDefault());
-  window.once('ready-to-show',()=>{window.show();if(process.connected)process.send({type:'diag-shown'},error=>{if(error)fail('IPC');});});
   window.webContents.once('did-fail-load',(_event,_code,_description,_url,isMainFrame)=>{if(isMainFrame!==false)fail('LOAD');});
   window.webContents.once('render-process-gone',()=>fail('RENDERER'));
-  try{await window.loadURL(url.href);}catch{fail('LOAD');}
+  try{await window.loadURL(url.href);}catch{fail('LOAD');return;}
+  if(failed || window.isDestroyed())return;
+  // Code / Live / Term / IDE と同じ共通演出。内容は拡大完了後にフェード表示する。
+  await window.webContents.executeJavaScript("document.documentElement.classList.add('desktop-opening','desktop-window')");
+  if(!await 拡大表示(BrowserWindow,window,{background:'#080b10'}) || failed)return;
+  await window.webContents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
+  if(!failed && !window.isDestroyed() && process.connected)process.send({type:'diag-shown'},error=>{if(error)fail('IPC');});
 }
 // Electron on Windows replaces stdin with an empty EOF stream. Use the inherited Node IPC channel.
 const timer=setTimeout(()=>fail('TIMEOUT'),10000);

@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { Code接続 } from '../src/code';
+import { Code接続 } from '../src/コード/コード会話';
 import { config } from './helpers';
 
 const launch = { 実行ファイル: process.execPath, 引数: [fileURLToPath(new URL('./fake-cli.cjs', import.meta.url))] };

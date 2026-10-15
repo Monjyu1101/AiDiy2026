@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { render, source } = require('./ui-components.cjs');
 test('compiled badges distinguish every state with text only, no icons', async () => {
   for (const [state, tone] of Object.entries({ 未確認: 'neutral', 未実施: 'neutral', 未取得: 'neutral', 未検出: 'warning', 注意: 'warning', OK: 'success', NG: 'danger', ERR: 'danger', 取得済: 'success', 取得中: 'pending', 失敗: 'danger', 確認中: 'pending', キャッシュ利用: 'cache', PASS: 'cache' })) {
-    const html = await render('StatusBadge.vue', { state });
+    const html = await render('共通表示/状態バッジ.vue', { state });
     assert.ok(html.includes(`data-state="${state}"`));
     assert.ok(html.includes(`data-tone="${tone}"`));
     assert.ok(html.includes(`aria-label="${state}"`));
@@ -14,7 +14,7 @@ test('compiled badges distinguish every state with text only, no icons', async (
 });
 
 test('untrusted labels are escaped', async () => {
-  const escaped = await render('StatusBadge.vue', { label: '<script>alert(1)</script>' });
+  const escaped = await render('共通表示/状態バッジ.vue', { label: '<script>alert(1)</script>' });
   assert.doesNotMatch(escaped, /<script>/);
   assert.match(escaped, /&lt;script&gt;/);
 });
@@ -49,7 +49,7 @@ test('badge palette is white text on solid colors with accessible contrast', () 
   assert.match(css, /\.badge\{--badge-fg:#ffffff;--badge-bg:#5b6673;[^}]*border:0/);
   assert.doesNotMatch(css, /badge-icon|badge-neutral-dot/);
   assert.doesNotMatch(css, /\.badge::before|\.status::before/);
-  assert.doesNotMatch(source('StatusBadge.vue'), /v-html|innerHTML|https?:/);
+  assert.doesNotMatch(source('共通表示/状態バッジ.vue'), /v-html|innerHTML|https?:/);
 });
 
 

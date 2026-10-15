@@ -19,7 +19,7 @@ import { createCoreConnection } from './core-connection.mjs';
 import { createPanels } from './panels.mjs';
 import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
-import { latestFile, latestFiles } from '../src/latest-file.js';
+import { latestFile, latestFiles } from '../src/ファイル閲覧/最新ファイル.js';
 import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
 export { scanTree, createScanPool } from './file-scan.mjs';
 

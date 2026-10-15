@@ -16,7 +16,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeF
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { プロジェクトルート } from '../src/config';
+import { プロジェクトルート } from '../src/接続/接続設定';
 import { defaults } from './helpers';
 
 test('単独起動・自動接続は無効なトークンを Electron 起動前に検出し、終了コード1で止まる', () => {

@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as completion from '../src/terminal-completion.js';
+import * as completion from '../src/ターミナル/コマンド補完.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileStyle}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
-const {descriptor}=parse(readFileSync(new URL('../src/components/TermPanel.vue',import.meta.url),'utf8'));
+const {descriptor}=parse(readFileSync(new URL('../src/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8'));
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 
 // 実Vueのsetupと実FitAddonを通す。文字セルの測定・描画・WebSocketだけを代替する。
@@ -38,7 +38,7 @@ async function fixture(t){
  class ResizeObserver{
   constructor(callback){this.callback=callback;observers.add(this);} observe(target){this.target=target;} disconnect(){observers.delete(this);}
  }
- const modules={'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'./StatusBar.vue':{},'./TerminalWelcome.vue':{},'../terminal-completion.js':completion};
+ const modules={'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
  const script=compileScript(descriptor,{id:'TermPanel',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
   module,URL,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},

@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
-import { cliCompletions } from '../src/terminal-completion.js';
+import { cliCompletions } from '../src/ターミナル/コマンド補完.js';
 import { toolsTarget } from '../ファイル機能/ai-search.mjs';
 
 // IDEのパネル中継だけが接続する、ランダムパス付きのローカル端末。

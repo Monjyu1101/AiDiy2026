@@ -16,7 +16,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import https from 'node:https';
-import { Discord通信, Discord音声通信, プロキシ経路 } from '../src/network';
+import { Discord通信, Discord音声通信, プロキシ経路 } from '../src/接続/ネットワーク接続';
 
 test('HTTP(S)_PROXY の大小文字、HTTPS優先・HTTPへの代替、NO_PROXYとローカル除外', () => {
   const lower = 'http://lower.test:8000', upper = 'http://upper.test:8000';

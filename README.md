@@ -292,7 +292,9 @@ python _cleanup.py
 6. [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
-9. [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md)
-10. [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md)
-11. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md)
-12. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+9. [backend_diag/AGENTS.md](./backend_diag/AGENTS.md) — Diag の診断・Vue 画面
+10. [frontend_ide/AGENTS.md](./frontend_ide/AGENTS.md) — Term / Code / Live / IDE の共通 Vue 画面
+11. [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md) — Code / Live の拡張ホスト・通信
+12. [frontend_discord/AGENTS.md](./frontend_discord/AGENTS.md) — Discord の接続・Vue パネル
+13. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) — ファイルAPI・Office表示
+14. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

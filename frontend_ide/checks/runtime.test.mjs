@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { startDevelopment } from '../server.mjs';
-import { codeTransport } from '../src/transports/code.js';
+import { codeTransport } from '../src/コード/コード通信.js';
 const project=fileURLToPath(new URL('../',import.meta.url));
 
 test('IDEの旧アプリ名は互換起動せず拒否する',async()=>{

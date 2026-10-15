@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { 接続失敗案内, 接続エラー詳細 } from '../src/connection-error';
+import { 接続失敗案内, 接続エラー詳細 } from '../src/接続/接続エラー';
 
 test('Hermes、Discord認証、Intent、通信の失敗を分けて案内する', () => {
   assert.match(接続失敗案内(new Error('Python が見つかりません。'), 'Hermes確認'), /Hermes用のPython/);

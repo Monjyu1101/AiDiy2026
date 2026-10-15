@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {orbitLevelRoll} from '../src/engines/orbit-guide.js';
+import {orbitLevelRoll} from '../src/開発スペース/軌道案内.js';
 
 test('軌道面の上側が機体の上を向くよう水平を合わせる',()=>{
   for(const yaw of [-7,0,1.5,8])for(const pitch of [-2.4,-.4,.5,2.8])for(const roll of [-1.2,0,2.4]){

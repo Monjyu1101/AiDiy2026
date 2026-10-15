@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDraftTargetRegistry } from '../src/draft-target-registry.js';
+import { createDraftTargetRegistry } from '../src/下書き連携/連携先登録.js';
 
 function panel(kind='code',projectPath='/same'){
   const info={kind,projectPath,contextId:'conversation',label:kind,maxLength:200000};

@@ -8,7 +8,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createSearchHistory } from './ai-search-history.mjs';
-import { searchRouteRecords } from '../src/engines/route-records.js';
+import { searchRouteRecords } from '../src/開発スペース/経路記録.js';
 
 const MAX_RESULT = 1024 * 1024;
 const within = (root, path) => { const back=relative(root,path); return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back); };

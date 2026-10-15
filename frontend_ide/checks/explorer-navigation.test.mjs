@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import * as latest from '../src/latest-file.js';
-import {scanWarning} from '../src/scan-warning.js';
-import {createSpace} from '../src/engines/space.js';
+import * as latest from '../src/ファイル閲覧/最新ファイル.js';
+import {scanWarning} from '../src/ファイル閲覧/走査警告.js';
+import {createSpace} from '../src/開発スペース/宇宙描画.js';
 
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
@@ -20,7 +20,7 @@ const reply=value=>({ok:true,json:async()=>value});
 const scan=(files,extra={})=>({root:'/project',tree:{n:'project',d:[],f:files.map(path=>[path,20,1000])},truncated:false,...extra});
 
 function explorer(fetcher=async()=>reply({files:[]})){
-  const path=new URL('../src/components/FileExplorer.vue',import.meta.url),{descriptor}=parse(readFileSync(path,'utf8'));
+  const path=new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),{descriptor}=parse(readFileSync(path,'utf8'));
   assert.deepEqual(compileTemplate({source:descriptor.template.content,id:'explorer',filename:path.pathname}).errors,[]);
   const script=compileScript(descriptor,{id:'explorer',genDefaultAs:'component'});
   const {code}=transformSync(`${script.content}\nmodule.exports=component;`,{format:'cjs'});
@@ -31,7 +31,7 @@ function explorer(fetcher=async()=>reply({files:[]})){
     module,document,fetch:fetcher,AbortController,URLSearchParams,Date,console,
     localStorage:{getItem:()=>null,setItem(){}},matchMedia:()=>({matches:true}),CSS:{escape:value=>value},
     setInterval:(callback,ms)=>{timers.set(++id,{callback,ms});return id;},clearInterval:key=>timers.delete(key),setTimeout,clearTimeout,
-    require:id=>id==='vue'?{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.includes('latest-file')?latest:id.includes('scan-warning')?{scanWarning}:{},
+    require:id=>id==='vue'?{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.includes('最新ファイル')?latest:id.includes('走査警告')?{scanWarning}:{},
   });
   const props=vue.reactive({root:'/project',tree:scan(['old.js']).tree,scan:scan(['old.js']),selected:'',current:'',startedAt:1,open:true,viewHistory:[],filter:true,color:()=>''});
   const scope=vue.effectScope(),state=scope.run(()=>module.exports.setup(props,{expose(){},emit:(...args)=>events.push(args)}));

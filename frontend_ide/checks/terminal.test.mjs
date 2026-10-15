@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { WebSocket } from 'ws';
 import { startTerminal } from '../aidiy_term/terminal.mjs';
 import { startDevelopment } from '../server.mjs';
-import { cliCompletions } from '../src/terminal-completion.js';
+import { cliCompletions } from '../src/ターミナル/コマンド補完.js';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(condition) { for (let i = 0; i < 200; i++) { if (condition()) return; await delay(50); } throw Error('端末の応答がタイムアウトしました。'); }
 async function connect(url, origin) {

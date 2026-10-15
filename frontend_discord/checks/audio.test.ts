@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import OpusScript from 'opusscript';
-import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換, 出力バッファ上限, 音声スペクトル, 音声レベル } from '../src/audio';
+import { Discord音声出力, 音声入力ミキサー, 入力PCM変換, 出力PCM変換, 出力バッファ上限, 音声スペクトル, 音声レベル } from '../src/ライブ/音声処理';
 
 test('48kHz stereo → 16/24kHz mono、24kHz mono → 48kHz stereo のレートと音量を検証', () => {
   const stereo = Buffer.alloc(3840);

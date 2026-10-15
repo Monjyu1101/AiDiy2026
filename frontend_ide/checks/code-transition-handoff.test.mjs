@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import * as draftHandoff from '../src/draft-handoff.js';
+import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -41,15 +41,15 @@ async function panel(t, { host = false, desktop = false } = {}) {
     fetch: (_url, options) => new Promise((resolve, reject) => { const packet = JSON.parse(options.body); sent.push(packet); requests.push({ packet, resolve, reject }); }),
   };
   const transport = { exports: {} };
-  vm.runInNewContext(transformSync(readFileSync(new URL('../src/transports/code.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, { ...globals, module: transport });
+  vm.runInNewContext(transformSync(readFileSync(new URL('../src/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, { ...globals, module: transport });
   const progress = { setup(_props, { expose }) { expose({ sync() {}, reset() {}, packet() {} }); return () => null; } };
   const modules = {
-    '../transports/code.js': transport.exports, '../draft-handoff.js': draftHandoff,
+    '../コード/コード通信.js': transport.exports, '../下書き連携/下書き受け渡し.js': draftHandoff,
     '../../host/src/stream-control': { visibleStreamContent: value => value },
-    '../engines/chat-arrival': { chatArrival: () => ({ reset() {}, dispose() {}, show() {}, reserve() {}, cancelReservation() {} }) },
-    'markdown-it': require('markdown-it'), './TerminalProgress.vue': progress,
+    '../コード/会話到着演出': { chatArrival: () => ({ reset() {}, dispose() {}, show() {}, reserve() {}, cancelReservation() {} }) },
+    'markdown-it': require('markdown-it'), '../ターミナル/進捗表示.vue': progress,
   };
-  const { descriptor } = parse(readFileSync(new URL('../src/components/CodePanel.vue', import.meta.url), 'utf8'));
+  const { descriptor } = parse(readFileSync(new URL('../src/コード/コードパネル.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'CodePanel', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, filename: 'CodePanel.vue', id: 'CodePanel', compilerOptions: { bindingMetadata: script.bindings } });
   assert.deepEqual(template.errors, []);

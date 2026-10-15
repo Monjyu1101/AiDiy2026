@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { 設定解析, プロジェクトルート } from '../src/config';
+import { 設定解析, プロジェクトルート } from '../src/接続/接続設定';
 import { defaults } from './helpers';
 
 test('PORT_CORE、共通モデル、作業フォルダを読み込み、元設定は変更しない', () => {

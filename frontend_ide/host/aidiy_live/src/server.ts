@@ -20,7 +20,7 @@ import { ライブモデル読込, ライブモデル保存, モデル保存先 
 import { ローカル接続先 } from '../local-backend.cjs';
 import { 接続エラー詳細 } from './connection-error';
 import { 接続元許可 } from '../../src/forwarded-origin';
-import { catppuccinAsset } from '../../../src/file-icons.js';
+import { catppuccinAsset } from '../../../src/ファイル閲覧/ファイルアイコン.js';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
 export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
