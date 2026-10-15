@@ -7,7 +7,7 @@
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createAISearch, runSearchAgent } from '../ai-search.mjs';
+import { createAISearch, runSearchAgent } from '../ファイル機能/ai-search.mjs';
 
 const root=await mkdtemp(join(tmpdir(),'aidiy-ai-live-'));
 let agentTask;

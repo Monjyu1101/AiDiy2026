@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createCoreConnection, coreTarget } from '../core-connection.mjs';
-import { toolsTarget } from '../../ai-search.mjs';
+import { toolsTarget } from '../../ファイル機能/ai-search.mjs';
 import { startServer } from '../server.mjs';
 
 const project = fileURLToPath(new URL('../web/', import.meta.url));

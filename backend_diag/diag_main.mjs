@@ -5,16 +5,16 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { catalog, scan, cancelProbes } from './probes.mjs';
-import {getToolsStatus} from './tools_status.mjs';
-import {browserMode,desktopBinary,openDesktop,closeDesktop} from './desktop.mjs';
-import {createPublicModelCache} from './public_models.mjs';
-import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './key_status.mjs';
+import { catalog, scan, cancelProbes } from './診断/probes.mjs';
+import {getToolsStatus} from './診断/tools_status.mjs';
+import {browserMode,desktopBinary,openDesktop,closeDesktop} from './起動/desktop.mjs';
+import {createPublicModelCache} from './モデル情報/public_models.mjs';
+import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './モデル情報/key_status.mjs';
 import {verify as verifyUi} from './ui/verify.mjs';
-import {stopRevision,watchStop} from './lifecycle.mjs';
-import {launchDetached} from './launch.mjs';
-import {headlessMain,writeInstallReport,INSTALL_FILE} from './headless.mjs';
-import {writeModelsInfo} from './models_info.mjs';
+import {stopRevision,watchStop} from './起動/lifecycle.mjs';
+import {launchDetached} from './起動/launch.mjs';
+import {headlessMain,writeInstallReport,INSTALL_FILE} from './診断/headless.mjs';
+import {writeModelsInfo} from './モデル情報/models_info.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -172,7 +172,7 @@ export async function main(args=process.argv.slice(2)) {
   const initialStop=await stopRevision();
   const token=randomBytes(32).toString('base64url');
   let entries,coverage;
-  try {entries=await catalog();coverage=JSON.parse(await readFile(new URL('./coverage.json',import.meta.url),'utf8'));}
+  try {entries=await catalog();coverage=JSON.parse(await readFile(new URL('./診断/coverage.json',import.meta.url),'utf8'));}
   catch {throw startupError('CATALOG');}
   const publicCache=createPublicModelCache();
   const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache});

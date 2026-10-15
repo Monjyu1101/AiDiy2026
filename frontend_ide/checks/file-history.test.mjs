@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname,resolve,sep} from 'node:path';
-import {createFileHistory} from '../file-history.mjs';
+import {createFileHistory} from '../ファイル機能/file-history.mjs';
 import {startDevelopment} from '../server.mjs';
 async function put(root,path,text){await mkdir(dirname(join(root,path)),{recursive:true});await writeFile(join(root,path),text);}
 async function fixture(t){const root=await mkdtemp(join(tmpdir(),'aidiy-history-'));t.after(()=>{assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep));return rm(root,{recursive:true,force:true});});await put(root,'src/main.js','const current = 3;');return root;}

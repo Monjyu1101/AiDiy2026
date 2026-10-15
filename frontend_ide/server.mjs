@@ -10,10 +10,10 @@ import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { basename,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAISearch } from './ai-search.mjs';
-import { createFileAnalysis } from './file-analysis.mjs';
-import { startTerminal } from './terminal.mjs';
-import { createFileHistory } from './file-history.mjs';
+import { createAISearch } from './ファイル機能/ai-search.mjs';
+import { createFileAnalysis } from './ファイル機能/file-analysis.mjs';
+import { startTerminal } from './aidiy_term/terminal.mjs';
+import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/file-icons.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){

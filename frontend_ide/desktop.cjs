@@ -6,7 +6,7 @@
 const {app,BrowserWindow,ipcMain,shell,clipboard,session,screen,dialog}=require('electron');
 const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
-const {projectProfile}=require('./project-profile.cjs');
+const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
 if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
 app.setName(`aidiy_${kind}`);
@@ -20,8 +20,8 @@ if(kind==='term'){
  app.setPath('userData',temporaryProfile);
  app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
 }
-const {windowBounds,windowMinimumSize}=require('./window-layout.cjs');
-const {reserveTermSlot}=require('./term-window-slot.cjs');
+const {windowBounds,windowMinimumSize}=require('./デスクトップ/window-layout.cjs');
+const {reserveTermSlot}=require('./デスクトップ/term-window-slot.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
 // IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
 if(kind!=='term'&&!app.requestSingleInstanceLock()){
@@ -29,10 +29,10 @@ if(kind!=='term'&&!app.requestSingleInstanceLock()){
  return;
 }
 const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
-const {createDraftRouter}=require('./draft-router.cjs');
-const {readDevelopmentState}=require('./desktop-session.cjs');
+const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
+const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
 const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
-const {createNativePreviewActions}=require('./native-preview-actions.cjs');
+const {createNativePreviewActions}=require('./デスクトップ/native-preview-actions.cjs');
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false;
 function focusWindow(window){
@@ -83,7 +83,7 @@ async function createWindow(kind,url,server,owner,linkKey){
  const bounds=windowBounds(kind,area,ownerBounds,slot);
  const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。

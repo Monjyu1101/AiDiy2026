@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {launchDetached} from '../launch.mjs';
+import {launchDetached} from '../起動/launch.mjs';
 import {parseArgs} from '../diag_main.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(fn){for(let n=0;n<150;n++){const value=await fn();if(value)return value;await pause(20);}throw Error('fixture readiness timeout');}
@@ -13,11 +13,11 @@ async function fixture(mode='normal') {
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-launch-'));
  await cp(new URL('../',import.meta.url),root,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
  // ネットワーク API と UI build のみ fixture 化。HTTP、CLI、IPC、所有関係は実プロセス。
- await writeFile(path.join(root,'public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
+ await writeFile(path.join(root,'モデル情報/public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
  await writeFile(path.join(root,'ui/verify.mjs'),'export async function verify(){return true;}');
- const desktop=path.join(root,'desktop.mjs');
+ const desktop=path.join(root,'起動/desktop.mjs');
  await writeFile(desktop,(await readFile(desktop,'utf8')).replace(/export async function desktopBinary[\s\S]*?\nconst failures=/,"export async function desktopBinary(){return process.execPath;}\nconst failures="));
- await writeFile(path.join(root,'electron-main.cjs'),`
+ await writeFile(path.join(root,'起動/electron-main.cjs'),`
  const fs=require('node:fs');
  process.on('disconnect',()=>process.exit(0));
  process.send({type:'diag-ready'});
@@ -89,7 +89,7 @@ test('detached startup timeout and early child failure reject and reap fixture p
 });
 
 test('safe diagnostic log accepts only fixed codes and stays within 64 KiB',async()=>{
- const {recordDesktopFailure}=await import('../desktop-log.mjs');
+ const {recordDesktopFailure}=await import('../起動/desktop-log.mjs');
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-safe-log-')),file=path.join(root,'errors.log');
  try{
   assert.equal(recordDesktopFailure('SECRET #token=private',file),false);
@@ -107,7 +107,7 @@ test('failure after detach leaves a fixed safe log and closes the server',{timeo
  }finally{await cleanup(root,child,info);}
 });
 test('probe diagnostic log retains safe structured failure fields only',async()=>{
- const {recordProbeFailure}=await import('../desktop-log.mjs');
+ const {recordProbeFailure}=await import('../起動/desktop-log.mjs');
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-probe-log-')),file=path.join(root,'errors.log');
  try{
   assert.equal(recordProbeFailure({reason:'SECRET'},file),false);
@@ -121,7 +121,7 @@ test('detached-mode real version failure writes safe log as well as stderr',{tim
  const root=await fixture();let child;
  try {
   const script=path.join(root,'probe-fixture.mjs');
-  await writeFile(script,`import {runVersion} from './probes.mjs';await runVersion('/definitely/missing/SECRET',['--version'],process.cwd(),{probeId:'fixture'});`);
+  await writeFile(script,`import {runVersion} from './診断/probes.mjs';await runVersion('/definitely/missing/SECRET',['--version'],process.cwd(),{probeId:'fixture'});`);
   child=spawn(process.execPath,[script],{env:{...process.env,AIDIY_DIAG_LAUNCHER_CHILD:'1'},stdio:['ignore','ignore','pipe']});let stderr='';child.stderr.on('data',x=>stderr+=x);
   assert.equal((await once(child,'exit'))[0],0);const log=await readFile(path.join(root,'.desktop-errors.log'),'utf8');
   for(const text of [log,stderr]){assert.match(text,/aidiy-diag:probe/);assert.match(text,/spawn_error/);assert.match(text,/ENOENT/);assert.ok(!text.includes('SECRET'));}
@@ -129,7 +129,7 @@ test('detached-mode real version failure writes safe log as well as stderr',{tim
 });
 
 test('safe diagnostic log rejects FIFO and directory without blocking',{skip:process.platform==='win32',timeout:3000},async()=>{
- const {recordDesktopFailure}=await import('../desktop-log.mjs');const root=await mkdtemp(path.join(os.tmpdir(),'diag-log-fifo-'));
+ const {recordDesktopFailure}=await import('../起動/desktop-log.mjs');const root=await mkdtemp(path.join(os.tmpdir(),'diag-log-fifo-'));
  try{const fifo=path.join(root,'fifo');const command=spawn('mkfifo',[fifo]);assert.equal((await once(command,'exit'))[0],0);assert.equal(recordDesktopFailure('EXIT',fifo),false);assert.equal(recordDesktopFailure('EXIT',root),false);}finally{await rm(root,{recursive:true,force:true});}
 });
 

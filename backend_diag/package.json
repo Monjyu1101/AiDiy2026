@@ -2,6 +2,6 @@
   "name": "aidiy-diag",
   "private": true,
   "version": "0.1.0",
-  "main": "electron-main.cjs",
+  "main": "起動/electron-main.cjs",
   "devDependencies": { "electron": "^44.7.0" }
 }

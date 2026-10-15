@@ -8,8 +8,8 @@ import { randomBytes } from 'node:crypto';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
-import { cliCompletions } from './src/terminal-completion.js';
-import { toolsTarget } from './ai-search.mjs';
+import { cliCompletions } from '../src/terminal-completion.js';
+import { toolsTarget } from '../ファイル機能/ai-search.mjs';
 
 // IDEのパネル中継だけが接続する、ランダムパス付きのローカル端末。
 // シェル・開始フォルダはサーバー側で決め、ブラウザから指定させない。
@@ -24,7 +24,7 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
   const shell = process.platform === 'win32'
     ? join(env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe')
     : env.SHELL || '/bin/sh';
-  const completionScript = fileURLToPath(new URL('./aidiy_term/powershell-init.ps1', import.meta.url)).replaceAll("'", "''");
+  const completionScript = fileURLToPath(new URL('./powershell-init.ps1', import.meta.url)).replaceAll("'", "''");
   const cliOptionsJson = JSON.stringify(Object.fromEntries(Object.entries(cliCompletions).map(([name, item]) => [name, item.options]))).replaceAll("'", "''");
   const args = process.platform === 'win32'
     ? ['-NoLogo', '-NoExit', '-Command', `. '${completionScript}' -CliOptionsJson '${cliOptionsJson}'`] : [];

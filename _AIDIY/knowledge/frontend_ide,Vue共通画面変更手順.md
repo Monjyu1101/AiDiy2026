@@ -1,6 +1,6 @@
 # Vue共通画面変更手順
 
-> 文書: `frontend_ide,Vue共通画面変更手順.md` | 実装: `frontend_ide/src/App.vue`, `frontend_ide/src/components/FileExplorer.vue`, `frontend_ide/server.mjs`, `frontend_ide/vscode-html.ts`
+> 文書: `frontend_ide,Vue共通画面変更手順.md` | 実装: `frontend_ide/src/App.vue`, `frontend_ide/src/components/FileExplorer.vue`, `frontend_ide/server.mjs`, `frontend_ide/host/src/vscode-html.ts`
 
 ## このメモを使う場面
 
@@ -83,7 +83,7 @@ grepは検索ボタンでのみ実行し、入力中は前回の結果を保持�
 
 AiDiy検索を選んでいる間はファイルツリー・ルート行・最終更新行を隠し、検索入力・履歴・結果にパネル全体を使います。起点検索・grep検索へ戻すとツリーを再表示し、検索結果や軌跡は保持します。
 
-`frontend_ide/ai-search.mjs` が `/api/ai-search` のPOST（依頼）とGET（結果確認）を受け持ちます。共通設定の `PORT_TOOLS` を使って `aidiy_code_agents/config` と `/run` を呼び、Codeの既存セッションは再利用しません。IDEの利用状態とHost / Origin検証を通し、ブラウザから接続先・任意の結果パスを指定できない構造に保ってください。
+`frontend_ide/ファイル機能/ai-search.mjs` が `/api/ai-search` のPOST（依頼）とGET（結果確認）を受け持ちます。共通設定の `PORT_TOOLS` を使って `aidiy_code_agents/config` と `/run` を呼び、Codeの既存セッションは再利用しません。IDEの利用状態とHost / Origin検証を通し、ブラウザから接続先・任意の結果パスを指定できない構造に保ってください。
 
 依頼ごとにID・秒形式の保存先・5分の期限を発行します。保存先はプロジェクト内のtempを実パスで確認し、`.request` の排他作成で重複を避けます。結果のrequestId・query一致、相対パス、実ファイル、リンク先の境界、件数・サイズ、routeとfilesの一致を検証してから返します。タイムアウト後も同じ依頼のGETで再確認できます。新しい依頼を始めても古い出力が新しい結果へ混入しないことを維持してください。
 
@@ -93,13 +93,13 @@ AiDiy検索を選んでいる間はファイルツリー・ルート行・最終
 
 `checks/ai-search.test.mjs` で期限・遅れた結果・不正結果・リンク・セッション・API・航路を検証し、`scripts/check-ai-search.mjs` で結果到着時にワープしないこと、マーク、切替、順番に閲覧、再検索時の古い結果抑制を撮影します。`scripts/check-ai-search-live.mjs` は実エージェントを使うため明示実行専用です。
 
-検索履歴は `ai-search-history.mjs` がプロジェクト内 `_AIDIY/aidiy_ide/file_searches/<依頼ID>.json` に保存します。保存先の作成・境界確認・旧版 `.aidiy/ai-search/` からの移行は `ide-data.mjs` の `ideDataFolder` に共通化しています。`/api/ai-search/history` のGETで一覧、`?id=`付きGETで理由と軌跡、DELETEで確認済みの1件を削除します。既存のHost / Origin・利用開始チェックを共用します。保存先の各段階で実パス境界を検証し、原子的な一時ファイル→renameで保存します。削除はIDだけの削除済み記録に置換し、元のtempから復活させません。初回一覧時に旧版の依頼付き結果を取り込みます。履歴読込ではパス形式・理由・routeの整合を検証し、現在は存在しない対象も検索当時の情報として残します。
+検索履歴は `ファイル機能/ai-search-history.mjs` がプロジェクト内 `_AIDIY/aidiy_ide/file_searches/<依頼ID>.json` に保存します。保存先の作成・境界確認・旧版 `.aidiy/ai-search/` からの移行は `ファイル機能/ide-data.mjs` の `ideDataFolder` に共通化しています。`/api/ai-search/history` のGETで一覧、`?id=`付きGETで理由と軌跡、DELETEで確認済みの1件を削除します。既存のHost / Origin・利用開始チェックを共用します。保存先の各段階で実パス境界を検証し、原子的な一時ファイル→renameで保存します。削除はIDだけの削除済み記録に置換し、元のtempから復活させません。初回一覧時に旧版の依頼付き結果を取り込みます。履歴読込ではパス形式・理由・routeの整合を検証し、現在は存在しない対象も検索当時の情報として残します。
 
 `AISearchPanel` は履歴の取得・選択・削除確認を担当します。初期復元は現在の検索方式・閲覧軌跡を変更せず、明示選択だけがAiDiy検索軌跡に切り替えます。`FileExplorer.acceptAI` は結果を受け取り、位置移動なしでmarksとrouteを更新します。新規検索開始・部品破棄では古い履歴応答を無効化してください。履歴の取得失敗と空一覧を区別し、既存のマークを消さず再読込を案内します。テストでは別プロジェクト分離、再起動、旧結果の移行、削除後の再取込防止、異なるマークへの切替、削除取消・確定、履歴切替で視点が動かないことを確認します。
 
 ## 更新履歴の比較を変更するとき
 
-`file-history.mjs` は `/api/file-history?path=...` で保存版一覧、`version=...` 付きで旧版・現在の全文を返します。プロジェクトとファイルの祖先にある `backup/YYYYMMDD/HHMMSS[.all][.コメント]` のみを調べ、各保存版の同じ相対パスを照合します。全体のバックアップ内容を再帰走査せず、最大5000保存版で打ち切りを明示します。IDはバックアップ相対パスのSHA-256ですが、取得時にも候補一覧との一致と実パス境界を再検証してください。外部リンク・保存版外のリンクを拒否し、利用状態と既存のHost / Origin検証を通します。比較は各1MBまで、UTF-8 / Shift_JISを読み、切り詰めません。
+`ファイル機能/file-history.mjs` は `/api/file-history?path=...` で保存版一覧、`version=...` 付きで旧版・現在の全文を返します。プロジェクトとファイルの祖先にある `backup/YYYYMMDD/HHMMSS[.all][.コメント]` のみを調べ、各保存版の同じ相対パスを照合します。全体のバックアップ内容を再帰走査せず、最大5000保存版で打ち切りを明示します。IDはバックアップ相対パスのSHA-256ですが、取得時にも候補一覧との一致と実パス境界を再検証してください。外部リンク・保存版外のリンクを拒否し、利用状態と既存のHost / Origin検証を通します。比較は各1MBまで、UTF-8 / Shift_JISを読み、切り詰めません。
 
 `FileViewer.vue` はテキスト表示時に履歴を確認し、存在する場合だけボタンを出します。`App.vue` が `FileHistoryDialog.vue` の対象を保持するため、ビューアの5分消去や別ファイルの選択でも比較対象が変わりません。MonacoのDiffEditorを読み取り専用・左右固定・空白差分を無視しない設定で使い、未変更行の位置合わせとスクロール同期を任せます。切り替え時の古い通信を中断し、閉じる際はエディターと両モデルを破棄します。更新履歴は最後の操作から5分で自動消去します。再読み込み・履歴選択・クリック・キー操作・ホイール・ドラッグ・左右Monacoのスクロールで時間を数え直し、単なるマウス移動では延長しません。閉じる際はタイマーとスクロール購読も解除します。
 
@@ -111,7 +111,7 @@ APIとパス境界は `checks/file-history.test.mjs`、共通読込の失敗と�
 
 `FileViewer.vue` の「AiDiy分析」ボタンから、`App.vue` が保持する `FileAnalysisDialog.vue` を開きます。対象のプロジェクトとファイルを固定し、ビューアの5分消去でもダイアログを消さない構成です。初回指示は画像類とソース類を分け、保存済み指示があれば必ず優先します。Markdown本文はHTMLを無効化し、外部画像を読み込みません。
 
-`file-analysis.mjs` は `/api/file-analysis` のGET（復元・結果確認）、PUT（指示保存）、POST（解析依頼）を担当します。既存の `runSearchAgent` を使い、対象と指示を含む依頼ID付きJSONをtempへ出力させます。ブラウザを閉じてもサーバー側が最大5分間確認し、最新の成功結果を `_AIDIY/aidiy_ide/file_analyses/<相対パスのSHA256>.json` に保存します（`ideDataFolder` を共用し、旧版 `.aidiy/file-analysis/` は初回に移します）。前回指示・本文・日時・対象の更新日時とサイズを保持し、失敗時に成功結果を消さないでください。保存先の実パス境界を確認し、ファイル別の書込キューと一時ファイルからのrenameで指示保存・結果到着の競合を防ぎます。
+`ファイル機能/file-analysis.mjs` は `/api/file-analysis` のGET（復元・結果確認）、PUT（指示保存）、POST（解析依頼）を担当します。既存の `runSearchAgent` を使い、対象と指示を含む依頼ID付きJSONをtempへ出力させます。ブラウザを閉じてもサーバー側が最大5分間確認し、最新の成功結果を `_AIDIY/aidiy_ide/file_analyses/<相対パスのSHA256>.json` に保存します（`ideDataFolder` を共用し、旧版 `.aidiy/file-analysis/` は初回に移します）。前回指示・本文・日時・対象の更新日時とサイズを保持し、失敗時に成功結果を消さないでください。保存先の実パス境界を確認し、ファイル別の書込キューと一時ファイルからのrenameで指示保存・結果到着の競合を防ぎます。
 
 `checks/file-analysis.test.mjs` は再起動・プロジェクト分離・更新判定・失敗時保持・遅延結果・保存競合・パス境界・APIを確認します。`scripts/check-file-analysis.mjs` は模擬エージェントによる実画面の指示復元・結果表示・ソース/画像の指示切替・縦横配置を確認します。配信更新時はVue bundleの再生成とIDEサーバーの再起動が必要です。
 
@@ -131,9 +131,9 @@ Code / Live / IDEの接続バーは `StatusBar.vue` のclockPulseを有効にし
 
 ポートは自動割り当てです。aidiy_code / aidiy_live / aidiy_ideからVue版を起動します。旧aidiy_devの互換起動はありません。cleanupのプロセス照合は起動スクリプトの完全一致とアプリ種別で行い、IDE群の解除が成功してから共通Vue生成物を削除します。
 
-Electronの初期配置は `window-layout.cjs` で画面のworkAreaから計算します。IDEは余白付きの大きな画面、Code / Liveは左右に配置し、IDE連携時は親の境界を基準にずらし、Code / Liveの上端と高さは揃えます。連携窓のタイトルは「AiDiy IDE / Code」「AiDiy IDE / Live」で、単独版のタイトルと区別します。既存窓の再表示では最小化を解除して前面に出すだけにします。単独Code / Liveは種別ごとのsingle-instance lock、IDEは同じプロジェクトごとのlockを使い、Termは複数起動を許可します。IDEのCode子窓は複数起動でき、それぞれ独立したサーバー・会話を持ちます。Live子窓だけ親セッションと初期化中のPromiseで重複を防ぎ、起動中は＋Liveを隠します。子窓の状態はメインプロセスから取得し、閉じたときにボタンを戻します。`checks/window-layout.test.mjs` と `scripts/check-windows.mjs` で画面外にはみ出さない配置・連打・前面復帰・終了連携を確認します。
+Electronの初期配置は `デスクトップ/window-layout.cjs` で画面のworkAreaから計算します。IDEは余白付きの大きな画面、Code / Liveは左右に配置し、IDE連携時は親の境界を基準にずらし、Code / Liveの上端と高さは揃えます。連携窓のタイトルは「AiDiy IDE / Code」「AiDiy IDE / Live」で、単独版のタイトルと区別します。既存窓の再表示では最小化を解除して前面に出すだけにします。単独Code / Liveは種別ごとのsingle-instance lock、IDEは同じプロジェクトごとのlockを使い、Termは複数起動を許可します。IDEのCode子窓は複数起動でき、それぞれ独立したサーバー・会話を持ちます。Live子窓だけ親セッションと初期化中のPromiseで重複を防ぎ、起動中は＋Liveを隠します。子窓の状態はメインプロセスから取得し、閉じたときにボタンを戻します。`checks/window-layout.test.mjs` と `scripts/check-windows.mjs` で画面外にはみ出さない配置・連打・前面復帰・終了連携を確認します。
 
-IDEのプロジェクト識別は `project-profile.cjs` に集約します。`launch.mjs` が `--project` / 位置引数 / 起動フォルダを先に解決し、実パスを `AIDIY_DEVELOPMENT_PROJECT` でElectronへ渡します。`desktop.cjs` はロック取得前に実パスのSHA-256を使って `userData` と `sessionData` をプロジェクト別に分けます。同名の別フォルダは共有せず、相対表記・リンクは同じ実体に揃えます。Windowsでは大小文字・区切り・長いパス表記を統一し、ファイルIDも加えて大小文字を区別する別実体を混同しません。ファイルAPIへ渡す実パスの大小文字は変えません。サーバーは従来どおり自動ポート・個別所有を維持し、他プロジェクトの終了・再起動に巻き込まないでください。旧プロファイルから認証・保存情報をコピーしません。`node --test frontend_ide/checks/project-instance.test.mjs` は模擬Electronと実ローカルHTTPで、重複時の前面化、別プロジェクトの子窓・キャッシュ・接続・ポート・終了の分離、起動引数、同時起動を確認します。実ElectronでのOSロックと前面化は別途確認が必要です。
+IDEのプロジェクト識別は `デスクトップ/project-profile.cjs` に集約します。`launch.mjs` が `--project` / 位置引数 / 起動フォルダを先に解決し、実パスを `AIDIY_DEVELOPMENT_PROJECT` でElectronへ渡します。`desktop.cjs` はロック取得前に実パスのSHA-256を使って `userData` と `sessionData` をプロジェクト別に分けます。同名の別フォルダは共有せず、相対表記・リンクは同じ実体に揃えます。Windowsでは大小文字・区切り・長いパス表記を統一し、ファイルIDも加えて大小文字を区別する別実体を混同しません。ファイルAPIへ渡す実パスの大小文字は変えません。サーバーは従来どおり自動ポート・個別所有を維持し、他プロジェクトの終了・再起動に巻き込まないでください。旧プロファイルから認証・保存情報をコピーしません。`node --test frontend_ide/checks/project-instance.test.mjs` は模擬Electronと実ローカルHTTPで、重複時の前面化、別プロジェクトの子窓・キャッシュ・接続・ポート・終了の分離、起動引数、同時起動を確認します。実ElectronでのOSロックと前面化は別途確認が必要です。
 
 WindowsでElectronのGUI本体をspawnするときは `windowsHide: false` にします。`true` では初回の画面表示が隠され、URLだけ出て再実行するまで窓が見えない場合があります。バックグラウンドの補助プロセスとは区別し、初回起動時の可視状態を `scripts/check-single-instance.mjs` でも確認します。
 
@@ -153,7 +153,7 @@ Code / Live / IDEの単独起動時は `host/scripts/window-opening.cjs` の750m
 
 Code / Live / IDEの単独Electron起動では `launch.mjs` がサーバーを所有するNodeプロセスを分離し、IPCで画面表示完了を受け取ってから呼出元を終了します。Electron自身のIPCはサーバー所有プロセスとの接続を維持し、画面終了でサーバーも閉じます。`--foreground` / `--wait`、ブラウザ版、`--no-open` / `--serve` は分離しません。`scripts/check-launcher.mjs code` / `scripts/check-launcher.mjs live` / `scripts/check-launcher.mjs ide` で、呼出元終了後の継続、再実行での既存窓再利用、×でのプロセス・ポート解放、起動失敗の通知を確認できます。
 
-Electron本体の起動は `desktop-process.mjs` に集約します。stdinを無効にし、stdout / stderrはpipeで読み取ります。背景起動時にはその出力を起動元へ転送せず、`--foreground` / `--wait` の待機起動時だけログを表示します。WindowsではElectronもdetachedでコンソールから切り離します。GUIの初回表示まで隠す `windowsHide:true` は使わず、IPC接続を維持して表示完了・終了を管理してください。起動元端末に空行や制御文字が出る場合の検証は `node --test frontend_ide/checks/desktop-process.test.mjs` です。実子プロセスが継続出力していても背景起動では漏れず、待機起動では出力でき、IPC終了も維持することを確認します。Windowsの実端末では放置中のカーソル位置と、IDE終了後に現象が止まるかも確認してください。
+Electron本体の起動は `デスクトップ/desktop-process.mjs` に集約します。stdinを無効にし、stdout / stderrはpipeで読み取ります。背景起動時にはその出力を起動元へ転送せず、`--foreground` / `--wait` の待機起動時だけログを表示します。WindowsではElectronもdetachedでコンソールから切り離します。GUIの初回表示まで隠す `windowsHide:true` は使わず、IPC接続を維持して表示完了・終了を管理してください。起動元端末に空行や制御文字が出る場合の検証は `node --test frontend_ide/checks/desktop-process.test.mjs` です。実子プロセスが継続出力していても背景起動では漏れず、待機起動では出力でき、IPC終了も維持することを確認します。Windowsの実端末では放置中のカーソル位置と、IDE終了後に現象が止まるかも確認してください。
 
 ## HTML / SVG の相対参照を確認するとき
 
@@ -169,11 +169,11 @@ Codespacesの転送先からAPIを開いた場合は、既存の `forwardedOrigi
 
 ## Term（ターミナル）の変更・検証
 
-Termの最小高さは `window-layout.cjs` の `windowMinimumSize()` で180pxにし、単独窓とIDE子窓で共用します。最小幅360px、初期の幅2/3・高さ1/2、Code / Live / IDE / ビューアの最小寸法は変えません。作業領域がさらに小さい時は初期配置の寸法を上限にします。`TermPanel.vue` はパネル自身をsize containerにし、高さ240px以下では入力前・表示クリア後の起動案内を畳んで端末へ高さを渡します。通常の14px文字なら180pxの窓で約4行が目安です。FitAddonとResizeObserverの対象は余白のない内側の `term-viewport` にし、外側のpaddingを行数へ数えて最下行が欠けることを防ぎます。ステータスは1行、短い画面のエラーは1行分のスクロールに収めます。Web版にも同じパネル内判定を使い、ブラウザー自体の最小サイズは変更しません。
+Termの最小高さは `デスクトップ/window-layout.cjs` の `windowMinimumSize()` で180pxにし、単独窓とIDE子窓で共用します。最小幅360px、初期の幅2/3・高さ1/2、Code / Live / IDE / ビューアの最小寸法は変えません。作業領域がさらに小さい時は初期配置の寸法を上限にします。`TermPanel.vue` はパネル自身をsize containerにし、高さ240px以下では入力前・表示クリア後の起動案内を畳んで端末へ高さを渡します。通常の14px文字なら180pxの窓で約4行が目安です。FitAddonとResizeObserverの対象は余白のない内側の `term-viewport` にし、外側のpaddingを行数へ数えて最下行が欠けることを防ぎます。ステータスは1行、短い画面のエラーは1行分のスクロールに収めます。Web版にも同じパネル内判定を使い、ブラウザー自体の最小サイズは変更しません。
 
 `checks/window-layout.test.mjs` は小さい作業領域・単独/IDE子窓の最小寸法と従来の初期配置、`checks/term-size.test.mjs` は実Vue処理と実FitAddonによる1〜5行への縮小・復元・入力・表示クリア・タブ往復・再起動、`checks/terminal.test.mjs` は小さい行数のサーバー検証と実PTYのリサイズを確認します。これらは実描画の検証ではありません。Electronの `checks/term-desktop-probe.cjs` では360×180への縮小・入力・クリア・操作ボタン・最下行・元の大きさへの復元も撮影して確認してください。
 
-TermのElectron窓は作業領域の幅2/3・高さ1/2で画面下中央に開き、次の窓を28pxずつ右上へ配置します。親IDEの矩形には合わせず、親と同じディスプレイの作業領域を使います。画面端まで進んだら基点へ戻します。単独Termはsingle-instance lockを使わず、起動ごとの一時Chromiumプロファイルを終了時に片付けます。`term-window-slot.cjs` は127.0.0.1の18440〜18567を操作受付のない排他用ポートとして使い、単独プロセスとIDE子窓で配置番号を共有します。番号は窓終了で解放し、プロセス異常終了でもOSが解放します。Code / Live / IDEの既存窓再利用は維持します。
+TermのElectron窓は作業領域の幅2/3・高さ1/2で画面下中央に開き、次の窓を28pxずつ右上へ配置します。親IDEの矩形には合わせず、親と同じディスプレイの作業領域を使います。画面端まで進んだら基点へ戻します。単独Termはsingle-instance lockを使わず、起動ごとの一時Chromiumプロファイルを終了時に片付けます。`デスクトップ/term-window-slot.cjs` は127.0.0.1の18440〜18567を操作受付のない排他用ポートとして使い、単独プロセスとIDE子窓で配置番号を共有します。番号は窓終了で解放し、プロセス異常終了でもOSが解放します。Code / Live / IDEの既存窓再利用は維持します。
 
 プロジェクトバーの「tools接続確認」はCodeの `auto-connect` トグルを共用します。既定ON、WebSocketの `tools-check` で切り替え、`tools` 応答の `enabled` / `online` で画面を同期します。OFFは疎通の定期実行を止め、シアン表示を解除して赤いバーにします。ONへ戻すと即時に疎通確認を再開します。シェルの再起動は行わず、端末の再起動でも同じサーバー内の選択を維持します。確認中にOFFへ変わった場合の古い応答は世代番号で無視してください。
 
@@ -181,15 +181,15 @@ Termの入力前はCodeと同じ `TerminalWelcome.vue` とアイコンを使い�
 
 CLI補完候補は `TermPanel.vue` でカーソル直後へ薄いグレーの文字として重ねます。xtermのセル寸法・表示中の行位置から配置し、右端で折り返します。端末バッファには候補を書き込まず、Tab確定時だけPSReadLineが入力へ追加します。描画・スクロール・サイズ変更時に位置を更新し、別画面や終了時には表示しません。候補を常設の下部パネルへ戻さず、下部はキー操作の案内だけにします。
 
-タイトルバーはCodeと同じ `StatusBar.vue`、プロジェクトバーは共通の `component-toolbar` を使い、フォルダ名と完全パスのツールチップを表示します。シェルの状態は下部に分け、シアンバーはtoolsの疎通だけで決めます。`terminal.mjs` は `ai-search.mjs` の接続先解決（`PORT_TOOLS`、既定8095）を共用し、`aidiy_code_agents/ping` を10秒ごと・タイムアウト1.5秒で確認します。tools停止でシェルを終了させず、シェルの自然終了後もtoolsの状態通知は維持します。
+タイトルバーはCodeと同じ `StatusBar.vue`、プロジェクトバーは共通の `component-toolbar` を使い、フォルダ名と完全パスのツールチップを表示します。シェルの状態は下部に分け、シアンバーはtoolsの疎通だけで決めます。`aidiy_term/terminal.mjs` は `ファイル機能/ai-search.mjs` の接続先解決（`PORT_TOOLS`、既定8095）を共用し、`aidiy_code_agents/ping` を10秒ごと・タイムアウト1.5秒で確認します。tools停止でシェルを終了させず、シェルの自然終了後もtoolsの状態通知は維持します。
 
 Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだけにPSReadLineのTabハンドラーを設定します。入力が対象CLI名だけでカーソルが末尾なら、`scripts/cli_bat` と同じ権限省略オプションを追加し、実行はEnterに任せます。対象は `codex` / `claude` / `copilot` / `agy` / `grok` / `aidiy_hermes` で、Claudeは既存バッチに合わせて `--chrome` も追加します。モデルは変更しません。それ以外は元のTab処理へ戻します。`src/terminal-completion.js` の `cliCompletions` を候補表示とシェル補完で共用し、履歴予測の斜体表示と確定済み引数を区別します。ユーザーのプロファイルは変更しません。検証では同名の模擬関数で引数を確認し、実CLIを起動しないでください。
 
 `aidiy_term` は `aidiy_term/launch.mjs` → 共通 `launch.mjs` の `--app term` で起動します。IDEのElectron版は「＋ Term」で独立した子窓を複数開き、Web版は `TermPanel.vue` をTermタブに保持します。利用モードはオンライン・オフライン両方で有効です。setup / start / cleanup の表示と処理は Term → Code → Live → IDE の順に揃えます。`aidiy_term/_setup.py` はランチャー、`_start.py` は環境確認・独立起動・プロセス照合、`_cleanup.py` は停止とランチャー解除を担当し、依存物は共通UIにまとめます。
 
-`terminal.mjs` はランダムパス付きのローカルサーバー、`viewer/panels.mjs` は同一公開元への中継です。Host / Origin・IDE利用状態を検証し、シェル・開始フォルダはサーバー側で決めます。入力サイズと端末寸法を制限し、描画完了のACKで出力を制御します。パネル初期化中・終了中のセッション切替では、破棄中のサーバーも完了まで待ちます。
+`aidiy_term/terminal.mjs` はランダムパス付きのローカルサーバー、`viewer/panels.mjs` は同一公開元への中継です。Host / Origin・IDE利用状態を検証し、シェル・開始フォルダはサーバー側で決めます。入力サイズと端末寸法を制限し、描画完了のACKで出力を制御します。パネル初期化中・終了中のセッション切替では、破棄中のサーバーも完了まで待ちます。
 
-`terminal-process.mjs` は `terminal-worker.mjs` を端末ごとに起動します。ネイティブのPTYと補助スレッドをそのプロセスに閉じ込め、ElectronからもNodeモードで動かします。Windowsの終了はそのworkerのプロセスツリーを停止します。WebSocket切断・ページ再読込・窓終了・IDE終了で停止し、タブ非表示だけでは切断しません。自然終了では末尾のIPC出力を送り終えてからworkerを終了します。ConPTYをIDEメインプロセスで直接保持すると補助スレッドの寿命がIDEに影響するため、この境界を維持してください。
+`aidiy_term/terminal-process.mjs` は `aidiy_term/terminal-worker.mjs` を端末ごとに起動します。ネイティブのPTYと補助スレッドをそのプロセスに閉じ込め、ElectronからもNodeモードで動かします。Windowsの終了はそのworkerのプロセスツリーを停止します。WebSocket切断・ページ再読込・窓終了・IDE終了で停止し、タブ非表示だけでは切断しません。自然終了では末尾のIPC出力を送り終えてからworkerを終了します。ConPTYをIDEメインプロセスで直接保持すると補助スレッドの寿命がIDEに影響するため、この境界を維持してください。
 
 - `node --test frontend_ide/checks/terminal.test.mjs`: 不正接続・寸法・フロー制御、実PTYの日本語、開始フォルダ、リサイズ、Ctrl+C、シェル配下の子プロセスの終了。
 - `node frontend_ide/scripts/check-term.mjs`: 専用ブラウザで日本語入力、タブ保持、狭い画面、exit後の再起動、利用終了。WindowsのChrome / Edgeで実行します。
@@ -201,12 +201,12 @@ Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだ
 
 ## 状態確認・最終更新・下書き連携の境界
 
-- `App.vue` と `ViewerWindow.vue` は `src/connection-state.js` で利用状態の応答を検証します。HTTP失敗・タイムアウト・不完全なJSONを `active:false` に置き換えないでください。Appの状態取得と下書き連携の確認には開始時のrevision・セッションを照合し、終了や再開後の遅延応答を捨てます。Electron側の `desktop-session.cjs` も同じ方針で、子窓監視失敗では破棄せず、終了確認時の不明は確認が必要な作業中として扱います。
+- `App.vue` と `ViewerWindow.vue` は `src/connection-state.js` で利用状態の応答を検証します。HTTP失敗・タイムアウト・不完全なJSONを `active:false` に置き換えないでください。Appの状態取得と下書き連携の確認には開始時のrevision・セッションを照合し、終了や再開後の遅延応答を捨てます。Electron側の `デスクトップ/desktop-session.cjs` も同じ方針で、子窓監視失敗では破棄せず、終了確認時の不明は確認が必要な作業中として扱います。
 - `FileExplorer.vue` の最終更新通知は、一覧の鮮度更新と自動追跡を分けます。`space.js` の手動latest/未知パス移動は `fresh=1` で再走査し、新しい手動選択・clear・フィルター切替・破棄があれば中断します。進行中の走査を共有した結果が古い場合だけもう一度確認します。自動探索のON/OFFで手動クリックを無効にしないでください。
 - `FileViewer.vue` は `file-reference.js` でgrepの行・列・検索語を現在の内容と照合します。Monacoと簡易表示の双方に位置を伝え、CRLF/CR/LFとUTF-16列を扱います。本文変更や削除で不一致なら再検索の案内にします。
 - `DraftHandoffDialog.vue` は初回表示時に候補を取得し、有効な `frontmostTargetId` を初期選択します。閉じて再表示した時も、その時点の最前面を取り直します。連携先行の「最前面を再選択」は候補を取り直し、`frontmostTargetId` を選び直します。通常の候補更新では有効な手動選択を保持し、再選択だけで下書きを追加しません。有効な候補が1件なら最前面情報の有無によらず名前を表示して選択します。最小化・非表示などで最前面情報がない場合は「最前面は未確認」と明示し、最前面と断定しません。初回表示・再選択時に複数候補の最前面を特定できなければ未選択として案内し、一覧での明示選択を残します。ゼロ件で自動起動・自動送信はしません。`CodePanel.vue` / `LivePanel.vue` の `draftTarget()` / `insertDraft()` は `src/draft-handoff.js` を共有し、今の下書きに追記します。Codeは合計200,000文字、Liveは20,000文字、選択本文は80,000文字までで、超過は切り詰めず拒否します。Codeの新規・履歴切替など会話変更操作では、要求を送る前に連携先を同期的に無効化します。途中の旧会話stateやHTTP成功だけで復帰させず、要求先の会話stateまたは変更前の確定拒否を待ちます。VS CodeはrequestId付きのconversationChangeResultと会話stateを照合し、実行中・モデル変更中・消えた履歴の拒否でも安全に復帰します。マルチルートの新規だけは、ホストが成功応答で確認した別の作業フォルダへ移れます。履歴選択は要求した会話ID・元のプロジェクトを維持します。応答喪失や500は適用済みか判断できないので、旧下書きのまま連携を停止し再読み込みを案内します。`checks/code-transition-handoff.test.mjs` は実テンプレートのクリックとHTTP/SSE・VS Code経路を検証します。
 - Webは `draft-target-registry.js` のマウント固有IDと会話contextIdを再照合します。ピン留めはAppが実際に開いたWindow参照だけを登録し、同じ公開元・IDEセッション・プロジェクトと送信元の生存を確認します。BroadcastChannelやlocalStorageに本文を流さないでください。
-- Electronは `draft-router.cjs` が所有IDE、セッション、窓ID、会話contextId、プロジェクトを検証し、限定したpreloadのIPCへ渡します。受信結果のACKまで待ち、期限切れ・閉じた窓・再配送を扱います。表示名やCodeの配置番号だけで相手を決めないでください。最前面候補はホストのウィンドウfocus順を記録し、現在の所有IDE・セッション・登録に一致する表示中のCode / Liveだけから選びます。IDE・ビューア・ダイアログへのフォーカスや登録情報の更新では順番を変えず、閉鎖・最小化・非表示の窓は最前面候補から除外します。Webは最後に表示したCode / Live種別をマウント固有IDへ変換し、Term・ダイアログを候補にせず、利用再開時に記録を消します。
+- Electronは `デスクトップ/draft-router.cjs` が所有IDE、セッション、窓ID、会話contextId、プロジェクトを検証し、限定したpreloadのIPCへ渡します。受信結果のACKまで待ち、期限切れ・閉じた窓・再配送を扱います。表示名やCodeの配置番号だけで相手を決めないでください。最前面候補はホストのウィンドウfocus順を記録し、現在の所有IDE・セッション・登録に一致する表示中のCode / Liveだけから選びます。IDE・ビューア・ダイアログへのフォーカスや登録情報の更新では順番を変えず、閉鎖・最小化・非表示の窓は最前面候補から除外します。Webは最後に表示したCode / Live種別をマウント固有IDへ変換し、Term・ダイアログを候補にせず、利用再開時に記録を消します。
 - LiveのWebパネルは隠してもマウントを保持し、`visible` でマイク取得待ちを無効化し音声入出力を止めます。会話・下書き・スピーカーの選択を残し、再表示でマイクを自動再開しません。
 
 `viewer/file-scan.mjs` の走査は同じサーバー内でフィルターと走査範囲（通常/grep）ごとに1秒だけ共有し、同時実行は1本です。grepのbackup除外は走査前に行い、対象外の保存版で候補・フォルダ・深さ・時間上限を消費しないようにします。通常のgalaxy/latestとは進行中の要求・キャッシュを分離し、通常一覧のbackup表示条件は維持します。明示操作の `fresh=1` は完了済みキャッシュを使わず、進行中の同じ走査は共有します。既定上限は30,000ファイル（backupフィルターは100,000）、10,000フォルダ、200,000項目、128階層、10秒。待機者の個別中断、全待機者の中断、利用終了・切替、サーバー終了を伝播し、中断した走査はキャッシュに残しません。常時watcherは使いません。
@@ -242,7 +242,7 @@ Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだ
 
 上流を更新する時は `SOURCE.md` の固定コミットから無改変のSVGをコピーし、`manifest.json` の原文パス・SHA-256、MIT原文、追加帰属を同期します。ブランドロゴには各権利者の別条件があり、MITだけで許諾済みとは扱いません。第三者素材へAiDiy独自の非商用制限を上乗せしないでください。
 
-共通ビルドはViteのpublicコピーでSVGを外部ファイルとして配布し、Code / Liveのdevelopment/assetsにも原文・帰属ごとコピーします。VS Codeでは `vscode-html.ts` のwebview URI、単独Liveではtoken配下の相対URLを起動設定に渡します。HTTPは `catppuccinAsset()` の許可集合だけを配信し、SVGへ `default-src 'none'; sandbox` とnosniffを付けます。
+共通ビルドはViteのpublicコピーでSVGを外部ファイルとして配布し、Code / Liveのdevelopment/assetsにも原文・帰属ごとコピーします。VS Codeでは `host/src/vscode-html.ts` のwebview URI、単独Liveではtoken配下の相対URLを起動設定に渡します。HTTPは `catppuccinAsset()` の許可集合だけを配信し、SVGへ `default-src 'none'; sandbox` とnosniffを付けます。
 
 ライセンス集は `viewer/scripts/licenses.mjs`、共通配布物の通知は `scripts/build.mjs` が `scripts/icon-notices.mjs` を共有します。変更後は `node frontend_ide/viewer/scripts/licenses.mjs` と、`frontend_ide/host` で `npm run check && npm run compile` を実行して配布物を検証します。`node --test frontend_ide/checks/file-icons.test.mjs` はマッピング、SVGハッシュと安全な要素、Vueの実レンダー、IDE/Code/LiveのHTTP・VS Code URI、ライセンス同梱を確認します。実画面ではツリー・ルート・最終更新と2Dページの整列、開閉、選択・更新マークを別途確認してください。2Dの先頭ページでは無効な「親へ」ボタンを出さず、子ページでは親への移動を保ちます。通常行は48pxを下限とし、16pxのサイズ・日時を行高18px・間隔0の2行と上下5pxの余白へ収めて、フォルダ行だけを広げず揃えます。ページ幅520px以下では名前の下でサイズ・日時を横並びから折り返し、長い文字を切り捨てず文字サイズを維持します。フォルダは少し濃いクリーム、ファイルだけは自然順のインデックスで薄いゼブラにし、旧・経由ページへも同じ状態を複製します。hover・カーソル・選択と検索文字の色を縞より優先してください。`checks/folder-pages.test.mjs` は2Dの実Vueマウントで通常・旧・経由ページのアイコンと操作境界、18px/16pxの文字、狭幅の折り返しを確認し、同梱SVGの色とクリーム色のコントラストも数値検証します。
 
@@ -264,7 +264,7 @@ FileExplorerは検索明細をrouteイベントの `records` として送り、S
 
 ## 下書き連携先の再選択とCode番号
 
-IDE連携CodeのOSタイトルは、既存の窓配置番号 `record.slot + 1` から `AiDiy IDE / Code n` とします。連携先一覧も同じslotを使い、別の連番を採番しません。`preload.cjs` の限定した `title()` は、信頼済みの送信元自身のOSタイトルだけを返し、`CodePanel.vue` の見出しへ反映します。単独Codeのタイトルは従来どおりです。窓を閉じてslotが再利用されても、受け渡しの窓IDと会話IDは別に照合します。
+IDE連携CodeのOSタイトルは、既存の窓配置番号 `record.slot + 1` から `AiDiy IDE / Code n` とします。連携先一覧も同じslotを使い、別の連番を採番しません。`デスクトップ/preload.cjs` の限定した `title()` は、信頼済みの送信元自身のOSタイトルだけを返し、`CodePanel.vue` の見出しへ反映します。単独Codeのタイトルは従来どおりです。窓を閉じてslotが再利用されても、受け渡しの窓IDと会話IDは別に照合します。
 
 `node --test frontend_ide/checks/draft-handoff.test.mjs frontend_ide/checks/draft-target-selection.test.mjs frontend_ide/checks/code-window-title.test.mjs` で、フォーカス順と作成順の違い、対象外窓、閉鎖・最小化・未登録・新規窓、初回・再表示の最前面選択、再選択と明示選択、1件・不明候補、連打・遅延応答・取得失敗、追加なし、Webピン留め・利用再開、Code追加・閉鎖・番号再利用を確認します。ダイアログは実Vueテンプレートをメモリ内へマウントし、App・Codeは実setup、Electronは実createWindowと模擬OSを使います。実OSの重なり順、横長・狭幅の見た目、タイトル表示は実画面で別途確認してください。
 

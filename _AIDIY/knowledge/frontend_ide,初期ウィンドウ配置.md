@@ -2,7 +2,7 @@
 
 ## 変更先と座標
 
-初期サイズ・座標は `frontend_ide/window-layout.cjs` の `windowBounds()`、最小サイズは `windowMinimumSize()` に集約します。`desktop.cjs` の `createWindow()` が生成時だけ適用します。単独起動はマウスポインター側、IDE連携は親IDEがあるディスプレイの `workArea` を使います。座標はタスクバー等を除く論理座標で、負の座標を持つサブ画面も扱います。
+初期サイズ・座標は `frontend_ide/デスクトップ/window-layout.cjs` の `windowBounds()`、最小サイズは `windowMinimumSize()` に集約します。`desktop.cjs` の `createWindow()` が生成時だけ適用します。単独起動はマウスポインター側、IDE連携は親IDEがあるディスプレイの `workArea` を使います。座標はタスクバー等を除く論理座標で、負の座標を持つサブ画面も扱います。
 
 Codeは左上、Liveは右上へ、作業領域の端から8px空けて表示します。IDE連携でも親窓の内側へ寄せず、同じ画面の隅を基準にします。通常の幅480・高さ600と、小画面に収める上限は維持します。
 

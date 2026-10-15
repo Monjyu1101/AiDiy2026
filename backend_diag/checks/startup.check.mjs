@@ -42,7 +42,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
  const root=await fixture();let child;
  try {
   // 外部通信のみを差し替え。実際の引数処理・検証・HTTP listen・静的配信を実行する。
-  await writeFile(path.join(root,'public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
+  await writeFile(path.join(root,'モデル情報/public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
   if(crlf)await convert(root);
   child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),'--browser','--no-open','--port','0'],{stdio:['ignore','pipe','pipe']});
   const exited=once(child,'exit');let output='',errors='';child.stderr.on('data',chunk=>errors+=chunk);
@@ -66,6 +66,6 @@ test('CLI errors report actionable categories without echoing arguments or file 
   assert.match(await run(['--PRIVATE']),/起動引数/);
   const app=path.join(root,'static/app.js'),before=await readFile(app);await writeFile(app,'PRIVATE');
   assert.match(await run(['--no-open']),/Vue UI/);await writeFile(app,before);
-  await writeFile(path.join(root,'catalog.json'),'PRIVATE');assert.match(await run(['--no-open']),/catalog.json/);
+  await writeFile(path.join(root,'診断/catalog.json'),'PRIVATE');assert.match(await run(['--no-open']),/catalog.json/);
  }finally{await rm(root,{recursive:true,force:true});}
 });

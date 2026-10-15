@@ -4,6 +4,20 @@
 
 診断本体の起動には Node.js が必要です。一覧は Python、uv、Node.js、npm、npx、Electron の順です。Python はバックエンドで使用します。Python が無くても配置済みランチャー・直接 Node 起動は使えます。全体セットアップは既存方式に合わせ Python を使用します。
 
+## フォルダ構成
+
+ルート直下は公開起動入口とセットアップ・設定・案内だけにします。内部モジュールを追加するときは、担当する機能のフォルダへ置きます。
+
+- `diag_main.mjs` / `aidiy_diag` / `aidiy_diag.cmd`: 外部から使う起動入口。
+- `起動/`: Electron ウィンドウ・preload・起動監視・安全な診断ログ。
+- `診断/`: インストール確認、MCP 状態、headless 実行、カタログと調査範囲。
+- `モデル情報/`: キー確認、モデル・音声 JSON の合成、公開モデル一覧。`openrouter_models/` はこの機能専用の同梱キャッシュです。
+- `runtime/`: モデル判定・通信の TypeScript と配布用 `.mjs`。
+- `ui/` / `static/`: Vue ソース・ビルド設定と配布画面。
+- `checks/` / `reference/`: 回帰テストとソース調査資料。
+
+Electron の依存物は引き続き `backend_diag/node_modules/`、停止要求・安全ログも従来のルート直下に置きます。診断結果の保存先 `_AIDIY/aidiy_diag/` は変わりません。内部モジュールの移動時は import だけでなく、`import.meta.url` 基準のデータ・実行ファイル・リポジトリ位置とテスト fixture のコピー先も確認します。
+
 ## 起動
 
 ```sh
@@ -37,7 +51,7 @@ Gemini / FreeAI はモデルIDに `lyria` を含むものを詳細・chat・live
 
 プロバイダ別ファイルへ `xx/auto` は挿入しません（旧表記 `xx/same` が残っていても合成時に除外します）。合成の `code_models_info.json` は導入済みCLIの区分だけを出力します（`claude_sdk` もClaude CLIの導入が必要）。`aidiy_hermes.models` だけは特別に、導入済みCLIの `xx/auto` をCopilot → Claude → Codex → Antigravity → Grok → OpenCodeの順で先頭へ追加し、その後に取得したモデルを並べます。導入判定はインストール診断と同じ探索先での実行ファイルの存在確認です。
 
-音声候補は `live_voices_info.json` に `{gemini_live: {voices: {...}}, freeai_live: {voices: {...}}, openai_live: {voices: {...}}}` の形式で保存します。固定定義は `voices_info.mjs` で管理します。キーの確認成功と現在の設定状態に合わせて出力し、未設定・確認失敗のプロバイダは含めません。FreeAIの声はGeminiと同じ定義です。個別更新では他の有効な確認済み候補を保持し、キーが無効化された場合は除外します。
+音声候補は `live_voices_info.json` に `{gemini_live: {voices: {...}}, freeai_live: {voices: {...}}, openai_live: {voices: {...}}}` の形式で保存します。固定定義は `モデル情報/voices_info.mjs` で管理します。キーの確認成功と現在の設定状態に合わせて出力し、未設定・確認失敗のプロバイダは含めません。FreeAIの声はGeminiと同じ定義です。個別更新では他の有効な確認済み候補を保持し、キーが無効化された場合は除外します。
 
 Copilot単独契約向けの例外として、Copilot CLIが導入済みで合成後の `copilot_cli.models` が空の場合だけ、指定のClaude / GPT固定8モデルを指定順・指定日付で補います。取得候補が1件でもあれば補わず、プロバイダ別ファイルへは固定8モデルを保存しません。
 
@@ -78,7 +92,7 @@ node backend_diag/diag_main.mjs --browser --no-open --port 8097
 
 ## 追加と検証
 
-`catalog.json` に実際のソース参照を伴う項目を追加します。`version_args: null` は存在確認のみです。GUI 起動やネットワーク・モデル取得を伴うコマンドは version 検査に登録しないでください。API 経由で項目を追加・変更する機能はありません。
+`診断/catalog.json` に実際のソース参照を伴う項目を追加します。`version_args: null` は存在確認のみです。GUI 起動やネットワーク・モデル取得を伴うコマンドは version 検査に登録しないでください。API 経由で項目を追加・変更する機能はありません。
 
 ```sh
 node --test backend_diag/checks/*.check.mjs backend_diag/checks/*.check.cjs
@@ -98,7 +112,7 @@ Playwright と Chromium が利用できる検証環境では `node backend_diag/
 
 通常の Markdown ガイド・skill 本文（README/AGENTS を除く）、画像・音声・モデル・Office/PDF、LaTeX 文書資産、ライセンス・非実行テキスト等は対象外です。実行可能な skill スクリプトやコード例は含めます。省略のある Python 教材 3 件は AST 解析できませんでしたが、全文テキストを走査済みです。全リポジトリの全バイトを検証したという主張ではありません。
 
-- [coverage.json](./coverage.json): 件数、基準コミット、除外、制限、AST テキスト代替走査の記録。
+- [診断/coverage.json](./診断/coverage.json): 件数、基準コミット、除外、制限、AST テキスト代替走査の記録。
 - [reference/source-manifest.json](./reference/source-manifest.json): 対象 3,333 件のパスと元の Git blob SHA。
 - [reference/source_scan.ts](./reference/source_scan.ts): 対象コードを実行しない、依存パッケージなしの TypeScript 走査スクリプト。Python は字句解析で呼出し・for・代入・dict 単位に候補を抽出します（旧 Python AST 版と同じ候補を出すことを確認済み。構文エラーのファイルも走査します）。基準コミットの作業コピーに対し Node.js 22.18+ で `node backend_diag/reference/source_scan.ts REPOSITORY OUTPUT_JSON COMMIT backend_diag/reference/source-manifest.json` を実行すると候補抽出を再現できます。抽出候補からカタログへの分類にはソース確認が必要です。
 
@@ -128,7 +142,7 @@ HTTP サーバーの起動後、匿名の公開 OpenRouter モデル一覧を一
 
 OpenRouter の先行手動テストは要求しません。公開情報が取得中・失敗・未取得でも、他のモデル試験は補完なしの警告付きで実行できます。公開情報の取得成功はキーの認証成功を意味しません。
 
-起動時に公開一覧を取得できない場合は、同梱の `openrouter_models/openrouter_models.zip`（OpenRouter `/api/v1/models` の応答を保存したもの）を一時フォルダ（`%TEMP%idiy_diag` / `$TMPDIR/aidiy_diag`）へ展開し、ネットワーク取得と同じ日付絞り込み・安全化を通して使います。展開は Node 標準の zlib だけで行い、外部コマンドは使いません。キー設定画面の見出しには「公開モデル一覧取得: OK」（ネットワーク取得、緑）または「キャッシュ利用」（同梱キャッシュ、黄）を表示します。同梱キャッシュは保存時点の一覧なので、新しいモデルは含まれません。
+起動時に公開一覧を取得できない場合は、同梱の `モデル情報/openrouter_models/openrouter_models.zip`（OpenRouter `/api/v1/models` の応答を保存したもの）を一時フォルダ（`%TEMP%idiy_diag` / `$TMPDIR/aidiy_diag`）へ展開し、ネットワーク取得と同じ日付絞り込み・安全化を通して使います。展開は Node 標準の zlib だけで行い、外部コマンドは使いません。キー設定画面の見出しには「公開モデル一覧取得: OK」（ネットワーク取得、緑）または「キャッシュ利用」（同梱キャッシュ、黄）を表示します。同梱キャッシュは保存時点の一覧なので、新しいモデルは含まれません。
 
 2026-10-15 の確認では OpenRouter の `/api/v1/models` はキーなしで応答しましたが、公式 API リファレンスには Authorization 必須の記載もあります。キーなし取得を将来も保証するものではありません。応答が失敗した場合は NG とし、キー自体の認証失敗とは断定しません。
 
@@ -177,7 +191,7 @@ Python、uv を先頭に表示します。CLI や拡張は利用する機能に�
 
 旧静的調査の抽出候補 246 件から 227 件を除き、現在の確認対象を 19 件に絞っています。AiDiy 起動コマンド群、Hermes 本体・専用プラグイン・スキル・補助依存、macOS 音声再生（afplay）、GStreamer、Edge、Brave、OS 補助・シェル・開発・導入・配置用の補助ツール（Git / pip 等）は診断カタログに含めません。任意項目を再表示するチェックもありません。
 実際のプログラムや機能を削除する変更ではありません。共通依存は非 Hermes の利用根拠で保持し、Hermes 専用の探索パスも除外します。
-対象ソース・設定 3,333 件の調査履歴・マニフェストは保持します。調査範囲と今回の診断対象は異なり、除外内容は coverage.json の catalogSelection に記録しています。
+対象ソース・設定 3,333 件の調査履歴・マニフェストは保持します。調査範囲と今回の診断対象は異なり、除外内容は 診断/coverage.json の catalogSelection に記録しています。
 モデルキー設定と外部連携設定は上部の独立タブです。MCP・CLI の試行は未実装です。
 
 ## 状態インジケーター

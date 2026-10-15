@@ -7,7 +7,7 @@ const assert=require('node:assert/strict');
 const {app,BrowserWindow,screen,dialog}=require('electron');
 dialog.showMessageBox=async()=>({response:0});
 if(process.env.AIDIY_TEST_PROFILE)app.setPath('appData',process.env.AIDIY_TEST_PROFILE);
-const {windowBounds}=require('../window-layout.cjs');
+const {windowBounds}=require('../デスクトップ/window-layout.cjs');
 // 拡大演出専用の一時窓をアプリ本体として数えない。
 const applicationWindows=()=>BrowserWindow.getAllWindows().filter(window=>/^http:/.test(window.webContents.getURL()));
 function assertBounds(actual,expected){for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=1,`${key}: ${actual[key]} / ${expected[key]}`);}

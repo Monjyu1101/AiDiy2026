@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import sessionModule from '../desktop-session.cjs';
+import sessionModule from '../デスクトップ/desktop-session.cjs';
 const {validateDevelopmentState,readDevelopmentState}=sessionModule;
 const valid={active:true,mode:'online',startedAt:10,project:{path:'/fixture'}};
 

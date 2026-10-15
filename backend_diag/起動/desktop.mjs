@@ -7,7 +7,7 @@ import {recordDesktopFailure} from './desktop-log.mjs';
 export function browserMode(options, env=process.env, platform=process.platform) {
   return options.browser || options.noOpen || env.CODESPACES==='true' || env.CI==='true' || (platform==='linux' && !env.DISPLAY && !env.WAYLAND_DISPLAY);
 }
-export async function desktopBinary(root=fileURLToPath(new URL('.',import.meta.url)), platform=process.platform) {
+export async function desktopBinary(root=fileURLToPath(new URL('../',import.meta.url)), platform=process.platform) {
   const suffix=platform==='win32'?'electron.exe':platform==='darwin'?'Electron.app/Contents/MacOS/Electron':'electron';
   const electron=path.join(root,'node_modules','electron');
   const metadata=JSON.parse(await readFile(path.join(electron,'package.json'),'utf8'));

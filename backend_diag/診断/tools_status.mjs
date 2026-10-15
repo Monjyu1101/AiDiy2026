@@ -1,6 +1,6 @@
 // Term と同じローカル Tools の ping のみ。設定・応答・例外の内容は公開しない。
 import http from 'node:http';
-import {readConfig} from './runtime/model_probe.mjs';
+import {readConfig} from '../runtime/model_probe.mjs';
 
 export const TOOLS_TIMEOUT_MS = 1500;
 export const TOOLS_RESPONSE_LIMIT = 16 * 1024;

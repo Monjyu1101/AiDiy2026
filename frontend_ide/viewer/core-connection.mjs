@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { toolsTarget } from '../ai-search.mjs';
+import { toolsTarget } from '../ファイル機能/ai-search.mjs';
 
 // Live と同じ規則: AiDiy 配置先を優先し、共通設定から PORT_CORE だけを使う。
 export function coreTarget(...folders) {

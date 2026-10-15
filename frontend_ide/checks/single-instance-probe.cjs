@@ -6,7 +6,7 @@
 const {app,BrowserWindow,screen}=require('electron');
 const {spawn}=require('node:child_process');
 const assert=require('node:assert/strict');
-const {windowBounds}=require('../window-layout.cjs');
+const {windowBounds}=require('../デスクトップ/window-layout.cjs');
 function assertBounds(actual,expected){for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=2,`${key}: ${actual[key]} / ${expected[key]}`);}
 app.setPath('appData',process.env.AIDIY_TEST_PROFILE);
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));

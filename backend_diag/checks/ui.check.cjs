@@ -26,7 +26,7 @@ test('states and safe text interpolation preserve hierarchy and model text rende
  const install=source('インストール/インストールパネル.vue')+source('インストール/インストール表示.mjs');for(const label of ['未確認','ベース','CLI群','その他拡張'])assert.ok(install.includes(label));
  const keys=source('モデルキー設定/モデルキー設定パネル.vue');assert.match(keys,/\{\{model\}\}/);assert.match(keys,/未実施/);assert.match(source('キー設定共通/キー設定表示.mjs'),/設定済/);assert.match(source('キー設定共通/キー設定表示.mjs'),/未設定/);
  assert.doesNotMatch(source('App.vue')+install+keys,/v-html|innerHTML/);
- const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../catalog.json'),'utf8'));assert.equal(catalog.length,19);assert.deepEqual(catalog.filter(e=>e.menuGroup==='ベース').map(e=>e.name),['Python','uv','Node.js','npm','npx','Electron']);
+ const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../診断/catalog.json'),'utf8'));assert.equal(catalog.length,19);assert.deepEqual(catalog.filter(e=>e.menuGroup==='ベース').map(e=>e.name),['Python','uv','Node.js','npm','npx','Electron']);
 });
 test('checked-in compiled assets match current Vue sources',async()=>{const {verify}=await import('../ui/verify.mjs');assert.equal(await verify(),true);});
 test('source edits and altered bundle invalidate deployment manifest',async()=>{
@@ -38,7 +38,7 @@ test('source edits and altered bundle invalidate deployment manifest',async()=>{
  }finally{fs.rmSync(folder,{recursive:true,force:true});}
 });
 test('config key order and public acquisition status are separate from tests with no router prerequisite',async()=>{
- const app=source('App.vue'),panel=source('モデルキー設定/モデルキー設定パネル.vue');const {KEY_PROVIDERS}=await import('../key_status.mjs');assert.deepEqual(KEY_PROVIDERS.slice(0,9).map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt']);
+ const app=source('App.vue'),panel=source('モデルキー設定/モデルキー設定パネル.vue');const {KEY_PROVIDERS}=await import('../モデル情報/key_status.mjs');assert.deepEqual(KEY_PROVIDERS.slice(0,9).map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt']);
  assert.match(panel,/公開モデル一覧取得: <StatusBadge class="public-indicator" :state="公開状態"\/>/);const view=source('モデルキー設定/モデルキー設定表示.mjs');assert.match(view,/取得元 === 'キャッシュ' \? 'キャッシュ利用' : 'OK'/);
  assert.doesNotMatch(app+panel,/prerequisite|先に実行してください|OpenRouter を選択/);assert.match(panel,/public-indicator/);const state=source('キー設定共通/キー設定状態.mjs');assert.match(state,/api\/公開モデル/);assert.match(state,/Number\(data.世代\)>=Number\(publicModels.value.世代\)/);assert.match(app,/response.status===401\)\{設定を破棄\(\)/);assert.match(state,/generation!==publicGeneration/);
 });

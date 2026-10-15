@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {EventEmitter} from 'node:events';
 import vm from 'node:vm';
-import routerModule from '../draft-router.cjs';
+import routerModule from '../デスクトップ/draft-router.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 async function desktopFixture(){
@@ -32,10 +32,10 @@ async function desktopFixture(){
  const modules={
   electron:{app,BrowserWindow:Window,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{}}),getDisplayNearestPoint:()=>({workArea:{}}),getCursorScreenPoint:()=>({})},dialog:{}},
   'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){}},
-  './project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
+  './デスクトップ/project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./デスクトップ/window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./デスクトップ/term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
-  './draft-router.cjs':routerModule,'./desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
-  './native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
+  './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
+  './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:{env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:'ide'},cwd:()=>'/project',on(){}},__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});
@@ -64,7 +64,7 @@ test('IDE Code番号: 実createWindowのslotをタイトル・限定IPC・連携
 
 test('preloadタイトル: 任意IPCを公開せずホストの同一ウィンドウタイトルだけを取得する',async()=>{
  let api;const calls=[];
- vm.runInNewContext(readFileSync(new URL('../preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld(_name,value){api=value;}},ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve('AiDiy IDE / Code 2');}}})});
+ vm.runInNewContext(readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld(_name,value){api=value;}},ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve('AiDiy IDE / Code 2');}}})});
  assert.equal(await api.title(),'AiDiy IDE / Code 2');assert.deepEqual(calls,[['development:window','title']]);assert.equal(api.invoke,undefined);
 });
 

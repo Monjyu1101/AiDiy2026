@@ -2,6 +2,18 @@
 
 Term / Code / Live / IDE の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は4種類です。
 
+
+## ソースの配置
+
+- `launch.mjs` / `server.mjs` / `desktop.cjs`: 共通起動・HTTPサーバー・Electronの入口。既存のコマンドと起動パスを維持します。
+- `デスクトップ/`: preload、ウィンドウ配置、プロジェクト別プロファイル、下書き受け渡し、ネイティブプレビュー。
+- `ファイル機能/`: AiDiy検索、ファイル解析、履歴と記録保存。
+- `aidiy_term/`: Termの入口とPTY・端末プロセス。`aidiy_code/` / `aidiy_live/` / `aidiy_ide/` は各コマンドの入口です。
+- `src/`: 共通Vue画面。`host/`: Code / Live通信とVS Code拡張。`viewer/`: ファイルAPIと文書表示。
+- `scripts/` / `checks/`: 開発用スクリプトとテスト。
+
+ルートの `index.html`、`package.json`、`package-lock.json`、`_setup.py`、`_cleanup.py`、`.cmd` はビルド・導入・起動に必要です。`dist/` と `node_modules/` はセットアップで準備する生成物・依存関係で、ソースの移動先ではありません。
+
 ## 開発スペース — 宇宙をテーマにした IDE 開発環境
 
 AiDiy IDE は、プロジェクトを宇宙に見立てた **開発スペース** です。フォルダは銀河、ファイルは星・惑星として浮かび、1階層ずつ宇宙を渡り歩いてプロジェクトを把握します。

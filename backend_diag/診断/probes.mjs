@@ -5,14 +5,14 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import {recordProbeFailure} from './desktop-log.mjs';
+import {recordProbeFailure} from '../起動/desktop-log.mjs';
 
 const activeProbes = new Set();
 let shuttingDown = false;
 export function cancelProbes() { shuttingDown = true; for (const cancel of [...activeProbes]) cancel(); }
 export const TIMEOUT = 5000;
 export const OUTPUT_LIMIT = 16384;
-const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const CATALOG_PATH = fileURLToPath(new URL('./catalog.json', import.meta.url));
 export async function catalog() { return JSON.parse(await readFile(CATALOG_PATH, 'utf8')); }
 const versionPattern = /(?:^|[^\w.])v?(\d+\.\d+(?:\.\d+){0,3}(?:[-+][\w.-]+)?)(?![\w.])/;

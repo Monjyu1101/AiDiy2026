@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {createAISearch,validateSearchResult} from '../ai-search.mjs';
-import {createSearchHistory,MAX_SEARCH_HISTORY_BYTES} from '../ai-search-history.mjs';
+import {createAISearch,validateSearchResult} from '../ファイル機能/ai-search.mjs';
+import {createSearchHistory,MAX_SEARCH_HISTORY_BYTES} from '../ファイル機能/ai-search-history.mjs';
 
 const expected=[{from:null,to:'f:A'},{from:'f:A',to:'f:src/B'}];
 const result=job=>({requestId:job.id,query:job.query,files:[{path:'A',reason:'入口'},{path:'src/B',reason:'実装'}],route:['A','src/B']});

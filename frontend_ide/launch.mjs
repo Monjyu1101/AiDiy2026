@@ -11,8 +11,8 @@ import { parseArgs } from 'node:util';
 import { startDevelopment } from './server.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
-import { spawnDesktop } from './desktop-process.mjs';
-import projectProfiles from './project-profile.cjs';
+import { spawnDesktop } from './デスクトップ/desktop-process.mjs';
+import projectProfiles from './デスクトップ/project-profile.cjs';
 const {projectIdentity}=projectProfiles;
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){

@@ -127,7 +127,7 @@ test('Live拡張の単独画面: token配下の相対URLでも同じSVGを配信
 
 test('VS Code: webview URIを起動設定へ渡し、img-srcは既存CSPだけを使う', () => {
   const module = { exports: {} };
-  vm.runInNewContext(transformSync(readFileSync(new URL('vscode-html.ts', root), 'utf8'), { loader: 'ts', format: 'cjs' }).code, { module });
+  vm.runInNewContext(transformSync(readFileSync(new URL('host/src/vscode-html.ts', root), 'utf8'), { loader: 'ts', format: 'cjs' }).code, { module });
   const html = module.exports.developmentHtml(path => 'https://resource.test/' + path, 'https://resource.test', 'nonce', { kind: 'code' });
   const config = JSON.parse(html.match(/id="development-config"[^>]*>([^<]+)/)[1]);
   assert.equal(config.iconAssets, 'https://resource.test/dist/development/' + CATPPUCCIN_ROOT);

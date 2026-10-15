@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, rm, stat, symlink, readFile} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {probe, resolveProgram, versionInvocation} from '../probes.mjs';
-import {recordProbeFailure} from '../desktop-log.mjs';
+import {probe, resolveProgram, versionInvocation} from '../診断/probes.mjs';
+import {recordProbeFailure} from '../起動/desktop-log.mjs';
 
 async function withTree(fn) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'diag-win & spaces-'));

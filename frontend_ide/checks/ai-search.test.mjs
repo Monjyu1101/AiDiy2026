@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rename, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createAISearch, validateSearchResult } from '../ai-search.mjs';
+import { createAISearch, validateSearchResult } from '../ファイル機能/ai-search.mjs';
 import { aiRouteTargets } from '../src/engines/ai-route.js';
 import { startDevelopment } from '../server.mjs';
 

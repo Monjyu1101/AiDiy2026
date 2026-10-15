@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {appendDraft,createDraftReceiver,DRAFT_LIMITS} from '../src/draft-handoff.js';
-import routerModule from '../draft-router.cjs';
+import routerModule from '../デスクトップ/draft-router.cjs';
 const {createDraftRouter}=routerModule;
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -127,7 +127,7 @@ test('Electron登録: 対象の種類・文字列上限を照合し、解除時�
 test('preload: IPC eventを公開せず、限定された受信と結果ACKだけをつなぎ解除できる',()=>{
  let api;const listeners=new Map(),sent=[];
  const ipcRenderer={invoke:(...args)=>Promise.resolve(args),on:(name,callback)=>listeners.set(name,callback),send:(...args)=>sent.push(args),removeListener:(name,callback)=>{if(listeners.get(name)===callback)listeners.delete(name);}};
- vm.runInNewContext(readFileSync(new URL('../preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld(name,value){assert.equal(name,'aidiyWindow');api=value;}},ipcRenderer})});
+ vm.runInNewContext(readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld(name,value){assert.equal(name,'aidiyWindow');api=value;}},ipcRenderer})});
  let payload;const stop=api.onDraftHandoff(data=>{payload=data;return{ok:true};});
  const event={private:'not exposed'},data={requestId:'one',text:'本文'};listeners.get('development:draft-handoff')(event,data);
  assert.equal(payload,data);assert.equal(sent[0][0],'development:draft-result');assert.equal(sent[0][1].ok,true);assert.equal(sent[0][1].requestId,'one');
@@ -176,6 +176,6 @@ test('最前面: 新規窓の登録前focusを保持し、非同期一覧取得�
 test('Electron配線: 各窓のfocusを信頼済みホストで記録する',()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  assert.match(source,/window\.on\('focus',\(\)=>draftRouter\.focused\(record\)\)/);
- const preload=readFileSync(new URL('../preload.cjs',import.meta.url),'utf8');
+ const preload=readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8');
  assert.doesNotMatch(preload,/draftRouter\.focused|frontmostTargetId/);
 });

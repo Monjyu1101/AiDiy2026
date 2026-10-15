@@ -90,7 +90,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
   const loaded = {exports:{}};
   runInNewContext(transformSync(readFileSync('src/extension.ts','utf8'),{loader:'ts',format:'cjs'}).code,{
     exports:loaded.exports,module:loaded,require(name){
-      if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../../vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
+      if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../src/vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
       if(name==='vscode') return vscode;
       if(name==='./code-connection') return require('../out/code-connection.cjs');
       if(name==='./model-preferences') return {

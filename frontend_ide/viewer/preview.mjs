@@ -18,7 +18,7 @@ import { createReadStream } from 'node:fs';
 import { open, realpath, stat, readFile } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { MAX_MARKDOWN_BYTES, markdownText, renderMarkdownDocument } from '../markdown-preview.mjs';
+import { MAX_MARKDOWN_BYTES, markdownText, renderMarkdownDocument } from './markdown-preview.mjs';
 import { forwardedOrigin } from './launch-options.mjs';
 
 const TYPES = {

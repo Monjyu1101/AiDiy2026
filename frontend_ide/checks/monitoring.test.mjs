@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { tmpdir } from 'node:os';
-import { startTerminal } from '../terminal.mjs';
+import { startTerminal } from '../aidiy_term/terminal.mjs';
 import { createSpace, ORBIT_PATH_SCALE } from '../src/engines/space.js';
 import { validConnectionState } from '../src/connection-state.js';
 import { createDraftTargetRegistry } from '../src/draft-target-registry.js';

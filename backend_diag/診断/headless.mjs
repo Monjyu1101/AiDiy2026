@@ -6,11 +6,11 @@ import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { catalog, probe, scan, cancelProbes } from './probes.mjs';
-import { getKeyStatus, testKey, cancelKeyProbes } from './key_status.mjs';
-import { createPublicModelCache } from './public_models.mjs';
-import { MODEL_PROVIDER_IDS, writeModelsInfo } from './models_info.mjs';
+import { getKeyStatus, testKey, cancelKeyProbes } from '../モデル情報/key_status.mjs';
+import { createPublicModelCache } from '../モデル情報/public_models.mjs';
+import { MODEL_PROVIDER_IDS, writeModelsInfo } from '../モデル情報/models_info.mjs';
 
-export const OUTPUT_DIRECTORY = fileURLToPath(new URL('../_AIDIY/aidiy_diag/', import.meta.url));
+export const OUTPUT_DIRECTORY = fileURLToPath(new URL('../../_AIDIY/aidiy_diag/', import.meta.url));
 export const INSTALL_FILE = 'install_info.json';
 const STATES = ['OK', '注意', '未確認', '未検出', 'NG', 'ERR'];
 

@@ -10,7 +10,7 @@ import {readFileSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import vm from 'node:vm';
-import actionsModule from '../native-preview-actions.cjs';
+import actionsModule from '../デスクトップ/native-preview-actions.cjs';
 const {createNativePreviewActions,validPreviewPath}=actionsModule;
 const desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -45,7 +45,7 @@ async function fixture(t){
 
 test('ネイティブプレビュー: preloadは専用IPCとパスだけを公開し分離設定を維持する',async()=>{
  let api;const calls=[];
- vm.runInNewContext(readFileSync(new URL('../preload.cjs',import.meta.url),'utf8'),{require:name=>{
+ vm.runInNewContext(readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8'),{require:name=>{
   assert.equal(name,'electron');
   return{contextBridge:{exposeInMainWorld:(name,value)=>{assert.equal(name,'aidiyWindow');api=value;}},
    ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve({ok:true});}}};

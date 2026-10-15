@@ -6,7 +6,7 @@ import {desktopLogPath} from './desktop-log.mjs';
 
 // 秘密 URL は常駐側だけで生成する。起動元へは固定の状態通知だけを返す。
 export async function launchDetached(args, {spawnFn=spawn, timeout=30000,
-  entry=fileURLToPath(new URL('./diag_main.mjs',import.meta.url))}={}) {
+  entry=fileURLToPath(new URL('../diag_main.mjs',import.meta.url))}={}) {
   const env={...process.env,AIDIY_DIAG_LAUNCHER_CHILD:'1'};
   for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH)$/i.test(key))delete env[key];
   const child=spawnFn(process.execPath,[entry,'--foreground',...args],{

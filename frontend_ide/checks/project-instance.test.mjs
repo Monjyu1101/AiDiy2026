@@ -12,7 +12,7 @@ import {dirname,join} from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import vm from 'node:vm';
-import profiles from '../project-profile.cjs';
+import profiles from '../デスクトップ/project-profile.cjs';
 import {startDevelopment} from '../server.mjs';
 import {createCoreConnection} from '../viewer/core-connection.mjs';
 const {projectIdentity,projectProfile}=profiles;
@@ -81,7 +81,7 @@ function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',a
  const area={x:0,y:0,width:1920,height:1080};
  const electron={app,BrowserWindow:Window,ipcMain,shell:{},dialog:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getCursorScreenPoint:()=>({x:0,y:0}),getDisplayNearestPoint:()=>({workArea:area}),getDisplayMatching:()=>({workArea:area})}};
  const load=name=>name==='electron'?electron:name==='./host/scripts/window-opening.cjs'?{拡大表示:async(_type,window)=>{window.show();window.focus();return true;}}
-  :name==='./desktop-session.cjs'?{readDevelopmentState:async()=>({active:true,mode:'offline',startedAt:1,project:{path:project}})}:desktopRequire(name);
+  :name==='./デスクトップ/desktop-session.cjs'?{readDevelopmentState:async()=>({active:true,mode:'offline',startedAt:1,project:{path:project}})}:desktopRequire(name);
  vm.runInNewContext(`(function(require,__dirname,process){${desktopSource}\n})`,{console,setInterval,clearInterval,URL})(load,dirname(desktopPath),process);
  return{app,process,windows,messages,paths,order,ready:()=>ready,request:(name,window,...args)=>handlers.get(name)({sender:window.webContents,senderFrame:window.webContents.mainFrame},...args)};
 }
@@ -157,7 +157,7 @@ test('起動引数: 明示プロジェクトを解決してからElectronへ渡�
  const child=new EventEmitter();child.connected=true;child.disconnect=()=>{child.connected=false;};
  const realOptions=await import('../viewer/launch-options.mjs');
  const load=name=>name==='./server.mjs'?{startDevelopment:async(project)=>{const app={url:'http://127.0.0.1:12349/',publicUrl:'http://127.0.0.1:12349/',close:async()=>{app.closed=true;}};started.push({project,app});return app;}}
-  :name==='./desktop-process.mjs'?{spawnDesktop:(_exe,_args,options)=>{spawned.push(options);queueMicrotask(()=>child.emit('message',{existingWindow:true}));return child;}}
+  :name==='./デスクトップ/desktop-process.mjs'?{spawnDesktop:(_exe,_args,options)=>{spawned.push(options);queueMicrotask(()=>child.emit('message',{existingWindow:true}));return child;}}
   :name==='./viewer/launch-options.mjs'?{...realOptions,useBrowser:()=>false,electronExecutable:()=>'/mock/electron'}
   :desktopRequire(name);
  vm.runInNewContext(code,{module,exports:module.exports,require:load,process:fakeProcess,console:{log(){},warn(){}},setTimeout,clearTimeout,URL});

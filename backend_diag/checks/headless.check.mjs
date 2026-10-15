@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,readdir,rm,writeFile,mkdir} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {runHeadless,OUTPUT_DIRECTORY,STEPS,modelsStep} from '../headless.mjs';
+import {runHeadless,OUTPUT_DIRECTORY,STEPS,modelsStep} from '../診断/headless.mjs';
 const installOnly=STEPS.filter(step=>step.id==='install');
 import {parseArgs} from '../diag_main.mjs';
 

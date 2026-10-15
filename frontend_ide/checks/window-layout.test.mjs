@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import layout from '../window-layout.cjs';
+import layout from '../デスクトップ/window-layout.cjs';
 const {windowBounds,windowMinimumSize}=layout;
 for(const area of [{x:0,y:0,width:1920,height:1040},{x:-1600,y:80,width:1600,height:900},{x:0,y:-900,width:1024,height:728},{x:0,y:0,width:640,height:480},{x:-1080,y:-300,width:1080,height:1880},{x:120,y:50,width:640,height:640}]){
  test(`配置が画面内に収まり、IDEに余白を残す: ${JSON.stringify(area)}`,()=>{

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm,symlink,readFile,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
-import {createFileAnalysis} from '../file-analysis.mjs';
+import {createFileAnalysis} from '../ファイル機能/file-analysis.mjs';
 import {startDevelopment} from '../server.mjs';
 async function fixture(t){const root=await mkdtemp(join(tmpdir(),'aidiy-analysis-'));t.after(()=>{assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep));return rm(root,{recursive:true,force:true});});await writeFile(join(root,'main.js'),'export const hello=1;');await writeFile(join(root,'other.js'),'other');return root;}
 const options={state:()=>({active:true,startedAt:1}),runAgent:()=>new Promise(()=>{}),pollMs:100000};

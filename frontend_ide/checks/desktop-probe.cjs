@@ -7,7 +7,7 @@
 const {app,screen}=require('electron');
 const {writeFileSync}=require('node:fs');
 const {join}=require('node:path');
-const {windowBounds}=require('../window-layout.cjs');
+const {windowBounds}=require('../デスクトップ/window-layout.cjs');
 if(process.env.AIDIY_TEST_PROFILE)app.setPath('appData',process.env.AIDIY_TEST_PROFILE);
 let openingWindow,openingMetrics;
 app.on('browser-window-created',(_event,window)=>{

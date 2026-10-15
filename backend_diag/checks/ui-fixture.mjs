@@ -1,5 +1,5 @@
 import {createServer} from '../diag_main.mjs';
-import {catalog} from '../probes.mjs';
+import {catalog} from '../診断/probes.mjs';
 const entries=await catalog();
 const publicCache={snapshot:()=>({状態:'取得済',件数:1,世代:2,説明:'公開モデル取得済（synthetic）'}),input:()=>({公開モデル:{'fixture/model':{model_id:'fixture/model'}},公開状態:'取得済',確認日時:new Date().toISOString()}),refresh:async()=>publicCache.snapshot()};
 // 書込は実ファイルへ保存せず、件数だけ返す。

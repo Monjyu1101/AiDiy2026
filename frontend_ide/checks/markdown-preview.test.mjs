@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { markdownText, renderMarkdownDocument, MAX_MARKDOWN_BYTES } from '../markdown-preview.mjs';
+import { markdownText, renderMarkdownDocument, MAX_MARKDOWN_BYTES } from '../viewer/markdown-preview.mjs';
 import { createPreview } from '../viewer/preview.mjs';
 import { startDevelopment } from '../server.mjs';
 

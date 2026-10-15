@@ -1,6 +1,6 @@
 // 設定値を返さず、UI用の固定スキーマだけを公開する。
-import {KEY_PROVIDERS,carryOpenRouterProof} from './runtime/model_probe.mjs';
-import {runModels,cancelKeyProbes,createModelRunner} from './runtime/model_runner.mjs';
+import {KEY_PROVIDERS,carryOpenRouterProof} from '../runtime/model_probe.mjs';
+import {runModels,cancelKeyProbes,createModelRunner} from '../runtime/model_runner.mjs';
 export {KEY_PROVIDERS,runModels,cancelKeyProbes,createModelRunner};
 const reason=code=>({timeout:'モデル確認がタイムアウトしました。',output:'モデル確認の応答が上限を超えました。',busy:'別のキー確認が実行中です。',stopped:'診断を終了しました。'}[code] || 'モデル確認処理を利用できません。配布ファイルと通信状態を確認してください。');
 const text=(value,limit=1000)=>typeof value==='string'?value.slice(0,limit):'';

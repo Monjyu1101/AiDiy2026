@@ -100,7 +100,7 @@ async function extensionPanel(t) {
       createOutputChannel: () => ({ appendLine() {}, clear() {}, dispose() {} }), registerWebviewViewProvider(_id, value) { provider = value; return subscription; } },
     Uri: { joinPath: (_root, path) => uri(path) }, commands: { registerCommand: () => subscription } };
   const modules = { vscode,
-    '../../vscode-html': { developmentHtml: () => '' },
+    './vscode-html': { developmentHtml: () => '' },
     './code-connection': { コード選択: value => ({ provider: value.provider || '', model: value.model || '' }), CodeConnection: class { constructor() { assert.fail('外部接続は禁止'); } } },
     './model-preferences': { モデル保存先: () => 'model.json', オフラインモデル保存先: () => 'offline.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込: () => 0 },
     '../aidiy_code/src/offline': { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline.json' },

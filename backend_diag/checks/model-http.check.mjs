@@ -39,7 +39,7 @@ test('abort destroys in-flight request and invalid pagination never constructs a
 
 test('anonymous public catalog accepts multi-MiB metadata and retains bounded sanitized cache',async()=>{
  const {createModelRunner}=await import('../runtime/model_runner.mjs');
- const {createPublicModelCache}=await import('../public_models.mjs');
+ const {createPublicModelCache}=await import('../モデル情報/public_models.mjs');
  const now=new Date('2026-10-15T12:00:00Z');
  const bytes=Buffer.from(JSON.stringify({data:Array.from({length:700},(_,i)=>({id:`google/example-${i}`,created:Math.floor(now.getTime()/1000),context_length:100000,architecture:{modality:'text->text'},description:'public metadata '.repeat(220)}))}));
  assert.ok(bytes.length>2*RESPONSE_LIMIT);
@@ -62,7 +62,7 @@ test('larger public cap stays bounded and never expands authenticated-provider c
 });
 test('public failures expose only fixed reasons from transport through cache and logs',async()=>{
  const {createModelRunner}=await import('../runtime/model_runner.mjs');
- const {createPublicModelCache}=await import('../public_models.mjs');
+ const {createPublicModelCache}=await import('../モデル情報/public_models.mjs');
  for(const [code,expected] of [['EAI_AGAIN','名前解決'],['UNABLE_TO_GET_ISSUER_CERT_LOCALLY','TLS証明書'],['ECONNRESET','接続できません']])await transport((_options,_callback,request)=>request.emit('error',Object.assign(new Error('synthetic-secret'),{code})),async()=>{
   const logs=[];const runner=createModelRunner(),cache=createPublicModelCache({run:runner.run,warn:message=>logs.push(message),loadBundled:async()=>{throw Error('no bundle');}});
   await cache.refresh();assert.equal(cache.snapshot().状態,'失敗');assert.ok(cache.snapshot().説明.includes(expected));assert.equal(logs.length,1);assert.ok(logs[0].includes(expected));assert.ok(!JSON.stringify([cache.snapshot(),logs]).includes('synthetic-secret'));

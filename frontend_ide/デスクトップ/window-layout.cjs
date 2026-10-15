@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 // ElectronのworkArea（タスクバーを除いた論理座標）に収める。
-const size=require('./host/scripts/window-size.cjs');
+const size=require('../host/scripts/window-size.cjs');
 // Termは操作バーと端末の数行を残せればよい。初期配置・会話画面の最小寸法とは分ける。
 function windowMinimumSize(kind,bounds){
  return{minWidth:Math.min(kind==='ide'?400:size.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:kind==='term'?180:size.会話最小高さ,bounds.height)};

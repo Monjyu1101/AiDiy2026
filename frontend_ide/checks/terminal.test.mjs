@@ -10,7 +10,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocket } from 'ws';
-import { startTerminal } from '../terminal.mjs';
+import { startTerminal } from '../aidiy_term/terminal.mjs';
 import { startDevelopment } from '../server.mjs';
 import { cliCompletions } from '../src/terminal-completion.js';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

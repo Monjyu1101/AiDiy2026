@@ -1,7 +1,7 @@
 // 起動 URL、秘密情報、生 stderr、例外本文は保存しない。固定分類だけの容量制限ログ。
 import {openSync,closeSync,fstatSync,ftruncateSync,writeSync,constants} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-export const DESKTOP_LOG=new URL('./.desktop-errors.log',import.meta.url);
+export const DESKTOP_LOG=new URL('../.desktop-errors.log',import.meta.url);
 const codes=new Set(['IPC','TIMEOUT','URL','WINDOW','LOAD','RENDERER','SPAWN','EXIT']);
 function appendSafeLine(body,file=DESKTOP_LOG) {
   let fd;

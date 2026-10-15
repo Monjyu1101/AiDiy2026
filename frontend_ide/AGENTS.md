@@ -4,6 +4,7 @@ Term / Code / Live / IDE は AiDiy の正式なサブシステムであり、本
 
 全体のコンセプトは **開発スペース（宇宙をテーマにした IDE 開発環境）**。プロジェクトを宇宙（フォルダ＝銀河、ファイル＝星・惑星）として見せ、人はソースをほぼ触らずに「眺める・辿る・読む・頼む」で開発する。編集は Code / Live を通じて AI に任せ、IDE 自体は読み取り専用を保つ。Code / Live は単独起動・VS Code 拡張を維持したまま、開発スペースの部品としても動作させる（3つの使い方を壊さない）。説明文では見た目を宇宙、画面の文字は「フォルダ」「ファイル」など一般名で書く。
 
+- ルート直下は起動入口（`launch.mjs` / `server.mjs` / `desktop.cjs`）、セットアップ・解除、設定・説明に限定する。Electronの内部処理は `デスクトップ/`、検索・解析・履歴のAPIは `ファイル機能/`、PTYは `aidiy_term/`、Markdown表示は `viewer/`、VS Code用HTMLは `host/src/` に置く。
 - 画面部品は `src/components/`、通信境界は `src/transports/`、Canvas描画は `src/engines/` に分ける。
 - Code / Liveの通信・VS Code拡張ホストは `host/`、ファイルAPI・Office表示は `viewer/` に統合する。Discordは `host/` の共通処理を利用する。AIコア・Hermesは共通バックエンドを使用し、UIに秘密情報を渡さない。
 - ポートは自動割り当て。ElectronとWebで同じVue画面を使う。
@@ -13,5 +14,5 @@ Term / Code / Live / IDE は AiDiy の正式なサブシステムであり、本
 - 自作ソースには既存の著作権・利用条件の定型文を維持する。第三者ライセンスは配布物へ含める。
 - 実装変更は画面を撮影して確認する。手順はREADMEと `_AIDIY/knowledge/` に記載する。
 
-- Termは `TermPanel.vue`（xterm.js）と `terminal.mjs`（WebSocket）を使い、`terminal-process.mjs` / `terminal-worker.mjs` が端末ごとのPTYとプロセス終了を管理する。端末は通常のシェル権限を持ち、ファイルビューアだけが読み取り専用。TermにはVS Code拡張を作らない。
+- Termは `TermPanel.vue`（xterm.js）と `aidiy_term/terminal.mjs`（WebSocket）を使い、`aidiy_term/terminal-process.mjs` / `aidiy_term/terminal-worker.mjs` が端末ごとのPTYとプロセス終了を管理する。端末は通常のシェル権限を持ち、ファイルビューアだけが読み取り専用。TermにはVS Code拡張を作らない。
 - setup / start / cleanup の表示・処理順は Term → Code → Live → IDE。共有依存物は各アプリの停止・解除後に片付ける。

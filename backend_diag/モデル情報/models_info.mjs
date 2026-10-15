@@ -5,9 +5,9 @@
 // モデル設定ファイルには依存せず、取得結果から生成する。Grok / local とCopilot候補なし時だけ固定候補。
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
-import { OUTPUT_DIRECTORY, writeResult } from './headless.mjs';
-import {catalog, resolveProgram} from './probes.mjs';
-import {currentOpenRouterProof} from './runtime/model_probe.mjs';
+import { OUTPUT_DIRECTORY, writeResult } from '../診断/headless.mjs';
+import {catalog, resolveProgram} from '../診断/probes.mjs';
+import {currentOpenRouterProof} from '../runtime/model_probe.mjs';
 import {LIVE_VOICES_FILE, liveVoicesInfo} from './voices_info.mjs';
 
 // 順序はHermesの先頭候補にも使う。存在確認のみでCLIは実行しない。

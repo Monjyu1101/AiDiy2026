@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
-import {createPublicModelCache as createCache} from '../public_models.mjs';
+import {createPublicModelCache as createCache} from '../モデル情報/public_models.mjs';
 const noBundle=async()=>{throw Error('no bundle');};
 const createPublicModelCache=(options={})=>createCache({loadBundled:noBundle,...options});
 const success={data:{状態:'OK',公開モデル:{'google/example':{model_id:'google/example',作成日:'2026/10/01',トークン数:'100',モダリティ:'text'}},確認日時:'2026-10-15T00:00:00Z'}};

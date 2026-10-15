@@ -1,7 +1,7 @@
 // 起動中だけ保持する匿名公開メタデータ。キー設定・認証試験結果とは別管理。
 // ネットワークで取得できない場合は、同梱の公開一覧（キャッシュ）を同じ絞り込みで使う。
 import {runModels} from './key_status.mjs';
-import {publicFailureDescription} from './runtime/model_probe.mjs';
+import {publicFailureDescription} from '../runtime/model_probe.mjs';
 import {loadBundledModels} from './bundled_models.mjs';
 export const SOURCES=Object.freeze({network:'ネットワーク',bundled:'キャッシュ'});
 export function createPublicModelCache({run=runModels,warn=console.warn,loadBundled=loadBundledModels}={}) {
