@@ -4,6 +4,21 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 const root=fileURLToPath(new URL('.',import.meta.url));
 async function files(directory){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const filename=path.join(directory,entry.name);if(entry.isDirectory())result.push(...await files(filename));else result.push(filename);}return result;}
-export async function manifest(){const names=[...await files(path.join(root,'src')),path.join(root,'build.mjs'),path.join(root,'package.json'),path.join(root,'package-lock.json'),...['app.js','style.css','index.html'].map(name=>path.join(root,'../static',name))].sort();return Object.fromEntries(await Promise.all(names.map(async name=>[path.relative(root,name).replaceAll('\\','/'),createHash('sha256').update(await readFile(name)).digest('hex')])));}
-export async function verify(){try{return JSON.stringify(await manifest())===JSON.stringify(JSON.parse(await readFile(path.join(root,'../static/build-manifest.json'),'utf8')));}catch{return false;}}
+export async function manifest(directory=root){
+  const names=[...await files(path.join(directory,'src')),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),...['app.js','style.css','index.html'].map(name=>path.join(directory,'../static',name))];
+  // Git の Windows checkout による CRLF だけを正規化。将来の画像等は生バイトで比較する。
+  const entries=await Promise.all(names.map(async name=>{
+    const relative=path.relative(directory,name).replaceAll('\\','/');
+    const bytes=await readFile(name);
+    const content=/\.(?:vue|m?js|css|html|json)$/.test(relative)?Buffer.from(bytes.toString('utf8').replace(/\r\n/g,'\n')):bytes;
+    return [relative,createHash('sha256').update(content).digest('hex')];
+  }));
+  return Object.fromEntries(entries.sort(([a],[b])=>a<b?-1:a>b?1:0));
+}
+export async function verify(directory=root){
+  try {
+    const actual=await manifest(directory),expected=JSON.parse(await readFile(path.join(directory,'../static/build-manifest.json'),'utf8'));
+    return expected!==null && typeof expected==='object' && !Array.isArray(expected) && Object.keys(actual).length===Object.keys(expected).length && Object.entries(actual).every(([name,hash])=>Object.hasOwn(expected,name) && expected[name]===hash);
+  }catch{return false;}
+}
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href){if(!await verify()){console.error('Vue UI のソースと配布物が一致しません。backend_diag/ui で npm ci && npm run build を実行してください。');process.exitCode=1;}else console.log('Vue UI のソースと配布物は一致しています。');}

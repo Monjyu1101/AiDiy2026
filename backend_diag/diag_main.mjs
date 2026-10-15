@@ -12,6 +12,19 @@ import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './key_status.m
 import {verify as verifyUi} from './ui/verify.mjs';
 import {stopRevision,watchStop} from './lifecycle.mjs';
 
+// 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
+const STARTUP_MESSAGES=Object.freeze({
+  ARGUMENTS:'起動引数が不正です。aidiy_diag --help で指定方法を確認してください。',
+  UI:'Vue UI のソースと配布物が一致しないか不足しています。同じ版の backend_diag を取得し直してください。UI を編集した場合は backend_diag/ui で npm ci && npm run build を実行してください。',
+  ELECTRON:'Electron が未準備です。python backend_diag/_setup.py を実行するか --browser を指定してください。',
+  DESKTOP:'Electron を起動できません。--browser でブラウザ起動できます。',
+  CATALOG:'catalog.json または coverage.json を読み込めません。同じ版の backend_diag を取得し直してください。',
+  EADDRINUSE:'指定ポートは使用中です。--port 0 で空きポートを使用してください。',
+  EACCES:'ローカル待受の権限がありません。--port 0 または OS のアクセス設定を確認してください。'
+});
+function startupError(code){return Object.assign(new Error('Diagnostic startup failed'),{diagCode:code});}
+export function startupMessage(error){return '診断を起動できません。'+((Object.hasOwn(STARTUP_MESSAGES,error?.diagCode) && STARTUP_MESSAGES[error.diagCode]) || (Object.hasOwn(STARTUP_MESSAGES,error?.code) && STARTUP_MESSAGES[error.code]) || '起動処理でエラーが発生しました。診断ファイルの配置とアクセス権を確認してください。');}
+
 export function basePath(value) {
   if (value === '/') return '/';
   if (!/^\/[A-Za-z0-9_/-]+\/?$/.test(value) || value.includes('//')) throw new Error('base-path は /proxy/8097/ のように指定してください。');
@@ -103,18 +116,20 @@ function openBrowser(url) {
   child.on('error',()=>console.log('自動で開けない場合は、上の URL をブラウザで開いてください。')); child.unref();
 }
 export async function main(args=process.argv.slice(2)) {
-  const options=parseArgs(args);
+  let options;try {options=parseArgs(args);}catch {throw startupError('ARGUMENTS');}
   if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--port 8097] [--base-path /proxy/8097/]'); return; }
-  if (!await verifyUi()) throw new Error('Vue UI の再ビルドが必要です。backend_diag/ui で npm ci && npm run build を実行してください。');
+  if (!await verifyUi()) throw startupError('UI');
   const useBrowser=browserMode(options);
   let executable;
   if (!useBrowser) {
     try {executable=await desktopBinary();}
-    catch {throw new Error('Electron が未準備です。python backend_diag/_setup.py を実行するか --browser を指定してください。');}
+    catch {throw startupError('ELECTRON');}
   }
   const initialStop=await stopRevision();
-  const token=randomBytes(32).toString('base64url'), entries=await catalog();
-  const coverage=JSON.parse(await readFile(new URL('./coverage.json',import.meta.url),'utf8'));
+  const token=randomBytes(32).toString('base64url');
+  let entries,coverage;
+  try {entries=await catalog();coverage=JSON.parse(await readFile(new URL('./coverage.json',import.meta.url),'utf8'));}
+  catch {throw startupError('CATALOG');}
   const publicCache=createPublicModelCache();
   const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port,'127.0.0.1',resolve);});
@@ -129,11 +144,11 @@ export async function main(args=process.argv.slice(2)) {
     if (!options.noOpen && process.env.CODESPACES !== 'true') openBrowser(url);
   } else {
     console.log('AiDiy 診断: Electron ウィンドウを開きます。Ctrl+C で終了。');
-    try {desktop=openDesktop(executable,url,close);} catch {close();throw new Error('Electron を起動できません。--browser でブラウザ起動できます。');}
+    try {desktop=openDesktop(executable,url,close);} catch {close();throw startupError('DESKTOP');}
   }
   stopWatching=watchStop(initialStop,close);
   server.once('close',()=>stopWatching());
   process.once('SIGINT',close);process.once('SIGTERM',close);
   return server;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(()=>{console.error('診断を起動できません。Electron は python backend_diag/_setup.py で準備してください。ブラウザ起動は --browser。引数、ポート、catalog.json も確認してください。Vue UI を変更した場合は backend_diag/ui で npm ci && npm run build が必要です。');process.exitCode=1;});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(error=>{console.error(startupMessage(error));process.exitCode=1;});
