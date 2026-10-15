@@ -97,14 +97,14 @@ export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:O
   if(p.probe==='local-fixed')return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:null,キー不要:true,ローカル:true,状態:'未実施',理由:'',テスト可能:true,説明:'本体と同じ固定候補（CHAT_LOCAL_MODELS）を使います（API 取得なし）。'};
   if(p.probe==='ollama-local')return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:null,キー不要:true,ローカル:true,状態:'未実施',理由:'',テスト可能:true,説明:'本体と同じく、ローカルの Ollama（ollama list と同じ一覧）を確認します。キーは使いません。'};
   if(p.oauth){const present=oauth[p.oauth];return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:present?'':`ログイン情報がありません。${OAUTH_CLI[p.oauth]} CLI でログインしてください。`,テスト可能:present,説明:'ログイン情報（OAuth）の有無のみ。接続は未確認です。'};}
-  const present=state==='読込不可'?null:configured(values[p.キー名],p.id),publicRow=p.id==='openrt';
-  const reason=state==='読込不可'?'設定を読み取れません。':!present&&!publicRow?'キーが未設定です。':!p.probe?'この項目の接続テストは未対応です。':'';
-  return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:publicRow,状態:'未実施',理由:reason,テスト可能:state!=='読込不可'&&!!p.probe&&(!!present||publicRow),説明:publicRow?'起動時の公開モデル一覧キャッシュを表示します。キーの有効性は確認しません。':'設定有無のみ。接続は未確認です。'};
+  const present=state==='読込不可'?null:configured(values[p.キー名],p.id);
+  const reason=state==='読込不可'?'設定を読み取れません。':!present?'キーが未設定です。':!p.probe?'この項目の接続テストは未対応です。':'';
+  return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:reason,テスト可能:state!=='読込不可'&&!!p.probe&&!!present,説明:p.id==='openrt'?'設定キーを確認し、公開モデル一覧キャッシュから候補を表示します。':'設定有無のみ。接続は未確認です。'};
  }),モデル:[]};
 }
 // ローカル Ollama は ollama list と同じ API を loopback 固定で読む（プロセスは起動しない）。
 const LOCAL_ENDPOINTS:Record<string,readonly [string,number,string]>={'ollama-local':['127.0.0.1',11434,'/api/tags']};
-const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],ollama:['ollama.com','/v1/models']};
+const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],'openrouter-key':['openrouter.ai','/api/v1/key'],ollama:['ollama.com','/v1/models']};
 export type Fetch=(provider:string,headers:Record<string,string>,pageToken?:unknown,signal?:AbortSignal)=>Promise<Dictionary>;
 export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promise((resolve,reject)=>{
  const local=LOCAL_ENDPOINTS[provider],endpoint=local?[local[0],local[2]] as const:ENDPOINTS[provider];if(!endpoint)return reject(new Error('provider'));
@@ -160,6 +160,25 @@ export async function publicCatalog({fetch=fetchMetadata,now,signal}:{fetch?:Fet
   return {状態:'NG',公開モデル:{},確認日時:timestamp,失敗理由:code,説明:publicFailureDescription(code)};
  }
 }
+// 認証証跡はプロセス内の非列挙 Symbol のみ。JSON・ブラウザ・保存ファイルにキーや指紋を含めない。
+// runner は bundle されるため、同一プロセスの共有 Symbol で安全化後の結果へ引き継ぐ。
+const ROUTER_PROOF=Symbol.for('aidiy.diag.openrouter-proof');
+export function carryOpenRouterProof<T extends object>(source:object,target:T):T {
+ const proof=Object.getOwnPropertyDescriptor(source,ROUTER_PROOF);
+ if(proof)Object.defineProperty(target,ROUTER_PROOF,proof);
+ return target;
+}
+export async function currentOpenRouterProof(result:unknown,reader?:Reader):Promise<boolean> {
+ if(!record(result))return false;
+ const proof=Object.getOwnPropertyDescriptor(result,ROUTER_PROOF)?.value;
+ return typeof proof==='function'&&await proof(reader)===true;
+}
+function authenticatedRouterResult<T extends object>(result:T,key:string):T {
+ return Object.defineProperty(result,ROUTER_PROOF,{value:async(reader?:Reader)=>{
+  const [state,values]=await readConfig(reader);
+  return state==='読込済み'&&configured(values.openrt_key_id,'openrt')&&values.openrt_key_id.trim()===key;
+ }});
+}
 export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch=fetchMetadata,now,cache,signal}:{reader?:Reader;oauthReader?:OAuthReader;codexLocalReader?:CodexLocalReader;fetch?:Fetch;now?:Date;cache?:unknown;signal?:AbortSignal}={}) {
  const output={id,状態:'未実施',説明:'未対応の項目です。',モデル:[] as string[],モデル詳細:[] as Record<string,string|null>[],確認日時:null as string|null,警告:[] as string[]};
  const selected=KEY_PROVIDERS.find(row=>row.id===id);if(!selected?.probe)return output;
@@ -196,15 +215,19 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
    return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,説明:'ローカルの Ollama からモデル一覧を取得しました（本体の ollama list と同じ一覧）。生成可否は未確認です。',一覧範囲:'インストール済みのローカルモデル（新しい順）。表示は最大500件。'};
   }catch{return {...output,状態:'NG',説明:'ローカルの Ollama に接続できません。Ollama が起動しているか確認してください（本体ではこの場合 Ollama の候補が空になります）。',確認日時:timestamp};}
  }
- if(id==='openrt'){
-  if(!ready)return {...output,説明:'起動時の公開OpenRouter一覧がまだ利用できません。キーのテストは未実施です。'};
-  // 本体の get_chat_models と同じく、表示一覧では廃止モデルを除く（補完用の公開一覧は除かない）。
-  const details=safeDetails(withoutRetired(router),[]);
-  return {...output,状態:'OK',説明:'起動時の匿名取得結果を表示。キーの有効性・生成可否・課金状態は未確認です。',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:record(cache)&&typeof cache.確認日時==='string'?cache.確認日時:null,一覧範囲:'公開一覧のキャッシュ。最大500件。'};
- }
  const [state,values]=await readConfig(reader);if(state==='読込不可')return {...output,説明:'設定を読み取れません。'};
  const keyValue=values[selected.キー名];if(!configured(keyValue,id))return {...output,説明:'キーが未設定です。'};
  const key=keyValue.trim(),provider=selected.probe,timestamp=new Date().toISOString();
+ // 公開 /models はキー認証の証拠にならない。生成せず専用 GET /key で確認する。
+ if(id==='openrt'){
+  try {
+   const body=await fetch('openrouter-key',{Authorization:'Bearer '+key},undefined,signal);
+   if(!record(body.data)||typeof body.data.is_free_tier!=='boolean')throw new Error('shape');
+   if(!ready)return {...output,状態:'NG',確認日時:timestamp,説明:'キー認証は成功しましたが、公開モデル一覧が利用できません。'};
+   const details=safeDetails(withoutRetired(router),secretValues(values));
+   return authenticatedRouterResult({...output,状態:'OK',認証確認:true,説明:'キー認証成功。公開一覧キャッシュから候補を表示します。生成可否・課金状態は未確認です。',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,一覧範囲:'認証確認済み。公開一覧のキャッシュ。最大500件。'},key);
+  }catch{return {...output,状態:'NG',確認日時:timestamp,説明:'OpenRouter のキー認証を確認できませんでした。キー設定と通信を確認してください。'};}
+ }
  const warnings=['google','openai','anthropic'].includes(provider)&&!ready?['起動時の公開OpenRouter一覧が利用できません。元のモデル処理と同じ空一覧時の処理で、日付・対応情報の補完なしで続行しました。']:[];
  try {
   const headers:Record<string,string>=provider==='google'?{'x-goog-api-key':key}:provider==='anthropic'?{'x-api-key':key,'anthropic-version':'2023-06-01'}:{Authorization:'Bearer '+key};

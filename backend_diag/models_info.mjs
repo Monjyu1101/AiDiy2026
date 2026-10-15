@@ -7,6 +7,7 @@ import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import { OUTPUT_DIRECTORY, writeResult } from './headless.mjs';
 import {catalog, resolveProgram} from './probes.mjs';
+import {currentOpenRouterProof} from './runtime/model_probe.mjs';
 import {LIVE_VOICES_FILE, liveVoicesInfo} from './voices_info.mjs';
 
 // 順序はHermesの先頭候補にも使う。存在確認のみでCLIは実行しない。
@@ -148,10 +149,11 @@ export async function modelsInfo(provider, result, {now = () => new Date()} = {}
   const fixedKey = provider.id === 'grok' ? 'grok_cli' : layout.chatFixed;
   const chatModels = fixedKey
     ? details({モデル詳細:Object.keys(FIXED_MODELS[fixedKey].models).map(model_id => ({model_id}))})
-    : result?.状態 === 'OK' ? details(result).filter(row => !gemini || !row.model_id.includes('lyria')) : [];
+    : result?.状態 === 'OK' && (provider.id !== 'openrt' || result.認証確認 === true) ? details(result).filter(row => !gemini || !row.model_id.includes('lyria')) : [];
   const info = {形式:2, 種類:'モデル情報', プロバイダ:provider.id, 名前:provider.名前, 保存日時:now().toISOString(), 確認日時:result?.確認日時 ?? null,
     状態:result?.状態 ?? '未実施', 説明:result?.説明 ?? '', 警告:Array.isArray(result?.警告) ? result.警告 : [],
     chat:{取得元:fixedKey ? '固定候補（aidiy_diag）' : result?.状態 === 'OK' ? 'API（本体と同じ絞り込み）' : '取得できませんでした', 件数:chatModels.length, モデル:chatModels}};
+  if (provider.id === 'openrt') info.認証確認 = result?.状態 === 'OK' && result.認証確認 === true;
   // 区分名以下は各プログラムがそのまま使う {models} のみ。API の詳細は chat.モデル に残す。
   // Claude / Grok の API 一覧は詳細だけで、本体に存在しない chat 区分は作らない。
   if (layout.chat) info.chat[layout.chat] = layout.chatFixed ? fixedSection(layout.chatFixed) : {models:chatLabels(chatModels, layout)};
@@ -197,20 +199,40 @@ function mergeModelsInfo(infos) {
 }
 
 // 保存済みの全プロバイダを合成する。個別テスト後の書込でも他プロバイダの候補を維持する。
-async function writeMergedModelsInfo(directory, installedClis) {
+async function writeMergedModelsInfo(directory, installedClis, providers, results, options) {
   const infos = [];
+  const routerVerified = results.openrt?.状態 === 'OK' && results.openrt?.認証確認 === true
+    && await currentOpenRouterProof(results.openrt, options.configReader);
   // 合成時だけ FreeAI を先頭にする。画面・診断のプロバイダ順は維持する。
   const order = ['freeai', ...MODEL_PROVIDER_IDS.filter(id => id !== 'freeai')];
   for (const id of order) {
-    try { infos.push(JSON.parse(await readFile(path.join(directory, modelsInfoFile(id)), 'utf8'))); }
+    try {
+      const info = JSON.parse(await readFile(path.join(directory, modelsInfoFile(id)), 'utf8'));
+      // 旧公開一覧の OK や、キー削除後の保存済み候補を引き継がない。
+      if (id === 'openrt' && (info.認証確認 !== true || !providers.some(row => row.id === id && row.設定済み === true) || !routerVerified)) continue;
+      infos.push(info);
+    }
     catch (error) { if (error?.code !== 'ENOENT') throw error; }
   }
   const saved = [];
   const merged = mergeModelsInfo(infos);
   merged.code = availableCodeModels(merged.code, installedClis);
   for (const [group, info] of Object.entries(merged)) {
+    // 無効ラベルや旧 auto/same の除外後、CLI の補完後に空区分を落とす。
+    const nonempty = Object.fromEntries(Object.entries(info).filter(([, entry]) => Object.keys(entry.models).length));
+    // 設定ファイル未作成でも選択欄を維持する。認証・導入済みの候補とは区別する。
+    if (group === 'live' && !Object.keys(nonempty).length) {
+      // Gemini側の既定と同じ Live 対応モデル。FreeAI側の旧09-2025既定は変更しない。
+      // https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-native-audio-preview-12-2025
+      // 2026-10-15確認: 最短終了予定2026-11-17。仮候補のため生成可否は未確認。
+      const id = 'gemini-2.5-flash-native-audio-preview-12-2025';
+      nonempty.freeai_live = {models:{[id]:`仮設定（未検証） - ${id}`}};
+    }
+    if (group === 'code' && !Object.keys(nonempty).length) {
+      nonempty.aidiy_hermes = {models:{auto:'仮設定（未検証） - auto'}};
+    }
     const file = modelsInfoFile(group);
-    await writeResult(path.join(directory, file), info);
+    await writeResult(path.join(directory, file), nonempty);
     saved.push(file);
   }
   return saved;
@@ -227,7 +249,7 @@ export async function writeModelsInfo(providers, results, {directory = OUTPUT_DI
     await writeResult(path.join(directory, file), await modelsInfo(provider, result, options));
     saved.push(file);
   }
-  if (saved.length) saved.push(...await writeMergedModelsInfo(directory, options.installedClis ?? await installedCodeClis()));
+  saved.push(...await writeMergedModelsInfo(directory, options.installedClis ?? await installedCodeClis(), providers, results, options));
   const confirmed = {};
   for (const id of ['gemini', 'freeai', 'openai']) {
     if (Object.hasOwn(results, id)) confirmed[id] = results[id];

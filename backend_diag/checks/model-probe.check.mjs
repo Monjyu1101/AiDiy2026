@@ -4,6 +4,7 @@ import {probe,publicCatalog,status,safeDetails,validatedCache} from '../runtime/
 const now=new Date('2026-10-15T12:00:00Z'),created=now.getTime()/1000;
 const reader=value=>async()=>JSON.stringify(value);
 const forbidden=()=>assert.fail('Unexpected config/network operation');
+const routerAuth={reader:reader({openrt_key_id:'fixture-key'}),fetch:async(provider,headers)=>{assert.equal(provider,'openrouter-key');assert.deepEqual(headers,{Authorization:'Bearer fixture-key'});return {data:{is_free_tier:false}};}};
 test('invalid configuration is unknown; unset and unsupported keys never fetch',async()=>{
  assert.equal((await status({reader:async()=> '[]'})).設定状態,'読込不可');
  assert.equal((await probe('gemini',{reader:reader({freeai_key_id:'fixture-key'}),fetch:forbidden})).状態,'未実施');
@@ -39,7 +40,7 @@ test('public failure does not leak provider errors and cache validation fails cl
  const result=await publicCatalog({now,fetch:async()=>{throw Error('secret-error');}});
  assert.equal(result.状態,'NG');assert.ok(!JSON.stringify(result).includes('secret-error'));
  for(const cache of [null,[],{公開状態:'取得中',公開モデル:{}},{公開状態:'取得済',公開モデル:{bad:null}}]){
-  const result=await probe('openrt',{reader:forbidden,fetch:forbidden,cache});assert.equal(result.状態,'未実施');
+  const result=await probe('openrt',{...routerAuth,cache});assert.equal(result.状態,'NG');
  }
 });
 test('configuration bounds, UTF-8 BOM, unreadable and missing states',async()=>{
@@ -53,7 +54,7 @@ test('configuration bounds, UTF-8 BOM, unreadable and missing states',async()=>{
 test('public details are unlimited but individual display is capped at 500',async()=>{
  const data=Array.from({length:501},(_,i)=>({id:`other/model-${i}`,created}));
  const result=await publicCatalog({now,fetch:async()=>({data})});assert.equal(Object.keys(result.公開モデル).length,501);
- const selected=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル:result.公開モデル}});assert.equal(selected.モデル.length,500);
+ const selected=await probe('openrt',{...routerAuth,cache:{公開状態:'取得済',公開モデル:result.公開モデル}});assert.equal(selected.モデル.length,500);
 });
 // 以下は旧 tests/test_model_probe.py の BridgeTests から、TypeScript 実装に該当する項目を移植。
 const day=86400;
@@ -68,7 +69,7 @@ test('fixed config path, provider order and safe status without key values',asyn
  assert.equal(rows.openai.設定済み,true);assert.equal(rows.gemini.設定済み,false);
  // Ollama は本体と同じくローカル（ollama list）。キーでは判定しない。
  assert.equal(rows.ollama.設定済み,null);assert.equal(rows.ollama.ローカル,true);assert.equal(rows.ollama.キー不要,true);assert.equal(rows.ollama.テスト可能,true);
- assert.equal(rows.openrt.キー不要,true);assert.equal(rows.openrt.テスト可能,true);
+ assert.equal(rows.openrt.キー不要,false);assert.equal(rows.openrt.テスト可能,false);
 });
 test('public catalog is anonymous and applies the OpenRouter date filter',async()=>{
  const result=await publicCatalog({now,fetch:async(provider,headers)=>{
@@ -77,11 +78,11 @@ test('public catalog is anonymous and applies the OpenRouter date filter',async(
  }});
  assert.equal(result.状態,'OK');assert.deepEqual(Object.keys(result.公開モデル),['other/new']);assert.match(result.説明,/キーの有効性/);
 });
-test('OpenRouter reuses only an acquired startup cache without config or network',async()=>{
+test('OpenRouter verifies credentials separately before reusing the startup cache',async()=>{
  const 公開モデル=(await publicCatalog({now,fetch:async()=>({data:[{id:'other/new',created:created-day}]})})).公開モデル;
- const result=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル}});
+ const result=await probe('openrt',{...routerAuth,cache:{公開状態:'取得済',公開モデル}});
  assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['other/new']);
- for(const state of ['未取得','取得中','失敗'])assert.equal((await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:state,公開モデル}})).状態,'未実施');
+ for(const state of ['未取得','取得中','失敗'])assert.equal((await probe('openrt',{...routerAuth,cache:{公開状態:state,公開モデル}})).状態,'NG');
 });
 test('missing router cache warns but continues; selected provider failure is NG without error text',async()=>{
  const result=await probe('openai',{now,reader:reader({openai_key_id:'fixture-secret'}),fetch:async provider=>{assert.equal(provider,'openai');return {data:[{id:'fresh',created:created-2*day}]};}});
@@ -107,7 +108,7 @@ test('display lists drop retired OpenAI models like get_chat_models, but the joi
  assert.deepEqual(openai.モデル,['gpt-6.1-sol']);
  const 公開モデル=(await publicCatalog({now,fetch:async()=>({data:[{id:'openai/gpt-6-sol',created},{id:'openai/gpt-6.1-sol',created},{id:'~openai/gpt-sol-latest',created}]})})).公開モデル;
  assert.ok(Object.hasOwn(公開モデル,'openai/gpt-6-sol'),'join source keeps retired models');assert.ok(Object.hasOwn(公開モデル,'~openai/gpt-sol-latest'),'aliases kept like the main app');
- const openrt=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル}});
+ const openrt=await probe('openrt',{...routerAuth,cache:{公開状態:'取得済',公開モデル}});
  assert.deepEqual(openrt.モデル,['openai/gpt-6.1-sol','~openai/gpt-sol-latest']);
 });
 test('Ollama lists local models like ollama list (newest first), without keys, and reports a stopped server as NG',async()=>{
@@ -128,4 +129,18 @@ test('live candidates carry creation dates: OpenAI from the API, Gemini from the
  assert.deepEqual(openai.ライブ候補,['gpt-realtime-2']);assert.match(openai.ライブ候補作成日['gpt-realtime-2'],/^\d{4}\/\d{2}\/\d{2}$/);
  const gemini=await probe('gemini',{now,reader:reader({gemini_key_id:'fixture-key'}),cache:{公開状態:'取得済',公開モデル:{'google/live-dated':{作成日:'2026/09/01'},'google/chat':{作成日:'2026/09/02'}}},fetch:async()=>({models:[{name:'models/live-dated',supportedGenerationMethods:['bidiGenerateContent']},{name:'models/live-undated',supportedGenerationMethods:['bidiGenerateContent']},{name:'models/chat',supportedGenerationMethods:['generateContent']}]})});
  assert.deepEqual(gemini.ライブ候補,['live-dated','live-undated']);assert.deepEqual(gemini.ライブ候補作成日,{'live-dated':'2026/09/01','live-undated':null});
+});
+
+test('OpenRouter never promotes public metadata without a verified key',async()=>{
+ const cache={公開状態:'取得済',公開モデル:{'other/new':{作成日:'2026/10/01'}}};
+ for(const key of [undefined,'','<placeholder>']){
+  const result=await probe('openrt',{reader:reader({openrt_key_id:key}),fetch:forbidden,cache});
+  assert.equal(result.状態,'未実施');assert.deepEqual(result.モデル,[]);assert.notEqual(result.認証確認,true);
+ }
+ for(const response of [()=>{throw Error('invalid-secret');},()=>({data:[]}),()=>({data:{}})]){
+  const result=await probe('openrt',{reader:reader({openrt_key_id:'fixture-key'}),cache,fetch:async(provider)=>{assert.equal(provider,'openrouter-key');return response();}});
+  assert.equal(result.状態,'NG');assert.deepEqual(result.モデル,[]);assert.ok(!JSON.stringify(result).includes('invalid-secret'));
+ }
+ const result=await probe('openrt',{...routerAuth,cache});
+ assert.equal(result.認証確認,true);assert.deepEqual(result.モデル,['other/new']);
 });

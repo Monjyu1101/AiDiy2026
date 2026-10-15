@@ -9,7 +9,7 @@ test('Node status uses only bounded config reader and never contacts a provider'
  const response=await runModels('status',undefined,{reader:reader({openai_key_id:'fixture-secret',gemini_key_id:' < placeholder > ',ollama_key_id:'ollama'}),fetch:forbidden});
  assert.equal(response.data.設定状態,'読込済み');
  const rows=Object.fromEntries(response.data.項目.map(row=>[row.id,row]));
- assert.equal(rows.openai.設定済み,true);assert.equal(rows.gemini.設定済み,false);assert.equal(rows.ollama.設定済み,null);assert.equal(rows.ollama.ローカル,true);assert.equal(rows.ollama.キー不要,true);assert.equal(rows.ollama.テスト可能,true);assert.equal(rows.openrt.キー不要,true);
+ assert.equal(rows.openai.設定済み,true);assert.equal(rows.gemini.設定済み,false);assert.equal(rows.ollama.設定済み,null);assert.equal(rows.ollama.ローカル,true);assert.equal(rows.ollama.キー不要,true);assert.equal(rows.ollama.テスト可能,true);assert.equal(rows.openrt.キー不要,false);
  assert.ok(!JSON.stringify(response).includes('fixture-secret'));
 });
 test('unknown and unsupported IDs never read config or fetch',async()=>{
@@ -34,9 +34,15 @@ test('public acquisition uses anonymous fetch, never configuration',async()=>{
  }});
  assert.equal(result.data.状態,'OK');assert.deepEqual(Object.keys(result.data.公開モデル),['other/new']);
 });
-test('OpenRouter individual test reuses cache without configuration or network',async()=>{
+test('OpenRouter individual test verifies key and preserves authentication marker',async()=>{
  const input={公開状態:'取得済',公開モデル:{example:{model_id:'example',作成日:'2026/10/15',トークン数:'100',モダリティ:'text'}},確認日時:now.toISOString()};
- const result=await runModels('test','openrt',{input,reader:forbidden,fetch:forbidden});
+ const result=await runModels('test','openrt',{input,reader:reader({openrt_key_id:'fixture-key'}),fetch:async provider=>{assert.equal(provider,'openrouter-key');return {data:{is_free_tier:false}};}});
+ assert.equal(result.data.認証確認,true);
+ const safe=await testKey('openrt',{run:async()=>result});assert.equal(safe.認証確認,true);
+ const {currentOpenRouterProof}=await import('../runtime/model_probe.mjs');
+ assert.equal(await currentOpenRouterProof(safe,reader({openrt_key_id:'fixture-key'})),true);
+ assert.equal(await currentOpenRouterProof(safe,reader({openrt_key_id:'changed-key'})),false);
+ assert.ok(!JSON.stringify(safe).includes('fixture-key'));
  assert.equal(result.data.状態,'OK');assert.deepEqual(result.data.モデル,['example']);
 });
 test('oversized cache is rejected before configuration or network',async()=>{

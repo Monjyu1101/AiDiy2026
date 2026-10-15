@@ -42,7 +42,7 @@ test('only configured, testable and successfully confirmed keys expose voices',(
 
 test('partial writes preserve confirmed voices and remove disabled or failed keys, including no-test runs',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-live-voices-'));
- const options={directory,installedClis:{}};
+ const options={configReader:()=>'{}',directory,installedClis:{}};
  const load=async()=>JSON.parse(await readFile(path.join(directory,LIVE_VOICES_FILE),'utf8'));
  try{
   assert.ok((await writeModelsInfo(providers,results,options)).includes(LIVE_VOICES_FILE));

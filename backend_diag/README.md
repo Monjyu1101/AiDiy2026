@@ -110,12 +110,12 @@ Python/Node のライブラリ、内部スクリプト、shell builtin、Git sub
 
 一覧は既存 config の固定キー順（Gemini、FreeAI、Claude、OpenAI、OpenAI OAuth、Grok（xAI）、OpenRouter、Ollama（ローカル）、ローカル（backend_local）、Hugging Face 読取・書込、Discord）です。Azure OpenAI と GitHub Copilot はモデル一覧の確認に対応しないため画面に表示しません（サーバーの登録とモデル名からのキー値秘匿の対象には残します）。表示対象外の設定項目は省き、JSON の任意の並べ替えには追従しません。左側でキーを選択し、右側で説明・テスト結果・モデル一覧を確認できます。キーの存在だけでは OK にしません。起動時には匿名の公開 OpenRouter 一覧だけを取得します。タブ移動・全テストから個別キーの API は呼びません。各行の「テスト」は明示操作時だけ固定プロバイダーのモデル一覧 API を読み取ります。生成リクエスト、MCP の挨拶、CLI 試行は未実装です。
 
-- キー試験の表示は未実施 / OK / NG。未設定・未対応の項目は未実施で、理由を表示します。OpenRouter のテストボタンは取得済み公開キャッシュの表示だけで、個別取得やキー認証はしません。起動時・明示再取得の公開要求にもキーを送りません。キーの有効性は未確認のままです。
+- キー試験の表示は未実施 / OK / NG。未設定・未対応の項目は未実施で、理由を表示します。OpenRouter の個別テストは設定キーを固定 GET `https://openrouter.ai/api/v1/key` で確認し、成功時だけ公開キャッシュから候補を表示します。公開 `/models` の応答だけでは認証成功にしません。キー未設定は未実施、認証・通信・応答形式の確認失敗は NG です。起動時・明示再取得の公開要求にはキーを送りません。
 - OK はモデル一覧 API の応答確認であり、生成可能性・課金状態の保証ではありません。公開モデル一覧の場合はキー有効性の検証にもなりません。
 - Gemini / FreeAI / Claude / OpenAI / OpenRouter / Ollama Cloud の固定 HTTPS 宛先だけを使います。OpenAI OAuth は `~/.codex/auth.json`（`CODEX_HOME`）、Grok（xAI）は `~/.grok/auth.json` のログイン情報があれば API キーが無くても設定済とし、それぞれ `chatgpt.com/backend-api/codex/models`（本体と同じく非表示・廃止モデルを除き優先度順）と `cli-chat-proxy.grok.com/v1/models`（非表示を除き、作成日が分かるものは 240 日以内）からモデル一覧を取得します。ログイン情報は読むだけで、トークンの更新（ファイルの書換え）はしません。期限切れのときは各 CLI での再ログインを案内します。
 - 絞り込み・並び順は本体（`backend_server/conf/conf_model.py` の取得関数と `get_chat_models`、OAuth は `command_hermes/hermes_cli/codex_models.py`）に合わせています。OpenAI / OpenRouter の表示一覧は旧 Sol（`gpt-6-sol` 系）を除き、補完用の公開一覧は除きません。OpenRouter の別名（`~provider/model`）も本体と同じく表示します。OpenAI OAuth は非表示・廃止を除いて優先度順に並べ、将来版と `-900k` 版を補完します。API で取れないときは本体と同じ代替候補（`~/.codex/config.toml` の model → `models_cache.json` → 既定値）を NG の結果と併せて表示します。Grok は本体がもともと固定候補（`grok-4.7` / `grok-4.6`）を流し込む系統のため、API で取れない場合は固定候補を表示して PASS（黄）とし、取れなかった理由を説明に残します。backend_local も本体は API を使わず固定候補（`CHAT_LOCAL_MODELS`）を流し込む系統のため、aidiy_diag が持つ同じ固定候補を表示して PASS（黄）とします。Ollama は本体と同じくキーを使わず、ローカルの Ollama（`ollama list` と同じ一覧、新しい順）を `127.0.0.1:11434/api/tags` から読みます（プロセスは起動しません）。
 - 「最新モデル取得」は設定状況を読み直し、モデルキー設定のテストできる行を上から順に取得します。取得中の行へ選択と右側のモデル一覧が追従します。Azure、Copilot、Hugging Face、Discord の個別テストは未対応です。
-- キーは当該サービスへのモデル一覧要求にだけ使用し、任意 URL / proxy / 環境変数の base URL は採用しません。リダイレクト禁止、要求ごとに期限・応答上限を設けます。モデル処理全体は 25 秒・同時2件、HTTPS 要求ごとは8秒・応答1 MiB、設定ファイルは128 KiB、表示モデルは500件上限です。終了・期限切れでは通信を中止し、Google のページ取得は最大20回です。表示の取得範囲・警告を確認してください。エラー本文やヘッダーは返しません。
+- キーは当該サービスへのモデル一覧要求（OpenRouter はキー確認 GET）にだけ使用し、任意 URL / proxy / 環境変数の base URL は採用しません。リダイレクト禁止、要求ごとに期限・応答上限を設けます。モデル処理全体は 25 秒・同時2件、HTTPS 要求ごとは8秒・応答1 MiB、設定ファイルは128 KiB、表示モデルは500件上限です。終了・期限切れでは通信を中止し、Google のページ取得は最大20回です。表示の取得範囲・警告を確認してください。エラー本文やヘッダーは返しません。
 - 設定状況を更新すると前のテスト表示を消します。別のキーに変更した場合は再テストしてください。テスト結果はブラウザのメモリ内だけで、再起動・再読込後に引き継ぎません。
 
 ### 起動時の公開モデル取得
@@ -202,3 +202,13 @@ Electron は既存 `scripts/_setup_electron.py` を使い、配置済み、他�
 Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環境変数・ログへ出しません。Windows の Electron は標準入力が常に EOF になるため、標準入力は使いません。renderer は sandbox / contextIsolation を有効、nodeIntegration を無効にします。非永続 session を使い、権限要求・別ウィンドウ・外部 navigation を拒否します。ウィンドウを閉じると診断サーバーも停止します。
 
 実際の Electron GUI 起動はこの変更の検証環境では未確認です。テストでは共有セットアップ、同版再利用、起動分岐、URL受渡、Electron権限制限を mock / 一時ファイルで検証します。
+
+## 空候補の固定仮補完
+
+- chat / live / code の合成 JSON は、モデルが0件のプロバイダ区分を含めません。CLI 絞り込み・Copilot 固定候補・Hermes 経路の合成後に判定します。chat の backend_local 固定4候補は維持します。
+- OpenRouter は現在キー設定済み、かつ今回保持しているキー確認済み結果だけを合成します。保存済みの認証確認だけでは合成せず、設定再読込後は再テストが必要です。画面を開いたままキーを差し替えた場合も、サーバー内の確認結果と現在キーを比較して無効化します（キー・指紋は保存や画面送信をしません）。
+- live 全体が空の場合だけ、`freeai_live` の `gemini-2.5-flash-native-audio-preview-12-2025` を1件、code 全体が空の場合だけ、`aidiy_hermes` の `auto` を1件、「仮設定（未検証）」として入れます。設定ファイルに依存せず、`AiDiy_key.json` が未作成でも同じ結果になります。
+- 仮補完は表示候補であり、認証・CLI 導入・生成可否を保証しません。通常候補が1件でもあればその区分の仮補完は行いません。キー値は出力せず、認証済みの音声候補も増やしません。
+- Live の仮モデルは既存 Gemini 側の既定と同じです。既存 FreeAI 側の09-2025既定は変更しません。[公式モデル資料](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-native-audio-preview-12-2025)で Live 対応を確認しました。[廃止予定](https://ai.google.dev/gemini-api/docs/deprecations)では最短終了予定が2026-11-17、後継が `gemini-3.8-live` です（2026-10-15確認）。後継への実動作移行は別途確認してください。
+- 認証方式の参照: [OpenRouter Get current API key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key)。診断は GET のみで、生成・課金操作を行いません。
+- `checks/node-only-startup.check.mjs` は隔離フォルダに設定ファイルを作らず、本物の `diag_main.mjs --headless` を実行します。HOME と PATH を隔離し、通信をオフライン mock にして同梱公開キャッシュを使い、local 4件・FreeAI Live 1件・Hermes auto 1件と、設定ファイル未作成の維持を確認します。

@@ -26,7 +26,30 @@ https.request=(options,callback)=>{if(options.hostname!=='openrouter.ai'||option
   let publicStatus;for(let i=0;i<100;i++){publicStatus=await api(encodeURIComponent('公開モデル'));if(publicStatus.状態==='取得済')break;await new Promise(resolve=>setTimeout(resolve,10));}
   assert.equal(publicStatus.状態,'取得済');assert.equal(publicStatus.件数,1);
   const status=await api(encodeURIComponent('キー設定'));assert.equal(status.設定状態,'読込済み');assert.equal(status.項目.find(row=>row.id==='gemini').設定済み,true);assert.ok(!JSON.stringify(status).includes('synthetic-gemini-key'));
-  const result=await api(encodeURIComponent('キーテスト')+'/openrt','POST');assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['openai/synthetic-model']);
+  const result=await api(encodeURIComponent('キーテスト')+'/openrt','POST');assert.equal(result.状態,'未実施');assert.deepEqual(result.モデル,[]);
   child.kill('SIGTERM');await exited;assert.equal(child.exitCode,0);assert.equal(stderr,'');
+ }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
+});
+
+test('actual headless entrypoint works with missing config and no credentials, using bundled catalog only',{timeout:20000},async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'diag-no-config-'));let child;
+ try {
+  const diag=path.join(root,'backend_diag');
+  await cp(new URL('../',import.meta.url),diag,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
+  await mkdir(path.join(root,'home'));await mkdir(path.join(root,'empty-path'));
+  // 本物の設定・OAuthを読ませない。通信は匿名公開一覧とloopbackのみ許容し、接続せず失敗させる。
+  const preload=path.join(root,'offline.mjs');
+  await writeFile(preload,`import https from 'node:https';import http from 'node:http';import {EventEmitter} from 'node:events';
+const offline=(options)=>{if(options.headers?.Authorization||options.headers?.['x-goog-api-key']||!['openrouter.ai','127.0.0.1'].includes(options.hostname))throw Error('unexpected authenticated request');const request=new EventEmitter();request.destroy=()=>{};request.end=()=>queueMicrotask(()=>request.emit('error',Object.assign(Error('offline fixture'),{code:'ENETUNREACH'})));return request;};https.request=offline;http.request=offline;`);
+  child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--headless'],{env:{PATH:path.join(root,'empty-path'),HOME:path.join(root,'home'),USERPROFILE:path.join(root,'home'),CODEX_HOME:path.join(root,'home','.codex'),NODE_OPTIONS:'',CI:'1'},stdio:['ignore','pipe','pipe']});
+  let output='',stderr='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
+  await once(child,'exit');assert.equal(child.exitCode,0,output+'\n'+stderr);
+  const {readFile,access}=await import('node:fs/promises');
+  await assert.rejects(access(path.join(root,'_config','AiDiy_key.json')),{code:'ENOENT'});
+  const load=async group=>JSON.parse(await readFile(path.join(root,'_AIDIY','aidiy_diag',group+'_models_info.json'),'utf8'));
+  const chat=await load('chat');assert.deepEqual(Object.keys(chat),['local_chat']);assert.equal(Object.keys(chat.local_chat.models).length,4);
+  assert.deepEqual(await load('live'),{freeai_live:{models:{'gemini-2.5-flash-native-audio-preview-12-2025':'仮設定（未検証） - gemini-2.5-flash-native-audio-preview-12-2025'}}});
+  assert.deepEqual(await load('code'),{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}});
+  assert.match(output,/完了しました/);
  }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
 });

@@ -349,13 +349,13 @@ async function status({ reader, oauthReader } = {}) {
       const present2 = oauth[p.oauth];
       return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present2, \u30AD\u30FC\u4E0D\u8981: false, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: present2 ? "" : `\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u304C\u3042\u308A\u307E\u305B\u3093\u3002${OAUTH_CLI[p.oauth]} CLI \u3067\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002`, \u30C6\u30B9\u30C8\u53EF\u80FD: present2, \u8AAC\u660E: "\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\uFF08OAuth\uFF09\u306E\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
     }
-    const present = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? null : configured(values[p.\u30AD\u30FC\u540D], p.id), publicRow = p.id === "openrt";
-    const reason = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? "\u8A2D\u5B9A\u3092\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3002" : !present && !publicRow ? "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" : !p.probe ? "\u3053\u306E\u9805\u76EE\u306E\u63A5\u7D9A\u30C6\u30B9\u30C8\u306F\u672A\u5BFE\u5FDC\u3067\u3059\u3002" : "";
-    return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present, \u30AD\u30FC\u4E0D\u8981: publicRow, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: reason, \u30C6\u30B9\u30C8\u53EF\u80FD: state !== "\u8AAD\u8FBC\u4E0D\u53EF" && !!p.probe && (!!present || publicRow), \u8AAC\u660E: publicRow ? "\u8D77\u52D5\u6642\u306E\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u8868\u793A\u3057\u307E\u3059\u3002\u30AD\u30FC\u306E\u6709\u52B9\u6027\u306F\u78BA\u8A8D\u3057\u307E\u305B\u3093\u3002" : "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
+    const present = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? null : configured(values[p.\u30AD\u30FC\u540D], p.id);
+    const reason = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? "\u8A2D\u5B9A\u3092\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3002" : !present ? "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" : !p.probe ? "\u3053\u306E\u9805\u76EE\u306E\u63A5\u7D9A\u30C6\u30B9\u30C8\u306F\u672A\u5BFE\u5FDC\u3067\u3059\u3002" : "";
+    return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present, \u30AD\u30FC\u4E0D\u8981: false, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: reason, \u30C6\u30B9\u30C8\u53EF\u80FD: state !== "\u8AAD\u8FBC\u4E0D\u53EF" && !!p.probe && !!present, \u8AAC\u660E: p.id === "openrt" ? "\u8A2D\u5B9A\u30AD\u30FC\u3092\u78BA\u8A8D\u3057\u3001\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u304B\u3089\u5019\u88DC\u3092\u8868\u793A\u3057\u307E\u3059\u3002" : "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
   }), \u30E2\u30C7\u30EB: [] };
 }
 var LOCAL_ENDPOINTS = { "ollama-local": ["127.0.0.1", 11434, "/api/tags"] };
-var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], ollama: ["ollama.com", "/v1/models"] };
+var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], "openrouter-key": ["openrouter.ai", "/api/v1/key"], ollama: ["ollama.com", "/v1/models"] };
 var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resolve, reject) => {
   const local = LOCAL_ENDPOINTS[provider], endpoint = local ? [local[0], local[2]] : ENDPOINTS[provider];
   if (!endpoint) return reject(new Error("provider"));
@@ -449,6 +449,23 @@ async function publicCatalog({ fetch = fetchMetadata, now, signal } = {}) {
     return { \u72B6\u614B: "NG", \u516C\u958B\u30E2\u30C7\u30EB: {}, \u78BA\u8A8D\u65E5\u6642: timestamp, \u5931\u6557\u7406\u7531: code, \u8AAC\u660E: publicFailureDescription(code) };
   }
 }
+var ROUTER_PROOF = Symbol.for("aidiy.diag.openrouter-proof");
+function carryOpenRouterProof(source, target) {
+  const proof = Object.getOwnPropertyDescriptor(source, ROUTER_PROOF);
+  if (proof) Object.defineProperty(target, ROUTER_PROOF, proof);
+  return target;
+}
+async function currentOpenRouterProof(result, reader) {
+  if (!record(result)) return false;
+  const proof = Object.getOwnPropertyDescriptor(result, ROUTER_PROOF)?.value;
+  return typeof proof === "function" && await proof(reader) === true;
+}
+function authenticatedRouterResult(result, key) {
+  return Object.defineProperty(result, ROUTER_PROOF, { value: async (reader) => {
+    const [state, values] = await readConfig(reader);
+    return state === "\u8AAD\u8FBC\u6E08\u307F" && configured(values.openrt_key_id, "openrt") && values.openrt_key_id.trim() === key;
+  } });
+}
 async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchMetadata, now, cache, signal } = {}) {
   const output = { id, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u8AAC\u660E: "\u672A\u5BFE\u5FDC\u306E\u9805\u76EE\u3067\u3059\u3002", \u30E2\u30C7\u30EB: [], \u30E2\u30C7\u30EB\u8A73\u7D30: [], \u78BA\u8A8D\u65E5\u6642: null, \u8B66\u544A: [] };
   const selected = KEY_PROVIDERS.find((row2) => row2.id === id);
@@ -485,16 +502,22 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
       return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30ED\u30FC\u30AB\u30EB\u306E Ollama \u306B\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3002Ollama \u304C\u8D77\u52D5\u3057\u3066\u3044\u308B\u304B\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\uFF08\u672C\u4F53\u3067\u306F\u3053\u306E\u5834\u5408 Ollama \u306E\u5019\u88DC\u304C\u7A7A\u306B\u306A\u308A\u307E\u3059\uFF09\u3002", \u78BA\u8A8D\u65E5\u6642: timestamp2 };
     }
   }
-  if (id === "openrt") {
-    if (!ready) return { ...output, \u8AAC\u660E: "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u304C\u307E\u3060\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002\u30AD\u30FC\u306E\u30C6\u30B9\u30C8\u306F\u672A\u5B9F\u65BD\u3067\u3059\u3002" };
-    const details = safeDetails(withoutRetired(router), []);
-    return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: "\u8D77\u52D5\u6642\u306E\u533F\u540D\u53D6\u5F97\u7D50\u679C\u3092\u8868\u793A\u3002\u30AD\u30FC\u306E\u6709\u52B9\u6027\u30FB\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: record(cache) && typeof cache.\u78BA\u8A8D\u65E5\u6642 === "string" ? cache.\u78BA\u8A8D\u65E5\u6642 : null, \u4E00\u89A7\u7BC4\u56F2: "\u516C\u958B\u4E00\u89A7\u306E\u30AD\u30E3\u30C3\u30B7\u30E5\u3002\u6700\u5927500\u4EF6\u3002" };
-  }
   const [state, values] = await readConfig(reader);
   if (state === "\u8AAD\u8FBC\u4E0D\u53EF") return { ...output, \u8AAC\u660E: "\u8A2D\u5B9A\u3092\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3002" };
   const keyValue = values[selected.\u30AD\u30FC\u540D];
   if (!configured(keyValue, id)) return { ...output, \u8AAC\u660E: "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" };
   const key = keyValue.trim(), provider = selected.probe, timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  if (id === "openrt") {
+    try {
+      const body = await fetch("openrouter-key", { Authorization: "Bearer " + key }, void 0, signal);
+      if (!record(body.data) || typeof body.data.is_free_tier !== "boolean") throw new Error("shape");
+      if (!ready) return { ...output, \u72B6\u614B: "NG", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "\u30AD\u30FC\u8A8D\u8A3C\u306F\u6210\u529F\u3057\u307E\u3057\u305F\u304C\u3001\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u304C\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002" };
+      const details = safeDetails(withoutRetired(router), secretValues(values));
+      return authenticatedRouterResult({ ...output, \u72B6\u614B: "OK", \u8A8D\u8A3C\u78BA\u8A8D: true, \u8AAC\u660E: "\u30AD\u30FC\u8A8D\u8A3C\u6210\u529F\u3002\u516C\u958B\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u304B\u3089\u5019\u88DC\u3092\u8868\u793A\u3057\u307E\u3059\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp, \u4E00\u89A7\u7BC4\u56F2: "\u8A8D\u8A3C\u78BA\u8A8D\u6E08\u307F\u3002\u516C\u958B\u4E00\u89A7\u306E\u30AD\u30E3\u30C3\u30B7\u30E5\u3002\u6700\u5927500\u4EF6\u3002" }, key);
+    } catch {
+      return { ...output, \u72B6\u614B: "NG", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "OpenRouter \u306E\u30AD\u30FC\u8A8D\u8A3C\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30AD\u30FC\u8A2D\u5B9A\u3068\u901A\u4FE1\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002" };
+    }
+  }
   const warnings = ["google", "openai", "anthropic"].includes(provider) && !ready ? ["\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u304C\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7A7A\u4E00\u89A7\u6642\u306E\u51E6\u7406\u3067\u3001\u65E5\u4ED8\u30FB\u5BFE\u5FDC\u60C5\u5831\u306E\u88DC\u5B8C\u306A\u3057\u3067\u7D9A\u884C\u3057\u307E\u3057\u305F\u3002"] : [];
   try {
     const headers = provider === "google" ? { "x-goog-api-key": key } : provider === "anthropic" ? { "x-api-key": key, "anthropic-version": "2023-06-01" } : { Authorization: "Bearer " + key };
@@ -546,7 +569,9 @@ export {
   KEY_PROVIDERS,
   PUBLIC_RESPONSE_LIMIT,
   RESPONSE_LIMIT,
+  carryOpenRouterProof,
   configured,
+  currentOpenRouterProof,
   fetchMetadata,
   oauthPath,
   probe,

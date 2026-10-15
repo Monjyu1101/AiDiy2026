@@ -59,7 +59,7 @@ export async function installStep({entries, probeFn = probe, log = console.log, 
 
 // モデル情報: 公開一覧を取得し、テストできるプロバイダのモデル一覧を取得して、プロバイダ別ファイルへ保存する。
 // モデル処理は同時 2 件までのため、その上限で並行実行する。
-export async function modelsStep({log = console.log, signal, directory = OUTPUT_DIRECTORY, statusFn = getKeyStatus, testFn = testKey, publicCache = createPublicModelCache({warn:() => {}})} = {}) {
+export async function modelsStep({log = console.log, signal, directory = OUTPUT_DIRECTORY, statusFn = getKeyStatus, testFn = testKey, configReader, publicCache = createPublicModelCache({warn:() => {}})} = {}) {
   if (signal?.aborted) throw cancelled();
   const [status] = await Promise.all([statusFn(), publicCache.refresh()]);
   if (signal?.aborted) throw cancelled();
@@ -68,7 +68,7 @@ export async function modelsStep({log = console.log, signal, directory = OUTPUT_
   if (signal?.aborted) throw cancelled();
   const byId = {};
   rows.forEach((row, index) => { const result = results[index]; byId[row.id] = result; log(`  ${String(result?.状態 ?? 'ERR').padEnd(3)} ${row.名前}（${result?.モデル?.length ?? 0} 件）`); });
-  const 保存先 = await writeModelsInfo(status.項目, byId, {directory});
+  const 保存先 = await writeModelsInfo(status.項目, byId, {directory, configReader});
   const 集計 = {};for (const result of Object.values(byId)) 集計[result?.状態 ?? 'ERR'] = (集計[result?.状態 ?? 'ERR'] ?? 0) + 1;
   return {集計, 保存先};
 }

@@ -51,7 +51,7 @@ test('anonymous public catalog accepts multi-MiB metadata and retains bounded sa
   const cache=createPublicModelCache({run:(action)=>runner.run(action,undefined,{now,reader:()=>assert.fail('public retrieval must not read configuration')})});
   await cache.refresh();assert.equal(cache.snapshot().状態,'取得済');assert.equal(cache.snapshot().件数,700);
   assert.ok(Buffer.byteLength(JSON.stringify(cache.input()))<RESPONSE_LIMIT);
-  const result=await runner.run('test','openrt',{input:cache.input()});assert.equal(result.data.状態,'OK');assert.equal(result.data.モデル.length,500);
+  const result=await runner.run('test','openrt',{input:cache.input(),reader:()=> '{}'});assert.equal(result.data.状態,'未実施');assert.equal(result.data.モデル.length,0);
  });
 });
 test('larger public cap stays bounded and never expands authenticated-provider cap',async()=>{
@@ -79,4 +79,12 @@ test('public HTTP, JSON, schema and interrupted-body errors remain distinguishab
   if(mode==='aborted'){r.emit('aborted');return;}
   r.emit('data',Buffer.from(mode==='json'?'synthetic-secret':JSON.stringify({data:[{id:'google/test',created:'synthetic-secret'}]})));r.emit('end');
  },async()=>{const result=await publicCatalog();assert.equal(result.状態,'NG');assert.equal(result.失敗理由,reason);assert.ok(!JSON.stringify(result).includes('synthetic-secret'));});
+});
+
+test('OpenRouter authentication uses fixed GET /key, not public /models',async()=>{
+ await transport((options,callback)=>{
+  assert.equal(options.hostname,'openrouter.ai');assert.equal(options.path,'/api/v1/key');
+  assert.equal(options.method,'GET');assert.equal(options.headers.Authorization,'Bearer synthetic-key');
+  const r=response(callback);r.emit('data',Buffer.from('{"data":{"is_free_tier":false}}'));r.emit('end');
+ },async()=>assert.deepEqual(await fetchMetadata('openrouter-key',{Authorization:'Bearer synthetic-key'}),{data:{is_free_tier:false}}));
 });

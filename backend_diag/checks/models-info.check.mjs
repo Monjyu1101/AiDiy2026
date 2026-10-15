@@ -5,13 +5,15 @@ import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {modelsInfo,writeModelsInfo as saveModelsInfo,installedCodeClis,MODEL_PROVIDER_IDS,modelsInfoFile} from '../models_info.mjs';
+import {probe} from '../runtime/model_probe.mjs';
 import {createHandler} from '../diag_main.mjs';
 
 const reads=[];
 const read=async name=>{reads.push(name);throw Error('must not read model configuration: '+name);};
 const now=()=>new Date('2026-10-15T00:00:00Z');
+const emptyDefaults={chat:{},live:{freeai_live:{models:{'gemini-2.5-flash-native-audio-preview-12-2025':'仮設定（未検証） - gemini-2.5-flash-native-audio-preview-12-2025'}}},code:{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}}};
 const allClis={copilot_cli:true,claude_cli:true,codex_cli:true,antigravity_cli:true,grok_cli:true,opencode_cli:true};
-const writeModelsInfo=(providers,results,options={})=>saveModelsInfo(providers,results,{installedClis:allClis,...options});
+const writeModelsInfo=(providers,results,options={})=>saveModelsInfo(providers,results,{installedClis:allClis,configReader:()=> '{}',...options});
 const ok=(extra={})=>({状態:'OK',説明:'ok',確認日時:'2026-10-15T00:00:00Z',モデル:['m1'],モデル詳細:[{model_id:'m1',作成日:'2026/10/01',トークン数:'100',モダリティ:'text'}],...extra});
 
 test('no provider inserts xx/auto and partial merges discard old inserted records',async()=>{
@@ -253,5 +255,52 @@ test('combined files merge providers and model keys, retain dated labels and pre
   assert.ok(codeKeys.indexOf('codex_cli')<codeKeys.indexOf('antigravity_cli'));
   await writeModelsInfo([provider('openai_oauth')],{openai_oauth:ok({モデル詳細:[{model_id:'gpt-6.1-sol',作成日:'2026/10/15'}]})},{directory,now});
   assert.equal((await load('code')).codex_cli.models['gpt-6.1-sol'],'2026/10/15 - gpt-6.1-sol');
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('consolidated outputs omit every empty provider after CLI fallback and label filtering',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-empty-'));
+ try {
+  const providers=['gemini','freeai','openai','openai_oauth','claude','ollama'].map(id=>({id,名前:id}));
+  await writeModelsInfo(providers,Object.fromEntries(providers.map(({id})=>[id,ok({モデル詳細:[],ライブ候補:[]})])),{directory,installedClis:{}});
+  for(const group of ['chat','live','code'])assert.deepEqual(JSON.parse(await readFile(path.join(directory,modelsInfoFile(group)),'utf8')),emptyDefaults[group]);
+  await writeFile(path.join(directory,'openai_oauth_models_info.json'),JSON.stringify({chat:{openai_oauth:{models:{bad:42}}},code:{aidiy_hermes:{models:{'copilot_cli/auto':'old'}}}}));
+  await writeModelsInfo([],{}, {directory,installedClis:{}});
+  for(const group of ['chat','live','code'])assert.deepEqual(JSON.parse(await readFile(path.join(directory,modelsInfoFile(group)),'utf8')),emptyDefaults[group]);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+test('OpenRouter requires verified results and current key presence even for saved legacy files',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-router-auth-'));
+ const provider={id:'openrt',名前:'OpenRouter',設定済み:true};
+ const load=async()=>JSON.parse(await readFile(path.join(directory,'chat_models_info.json'),'utf8'));
+ try {
+  await writeModelsInfo([provider],{openrt:ok()},{directory,installedClis:{}});assert.deepEqual(await load(),{});
+  const configReader=()=>JSON.stringify({openrt_key_id:'fixture-key'});
+  const verified=await probe('openrt',{reader:configReader,cache:{公開状態:'取得済',公開モデル:{m1:{作成日:'2026/10/01'}}},fetch:async()=>({data:{is_free_tier:false}})});
+  await writeModelsInfo([provider],{openrt:verified},{directory,installedClis:{},configReader});assert.deepEqual((await load()).openrt_chat.models,{m1:'2026/10/01 - m1'});
+  await writeModelsInfo([provider],{openrt:verified},{directory,installedClis:{},configReader:()=>JSON.stringify({openrt_key_id:'changed-key'})});assert.deepEqual(await load(),{},'external key edit invalidates the in-memory result');
+  await writeModelsInfo([provider],{openrt:JSON.parse(JSON.stringify(verified))},{directory,installedClis:{},configReader});assert.deepEqual(await load(),{},'serialized proof cannot authorize a provider');
+  await writeModelsInfo([provider],{},{directory,installedClis:{}});assert.deepEqual(await load(),{},'saved authentication is not evidence for the currently configured key');
+  await writeModelsInfo([{...provider,設定済み:false}],{},{directory,installedClis:{}});assert.deepEqual(await load(),{});
+  await writeModelsInfo([provider],{openrt:{状態:'未実施'}},{directory,installedClis:{}});assert.deepEqual(await load(),{});
+  await writeModelsInfo([provider],{openrt:{状態:'NG'}},{directory,installedClis:{}});assert.deepEqual(await load(),{});
+  await writeFile(path.join(directory,'openrt_models_info.json'),JSON.stringify({状態:'OK',chat:{openrt_chat:{models:{old:'old'}}}}));
+  await writeModelsInfo([provider],{},{directory,installedClis:{}});assert.deepEqual(await load(),{});
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+test('entirely empty Live and Code receive fixed provisional defaults without reading configuration',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-fixed-fallback-'));
+ const options={directory,installedClis:{},configReader:()=>assert.fail('fallback must not read configuration')};
+ const load=async group=>JSON.parse(await readFile(path.join(directory,modelsInfoFile(group)),'utf8'));
+ try {
+  await writeModelsInfo([],{},options);
+  assert.deepEqual(await load('live'),emptyDefaults.live);assert.deepEqual(await load('code'),emptyDefaults.code);
+  await writeModelsInfo([{id:'gemini',名前:'Gemini'},{id:'openai_oauth',名前:'OAuth'}],{gemini:ok({ライブ候補:['real-live']}),openai_oauth:ok()},options);
+  assert.deepEqual(await load('live'),{gemini_live:{models:{'real-live':'yyyy/mm/dd - real-live'}}});
+  assert.deepEqual(await load('code'),{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - m1'}}});
+  await writeModelsInfo([{id:'gemini',名前:'Gemini'},{id:'openai_oauth',名前:'OAuth'}],{gemini:{状態:'NG'},openai_oauth:{状態:'NG'}},{...options,installedClis:{copilot_cli:true}});
+  assert.deepEqual(await load('live'),emptyDefaults.live);
+  assert.deepEqual(Object.keys(await load('code')),['copilot_cli','aidiy_hermes']);
+  assert.equal(Object.keys((await load('code')).copilot_cli.models).length,8);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
