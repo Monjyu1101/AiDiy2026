@@ -776,6 +776,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
+    print_info("  0. 環境診断(Diag)")
     print_info(f"  1. 全階層の {TEMP_TARGET_LABEL} フォルダ")
     print_info("  2. ルート backup フォルダ")
     print_info("  3. バックエンド(local)")

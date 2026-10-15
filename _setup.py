@@ -656,7 +656,7 @@ def collect_setup_choices() -> dict | None:
         "continue_on_error":     False,
     }
 
-    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャーをセットアップしますか？", default="y")
+    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャー・Electronをセットアップしますか？", default="y")
     choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
@@ -693,6 +693,7 @@ def collect_setup_choices() -> dict | None:
 # メイン
 # ============================================================
 def main():
+    global AUTO_MODE
     print_header("プロジェクト セットアップ")
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
@@ -709,8 +710,6 @@ def main():
     print_info(" 10. フロントエンド(Discord、任意)")
     print()
 
-    ensure_prerequisites()
-
     choices = collect_setup_choices()
     if choices is None:
         print_warning("セットアップをキャンセルしました。")
@@ -722,13 +721,29 @@ def main():
 
     print()
     if choices.get("diag"):
-        if not _load_folder_module("backend_diag").setup(choices):
+        if not _load_folder_module("backend_diag").setup(choices, desktop=False):
             error_locations.append("環境診断(Diag)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
 
     print()
+    # ランチャー配置には Node.js / Git が不要。前提ツールの導入失敗より先に配置する。
+    # 従来は a=auto 選択前の対話だったため、OS ツール導入は自動承認に変えない。
+    selected_auto_mode = AUTO_MODE
+    try:
+        AUTO_MODE = False
+        ensure_prerequisites()
+    finally:
+        AUTO_MODE = selected_auto_mode
+
+    if choices.get("diag"):
+        if not _load_folder_module("backend_diag").setup_desktop():
+            error_locations.append("環境診断(Diag): Electron")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+
     if choices["common"]:
         error_locations.extend(setup_common_global_tools(choices))
         if GLOBAL_CLI_INSTALL_PROCESSES:
@@ -867,7 +882,7 @@ def main():
     print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
     print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
-    print_info("    Diag起動   : aidiy_diag --browser")
+    print_info("    Diag起動   : aidiy_diag （ブラウザ版: aidiy_diag --browser）")
     print_info("    Hermes起動 : aidiy_hermes")
     print_info("    Term起動   : aidiy_term")
     print_info("    Code起動   : aidiy_code")

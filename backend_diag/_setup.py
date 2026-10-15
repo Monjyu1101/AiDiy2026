@@ -1,9 +1,12 @@
-"""依存追加なしで aidiy_diag ランチャーを配置する。"""
+"""aidiy_diag ランチャーを配置し、共有 Electron セットアップを使う。"""
 import os
 import hashlib
 from pathlib import Path
 import shlex
 import sys
+import shutil
+import subprocess
+import importlib.util
 
 THIS_DIR = Path(__file__).resolve().parent
 
@@ -22,7 +25,7 @@ def launcher_content(script, windows=None):
             f'exec node {shlex.quote(str(script))} "$@"\n')
 
 
-def setup(choices=None):
+def setup(choices=None, *, desktop=True):
     if choices is not None and choices.get('diag') is False:
         return True
     directory = Path.home() / '.local' / 'bin'
@@ -38,8 +41,28 @@ def setup(choices=None):
     print(f'診断ランチャーを作成しました: {launcher}')
     if str(directory) not in os.environ.get('PATH', '').split(os.pathsep):
         print(f'{directory} を PATH に追加してください。')
-    print('起動: aidiy_diag --browser（Node.js 標準モジュールのみ）')
-    return True
+    print('起動: aidiy_diag（Electron） / aidiy_diag --browser（ブラウザ）')
+    return setup_desktop() if desktop else True
+
+
+def setup_desktop():
+    if os.environ.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))):
+        print('GUI なし / Codespaces: ブラウザ起動を使用します。Electron 導入をスキップします。')
+        return True
+    npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
+    if not shutil.which('node.exe' if sys.platform == 'win32' else 'node') or not npm:
+        print('Electron の準備には Node.js と npm が必要です。導入後に python backend_diag/_setup.py を再実行してください。')
+        return False
+    spec = importlib.util.spec_from_file_location('aidiy_diag_shared_electron', THIS_DIR.parent / 'scripts' / '_setup_electron.py')
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    def run(command, **kwargs):
+        try:
+            subprocess.run(command, check=True, **kwargs)
+            return True
+        except (OSError, subprocess.SubprocessError):
+            return False
+    return helper.setup_dependencies(THIS_DIR, npm, '環境診断(Diag)', run)
 
 
 if __name__ == '__main__':

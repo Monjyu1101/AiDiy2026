@@ -49,7 +49,7 @@ function childEnvironment(directory) {
 }
 
 export function runVersion(executable, args, directory, options = {}) {
-  if (shuttingDown) return Promise.resolve({状態:'確認失敗', 説明:'診断を終了しました。'});
+  if (shuttingDown) return Promise.resolve({状態:'ERR', 説明:'診断を終了しました。'});
   return new Promise(resolve => {
     let child, ended = false, bytes = 0, chunks = [], timer;
     const killGroup = () => {
@@ -62,28 +62,28 @@ export function runVersion(executable, args, directory, options = {}) {
       child?.stdout?.destroy(); child?.stderr?.destroy(); child?.unref();
       resolve(result);
     };
-    const cancel = () => finish({状態:'確認失敗', 説明:'診断を終了しました。'});
+    const cancel = () => finish({状態:'ERR', 説明:'診断を終了しました。'});
     activeProbes.add(cancel);
     try {
       child = spawn(executable, args, { shell:false, cwd:directory, env:childEnvironment(directory),
         stdio:['ignore','pipe','pipe'], detached:process.platform !== 'win32', windowsHide:true });
-    } catch { return finish({状態:'確認失敗', 説明:'ファイルはありますが、起動できませんでした。'}); }
-    timer = setTimeout(() => finish({状態:'確認失敗', 説明:'バージョン確認がタイムアウトしました。'}), options.timeout ?? TIMEOUT);
+    } catch { return finish({状態:'ERR', 説明:'ファイルはありますが、起動できませんでした。'}); }
+    timer = setTimeout(() => finish({状態:'ERR', 説明:'バージョン確認がタイムアウトしました。'}), options.timeout ?? TIMEOUT);
     const read = chunk => {
       if (ended) return;
       bytes += chunk.length;
-      if (bytes > (options.outputLimit ?? OUTPUT_LIMIT)) return finish({状態:'確認失敗', 説明:'バージョン出力の上限を超えました。'});
+      if (bytes > (options.outputLimit ?? OUTPUT_LIMIT)) return finish({状態:'ERR', 説明:'バージョン出力の上限を超えました。'});
       chunks.push(chunk);
     };
     child.stdout.on('data', read); child.stderr.on('data', read);
-    child.on('error', () => finish({状態:'確認失敗', 説明:'ファイルはありますが、起動できませんでした。'}));
+    child.on('error', () => finish({状態:'ERR', 説明:'ファイルはありますが、起動できませんでした。'}));
     // 親が先に終了しても同じ POSIX group の子を停止。pipe close を無期限に待たない。
     child.on('exit', killGroup);
     child.on('close', code => {
       if (ended) return;
-      if (code !== 0) return finish({状態:'確認失敗', 説明:`ファイルはありますが正常終了しませんでした (終了コード ${code})。`});
+      if (code !== 0) return finish({状態:code === null ? 'ERR' : 'NG', 説明:`ファイルはありますが正常終了しませんでした (終了コード ${code})。`});
       const match = Buffer.concat(chunks).toString('utf8').match(versionPattern);
-      finish({状態:'導入済み', バージョン:match?.[1] || null,
+      finish({状態:'OK', バージョン:match?.[1] || null,
         説明:match ? 'バージョンコマンドが正常終了しました。' : '正常終了しましたが、バージョン番号を抽出できませんでした。'});
     });
   });
@@ -91,16 +91,28 @@ export function runVersion(executable, args, directory, options = {}) {
 
 export async function probe(entry, options = {}) {
   const result = {id:entry.id, 状態:'未検出', パス:null, バージョン:null, 説明:'PATH / 標準配置先に見つかりません。', 確認日時:new Date().toISOString()};
-  if (entry.platforms?.length && !entry.platforms.includes(options.platform || process.platform)) return {...result,状態:'対象外',説明:'この OS では使用しないプログラムです。'};
-  const executable = await (options.resolve || resolveProgram)(entry, options);
+  if (entry.platforms?.length && !entry.platforms.includes(options.platform || process.platform)) return {...result,状態:'未確認',説明:'対象外: この OS では使用しないため確認していません。'};
+  let executable;
+  try { executable = await (options.resolve || resolveProgram)(entry, options); }
+  catch { return {...result,状態:'ERR',説明:'実行ファイルの探索に失敗しました。'}; }
   if (!executable) return result;
   result.パス = executable;
-  if (entry.allow_version === false || !entry.version_args || /\.(cmd|bat|ps1)$/i.test(executable) || /[\\/]Microsoft[\\/]WindowsApps[\\/]python[^\\/]*\.exe$/i.test(executable)) return {...result,状態:'存在確認',説明:'起動・副作用を避けるため、ファイルの存在のみ確認しました。'};
+  if (entry.allow_version === false || !entry.version_args || /\.(cmd|bat|ps1)$/i.test(executable) || /[\\/]Microsoft[\\/]WindowsApps[\\/]python[^\\/]*\.exe$/i.test(executable)) return {...result,状態:'OK',説明:'起動・副作用を避けるため、ファイルの存在のみ確認しました。'};
   let directory;
   try {
     directory = await mkdtemp(path.join(os.tmpdir(), 'aidiy-diag-'));
-    return {...result, ...await runVersion(executable, entry.version_args, directory, options)};
-  } catch { return {...result,状態:'確認失敗',説明:'確認用の一時領域を準備できませんでした。'}; }
+    const checked = {...result, ...await runVersion(executable, entry.version_args, directory, options)};
+    if (checked.状態 === 'OK' && checked.バージョン && entry.minimumVersion) {
+      const found = checked.バージョン.split(/[.-]/).slice(0,3).map(Number);
+      const required = entry.minimumVersion.split('.').map(Number);
+      for (let index=0; index<Math.max(found.length,required.length); index++) {
+        const actual=found[index] || 0, minimum=required[index] || 0;
+        if (actual < minimum) return {...checked,状態:'NG',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`};
+        if (actual > minimum) break;
+      }
+    }
+    return checked;
+  } catch { return {...result,状態:'ERR',説明:'確認用の一時領域を準備できませんでした。'}; }
   finally { if (directory) await rm(directory, {recursive:true,force:true,maxRetries:0}).catch(() => {}); }
 }
 

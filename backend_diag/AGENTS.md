@@ -1,7 +1,8 @@
 # backend_diag 実装概要
 
-Node.js 標準モジュールだけで動作する読み取り専用の環境診断です。AIコアや DB が未設定でも起動できます。
+Node.js 標準モジュールの読み取り専用診断サーバーと Electron / Web 表示です。AIコアや DB が未設定でも起動できます。
 
+- `desktop.mjs` / `electron-main.cjs`: 既存共有セットアップで用意した Electron を通常表示に使います。ブラウザ・Codespaces は Node.js のみです。
 - `diag_main.mjs`: ループバック HTTP、起動単位の認証、ブラウザ起動。
 - `catalog.json`: リポジトリの利用箇所から整理した外部プログラムの登録情報。
 - `probes.mjs`: 固定引数での存在・バージョン確認。任意コマンド API は設けません。

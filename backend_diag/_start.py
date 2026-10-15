@@ -19,7 +19,7 @@ def check_environment():
             return False, 'Node.js 18 以降が必要です: https://nodejs.org/'
     except (ValueError, OSError, subprocess.SubprocessError):
         return False, 'Node.js のバージョンを確認できません。'
-    return True, 'Node.js / 追加 npm 依存なし / AIコア不要'
+    return True, 'Node.js / Electron またはブラウザ / AIコア不要'
 
 
 def start():
@@ -27,6 +27,6 @@ def start():
     if not node:
         raise RuntimeError('Node.js が見つかりません: https://nodejs.org/')
     # 認証 URL は直接ターミナルへ。集約出力のバッファ・ファイルへ保存しない。
-    return subprocess.Popen([node, str(ROOT / 'diag_main.mjs'), '--browser'], cwd=ROOT,
+    return subprocess.Popen([node, str(ROOT / 'diag_main.mjs')], cwd=ROOT,
                             start_new_session=sys.platform != 'win32',
                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0)

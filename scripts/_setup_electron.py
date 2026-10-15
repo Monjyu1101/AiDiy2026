@@ -143,7 +143,7 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
             return True
 
         project_root = frontend_dir.parent.parent if frontend_dir.parent.name == 'frontend_ide' else frontend_dir.parent
-        for name in ("frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
+        for name in ("backend_diag", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
             peer = project_root / name
             if peer.resolve() == frontend_dir.resolve():
                 continue
@@ -203,3 +203,4 @@ def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *,
             error(f"{label}: Electron バイナリを確認できません。")
             return False
     return True
+

@@ -27,7 +27,7 @@ test('server connection/header bounds, no listener started',()=>{
  const server=createServer({token:'test-key',entries:[]});assert.equal(server.maxConnections,16);assert.equal(server.headersTimeout,10000);assert.equal(server.requestTimeout,10000);assert.equal(server.maxRequestsPerSocket,20);server.close();
 });
 test('strict args and Codespaces/base-path URLs',()=>{
- assert.deepEqual(parseArgs(['--browser','--no-open','--port','8097','--base-path','/proxy/8097']),{port:8097,prefix:'/proxy/8097/',noOpen:true,help:false});
+ assert.deepEqual(parseArgs(['--browser','--no-open','--port','8097','--base-path','/proxy/8097']),{port:8097,prefix:'/proxy/8097/',noOpen:true,browser:true,help:false});
  for(const args of [['--port','-1'],['--port','65536'],['--command','whoami'],['--base-path','//evil/']]) assert.throws(()=>parseArgs(args));
  assert.equal(basePath('/proxy/8097'),'/proxy/8097/');assert.throws(()=>basePath('/a/../'));
  assert.equal(publicUrl(8097,'/',{CODESPACES:'true',CODESPACE_NAME:'safe-name',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}),'https://safe-name-8097.app.github.dev/');

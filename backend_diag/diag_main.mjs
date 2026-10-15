@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { catalog, scan, cancelProbes } from './probes.mjs';
+import {browserMode,desktopBinary,openDesktop,closeDesktop} from './desktop.mjs';
 import {stopRevision,watchStop} from './lifecycle.mjs';
 
 export function basePath(value) {
@@ -19,10 +20,10 @@ export function publicUrl(port, prefix, env = process.env) {
   return `http://127.0.0.1:${port}${prefix}`;
 }
 export function parseArgs(args) {
-  const options = {port:0, prefix:'/', noOpen:false, help:false};
+  const options = {port:0, prefix:'/', noOpen:false, browser:false, help:false};
   for (let i=0;i<args.length;i++) {
     const arg = args[i];
-    if (arg === '--browser') continue;
+    if (arg === '--browser') {options.browser = true;continue;}
     if (arg === '--no-open') options.noOpen = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
     else if (arg === '--port') { const value = args[++i]; if (!/^\d+$/.test(value || '') || Number(value)>65535) throw new Error('port は 0〜65535 で指定してください。'); options.port=Number(value); }
@@ -85,20 +86,31 @@ function openBrowser(url) {
 export async function main(args=process.argv.slice(2)) {
   const options=parseArgs(args);
   if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--port 8097] [--base-path /proxy/8097/]'); return; }
+  const useBrowser=browserMode(options);
+  let executable;
+  if (!useBrowser) {
+    try {executable=await desktopBinary();}
+    catch {throw new Error('Electron が未準備です。python backend_diag/_setup.py を実行するか --browser を指定してください。');}
+  }
   const initialStop=await stopRevision();
   const token=randomBytes(32).toString('base64url'), entries=await catalog();
   const coverage=JSON.parse(await readFile(new URL('./coverage.json',import.meta.url),'utf8'));
   const server=createServer({token,prefix:options.prefix,entries,coverage});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port,'127.0.0.1',resolve);});
   const url=publicUrl(server.address().port,options.prefix)+'#token='+token;
-  console.log('AiDiy 診断: '+url);
-  console.log('この起動中のみ有効な認証 URL です。共有せず、転送ポートは非公開にしてください。Ctrl+C で終了。');
-  if (!options.noOpen && process.env.CODESPACES !== 'true') openBrowser(url);
-  let stopWatching=()=>{};
-  const close=()=>{stopWatching();cancelProbes();server.close();server.closeAllConnections();};
+  let stopWatching=()=>{}, desktop;
+  const close=()=>{stopWatching();cancelProbes();closeDesktop(desktop);server.close();server.closeAllConnections();};
+  if (useBrowser) {
+    console.log('AiDiy 診断: '+url);
+    console.log('この起動中のみ有効な認証 URL です。共有せず、転送ポートは非公開にしてください。Ctrl+C で終了。');
+    if (!options.noOpen && process.env.CODESPACES !== 'true') openBrowser(url);
+  } else {
+    console.log('AiDiy 診断: Electron ウィンドウを開きます。Ctrl+C で終了。');
+    try {desktop=openDesktop(executable,url,close);} catch {close();throw new Error('Electron を起動できません。--browser でブラウザ起動できます。');}
+  }
   stopWatching=watchStop(initialStop,close);
   server.once('close',()=>stopWatching());
   process.once('SIGINT',close);process.once('SIGTERM',close);
   return server;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(()=>{console.error('診断を起動できません。引数、ポートの使用状況、catalog.json を確認してください。');process.exitCode=1;});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(()=>{console.error('診断を起動できません。Electron は python backend_diag/_setup.py で準備してください。ブラウザ起動は --browser。引数、ポート、catalog.json も確認してください。');process.exitCode=1;});

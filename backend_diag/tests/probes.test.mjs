@@ -12,23 +12,23 @@ async function fixture(code,options={}) {
 }
 test('missing and unsupported are separate',async()=>{
  assert.equal((await probe({id:'absent',commands:['no-such-aidiy-tool'],version_args:['--version']})).状態,'未検出');
- assert.equal((await probe({id:'other',platforms:['imaginary']})).状態,'対象外');
+ assert.equal((await probe({id:'other',platforms:['imaginary']})).状態,'未確認');
 });
 test('GUI/no version and Windows wrappers only discover',async()=>{
  for(const entry of [{id:'gui',version_args:null},{id:'wrapper',version_args:['--version']}]) {
- const result=await probe(entry,{resolve:async()=>'/fake/tool.cmd'});assert.equal(result.状態,'存在確認'); }
+ const result=await probe(entry,{resolve:async()=>'/fake/tool.cmd'});assert.equal(result.状態,'OK'); }
 });
 test('safe actual Node version',async()=>{
- const result=await probe({id:'node',commands:['node'],version_args:['--version']});assert.equal(result.状態,'導入済み');assert.equal(result.バージョン,process.versions.node);
+ const result=await probe({id:'node',commands:['node'],version_args:['--version']});assert.equal(result.状態,'OK');assert.equal(result.バージョン,process.versions.node);
 });
 test('failure, timeout and output caps',async()=>{
- assert.equal((await fixture('process.exit(9)')).状態,'確認失敗');
+ assert.equal((await fixture('process.exit(9)')).状態,'NG');
  assert.match((await fixture('setInterval(()=>{},1000)')).説明,/タイムアウト/);
  assert.match((await fixture('process.stdout.write("x".repeat(1000000))')).説明,/上限/);
 });
 test('parent exit with inherited pipe holder is bounded',{skip:process.platform==='win32'},async()=>{
  const start=Date.now(); const result=await fixture('require("child_process").spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:["ignore",process.stdout,process.stderr]});console.log("1.2.3");process.exit(0);',{timeout:1000});
- assert.ok(Date.now()-start<1500);assert.equal(result.状態,'導入済み');
+ assert.ok(Date.now()-start<1500);assert.equal(result.状態,'OK');
 });
 test('raw output and sensitive inherited environment never returned',async()=>{
  process.env.AIDIY_TEST_SECRET='private-fixture';
@@ -44,7 +44,7 @@ test('standard paths expand supported environment syntax',()=>{
  assert.equal(expandPath('${PROGRAMFILES(X86)}/Chrome',{'PROGRAMFILES(X86)':'C:/Program Files (x86)'}),'C:/Program Files (x86)/Chrome');
 });
 test('catalog identifiers unique; fixed version args and source evidence required',async()=>{
- const entries=await catalog();assert.ok(entries.length>=20);assert.equal(entries[0].id,'node');assert.equal(entries[1].id,'python');assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
+ const entries=await catalog();assert.ok(entries.length>=19);assert.equal(entries[0].id,'python');assert.equal(entries[1].id,'uv');assert.equal(new Set(entries.map(e=>e.id)).size,entries.length);
  for(const entry of entries) {assert.ok(entry.sources.length);assert.ok(entry.commands.length);assert.ok(entry.version_args===null || (Array.isArray(entry.version_args)&&entry.version_args.every(v=>typeof v==='string')));}
 });
 test('Windows disk converter is not ImageMagick',async()=>{
@@ -59,6 +59,31 @@ test('coverage is pinned to complete selected-source manifest and exact catalog 
  const catalogBytes=await readFile(new URL('../catalog.json',import.meta.url));
  assert.equal(coverage.complete,true);assert.equal(coverage.sourceTargetFiles,3333);assert.equal(coverage.scannedSourceFiles,3333);
  assert.equal(JSON.parse(manifestBytes).length,3333);assert.equal(createHash('sha256').update(manifestBytes).digest('hex'),coverage.sourceTargetManifestSha256);
- assert.equal(JSON.parse(catalogBytes).length,246);assert.equal(createHash('sha256').update(catalogBytes).digest('hex'),coverage.catalogSha256);
+ assert.equal(JSON.parse(catalogBytes).length,19);assert.equal(createHash('sha256').update(catalogBytes).digest('hex'),coverage.catalogSha256);
  for (const entry of JSON.parse(catalogBytes)) assert.ok(entry.evidence?.length && entry.evidence.every(e=>e.path && Number.isInteger(e.line) && e.line>0));
+});
+
+test('menu classification keeps base minimal and all source evidence',async()=>{
+ const entries=await catalog();
+ assert.deepEqual(entries.filter(e=>e.menuGroup==='ベース').map(e=>e.id),['python','uv','node','npm','npx','electron']);
+ assert.ok(entries.every(e=>!['optional','reference'].includes(e.usageTier)));
+ assert.ok(entries.every(e=>!['git','pip','bash','docker','curl','winget'].includes(e.id)));
+ for(const e of entries) {assert.ok(['ベース','CLI群','その他拡張'].includes(e.menuGroup));assert.ok(e.usageTier);}
+ assert.equal(entries.find(e=>e.id==='ffmpeg').usageTier,'integration');
+ assert.equal(entries.find(e=>e.id==='chrome').name,'Chrome');
+ assert.equal(entries.find(e=>e.id==='code').name,'VS Code');
+ assert.equal(entries.find(e=>e.id==='codex').menuGroup,'CLI群');
+ assert.deepEqual(entries.filter(e=>e.menuGroup==='CLI群').map(e=>e.id),['claude','codex','copilot','agy','grok','opencode','ollama']);
+ assert.ok(entries.every(e=>!e.id.startsWith('aidiy_') && !['hermes','afplay','gst-launch','pwsh','edge','brave'].includes(e.id)));
+ for(const entry of entries) assert.ok(entry.sources.every(s=>!s.startsWith('command_hermes/')) && entry.evidence.every(e=>!e.path.startsWith('command_hermes/')));
+ assert.equal(entries.filter(e=>e.usageTier==='integration').length,6);
+});
+
+test('NG version requirement and ERR execution failures are distinct',async()=>{
+ const tooOld=await probe({id:'fixture',version_args:['--version'],minimumVersion:'999.0'}, {resolve:async()=>process.execPath});
+ assert.equal(tooOld.状態,'NG');assert.match(tooOld.説明,/要件/);
+ const broken=await probe({id:'fixture',version_args:['--version']},{resolve:async()=>'/no-such-diag-executable'});assert.equal(broken.状態,'ERR');
+ assert.equal((await fixture('setInterval(()=>{},1000)')).状態,'ERR');
+ assert.equal((await fixture('process.stdout.write("x".repeat(1000000))')).状態,'ERR');
+ const excluded=await probe({id:'fixture',platforms:['imaginary']});assert.equal(excluded.状態,'未確認');assert.match(excluded.説明,/対象外/);
 });
