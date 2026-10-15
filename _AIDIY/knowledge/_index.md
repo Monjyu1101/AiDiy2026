@@ -302,3 +302,5 @@ AiDiy IDE の文書表示（Word / Excel / PowerPoint / PDF）は [`frontend_ide
 
 - [frontend_ide,Vue共通画面変更手順.md](./frontend_ide,Vue共通画面変更手順.md) — Vue部品、起動互換、配布・確認。
 
+
+- [frontend_ide,初期ウィンドウ配置.md](./frontend_ide,初期ウィンドウ配置.md) — Code / Liveの画面隅、Codeの複数窓、Termの縦横別サイズ。

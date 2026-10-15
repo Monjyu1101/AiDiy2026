@@ -14,7 +14,7 @@ function windowBounds(kind,area,owner,slot=0){
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
  if(kind==='term'){
-  const width=Math.min(Math.round(area.width*2/3),available.width),height=Math.min(Math.round(area.height/2),available.height);
+  const width=Math.min(Math.round(area.width*2/3),available.width),height=Math.min(Math.round(area.height/(area.width>area.height?3:4)),available.height);
   const originX=area.x+(area.width-width)/2,originY=available.y+available.height-height;
   const steps=Math.max(1,Math.floor(Math.min(available.x+available.width-width-originX,originY-available.y)/28)+1),offset=(slot%steps)*28;
   return{x:Math.round(originX+offset),y:Math.round(originY-offset),width,height};
@@ -26,12 +26,13 @@ function windowBounds(kind,area,owner,slot=0){
   const x=base.x+base.width-width-24-offset,y=base.y+(owner?36:0)+offset;
   return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
  }
- const inset=owner?24:0;
+ // Code / LiveはIDEの位置によらず同じディスプレイの左上 / 右上へ置く。
  const width=Math.min(size.幅,available.width);
  const height=Math.min(size.会話高さ,available.height);
- const offset=owner&&kind==='code'?(slot%6)*24:0;
- const x=kind==='code'?base.x+inset+offset:base.x+base.width-width-inset;
- const y=base.y+(owner?36:0)+offset;
+ // 先頭窓以外は24〜120pxを循環させ、7枚目以降も先頭位置へ戻さない。
+ const offset=owner&&kind==='code'&&slot>0?((slot-1)%5+1)*24:0;
+ const x=kind==='code'?available.x+offset:available.x+available.width-width;
+ const y=available.y+offset;
  return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
 }
 module.exports={windowBounds,windowMinimumSize};

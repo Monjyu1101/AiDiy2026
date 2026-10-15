@@ -34,8 +34,8 @@ function compile(path,{modules={},globals={},scriptOnly=false,vueApi=vue}={}){
   require:id=>id==='vue'?vueApi:modules[id]||{},...globals});
  return module.exports;
 }
-function dialogFixture(initial,{load,launch}={}){
- let current=initial,preferred='',calls=0,apiResult={ok:true},state;
+function dialogFixture(initial,{load,launch,frontmost=initial.length===1?initial[0].id:''}={}){
+ let current=initial,preferred=frontmost,calls=0,apiResult={ok:true},state;
  const inserted=[],emitted=[];
  const component=compile('../src/components/DraftHandoffDialog.vue',{modules:{'./ModalDialog.vue':vue.defineComponent({setup(_props,{slots}){return()=>vue.h('section',slots.default?.());}})}});
  const setup=component.setup;component.setup=(props,context)=>{state=setup(props,{...context,emit:(...args)=>emitted.push(args)});return state;};
@@ -63,7 +63,7 @@ test('ダイアログ: 新規候補・閉じた候補・候補なし・未知の
  try{await flush();assert.equal(f.state.selected.value,'old');
   f.setTargets([target('old'),target('new')]);f.setPreferred('new');await f.button('最前面を再選択').props.onClick();assert.equal(f.state.selected.value,'new');
   f.setTargets([target('old')]);f.setPreferred('old');await f.state.refresh(true);assert.equal(f.state.selected.value,'old');
-  f.setPreferred('');await f.state.refresh(true);await flush();assert.equal(f.state.selected.value,'');assert.equal(f.button('下書きへ追加').props.disabled,true);assert.ok(walk(f.root,item=>item.type==='select'));
+  f.setPreferred('');await f.state.refresh(true);await flush();assert.equal(f.state.selected.value,'old');assert.equal(f.button('下書きへ追加').props.disabled,false);assert.match(textOf(f.root),/最前面は未確認/);
   f.setTargets([]);await f.state.refresh(true);await flush();assert.equal(f.state.selected.value,'');assert.equal(f.button('下書きへ追加').props.disabled,true);assert.match(textOf(f.root),/起動中のCode \/ Liveがありません/);
   f.setTargets([target('a'),target('b')]);f.setPreferred('closed');await f.state.refresh(true);assert.equal(f.state.selected.value,'');assert.match(f.state.error.value,/最前面の連携先を確認できません/);
   assert.equal(f.inserted.length,0);
@@ -126,4 +126,34 @@ test('Codeパネル実setup: ホストが返したCode番号付きタイトル�
   if(!late)for(const fn of unmounted)fn();scope.stop();
  }
  const source=readFileSync(new URL('../src/components/CodePanel.vue',import.meta.url),'utf8');assert.match(source,/<StatusBar :title="windowTitle \|\|/);
+});
+
+
+test('初期表示: 複数候補の最前面を選び、手動変更後の通常更新では変えず、再表示時は再取得する',async()=>{
+ const targets=[target('code1'),target('code2'),target('live','live')];
+ for(const preferred of ['code2','live']){
+  const f=dialogFixture(targets,{frontmost:preferred});
+  try{await flush();assert.equal(f.calls(),1);assert.equal(f.state.selected.value,preferred);
+   const select=walk(f.root,item=>item.type==='select');assert.equal(select.options[select.selectedIndex]._value,preferred);
+   assert.equal(f.button('下書きへ追加').props.disabled,false);assert.equal(f.inserted.length,0);
+   f.state.selected.value='code1';f.setPreferred(preferred==='live'?'code2':'live');await f.state.refresh();assert.equal(f.state.selected.value,'code1');
+   await f.button('最前面を再選択').props.onClick();assert.equal(f.state.selected.value,preferred==='live'?'code2':'live');assert.equal(f.inserted.length,0);
+  }finally{f.dispose();}
+ }
+});
+
+test('初期表示: 1件は名前を表示して選択、複数の最前面不明は未選択、ゼロ件は起動案内のみ',async()=>{
+ for(const targets of [[target('one')],[target('one'),target('two')]]){
+  for(const preferred of ['', 'closed']){
+   const f=dialogFixture(targets,{frontmost:preferred});
+   try{await flush();
+    if(targets.length===1){assert.equal(f.state.selected.value,'one');assert.equal(f.state.error.value,'');assert.match(textOf(f.root),/連携先: code one/);assert.match(textOf(f.root),/最前面は未確認/);assert.equal(f.button('下書きへ追加').props.disabled,false);}
+    else{assert.equal(f.state.selected.value,'');assert.match(f.state.error.value,/最前面の連携先を確認できません/);assert.equal(f.button('下書きへ追加').props.disabled,true);}
+    assert.equal(f.inserted.length,0);}
+   finally{f.dispose();}
+  }
+ }
+ const single=dialogFixture([target('only')],{frontmost:'only'}),empty=dialogFixture([]);
+ try{await flush();assert.equal(single.state.selected.value,'only');assert.equal(single.state.error.value,'');assert.match(textOf(single.root),/連携先: code only/);assert.doesNotMatch(textOf(single.root),/最前面は未確認/);assert.equal(empty.state.selected.value,'');assert.equal(empty.state.error.value,'');assert.match(textOf(empty.root),/起動中のCode \/ Liveがありません/);assert.equal(single.inserted.length+empty.inserted.length,0);}
+ finally{single.dispose();empty.dispose();}
 });

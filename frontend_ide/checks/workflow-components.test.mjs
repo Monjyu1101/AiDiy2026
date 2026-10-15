@@ -59,11 +59,11 @@ test('ビューア: ファイル切替より前に始めた遅い読込は新し
 });
 function dialogFixture(targets){
   const inserted=[],launched=[];let current=targets,result={ok:true};
-  const fixture=component('DraftHandoffDialog',{props:{request:{path:'file',projectPath:'/same',text:'reference'},loadTargets:async()=>({ok:true,sessionKey:'session',projectPath:'/same',mode:'online',targets:current}),insertDraft:async request=>{inserted.push(request);return result;},launchTarget:async kind=>{launched.push(kind);return{ok:true};}}});
+  const fixture=component('DraftHandoffDialog',{props:{request:{path:'file',projectPath:'/same',text:'reference'},loadTargets:async()=>({ok:true,sessionKey:'session',projectPath:'/same',mode:'online',targets:current,frontmostTargetId:current.length===1?current[0].id:''}),insertDraft:async request=>{inserted.push(request);return result;},launchTarget:async kind=>{launched.push(kind);return{ok:true};}}});
   return{...fixture,inserted,launched,setTargets:value=>current=value,setResult:value=>result=value};
 }
 const target=(id,kind='code')=>({id,kind,label:kind+' '+id,contextId:'context-'+id,projectPath:'/same',maxLength:200000});
-test('連携先: 1件なら固定、複数なら明示選択し、表示しただけでは追加しない',async()=>{
+test('連携先: 有効な1件を初期選択、通常更新後の複数候補は明示選択し、表示しただけでは追加しない',async()=>{
   const fixture=dialogFixture([target('one')]);
   try{await fixture.mount();assert.equal(fixture.state.selected.value,'one');assert.equal(fixture.inserted.length,0);
     fixture.setTargets([target('two'),target('three'),target('live','live')]);await fixture.state.refresh();assert.equal(fixture.state.selected.value,'');await fixture.state.insert();assert.equal(fixture.inserted.length,0);
