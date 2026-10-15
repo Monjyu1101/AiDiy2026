@@ -656,11 +656,12 @@ def collect_setup_choices() -> dict | None:
         "continue_on_error":     False,
     }
 
-    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャー・Electronをセットアップしますか？", default="y")
     choices["common"] = ask_yes_no("共通セットアップを実行しますか？", default="y")
     if choices["common"]:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
         choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity + Grok Build)をインストール/アップデートしますか？", default="n")
+
+    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャー・Electronをセットアップしますか？", default="y")
 
     choices["local"] = ask_yes_no("バックエンド(local)のセットアップを実行しますか？", default="y")
     if choices["local"]:
@@ -697,8 +698,8 @@ def main():
     print_header("プロジェクト セットアップ")
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
-    print_info("  0. 環境診断(Diag)")
-    print_info("  1. 共通")
+    print_info("  0. 共通")
+    print_info("  1. 環境診断(Diag)")
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")
     print_info("  4. バックエンド(core,apps)")

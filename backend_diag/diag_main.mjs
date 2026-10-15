@@ -7,6 +7,9 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { catalog, scan, cancelProbes } from './probes.mjs';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from './desktop.mjs';
+import {createPublicModelCache} from './public_models.mjs';
+import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './key_status.mjs';
+import {verify as verifyUi} from './ui/verify.mjs';
 import {stopRevision,watchStop} from './lifecycle.mjs';
 
 export function basePath(value) {
@@ -32,8 +35,9 @@ export function parseArgs(args) {
   }
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan}) {
-  let results = [], busy = false;
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache()}) {
+  let results = [], busy = false, keyBusy = false;
+
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']]]);
   return async (req,res) => {
     const reply = (status, body, type='application/json; charset=utf-8') => {
@@ -52,6 +56,21 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
       if (req.method === 'GET' && route === 'api/一覧') return reply(200,{項目:entries,結果:results,調査:coverage});
+      if (req.method === 'GET' && route === 'api/キー設定') return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});
+      if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
+      if (req.method === 'POST' && route === 'api/公開モデル/再取得') {
+        if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
+        return reply(200,await publicCache.refresh());
+      }
+      if (req.method === 'POST' && route?.startsWith('api/キーテスト/')) {
+        const id=route.slice('api/キーテスト/'.length);
+        if (!KEY_PROVIDERS.some(provider=>provider.id===id)) return reply(404,{エラー:'未対応の項目です。'});
+        if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
+        if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
+        keyBusy=true;
+        try {reply(200,await keyTestFn(id,{publicCache:publicCache.input()}));} finally {keyBusy=false;}
+        return;
+      }
       if (req.method === 'POST' && route === 'api/診断') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
         if (busy) return reply(409,{エラー:'診断実行中です。完了後に再試行してください。'});
@@ -86,6 +105,7 @@ function openBrowser(url) {
 export async function main(args=process.argv.slice(2)) {
   const options=parseArgs(args);
   if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--port 8097] [--base-path /proxy/8097/]'); return; }
+  if (!await verifyUi()) throw new Error('Vue UI の再ビルドが必要です。backend_diag/ui で npm ci && npm run build を実行してください。');
   const useBrowser=browserMode(options);
   let executable;
   if (!useBrowser) {
@@ -95,11 +115,14 @@ export async function main(args=process.argv.slice(2)) {
   const initialStop=await stopRevision();
   const token=randomBytes(32).toString('base64url'), entries=await catalog();
   const coverage=JSON.parse(await readFile(new URL('./coverage.json',import.meta.url),'utf8'));
-  const server=createServer({token,prefix:options.prefix,entries,coverage});
+  const publicCache=createPublicModelCache();
+  const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port,'127.0.0.1',resolve);});
+  // 公開一覧だけを起動時に取得。キー設定や他 provider の API は自動で呼ばない。
+  void publicCache.refresh();
   const url=publicUrl(server.address().port,options.prefix)+'#token='+token;
   let stopWatching=()=>{}, desktop;
-  const close=()=>{stopWatching();cancelProbes();closeDesktop(desktop);server.close();server.closeAllConnections();};
+  const close=()=>{stopWatching();cancelProbes();cancelKeyProbes();closeDesktop(desktop);server.close();server.closeAllConnections();};
   if (useBrowser) {
     console.log('AiDiy 診断: '+url);
     console.log('この起動中のみ有効な認証 URL です。共有せず、転送ポートは非公開にしてください。Ctrl+C で終了。');
@@ -113,4 +136,4 @@ export async function main(args=process.argv.slice(2)) {
   process.once('SIGINT',close);process.once('SIGTERM',close);
   return server;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(()=>{console.error('診断を起動できません。Electron は python backend_diag/_setup.py で準備してください。ブラウザ起動は --browser。引数、ポート、catalog.json も確認してください。');process.exitCode=1;});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(()=>{console.error('診断を起動できません。Electron は python backend_diag/_setup.py で準備してください。ブラウザ起動は --browser。引数、ポート、catalog.json も確認してください。Vue UI を変更した場合は backend_diag/ui で npm ci && npm run build が必要です。');process.exitCode=1;});

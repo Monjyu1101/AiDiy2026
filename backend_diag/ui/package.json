@@ -1,0 +1,15 @@
+{
+  "name": "aidiy-diag-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node verify.mjs"
+  },
+  "devDependencies": {
+    "@vue/compiler-sfc": "3.5.43",
+    "esbuild": "0.27.0",
+    "vue": "3.5.43"
+  }
+}

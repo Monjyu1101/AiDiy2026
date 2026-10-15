@@ -1,0 +1,14 @@
+{
+  "../static/app.js": "82c7f63d84ff096c16c45f8a5dc5c57bd47e322161036bc7c4b0c8fedade8b4c",
+  "../static/index.html": "a7f0136ab72c2983c612d57616ac6c4be784f446aea05399a1843d833ffa5559",
+  "../static/style.css": "c67421b9963bd0f9b02c15e136f1944d03ae7db53bf73071e6ce89b164b5e974",
+  "build.mjs": "124442b4cf39dff2fed0ddee189c849e07323782db7397322e92023ec0925464",
+  "package-lock.json": "6ef55ab14ee6e0ffe9cceb368ce208d1b94a51e9f69b9eb8eb7ecff242c69043",
+  "package.json": "d2274d56b1aed5fcfc1bca7a402ff110eb271c8a7e2bdba6d8051ca58c1f5b8a",
+  "src/App.vue": "757a2f90af554618edfa28b1025b7dc24ec8d51fef26d8d0a48b5617abae2bac",
+  "src/InstallPanel.vue": "f954a5e08e3c940b95ed476a34b97378106778bebbfe73c6743da4ef8692be7e",
+  "src/KeyPanel.vue": "c5c9c3a2024c33f99dd1947f71432d08868d894a500643a6d84682112d94f617",
+  "src/index.html": "a7f0136ab72c2983c612d57616ac6c4be784f446aea05399a1843d833ffa5559",
+  "src/main.js": "4f28b634f509f112d7c3fa22fd11a5611bd9b47ebc0553b770a468d09952bfd6",
+  "src/style.css": "6d92fe6fe26d2782c3485c04acb02f31df749e5076203c09a6fda6586ea3beaf"
+}

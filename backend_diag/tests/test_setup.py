@@ -32,14 +32,37 @@ class RootIntegrationTests(unittest.TestCase):
     def root_module(self,name):
         spec=importlib.util.spec_from_file_location('root_diag_test_'+name,ROOT.parent/(name+'.py'))
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
-    def test_setup_auto_includes_diag_first(self):
-        module=self.root_module('_setup');calls=[]
-        original=module.ask_yes_no
-        def ask(prompt,default='n'):
-            calls.append((prompt,default));return original(prompt,default)
-        with patch.object(module,'ask_start_mode',return_value=(True,True)),patch.object(module,'ask_yes_no',side_effect=ask),patch('builtins.print'):
-            choices=module.collect_setup_choices()
-        self.assertTrue(choices['diag']);self.assertIn('Diag',calls[0][0]);self.assertEqual(calls[0][1],'y')
+    def test_setup_common_then_diag_in_manual_and_auto_modes(self):
+        for auto in (False,True):
+            with self.subTest(auto=auto):
+                module=self.root_module('_setup');calls=[]
+                original=module.ask_yes_no
+                def ask(prompt,default='n'):
+                    calls.append((prompt,default));return original(prompt,default)
+                with patch.object(module,'ask_start_mode',return_value=(True,auto)),patch.object(module,'ask_yes_no',side_effect=ask),patch.object(module,'_read_single_key',side_effect=lambda valid,default_key:default_key),patch('builtins.print'):
+                    choices=module.collect_setup_choices()
+                self.assertEqual([prompt for prompt,_ in calls[:4]],[
+                    '共通セットアップを実行しますか？',
+                    '共通: グローバル環境 Python ツールをアップグレードしますか？',
+                    '共通: グローバル環境の AI CLI ツール(npm + Antigravity + Grok Build)をインストール/アップデートしますか？',
+                    '環境診断(Diag)のランチャー・Electronをセットアップしますか？',
+                ])
+                self.assertEqual([default for _,default in calls[:4]],['y','y','n','y'])
+                self.assertTrue(choices['common']);self.assertTrue(choices['diag'])
+                self.assertTrue(choices['common_python_upgrade']);self.assertFalse(choices['common_npm_install'])
+                self.assertEqual(module.AUTO_MODE,auto)
+    def test_setup_target_numbers_common_zero_diag_one(self):
+        module=self.root_module('_setup')
+        with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'print_info') as info,patch('builtins.print'):
+            with self.assertRaises(SystemExit):module.main()
+        targets=[call.args[0].strip() for call in info.call_args_list if call.args[0].strip()[:1].isdigit()]
+        self.assertEqual(targets,[
+            '0. 共通','1. 環境診断(Diag)','2. バックエンド(local)',
+            '3. バックエンド(tools)','4. バックエンド(core,apps)',
+            '5. バックエンド(task,team)','6. フロントエンド(Web)',
+            '7. フロントエンド(Avatar)','8. コマンド(hermes)',
+            '9. IDE群(Term / Code / Live / IDE)','10. フロントエンド(Discord、任意)',
+        ])
     def test_cleanup_auto_includes_diag_first(self):
         module=self.root_module('_cleanup');calls=[];original=module.ask_yes_no
         def ask(prompt,default='n'):

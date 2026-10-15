@@ -33,3 +33,30 @@ test('strict args and Codespaces/base-path URLs',()=>{
  assert.equal(publicUrl(8097,'/',{CODESPACES:'true',CODESPACE_NAME:'safe-name',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}),'https://safe-name-8097.app.github.dev/');
  assert.equal(publicUrl(8097,'/',{CODESPACES:'true',CODESPACE_NAME:'bad/name',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}),'http://127.0.0.1:8097/');
 });
+test('key status and individual tests require auth and fixed no-body POST contract',async()=>{
+ let reads=0,tests=0;const h=createHandler({token:'test-key',keyStatusFn:async()=>{reads++;return {項目:[]};},keyTestFn:async id=>{tests++;return {id,状態:'OK',モデル:[]};}});
+ for(const route of ['/api/キー設定','/api/キーテスト/openai'])assert.equal((await request(h,route,'POST')).status,401);
+ assert.equal((await request(h,'/api/キー設定','GET',auth)).status,200);assert.equal(reads,1);assert.equal(tests,0);
+ assert.equal((await request(h,'/api/キーテスト/openai','GET',auth)).status,404);
+ assert.equal((await request(h,'/api/キーテスト/arbitrary','POST',auth)).status,404);
+ assert.equal((await request(h,'/api/キーテスト/openai?url=https://evil.test','POST',auth)).status,400);
+ for(const headers of [{'content-length':'3'},{'transfer-encoding':'chunked'}])assert.equal((await request(h,'/api/キーテスト/openai','POST',auth,headers)).status,400);
+ assert.equal(tests,0);assert.equal((await request(h,'/api/キーテスト/openai','POST',auth)).status,200);assert.equal(tests,1);
+});
+test('key test concurrency is bounded and installation action never runs key tests',async()=>{
+ let release,tests=0;const h=createHandler({token:'test-key',scanFn:async()=>[],keyStatusFn:async()=>({項目:[]}),keyTestFn:async()=>{tests++;return new Promise(resolve=>{release=resolve;});}});
+ assert.equal((await request(h,'/api/診断','POST',auth)).status,200);assert.equal(tests,0);
+ await request(h,'/api/キー設定','GET',auth);
+ const first=request(h,'/api/キーテスト/openai','POST',auth);assert.equal((await request(h,'/api/キーテスト/gemini','POST',auth)).status,409);
+ release({状態:'OK',モデル:[]});assert.equal((await first).status,200);assert.equal(tests,1);
+});
+test('public status/retry authenticated, bounded and separate from individual test results',async()=>{
+ let refreshes=0;const publicCache={snapshot:()=>({状態:'取得済',件数:1,世代:2}),input:()=>({公開モデル:{example:{model_id:'example'}},公開状態:'取得済'}),refresh:async()=>{refreshes++;return {状態:'取得済'};}};
+ const calls=[];const h=createHandler({token:'test-key',publicCache,keyStatusFn:async()=>({項目:[{id:'openrt',設定済み:true}]}),keyTestFn:async(id,options)=>{calls.push({id,options});return {id,状態:'OK',モデル:[]};}});
+ assert.equal((await request(h,'/api/公開モデル','GET')).status,401);assert.equal((await request(h,'/api/公開モデル/再取得','POST')).status,401);
+ assert.equal(JSON.parse((await request(h,'/api/キー設定','GET',auth)).body).公開モデル.状態,'取得済');assert.equal(refreshes,0);
+ assert.equal((await request(h,'/api/キーテスト/openai','POST',auth)).status,200);assert.equal(calls[0].options.publicCache.公開状態,'取得済');assert.equal(refreshes,0);
+ assert.equal((await request(h,'/api/公開モデル/再取得','POST',auth,{'content-length':'5'})).status,400);
+ assert.equal((await request(h,'/api/公開モデル/再取得?url=bad','POST',auth)).status,400);
+ assert.equal((await request(h,'/api/公開モデル/再取得','POST',auth)).status,200);assert.equal(refreshes,1);
+});
