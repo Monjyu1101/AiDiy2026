@@ -105,7 +105,11 @@ def 初期モデル設定生成(app_conf) -> dict:
         "TEAM_AI_MODEL_do": app_conf.json.get("TEAM_AI_MODEL_do", "auto"),
         "TEAM_AI_MODEL_check": app_conf.json.get("TEAM_AI_MODEL_check", "auto"),
     }
-    return モデル設定正規化(設定)
+    設定 = モデル設定正規化(設定)
+    models = getattr(app_conf, "models", None)
+    if models is not None and callable(getattr(models, "normalize_initial_settings", None)):
+        設定 = models.normalize_initial_settings(設定)
+    return 設定
 
 
 def モデル設定正規化(設定: Optional[dict]) -> dict:

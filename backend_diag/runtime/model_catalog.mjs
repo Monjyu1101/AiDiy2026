@@ -1,4 +1,4 @@
-// ../runtime/model_catalog.ts
+// backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {
@@ -119,11 +119,125 @@ function ollamaCatalog(body, now = /* @__PURE__ */ new Date()) {
   }
   return out;
 }
+function isRetiredOpenaiModel(id) {
+  const slug = (id.trim().toLowerCase().split("/").at(-1) ?? "").replace(/^openai\./, "");
+  return slug === "gpt-6-sol" || slug.startsWith("gpt-6-sol-") || slug.startsWith("gpt-6-sol.");
+}
+function withoutRetired(models) {
+  const out = empty();
+  for (const [id, model] of Object.entries(models)) if (!isRetiredOpenaiModel(id)) out[id] = model;
+  return out;
+}
+var DEFAULT_CODEX_MODELS = Object.freeze(["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]);
+var OAUTH_FALLBACK_MODELS = Object.freeze(["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]);
+var FORWARD_COMPAT = [["gpt-6-astra", ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]], ["gpt-6.1-sol", ["gpt-5.5", "gpt-5.4"]], ["gpt-5.6-terra", ["gpt-5.5", "gpt-5.4"]], ["gpt-6-luna", ["gpt-5.5", "gpt-5.4"]]];
+var CONTEXT_SUFFIX = "-900k";
+var CONTEXT_BASES = /* @__PURE__ */ new Set(["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-5.4", "gpt-daybreak-blue-latest"]);
+var CONTEXT_SNAPSHOT_BASES = ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"];
+function isCodex900kBase(model) {
+  const slug = model.trim().toLowerCase().split("/").at(-1) ?? "";
+  if (!slug || slug.endsWith(CONTEXT_SUFFIX)) return false;
+  if (CONTEXT_BASES.has(slug)) return true;
+  return CONTEXT_SNAPSHOT_BASES.some((base) => slug.startsWith(base + "-") && /^\d{4}-\d{2}-\d{2}$/.test(slug.slice(base.length + 1)));
+}
+function finalizeCodexModels(ids) {
+  const ordered = [], seen = /* @__PURE__ */ new Set();
+  for (const id of ids.filter((id2) => !isRetiredOpenaiModel(id2))) if (!seen.has(id)) {
+    ordered.push(id);
+    seen.add(id);
+  }
+  for (const [synthetic, templates] of FORWARD_COMPAT) if (!seen.has(synthetic) && templates.some((template) => seen.has(template))) {
+    ordered.push(synthetic);
+    seen.add(synthetic);
+  }
+  const out = [], present = new Set(ordered);
+  for (const id of ordered) {
+    out.push(id);
+    const variant = id + CONTEXT_SUFFIX;
+    if (present.has(variant) || out.includes(variant)) continue;
+    if (isCodex900kBase(id)) out.push(variant);
+  }
+  return out;
+}
+function codexSlugs(body) {
+  const items = row(body).models;
+  if (!Array.isArray(items)) throw new Error("shape");
+  const sortable = [];
+  for (const entry of items) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const item = entry, slug = typeof item.slug === "string" ? item.slug.trim() : "";
+    if (!slug) continue;
+    if (typeof item.visibility === "string" && ["hide", "hidden"].includes(item.visibility.trim().toLowerCase())) continue;
+    sortable.push([typeof item.priority === "number" && Number.isFinite(item.priority) ? Math.trunc(item.priority) : 1e4, slug]);
+  }
+  sortable.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
+  return [...new Set(sortable.map(([, slug]) => slug))];
+}
+function idsCatalog(ids) {
+  const out = empty();
+  for (const id of ids) if (!isRetiredOpenaiModel(id) && !Object.hasOwn(out, id)) out[id] = { model_id: id, \u30C8\u30FC\u30AF\u30F3\u6570: null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  return out;
+}
+function codexCatalog(body) {
+  return idsCatalog(finalizeCodexModels(codexSlugs(body)));
+}
+function codexFallbackCatalog(defaultModel, cacheIds) {
+  const ordered = [];
+  for (const id of [...defaultModel ? [defaultModel] : [], ...cacheIds, ...DEFAULT_CODEX_MODELS]) if (!ordered.includes(id)) ordered.push(id);
+  const ids = finalizeCodexModels(ordered);
+  return idsCatalog(ids.length ? ids : OAUTH_FALLBACK_MODELS);
+}
+var GROK_CLI_MODELS = Object.freeze(["grok-4.7", "grok-4.6"]);
+var LOCAL_CHAT_MODELS = Object.freeze(["google/gemma-4-E2B-it", "google/gemma-4-E4B-it", "google/gemma-4-E2B-it-qat-mobile-transformers", "google/gemma-4-E4B-it-qat-mobile-transformers"]);
+function grokCatalog(body) {
+  const source = row(body), list = Array.isArray(source.data) ? source.data : Array.isArray(source.models) ? source.models : null;
+  if (!list) throw new Error("shape");
+  const out = empty();
+  for (const entry of list) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const item = entry, info = item.info !== null && typeof item.info === "object" && !Array.isArray(item.info) ? item.info : {};
+    const id = [item.id, item.model, item.slug, info.id].find((value) => typeof value === "string" && !!value.trim())?.trim();
+    if (!id || item.hidden === true || info.hidden === true || Object.hasOwn(out, id)) continue;
+    const context = [item.context_window, item.context_length, info.context_window].find((value) => typeof value === "number");
+    out[id] = { model_id: id, \u30C8\u30FC\u30AF\u30F3\u6570: typeof context === "number" ? String(context) : null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  }
+  return out;
+}
+function ollamaLocalCatalog(body) {
+  const items = row(body).models;
+  if (!Array.isArray(items)) throw new Error("shape");
+  const rows = items.filter((item) => item !== null && typeof item === "object" && !Array.isArray(item) && typeof item.name === "string" && !!item.name.trim());
+  const time = (item) => {
+    const value = Date.parse(String(item.modified_at ?? ""));
+    return Number.isFinite(value) ? value : 0;
+  };
+  rows.sort((a, b) => time(b) - time(a));
+  const out = empty();
+  for (const item of rows) {
+    const name = item.name.trim().split(/\s+/)[0];
+    if (!Object.hasOwn(out, name)) out[name] = { model_id: name, \u30C8\u30FC\u30AF\u30F3\u6570: null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  }
+  return out;
+}
 export {
+  DEFAULT_CODEX_MODELS,
+  GROK_CLI_MODELS,
+  LOCAL_CHAT_MODELS,
+  OAUTH_FALLBACK_MODELS,
   claudeCatalog,
+  codexCatalog,
+  codexFallbackCatalog,
+  codexSlugs,
+  finalizeCodexModels,
   googleCatalog,
+  grokCatalog,
+  idsCatalog,
+  isCodex900kBase,
+  isRetiredOpenaiModel,
   ollamaCatalog,
+  ollamaLocalCatalog,
   openaiCatalog,
   openrouterCatalog,
-  pythonString
+  pythonString,
+  withoutRetired
 };

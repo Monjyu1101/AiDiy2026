@@ -26,15 +26,19 @@ let historyNumber = 0;
 const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => startServer(project, launch, initial, file, run, history);
 const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-test('Code: Hermes既定モデルを共通設定から読み、モデル候補はbatと同じ固定値に限定する', () => {
+test('Code: 未生成時はsameだけ、生成済みなら診断のHermes候補を読む', () => {
   const root = join(preferences, 'configured');
   mkdirSync(join(root, '_config'), {recursive:true});
   const file = join(root, '_config/AiDiy_key.json');
   writeFileSync(file, '\uFEFF' + JSON.stringify({CODE_AIDIY_HERMES_MODEL:'openai_oauth/configured-model'}));
   assert.equal(Hermes既定モデル(join(root, 'frontend_ide/host')), 'openai_oauth/configured-model');
-  const expected = ['same','codex_cli/same','copilot_cli/same','openai_oauth/gpt-6-astra','openai_oauth/gpt-6.1-sol','openai_oauth/gpt-5.6-terra','openai_oauth/gpt-6-luna'];
+  const expected = ['same'];
   assert.deepEqual(オフラインモデル候補(root).map(p=>p.id), expected);
-  assert.deepEqual(オフラインモデル候補(process.cwd()).map(p=>p.id), expected);
+  const directory = join(root, '_AIDIY/aidiy_diag'); mkdirSync(directory, {recursive:true});
+  writeFileSync(join(directory, 'code_models_info.json'), JSON.stringify({aidiy_hermes:{models:{'claude_cli/same':'Claude same','openai_oauth/new-model':'New model'}}}));
+  assert.deepEqual(オフラインモデル候補(join(root, 'frontend_ide/host')), [
+    {id:'same',label:'same (変更なし)'},{id:'claude_cli/same',label:'Claude same'},{id:'openai_oauth/new-model',label:'New model'},
+  ]);
   writeFileSync(file, '{}');
   assert.equal(Hermes既定モデル(root), 'auto');
 });
@@ -146,6 +150,16 @@ test('Code: --offline 起動から自動接続ONで新規オンライン会話�
   } finally { await stream.close(); await app.close(); }
 });
 
+test('Code: 手動選択がなければAPIの初期モデルを使う', async t => {
+  const backend = require('./fake-core.cjs').core({CODE_AI1_NAME:'copilot_cli',CODE_AI1_MODEL:'gpt-6-sol'}); backend.install(t);
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091', {}), stream = await connect(app);
+  try {
+    const state = await stream.wait(p=>p.type==='state' && p.接続済み);
+    assert.equal(state.provider,'copilot_cli');assert.equal(state.model,'gpt-6-sol');
+    assert.equal(backend.requests.filter(request=>request.path.endsWith('設定')).length,0);
+  } finally {await stream.close();await app.close();}
+});
+
 test('Code: AIコアのモデル候補・選択値・送信と停止を中継する', async t => {
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   const file = join(preferences, 'remember.json');
@@ -229,7 +243,7 @@ test('Code: 古い履歴からのモード切替で最終手動モデルを上�
     const online = {provider:'codex_cli',model:'auto'};
     const offline = {provider:'aidiy_hermes',model:'same'};
     const latest = mode === 'online' ? {provider:'copilot_cli',model:'gpt-6-sol'}
-      : {provider:'aidiy_hermes',model:'copilot_cli/same'};
+      : {provider:'aidiy_hermes',model:'copilot_cli/auto'};
     writeFileSync(file, JSON.stringify(online));
     writeFileSync(オフラインモデル保存先(file), JSON.stringify(offline));
     const run = () => ({完了:Promise.resolve({終了コード:0}),停止(){}});
@@ -284,8 +298,7 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     assert.equal(backend.sockets.length,0); assert.equal(backend.requests.length,0);
     assert.deepEqual((await (await fetch(app.url+'catalog')).json()).providers.map(p=>p.id),['aidiy_hermes']);
     const catalog = await (await fetch(app.url+'catalog?provider=aidiy_hermes')).json();
-    const bat=readFileSync(resolve('../../scripts/cli_bat/_hermes_cli.bat'),'utf8');
-    const expected=[...new Set(['same',...[...bat.matchAll(/set "MODEL=([^"%\r\n]+)"/g)].map(match=>match[1])])];
+    const expected=オフラインモデル候補(process.cwd()).map(item=>item.id);
     assert.deepEqual(catalog.models.map(p=>p.id),expected);
     assert.equal((await post(app,{type:'model',provider:'copilot_cli',model:'auto'})).status,400);
     assert.equal((await post(app,{type:'model',provider:'aidiy_hermes',model:'openai_oauth/unlisted'})).status,400);
@@ -367,13 +380,13 @@ test('Code 会話履歴: 本文上限の日本語回答を保存し、再起動�
 });
 
 test('Code offline: CLI組み合わせモデルはHermesのCLI Providerへ渡す', async () => {
-  for (const provider of ['codex','copilot']) {
+  for (const provider of ['codex','copilot','claude','antigravity','grok','opencode']) {
     const job = オフライン実行(process.cwd(), process.cwd(), `${provider}_cli/same`, '引数確認', undefined, ()=>{},
       {実行ファイル:process.execPath,引数:[resolve('checks/fake-cli.cjs'),'echo']});
     const result = await job.完了;
     assert.equal(result.終了コード,0);
     const {args} = JSON.parse(result.回答);
-    assert.equal(args[args.indexOf('--provider')+1], `${provider}-cli`);
+    assert.equal(args[args.indexOf('--provider')+1], provider === 'claude' ? 'claude-code' : provider === 'opencode' ? 'opencode' : `${provider}-cli`);
     assert.ok(!args.includes('--model'));
   }
 });
@@ -482,7 +495,7 @@ test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変�
   backend.hold=true; backend.holdCancel=true;
   for (const mode of ['online','offline']) {
     const file = join(preferences,`stop-switch-${mode}.json`);
-    const online={provider:'codex_cli',model:'auto'}, offline={provider:'aidiy_hermes',model:'copilot_cli/same'};
+    const online={provider:'codex_cli',model:'auto'}, offline={provider:'aidiy_hermes',model:'copilot_cli/auto'};
     writeFileSync(file,JSON.stringify(online));
     writeFileSync(オフラインモデル保存先(file),JSON.stringify(offline));
     let stops=0, finish;
@@ -515,8 +528,8 @@ test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変�
       await stream.wait(p=>p.type==='state' && !p.実行中 && !p.停止中 && p.メッセージ.length>0);
       if (mode==='online') await post(app,{type:'autoConnect',enabled:false});
       const offset=stream.packets.length;
-      await post(app,{type:'model',provider:'aidiy_hermes',model:'codex_cli/same'});
-      await stream.wait(p=>stream.packets.indexOf(p)>=offset && p.type==='state' && p.model==='codex_cli/same');
+      await post(app,{type:'model',provider:'aidiy_hermes',model:'codex_cli/auto'});
+      await stream.wait(p=>stream.packets.indexOf(p)>=offset && p.type==='state' && p.model==='codex_cli/auto');
       const onOffset=stream.packets.length;
       await post(app,{type:'autoConnect',enabled:true});
       const restored=await stream.wait(p=>stream.packets.indexOf(p)>=onOffset && p.type==='state' && p.接続済み && p.実行モード==='online');
@@ -527,7 +540,7 @@ test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変�
       await post(app,{type:'autoConnect',enabled:true});
       assert.equal(backend.sockets.length,sockets,'同じON通知で接続を作り直さない');
       assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),online);
-      assert.equal(JSON.parse(readFileSync(オフラインモデル保存先(file),'utf8')).model,'codex_cli/same');
+      assert.equal(JSON.parse(readFileSync(オフラインモデル保存先(file),'utf8')).model,'codex_cli/auto');
     } finally { if(finish) finish(); await stream.close(); await app.close(); }
   }
 });

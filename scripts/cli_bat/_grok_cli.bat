@@ -20,16 +20,16 @@ if /I "%UPDATE%"=="y" (
 :SELECT_MODEL
 ECHO.
 ECHO Grok Build CLI model list
-ECHO   1: Grok 4.8
-ECHO   2: Grok 4.7 - coding and agent tasks
+ECHO   1: Grok 4.7 - coding and agent tasks
+ECHO   2: Grok 4.6
 ECHO   0: Exit
 ECHO.
 set "MODEL_NUMBER="
 set /p "MODEL_NUMBER=Model number [Enter: default]: "
 if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH
-if "%MODEL_NUMBER%"=="1" set "MODEL=grok-4.8"
-if "%MODEL_NUMBER%"=="2" set "MODEL=grok-4.7"
+if "%MODEL_NUMBER%"=="1" set "MODEL=grok-4.7"
+if "%MODEL_NUMBER%"=="2" set "MODEL=grok-4.6"
 if defined MODEL goto LAUNCH
 ECHO Invalid input. Enter a number or press Enter.
 goto SELECT_MODEL

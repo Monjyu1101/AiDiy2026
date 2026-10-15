@@ -51,17 +51,22 @@ export function Hermes既定モデル(...folders: string[]): string {
   return 'auto';
 }
 
-// AIコアもモデル情報APIも使わず、ローカルのHermesランチャーから候補を読む。
-export function オフラインモデル候補(root: string) {
-  const models = new Set<string>(['same']);
-  try {
-    const bat = readFileSync(共通ファイル(root, 'scripts', 'cli_bat', '_hermes_cli.bat'), 'utf8');
-    for (const match of bat.matchAll(/set "MODEL=([^"%\r\n]+)"/g)) models.add(match[1].includes('/') ? match[1] : `openai_oauth/${match[1]}`);
-  } catch {
-    // ランチャーを同梱しない配置でも、同じ固定候補を使う。
-    for (const model of ['codex_cli/same', 'copilot_cli/same', 'openai_oauth/gpt-6-astra', 'openai_oauth/gpt-6.1-sol', 'openai_oauth/gpt-5.6-terra', 'openai_oauth/gpt-6-luna']) models.add(model);
+// AIコアを使わず、aidiy_diag の Hermes 候補だけを読む。
+export function オフラインモデル候補(...folders: string[]) {
+  for (const folder of folders) {
+    let file: string;
+    try { file = 共通ファイル(folder, '_AIDIY', 'aidiy_diag', 'code_models_info.json'); }
+    catch { continue; }
+    let models: unknown;
+    try { models = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')).aidiy_hermes?.models; }
+    catch { throw new Error('aidiy_diag のコードモデル情報を読み込めません。aidiy_diag で再保存してください。'); }
+    if (!models || typeof models !== 'object' || Array.isArray(models)
+        || Object.values(models).some(label => typeof label !== 'string'))
+      throw new Error('aidiy_diag の Hermes モデル情報が不正です。aidiy_diag で再保存してください。');
+    return [{id:'same', label:'same (変更なし)'}, ...Object.entries(models)
+      .filter(([id]) => !['same', 'auto'].includes(id)).map(([id, label]) => ({id, label:label as string}))];
   }
-  return [...models].map(id => ({ id, label: id === 'same' || id.endsWith('/same') ? `${id} (変更なし)` : id }));
+  return [{id:'same', label:'same (変更なし)'}];
 }
 
 export function オフライン実行(root: string, project: string, model: string, text: string,
@@ -72,8 +77,8 @@ export function オフライン実行(root: string, project: string, model: stri
     try { launch = 起動解決('aidiy_hermes', '', project); }
     catch { launch = 起動解決(共通ファイル(root, 'command_hermes', 'cli_main.py')); }
   }
-  const cli = /^(codex_cli|copilot_cli)\/(.+)$/.exec(model);
-  const args = cli ? 会話引数(cli[1].replace('_', '-'), cli[2], 999, session) : 会話引数('', model, 999, session);
+  const cli = /^(claude_cli|codex_cli|copilot_cli|antigravity_cli|grok_cli|opencode_cli)\/(.+)$/.exec(model);
+  const args = cli ? 会話引数(cli[1] === 'claude_cli' ? 'claude-code' : cli[1] === 'opencode_cli' ? 'opencode' : cli[1].replace('_', '-'), cli[2], 999, session) : 会話引数('', model, 999, session);
   return コード要求実行({ セッションID: session || '', チャンネル: 'code1',
     メッセージ識別: 'input_text', メッセージ内容: text }, {
     起動: launch, 作業フォルダ: project, 引数: args, 制限時間: 1800000,

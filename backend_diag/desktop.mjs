@@ -24,9 +24,10 @@ const failures={
 };
 export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000, onReady=()=>{}) {
   // Windows Electron の stdin は常に EOF。IDE と同じ専用 IPC を使い、秘密 URL は argv/env/log に出さない。
+  // GUI には SW_HIDE を引き継がせない（windowsHide:true だと Windows で show() 後も非表示のまま）。
   const env={...process.env};
   for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH)$/i.test(key))delete env[key];
-  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:true,detached:process.platform!=='win32'});
+  const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:false,detached:process.platform!=='win32'});
   let ended=false, sent=false, shown=false, reported=false, disconnectTimer;
   const finish=()=>{if(ended)return;ended=true;clearTimeout(timer);clearTimeout(disconnectTimer);onClose();};
   const report=(code,detail='')=>{

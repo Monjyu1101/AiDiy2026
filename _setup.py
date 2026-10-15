@@ -134,6 +134,22 @@ def _load_folder_module(folder: str):
     return mod
 
 
+def run_diag_headless() -> bool:
+    """`aidiy_diag --headless` を実行する。処理本体は全体起動と共通の `_start.py` を使う。"""
+    print_header("バックエンド(Diag): aidiy_diag --headless")
+    path = BASE_DIR / "backend_diag" / "_start.py"
+    spec = importlib.util.spec_from_file_location("aidiy_backend_diag_start", path)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+        mod.run_headless()
+    except (OSError, RuntimeError) as exc:
+        print_error(str(exc))
+        return False
+    print_success("バックエンド(Diag) の事前実行が完了しました。")
+    return True
+
+
 # `_setup.py` を import するフォルダ（= `__pycache__` が生成される）。
 IMPORT_CACHE_FOLDERS = (
     "backend_diag",
@@ -661,7 +677,8 @@ def collect_setup_choices() -> dict | None:
         choices["common_python_upgrade"] = ask_yes_no("共通: グローバル環境 Python ツールをアップグレードしますか？", default="y")
         choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity + Grok Build)をインストール/アップデートしますか？", default="n")
 
-    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャー・Electronをセットアップしますか？", default="y")
+    choices["diag"] = True
+    print_info("バックエンド(Diag)のランチャー・Electronをセットアップします [y]")
 
     choices["local"] = ask_yes_no("バックエンド(local)のセットアップを実行しますか？", default="y")
     if choices["local"]:
@@ -699,7 +716,7 @@ def main():
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
     print_info("  0. 共通")
-    print_info("  1. 環境診断(Diag)")
+    print_info("  1. バックエンド(Diag)")
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")
     print_info("  4. バックエンド(core,apps)")
@@ -723,7 +740,7 @@ def main():
     print()
     if choices.get("diag"):
         if not _load_folder_module("backend_diag").setup(choices, desktop=False):
-            error_locations.append("環境診断(Diag)")
+            error_locations.append("バックエンド(Diag)")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -740,7 +757,7 @@ def main():
 
     if choices.get("diag"):
         if not _load_folder_module("backend_diag").setup_desktop():
-            error_locations.append("環境診断(Diag): Electron")
+            error_locations.append("バックエンド(Diag): Electron")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -867,6 +884,15 @@ def main():
                 sys.exit(1)
     else:
         print_warning("フロントエンド(Discord)のセットアップをスキップしました。")
+
+    # 全体起動と同じ診断を事前実行し、モデル合成JSONを生成しておく。
+    print()
+    if choices.get("diag"):
+        if not run_diag_headless():
+            error_locations.append("バックエンド(Diag): aidiy_diag --headless")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
 
     print()
     remove_folder_import_caches()

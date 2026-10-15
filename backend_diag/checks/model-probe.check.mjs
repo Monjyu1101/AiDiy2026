@@ -1,0 +1,131 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {probe,publicCatalog,status,safeDetails,validatedCache} from '../runtime/model_probe.mjs';
+const now=new Date('2026-10-15T12:00:00Z'),created=now.getTime()/1000;
+const reader=value=>async()=>JSON.stringify(value);
+const forbidden=()=>assert.fail('Unexpected config/network operation');
+test('invalid configuration is unknown; unset and unsupported keys never fetch',async()=>{
+ assert.equal((await status({reader:async()=> '[]'})).設定状態,'読込不可');
+ assert.equal((await probe('gemini',{reader:reader({freeai_key_id:'fixture-key'}),fetch:forbidden})).状態,'未実施');
+ assert.equal((await probe('azure',{reader:forbidden,fetch:forbidden})).状態,'未実施');
+});
+test('selected Google credential only, pagination completes before cache filtering',async()=>{
+ const calls=[];
+ const result=await probe('freeai',{now,reader:reader({gemini_key_id:'other-secret',freeai_key_id:'selected-secret'}),cache:{公開状態:'取得済',公開モデル:{'google/second':{作成日:'2026/10/01'}}},fetch:async(provider,headers,token)=>{
+  calls.push({provider,headers,token});return {models:[{name:`models/${token?'second':'first'}`,supportedGenerationMethods:['generateContent'],inputTokenLimit:222}],...(token?{}:{nextPageToken:'page2'})};
+ }});
+ assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['second']);assert.equal(result.モデル詳細[0].作成日,'2026/10/01');assert.equal(calls.length,2);
+ for(const call of calls){assert.equal(call.provider,'google');assert.deepEqual(call.headers,{'x-goog-api-key':'selected-secret'});}
+ assert.equal(calls[1].token,'page2');assert.ok(!JSON.stringify(result).includes('secret'));
+});
+test('pagination is bounded and malformed responses fail closed',async()=>{
+ let count=0;
+ const result=await probe('gemini',{reader:reader({gemini_key_id:'fixture-key'}),fetch:async()=>{count++;return {models:[],nextPageToken:'again'};}});
+ assert.equal(result.状態,'NG');assert.equal(count,20);
+ for(const body of [{data:{}},{data:null},{models:[]}]){
+  const response=await probe('openai',{reader:reader({openai_key_id:'fixture-key'}),fetch:async()=>body});assert.equal(response.状態,'NG');
+ }
+});
+test('all configured secrets and organization are redacted from metadata',async()=>{
+ const result=await probe('openai',{now,reader:reader({openai_key_id:'fixture-key',gemini_key_id:'other-secret',openai_organization:'fixture-org'}),fetch:async(provider,headers)=>{
+  assert.equal(provider,'openai');assert.equal(headers['OpenAI-Organization'],'fixture-org');assert.equal(headers.Authorization,'Bearer fixture-key');
+  return {data:[{id:'safe-model',created},{id:'fixture-org',created},{id:'other-secret',created}]};
+ }});
+ assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['safe-model']);assert.ok(result.警告.length);
+ assert.ok(!JSON.stringify(result).includes('fixture-org'));assert.ok(!JSON.stringify(result).includes('other-secret'));
+ assert.deepEqual(safeDetails({'safe-model':{作成日:'other-secret',トークン数:'fixture-key',モダリティ:'prefix-other-secret'}},['fixture-key','other-secret']),[{model_id:'safe-model',作成日:null,トークン数:null,モダリティ:null}]);
+});
+test('public failure does not leak provider errors and cache validation fails closed',async()=>{
+ const result=await publicCatalog({now,fetch:async()=>{throw Error('secret-error');}});
+ assert.equal(result.状態,'NG');assert.ok(!JSON.stringify(result).includes('secret-error'));
+ for(const cache of [null,[],{公開状態:'取得中',公開モデル:{}},{公開状態:'取得済',公開モデル:{bad:null}}]){
+  const result=await probe('openrt',{reader:forbidden,fetch:forbidden,cache});assert.equal(result.状態,'未実施');
+ }
+});
+test('configuration bounds, UTF-8 BOM, unreadable and missing states',async()=>{
+ const {readConfig,CONFIG_LIMIT}=await import('../runtime/model_probe.mjs');
+ assert.equal((await readConfig(async()=> '\uFEFF{"openai_key_id":"fixture-key"}'))[0],'読込済み');
+ assert.equal((await readConfig(async()=> 'x'.repeat(CONFIG_LIMIT+1)))[0],'読込不可');
+ assert.equal((await readConfig(async()=> Buffer.from([0xff,0xfe])))[0],'読込不可');
+ assert.equal((await readConfig(async()=> {throw Object.assign(Error('fixture-secret'),{code:'ENOENT'});}))[0],'未作成');
+ assert.equal((await readConfig(async()=> {throw Error('fixture-secret');}))[0],'読込不可');
+});
+test('public details are unlimited but individual display is capped at 500',async()=>{
+ const data=Array.from({length:501},(_,i)=>({id:`other/model-${i}`,created}));
+ const result=await publicCatalog({now,fetch:async()=>({data})});assert.equal(Object.keys(result.公開モデル).length,501);
+ const selected=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル:result.公開モデル}});assert.equal(selected.モデル.length,500);
+});
+// 以下は旧 tests/test_model_probe.py の BridgeTests から、TypeScript 実装に該当する項目を移植。
+const day=86400;
+test('fixed config path, provider order and safe status without key values',async()=>{
+ const result=await status({reader:async file=>{
+  assert.match(file.replaceAll('\\','/'),/\/_config\/AiDiy_key\.json$/);
+  return JSON.stringify({openai_key_id:'fixture-secret',gemini_key_id:' < placeholder > ',ollama_key_id:'ollama'});
+ }});
+ assert.deepEqual(result.項目.map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt','ollama','local','huggingface_read','huggingface_write','discord']);
+ assert.ok(!JSON.stringify(result).includes('fixture-secret'));
+ const rows=Object.fromEntries(result.項目.map(row=>[row.id,row]));
+ assert.equal(rows.openai.設定済み,true);assert.equal(rows.gemini.設定済み,false);
+ // Ollama は本体と同じくローカル（ollama list）。キーでは判定しない。
+ assert.equal(rows.ollama.設定済み,null);assert.equal(rows.ollama.ローカル,true);assert.equal(rows.ollama.キー不要,true);assert.equal(rows.ollama.テスト可能,true);
+ assert.equal(rows.openrt.キー不要,true);assert.equal(rows.openrt.テスト可能,true);
+});
+test('public catalog is anonymous and applies the OpenRouter date filter',async()=>{
+ const result=await publicCatalog({now,fetch:async(provider,headers)=>{
+  assert.equal(provider,'openrouter');assert.deepEqual(headers,{});
+  return {data:[{id:'other/new',created:created-day},{id:'other/old',created:created-91*day}]};
+ }});
+ assert.equal(result.状態,'OK');assert.deepEqual(Object.keys(result.公開モデル),['other/new']);assert.match(result.説明,/キーの有効性/);
+});
+test('OpenRouter reuses only an acquired startup cache without config or network',async()=>{
+ const 公開モデル=(await publicCatalog({now,fetch:async()=>({data:[{id:'other/new',created:created-day}]})})).公開モデル;
+ const result=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル}});
+ assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['other/new']);
+ for(const state of ['未取得','取得中','失敗'])assert.equal((await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:state,公開モデル}})).状態,'未実施');
+});
+test('missing router cache warns but continues; selected provider failure is NG without error text',async()=>{
+ const result=await probe('openai',{now,reader:reader({openai_key_id:'fixture-secret'}),fetch:async provider=>{assert.equal(provider,'openai');return {data:[{id:'fresh',created:created-2*day}]};}});
+ assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['fresh']);assert.ok(result.警告.length);
+ const failed=await probe('openai',{now,reader:reader({openai_key_id:'fixture-secret'}),fetch:async()=>{throw Error('secret-error');}});
+ assert.equal(failed.状態,'NG');assert.deepEqual(failed.モデル,[]);assert.ok(!JSON.stringify(failed).includes('secret-error'));
+});
+test('Claude wire ISO dates are filtered by the 240 day window',async()=>{
+ const result=await probe('claude',{now,reader:reader({claude_key_id:'fixture-key'}),fetch:async(provider,headers)=>{
+  assert.equal(provider,'anthropic');assert.equal(headers['x-api-key'],'fixture-key');
+  return {data:[{id:'old',created_at:'2025-01-01T00:00:00Z'},{id:'new',created_at:'2026-10-14T12:00:00Z'}]};
+ }});
+ assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['new']);
+});
+test('placeholder OpenAI organization is not sent',async()=>{
+ const calls=[];
+ await probe('openai',{now,reader:reader({openai_key_id:'fixture-key',openai_organization:' < your organization > '}),fetch:async(provider,headers)=>{calls.push(headers);return {data:[]};}});
+ assert.equal(calls.length,1);assert.ok(!Object.hasOwn(calls[0],'OpenAI-Organization'));
+});
+// 以下は本体（conf_model.py の get_chat_models / _get_ollama_local_models）との一致。
+test('display lists drop retired OpenAI models like get_chat_models, but the join source keeps them',async()=>{
+ const openai=await probe('openai',{now,reader:reader({openai_key_id:'fixture-key'}),fetch:async()=>({data:[{id:'gpt-6-sol',created:created-day},{id:'gpt-6.1-sol',created:created-day},{id:'gpt-6-sol-mini',created:created-day}]})});
+ assert.deepEqual(openai.モデル,['gpt-6.1-sol']);
+ const 公開モデル=(await publicCatalog({now,fetch:async()=>({data:[{id:'openai/gpt-6-sol',created},{id:'openai/gpt-6.1-sol',created},{id:'~openai/gpt-sol-latest',created}]})})).公開モデル;
+ assert.ok(Object.hasOwn(公開モデル,'openai/gpt-6-sol'),'join source keeps retired models');assert.ok(Object.hasOwn(公開モデル,'~openai/gpt-sol-latest'),'aliases kept like the main app');
+ const openrt=await probe('openrt',{reader:forbidden,fetch:forbidden,cache:{公開状態:'取得済',公開モデル}});
+ assert.deepEqual(openrt.モデル,['openai/gpt-6.1-sol','~openai/gpt-sol-latest']);
+});
+test('Ollama lists local models like ollama list (newest first), without keys, and reports a stopped server as NG',async()=>{
+ const calls=[];
+ const ok=await probe('ollama',{reader:reader({ollama_key_id:'cloud-secret'}),fetch:async(provider,headers)=>{calls.push({provider,headers});return {models:[{name:'old:latest',modified_at:'2026-01-01T00:00:00Z'},{name:'new:cloud',modified_at:'2026-10-01T00:00:00Z'},{name:''}]};}});
+ assert.equal(ok.状態,'OK');assert.deepEqual(ok.モデル,['new:cloud','old:latest']);assert.deepEqual(calls,[{provider:'ollama-local',headers:{}}]);
+ assert.equal(ok.モデル詳細[0].作成日,null);
+ const stopped=await probe('ollama',{reader:reader({}),fetch:async()=>{throw Error('network');}});
+ assert.equal(stopped.状態,'NG');assert.match(stopped.説明,/ローカルの Ollama に接続できません/);
+});
+test('backend_local reports the fixed candidates (same as CHAT_LOCAL_MODELS) as PASS without reading _config',async()=>{
+ const result=await probe('local',{reader:forbidden,fetch:forbidden});
+ assert.equal(result.状態,'PASS');assert.deepEqual(result.モデル,['google/gemma-4-E2B-it','google/gemma-4-E4B-it','google/gemma-4-E2B-it-qat-mobile-transformers','google/gemma-4-E4B-it-qat-mobile-transformers']);assert.match(result.説明,/固定候補/);
+ const row=(await status({reader:reader({})})).項目.find(item=>item.id==='local');assert.equal(row.テスト可能,true);assert.equal(row.ローカル,true);assert.equal(row.キー名,'固定候補');
+});
+test('live candidates carry creation dates: OpenAI from the API, Gemini from the OpenRouter join',async()=>{
+ const openai=await probe('openai',{now,reader:reader({openai_key_id:'fixture-key'}),fetch:async()=>({data:[{id:'gpt-realtime-2',created},{id:'gpt-6.1-sol',created}]})});
+ assert.deepEqual(openai.ライブ候補,['gpt-realtime-2']);assert.match(openai.ライブ候補作成日['gpt-realtime-2'],/^\d{4}\/\d{2}\/\d{2}$/);
+ const gemini=await probe('gemini',{now,reader:reader({gemini_key_id:'fixture-key'}),cache:{公開状態:'取得済',公開モデル:{'google/live-dated':{作成日:'2026/09/01'},'google/chat':{作成日:'2026/09/02'}}},fetch:async()=>({models:[{name:'models/live-dated',supportedGenerationMethods:['bidiGenerateContent']},{name:'models/live-undated',supportedGenerationMethods:['bidiGenerateContent']},{name:'models/chat',supportedGenerationMethods:['generateContent']}]})});
+ assert.deepEqual(gemini.ライブ候補,['live-dated','live-undated']);assert.deepEqual(gemini.ライブ候補作成日,{'live-dated':'2026/09/01','live-undated':null});
+});

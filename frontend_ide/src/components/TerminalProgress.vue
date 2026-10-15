@@ -34,7 +34,7 @@ function sync(text, direct = false) {
   if (!direct && (active || text === target)) return;
   target = text; visible.value = !!text; title.value = text.split('\n').at(-1)?.slice(0, 160) || '実行中…'; output.value.textContent = text; scroll();
 }
-defineExpose({ packet, sync, reset });
+defineExpose({ packet, sync, reset, visible });
 onBeforeUnmount(reset);
 </script>
 <template>

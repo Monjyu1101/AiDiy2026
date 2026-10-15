@@ -9,166 +9,18 @@
 # -------------------------------------------------------------------------
 
 from log_config import get_logger
-logger = get_logger(__name__)
-
-import datetime
 import json
 import os
-import requests
 from typing import Dict, Optional
 
-_OLLAMA_CLOUD_MODELS_URL = "https://ollama.com/v1/models"
-
-
-def _is_ollama_cloud_key(api_key: str) -> bool:
-    """Ollama Cloud用APIキーが設定されているか判定する。"""
-    return isinstance(api_key, str) and bool(api_key.strip()) and not api_key.strip().startswith("<")
-
-
-def _format_ollama_model_label(model_id: str, created_timestamp=None) -> str:
-    """他のチャットモデルと同じ「日付 - モデル名」形式に整える。"""
-    created_date = "yyyy/mm/dd"
-    try:
-        if created_timestamp:
-            created_date = datetime.datetime.fromtimestamp(int(created_timestamp)).strftime("%Y/%m/%d")
-    except Exception:
-        created_date = "yyyy/mm/dd"
-    return f"{created_date} - {model_id}"
-
-
-def _is_retired_openai_model(model_id: str) -> bool:
-    """GPT-6.1 Sol へ統一した旧 Sol の候補を判定する。"""
-    slug = model_id.strip().lower().rsplit("/", 1)[-1].removeprefix("openai.")
-    return slug == "gpt-6-sol" or slug.startswith(("gpt-6-sol-", "gpt-6-sol."))
+logger = get_logger(__name__)
 
 
 class conf_models:
-    """AIコアモデル管理クラス"""
-
+    """モデル候補はaidiy_diagの合成JSONだけを読む。外部API取得・設定への書込は行わない。"""
     def __init__(self, conf=None):
         self.conf = conf
-        self.openrt_models: Dict[str, Dict[str, str]] = {}
-        self.google_models: Dict[str, Dict[str, str]] = {}
-        self.openai_models: Dict[str, Dict[str, str]] = {}
-        self.claude_models: Dict[str, Dict[str, str]] = {}
-        self.ollama_models: Dict[str, str] = {}
-        self.mcp_servers: Dict[str, dict] = {}
-
-        # ライブAIモデル一覧
-        self.LIVE_GEMINI_MODELS = {
-            "gemini-3.1-flash-live-preview": "2026/03/-- - gemini-3.1-flash-live-preview",
-            "gemini-2.5-flash-native-audio-preview-12-2025": "2025/12/-- - gemini-2.5-flash-native-audio-preview-12-2025",
-            "gemini-2.5-flash-native-audio-preview-09-2025": "2925/09/-- - gemini-2.5-flash-native-audio-preview-09-2025",
-            "gemini-live-2.5-flash-preview": "yyyy/mm/dd - gemini-live-2.5-flash-preview",
-        }
-        self.LIVE_OPENAI_MODELS = {
-            "gpt-realtime-2.1-mini": "2026/07/06 - gpt-realtime-2.1-mini",
-            "gpt-realtime-2.1": "2026/07/06 - gpt-realtime-2.1",
-        }
-
-        # ライブAIボイス一覧
-        self.LIVE_GEMINI_VOICES = {
-            "Zephyr": "(2.5) Zephyr Female",
-
-            "Puck": "(2.0) Puck",
-            "Charon": "(2.0) Charon",
-            "Kore": "(2.0) Kore Female",
-            "Fenrir": "(2.0) Fenrir",
-            "Leda": "(2.5) Leda Female",
-            "Orus": "(2.5) Orus",
-            "Aoede": "(2.0) Aoede Female",
-
-            "Callirrhoe": "Callirrhoe Female",
-            "Autonoe": "Autonoe Female",
-            "Enceladus": "Enceladus",
-            "Lapetus": "Lapetus",
-            "Umbriel": "Umbriel",
-            "Algieba": "Algieba",
-            "Despina": "Despina Female",
-            "Erinome": "Erinome Female",
-            "Algenib": "Algenib",
-            "Rasalgethi": "Rasalgethi",
-            "Laomedeia": "Laomedeia Female",
-            "Achernar": "Achernar Female",
-            "Alnilam": "Alnilam",
-            "Schedar": "Schedar",
-            "Gacrux": "Gacrux Female",
-            "Pulcherrima": "Pulcherrima",
-            "Achird": "Achird",
-            "Zubenelgenubi": "Zubenelgenubi",
-            "Vindemiatrix": "Vindemiatrix Female",
-            "Sadachbia": "Sadachbia",
-            "Sadaltager": "Sadaltager",
-            "Sulafat": "Sulafat Female",
-        }
-        self.LIVE_OPENAI_VOICES = {
-            "marin": "Marin Female",
-
-            "alloy": "Alloy Female",
-            "ash": "Ash",
-            "ballad": "Ballad Female",
-            "cedar": "Cedar",
-            "coral": "Coral Female",
-            "echo": "Echo",
-            "fable": "Fable",
-            "nova": "Nova Female",
-            "onyx": "Onyx",
-            "sage": "Sage Female",
-            "shimmer": "Shimmer Female",
-            "verse": "Verse Female",
-        }
-
-        # コードAIモデル一覧
-        self.CODE_CLAUDE_SDK_MODELS = {
-            "fable": "yyyy/mm/dd - fable",
-            "opus": "yyyy/mm/dd - opus",
-            "sonnet": "yyyy/mm/dd - sonnet",
-            "haiku": "yyyy/mm/dd - haiku",
-        }
-        self.CODE_CLAUDE_CLI_MODELS = {
-            "fable": "yyyy/mm/dd - fable",
-            "opus": "yyyy/mm/dd - opus",
-            "sonnet": "yyyy/mm/dd - sonnet",
-            "haiku": "yyyy/mm/dd - haiku",
-        }
-        # scripts/cli_bat/_copilot_cli.bat の MODEL 値だけを公開する。
-        self.CODE_COPILOT_CLI_MODELS = {
-            "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
-            "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
-            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
-            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
-            "claude-fable-5.1": "yyyy/mm/dd - claude-fable-5.1",
-            "claude-opus-5.5": "yyyy/mm/dd - claude-opus-5.5",
-            "claude-sonnet-5.5": "yyyy/mm/dd - claude-sonnet-5.5",
-            "claude-haiku-5.5": "yyyy/mm/dd - claude-haiku-5.5",
-            "gemini-3.8-flash": "yyyy/mm/dd - gemini-3.8-flash",
-        }
-        self.CODE_ANTIGRAVITY_CLI_MODELS = {
-            "gemini-3.8-flash-high": "yyyy/mm/dd - gemini-3.8-flash-high",
-            "gemini-3.8-flash-medium": "yyyy/mm/dd - gemini-3.8-flash-medium",
-            "gemini-3.8-flash-low": "yyyy/mm/dd - gemini-3.8-flash-low",
-        }
-        self.CODE_CODEX_CLI_MODELS = {
-            "gpt-6-astra": "yyyy/mm/dd - gpt-6-astra",
-            "gpt-6.1-sol": "yyyy/mm/dd - gpt-6.1-sol",
-            "gpt-5.6-terra": "yyyy/mm/dd - gpt-5.6-terra",
-            "gpt-6-luna": "yyyy/mm/dd - gpt-6-luna",
-        }
-        self.CODE_GROK_CLI_MODELS = {
-            "grok-4.8": "yyyy/mm/dd - grok-4.8",
-            "grok-4.7": "yyyy/mm/dd - grok-4.7",
-        }
-
-        # ローカル LLM（backend_local）チャットモデル一覧の既定値
-        self.CHAT_LOCAL_MODELS = {
-            "google/gemma-4-E2B-it": "google/gemma-4-E2B-it / 約10GB bf16 / 速い (default)",
-            "google/gemma-4-E4B-it": "google/gemma-4-E4B-it / 約16GB bf16 / やや遅い・高品質",
-            "google/gemma-4-E2B-it-qat-mobile-transformers": "google/gemma-4-E2B-it-qat-mobile-transformers / 約2.5GB / 省メモリ・中速",
-            "google/gemma-4-E4B-it-qat-mobile-transformers": "google/gemma-4-E4B-it-qat-mobile-transformers / 約3.5GB / 省メモリ・低速",
-        }
-
-        # _config 下の設定JSONと同期（無ければ作成、あれば読込）
-        self._sync_local_model_configs()
+        self.mcp_servers = self._load_mcp_config("AiDiy_mcp.json")
 
     def _config_dir_path(self) -> str:
         """プロジェクトルートの _config ディレクトリを返す"""
@@ -176,59 +28,13 @@ class conf_models:
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_config")
         )
 
-    def _config_file_path(self, filename: str) -> str:
-        """設定ファイルの絶対パスを返す（ディレクトリは自動作成）"""
-        config_dir = self._config_dir_path()
-        os.makedirs(config_dir, exist_ok=True)
-        return os.path.join(config_dir, filename)
-
-    def _write_json_file(self, file_path: str, payload: dict) -> None:
-        """JSONファイルを書き込む（.editorconfig に合わせ BOM なし UTF-8 / LF）"""
-        with open(file_path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(payload, f, indent=4, ensure_ascii=False)
-
-    def _load_or_create_live_config(
-        self,
-        filename: str,
-        default_models: Dict[str, str],
-        default_voices: Dict[str, str],
-    ) -> tuple[Dict[str, str], Dict[str, str]]:
-        """
-        ライブ設定JSONを読込。無ければデフォルトで作成。
-        返却値は（models, voices）。
-        """
-        file_path = self._config_file_path(filename)
-        default_payload = {
-            "models": default_models,
-            "voices": default_voices,
-        }
-
-        if not os.path.exists(file_path):
-            self._write_json_file(file_path, default_payload)
-            logger.info(f"ライブ設定JSONを作成: {os.path.relpath(file_path)}")
-            return default_models.copy(), default_voices.copy()
-
-        try:
-            with open(file_path, "r", encoding="utf-8-sig") as f:
-                payload = json.load(f)
-            if not isinstance(payload, dict):
-                raise ValueError("JSONのルートはobject(dict)である必要があります")
-            models = payload.get("models", {})
-            voices = payload.get("voices", {})
-            if not isinstance(models, dict) or not isinstance(voices, dict):
-                raise ValueError("models/voices は object(dict)である必要があります")
-            logger.info(f"ライブ設定JSONを読込: {os.path.relpath(file_path)}")
-            return dict(models), dict(voices)
-        except Exception as e:
-            logger.error(f"ライブ設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
-            return default_models.copy(), default_voices.copy()
 
     def _load_mcp_config(self, filename: str) -> Dict[str, dict]:
         """
         MCP設定JSONを読込。ファイルが無ければ空dictを返す（ファイル作成は行わない）。
         期待する形式: {"mcpServers": {"サーバー名": {"type": "sse", "url": "..."}, ...}}
         """
-        file_path = self._config_file_path(filename)
+        file_path = os.path.join(self._config_dir_path(), filename)
         if not os.path.exists(file_path):
             logger.info(f"MCP設定ファイルが存在しません（スキップ）: {os.path.relpath(file_path)}")
             return {}
@@ -246,605 +52,104 @@ class conf_models:
             logger.error(f"MCP設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
             return {}
 
-    def _load_or_create_code_config(
-        self,
-        filename: str,
-        default_models: Dict[str, str],
-    ) -> Dict[str, str]:
-        """
-        コード設定JSONを読込。無ければデフォルトで作成。
-        返却値は models。
-        """
-        file_path = self._config_file_path(filename)
-        default_payload = {
-            "models": default_models,
-        }
-
-        if not os.path.exists(file_path):
-            self._write_json_file(file_path, default_payload)
-            logger.info(f"コード設定JSONを作成: {os.path.relpath(file_path)}")
-            return default_models.copy()
-
-        try:
-            with open(file_path, "r", encoding="utf-8-sig") as f:
-                payload = json.load(f)
-            if not isinstance(payload, dict):
-                raise ValueError("JSONのルートはobject(dict)である必要があります")
-            models = payload.get("models", {})
-            if not isinstance(models, dict):
-                raise ValueError("models は object(dict)である必要があります")
-            logger.info(f"コード設定JSONを読込: {os.path.relpath(file_path)}")
-            return dict(models)
-        except Exception as e:
-            logger.error(f"コード設定JSON読込エラー: {os.path.relpath(file_path)}, {e}")
-            return default_models.copy()
-
-    def _sync_fixed_code_config(self, filename: str, models: Dict[str, str]) -> Dict[str, str]:
-        """bat と一致させる固定候補をローカル設定JSONにも反映する。"""
-        loaded_models = self._load_or_create_code_config(filename, models)
-        if loaded_models != models:
-            self._write_json_file(self._config_file_path(filename), {"models": models})
-            logger.info(f"コードモデル候補を bat の設定に同期しました: {filename}")
-        return models
-
-    def _sync_local_model_configs(self) -> None:
-        """ローカル設定JSONとモデル定義を同期"""
-        self.LIVE_GEMINI_MODELS, self.LIVE_GEMINI_VOICES = self._load_or_create_live_config(
-            "AiDiy_live_gemini.json",
-            self.LIVE_GEMINI_MODELS,
-            self.LIVE_GEMINI_VOICES,
-        )
-        self.LIVE_OPENAI_MODELS, self.LIVE_OPENAI_VOICES = self._load_or_create_live_config(
-            "AiDiy_live_openai.json",
-            self.LIVE_OPENAI_MODELS,
-            self.LIVE_OPENAI_VOICES,
-        )
-        self.CODE_CLAUDE_SDK_MODELS = self._load_or_create_code_config(
-            "AiDiy_code_claude_sdk.json",
-            self.CODE_CLAUDE_SDK_MODELS,
-        )
-        self.CODE_CLAUDE_CLI_MODELS = self._sync_fixed_code_config(
-            "AiDiy_code_claude_cli.json",
-            self.CODE_CLAUDE_CLI_MODELS,
-        )
-        self.CODE_ANTIGRAVITY_CLI_MODELS = self._sync_fixed_code_config(
-            "AiDiy_code_antigravity_cli.json",
-            self.CODE_ANTIGRAVITY_CLI_MODELS,
-        )
-        # Copilot / Codex / Grok CLI も bat の候補を正とし、古い設定を同期する。
-        self.CODE_COPILOT_CLI_MODELS = self._sync_fixed_code_config(
-            "AiDiy_code_copilot_cli.json", self.CODE_COPILOT_CLI_MODELS,
-        )
-        self.CODE_CODEX_CLI_MODELS = self._sync_fixed_code_config(
-            "AiDiy_code_codex_cli.json", self.CODE_CODEX_CLI_MODELS,
-        )
-        self.CODE_GROK_CLI_MODELS = self._sync_fixed_code_config(
-            "AiDiy_code_grok_cli.json",
-            self.CODE_GROK_CLI_MODELS,
-        )
-        self.CHAT_LOCAL_MODELS = self._load_or_create_code_config(
-            "AiDiy_chat_local.json",
-            self.CHAT_LOCAL_MODELS,
-        )
-        self.mcp_servers = self._load_mcp_config("AiDiy_mcp.json")
 
     def fetch_all_models(self):
-        """起動時に全モデルを一括取得"""
-        if self.conf:
-            self.get_openrt_models(self.conf.json.openrt_key_id)
+        """互換入口。外部API・CLIは呼ばず、合成ファイルの読込だけを確認する。"""
+        for kind in ("chat", "live", "code"):
+            self._get_diag_models(kind)
+        self.get_live_voices()
 
-            gemini_key = self.conf.json.gemini_key_id
-            freeai_key = self.conf.json.freeai_key_id
-
-            if gemini_key and not gemini_key.startswith('<'):
-                api_key = gemini_key
-                key_source = "gemini_key"
-            elif freeai_key and not freeai_key.startswith('<'):
-                api_key = freeai_key
-                key_source = "freeai_key"
-            else:
-                api_key = None
-                key_source = None
-
-            self.get_google_models(api_key, key_source=key_source)
-
-            org = self.conf.json.openai_organization
-            self.get_openai_models(self.conf.json.openai_key_id, org)
-
-            self.get_claude_models(self.conf.json.claude_key_id)
-
-            # Ollama（APIキーが未設定ならローカルCLI、設定済みならOllama Cloudから取得）
-            self.get_ollama_models()
-
-    def get_ollama_models(self) -> Dict[str, str]:
-        """Ollamaの利用可能モデル一覧を取得（ollama list コマンドで取得）"""
-        return self._get_ollama_local_models()
-
-    def _get_ollama_cloud_models(self, api_key: str) -> Dict[str, str]:
-        """Ollama CloudのWeb APIから利用可能モデル一覧を取得"""
-        result: Dict[str, str] = {}
-        try:
-            response = requests.get(
-                _OLLAMA_CLOUD_MODELS_URL,
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=30,
-            )
-            if response.status_code != 200:
-                logger.info(f"Ollama Cloudモデル取得失敗: HTTP {response.status_code}")
-                raise RuntimeError(f"HTTP {response.status_code}")
-
-            models_data = response.json()
-            current_time = datetime.datetime.now()
-            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
-            source_models = [
-                model for model in models_data.get("data", [])
-                if isinstance(model, dict)
-            ]
-            source_models.sort(key=lambda model: model.get("created") or 0, reverse=True)
-
-            for model in source_models:
-                if not isinstance(model, dict):
-                    continue
-                model_id = model.get("id", "")
-                if not model_id:
-                    continue
-                created_timestamp = model.get("created")
-                if not created_timestamp or created_timestamp < filter_8months:
-                    continue
-                result[model_id] = _format_ollama_model_label(model_id, created_timestamp)
-
-            if result:
-                logger.info(f"Ollama Cloudモデル取得完了: {len(result)}個（8ヶ月以内・新しい順）")
-                self.ollama_models = result
-                return result
-            logger.info("Ollama Cloudモデルが見つかりません")
-        except requests.exceptions.Timeout:
-            logger.info("Ollama Cloudモデル取得タイムアウト")
-        except requests.exceptions.RequestException as e:
-            logger.info(f"Ollama Cloudモデル取得リクエストエラー: {e}")
-        except Exception as e:
-            logger.info(f"Ollama Cloudモデル取得エラー: {e}")
-
-        self.ollama_models = {}
-        return {}
-
-    def _get_ollama_local_models(self) -> Dict[str, str]:
-        """ollama list コマンドでローカル利用可能モデル一覧を取得"""
-        import subprocess
-        import tempfile
-        result: Dict[str, str] = {}
-        try:
-            # WindowsではOllamaの子プロセスが出力ハンドルを引き継ぐと、
-            # PIPEの回収がtimeout後も止まらない。一時ファイルなら終了待ちを制限できる。
-            with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
-                proc = subprocess.run(
-                    ["ollama", "list"],
-                    stdin=subprocess.DEVNULL,
-                    stdout=stdout_file, stderr=stderr_file, timeout=10,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-                )
-                stdout_file.seek(0)
-                stderr_file.seek(0)
-                stdout = stdout_file.read().decode("utf-8", errors="replace")
-                stderr = stderr_file.read().decode("utf-8", errors="replace")
-            if proc.returncode == 0:
-                lines = stdout.splitlines()
-                for line in lines[1:]:  # ヘッダー行をスキップ
-                    parts = line.split()
-                    if len(parts) < 1:
-                        continue
-                    name = parts[0]
-                    result[name] = _format_ollama_model_label(name)
-                if result:
-                    logger.info(f"Ollamaモデル取得完了: {len(result)}個")
-                    self.ollama_models = result
-                    return result
-                logger.info("Ollamaモデルが見つかりません")
-            else:
-                logger.info(f"ollama list 失敗: {stderr.strip()}")
-        except FileNotFoundError:
-            logger.info("ollama コマンドが見つかりません（未インストール）")
-        except subprocess.TimeoutExpired:
-            logger.info("ollama list 取得タイムアウト（10秒）")
-        except Exception as e:
-            logger.info(f"ollama list エラー: {e}")
-        self.ollama_models = {}
-        return {}
-
-    def get_openrt_models(self, api_key: str) -> Dict[str, Dict[str, str]]:
-        """OpenRouter apiからモデル一覧を取得（プロバイダー別フィルタリング）"""
-        try:
-            if not api_key or api_key.startswith('<'):
-                logger.warning("OpenRouter apiキーが未設定です")
-                return {}
-
-            headers = {
-                "Authorization": f"Bearer {api_key}"
-            }
-            response = requests.get(
-                "https://openrouter.ai/api/v1/models",
-                headers=headers,
-                timeout=30
-            )
-
-            if response.status_code != 200:
-                logger.error(f"OpenRouterモデル取得エラー: HTTP {response.status_code}")
-                return {}
-
-            models_data = response.json()
-            result_models = {}
-
-            current_time = datetime.datetime.now()
-            filter_1year = (current_time - datetime.timedelta(days=365)).timestamp()
-            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
-            filter_3months = (current_time - datetime.timedelta(days=90)).timestamp()
-
-            very_long_filter_providers = ["perplexity"]
-            long_filter_providers = ["google", "openai", "anthropic", "x-ai"]
-
-            filtered_count = 0
-            for model in models_data.get('data', []):
-                model_id = model.get("id", "")
-                context_length = model.get("context_length", 0)
-                modality = model.get("architecture", {}).get("modality", "unknown")
-                created_timestamp = model.get("created", 0)
-
-                provider = model_id.split('/')[0].lower() if '/' in model_id else ""
-
-                if provider in very_long_filter_providers:
-                    if created_timestamp < filter_1year:
-                        continue
-                elif provider in long_filter_providers:
-                    if created_timestamp < filter_8months:
-                        continue
-                else:
-                    if created_timestamp < filter_3months:
-                        continue
-
-                created_date = datetime.datetime.fromtimestamp(created_timestamp).strftime("%Y/%m/%d")
-
-                result_models[model_id] = {
-                    "model_id": model_id,
-                    "トークン数": str(context_length),
-                    "モダリティ": modality,
-                    "作成日": created_date
-                }
-                filtered_count += 1
-
-            self.openrt_models = result_models
-
-            logger.info(f"OpenRouterモデル取得完了: {filtered_count}個のモデル（プロバイダー別フィルタリング適用）")
-
-            return result_models
-
-        except requests.exceptions.Timeout:
-            logger.error("OpenRouterモデル取得タイムアウト")
-            return {}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouterモデル取得リクエストエラー: {e}")
-            return {}
-        except Exception as e:
-            logger.error(f"OpenRouterモデル取得エラー: {e}")
-            return {}
-
-    def get_google_models(self, api_key: str, key_source: str = None) -> Dict[str, Dict[str, str]]:
-        """Google Gemini apiからモデル一覧を取得（全件取得後、日付のあるものだけ残す）"""
-        try:
-            if not api_key or api_key.startswith('<'):
-                logger.warning("Google apiキー・FreeAI apiキーともに未設定です")
-                return {}
-
-            import google.genai as genai
-            client = genai.Client(api_key=api_key)
-
-            models = client.models.list()
-            result_models = {}
-
-            for model in models:
-                if "generateContent" in model.supported_actions:
-                    model_id = model.name.replace('models/', '')
-
-                    token_limit = model.input_token_limit if hasattr(model, 'input_token_limit') else 0
-
-                    if hasattr(model, 'supported_actions'):
-                        modality = ','.join(model.supported_actions)
-                    else:
-                        modality = "unknown"
-
-                    result_models[model_id] = {
-                        "model_id": model_id,
-                        "トークン数": str(token_limit),
-                        "モダリティ": modality,
-                        "作成日": None
-                    }
-
-            has_openrouter = len(self.openrt_models) > 0
-            if has_openrouter:
-                for model_id in list(result_models.keys()):
-                    openrt_key = f"google/{model_id}"
-                    if openrt_key in self.openrt_models:
-                        result_models[model_id]["作成日"] = self.openrt_models[openrt_key]["作成日"]
-                    else:
-                        if "live" not in model_id.lower():
-                            del result_models[model_id]
-
-            self.google_models = result_models
-
-            if not has_openrouter:
-                filter_info = "全てのモデル"
-            else:
-                filter_info = f"使用キー: {key_source}" if key_source else "不明なキー"
-            logger.info(f"Googleモデル取得完了: {len(result_models)}個のモデル（{filter_info}）")
-
-            return result_models
-
-        except ImportError:
-            logger.error("google-genai パッケージがインストールされていません")
-            return {}
-        except Exception as e:
-            logger.error(f"Googleモデル取得エラー: {e}")
-            return {}
-
-    def get_openai_models(self, api_key: str, organization: str = None) -> Dict[str, Dict[str, str]]:
-        """OpenAI apiからモデル一覧を取得（8ヶ月以内のモデル）"""
-        try:
-            if not api_key or api_key.startswith('<'):
-                logger.warning("OpenAI apiキーが未設定です")
-                return {}
-
-            import openai
-            client = openai.OpenAI(
-                api_key=api_key,
-                organization=organization
-            )
-
-            models = client.models.list()
-            result_models = {}
-
-            current_time = datetime.datetime.now()
-            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
-
-            for model in models:
-                model_id = model.id
-                created_timestamp = model.created
-
-                if created_timestamp < filter_8months:
-                    continue
-
-                created_date = datetime.datetime.fromtimestamp(created_timestamp).strftime("%Y/%m/%d")
-
-                result_models[model_id] = {
-                    "model_id": model_id,
-                    "トークン数": "0",
-                    "モダリティ": None,
-                    "作成日": created_date
-                }
-
-            has_openrouter = len(self.openrt_models) > 0
-            if has_openrouter:
-                for model_id in result_models.keys():
-                    openrt_key = f"openai/{model_id}"
-                    if openrt_key in self.openrt_models:
-                        result_models[model_id]["トークン数"] = self.openrt_models[openrt_key]["トークン数"]
-                        result_models[model_id]["モダリティ"] = self.openrt_models[openrt_key]["モダリティ"]
-
-                for model_id in list(result_models.keys()):
-                    if "realtime" not in model_id.lower():
-                        if result_models[model_id]["トークン数"] == "0":
-                            del result_models[model_id]
-
-            self.openai_models = result_models
-
-            filter_info = "全てのモデル" if not has_openrouter else "8ヶ月以内"
-            logger.info(f"OpenAIモデル取得完了: {len(result_models)}個のモデル（{filter_info}）")
-
-            return result_models
-
-        except ImportError:
-            logger.error("openai パッケージがインストールされていません")
-            return {}
-        except Exception as e:
-            logger.error(f"OpenAIモデル取得エラー: {e}")
-            return {}
-
-    def get_claude_models(self, api_key: str) -> Dict[str, Dict[str, str]]:
-        """Anthropic Claude apiからモデル一覧を取得（8ヶ月以内のモデル）"""
-        try:
-            if not api_key or api_key.startswith('<'):
-                logger.warning("Claude apiキーが未設定です")
-                return {}
-
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
-
-            models = client.models.list()
-            result_models = {}
-
-            current_time = datetime.datetime.now()
-            filter_8months = (current_time - datetime.timedelta(days=240)).timestamp()
-
-            for model in models.data:
-                model_id = model.id
-
-                created_date = None
-                created_timestamp = None
-                try:
-                    if hasattr(model, 'created_at') and model.created_at:
-                        if isinstance(model.created_at, str):
-                            from dateutil import parser
-                            created_dt = parser.parse(model.created_at)
-                        else:
-                            created_dt = model.created_at
-                        created_timestamp = created_dt.timestamp()
-                        created_date = created_dt.strftime("%Y/%m/%d")
-                except Exception as e:
-                    logger.debug(f"日付変換エラー ({model_id}): {e}")
-
-                if created_timestamp is not None and created_timestamp < filter_8months:
-                    continue
-
-                result_models[model_id] = {
-                    "model_id": model_id,
-                    "トークン数": "0",
-                    "モダリティ": None,
-                    "作成日": created_date
-                }
-
-            has_openrouter = len(self.openrt_models) > 0
-            if has_openrouter:
-                for model_id in result_models.keys():
-                    normalized_id = model_id
-
-                    if len(normalized_id) >= 9 and normalized_id[-9:-8] == '-' and normalized_id[-8:-6] == '20':
-                        normalized_id = normalized_id[:-9]
-
-                    if len(normalized_id) >= 3 and normalized_id[-2] == '-':
-                        last_char = normalized_id[-1]
-                        third_last = normalized_id[-3]
-                        if third_last in ['3', '4', '5'] and last_char.isdigit():
-                            normalized_id = normalized_id[:-3] + third_last + '.' + last_char
-
-                    openrt_key = f"anthropic/{normalized_id}"
-                    if openrt_key in self.openrt_models:
-                        result_models[model_id]["トークン数"] = self.openrt_models[openrt_key]["トークン数"]
-                        result_models[model_id]["モダリティ"] = self.openrt_models[openrt_key]["モダリティ"]
-
-            self.claude_models = result_models
-
-            filter_info = "全てのモデル" if not has_openrouter else "8ヶ月以内"
-            logger.info(f"Claudeモデル取得完了: {len(result_models)}個のモデル（{filter_info}）")
-
-            return result_models
-
-        except ImportError:
-            logger.error("anthropic パッケージがインストールされていません")
-            return {}
-        except Exception as e:
-            logger.error(f"Claudeモデル取得エラー: {e}")
-            import traceback
-            traceback.print_exc()
-            return {}
 
     def get_chat_models(self) -> Dict[str, Dict[str, str]]:
-        """チャットAIモデル一覧を取得（日付情報付き）"""
-        # API と OAuth は同じチャットモデル候補を共有する。
-        # API から取得できない場合だけ OAuth の一覧を使う。
-        openai_models = {
-            k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
-            for k, v in self.openai_models.items()
-            if not _is_retired_openai_model(k)
-        }
-        if not openai_models:
-            try:
-                from AIコア.AIチャット_openai import get_openai_oauth_models
+        """chat合成ファイルの候補を取得する。"""
+        return self._get_diag_models("chat") or {}
 
-                openai_models = {
-                    model: label for model, label in get_openai_oauth_models().items()
-                    if not _is_retired_openai_model(model)
-                }
-            except Exception as e:
-                logger.warning(f"OpenAI OAuth モデル一覧の初期化エラー: {e}")
-                openai_models = {}
-            if not openai_models:
-                openai_models = {
-                    model: f"yyyy/mm/dd - {model}"
-                    for model in ("gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")
-                }
-        models: Dict[str, Dict[str, str]] = {
-            "gemini_chat": {
-                k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
-                for k, v in self.google_models.items()
-            },
-            "freeai_chat": {
-                k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
-                for k, v in self.google_models.items()
-            },
-            "openrt_chat": {
-                k: f"{v.get('作成日') or 'yyyy/mm/dd'} - {k}"
-                for k, v in self.openrt_models.items()
-                if not _is_retired_openai_model(k)
-            },
-            "openai_chat": openai_models,
-            "openai_oauth": openai_models,
-        }
-        if self.ollama_models:
-            models["ollama_chat"] = self.ollama_models
-        if self.CHAT_LOCAL_MODELS:
-            models["local_chat"] = self.CHAT_LOCAL_MODELS
-        return models
 
     def get_live_models(self) -> Dict[str, Dict[str, str]]:
-        """ライブAIモデル一覧を取得（手動保守）"""
-        return {
-            "gemini_live": self.LIVE_GEMINI_MODELS,
-            "freeai_live": self.LIVE_GEMINI_MODELS,
-            "openai_live": self.LIVE_OPENAI_MODELS,
-        }
+        """live合成ファイルの候補を取得する。"""
+        return self._get_diag_models("live") or {}
+
 
     def get_live_voices(self) -> Dict[str, Dict[str, str]]:
-        """ライブAIボイス一覧を取得（手動保守）"""
-        return {
-            "gemini_live": self.LIVE_GEMINI_VOICES,
-            "freeai_live": self.LIVE_GEMINI_VOICES,
-            "openai_live": self.LIVE_OPENAI_VOICES,
-        }
+        """診断の音声合成JSONを読み込む。"""
+        return self._get_diag_models("live", field="voices") or {}
 
-    def _get_aidiy_hermes_models(self) -> Dict[str, str]:
-        """_hermes.bat の OpenAI OAuth モデルを画面用の候補にする。"""
-        return {
-            "openai_oauth/gpt-6-astra": "yyyy/mm/dd - OpenAI OAuth / gpt-6-astra",
-            "openai_oauth/gpt-6.1-sol": "yyyy/mm/dd - OpenAI OAuth / gpt-6.1-sol (bat default)",
-            "openai_oauth/gpt-5.6-terra": "yyyy/mm/dd - OpenAI OAuth / gpt-5.6-terra",
-            "openai_oauth/gpt-6-luna": "yyyy/mm/dd - OpenAI OAuth / gpt-6-luna",
-        }
 
-    def _get_opencode_cli_models(self) -> Dict[str, str]:
-        """opencode_cli のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {}
-        if self.ollama_models:
-            result.update(self.ollama_models)
-        return result
+    def _get_diag_models(self, kind: str, *, field: str = "models") -> Optional[Dict[str, Dict[str, str]]]:
+        """モデル情報API向けに合成JSONの {区分: {models}} を展開する。"""
+        filename = os.path.join(self._config_dir_path(), "..", "_AIDIY", "aidiy_diag", f"{kind}_{field}_info.json")
+        try:
+            with open(filename, encoding="utf-8-sig") as source:
+                text = source.read(4 * 1024 * 1024 + 1)
+            if len(text) > 4 * 1024 * 1024:
+                raise ValueError("モデル情報ファイルが大きすぎます")
+            payload = json.loads(text)
+            if not isinstance(payload, dict):
+                raise ValueError("モデル情報のルートはobjectで指定してください")
+            result = {}
+            for provider, entry in payload.items():
+                models = entry.get(field) if isinstance(entry, dict) else None
+                if not isinstance(models, dict) or any(not isinstance(label, str) for label in models.values()):
+                    raise ValueError(f"{field}は表示名のobjectで指定してください")
+                result[provider] = dict(models)
+            return result
+        except FileNotFoundError:
+            logger.warning(f"合成ファイルがありません。aidiy_diag --headless で生成してください: {kind}_{field}_info.json")
+            return None
+        except (OSError, UnicodeError, ValueError):
+            logger.warning(f"aidiy_diag の情報を読み込めません。aidiy_diag --headless で生成してください: {kind}_{field}_info.json")
+            return None
 
-    def _get_claude_ollama_models(self) -> Dict[str, str]:
-        """claude_ollama のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {}
-        if self.ollama_models:
-            result.update(self.ollama_models)
-        return result
-
-    def _get_codex_ollama_models(self) -> Dict[str, str]:
-        """codex_ollama のモデル一覧を Ollama モデル一覧から動的生成する。"""
-        result = {}
-        if self.ollama_models:
-            result.update(self.ollama_models)
-        return result
 
     def get_code_models(self) -> Dict[str, Dict[str, str]]:
-        """コードAIモデル一覧を取得（手動保守）"""
-        models: Dict[str, Dict[str, str]] = {
-            "claude_sdk": self.CODE_CLAUDE_SDK_MODELS,
-            "claude_cli": self.CODE_CLAUDE_CLI_MODELS,
-            "copilot_cli": self.CODE_COPILOT_CLI_MODELS,
-            "antigravity_cli": self.CODE_ANTIGRAVITY_CLI_MODELS,
-            "codex_cli": self.CODE_CODEX_CLI_MODELS,
-            "grok_cli": self.CODE_GROK_CLI_MODELS,
-            "opencode_cli": self._get_opencode_cli_models(),
-            "aidiy_hermes": self._get_aidiy_hermes_models(),
-        }
-        if self.ollama_models:
-            models["claude_ollama"] = self._get_claude_ollama_models()
-            models["codex_ollama"] = self._get_codex_ollama_models()
-        # auto / same はモデルそのものではなく実行方法。JSONには保存せず表示時に付ける。
+        """code合成ファイルに画面用の実行方法だけを追加する。"""
+        models = self._get_diag_models("code") or {}
         return {
-            provider: {
-                "auto": "auto (自動判定)",
-                "same": "same (変更なし)",
-                **{key: label for key, label in choices.items() if key not in ("auto", "same")},
-            }
+            provider: {"auto": "auto (自動判定)", "same": "same (変更なし)",
+                       **{key: label for key, label in choices.items() if key not in ("auto", "same")}}
             for provider, choices in models.items()
         }
 
 
-__all__ = [
-    "conf_models",
-]
+    def normalize_initial_settings(self, settings: dict) -> dict:
+        """共通初期値だけを診断候補に合わせる。設定ファイル・接続済みセッションは変更しない。"""
+        result = dict(settings)
+        for kind in ("chat", "live", "code"):
+            catalog = self._get_diag_models(kind)
+            if catalog is None:
+                continue
+            available = {key: models for key, models in catalog.items() if models}
+            if not available:
+                continue
+            def select(key, choices, controls=False):
+                current = result.get(key)
+                if current not in choices and not (controls and current in ("auto", "same", "")):
+                    result[key] = next(iter(choices), "")
+            if kind == "code":
+                for provider, choices in available.items():
+                    select(f"CODE_{provider.upper()}_MODEL", choices, True)
+                for index in range(1, 7):
+                    name_key, model_key = f"CODE_AI{index}_NAME", f"CODE_AI{index}_MODEL"
+                    if result.get(name_key) in ("auto", "same", ""):
+                        continue
+                    select(name_key, available)
+                    select(model_key, available[result[name_key]], True)
+                continue
+            select(f"{kind.upper()}_AI_NAME", available)
+            for provider, choices in available.items():
+                vendor = provider.removesuffix(f"_{kind}").upper()
+                if kind == "chat" and provider == "openai_chat" and result.get("CHAT_AI_NAME") == "openai_oauth":
+                    continue
+                if provider == "openai_oauth":
+                    if result.get("CHAT_AI_NAME") != provider:
+                        continue
+                    vendor = "OPENAI"
+                select(f"{kind.upper()}_{vendor}_MODEL", choices)
+            if kind == "live":
+                for provider, voices in self.get_live_voices().items():
+                    if provider in available and voices:
+                        select(f"LIVE_{provider.removesuffix('_live').upper()}_VOICE", voices)
+        return result
+
+
+__all__ = ["conf_models"]

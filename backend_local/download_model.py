@@ -52,8 +52,8 @@ DEFAULT_MODELS_DIR = _cfg.get_str("CHAT_LOCAL_MODELS_DIR", None) or default_mode
 # ダウンロードはゲートアクセスのため read トークンを使用
 DEFAULT_TOKEN = _cfg.get_str("huggingface_key_read", None)
 
-# --all で AiDiy_chat_local.json が無い場合のフォールバック候補。
-# 通常は AiDiy_chat_local.json の models を取得対象にする。
+# --all でchat合成JSONが無い場合のフォールバック候補。
+# 通常はchat合成JSONの local_chat.models を取得対象にする。
 LOCAL_MODEL_CANDIDATES = [
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
@@ -65,7 +65,7 @@ LOCAL_MODEL_CANDIDATES = [
 def _all_models() -> list[str]:
     """--all の取得対象一覧を返す。
 
-    AiDiy_chat_local.json があればそこに書かれたモデルを使う。
+    chat合成JSONがあればそこに書かれたローカルモデルを使う。
     無ければフォールバック候補 + 設定中モデルを使う。
     """
     json_models = load_local_models()
@@ -160,9 +160,9 @@ def main() -> int:
     args = parse_args()
 
     if args.all:
-        # AiDiy_chat_local.json があればそのモデル、無ければフォールバック候補
+        # chat合成JSONがあればそのモデル、無ければフォールバック候補
         models = _all_models()
-        src = "AiDiy_chat_local.json" if load_local_models() else "フォールバック候補"
+        src = "chat_models_info.json" if load_local_models() else "フォールバック候補"
         print(f"=== 一括ダウンロード: {len(models)} モデル（{src}）===")
         rc = 0
         for i, m in enumerate(models, 1):

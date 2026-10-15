@@ -13,6 +13,8 @@ import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './key_status.m
 import {verify as verifyUi} from './ui/verify.mjs';
 import {stopRevision,watchStop} from './lifecycle.mjs';
 import {launchDetached} from './launch.mjs';
+import {headlessMain,writeInstallReport,INSTALL_FILE} from './headless.mjs';
+import {writeModelsInfo} from './models_info.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -42,6 +44,7 @@ export function parseArgs(args) {
   for (let i=0;i<args.length;i++) {
     const arg = args[i];
     if (arg === '--browser') {options.browser = true;continue;}
+    if (arg === '--headless') {options.headless = true;continue;}
     if (arg === '--foreground' || arg === '--wait') options.foreground = true;
     else if (arg === '--no-open') options.noOpen = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
@@ -49,10 +52,13 @@ export function parseArgs(args) {
     else if (arg === '--base-path') options.prefix = basePath(args[++i] || '');
     else throw new Error(`不明な引数: ${arg}`);
   }
+  // ヘッドレスは画面・待受を持たないため、表示・待受系の指定とは併用しない。
+  if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache()}) {
-  let results = [], busy = false, keyBusy = false;
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo}) {
+  let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false;
+  const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']]]);
   return async (req,res) => {
@@ -78,7 +84,8 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         finally {res.removeListener('close',abort);}
       }
       if (req.method === 'GET' && route === 'api/一覧') return reply(200,{項目:entries,結果:results,調査:coverage});
-      if (req.method === 'GET' && route === 'api/キー設定') return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});
+      // 設定の読み直しで、画面と同じくサーバー側のキーテスト結果も破棄する。
+      if (req.method === 'GET' && route === 'api/キー設定') {if(!modelWriting)modelResults={};return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});}
       if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
       if (req.method === 'POST' && route === 'api/公開モデル/再取得') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
@@ -90,14 +97,36 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
         if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
         keyBusy=true;
-        try {reply(200,await keyTestFn(id,{publicCache:publicCache.input()}));} finally {keyBusy=false;}
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input()});if(['OK','NG','PASS'].includes(result?.状態)&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
         return;
       }
       if (req.method === 'POST' && route === 'api/診断') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
-        if (busy) return reply(409,{エラー:'診断実行中です。完了後に再試行してください。'});
+        if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
         busy=true;
-        try { results=await scanFn(entries); reply(200,{結果:results}); } finally { busy=false; }
+        try { results=[];scanStarted=new Date();results=await scanFn(entries);scanFinished=new Date(); reply(200,{結果:results}); } finally { busy=false; }
+        return;
+      }
+      // モデル情報: このサーバーが直前に取得したキーテスト結果だけを、プロバイダ別ファイルへ保存する。
+      if (req.method === 'POST' && route === 'api/モデル書込') {
+        if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
+        if (keyBusy || modelWriting) return reply(409,{エラー:'モデル取得または書込の実行中です。完了後に再試行してください。'});
+        if (!Object.keys(modelResults).length) return reply(409,{エラー:'先に最新モデル取得を実行してください。'});
+        modelWriting=true;
+        try { const status=await keyStatusFn();const saved=await modelsWriteFn(status.項目,modelResults); reply(200,{保存先:saved.map(file=>'_AIDIY/aidiy_diag/'+file),件数:saved.length}); }
+        catch { reply(500,{エラー:'モデル情報の書き込みに失敗しました。書き込めなかったファイルは以前の内容のままです。'}); }
+        finally { modelWriting=false; }
+        return;
+      }
+      // 画面からは値を受け取らず、このサーバーが直前に確認した結果だけを保存する。
+      if (req.method === 'POST' && route === 'api/書込') {
+        if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
+        if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
+        if (!scanFinished || results.length !== entries.length) return reply(409,{エラー:'先にインストール確認を実行してください。'});
+        writing=true;
+        try { const report=await installWriteFn(entries,results,scanStarted,scanFinished); reply(200,{保存先:'_AIDIY/aidiy_diag/'+INSTALL_FILE,件数:report.件数,集計:report.集計}); }
+        catch { reply(500,{エラー:'書き込みに失敗しました。既存のファイルは変更していません。'}); }
+        finally { writing=false; }
         return;
       }
       if (req.method === 'GET' && assets.has(route)) {
@@ -130,7 +159,8 @@ export async function main(args=process.argv.slice(2)) {
   const startupDisconnect=()=>process.exit(1);
   if(launcherChild){if(!process.connected)throw startupError('DESKTOP');process.once('disconnect',startupDisconnect);}
   let options;try {options=parseArgs(args);}catch {throw startupError('ARGUMENTS');}
-  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--foreground | --wait] [--port 8097] [--base-path /proxy/8097/]'); return; }
+  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--foreground | --wait] [--port 8097] [--base-path /proxy/8097/]\n            aidiy_diag --headless   画面を開かず全診断を実行し _AIDIY/aidiy_diag/ へ保存'); return; }
+  if (options.headless) { process.exitCode = await headlessMain(); return; }
   if (!await verifyUi()) throw startupError('UI');
   const useBrowser=browserMode(options);
   if (!useBrowser && !options.foreground) return launchDetached(args);

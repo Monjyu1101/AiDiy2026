@@ -33,14 +33,13 @@ _CONFIG_DIR = os.path.normpath(
 )
 _KEY_PATH = os.path.join(_CONFIG_DIR, "AiDiy_key.json")
 # ローカル LLM のモデル一覧ファイル（--all の取得対象）
-_CHAT_LOCAL_PATH = os.path.join(_CONFIG_DIR, "AiDiy_chat_local.json")
+_CHAT_LOCAL_PATH = os.path.normpath(os.path.join(_BACKEND_LOCAL_DIR, "..", "_AIDIY", "aidiy_diag", "chat_models_info.json"))
 
 
 def load_local_models(path: Optional[str] = None) -> list[str]:
-    """AiDiy_chat_local.json の models からモデル ID 一覧を返す。
+    """chat合成JSONの local_chat.models からモデル ID 一覧を返す。
 
-    無い/壊れている場合は空リストを返す。`models` は
-    dict（{id: 説明}）または list のどちらでも受け付ける。
+    無い/壊れている場合は空リストを返す。
     """
     target = path or _CHAT_LOCAL_PATH
     try:
@@ -48,11 +47,10 @@ def load_local_models(path: Optional[str] = None) -> list[str]:
             data = json.load(f)
     except Exception:
         return []
-    models = data.get("models") if isinstance(data, dict) else None
+    entry = data.get("local_chat") if isinstance(data, dict) else None
+    models = entry.get("models") if isinstance(entry, dict) else None
     if isinstance(models, dict):
         return [str(k) for k in models.keys() if k]
-    if isinstance(models, list):
-        return [str(m) for m in models if m]
     return []
 
 

@@ -22,6 +22,17 @@ def check_environment():
     return True, 'Node.js / Electron またはブラウザ / AIコア不要'
 
 
+def run_headless():
+    """全体起動の必須前処理。完了を待ってモデル合成ファイルを生成する。"""
+    node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
+    if not node:
+        raise RuntimeError('Node.js が見つかりません: https://nodejs.org/')
+    result = subprocess.run([node, str(ROOT / 'diag_main.mjs'), '--headless'], cwd=ROOT,
+                            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+    if result.returncode:
+        raise RuntimeError(f'aidiy_diag --headless に失敗しました（終了コード {result.returncode}）。')
+
+
 def start():
     node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
     if not node:

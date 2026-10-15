@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 const root=fileURLToPath(new URL('.',import.meta.url));
-async function files(directory){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const filename=path.join(directory,entry.name);if(entry.name==='tests' && entry.isDirectory())continue;if(entry.isDirectory())result.push(...await files(filename));else result.push(filename);}return result;}
+async function files(directory){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const filename=path.join(directory,entry.name);if(entry.name==='checks' && entry.isDirectory())continue;if(entry.isDirectory())result.push(...await files(filename));else result.push(filename);}return result;}
 export async function manifest(directory=root){
   const names=[...await files(path.join(directory,'src')),...await files(path.join(directory,'../runtime')),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),path.join(directory,'tsconfig.runtime.json'),...['app.js','style.css','index.html'].map(name=>path.join(directory,'../static',name))];
   // Git の Windows checkout による CRLF だけを正規化。将来の画像等は生バイトで比較する。

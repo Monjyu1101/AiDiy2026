@@ -62,7 +62,7 @@ def setup_desktop():
             return True
         except (OSError, subprocess.SubprocessError):
             return False
-    return helper.setup_dependencies(THIS_DIR, npm, '環境診断(Diag)', run)
+    return helper.setup_dependencies(THIS_DIR, npm, 'バックエンド(Diag)', run)
 
 
 if __name__ == '__main__':

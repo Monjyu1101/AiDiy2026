@@ -4,7 +4,9 @@
 
 - セットアップとクリーンアップでは最初の選択項目に置き、既定 `[y]/n`、全体の a=auto でも対象にします。
 - 通常は `aidiy_diag` で Electron 起動、`aidiy_diag --browser` で Web 起動します。Codespaces / GUI なしでは Web です。Electron は既存 `scripts/_setup_electron.py` の共有 ZIP / 同版 dist を使ってセットアップします。Node.js 自体が無い場合はランチャーが理由と公式導入先を表示します。Python は診断アプリ起動には不要です。
-- `_start.py` の IDE グループでは Diag を先頭に置きます。既定は n、選択した場合だけ起動します。全体起動から起動した Diag は全体の終了・クリーンアップ要求で停止し、自動再起動しません。
+- `aidiy_diag --headless` は画面を開かず全診断をコマンドラインで最速実行し、`_AIDIY/aidiy_diag/install_info.json` へ保存します。画面の「書込」「全テスト」も同じ形式で保存します。実行に失敗した場合は既存の結果を書き換えません。
+- ルート `_start.py` は起動選択より先に必ず `aidiy_diag --headless` を実行し、モデル合成JSONの生成完了を待ちます。失敗時はサービスを起動せず終了します。DiagのGUI起動を選ぶ質問はありません。
+- ルート `_setup.py` のDiagは `[y]` の表示だけで選択入力を受けず、ランチャー配置とElectronの準備を必ず行います。単独の `aidiy_diag` は従来どおりGUIで使えます。
 - Python、uv、Node.js、npm、npx、Electron、その他のコア周辺、機能別の任意依存の順に確認します。任意機能の未検出をシステム全体の故障と判断しないでください。
 - 固定 version 引数に副作用が無いことを確認できない項目は、存在確認のみにします。Ollama の `--version` はサーバーへ接続するため実行しません。
 - Web 版でも全機能を使えます。Codespaces の転送ポートは Private にし、起動時の認証 URL を共有しないでください。確認対象はブラウザ端末ではなく診断サーバーです。

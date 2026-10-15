@@ -16,7 +16,8 @@ import { basename, dirname, join } from 'node:path';
 import { DiscordBot } from './bot';
 import { 設定読込, 設定エラー, プロジェクトルート, type Discord設定 } from './config';
 import { ライブ選択エラー, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from './vscode';
-import { ライブ候補読込 } from './live-catalog';
+import { ライブ候補読込, ライブ初期値 } from './live-catalog';
+import { モデル情報取得, APIコード候補, APIコード初期値, type モデル初期情報 } from './model-info';
 import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './connection-error';
 
 export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
@@ -54,6 +55,7 @@ export class Discordパネル {
   private preferred: Record<string, string>;
   private codePreferred?: { provider: string; model: string };
   private features: 機能設定;
+  private apiInfo?: モデル初期情報;
   private catalogs = new Set<ReturnType<typeof CLI実行>>();
   発言?: (value: パネル発言) => void;
   音量?: (value: { kind: 'input' | 'output'; level: number; bins: number[] }) => void;
@@ -66,7 +68,8 @@ export class Discordパネル {
     private timeoutMs = 40_000,
     private codePreferenceFile = join(dirname(preferenceFile), 'aidiy_discord_code_model.json'),
     private readCatalog = ライブ候補読込,
-    private featureFile = join(dirname(preferenceFile), 'aidiy_discord_features.json')) {
+    private featureFile = join(dirname(preferenceFile), 'aidiy_discord_features.json'),
+    private readAPI = モデル情報取得) {
     this.preferred = ライブモデル読込(preferenceFile) || {};
     this.codePreferred = コードモデル読込(codePreferenceFile);
     this.features = 機能設定読込(featureFile);
@@ -76,13 +79,15 @@ export class Discordパネル {
   }
   async 初期情報() {
     const config = this.readConfig();
-    const settings = { ...config.liveModels, ...this.preferred };
-    const { models, voices } = this.readCatalog();
+    this.apiInfo = await this.readAPI(config.coreUrl);
+    const { models, voices } = this.apiInfo?.catalog || this.readCatalog();
+    const settings = { ...ライブ初期値(this.apiInfo?.settings || config.liveModels, {models, voices}), ...this.preferred };
     const notice = this.features.live ? ライブ選択エラー(settings, { models, voices }) : '';
-    return { state: this.状態, features: this.features, settings, models, voices, notice, code: this.codePreferred || { provider: config.provider, model: config.model }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
+    return { state: this.状態, features: this.features, settings, models, voices, notice, code: this.codePreferred || APIコード初期値(this.apiInfo, config), folder: { name: basename(config.folder) || config.folder, path: config.folder } };
   }
   async コード候補(provider: unknown) {
     if (this.closed || typeof provider !== 'string' || provider.length > 200) throw new Error();
+    if (this.apiInfo) return APIコード候補(this.apiInfo, provider);
     const config = this.readConfig(), cli = 起動解決(config.cli, config.python, config.folder);
     if (!cli.引数[0]?.endsWith('.py')) throw new Error();
     const job = CLI実行({ 起動: { 実行ファイル: cli.実行ファイル, 引数: [join(プロジェクトルート, 'frontend_ide/host/scripts/model-catalog.py'), cli.引数[0], provider] }, 作業フォルダ: config.folder, 本文: '', 引数: [], 制限時間: 30_000 });
@@ -105,7 +110,7 @@ export class Discordパネル {
   }
   選択保存(value: unknown) {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
-    const error = ライブ選択エラー({ ...this.readConfig().liveModels, ...value as Record<string, string> }, this.readCatalog());
+    const error = ライブ選択エラー({ ...(this.apiInfo?.settings || this.readConfig().liveModels), ...value as Record<string, string> }, this.apiInfo?.catalog || this.readCatalog());
     if (error) throw new 設定エラー(error);
     this.preferred = ライブモデル保存(value, this.preferenceFile);
     return this.preferred;
@@ -121,17 +126,22 @@ export class Discordパネル {
     const startedAt = Date.now();
     try {
       const config = this.readConfig(); token = config.token;
+      this.apiInfo = await this.readAPI(config.coreUrl);
+      if (run !== this.generation || this.closed) return;
+      let liveModels = { ...(this.apiInfo?.settings || config.liveModels), ...this.preferred };
       // 接続制御: 無効な機能は確認も接続もしない。
       const features = this.features;
       if (!features.live && !features.code) throw new 設定エラー('Live と Code の両方が OFF です。どちらかを ON にしてください。');
       if (features.code) { stage = 'Hermes確認'; this.validateCLI(config); }
       if (features.live) {
         stage = 'モデル確認';
-        const error = ライブ選択エラー({ ...config.liveModels, ...this.preferred }, this.readCatalog());
+        const catalog = this.apiInfo?.catalog || this.readCatalog();
+        liveModels = { ...ライブ初期値(this.apiInfo?.settings || config.liveModels, catalog), ...this.preferred };
+        const error = ライブ選択エラー(liveModels, catalog);
         if (error) throw new 設定エラー(error);
       }
       stage = 'Bot作成';
-      const bot = this.createBot({ ...config, ...this.codePreferred, liveModels: { ...config.liveModels, ...this.preferred }, liveEnabled: features.live, codeEnabled: features.code });
+      const bot = this.createBot({ ...config, ...APIコード初期値(this.apiInfo, config), ...this.codePreferred, liveModels, liveEnabled: features.live, codeEnabled: features.code });
       this.bot = bot;
       bot.音声 = (kind, pcm, rate) => { if (run === this.generation) this.音声?.({ kind, data: pcm.toString('base64'), rate }); };
       bot.メーター = (kind, level, bins) => { if (run === this.generation) this.音量?.({ kind, level, bins }); };

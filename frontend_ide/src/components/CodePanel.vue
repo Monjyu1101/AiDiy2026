@@ -38,7 +38,8 @@ markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tok
 const offline = computed(() => state.実行モード === 'offline' || (state.オフライン対応 && !state.接続済み));
 const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value || changingConversation.value);
 // 一度本文が届いた依頼では、進捗100件の窓から本文が消えても待機演出へ戻さない。
-const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value);
+// ストリーム枠が開いている間は、光をストリーム枠側（chat-presentation.css）で流す。
+const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value && !stream.value?.visible);
 const operable = computed(() => state.信頼済み && state.画面接続済み !== false);
 const allowed = computed(() => state.信頼済み && state.画面接続済み !== false && !!state.作業フォルダ && (offline.value || state.接続済み));
 const canSend = computed(() => allowed.value && !busy.value && prompt.value.trim());

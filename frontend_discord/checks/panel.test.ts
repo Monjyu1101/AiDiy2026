@@ -16,6 +16,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Discordパネル } from '../src/panel';
+import { type モデル初期情報 } from '../src/model-info';
 import { type Discord設定 } from '../src/config';
 import { config, waitFor } from './helpers';
 
@@ -29,7 +30,7 @@ function fixture() {
     configurations.push(value);
     return { 起動: async () => { startCount++; }, 終了: async () => { stopCount++; }, client: { isReady: () => ready } };
   };
-  const read = () => ({ ...config(), liveModels: { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'common-model', LIVE_FREEAI_VOICE: 'Zephyr' } });
+  const read = () => ({ ...config(), coreUrl:'ws://127.0.0.1:1/core/ws/AIコア', liveModels: { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'common-model', LIVE_FREEAI_VOICE: 'Zephyr' } });
   const catalog = { models: { freeai_live: { 'common-model': 'Common' }, openai_live: { 'test-live-model': 'Test' } },
     voices: { freeai_live: { Zephyr: 'Zephyr' }, openai_live: { marin: 'Marin', cedar: 'Cedar' } } };
   const panel = () => new Discordパネル(() => {}, read, create, file, () => {}, undefined, undefined, () => catalog);
@@ -59,6 +60,33 @@ test('候補の順序を維持し、保存済みでも削除されたモデル�
     assert.equal(panel.状態.phase, 'error'); assert.equal(f.configurations.length, 1);
     await panel.終了();
   } finally { f.cleanup(); }
+});
+
+test('APIの初期値・候補を優先し、API停止時はファイル候補と共通初期値に戻る', async () => {
+ const f=fixture();
+ let available=true;
+ const info:モデル初期情報={settings:{...selection,CODE_AIDIY_HERMES_MODEL:'openai_oauth/api-code'},
+   catalog:{models:{openai_live:{'test-live-model':'API Live'}},voices:{openai_live:{marin:'API Marin'}}},
+   code:{copilot_cli:{auto:'auto',same:'same','claude-haiku-5.5':'API Haiku'}},chat:{}};
+ const panel=new Discordパネル(()=>{},f.read,f.create,f.file,()=>{},undefined,undefined,
+   ()=>f.catalog,undefined,async()=>available?info:undefined);
+ try{
+  const initial=await panel.初期情報();
+  assert.deepEqual(initial.models,info.catalog.models);
+  assert.equal(initial.settings.LIVE_AI_NAME,'openai_live');
+  assert.deepEqual(initial.code,{provider:'openai_oauth',model:'api-code'});
+  assert.deepEqual(await panel.コード候補('copilot-cli'),{models:[{id:'same',label:'same (変更なし)'},{id:'claude-haiku-5.5',label:'API Haiku'}]});
+  await panel.開始();
+  assert.equal(f.configurations[0].liveModels.LIVE_AI_NAME,'openai_live');
+  assert.equal(f.configurations[0].model,'api-code');
+  await panel.停止();
+  available=false;
+  const fallback=await panel.初期情報();
+  assert.deepEqual(fallback.models,f.catalog.models);
+  assert.equal(fallback.settings.LIVE_AI_NAME,'freeai_live');
+  await panel.開始();
+  assert.equal(f.configurations[1].liveModels.LIVE_FREEAI_MODEL,'common-model');
+ }finally{await panel.終了();f.cleanup();}
 });
 
 test('起動時は未接続、初回は共通モデルを使い開始と停止だけで Bot を制御する', async () => {
@@ -125,16 +153,17 @@ test('終了時はモデル候補CLIの完了を待つ前にBotの切断を開�
 });
 
 test('接続途中の停止とパネル終了はログイン完了を待たず回収し、遅い結果で復帰しない', async () => {
-  const f = fixture(); let finish!: () => void, stopped = 0;
+  const f = fixture(); let finish!: () => void, stopped = 0, launched = 0;
   const panel = new Discordパネル(() => {}, f.read, () => ({
-    起動: () => new Promise<void>(resolve => { finish = resolve; }),
+    起動: () => new Promise<void>(resolve => { launched++; finish = resolve; }),
     終了: async () => { stopped++; }, client: { isReady: () => true },
   }), f.file, () => {}, undefined, undefined, () => f.catalog);
   try {
     const connecting = panel.開始(); assert.equal(panel.状態.phase, 'connecting');
+    await waitFor(()=>launched===1);
     await panel.停止(); await connecting; assert.equal(stopped, 1);
     finish(); assert.equal(panel.状態.phase, 'idle');
-    const connectingAgain = panel.開始(); await panel.終了(); await connectingAgain;
+    const connectingAgain = panel.開始(); await waitFor(()=>launched===2); await panel.終了(); await connectingAgain;
     finish(); await panel.開始(); assert.equal(stopped, 2); assert.equal(panel.状態.phase, 'idle');
   } finally { await panel.終了(); f.cleanup(); }
 });

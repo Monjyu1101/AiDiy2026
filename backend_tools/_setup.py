@@ -61,7 +61,7 @@ VSCODE_CHAT_MODEL_MAX_OUTPUT_TOKENS = 16000
 # VS Code チャットモデル (chatLanguageModels.json) 用設定 — backend_local（ローカル LLM / OpenAI 互換）
 LOCAL_CHAT_PROVIDER_NAME = "aidiy_local"
 LOCAL_CHAT_URL = "http://127.0.0.1:8096/v1/chat/completions"
-# backend_local の既定フォールバック（AiDiy_chat_local.json が読めない場合のみ使用）
+# backend_local の既定フォールバック（モデル合成JSONが読めない場合のみ使用）
 LOCAL_CHAT_MODEL_IDS_FALLBACK = [
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
@@ -372,14 +372,14 @@ def _build_chat_completions_provider() -> dict:
 
 
 def _load_local_chat_model_ids() -> list:
-    """backend_local の利用可能モデル ID を AiDiy_chat_local.json から取得する。
+    """backend_local の利用可能モデル ID をchat合成JSONから取得する。
 
     読めない／空の場合は LOCAL_CHAT_MODEL_IDS_FALLBACK を使う。
     """
-    local_path = CONFIG_DIR / "AiDiy_chat_local.json"
+    local_path = CONFIG_DIR.parent / "_AIDIY" / "aidiy_diag" / "chat_models_info.json"
     try:
         data = load_json_dict_file(local_path)
-        models = data.get("models")
+        models = data.get("local_chat", {}).get("models")
         if isinstance(models, dict) and models:
             return list(models.keys())
     except Exception:

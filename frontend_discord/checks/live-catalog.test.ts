@@ -12,12 +12,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ライブ候補読込 } from '../src/live-catalog';
+import { ライブ候補読込, ライブ初期値 } from '../src/live-catalog';
 
-test('2つのJSONのモデル・声・表示順を読み、FreeAIもGeminiの一覧を使う', () => {
+test('合成ファイル未生成時は空になり、旧JSONの音声候補は使わない', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aidiy-live-catalog-'));
   try {
     const gemini = { models: { second: '2', first: '1' }, voices: { Kore: '声2', Zephyr: '声1' } };
@@ -25,15 +25,39 @@ test('2つのJSONのモデル・声・表示順を読み、FreeAIもGeminiの一
     writeFileSync(join(directory, 'AiDiy_live_gemini.json'), '\uFEFF' + JSON.stringify(gemini));
     writeFileSync(join(directory, 'AiDiy_live_openai.json'), JSON.stringify(openai));
     const catalog = ライブ候補読込(directory);
-    assert.deepEqual(catalog.models.freeai_live, gemini.models);
-    assert.deepEqual(Object.keys(catalog.models.gemini_live), ['second', 'first']);
-    assert.deepEqual(catalog.voices.gemini_live, gemini.voices);
-    assert.deepEqual(catalog.voices.freeai_live, gemini.voices);
-    assert.deepEqual(catalog.models.openai_live, openai.models);
-    assert.deepEqual(Object.keys(catalog.voices.openai_live), ['cedar', 'marin']);
+    assert.deepEqual(catalog.models, {});
+    assert.deepEqual(catalog.voices, {});
     writeFileSync(join(directory, 'AiDiy_live_openai.json'), '{broken');
-    assert.throws(() => ライブ候補読込(directory), /AiDiy_live_openai.json/);
+    assert.deepEqual(ライブ候補読込(directory).voices, {});
     writeFileSync(join(directory, 'AiDiy_live_openai.json'), JSON.stringify({ models: {}, voices: [] }));
-    assert.throws(() => ライブ候補読込(directory), /読み込めません/);
+    assert.deepEqual(ライブ候補読込(directory).voices, {});
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('診断のLive候補を優先し、共通初期値だけを補正する。声と有効な選択は保持する', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aidiy-diag-live-'));
+  try {
+    const config = join(root, '_config'), output = join(root, '_AIDIY/aidiy_diag');
+    mkdirSync(config);mkdirSync(output,{recursive:true});
+    const voiceFile=join(output,'live_voices_info.json');
+    writeFileSync(voiceFile,JSON.stringify({freeai_live:{voices:{Zephyr:'Zephyr'}},openai_live:{voices:{marin:'Marin'}}}));
+    const payload={freeai_live:{models:{'gemini-3.8-live':'new','gemini-3.1-live':'kept'}},openai_live:{models:{'gpt-realtime-2':'Realtime'}}};
+    writeFileSync(join(output,'live_models_info.json'),JSON.stringify(payload));
+    const catalog=ライブ候補読込(config);
+    assert.deepEqual(Object.keys(catalog.models),['freeai_live','openai_live']);
+    assert.deepEqual(Object.keys(catalog.voices),['freeai_live','openai_live']);
+    assert.equal(catalog.voices.gemini_live,undefined);
+    const settings={LIVE_AI_NAME:'removed',LIVE_FREEAI_MODEL:'removed',LIVE_FREEAI_VOICE:'Zephyr'};
+    assert.equal(ライブ初期値(settings,catalog).LIVE_FREEAI_MODEL,'gemini-3.8-live');
+    assert.equal(ライブ初期値(settings,catalog).LIVE_AI_NAME,'freeai_live');
+    assert.equal(ライブ初期値({...settings,LIVE_FREEAI_MODEL:'gemini-3.1-live'},catalog).LIVE_FREEAI_MODEL,'gemini-3.1-live');
+    assert.equal(settings.LIVE_AI_NAME,'removed');
+    writeFileSync(voiceFile,'{}');
+    assert.deepEqual(ライブ候補読込(config).voices,{});
+    writeFileSync(voiceFile,'{"freeai_live":{"voices":[]}}');
+    assert.throws(()=>ライブ候補読込(config),/live_voices_info/);
+    writeFileSync(voiceFile,'{}');
+    writeFileSync(join(output,'live_models_info.json'),'{broken');
+    assert.throws(()=>ライブ候補読込(config),/live_models_info/);
+  } finally {rmSync(root,{recursive:true,force:true});}
 });

@@ -24,7 +24,17 @@ SPEC.loader.exec_module(catalog)
 
 
 class ModelCatalogTest(unittest.TestCase):
-    def test_json_models_take_priority_over_bat(self):
+    def test_diag_candidates_win_and_no_hermes_import_is_needed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "_AIDIY" / "aidiy_diag"
+            output.mkdir(parents=True)
+            (output / "code_models_info.json").write_text(json.dumps({"copilot_cli": {"models": {"claude-haiku-5.5": "2026/10/07 - claude-haiku-5.5"}}}), encoding="utf-8")
+            (output / "chat_models_info.json").write_text(json.dumps({"freeai_chat": {"models": {"gemini-new": "New Gemini"}}}), encoding="utf-8")
+            self.assertEqual(catalog.catalog(str(root / "command_hermes" / "cli_main.py"), "copilot-cli"), {"models": [{"id": "same", "label": "same (変更なし)"}, {"id": "claude-haiku-5.5", "label": "2026/10/07 - claude-haiku-5.5"}]})
+            self.assertEqual(catalog.catalog(str(root / "command_hermes" / "cli_main.py"), "freeai"), {"models": [{"id": "gemini-new", "label": "New Gemini"}]})
+
+    def test_old_config_models_are_ignored(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_dir = root / "_config"
@@ -36,11 +46,11 @@ class ModelCatalogTest(unittest.TestCase):
             models = catalog._cli_models(root, "codex-cli")
 
         self.assertEqual(
-            [{"label": "same (変更なし)", "id": "same"}, {"label": "GPT 6.1 Sol", "id": "gpt-6.1-sol"}],
+            [{"label": "same (変更なし)", "id": "same"}],
             models,
         )
 
-    def test_auto_only_json_falls_back_to_bat(self):
+    def test_missing_catalog_does_not_fall_back_to_bat(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_dir = root / "_config"
@@ -56,7 +66,7 @@ class ModelCatalogTest(unittest.TestCase):
             models = catalog._cli_models(root, "grok-cli")
 
         self.assertEqual(
-            [{"label": "same (変更なし)", "id": "same"}, {"label": "grok-4.7", "id": "grok-4.7"}],
+            [{"label": "same (変更なし)", "id": "same"}],
             models,
         )
 

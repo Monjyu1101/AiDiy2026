@@ -198,11 +198,11 @@ def _write_json_list_file(path: Path, data: list) -> bool:
 
 
 def _load_local_chat_model_ids() -> list:
-    local_path = CONFIG_DIR / "AiDiy_chat_local.json"
+    local_path = CONFIG_DIR.parent / "_AIDIY" / "aidiy_diag" / "chat_models_info.json"
     try:
         with open(local_path, encoding="utf-8") as f:
             data = json.load(f)
-        models = data.get("models")
+        models = data.get("local_chat", {}).get("models")
         if isinstance(models, dict) and models:
             return list(models.keys())
     except Exception:

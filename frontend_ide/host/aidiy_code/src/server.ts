@@ -36,11 +36,11 @@ export async function 単独起動(project: string, backend?: string, initialMod
   const offlineSaved = コードモデル読込(offlineFile);
   // 最後に選んだオンラインの検証回数を次回も使う（未保存なら0回）。
   const optionsFile = コード設定保存先(modelFile);
-  const offlineModels = オフラインモデル候補(root);
+  const offlineModels = オフラインモデル候補(root, folder);
   const offlineModelAllowed = (model: string) => offlineModels.some(item => item.id === model);
   const modeModels = {
-    online: コード選択(initialModel.offline ? savedModel ?? defaultModel
-      : remembered ?? (!requestedProvider && !requestedModel ? defaultModel
+    online: コード選択(initialModel.offline ? savedModel ?? {provider:'',model:''}
+      : remembered ?? (!requestedProvider && !requestedModel ? {provider:'',model:''}
         : { provider: requestedProvider || 'aidiy_hermes', model: requestedModel || (requestedProvider === 'aidiy_hermes' ? defaultModel.model : '') })),
     offline: { provider: 'aidiy_hermes', model: offlineSaved?.provider === 'aidiy_hermes' && offlineModelAllowed(offlineSaved.model)
       ? offlineSaved.model : offlineModelAllowed(defaultModel.model) ? defaultModel.model : 'same' },
@@ -48,7 +48,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
   if (initialModel.offline && (requestedProvider || requestedModel)) {
     const selected = コード選択({ provider: requestedProvider || 'aidiy_hermes', model: requestedModel || modeModels.offline.model });
     if (selected.provider !== 'aidiy_hermes') throw new Error('オフラインでは aidiy_hermes だけを使用できます。');
-    if (!offlineModelAllowed(selected.model)) throw new Error('オフラインのモデルは same または _hermes_cli.bat の選択値を指定してください。');
+    if (!offlineModelAllowed(selected.model)) throw new Error('オフラインのモデルは same または aidiy_diag の一覧から選択してください。');
     modeModels.offline = selected;
   }
   const state = {

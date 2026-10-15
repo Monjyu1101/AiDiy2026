@@ -88,7 +88,8 @@ if self.code_ai == "grok_cli":
 
 候補の照合元: `scripts/cli_bat/_grok_cli.bat`。利用可能性はログイン済みアカウントの `grok models` で確認する。
 
-現行の候補は `grok-4.8` と `grok-4.7` の 2 つ（設定画面には `auto` も表示）。
+現行の候補は `grok-4.7` と `grok-4.6` の 2 つ（設定画面には `auto` も表示）。
+公開済みかは OpenRouter の `x-ai/` 一覧に載っているかで判断する（`~x-ai/grok-latest` の参照先が最新）。2026-10-15 時点で `grok-4.8` は発表のみで未掲載のため候補に含めない。
 `grok-4` / `grok-4-fast` / `grok-code-fast-1` / `grok-4.6-build` は `unknown model id` で拒否される。
 `grok-4.6-build` は `--output-format json` の `modelUsage` に出る内部名で、`-m` には渡せない。
 

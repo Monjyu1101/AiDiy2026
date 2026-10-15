@@ -77,7 +77,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('aidiyHermes');
-    this.オフライン候補 = オフラインモデル候補(context.extensionPath);
+    this.オフライン候補 = オフラインモデル候補(context.extensionPath, this.選択フォルダ()?.uri.fsPath ?? context.extensionPath);
     const defaultModel = Hermes既定モデル(context.extensionPath, this.選択フォルダ()?.uri.fsPath ?? context.extensionPath);
     const offlineSaved = コードモデル読込(this.オフライン保存先);
     const offlineModel = offlineSaved?.provider === 'aidiy_hermes' && this.オフライン候補.some(item => item.id === offlineSaved.model)

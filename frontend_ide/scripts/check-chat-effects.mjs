@@ -126,6 +126,10 @@ try {
   await evaluate(`fixtureNotify({メッセージ識別:'output_stream',メッセージ内容:'\u0002'});fixtureNotify({メッセージ識別:'output_stream',メッセージ内容:'変更箇所を確認しています。'});`);await sleep(180);
   assert.equal(await evaluate(`document.querySelector('.progress pre').textContent.trim()`),'変更箇所を確認しています。');
   assert.equal(await evaluate(`!!document.querySelector('.progress .terminal-cursor')`),true);
+  // ストリーム枠が開いたら、光はストリーム枠の上下の枠線を流れる。
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.progress'),'::before').animationName`),'prompt-reflect');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.progress'),'::after').height`),'1px');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.prompt-frame'),'::before').animationName`),'none');
   await capture('nn-effects-code-running.png');
   const stopAppearance=await stopMetrics('.stop');
   assert.equal(stopAppearance.loaded,true);

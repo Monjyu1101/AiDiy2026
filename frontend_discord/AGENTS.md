@@ -15,7 +15,7 @@ Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコアの WebS
 | `src/panel.ts` | 開始・停止、モデル選択と Live ON/OFF の永続化、モニター切替 |
 | `src/panel-service.ts` | Electron 版（`src/panel-worker.ts`）とブラウザ版（`src/web-server.ts`）共通のパネル操作・通知の中継 |
 | `src/config.ts` | 共通 JSON の読込・検証、パスと接続先の解決 |
-| `src/live-catalog.ts` | `_config/AiDiy_live_*.json` の Live モデル・音声候補の読込 |
+| `src/live-catalog.ts` / `src/model-info.ts` | モデル情報APIを優先し、取得失敗時はdiagのモデル・音声合成JSONを読む。共通初期値の補正 |
 | `src/network.ts` / `src/gateway-worker.mjs` | REST / Gateway / 音声 WebSocket のプロキシ対応 |
 | `src/connection-error.ts` | 接続失敗の段階別案内と、秘密値を伏せたエラー詳細 |
 | `src/commands.ts` | コマンド解析、利用許可、回答分割 |

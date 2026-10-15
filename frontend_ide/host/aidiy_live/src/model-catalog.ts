@@ -20,7 +20,7 @@ export type LiveCatalog = {
   voices: Record<string, Record<string, string>>;
 };
 
-// 候補は AiDiy_live_*.json 由来の一覧だけ。保存済み設定で候補を増やさない。
+// 候補はモデル情報API（aidiy_diag の合成一覧を優先）。保存済み設定で候補を増やさない。
 export function ライブ選択エラー(settings: Record<string, string>, catalog: LiveCatalog): string {
   const provider = settings.LIVE_AI_NAME, keys = LIVE_KEYS[provider];
   if (!keys || !Object.hasOwn(catalog.models, provider)) return 'ライブAIを候補から選び直してください。';

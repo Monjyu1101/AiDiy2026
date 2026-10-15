@@ -225,7 +225,7 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
             if _folder not in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord")
             for service_name in service_names
-        ] + ["フロントエンド(diag)", "フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
+        ] + ["バックエンド(Diag)", "フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
     payload = {
         "owner_pid": os.getpid(),
         "services": services,
@@ -558,7 +558,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     print_header("クリーンアップ内容の選択")
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
     print_info("常駐サービスが起動中の場合は、削除開始前にすべて停止します。")
-    print_info(f"全階層の {TEMP_TARGET_LABEL} はフォルダ選択に関係なく削除します（ダウンロード済みモデルを含む）。")
+    print_info(f"全階層の {TEMP_TARGET_LABEL} はフォルダ選択に関係なく、最後にまとめて削除します（ダウンロード済みモデルを含む）。")
 
     choices: dict = {
         "npm_uninstall":  False,
@@ -587,13 +587,13 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
         "hermes_temp":    None,
     }
 
-    choices["diag"] = ask_yes_no("環境診断(Diag)のランチャーを解除しますか？", default="y")
+    if (base_dir / BACKUP_PATH).exists():
+        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
+
+    choices["diag"] = ask_yes_no("バックエンド(Diag)のランチャーを解除しますか？", default="y")
     choices["npm_uninstall"] = ask_yes_no(
         "グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n",
     )
-
-    if (base_dir / BACKUP_PATH).exists():
-        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
 
     choices["local"] = ask_yes_no("バックエンド(local) をクリーンアップしますか？", default="y")
     if choices["local"]:
@@ -673,17 +673,18 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     stop_all_services(choices)
 
+    print()
+    cleanup_backup(base_dir, choices)
+
+    print()
     if choices.get("diag"):
         if not _run_folder_cleanup("backend_diag", choices):
-            cleanup_errors.append("環境診断(Diag)")
+            cleanup_errors.append("バックエンド(Diag)")
 
     if choices["npm_uninstall"]:
         uninstall_global_npm_tools()
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
-
-    print()
-    cleanup_backup(base_dir, choices)
 
     print()
     if choices["local"]:
@@ -776,18 +777,18 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  0. 環境診断(Diag)")
-    print_info(f"  1. 全階層の {TEMP_TARGET_LABEL} フォルダ")
-    print_info("  2. ルート backup フォルダ")
-    print_info("  3. バックエンド(local)")
-    print_info("  4. バックエンド(tools)")
-    print_info("  5. バックエンド(core,apps)")
-    print_info("  6. バックエンド(task,team)")
-    print_info("  7. フロントエンド(Web)")
-    print_info("  8. フロントエンド(Avatar)")
-    print_info("  9. コマンド(hermes)")
-    print_info(" 10. IDE群(Term / Code / Live / IDE)")
-    print_info(" 11. フロントエンド(Discord)")
+    print_info("  0. ルート backup フォルダ")
+    print_info("  1. バックエンド(Diag)")
+    print_info("  2. バックエンド(local)")
+    print_info("  3. バックエンド(tools)")
+    print_info("  4. バックエンド(core,apps)")
+    print_info("  5. バックエンド(task,team)")
+    print_info("  6. フロントエンド(Web)")
+    print_info("  7. フロントエンド(Avatar)")
+    print_info("  8. コマンド(hermes)")
+    print_info("  9. IDE群(Term / Code / Live / IDE)")
+    print_info(" 10. フロントエンド(Discord)")
+    print_info(f" 11. 全階層の {TEMP_TARGET_LABEL} フォルダ（最後にまとめて削除）")
     print()
 
     choices = collect_cleanup_choices(base_dir)

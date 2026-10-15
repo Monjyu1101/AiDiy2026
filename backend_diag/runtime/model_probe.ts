@@ -2,8 +2,11 @@
 import {open,stat} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import os from 'node:os';
+import path from 'node:path';
 import https from 'node:https';
-import {openrouterCatalog,googleCatalog,openaiCatalog,claudeCatalog,ollamaCatalog,pythonString,type Catalog} from './model_catalog';
+import http from 'node:http';
+import {openrouterCatalog,googleCatalog,openaiCatalog,claudeCatalog,ollamaCatalog,codexCatalog,codexSlugs,codexFallbackCatalog,grokCatalog,idsCatalog,ollamaLocalCatalog,withoutRetired,GROK_CLI_MODELS,LOCAL_CHAT_MODELS,pythonString,type Catalog} from './model_catalog';
 export const CONFIG_LIMIT=128*1024, RESPONSE_LIMIT=1024*1024;
 // 公開一覧は説明・価格などを含む。受信上限だけを分離し、整形後の出力上限は維持する。
 export const PUBLIC_RESPONSE_LIMIT=16*1024*1024;
@@ -15,63 +18,112 @@ const CONFIG_PATH=fileURLToPath(new URL('../../_config/AiDiy_key.json',import.me
 export const KEY_PROVIDERS=Object.freeze([
  ['gemini','Gemini','gemini_key_id','google'],['freeai','FreeAI（Gemini）','freeai_key_id','google'],
  ['claude','Claude','claude_key_id','anthropic'],['openai','OpenAI API','openai_key_id','openai'],
+ ['openai_oauth','OpenAI OAuth','~/.codex/auth.json','codex'],['grok','Grok（xAI）','~/.grok/auth.json','grok'],
  ['azure','Azure OpenAI','azure_key_id',null],['copilot','GitHub Copilot','copilot_key_id',null],
- ['openrt','OpenRouter','openrt_key_id','openrouter'],['ollama','Ollama Cloud','ollama_key_id','ollama'],
+ ['openrt','OpenRouter','openrt_key_id','openrouter'],['ollama','Ollama（ローカル）','ollama list','ollama-local'],['local','ローカル（backend_local）','固定候補','local-fixed'],
  ['huggingface_read','Hugging Face 読取','huggingface_key_read',null],['huggingface_write','Hugging Face 書込','huggingface_key_write',null],
  ['discord','Discord Bot','DISCORD_BOT_TOKEN',null],
-].map(([id,名前,キー名,probe])=>Object.freeze({id:id!,名前:名前!,キー名:キー名!,probe})));
+].map(([id,名前,キー名,probe])=>Object.freeze({id:id!,名前:名前!,キー名:キー名!,probe,oauth:probe==='codex'||probe==='grok'?probe as OAuthKind:null})));
+// モデル名に紛れたキー値を伏せる対象（行の追加・変更とは独立）。
+const SECRET_CONFIG_KEYS=Object.freeze(['gemini_key_id','freeai_key_id','claude_key_id','openai_key_id','azure_key_id','copilot_key_id','openrt_key_id','ollama_key_id','huggingface_key_read','huggingface_key_write','DISCORD_BOT_TOKEN','openai_organization']);
 export type Dictionary=Record<string,unknown>;
 const record=(value:unknown):value is Dictionary=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 export type Reader=(path:string)=>Promise<string|Uint8Array>|string|Uint8Array;
+// FIFO/device は開かない。事前確認後の置換も非blocking openとhandle側確認で防ぐ。
+async function readLimited(file:string,limit=CONFIG_LIMIT):Promise<Uint8Array> {
+ const before=await stat(file);if(!before.isFile()||before.size>limit)throw new Error('file');
+ const handle=await open(file,constants.O_RDONLY|(constants.O_NONBLOCK??0));
+ try{
+  const info=await handle.stat();if(!info.isFile()||info.size>limit)throw new Error('file');
+  const bytes=Buffer.alloc(limit+1);let total=0;
+  while(total<bytes.length){const {bytesRead}=await handle.read(bytes,total,bytes.length-total,total);if(!bytesRead)break;total+=bytesRead;}
+  return bytes.subarray(0,total);
+ }finally{await handle.close();}
+}
+function parseJson(raw:string|Uint8Array,limit=CONFIG_LIMIT):Dictionary {
+ const bytes=typeof raw==='string'?Buffer.from(raw):Buffer.from(raw);
+ if(bytes.length>limit)throw new Error('size');
+ const value:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes).replace(/^﻿/,''));
+ if(!record(value))throw new Error('shape');return value;
+}
 export async function readConfig(reader?:Reader):Promise<[string,Dictionary]> {
+ try {return ['読込済み',parseJson(reader?await reader(CONFIG_PATH):await readLimited(CONFIG_PATH))];}
+ catch(error){return [(error as NodeJS.ErrnoException)?.code==='ENOENT'?'未作成':'読込不可',{}];}
+}
+// OAuth は各 CLI のログイン情報ファイルを読むだけ。トークンの更新（ファイルの書換え）はしない。
+export type OAuthKind='codex'|'grok';
+export type OAuthReader=(kind:OAuthKind)=>Promise<string|Uint8Array>|string|Uint8Array;
+export type OAuthCredential={token:string;account:string|null;expiresAt:number|null};
+export function oauthPath(kind:OAuthKind,env:NodeJS.ProcessEnv=process.env,home=os.homedir()):string {
+ return kind==='codex'?path.join(env.CODEX_HOME?.trim()||path.join(home,'.codex'),'auth.json'):path.join(home,'.grok','auth.json');
+}
+function jwtClaims(token:string):Dictionary {try{const value:unknown=JSON.parse(Buffer.from(token.split('.')[1]??'','base64url').toString('utf8'));return record(value)?value:{};}catch{return {};}}
+export async function readOAuth(kind:OAuthKind,reader?:OAuthReader):Promise<OAuthCredential|null> {
  try {
-  let raw:string|Uint8Array;
-  if(reader)raw=await reader(CONFIG_PATH);
-  else {
-   // FIFO/device は開かない。事前確認後の置換も非blocking openとhandle側確認で防ぐ。
-   const before=await stat(CONFIG_PATH);if(!before.isFile()||before.size>CONFIG_LIMIT)throw new Error('file');
-   const handle=await open(CONFIG_PATH,constants.O_RDONLY|(constants.O_NONBLOCK??0));
-   try{
-    const info=await handle.stat();if(!info.isFile()||info.size>CONFIG_LIMIT)throw new Error('file');
-    const bytes=Buffer.alloc(CONFIG_LIMIT+1);let total=0;
-    while(total<bytes.length){const {bytesRead}=await handle.read(bytes,total,bytes.length-total,total);if(!bytesRead)break;total+=bytesRead;}
-    raw=bytes.subarray(0,total);
-   }finally{await handle.close();}
+  const value=parseJson(reader?await reader(kind):await readLimited(oauthPath(kind)));
+  if(kind==='codex'){
+   const tokens=value.tokens;if(!record(tokens)||typeof tokens.access_token!=='string'||!tokens.access_token.trim())return null;
+   const token=tokens.access_token.trim(),claims=jwtClaims(token),auth=record(claims['https://api.openai.com/auth'])?claims['https://api.openai.com/auth'] as Dictionary:{};
+   const account=[tokens.account_id,auth.chatgpt_account_id].find((v):v is string=>typeof v==='string'&&!!v.trim())?.trim()??null;
+   return {token,account,expiresAt:typeof claims.exp==='number'?claims.exp*1000:null};
   }
-  const bytes=typeof raw==='string'?Buffer.from(raw):Buffer.from(raw);
-  if(bytes.length>CONFIG_LIMIT)throw new Error('size');
-  const value:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes).replace(/^\uFEFF/,''));
-  if(!record(value))throw new Error('shape');return ['読込済み',value];
- }catch(error){return [(error as NodeJS.ErrnoException)?.code==='ENOENT'?'未作成':'読込不可',{}];}
+  for(const [issuer,entry] of Object.entries(value)){
+   if(!issuer.startsWith('https://auth.x.ai')||!record(entry)||typeof entry.key!=='string'||!entry.key.trim())continue;
+   const expires=Date.parse(String(entry.expires_at??''));
+   return {token:entry.key.trim(),account:null,expiresAt:Number.isFinite(expires)?expires:null};
+  }
+  return null;
+ }catch{return null;}
+}
+const OAUTH_CLI:Record<OAuthKind,string>={codex:'codex',grok:'grok'};
+// API が使えないときの Codex の代替候補元（get_codex_model_ids と同じ）: config.toml の model と models_cache.json。
+export type CodexLocalReader=(name:'config.toml'|'models_cache.json')=>Promise<string|Uint8Array>|string|Uint8Array;
+export async function readCodexLocal(reader?:CodexLocalReader,env:NodeJS.ProcessEnv=process.env,home=os.homedir()):Promise<{defaultModel:string|null;cacheIds:string[]}> {
+ const folder=path.dirname(oauthPath('codex',env,home)),read=async(name:'config.toml'|'models_cache.json')=>reader?await reader(name):await readLimited(path.join(folder,name),RESPONSE_LIMIT);
+ let defaultModel:string|null=null,cacheIds:string[]=[];
+ try {
+  const text=Buffer.from(await read('config.toml')).toString('utf8'),top=text.split(/^\s*\[/m)[0];
+  const match=/^\s*model\s*=\s*(["'])([^"'\r\n]+)\1/m.exec(top);if(match&&match[2].trim())defaultModel=match[2].trim();
+ }catch{}
+ try {cacheIds=codexSlugs(parseJson(await read('models_cache.json'),RESPONSE_LIMIT));}catch{}
+ return {defaultModel,cacheIds};
 }
 export function configured(value:unknown,id:string):value is string {return typeof value==='string'&&!!value.trim()&&!value.trim().startsWith('<')&&!(id==='ollama'&&value.trim().toLowerCase()==='ollama');}
-export async function status({reader}:{reader?:Reader}={}) {
+export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:OAuthReader}={}) {
  const [state,values]=await readConfig(reader);
+ const oauth:Record<OAuthKind,boolean>={codex:!!await readOAuth('codex',oauthReader),grok:!!await readOAuth('grok',oauthReader)};
  return {設定状態:state,項目:KEY_PROVIDERS.map(p=>{
+  // OAuth は API キーではなく、該当フォルダのログイン情報の有無で設定済みを判断する。
+  if(p.probe==='local-fixed')return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:null,キー不要:true,ローカル:true,状態:'未実施',理由:'',テスト可能:true,説明:'本体と同じ固定候補（CHAT_LOCAL_MODELS）を使います（API 取得なし）。'};
+  if(p.probe==='ollama-local')return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:null,キー不要:true,ローカル:true,状態:'未実施',理由:'',テスト可能:true,説明:'本体と同じく、ローカルの Ollama（ollama list と同じ一覧）を確認します。キーは使いません。'};
+  if(p.oauth){const present=oauth[p.oauth];return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:present?'':`ログイン情報がありません。${OAUTH_CLI[p.oauth]} CLI でログインしてください。`,テスト可能:present,説明:'ログイン情報（OAuth）の有無のみ。接続は未確認です。'};}
   const present=state==='読込不可'?null:configured(values[p.キー名],p.id),publicRow=p.id==='openrt';
   const reason=state==='読込不可'?'設定を読み取れません。':!present&&!publicRow?'キーが未設定です。':!p.probe?'この項目の接続テストは未対応です。':'';
   return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:publicRow,状態:'未実施',理由:reason,テスト可能:state!=='読込不可'&&!!p.probe&&(!!present||publicRow),説明:publicRow?'起動時の公開モデル一覧キャッシュを表示します。キーの有効性は確認しません。':'設定有無のみ。接続は未確認です。'};
  }),モデル:[]};
 }
-const ENDPOINTS:Record<string,readonly [string,string]>={google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],ollama:['ollama.com','/v1/models']};
+// ローカル Ollama は ollama list と同じ API を loopback 固定で読む（プロセスは起動しない）。
+const LOCAL_ENDPOINTS:Record<string,readonly [string,number,string]>={'ollama-local':['127.0.0.1',11434,'/api/tags']};
+const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],ollama:['ollama.com','/v1/models']};
 export type Fetch=(provider:string,headers:Record<string,string>,pageToken?:unknown,signal?:AbortSignal)=>Promise<Dictionary>;
 export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promise((resolve,reject)=>{
- const endpoint=ENDPOINTS[provider];if(!endpoint)return reject(new Error('provider'));
+ const local=LOCAL_ENDPOINTS[provider],endpoint=local?[local[0],local[2]] as const:ENDPOINTS[provider];if(!endpoint)return reject(new Error('provider'));
  let pathname=endpoint[1];
  if(pageToken){if(provider!=='google'||typeof pageToken!=='string'||pageToken.length>4096)return reject(new Error('pagination'));pathname+='?'+new URLSearchParams({pageToken});}
  if(signal?.aborted)return reject(new Error('stopped'));
  const responseLimit=provider==='openrouter'&&Object.keys(headers).length===0?PUBLIC_RESPONSE_LIMIT:RESPONSE_LIMIT;
  let settled=false,size=0;const chunks:Buffer[]=[];
  // 専用 Agent を使わず agent:false。環境 proxy・globalAgent・redirect にキーを渡さない。
- const request=https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},response=>{
+ const respond=(response:http.IncomingMessage)=>{
   if(!response.statusCode||response.statusCode<200||response.statusCode>=300){response.destroy();return finish(new Error('http'));}
   response.on('data',(chunk:Buffer)=>{if(settled)return;size+=chunk.length;if(size>responseLimit)return finish(new Error('size'));chunks.push(chunk);});
   response.on('error',()=>finish(new Error('response')));
   response.on('aborted',()=>finish(new Error('response')));
   response.on('end',()=>{if(settled)return;try{const body:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!record(body))return finish(new Error('shape'));finish(undefined,body);}catch{finish(new Error('json'));}});
- });
+ };
+ const request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
  const cancel=()=>finish(new Error('stopped'));
- const timer=setTimeout(()=>finish(new Error('timeout')),8000);
+ const timer=setTimeout(()=>finish(new Error('timeout')),local?10000:8000);
  function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request.destroy();if(error)reject(error);else resolve(value!);}
  signal?.addEventListener('abort',cancel,{once:true});request.on('error',(error:NodeJS.ErrnoException)=>{
   const code=error.code??'';
@@ -79,10 +131,12 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
   finish(new Error(reason));
  });request.end();
 });
+function secretValues(values:Dictionary):string[] {return SECRET_CONFIG_KEYS.map(name=>values[name]).filter((value):value is string=>configured(value,'')).map(value=>value.trim());}
 export function safeDetails(models:Dictionary,secrets:string[],limit:number|null=500) {
  const result:Record<string,string|null>[]=[];
  for(const [id,entry] of Object.entries(models)) {
-  if(!/^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)||!record(entry))continue;
+  // OpenRouter の別名（~provider/model）も本体と同じく通す。
+  if(!/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)||!record(entry))continue;
   const values={...entry,model_id:id},cleaned:Record<string,string|null>={};
   for(const name of ['model_id','作成日','トークン数','モダリティ']){const value=values[name as keyof typeof values];let val=value==null?null:pythonString(value);if(val!==null&&(val.length>512||secrets.some(secret=>val!.includes(secret))))val=null;cleaned[name]=val;}
   if(cleaned.model_id!==null)result.push(cleaned);
@@ -106,13 +160,46 @@ export async function publicCatalog({fetch=fetchMetadata,now,signal}:{fetch?:Fet
   return {状態:'NG',公開モデル:{},確認日時:timestamp,失敗理由:code,説明:publicFailureDescription(code)};
  }
 }
-export async function probe(id:string,{reader,fetch=fetchMetadata,now,cache,signal}:{reader?:Reader;fetch?:Fetch;now?:Date;cache?:unknown;signal?:AbortSignal}={}) {
+export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch=fetchMetadata,now,cache,signal}:{reader?:Reader;oauthReader?:OAuthReader;codexLocalReader?:CodexLocalReader;fetch?:Fetch;now?:Date;cache?:unknown;signal?:AbortSignal}={}) {
  const output={id,状態:'未実施',説明:'未対応の項目です。',モデル:[] as string[],モデル詳細:[] as Record<string,string|null>[],確認日時:null as string|null,警告:[] as string[]};
  const selected=KEY_PROVIDERS.find(row=>row.id===id);if(!selected?.probe)return output;
+ if(selected.oauth){
+  const kind=selected.oauth,cli=OAUTH_CLI[kind],credential=await readOAuth(kind,oauthReader);
+  if(!credential)return {...output,説明:`ログイン情報がありません。${cli} CLI でログインしてください。`};
+  const timestamp=new Date().toISOString(),expired=credential.expiresAt!==null&&credential.expiresAt<=(now??new Date()).getTime();
+  const expiredNote=`ログイン情報の有効期限が切れています。${cli} CLI を起動して再ログインしてください（診断はトークンを更新しません）。`;
+  try {
+   const headers:Record<string,string>={Authorization:'Bearer '+credential.token,'User-Agent':'aidiy-diag'};
+   if(credential.account)headers['ChatGPT-Account-Id']=credential.account;
+   const body=await fetch(kind,headers,undefined,signal);
+   const details=safeDetails(kind==='codex'?codexCatalog(body):grokCatalog(body),[credential.token,...(credential.account?[credential.account]:[])]);
+   return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,警告:expired?[expiredNote]:[],説明:'OAuth のログイン情報でモデル一覧を取得しました。生成可否・利用上限は未確認です。',一覧範囲:kind==='codex'?'本体（get_codex_model_ids）と同じく、非表示・廃止モデルを除いて優先度順に並べ、将来版と -900k 版を補完。表示は最大500件。':'本体に API 一覧の絞り込みは無いため、非表示モデルだけを除外。表示は最大500件。'};
+  }catch{
+   // 本体は API で取れない場合も代替候補で続行する。OpenAI OAuth は API 一覧を使う系統なので NG とし、本体が使う候補を併せて示す。
+   // Grok は本体がもともと固定候補を流し込む系統なので、固定候補を示して PASS（黄）とする。
+   const fallback=kind==='codex'?await readCodexLocal(codexLocalReader).then(local=>codexFallbackCatalog(local.defaultModel,local.cacheIds)):idsCatalog(GROK_CLI_MODELS);
+   const details=safeDetails(fallback,[credential.token,...(credential.account?[credential.account]:[])]);
+   const reason=expired?expiredNote:'OAuth のモデル一覧取得に失敗しました。ログイン状態と通信を確認してください。';
+   return {...output,状態:kind==='grok'?'PASS':'NG',説明:kind==='grok'?`本体と同じ固定候補（${GROK_CLI_MODELS.join(' / ')}）を使用します。API 一覧は未取得: ${reason}`:reason,確認日時:timestamp,モデル:details.map(item=>item.model_id!),モデル詳細:details,警告:[kind==='codex'?'API から取得できないため、本体と同じ代替候補（~/.codex の config.toml・models_cache.json・既定値）を表示しています。':'API から取得できないため、本体と同じ固定候補（Grok Build CLI の grok-4.7 / grok-4.6）を表示しています。'],一覧範囲:'代替候補（本体が API 取得失敗時に使う一覧）。'};
+  }
+ }
  const [router,ready]=validatedCache(cache);
+ // backend_local: aidiy_diag の固定候補（本体 conf_model.py の CHAT_LOCAL_MODELS と同じ）。_config 側は廃止予定のため読まない。固定候補なので PASS（黄）。
+ if(selected.probe==='local-fixed'){
+  const details=safeDetails(idsCatalog(LOCAL_CHAT_MODELS),[]);
+  return {...output,状態:'PASS',説明:'本体と同じ固定候補（aidiy_diag の定義。本体 CHAT_LOCAL_MODELS と同じ）を使用します。backend_local は API でモデル一覧を取得しません。',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:new Date().toISOString(),一覧範囲:'固定候補（本体の local_chat）。'};
+ }
+ if(selected.probe==='ollama-local'){
+  const timestamp=new Date().toISOString(),[,values]=await readConfig(reader);
+  try {
+   const details=safeDetails(ollamaLocalCatalog(await fetch('ollama-local',{},undefined,signal)),secretValues(values));
+   return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,説明:'ローカルの Ollama からモデル一覧を取得しました（本体の ollama list と同じ一覧）。生成可否は未確認です。',一覧範囲:'インストール済みのローカルモデル（新しい順）。表示は最大500件。'};
+  }catch{return {...output,状態:'NG',説明:'ローカルの Ollama に接続できません。Ollama が起動しているか確認してください（本体ではこの場合 Ollama の候補が空になります）。',確認日時:timestamp};}
+ }
  if(id==='openrt'){
   if(!ready)return {...output,説明:'起動時の公開OpenRouter一覧がまだ利用できません。キーのテストは未実施です。'};
-  const details=safeDetails(router,[]);
+  // 本体の get_chat_models と同じく、表示一覧では廃止モデルを除く（補完用の公開一覧は除かない）。
+  const details=safeDetails(withoutRetired(router),[]);
   return {...output,状態:'OK',説明:'起動時の匿名取得結果を表示。キーの有効性・生成可否・課金状態は未確認です。',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:record(cache)&&typeof cache.確認日時==='string'?cache.確認日時:null,一覧範囲:'公開一覧のキャッシュ。最大500件。'};
  }
  const [state,values]=await readConfig(reader);if(state==='読込不可')return {...output,説明:'設定を読み取れません。'};
@@ -122,19 +209,22 @@ export async function probe(id:string,{reader,fetch=fetchMetadata,now,cache,sign
  try {
   const headers:Record<string,string>=provider==='google'?{'x-goog-api-key':key}:provider==='anthropic'?{'x-api-key':key,'anthropic-version':'2023-06-01'}:{Authorization:'Bearer '+key};
   if(provider==='openai'&&configured(values.openai_organization,''))headers['OpenAI-Organization']=values.openai_organization.trim();
-  let body=await fetch(provider,headers,undefined,signal),models:Catalog;
+  let body=await fetch(provider,headers,undefined,signal),models:Catalog,live:string[]=[];
   if(provider==='google'){
    if(!Array.isArray(body.models))throw new Error('shape');const entries=[...body.models];let token=body.nextPageToken,pages=1;
    while(token){if(pages>=20)throw new Error('pages');body=await fetch(provider,headers,token,signal);if(!Array.isArray(body.models))throw new Error('shape');entries.push(...body.models);token=body.nextPageToken;pages++;}
+   live=entries.filter(item=>record(item)&&typeof item.name==='string'&&Array.isArray(item.supportedGenerationMethods)&&item.supportedGenerationMethods.includes('bidiGenerateContent')).map(item=>String((item as Dictionary).name).replaceAll('models/',''));
    models=googleCatalog(entries.map(item=>{if(!record(item)||typeof item.name!=='string'||(item.supportedGenerationMethods!==undefined&&(!Array.isArray(item.supportedGenerationMethods)||item.supportedGenerationMethods.some(x=>typeof x!=='string'))))throw new Error('shape');return {name:item.name,supported_actions:item.supportedGenerationMethods??[],input_token_limit:item.inputTokenLimit??null};}),router);
   }else {
    if(!Array.isArray(body.data))throw new Error('shape');
-   if(provider==='openai')models=openaiCatalog(body.data.map(item=>{if(!record(item)||typeof item.id!=='string'||typeof item.created!=='number')throw new Error('shape');return {id:item.id,created:item.created};}),router,now);
+   if(provider==='openai')models=withoutRetired(openaiCatalog(body.data.map(item=>{if(!record(item)||typeof item.id!=='string'||typeof item.created!=='number')throw new Error('shape');return {id:item.id,created:item.created};}),router,now));
    else if(provider==='anthropic')models=claudeCatalog({data:body.data.map(item=>{if(!record(item)||typeof item.id!=='string')throw new Error('shape');return {id:item.id,created_at:item.created_at};})},router,now);
    else models=ollamaCatalog(body,now);
   }
-  const secrets=KEY_PROVIDERS.map(p=>values[p.キー名]).filter((value):value is string=>configured(value,'')).map(value=>value.trim());if(configured(values.openai_organization,''))secrets.push(values.openai_organization.trim());
-  const details=safeDetails(models,secrets);
-  return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
+  const secrets=secretValues(values);
+  if(provider==='openai')live=Object.keys(models).filter(id=>id.toLowerCase().includes('realtime'));
+  const liveDate=(id:string)=>{const value=provider==='google'?router[`google/${id}`]?.作成日:models[id]?.作成日;return typeof value==='string'&&/^\d{4}\/\d{2}\/\d{2}$/.test(value)?value:null;};
+  const details=safeDetails(models,secrets),liveCandidates=[...new Set(live)].filter(id=>/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)&&!secrets.some(secret=>id.includes(secret))).slice(0,200);
+  return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,ライブ候補:liveCandidates,ライブ候補作成日:Object.fromEntries(liveCandidates.map(id=>[id,liveDate(id)])),確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
  }catch{return {...output,状態:'NG',説明:'モデル一覧APIの通信または診断用モデル処理に失敗しました。',確認日時:timestamp,警告:warnings};}
 }

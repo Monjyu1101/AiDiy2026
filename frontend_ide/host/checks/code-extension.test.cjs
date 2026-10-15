@@ -222,18 +222,18 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     receive({type:'chooseModel',provider:''});await flush();
     assert.deepEqual(posts.findLast(p=>p.type==='modelCatalog').items.map(m=>m.id),['aidiy_hermes']);
     receive({type:'chooseModel',provider:'aidiy_hermes'});await flush();
-    assert.ok(posts.findLast(p=>p.type==='modelCatalog').items.some(m=>m.id==='copilot_cli/same'));
-    receive({type:'setModel',provider:'aidiy_hermes',model:'copilot_cli/same'});await flush();
-    assert.equal(latest().model,'copilot_cli/same');assert.equal(backend.requests.length,requestsBefore);
+    assert.ok(posts.findLast(p=>p.type==='modelCatalog').items.some(m=>m.id==='copilot_cli/auto'));
+    receive({type:'setModel',provider:'aidiy_hermes',model:'copilot_cli/auto'});await flush();
+    assert.equal(latest().model,'copilot_cli/auto');assert.equal(backend.requests.length,requestsBefore);
     assert.deepEqual(preferences.get('online.json'),{provider:'copilot_cli',model:'gpt-6-sol'});
-    assert.deepEqual(preferences.get('online_offline.json'),{provider:'aidiy_hermes',model:'copilot_cli/same'});
+    assert.deepEqual(preferences.get('online_offline.json'),{provider:'aidiy_hermes',model:'copilot_cli/auto'});
     backend.unavailable=true;receive({type:'autoConnect',enabled:true});await flush();
     ui.input('切断中');assert.equal(ui.element('send').disabled,false);
     ui.element('composer').listeners.get('submit')({preventDefault(){}});await flush();
-    assert.equal(runs.length,1);assert.equal(runs[0].model,'copilot_cli/same');assert.equal(runs[0].session,undefined);
+    assert.equal(runs.length,1);assert.equal(runs[0].model,'copilot_cli/auto');assert.equal(runs[0].session,undefined);
     assert.equal(runs[0].project,'/project');assert.equal(latest().実行中,true);
     backend.unavailable=false;t.mock.timers.tick(10000);await flush();assert.equal(latest().接続済み,true);
-    assert.equal(latest().実行モード,'offline');assert.equal(latest().model,'copilot_cli/same');assert.equal(latest().実行中,true);
+    assert.equal(latest().実行モード,'offline');assert.equal(latest().model,'copilot_cli/auto');assert.equal(latest().実行中,true);
     for(const data of [{type:'autoConnect',enabled:false},{type:'autoConnect',enabled:true},{type:'connect'},{type:'disconnect'}]) {
       receive(data);await flush();assert.equal(latest().接続済み,true);assert.equal(latest().実行中,true);
     }
@@ -248,7 +248,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.equal(latest().HermesセッションID,'hermes-only');assert.equal(latest().コアセッションID,coreSession);
     receive({type:'disconnect'});await flush();
     receive({メッセージ識別:'input_text',メッセージ内容:'Hermes続き'});await flush();
-    assert.equal(runs[1].session,'hermes-only');assert.equal(runs[1].model,'copilot_cli/same');
+    assert.equal(runs[1].session,'hermes-only');assert.equal(runs[1].model,'copilot_cli/auto');
     receive({メッセージ識別:'cancel_run'});await flush();assert.equal(runs[1].stops,1);
     runs[1].receive({メッセージ識別:'output_stream',メッセージ内容:'\x18'});
     receive({メッセージ識別:'cancel_run'});await flush();assert.equal(runs[1].stops,1);
@@ -257,7 +257,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     receive({type:'connect'});await flush();assert.equal(latest().provider,'copilot_cli');
     // 再起動でもモード別の保存値を読む。
     provider.dispose();loaded.exports.activate(context);provider.resolveWebviewView(view);visibility();
-    assert.equal(latest().provider,'aidiy_hermes');assert.equal(latest().model,'copilot_cli/same');
+    assert.equal(latest().provider,'aidiy_hermes');assert.equal(latest().model,'copilot_cli/auto');
     receive({type:'ready'});await flush();assert.equal(latest().provider,'copilot_cli');assert.equal(latest().model,'gpt-6-sol');
     assert.equal(latest().自動接続,true);
     receive({type:'disconnect'});await flush();vscode.workspace.isTrusted=false;

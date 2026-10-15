@@ -2,7 +2,10 @@
 import { open, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
+import path from "node:path";
 import https from "node:https";
+import http from "node:http";
 
 // backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
@@ -125,6 +128,106 @@ function ollamaCatalog(body, now = /* @__PURE__ */ new Date()) {
   }
   return out;
 }
+function isRetiredOpenaiModel(id) {
+  const slug = (id.trim().toLowerCase().split("/").at(-1) ?? "").replace(/^openai\./, "");
+  return slug === "gpt-6-sol" || slug.startsWith("gpt-6-sol-") || slug.startsWith("gpt-6-sol.");
+}
+function withoutRetired(models) {
+  const out = empty();
+  for (const [id, model] of Object.entries(models)) if (!isRetiredOpenaiModel(id)) out[id] = model;
+  return out;
+}
+var DEFAULT_CODEX_MODELS = Object.freeze(["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]);
+var OAUTH_FALLBACK_MODELS = Object.freeze(["gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]);
+var FORWARD_COMPAT = [["gpt-6-astra", ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"]], ["gpt-6.1-sol", ["gpt-5.5", "gpt-5.4"]], ["gpt-5.6-terra", ["gpt-5.5", "gpt-5.4"]], ["gpt-6-luna", ["gpt-5.5", "gpt-5.4"]]];
+var CONTEXT_SUFFIX = "-900k";
+var CONTEXT_BASES = /* @__PURE__ */ new Set(["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-5.4", "gpt-daybreak-blue-latest"]);
+var CONTEXT_SNAPSHOT_BASES = ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"];
+function isCodex900kBase(model) {
+  const slug = model.trim().toLowerCase().split("/").at(-1) ?? "";
+  if (!slug || slug.endsWith(CONTEXT_SUFFIX)) return false;
+  if (CONTEXT_BASES.has(slug)) return true;
+  return CONTEXT_SNAPSHOT_BASES.some((base) => slug.startsWith(base + "-") && /^\d{4}-\d{2}-\d{2}$/.test(slug.slice(base.length + 1)));
+}
+function finalizeCodexModels(ids) {
+  const ordered = [], seen = /* @__PURE__ */ new Set();
+  for (const id of ids.filter((id2) => !isRetiredOpenaiModel(id2))) if (!seen.has(id)) {
+    ordered.push(id);
+    seen.add(id);
+  }
+  for (const [synthetic, templates] of FORWARD_COMPAT) if (!seen.has(synthetic) && templates.some((template) => seen.has(template))) {
+    ordered.push(synthetic);
+    seen.add(synthetic);
+  }
+  const out = [], present = new Set(ordered);
+  for (const id of ordered) {
+    out.push(id);
+    const variant = id + CONTEXT_SUFFIX;
+    if (present.has(variant) || out.includes(variant)) continue;
+    if (isCodex900kBase(id)) out.push(variant);
+  }
+  return out;
+}
+function codexSlugs(body) {
+  const items = row(body).models;
+  if (!Array.isArray(items)) throw new Error("shape");
+  const sortable = [];
+  for (const entry of items) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const item = entry, slug = typeof item.slug === "string" ? item.slug.trim() : "";
+    if (!slug) continue;
+    if (typeof item.visibility === "string" && ["hide", "hidden"].includes(item.visibility.trim().toLowerCase())) continue;
+    sortable.push([typeof item.priority === "number" && Number.isFinite(item.priority) ? Math.trunc(item.priority) : 1e4, slug]);
+  }
+  sortable.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
+  return [...new Set(sortable.map(([, slug]) => slug))];
+}
+function idsCatalog(ids) {
+  const out = empty();
+  for (const id of ids) if (!isRetiredOpenaiModel(id) && !Object.hasOwn(out, id)) out[id] = { model_id: id, \u30C8\u30FC\u30AF\u30F3\u6570: null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  return out;
+}
+function codexCatalog(body) {
+  return idsCatalog(finalizeCodexModels(codexSlugs(body)));
+}
+function codexFallbackCatalog(defaultModel, cacheIds) {
+  const ordered = [];
+  for (const id of [...defaultModel ? [defaultModel] : [], ...cacheIds, ...DEFAULT_CODEX_MODELS]) if (!ordered.includes(id)) ordered.push(id);
+  const ids = finalizeCodexModels(ordered);
+  return idsCatalog(ids.length ? ids : OAUTH_FALLBACK_MODELS);
+}
+var GROK_CLI_MODELS = Object.freeze(["grok-4.7", "grok-4.6"]);
+var LOCAL_CHAT_MODELS = Object.freeze(["google/gemma-4-E2B-it", "google/gemma-4-E4B-it", "google/gemma-4-E2B-it-qat-mobile-transformers", "google/gemma-4-E4B-it-qat-mobile-transformers"]);
+function grokCatalog(body) {
+  const source = row(body), list = Array.isArray(source.data) ? source.data : Array.isArray(source.models) ? source.models : null;
+  if (!list) throw new Error("shape");
+  const out = empty();
+  for (const entry of list) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const item = entry, info = item.info !== null && typeof item.info === "object" && !Array.isArray(item.info) ? item.info : {};
+    const id = [item.id, item.model, item.slug, info.id].find((value) => typeof value === "string" && !!value.trim())?.trim();
+    if (!id || item.hidden === true || info.hidden === true || Object.hasOwn(out, id)) continue;
+    const context = [item.context_window, item.context_length, info.context_window].find((value) => typeof value === "number");
+    out[id] = { model_id: id, \u30C8\u30FC\u30AF\u30F3\u6570: typeof context === "number" ? String(context) : null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  }
+  return out;
+}
+function ollamaLocalCatalog(body) {
+  const items = row(body).models;
+  if (!Array.isArray(items)) throw new Error("shape");
+  const rows = items.filter((item) => item !== null && typeof item === "object" && !Array.isArray(item) && typeof item.name === "string" && !!item.name.trim());
+  const time = (item) => {
+    const value = Date.parse(String(item.modified_at ?? ""));
+    return Number.isFinite(value) ? value : 0;
+  };
+  rows.sort((a, b) => time(b) - time(a));
+  const out = empty();
+  for (const item of rows) {
+    const name = item.name.trim().split(/\s+/)[0];
+    if (!Object.hasOwn(out, name)) out[name] = { model_id: name, \u30C8\u30FC\u30AF\u30F3\u6570: null, \u30E2\u30C0\u30EA\u30C6\u30A3: null, \u4F5C\u6210\u65E5: null };
+  }
+  return out;
+}
 
 // backend_diag/runtime/model_probe.ts
 var CONFIG_LIMIT = 128 * 1024;
@@ -140,61 +243,121 @@ var KEY_PROVIDERS = Object.freeze([
   ["freeai", "FreeAI\uFF08Gemini\uFF09", "freeai_key_id", "google"],
   ["claude", "Claude", "claude_key_id", "anthropic"],
   ["openai", "OpenAI API", "openai_key_id", "openai"],
+  ["openai_oauth", "OpenAI OAuth", "~/.codex/auth.json", "codex"],
+  ["grok", "Grok\uFF08xAI\uFF09", "~/.grok/auth.json", "grok"],
   ["azure", "Azure OpenAI", "azure_key_id", null],
   ["copilot", "GitHub Copilot", "copilot_key_id", null],
   ["openrt", "OpenRouter", "openrt_key_id", "openrouter"],
-  ["ollama", "Ollama Cloud", "ollama_key_id", "ollama"],
+  ["ollama", "Ollama\uFF08\u30ED\u30FC\u30AB\u30EB\uFF09", "ollama list", "ollama-local"],
+  ["local", "\u30ED\u30FC\u30AB\u30EB\uFF08backend_local\uFF09", "\u56FA\u5B9A\u5019\u88DC", "local-fixed"],
   ["huggingface_read", "Hugging Face \u8AAD\u53D6", "huggingface_key_read", null],
   ["huggingface_write", "Hugging Face \u66F8\u8FBC", "huggingface_key_write", null],
   ["discord", "Discord Bot", "DISCORD_BOT_TOKEN", null]
-].map(([id, \u540D\u524D, \u30AD\u30FC\u540D, probe2]) => Object.freeze({ id, \u540D\u524D, \u30AD\u30FC\u540D, probe: probe2 })));
+].map(([id, \u540D\u524D, \u30AD\u30FC\u540D, probe2]) => Object.freeze({ id, \u540D\u524D, \u30AD\u30FC\u540D, probe: probe2, oauth: probe2 === "codex" || probe2 === "grok" ? probe2 : null })));
+var SECRET_CONFIG_KEYS = Object.freeze(["gemini_key_id", "freeai_key_id", "claude_key_id", "openai_key_id", "azure_key_id", "copilot_key_id", "openrt_key_id", "ollama_key_id", "huggingface_key_read", "huggingface_key_write", "DISCORD_BOT_TOKEN", "openai_organization"]);
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+async function readLimited(file, limit = CONFIG_LIMIT) {
+  const before = await stat(file);
+  if (!before.isFile() || before.size > limit) throw new Error("file");
+  const handle = await open(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > limit) throw new Error("file");
+    const bytes = Buffer.alloc(limit + 1);
+    let total = 0;
+    while (total < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, total, bytes.length - total, total);
+      if (!bytesRead) break;
+      total += bytesRead;
+    }
+    return bytes.subarray(0, total);
+  } finally {
+    await handle.close();
+  }
+}
+function parseJson(raw, limit = CONFIG_LIMIT) {
+  const bytes = typeof raw === "string" ? Buffer.from(raw) : Buffer.from(raw);
+  if (bytes.length > limit) throw new Error("size");
+  const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^﻿/, ""));
+  if (!record(value)) throw new Error("shape");
+  return value;
+}
 async function readConfig(reader) {
   try {
-    let raw;
-    if (reader) raw = await reader(CONFIG_PATH);
-    else {
-      const before = await stat(CONFIG_PATH);
-      if (!before.isFile() || before.size > CONFIG_LIMIT) throw new Error("file");
-      const handle = await open(CONFIG_PATH, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
-      try {
-        const info = await handle.stat();
-        if (!info.isFile() || info.size > CONFIG_LIMIT) throw new Error("file");
-        const bytes2 = Buffer.alloc(CONFIG_LIMIT + 1);
-        let total = 0;
-        while (total < bytes2.length) {
-          const { bytesRead } = await handle.read(bytes2, total, bytes2.length - total, total);
-          if (!bytesRead) break;
-          total += bytesRead;
-        }
-        raw = bytes2.subarray(0, total);
-      } finally {
-        await handle.close();
-      }
-    }
-    const bytes = typeof raw === "string" ? Buffer.from(raw) : Buffer.from(raw);
-    if (bytes.length > CONFIG_LIMIT) throw new Error("size");
-    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, ""));
-    if (!record(value)) throw new Error("shape");
-    return ["\u8AAD\u8FBC\u6E08\u307F", value];
+    return ["\u8AAD\u8FBC\u6E08\u307F", parseJson(reader ? await reader(CONFIG_PATH) : await readLimited(CONFIG_PATH))];
   } catch (error) {
     return [error?.code === "ENOENT" ? "\u672A\u4F5C\u6210" : "\u8AAD\u8FBC\u4E0D\u53EF", {}];
   }
 }
+function oauthPath(kind, env = process.env, home = os.homedir()) {
+  return kind === "codex" ? path.join(env.CODEX_HOME?.trim() || path.join(home, ".codex"), "auth.json") : path.join(home, ".grok", "auth.json");
+}
+function jwtClaims(token) {
+  try {
+    const value = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+    return record(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+async function readOAuth(kind, reader) {
+  try {
+    const value = parseJson(reader ? await reader(kind) : await readLimited(oauthPath(kind)));
+    if (kind === "codex") {
+      const tokens = value.tokens;
+      if (!record(tokens) || typeof tokens.access_token !== "string" || !tokens.access_token.trim()) return null;
+      const token = tokens.access_token.trim(), claims = jwtClaims(token), auth = record(claims["https://api.openai.com/auth"]) ? claims["https://api.openai.com/auth"] : {};
+      const account = [tokens.account_id, auth.chatgpt_account_id].find((v) => typeof v === "string" && !!v.trim())?.trim() ?? null;
+      return { token, account, expiresAt: typeof claims.exp === "number" ? claims.exp * 1e3 : null };
+    }
+    for (const [issuer, entry] of Object.entries(value)) {
+      if (!issuer.startsWith("https://auth.x.ai") || !record(entry) || typeof entry.key !== "string" || !entry.key.trim()) continue;
+      const expires = Date.parse(String(entry.expires_at ?? ""));
+      return { token: entry.key.trim(), account: null, expiresAt: Number.isFinite(expires) ? expires : null };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+var OAUTH_CLI = { codex: "codex", grok: "grok" };
+async function readCodexLocal(reader, env = process.env, home = os.homedir()) {
+  const folder = path.dirname(oauthPath("codex", env, home)), read = async (name) => reader ? await reader(name) : await readLimited(path.join(folder, name), RESPONSE_LIMIT);
+  let defaultModel = null, cacheIds = [];
+  try {
+    const text = Buffer.from(await read("config.toml")).toString("utf8"), top = text.split(/^\s*\[/m)[0];
+    const match = /^\s*model\s*=\s*(["'])([^"'\r\n]+)\1/m.exec(top);
+    if (match && match[2].trim()) defaultModel = match[2].trim();
+  } catch {
+  }
+  try {
+    cacheIds = codexSlugs(parseJson(await read("models_cache.json"), RESPONSE_LIMIT));
+  } catch {
+  }
+  return { defaultModel, cacheIds };
+}
 function configured(value, id) {
   return typeof value === "string" && !!value.trim() && !value.trim().startsWith("<") && !(id === "ollama" && value.trim().toLowerCase() === "ollama");
 }
-async function status({ reader } = {}) {
+async function status({ reader, oauthReader } = {}) {
   const [state, values] = await readConfig(reader);
+  const oauth = { codex: !!await readOAuth("codex", oauthReader), grok: !!await readOAuth("grok", oauthReader) };
   return { \u8A2D\u5B9A\u72B6\u614B: state, \u9805\u76EE: KEY_PROVIDERS.map((p) => {
+    if (p.probe === "local-fixed") return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: null, \u30AD\u30FC\u4E0D\u8981: true, \u30ED\u30FC\u30AB\u30EB: true, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: "", \u30C6\u30B9\u30C8\u53EF\u80FD: true, \u8AAC\u660E: "\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08CHAT_LOCAL_MODELS\uFF09\u3092\u4F7F\u3044\u307E\u3059\uFF08API \u53D6\u5F97\u306A\u3057\uFF09\u3002" };
+    if (p.probe === "ollama-local") return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: null, \u30AD\u30FC\u4E0D\u8981: true, \u30ED\u30FC\u30AB\u30EB: true, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: "", \u30C6\u30B9\u30C8\u53EF\u80FD: true, \u8AAC\u660E: "\u672C\u4F53\u3068\u540C\u3058\u304F\u3001\u30ED\u30FC\u30AB\u30EB\u306E Ollama\uFF08ollama list \u3068\u540C\u3058\u4E00\u89A7\uFF09\u3092\u78BA\u8A8D\u3057\u307E\u3059\u3002\u30AD\u30FC\u306F\u4F7F\u3044\u307E\u305B\u3093\u3002" };
+    if (p.oauth) {
+      const present2 = oauth[p.oauth];
+      return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present2, \u30AD\u30FC\u4E0D\u8981: false, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: present2 ? "" : `\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u304C\u3042\u308A\u307E\u305B\u3093\u3002${OAUTH_CLI[p.oauth]} CLI \u3067\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002`, \u30C6\u30B9\u30C8\u53EF\u80FD: present2, \u8AAC\u660E: "\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\uFF08OAuth\uFF09\u306E\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
+    }
     const present = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? null : configured(values[p.\u30AD\u30FC\u540D], p.id), publicRow = p.id === "openrt";
     const reason = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? "\u8A2D\u5B9A\u3092\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3002" : !present && !publicRow ? "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" : !p.probe ? "\u3053\u306E\u9805\u76EE\u306E\u63A5\u7D9A\u30C6\u30B9\u30C8\u306F\u672A\u5BFE\u5FDC\u3067\u3059\u3002" : "";
     return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present, \u30AD\u30FC\u4E0D\u8981: publicRow, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: reason, \u30C6\u30B9\u30C8\u53EF\u80FD: state !== "\u8AAD\u8FBC\u4E0D\u53EF" && !!p.probe && (!!present || publicRow), \u8AAC\u660E: publicRow ? "\u8D77\u52D5\u6642\u306E\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u8868\u793A\u3057\u307E\u3059\u3002\u30AD\u30FC\u306E\u6709\u52B9\u6027\u306F\u78BA\u8A8D\u3057\u307E\u305B\u3093\u3002" : "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
   }), \u30E2\u30C7\u30EB: [] };
 }
-var ENDPOINTS = { google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], ollama: ["ollama.com", "/v1/models"] };
+var LOCAL_ENDPOINTS = { "ollama-local": ["127.0.0.1", 11434, "/api/tags"] };
+var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], ollama: ["ollama.com", "/v1/models"] };
 var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resolve, reject) => {
-  const endpoint = ENDPOINTS[provider];
+  const local = LOCAL_ENDPOINTS[provider], endpoint = local ? [local[0], local[2]] : ENDPOINTS[provider];
   if (!endpoint) return reject(new Error("provider"));
   let pathname = endpoint[1];
   if (pageToken) {
@@ -205,7 +368,7 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
   const responseLimit = provider === "openrouter" && Object.keys(headers).length === 0 ? PUBLIC_RESPONSE_LIMIT : RESPONSE_LIMIT;
   let settled = false, size = 0;
   const chunks = [];
-  const request = https.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, (response) => {
+  const respond = (response) => {
     if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
       response.destroy();
       return finish(new Error("http"));
@@ -228,9 +391,10 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
         finish(new Error("json"));
       }
     });
-  });
+  };
+  const request = local ? http.request({ hostname: local[0], port: local[1], path: pathname, method: "GET", agent: false, headers: { Accept: "application/json", ...headers } }, respond) : https.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, respond);
   const cancel = () => finish(new Error("stopped"));
-  const timer = setTimeout(() => finish(new Error("timeout")), 8e3);
+  const timer = setTimeout(() => finish(new Error("timeout")), local ? 1e4 : 8e3);
   function finish(error, value) {
     if (settled) return;
     settled = true;
@@ -248,10 +412,13 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
   });
   request.end();
 });
+function secretValues(values) {
+  return SECRET_CONFIG_KEYS.map((name) => values[name]).filter((value) => configured(value, "")).map((value) => value.trim());
+}
 function safeDetails(models, secrets, limit = 500) {
   const result = [];
   for (const [id, entry] of Object.entries(models)) {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id) || !record(entry)) continue;
+    if (!/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id) || !record(entry)) continue;
     const values = { ...entry, model_id: id }, cleaned = {};
     for (const name of ["model_id", "\u4F5C\u6210\u65E5", "\u30C8\u30FC\u30AF\u30F3\u6570", "\u30E2\u30C0\u30EA\u30C6\u30A3"]) {
       const value = values[name];
@@ -282,14 +449,45 @@ async function publicCatalog({ fetch = fetchMetadata, now, signal } = {}) {
     return { \u72B6\u614B: "NG", \u516C\u958B\u30E2\u30C7\u30EB: {}, \u78BA\u8A8D\u65E5\u6642: timestamp, \u5931\u6557\u7406\u7531: code, \u8AAC\u660E: publicFailureDescription(code) };
   }
 }
-async function probe(id, { reader, fetch = fetchMetadata, now, cache, signal } = {}) {
+async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchMetadata, now, cache, signal } = {}) {
   const output = { id, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u8AAC\u660E: "\u672A\u5BFE\u5FDC\u306E\u9805\u76EE\u3067\u3059\u3002", \u30E2\u30C7\u30EB: [], \u30E2\u30C7\u30EB\u8A73\u7D30: [], \u78BA\u8A8D\u65E5\u6642: null, \u8B66\u544A: [] };
   const selected = KEY_PROVIDERS.find((row2) => row2.id === id);
   if (!selected?.probe) return output;
+  if (selected.oauth) {
+    const kind = selected.oauth, cli = OAUTH_CLI[kind], credential = await readOAuth(kind, oauthReader);
+    if (!credential) return { ...output, \u8AAC\u660E: `\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u304C\u3042\u308A\u307E\u305B\u3093\u3002${cli} CLI \u3067\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002` };
+    const timestamp2 = (/* @__PURE__ */ new Date()).toISOString(), expired = credential.expiresAt !== null && credential.expiresAt <= (now ?? /* @__PURE__ */ new Date()).getTime();
+    const expiredNote = `\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u306E\u6709\u52B9\u671F\u9650\u304C\u5207\u308C\u3066\u3044\u307E\u3059\u3002${cli} CLI \u3092\u8D77\u52D5\u3057\u3066\u518D\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\uFF08\u8A3A\u65AD\u306F\u30C8\u30FC\u30AF\u30F3\u3092\u66F4\u65B0\u3057\u307E\u305B\u3093\uFF09\u3002`;
+    try {
+      const headers = { Authorization: "Bearer " + credential.token, "User-Agent": "aidiy-diag" };
+      if (credential.account) headers["ChatGPT-Account-Id"] = credential.account;
+      const body = await fetch(kind, headers, void 0, signal);
+      const details = safeDetails(kind === "codex" ? codexCatalog(body) : grokCatalog(body), [credential.token, ...credential.account ? [credential.account] : []]);
+      return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u8B66\u544A: expired ? [expiredNote] : [], \u8AAC\u660E: "OAuth \u306E\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u3067\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\u3002\u751F\u6210\u53EF\u5426\u30FB\u5229\u7528\u4E0A\u9650\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: kind === "codex" ? "\u672C\u4F53\uFF08get_codex_model_ids\uFF09\u3068\u540C\u3058\u304F\u3001\u975E\u8868\u793A\u30FB\u5EC3\u6B62\u30E2\u30C7\u30EB\u3092\u9664\u3044\u3066\u512A\u5148\u5EA6\u9806\u306B\u4E26\u3079\u3001\u5C06\u6765\u7248\u3068 -900k \u7248\u3092\u88DC\u5B8C\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" : "\u672C\u4F53\u306B API \u4E00\u89A7\u306E\u7D5E\u308A\u8FBC\u307F\u306F\u7121\u3044\u305F\u3081\u3001\u975E\u8868\u793A\u30E2\u30C7\u30EB\u3060\u3051\u3092\u9664\u5916\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" };
+    } catch {
+      const fallback = kind === "codex" ? await readCodexLocal(codexLocalReader).then((local) => codexFallbackCatalog(local.defaultModel, local.cacheIds)) : idsCatalog(GROK_CLI_MODELS);
+      const details = safeDetails(fallback, [credential.token, ...credential.account ? [credential.account] : []]);
+      const reason = expired ? expiredNote : "OAuth \u306E\u30E2\u30C7\u30EB\u4E00\u89A7\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u30ED\u30B0\u30A4\u30F3\u72B6\u614B\u3068\u901A\u4FE1\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+      return { ...output, \u72B6\u614B: kind === "grok" ? "PASS" : "NG", \u8AAC\u660E: kind === "grok" ? `\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08${GROK_CLI_MODELS.join(" / ")}\uFF09\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002API \u4E00\u89A7\u306F\u672A\u53D6\u5F97: ${reason}` : reason, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u8B66\u544A: [kind === "codex" ? "API \u304B\u3089\u53D6\u5F97\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u672C\u4F53\u3068\u540C\u3058\u4EE3\u66FF\u5019\u88DC\uFF08~/.codex \u306E config.toml\u30FBmodels_cache.json\u30FB\u65E2\u5B9A\u5024\uFF09\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059\u3002" : "API \u304B\u3089\u53D6\u5F97\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08Grok Build CLI \u306E grok-4.7 / grok-4.6\uFF09\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059\u3002"], \u4E00\u89A7\u7BC4\u56F2: "\u4EE3\u66FF\u5019\u88DC\uFF08\u672C\u4F53\u304C API \u53D6\u5F97\u5931\u6557\u6642\u306B\u4F7F\u3046\u4E00\u89A7\uFF09\u3002" };
+    }
+  }
   const [router, ready] = validatedCache(cache);
+  if (selected.probe === "local-fixed") {
+    const details = safeDetails(idsCatalog(LOCAL_CHAT_MODELS), []);
+    return { ...output, \u72B6\u614B: "PASS", \u8AAC\u660E: "\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08aidiy_diag \u306E\u5B9A\u7FA9\u3002\u672C\u4F53 CHAT_LOCAL_MODELS \u3068\u540C\u3058\uFF09\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002backend_local \u306F API \u3067\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u305B\u3093\u3002", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: (/* @__PURE__ */ new Date()).toISOString(), \u4E00\u89A7\u7BC4\u56F2: "\u56FA\u5B9A\u5019\u88DC\uFF08\u672C\u4F53\u306E local_chat\uFF09\u3002" };
+  }
+  if (selected.probe === "ollama-local") {
+    const timestamp2 = (/* @__PURE__ */ new Date()).toISOString(), [, values2] = await readConfig(reader);
+    try {
+      const details = safeDetails(ollamaLocalCatalog(await fetch("ollama-local", {}, void 0, signal)), secretValues(values2));
+      return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u8AAC\u660E: "\u30ED\u30FC\u30AB\u30EB\u306E Ollama \u304B\u3089\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\uFF08\u672C\u4F53\u306E ollama list \u3068\u540C\u3058\u4E00\u89A7\uFF09\u3002\u751F\u6210\u53EF\u5426\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u6E08\u307F\u306E\u30ED\u30FC\u30AB\u30EB\u30E2\u30C7\u30EB\uFF08\u65B0\u3057\u3044\u9806\uFF09\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" };
+    } catch {
+      return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30ED\u30FC\u30AB\u30EB\u306E Ollama \u306B\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3002Ollama \u304C\u8D77\u52D5\u3057\u3066\u3044\u308B\u304B\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\uFF08\u672C\u4F53\u3067\u306F\u3053\u306E\u5834\u5408 Ollama \u306E\u5019\u88DC\u304C\u7A7A\u306B\u306A\u308A\u307E\u3059\uFF09\u3002", \u78BA\u8A8D\u65E5\u6642: timestamp2 };
+    }
+  }
   if (id === "openrt") {
     if (!ready) return { ...output, \u8AAC\u660E: "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u304C\u307E\u3060\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002\u30AD\u30FC\u306E\u30C6\u30B9\u30C8\u306F\u672A\u5B9F\u65BD\u3067\u3059\u3002" };
-    const details = safeDetails(router, []);
+    const details = safeDetails(withoutRetired(router), []);
     return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: "\u8D77\u52D5\u6642\u306E\u533F\u540D\u53D6\u5F97\u7D50\u679C\u3092\u8868\u793A\u3002\u30AD\u30FC\u306E\u6709\u52B9\u6027\u30FB\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: record(cache) && typeof cache.\u78BA\u8A8D\u65E5\u6642 === "string" ? cache.\u78BA\u8A8D\u65E5\u6642 : null, \u4E00\u89A7\u7BC4\u56F2: "\u516C\u958B\u4E00\u89A7\u306E\u30AD\u30E3\u30C3\u30B7\u30E5\u3002\u6700\u5927500\u4EF6\u3002" };
   }
   const [state, values] = await readConfig(reader);
@@ -301,7 +499,7 @@ async function probe(id, { reader, fetch = fetchMetadata, now, cache, signal } =
   try {
     const headers = provider === "google" ? { "x-goog-api-key": key } : provider === "anthropic" ? { "x-api-key": key, "anthropic-version": "2023-06-01" } : { Authorization: "Bearer " + key };
     if (provider === "openai" && configured(values.openai_organization, "")) headers["OpenAI-Organization"] = values.openai_organization.trim();
-    let body = await fetch(provider, headers, void 0, signal), models;
+    let body = await fetch(provider, headers, void 0, signal), models, live = [];
     if (provider === "google") {
       if (!Array.isArray(body.models)) throw new Error("shape");
       const entries2 = [...body.models];
@@ -314,26 +512,31 @@ async function probe(id, { reader, fetch = fetchMetadata, now, cache, signal } =
         token = body.nextPageToken;
         pages++;
       }
+      live = entries2.filter((item) => record(item) && typeof item.name === "string" && Array.isArray(item.supportedGenerationMethods) && item.supportedGenerationMethods.includes("bidiGenerateContent")).map((item) => String(item.name).replaceAll("models/", ""));
       models = googleCatalog(entries2.map((item) => {
         if (!record(item) || typeof item.name !== "string" || item.supportedGenerationMethods !== void 0 && (!Array.isArray(item.supportedGenerationMethods) || item.supportedGenerationMethods.some((x) => typeof x !== "string"))) throw new Error("shape");
         return { name: item.name, supported_actions: item.supportedGenerationMethods ?? [], input_token_limit: item.inputTokenLimit ?? null };
       }), router);
     } else {
       if (!Array.isArray(body.data)) throw new Error("shape");
-      if (provider === "openai") models = openaiCatalog(body.data.map((item) => {
+      if (provider === "openai") models = withoutRetired(openaiCatalog(body.data.map((item) => {
         if (!record(item) || typeof item.id !== "string" || typeof item.created !== "number") throw new Error("shape");
         return { id: item.id, created: item.created };
-      }), router, now);
+      }), router, now));
       else if (provider === "anthropic") models = claudeCatalog({ data: body.data.map((item) => {
         if (!record(item) || typeof item.id !== "string") throw new Error("shape");
         return { id: item.id, created_at: item.created_at };
       }) }, router, now);
       else models = ollamaCatalog(body, now);
     }
-    const secrets = KEY_PROVIDERS.map((p) => values[p.\u30AD\u30FC\u540D]).filter((value) => configured(value, "")).map((value) => value.trim());
-    if (configured(values.openai_organization, "")) secrets.push(values.openai_organization.trim());
-    const details = safeDetails(models, secrets);
-    return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings, \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u53D6\u5F97\u6210\u529F\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7D5E\u308A\u8FBC\u307F\u30FB\u88DC\u5B8C\u3092\u9069\u7528\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3092\u79FB\u690D\u3057\u305F\u53D6\u5F97\u30E2\u30C7\u30EB\u306E\u7D5E\u308A\u8FBC\u307F\u7D50\u679C\u3001\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002\u9759\u7684\u30FBOAuth\u5019\u88DC\u306F\u542B\u307F\u307E\u305B\u3093\u3002", \u88DC\u5B8C: ["google", "openai", "anthropic"].includes(provider) ? "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u5229\u7528\u3002\u30C6\u30B9\u30C8\u6642\u306E\u8FFD\u52A0\u53D6\u5F97\u306F\u884C\u3044\u307E\u305B\u3093\u3002" : "" };
+    const secrets = secretValues(values);
+    if (provider === "openai") live = Object.keys(models).filter((id2) => id2.toLowerCase().includes("realtime"));
+    const liveDate = (id2) => {
+      const value = provider === "google" ? router[`google/${id2}`]?.\u4F5C\u6210\u65E5 : models[id2]?.\u4F5C\u6210\u65E5;
+      return typeof value === "string" && /^\d{4}\/\d{2}\/\d{2}$/.test(value) ? value : null;
+    };
+    const details = safeDetails(models, secrets), liveCandidates = [...new Set(live)].filter((id2) => /^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id2) && !secrets.some((secret) => id2.includes(secret))).slice(0, 200);
+    return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u30E9\u30A4\u30D6\u5019\u88DC: liveCandidates, \u30E9\u30A4\u30D6\u5019\u88DC\u4F5C\u6210\u65E5: Object.fromEntries(liveCandidates.map((id2) => [id2, liveDate(id2)])), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings, \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u53D6\u5F97\u6210\u529F\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7D5E\u308A\u8FBC\u307F\u30FB\u88DC\u5B8C\u3092\u9069\u7528\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3092\u79FB\u690D\u3057\u305F\u53D6\u5F97\u30E2\u30C7\u30EB\u306E\u7D5E\u308A\u8FBC\u307F\u7D50\u679C\u3001\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002\u9759\u7684\u30FBOAuth\u5019\u88DC\u306F\u542B\u307F\u307E\u305B\u3093\u3002", \u88DC\u5B8C: ["google", "openai", "anthropic"].includes(provider) ? "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u5229\u7528\u3002\u30C6\u30B9\u30C8\u6642\u306E\u8FFD\u52A0\u53D6\u5F97\u306F\u884C\u3044\u307E\u305B\u3093\u3002" : "" };
   } catch {
     return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u306E\u901A\u4FE1\u307E\u305F\u306F\u8A3A\u65AD\u7528\u30E2\u30C7\u30EB\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings };
   }
@@ -345,10 +548,13 @@ export {
   RESPONSE_LIMIT,
   configured,
   fetchMetadata,
+  oauthPath,
   probe,
   publicCatalog,
   publicFailureDescription,
+  readCodexLocal,
   readConfig,
+  readOAuth,
   safeDetails,
   status,
   validatedCache

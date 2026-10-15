@@ -135,7 +135,7 @@ MANAGED_SERVICE_NAMES = frozenset({
     "バックエンド(core)",
     "バックエンド(apps)",
     "バックエンド(task,team)",
-    "フロントエンド(diag)",
+    "バックエンド(Diag)",
     "フロントエンド(Web)",
     "フロントエンド(Avatar)",
     "フロントエンド(code)",
@@ -489,7 +489,7 @@ def collect_startup_choices() -> tuple[bool, ...]:
     web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=True)
     avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=False)
     print("フロントエンド(IDE)")
-    diag_enabled          = prompt_choice("  Diag      : 起動しますか?", default_yes=False)
+    diag_enabled          = False  # 診断はmainの必須前処理としてheadless実行する。
     term_enabled          = prompt_choice("  Term      : 起動しますか?", default_yes=False)
     code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=False)
     live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=False)
@@ -705,15 +705,16 @@ def validate_initial_environment(
             print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
 
-    if diag_enabled or term_enabled or code_enabled or live_enabled or dev_enabled:
-        print_header("IDE群(Diag / Term / Code / Live / IDE)")
     if diag_enabled:
+        print_header("バックエンド(Diag)")
         ok, detail = DIAG.check_environment()
         if ok:
-            print_success(f"フロントエンド(diag): OK ({detail})")
+            print_success(f"バックエンド(Diag): OK ({detail})")
         else:
-            print_error(f"フロントエンド(diag): 未準備 ({detail})")
+            print_error(f"バックエンド(Diag): 未準備 ({detail})")
             has_error = True
+    if term_enabled or code_enabled or live_enabled or dev_enabled:
+        print_header("IDE群(Term / Code / Live / IDE)")
     if term_enabled:
         ok, detail = TERM.check_environment()
         if ok:
@@ -806,7 +807,7 @@ def start_service(
                 print_error("フロントエンド(Avatar): npm コマンドが見つかりません")
                 return False
             process = AVATAR.start(npm_command)
-        elif name == "フロントエンド(diag)":
+        elif name == "バックエンド(Diag)":
             process = DIAG.start()
         elif name == "フロントエンド(term)":
             process = TERM.start()
@@ -857,7 +858,7 @@ def start_initial_services(
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
         # 手動で閉じた単独ウィンドウ・パネルは自動で開き直さない。
-        "フロントエンド(diag)": False,
+        "バックエンド(Diag)": False,
         "フロントエンド(term)": False,
         "フロントエンド(code)": False,
         "フロントエンド(live)": False,
@@ -908,9 +909,14 @@ def start_initial_services(
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
 
-    if diag_enabled or term_enabled or code_enabled or live_enabled or dev_enabled:
-        print_header("IDE群(Diag / Term / Code / Live / IDE)")
-    for module, enabled in (("diag", diag_enabled), ("term", term_enabled), ("code", code_enabled), ("live", live_enabled)):
+    if diag_enabled:
+        print_header("バックエンド(Diag) 起動")
+        if start_service("バックエンド(Diag)", processes, last_output_times, npm_command):
+            wait_for_services_quiet(last_output_times, ["バックエンド(Diag)"], label="バックエンド(Diag)")
+
+    if term_enabled or code_enabled or live_enabled or dev_enabled:
+        print_header("IDE群(Term / Code / Live / IDE)")
+    for module, enabled in (("term", term_enabled), ("code", code_enabled), ("live", live_enabled)):
         if enabled:
             name = f"フロントエンド({module})"
             print_header(f"{name} 起動" + ("・自動接続" if module == "live" else ""))
@@ -1017,6 +1023,12 @@ def monitor_and_restart(
 
 def main() -> None:
     _init_modules()
+    print_header("バックエンド(Diag) [y] aidiy_diag --headless")
+    try:
+        DIAG.run_headless()
+    except (OSError, RuntimeError) as exc:
+        print_error(str(exc))
+        sys.exit(1)
 
     (
         local_enabled,
@@ -1096,7 +1108,9 @@ def main() -> None:
                 print_success(f"フロントエンド(Web): http://127.0.0.1:{WEB.PORT_WEB}/")
             if "フロントエンド(Avatar)" in processes:
                 print_success(f"フロントエンド(Avatar): renderer http://127.0.0.1:{AVATAR.PORT_AVATAR}")
-            for module in ("diag", "term", "code", "live"):
+            if "バックエンド(Diag)" in processes:
+                print_success("バックエンド(Diag): aidiy_diag 起動済み")
+            for module in ("term", "code", "live"):
                 if f"フロントエンド({module})" in processes:
                     print_success(f"フロントエンド({module}): aidiy_{module} 起動済み")
             if "フロントエンド(IDE)" in processes:

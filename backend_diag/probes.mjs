@@ -181,9 +181,9 @@ export async function probe(entry, options = {}) {
   finally { if (directory) await rm(directory, {recursive:true,force:true,maxRetries:0}).catch(() => {}); }
 }
 
-export async function scan(entries, probeFn = probe) {
+export async function scan(entries, probeFn = probe, concurrency = 4) {
   const results = new Array(entries.length); let cursor = 0;
-  await Promise.all(Array.from({length:Math.min(4, entries.length)}, async () => {
+  await Promise.all(Array.from({length:Math.min(concurrency, entries.length)}, async () => {
     while (cursor < entries.length) { const index = cursor++; results[index] = await probeFn(entries[index]); }
   }));
   return results;

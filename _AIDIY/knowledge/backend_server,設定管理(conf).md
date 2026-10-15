@@ -9,7 +9,7 @@
 - 設定ファイルの保存先パスや外部プロジェクト探索を変更するとき
 - 新しい設定キーを追加するとき
 
-コードモデル一覧の `auto` / `same` は実行方法の選択肢なので、`AiDiy_code_*.json` と新規作成用のモデル定義には含めません。`conf_models.get_code_models()` が画面用一覧の先頭に `auto (自動判定)` / `same (変更なし)` を追加します。モデル一覧取得時には設定ファイルを変更せず、実モデルの表示名は設定値を維持します。
+コードモデル一覧の `auto` / `same` は実行方法の選択肢なので合成JSONには含めません。`conf_models.get_code_models()` が画面用一覧の先頭に追加します。モデル一覧取得時には設定ファイルを変更せず、実モデルの表示名は合成JSONの値を維持します。
 
 ## アーキテクチャ
 
@@ -18,7 +18,7 @@
 ```
 conf_path      → パス解決（実行パス、外部プロジェクト探索）
 conf_json      → JSON 設定ファイル管理（ロード/保存/補完）
-conf_models    → AI モデル一覧管理（provider API 取得/キャッシュ）
+conf_models    → aidiy_diag のモデル・音声合成JSON読込、初期値補正、MCP設定読込
 ```
 
 ## conf_path — パス解決
@@ -97,33 +97,27 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 ```python
 from conf.conf_model import conf_models
 models = conf_models(conf=config)
-models.fetch_all_models()  # 起動時に1度呼ぶ
+models.fetch_all_models()  # 互換入口。合成ファイルの読込確認のみ
 ```
 
 ### モデル一覧の取得元
 
-| プロバイダ | 取得方法 | 保存ファイル |
-|-----------|---------|-------------|
-| Google Gemini | SDK `genai.list_models()` | `AiDiy_live_gemini.json` など |
-| OpenAI | SDK | `AiDiy_live_openai.json` など |
-| Anthropic Claude | SDK | `AiDiy_code_claude_sdk.json` など |
-| OpenRouter | REST API | モデルメタデータを補充 |
-| Ollama | `ollama list` CLI / Ollama Cloud REST API | ローカルモデル一覧 |
+`_AIDIY/aidiy_diag/chat_models_info.json`、`live_models_info.json`、`code_models_info.json` だけを使います。各ファイルは `{区分名: {"models": {モデルID: 表示名}}}` 形式です。取得・絞り込み・重複統合・表示順は `aidiy_diag` が担当します。
 
 ### データフロー
 
-1. `_sync_local_model_configs()` で JSON ファイル群を読み込み/作成
-2. `fetch_all_models()` で全 provider のモデルリストを取得
-3. 各 provider のモデルは recency フィルタ（3〜12ヶ月）と OpenRouter データのクロスリファレンスで拡充
-4. `get_chat_models()`, `get_live_models()`, `get_live_voices()`, `get_code_models()` で UI に公開
+1. ルート `_start.py` が必ず `aidiy_diag --headless` の完了を待ち、合成JSONを生成します。
+2. `get_chat_models()`、`get_live_models()`、`get_code_models()` は呼出時に合成JSONを読み、モデル情報APIへ公開します。Coreから外部APIやモデル取得CLIは呼びません。
+3. 新規セッションとモデル情報APIの共通初期値は `normalize_initial_settings()` で候補に合わせます。有効な既定値と `auto` / `same` は維持し、候補外の値は先頭の有効な候補に補正します。共通設定への書き戻しは行いません。
+4. Code / Live はAPI経由、オフラインCodeとDiscordは同じ合成JSONを直接読みます。最後の手動選択は各クライアントの専用ファイルに保持します。
 
-### 起動中の Ollama 一覧取得が止まる場合
+### ファイルがない・読み込めない場合
 
-Core プロセスが存在するのに 8091 が待受していない場合、`fetch_all_models()` 内の `ollama list` 待ちを確認する。Windows では Ollama が起動する子プロセスへ出力パイプが引き継がれると、`subprocess.run(capture_output=True, timeout=10)` のタイムアウト後もパイプ回収で待ち続ける場合がある。`_get_ollama_local_models()` は stdout / stderr を一時ファイルへ向け、10秒で打ち切って空の一覧で起動を続ける。確認は `python -m unittest discover -s tests -p test_ollama_local_models.py` で行う。
+モデル候補は空になり、ログに `aidiy_diag --headless` の実行を案内します。旧 `_config` のモデル一覧・bat・固定モデルへのフォールバックはしません。修復後は次の一覧取得から反映します。読込・初期値・書込なしの確認は `python -m unittest discover -s tests -p test_diag_model_catalog.py` で行います。
 
-### ハードコードドデフォルト
+### 音声とMCP
 
-`fetch_all_models()` 未実行の場合のフォールバックとして、主要な live-AI モデル/音声と code-AI モデルのハードコードド辞書が用意されています。
+声は `_AIDIY/aidiy_diag/live_voices_info.json` の `{区分: {voices: {音声ID: 表示名}}}` を読みます。区分は `gemini_live` / `freeai_live` / `openai_live` です。固定定義は `backend_diag/voices_info.mjs` で管理し、キー確認成功・現在設定済みのプロバイダだけを出力します。Python側に音声定義や旧設定への代替読込はありません。MCPは従来の設定を読みます。`conf_models` は設定ファイルを作成・更新しません。
 
 ## 設定ファイル一覧
 
@@ -134,12 +128,14 @@ Core プロセスが存在するのに 8091 が待受していない場合、`fe
 | `_config/AiDiy_live__context.json` | ライブ音声コンテキスト |
 | `_config/AiDiy_code__context.json` | コード AI コンテキスト |
 | `_config/AiDiy_mcp.json` | MCP 設定 |
-| `_config/AiDiy_live_*.json` | 各プロバイダの live-AI モデル/音声一覧 |
-| `_config/AiDiy_code_*.json` | 各プロバイダの code-AI モデル一覧 |
+| `_AIDIY/aidiy_diag/*_models_info.json` | モデル詳細・合成一覧（aidiy_diagが生成） |
+| `_AIDIY/aidiy_diag/live_voices_info.json` | 有効キーに対応した固定音声候補（aidiy_diagが生成） |
+| `_config/AiDiy_live_gemini.json` / `AiDiy_live_openai.json` | 廃止済み。作成・参照・更新しない |
+| `_config/AiDiy_code_*.json` / `AiDiy_chat_local.json` | 廃止済み。作成・参照・更新しない |
 
 ## 注意点
 
 - **conf_json の即時保存**: `obj.key = value` で即座に JSON ファイルへ書き込まれる。バッチ更新は `update()` を使うこと
-- **conf_models の起動順序**: `conf_json` が先に初期化されている必要がある（API キー参照のため）
+- **conf_models の生成元**: 合成JSONを先に `aidiy_diag --headless` で生成する。Core側の読込ではAPIキーを参照しない
 - **conf_path の init**: `conf_path.init()` は `__file__` 基準でパスを再計算する。繰り返し呼んでも階層はズレず、外部プロジェクト一覧も再探索する
 - **外部プロジェクト探索**: `_AIDIY.md` の有無で判定。新しい外部エージェントを追加したらこのファイルを配置する

@@ -10,26 +10,41 @@
  * -------------------------------------------------------------------------
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LiveCatalog } from '../../frontend_ide/host/aidiy_live/src/model-catalog';
 import { プロジェクトルート, 設定エラー } from './config';
 
 export function ライブ候補読込(directory = join(プロジェクトルート, '_config')): LiveCatalog {
-  const read = (name: string) => {
+  const read = (field: 'models' | 'voices') => {
+    const name = `live_${field}_info.json`;
+    const file = join(directory, '..', '_AIDIY', 'aidiy_diag', name);
+    if (!existsSync(file)) return {};
     try {
-      const data = JSON.parse(readFileSync(join(directory, name), 'utf8').replace(/^\uFEFF/, ''));
-      for (const key of ['models', 'voices']) {
-        const values = data?.[key];
+      const data = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error();
+      return Object.fromEntries(Object.entries(data).map(([key, value]) => {
+        const values = (value as Record<string, unknown> | null)?.[field];
         if (!values || typeof values !== 'object' || Array.isArray(values)
             || Object.entries(values).some(([id, label]) => !id.trim() || typeof label !== 'string')) throw new Error();
-      }
-      return data as { models: Record<string, string>; voices: Record<string, string> };
-    } catch { throw new 設定エラー(`${name} のモデル・音声候補を読み込めません。設定ファイルを確認してください。`); }
+        return [key, values as Record<string, string>];
+      }));
+    } catch { throw new 設定エラー(`${name} を読み込めません。aidiy_diag --headless で再生成してください。`); }
   };
-  const gemini = read('AiDiy_live_gemini.json'), openai = read('AiDiy_live_openai.json');
-  return {
-    models: { freeai_live: gemini.models, gemini_live: gemini.models, openai_live: openai.models },
-    voices: { freeai_live: gemini.voices, gemini_live: gemini.voices, openai_live: openai.voices },
-  };
+  return { models: read('models'), voices: read('voices') };
+}
+
+// 共通設定だけを候補へ合わせる。手動保存した選択は呼出側で後から重ねて検証する。
+export function ライブ初期値(settings: Record<string, string>, catalog: LiveCatalog) {
+  const result = {...settings};
+  const providers = Object.keys(catalog.models).filter(key => Object.keys(catalog.models[key]).length);
+  if (providers.length && !providers.includes(result.LIVE_AI_NAME)) result.LIVE_AI_NAME = providers[0];
+  for (const provider of providers) {
+    const vendor = provider.replace(/_live$/, '').toUpperCase();
+    const modelKey = `LIVE_${vendor}_MODEL`, voiceKey = `LIVE_${vendor}_VOICE`;
+    if (!Object.hasOwn(catalog.models[provider], result[modelKey] || '')) result[modelKey] = Object.keys(catalog.models[provider])[0];
+    const voices = catalog.voices[provider] || {};
+    if (Object.keys(voices).length && !Object.hasOwn(voices, result[voiceKey] || '')) result[voiceKey] = Object.keys(voices)[0];
+  }
+  return result;
 }
