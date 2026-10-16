@@ -1,4 +1,5 @@
 // 設定値を返さず、UI用の固定スキーマだけを公開する。
+import {oauthModelFallback} from './model_fallbacks.mjs';
 import {KEY_PROVIDERS,carryOpenRouterProof} from '../runtime/model_probe.mjs';
 import {runModels,cancelKeyProbes,createModelRunner} from '../runtime/model_runner.mjs';
 export {KEY_PROVIDERS,runModels,cancelKeyProbes,createModelRunner};
@@ -15,11 +16,14 @@ export async function getKeyStatus(options={}) {
 export async function testKey(id,options={}) {
   const result={id,状態:'未実施',説明:'未対応の項目です。',モデル:[],モデル詳細:[],確認日時:null};
   if(!KEY_PROVIDERS.some(p=>p.id===id && p.probe))return result;
+  // 未確認・検出エラーは未導入と見なさず、今回のインストール確認で未検出の場合だけ省略する。
+  if(id==='ollama' && options.installResults?.some(row=>row?.id==='ollama' && row.状態==='未検出'))return {...result,スキップ:true,説明:'Ollama が未検出のため、モデル一覧の取得をスキップしました。'};
   const response=await (options.run || runModels)('test',id,{input:options.publicCache || {公開モデル:{},公開状態:'未取得'}});
   if(response.error)return {...result,説明:reason(response.error)};
   const data=response.data;
   if(!data || data.id!==id || !['未実施','OK','NG','PASS'].includes(data.状態) || !Array.isArray(data.モデル))return {...result,説明:reason('invalid')};
   const models=[...new Set(data.モデル.filter(v=>typeof v==='string' && /^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(v)))].slice(0,500);
   const details=Array.isArray(data.モデル詳細)?data.モデル詳細.filter(row=>row && models.includes(row.model_id)).slice(0,500).map(row=>({model_id:row.model_id,作成日:text(row.作成日,20),トークン数:text(String(row.トークン数 ?? ''),30),モダリティ:text(row.モダリティ,200)})):[];
-  return carryOpenRouterProof(data,{...result,認証確認:data.認証確認===true,状態:data.状態,説明:text(data.説明),モデル:models,モデル詳細:details,確認日時:typeof data.確認日時==='string' && Number.isFinite(Date.parse(data.確認日時))?data.確認日時:null,一覧範囲:text(data.一覧範囲),ライブ候補作成日:data.ライブ候補作成日&&typeof data.ライブ候補作成日==='object'&&!Array.isArray(data.ライブ候補作成日)?Object.fromEntries(Object.entries(data.ライブ候補作成日).filter(([id,date])=>/^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(id)&&(date===null||/^\d{4}\/\d{2}\/\d{2}$/.test(date))).slice(0,200)):{},ライブ候補:Array.isArray(data.ライブ候補)?data.ライブ候補.filter(v=>typeof v==='string' && /^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(v)).slice(0,200):[],補完:text(data.補完),警告:Array.isArray(data.警告)?data.警告.map(v=>text(v)).slice(0,5):[]});
+  const safe = carryOpenRouterProof(data,{...result,認証確認:data.認証確認===true,状態:data.状態,説明:text(data.説明),モデル:models,モデル詳細:details,確認日時:typeof data.確認日時==='string' && Number.isFinite(Date.parse(data.確認日時))?data.確認日時:null,一覧範囲:text(data.一覧範囲),ライブ候補作成日:data.ライブ候補作成日&&typeof data.ライブ候補作成日==='object'&&!Array.isArray(data.ライブ候補作成日)?Object.fromEntries(Object.entries(data.ライブ候補作成日).filter(([id,date])=>/^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(id)&&(date===null||/^\d{4}\/\d{2}\/\d{2}$/.test(date))).slice(0,200)):{},ライブ候補:Array.isArray(data.ライブ候補)?data.ライブ候補.filter(v=>typeof v==='string' && /^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(v)).slice(0,200):[],補完:text(data.補完),警告:Array.isArray(data.警告)?data.警告.map(v=>text(v)).slice(0,5):[]});
+  return oauthModelFallback(safe);
 }

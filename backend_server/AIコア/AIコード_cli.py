@@ -550,6 +550,18 @@ class CodeAI:
                 ]
                 return base + ["-Q"] + local_args + ["--oneshot-stdin"]
 
+            # 合成モデル一覧の CLI/model を Hermes の外部 CLI provider に渡す。
+            # --model だけでは Hermes が Ollama のモデル名として解釈してしまう。
+            cli_providers = {
+                "copilot_cli": "copilot-cli", "claude_cli": "claude-code",
+                "codex_cli": "codex-cli", "antigravity_cli": "antigravity-cli",
+                "opencode_cli": "opencode", "grok_cli": "grok-cli",
+            }
+            provider, separator, model = (self.code_model or "").partition("/")
+            if separator and provider in cli_providers and model:
+                return base + ["-Q", "--provider", cli_providers[provider],
+                               "--model", model, "--oneshot-stdin"]
+
             _model = self._ollama_cloud_suffix除去(self.code_model)
             if (_model or "").lower() == "same":
                 # Hermes の保存済み provider / モデルを、非対話起動でも復元する。

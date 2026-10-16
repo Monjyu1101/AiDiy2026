@@ -11,7 +11,7 @@ import {createHandler} from '../diag_main.mjs';
 const reads=[];
 const read=async name=>{reads.push(name);throw Error('must not read model configuration: '+name);};
 const now=()=>new Date('2026-10-15T00:00:00Z');
-const emptyDefaults={chat:{},live:{freeai_live:{models:{'gemini-2.5-flash-native-audio-preview-12-2025':'仮設定（未検証） - gemini-2.5-flash-native-audio-preview-12-2025'}}},code:{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}}};
+const emptyDefaults={chat:{},live:{},code:{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}}};
 const allClis={copilot_cli:true,claude_cli:true,codex_cli:true,antigravity_cli:true,grok_cli:true,opencode_cli:true};
 const writeModelsInfo=(providers,results,options={})=>saveModelsInfo(providers,results,{installedClis:allClis,configReader:()=> '{}',...options});
 const ok=(extra={})=>({状態:'OK',説明:'ok',確認日時:'2026-10-15T00:00:00Z',モデル:['m1'],モデル詳細:[{model_id:'m1',作成日:'2026/10/01',トークン数:'100',モダリティ:'text'}],...extra});
@@ -212,7 +212,9 @@ test('Codex excludes realtime; Hermes keeps acquired OAuth models with a provide
  assert.deepEqual(realtime.code.codex_cli.models,{'gpt-code':'yyyy/mm/dd - gpt-code'});
  assert.ok(Object.hasOwn(realtime.code.aidiy_hermes.models,'openai_oauth/gpt-realtime-2'));
  const failed=await modelsInfo({id:'openai_oauth',名前:'OpenAI OAuth'},ok({状態:'NG'}),{read,now});
- assert.deepEqual(failed.code.codex_cli.models,{});assert.deepEqual(failed.code.aidiy_hermes.models,{});
+ assert.deepEqual(failed.code.codex_cli.models,{});assert.deepEqual(failed.code.copilot_cli.models,{});
+ assert.equal(Object.keys(failed.code.aidiy_hermes.models).length,4);
+ assert.ok(Object.values(failed.code.aidiy_hermes.models).every(label=>label.startsWith('仮設定（未検証）')));
 });
 
 test('Codex keeps the numerically newest version per family and context variant',async()=>{
@@ -288,9 +290,9 @@ test('OpenRouter requires verified results and current key presence even for sav
   await writeModelsInfo([provider],{},{directory,installedClis:{}});assert.deepEqual(await load(),{});
  }finally{await rm(directory,{recursive:true,force:true});}
 });
-test('entirely empty Live and Code receive fixed provisional defaults without reading configuration',async()=>{
+test('empty Live without configuration stays empty and Code keeps its fixed provisional default',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-fixed-fallback-'));
- const options={directory,installedClis:{},configReader:()=>assert.fail('fallback must not read configuration')};
+ const options={directory,installedClis:{},configReader:()=>JSON.stringify({CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'configured-chat'})};
  const load=async group=>JSON.parse(await readFile(path.join(directory,modelsInfoFile(group)),'utf8'));
  try {
   await writeModelsInfo([],{},options);

@@ -5,7 +5,7 @@ Node.js 標準モジュールの読み取り専用診断サーバーと Electron
 - `起動/desktop.mjs` / `起動/electron-main.cjs`: 既存共有セットアップで用意した Electron を通常表示に使います。ブラウザ・Codespaces は Node.js のみです。
 - `diag_main.mjs`: ループバック HTTP、起動単位の認証、ブラウザ起動。
 - `モデル情報/models_info.mjs`: プロバイダ別モデル情報とchat / live / codeの合成JSON。取得モデルから `models` を生成し、API の詳細情報も保持。Grok / backend_local の固定候補と、Copilot導入済み・合成候補なし時の固定8モデルを管理。本体・クライアントは合成JSONを読み、`_config` 上のモデル設定ファイルには依存しません。
-- `モデル情報/voices_info.mjs`: Gemini / FreeAI / OpenAIの固定音声候補。確認済みの有効キーに合わせて `live_voices_info.json` を生成します。
+- `モデル情報/voices_info.mjs`: Gemini / FreeAI / OpenAIの固定音声候補。取得・認証状態にかかわらず3区分の `live_voices_info.json` を生成します。候補の存在は認証成功を意味しません。
 - `診断/headless.mjs`: `--headless` の全診断と、画面の書込と共通の保存形式。画面・待受なしで最速実行し、`_AIDIY/aidiy_diag/*.json` へ成功時だけ保存します（現在は `install_info.json`）。
 - `診断/catalog.json`: リポジトリの利用箇所から整理した外部プログラムの登録情報。
 - `診断/probes.mjs`: 固定引数での存在・バージョン確認。任意コマンド API は設けません。

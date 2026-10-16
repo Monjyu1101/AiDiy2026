@@ -25,22 +25,22 @@ test('fixed voices use live provider keys and preserve labels and order',()=>{
  assert.equal(liveVoicesInfo(providers,results).freeai_live.voices.Zephyr,'(2.5) Zephyr Female');
 });
 
-test('only configured, testable and successfully confirmed keys expose voices',()=>{
+test('all three voice catalogs are exposed regardless of configuration or test results',()=>{
  for(const {id} of providers){
   for(const state of ['NG','未実施','ERR']){
    const info=liveVoicesInfo(providers,{...results,[id]:{状態:state}});
-   assert.equal(Object.hasOwn(info,id+'_live'),false);
-   assert.equal(Object.keys(info).length,2);
+   assert.deepEqual(info,liveVoicesInfo());
   }
   for(const flag of ['設定済み','テスト可能']){
    const info=liveVoicesInfo(providers.map(row=>row.id===id?{...row,[flag]:false}:row),results);
-   assert.equal(Object.hasOwn(info,id+'_live'),false);
+   assert.deepEqual(info,liveVoicesInfo());
   }
  }
- assert.deepEqual(liveVoicesInfo(providers,{}),{});
+ assert.deepEqual(liveVoicesInfo(providers,{}),liveVoicesInfo());
+ assert.deepEqual(Object.keys(liveVoicesInfo([],{})),['freeai_live','gemini_live','openai_live']);
 });
 
-test('partial writes preserve confirmed voices and remove disabled or failed keys, including no-test runs',async()=>{
+test('every save writes all three voice catalogs, including failed, disabled and no-test runs',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-live-voices-'));
  const options={configReader:()=>'{}',directory,installedClis:{}};
  const load=async()=>JSON.parse(await readFile(path.join(directory,LIVE_VOICES_FILE),'utf8'));
@@ -48,10 +48,12 @@ test('partial writes preserve confirmed voices and remove disabled or failed key
   assert.ok((await writeModelsInfo(providers,results,options)).includes(LIVE_VOICES_FILE));
   assert.deepEqual(Object.keys(await load()),['freeai_live','gemini_live','openai_live']);
   await writeModelsInfo(providers,{gemini:{状態:'NG'}},options);
-  assert.deepEqual(Object.keys(await load()),['freeai_live','openai_live']);
+  assert.deepEqual(await load(),liveVoicesInfo());
   await writeModelsInfo(providers.map(row=>row.id==='openai'?{...row,設定済み:false,テスト可能:false}:row),{freeai:{状態:'OK',モデル詳細:[]}},options);
-  assert.deepEqual(Object.keys(await load()),['freeai_live']);
+  assert.deepEqual(await load(),liveVoicesInfo());
   await writeModelsInfo(providers.map(row=>({...row,設定済み:false,テスト可能:false})),{},options);
-  assert.deepEqual(await load(),{});
+  assert.deepEqual(await load(),liveVoicesInfo());
+  await writeModelsInfo([],{},options);
+  assert.deepEqual(await load(),liveVoicesInfo());
  }finally{await rm(directory,{recursive:true,force:true});}
 });

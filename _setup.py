@@ -885,7 +885,10 @@ def main():
     else:
         print_warning("フロントエンド(Discord)のセットアップをスキップしました。")
 
-    # 全体起動と同じ診断を事前実行し、モデル合成JSONを生成しておく。
+    print_header("キャッシュクリア")
+    remove_folder_import_caches()
+
+    # キャッシュクリア後に全体起動と同じ診断を実行し、モデル合成JSONを生成しておく。
     print()
     if choices.get("diag"):
         if not run_diag_headless():
@@ -893,9 +896,6 @@ def main():
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
-
-    print()
-    remove_folder_import_caches()
 
     print_setup_summary(error_locations)
     print_info("起動方法:")

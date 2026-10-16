@@ -87,22 +87,52 @@ class RootIntegrationTests(unittest.TestCase):
         self.assertFalse(any('Diag' in prompt for prompt,_ in calls))
         self.assertIn('Term',calls[6][0])
 
-    def test_headless_always_runs_before_start_choices(self):
+    def test_start_choices_do_not_run_headless(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        module=self.root_module('_start');diag=SimpleNamespace(run_headless=Mock())
+        with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag),patch.object(module,'collect_startup_choices',side_effect=KeyboardInterrupt),patch('builtins.print'):
+            with self.assertRaises(KeyboardInterrupt):module.main()
+        diag.run_headless.assert_not_called()
+
+    def test_tools_diagnosis_order_selection_and_cleanup_skip(self):
+        from types import SimpleNamespace
+        for enabled,blocked in [(False,False),(True,False),(True,True)]:
+            with self.subTest(enabled=enabled,blocked=blocked):
+                module=self.root_module('_start');events=[]
+                diag=SimpleNamespace(run_headless=lambda:events.append('diag'))
+                def service(name):
+                    events.append(name);return object()
+                with patch.object(module,'DIAG',diag),patch.object(module,'TOOLS',SimpleNamespace(start=lambda:service('tools'))),patch.object(module,'LOCAL',SimpleNamespace(start=lambda:service('local'))),patch.object(module,'SERVER',SimpleNamespace(start_core=lambda:service('core'),start_apps=lambda:service('apps'))),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value={'バックエンド(tools)'} if blocked else set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch('builtins.print'):
+                    module.start_initial_services(True,enabled,True,False,False,False,{}, {},None)
+                self.assertEqual(events,['local','diag','tools','core','apps'] if enabled and not blocked else ['local','core','apps'])
+
+    def test_tools_restart_runs_diagnosis_once_per_launch(self):
         from types import SimpleNamespace
         module=self.root_module('_start');events=[]
-        diag=SimpleNamespace(run_headless=lambda:events.append('headless'))
-        with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag,create=True),patch.object(module,'collect_startup_choices',side_effect=lambda:events.append('choices') or (_ for _ in ()).throw(KeyboardInterrupt)),patch('builtins.print'):
-            with self.assertRaises(KeyboardInterrupt):module.main()
-        self.assertEqual(events,['headless','choices'])
+        with patch.object(module,'DIAG',SimpleNamespace(run_headless=lambda:events.append('diag'))),patch.object(module,'TOOLS',SimpleNamespace(start=lambda:events.append('tools') or object())),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch('builtins.print'):
+            for _ in range(2):self.assertTrue(module.start_service('バックエンド(tools)',{}, {},None))
+        self.assertEqual(events,['diag','tools','diag','tools'])
 
-    def test_headless_failure_stops_startup(self):
+    def test_headless_failure_stops_startup_and_cleans_started_processes(self):
         from types import SimpleNamespace
-        module=self.root_module('_start')
-        diag=SimpleNamespace(run_headless=lambda:(_ for _ in ()).throw(RuntimeError('failed')))
-        with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag,create=True),patch.object(module,'collect_startup_choices') as choices,patch('builtins.print'):
-            with self.assertRaises(SystemExit) as result:module.main()
-            self.assertEqual(result.exception.code,1)
-            choices.assert_not_called()
+        from unittest.mock import Mock
+        for error in (RuntimeError('failed'),OSError('failed')):
+            with self.subTest(error=type(error)):
+                module=self.root_module('_start');tools=SimpleNamespace(start=Mock());local_process=object()
+                with patch.object(module,'_init_modules'),patch.object(module,'DIAG',SimpleNamespace(run_headless=Mock(side_effect=error))),patch.object(module,'TOOLS',tools),patch.object(module,'LOCAL',SimpleNamespace(start=lambda:local_process)),patch.object(module,'collect_startup_choices',return_value=(True,True)+(False,)*10),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes') as stop,patch.object(module,'monitor_and_restart') as monitor,patch('builtins.print'):
+                    with self.assertRaises(SystemExit) as result:module.main()
+                self.assertEqual(result.exception.code,1);tools.start.assert_not_called();monitor.assert_not_called()
+                stop.assert_called_once_with({'バックエンド(local)':local_process})
+
+    def test_main_runs_diagnosis_once_only_when_tools_selected(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        for enabled in (False,True):
+            module=self.root_module('_start');diag=SimpleNamespace(run_headless=Mock())
+            with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag),patch.object(module,'TOOLS',SimpleNamespace(start=Mock(return_value=object()),PORT_TOOLS=8095)),patch.object(module,'collect_startup_choices',return_value=(False,enabled)+(False,)*10),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes'),patch.object(module,'monitor_and_restart'),patch.object(module.time,'sleep'),patch('builtins.print'):
+                module.main()
+            self.assertEqual(diag.run_headless.call_count,int(enabled))
 
     def test_headless_command_and_nonzero_exit(self):
         from types import SimpleNamespace
@@ -143,6 +173,24 @@ class SetupOrderingTests(unittest.TestCase):
         with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
             with self.assertRaises(SystemExit):module.main()
             prerequisites.assert_not_called()
+    def test_cache_clear_before_single_diag_and_error_policy(self):
+        for success,keep_going in [(True,False),(False,True),(False,False)]:
+            with self.subTest(success=success,keep_going=keep_going):
+                module=self.root_module('_setup');events=[]
+                choices=dict.fromkeys(['common','local','mcp','backend','taskteam','web','avatar','hermes','ide','discord','diag'],False)
+                choices.update(diag=True,continue_on_error=keep_going)
+                from types import SimpleNamespace
+                fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda:True)
+                def diagnose():events.append('diag');return success
+                with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
+                    if not success and not keep_going:
+                        with self.assertRaises(SystemExit) as result:module.main()
+                        self.assertEqual(result.exception.code,1)
+                    else:module.main()
+                start=events.index('キャッシュクリア');self.assertEqual(events[start:start+3],['キャッシュクリア','clear','diag'])
+                self.assertEqual(events.count('diag'),1)
+                summary.assert_called_once_with([] if success else ['バックエンド(Diag): aidiy_diag --headless'])
+
     def test_cleanup_backup_then_diag_after_safe_service_stop(self):
         module=self.root_module('_cleanup');events=[]
         def folder(name,choices):

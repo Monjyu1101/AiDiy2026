@@ -70,3 +70,14 @@ test('external abort prevents startup and aborts an active request',async()=>{
  const pending=runner.run('test','openai',{signal:controller.signal,reader:reader({openai_key_id:'fixture-secret'}),fetch:async(_p,_h,_t,signal)=>{requestSignal=signal;started();return new Promise(()=>{});}});
  await ready;controller.abort();assert.equal((await pending).error,'stopped');assert.equal(requestSignal.aborted,true);
 });
+
+
+test('Ollama confirmed missing skips all model work, other installation states preserve acquisition',async()=>{
+ const skipped=await testKey('ollama',{installResults:[{id:'ollama',状態:'未検出'}],run:forbidden});
+ assert.equal(skipped.状態,'未実施');assert.equal(skipped.スキップ,true);assert.deepEqual(skipped.モデル,[]);assert.match(skipped.説明,/未検出.*スキップ/);
+ for(const state of [undefined,'未確認','OK','注意','NG','ERR']){
+  let calls=0;
+  const result=await testKey('ollama',{installResults:state?[{id:'ollama',状態:state}]:[],run:(action,id,options)=>runModels(action,id,{...options,reader:reader({}),fetch:async provider=>{assert.equal(provider,'ollama-local');calls++;return {models:[{name:'fixture:latest'}]};}})});
+  assert.equal(calls,1,state);assert.equal(result.状態,'OK');assert.deepEqual(result.モデル,['fixture:latest']);
+ }
+});

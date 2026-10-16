@@ -59,12 +59,12 @@ export async function installStep({entries, probeFn = probe, log = console.log, 
 
 // モデル情報: 公開一覧を取得し、テストできるプロバイダのモデル一覧を取得して、プロバイダ別ファイルへ保存する。
 // モデル処理は同時 2 件までのため、その上限で並行実行する。
-export async function modelsStep({log = console.log, signal, directory = OUTPUT_DIRECTORY, statusFn = getKeyStatus, testFn = testKey, configReader, publicCache = createPublicModelCache({warn:() => {}})} = {}) {
+export async function modelsStep({installResults = [], log = console.log, signal, directory = OUTPUT_DIRECTORY, statusFn = getKeyStatus, testFn = testKey, configReader, publicCache = createPublicModelCache({warn:() => {}})} = {}) {
   if (signal?.aborted) throw cancelled();
   const [status] = await Promise.all([statusFn(), publicCache.refresh()]);
   if (signal?.aborted) throw cancelled();
   const rows = status.項目.filter(row => MODEL_PROVIDER_IDS.includes(row.id) && row.テスト可能), input = publicCache.input();
-  const results = await scan(rows, row => testFn(row.id, {publicCache:input}), 2);
+  const results = await scan(rows, row => testFn(row.id, {publicCache:input, installResults}), 2);
   if (signal?.aborted) throw cancelled();
   const byId = {};
   rows.forEach((row, index) => { const result = results[index]; byId[row.id] = result; log(`  ${String(result?.状態 ?? 'ERR').padEnd(3)} ${row.名前}（${result?.モデル?.length ?? 0} 件）`); });
@@ -83,13 +83,14 @@ export async function runHeadless({steps = STEPS, directory = OUTPUT_DIRECTORY, 
   try { entries = await loadEntries(); }
   catch { error('診断を実行できません。catalog.json を読み込めません。同じ版の backend_diag を取得し直してください。'); return 1; }
   log(`AiDiy 診断（ヘッドレス）: 全診断 ${steps.length} 件を実行します。`);
-  let failed = 0;
+  let failed = 0, installResults = [];
   for (const [index, step] of steps.entries()) {
     const started = Date.now();
     log(`[${index + 1}/${steps.length}] ${step.名前}`);
     try {
       // file を持つ手順は結果を 1 ファイルへ保存し、持たない手順は自身で保存して保存先を返す。
-      const value = await step.run({entries, probeFn, log, signal, directory});
+      const value = await step.run({entries, probeFn, log, signal, directory, installResults});
+      if (step.id === 'install') installResults = value.項目 ?? [];
       const saved = step.file ? [path.join(directory, step.file)] : (value.保存先 ?? []).map(file => path.join(directory, file));
       if (step.file) await writeResult(saved[0], value);
       const where = saved.length === 1 ? saved[0] : saved.length ? `${directory}（${saved.map(file => path.basename(file)).join(', ')}）` : '保存対象なし';

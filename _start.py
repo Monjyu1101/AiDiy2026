@@ -489,7 +489,7 @@ def collect_startup_choices() -> tuple[bool, ...]:
     web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=True)
     avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=False)
     print("フロントエンド(IDE)")
-    diag_enabled          = False  # 診断はmainの必須前処理としてheadless実行する。
+    diag_enabled          = False  # 診断はTools起動直前にheadless実行する。
     term_enabled          = prompt_choice("  Term      : 起動しますか?", default_yes=False)
     code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=False)
     live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=False)
@@ -786,6 +786,14 @@ def start_service(
         print_warning(f"[{name}] クリーンアップ対象のため起動をスキップします")
         return False
 
+    if name == "バックエンド(tools)":
+        print_header("バックエンド(Diag) [y] aidiy_diag --headless")
+        try:
+            DIAG.run_headless()
+        except (OSError, RuntimeError) as exc:
+            print_error(str(exc))
+            sys.exit(1)
+
     try:
         if name == "バックエンド(tools)":
             process = TOOLS.start()
@@ -1023,12 +1031,6 @@ def monitor_and_restart(
 
 def main() -> None:
     _init_modules()
-    print_header("バックエンド(Diag) [y] aidiy_diag --headless")
-    try:
-        DIAG.run_headless()
-    except (OSError, RuntimeError) as exc:
-        print_error(str(exc))
-        sys.exit(1)
 
     (
         local_enabled,

@@ -48,7 +48,12 @@ const offline=(options)=>{if(options.headers?.Authorization||options.headers?.['
   await assert.rejects(access(path.join(root,'_config','AiDiy_key.json')),{code:'ENOENT'});
   const load=async group=>JSON.parse(await readFile(path.join(root,'_AIDIY','aidiy_diag',group+'_models_info.json'),'utf8'));
   const chat=await load('chat');assert.deepEqual(Object.keys(chat),['local_chat']);assert.equal(Object.keys(chat.local_chat.models).length,4);
-  assert.deepEqual(await load('live'),{freeai_live:{models:{'gemini-2.5-flash-native-audio-preview-12-2025':'仮設定（未検証） - gemini-2.5-flash-native-audio-preview-12-2025'}}});
+  assert.deepEqual(await load('live'),{});
+  const voices=JSON.parse(await readFile(path.join(root,'_AIDIY','aidiy_diag','live_voices_info.json'),'utf8'));
+  assert.deepEqual(Object.keys(voices),['freeai_live','gemini_live','openai_live']);
+  assert.equal(Object.keys(voices.freeai_live.voices).length,30);
+  assert.equal(Object.keys(voices.gemini_live.voices).length,30);
+  assert.equal(Object.keys(voices.openai_live.voices).length,13);
   assert.deepEqual(await load('code'),{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}});
   assert.match(output,/完了しました/);
  }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}

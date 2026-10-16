@@ -119,7 +119,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
         if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
         keyBusy=true;
-        try {const result=await keyTestFn(id,{publicCache:publicCache.input()});if(['OK','NG','PASS'].includes(result?.状態)&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if((['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
         return;
       }
       if (req.method === 'POST' && route === 'api/診断') {

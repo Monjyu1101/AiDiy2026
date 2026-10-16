@@ -2,28 +2,18 @@
 // Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 // プロバイダ別のモデル情報を _AIDIY/aidiy_diag/<id>_models_info.json へ保存する。
 // 用途の分け方は本体（backend_server/conf/conf_model.py の get_chat_models / get_live_models / get_code_models）に合わせる。
-// モデル設定ファイルには依存せず、取得結果から生成する。Grok / local とCopilot候補なし時だけ固定候補。
+// 取得結果を優先し、Chat が空または local のみなら設定モデルを未検証の候補として補う。
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import { OUTPUT_DIRECTORY, writeResult } from '../診断/headless.mjs';
 import {catalog, resolveProgram} from '../診断/probes.mjs';
-import {currentOpenRouterProof} from '../runtime/model_probe.mjs';
+import {currentOpenRouterProof, readConfig} from '../runtime/model_probe.mjs';
 import {LIVE_VOICES_FILE, liveVoicesInfo} from './voices_info.mjs';
+import {COPILOT_FALLBACK_MODELS, OAUTH_FALLBACK_SOURCE, oauthModelFallback} from './model_fallbacks.mjs';
 
 // 順序はHermesの先頭候補にも使う。存在確認のみでCLIは実行しない。
 const CODE_CLIS = Object.freeze({copilot_cli:'copilot', claude_cli:'claude', codex_cli:'codex',
   antigravity_cli:'agy', grok_cli:'grok', opencode_cli:'opencode'});
-// Copilot単独契約向け。合成した候補が皆無の場合だけ、指定順の8件を補う。
-const COPILOT_FALLBACK_MODELS = Object.freeze({
-  'claude-fable-5.1':'2026/08/28 - claude-fable-5.1',
-  'claude-opus-5.5':'2026/09/21 - claude-opus-5.5',
-  'claude-sonnet-5.5':'2026/09/28 - claude-sonnet-5.5',
-  'claude-haiku-5.5':'2026/10/07 - claude-haiku-5.5',
-  'gpt-6-astra':'2026/08/28 - gpt-6-astra',
-  'gpt-6.1-sol':'2026/09/28 - gpt-6.1-sol',
-  'gpt-5.6-terra':'2026/06/24 - gpt-5.6-terra',
-  'gpt-6-luna':'2026/09/15 - gpt-6-luna',
-});
 export async function installedCodeClis({loadEntries = catalog, resolve = resolveProgram} = {}) {
   const entries = await loadEntries();
   return Object.fromEntries(await Promise.all(Object.entries(CODE_CLIS).map(async ([key, id]) => {
@@ -144,19 +134,23 @@ const details = result => newestFirst((Array.isArray(result?.モデル詳細) ? 
 
 // 1 プロバイダ分のファイル内容。result は画面と同じキーテスト結果（サーバー側で保持したもの）。
 export async function modelsInfo(provider, result, {now = () => new Date()} = {}) {
+  result = provider.設定済み === false ? result : oauthModelFallback({...result, id:provider.id});
+  const provisional = provider.id === 'openai_oauth' && result.補完 === OAUTH_FALLBACK_SOURCE;
   const layout = LAYOUT[provider.id]; if (!layout) throw new Error('provider');
+  const labels = rows => provisional ? Object.fromEntries(rows.map(row => [row.model_id,`仮設定（未検証） - ${row.model_id}`])) : chatLabels(rows, layout);
   const gemini = provider.id === 'gemini' || provider.id === 'freeai';
   const fixedKey = provider.id === 'grok' ? 'grok_cli' : layout.chatFixed;
   const chatModels = fixedKey
     ? details({モデル詳細:Object.keys(FIXED_MODELS[fixedKey].models).map(model_id => ({model_id}))})
-    : result?.状態 === 'OK' && (provider.id !== 'openrt' || result.認証確認 === true) ? details(result).filter(row => !gemini || !row.model_id.includes('lyria')) : [];
+    : (provisional || result?.状態 === 'OK') && (provider.id !== 'openrt' || result.認証確認 === true) ? details(result).filter(row => !gemini || !row.model_id.includes('lyria')) : [];
   const info = {形式:2, 種類:'モデル情報', プロバイダ:provider.id, 名前:provider.名前, 保存日時:now().toISOString(), 確認日時:result?.確認日時 ?? null,
     状態:result?.状態 ?? '未実施', 説明:result?.説明 ?? '', 警告:Array.isArray(result?.警告) ? result.警告 : [],
-    chat:{取得元:fixedKey ? '固定候補（aidiy_diag）' : result?.状態 === 'OK' ? 'API（本体と同じ絞り込み）' : '取得できませんでした', 件数:chatModels.length, モデル:chatModels}};
+    chat:{取得元:provisional ? OAUTH_FALLBACK_SOURCE : fixedKey ? '固定候補（aidiy_diag）' : result?.状態 === 'OK' ? 'API（本体と同じ絞り込み）' : '取得できませんでした', 件数:chatModels.length, モデル:chatModels}};
+  if (provisional) { info.認証確認 = false; info.補完 = OAUTH_FALLBACK_SOURCE; }
   if (provider.id === 'openrt') info.認証確認 = result?.状態 === 'OK' && result.認証確認 === true;
   // 区分名以下は各プログラムがそのまま使う {models} のみ。API の詳細は chat.モデル に残す。
   // Claude / Grok の API 一覧は詳細だけで、本体に存在しない chat 区分は作らない。
-  if (layout.chat) info.chat[layout.chat] = layout.chatFixed ? fixedSection(layout.chatFixed) : {models:chatLabels(chatModels, layout)};
+  if (layout.chat) info.chat[layout.chat] = layout.chatFixed ? fixedSection(layout.chatFixed) : {models:labels(chatModels)};
   if (layout.live) {
     const acquired = result?.状態 === 'OK';
     const apiIds = acquired && Array.isArray(result?.ライブ候補) ? result.ライブ候補 : [];
@@ -168,9 +162,11 @@ export async function modelsInfo(provider, result, {now = () => new Date()} = {}
       if (source === 'fixed') info.code[key] = fixedSection(key);
       else {
         const prefix = source === 'openai_oauth/' ? source : '';
-        const codeModels = key === 'codex_cli' || (['openai', 'openai_oauth'].includes(provider.id) && key === 'copilot_cli') ? latestCodexModels(chatModels) : chatModels;
+        // OAuth の仮候補は OAuth 経路だけに渡し、別契約のCLI取得結果へ混ぜない。
+        const codeModels = provisional ? (key === 'aidiy_hermes' ? chatModels : [])
+          : key === 'codex_cli' || (['openai', 'openai_oauth'].includes(provider.id) && key === 'copilot_cli') ? latestCodexModels(chatModels) : chatModels;
         info.code[key] = {models:provider.id === 'claude' ? claudeLabels(chatModels, {versioned:key === 'copilot_cli'})
-          : Object.fromEntries(Object.entries(chatLabels(codeModels, layout))
+          : Object.fromEntries(Object.entries(labels(codeModels))
             .map(([id, label]) => [prefix + id, label]))};
       }
     }
@@ -208,6 +204,7 @@ async function writeMergedModelsInfo(directory, installedClis, providers, result
   for (const id of order) {
     try {
       const info = JSON.parse(await readFile(path.join(directory, modelsInfoFile(id)), 'utf8'));
+      if (id === 'openai_oauth' && providers.some(row => row.id === id && row.設定済み === false)) continue;
       // 旧公開一覧の OK や、キー削除後の保存済み候補を引き継がない。
       if (id === 'openrt' && (info.認証確認 !== true || !providers.some(row => row.id === id && row.設定済み === true) || !routerVerified)) continue;
       infos.push(info);
@@ -219,14 +216,29 @@ async function writeMergedModelsInfo(directory, installedClis, providers, result
   merged.code = availableCodeModels(merged.code, installedClis);
   for (const [group, info] of Object.entries(merged)) {
     // 無効ラベルや旧 auto/same の除外後、CLI の補完後に空区分を落とす。
-    const nonempty = Object.fromEntries(Object.entries(info).filter(([, entry]) => Object.keys(entry.models).length));
+    let nonempty = Object.fromEntries(Object.entries(info).filter(([, entry]) => Object.keys(entry.models).length));
+    if (group === 'chat' && Object.keys(nonempty).every(key => key === 'local_chat')) {
+      const [, config] = await readConfig(options.configReader);
+      const modelKeys = {gemini_chat:'CHAT_GEMINI_MODEL', freeai_chat:'CHAT_FREEAI_MODEL',
+        openai_chat:'CHAT_OPENAI_MODEL', openai_oauth:'CHAT_OPENAI_MODEL', openrt_chat:'CHAT_OPENRT_MODEL',
+        ollama_chat:'CHAT_OLLAMA_MODEL', local_chat:'CHAT_LOCAL_MODEL'};
+      const provider = typeof config.CHAT_AI_NAME === 'string' ? config.CHAT_AI_NAME.trim() : '';
+      const value = Object.hasOwn(modelKeys, provider) ? config[modelKeys[provider]] : null;
+      const model = typeof value === 'string' ? value.trim() : '';
+      if (model && !/^<.*>$/.test(model) && !Object.hasOwn(nonempty[provider]?.models ?? {}, model)) {
+        // config 候補を local より先に保存する。既存 local のモデルと順序は維持する。
+        const models = {...nonempty[provider]?.models, [model]:`仮設定（未検証） - ${model}`};
+        nonempty = {...{[provider]:{models}}, ...Object.fromEntries(Object.entries(nonempty).filter(([key]) => key !== provider))};
+      }
+    }
     // 設定ファイル未作成でも選択欄を維持する。認証・導入済みの候補とは区別する。
     if (group === 'live' && !Object.keys(nonempty).length) {
-      // Gemini側の既定と同じ Live 対応モデル。FreeAI側の旧09-2025既定は変更しない。
-      // https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash-native-audio-preview-12-2025
-      // 2026-10-15確認: 最短終了予定2026-11-17。仮候補のため生成可否は未確認。
-      const id = 'gemini-2.5-flash-native-audio-preview-12-2025';
-      nonempty.freeai_live = {models:{[id]:`仮設定（未検証） - ${id}`}};
+      const [, config] = await readConfig(options.configReader);
+      const modelKeys = {freeai_live:'LIVE_FREEAI_MODEL', gemini_live:'LIVE_GEMINI_MODEL', openai_live:'LIVE_OPENAI_MODEL'};
+      const provider = typeof config.LIVE_AI_NAME === 'string' ? config.LIVE_AI_NAME.trim() : '';
+      const value = Object.hasOwn(modelKeys, provider) ? config[modelKeys[provider]] : null;
+      const model = typeof value === 'string' ? value.trim() : '';
+      if (model && !/^<.*>$/.test(model)) nonempty[provider] = {models:{[model]:`仮設定（未検証） - ${model}`}};
     }
     if (group === 'code' && !Object.keys(nonempty).length) {
       nonempty.aidiy_hermes = {models:{auto:'仮設定（未検証） - auto'}};
@@ -244,21 +256,13 @@ export async function writeModelsInfo(providers, results, {directory = OUTPUT_DI
   const saved = [];
   for (const provider of providers) {
     const result = results[provider.id];
-    if (!MODEL_PROVIDER_IDS.includes(provider.id) || !result || !['OK', 'NG', 'PASS'].includes(result.状態)) continue;
+    if (!MODEL_PROVIDER_IDS.includes(provider.id) || !result || !(['OK', 'NG', 'PASS'].includes(result.状態) || (provider.id === 'ollama' && result.スキップ === true && result.状態 === '未実施'))) continue;
     const file = modelsInfoFile(provider.id);
     await writeResult(path.join(directory, file), await modelsInfo(provider, result, options));
     saved.push(file);
   }
   saved.push(...await writeMergedModelsInfo(directory, options.installedClis ?? await installedCodeClis(), providers, results, options));
-  const confirmed = {};
-  for (const id of ['gemini', 'freeai', 'openai']) {
-    if (Object.hasOwn(results, id)) confirmed[id] = results[id];
-    else {
-      try { confirmed[id] = JSON.parse(await readFile(path.join(directory, modelsInfoFile(id)), 'utf8')); }
-      catch (error) { if (error?.code !== 'ENOENT') throw error; }
-    }
-  }
-  await writeResult(path.join(directory, LIVE_VOICES_FILE), liveVoicesInfo(providers, confirmed));
+  await writeResult(path.join(directory, LIVE_VOICES_FILE), liveVoicesInfo());
   saved.push(LIVE_VOICES_FILE);
   return saved;
 }

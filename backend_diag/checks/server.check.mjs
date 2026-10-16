@@ -75,3 +75,17 @@ test('write saves only the server-side results of a completed check, never reque
  assert.equal(writes.length,1);assert.deepEqual(writes[0].results.map(r=>r.id),['node','ffmpeg']);assert.ok(writes[0].started<=writes[0].finished);
  fail=true;const failed=await request(h,'/api/書込','POST',auth);assert.equal(failed.status,500);assert.ok(!failed.body.toString().includes('disk'));
 });
+
+
+test('screen uses latest installation result to skip Ollama and replaces prior acquired models',async()=>{
+ const {testKey,runModels}=await import('../モデル情報/key_status.mjs');
+ let state='未検出',calls=0,saved;
+ const h=createHandler({token:'test-key',entries:[{id:'ollama'}],scanFn:async()=>[{id:'ollama',状態:state}],keyStatusFn:async()=>({項目:[{id:'ollama'}]}),modelsWriteFn:async(_providers,results)=>{saved=results.ollama;return [];},keyTestFn:(id,options)=>testKey(id,{...options,run:(action,id,options)=>runModels(action,id,{...options,reader:async()=> '{}',fetch:async provider=>{assert.equal(provider,'ollama-local');calls++;return {models:[{name:'fixture:latest'}]};}})})});
+ const run=async()=>JSON.parse((await request(h,'/api/キーテスト/ollama','POST',auth)).body);
+ assert.equal((await run()).状態,'OK');assert.equal(calls,1); // No installation result is not missing.
+ await request(h,'/api/診断','POST',auth);
+ const skipped=await run();assert.equal(skipped.状態,'未実施');assert.equal(skipped.スキップ,true);assert.equal(calls,1);
+ assert.equal((await request(h,'/api/モデル書込','POST',auth)).status,200);assert.deepEqual(saved.モデル,[]);assert.equal(saved.状態,'未実施');
+ state='OK';await request(h,'/api/診断','POST',auth);
+ assert.equal((await run()).状態,'OK');assert.equal(calls,2);
+});

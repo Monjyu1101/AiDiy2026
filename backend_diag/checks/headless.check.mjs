@@ -66,3 +66,17 @@ test('models step tests only model providers that can be tested (2 at a time) an
  assert.deepEqual((await readdir(directory)).sort(),['chat_models_info.json','code_models_info.json','gemini_models_info.json','live_models_info.json','live_voices_info.json','ollama_models_info.json','openrt_models_info.json']);
  assert.ok(lines.some(line=>line.includes('NG  Ollama')));
 }));
+
+
+test('headless passes current installation results and saves missing Ollama without fetching models',async()=>folder(async directory=>{
+ const {testKey,runModels}=await import('../モデル情報/key_status.mjs');
+ const providers=[{id:'ollama',名前:'Ollama',テスト可能:true}];
+ for(const state of ['OK','未検出','OK']){
+  let calls=0;
+  const models={...STEPS[1],run:options=>modelsStep({...options,statusFn:async()=>({項目:providers}),configReader:()=> '{}',publicCache:{refresh:async()=>({}),input:()=>({})},testFn:(id,options)=>testKey(id,{...options,run:(action,id,options)=>runModels(action,id,{...options,reader:async()=> '{}',fetch:async provider=>{assert.equal(provider,'ollama-local');calls++;return {models:[{name:'fixture:latest'}]};}})})})};
+  const code=await runHeadless({directory,steps:[STEPS[0],models],loadEntries:async()=>[{id:'ollama',name:'Ollama'}],probeFn:async()=>({id:'ollama',状態:state}),...quiet});
+  assert.equal(code,0);assert.equal(calls,state==='未検出'?0:1);
+  const saved=JSON.parse(await readFile(path.join(directory,'ollama_models_info.json'),'utf8'));
+  assert.equal(saved.状態,state==='未検出'?'未実施':'OK');assert.equal(saved.chat.件数,calls);
+ }
+}));

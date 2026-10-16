@@ -51,13 +51,10 @@ const LIVE_OPENAI_VOICES = Object.freeze({
   "verse": "Verse Female"
 });
 
-// キー確認に成功した区分だけ固定の声を公開する。FreeAIはGeminiと同じ定義。
-export function liveVoicesInfo(providers, results) {
+// 音声候補は取得・認証状態にかかわらず3区分とも公開する。FreeAIはGeminiと同じ定義。
+export function liveVoicesInfo() {
   const voices = {};
   for (const id of ['freeai', 'gemini', 'openai']) {
-    const provider = providers.find(row => row.id === id);
-    if (!provider || provider.設定済み === false || provider.テスト可能 === false
-        || results[id]?.状態 !== 'OK') continue;
     voices[id + '_live'] = {voices:{...(id === 'openai' ? LIVE_OPENAI_VOICES : LIVE_GEMINI_VOICES)}};
   }
   return voices;

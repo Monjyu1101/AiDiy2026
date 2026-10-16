@@ -43,6 +43,20 @@ class DiagModelCatalogTest(unittest.TestCase):
         self.write("code", {"codex_cli": {"models": {"gpt-new": "new"}}})
         self.assertEqual(list(self.models.get_code_models()), ["codex_cli"])
 
+    def test_config_chat_precedes_local_in_api_catalog_and_initial_selection(self):
+        self.write("chat", {
+            "freeai_chat": {"models": {"configured": "仮設定（未検証） - configured"}},
+            "local_chat": {"models": {"local-first": "first", "local-second": "second"}},
+        })
+        catalog = self.models.get_chat_models()
+        # APIはこのdictをそのまま返し、画面のObject.keysもこの順序で選択肢を作る。
+        self.assertEqual(list(catalog), ["freeai_chat", "local_chat"])
+        self.assertEqual(list(catalog["local_chat"]), ["local-first", "local-second"])
+        settings = self.models.normalize_initial_settings({"CHAT_AI_NAME": "removed"})
+        self.assertEqual(settings["CHAT_AI_NAME"], "freeai_chat")
+        self.assertEqual(settings["CHAT_FREEAI_MODEL"], "configured")
+        self.assertEqual(self.models.normalize_initial_settings({"CHAT_AI_NAME": "local_chat"})["CHAT_AI_NAME"], "local_chat")
+
     def test_provider_ids_and_display_labels_are_used_without_rebuilding(self):
         # 選別・統合はdiagの責務。PythonではCLI用ID、バージョン表示、UTF-8を保持する。
         code = {
