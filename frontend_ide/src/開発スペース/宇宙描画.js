@@ -333,7 +333,7 @@ let since = null;            // 起点日時（ms）。これ以降に更新し�
 let voyages = {};            // 階層ごとの航路 { 階層パス: [{ from, to }, ...] }
 let voyageCurrent = {};       // 再訪は明細を増やさず、この現在点だけを更新する
 let journal = [];            // 航海日誌（新しい順） [{ type, path, at }]
-let routeMode = 'view', aiRoute = [], aiRecords = [];
+let routeMode = 'view', aiRoute = [], aiRecords = [], searchPaths = [];
 
 // ---------------------------------------------------------------- 描画
 function resize() {
@@ -675,6 +675,7 @@ function drawGate(t) {
 /** 各明細の出発点と到着点を結ぶ。再訪後の分岐を配列順で繋ぎ直さない。 */
 function voyageTargets() {
   if(routeMode==='ai')return aiRouteRecords(aiRecords,trail,world);
+  if(routeMode==='search'){const [origin,...targets]=aiRouteTargets(searchPaths,trail,world);return [...new Set(targets)].map(to=>({from:origin,to}));}
   const resolve = key => key === null ? null : key[0] === 'g'
     ? world.galaxies.find(g => g.path === key.slice(2)) : world.byPath.get(key.slice(2));
   return (voyages[basePath()] || []).map(({from,to}) => ({from:resolve(from),to:resolve(to)}));
@@ -698,7 +699,7 @@ function drawVoyage(t) {
   ctx.fillStyle = routeMode==='ai'?'#a7f6ff':'#ffe2a0';
   const marked = new Set();
   // 線の重複を除いても、検索の最後の参照点は元の順序から求める。
-  const aiCurrent = routeMode==='ai' ? aiRouteTargets(aiRoute,trail,world).at(-1) : null;
+  const aiCurrent = routeMode!=='view' ? aiRouteTargets(routeMode==='ai'?aiRoute:searchPaths,trail,world).at(-1) : null;
   const markers=records.flatMap((record,i)=>[
     {point:record.from,screen:points[i].from,index:i},
     {point:record.to,screen:points[i].to,index:i},
@@ -707,7 +708,7 @@ function drawVoyage(t) {
     if (!s || marked.has(point)) return;
     marked.add(point);
     const current = voyageCurrent[basePath()];
-    const latest = routeMode==='ai' ? point===aiCurrent : point && point.path === current?.slice(2);
+    const latest = routeMode!=='view' ? point===aiCurrent : point && point.path === current?.slice(2);
     const r = latest ? 5 + Math.sin(t * 3) * 1.2 : 3;
     ctx.globalAlpha = latest ? 0.95 : 0.25 + 0.5 * (i / n);
     ctx.beginPath();
@@ -1474,6 +1475,11 @@ function remember(type, path, base = basePath(), save = true) {
   journal = [{ type, path, at: Date.now() }, ...journal.filter(j => !(j.type === type && j.path === path))].slice(0, 80);
   if (save) saveVoyage();
 }
+// 閲覧日時一覧だけを消す。階層別経路・現在点・AI検索の経路は保持する。
+function clearViewHistory() {
+  journal = journal.filter(entry => entry.type !== 'file');
+  saveVoyage(); notify();
+}
 function clearVoyage() {
   delete voyages[basePath()]; delete voyageCurrent[basePath()];
   saveVoyage();
@@ -1529,7 +1535,7 @@ function notify() {
   if (disposed) return;
   notifiedOrbitPhase = autoOrbit.phase;
   if (viewMode === '2d') driving = isDriving(performance.now());
-  change({ scan, trail: [...trail], selected, focus, journal, autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
+  change({ scan, trail: [...trail], selected, focus, journal, voyages: Object.fromEntries(Object.entries(voyages).map(([base,records])=>[base,records.map(record=>({...record}))])), autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
   scheduleFollow2D();
 }
 function updateSide() { notify(); }
@@ -1549,6 +1555,24 @@ function setFilter(on) {
   invalidateNavigation(); clearFollowRequests(); cancelRefresh();
   fileFilter = next; knownPaths = null;
   void refresh(undefined,{fresh:false});
+}
+// 監視の結果を今のページへ反映する。移動・手動更新中の結果は次回に回す。
+function applyFolderSnapshot(context, result) {
+  if (disposed || viewMode !== '2d' || !autoSpin || refreshPending || context.path !== basePath() || context.filter !== fileFilter || !scan || result.truncated) return false;
+  const current = nodeAt(trail);
+  if (!current || !result.tree) return false;
+  if (JSON.stringify(current) === JSON.stringify(result.tree)) return true;
+  const replace = (node, depth) => depth === trail.length ? result.tree : { ...node, d: node.d.map(child => child.n === trail[depth] ? replace(child, depth + 1) : child) };
+  scan = { ...scan, tree: replace(scan.tree, 0), scannedAt: Date.now() };
+  const previous = selected;
+  world = buildWorld();
+  if (previous) {
+    const body = world.byPath.get(previous.path);
+    if (body) selectBody({...body,...selectionLocation(previous)},{record:false,zoom:false});
+    else if (!previous.unlisted) { selected=null;tracking=null;focus=null;updateSide(); }
+  }
+  knownPaths = new Set(collectFiles(scan.tree, '').map(file => file.path));
+  notify(); return true;
 }
 function refresh(startedAt, {fresh=true}={}) {
   if(disposed)return Promise.resolve(false);
@@ -1626,7 +1650,7 @@ listen(document, 'visibilitychange', () => {
 });
 requestAnimationFrame(frame);
 return {
-  refresh, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  refresh, applyFolderSnapshot, clearViewHistory, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
   get viewMode() { return viewMode; }, get selected() { return selected; },
   get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,
   get projection() { return { x: CX, y: CY }; },
@@ -1635,14 +1659,17 @@ return {
   get orbitVisibility() { return autoOrbit.visibility; },
   color: name => KINDS[kindOf(name)].color,
   route(value) {
-    routeMode=value.mode; aiRoute=[...(value.paths||[])];
+    routeMode=value.mode;
+    if(routeMode==='search'){searchPaths=[...new Set(value.paths||[])];return;}
+    if(routeMode==='view')return;
+    aiRoute=[...(value.paths||[])];
     const expected=searchRouteRecords(aiRoute);
     // 旧UIのpathsだけでも補完。外から渡す明細は検索順・両端が一致するものだけを採用する。
     aiRecords=Array.isArray(value.records)&&value.records.length===expected.length&&value.records.every((r,i)=>r?.from===expected[i].from&&r?.to===expected[i].to)
       ? value.records.map(({from,to})=>({from,to})) : expected;
   },
-  get searchRouteRecords() { return aiRecords.map(record=>({...record})); },
-  get routeState() { return {mode:routeMode,paths:[...aiRoute]}; },
+  get searchRouteRecords() { return routeMode==='search'?searchPaths.map(path=>({from:null,to:`f:${path}`})):aiRecords.map(record=>({...record})); },
+  get routeState() { return {mode:routeMode,paths:[...(routeMode==='search'?searchPaths:aiRoute)]}; },
   marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
   dispose() { disposed = true; cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
 };

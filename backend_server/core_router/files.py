@@ -8,8 +8,10 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
+from typing import Literal
+from .フォルダ状態 import フォルダ状態取得
 import os
 import base64
 import core_schema as schemas
@@ -124,3 +126,24 @@ def update_ファイル内容(
         message="ファイル内容を更新しました",
         data={"ファイル名": ファイル名, "解決ファイルパス": 解決パス},
     )
+
+
+class フォルダ状態Request(BaseModel):
+    フォルダ: str = ""
+    フィルター: Literal["", "backup"] = "backup"
+
+
+@router.post("/フォルダ状態", response_model=schemas.ResponseBase)
+def get_フォルダ状態(request: フォルダ状態Request, http_request: Request,
+                 現在利用者: models.C利用者 = Depends(deps.get_現在利用者)):
+    # 利用者指定の絶対ルートは受け付けず、サーバーが設定したCode作業ルート内に限定する。
+    conf = getattr(http_request.app, "conf", None)
+    settings = getattr(conf, "json", None)
+    root = _解決ファイルパス(getattr(settings, "CODE_BASE_PATH", "../") or "../")
+    try:
+        data = フォルダ状態取得(root, request.フォルダ, request.フィルター)
+    except BlockingIOError:
+        raise HTTPException(status_code=429, detail="フォルダを確認中です", headers={"Retry-After": "2"})
+    except (ValueError, OSError):
+        raise HTTPException(status_code=404, detail="参照できるフォルダが見つかりません")
+    return schemas.ResponseBase(status="OK", message="フォルダ状態を取得しました", data=data)

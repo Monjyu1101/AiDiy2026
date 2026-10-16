@@ -11,6 +11,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { createSpace } from '../src/開発スペース/宇宙描画.js';
+import { createFolderMonitor } from '../src/ファイル閲覧/フォルダ監視.js';
+import * as routeTree from '../src/開発スペース/軌跡ツリー.js';
+import * as routeRecords from '../src/開発スペース/経路記録.js';
+import * as fileDates from '../src/ファイル閲覧/ファイル日時.js';
 import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
@@ -35,11 +39,11 @@ const textOf = node => [node.text || '', ...(node.children || []).map(textOf)].j
 
 // 実際のSFCテンプレートのイベント/propsで全体を接続する。エンジンや選択処理は置き換えない。
 // 描画先だけをメモリ内にし、AI結果は確定済みの通知、Monacoは簡易表示へ置き換える。
-async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = {}) {
+async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', actualAI = false } = {}) {
   const old = new Map(), frames = new Map(), timers = new Map(), intervals = new Map(), storage = new Map();
   const requests = [], warnings = [], states = new Map(), props = new Map(), components = new Map();
   const window = new EventTarget(), document = new EventTarget(), location = { hash, origin: 'http://localhost' };
-  let clock = 0, id = 0, engine, navigation, emitAI;
+  let clock = 0, id = 0, engine, navigation, emitAI, beginAI;
   document.hidden = false;
   const context = new Proxy({ font: '', createRadialGradient: () => ({ addColorStop() {} }), measureText: text => ({ width: text.length * 6 }) }, { get: (object, key) => key in object ? object[key] : () => {} });
   function node(type, text = '') {
@@ -70,6 +74,8 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
     getComputedStyle: () => ({ getPropertyValue: () => '78px' }), matchMedia: () => ({ matches: true }), CSS: { escape: value => value },
     fetch: async (url, options) => {
+      // 既存の移動/追跡リクエスト件数とは別の監視。監視自体は専用テストで検証する。
+      if (url.startsWith('/api/folder-state')) return reply({ revision: 'unchanged', files: 0 });
       requests.push({ url, at: clock, ...options });
       if (fetcher) { const result = await fetcher(url, options); if (result !== undefined) return result; }
       if (url.startsWith('/api/galaxy')) return reply(snapshot());
@@ -86,11 +92,14 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
+    './ファイル日時.js': fileDates,
+    '../開発スペース/軌跡ツリー.js':routeTree,'../開発スペース/経路記録.js':routeRecords,
+    '../ファイル閲覧/フォルダ監視.js': { createFolderMonitor },
     '../開発スペース/宇宙描画.js': { createSpace(...args) { engine = createSpace(...args); navigation = t.mock.method(engine, 'goTo'); engine.setAutoSpin(auto); return engine; } },
     '../ファイル閲覧/最新ファイル.js': latest, '../ファイル閲覧/フォルダページ構成.js': pages, '../ファイル閲覧/ファイル参照.js': references, '../ファイル閲覧/ファイル操作.js': fileActions,
     '../ファイル閲覧/ファイルアイコン.js': { fileIcon }, '../ファイル閲覧/走査警告.js': { scanWarning }, '../ファイル閲覧/コード表示.js': { loadMonaco: async () => null, monacoLanguage: () => 'javascript' },
   };
-  const aiPanel = { props: ['root'], emits: ['result'], setup(_props, { emit }) { emitAI = result => emit('result', result); return () => null; } };
+  const aiPanel = { props: ['root'], emits: ['result','search'], setup(_props, { emit }) { emitAI = result => emit('result', result);beginAI=()=>emit('search'); return () => null; } };
   const runtime = { ...vue, TransitionGroup: { inheritAttrs: false, setup(_props, { slots }) { return () => slots.default?.(); } } };
   function component(name) {
     if (components.has(name)) return components.get(name);
@@ -102,7 +111,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
     const module = { exports: {} };
     vm.runInNewContext(transformSync(`${script.content}\n${template.code}\ncomponent.render=render;module.exports=component;`, { format: 'cjs' }).code, {
       ...globals, module, Date, console, AbortController, AbortSignal, URLSearchParams,
-      require: id => id === 'vue' ? runtime : id === '../ファイル検索/AI検索パネル.vue' ? aiPanel
+      require: id => id === 'vue' ? runtime : id === '../ファイル検索/AI検索パネル.vue' ? (actualAI?component('AISearchPanel'):aiPanel)
         : id.endsWith('.vue') ? component(componentName(id)) : moduleMap[id] || assert.fail(`Unexpected import: ${id}`),
     });
     const result = module.exports, setup = result.setup;
@@ -133,7 +142,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d' } = 
   t.after(() => assert.deepEqual(warnings, [], 'Vue mount/update/unmount completes without warnings'));
   const find = predicate => walk(root, predicate);
   return { engine, navigation, root, states, props, viewProps, requests, frames, timers, intervals, warnings, window, document, location, dispose,
-    emitAI: value => emitAI(value), find,
+    emitAI: value => emitAI(value), beginAI:()=>beginAI(),find,
     async frame(ms = 100) { const callbacks = [...frames.values()]; frames.clear(); await this.advance(ms); for (const callback of callbacks) callback(clock); await flush(); },
     async click(predicate) { const element = find(predicate); assert.ok(element, 'rendered control exists'); assert.equal(typeof element.props.onClick, 'function'); element.props.onClick({ target: element, currentTarget: element, stopPropagation() {}, preventDefault() {} }); await flush(); return element; },
     async advance(ms) {
@@ -198,12 +207,14 @@ test('2D統合: AI結果の通知は移動せず、結果クリック・前後�
     await h.click(node => node.props?.['aria-label'] === '次の関連ファイル'); selected(h, route[2]);
     await h.click(node => node.props?.['aria-label'] === '前の関連ファイル'); selected(h, route[1]);
     await h.click(node => hasClass(node, 'route-choice') && textOf(node) === '閲覧軌跡');
-    const viewRoute = [...h.states.get('FileExplorer').routePaths.value];
-    assert.equal(new Set(viewRoute).size, 3);
-    await h.click(node => node.props?.['data-route-path'] === viewRoute[0]); selected(h, viewRoute[0]);
-    await h.click(node => node.props?.['aria-label'] === '次の閲覧ファイル'); selected(h, viewRoute[1]);
-    await h.click(node => node.props?.['aria-label'] === '次の閲覧ファイル'); selected(h, viewRoute[2]);
-    assert.deepEqual([...h.states.get('FileExplorer').routePaths.value], viewRoute, '閲覧順を途中で入れ替えず全件を辿る');
+    const explorer=h.states.get('FileExplorer'),steps=[...explorer.routeSteps.value];
+    assert.equal(new Set(explorer.routePaths.value).size,3);
+    await h.click(node=>node.props?.['data-route-path']===steps[0].path);
+    for(const row of steps.slice(1)){
+      await h.click(node=>node.props?.['aria-label']==='次の閲覧ファイル');
+      if(row.type==='file')selected(h,row.path);else {assert.equal(h.engine.trail.join('/'),row.path);assert.equal(h.engine.selected,null);}
+    }
+    assert.equal(explorer.routeIndex.value,explorer.routeSteps.value.length-1,'リスト順に終端まで辿る');
     assert.equal(h.requests.some(request => request.url.includes('ai-search')), false);
   } finally { h.dispose(); }
 });
@@ -438,7 +449,7 @@ for(const mode of ['2d','3d'])test(`${mode}実部品の探索枠: 更新候補�
     h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await h.frame();assert.equal(spinning(),true);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),false);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),true);
-    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,0);assert.equal(h.intervals.size,1);
+    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,mode==='2d'?2:0,'2Dだけ監視と次の深夜更新を予約');assert.equal(h.intervals.size,1);
   } finally {h.dispose();}
 });
 
@@ -479,4 +490,121 @@ for(const mode of ['2d','3d'])for(const action of ['switch','rapid','deleted','d
     const calls=h.requests.length;await h.advance(120000);await h.frame();assert.equal(h.requests.length,calls);
     assert.equal(h.frames.size,action==='dispose'||h.viewProps.viewMode==='2d'?0:1);
   } finally {pending?.resolve(reply(data));await flush();h.dispose();}
+});
+
+
+test('閲覧軌跡クリア: 開いた見出しだけに表示し、現在位置・経路・検索軌跡を保持する',async t=>{
+ const h=await workspace(t,{auto:false,mode:'2d'});
+ try{
+  assert.equal(h.find(n=>n.props?.['aria-label']==='閲覧軌跡をクリア'),undefined);
+  await h.engine.goTo({type:'file',path:'src/main.js'});await flush();
+  h.emitAI({route:['root.js','src/main.js'],files:[]});await flush();
+  await h.click(n=>n.text==='閲覧軌跡');
+  const before=JSON.parse(localStorage.getItem('aidiy_ide:/project'));
+  const selected=h.engine.selected,trail=[...h.engine.trail];
+  await h.click(n=>n.props?.['aria-label']==='閲覧軌跡をクリア');
+  assert.equal(h.engine.selected,selected);assert.deepEqual(h.engine.trail,trail);
+  assert.equal(h.props.get('FileExplorer').viewHistory.filter(e=>e.type==='file').length,0);
+  const saved=JSON.parse(localStorage.getItem('aidiy_ide:/project'));
+  assert.deepEqual(saved.voyages,before.voyages);assert.deepEqual(saved.voyageCurrent,before.voyageCurrent);
+  assert.equal(h.find(n=>n.props?.['aria-label']==='閲覧軌跡をクリア').props.disabled,true);
+  await h.click(n=>n.text==='AiDiy検索軌跡');assert.equal(h.find(n=>n.props?.['aria-label']==='閲覧軌跡をクリア'),undefined);
+  assert.deepEqual([...h.states.get('FileExplorer').aiRoute.value],['root.js','src/main.js']);
+  await h.click(n=>n.text==='閲覧軌跡');await h.click(n=>n.text==='閲覧軌跡');assert.equal(h.find(n=>n.props?.['aria-label']==='閲覧軌跡をクリア'),undefined);
+ }finally{h.dispose();}
+});
+
+
+test('エクスプローラー: 起点/grepのフォルダは通常色対象、右側の対象件数とファイル着色を保持する',async t=>{
+ const h=await workspace(t,{auto:false,mode:'2d'});
+ try{
+  const explorer=h.states.get('FileExplorer');explorer.mode.value='since';explorer.since.value=1;await flush();
+  let row=h.find(n=>n.props?.['data-path']==='src');assert.ok(hasClass(row,'plain-folder'));assert.ok(hasClass(row,'fresh'));assert.equal(row.props['data-entry-type'],'dir');
+  explorer.mode.value='grep';await flush();explorer.matches.value=new Set(['src/main.js']);await flush();
+  row=h.find(n=>n.props?.['data-path']==='src');assert.ok(hasClass(row,'plain-folder'));assert.ok(hasClass(row,'fresh'));assert.ok(explorer.counts.value.get('src')>0);
+  const file=h.find(n=>n.props?.['data-path']==='src/main.js');if(file)assert.equal(hasClass(file,'plain-folder'),false);
+  explorer.mode.value='ai';await flush();row=h.find(n=>n.props?.['data-path']==='src');assert.equal(hasClass(row,'plain-folder'),false,'既存のAI検索用表示は変更しない');
+ }finally{h.dispose();}
+});
+
+
+test('軌跡3分類: 起点/grep開始・結果・失敗・再検索・空結果を独立表示し、経路を変更しない',async t=>{
+ let next=reply({paths:['src/main.js','other/second.js'],matches:[],checked:4,skipped:0});
+ const h=await workspace(t,{fetcher:url=>url.startsWith('/api/grep')?next:undefined});
+ try{
+  const ex=h.states.get('FileExplorer');
+  await h.engine.goTo({type:'file',path:'root.js'});await flush();
+  const saved=JSON.parse(localStorage.getItem('aidiy_ide:/project'));
+  await h.click(n=>n.text==='検索軌跡');assert.equal(ex.routeRows.value.length,0);assert.equal(h.engine.routeState.mode,'search');
+  await h.click(n=>n.text==='閲覧軌跡');
+  ex.choose('start');await flush();assert.equal(ex.routeMode.value,'search');assert.ok(ex.routePaths.value.includes('root.js'));
+  assert.ok(ex.routeRows.value.every(row=>row.parent===null));
+  ex.mode.value='grep';await flush();ex.query.value='needle';
+  let pending=deferred();next=pending.promise;const running=ex.grep();await flush();assert.equal(h.engine.routeState.mode,'search');
+  pending.resolve(reply({paths:['src/main.js','other/second.js'],matches:[],checked:4,skipped:0}));await running;await flush();
+  assert.deepEqual([...ex.routePaths.value],['src/main.js','other/second.js']);
+  await h.click(n=>n.text==='AiDiy検索軌跡');assert.equal(ex.routeRows.value.length,0);assert.equal(h.engine.routeState.mode,'ai');
+  h.beginAI();await flush();assert.equal(ex.routeMode.value,'ai');
+  h.emitAI({query:'AI',route:['root.js','src/nested/deep.js'],files:[],routeRecords:[{from:null,to:'f:root.js'},{from:'f:root.js',to:'f:src/nested/deep.js'}]});await flush();
+  assert.deepEqual(ex.routeRows.value.map(row=>[row.path,row.parent]),[['root.js',null],['src/nested/deep.js','f:root.js']]);
+  await h.click(n=>n.text==='検索軌跡');assert.deepEqual([...ex.routePaths.value],['src/main.js','other/second.js']);
+  assert.equal(h.find(n=>n.props?.['aria-label']==='閲覧軌跡をクリア'),undefined);
+  ex.mode.value='grep';await flush();next={ok:false,text:async()=> 'fixture failure'};await ex.grep();await flush();
+  assert.match(ex.status.value,/fixture failure/);assert.equal(h.engine.routeState.mode,'search');assert.deepEqual([...ex.routePaths.value],['src/main.js','other/second.js']);
+  next=reply({paths:[],matches:[],checked:4,skipped:0});await ex.grep();await flush();assert.equal(ex.routeRows.value.length,0);
+  await h.click(n=>n.text==='閲覧軌跡');assert.deepEqual([...ex.routePaths.value],['root.js']);
+  assert.deepEqual(JSON.parse(localStorage.getItem('aidiy_ide:/project')),saved,'分類切替と検索だけでは閲覧記録や経路を追加しない');
+  await h.click(n=>n.text==='AiDiy検索軌跡');assert.deepEqual([...ex.aiRoute.value],['root.js','src/nested/deep.js']);
+ }finally{h.dispose();}
+});
+
+test('閲覧ツリーの実部品: 再訪・分岐・ポイント移動・クリアの分類分離',async t=>{
+ const h=await workspace(t);
+ try{
+  const ex=h.states.get('FileExplorer');
+  for(const path of ['src/main.js','src/nested/deep.js','src/main.js','root.js']){await h.engine.goTo({type:'file',path});await flush();}
+  await h.click(n=>n.text==='閲覧軌跡');
+  const records=JSON.parse(localStorage.getItem('aidiy_ide:/project')).voyages;
+  const row=ex.routeRows.value.find(r=>r.path==='src/main.js');assert.ok(row);
+  await h.click(n=>n.props?.['data-route-path']==='src/main.js');selected(h,'src/main.js');
+  assert.deepEqual(JSON.parse(localStorage.getItem('aidiy_ide:/project')).voyages,records,'再訪で重複枝を増やさない');
+  ex.acceptSearch(['root.js','other/second.js'],'grep','query');h.emitAI({route:['src/nested/deep.js'],files:[]});await flush();
+  await h.click(n=>n.text==='検索軌跡');await h.click(n=>n.props?.['data-route-path']==='other/second.js');selected(h,'other/second.js');
+  await h.click(n=>n.text==='閲覧軌跡');await h.click(n=>n.props?.['aria-label']==='閲覧軌跡をクリア');assert.equal(ex.routeRows.value.length,0);
+  await h.click(n=>n.text==='検索軌跡');assert.deepEqual([...ex.routePaths.value],['root.js','other/second.js']);
+  await h.click(n=>n.text==='AiDiy検索軌跡');assert.deepEqual([...ex.routePaths.value],['src/nested/deep.js']);
+ }finally{h.dispose();}
+});
+
+
+test('実AI検索部品: 開始・失敗・再検索・再確認でAiDiy分類へ切替、前回確定結果を保持',async t=>{
+ let response=reply({status:'failed',message:'fixture offline',id:'test'});
+ const h=await workspace(t,{actualAI:true,fetcher:url=>url.includes('/api/ai-search/history')?reply({entries:[]}):url.startsWith('/api/ai-search')?response:undefined});
+ try{
+  const ai=h.states.get('AISearchPanel'),ex=h.states.get('FileExplorer');ai.query.value='query';
+  await ai.search();await flush();assert.equal(ex.routeMode.value,'ai');assert.equal(ex.aiRoute.value.length,0);assert.match(ai.message.value,/fixture offline/);
+  response=reply({status:'complete',result:{id:'fixture',query:'query',files:[],route:['src/main.js']}});
+  await h.click(n=>n.text==='閲覧軌跡');await ai.search();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
+  await h.click(n=>n.text==='閲覧軌跡');response=reply({status:'failed',message:'fixture fail',id:'test'});await ai.search();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
+  await h.click(n=>n.text==='検索軌跡');ai.recheck();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
+ }finally{h.dispose();}
+});
+
+test('フォルダA/Bの対とリスト連続移動: 2つの関係は1操作、ファイルは飛ばさず再訪で枝を増やさない',async t=>{
+ const data={root:'/project',tree:directory('project',[],[directory('A',[],[directory('B',['one.txt','two.txt'])])])};
+ const h=await workspace(t,{fetcher:url=>url.startsWith('/api/galaxy')?reply(data):undefined});
+ try{
+  for(const entry of [{type:'dir',path:'A'},{type:'dir',path:'A/B'},{type:'file',path:'A/B/one.txt'},{type:'file',path:'A/B/two.txt'}]){await h.engine.goTo(entry);await flush();}
+  await h.click(n=>n.text==='閲覧軌跡');const ex=h.states.get('FileExplorer');
+  assert.deepEqual(ex.routeSteps.value.map(r=>r.path),['','A','A/B','A/B/one.txt','A/B/two.txt']);
+  const stored=JSON.parse(localStorage.getItem('aidiy_ide:/project')).voyages;
+  await h.click(n=>n.props?.['data-route-path']==='A/B');assert.equal(h.engine.trail.join('/'),'A/B');assert.equal(h.engine.selected,null);
+  await h.click(n=>n.props?.['aria-label']==='次の閲覧ファイル');selected(h,'A/B/one.txt');
+  await h.click(n=>n.props?.['aria-label']==='次の閲覧ファイル');selected(h,'A/B/two.txt');
+  assert.equal(h.find(n=>n.props?.['aria-label']==='次の閲覧ファイル').props.disabled,true);
+  await h.click(n=>n.props?.['aria-label']==='前の閲覧ファイル');selected(h,'A/B/one.txt');
+  await h.click(n=>n.props?.['aria-label']==='前の閲覧ファイル');assert.equal(h.engine.trail.join('/'),'A/B');assert.equal(h.engine.selected,null);
+  await h.click(n=>n.props?.['aria-label']==='前の閲覧ファイル');assert.equal(h.engine.trail.join('/'),'A');
+  assert.deepEqual(JSON.parse(localStorage.getItem('aidiy_ide:/project')).voyages,stored);
+ }finally{h.dispose();}
 });

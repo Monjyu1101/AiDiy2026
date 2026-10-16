@@ -9,8 +9,10 @@ import AISearchPanel from '../ファイル検索/AI検索パネル.vue';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
 import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新ファイル.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
-const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
-const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route']);
+import { searchRouteRecords } from '../開発スペース/経路記録.js';
+import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
+const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
+const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history']);
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
 // 前回の最新日時以降を更新順で表示する。更新なしなら前回の一覧を保持する。
@@ -54,6 +56,8 @@ watch(tree, value => { if (!switchingFilter) acceptUpdates(latestFiles(value, up
 const latestTime = value => new Date(value.mtime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const expanded = ref(new Set()), cursor = ref(''), mode = ref('since'), since = ref(props.startedAt), preset = ref('start');
 const aiResult=shallowRef(null),routeMode=ref('view');
+// 検索方法の切替や失敗で、前回確定した別分類の経路を消さない。
+const searchRoute=shallowRef([]),searchKind=ref(''),searchTitle=ref('');
 const aiFiles=computed(()=>new Map((aiResult.value?.files||[]).map(file=>[file.path,file.reason])));
 const aiRoute=computed(()=>aiResult.value?.route||[]);
 const routeListOpen=ref(false),routeElement=ref(),viewRoute=ref([]);
@@ -65,7 +69,13 @@ watch(viewedFiles,entries=>{
   viewRoute.value=routeListOpen.value&&routeMode.value==='view'
     ? [...paths.filter(path=>!viewRoute.value.includes(path)),...viewRoute.value.filter(path=>paths.includes(path))] : paths;
 },{immediate:true});
-const routePaths=computed(()=>routeMode.value==='ai'?aiRoute.value:viewRoute.value);
+const routePaths=computed(()=>routeMode.value==='ai'?aiRoute.value:routeMode.value==='search'?searchRoute.value:viewRoute.value);
+const routeLabel=computed(()=>routeMode.value==='ai'?'AiDiy検索軌跡':routeMode.value==='search'?'検索軌跡':'閲覧軌跡');
+const routeRows=computed(()=>routeTreeRows(routeMode.value==='view'?viewTreeRecords(props.viewVoyages,viewRoute.value,props.viewHistory.filter(entry=>entry?.type==='dir').map(entry=>entry.path))
+  :routeMode.value==='search'?searchRoute.value.map(path=>({from:null,to:'f:'+path}))
+  :aiResult.value?.routeRecords||searchRouteRecords(aiRoute.value)));
+function beginSearch(kind){routeMode.value=kind==='ai'?'ai':'search';}
+function acceptSearch(paths,kind,title){searchRoute.value=[...new Set(paths)];searchKind.value=kind;searchTitle.value=title;}
 const viewedAt=path=>{const at=viewedFiles.value.find(entry=>entry.path===path)?.at;return Number.isFinite(at)?new Date(at).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';};
 function closeRouteList(event){if(!routeElement.value?.contains(event.target))routeListOpen.value=false;}
 onMounted(()=>document.addEventListener('pointerdown',closeRouteList));
@@ -74,13 +84,16 @@ const hiddenAI=computed(()=>{
   function walk(node,prefix=''){if(!node)return;for(const [name] of node.f)paths.add(prefix+name);for(const dir of node.d)walk(dir,prefix+dir.n+'/');}
   walk(tree.value);return aiRoute.value.filter(path=>!paths.has(path)).length;
 });
-const routeIndex=computed(()=>routePaths.value.indexOf(cursor.value||props.selected));
+const routeSteps=computed(()=>routeNavigationSteps(routeRows.value));
+const routeIndex=computed(()=>routeSteps.value.findIndex(row=>row.path===(cursor.value||props.selected||props.current)));
 function chooseRoute(value){
   const opening=routeMode.value!==value||!routeListOpen.value;
   routeMode.value=value;routeListOpen.value=opening;
-  if(value==='ai')mode.value='ai';else if(opening)syncViewRoute();
+  if(value==='ai')mode.value='ai';else if(value==='view'&&opening)syncViewRoute();
 }
-function stepRoute(offset){const index=routeIndex.value<0?(offset>0?0:routePaths.value.length-1):routeIndex.value+offset;const path=routePaths.value[index];if(path)select({type:'file',path});}
+function selectRoutePath(path){const match=routeMode.value==='search'&&searchKind.value==='grep'?grepResults.value.find(item=>item.path===path):null;if(match)selectMatch(match);else select({type:'file',path,source:routeMode.value});}
+function selectRoutePoint(row){if(row.type==='dir')select({type:'dir',path:row.path});else selectRoutePath(row.path);}
+function stepRoute(offset){const index=routeIndex.value<0?(offset>0?0:routeSteps.value.length-1):routeIndex.value+offset;const row=routeSteps.value[index];if(row)selectRoutePoint(row);}
 function acceptAI(result,activate=true){
   aiResult.value=result;if(activate){mode.value='ai';routeMode.value='ai';}
   if(!result)return;
@@ -172,18 +185,25 @@ function choose(value) {
   else if(value==='hour')since.value=Date.now()-3600000;
   else if(value==='today'){const d=new Date();d.setHours(0,0,0,0);since.value=d.getTime();}
   else since.value=null;
-  expandSinceMatches();
+  updateSinceRoute();expandSinceMatches();
 }
-function chooseDate(value) { since.value=value?new Date(value).getTime():null;preset.value='custom';expandSinceMatches(); }
+function updateSinceRoute(){
+  beginSearch('since');const paths=[];
+  function walk(node,prefix=''){if(!node)return;for(const [name,,mtime] of node.f)if(since.value!=null&&mtime>=since.value)paths.push(prefix+name);for(const dir of node.d)walk(dir,prefix+dir.n+'/');}
+  walk(tree.value);acceptSearch(paths,'since','起点検索');
+}
+function chooseDate(value) { since.value=value?new Date(value).getTime():null;preset.value='custom';updateSinceRoute();expandSinceMatches(); }
 async function grep() {
   clearSearch();expanded.value=new Set();cursor.value='';save();scrollToTop();
   if(!query.value.trim())return;
+  beginSearch('grep');
   const run=generation, text=query.value, sensitive=caseSensitive.value;controller=new AbortController();status.value='検索中…';searching.value=true;rootExpanded.value=false;
   try {
     const response=await fetch('/api/grep?'+new URLSearchParams({q:text,case:sensitive?'1':'0'}),{signal:controller.signal});
     if(!response.ok)throw Error(await response.text());const result=await response.json();
     if(run!==generation)return;
     matches.value=new Set(result.paths);
+    acceptSearch(result.paths,'grep',text);
     grepResults.value=Array.isArray(result.matches)?result.matches:[];resultQuery.value=text;resultCase.value=sensitive;
     const next=new Set();
     for(const path of result.paths){const parts=path.split('/');for(let i=1;i<parts.length;i++)next.add(parts.slice(0,i).join('/'));}
@@ -208,10 +228,10 @@ function key(event) {
 watch(()=>props.root,()=>{try{expanded.value=new Set(JSON.parse(localStorage.getItem(`aidiy_ide:explorer:${props.root}`)||'{}').expanded||[]);}catch{expanded.value=new Set();}},{immediate:true});
 watch(()=>props.root,(value,previous)=>{
   if(previous !== undefined){clearSearch();resetLatest();initialSent=false;void pollLatest();}
-  aiResult.value=null;routeMode.value='view';
+  aiResult.value=null;searchRoute.value=[];searchKind.value='';searchTitle.value='';routeMode.value='view';
   routeListOpen.value=false;
 },{immediate:true});
-watch([routeMode,aiRoute],()=>emit('route',{mode:routeMode.value,paths:aiRoute.value,records:aiResult.value?.routeRecords}),{immediate:true});
+watch([routeMode,aiRoute,searchRoute],()=>emit('route',{mode:routeMode.value,paths:routeMode.value==='search'?searchRoute.value:aiRoute.value,records:routeMode.value==='ai'?aiResult.value?.routeRecords:undefined}),{immediate:true});
 watch(()=>[props.selected,props.current,props.open],()=>{if(props.open&&!props.navigating)reveal();});
 watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();initialSent=false;since.value=props.startedAt;preset.value='start';void pollLatest();});
 watch(()=>props.filter,clearSearch);
@@ -224,13 +244,15 @@ defineExpose({reveal});
   <div class="explorer-component" data-component="FileExplorer">
     <button v-if="!open" class="explorer-toggle" aria-label="エクスプローラーを開く" :aria-expanded="false" @click="emit('update:open',true)">☰</button>
     <div ref="routeElement" class="explorer-routes" :class="{'explorer-collapsed':!open}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
-      <button class="route-choice" :aria-pressed="routeMode==='view'" :aria-expanded="routeMode==='view'&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute('view')">閲覧軌跡</button><button class="route-choice" :aria-pressed="routeMode==='ai'" :aria-expanded="routeMode==='ai'&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute('ai')">AiDiy検索軌跡</button>
-      <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':'前の閲覧ファイル'" :disabled="!routePaths.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':'次の閲覧ファイル'" :disabled="!routePaths.length||routeIndex===routePaths.length-1" @click="stepRoute(1)">&gt;</button>
-      <section v-if="routeListOpen" id="route-file-list" class="route-file-list" :aria-label="routeMode==='ai'?'AiDiy検索軌跡のファイル一覧':'閲覧軌跡のファイル一覧'">
+      <button v-for="[value,label] in [['view','閲覧軌跡'],['search','検索軌跡'],['ai','AiDiy検索軌跡']]" :key="value" class="route-choice" :aria-pressed="routeMode===value" :aria-expanded="routeMode===value&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute(value)">{{ label }}</button>
+      <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':routeMode==='search'?'前の検索ファイル':'前の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':routeMode==='search'?'次の検索ファイル':'次の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===routeSteps.length-1" @click="stepRoute(1)">&gt;</button>
+      <section v-if="routeListOpen" id="route-file-list" class="route-file-list" :aria-label="routeLabel+'のファイル一覧'">
         <p v-if="routeMode==='ai'&&aiResult" class="ai-route-title" :title="aiResult.query">{{ aiResult.title || aiResult.query }}</p>
-        <p>{{ routeMode==='ai'?'AiDiy検索軌跡':'閲覧軌跡（最近開いた順）' }} · {{ routePaths.length }}件</p>
-        <ol v-if="routePaths.length"><li v-for="path in routePaths" :key="path"><button :data-route-path="path" :aria-current="path===selected?'true':undefined" :title="routeMode==='ai'?aiFiles.get(path):path" @click="select({type:'file',path})"><span>{{ path }}</span><small v-if="routeMode==='ai'">{{ aiFiles.get(path) }}</small><small v-else>{{ viewedAt(path) }}</small></button></li></ol>
-        <p v-else>{{ routeMode==='ai'?'AiDiy検索の結果を選ぶと、ここに表示します。':'ファイルを開くと、ここに表示します。' }}</p>
+        <p v-if="routeMode==='search'&&searchTitle" :title="searchTitle">{{ searchTitle }}</p>
+        <p class="route-list-heading"><span>{{ routeLabel }} · {{ routePaths.length }}件</span><button v-if="routeMode==='view'" type="button" class="route-list-clear" aria-label="閲覧軌跡をクリア" :disabled="!viewedFiles.length" @click="emit('clear-view-history')">クリア</button></p>
+        <p v-if="routeRows.length" class="route-tree-origin">{{ routeMode==='search'?'検索結果（並列の候補）':'記録された出発点と分岐' }}</p>
+        <ul v-if="routeRows.length" class="route-tree" :aria-label="routeLabel+'のツリー'"><li v-for="row in routeRows" :key="row.key" :data-route-point="row.point" :data-route-parent="row.parent" :data-route-depth="row.depth" :class="{'route-reference':row.reference}" :style="{'--route-depth':row.depth}"><button :data-route-path="row.path" :aria-current="row.path===selected?'true':undefined" :title="routeMode==='ai'?aiFiles.get(row.path):row.path" @click="selectRoutePoint(row)"><span>{{ row.path || '/' }}{{ row.origin?'（出発元）':row.type==='dir'?'（到着）':'' }}{{ row.reference?' ↩（参照）':'' }}</span><small v-if="routeMode==='ai'">{{ aiFiles.get(row.path) }}</small><small v-else-if="routeMode==='view'">{{ viewedAt(row.path) }}</small></button></li></ul>
+        <p v-else>{{ routeMode==='ai'?'AiDiy検索の結果を選ぶと、ここに表示します。':routeMode==='search'?'検索軌跡はありません。検索結果があると、ここに表示します。':'ファイルを開くと、ここに表示します。' }}</p>
       </section>
     </div>
     <aside v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
@@ -246,15 +268,15 @@ defineExpose({reveal});
           <p role="status">{{ status }}</p>
           <ol v-if="grepResults.length" class="grep-results" aria-label="grep検索の一致箇所"><li v-for="(match,index) in grepResults" :key="`${match.path}:${match.line}:${match.column}:${index}`"><button type="button" :title="`${match.path}:${match.line}:${match.column}`" @click="selectMatch(match)"><span>{{ match.path }}:{{ match.line }}:{{ match.column }}</span><small>{{ match.snippet }}</small></button></li></ol>
         </form>
-        <AISearchPanel :key="root" :root="root" v-show="mode==='ai'" @result="acceptAI" />
+        <AISearchPanel :key="root" :root="root" v-show="mode==='ai'" @search="beginSearch('ai')" @result="acceptAI" />
         <div v-if="mode==='ai'&&aiResult" class="ai-route-results"><p v-if="hiddenAI">{{ hiddenAI }}件は現在の一覧にありません。フィルターをOFFにするか一覧を更新してください。</p><p :title="aiResult.query">{{ aiResult.title || aiResult.query }} · {{ aiRoute.length }}件</p><ol><li v-for="path in aiRoute" :key="path"><button :title="aiFiles.get(path)" @click="select({type:'file',path})">{{ path }}</button><small>{{ aiFiles.get(path) }}</small></li></ol></div>
       </section>
       <div class="explorer-root" :title="root">
         <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
         <button class="explorer-root-name" :disabled="searching" @click="select({type:'dir',path:''})"><FileTypeIcon :name="tree?.n" directory :open="rootExpanded" /><span class="file-name">{{ tree?.n }}</span></button>
       </div>
-      <ul ref="treeElement" role="tree" tabindex="0" @keydown="key"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,selected:selected===row.path,cursor:cursor===row.path}" @click="select(row,true)">
-        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh">●</span>
+      <ul ref="treeElement" role="tree" tabindex="0" @keydown="key"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :data-entry-type="row.type" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,'plain-folder':row.type==='dir'&&mode!=='ai',selected:selected===row.path,cursor:cursor===row.path}" @click="select(row,true)">
+        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh" class="file-mark">●</span>
       </li></TransitionGroup></ul>
       <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
       <footer class="explorer-footer">

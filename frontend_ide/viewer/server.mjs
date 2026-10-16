@@ -334,10 +334,23 @@ export async function startServer(root, port = 0, { strict = false, env = proces
             truncated: result.truncated, truncationReason: result.truncationReason };
         });
       }
+      if (url.pathname === '/api/folder-state') {
+        if (req.method !== 'GET') return fail(405, 'GET required');
+        const filter = url.searchParams.get('filter') || '', folder = url.searchParams.get('path') || '';
+        if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
+        return await fileWork(async signal => {
+          const result = await scans.get({ filter, folder, signal });
+          if (result.missing) return { missing: true, path: folder };
+          return { path: folder, scope: 'recursive', files: result.files, latest: result.latest, revision: result.revision,
+            truncated: result.truncated, truncationReason: result.truncationReason, elapsedMs: result.elapsedMs, unchanged: url.searchParams.get('since') === result.revision,
+            ...(url.searchParams.get('since') !== result.revision ? { fileList: result.fileList } : {}),
+            ...(url.searchParams.get('since') !== result.revision && !result.truncated ? { tree: result.tree } : {}) };
+        });
+      }
       if (url.pathname === '/api/galaxy') {
         const filter = url.searchParams.get('filter');
         if (filter && filter !== 'backup') return fail(400, 'filter は backup だけ指定できます。');
-        return await fileWork(signal => scans.get({ filter, signal, fresh: url.searchParams.get('fresh') === '1' }));
+        return await fileWork(async signal => { const {fileList, ...result} = await scans.get({ filter, signal, fresh: url.searchParams.get('fresh') === '1' }); return result; });
       }
       if (url.pathname === '/api/file') {
         const result = await describeFile(root, url.searchParams.get('path'));

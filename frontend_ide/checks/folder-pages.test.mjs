@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
+import { createFolderMonitor } from '../src/ファイル閲覧/フォルダ監視.js';
+import * as fileDates from '../src/ファイル閲覧/ファイル日時.js';
 import * as folderPages from '../src/ファイル閲覧/フォルダページ構成.js';
 import { fileIcon, catppuccinAsset } from '../src/ファイル閲覧/ファイルアイコン.js';
 import { validConnectionState } from '../src/共通表示/接続状態.js';
@@ -28,10 +30,12 @@ function setup(path, { props = {}, modules = {}, globals = {} } = {}) {
   const mounted = [], unmounted = [], emitted = [], module = { exports: {} };
   const window = new EventTarget();
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, window, location: { hash: '' }, AbortController, AbortSignal, URLSearchParams, Date,
+    module, window, document: new EventTarget(), location: { hash: '' }, AbortController, AbortSignal, URLSearchParams, Date,
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1, clearTimeout() {},
     require: id => id === 'vue' ? { ...vue, provide() {}, inject: (_key, fallback) => fallback, onMounted: callback => mounted.push(callback), onBeforeUnmount: callback => unmounted.push(callback) }
+      : id.endsWith('/ファイル日時.js') ? fileDates
       : id.endsWith('/フォルダページ構成.js') ? folderPages
+      : id.endsWith('/フォルダ監視.js') ? { createFolderMonitor }
       : id.endsWith('/接続状態.js') ? { validConnectionState }
       : id.endsWith('/連携先登録.js') ? { createDraftTargetRegistry } : modules[id] || {},
     ...globals,
@@ -325,7 +329,7 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:calc\(0% - var\(--page-turn-slant\)\)\}/);
   assert.match(css, /@keyframes folder-page-edge-back\{from\{left:calc\(0% - var\(--page-turn-slant\)\)\}to\{left:100%\}/);
   assert.doesNotMatch(css, /rotateY\(/);
-  assert.doesNotMatch(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval|setTimeout/);
+  assert.doesNotMatch(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval/);
 });
 
 test('2Dページの斜線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
@@ -463,7 +467,7 @@ test('2D文字の折り返し: ページ幅で日時を次行へ送り、長い�
   assert.equal(value('.folder-pages', 'overflow'), 'auto');
   assert.equal(value('.folder-page-entry', 'display'), 'grid');
   assert.equal(value('.folder-page-entry', 'min-height'), '48px');
-  assert.equal(value('.folder-page-entry', 'grid-template-columns'), '32px minmax(0,1fr) minmax(0,42%)');
+  assert.equal(value('.folder-page-entry', 'grid-template-columns'), '32px minmax(0,1fr) max-content');
   assert.equal(value('.folder-page-entry', 'grid-template-columns', 'container'), '32px minmax(0,1fr)');
   assert.equal(value('.folder-page-meta', 'grid-column', 'container'), '2');
   assert.equal(value('.folder-page-meta', 'text-align', 'container'), 'left');
@@ -515,7 +519,9 @@ test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし�
   const rules = new Map();
   css.walkRules(rule => { if (rule.parent.type === 'root') rules.set(rule.selector, Object.fromEntries(rule.nodes.map(decl => [decl.prop, decl.value]))); });
   const folder = '.mode-2d .folder-page-entry.folder', stripe = '.mode-2d .folder-page-entry.striped';
-  assert.equal(rules.get(folder).background, 'linear-gradient(150deg,#ece5d6 0%,#e0d5c0 55%,#d6c9b0 100%)'); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
+  assert.equal(rules.get(folder).background, '#f3edde');
+  assert.equal(rules.get('.folder-page-entry.folder')['border-radius'], '0');
+  assert.match(rules.get('.folder-page-entry.folder')['box-shadow'], /inset 0 0/); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
   assert.equal(rules.get(folder)['border-color'], '#d8d0c4');
   const selectors = [...rules.keys()];
   for (const state of [':hover', '[data-cursor=true]', '.selected']) {
@@ -599,7 +605,7 @@ async function mountedPages(globals = {}) {
   const script = compileScript(descriptor, { id: 'mounted-pages', genDefaultAs: 'component', inlineTemplate: true });
   const module = { exports: {} };
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, Date, require: id => id === 'vue' ? vue : id.endsWith('ファイル種別アイコン.vue') ? iconModule.exports : folderPages, ...globals,
+    module, Date, setTimeout:()=>1,clearTimeout(){},require: id => id === 'vue' ? vue : id.endsWith('ファイル日時.js') ? fileDates : id.endsWith('ファイル種別アイコン.vue') ? iconModule.exports : folderPages, ...globals,
   });
   const walk = (element, predicate) => predicate(element) ? element : (element.children || []).map(child => walk(child, predicate)).find(Boolean);
   const node = type => ({ type, children: [], props: {}, scrollTop: 0,
@@ -915,4 +921,36 @@ test('2Dアイコン: 24px表示は既存32px列内に収まり、クリーム�
       }
     }
   }
+});
+
+
+test('更新シート: 上から下へ切替、位置と選択を保持し連続更新・取消・reduced-motionに対応する', async()=>{
+ const query={matches:false,addEventListener(){},removeEventListener(){}};
+ const {app,root,props,walk,find}=await mountedPages({matchMedia:()=>query});
+ const layer=kind=>walk(root,e=>e.props['data-page-layer']===kind);
+ try {
+  walk(layer('live'),e=>e.props.title==='root2.js').props.onClick();await flush();
+  layer('live').scrollTop=220;layer('live').props.onScroll();const live=layer('live');
+  props.tree={...tree(),f:[['root2.js',99,5000],['added.txt',1,1000]]};await flush();
+  const old=layer('outgoing');assert.ok(old.props.class.includes('page-turn-refresh'));assert.equal(old.scrollTop,220);assert.equal(live.scrollTop,220);
+  assert.equal(props.selected,'root2.js');assert.ok(walk(old,e=>e.props.title==='root10.md'));assert.equal(walk(live,e=>e.props.title==='root10.md'),undefined);
+  const line=walk(find('folder-page-turn-edge'),e=>e.type==='line');assert.deepEqual([line.props.x1,line.props.y1,line.props.x2,line.props.y2],['0','0','100','0']);
+  props.tree={...tree(),f:[['root2.js',100,6000]]};await flush();const newest=layer('outgoing');
+  old.props.onAnimationend({type:'animationend',target:old,currentTarget:old,animationName:'folder-page-refresh'});await flush();assert.equal(layer('outgoing'),newest);
+  find('folder-page-stack').props.onWheelCapturePassive();await flush();assert.equal(layer('outgoing'),undefined);assert.equal(live.scrollTop,220);
+  query.matches=true;props.tree={...tree(),f:[['root2.js',101,7000]]};await flush();assert.equal(layer('outgoing'),undefined);
+ } finally {app.unmount();}
+});
+
+
+test('手動更新: 差分なしでも更新シートを出し、連打を共有、失敗・離脱後は出さない',async()=>{
+ const {app,root,props,walk,find}=await mountedPages();const layer=kind=>walk(root,e=>e.props['data-page-layer']===kind);
+ try {
+  let complete,calls=0;props.reload=()=>{calls++;return new Promise(resolve=>complete=resolve);};await flush();
+  const button=find('folder-page-refresh');const first=button.props.onClick();button.props.onClick();await flush();assert.equal(calls,1);assert.equal(button.props.disabled,true);
+  complete(true);await first;await flush();assert.ok(layer('outgoing').props.class.includes('page-turn-refresh'));
+  find('folder-page-stack').props.onWheelCapturePassive();await flush();
+  const failed=button.props.onClick();complete(false);await failed;await flush();assert.equal(layer('outgoing'),undefined);
+  const leaving=button.props.onClick();props.active=false;await flush();complete(true);await leaving;assert.equal(layer('outgoing'),undefined);
+ }finally{app.unmount();}
 });

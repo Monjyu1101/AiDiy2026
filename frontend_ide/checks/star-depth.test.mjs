@@ -453,10 +453,10 @@ test('検索明細のUI受渡: Explorerのroute通知からengine保持・描画
     await h.ready();
     const records=[{from:null,to:'f:A'},{from:'f:A',to:'f:B'}];
     const source=readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),'utf8');
-    const notification=source.split('\n').find(line=>line.startsWith('watch([routeMode,aiRoute]'));
+    const notification=source.split('\n').find(line=>line.startsWith('watch([routeMode,aiRoute,searchRoute]'));
     assert.ok(notification);
     const dispatch=result=>runInNewContext(notification,{
-      watch:(_sources,callback)=>callback(),routeMode:{value:'ai'},aiRoute:{value:['A','B']},
+      watch:(_sources,callback)=>callback(),routeMode:{value:'ai'},aiRoute:{value:['A','B']},searchRoute:{value:[]},
       aiResult:{value:result},emit:(event,value)=>{assert.equal(event,'route');h.engine.route(value);},
     });
     dispatch({routeRecords:records});

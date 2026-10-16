@@ -4,10 +4,11 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import { computed, ref, shallowRef, watch, nextTick, onBeforeUnmount } from 'vue';
+import { computed, ref, shallowRef, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { fileDateInfo, nextLocalMidnight } from './ファイル日時.js';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
 import { indexFolderPages, createFolderPageMemory, folderPageTurnPlan } from '../ファイル閲覧/フォルダページ構成.js';
-const props = defineProps({ tree: Object, current: { type: String, default: '' }, selected: String, unlistedParent: String, marks: Object, active: Boolean, color: Function });
+const props = defineProps({ tree: Object, current: { type: String, default: '' }, selected: String, unlistedParent: String, monitorMessage: String, reload: Function, marks: Object, active: Boolean, color: Function });
 const emit = defineEmits(['select', 'clear', 'refresh', 'toggle-explorer', 'activity']);
 const pages = computed(() => props.active ? indexFolderPages(props.tree, props.marks) : new Map());
 const page = computed(() => pages.value.get(props.current));
@@ -32,9 +33,37 @@ function bindBody(element, layer) {
   if (layer.live) body.value = element;
   else if (element) element.scrollTop = layer.scrollTop;
 }
+const manualRefresh = ref(false);
+async function refreshPage() {
+  if (manualRefresh.value) return;
+  if (!props.reload) { emit('refresh'); return; }
+  const path = props.current, outgoing = snapshot(path, true);
+  manualRefresh.value = true;
+  try {
+    const ok = await props.reload();
+    if (ok !== false && !disposed && props.active && props.current === path && !motionQuery?.matches) {
+      cancelTurns(); turnDuration.value = 650;
+      turn.value = { id: ++turnSerial, direction: 'refresh', outgoing, incoming: snapshot(path) };
+    }
+  } finally { manualRefresh.value = false; }
+}
 let disposed = false, restoration = 0, pendingFocus = false, presentedPath = props.current;
 const formatSize = size => size < 1024 ? `${size} B` : size < 1024 ** 2 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 ** 2).toFixed(1)} MB`;
-const formatDate = mtime => new Date(mtime).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+const dateClock = ref(Date.now()), dateCache = new Map();
+let dateTimer, dateMounted = false;
+function dateInfo(mtime) {
+  const clock = dateClock.value;
+  if (dateCache.size > 4096) dateCache.clear();
+  if (!dateCache.has(mtime)) dateCache.set(mtime, fileDateInfo(mtime, clock));
+  return dateCache.get(mtime);
+}
+function syncDateClock() {
+  clearTimeout(dateTimer); dateCache.clear(); dateClock.value = Date.now();
+  if (dateMounted && props.active && !disposed) dateTimer = setTimeout(syncDateClock, nextLocalMidnight(dateClock.value) - dateClock.value + 20);
+}
+watch(()=>props.active,()=>{if(dateMounted)syncDateClock();});
+onMounted(()=>{dateMounted=true;syncDateClock();if(typeof document!=='undefined')document.addEventListener('visibilitychange',syncDateClock);});
+
 function save(path = props.current) {
   memory.save(path, { cursor: cursor.value, scrollTop: body.value?.scrollTop || 0 });
 }
@@ -103,7 +132,7 @@ function keydown(event) {
   if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
   if (event.key === 'Backspace' || (event.altKey && event.key === 'ArrowLeft')) { event.preventDefault(); event.stopPropagation(); back(); return; }
   if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (props.selected) emit('clear'); else back(); return; }
-  if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); emit('refresh'); return; }
+  if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); void refreshPage(); return; }
   // パンくずと親ボタンは通常のTab/Enter操作。項目リストだけにロービング選択を適用する。
   if (!body.value?.contains(event.target)) return;
   if (turn.value && ['Enter', ' ', 'ArrowRight'].includes(event.key)) { event.preventDefault(); cancelTurns(); activity(); return; }
@@ -117,19 +146,27 @@ function keydown(event) {
   else if (event.key === 'ArrowRight' && entries.value[index]?.type === 'dir') { event.preventDefault(); select(entries.value[index]); }
   else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (entries.value[index]) select(entries.value[index]); }
 }
-watch([() => props.current, () => props.active, pages], ([path, active, index], [previous, wasActive, previousIndex]) => {
+watch([() => props.current, () => props.active, pages, () => props.tree], ([path, active, index, tree], [previous, wasActive, previousIndex, previousTree]) => {
   // 一覧更新と移動が同じtickでも、旧ページのカーソルを保存してから一度だけ復元する。
   const moved = path !== previous || active !== wasActive;
   if (moved && wasActive) save(previous);
   if (moved) startTurns(previous || '', path, active && wasActive && index === previousIndex && !motionQuery?.matches);
-  else cancelTurns();
+  else {
+    save(path); cancelTurns();
+    const oldEntries = previousIndex?.get(path)?.entries || [];
+    if (active && !manualRefresh.value && previousTree && tree !== previousTree && !motionQuery?.matches && JSON.stringify(oldEntries) !== JSON.stringify(entries.value)) {
+      turnDuration.value = 650;
+      turn.value = { id: ++turnSerial, direction: 'refresh', incoming: snapshot(path),
+        outgoing: { path, entries: oldEntries.map(entry=>({...entry})), cursor: cursor.value, selected: props.selected, scrollTop: body.value?.scrollTop || 0 } };
+    }
+  }
   presentedPath = path;
   if (active) void restore(moved, moved);
 }, { immediate: true });
 watch(() => props.selected, selected => {
   if (presentedPath === props.current && entries.value.some(entry => entry.path === selected)) { cursor.value = selected; memory.save(props.current, { cursor: selected }); }
 });
-onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQuery?.removeEventListener?.('change', motionChanged); memory.clear(); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(dateTimer); if(typeof document!=='undefined')document.removeEventListener('visibilitychange',syncDateClock); restoration++; cancelTurns(); motionQuery?.removeEventListener?.('change', motionChanged); memory.clear(); });
 </script>
 <template>
   <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown" @wheel.passive="activity" @touchmove.passive="activity" @pointerdown="activity" @pointermove="pointerMove">
@@ -139,10 +176,11 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
         <button :aria-current="!trail.length ? 'location' : undefined" @click="navigate('')">{{ tree?.n }}</button>
         <template v-for="(name, index) in trail" :key="index"><span aria-hidden="true">›</span><button :aria-current="index===trail.length-1 ? 'location' : undefined" @click="navigate(trail.slice(0,index+1).join('/'))">{{ name }}</button></template>
       </nav>
-      <button class="folder-page-refresh" title="一覧を更新" aria-label="一覧を更新" @click="emit('refresh')">↻</button>
+      <button class="folder-page-refresh" title="一覧を更新" aria-label="一覧を更新" :disabled="manualRefresh" :aria-busy="manualRefresh" @click="refreshPage">↻</button>
     </header>
     <p v-if="unlistedParent!==undefined" class="folder-page-reference-note" role="status">検索ファイルの親フォルダ「{{ unlistedParent || '/' }}」は現在の一覧にありません。プレビューは開いたままです。該当ページへ移動するには、フィルターをOFFにして一覧を更新し、検索結果を選び直してください。</p>
-    <div class="folder-page-summary" role="status">{{ page?.folders.length || 0 }} フォルダ · {{ page?.files.length || 0 }} ファイル<span v-if="pageTurn" class="folder-page-turn-status" aria-hidden="true">ページ移動 {{ turnPath || '/' }}{{ turnSkipped ? '（'+turnSkipped+'階層省略）' : '' }}</span><span v-else>この階層の直下</span></div>
+    <div class="folder-page-summary" role="status">{{ page?.folders.length || 0 }} フォルダ · {{ page?.files.length || 0 }} ファイル<span v-if="pageTurn" class="folder-page-turn-status" aria-hidden="true">{{ pageTurn==='refresh' ? '更新中' : 'ページ移動' }} {{ turnPath || '/' }}{{ turnSkipped ? '（'+turnSkipped+'階層省略）' : '' }}</span><span v-else>この階層の直下</span></div>
+    <p v-if="monitorMessage" class="folder-page-monitor-status" role="status">{{ monitorMessage }}</p>
     <div class="folder-page-stack" :style="{'--page-turn-duration':turnDuration+'ms'}" @pointerdown.capture="pointerStart" @pointercancel.capture="pointerCancel" @click.capture="settleClick" @wheel.capture.passive="cancelTurns" @touchmove.capture.passive="cancelTurns">
       <div v-for="layer in layers" :key="layer.id" :ref="element => bindBody(element,layer)" class="folder-page-body" :class="layer.live ? '' : ['folder-page-sheet',layer.outgoing ? 'page-turn-'+pageTurn : 'folder-page-underlay']" :data-page-path="layer.path" :data-page-layer="layer.live ? 'live' : layer.outgoing ? 'outgoing' : 'incoming'" :tabindex="layer.live ? 0 : undefined" :role="layer.live ? 'listbox' : undefined" :aria-label="layer.live ? 'フォルダとファイル' : undefined" :aria-hidden="layer.live ? undefined : true" :inert="!layer.live" :aria-activedescendant="layer.live && cursor ? 'folder-page-entry-'+entries.findIndex(entry=>entry.path===cursor) : undefined" @scroll="layer.live && layer.path===current && save(layer.path)" @animationend="finishTurn($event,layer.id)" @animationcancel="finishTurn($event,layer.id)">
         <div class="folder-page-items">
@@ -150,12 +188,12 @@ onBeforeUnmount(() => { disposed = true; restoration++; cancelTurns(); motionQue
             <span class="folder-page-icon" aria-hidden="true"><FileTypeIcon :name="entry.name" :directory="entry.type==='dir'" /></span>
             <span class="folder-page-name">{{ entry.name }}</span>
             <span v-if="entry.type==='dir'" class="folder-page-meta">{{ entry.count }} ファイル<span v-if="entry.marked" class="folder-page-mark"> · 対象 {{ entry.marked }}</span></span>
-            <span v-else class="folder-page-meta"><span class="folder-page-size">{{ formatSize(entry.size) }}</span><time :datetime="new Date(entry.mtime).toISOString()">{{ formatDate(entry.mtime) }}</time></span>
+            <span v-else class="folder-page-meta"><span class="folder-page-size">{{ formatSize(entry.size) }}</span><time :datetime="dateInfo(entry.mtime).iso" :title="dateInfo(entry.mtime).title" :class="{'is-today':dateInfo(entry.mtime).today}">{{ dateInfo(entry.mtime).text }}</time></span>
           </div>
           <p v-if="!layer.entries.length" class="folder-page-empty">この階層に表示できるフォルダ・ファイルはありません</p>
         </div>
       </div>
-      <svg v-if="turn" :key="'edge:'+turn.id" class="folder-page-turn-edge" :class="'page-turn-'+pageTurn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line x1="100" y1="0" x2="0" y2="100" vector-effect="non-scaling-stroke" /></svg>
+      <svg v-if="turn" :key="'edge:'+turn.id" class="folder-page-turn-edge" :class="'page-turn-'+pageTurn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line :x1="pageTurn==='refresh'?'0':'100'" y1="0" :x2="pageTurn==='refresh'?'100':'0'" :y2="pageTurn==='refresh'?'0':'100'" vector-effect="non-scaling-stroke" /></svg>
     </div>
     <footer>フォルダを開くと次のページへ · ↑↓ 選択 · Enter 開く · Backspace 親へ</footer>
   </section>

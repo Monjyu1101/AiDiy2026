@@ -1,0 +1,64 @@
+{
+  "ignored": [
+    "node_modules",
+    ".git",
+    "dist",
+    "out",
+    "build",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "_cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".next",
+    ".turbo",
+    ".cache"
+  ],
+  "backupDirectories": [
+    "__pycache__",
+    ".git",
+    ".venv",
+    "venv",
+    "_data",
+    "temp",
+    "log",
+    "logs",
+    "backup",
+    "node_modules",
+    "dist",
+    "build",
+    ".output",
+    ".nuxt",
+    ".next",
+    ".vite",
+    ".turbo",
+    ".cache",
+    ".npm",
+    ".pnpm-store",
+    ".yarn"
+  ],
+  "backupFiles": [
+    ".DS_Store",
+    "Thumbs.db",
+    "package-lock.json",
+    "package.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "bun.lockb",
+    "npm-shrinkwrap.json"
+  ],
+  "backupPaths": [
+    "_AIDIY/aidiy_code",
+    "_AIDIY/aidiy_ide"
+  ],
+  "backupExtensions": [
+    ".pyc",
+    ".pyo",
+    ".pyd",
+    ".log",
+    ".tmp",
+    ".swp"
+  ]
+}

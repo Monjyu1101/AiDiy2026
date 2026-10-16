@@ -6,7 +6,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue';
 const props=defineProps({root:String});
-const emit=defineEmits(['result']);
+const emit=defineEmits(['result','search']);
 const query=ref(''),job=shallowRef(null),busy=ref(false),message=ref(''),copyMessage=ref('');
 const history=ref([]),selectedId=ref(''),historyBusy=ref(false),historyError=ref(''),deleting=ref(null),showHistory=ref(false);
 let historyRun=0,historyController;
@@ -30,6 +30,7 @@ async function loadHistory(restore=false){
 }
 async function selectHistory(entry){
   if(busy.value||historyBusy.value)return;
+  emit('search');
   const run=++historyRun;historyController?.abort();historyController=new AbortController();historyBusy.value=true;historyError.value='';
   try{
     const result=await historyRequest('?'+new URLSearchParams({id:entry.id}));if(run!==historyRun)return;
@@ -72,12 +73,13 @@ async function check(run){
 }
 async function search(){
   if(!query.value.trim())return;
+  emit('search');
   stop();const run=generation;job.value=null;busy.value=true;message.value='AIエージェントへ依頼しています。';copyMessage.value='';
   ++historyRun;historyController?.abort();historyBusy.value=false;deleting.value=null;showHistory.value=false;
   try{accept(await request('/api/ai-search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:query.value})}),run);}
   catch(error){if(run===generation){busy.value=false;message.value=error.message;}}
 }
-function recheck(){if(!job.value)return;stop();busy.value=true;void check(generation);}
+function recheck(){if(!job.value)return;emit('search');stop();busy.value=true;void check(generation);}
 async function copy(){try{await navigator.clipboard.writeText(job.value.prompt);copyMessage.value='依頼文をコピーしました。';}catch{copyMessage.value='下の依頼文を選択してコピーしてください。';}}
 onMounted(()=>loadHistory(true));
 onBeforeUnmount(()=>{stop();++historyRun;historyController?.abort();});

@@ -472,3 +472,20 @@ test('2D自動探索表示: 3Dと同じ開始・手動待機・OFF・非表示�
     h.engine.dispose();assert.equal(h.timers.size,0);
   } finally {h.dispose();}
 });
+
+
+test('2D監視スナップショット: 対象フォルダだけ更新し選択保持、古い条件・OFF・3Dを拒否',async t=>{
+ const h=space(t);
+ try {
+  h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'file',path:'src/main.js'});
+  const context={path:'src',filter:'backup'}, tree=directory('src',['main.js','new.js']);
+  assert.equal(h.engine.applyFolderSnapshot(context,{tree,truncated:false}),true);
+  assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.state().scan.tree.f[0][0],'root.js');
+  assert.deepEqual(h.state().scan.tree.d.find(d=>d.n==='src').f.map(f=>f[0]),['main.js','new.js']);
+  assert.equal(h.engine.applyFolderSnapshot({...context,path:''},{tree}),false);
+  assert.equal(h.engine.applyFolderSnapshot(context,{tree,truncated:true}),false);
+  h.engine.setAutoSpin(false);assert.equal(h.engine.applyFolderSnapshot(context,{tree}),false);
+  h.engine.setAutoSpin(true);h.engine.setViewMode('3d');assert.equal(h.engine.applyFolderSnapshot(context,{tree}),false);
+  h.engine.setViewMode('2d');assert.equal(h.engine.applyFolderSnapshot(context,{tree:directory('src',[])}),true);assert.equal(h.engine.selected,null);
+ }finally{h.dispose();}
+});
