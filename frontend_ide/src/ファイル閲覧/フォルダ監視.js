@@ -6,7 +6,7 @@
 
 // 応答完了後に次を予約する。切替時の古い応答はabortと世代番号の両方で排除する。
 export function createFolderMonitor({ fetch: request = globalThis.fetch, apply, report = () => {},
-  schedule = setTimeout, cancel = clearTimeout, interval = 3000 } = {}) {
+  schedule = setTimeout, cancel = clearTimeout, interval = 30000 } = {}) {
   let context, generation = 0, timer, controller, revision = '', closed = false, failures = 0;
   function stop() { generation++; cancel(timer); timer = undefined; controller?.abort(); controller = undefined; }
   async function poll(run) {

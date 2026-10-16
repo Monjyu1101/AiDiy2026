@@ -44,7 +44,7 @@ try{
  ws.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){pending.get(message.id)?.(message);pending.delete(message.id);}if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.text);});
  const send=(method,params={})=>new Promise(resolve=>{pending.set(++sequence,resolve);ws.send(JSON.stringify({id:sequence,method,params}));});
  async function evaluate(expression){const message=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.equal(message.error,undefined);assert.equal(message.result?.exceptionDetails,undefined,JSON.stringify(message.result?.exceptionDetails));return message.result.result.value;}
- async function until(expression){for(let i=0;i<240;i++){if(await evaluate(expression))return;await sleep(50);}console.error(JSON.stringify({errors,screen:await evaluate('document.body.innerText')},null,2));assert.fail(`画面待機: ${expression}`);}
+ async function until(expression){for(let i=0;i<700;i++){if(await evaluate(expression))return;await sleep(50);}console.error(JSON.stringify({errors,screen:await evaluate('document.body.innerText')},null,2));assert.fail(`画面待機: ${expression}`);}
  const output=resolve('temp/folder-monitor-check');mkdirSync(output,{recursive:true});
  const stamp=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date()).replace(/\D/g,'');
  let shotNumber=0;const shots=[];
@@ -105,7 +105,7 @@ try{
  // OFF中は確認しない。ON復帰で追加削除・連続書き込みの最終状態を反映。
  await evaluate(`document.querySelector('[aria-label="自動探索"]').click()`);await sleep(100);
  const offCount=await evaluate('folderCalls.length');writeFileSync(join(project,'added.txt'),'added');rmSync(join(project,'file001.txt'));
- await sleep(3300);assert.equal(await evaluate('folderCalls.length'),offCount);
+ await sleep(31000);assert.equal(await evaluate('folderCalls.length'),offCount);
  assert.equal(await evaluate(`!!document.querySelector('[data-page-layer="live"] [title="added.txt"]')`),false);
  await evaluate(`document.querySelector('[aria-label="自動探索"]').click();aidiyIDE.interact()`);
  await until(`!!document.querySelector('[data-page-layer="live"] [title="added.txt"]')`);
@@ -177,14 +177,14 @@ try{
  await evaluate(`document.querySelector('[aria-label="エクスプローラーを閉じる"]').click()`);
  // 非表示と3Dでは停止し、復帰後は一つの監視だけ。
  await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));`);await sleep(50);
- const hiddenCount=await evaluate('folderCalls.length');await sleep(3200);assert.equal(await evaluate('folderCalls.length'),hiddenCount);
+ const hiddenCount=await evaluate('folderCalls.length');await sleep(31000);assert.equal(await evaluate('folderCalls.length'),hiddenCount);
  await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));`);await until(`folderCalls.length>${hiddenCount}`);
  await evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click()`);await sleep(50);
- const modeCount=await evaluate('folderCalls.length');await sleep(3200);assert.equal(await evaluate('folderCalls.length'),modeCount);
+ const modeCount=await evaluate('folderCalls.length');await sleep(31000);assert.equal(await evaluate('folderCalls.length'),modeCount);
  await evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='2D').click()`);
  await until(`folderCalls.length>${modeCount}`);
  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='利用終了').click()`);
- await until(`!document.querySelector('.folder-pages')`);const endCount=await evaluate('folderCalls.length');await sleep(3200);assert.equal(await evaluate('folderCalls.length'),endCount);
+ await until(`!document.querySelector('.folder-pages')`);const endCount=await evaluate('folderCalls.length');await sleep(31000);assert.equal(await evaluate('folderCalls.length'),endCount);
  assert.deepEqual(errors,[]);
  const evidence={treeRows,grepPaths,normalFolder,sinceFolder,grepFolder,decoration,nameMetrics,before,after,line1,line2,layouts,operations:['横幅による折り返し修正','矩形カードの四辺陰影','今日だけ赤字・元日時tooltip','差分なしの手動更新と連打','変更時の下方向モーション','カーソルとスクロール維持','OFF/ON','追加削除と連続更新','フォルダ切替','reduced-motion','非表示/3D/利用終了の監視停止','閲覧軌跡のみクリアと位置保持','起点/grepのフォルダ色保持と件数表示','3分類の独立ツリーとフォルダ入場対の順次移動'],shots,errors};
  writeFileSync(join(output,'result.json'),JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify(evidence,null,2));
