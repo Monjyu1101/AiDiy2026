@@ -6,14 +6,16 @@ import {fetchMetadata,RESPONSE_LIMIT} from '../runtime/model_probe.mjs';
 // HTTP transport is replaced locally; these tests never contact real providers.
 async function transport(handler,run){
  const original=https.request;let destroyed=0;
+ const env=Object.fromEntries(Object.entries(process.env).filter(([name])=>/^(https?_proxy|no_proxy)$/i.test(name)));
+ for(const name of Object.keys(env))delete process.env[name];
  https.request=(options,callback)=>{
   const request=new EventEmitter();request.destroy=()=>{destroyed++;};
   request.end=()=>queueMicrotask(()=>handler(options,callback,request));return request;
  };
- try{await run(()=>destroyed);}finally{https.request=original;}
+ try{await run(()=>destroyed);}finally{https.request=original;Object.assign(process.env,env);}
 }
 function response(callback,status=200){const value=new EventEmitter();value.statusCode=status;value.destroy=()=>{};callback(value);return value;}
-test('model transport has fixed HTTPS hosts, header credentials, no redirects or proxy agent',async()=>{
+test('model transport has fixed HTTPS hosts, header credentials and direct transport without proxy settings',async()=>{
  await transport((options,callback)=>{
   assert.deepEqual({hostname:options.hostname,path:options.path,port:options.port,method:options.method,agent:options.agent,rejectUnauthorized:options.rejectUnauthorized},{hostname:'generativelanguage.googleapis.com',path:'/v1beta/models?pageToken=next%2Fpage',port:443,method:'GET',agent:false,rejectUnauthorized:true});
   assert.equal(options.headers['x-goog-api-key'],'synthetic-key');assert.ok(!options.path.includes('synthetic-key'));
@@ -87,4 +89,13 @@ test('OpenRouter authentication uses fixed GET /key, not public /models',async()
   assert.equal(options.method,'GET');assert.equal(options.headers.Authorization,'Bearer synthetic-key');
   const r=response(callback);r.emit('data',Buffer.from('{"data":{"is_free_tier":false}}'));r.emit('end');
  },async()=>assert.deepEqual(await fetchMetadata('openrouter-key',{Authorization:'Bearer synthetic-key'}),{data:{is_free_tier:false}}));
+});
+
+test('HTTP authentication failures remain distinct from transport failures without response details',async()=>{
+ const {probe}=await import('../runtime/model_probe.mjs');
+ for(const status of [401,403])await transport((_options,callback)=>response(callback,status),async()=>{
+  const result=await probe('openai',{reader:()=>JSON.stringify({openai_key_id:'synthetic-secret'})});
+  assert.equal(result.状態,'NG');assert.ok(result.説明.includes('HTTP認証'));
+  assert.ok(!JSON.stringify(result).includes('synthetic'));
+ });
 });

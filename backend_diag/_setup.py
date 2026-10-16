@@ -11,6 +11,22 @@ import importlib.util
 THIS_DIR = Path(__file__).resolve().parent
 
 
+class Colors:
+    HEADER = '\033[97m'
+    OKGREEN = '\033[92m'
+    ENDC = '\033[0m'
+
+
+def print_header(message):
+    print(f"\n{Colors.HEADER}{'=' * 60}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{message}{Colors.ENDC}")
+    print(f"{Colors.HEADER}{'=' * 60}{Colors.ENDC}\n")
+
+
+def print_info(message):
+    print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
+
+
 def launcher_content(script, windows=None):
     windows = sys.platform == 'win32' if windows is None else windows
     marker = 'aidiy_diag-owner:' + hashlib.sha256(str(script).encode('utf-8')).hexdigest()
@@ -28,6 +44,9 @@ def launcher_content(script, windows=None):
 def setup(choices=None, *, desktop=True):
     if choices is not None and choices.get('diag') is False:
         return True
+    print_header('バックエンド(Diag) セットアップ')
+    print_info(f'作業ディレクトリ: {THIS_DIR}')
+    print_info('対象: 診断ランチャー（aidiy_diag）の配置 / Electron 実行環境の準備')
     directory = Path.home() / '.local' / 'bin'
     launcher = directory / ('aidiy_diag.cmd' if sys.platform == 'win32' else 'aidiy_diag')
     try:

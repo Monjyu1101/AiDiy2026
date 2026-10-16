@@ -1,4 +1,6 @@
 import importlib.util
+import io
+from contextlib import redirect_stdout, ExitStack
 from pathlib import Path
 import tempfile
 import unittest
@@ -277,6 +279,48 @@ class SetupOrderingTests(unittest.TestCase):
             with patch.object(module,'ask_start_mode',return_value=(True,False)),patch.object(module,'_read_single_key',side_effect=lambda valid,default_key:default_key),patch('builtins.print'):
                 choices=getattr(module,method)(ROOT.parent) if name=='_cleanup' else getattr(module,method)()
             self.assertTrue(choices['diag'])
+
+
+class SetupDisplayTests(unittest.TestCase):
+    root_module = RootIntegrationTests.root_module
+
+    def assert_diag_display(self, output):
+        self.assertEqual(output.count('バックエンド(Diag) セットアップ'), 1)
+        self.assertIn(setup.Colors.HEADER + '=' * 60 + setup.Colors.ENDC, output)
+        self.assertIn('[INFO] 作業ディレクトリ:', output)
+        self.assertIn('[INFO] 対象: 診断ランチャー（aidiy_diag）の配置 / Electron 実行環境の準備', output)
+        self.assertLess(output.index('セットアップ'), output.index('診断ランチャーを作成しました'))
+        self.assertLess(output.index('診断ランチャーを作成しました'), output.index('desktop-fixture'))
+
+    def test_standalone_display_once_before_launcher_and_desktop(self):
+        output=io.StringIO()
+        with tempfile.TemporaryDirectory() as directory, patch.object(Path,'home',return_value=Path(directory)), patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True), redirect_stdout(output):
+            self.assertTrue(setup.setup())
+        self.assert_diag_display(output.getvalue())
+
+    def test_root_display_after_common_before_local_without_duplicate_header(self):
+        from types import SimpleNamespace
+        module=self.root_module('_setup');output=io.StringIO()
+        choices=dict.fromkeys(['common','diag','local','mcp','backend','taskteam','web','avatar','hermes','ide','discord'],False)
+        choices.update(common=True,diag=True,local=True,continue_on_error=False)
+        local=SimpleNamespace(setup=lambda _:print('local-fixture') or True,launch_model_download=lambda _:True)
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            stack.enter_context(patch.object(Path,'home',return_value=Path(directory)))
+            stack.enter_context(patch.object(module,'GLOBAL_CLI_INSTALL_PROCESSES',['fixture']))
+            for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:None),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
+                stack.enter_context(patch.object(module,name,value))
+            stack.enter_context(patch.object(module.time,'sleep'))
+            stack.enter_context(patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True))
+            stack.enter_context(redirect_stdout(output));module.main()
+        text=output.getvalue();self.assert_diag_display(text)
+        self.assertLess(text.index('common-wait-fixture'),text.index('バックエンド(Diag) セットアップ'))
+        self.assertLess(text.index('desktop-fixture'),text.index('local-fixture'))
+
+    def test_unselected_diag_has_no_display_or_install(self):
+        output=io.StringIO()
+        with patch.object(Path,'home') as home, patch.object(setup,'setup_desktop') as desktop, redirect_stdout(output):
+            self.assertTrue(setup.setup({'diag':False}))
+        self.assertEqual(output.getvalue(),'');home.assert_not_called();desktop.assert_not_called()
 
 
 class ElectronSetupTests(unittest.TestCase):

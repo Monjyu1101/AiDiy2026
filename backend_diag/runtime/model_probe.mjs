@@ -4,8 +4,114 @@ import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
-import https from "node:https";
+import https2 from "node:https";
+import http2 from "node:http";
+
+// backend_diag/runtime/environment_proxy.ts
 import http from "node:http";
+import https from "node:https";
+import tls from "node:tls";
+import { isIP } from "node:net";
+function proxyRoute(address, env = process.env) {
+  const host = address.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127\./.test(host)) return null;
+  const secure = address.protocol === "https:", port = address.port || (secure ? "443" : "80");
+  for (const entry of (env.no_proxy || env.NO_PROXY || "").toLowerCase().split(/[,\s]+/).filter(Boolean)) {
+    if (entry === "*") return null;
+    const match = entry.match(/^(.+):(\d+)$/);
+    if (match && match[2] !== port) continue;
+    const name = match?.[1] || entry;
+    if (name.startsWith(".") || name.startsWith("*")) {
+      if (host.endsWith(name.replace(/^\*/, ""))) return null;
+    } else if (host === name) return null;
+  }
+  const httpProxy = env.http_proxy || env.HTTP_PROXY || "";
+  const value = secure ? env.https_proxy || env.HTTPS_PROXY || httpProxy : httpProxy;
+  if (!value) return null;
+  try {
+    const proxy = new URL(value);
+    if (!["http:", "https:"].includes(proxy.protocol) || proxy.pathname !== "/" || proxy.search || proxy.hash) throw Error();
+    decodeURIComponent(proxy.username);
+    decodeURIComponent(proxy.password);
+    return proxy;
+  } catch {
+    throw new Error("proxy-config");
+  }
+}
+var MetadataProxyAgent = class extends https.Agent {
+  constructor(proxy) {
+    super({ keepAlive: false, maxCachedSessions: 0 });
+    this.proxy = proxy;
+  }
+  pending = /* @__PURE__ */ new Set();
+  tunnels = /* @__PURE__ */ new Set();
+  closed = false;
+  createConnection(options, callback) {
+    let complete = false;
+    const done = (error, socket) => {
+      if (complete) return;
+      complete = true;
+      callback?.(error, socket);
+    };
+    if (this.closed) {
+      done(new Error("stopped"));
+      return;
+    }
+    const hostname = String(options.hostname || options.host), authority = `${hostname}:${options.port || 443}`;
+    const headers = { Host: authority };
+    if (this.proxy.username || this.proxy.password) headers["Proxy-Authorization"] = "Basic " + Buffer.from(decodeURIComponent(this.proxy.username) + ":" + decodeURIComponent(this.proxy.password)).toString("base64");
+    const transport = this.proxy.protocol === "https:" ? https : http;
+    const request = transport.request({ hostname: this.proxy.hostname.replace(/^\[|\]$/g, ""), port: this.proxy.port || (this.proxy.protocol === "https:" ? 443 : 80), method: "CONNECT", path: authority, headers, agent: false, rejectUnauthorized: true });
+    this.pending.add(request);
+    request.once("close", () => this.pending.delete(request));
+    request.once("error", (error) => done(error));
+    request.once("connect", (response, socket, head) => {
+      this.pending.delete(request);
+      if (this.closed) {
+        socket.destroy();
+        done(new Error("stopped"));
+        return;
+      }
+      if (response.statusCode !== 200) {
+        socket.destroy();
+        done(new Error(response.statusCode === 407 ? "proxy-auth" : "proxy-connect"));
+        return;
+      }
+      if (head.length) {
+        socket.destroy();
+        done(new Error("proxy-connect"));
+        return;
+      }
+      this.tunnels.add(socket);
+      socket.once("close", () => this.tunnels.delete(socket));
+      const secured = tls.connect({ socket, servername: isIP(hostname) ? void 0 : hostname, rejectUnauthorized: true });
+      this.tunnels.add(secured);
+      secured.once("close", () => this.tunnels.delete(secured));
+      secured.once("error", (error) => {
+        socket.destroy();
+        done(error);
+      });
+      secured.once("secureConnect", () => done(null, secured));
+    });
+    request.end();
+  }
+  destroy() {
+    this.closed = true;
+    for (const request of this.pending) request.destroy();
+    for (const socket of this.tunnels) socket.destroy();
+    this.pending.clear();
+    this.tunnels.clear();
+    super.destroy();
+  }
+};
+function networkFailure(error) {
+  const code = error?.code || "";
+  const message = error instanceof Error ? error.message : "";
+  if (["proxy-config", "proxy-auth", "proxy-connect", "stopped"].includes(message)) return message;
+  if (["ENOTFOUND", "EAI_AGAIN"].includes(code)) return "dns";
+  if (["CERT_HAS_EXPIRED", "CERT_NOT_YET_VALID", "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code)) return "tls";
+  return "network";
+}
 
 // backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
@@ -233,8 +339,14 @@ function ollamaLocalCatalog(body) {
 var CONFIG_LIMIT = 128 * 1024;
 var RESPONSE_LIMIT = 1024 * 1024;
 var PUBLIC_RESPONSE_LIMIT = 16 * 1024 * 1024;
+function connectionFailureDescription(error) {
+  const reasons = { dns: "\u63A5\u7D9A\u5148\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306E\u540D\u524D\u89E3\u6C7A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", tls: "\u63A5\u7D9A\u5148\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306ETLS\u8A3C\u660E\u66F8\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", network: "\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3068\u30D7\u30ED\u30AD\u30B7\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "proxy-config": "HTTP_PROXY / HTTPS_PROXY \u306EURL\u8A2D\u5B9A\u304C\u7121\u52B9\u3067\u3059\u3002", "proxy-auth": "\u30D7\u30ED\u30AD\u30B7\u8A8D\u8A3C\u304C\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002", "proxy-connect": "\u30D7\u30ED\u30AD\u30B7\u304C\u63A5\u7D9A\u3092\u8A31\u53EF\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002", auth: "HTTP\u8A8D\u8A3C\u307E\u305F\u306F\u30A2\u30AF\u30BB\u30B9\u6A29\u304C\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002", http: "\u6B63\u5E38\u306AHTTP\u5FDC\u7B54\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", timeout: "\u901A\u4FE1\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002", stopped: "\u53D6\u5F97\u3092\u4E2D\u6B62\u3057\u307E\u3057\u305F\u3002", response: "\u53D7\u4FE1\u304C\u9014\u4E2D\u3067\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002", size: "\u53D7\u4FE1\u30B5\u30A4\u30BA\u304C\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", json: "\u5FDC\u7B54\u3092JSON\u3068\u3057\u3066\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002", shape: "\u30E2\u30C7\u30EB\u30C7\u30FC\u30BF\u5F62\u5F0F\u304C\u60F3\u5B9A\u3068\u7570\u306A\u308A\u307E\u3059\u3002" };
+  const reason = error instanceof Error ? error.message : "";
+  return Object.hasOwn(reasons, reason) ? reasons[reason] : "\u30E2\u30C7\u30EB\u53D6\u5F97\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002";
+}
 function publicFailureDescription(code) {
-  const reasons = { size: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u30B5\u30A4\u30BA\u304C\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", output: "\u6574\u5F62\u3057\u305F\u516C\u958B\u4E00\u89A7\u304C\u51FA\u529B\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", timeout: "\u516C\u958B\u4E00\u89A7\u306E\u901A\u4FE1\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002", dns: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u306E\u540D\u524D\u89E3\u6C7A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", tls: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u306ETLS\u8A3C\u660E\u66F8\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", http: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u304C\u6B63\u5E38\u306AHTTP\u5FDC\u7B54\u3092\u8FD4\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002", json: "\u516C\u958B\u4E00\u89A7\u306E\u5FDC\u7B54\u3092JSON\u3068\u3057\u3066\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002", shape: "\u516C\u958B\u4E00\u89A7\u306E\u30C7\u30FC\u30BF\u5F62\u5F0F\u304C\u60F3\u5B9A\u3068\u7570\u306A\u308A\u307E\u3059\u3002", network: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u3078\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3084\u30D7\u30ED\u30AD\u30B7\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", response: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u304C\u9014\u4E2D\u3067\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002", stopped: "\u516C\u958B\u4E00\u89A7\u306E\u53D6\u5F97\u3092\u4E2D\u6B62\u3057\u307E\u3057\u305F\u3002", busy: "\u5225\u306E\u30E2\u30C7\u30EB\u78BA\u8A8D\u304C\u5B9F\u884C\u4E2D\u3067\u3059\u3002" };
+  if (typeof code === "string" && ["proxy-config", "proxy-auth", "proxy-connect", "auth"].includes(code)) return connectionFailureDescription(new Error(code));
+  const reasons = { size: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u30B5\u30A4\u30BA\u304C\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", output: "\u6574\u5F62\u3057\u305F\u516C\u958B\u4E00\u89A7\u304C\u51FA\u529B\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", timeout: "\u516C\u958B\u4E00\u89A7\u306E\u901A\u4FE1\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002", dns: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306E\u540D\u524D\u89E3\u6C7A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", tls: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306ETLS\u8A3C\u660E\u66F8\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", http: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u304C\u6B63\u5E38\u306AHTTP\u5FDC\u7B54\u3092\u8FD4\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002", json: "\u516C\u958B\u4E00\u89A7\u306E\u5FDC\u7B54\u3092JSON\u3068\u3057\u3066\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002", shape: "\u516C\u958B\u4E00\u89A7\u306E\u30C7\u30FC\u30BF\u5F62\u5F0F\u304C\u60F3\u5B9A\u3068\u7570\u306A\u308A\u307E\u3059\u3002", network: "\u516C\u958B\u4E00\u89A7\u30B5\u30FC\u30D0\u30FC\u3078\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3084\u30D7\u30ED\u30AD\u30B7\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", response: "\u516C\u958B\u4E00\u89A7\u306E\u53D7\u4FE1\u304C\u9014\u4E2D\u3067\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002", stopped: "\u516C\u958B\u4E00\u89A7\u306E\u53D6\u5F97\u3092\u4E2D\u6B62\u3057\u307E\u3057\u305F\u3002", busy: "\u5225\u306E\u30E2\u30C7\u30EB\u78BA\u8A8D\u304C\u5B9F\u884C\u4E2D\u3067\u3059\u3002" };
   return typeof code === "string" && Object.hasOwn(reasons, code) ? reasons[code] : "\u516C\u958B\u4E00\u89A7\u306E\u53D6\u5F97\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002";
 }
 var CONFIG_PATH = fileURLToPath(new URL("../../_config/AiDiy_key.json", import.meta.url));
@@ -368,10 +480,17 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
   const responseLimit = provider === "openrouter" && Object.keys(headers).length === 0 ? PUBLIC_RESPONSE_LIMIT : RESPONSE_LIMIT;
   let settled = false, size = 0;
   const chunks = [];
+  let agent, request;
+  try {
+    const proxy = local ? null : proxyRoute(new URL(`https://${endpoint[0]}`));
+    if (proxy) agent = new MetadataProxyAgent(proxy);
+  } catch (error) {
+    return reject(new Error(networkFailure(error)));
+  }
   const respond = (response) => {
     if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
       response.destroy();
-      return finish(new Error("http"));
+      return finish(new Error([401, 403].includes(response.statusCode ?? 0) ? "auth" : "http"));
     }
     response.on("data", (chunk) => {
       if (settled) return;
@@ -392,7 +511,6 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
       }
     });
   };
-  const request = local ? http.request({ hostname: local[0], port: local[1], path: pathname, method: "GET", agent: false, headers: { Accept: "application/json", ...headers } }, respond) : https.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, respond);
   const cancel = () => finish(new Error("stopped"));
   const timer = setTimeout(() => finish(new Error("timeout")), local ? 1e4 : 8e3);
   function finish(error, value) {
@@ -400,17 +518,19 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
     settled = true;
     clearTimeout(timer);
     signal?.removeEventListener("abort", cancel);
-    request.destroy();
+    request?.destroy();
+    agent?.destroy();
     if (error) reject(error);
     else resolve(value);
   }
-  signal?.addEventListener("abort", cancel, { once: true });
-  request.on("error", (error) => {
-    const code = error.code ?? "";
-    const reason = ["ENOTFOUND", "EAI_AGAIN"].includes(code) ? "dns" : ["CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "ERR_TLS_CERT_ALTNAME_INVALID"].includes(code) ? "tls" : "network";
-    finish(new Error(reason));
-  });
-  request.end();
+  try {
+    request = local ? http2.request({ hostname: local[0], port: local[1], path: pathname, method: "GET", agent: false, headers: { Accept: "application/json", ...headers } }, respond) : https2.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: agent ?? false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, respond);
+    signal?.addEventListener("abort", cancel, { once: true });
+    request.on("error", (error) => finish(new Error(networkFailure(error))));
+    request.end();
+  } catch (error) {
+    finish(new Error(networkFailure(error)));
+  }
 });
 function secretValues(values) {
   return SECRET_CONFIG_KEYS.map((name) => values[name]).filter((value) => configured(value, "")).map((value) => value.trim());
@@ -445,7 +565,7 @@ async function publicCatalog({ fetch = fetchMetadata, now, signal } = {}) {
     return result;
   } catch (error) {
     const candidate = error instanceof Error ? error.message : "";
-    const code = ["size", "output", "timeout", "dns", "tls", "http", "json", "network", "response", "stopped"].includes(candidate) ? candidate : "shape";
+    const code = ["size", "output", "timeout", "dns", "tls", "http", "auth", "proxy-config", "proxy-auth", "proxy-connect", "json", "network", "response", "stopped"].includes(candidate) ? candidate : "shape";
     return { \u72B6\u614B: "NG", \u516C\u958B\u30E2\u30C7\u30EB: {}, \u78BA\u8A8D\u65E5\u6642: timestamp, \u5931\u6557\u7406\u7531: code, \u8AAC\u660E: publicFailureDescription(code) };
   }
 }
@@ -481,10 +601,10 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
       const body = await fetch(kind, headers, void 0, signal);
       const details = safeDetails(kind === "codex" ? codexCatalog(body) : grokCatalog(body), [credential.token, ...credential.account ? [credential.account] : []]);
       return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u8B66\u544A: expired ? [expiredNote] : [], \u8AAC\u660E: "OAuth \u306E\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u3067\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\u3002\u751F\u6210\u53EF\u5426\u30FB\u5229\u7528\u4E0A\u9650\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: kind === "codex" ? "\u672C\u4F53\uFF08get_codex_model_ids\uFF09\u3068\u540C\u3058\u304F\u3001\u975E\u8868\u793A\u30FB\u5EC3\u6B62\u30E2\u30C7\u30EB\u3092\u9664\u3044\u3066\u512A\u5148\u5EA6\u9806\u306B\u4E26\u3079\u3001\u5C06\u6765\u7248\u3068 -900k \u7248\u3092\u88DC\u5B8C\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" : "\u672C\u4F53\u306B API \u4E00\u89A7\u306E\u7D5E\u308A\u8FBC\u307F\u306F\u7121\u3044\u305F\u3081\u3001\u975E\u8868\u793A\u30E2\u30C7\u30EB\u3060\u3051\u3092\u9664\u5916\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" };
-    } catch {
+    } catch (error) {
       const fallback = kind === "codex" ? await readCodexLocal(codexLocalReader).then((local) => codexFallbackCatalog(local.defaultModel, local.cacheIds)) : idsCatalog(GROK_CLI_MODELS);
       const details = safeDetails(fallback, [credential.token, ...credential.account ? [credential.account] : []]);
-      const reason = expired ? expiredNote : "OAuth \u306E\u30E2\u30C7\u30EB\u4E00\u89A7\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u30ED\u30B0\u30A4\u30F3\u72B6\u614B\u3068\u901A\u4FE1\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+      const reason = expired ? expiredNote : "OAuth \u306E\u30E2\u30C7\u30EB\u4E00\u89A7\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002" + connectionFailureDescription(error);
       return { ...output, \u72B6\u614B: kind === "grok" ? "PASS" : "NG", \u8AAC\u660E: kind === "grok" ? `\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08${GROK_CLI_MODELS.join(" / ")}\uFF09\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002API \u4E00\u89A7\u306F\u672A\u53D6\u5F97: ${reason}` : reason, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u8B66\u544A: [kind === "codex" ? "API \u304B\u3089\u53D6\u5F97\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u672C\u4F53\u3068\u540C\u3058\u4EE3\u66FF\u5019\u88DC\uFF08~/.codex \u306E config.toml\u30FBmodels_cache.json\u30FB\u65E2\u5B9A\u5024\uFF09\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059\u3002" : "API \u304B\u3089\u53D6\u5F97\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u672C\u4F53\u3068\u540C\u3058\u56FA\u5B9A\u5019\u88DC\uFF08Grok Build CLI \u306E grok-4.7 / grok-4.6\uFF09\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059\u3002"], \u4E00\u89A7\u7BC4\u56F2: "\u4EE3\u66FF\u5019\u88DC\uFF08\u672C\u4F53\u304C API \u53D6\u5F97\u5931\u6557\u6642\u306B\u4F7F\u3046\u4E00\u89A7\uFF09\u3002" };
     }
   }
@@ -514,8 +634,8 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
       if (!ready) return { ...output, \u72B6\u614B: "NG", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "\u30AD\u30FC\u8A8D\u8A3C\u306F\u6210\u529F\u3057\u307E\u3057\u305F\u304C\u3001\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u304C\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002" };
       const details = safeDetails(withoutRetired(router), secretValues(values));
       return authenticatedRouterResult({ ...output, \u72B6\u614B: "OK", \u8A8D\u8A3C\u78BA\u8A8D: true, \u8AAC\u660E: "\u30AD\u30FC\u8A8D\u8A3C\u6210\u529F\u3002\u516C\u958B\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u304B\u3089\u5019\u88DC\u3092\u8868\u793A\u3057\u307E\u3059\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp, \u4E00\u89A7\u7BC4\u56F2: "\u8A8D\u8A3C\u78BA\u8A8D\u6E08\u307F\u3002\u516C\u958B\u4E00\u89A7\u306E\u30AD\u30E3\u30C3\u30B7\u30E5\u3002\u6700\u5927500\u4EF6\u3002" }, key);
-    } catch {
-      return { ...output, \u72B6\u614B: "NG", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "OpenRouter \u306E\u30AD\u30FC\u8A8D\u8A3C\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30AD\u30FC\u8A2D\u5B9A\u3068\u901A\u4FE1\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002" };
+    } catch (error) {
+      return { ...output, \u72B6\u614B: "NG", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8AAC\u660E: "OpenRouter \u306E\u30AD\u30FC\u8A8D\u8A3C\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002" + connectionFailureDescription(error) };
     }
   }
   const warnings = ["google", "openai", "anthropic"].includes(provider) && !ready ? ["\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u304C\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7A7A\u4E00\u89A7\u6642\u306E\u51E6\u7406\u3067\u3001\u65E5\u4ED8\u30FB\u5BFE\u5FDC\u60C5\u5831\u306E\u88DC\u5B8C\u306A\u3057\u3067\u7D9A\u884C\u3057\u307E\u3057\u305F\u3002"] : [];
@@ -560,8 +680,8 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
     };
     const details = safeDetails(models, secrets), liveCandidates = [...new Set(live)].filter((id2) => /^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id2) && !secrets.some((secret) => id2.includes(secret))).slice(0, 200);
     return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u30E9\u30A4\u30D6\u5019\u88DC: liveCandidates, \u30E9\u30A4\u30D6\u5019\u88DC\u4F5C\u6210\u65E5: Object.fromEntries(liveCandidates.map((id2) => [id2, liveDate(id2)])), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings, \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u53D6\u5F97\u6210\u529F\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7D5E\u308A\u8FBC\u307F\u30FB\u88DC\u5B8C\u3092\u9069\u7528\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3092\u79FB\u690D\u3057\u305F\u53D6\u5F97\u30E2\u30C7\u30EB\u306E\u7D5E\u308A\u8FBC\u307F\u7D50\u679C\u3001\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002\u9759\u7684\u30FBOAuth\u5019\u88DC\u306F\u542B\u307F\u307E\u305B\u3093\u3002", \u88DC\u5B8C: ["google", "openai", "anthropic"].includes(provider) ? "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u5229\u7528\u3002\u30C6\u30B9\u30C8\u6642\u306E\u8FFD\u52A0\u53D6\u5F97\u306F\u884C\u3044\u307E\u305B\u3093\u3002" : "" };
-  } catch {
-    return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u306E\u901A\u4FE1\u307E\u305F\u306F\u8A3A\u65AD\u7528\u30E2\u30C7\u30EB\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings };
+  } catch (error) {
+    return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u306E\u901A\u4FE1\u307E\u305F\u306F\u8A3A\u65AD\u7528\u30E2\u30C7\u30EB\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002" + connectionFailureDescription(error), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings };
   }
 }
 export {

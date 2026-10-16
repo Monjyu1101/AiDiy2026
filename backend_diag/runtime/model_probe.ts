@@ -6,12 +6,19 @@ import os from 'node:os';
 import path from 'node:path';
 import https from 'node:https';
 import http from 'node:http';
+import {proxyRoute,MetadataProxyAgent,networkFailure} from './environment_proxy';
 import {openrouterCatalog,googleCatalog,openaiCatalog,claudeCatalog,ollamaCatalog,codexCatalog,codexSlugs,codexFallbackCatalog,grokCatalog,idsCatalog,ollamaLocalCatalog,withoutRetired,GROK_CLI_MODELS,LOCAL_CHAT_MODELS,pythonString,type Catalog} from './model_catalog';
 export const CONFIG_LIMIT=128*1024, RESPONSE_LIMIT=1024*1024;
 // 公開一覧は説明・価格などを含む。受信上限だけを分離し、整形後の出力上限は維持する。
 export const PUBLIC_RESPONSE_LIMIT=16*1024*1024;
+function connectionFailureDescription(error:unknown):string {
+ const reasons:Record<string,string>={dns:'接続先またはプロキシの名前解決に失敗しました。',tls:'接続先またはプロキシのTLS証明書を検証できませんでした。',network:'接続できませんでした。ネットワークとプロキシ設定を確認してください。','proxy-config':'HTTP_PROXY / HTTPS_PROXY のURL設定が無効です。','proxy-auth':'プロキシ認証が拒否されました。','proxy-connect':'プロキシが接続を許可しませんでした。',auth:'HTTP認証またはアクセス権が拒否されました。',http:'正常なHTTP応答を取得できませんでした。',timeout:'通信がタイムアウトしました。',stopped:'取得を中止しました。',response:'受信が途中で切断されました。',size:'受信サイズが上限を超えました。',json:'応答をJSONとして読み取れませんでした。',shape:'モデルデータ形式が想定と異なります。'};
+ const reason=error instanceof Error?error.message:'';
+ return Object.hasOwn(reasons,reason)?reasons[reason]:'モデル取得処理に失敗しました。';
+}
 export function publicFailureDescription(code:unknown):string {
- const reasons:Record<string,string>={size:"公開一覧の受信サイズが上限を超えました。",output:"整形した公開一覧が出力上限を超えました。",timeout:"公開一覧の通信がタイムアウトしました。",dns:"公開一覧サーバーの名前解決に失敗しました。",tls:"公開一覧サーバーのTLS証明書を検証できませんでした。",http:"公開一覧サーバーが正常なHTTP応答を返しませんでした。",json:"公開一覧の応答をJSONとして読み取れませんでした。",shape:"公開一覧のデータ形式が想定と異なります。",network:"公開一覧サーバーへ接続できませんでした。ネットワークやプロキシ設定を確認してください。",response:"公開一覧の受信が途中で切断されました。",stopped:"公開一覧の取得を中止しました。",busy:"別のモデル確認が実行中です。"};
+ if(typeof code==='string'&&['proxy-config','proxy-auth','proxy-connect','auth'].includes(code))return connectionFailureDescription(new Error(code));
+ const reasons:Record<string,string>={size:"公開一覧の受信サイズが上限を超えました。",output:"整形した公開一覧が出力上限を超えました。",timeout:"公開一覧の通信がタイムアウトしました。",dns:"公開一覧サーバーまたはプロキシの名前解決に失敗しました。",tls:"公開一覧サーバーまたはプロキシのTLS証明書を検証できませんでした。",http:"公開一覧サーバーが正常なHTTP応答を返しませんでした。",json:"公開一覧の応答をJSONとして読み取れませんでした。",shape:"公開一覧のデータ形式が想定と異なります。",network:"公開一覧サーバーへ接続できませんでした。ネットワークやプロキシ設定を確認してください。",response:"公開一覧の受信が途中で切断されました。",stopped:"公開一覧の取得を中止しました。",busy:"別のモデル確認が実行中です。"};
  return typeof code==='string'&&Object.hasOwn(reasons,code)?reasons[code]:"公開一覧の取得処理に失敗しました。";
 }
 const CONFIG_PATH=fileURLToPath(new URL('../../_config/AiDiy_key.json',import.meta.url));
@@ -113,23 +120,23 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
  if(signal?.aborted)return reject(new Error('stopped'));
  const responseLimit=provider==='openrouter'&&Object.keys(headers).length===0?PUBLIC_RESPONSE_LIMIT:RESPONSE_LIMIT;
  let settled=false,size=0;const chunks:Buffer[]=[];
- // 専用 Agent を使わず agent:false。環境 proxy・globalAgent・redirect にキーを渡さない。
+ let agent:MetadataProxyAgent|undefined,request:http.ClientRequest|undefined;
+ try{const proxy=local?null:proxyRoute(new URL(`https://${endpoint[0]}`));if(proxy)agent=new MetadataProxyAgent(proxy);}catch(error){return reject(new Error(networkFailure(error)));}
+ // 明示した proxy のみ使用。キーは TLS 内側の API リクエストだけへ渡し、redirect は追わない。
  const respond=(response:http.IncomingMessage)=>{
-  if(!response.statusCode||response.statusCode<200||response.statusCode>=300){response.destroy();return finish(new Error('http'));}
+  if(!response.statusCode||response.statusCode<200||response.statusCode>=300){response.destroy();return finish(new Error([401,403].includes(response.statusCode??0)?'auth':'http'));}
   response.on('data',(chunk:Buffer)=>{if(settled)return;size+=chunk.length;if(size>responseLimit)return finish(new Error('size'));chunks.push(chunk);});
   response.on('error',()=>finish(new Error('response')));
   response.on('aborted',()=>finish(new Error('response')));
   response.on('end',()=>{if(settled)return;try{const body:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!record(body))return finish(new Error('shape'));finish(undefined,body);}catch{finish(new Error('json'));}});
  };
- const request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
  const cancel=()=>finish(new Error('stopped'));
  const timer=setTimeout(()=>finish(new Error('timeout')),local?10000:8000);
- function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request.destroy();if(error)reject(error);else resolve(value!);}
- signal?.addEventListener('abort',cancel,{once:true});request.on('error',(error:NodeJS.ErrnoException)=>{
-  const code=error.code??'';
-  const reason=['ENOTFOUND','EAI_AGAIN'].includes(code)?'dns':['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY','ERR_TLS_CERT_ALTNAME_INVALID'].includes(code)?'tls':'network';
-  finish(new Error(reason));
- });request.end();
+ function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request?.destroy();agent?.destroy();if(error)reject(error);else resolve(value!);}
+ try{
+  request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:agent??false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
+  signal?.addEventListener('abort',cancel,{once:true});request.on('error',error=>finish(new Error(networkFailure(error))));request.end();
+ }catch(error){finish(new Error(networkFailure(error)));}
 });
 function secretValues(values:Dictionary):string[] {return SECRET_CONFIG_KEYS.map(name=>values[name]).filter((value):value is string=>configured(value,'')).map(value=>value.trim());}
 export function safeDetails(models:Dictionary,secrets:string[],limit:number|null=500) {
@@ -156,7 +163,7 @@ export async function publicCatalog({fetch=fetchMetadata,now,signal}:{fetch?:Fet
   if(Buffer.byteLength(JSON.stringify(result))>RESPONSE_LIMIT)throw new Error('output');return result;
  }catch(error){
   const candidate=error instanceof Error?error.message:'';
-  const code=['size','output','timeout','dns','tls','http','json','network','response','stopped'].includes(candidate)?candidate:'shape';
+  const code=['size','output','timeout','dns','tls','http','auth','proxy-config','proxy-auth','proxy-connect','json','network','response','stopped'].includes(candidate)?candidate:'shape';
   return {状態:'NG',公開モデル:{},確認日時:timestamp,失敗理由:code,説明:publicFailureDescription(code)};
  }
 }
@@ -193,12 +200,12 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
    const body=await fetch(kind,headers,undefined,signal);
    const details=safeDetails(kind==='codex'?codexCatalog(body):grokCatalog(body),[credential.token,...(credential.account?[credential.account]:[])]);
    return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,警告:expired?[expiredNote]:[],説明:'OAuth のログイン情報でモデル一覧を取得しました。生成可否・利用上限は未確認です。',一覧範囲:kind==='codex'?'本体（get_codex_model_ids）と同じく、非表示・廃止モデルを除いて優先度順に並べ、将来版と -900k 版を補完。表示は最大500件。':'本体に API 一覧の絞り込みは無いため、非表示モデルだけを除外。表示は最大500件。'};
-  }catch{
+  }catch(error){
    // 本体は API で取れない場合も代替候補で続行する。OpenAI OAuth は API 一覧を使う系統なので NG とし、本体が使う候補を併せて示す。
    // Grok は本体がもともと固定候補を流し込む系統なので、固定候補を示して PASS（黄）とする。
    const fallback=kind==='codex'?await readCodexLocal(codexLocalReader).then(local=>codexFallbackCatalog(local.defaultModel,local.cacheIds)):idsCatalog(GROK_CLI_MODELS);
    const details=safeDetails(fallback,[credential.token,...(credential.account?[credential.account]:[])]);
-   const reason=expired?expiredNote:'OAuth のモデル一覧取得に失敗しました。ログイン状態と通信を確認してください。';
+   const reason=expired?expiredNote:'OAuth のモデル一覧取得に失敗しました。'+connectionFailureDescription(error);
    return {...output,状態:kind==='grok'?'PASS':'NG',説明:kind==='grok'?`本体と同じ固定候補（${GROK_CLI_MODELS.join(' / ')}）を使用します。API 一覧は未取得: ${reason}`:reason,確認日時:timestamp,モデル:details.map(item=>item.model_id!),モデル詳細:details,警告:[kind==='codex'?'API から取得できないため、本体と同じ代替候補（~/.codex の config.toml・models_cache.json・既定値）を表示しています。':'API から取得できないため、本体と同じ固定候補（Grok Build CLI の grok-4.7 / grok-4.6）を表示しています。'],一覧範囲:'代替候補（本体が API 取得失敗時に使う一覧）。'};
   }
  }
@@ -226,7 +233,7 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
    if(!ready)return {...output,状態:'NG',確認日時:timestamp,説明:'キー認証は成功しましたが、公開モデル一覧が利用できません。'};
    const details=safeDetails(withoutRetired(router),secretValues(values));
    return authenticatedRouterResult({...output,状態:'OK',認証確認:true,説明:'キー認証成功。公開一覧キャッシュから候補を表示します。生成可否・課金状態は未確認です。',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,一覧範囲:'認証確認済み。公開一覧のキャッシュ。最大500件。'},key);
-  }catch{return {...output,状態:'NG',確認日時:timestamp,説明:'OpenRouter のキー認証を確認できませんでした。キー設定と通信を確認してください。'};}
+  }catch(error){return {...output,状態:'NG',確認日時:timestamp,説明:'OpenRouter のキー認証を確認できませんでした。'+connectionFailureDescription(error)};}
  }
  const warnings=['google','openai','anthropic'].includes(provider)&&!ready?['起動時の公開OpenRouter一覧が利用できません。元のモデル処理と同じ空一覧時の処理で、日付・対応情報の補完なしで続行しました。']:[];
  try {
@@ -249,5 +256,5 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
   const liveDate=(id:string)=>{const value=provider==='google'?router[`google/${id}`]?.作成日:models[id]?.作成日;return typeof value==='string'&&/^\d{4}\/\d{2}\/\d{2}$/.test(value)?value:null;};
   const details=safeDetails(models,secrets),liveCandidates=[...new Set(live)].filter(id=>/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)&&!secrets.some(secret=>id.includes(secret))).slice(0,200);
   return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,ライブ候補:liveCandidates,ライブ候補作成日:Object.fromEntries(liveCandidates.map(id=>[id,liveDate(id)])),確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
- }catch{return {...output,状態:'NG',説明:'モデル一覧APIの通信または診断用モデル処理に失敗しました。',確認日時:timestamp,警告:warnings};}
+ }catch(error){return {...output,状態:'NG',説明:'モデル一覧APIの通信または診断用モデル処理に失敗しました。'+connectionFailureDescription(error),確認日時:timestamp,警告:warnings};}
 }
