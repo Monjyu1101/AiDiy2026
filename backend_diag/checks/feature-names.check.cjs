@@ -1,0 +1,27 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {render,source}=require('./ui-components.cjs');
+
+test('four tabs and feature modules use the requested names while stable tab IDs remain',()=>{
+ const tabs=[...source('App.vue').matchAll(/@click="changeTab\('([^']+)'\)">([^<]+)<\/button>/g)].map(([,id,name])=>[id,name]);
+ assert.deepEqual(tabs,[['install','導入状況'],['keys','モデル一覧'],['integrations','外部連携'],['trials','設定モデル']]);
+ for(const name of tabs.map(([,name])=>name))assert.ok(fs.existsSync(path.join(__dirname,'../ui/src',name,`${name}パネル.vue`)));
+ for(const name of ['インストール','モデルキー設定','外部連携設定','configモデル試行'])assert.equal(fs.existsSync(path.join(__dirname,'../ui/src',name)),false);
+ assert.match(source('導入状況/導入状況状態.mjs'),/api\/診断/);
+ assert.match(source('キー設定共通/キー設定状態.mjs'),/api\/キー設定/);
+ assert.match(source('設定モデル/設定モデル状態.mjs'),/api\/モデル試行/);
+});
+
+test('headings and main actions match each tab and valid write/refresh actions remain',async()=>{
+ const install=await render('導入状況/導入状況パネル.vue',{項目:[],結果:[],接続済み:true});
+ assert.match(install,/<h2>導入状況<\/h2>/);assert.match(install,/id="install-run"[^>]*>状況確認<\/button>/);assert.match(install,/id="install-write"/);
+ const models=await render('モデル一覧/モデル一覧パネル.vue',{data:{項目:[]},results:{},connected:true});
+ assert.match(models,/<h2>モデル一覧取得<\/h2>/);assert.match(models,/id="latest-models"[^>]*>一覧再取得<\/button>/);assert.match(models,/id="models-write"/);
+ const external=await render('外部連携/外部連携パネル.vue',{data:{項目:[]},connected:true});
+ assert.match(external,/<h2>外部連携確認<\/h2>/);assert.match(external,/>設定状況を更新<\/button>/);assert.doesNotMatch(external,/>テスト<\/button>/);
+ const configured=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[]},results:{},online:true});
+ assert.match(configured,/<h2>モデル動作確認<\/h2>/);assert.match(configured,/id="model-trial-start"[^>]*>動作確認<\/button>/);
+ assert.match(configured,/<div class="panel-heading trial-heading">[^]*?class="trial-reload"[^>]*>再読込<\/button>/);
+});

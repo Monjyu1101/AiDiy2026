@@ -38,7 +38,7 @@ function availableCodeModels(code, installedClis) {
   return Object.fromEntries(Object.entries(filtered).sort(([a], [b]) => priority(a) - priority(b)));
 }
 
-// モデルキー設定に表示する（モデル一覧を取得する）プロバイダ。ファイル名にも使う。
+// モデル一覧に表示する（モデル一覧を取得する）プロバイダ。ファイル名にも使う。
 export const MODEL_PROVIDER_IDS = Object.freeze(['gemini', 'freeai', 'claude', 'openai', 'openai_oauth', 'grok', 'openrt', 'ollama', 'local']);
 export const modelsInfoFile = id => `${id}_models_info.json`;
 

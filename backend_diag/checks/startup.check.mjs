@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
+import {randomBytes} from 'node:crypto';
 import {verify,manifest} from '../ui/verify.mjs';
 import {startupMessage} from '../diag_main.mjs';
 async function fixture(){
@@ -20,13 +21,13 @@ test('LF and Windows CRLF checkouts verify without rebuilding; actual edits stil
  const root=await fixture(),ui=path.join(root,'ui');
  try {
   assert.equal(await verify(ui),true);const lf=await manifest(ui);
-  assert.ok(Object.hasOwn(lf, 'src/インストール/インストールパネル.vue'));
+  assert.ok(Object.hasOwn(lf, 'src/導入状況/導入状況パネル.vue'));
   assert.deepEqual(Object.keys(lf), Object.keys(lf).sort());
   assert.ok(!Object.keys(lf).some(name => name.includes('/checks/')));
   await convert(root);assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
   const manifestFile=path.join(root,'static/build-manifest.json');
   await writeFile(manifestFile,JSON.stringify(Object.fromEntries(Object.entries(lf).reverse())));assert.equal(await verify(ui),true);
-  for(const relative of ['ui/src/App.vue','ui/src/インストール/インストールパネル.vue','ui/src/インストール/インストール状態.mjs','ui/src/インストール/インストール表示.mjs','ui/src/インストール/インストール.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
+  for(const relative of ['ui/src/App.vue','ui/src/導入状況/導入状況パネル.vue','ui/src/導入状況/導入状況状態.mjs','ui/src/導入状況/導入状況表示.mjs','ui/src/導入状況/導入状況.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
    const file=path.join(root,relative),before=await readFile(file);await writeFile(file,Buffer.concat([before,Buffer.from('\nchanged')]));assert.equal(await verify(ui),false,relative);await writeFile(file,before);
   }
   await rm(path.join(root,'static/app.js'));assert.equal(await verify(ui),false);
@@ -52,7 +53,10 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
   });
   for(const asset of ['','app.js','style.css']){const response=await fetch(address+asset);assert.equal(response.status,200);assert.ok((await response.text()).length>0);}
   assert.equal((await fetch(address+'api/'+encodeURIComponent('キー設定'))).status,401);
-  child.kill('SIGTERM');await exited;assert.equal(child.exitCode,0);assert.equal(errors,'');
+  // Windows の kill(SIGTERM) は正常終了処理を通さないため、既存の停止通知を使う。
+  if(process.platform==='win32')await writeFile(path.join(root,'.stop-request'),randomBytes(16).toString('hex'));
+  else child.kill('SIGTERM');
+  await exited;assert.equal(child.exitCode,0);assert.equal(errors,'');
  }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
 });
 

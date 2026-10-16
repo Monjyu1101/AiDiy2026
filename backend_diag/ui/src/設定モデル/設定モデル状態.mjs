@@ -1,12 +1,12 @@
 import { ref } from 'vue';
-import { モデル試行音声を作成 } from './モデル試行音声.mjs';
+import { 設定モデル音声を作成 } from './設定モデル音声.mjs';
 
 // 試行は明示操作だけで開始し、サーバー指定順に一件ずつ待つ。共有判定はサーバーだけが行う。
-export function モデル試行状態を作成({ api, 接続可能 }) {
+export function 設定モデル状態を作成({ api, 接続可能 }) {
  const 設定=ref(null),結果=ref({}),読込中=ref(false),実行中=ref(false),選択=ref(''),通知=ref('');
  let 世代=0,制御,実行ID='',破棄済み=false;
  const 有効=()=>!破棄済み&&接続可能();
- const 音声=モデル試行音声を作成({api,接続可能:有効});
+ const 音声=設定モデル音声を作成({api,接続可能:有効});
  async function サーバー中止(id){if(id)try{await api(`api/モデル試行/${encodeURIComponent(id)}`,'DELETE');}catch{/* 切断時も表示は無効化し、サーバー側の期限・切断処理に委ねる。 */}}
  function 中止(理由='試行を中止しました。'){
   音声.破棄();++世代;制御?.abort();制御=undefined;const id=実行ID;実行ID='';
@@ -55,5 +55,5 @@ export function モデル試行状態を作成({ api, 接続可能 }) {
  }
  function 切断(){中止('Tools または診断への接続が切れたため、試行を中止しました。');設定.value=null;結果.value={};選択.value='';}
  function 終了(){中止();破棄済み=true;}
- return {音声状態:音声.音声状態,音声読込:音声.読込,音声再生失敗:音声.再生失敗,設定,結果,読込中,実行中,選択,通知,読込,開始,個別開始:()=>開始(選択.value),中止,切断,終了};
+ return {音声状態:音声.音声状態,音声読込:音声.読込,音声再生失敗:音声.再生失敗,設定,結果,読込中,実行中,選択,通知,読込,開始,個別開始:(id=選択.value)=>開始(id),中止,切断,終了};
 }

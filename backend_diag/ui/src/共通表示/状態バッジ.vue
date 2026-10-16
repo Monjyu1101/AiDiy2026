@@ -4,7 +4,7 @@ const props = defineProps({
   state: { type: String, default: '未確認' },
   label: { type: String, default: '' },
 });
-const tone = computed(() => ({ OK: 'success', 取得済: 'success', 未検出: 'warning', 注意: 'warning', NG: 'danger', ERR: 'danger', 失敗: 'danger', 実行中: 'pending', 取得中: 'pending', 確認中: 'pending', キャッシュ利用: 'cache', PASS: 'cache' })[props.state] || 'neutral');
+const tone = computed(() => ({ OK: 'success', 取得済: 'success', 未実施: 'warning', 未検出: 'warning', 注意: 'warning', NG: 'danger', ERR: 'danger', 失敗: 'danger', 実行中: 'pending', 取得中: 'pending', 確認中: 'pending', キャッシュ利用: 'cache', PASS: 'cache' })[props.state] || 'neutral');
 const text = computed(() => props.label || props.state);
 </script>
 

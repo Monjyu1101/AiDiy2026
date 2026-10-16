@@ -5,7 +5,7 @@ export function 再生可能な音声(result){
  const audio=result?.音声ファイル;
  return audio && /^[a-f0-9]{32}$/.test(audio.id) && audio.MIME==='audio/wav' && Number.isFinite(audio.長さms) && audio.長さms>=1000 ? audio : null;
 }
-export function モデル試行音声を作成({api,接続可能,createURL=blob=>URL.createObjectURL(blob),revokeURL=url=>URL.revokeObjectURL(url)}){
+export function 設定モデル音声を作成({api,接続可能,createURL=blob=>URL.createObjectURL(blob),revokeURL=url=>URL.revokeObjectURL(url)}){
  const 音声状態=ref({});let 世代=0;const requests=new Map();
  function 破棄(){世代++;for(const controller of requests.values())controller.abort();requests.clear();for(const state of Object.values(音声状態.value))if(state.url)revokeURL(state.url);音声状態.value={};}
  async function 読込(result){

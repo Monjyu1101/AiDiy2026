@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue';
 
 // 一覧の選択・開閉と詳細表示はインストール画面内で保持します。
-export function インストール表示を作成(props) {
+export function 導入状況表示を作成(props) {
   const 選択ID=ref(null),折り畳み=ref(new Set(['その他拡張']));
   const 分類=['ベース','CLI群','その他拡張'];
   const 状態=id=>props.結果.find(r=>r.id===id)?.状態 || '未確認';

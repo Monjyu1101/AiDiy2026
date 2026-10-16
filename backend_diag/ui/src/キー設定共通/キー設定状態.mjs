@@ -19,8 +19,8 @@ async function testKey(id){
  try{const result=await api(`api/キーテスト/${encodeURIComponent(id)}`,'POST');if(generation===keyGeneration)keyResults.value={...keyResults.value,[id]:result};}catch(error){if(generation===keyGeneration)message.value=error.message;}finally{if(generation===keyGeneration)keyTesting.value='';}
 }
 
-// 最新モデル取得: 設定状況を読み直し、モデルキー設定のテスト可能な行を上から順に取得する。
-async function 最新モデル取得(){
+// 一覧再取得: 設定状況を読み直し、モデル一覧のテスト可能な行を上から順に取得する。
+async function 一覧再取得(){
  if(!connected.value || latestBusy.value || keyBusy.value || keyTesting.value)return;
  latestBusy.value=true;const generation=keyGeneration+1;
  try{await loadKeys();if(generation!==keyGeneration || !keyData.value)return;
@@ -37,5 +37,5 @@ async function モデル書込(){
 }
 function 設定を破棄(){resetPublic();keyGeneration++;keyData.value=null;keyResults.value={};keyBusy.value=false;keyTesting.value='';}
 function 終了(){設定を破棄();}
-return { keyData,keyBusy,keyTesting,keyResults,latestBusy,modelWriteBusy,modelWritten,publicModels,publicBusy,loadKeys,testKey,最新モデル取得,モデル書込,refreshPublic,resetPublic,設定を破棄,終了 };
+return { keyData,keyBusy,keyTesting,keyResults,latestBusy,modelWriteBusy,modelWritten,publicModels,publicBusy,loadKeys,testKey,一覧再取得,モデル書込,refreshPublic,resetPublic,設定を破棄,終了 };
 }

@@ -39,4 +39,4 @@ function component(name) {
 const render = (name, props) => renderToString(createSSRApp({ render: () => h(component(name).default, props) }));
 
 
-module.exports = { render, source };
+module.exports = { render, source, component };

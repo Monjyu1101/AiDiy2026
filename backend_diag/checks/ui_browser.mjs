@@ -50,32 +50,32 @@ try{
   assert.deepEqual(layout,{page:false,aside:'auto',scrolls:true,article:'auto'},JSON.stringify(size));
  }
  await page.setViewportSize({width:1360,height:950});
- await page.getByRole('button',{name:'モデルキー設定',exact:true}).click();await page.waitForSelector('.key-row');assert.equal(await page.locator('.key-row').count(),3);
+ await page.getByRole('button',{name:'モデル一覧',exact:true}).click();await page.waitForSelector('.key-row');assert.equal(await page.locator('.key-row').count(),3);
  assert.ok((await page.locator('.key-row').first().innerText()).includes('OpenAI API'));
  assert.equal(await page.locator('.model-key-panel').getByText(/Azure|GitHub Copilot/).count(),0,'確認不要の項目は表示しない');
  assert.equal(await page.locator('.public-indicator').count(),1);assert.equal(await page.locator('.public-indicator').innerText(),'OK');
- // 全テストはインストール確認→書込のあと、テストできる行だけ最新モデル取得→モデル書込まで行う。
+ // 全テストは状況確認→書込のあと、テストできる行だけ一覧再取得→モデル書込まで行う。
  const firstRun=requests.filter(([method])=>method==='POST').map(([,url])=>decodeURIComponent(url).split('/api/')[1]);
  assert.deepEqual(firstRun,['診断','書込','キーテスト/openai','キーテスト/openrt','モデル書込'],String(firstRun));
  await page.locator('.key-row').first().getByRole('button',{name:'テスト',exact:true}).click();await page.waitForSelector('.models li');assert.equal(await page.locator('.models li').last().innerText(),'<script>alert(1)</script>');
  assert.ok(await page.locator('.key-row').nth(1).getByRole('button',{name:'テスト'}).isDisabled());
  assert.ok((await page.locator('.model-meta').innerText()).includes('128000'));
  await page.screenshot({path:path.join(output,'keys.png'),fullPage:true});
- await page.getByRole('button',{name:'外部連携設定',exact:true}).click();assert.equal(await page.locator('.integration-row').count(),3);
+ await page.getByRole('button',{name:'外部連携',exact:true}).click();assert.equal(await page.locator('.integration-row').count(),3);
  assert.equal(await page.locator('.integration-panel .public-indicator').count(),0);assert.equal(await page.locator('.integration-panel .models').count(),0);
- for(const button of await page.locator('.integration-row .integration-test button').all())assert.ok(await button.isDisabled());
+ assert.equal(await page.locator('.integration-row .integration-test button').count(),0);
  await page.locator('.integration-row').filter({hasText:'Discord Bot'}).locator('.key-select').click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');
  assert.ok((await page.locator('.integration-panel article').innerText()).includes('DISCORD_BOT_TOKEN'));
  await page.screenshot({path:path.join(output,'integrations.png'),fullPage:true});
- await page.getByRole('button',{name:'モデルキー設定',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
- await page.getByRole('button',{name:'外部連携設定',exact:true}).click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');
+ await page.getByRole('button',{name:'モデル一覧',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
+ await page.getByRole('button',{name:'外部連携',exact:true}).click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');
  await page.locator('.integration-panel').getByRole('button',{name:'設定状況を更新'}).click();await page.waitForFunction(()=>document.querySelectorAll('.models li').length===0);
  // 再読込中は一時的に案内表示になるため、選択項目の表示へ戻るまで待つ。
  await page.locator('.integration-panel article h2',{hasText:'Discord Bot'}).waitFor({timeout:5000});
- await page.getByRole('button',{name:'モデルキー設定',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
- // 最新モデル取得: 設定を読み直し、テストできる行を上から順に取得して、選択（右側）も追従する。
+ await page.getByRole('button',{name:'モデル一覧',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
+ // 一覧再取得: 設定を読み直し、テストできる行を上から順に取得して、選択（右側）も追従する。
  assert.equal(await page.locator('.model-key-panel').getByRole('button',{name:'設定状況を更新'}).count(),0);
- await page.locator('#latest-models').click();await page.waitForFunction(()=>document.querySelector('#latest-models').textContent==='最新モデル取得'&&document.querySelectorAll('.key-row .key-test .badge[data-state="OK"]').length===2);
+ await page.locator('#latest-models').click();await page.waitForFunction(()=>document.querySelector('#latest-models').textContent==='一覧再取得'&&document.querySelectorAll('.key-row .key-test .badge[data-state="OK"]').length===2);
  await page.locator('.model-key-panel article h2',{hasText:'OpenRouter'}).waitFor({timeout:5000});
  assert.ok(!await page.locator('.key-row').first().getByRole('button',{name:'テスト',exact:true}).isDisabled());
  // 再取得はキャッシュ利用時だけ表示する（ネットワーク取得済みでは出さない）。
@@ -84,7 +84,7 @@ try{
  const posts=requests.filter(([method])=>method==='POST').map(([,url])=>url);assert.equal(posts.length,13,String(posts));assert.equal(posts.filter(url=>url.includes('%E6%9B%B8%E8%BE%BC')).length,4,String(posts));
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'mobile.png'),fullPage:true});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'horizontal overflow');
- await page.getByRole('button',{name:'外部連携設定',exact:true}).click();await page.screenshot({path:path.join(output,'mobile-integrations.png'),fullPage:true});
+ await page.getByRole('button',{name:'外部連携',exact:true}).click();await page.screenshot({path:path.join(output,'mobile-integrations.png'),fullPage:true});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'external horizontal overflow');
  await page.reload();await page.waitForSelector('#login');assert.ok(await page.locator('#run').isDisabled());assert.deepEqual(errors,[]);
  console.log('PASS: Chromium Vue mount, strict CSP, prefix URL/auth hash removal, installation 19 items, detail, separated settings tabs and selection persistence, explicit-only tests, disabled unset key, escaped models, refresh invalidation, all-test scope, mobile, reload login. external disabled test/no model UI, model metadata; POST requests:',posts.length);
