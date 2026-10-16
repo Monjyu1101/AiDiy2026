@@ -243,10 +243,13 @@ def ask_yes_no(prompt, default="n"):
 
 
 def ask_start_mode(prompt, default="n"):
-    bracket = "[y]/n/a=auto" if default.lower() == "y" else "y/[n]/a=auto"
+    """戻り値: (実行可否または "node", AUTO)。既存 y/n/a の戻り値は維持する。"""
+    bracket = "[y]/n/a=auto/r=Node.js系の再配置" if default.lower() == "y" else "y/[n]/a=auto/r=Node.js系の再配置"
     print(f"\n{prompt} ({bracket}): ", end="", flush=True)
     default_key = b"y" if default.lower() == "y" else b"n"
-    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A"), default_key)
+    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A", b"r", b"R"), default_key)
+    if key in (b"r", b"R"):
+        return "node", False
     if key in (b"a", b"A"):
         return True, True
     if key in (b"y", b"Y"):
@@ -644,6 +647,9 @@ def collect_setup_choices() -> dict | None:
     if not run_setup:
         return None
 
+    if run_setup == "node":
+        return {"node_refresh": True}
+
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
 
@@ -708,6 +714,72 @@ def collect_setup_choices() -> dict | None:
 
 
 # ============================================================
+# git pull 後の Node.js 系再配置
+# ============================================================
+def setup_node_refresh() -> list[str]:
+    """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
+    print_header("Node.js系の再配置（git pull 後の軽量更新）")
+    print_info("対象: Diag / Web / Avatar / IDE群(Term・Code・Live・IDE) / Discord")
+    print_info("依存を同期し、導入済みでも画面・拡張を再生成します。")
+    print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
+    if get_node_version() is None or get_npm_version() is None:
+        print_error("Node.js と npm が必要です。導入後に r を再実行してください。")
+        return ["Node.js / npm の確認"]
+
+    spec = importlib.util.spec_from_file_location("aidiy_refresh_electron", BASE_DIR / "scripts" / "_setup_electron.py")
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    npm = npm_command()
+    desktop = not (os.environ.get("ELECTRON_SKIP_BINARY_DOWNLOAD") == "1"
+                   or os.environ.get("CODESPACES") == "true"
+                   or (sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))))
+
+    def dependencies(folder, *, electron=False):
+        directory = BASE_DIR / folder
+        if electron:
+            return helper.setup_dependencies(directory, npm, folder, run_command,
+                                             update=False, desktop=desktop,
+                                             info=print_info, warning=print_warning, error=print_error)
+        return run_command([npm, "install", "--include=dev", "--no-fund", "--no-audit"], cwd=directory)
+
+    def build(folder, script="build"):
+        return run_command([npm, "run", script], cwd=BASE_DIR / folder)
+
+    # 項目ごとに失敗場所を残し、その後の配置を止める。
+    steps = [
+        ("Diag: 依存", lambda: dependencies("backend_diag", electron=True)),
+        ("Diag UI: 依存", lambda: dependencies("backend_diag/ui")),
+        ("Diag UI: ビルド", lambda: build("backend_diag/ui")),
+        ("Diag: ランチャー", lambda: _load_folder_module("backend_diag").setup(desktop=False)),
+        ("Web: 依存", lambda: dependencies("frontend_web")),
+        ("Web: ビルド", lambda: build("frontend_web")),
+        ("Avatar: 依存", lambda: dependencies("frontend_avatar", electron=True)),
+        ("Avatar: ビルド", lambda: build("frontend_avatar")),
+        ("Avatar: ランチャー", lambda: _load_folder_module("frontend_avatar").install_standalone_launcher()),
+        ("IDE共通UI: 依存", lambda: dependencies("frontend_ide")),
+        ("Code / Live: 依存", lambda: dependencies("frontend_ide/host", electron=True)),
+        # hostの既存compile/packageは共通Vueのビルドも行うため、二重ビルドしない。
+        ("Code / Live / IDE: ビルド・配置", lambda: _load_folder_module("frontend_ide/host").setup_assets(npm)),
+        ("IDEビューア: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
+        ("IDE: ランチャー", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
+        ("Term: ランチャー", lambda: _load_folder_module("frontend_ide/aidiy_term").setup()),
+        ("Discord: 依存", lambda: dependencies("frontend_discord", electron=True)),
+        ("Discord: ビルド", lambda: build("frontend_discord", "build:panel")),
+        ("Discord: ランチャー", lambda: _load_folder_module("frontend_discord").install_launcher(BASE_DIR / "frontend_discord")),
+    ]
+    for label, action in steps:
+        print_info(label)
+        try:
+            # install_launcherは成功時にNoneを返す既存APIもある。
+            if action() is not False:
+                continue
+        except (OSError, RuntimeError, ValueError, ImportError, subprocess.SubprocessError) as exc:
+            print_error(f"{label}: {exc}")
+        return [label]
+    return []
+
+
+# ============================================================
 # メイン
 # ============================================================
 def main():
@@ -726,12 +798,20 @@ def main():
     print_info("  8. コマンド(hermes)")
     print_info("  9. IDE群(Term / Code / Live / IDE)")
     print_info(" 10. フロントエンド(Discord、任意)")
+    print_info("git pull 後の軽量更新は r=Node.js系の再配置 を選択してください。")
     print()
 
     choices = collect_setup_choices()
     if choices is None:
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
+
+    if choices.get("node_refresh"):
+        errors = setup_node_refresh()
+        print_setup_summary(errors)
+        if errors:
+            sys.exit(1)
+        return
 
     print_header("一括実行開始")
     continue_on_error = choices["continue_on_error"]

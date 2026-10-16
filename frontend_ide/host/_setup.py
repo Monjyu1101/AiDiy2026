@@ -349,8 +349,6 @@ def setup(choices: dict | None = None) -> bool:
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
         return False
 
-    vscode_cli = find_vscode_cli()
-
     if not setup_dependencies(
         FRONTEND_VSCODE_DIR, npm_path, label, run_command,
         info=print_info, warning=print_warning, error=print_error,
@@ -360,6 +358,13 @@ def setup(choices: dict | None = None) -> bool:
     vue_setup = FRONTEND_VSCODE_DIR.parent.parent / 'frontend_ide' / '_setup.py'
     if not run_command([sys.executable, '-c', "import runpy; raise SystemExit(0 if runpy.run_path(" + repr(str(vue_setup)) + ")[\"prepare\"]() else 1)"], cwd=FRONTEND_VSCODE_DIR):
         return False
+    return setup_assets(npm_path, choices=choices)
+
+
+def setup_assets(npm_path: str, *, choices=None) -> bool:
+    """導入済み依存から共通UI・Code/Live拡張を必ず再生成し、既存配置処理を使う。"""
+    label = "IDE群(Term / Code / Live / IDE)"
+    vscode_cli = find_vscode_cli()
     if vscode_cli is None:
         print_warning("vscode CLI が見つからないため、単独画面だけをセットアップします。")
         if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):

@@ -184,22 +184,25 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
         return False
 
 
-def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print) -> bool:
+def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True) -> bool:
     """npm での重複取得を避け、依存導入後に Electron を一度だけ準備する。"""
     env = {**os.environ, "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"}
     recovery_needed = False
-    for action in ("install", "update"):
-        if not run_command([npm, action], cwd=frontend_dir, env=env):
+    # pull後の再配置では導入済み依存を残して同期し、範囲内最新版への更新は行わない。
+    flags = [] if update else ["--include=dev", "--no-fund", "--no-audit"]
+    for action in (("install", "update") if update else ("install",)):
+        command = [npm, action, *flags]
+        if not run_command(command, cwd=frontend_dir, env=env):
             warning(f"{label}: npm {action} を --ignore-scripts で再試行します。")
             recovery_needed = True
-            if not run_command([npm, action, "--ignore-scripts"], cwd=frontend_dir, env=env):
+            if not run_command([*command, "--ignore-scripts"], cwd=frontend_dir, env=env):
                 return False
-    if not prepare_electron_binary(frontend_dir, label, info=info, error=error):
+    if desktop and not prepare_electron_binary(frontend_dir, label, info=info, error=error):
         return False
     if recovery_needed:
         if not run_command([npm, "rebuild"], cwd=frontend_dir, env=env):
             return False
-        if not electron_binary_ready(frontend_dir):
+        if desktop and not electron_binary_ready(frontend_dir):
             error(f"{label}: Electron バイナリを確認できません。")
             return False
     return True
