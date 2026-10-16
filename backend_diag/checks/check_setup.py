@@ -116,6 +116,7 @@ class RootIntegrationTests(unittest.TestCase):
             for _ in range(2):self.assertTrue(module.start_service('バックエンド(tools)',{}, {},None))
         self.assertEqual(events,['diag','tools','diag','tools'])
 
+<<<<<<< Updated upstream
     def test_tools_headers_follow_completed_diagnosis_before_start_and_wait(self):
         from types import SimpleNamespace
         for initial in (True,False):
@@ -158,6 +159,10 @@ class RootIntegrationTests(unittest.TestCase):
 
     def test_headless_failure_stops_startup_and_cleans_started_processes(self):
         from types import SimpleNamespace
+=======
+    def test_headless_failure_stops_startup_and_cleans_started_processes(self):
+        from types import SimpleNamespace
+>>>>>>> Stashed changes
         from unittest.mock import Mock
         for error in (RuntimeError('failed'),OSError('failed')):
             with self.subTest(error=type(error)):

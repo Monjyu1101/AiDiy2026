@@ -16,7 +16,11 @@ export function oauthModelFallback(result) {
   if (result?.id !== 'openai_oauth' || !(result.状態 === 'NG' || (result.状態 === 'OK' && !result.モデル?.length && !result.モデル詳細?.length))) return result;
   const models = Object.keys(COPILOT_FALLBACK_MODELS).filter(id => id.startsWith('gpt-'));
   const warning = '一覧取得失敗のため Copilot 既定の OpenAI 4モデルを仮補完しました。認証・生成可否は未検証です。';
+<<<<<<< Updated upstream
   return {...result, 状態:'PASS', 認証確認:false,
+=======
+  return {...result, 状態:'NG', 認証確認:false,
+>>>>>>> Stashed changes
     説明:result.状態 === 'OK' ? 'OAuth の取得モデル一覧が空でした。' : result.説明,
     モデル:models, モデル詳細:models.map(model_id => ({model_id,作成日:null,トークン数:null,モダリティ:null})),
     補完:OAUTH_FALLBACK_SOURCE, 一覧範囲:OAUTH_FALLBACK_SOURCE,
