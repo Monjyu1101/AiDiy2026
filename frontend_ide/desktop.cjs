@@ -37,6 +37,8 @@ const nativePreviewActions=createNativePreviewActions({records:windows,trustedEv
 let quitting=false;
 const {panelBounds,createPanelWindows}=require('./デスクトップ/panel-windows.cjs');
 const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting});
+const {createCodeDrag}=require('./デスクトップ/code-drag.cjs');
+const codeDrag=createCodeDrag({trustedEvent,screen});
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
  if(window.isMinimized())window.restore();window.show();window.focus();
@@ -199,8 +201,12 @@ app.whenReady().then(async()=>{
   if(type==='live')record.pending.set(type,opening);
   try{return await opening;}finally{if(record.pending.get(type)===opening)record.pending.delete(type);}
  });
- ipcMain.handle('development:prepare-explorer',(event,rect)=>panelWindows.prepare(event,rect));
+ ipcMain.handle('development:code-move-begin',event=>codeDrag.begin(event));
+ ipcMain.handle('development:code-move',(event,token)=>codeDrag.move(event,token));
+ ipcMain.handle('development:code-move-end',(event,token)=>codeDrag.end(event,token));
+ ipcMain.handle('development:prepare-explorer',(event,rect,kind)=>panelWindows.prepare(event,rect,kind));
  ipcMain.handle('development:show-explorer',(event,name,reduced)=>panelWindows.show(event,name,reduced));
+ ipcMain.handle('development:resize-routes',(event,name,height)=>panelWindows.resizeRoutes(event,name,height));
  // ピン留め: IDEのプレビューを、同じIDEサーバーのファイルAPIを使う独立ウィンドウ（IDEの子ウィンドウ）で開く。
  // 同じファイルは既存の窓を前面へ出す。利用終了・セッション切り替えでは他の子ウィンドウと一緒に閉じる。
  ipcMain.handle('development:open-viewer',async(event,path,anchor)=>{

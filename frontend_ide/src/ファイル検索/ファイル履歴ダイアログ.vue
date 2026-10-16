@@ -6,16 +6,17 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import {ref,computed,onMounted,onBeforeUnmount,nextTick} from 'vue';
 import {loadMonaco,monacoLanguage} from '../ファイル閲覧/コード表示.js';
-const props=defineProps({file:Object,root:String});
-const emit=defineEmits(['close']);
+import {createViewerActivity} from '../ファイル閲覧/閲覧待機.js';
+const props=defineProps({file:Object,root:String,embedded:Boolean,pinned:Boolean,pinBusy:Boolean});
+const emit=defineEmits(['close','pin','activity']);
 const dialog=ref(),host=ref(),versions=ref([]),selected=ref(''),loading=ref(true),error=ref(''),comparison=ref(),truncated=ref(false),changes=ref(null);
 const chosen=computed(()=>versions.value.find(v=>v.id===selected.value));
-let editor,models=[],subscription,scrollSubscriptions=[],controller,revision=0,closed=false,idleTimer;
-const IDLE_TIMEOUT=300_000;
-function resetIdleTimer(){if(closed)return;clearTimeout(idleTimer);idleTimer=setTimeout(close,IDLE_TIMEOUT);}
-function onPointerMove(event){if(event.buttons)resetIdleTimer();}
+let editor,models=[],subscription,scrollSubscriptions=[],controller,revision=0,closed=false;
+const userActivity=createViewerActivity(()=>emit('activity'));
+const activity=event=>userActivity.handle(event);
+const onPointerMove=activity;
 function disposeEditor(){subscription?.dispose();subscription=null;for(const item of scrollSubscriptions)item.dispose();scrollSubscriptions=[];editor?.dispose();editor=null;for(const model of models)model.dispose();models=[];}
-function close(){if(closed)return;closed=true;clearTimeout(idleTimer);controller?.abort();dialog.value?.close();emit('close');}
+function close(){if(closed)return;closed=true;controller?.abort();dialog.value?.close?.();emit('close');}
 async function request(params,signal){
   const response=await fetch('/api/file-history?'+new URLSearchParams({path:props.file.path,...params}),{cache:'no-store',signal});
   const value=await response.json();if(!response.ok)throw Error(value.error||'更新履歴を読み込めません。');return value;
@@ -39,7 +40,7 @@ async function loadComparison(){
     subscription=editor.onDidUpdateDiff(()=>{changes.value=editor.getLineChanges()?.length??null;});
     editor.setModel({original:models[0],modified:models[1]});
     // Monaco は独自スクロールのため、左右エディターの位置変更も操作として受け取る。
-    scrollSubscriptions=[editor.getOriginalEditor(),editor.getModifiedEditor()].map(view=>view.onDidScrollChange(event=>{if(event.scrollTopChanged||event.scrollLeftChanged)resetIdleTimer();}));
+    scrollSubscriptions=[editor.getOriginalEditor(),editor.getModifiedEditor()].map(view=>view.onDidScrollChange(event=>{if(event.scrollTopChanged||event.scrollLeftChanged)userActivity.scroll();}));
   }catch(e){if(!closed&&run===revision&&e.name!=='AbortError')error.value=e.message;}
   finally{if(!closed&&run===revision)loading.value=false;}
 }
@@ -54,13 +55,13 @@ async function refresh(){
   finally{if(!closed&&run===revision)loading.value=false;}
 }
 const when=value=>new Date(value).toLocaleString('ja-JP');
-onMounted(()=>{dialog.value.showModal();resetIdleTimer();void refresh();});
-onBeforeUnmount(()=>{closed=true;clearTimeout(idleTimer);revision++;controller?.abort();disposeEditor();dialog.value?.close();});
+onMounted(()=>{if(props.embedded)dialog.value.focus({preventScroll:true});else dialog.value.showModal();void refresh();});
+onBeforeUnmount(()=>{userActivity.dispose();closed=true;revision++;controller?.abort();disposeEditor();dialog.value?.close?.();});
 </script>
 <template>
-  <Teleport to="body">
-    <dialog ref="dialog" class="file-history-dialog" aria-labelledby="file-history-title" @keydown.stop @keydown.capture="resetIdleTimer" @pointerdown.capture="resetIdleTimer" @pointermove.capture="onPointerMove" @click.capture="resetIdleTimer" @wheel.capture.passive="resetIdleTimer" @scroll.capture.passive="resetIdleTimer" @change.capture="resetIdleTimer" @cancel.prevent="close">
-      <header><h2 id="file-history-title">更新履歴</h2><span :title="root">{{ file.path }}</span><button aria-label="更新履歴を閉じる" @click="close">×</button></header>
+  <Teleport to="body" :disabled="embedded">
+    <component :is="embedded?'section':'dialog'" ref="dialog" class="file-history-dialog" :class="{'history-embedded':embedded}" role="dialog" tabindex="-1" @keydown.esc.prevent="close" aria-labelledby="file-history-title" @keydown.stop @keydown.capture="activity" @pointerdown.capture="activity" @pointermove.capture="onPointerMove" @click.capture="activity" @wheel.capture.passive="activity" @touchstart.capture.passive="activity" @touchmove.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @cancel.prevent="close">
+      <header><h2 id="file-history-title">更新履歴</h2><span :title="root">{{ file.path }}</span><button v-if="embedded&&!pinned" class="viewer-pin" :disabled="pinBusy" title="ピン留め（別ウィンドウで開く）" aria-label="ソース比較をピン留め" @click="emit('pin')">📌</button><button aria-label="更新履歴を閉じる" @click="close">×</button></header>
       <div class="file-history-toolbar">
         <label>旧版 <select v-model="selected" :disabled="!versions.length" aria-label="比較するバックアップ" @change="loadComparison"><option v-for="version in versions" :key="version.id" :value="version.id">{{ version.label }}{{ version.fullBackup?'（全件）':'' }} · {{ version.backupPath.split('/backup/')[0]===version.backupPath?'ルート':version.backupPath.split('/backup/')[0] }}</option></select></label>
         <button :disabled="loading" @click="refresh">再読み込み</button>
@@ -75,6 +76,6 @@ onBeforeUnmount(()=>{closed=true;clearTimeout(idleTimer);revision++;controller?.
         <p v-else-if="error" class="file-history-message error" role="alert">{{ error }} <button @click="refresh">再試行</button></p>
         <p v-else-if="!versions.length" class="file-history-message">このファイルのバックアップはありません。</p>
       </div>
-    </dialog>
+    </component>
   </Teleport>
 </template>

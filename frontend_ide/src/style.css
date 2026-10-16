@@ -188,3 +188,50 @@
 .panel-opening,.viewer-popup,.route-file-list{animation:panel-fade-in 260ms ease-out}
 @keyframes panel-fade-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.panel-opening,.viewer-popup,.route-file-list{animation:none}}
+
+/* 今日/本日最新は文字色・選択色と独立した縁だけを重ねる。 */
+.folder-page-entry{position:relative}
+.folder-page-entry.updated-today::after{content:"";position:absolute;inset:1px;pointer-events:none;border:1px solid #b8965530;box-shadow:inset 0 0 12px #e0b86818}
+.folder-page-entry.updated-latest::after{border-color:#b58d4866;box-shadow:inset 0 0 16px #e0b86830}
+.file-update-pulse{position:absolute;inset:0;pointer-events:none;background:#e9bb6540;opacity:0;animation:file-update-pulse 1200ms ease-in-out both}
+@keyframes file-update-pulse{0%,100%{opacity:0}50%{opacity:.7}}
+@media(prefers-reduced-motion:reduce){.file-update-pulse{display:none;animation:none}}
+
+/* 同じ閲覧DOMを移すため、比較と通常表示は同じ別窓内に収める。 */
+.viewer-session{display:contents}
+.viewer-session.detached{display:flex;flex-direction:column;height:100%;min-height:0}
+.history-embedded{position:fixed;inset:20px 16px;margin:auto;z-index:60;display:flex;flex-direction:column;box-shadow:0 18px 60px #000b}
+.viewer-window .history-embedded{position:relative;inset:auto;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;box-shadow:none;flex:1;min-height:0}
+.viewer-window .viewer-pinned{width:100%;box-sizing:border-box}
+.viewer-pin-error{position:fixed;right:24px;bottom:62px;z-index:65;padding:8px;background:#080c1a}
+.viewer-window .viewer-pin-error{position:relative;inset:auto;margin:0}
+
+/* Code のElectron窓だけで、長押し成立後に表示する移動目印。 */
+.code-window-moving,.code-window-moving *{user-select:none!important;cursor:move!important}
+.code-move-indicator{position:fixed;z-index:2147483647;width:64px;height:64px;transform:translate(-50%,-50%);pointer-events:none;color:#d8ecff;filter:drop-shadow(0 1px 3px #091424);font:22px/1 sans-serif}
+.code-move-pair{position:absolute;inset:0;animation:code-move-orbit var(--move-duration) linear infinite;animation-delay:var(--move-phase)}
+.code-move-pair i{position:absolute;left:24px;top:22px;font-style:normal;transform:rotate(var(--arrow-angle)) translateY(-23px)}
+.code-move-direction{display:none;position:absolute;left:24px;top:20px;transform:rotate(var(--move-angle))}
+.code-move-indicator.moving .code-move-pair{display:none}
+.code-move-indicator.moving .code-move-direction{display:block}
+@keyframes code-move-orbit{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.code-move-pair{animation:none}}
+
+/* 軌跡は同じ3分類・ツリーを小さな別窓へ移す。閉じても記録は残す。 */
+.route-restore-toggle{position:fixed;left:64px;top:var(--workspace-top);z-index:41;background:#080c1af2;padding:7px 10px;font-size:11px}
+
+/* 展開の高さ・本文を見せるタイミングは本体と別窓で共通。 */
+.explorer-routes{display:block;padding:0}
+.route-controls{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding:5px}
+.route-controls .route-choice{grid-column:span 2;min-width:0;padding:5px 2px;white-space:nowrap;font-size:10px}
+.route-controls>button{min-width:0;padding:4px 2px}
+.route-drag-handle{display:none}
+.route-reveal{overflow:hidden;transition:height 260ms cubic-bezier(.2,.75,.25,1)}
+.explorer-routes .route-file-list{position:relative;inset:auto;width:100%;height:100%;box-sizing:border-box;overflow:auto;margin:0;box-shadow:none;animation:none}
+.route-window-document,.route-window-document body,.development-app.routes-window{background:transparent!important;overflow:hidden}
+.development-app.routes-window{height:100vh}
+.routes-window .explorer-routes,.routes-window .explorer-routes.explorer-collapsed{position:relative;inset:auto;width:100%;height:auto;box-sizing:border-box;background:#080c1a;box-shadow:none}
+.native-route-window .route-drag-handle{display:block;grid-column:1/-1;height:6px;-webkit-app-region:drag;cursor:move;background:#334058;border-radius:3px;width:36px;justify-self:center}
+.native-route-window .route-controls button{-webkit-app-region:no-drag}
+.routes-window .route-tree{min-width:0}
+@media(prefers-reduced-motion:reduce){.route-reveal{transition:none}}

@@ -46,7 +46,7 @@ test('HTML/SVG: フォルダ基準の相対参照・ディレクトリURL・配�
       assert.match(body,/aidiy-ide-viewer-activity/,'iframe内の操作を通知する');
       assert.equal(Number(response.headers.get('content-length')),Buffer.byteLength(body));
       assert.match(body,/assets\/picture.png|\.\.\/shared\/picture.png/,'相対参照を維持');
-      if(url===svg)assert.match(body,/<script><!\[CDATA\[.*\]\]><\/script><\/svg>$/);
+      if(url===svg)assert.match(body,/<script><!\[CDATA\[.*\]\]><\/script><\/svg>$/s);
     }
     assert.equal(await (await fetch(svg)).text(),files['pages/drawing.svg'],'画像など通常取得は元のまま');
     const directory=await preview.url('pages/sub');

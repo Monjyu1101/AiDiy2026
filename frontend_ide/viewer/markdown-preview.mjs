@@ -3,6 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import {viewerActivityScript} from '../src/ファイル閲覧/閲覧待機.js';
 import MarkdownIt from 'markdown-it';
 
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: false });
@@ -38,6 +39,6 @@ export function renderMarkdownDocument(text, title, nonce) {
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0d1117;color:#e6edf3;font:14px/1.7 Arial,"Yu Gothic UI",sans-serif;overflow-wrap:anywhere}article{max-width:980px;margin:auto;padding:18px 20px}h1,h2,h3,h4,h5,h6{line-height:1.35;margin:1.4em 0 .65em}h1{font-size:1.8em}h2{font-size:1.45em}h1,h2{padding-bottom:.3em;border-bottom:1px solid #30363d}article>:first-child{margin-top:0}p,ul,ol,pre,table,blockquote{margin:0 0 16px}li>p{margin-bottom:6px}a{color:#79c0ff;text-underline-offset:3px}a:hover{text-decoration-thickness:2px}a:focus-visible{outline:2px solid #79c0ff}blockquote{border-left:4px solid #3d444d;padding:0 14px;color:#a8b3c2}pre{padding:12px;background:#161b22;border:1px solid #30363d;overflow:auto;white-space:pre}code{font:12px/1.6 Consolas,monospace;background:#21262d;padding:2px 4px}pre code{padding:0;background:transparent}table{display:block;max-width:100%;overflow:auto;border-collapse:collapse}th,td{padding:6px 10px;border:1px solid #3d444d}th{background:#161b22}tr:nth-child(even){background:#161b2280}img{max-width:100%;height:auto}hr{height:1px;border:0;background:#30363d;margin:22px 0}
 </style></head><body><article class="markdown-body">${body}</article><script nonce="${escaped(nonce)}">
-(()=>{const notify=()=>parent.postMessage({type:'aidiy-ide-viewer-activity'},'*');for(const type of ['pointerdown','click','keydown','wheel','scroll','change'])addEventListener(type,notify,{capture:true,passive:true});addEventListener('pointermove',e=>{if(e.buttons)notify();},{capture:true,passive:true});})();
+${viewerActivityScript}
 </script></body></html>`;
 }

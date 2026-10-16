@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
+import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as fileReference from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
 const require=createRequire(import.meta.url),vue=require('vue');
@@ -23,7 +24,7 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
     module,window,AbortController,AbortSignal,URLSearchParams,Response,Date,
     localStorage:{getItem:()=>null,setItem(){}},getComputedStyle:()=>({getPropertyValue:()=>10}),
     setTimeout:()=>0,clearTimeout(){},
-    require:id=>id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../ファイル閲覧/ファイル操作.js'?fileActions:modules[id]||{},
+    require:id=>id==='../ファイル閲覧/閲覧待機.js'?viewerIdle:id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../ファイル閲覧/ファイル操作.js'?fileActions:modules[id]||{},
     ...globals,
   });
   const scope=vue.effectScope(),reactive=vue.reactive(props);
@@ -57,6 +58,22 @@ test('ビューア: ファイル切替より前に始めた遅い読込は新し
   const fixture=viewerFixture({file:{name:'old',path:'old'},fetcher:async url=>url.endsWith('old')?new Promise(resolve=>{release=resolve;}):new Response(JSON.stringify({kind:'text',text:'new',size:3}))});
   try{fixture.props.file={name:'new',path:'new'};await flush();assert.equal(fixture.state.data.value.text,'new');release(new Response(JSON.stringify({kind:'text',text:'old',size:3})));await flush();assert.equal(fixture.state.data.value.text,'new');}
   finally{fixture.dispose();}
+});
+test('ビューア操作: Monaco/iframeの同期scrollを無視し、文書差替え・破棄で購読解除',async t=>{
+ let now=0;t.mock.method(Date,'now',()=>now);
+ const fixture=viewerFixture();
+ const document=()=>{const listeners=new Map();return{listeners,addEventListener:(type,fn)=>listeners.set(type,fn),removeEventListener:type=>listeners.delete(type)};};
+ const first=document(),second=document();
+ try{
+  await fixture.mount();const state=fixture.state;
+  state.userActivity.scroll();assert.equal(fixture.emitted.length,0);
+  state.activity({type:'wheel',isTrusted:true});state.userActivity.scroll();assert.equal(fixture.emitted.length,2);
+  now=2000;state.userActivity.scroll();assert.equal(fixture.emitted.length,2);
+  state.bindFrame({target:{tagName:'IFRAME',contentDocument:first}});assert.equal(first.listeners.size,9);
+  first.listeners.get('scroll')({type:'scroll',isTrusted:true});assert.equal(fixture.emitted.length,2);
+  first.listeners.get('touchmove')({type:'touchmove',isTrusted:true});first.listeners.get('scroll')({type:'scroll',isTrusted:true});assert.equal(fixture.emitted.length,4);
+  state.bindFrame({target:{tagName:'IFRAME',contentDocument:second}});assert.equal(first.listeners.size,0);assert.equal(second.listeners.size,9);
+ }finally{fixture.dispose();assert.equal(first.listeners.size,0);assert.equal(second.listeners.size,0);}
 });
 function dialogFixture(targets){
   const inserted=[],launched=[];let current=targets,result={ok:true};

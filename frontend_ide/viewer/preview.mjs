@@ -13,6 +13,7 @@
 // - 最初のプレビュー要求で起動し、IDE のサーバーを閉じる時に一緒に止める。ファイルは一切書き出さない（ゴミを残さない）。
 // - URL には起動ごとの合言葉（推測できない token）を入れ、IDE が渡した URL からだけ読めるようにする。
 // - 鍵・設定・依存物・隠しファイルは配らない。HTML にはサンドボックスの CSP を付ける（iframe 側でも sandbox を付ける）。
+import {viewerActivityScript} from '../src/ファイル閲覧/閲覧待機.js';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { open, realpath, stat, readFile } from 'node:fs/promises';
@@ -150,7 +151,7 @@ export function createPreview(root, isActive = () => true, { env = process.env }
     // iframe内の操作だけを親へ通知する。文書の内容や入力値は送らず、隔離オリジンを維持する。
     if (document && ['iframe','document'].includes(req.headers['sec-fetch-dest']) && size <= 1024*1024) {
       const source = (await readFile(file.full)).toString('latin1');
-      const activity = `(()=>{const notify=()=>parent.postMessage({type:'aidiy-ide-viewer-activity'},'*');for(const type of ['pointerdown','click','keydown','wheel','scroll','change'])addEventListener(type,notify,{capture:true,passive:true});addEventListener('pointermove',e=>{if(e.buttons)notify();},{capture:true,passive:true});})();`;
+      const activity = viewerActivityScript;
       const content = type === 'image/svg+xml'
         ? source.replace(/<\/svg\s*>\s*$/i,`<script><![CDATA[${activity}]]></script></svg>`)
         : source + `<script>${activity}</script>`;

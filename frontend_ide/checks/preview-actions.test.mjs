@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
+import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as actions from '../src/ファイル閲覧/ファイル操作.js';
 
@@ -54,7 +55,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     localStorage: { getItem: () => null },
     fetch: async () => ({ ok: true, json: async () => ({ kind: 'text', text: '本文は消えません', size: 24 }) }),
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
-    require: id => id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
+    require: id => id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
       : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
         : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });

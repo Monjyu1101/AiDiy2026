@@ -5,6 +5,7 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { createRouteExpansion } from '../ファイル閲覧/軌跡パネル展開.js';
 import { createPanelWindow, fadePanel } from '../ファイル閲覧/パネル別窓.js';
 import AISearchPanel from '../ファイル検索/AI検索パネル.vue';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
@@ -15,12 +16,23 @@ import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発�
 const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached']);
 const panel=ref(),detached=ref(false),pinError=ref('');
-let panelWindow;
+let panelWindow,routeWindow;
+const routeDetached=ref(false),routeClosed=ref(false);
+function pinRoutes(){
+  routeClosed.value=false;
+  routeWindow??=createPanelWindow({element:()=>routeElement.value,title:'軌跡',kind:'panel-routes',className:'routes-window',
+    rectangle:()=>({getBoundingClientRect:()=>{const rect=routeElement.value.getBoundingClientRect();return{left:rect.left,top:rect.top,width:360,height:routeMeasure().bar};}}),
+    changed:value=>{routeDetached.value=value;},closed:()=>{routeClosed.value=true;routeListOpen.value=false;},
+    moved:()=>syncRouteDocument(),report:message=>{pinError.value=message;}});
+  return routeWindow.pin();
+}
+function openRoutes(){if(!routeWindow?.focus())routeClosed.value=false;}
+function closeRoutes(){if(routeDetached.value)routeWindow.dismiss();else{routeClosed.value=true;routeListOpen.value=false;}}
 function pinExplorer(){
-  panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},report:message=>{pinError.value=message;}});
+  panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},closed:()=>emit('update:open',false),report:message=>{pinError.value=message;}});
   return panelWindow.pin();
 }
-function closeExplorer(){if(detached.value)panelWindow.restore();else emit('update:open',false);}
+function closeExplorer(){if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
 watch([()=>props.open,detached],async([open,away])=>{if(open&&!away){await nextTick();fadePanel(panel.value);}});
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
@@ -70,6 +82,33 @@ const searchRoute=shallowRef([]),searchKind=ref(''),searchTitle=ref('');
 const aiFiles=computed(()=>new Map((aiResult.value?.files||[]).map(file=>[file.path,file.reason])));
 const aiRoute=computed(()=>aiResult.value?.route||[]);
 const routeListOpen=ref(false),routeElement=ref(),viewRoute=ref([]);
+const routeMotionState=shallowRef({height:0,visible:false,phase:'closed'});
+let routeDocumentCleanup=()=>{},routeDisposed=false;
+function routeMeasure(){
+  const node=routeElement.value,view=node?.ownerDocument?.defaultView||window;
+  const bar=Math.ceil(node?.querySelector?.('.route-controls')?.getBoundingClientRect?.().height||64)+2;
+  const away=!!node&&node.ownerDocument!==document;
+  const top=node?.getBoundingClientRect?.().top||0,available=Math.max(0,(view.innerHeight||768)-top-bar-(away?0:8));
+  return{bar,target:away?300:Math.min(300,available),available};
+}
+const routeMotion=createRouteExpansion({measure:routeMeasure,
+  schedule:(fn,delay)=>{const view=routeElement.value?.ownerDocument?.defaultView||window;return{view,id:view.setTimeout?view.setTimeout(fn,delay):setTimeout(fn,delay)};},
+  cancel:timer=>{if(timer)try{timer.view.clearTimeout?timer.view.clearTimeout(timer.id):clearTimeout(timer.id);}catch{}},
+  reserve:async height=>{const node=routeElement.value;if(routeDetached.value&&node?.ownerDocument!==document)return routeWindow.reserveRouteHeight(height);return{height:routeMeasure().bar+routeMeasure().available};},
+  reduced:()=>!!(routeElement.value?.ownerDocument?.defaultView||window).matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  changed:value=>{routeMotionState.value=value;},report:message=>{pinError.value=message;}});
+function syncRouteDocument(){
+  routeDocumentCleanup();if(routeDisposed)return;
+  const view=routeElement.value?.ownerDocument?.defaultView||window,media=view.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const resize=()=>routeMotion.refresh(),motion=()=>void routeMotion.set(routeListOpen.value&&!routeClosed.value,{restart:true});
+  view.addEventListener('resize',resize);media?.addEventListener?.('change',motion);
+  routeDocumentCleanup=()=>{view.removeEventListener('resize',resize);media?.removeEventListener?.('change',motion);};
+  void routeMotion.set(routeListOpen.value&&!routeClosed.value,{restart:true});
+}
+watch([routeListOpen,routeClosed],async()=>{await nextTick();if(!routeDisposed)void routeMotion.set(routeListOpen.value&&!routeClosed.value);});
+onMounted(syncRouteDocument);
+
+watch([routeClosed,routeDetached],async([closed,away])=>{if(!closed&&!away){await nextTick();fadePanel(routeElement.value);}});
 const viewedFiles=computed(()=>props.viewHistory.filter(entry=>entry?.type==='file'&&typeof entry.path==='string'));
 function syncViewRoute(){viewRoute.value=[...new Set(viewedFiles.value.map(entry=>entry.path))];}
 watch(viewedFiles,entries=>{
@@ -86,7 +125,7 @@ const routeRows=computed(()=>routeTreeRows(routeMode.value==='view'?viewTreeReco
 function beginSearch(kind){routeMode.value=kind==='ai'?'ai':'search';}
 function acceptSearch(paths,kind,title){searchRoute.value=[...new Set(paths)];searchKind.value=kind;searchTitle.value=title;}
 const viewedAt=path=>{const at=viewedFiles.value.find(entry=>entry.path===path)?.at;return Number.isFinite(at)?new Date(at).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';};
-function closeRouteList(event){if(!routeElement.value?.contains(event.target))routeListOpen.value=false;}
+function closeRouteList(event){if(!routeDetached.value&&!routeElement.value?.contains(event.target))routeListOpen.value=false;}
 onMounted(()=>document.addEventListener('pointerdown',closeRouteList));
 const hiddenAI=computed(()=>{
   const paths=new Set();
@@ -246,16 +285,22 @@ watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();in
 watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,matches,aiResult],emitMarks,{immediate:true});
-onBeforeUnmount(()=>{panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
+onBeforeUnmount(()=>{routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
 defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false});
 </script>
 <template>
   <div class="explorer-component" data-component="FileExplorer">
     <button v-if="!open||detached" class="explorer-toggle" aria-label="エクスプローラーを開く" :aria-expanded="false" @click="detached?panelWindow.focus():emit('update:open',true)">☰</button>
-    <div ref="routeElement" class="explorer-routes" :class="{'explorer-collapsed':!open||detached}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
+    <button v-if="routeClosed||routeDetached" class="route-restore-toggle" aria-label="軌跡バーを開く" @click="openRoutes">軌跡</button>
+    <div ref="routeElement" v-show="!routeClosed" class="explorer-routes" :class="{'explorer-collapsed':!open||detached}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
+      <div class="route-controls"><span class="route-drag-handle" aria-hidden="true"></span>
       <button v-for="[value,label] in [['view','閲覧軌跡'],['search','検索軌跡'],['ai','AiDiy検索軌跡']]" :key="value" class="route-choice" :aria-pressed="routeMode===value" :aria-expanded="routeMode===value&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute(value)">{{ label }}</button>
       <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':routeMode==='search'?'前の検索ファイル':'前の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':routeMode==='search'?'次の検索ファイル':'次の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===routeSteps.length-1" @click="stepRoute(1)">&gt;</button>
-      <section v-if="routeListOpen" id="route-file-list" class="route-file-list" :aria-label="routeLabel+'のファイル一覧'">
+      <button :aria-label="routeDetached?'軌跡バーを本体へ戻す':'軌跡バーをピン留め'" :title="routeDetached?'本体へ戻す':'小さな別ウィンドウで開く'" @click="routeDetached?routeWindow.restore():pinRoutes()">{{ routeDetached?'↙':'📌' }}</button>
+      <button aria-label="軌跡バーを閉じる" @click="closeRoutes">×</button>
+      </div>
+      <div class="route-reveal" :data-phase="routeMotionState.phase" :style="{height:routeMotionState.height+'px'}">
+      <section v-if="routeListOpen" :inert="!routeMotionState.visible" :aria-hidden="!routeMotionState.visible" :style="{visibility:routeMotionState.visible?'visible':'hidden'}" id="route-file-list" class="route-file-list" :aria-label="routeLabel+'のファイル一覧'">
         <p v-if="routeMode==='ai'&&aiResult" class="ai-route-title" :title="aiResult.query">{{ aiResult.title || aiResult.query }}</p>
         <p v-if="routeMode==='search'&&searchTitle" :title="searchTitle">{{ searchTitle }}</p>
         <p class="route-list-heading"><span>{{ routeLabel }} · {{ routePaths.length }}件</span><button v-if="routeMode==='view'" type="button" class="route-list-clear" aria-label="閲覧軌跡をクリア" :disabled="!viewedFiles.length" @click="emit('clear-view-history')">クリア</button></p>
@@ -263,6 +308,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false});
         <ul v-if="routeRows.length" class="route-tree" :aria-label="routeLabel+'のツリー'"><li v-for="row in routeRows" :key="row.key" :data-route-point="row.point" :data-route-parent="row.parent" :data-route-depth="row.depth" :class="{'route-reference':row.reference}" :style="{'--route-depth':row.depth}"><button :data-route-path="row.path" :aria-current="row.path===selected?'true':undefined" :title="routeMode==='ai'?aiFiles.get(row.path):row.path" @click="selectRoutePoint(row)"><span>{{ row.path || '/' }}{{ row.origin?'（出発元）':row.type==='dir'?'（到着）':'' }}{{ row.reference?' ↩（参照）':'' }}</span><small v-if="routeMode==='ai'">{{ aiFiles.get(row.path) }}</small><small v-else-if="routeMode==='view'">{{ viewedAt(row.path) }}</small></button></li></ul>
         <p v-else>{{ routeMode==='ai'?'AiDiy検索の結果を選ぶと、ここに表示します。':routeMode==='search'?'検索軌跡はありません。検索結果があると、ここに表示します。':'ファイルを開くと、ここに表示します。' }}</p>
       </section>
+      </div>
     </div>
     <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
       <header><button aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer">☰</button><span>エクスプローラー</span><button :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>

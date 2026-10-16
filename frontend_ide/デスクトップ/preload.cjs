@@ -5,7 +5,11 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
- prepareExplorer:rect=>ipcRenderer.invoke('development:prepare-explorer',rect),
+ beginCodeMove:()=>ipcRenderer.invoke('development:code-move-begin'),
+ moveCode:token=>ipcRenderer.invoke('development:code-move',token),
+ endCodeMove:token=>ipcRenderer.invoke('development:code-move-end',token),
+ prepareExplorer:(rect,kind)=>ipcRenderer.invoke('development:prepare-explorer',rect,kind),
+ resizeRoutes:(name,height)=>ipcRenderer.invoke('development:resize-routes',name,height),
  showExplorer:(name,reduced)=>ipcRenderer.invoke('development:show-explorer',name,reduced),
  onViewerClosed:callback=>{const listener=(_event,path)=>callback(path);ipcRenderer.on('development:viewer-closed',listener);return()=>ipcRenderer.removeListener('development:viewer-closed',listener);},
  title:()=>ipcRenderer.invoke('development:window','title'),

@@ -5,16 +5,16 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, nextTick, inject } from 'vue';
-import { panelRect, popupFeatures } from '../ファイル閲覧/パネル別窓.js';
 import { createFolderMonitor } from '../ファイル閲覧/フォルダ監視.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import SpaceCanvas from '../開発スペース/宇宙キャンバス.vue';
 import FolderPages from '../ファイル閲覧/フォルダページ.vue';
 import FileExplorer from '../ファイル閲覧/ファイル一覧.vue';
-import FileViewer from '../ファイル閲覧/ファイルビューア.vue';
+import ViewerSession from '../ファイル閲覧/閲覧セッション.vue';
 const props=defineProps({startedAt:Number,viewMode:{type:String,default:'3d'}});
 const pagesReady=ref(props.viewMode==='2d');
 watch(()=>props.viewMode,mode=>{if(mode==='2d')pagesReady.value=true;});
+const updateMarks=shallowRef({levels:{},flashes:{}});
 const scan=shallowRef(),selected=shallowRef(),trail=ref([]),focus=shallowRef();
 const unlistedParent=computed(()=>{const file=selected.value,parent=file?.path.split('/').slice(0,-1).join('/');return file?.unlisted&&parent!==trail.value.join('/')?parent:undefined;});
 const explorer=ref(),explorerDetached=ref(false);
@@ -27,33 +27,18 @@ const route=shallowRef({mode:'view',paths:[]});
 const viewHistory=shallowRef([]);
 const viewVoyages=shallowRef({});
 watch(route,value=>engine?.route(value));
-// ピン留め: 今のプレビューを閉じ、同じファイルを宇宙パネルの外の独立ウィンドウで開く（複数ファイルを並べて見る）。
-// Electron 版は IDE の子ウィンドウ（利用終了・セッション切り替えで一緒に閉じる）、Web 版はブラウザの別ウィンドウ。
-const pinError=ref('');
-const registerPinnedViewer=inject('registerPinnedViewer',null);
-let pinning=false,viewerCloseListener;
-const viewerWindows=new Map();
-function closeViewerWindows(){for(const entry of viewerWindows.values()){clearInterval(entry.timer);entry.window?.close();}viewerWindows.clear();}
-function restoreViewer(file){if(!selected.value)void engine?.goTo(file);}
-async function pin(file){
-  if(pinning)return;pinning=true;pinError.value='';
-  try{
-    const rect=panelRect(root.value?.querySelector('.viewer-popup'));
-    if(window.aidiyWindow?.openViewer){const result=await window.aidiyWindow.openViewer(file.path,rect);if(!result?.ok)throw Error(result?.error||'ビューアを開けません。');viewerWindows.set(file.path,{file});}
-    else {
-      let entry=viewerWindows.get(file.path);
-      if(entry?.window&&!entry.window.closed)entry.window.focus();
-      else {
-        const opened=window.open('/#viewer='+encodeURIComponent(file.path),`aidiy-viewer-${file.path}`,popupFeatures(rect));
-        if(!opened)throw Error('ポップアップがブロックされました。');
-        registerPinnedViewer?.(opened);
-        entry={file,window:opened,timer:setInterval(()=>{if(opened.closed){clearInterval(entry.timer);viewerWindows.delete(file.path);restoreViewer(file);}},250)};
-        viewerWindows.set(file.path,entry);
-      }
-    }
-    engine.clear();
-  }catch(e){pinError.value=e.message;}finally{pinning=false;}
-}
+// 同じ閲覧セッションを別Documentへ移す。比較・表示モード・スクロールを再生成しない。
+const viewerSessions=ref([]),viewerRefs=new Map();
+watch(selected,file=>{
+  viewerSessions.value=viewerSessions.value.filter(entry=>entry.detached||entry.file.path===file?.path);
+  if(!file)return;
+  const entry=viewerSessions.value.find(entry=>entry.file.path===file.path);
+  if(entry?.detached){viewerRefs.get(file.path)?.focus();engine?.clear();return;}
+  if(entry){if(entry.keepView)entry.keepView=false;else entry.file=file;}else viewerSessions.value.push({file,detached:false});
+});
+function detachedViewer(entry){entry.detached=true;if(selected.value?.path===entry.file.path)engine?.clear();}
+function closeViewer(entry){viewerSessions.value=viewerSessions.value.filter(item=>item!==entry);viewerRefs.delete(entry.file.path);if(selected.value?.path===entry.file.path)engine?.clear();}
+function recoverViewer(entry){if(!entry.detached)return;entry.detached=false;entry.keepView=true;void engine?.goTo(entry.file);}
 // 最終更新ファイルの表示: 起動直後の最終更新と、その後の新しい最終更新を宇宙へ予約する。
 // 宇宙は自動探索 ON・オープニング後・追いかけてよい状態になってから、そのファイルまでワープして開く。
 function onLatest(file){engine?.requestFollow(file.files.map(item=>item.path));}
@@ -61,11 +46,6 @@ function onFreshness(){void engine?.refresh(undefined,{fresh:false});}
 // フィルター（左下、既定 ON）: 宇宙とエクスプローラーを AiDiy のバックアップ対象だけにする。
 const filter=ref(true);
 watch(filter,on=>engine?.setFilter(on));
-// ピン留めしていないビューアは最後の操作から5分で閉じ、自動探索が ON なら彗星軌道へ戻る。
-// 別ファイルの表示と、ビューア内のスクロール・ボタン操作で期限を数え直す。
-const PREVIEW_LIFETIME=300_000;let previewTimer;
-function armPreviewTimer(){clearTimeout(previewTimer);if(!selected.value)return;previewTimer=setTimeout(()=>{if(!selected.value||!engine)return;engine.clear();if(autoSpin.value)engine.setAutoSpin(true);},PREVIEW_LIFETIME);}
-watch(()=>selected.value?.path,armPreviewTimer);
 let engine, folderMonitor;
 const monitorMessage = ref('');
 function syncFolderMonitor() {
@@ -82,7 +62,7 @@ async function selectExplorer(entry){
   try{await engine?.goTo(entry);}
   finally{if(explorerNavigation.value===entry)explorerNavigation.value=null;}
 }
-function change(value){if('scan'in value){scan.value=value.scan;selected.value=value.selected;trail.value=value.trail;focus.value=value.focus;viewHistory.value=value.journal||[];viewVoyages.value=value.voyages||{};}if('autoSpin'in value)autoSpin.value=value.autoSpin;if('driving'in value)driving.value=value.driving;if('orbitPhase'in value)orbitPhase.value=value.orbitPhase;loading.value=value.loading;if('error'in value)error.value=value.error||'';}
+function change(value){if('scan'in value){scan.value=value.scan;selected.value=value.selected;trail.value=value.trail;focus.value=value.focus;updateMarks.value=value.updateMarks||{levels:{},flashes:{}};viewHistory.value=value.journal||[];viewVoyages.value=value.voyages||{};}if('autoSpin'in value)autoSpin.value=value.autoSpin;if('driving'in value)driving.value=value.driving;if('orbitPhase'in value)orbitPhase.value=value.orbitPhase;loading.value=value.loading;if('error'in value)error.value=value.error||'';}
 function layout({preview:plannedPreview}={}){
   const element=root.value;
   const preview=plannedPreview??!!element?.querySelector('.viewer-popup');
@@ -124,12 +104,10 @@ let pageLayoutObserver;
 function pageLayout(){
   const element=root.value;if(!element)return;
   const top=parseFloat(getComputedStyle(element).getPropertyValue('--workspace-top'))||78;
-  const bottom=element.querySelector('.explorer-routes')?.getBoundingClientRect().bottom||top;
+  const bottom=element.querySelector('.route-controls')?.getBoundingClientRect().bottom||top;
   element.style.setProperty('--folder-page-top',`${Math.max(top+48,bottom+8)}px`);
 }
 onMounted(async()=>{
-  window.addEventListener('pagehide',closeViewerWindows);
-  viewerCloseListener=window.aidiyWindow?.onViewerClosed?.(path=>{const entry=viewerWindows.get(path);viewerWindows.delete(path);if(entry)restoreViewer(entry.file);});
   folderMonitor = createFolderMonitor({ apply: (context,result) => engine?.applyFolderSnapshot(context,result) ?? false, report: message => { monitorMessage.value=message; } });
   document.addEventListener('visibilitychange',syncFolderMonitor);syncFolderMonitor();
   window.addEventListener('message',documentKey);window.addEventListener('keydown',pageKey);window.addEventListener('resize',pageLayout);
@@ -137,12 +115,12 @@ onMounted(async()=>{
   const routes=root.value?.querySelector('.explorer-routes');
   if(routes&&typeof ResizeObserver!=='undefined'){pageLayoutObserver=new ResizeObserver(pageLayout);pageLayoutObserver.observe(routes);}
 });
-onBeforeUnmount(()=>{viewerCloseListener?.();window.removeEventListener('pagehide',closeViewerWindows);closeViewerWindows();folderMonitor?.close();document.removeEventListener('visibilitychange',syncFolderMonitor);clearTimeout(previewTimer);pageLayoutObserver?.disconnect();if(window.aidiyIDE===engine)delete window.aidiyIDE;window.removeEventListener('message',documentKey);window.removeEventListener('keydown',pageKey);window.removeEventListener('resize',pageLayout);});
+onBeforeUnmount(()=>{viewerRefs.clear();folderMonitor?.close();document.removeEventListener('visibilitychange',syncFolderMonitor);pageLayoutObserver?.disconnect();if(window.aidiyIDE===engine)delete window.aidiyIDE;window.removeEventListener('message',documentKey);window.removeEventListener('keydown',pageKey);window.removeEventListener('resize',pageLayout);});
 </script>
 <template>
   <section ref="root" class="space-view" :class="{'explorer-open':open&&!explorerDetached,viewing:!!selected,'mode-2d':viewMode==='2d'}" data-component="SpaceView">
     <SpaceCanvas :mode="viewMode" :layout="layout" @ready="ready" @change="change" @toggle-explorer="toggleExplorer" />
-    <FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'" :tree="scan.tree" :current="trail.join('/')" :selected="selected?.path" :unlisted-parent="unlistedParent" :monitor-message="monitorMessage" :reload="()=>engine?.refresh()" :marks="marks" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @activity="engine?.interact()" @clear="engine?.clear()" @refresh="engine?.refresh()" @toggle-explorer="toggleExplorer" />
+    <FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'" :tree="scan.tree" :current="trail.join('/')" :selected="selected?.path" :unlisted-parent="unlistedParent" :monitor-message="monitorMessage" :reload="()=>engine?.refresh()" :marks="marks" :update-marks="updateMarks" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @activity="engine?.interact()" @clear="engine?.clear()" @refresh="engine?.refresh()" @toggle-explorer="toggleExplorer" />
     <div class="space-flight-controls">
       <button v-show="viewMode==='3d'" class="space-motion-toggle space-fast-warp-toggle" role="switch" aria-label="高速ワープ" :aria-checked="fastWarp" title="別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動" @click="fastWarp=!fastWarp"><span>高速ワープ</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ fastWarp?'ON':'OFF' }}</span></button>
       <div class="space-auto-explore">
@@ -153,8 +131,7 @@ onBeforeUnmount(()=>{viewerCloseListener?.();window.removeEventListener('pagehid
     <FileExplorer ref="explorer" @detached="value=>explorerDetached=value" v-model:open="open" :view-history="viewHistory" :view-voyages="viewVoyages" :tree="scan?.tree" :scan="scan" :root="scan?.root" :selected="explorerNavigation ? (explorerNavigation.type==='file' ? explorerNavigation.path : undefined) : selected?.path" :current="explorerNavigation ? (explorerNavigation.type==='dir' ? explorerNavigation.path : explorerNavigation.path.split('/').slice(0,-1).join('/')) : trail.join('/')" :navigating="!!explorerNavigation" :started-at="startedAt" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @clear="engine?.clear()" @marks="value=>marks=value" @latest="onLatest" @freshness="onFreshness" @route="value=>route=value" @clear-view-history="engine?.clearViewHistory()" :filter="filter" />
     <p v-if="scan?.truncated&&!open" class="space-scan-warning" role="status">{{ scanWarning(scan) }}</p>
     <button class="space-filter-toggle" role="switch" aria-label="フィルター" :aria-checked="filter" title="AiDiy のバックアップ対象のファイルだけを表示" @click="filter=!filter"><span>フィルター</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ filter?'ON':'OFF' }}</span></button>
-    <FileViewer v-if="selected" :file="selected" :root="scan?.root" @activity="armPreviewTimer" @close="engine.clear()" @pin="pin" />
-    <p v-if="pinError" class="app-error" role="alert">{{ pinError }}</p>
+    <ViewerSession v-for="entry in viewerSessions" :key="entry.file.path" :ref="value=>value?viewerRefs.set(entry.file.path,value):viewerRefs.delete(entry.file.path)" :file="entry.file" :root="scan?.root" :auto-spin="autoSpin" @close="closeViewer(entry)" @detached="detachedViewer(entry)" @recover="recoverViewer(entry)" />
     <nav v-if="scan" v-show="viewMode==='3d'" class="space-breadcrumb"><button @click="engine.ascend(0)">{{ scan.tree.n }}</button><template v-for="(name,i) in trail" :key="i"><span>›</span><button @click="engine.ascend(i+1)">{{ name }}</button></template></nav>
     <div v-if="!scan&&(loading||error)" class="space-loading">{{ error||'読み込み中…' }}</div>
     <div v-else-if="error" class="space-notice" role="status"><span>{{ error }}</span><button aria-label="案内を閉じる" @click="error=''">×</button></div>

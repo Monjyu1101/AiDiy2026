@@ -293,8 +293,9 @@ test('Code: 実サーバーのHTTP拒否とSSE会話切替を、生成物を書�
   serverModule._compile(compiled.outputFiles[0].text, join(folder, 'server.cjs'));
   const app = await serverModule.exports.単独起動(folder, 'http://127.0.0.1:0', { offline: true, lockedMode: true, provider: 'aidiy_hermes', model: 'same' },
     join(folder, 'model.json'), () => assert.fail('AI実行は禁止'), join(folder, 'histories'));
-  const reader = (await fetch(app.url + 'events')).body.getReader();
-  t.after(async () => { await reader.cancel(); await app.close(); rmSync(folder, { recursive: true, force: true }); });
+  let reader;
+  t.after(async () => { await reader?.cancel(); await app.close(); rmSync(folder, { recursive: true, force: true }); });
+  reader = (await fetch(app.url + 'events')).body.getReader();
   let buffer = ''; const decoder = new TextDecoder();
   async function nextState(predicate = () => true) {
     while (true) {

@@ -5,6 +5,7 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, reactive, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { installCodeMove } from './コード/長押し窓移動.js';
 import CodePanel from './コード/コードパネル.vue';
 import TermPanel from './ターミナル/ターミナルパネル.vue';
 import LivePanel from './ライブ/ライブパネル.vue';
@@ -32,6 +33,7 @@ const viewerPath=config.kind==='ide'&&location.hash.startsWith('#viewer=')?decod
 const state=ref({active:false}),base=reactive({term:'',code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
 const statusError=ref('');
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false),viewMode=ref('3d');
+let stopCodeMove=()=>{};
 const desktop=!!window.aidiyWindow;let timer,disposed=false,revision=0,polling=false,session='';
 const lifetime=new AbortController();
 async function status(){
@@ -130,12 +132,13 @@ const draftLink={
   async launch(sender,kind,request){const linked=verifyPinned(sender,request);await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return launchDraftTarget(kind,{...request,sessionKey:linked.sessionKey});},
 };
 onMounted(async()=>{
+  stopCodeMove=installCodeMove({kind:config.kind,host:config.host});
   if(config.kind==='ide'&&!desktop&&!viewerPath)window.aidiyDraftLink=draftLink;
   if(config.host||viewerPath)return;
   if(config.kind==='ide'){await status();if(!disposed)timer=setInterval(status,10000);}
   else if(!base[config.kind])await openPanel(config.kind);
 });
-onBeforeUnmount(()=>{disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
+onBeforeUnmount(()=>{stopCodeMove();disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
 </script>
 <template>
   <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertFileDraft" :launch-target="launchDraftTarget" @close="draftRequest=null" />

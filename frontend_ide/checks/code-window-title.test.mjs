@@ -9,6 +9,8 @@ import {readFileSync} from 'node:fs';
 import {EventEmitter} from 'node:events';
 import vm from 'node:vm';
 import routerModule from '../デスクトップ/draft-router.cjs';
+import panelModule from '../デスクトップ/panel-windows.cjs';
+import codeDragModule from '../デスクトップ/code-drag.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 async function desktopFixture(){
@@ -36,6 +38,7 @@ async function desktopFixture(){
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
   './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
   './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
+  './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:{env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:'ide'},cwd:()=>'/project',on(){}},__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});

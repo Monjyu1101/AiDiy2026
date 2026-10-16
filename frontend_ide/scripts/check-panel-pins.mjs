@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-// オフラインfixtureでExplorer/Viewerの別窓化・状態保持・X復元・Webフェードを実画面検証する。
+// オフラインfixtureでExplorer/Viewerの別窓化・状態保持・X折畳み/閲覧終了・Webフェードを実画面検証する。
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {existsSync,mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
@@ -86,7 +86,7 @@ try{
  assert.equal(await main.evaluate(`explorerNode.ownerDocument!==document&&treeNode===explorerNode.querySelector('[role=tree]')`),true);
  await explorer.evaluate(`document.querySelector('[data-path="src/file-01.txt"]').click()`);
  await main.until(`document.querySelector('.viewer-popup header')?.textContent.includes('file-01.txt')`);
- // grepを別窓で実行し、条件・結果・選択をリロードとX復元の後も保持する。
+ // grepを別窓で実行し、条件・結果・選択をリロードとX折畳み後の再表示も保持する。
  await explorer.evaluate(`document.querySelector('input[value="grep"]').click()`);
  await explorer.evaluate(`const input=document.querySelector('input[type=search]');input.value='Searchable';input.dispatchEvent(new Event('input',{bubbles:true}));Array.from(document.querySelectorAll('form button')).find(b=>b.textContent==='検索').click()`);
  await explorer.until(`document.querySelector('form [role=status]')?.textContent.includes('80ファイル一致')`);
@@ -95,7 +95,8 @@ try{
  await explorer.send('Page.reload');
  await explorer.until(`!!document.querySelector('.grep-results')`);
  assert.deepEqual(await explorer.evaluate(`({query:document.querySelector('input[type=search]').value,status:document.querySelector('form [role=status]').textContent,count:document.querySelectorAll('.grep-results li').length})`),grepBefore);
- await explorer.send('Page.close');await main.until(`!!document.querySelector('[aria-label="エクスプローラーをピン留め"]')&&getComputedStyle(document.querySelector('.explorer-panel')).visibility==='visible'`);
+ await explorer.send('Page.close');await main.until(`getComputedStyle(explorerNode).display==='none'`);
+ await main.evaluate(`document.querySelector('.explorer-toggle').click()`);await main.until(`getComputedStyle(explorerNode).display!=='none'`);
  assert.equal(await main.evaluate(`explorerNode===document.querySelector('.explorer-panel')&&treeNode===document.querySelector('[role=tree]')`),true);
  assert.equal(await main.evaluate(`getComputedStyle(explorerNode).backdropFilter`),'blur(4px)');
  await main.capture('explorer-restored');
@@ -103,30 +104,31 @@ try{
  await main.until(`!document.querySelector('.explorer-panel')`);
  explorerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Explorer');const again=await connect(explorerTarget);
  await again.until(`!!document.querySelector('.grep-results')`);
- // AI検索の未送信入力も同じインスタンス。APIを呼ばず再pin・X復元で保持する。
+ // AI検索の未送信入力も同じインスタンス。APIを呼ばず再pin・本体への復帰で保持する。
  await again.evaluate(`document.querySelector('input[value="ai"]').click()`);
  await again.evaluate(`const input=document.querySelector('.ai-search-panel textarea');input.value='未送信の調査内容';input.dispatchEvent(new Event('input',{bubbles:true}))`);
  await again.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  assert.equal(await again.evaluate(`getComputedStyle(document.querySelector('main')).animationDuration`),'0.26s');
  await again.evaluate(`document.querySelector('[aria-label="本体へ戻す"]').click()`);await main.until(`!!document.querySelector('.explorer-panel')`);
  assert.equal(await main.evaluate(`document.querySelector('.ai-search-panel textarea').value`),'未送信の調査内容');
- // Viewerも同じ位置指定で起動し、閉鎖後は元の選択を復元して再pinできる。
+ // Viewerも同じ位置指定で起動し、閉鎖後は閲覧を破棄し、明示的に再open/pinできる。
  await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);
  await main.until(`!document.querySelector('.viewer-popup')`);
- let viewerTarget=(await targets()).find(t=>t.url.includes('#viewer='));assert.ok(viewerTarget);const viewer=await connect(viewerTarget);
+ let viewerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Viewer');assert.ok(viewerTarget);const viewer=await connect(viewerTarget);
  await viewer.until(`!!document.querySelector('.viewer-pinned .viewer-meta')`);
  const features=await main.evaluate('pinFeatures');assert.match(features,/left=-?\d+,top=-?\d+,width=\d+,height=\d+/);
  assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationName`),'none');
  await viewer.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationDuration`),'0.26s');
  await viewer.capture('viewer-pinned');await viewer.send('Page.close');
- await main.until(`document.querySelector('.viewer-popup header')?.textContent.includes('file-01.txt')`);
+ await main.until(`!document.querySelector('.viewer-session')`);
+ await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/file-01.txt'})`);await main.until(`!!document.querySelector('[aria-label="ピン留め"]')`);
  await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);await main.until(`!document.querySelector('.viewer-popup')`);
  await main.evaluate(`document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);await main.until(`!document.querySelector('.explorer-panel')`);
  await main.send('Page.close');await sleep(700);
- assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer'||t.url.includes('#viewer=')).length,0);
+ assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer'||t.title==='AiDiy IDE / Viewer').length,0);
  assert.deepEqual(errors,[]);
- const result={before:{...before,html:undefined},detached:{...detached,html:undefined},grepBefore,features,shots,errors,operations:['popup失敗時本体保持','連打で1窓','同じDOM・スクロール保持','別窓選択とIDE連動','grep条件/結果の引継ぎ','子再読込','X復元・すりガラス復元','3D再pin','AI未送信入力保持','画面内・軌跡・Web別窓260msフェード/reduced-motion','通常の更新で演出連発なし','Viewer X復元・再pin','親終了で子終了']};
+ const result={before:{...before,html:undefined},detached:{...detached,html:undefined},grepBefore,features,shots,errors,operations:['popup失敗時本体保持','連打で1窓','同じDOM・スクロール保持','別窓選択とIDE連動','grep条件/結果の引継ぎ','子再読込','X折畳み・再表示','3D再pin','AI未送信入力保持','画面内・軌跡・Web別窓260msフェード/reduced-motion','通常の更新で演出連発なし','Viewer X終了・再open/pin','親終了で子終了']};
  writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{
  for(const ws of sockets)ws.close();chrome.kill();await app.close();await sleep(300);

@@ -8,8 +8,9 @@ import { ref, computed, inject, watch, nextTick, onMounted, onBeforeUnmount } fr
 import { loadMonaco, monacoLanguage } from '../ファイル閲覧/コード表示.js';
 import { searchReference, fileDraftReference } from '../ファイル閲覧/ファイル参照.js';
 import { copyBrowserText, fullFilePath } from '../ファイル閲覧/ファイル操作.js';
+import {createViewerActivity} from '../ファイル閲覧/閲覧待機.js';
 // pinned: 右側のプレビューではなく、ピン留めした独立ウィンドウの中身として全面に表示する
-const props=defineProps({file:Object,root:String,pinned:Boolean});const emit=defineEmits(['close','pin','activity']);
+const props=defineProps({file:Object,root:String,pinned:Boolean,pinBusy:Boolean});const emit=defineEmits(['close','pin','activity']);
 const openAnalysis=inject('openFileAnalysis',null),openDraft=inject('openFileDraft',null);
 const openHistory=inject('openFileHistory',null),hasHistory=ref(false),historyError=ref('');
 const data=ref(),error=ref(''),host=ref(),fallback=ref(false),copied=ref(false),stamp=ref(Date.now()),reloading=ref(false);
@@ -18,12 +19,16 @@ let actionRevision=0,copyTimer;
 let controller,editor,scrollSubscription,revision=0,frameCleanup;
 const viewer=ref(),fallbackHost=ref(),fallbackMatch=ref(),jump=ref(null),jumpNote=ref('');
 const fallbackParts=computed(()=>{const text=data.value?.text||'',at=jump.value;return at&&!at.stale?{before:text.slice(0,at.start),match:text.slice(at.start,at.start+at.length),after:text.slice(at.start+at.length)}:null;});
-function activity(){emit('activity');}
-function pointerActivity(event){if(event.buttons)activity();}
+const userActivity=createViewerActivity(()=>emit('activity'));
+const activity=event=>userActivity.handle(event);
+const pointerActivity=activity;
 // Officeなど同一オリジンの文書内イベントも拾う。別オリジンのプレビューは通知を受け取る。
-function bindFrame(event){if(event.target.tagName!=='IFRAME')return;frameCleanup?.();frameCleanup=null;try{const doc=event.target.contentDocument;if(!doc)return;const types=['pointerdown','click','keydown','wheel','scroll','change'];for(const type of types)doc.addEventListener(type,activity,{capture:true,passive:true});doc.addEventListener('pointermove',pointerActivity,true);frameCleanup=()=>{for(const type of types)doc.removeEventListener(type,activity,true);doc.removeEventListener('pointermove',pointerActivity,true);};}catch{}}
-function frameActivity(event){const frame=viewer.value?.querySelector('iframe');if(frame&&event.source===frame.contentWindow&&event.data?.type==='aidiy-ide-viewer-activity')activity();}
-onMounted(()=>window.addEventListener('message',frameActivity));
+function bindFrame(event){if(event.target.tagName!=='IFRAME')return;frameCleanup?.();frameCleanup=null;try{const doc=event.target.contentDocument;if(!doc)return;const types=['pointerdown','click','keydown','wheel','touchstart','touchmove','scroll','change'];for(const type of types)doc.addEventListener(type,activity,{capture:true,passive:true});doc.addEventListener('pointermove',pointerActivity,true);frameCleanup=()=>{for(const type of types)doc.removeEventListener(type,activity,true);doc.removeEventListener('pointermove',pointerActivity,true);};}catch{}}
+function frameActivity(event){const frame=viewer.value?.querySelector('iframe');if(frame&&event.source===frame.contentWindow&&event.data?.type==='aidiy-ide-viewer-activity'&&event.data.userInput===true)emit('activity');}
+let activityWindow;
+function bindActivityWindow(){activityWindow?.removeEventListener('message',frameActivity);activityWindow=viewer.value?.ownerDocument?.defaultView||window;activityWindow.addEventListener('message',frameActivity);}
+onMounted(bindActivityWindow);
+watch(()=>props.pinned,()=>nextTick(bindActivityWindow));
 // HTML / SVG / Vue / Markdown はコードとプレビューを切り替える。文書は別オリジンで表示する。
 // 最後に選んだ方を種類ごとに覚える（SVG / Markdownは表示が既定）。
 const previewKind=computed(()=>/\.(md|markdown)$/i.test(props.file?.name||'')?'markdown':/\.html?$/i.test(props.file?.name||'')?'html':/\.svg$/i.test(props.file?.name||'')?'svg':/\.vue$/i.test(props.file?.name||'')?'vue':'');
@@ -68,7 +73,7 @@ async function load(file){
       if(!monaco){fallback.value=true;await revealMatch(file,run);return;}
       const fontSize=parseFloat(getComputedStyle(host.value).getPropertyValue('--file-font-size'))||10;
       editor=monaco.editor.create(host.value,{value:value.text,language:monacoLanguage(file.name),theme:'aidiy-space',readOnly:true,domReadOnly:true,automaticLayout:true,fontSize,wordWrap:'on',minimap:{enabled:!props.pinned},scrollBeyondLastLine:false,contextmenu:false});
-      scrollSubscription=editor.onDidScrollChange(event=>{if(event.scrollTopChanged||event.scrollLeftChanged)activity();});
+      scrollSubscription=editor.onDidScrollChange(event=>{if(event.scrollTopChanged||event.scrollLeftChanged)userActivity.scroll();});
       await revealMatch(file,run);
     }
   }catch(e){if(run===revision)error.value=e.message;}
@@ -104,7 +109,7 @@ function selectedReference(){
   if(mode.value==='view'||data.value?.kind!=='text')return null;
   const selection=editor?.getSelection();
   if(selection&&!selection.isEmpty())return{text:editor.getModel().getValueInRange(selection),startLine:selection.startLineNumber,endLine:selection.endLineNumber};
-  const dom=window.getSelection?.();
+  const dom=(viewer.value?.ownerDocument?.defaultView||window).getSelection?.();
   if(!fallbackHost.value||!dom?.rangeCount||dom.isCollapsed)return null;
   const range=dom.getRangeAt(0);
   if(!fallbackHost.value.contains(range.startContainer)||!fallbackHost.value.contains(range.endContainer))return null;
@@ -117,16 +122,17 @@ function handoff(){
   try{const selection=selectedReference();openDraft({projectPath:props.root,path:props.file.path,name:props.file.name,text:fileDraftReference(props.file,selection),selection:!!selection});}
   catch(e){error.value=e.message;}
 }
-onBeforeUnmount(()=>{resetActions();revision++;previewRun++;controller?.abort();disposeEditor();frameCleanup?.();window.removeEventListener('message',frameActivity);});
+onBeforeUnmount(()=>{userActivity.dispose();resetActions();revision++;previewRun++;controller?.abort();disposeEditor();frameCleanup?.();activityWindow?.removeEventListener('message',frameActivity);activityWindow=null;});
+defineExpose({moved:bindActivityWindow});
 </script>
 <template>
-  <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
+  <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @touchstart.capture.passive="activity" @touchmove.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
       <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">{{ previewKind==='markdown'?'プレビュー':'表示' }}</button></span>
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
       <!-- 右端は ⟳ 📌 × の順。右端へ寄せる役目は先頭の ⟳ が持つ -->
-      <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" title="ピン留め（別ウィンドウで開く）" aria-label="ピン留め" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')">×</button></header>
+      <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" :disabled="pinBusy" title="ピン留め（別ウィンドウで開く）" aria-label="ピン留め" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')">×</button></header>
     <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><div class="viewer-path-actions"><button class="viewer-copy" :disabled="!!actionBusy" aria-live="polite" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button><button v-if="canOpenFile" class="viewer-open-app" :disabled="!!actionBusy" @click="openFile">{{ actionBusy==='open'?'開いています…':'アプリで開く' }}</button></div></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
     <p v-if="actionError" class="error viewer-action-error" role="status">{{ actionError }}</p>
     <p v-if="file.unlisted" class="input-hint">現在の一覧に含まれない検索結果を直接表示しています。</p>

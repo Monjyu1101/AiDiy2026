@@ -6,12 +6,12 @@
 
 // ブラウザーのscreen座標はCSS px。devicePixelRatio（OS拡大率を含む）は重ねて掛けない。
 // 外枠/表示領域の差からツールバーを見積もる。配置要求の最終判断はブラウザーが行う。
-export function popupFeatures(rect, win = window) {
+export function popupFeatures(rect, win = window, compact = false) {
   const screen = win.screen, margin = 8;
   const left = Number.isFinite(screen.availLeft) ? screen.availLeft : win.screenX;
   const top = Number.isFinite(screen.availTop) ? screen.availTop : win.screenY;
   const width = Math.min(Math.max(300, Math.round(rect.width)), Math.max(100, screen.availWidth - margin * 2));
-  const height = Math.min(Math.max(320, Math.round(rect.height)), Math.max(100, screen.availHeight - 80));
+  const height = Math.min(Math.max(compact ? 40 : 320, Math.round(rect.height)), Math.max(100, screen.availHeight - 80));
   const border = Math.max(0, (win.outerWidth - win.innerWidth) / 2);
   const chrome = Math.max(0, win.outerHeight - win.innerHeight - border);
   const x = Math.round(Math.max(left + margin, Math.min(win.screenX + border + rect.left, left + screen.availWidth - width - margin)));
@@ -35,7 +35,7 @@ export function fadePanel(element) {
 
 // Vueのインスタンス・DOM・イベントをそのまま移動する。検索ジョブを再発行せず、
 // AI入力、検索結果、展開、選択、スクロールも同じ実体を保持する。
-export function createPanelWindow({ element, changed, report, win = window }) {
+export function createPanelWindow({ element, changed, report, closed = () => {}, recovered = () => {}, moved = () => {}, title = 'Explorer', kind = 'explorer', className = 'explorer-window', rectangle = element, win = window }) {
   let child, parent, anchor, timer, opening = false, disposed = false, detached = false, documentSeen;
   let cleanupDocument = () => {};
   const restoreScroll = () => {
@@ -46,7 +46,7 @@ export function createPanelWindow({ element, changed, report, win = window }) {
     clearInterval(timer); timer = undefined; cleanupDocument(); documentSeen = undefined;
     const node = element();
     if (node && parent) {
-      const scroll = restoreScroll(); parent.insertBefore(node, anchor?.parentNode === parent ? anchor : null); scroll();
+      const scroll = restoreScroll(); parent.insertBefore(node, anchor?.parentNode === parent ? anchor : null); scroll(); moved();
     }
     anchor?.remove(); anchor = parent = undefined;
     const closing = child; child = undefined;
@@ -58,7 +58,7 @@ export function createPanelWindow({ element, changed, report, win = window }) {
     if (doc === documentSeen || opening) return;
     opening = true;
     try {
-      cleanupDocument(); doc.title = 'AiDiy IDE / Explorer';
+      cleanupDocument(); doc.title = 'AiDiy IDE / ' + title;
       const base = doc.createElement('base'); base.href = win.document.baseURI; doc.head.append(base);
       const loads = [...win.document.querySelectorAll('style, link[rel="stylesheet"]')].map(style => {
         const copy = style.cloneNode(true);
@@ -71,18 +71,20 @@ export function createPanelWindow({ element, changed, report, win = window }) {
       try { await Promise.race([Promise.all(loads), new Promise((_, reject) => { timeout = setTimeout(() => reject(Error('別窓の準備がタイムアウトしました。')), 8000); })]); }
       finally { clearTimeout(timeout); }
       if (disposed || child !== target || target.closed || target.document !== doc) return;
-      const host = doc.createElement('main'); host.className = 'development-app explorer-window';
+      const host = doc.createElement('main'); host.className = 'development-app ' + className;
       doc.body.replaceChildren(host);
+      if(kind==='panel-routes'){doc.documentElement.classList.add('route-window-document');if(win.aidiyWindow?.resizeRoutes)doc.documentElement.classList.add('native-route-window');}
       // 元Documentのタイムラインを別窓へ持ち込まない（裏のIDEでは停止し得る）。
       fades.get(element())?.cancel(); fades.delete(element());
       const scroll = restoreScroll(); host.append(element()); scroll();
       documentSeen = doc;
       if (!detached) { detached = true; changed(true); }
       // リロードで旧Documentが消える前にDOMを親へ退避する。次のDocumentに同じ実体を戻す。
-      const leaving = () => { const keepScroll = restoreScroll(); parent.insertBefore(element(), anchor); element().style.visibility = 'hidden'; keepScroll(); };
+      const leaving = () => { if (!parent || !element()) return; const keepScroll = restoreScroll(); parent.insertBefore(element(), anchor); element().style.visibility = 'hidden'; keepScroll(); };
       target.addEventListener('beforeunload', leaving);
       cleanupDocument = () => { target.removeEventListener('beforeunload', leaving); if (element()) element().style.visibility = ''; };
       element().style.visibility = '';
+      moved();
       if (win.aidiyWindow?.showExplorer) {
         const result = await win.aidiyWindow.showExplorer(target.name, win.matchMedia('(prefers-reduced-motion: reduce)').matches);
         if (!result?.ok) throw Error(result?.error || '別窓を表示できません。');
@@ -92,32 +94,44 @@ export function createPanelWindow({ element, changed, report, win = window }) {
   }
   async function pin() {
     if (disposed) return;
-    if (child && !child.closed) { child.focus(); return; }
+    if (child && !child.closed) { child.focus(); return true; }
     if (opening) return;
     report(''); opening = true;
     try {
-      const node = element(), rect = panelRect(node);
+      const node = element(), rect = panelRect(rectangle());
       let name = 'aidiy-explorer-' + win.crypto.randomUUID();
       if (win.aidiyWindow?.prepareExplorer) {
-        const result = await win.aidiyWindow.prepareExplorer(rect);
+        const result = await win.aidiyWindow.prepareExplorer(rect, kind);
         if (!result?.ok) throw Error(result?.error || '別窓を準備できません。');
         name = result.name;
       }
       if (disposed) return;
-      child = win.open('about:blank', name, popupFeatures(rect, win));
+      child = win.open('about:blank', name, popupFeatures(rect, win, kind === 'panel-routes'));
       if (!child) throw Error('ポップアップがブロックされました。');
       parent = node.parentNode; anchor = win.document.createComment('Explorerを戻す位置'); parent.insertBefore(anchor, node);
       opening = false;
       await attach();
       if (!child || child.closed || disposed) { restore(); return; }
       timer = setInterval(() => {
-        if (!child || child.closed) { restore(); return; }
-        void attach().catch(error => { restore(); report(error.message); });
+        if (!child || child.closed) { dismiss(); return; }
+        void attach().catch(error => { restore(); recovered(); report(error.message); });
       }, 250);
-    } catch (error) { restore(); report(error.message); }
+      return true;
+    } catch (error) { restore(); recovered(); report(error.message); return false; }
     finally { opening = false; }
   }
   const end = () => { disposed = true; restore(); win.removeEventListener('pagehide', end); };
+  function dismiss() { restore(); closed(); }
   win.addEventListener('pagehide', end);
-  return { pin, restore, close: end, focus: () => { if (child && !child.closed) { child.focus(); return true; } return false; } };
+  async function reserveRouteHeight(height){
+    const target=child;if(kind!=='panel-routes'||!target||target.closed)return null;
+    if(win.aidiyWindow?.resizeRoutes){const result=await win.aidiyWindow.resizeRoutes(target.name,height);if(!result?.ok)throw Error(result?.error||'軌跡パネルを広げられません。');return result;}
+    // ブラウザーには透明なOS窓や確実なresizeのAPIがない。拒否時は現在の範囲内で表示する。
+    const screen=target.screen,bottom=(screen.availTop||0)+screen.availHeight;
+    const chrome=Math.max(0,target.outerHeight-target.innerHeight),available=Math.max(1,bottom-target.screenY-chrome-8);
+    try{target.resizeTo(target.outerWidth,Math.ceil(Math.min(height,available)+chrome));}catch{}
+    await new Promise(resolve=>setTimeout(resolve,40));
+    return target===child&&!target.closed?{height:target.innerHeight}:null;
+  }
+  return { pin, restore, dismiss, reserveRouteHeight, close: end, focus: () => { if (child && !child.closed) { child.focus(); return true; } return false; } };
 }

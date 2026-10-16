@@ -38,7 +38,7 @@ function fixture(){
  const windows=new Map();let state={active:true,mode:'offline',startedAt:1},animations=0,quitting=false;
  class Window extends EventEmitter{
   constructor(){super();this.webContents=new EventEmitter();Object.assign(this.webContents,{getZoomFactor:()=>1,setWindowOpenHandler:fn=>{this.handler=fn;}});}
-  isDestroyed(){return !!this.dead;}destroy(){this.dead=true;this.emit('closed');}setBounds(value){this.bounds=value;}setAlwaysOnTop(){}getContentBounds(){return{x:100,y:100};}show(){this.shown=true;}focus(){}
+  isDestroyed(){return !!this.dead;}destroy(){this.dead=true;this.emit('closed');}setBounds(value){this.bounds=value;}setAlwaysOnTop(){}getContentBounds(){return this.bounds||{x:100,y:100,width:420,height:360};}getBounds(){return this.getContentBounds();}show(){this.shown=true;}focus(){}
  }
  const owner={window:new Window(),kind:'ide',revision:0},event={owner},key=state=>state.active?`${state.mode}:${state.startedAt}`:'';
  const controller=createPanelWindows({windows,trustedEvent:e=>e.owner,readState:async()=>state,sessionKey:key,screen:{getDisplayMatching:()=>({workArea:{x:0,y:0,width:1920,height:1040}})},BrowserWindow:Window,拡大表示:async()=>{animations++;},isQuitting:()=>quitting});
@@ -69,4 +69,40 @@ test('Explorer: 非IDE・無効位置・セッション終了・古い起動予�
  const request=await f.controller.prepare(f.event,f.rect);f.owner.revision++;
  assert.equal(f.controller.open(f.owner,{url:'about:blank',frameName:request.name}),null);
  f.state({active:false});assert.equal((await f.controller.prepare(f.event,f.rect)).ok,false);
+});
+test('Viewer/比較/軌跡: Explorerと共存し、同じ予約・配置・ズーム・終了境界を使う',async()=>{
+ const f=fixture(),children=[];
+ for(const kind of ['explorer','panel-viewer','panel-viewer','panel-routes']){
+  const request=await f.controller.prepare(f.event,f.rect,kind);assert.equal(request.ok,true);
+  const details={url:'about:blank',frameName:request.name};assert.equal(f.controller.open(f.owner,details).action,'allow');
+  const child=new f.Window();f.controller.created(f.owner,child,details);children.push(child);
+  assert.equal(f.windows.get(child.webContents).kind,kind);
+  assert.equal((await f.controller.show(f.event,request.name,false)).ok,true);
+ }
+ assert.equal(f.windows.size,4);assert.equal(f.animations(),3,'軌跡の展開は共通UIで行い、不透明なnative zoomを使わない');
+ assert.equal((await f.controller.prepare(f.event,f.rect,'explorer')).ok,false);
+ assert.equal((await f.controller.prepare(f.event,f.rect,'untrusted')).ok,false);
+ for(const child of children)child.destroy();assert.equal(f.windows.size,0);
+});
+
+test('軌跡: 透明枠なしの小さいバーから先に領域確保、上端維持・画面下端制限・閉じると縮小',async()=>{
+ const f=fixture(),request=await f.controller.prepare(f.event,{left:16,top:78,width:360,height:68},'panel-routes');
+ const details={url:'about:blank',frameName:request.name},options=f.controller.open(f.owner,details).overrideBrowserWindowOptions;
+ assert.equal(options.height,68);assert.equal(options.frame,false);assert.equal(options.transparent,true);assert.equal(options.backgroundColor,'#00000000');
+ const child=new f.Window();f.controller.created(f.owner,child,details);child.setBounds({x:116,y:900,width:360,height:68});
+ const expanded=f.controller.resizeRoutes(f.event,request.name,368);assert.equal(expanded.ok,true);assert.equal(child.bounds.y,900);assert.equal(child.bounds.height,132);assert.equal(expanded.height,132);
+ f.controller.resizeRoutes(f.event,request.name,68);assert.equal(child.bounds.y,900);assert.equal(child.bounds.height,68);
+ assert.equal(f.controller.resizeRoutes({owner:{kind:'ide'}},request.name,360).ok,false);
+ assert.equal(f.controller.resizeRoutes(f.event,request.name,NaN).ok,false);assert.equal(f.controller.resizeRoutes(f.event,request.name,9000).ok,false);
+ f.owner.revision++;assert.equal(f.controller.resizeRoutes(f.event,request.name,360).ok,false);child.destroy();
+});
+
+test('小さな軌跡パネル: 負座標の実画面内へ収め、DPI倍率を二重適用しない',()=>{
+ const screens=[{x:-1600,y:200,width:1500,height:860},{x:0,y:0,width:1920,height:1040}];
+ for(const zoom of [.8,1,1.5,2]){
+  const owner={window:{getContentBounds:()=>({x:-1500,y:220}),webContents:{getZoomFactor:()=>zoom}}};
+  const result=panelBounds({left:1400,top:800,width:420,height:360},owner,{getDisplayMatching:()=>({workArea:screens[0]})});
+  assert.ok(result.x>=-1600&&result.x+result.width<=-100);assert.ok(result.y>=200&&result.y+result.height<=1060);
+  assert.equal(result.width,420*zoom);assert.equal(result.height,360*zoom);
+ }
 });

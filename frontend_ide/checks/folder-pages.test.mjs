@@ -320,9 +320,11 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.match(app, /class="ide-toolbar-right">\s*<nav[^>]+class="ai-launchers"/);
   assert.match(app, /<SpaceView :key="[^"\n]+" :started-at="state.startedAt" :view-mode="viewMode"/);
   assert.doesNotMatch(app, /<SpaceView[^>]*:key="[^"\n]*viewMode/);
-  assert.equal((view.match(/<FileViewer /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
+  assert.equal((view.match(/<ViewerSession /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
   assert.match(view, /<SpaceCanvas :mode="viewMode"/); assert.match(view, /<FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'"/);
-  assert.match(view, /<FileViewer v-if="selected"/); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
+  assert.match(view, /<ViewerSession v-for="entry in viewerSessions"/);
+  const session = readFileSync(new URL('../src/ファイル閲覧/閲覧セッション.vue', import.meta.url), 'utf8');
+  assert.equal((session.match(/<FileViewer /g) || []).length, 1); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
   assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,800ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,800ms\)/);
   assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:polygon\(/);
   assert.match(css, /@keyframes folder-page-back\{from\{clip-path:polygon\(/);

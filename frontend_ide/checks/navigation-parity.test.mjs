@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { createSpace } from '../src/開発スペース/宇宙描画.js';
 import { createFolderMonitor } from '../src/ファイル閲覧/フォルダ監視.js';
+import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as routeTree from '../src/開発スペース/軌跡ツリー.js';
 import * as routeRecords from '../src/開発スペース/経路記録.js';
 import * as fileDates from '../src/ファイル閲覧/ファイル日時.js';
@@ -19,6 +20,7 @@ import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import * as routeExpansion from '../src/ファイル閲覧/軌跡パネル展開.js';
 import * as panelWindows from '../src/ファイル閲覧/パネル別窓.js';
 import { scanWarning } from '../src/ファイル閲覧/走査警告.js';
 import { fileIcon } from '../src/ファイル閲覧/ファイルアイコン.js';
@@ -93,7 +95,8 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
-    '../ファイル閲覧/パネル別窓.js':panelWindows,
+    '../ファイル閲覧/閲覧待機.js':viewerIdle,
+    '../ファイル閲覧/軌跡パネル展開.js':routeExpansion,'../ファイル閲覧/パネル別窓.js':panelWindows,
     './ファイル日時.js': fileDates,
     '../開発スペース/軌跡ツリー.js':routeTree,'../開発スペース/経路記録.js':routeRecords,
     '../ファイル閲覧/フォルダ監視.js': { createFolderMonitor },
@@ -451,7 +454,7 @@ for(const mode of ['2d','3d'])test(`${mode}実部品の探索枠: 更新候補�
     h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await h.frame();assert.equal(spinning(),true);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),false);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),true);
-    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,mode==='2d'?2:0,'2Dだけ監視と次の深夜更新を予約');assert.equal(h.intervals.size,1);
+    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,mode==='2d'?3:1,'共通の更新目印の深夜予約に加え、2Dだけ監視と日時更新を予約');assert.equal(h.intervals.size,1);
   } finally {h.dispose();}
 });
 

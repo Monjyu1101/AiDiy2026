@@ -19,6 +19,9 @@ import { createAutoOrbit } from '../開発スペース/自動周回.js';
 import { turnToTarget, cameraPosition, orbitAround, interpolateOrbit, interpolateCamera, cockpitLook, framingDistance, WARP_APPROACH_WIDTH, WARP_PEAK_WIDTH } from '../開発スペース/ワープ視点.js';
 import { aiRouteRecords, aiRouteTargets } from '../開発スペース/検索経路.js';
 import { restoreRoute, visitPoint, searchRouteRecords } from '../開発スペース/経路記録.js';
+import { createUpdateMarks, updateFlash, UPDATE_FLASH_MS } from '../ファイル閲覧/更新の目印.js';
+import { nextLocalMidnight } from '../ファイル閲覧/ファイル日時.js';
+import { createElectronOrbits } from './電子の周回.js';
 import { createTextWidthCache } from '../開発スペース/文字幅キャッシュ.js';
 
 export const ORBIT_PATH_SCALE = .9;
@@ -49,6 +52,23 @@ const requestAnimationFrame = callback => {
 const $ = id => elements[id];
 const ctx = canvas.getContext('2d');
 const textWidths = createTextWidthCache(ctx);
+const electronOrbits = createElectronOrbits(document), updateTracker = createUpdateMarks();
+const motionPreference = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+let updateMarks = updateTracker.snapshot(), updateTimer = 0;
+const reducedMotion = () => !!motionPreference?.matches;
+function scheduleUpdateMarks() {
+  clearTimeout(updateTimer); updateTimer = 0;
+  if (disposed || document.hidden || !world) return;
+  const now = Date.now(), expiry = Object.values(updateMarks.flashes).map(flash => flash.at + UPDATE_FLASH_MS);
+  const next = Math.min(nextLocalMidnight(now) + 20, ...expiry);
+  updateTimer = setTimeout(() => { syncUpdateMarks(); notify(); }, Math.max(1, next - now));
+}
+function syncUpdateMarks() {
+  updateMarks = updateTracker.snapshot(Date.now(), !reducedMotion());
+  if (world) electronOrbits.update(world.planets, updateMarks.electrons);
+  scheduleUpdateMarks();
+}
+if (motionPreference?.addEventListener) listen(motionPreference, 'change', () => { syncUpdateMarks(); notify(); });
 if (document.fonts) listen(document.fonts, 'loadingdone', () => textWidths.clear());
 let W = 0, H = 0, DPR = 1, F = 800;
 let CX = 0, CY = 0;          // 宇宙の画面中心。縦表示は上側の領域へ寄せる。
@@ -86,6 +106,13 @@ function sprite(size, draw) {
   draw(c.getContext('2d'), size);
   return c;
 }
+const STATIC_ELECTRONS = Object.fromEntries([1, 2, 4].map(count => [count, sprite(64, (g, size) => {
+  g.fillStyle = '#c7e5ff';
+  for (let i = 0; i < count; i++) {
+    const angle = i * Math.PI * 2 / count;
+    g.beginPath(); g.arc(size / 2 + Math.cos(angle) * 27, size / 2 + Math.sin(angle) * 17.55, 1.7, 0, Math.PI * 2); g.fill();
+  }
+})]));
 function radial(stops) {
   return sprite(128, (g, size) => {
     const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
@@ -242,6 +269,9 @@ function buildWorld() {
     x: 0, y: 0, z: 0, R: 60,
     name: node.n,
   };
+  updateMarks = updateTracker.update(planets, JSON.stringify([scan.root, prefix, fileFilter, sessionStartedAt]), now, !reducedMotion());
+  electronOrbits.update(planets, updateMarks.electrons);
+  // buildWorldの戻り値がworldへ代入された後、notifyで日付/発光の期限を予約する。
   return { galaxies, stars, planets, radius, byPath, gate };
 }
 
@@ -431,7 +461,13 @@ function frame(now) {
     }
   }
   ctx.globalCompositeOperation = 'source-over';
-  if (world) drawLabels(t);
+  if (world) {
+    electronOrbits.render(ctx, { width: W, height: H, dpr: DPR, focal: F,
+      rotation: [...turn(1, 0, 0), ...turn(0, 1, 0), ...turn(0, 0, 1)],
+      target: [cam.tx, cam.ty, cam.tz], offset: look(0, 0, cam.dist), time: t,
+      alpha: Math.min(1, Math.max(0, (now - introAt) / 1000 - 1.2)) * (focus ? .35 : 1), reduced: reducedMotion() });
+    drawLabels(t);
+  }
   requestAnimationFrame(frame);
 }
 
@@ -626,6 +662,16 @@ function drawPlanets(t, now) {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = alpha;
     ctx.drawImage(PLANET[planet.kind], x - size / 2, y - size / 2, size, size);
+    const count = electronOrbits.fallbackCount(planet.path);
+    if (count) {
+      const orbit = Math.max(7, planet.R * k * 1.8) * 64 / 27;
+      ctx.drawImage(STATIC_ELECTRONS[count], x - orbit / 2, y - orbit / 2, orbit, orbit);
+    }
+    const pulse = reducedMotion() ? 0 : updateFlash(updateMarks.flashes[planet.path]);
+    if (pulse) {
+      ctx.globalAlpha = alpha * pulse * .32;
+      ctx.drawImage(FLARE, x - size, y - size, size * 2, size * 2);
+    }
     if (fresh) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = alpha * blink * (planet === selected ? 0.08 : 0.22);
@@ -1533,9 +1579,10 @@ function isDriving(now) {
 }
 function notify() {
   if (disposed) return;
+  scheduleUpdateMarks();
   notifiedOrbitPhase = autoOrbit.phase;
   if (viewMode === '2d') driving = isDriving(performance.now());
-  change({ scan, trail: [...trail], selected, focus, journal, voyages: Object.fromEntries(Object.entries(voyages).map(([base,records])=>[base,records.map(record=>({...record}))])), autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
+  change({ scan, updateMarks, trail: [...trail], selected, focus, journal, voyages: Object.fromEntries(Object.entries(voyages).map(([base,records])=>[base,records.map(record=>({...record}))])), autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
   scheduleFollow2D();
 }
 function updateSide() { notify(); }
@@ -1635,6 +1682,7 @@ listen(window, 'keydown', event => {
 });
 // 非表示中はCanvas描画と毎フレームのDOM寸法取得を止める。復帰時の時間差を飛行へ加算しない。
 listen(document, 'visibilitychange', () => {
+  syncUpdateMarks();
   window.cancelAnimationFrame(frameId); frameId = 0; last = performance.now();
   if (document.hidden) {
     cancelScheduledFollow();
@@ -1652,6 +1700,7 @@ requestAnimationFrame(frame);
 return {
   refresh, applyFolderSnapshot, clearViewHistory, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
   get viewMode() { return viewMode; }, get selected() { return selected; },
+  get updateMarks() { return updateMarks; }, get electronStats() { return electronOrbits.stats; },
   get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,
   get projection() { return { x: CX, y: CY }; },
   get orbitPath() { return autoOrbit.path; },
@@ -1671,7 +1720,7 @@ return {
   get searchRouteRecords() { return routeMode==='search'?searchPaths.map(path=>({from:null,to:`f:${path}`})):aiRecords.map(record=>({...record})); },
   get routeState() { return {mode:routeMode,paths:[...(routeMode==='search'?searchPaths:aiRoute)]}; },
   marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
-  dispose() { disposed = true; cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
+  dispose() { disposed = true; clearTimeout(updateTimer); updateTracker.clear(); electronOrbits.dispose(); cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
 };
 }
 

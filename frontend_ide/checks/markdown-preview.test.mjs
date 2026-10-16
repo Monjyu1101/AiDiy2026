@@ -63,9 +63,11 @@ test('Markdownでも秘密ファイル・プロジェクト外リンク・サイ
   await put(root, 'large.md', 'a'.repeat(MAX_MARKDOWN_BYTES + 1));
   await put(root, 'binary.md', Buffer.from([0, 1]));
   await put(outside, 'private.md', '# outside');
-  await symlink(join(outside, 'private.md'), join(root, 'linked.md'));
+  const linked = process.platform === 'win32' ? 'linked/private.md' : 'linked.md';
+  if (process.platform === 'win32') await symlink(outside, join(root, 'linked'), 'junction');
+  else await symlink(join(outside, 'private.md'), join(root, 'linked.md'));
   assert.equal(await preview.url('_config/note.md'), null);
-  assert.equal(await preview.url('linked.md'), null);
+  assert.equal(await preview.url(linked), null);
   assert.equal((await fetch(await preview.url('large.md'))).status, 413);
   assert.equal((await fetch(await preview.url('binary.md'))).status, 415);
 });

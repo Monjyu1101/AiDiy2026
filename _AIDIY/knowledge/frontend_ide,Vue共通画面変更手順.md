@@ -346,12 +346,56 @@ IDEから開いたTermは、既存の `reserveTermSlot()` が確保した配置�
 ビルド後の `node frontend_ide/scripts/check-glass-panels.mjs` は一時プロジェクトとテスト用ブラウザーを使い、2D/3D・文字とアイコン/件数色・更新と開閉・実ピン留めと別窓更新・CSSの適用漏れを検証し、`temp/glass-panel-check/` に画像と結果を保存します。非対応時は@supportsの強化ルールだけを除いて模擬し、基礎スタイルを維持することを確認します。別窓は強化ルールの有無で計算済みスタイルが一致することも比較します。実サービス再起動やAI APIは不要です。
 ## ExplorerとViewerのピン留め・表示開始
 
-Explorerは `ファイル閲覧/パネル別窓.js` で同じVueインスタンスのaside DOMを別Documentへ移します。検索やAIジョブを再発行せず、入力・展開・選択・結果・スクロールを保持し、既存のselect/marks/routeイベントでIDEと連携します。軌跡バーは本体に残します。別窓のCSSが準備できてから移し、ポップアップ失敗時は本体を残します。Xまたは「本体へ戻す」で元の位置へ戻り、子の再読み込みでは旧Documentを離れる前にDOMを退避して、新Documentへ戻します。Vueがaside自体を条件付きで作り直す変更は避けてください。
+Explorerは `ファイル閲覧/パネル別窓.js` で同じVueインスタンスのaside DOMを別Documentへ移します。検索やAIジョブを再発行せず、入力・展開・選択・結果・スクロールを保持し、既存のselect/marks/routeイベントでIDEと連携します。軌跡バーは本体に残します。別窓のCSSが準備できてから移し、ポップアップ失敗時は本体を残します。別窓のXはIDE内へ折り畳み、バーガーマークだけを戻します。バーガーで再表示した時に検索・展開・入力を保持し、「本体へ戻す」は従来どおり開いた状態へ戻します。子の再読み込みでは旧Documentを離れる前にDOMを退避して、新Documentへ戻します。Vueがaside自体を条件付きで作り直す変更は避けてください。
 
-Electronは親IDEからの限定IPCで、一度だけ使えるwindow名とabout:blankを予約します。子窓を既存のセッション監視に登録し、利用終了・親終了で閉じます。Webは親のpagehideとコンポーネント破棄時に子窓を閉じます。再pinでリスナーやポーリングを積み重ねません。ViewerのX復元は本体で別のファイルを既に開いている場合、その新しい選択を優先します。
+Electronは親IDEからの限定IPCで、一度だけ使えるwindow名とabout:blankを予約します。子窓を既存のセッション監視に登録し、利用終了・親終了で閉じます。Webは親のpagehideとコンポーネント破棄時に子窓を閉じます。再pinでリスナーやポーリングを積み重ねません。Viewerとソース比較の別窓Xは、その閲覧セッションを終了します。IDE内への自動復元やファイル削除は行わず、Monacoモデル・要求・タイマー・窓参照を解放します。ファイルを選び直せば新しい閲覧を開始できます。子reloadと起動失敗はXとは区別し、既存セッションを保持します。
 
 両別窓の初期位置は元パネルの矩形を使います。ElectronではgetContentBoundsとworkAreaのDIPへwebContentsのzoomだけを掛け、パネルに対応するディスプレイ内へ収めます。OSのDPI倍率を二重に掛けません。Windowsでは外枠が1～2px丸められる場合があります。ブラウザーでは外枠と表示領域の差から位置を見積もり、screenの利用可能領域へ制限します。配置・寸法の要求はブラウザーやOSに制限されるため完全一致は保証できず、複数画面やブラウザーズームでも厳密に配置する必要がある場合はElectronを使います。追加の画面アクセス権限は要求しません。
 
-Web別窓、画面内Explorer/Viewer、軌跡一覧の開始は260msのopacityフェードです。通常の再描画や内容更新では繰り返さず、閉→開・pin→X復元でだけ開始します。別Documentへ移す際は元Documentのフェードを解除します。Electron別窓は既存 `host/scripts/window-opening.cjs` の750ms・.55倍からのズーム演出を使います。reduced-motionでは両方式とも開始演出を省略します。フォルダ更新線の演出は独立しています。別窓は不透明背景、本体へ戻すと既存すりガラスの適用範囲へ戻ります。
+Web別窓、画面内Explorer/Viewer、軌跡一覧の開始は260msのopacityフェードです。通常の再描画や内容更新では繰り返さず、閉→開・明示的な本体への復帰でだけ開始します。別Documentへ移す際は元Documentのフェードを解除します。Electron別窓は既存 `host/scripts/window-opening.cjs` の750ms・.55倍からのズーム演出を使います。reduced-motionでは両方式とも開始演出を省略します。フォルダ更新線の演出は独立しています。別窓は不透明背景、本体へ戻すと既存すりガラスの適用範囲へ戻ります。
 
 `node --test frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/window-layout.test.mjs frontend_ide/checks/desktop-session.test.mjs frontend_ide/checks/navigation-parity.test.mjs` で配置・ズーム・負座標・予約とセッション境界・既存IDE連携を確認します。ビルド済み画面の検証は `node frontend_ide/scripts/check-panel-pins.mjs` と `node frontend_ide/scripts/check-panel-desktop.mjs` です。後者はセットアップ済みElectronを使い、必要ならELECTRON_PATHを指定します。一時プロジェクト/プロファイルだけを使い、実サービスや有料AI APIを起動しません。画像と結果は `temp/panel-pin-check/` に保存します。
+
+
+### ソース比較とViewerの共通閲覧セッション
+
+IDEの `閲覧セッション.vue` は通常ビューアと更新履歴の比較をまとめます。比較中のヘッダー📌でも通常ビューアの📌でも、同じ `createPanelWindow` でDOMを別Documentへ移します。通常表示は比較中も非表示で維持し、比較解除で表示モードとスクロールを引き継ぎます。旧版の選択・比較結果・左右のMonacoモデル/スクロールはpinや子reloadで再取得しません。別窓内からの比較開始もその窓内に表示し、本体へモーダルを残しません。比較ヘッダーの×は比較を解除、OS/ブラウザー窓のXは閲覧セッション全体を終了します。
+
+同じファイルをIDEから選び直すと既存の別窓へフォーカスし、重複した閲覧窓を作りません。別のファイルは別セッションで開けます。比較要求は既存のrevision/AbortControllerを保ち、旧版の変更・解除・セッション終了後に届く古い結果を採用しません。本文のDOM選択とiframeの操作通知は、移動後のownerDocument/defaultViewへ結び直します。Electronでは既存の限定予約IPCに `panel-viewer` 種別を加え、Explorerと同じ配置・ズーム演出・親セッション境界を使います。
+
+`node --test frontend_ide/checks/panel-lifecycle.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/file-history.test.mjs` で状態境界を確認します。ビルド済み実画面は `node frontend_ide/scripts/check-compare-pins.mjs` で比較直接pin、通常viewerから比較、左右スクロールとモデル同一性、子reload、遅延結果、X終了と再open、Explorer折畳み/再表示、親終了を検証し `temp/compare-pin-check/` に画像と結果を保存します。実Monacoを使うためviewerの既存依存をセットアップしてください。ネット接続やAI APIは検証中に使いません。
+
+
+### 閲覧の3分無操作と自動探索
+
+通常ビューアと比較の自動終了は `閲覧セッション.vue` の `閲覧待機.js` に一元化します。IDE内に表示中かつ自動探索ONの場合だけ、最後の実ユーザー操作から180秒後に閲覧を閉じます。外出し済み・pin準備中・自動探索OFFでは予約を持たず、Xで終了するまで保持します。ON→OFFとpin開始は同期watchで取消し、OFF→ONとpin失敗時の本体復帰は新たな3分から始めます。解除前に実行待ちとなったcallbackも世代と条件を再確認します。
+
+クリック・キー・wheel・touch・押下中のpointermoveを操作として受け取り、Monaco左右や入れ子のscrollは直前1.5秒以内の実入力がある場合だけ延長します。scroll.isTrustedだけで判定してはいけません。プログラムによる同期scrollもtrueになり得るためです。プレビュー/Markdown iframeの通知も同じ判定を埋め込み、同一オリジン文書の購読は差替え・破棄時に解除します。単なるmousemove、比較結果の再描画、同じファイルのメタデータ更新では期限を延ばしません。明示的な別対象選択は新しい閲覧として扱います。
+
+`node --test frontend_ide/checks/viewer-idle.test.mjs frontend_ide/checks/preview-actions.test.mjs frontend_ide/checks/workflow-components.test.mjs frontend_ide/checks/markdown-preview.test.mjs frontend_ide/viewer/checks/preview.test.mjs` で4条件、ON/OFF、pin境界・失敗復帰、左右/入れ子/iframeの操作、同期scroll、古いcallbackと破棄を確認します。
+
+
+## Code の長押し窓移動
+
+Electron の `aidiy_code` だけ、読み取り専用の回答や空白で左ボタンを1秒ほぼ静止して押すと窓を移動できます。1秒前に6 CSS pxを超えて動かした場合、通常の文字選択・dragを優先して取り消します。入力欄・ボタン・リンク・スクロールバー等は対象外です。最大化・全画面の窓では開始しません。
+
+成立後は4本の矢印を2ペアで表示します。方向・速度・位相は開始時に決め、毎フレーム乱数を使いません。移動中は進行方向の矢印に切り替え、reduced-motionでは待機時の周回を止めます。解放・Esc・blur・pointercancel・画面破棄で解除します。
+
+`src/コード/長押し窓移動.js` を `App.vue` の Code / 非host で導入します。ネイティブ側 `デスクトップ/code-drag.cjs` も信頼した主frameの `kind==='code'` を検証し、その窓にだけtokenを発行します。rendererから任意の窓IDや座標を受け取らず、Electronのカーソル・窓位置を同じDIP座標で差分計算します。lease・navigation・終了時にtokenと購読を破棄します。IDE/Live/Term/Web/VS Codeには導入しません。
+
+検証は `node --test checks/code-drag.test.mjs checks/code-window-title.test.mjs` と、ビルド後の `node scripts/check-code-drag.mjs`。後者は隔離Chromeで実bundleを使い、窓移動IPC・通信だけをモックに置き換えて選択・送信・ストリームも確認します。実ElectronでのOS窓移動や複数ディスプレイ確認とは分けて扱ってください。
+
+
+## 小さな軌跡パネル
+
+軌跡バーの📌は閲覧・検索・AiDiy検索の3分類とツリーを同じDOMのまま別窓へ移します。閉じた状態では幅360px・バーの実測高だけの小さなパネルとして開きます。分類を開くと上端を保ったまま下へ最大300px伸ばし、260msの展開が終わってから本文を表示・操作可能にします。閉じる時は本文をすぐ隠し、縮む演出の後に窓の領域をバーの高さへ戻します。
+
+`src/ファイル閲覧/軌跡パネル展開.js` がWeb埋込・別窓共通の開閉状態を持ちます。世代番号とタイマー解除で途中反転、連打、遅れて届く領域確保応答を処理し、分類だけの変更では再展開しません。Document移動・reloadでタイマーとresize/reduced-motion購読を付け直し、破棄時に解除します。画面下端では表示可能な高さに収め、reduced-motionでは高さ演出を省略します。
+
+Electronは枠なし・透明の軌跡専用窓を作り、`development:resize-routes` で透明な領域を先に確保してから共通の高さ演出を開始します。IPCは信頼済みIDEとその所有する軌跡子窓、同じ起動世代に限定します。手動リサイズを無効にするのは[Electronの透明窓の制約](https://www.electronjs.org/docs/latest/tutorial/custom-window-styles)によるものです。実OSでの透明表示・プログラムによるサイズ変更は、モック検証とは別に確認してください。
+
+Web別窓はOS背景の透明化を保証できず、ブラウザーが最小窓サイズやresize要求を制限する場合があります。先にresizeを要求し、取得できた内側の高さに表示を収めます。Web埋込でも同じ下方向の演出を使います。Electronの透明な余白はクリック透過にはしません。
+
+↙で本体へ戻し、×またはOSのXで閉じると、本体ではバーを折り畳んで「軌跡」ボタンを残します。記録・分類を保持し、再表示後も選択ジャンプ・閲覧軌跡のクリアができます。reloadは閉じる操作と区別して同じDOMを再接続します。表示に失敗した場合は本体側を保持します。
+
+検証は `node --test checks/route-expansion.test.mjs checks/navigation-parity.test.mjs checks/panel-windows.test.mjs checks/panel-lifecycle.test.mjs`、ビルド後に `node scripts/check-route-expansion.mjs`。後者は隔離Chromeと一時プロジェクトで開閉中の高さ・本文の表示時刻、途中反転、画面下端、reduced-motion、3分類・実ツリー・ジャンプ・X復帰・クリア・親終了を確認します。AiDiy検索は固定結果に置き換え、外部AIの実行を禁止します。Electron実窓の検証とは区別してください。
