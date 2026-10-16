@@ -42,5 +42,12 @@ test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body re
     assert.equal(calls,3);assert.equal((await call(`/${id}`,'DELETE')).status,404);
     const again=await call('/開始','POST');assert.equal((await call(`/${again.data.実行ID}`,'DELETE')).data.状態,'中止');
     assert.equal((await call(`/${again.data.実行ID}/CHAT`,'POST')).status,404);
+    assert.equal((await call('/開始/arbitrary','POST')).status,404);
+    assert.equal((await call('/開始/CODE4','POST',false)).status,401);
+    assert.equal((await call('/開始/CODE4','POST',true,'{}')).status,400);
+    const single=await call('/開始/CODE4','POST');assert.equal(single.status,200);assert.deepEqual(single.data.実行順,['CODE4']);
+    assert.equal((await call(`/${single.data.実行ID}/CHAT`,'POST')).status,409);
+    assert.equal((await call(`/${single.data.実行ID}/CODE4`,'POST')).data.状態,'OK');assert.equal(calls,4);
+    assert.equal((await call(`/${single.data.実行ID}/CODE4`,'POST')).status,404);
   }finally{await trials.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(temp,{recursive:true,force:true});}
 });

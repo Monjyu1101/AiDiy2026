@@ -15,7 +15,8 @@ const LIVE = {gemini_live:'GEMINI',freeai_live:'FREEAI',openai_live:'OPENAI'};
 const CODE = new Set(['auto','same','claude_sdk','claude_cli','claude_ollama','copilot_cli','codex_cli','codex_ollama','antigravity_cli','grok_cli','opencode_cli','aidiy_hermes']);
 const text = value => typeof value === 'string' ? value.trim() : '';
 const label = value => /^[\w./:@+-]{1,180}$/.test(text(value)) && !/^(?:sk-|AIza|Bearer )/i.test(text(value)) ? text(value) : '';
-const failure = (message, status=409) => Object.assign(new Error(message),{status});
+const failure = (message, status=409) => Object.assign(new Error(message),{status,trialFailure:true});
+const sharedKey = row => JSON.stringify([row.区分==='CHAT'?'chat':row.区分==='LIVE'?'live':'code',row.プロバイダ,row.モデル,row.音声]);
 function portOf(config) {const value=config.PORT_TOOLS ?? 8095;const port=Number(value);return /^(?:[1-9]\d*)$/.test(String(value)) && Number.isInteger(port) && port<=65535 ? port : 0;}
 export function configRows(config) {
   const rows=[];
@@ -32,7 +33,20 @@ export function configRows(config) {
   add('LIVE','LIVE','音声会話',live,config[`LIVE_${LIVE[live]}_MODEL`],config[`LIVE_${LIVE[live]}_VOICE`]);
   for(let i=1;i<=6;i++){const inherit=i>1 && config[`CODE_AI${i}_NAME`]==='auto';const n=inherit?1:i;add(`CODE${i}`,'CODE',`CODE${i}`,config[`CODE_AI${n}_NAME`],config[`CODE_AI${n}_MODEL`],'',inherit?'CODE1':'');}
   for(const family of ['TASK','TEAM'])for(const phase of ['plan','do','check'])add(`${family}_${phase}`,family,phase,config[`${family}_AI_NAME`],config[`${family}_AI_MODEL_${phase}`]);
-  return rows;
+  return rows.map(row=>({...row,共有対象:rows.filter(other=>other.id===row.id || (row.状態==='未実行' && other.状態==='未実行' && sharedKey(other)===sharedKey(row))).map(other=>other.id)}));
+}
+
+// Tools の文字列戻り値は MCPServer が structuredContent: {result: '<JSON>'} に包む。
+// オブジェクト形式や従来のテキスト形式も、内側の会話結果を取り出して判定する。
+function toolPayload(result) {
+  const object=value=>value && typeof value==='object' && !Array.isArray(value);
+  if(object(result?.structuredContent)){
+    const structured=result.structuredContent;
+    if(typeof structured.status==='string')return structured;
+    if(typeof structured.result==='string')try{const parsed=JSON.parse(structured.result);if(object(parsed))return parsed;}catch{}
+  }
+  for(const content of result?.content || [])if(content.type==='text')try{const parsed=JSON.parse(content.text);if(object(parsed))return parsed;}catch{}
+  throw failure('MCP の試行結果を読み取れません。');
 }
 
 // 固定 loopback、リダイレクトなし、応答上限。JSON と MCP SSE の双方を処理する。
@@ -78,9 +92,7 @@ export async function callMcp(row, config, {signal,request=localRequest}={}) {
     const args={prompt:'おはよう',ai_name:row.プロバイダ,ai_model:row.モデル,resume:false,timeout_sec:60,...(chat?{use_tools:false,session_id:`diag_${randomBytes(12).toString('hex')}`}:{code_permissions:option('CODE_PERMISSIONS',['auto','full','none']),self_check_loop:0})};
     const result=await rpc(2,'tools/call',{name:chat?'chat_llms_run':'code_agents_run',arguments:args});
     if(result?.isError)throw failure('MCP ツールがエラーを返しました。');
-    if(result?.structuredContent)return result.structuredContent;
-    for(const content of result?.content || [])if(content.type==='text')try{return JSON.parse(content.text);}catch{}
-    throw failure('MCP の試行結果を読み取れません。');
+    return toolPayload(result);
   } finally {
     // 中止時も独立した短い期限でセッションを破棄する。
     if(session)try{await request({port,path,method:'DELETE',headers:headers(),timeoutMs:1500});}catch{}
@@ -98,20 +110,20 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
   function cancel(preserveAudio=false){if(run){const id=run.id;run.controller.abort();clearTimeout(run.timer);run=null;if(!preserveAudio)void audioStore.clear(id).catch(()=>{});}}
   return {
     async snapshot(){return publicSnapshot(await snapshot());},
-    async start({signal}={}) {
+    async start({signal,rowId}={}) {
       if(run)throw failure('前の試行を終了してから開始してください。');
       // 準備中も占有し、同時の開始を拒否する。
       const current={id:randomBytes(16).toString('hex'),controller:new AbortController(),cache:new Map(),index:0,busy:false};run=current;
       const abort=()=>current.controller.abort();signal?.addEventListener('abort',abort,{once:true});
-      try {await audioStore.clear();if(signal?.aborted)abort();const s=await snapshot();if(s.state!=='読込済み' || !portOf(s.config))throw failure('設定ファイルを読み取れません。');if(!(await statusFn({signal:current.controller.signal})).online || current.controller.signal.aborted)throw failure('Tools に接続してください。');Object.assign(current,s);current.timer=setTimeout(cancel,TRIAL_RUN_TTL_MS);current.timer.unref?.();return {実行ID:current.id,...publicSnapshot(s)};}
+      try {await audioStore.clear();if(signal?.aborted)abort();const s=await snapshot();if(s.state!=='読込済み' || !portOf(s.config))throw failure('設定ファイルを読み取れません。');const queue=rowId===undefined?s.rows:s.rows.filter(row=>row.id===rowId);if(!queue.length)throw failure('設定項目が見つかりません。',404);if(!(await statusFn({signal:current.controller.signal})).online || current.controller.signal.aborted)throw failure('Tools に接続してください。');Object.assign(current,s,{queue});current.timer=setTimeout(cancel,TRIAL_RUN_TTL_MS);current.timer.unref?.();return {実行ID:current.id,実行順:queue.map(row=>row.id),...publicSnapshot(s)};}
       catch(error){if(run===current)cancel();throw error;}finally{signal?.removeEventListener('abort',abort);}
     },
     cancel(id){if(run?.id!==id)throw failure('試行が見つかりません。',404);cancel();return {状態:'中止'};},
     async next(id,rowId,{signal}={}) {
       const current=run;if(!current || current.id!==id || !current.rows)throw failure('試行が見つかりません。',404);
       if(current.busy)throw failure('モデル試行は順番に実行してください。');
-      const row=current.rows[current.index];if(row?.id!==rowId)throw failure('モデル試行の順序が一致しません。');
-      const key=JSON.stringify([row.区分==='CHAT'?'chat':row.区分==='LIVE'?'live':'code',row.プロバイダ,row.モデル,row.音声]);
+      const row=current.queue[current.index];if(row?.id!==rowId)throw failure('モデル試行の順序が一致しません。');
+      const key=sharedKey(row);
       current.busy=true;const started=Date.now(),abort=()=>current.controller.abort();signal?.addEventListener('abort',abort,{once:true});
       const timer=setTimeout(abort,timeoutMs);if(signal?.aborted)abort();
       try {
@@ -136,8 +148,8 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         const actual=row.区分==='LIVE'?payload?.model:row.区分==='CHAT'?payload?.ai_model:payload?.selected_model;
         const result={...base,状態:ok?'OK':payload?.status==='UNSUPPORTED'?'未対応':'NG',応答:ok && textOk?redact(answer,current.config):'',...(audio?{音声ファイル:audio}:{}),実行モデル:['auto','same'].includes(text(actual))?'':label(redact(actual,current.config)),所要ms:Date.now()-started,説明:ok?(audio?'音声応答を確認しました。':''):live?'有効な会話応答または1秒以上の音声応答を確認できませんでした。':payload?.status==='UNSUPPORTED'?'接続先 MCP はこのプロバイダに対応していません。':'有効な会話応答を確認できませんでした。'};
         current.cache.set(key,result);return result;
-      }catch(error){if(error?.configChanged)throw error;if(current.controller.signal.aborted){if(run===current)cancel();return {id:row.id,状態:'中止',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:'試行を中止しました。'};}if(run!==current)throw error;const result={id:row.id,状態:'NG',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:'Tools から会話応答を取得できませんでした。'};current.cache.set(key,result);return result;}
-      finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);current.busy=false;current.index++;if(current.index>=current.rows.length && run===current)cancel(true);}
+      }catch(error){if(error?.configChanged)throw error;if(current.controller.signal.aborted){if(run===current)cancel();return {id:row.id,状態:'中止',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:'試行を中止しました。'};}if(run!==current)throw error;const result={id:row.id,状態:'NG',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:error?.trialFailure?error.message:'Tools から会話応答を取得できませんでした。'};current.cache.set(key,result);return result;}
+      finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);current.busy=false;current.index++;if(current.index>=current.queue.length && run===current)cancel(true);}
     },
     audio:id=>audioStore.get(id),
     close(){cancel();return audioStore.close().catch(()=>{});},

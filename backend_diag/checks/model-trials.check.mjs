@@ -22,3 +22,44 @@ test('known adapter error sentinels cannot become successful conversations',asyn
 test('all public labels reject embedded known credentials and malformed model IDs',async()=>{const c={...config(),CHAT_FREEAI_MODEL:'prefix-secret-for-tests',LIVE_FREEAI_VOICE:'secret-for-tests',CODE_AI1_MODEL:'secret-for-tests',TEAM_AI_NAME:'secret-for-tests'};const trials=createModelTrials({reader:async()=>JSON.stringify(c)});const snapshot=await trials.snapshot();assert.ok(!JSON.stringify(snapshot).includes('secret-for-tests'));assert.equal(snapshot.項目[0].状態,'未設定');assert.equal(configRows({...config(),CHAT_FREEAI_MODEL:'Bearer token'})[0].状態,'未設定');});
 
 test('Live budgets include readiness, ten-second settle, response and cleanup; run supports all fourteen rows',async()=>{assert.ok(LIVE_HTTP_TIMEOUT_MS>=(20+10+30+9+5)*1000);assert.ok(TRIAL_ROW_TIMEOUT_MS>LIVE_HTTP_TIMEOUT_MS);assert.ok(TRIAL_RUN_TTL_MS>=14*TRIAL_ROW_TIMEOUT_MS+120000);const calls=[],trials=createModelTrials({reader:async()=>JSON.stringify(config()),statusFn:async()=>({online:true}),request:mockRequest(calls)});const start=await trials.start();await trials.next(start.実行ID,'CHAT');await trials.next(start.実行ID,'LIVE');assert.equal(calls.find(c=>c.path==='/internal/live_model_check').timeoutMs,LIVE_HTTP_TIMEOUT_MS);trials.close();});
+
+test('single selected row executes once, publishes exact sharing group and completes the run',async()=>{
+ const c={...config(),CODE_AI6_NAME:'claude_cli',CODE_AI6_MODEL:'auto'},calls=[];
+ const trials=createModelTrials({reader:async()=>JSON.stringify(c),statusFn:async()=>({online:true}),request:mockRequest(calls)});
+ try{
+  const start=await trials.start({rowId:'TASK_do'});assert.deepEqual(start.実行順,['TASK_do']);assert.equal(start.項目.length,14);
+  const group=start.項目.find(row=>row.id==='TASK_do').共有対象;
+  assert.ok(group.includes('CODE1'));assert.ok(group.includes('TEAM_check'));
+  for(const other of ['CHAT','LIVE','CODE6'])assert.ok(!group.includes(other));
+  await assert.rejects(()=>trials.next(start.実行ID,'CHAT'),/順序/);
+  assert.equal((await trials.next(start.実行ID,'TASK_do')).状態,'OK');
+  assert.equal(calls.filter(call=>call.body?.method==='tools/call').length,1);
+  await assert.rejects(()=>trials.next(start.実行ID,'TASK_do'),/見つかりません/);
+  await assert.rejects(()=>trials.start({rowId:'arbitrary'}),/設定項目/);
+ }finally{await trials.close();}
+});
+
+test('single tests require Tools online and preserve unset/unsupported failures without model requests',async()=>{
+ let online=false;const calls=[];
+ const trials=createModelTrials({reader:async()=>JSON.stringify({...config(),CODE_AI6_NAME:'unknown'}),statusFn:async()=>({online}),request:mockRequest(calls)});
+ try{
+  await assert.rejects(()=>trials.start({rowId:'CODE6'}),/Tools/);online=true;
+  const start=await trials.start({rowId:'CODE6'});
+  assert.deepEqual(start.項目.find(row=>row.id==='CODE6').共有対象,['CODE6']);
+  assert.equal((await trials.next(start.実行ID,'CODE6')).状態,'未対応');assert.equal(calls.length,0);
+ }finally{await trials.close();}
+});
+
+test('MCP string wrappers, object results and legacy text preserve failure semantics',async()=>{
+ for(const payload of [{status:'OK',result:'おはよう'}, {status:'NG',result:'bad'}, {status:'OK',result:'（応答なし）'}]){
+  for(const shape of ['wrapped','object','text']){
+   const request=mockRequest([],payload);
+   const trials=createModelTrials({reader:async()=>JSON.stringify(config()),statusFn:async()=>({online:true}),request:async options=>{
+    const response=await request(options);
+    if(options.body?.method==='tools/call' && shape!=='text')response.body.result={structuredContent:shape==='wrapped'?{result:JSON.stringify(payload)}:payload};
+    return response;
+   }});
+   try{const start=await trials.start({rowId:'CHAT'});assert.equal((await trials.next(start.実行ID,'CHAT')).状態,payload.status==='OK'&&payload.result==='おはよう'?'OK':'NG');}finally{await trials.close();}
+  }
+ }
+});

@@ -49,11 +49,56 @@ test('設定変更エラーで残りを送らず、更新で前の結果を破�
 });
 
 test('Appは接続でタブを制御し、全診断へ試行を含めない',()=>{
- const app=source('App.vue');assert.match(app,/:disabled="!connected \|\| !toolsOnline"/);assert.match(app,/if\(!value\)試行.切断\(\)/);assert.doesNotMatch(app.match(/async function 全診断\(\).*\n/)[0],/試行/);
+ const app=source('App.vue');assert.match(app,/:disabled="!connected \|\| !toolsOnline"/);assert.match(app,/if\(!value\)試行.切断\(\)/);assert.doesNotMatch(app.match(/async function 全診断\(\)[^\r\n]*/)[0],/試行/);
 });
 
 test('Tools再確認中は接続を保持し、失敗確定時だけオフライン',async()=>{
  const {Tools接続を作成}=await import('../../ウィンドウ/Tools接続.mjs');const states=[],pending=deferred();let n=0;
  const tools=Tools接続を作成({api:()=>++n===1?Promise.resolve({online:true}):pending.promise,反映:s=>states.push(s),setTimer:()=>0,clearTimer(){}});
  tools.接続(true);await tick();const check=tools.refresh();assert.deepEqual(states.at(-1),{online:true,checking:true});pending.reject(new Error('offline'));await check;assert.deepEqual(states.at(-1),{online:false,checking:false});tools.終了();
+});
+
+const group=['CODE1','CODE2','TASK_do','TEAM_check'];
+const grouped={...snapshot,項目:snapshot.項目.map(row=>({...row,共有対象:group.includes(row.id)?group:[row.id]}))};
+test('個別テストは選択行だけ要求し、サーバー指定の同一設定行を同時更新する',async()=>{
+ const pending=deferred(),calls=[];
+ const {state}=await setup(async(path,method)=>{calls.push([path,method]);if(method==='GET')return grouped;if(method==='DELETE')return {};if(path.endsWith('/開始/TASK_do'))return {...grouped,実行ID:'single',実行順:['TASK_do']};return pending.promise;});
+ await state.読込();state.選択.value='TASK_do';state.結果.value={CHAT:{状態:'OK',応答:'previous'}};
+ const run=state.個別開始();await tick();
+ for(const id of group)assert.equal(state.結果.value[id].状態,'実行中');
+ assert.equal(state.結果.value.CHAT.応答,'previous');assert.equal(state.結果.value.CODE3,undefined);
+ const html=await render('configモデル試行/モデル試行パネル.vue',{data:grouped,results:state.結果.value,selected:'TASK_do',online:true,running:true});
+ assert.match(html,/テスト中/);assert.match(html,/config設定の再読込/);assert.match(html,/id="model-trial-single" disabled/);
+ pending.resolve({id:'TASK_do',状態:'OK',応答:'おはよう',所要ms:123});await run;
+ for(const id of group){assert.equal(state.結果.value[id].状態,'OK');assert.equal(state.結果.value[id].共有元,id==='TASK_do'?'':'TASK_do');}
+ assert.deepEqual(calls.filter(x=>x[1]==='POST').map(x=>x[0]),['api/モデル試行/開始/TASK_do','api/モデル試行/single/TASK_do']);assert.equal(state.実行中.value,false);
+});
+
+test('共有行の中止・通信失敗でテスト中を全て解除し、選択変更にも影響されない',async()=>{
+ for(const mode of ['cancel','failure']){
+  const pending=deferred();const {state}=await setup(async(path,method)=>{if(method==='GET')return grouped;if(method==='DELETE')return {};if(path.includes('/開始/'))return {...grouped,実行ID:'r',実行順:['CODE1']};return pending.promise;});
+  await state.読込();state.選択.value='CODE1';const run=state.個別開始();await tick();state.選択.value='LIVE';
+  if(mode==='cancel'){state.中止();pending.resolve({状態:'OK'});}else pending.reject(new Error('connection failed'));
+  await run;for(const id of group)assert.equal(state.結果.value[id].状態,mode==='cancel'?'中止':'ERR');
+  assert.equal(state.実行中.value,false);assert.equal(state.結果.value.LIVE,undefined);
+ }
+});
+
+test('全件逐次実行は共有結果をテスト中へ戻さず、サーバーのキャッシュ順序を保つ',async()=>{
+ const calls=[];let state;
+ ({state}=await setup(async(path,method)=>{
+  if(method==='GET')return grouped;if(method==='DELETE')return {};if(path.endsWith('/開始'))return {...grouped,実行ID:'all',実行順:ids};
+  const id=path.split('/').pop();calls.push(id);
+  if(id==='CODE1')for(const shared of group)assert.equal(state.結果.value[shared].状態,'実行中');
+  if(group.includes(id)&&id!=='CODE1')for(const shared of group)assert.equal(state.結果.value[shared].状態,'NG');
+  return {id,状態:group.includes(id)?'NG':'OK',共有元:group.includes(id)&&id!=='CODE1'?'CODE1':'',所要ms:id==='CODE1'?42:0};
+ }));
+ await state.読込();await state.開始();assert.deepEqual(calls,ids);assert.equal(state.結果.value.CODE1.所要ms,42);
+ for(const id of group)assert.equal(state.結果.value[id].状態,'NG');
+});
+
+test('個別テストで設定版が変われば旧結果を破棄し、オフライン中は送信しない',async()=>{
+ let posts=0;const {state,offline}=await setup(async(path,method)=>{if(method==='GET')return grouped;if(method==='DELETE')return {};posts++;if(path.includes('/開始/'))return {...grouped,版:'v2',実行ID:'r',実行順:['CHAT']};return {状態:'OK'};});
+ await state.読込();state.結果.value={CODE1:{状態:'OK'}};await state.個別開始();assert.equal(state.結果.value.CODE1,undefined);assert.equal(posts,2);
+ offline();await state.個別開始();assert.equal(posts,2);
 });

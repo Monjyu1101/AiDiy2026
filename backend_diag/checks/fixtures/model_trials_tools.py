@@ -1,0 +1,96 @@
+"""Actual MCP SDK + Tools registrations; only the paid model execution is synthetic."""
+import asyncio
+from contextlib import AsyncExitStack, asynccontextmanager
+import json
+import logging
+from pathlib import Path
+import socket
+import sys
+import types
+from unittest.mock import patch
+
+import uvicorn
+from fastapi import FastAPI
+from mcp.server.mcpserver import MCPServer
+from starlette.routing import Mount
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "backend_tools"))
+# Import the production registrations without creating real service logs.
+sys.modules["log_config"] = types.SimpleNamespace(get_logger=logging.getLogger)
+from tools_proc import tools_agents, tools_chat
+from tools_proc.live_model_check import LiveModelCheck, register_live_model_check
+
+
+class Model:
+    version_info = {"synthetic": {"ok": True, "version": "test"}}
+
+    def get_description(self):
+        return "Offline contract test"
+
+    async def run_async(self, *args, **kwargs):
+        prompt = args[0] if args else kwargs["prompt"]
+        assert prompt == "おはよう"
+        if args:
+            assert args[6] is False and args[10] is False
+        else:
+            assert kwargs["resume"] is False and kwargs["self_check_loop"] == 0
+        return {"status": "OK", "result": "おはようございます", "ai_model": "chat-test", "selected_model": "code-test"}
+
+
+class Live:
+    def __init__(self, **kwargs):
+        assert kwargs["live_ai"] == "freeai" and kwargs["live_model"] == "live-test"
+        assert kwargs["live_voice"] == "Zephyr" and kwargs["diagnostic"] is True
+        self.live_session = None
+
+    async def 開始(self, **kwargs):
+        self.queue = kwargs["テキスト受信処理Q"]
+        assert self.queue is kwargs["音声受信処理Q"]
+        self.live_session = object()
+        return True
+
+    async def テキスト送信(self, text):
+        assert text == "おはよう"
+        await self.queue.put({"text": "おはようございます"})
+        await self.queue.put({"diagnostic_turn_complete": True})
+        return True
+
+    async def 終了(self):
+        self.live_session = None
+
+
+async def skip_sleep(seconds):
+    assert seconds == 10
+
+
+async def main():
+    chat, code = MCPServer("aidiy_chat_llms"), MCPServer("aidiy_code_agents")
+    tools_chat.register_tools(chat, Model())
+    tools_agents.register_tools(code, Model())
+    chat_app, code_app = chat.streamable_http_app(), code.streamable_http_app()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(chat.session_manager.run())
+            await stack.enter_async_context(code.session_manager.run())
+            yield
+
+    app = FastAPI(routes=[Mount("/aidiy_chat_llms", chat_app), Mount("/aidiy_code_agents", code_app)], lifespan=lifespan)
+    register_live_model_check(app, LiveModelCheck(factory=Live, sleep=skip_sleep))
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level="critical", access_log=False))
+    task = asyncio.create_task(server.serve(sockets=[sock]))
+    while not server.started:
+        if task.done():
+            await task
+        await asyncio.sleep(.01)
+    print(json.dumps({"port": sock.getsockname()[1]}), flush=True)
+    await task
+
+
+if __name__ == "__main__":
+    with patch("tools_proc.live_model_check.read_config", return_value={"LIVE_AI_NAME":"freeai_live", "LIVE_FREEAI_MODEL":"live-test", "LIVE_FREEAI_VOICE":"Zephyr", "freeai_key_id":"synthetic-only"}):
+        asyncio.run(main())
