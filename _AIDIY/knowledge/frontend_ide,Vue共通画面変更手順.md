@@ -335,3 +335,12 @@ IDEから開いたTermは、既存の `reserveTermSlot()` が確保した配置�
 閲覧のクリアはファイル閲覧journalだけを消します。フォルダの記録が残る場合はその部分を表示し、消したファイルを保存済みの辺から復活させません。検索・AI分類と保存済みvoyagesは保持します。表示用変換からlocalStorageを直接書き換えないでください。
 
 `node --test frontend_ide/checks/route-tree.test.mjs frontend_ide/checks/route-records.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/star-depth.test.mjs` で、分岐・再訪・逆方向・循環・1.2万点・3分類・開始/失敗/再検索・実AI検索部品のイベント・フォルダA/Bの到着/出発元対・連続前後移動・クリア対象を検証します。実画面確認の `check-folder-monitor.mjs` はAI応答もブラウザー内のfixtureに置き換え、保存済み利用者データや有料APIを使いません。
+
+
+## IDE内の薄いすりガラスと別窓の分離
+
+すりガラスは `.development-app.ide .space-view` 配下のエクスプローラー、軌跡バー/一覧、画面内の `.viewer-popup` に限定します。背景面を `rgba(7,11,23,.82)`、背景のぼかしを4pxとし、文字・アイコン・件数色や要素全体のopacityは変更しません。軌跡バーは疑似要素で背景だけを描き、バー自身が子の一覧のbackdrop境界になるのを避けます。疑似要素はクリックを受けません。
+
+`@supports` 内に限定し、backdrop-filter非対応時は従来背景へ戻します。ピン留めした `.development-app.viewer-window` / `.viewer-pinned`、Monacoの共通テーマ、文書プレビューの本文背景には転用しません。画面内/別窓はFileViewerの既存のpinned属性が選ぶclassで区別し、別の判定処理は追加しません。
+
+ビルド後の `node frontend_ide/scripts/check-glass-panels.mjs` は一時プロジェクトとテスト用ブラウザーを使い、2D/3D・文字とアイコン/件数色・更新と開閉・実ピン留めと別窓更新・CSSの適用漏れを検証し、`temp/glass-panel-check/` に画像と結果を保存します。非対応時は@supportsの強化ルールだけを除いて模擬し、基礎スタイルを維持することを確認します。別窓は強化ルールの有無で計算済みスタイルが一致することも比較します。実サービス再起動やAI APIは不要です。
