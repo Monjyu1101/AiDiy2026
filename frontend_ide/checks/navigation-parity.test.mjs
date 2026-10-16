@@ -19,6 +19,7 @@ import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import * as panelWindows from '../src/ファイル閲覧/パネル別窓.js';
 import { scanWarning } from '../src/ファイル閲覧/走査警告.js';
 import { fileIcon } from '../src/ファイル閲覧/ファイルアイコン.js';
 
@@ -92,6 +93,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
+    '../ファイル閲覧/パネル別窓.js':panelWindows,
     './ファイル日時.js': fileDates,
     '../開発スペース/軌跡ツリー.js':routeTree,'../開発スペース/経路記録.js':routeRecords,
     '../ファイル閲覧/フォルダ監視.js': { createFolderMonitor },

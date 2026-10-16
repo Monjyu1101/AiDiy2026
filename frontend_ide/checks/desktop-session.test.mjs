@@ -62,7 +62,7 @@ test('Electron IPC: 同じメインフレーム・正確なURLだけを信用し
 
 function launchFixture(){
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf(" ipcMain.handle('development:open-app'"),source.indexOf(' // ピン留め:'))
+ const body=source.slice(source.indexOf(" ipcMain.handle('development:open-app'"),source.indexOf(" ipcMain.handle('development:prepare-explorer'"))
   .replace("const {startDevelopment}=await import('./server.mjs');","const {startDevelopment}=testServer;");
  const windows=new Map(),state={...valid,project:{...valid.project}},starts=[],created=[],focused=[],closed=[];let launch,hold;
  const owner={kind:'ide',window:{isDestroyed:()=>false},revision:0,pending:new Map()},viewer={kind:'viewer',owner,linkKey:'online:10',window:{isDestroyed:()=>false}};

@@ -5,6 +5,9 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
+ prepareExplorer:rect=>ipcRenderer.invoke('development:prepare-explorer',rect),
+ showExplorer:(name,reduced)=>ipcRenderer.invoke('development:show-explorer',name,reduced),
+ onViewerClosed:callback=>{const listener=(_event,path)=>callback(path);ipcRenderer.on('development:viewer-closed',listener);return()=>ipcRenderer.removeListener('development:viewer-closed',listener);},
  title:()=>ipcRenderer.invoke('development:window','title'),
  copyFilePath:path=>ipcRenderer.invoke('development:copy-file-path',path),
  openFile:path=>ipcRenderer.invoke('development:open-file',path),
@@ -24,4 +27,4 @@ contextBridge.exposeInMainWorld('aidiyWindow',{
   ipcRenderer.on('development:draft-handoff',listener);
   return()=>ipcRenderer.removeListener('development:draft-handoff',listener);
  },
- childWindows:()=>ipcRenderer.invoke('development:child-windows'),endSession:()=>ipcRenderer.invoke('development:end-session'),openApp:kind=>ipcRenderer.invoke('development:open-app',kind),openViewer:path=>ipcRenderer.invoke('development:open-viewer',path),maximize:()=>ipcRenderer.invoke('development:window','maximize'),isMaximized:()=>ipcRenderer.invoke('development:window','isMaximized'),minimize:()=>ipcRenderer.invoke('development:window','minimize'),close:()=>ipcRenderer.invoke('development:window','close')});
+ childWindows:()=>ipcRenderer.invoke('development:child-windows'),endSession:()=>ipcRenderer.invoke('development:end-session'),openApp:kind=>ipcRenderer.invoke('development:open-app',kind),openViewer:(path,rect)=>ipcRenderer.invoke('development:open-viewer',path,rect),maximize:()=>ipcRenderer.invoke('development:window','maximize'),isMaximized:()=>ipcRenderer.invoke('development:window','isMaximized'),minimize:()=>ipcRenderer.invoke('development:window','minimize'),close:()=>ipcRenderer.invoke('development:window','close')});

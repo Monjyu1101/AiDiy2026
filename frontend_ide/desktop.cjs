@@ -35,6 +35,8 @@ const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=
 const {createNativePreviewActions}=require('./デスクトップ/native-preview-actions.cjs');
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false;
+const {panelBounds,createPanelWindows}=require('./デスクトップ/panel-windows.cjs');
+const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting});
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
  if(window.isMinimized())window.restore();window.show();window.focus();
@@ -69,7 +71,7 @@ function audioAllowed(contents,permission,details){
  const record=windows.get(contents);
  return !!record&&record.kind==='live'&&permission==='media'&&details?.isMainFrame===true&&details.requestingUrl?.split('#')[0]===record.url;
 }
-async function createWindow(kind,url,server,owner,linkKey){
+async function createWindow(kind,url,server,owner,linkKey,anchor){
  // ピン留めのビューアは #viewer=ファイル で開く。照合・遷移の判定は # より前の URL で行う。
  const [base,hash='']=url.split('#');
  const viewerPath=kind==='viewer'&&hash.startsWith('viewer=')?decodeURIComponent(hash.slice('viewer='.length)):'';
@@ -80,7 +82,7 @@ async function createWindow(kind,url,server,owner,linkKey){
  const placement=kind==='term'?await reserveTermSlot():null;
  if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
  let slot=placement?.slot||0;if(owner&&(kind==='code'||kind==='viewer'))while(used.has(slot))slot++;
- const bounds=windowBounds(kind,area,ownerBounds,slot);
+ const bounds=(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot);
  const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;
  try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
@@ -111,17 +113,20 @@ async function createWindow(kind,url,server,owner,linkKey){
   });
  }
  const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);});
+ window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
  contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame){nativePreviewActions.invalidate(record);if(!isInPlace)draftRouter.invalidate(record);}});
  contents.on('render-process-gone',()=>{draftRouter.invalidate(record);nativePreviewActions.invalidate(record);});
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
  contents.on('will-redirect',event=>event.preventDefault());contents.on('will-attach-webview',event=>event.preventDefault());
- contents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//i.test(url))void shell.openExternal(url);return{action:'deny'};});
+ contents.setWindowOpenHandler(details=>{const allowed=kind==='ide'?panelWindows.open(record,details):null;if(allowed)return allowed;if(/^https?:\/\//i.test(details.url))void shell.openExternal(details.url);return{action:'deny'};});
+ contents.on('did-create-window',(child,details)=>panelWindows.created(record,child,details));
  try{
   await window.loadURL(url);
   if(!window.isDestroyed()){
    await contents.executeJavaScript("document.documentElement.classList.add('desktop-opening')");
-   if(await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
+   const reduced=kind==='viewer'&&await contents.executeJavaScript("matchMedia('(prefers-reduced-motion: reduce)').matches");
+   if(reduced){window.show();window.focus();}
+   if(reduced||await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
   }
   return window;
  }
@@ -194,20 +199,27 @@ app.whenReady().then(async()=>{
   if(type==='live')record.pending.set(type,opening);
   try{return await opening;}finally{if(record.pending.get(type)===opening)record.pending.delete(type);}
  });
+ ipcMain.handle('development:prepare-explorer',(event,rect)=>panelWindows.prepare(event,rect));
+ ipcMain.handle('development:show-explorer',(event,name,reduced)=>panelWindows.show(event,name,reduced));
  // ピン留め: IDEのプレビューを、同じIDEサーバーのファイルAPIを使う独立ウィンドウ（IDEの子ウィンドウ）で開く。
  // 同じファイルは既存の窓を前面へ出す。利用終了・セッション切り替えでは他の子ウィンドウと一緒に閉じる。
- ipcMain.handle('development:open-viewer',async(event,path)=>{
+ ipcMain.handle('development:open-viewer',async(event,path,anchor)=>{
   const record=trustedEvent(event);
   if(!record||record.kind!=='ide'||typeof path!=='string'||!path||path.length>4096||path.includes('\0'))return{ok:false,error:'この画面からは開けません。'};
-  try{
+  const pendingKey='viewer:'+path;if(record.pending.has(pendingKey))return record.pending.get(pendingKey);
+  const revision=record.revision;
+  const opening=(async()=>{try{
    const state=await readState(record);
+   if(record.revision!==revision||trustedEvent(event)!==record)throw Error('IDEの利用状態が変わりました。');
    if(!state.active)throw Error('IDEの利用を開始してください。');
    const existing=[...windows.values()].find(item=>item.owner===record&&item.kind==='viewer'&&item.viewerPath===path&&!item.window.isDestroyed());
    if(existing){focusWindow(existing.window);return{ok:true,reused:true};}
    if(quitting||record.window.isDestroyed())throw Error('IDEが終了しています。');
-   await createWindow('viewer',`${record.url}#viewer=${encodeURIComponent(path)}`,undefined,record,sessionKey(state));
+   await createWindow('viewer',`${record.url}#viewer=${encodeURIComponent(path)}`,undefined,record,sessionKey(state),anchor);
    return{ok:true};
-  }catch(error){return{ok:false,error:error.message};}
+  }catch(error){return{ok:false,error:error.message};}})();
+  record.pending.set(pendingKey,opening);
+  try{return await opening;}finally{if(record.pending.get(pendingKey)===opening)record.pending.delete(pendingKey);}
  });
  await createWindow(kind,url);process.send?.({windowShown:true});
 }).catch(error=>{console.error(error);app.quit();});

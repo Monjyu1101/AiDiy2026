@@ -46,7 +46,7 @@ test('最小寸法: Termだけ高さ180、横幅・Code/Live/IDE/ビューアは
 });
 test('Electron生成: 単独Term・IDE子Termの双方へ最小寸法を渡し、初期サイズを維持する',async()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey){'),source.indexOf("process.on('disconnect'"));
+ const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey,anchor){'),source.indexOf("process.on('disconnect'"));
  const area={x:0,y:0,width:1920,height:1040},windows=new Map();
  class Window{
   constructor(options){this.options=options;this.webContents={on(){},setWindowOpenHandler(){},async executeJavaScript(){}};}
@@ -94,7 +94,7 @@ test('狭い画面でも全窓と最小寸法を作業領域内へ収め、Term�
 
 test('Electron生成: 親IDE側の画面を選び、Code番号・閉鎖後のslot再利用・手動配置を維持する',async()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey){'),source.indexOf("process.on('disconnect'"));
+ const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey,anchor){'),source.indexOf("process.on('disconnect'"));
  const primary={x:0,y:0,width:1920,height:1040},secondary={x:-1080,y:-200,width:1080,height:1880},windows=new Map(),matched=[];
  class Window{
   constructor(options){this.options=options;this.closed=[];this.webContents={on(){},setWindowOpenHandler(){},async executeJavaScript(){}};}

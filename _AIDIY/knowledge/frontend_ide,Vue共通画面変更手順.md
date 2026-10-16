@@ -344,3 +344,14 @@ IDEから開いたTermは、既存の `reserveTermSlot()` が確保した配置�
 `@supports` 内に限定し、backdrop-filter非対応時は従来背景へ戻します。ピン留めした `.development-app.viewer-window` / `.viewer-pinned`、Monacoの共通テーマ、文書プレビューの本文背景には転用しません。画面内/別窓はFileViewerの既存のpinned属性が選ぶclassで区別し、別の判定処理は追加しません。
 
 ビルド後の `node frontend_ide/scripts/check-glass-panels.mjs` は一時プロジェクトとテスト用ブラウザーを使い、2D/3D・文字とアイコン/件数色・更新と開閉・実ピン留めと別窓更新・CSSの適用漏れを検証し、`temp/glass-panel-check/` に画像と結果を保存します。非対応時は@supportsの強化ルールだけを除いて模擬し、基礎スタイルを維持することを確認します。別窓は強化ルールの有無で計算済みスタイルが一致することも比較します。実サービス再起動やAI APIは不要です。
+## ExplorerとViewerのピン留め・表示開始
+
+Explorerは `ファイル閲覧/パネル別窓.js` で同じVueインスタンスのaside DOMを別Documentへ移します。検索やAIジョブを再発行せず、入力・展開・選択・結果・スクロールを保持し、既存のselect/marks/routeイベントでIDEと連携します。軌跡バーは本体に残します。別窓のCSSが準備できてから移し、ポップアップ失敗時は本体を残します。Xまたは「本体へ戻す」で元の位置へ戻り、子の再読み込みでは旧Documentを離れる前にDOMを退避して、新Documentへ戻します。Vueがaside自体を条件付きで作り直す変更は避けてください。
+
+Electronは親IDEからの限定IPCで、一度だけ使えるwindow名とabout:blankを予約します。子窓を既存のセッション監視に登録し、利用終了・親終了で閉じます。Webは親のpagehideとコンポーネント破棄時に子窓を閉じます。再pinでリスナーやポーリングを積み重ねません。ViewerのX復元は本体で別のファイルを既に開いている場合、その新しい選択を優先します。
+
+両別窓の初期位置は元パネルの矩形を使います。ElectronではgetContentBoundsとworkAreaのDIPへwebContentsのzoomだけを掛け、パネルに対応するディスプレイ内へ収めます。OSのDPI倍率を二重に掛けません。Windowsでは外枠が1～2px丸められる場合があります。ブラウザーでは外枠と表示領域の差から位置を見積もり、screenの利用可能領域へ制限します。配置・寸法の要求はブラウザーやOSに制限されるため完全一致は保証できず、複数画面やブラウザーズームでも厳密に配置する必要がある場合はElectronを使います。追加の画面アクセス権限は要求しません。
+
+Web別窓、画面内Explorer/Viewer、軌跡一覧の開始は260msのopacityフェードです。通常の再描画や内容更新では繰り返さず、閉→開・pin→X復元でだけ開始します。別Documentへ移す際は元Documentのフェードを解除します。Electron別窓は既存 `host/scripts/window-opening.cjs` の750ms・.55倍からのズーム演出を使います。reduced-motionでは両方式とも開始演出を省略します。フォルダ更新線の演出は独立しています。別窓は不透明背景、本体へ戻すと既存すりガラスの適用範囲へ戻ります。
+
+`node --test frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/window-layout.test.mjs frontend_ide/checks/desktop-session.test.mjs frontend_ide/checks/navigation-parity.test.mjs` で配置・ズーム・負座標・予約とセッション境界・既存IDE連携を確認します。ビルド済み画面の検証は `node frontend_ide/scripts/check-panel-pins.mjs` と `node frontend_ide/scripts/check-panel-desktop.mjs` です。後者はセットアップ済みElectronを使い、必要ならELECTRON_PATHを指定します。一時プロジェクト/プロファイルだけを使い、実サービスや有料AI APIを起動しません。画像と結果は `temp/panel-pin-check/` に保存します。

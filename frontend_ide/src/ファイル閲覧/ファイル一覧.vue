@@ -5,6 +5,7 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { createPanelWindow, fadePanel } from '../ファイル閲覧/パネル別窓.js';
 import AISearchPanel from '../ファイル検索/AI検索パネル.vue';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
 import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新ファイル.js';
@@ -12,7 +13,15 @@ import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
 const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
-const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history']);
+const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached']);
+const panel=ref(),detached=ref(false),pinError=ref('');
+let panelWindow;
+function pinExplorer(){
+  panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},report:message=>{pinError.value=message;}});
+  return panelWindow.pin();
+}
+function closeExplorer(){if(detached.value)panelWindow.restore();else emit('update:open',false);}
+watch([()=>props.open,detached],async([open,away])=>{if(open&&!away){await nextTick();fadePanel(panel.value);}});
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
 // 前回の最新日時以降を更新順で表示する。更新なしなら前回の一覧を保持する。
@@ -32,7 +41,7 @@ function acceptUpdates(files) {
   return changed;
 }
 async function pollLatest() {
-  if (latestDisposed || document.hidden || latestController) return;   // 裏に隠れている間と前回取得中は問い合わせない
+  if (latestDisposed || (panel.value?.ownerDocument||document).hidden || latestController) return;   // 裏に隠れている間と前回取得中は問い合わせない
   const run = ++latestRun, forFilter = props.filter, request = new AbortController();
   latestController = request;
   try {
@@ -237,13 +246,13 @@ watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();in
 watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,matches,aiResult],emitMarks,{immediate:true});
-onBeforeUnmount(()=>{cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
-defineExpose({reveal});
+onBeforeUnmount(()=>{panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
+defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false});
 </script>
 <template>
   <div class="explorer-component" data-component="FileExplorer">
-    <button v-if="!open" class="explorer-toggle" aria-label="エクスプローラーを開く" :aria-expanded="false" @click="emit('update:open',true)">☰</button>
-    <div ref="routeElement" class="explorer-routes" :class="{'explorer-collapsed':!open}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
+    <button v-if="!open||detached" class="explorer-toggle" aria-label="エクスプローラーを開く" :aria-expanded="false" @click="detached?panelWindow.focus():emit('update:open',true)">☰</button>
+    <div ref="routeElement" class="explorer-routes" :class="{'explorer-collapsed':!open||detached}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
       <button v-for="[value,label] in [['view','閲覧軌跡'],['search','検索軌跡'],['ai','AiDiy検索軌跡']]" :key="value" class="route-choice" :aria-pressed="routeMode===value" :aria-expanded="routeMode===value&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute(value)">{{ label }}</button>
       <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':routeMode==='search'?'前の検索ファイル':'前の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':routeMode==='search'?'次の検索ファイル':'次の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===routeSteps.length-1" @click="stepRoute(1)">&gt;</button>
       <section v-if="routeListOpen" id="route-file-list" class="route-file-list" :aria-label="routeLabel+'のファイル一覧'">
@@ -255,8 +264,8 @@ defineExpose({reveal});
         <p v-else>{{ routeMode==='ai'?'AiDiy検索の結果を選ぶと、ここに表示します。':routeMode==='search'?'検索軌跡はありません。検索結果があると、ここに表示します。':'ファイルを開くと、ここに表示します。' }}</p>
       </section>
     </div>
-    <aside v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
-      <header><button aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="emit('update:open',false)">☰</button><span>エクスプローラー</span><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
+    <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
+      <header><button aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer">☰</button><span>エクスプローラー</span><button :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
       <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">起点検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>
@@ -288,6 +297,7 @@ defineExpose({reveal});
       </footer>
 
     </aside>
+    <p v-if="pinError" class="app-error" role="alert">{{ pinError }}</p>
   </div>
 </template>
 
