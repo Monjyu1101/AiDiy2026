@@ -129,7 +129,7 @@ Python/Node のライブラリ、内部スクリプト、shell builtin、Git sub
 - キー試験の表示は未実施 / OK / NG。未設定・未対応の項目は未実施で、理由を表示します。OpenRouter の個別テストは設定キーを固定 GET `https://openrouter.ai/api/v1/key` で確認し、成功時だけ公開キャッシュから候補を表示します。公開 `/models` の応答だけでは認証成功にしません。キー未設定は未実施、認証・通信・応答形式の確認失敗は NG です。起動時・明示再取得の公開要求にはキーを送りません。
 - OK はモデル一覧 API の応答確認であり、生成可能性・課金状態の保証ではありません。公開モデル一覧の場合はキー有効性の検証にもなりません。
 - Gemini / FreeAI / Claude / OpenAI / OpenRouter / Ollama Cloud の固定 HTTPS 宛先だけを使います。OpenAI OAuth は `~/.codex/auth.json`（`CODEX_HOME`）、Grok（xAI）は `~/.grok/auth.json` のログイン情報があれば API キーが無くても設定済とし、それぞれ `chatgpt.com/backend-api/codex/models`（本体と同じく非表示・廃止モデルを除き優先度順）と `cli-chat-proxy.grok.com/v1/models`（非表示を除き、作成日が分かるものは 240 日以内）からモデル一覧を取得します。ログイン情報は読むだけで、トークンの更新（ファイルの書換え）はしません。期限切れのときは各 CLI での再ログインを案内します。
-- 絞り込み・並び順は本体（`backend_server/conf/conf_model.py` の取得関数と `get_chat_models`、OAuth は `command_hermes/hermes_cli/codex_models.py`）に合わせています。OpenAI / OpenRouter の表示一覧は旧 Sol（`gpt-6-sol` 系）を除き、補完用の公開一覧は除きません。OpenRouter の別名（`~provider/model`）も本体と同じく表示します。OpenAI OAuth は非表示・廃止を除いて優先度順に並べ、将来版と `-900k` 版を補完します。API で取れないときや空一覧の場合は、Copilot 既定の OpenAI 系4モデルを NG のまま未検証候補として表示します。OAuth 未設定時は補完しません。Grok は本体がもともと固定候補（`grok-4.7` / `grok-4.6`）を流し込む系統のため、API で取れない場合は固定候補を表示して PASS（黄）とし、取れなかった理由を説明に残します。backend_local も本体は API を使わず固定候補（`CHAT_LOCAL_MODELS`）を流し込む系統のため、aidiy_diag が持つ同じ固定候補を表示して PASS（黄）とします。Ollama は本体と同じくキーを使わず、ローカルの Ollama（`ollama list` と同じ一覧、新しい順）を `127.0.0.1:11434/api/tags` から読みます（プロセスは起動しません）。
+- 絞り込み・並び順は本体（`backend_server/conf/conf_model.py` の取得関数と `get_chat_models`、OAuth は `command_hermes/hermes_cli/codex_models.py`）に合わせています。OpenAI / OpenRouter の表示一覧は旧 Sol（`gpt-6-sol` 系）を除き、補完用の公開一覧は除きません。OpenRouter の別名（`~provider/model`）も本体と同じく表示します。OpenAI OAuth は非表示・廃止を除いて優先度順に並べ、将来版と `-900k` 版を補完します。API で取れないときや空一覧の場合は、Copilot 既定の OpenAI 系4モデルで補完し、PASS（補完・実応答未検証）として表示します。OAuth 未設定時は補完しません。Grok は本体がもともと固定候補（`grok-4.7` / `grok-4.6`）を流し込む系統のため、API で取れない場合は固定候補を表示して PASS（黄）とし、取れなかった理由を説明に残します。backend_local も本体は API を使わず固定候補（`CHAT_LOCAL_MODELS`）を流し込む系統のため、aidiy_diag が持つ同じ固定候補を表示して PASS（黄）とします。Ollama は本体と同じくキーを使わず、ローカルの Ollama（`ollama list` と同じ一覧、新しい順）を `127.0.0.1:11434/api/tags` から読みます（プロセスは起動しません）。
 - 「最新モデル取得」は設定状況を読み直し、モデルキー設定のテストできる行を上から順に取得します。取得中の行へ選択と右側のモデル一覧が追従します。Azure、Copilot、Hugging Face、Discord の個別テストは未対応です。
 - キーは当該サービスへのモデル一覧要求（OpenRouter はキー確認 GET）にだけ使用し、任意 URL / proxy / 環境変数の base URL は採用しません。リダイレクト禁止、要求ごとに期限・応答上限を設けます。モデル処理全体は 25 秒・同時2件、HTTPS 要求ごとは8秒・応答1 MiB、設定ファイルは128 KiB、表示モデルは500件上限です。終了・期限切れでは通信を中止し、Google のページ取得は最大20回です。表示の取得範囲・警告を確認してください。エラー本文やヘッダーは返しません。
 - 設定状況を更新すると前のテスト表示を消します。別のキーに変更した場合は再テストしてください。テスト結果はブラウザのメモリ内だけで、再起動・再読込後に引き継ぎません。
@@ -213,7 +213,7 @@ Python、uv を先頭に表示します。CLI や拡張は利用する機能に�
 
 通常の `aidiy_diag` は Electron ウィンドウを開きます。`--browser`、`--no-open`、Codespaces、Linux の DISPLAY / WAYLAND_DISPLAY がない環境では Node.js の Web 版を使います。CI 環境も Web です。GUI 環境で Electron が未準備の場合は黙ってブラウザに切り替えず、セットアップまたは `--browser` を案内します。
 
-全体 `_setup.py` は Diag ランチャーを最初に配置し、Git / Node.js の前提確認後に Diag の Electron を準備します。Node.js がないときもランチャー配置はできます。前提ツールの導入は従来どおり確認付きです。単体 `python backend_diag/_setup.py` は Node.js / npm の準備後に使います。Codespaces / Linux GUI なしでは Electron 導入をスキップします。
+全体 `_setup.py` は Git / Node.js の前提確認後、共通セットアップ（AI CLI 導入の待機を含む）→ Diag ランチャー配置・Electron準備 → local の順で実行します。共通や local が未選択ならその段階だけをスキップします。前提ツールの導入は auto 選択時も従来どおり確認付きです。単体 `python backend_diag/_setup.py` は Node.js / npm の準備後に使います。Codespaces / Linux GUI なしでは Electron 導入をスキップします。
 
 Electron は既存 `scripts/_setup_electron.py` を使い、配置済み、他コンポーネントの同版 dist、`_cache/electron` の共有 ZIP の順で再利用し、不足時だけ取得します。Diag は既存 frontend と同じ `^44.7.0` の Electron パッケージを使います。同版 Diag dist も後段 frontend から再利用でき、専用の別キャッシュは作りません。起動時の npm install / ダウンロードはしません。
 
@@ -227,7 +227,7 @@ Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環�
 - OpenRouter は現在キー設定済み、かつ今回保持しているキー確認済み結果だけを合成します。保存済みの認証確認だけでは合成せず、設定再読込後は再テストが必要です。画面を開いたままキーを差し替えた場合も、サーバー内の確認結果と現在キーを比較して無効化します（キー・指紋は保存や画面送信をしません）。
 - chat が空または local_chat のみなら、設定の CHAT_AI_NAME と対応するモデルを local より前に補完します。既存 local の候補・順序は保持し、同一候補は重複させません。local 以外が1件でもあれば補完しません。
 - live 全体が空なら、設定の LIVE_AI_NAME と対応するモデルを補完します。設定不存在・空値・未対応プロバイダなら空のままです。code 全体が空なら従来どおり aidiy_hermes / auto を補います。config 自体は変更しません。
-- config 補完と OAuth の4候補は「仮設定（未検証）」です。認証・CLI導入・生成可否を保証しません。OAuth 取得成功時は取得結果を優先し、失敗時は NG を維持します。
+- config 補完と OAuth の4候補は「仮設定（未検証）」です。認証・CLI導入・生成可否を保証しません。OAuth 取得成功時は取得結果を優先し、4候補で補完できたときは PASS とします。認証確認は成功に変更しません。
 - live_voices_info.json は FreeAI / Gemini / OpenAI の3区分を常時保存します。既存の音声定義・順序を使い、音声候補の存在は認証成功を意味しません。
 - 認証方式の参照: [OpenRouter Get current API key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key)。キー確認は GET のみです。別タブの config モデル試行は会話生成・課金が発生し得ます。
 - `checks/node-only-startup.check.mjs` は隔離フォルダに設定ファイルを作らず、本物の `diag_main.mjs --headless` を実行します。HOME と PATH を隔離し、通信をオフライン mock にして同梱公開キャッシュを使い、local 4件・Liveモデル0件・Hermes auto 1件・音声3区分と、設定ファイル未作成の維持を確認します。

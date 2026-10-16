@@ -151,23 +151,88 @@ class RootIntegrationTests(unittest.TestCase):
 
 class SetupOrderingTests(unittest.TestCase):
     root_module = RootIntegrationTests.root_module
-    def test_diag_installed_before_prerequisite_failure_without_node(self):
+    def test_prerequisite_failure_prevents_setup_and_restores_auto_mode(self):
         module=self.root_module('_setup');events=[]
         choices={'diag':True,'continue_on_error':True}
         def prerequisites():
             events.append('prerequisites')
             self.assertFalse(module.AUTO_MODE)
             raise RuntimeError('prerequisite failure')
-        def loader(folder):
-            self.assertEqual(folder,'backend_diag')
-            return setup
-        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'_load_folder_module',side_effect=loader),patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
+        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'_load_folder_module') as loader,patch.object(module,'setup_common_global_tools') as common,patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
             with self.assertRaisesRegex(RuntimeError,'prerequisite failure'):
                 module.main()
             launcher=Path(directory)/'.local/bin'/('aidiy_diag.cmd' if setup.sys.platform=='win32' else 'aidiy_diag')
-            self.assertTrue(launcher.exists())
+            self.assertFalse(launcher.exists())
+            loader.assert_not_called();common.assert_not_called()
             self.assertTrue(module.AUTO_MODE)
         self.assertEqual(events,['prerequisites'])
+    def run_setup_order(self, *, common=True, diag=True, local=True, auto=False, failure=None, keep_going=False):
+        from contextlib import ExitStack
+        from types import SimpleNamespace
+        module=self.root_module('_setup');events=[];exit_code=0
+        choices=dict.fromkeys(['common','diag','local','mcp','backend','taskteam','web','avatar','hermes','ide','discord'],False)
+        choices.update(common=common,diag=diag,local=local,continue_on_error=keep_going)
+        def record(name):
+            events.append(name)
+            self.assertEqual(module.AUTO_MODE,auto)
+            return failure != name
+        def prerequisites():
+            events.append('prerequisites');self.assertFalse(module.AUTO_MODE)
+        def launcher(selected, *, desktop):
+            self.assertIs(selected,choices);self.assertFalse(desktop)
+            return record('diag-launcher')
+        modules={
+            'backend_diag':SimpleNamespace(setup=launcher,setup_desktop=lambda:record('diag-desktop')),
+            'backend_local':SimpleNamespace(setup=lambda selected:record('local'),launch_model_download=lambda selected:record('download')),
+        }
+        with ExitStack() as stack:
+            for name,value in [('AUTO_MODE',auto),('GLOBAL_CLI_INSTALL_PROCESSES',['pending'])]:stack.enter_context(patch.object(module,name,value))
+            stack.enter_context(patch.object(module,'collect_setup_choices',return_value=choices))
+            stack.enter_context(patch.object(module,'ensure_prerequisites',side_effect=prerequisites))
+            stack.enter_context(patch.object(module,'setup_common_global_tools',side_effect=lambda selected:[] if record('common') else ['common-error']))
+            stack.enter_context(patch.object(module,'wait_global_cli_tools_install',side_effect=lambda:[] if record('common-wait') else ['fixture-package']))
+            stack.enter_context(patch.object(module,'_load_folder_module',side_effect=lambda folder:modules[folder]))
+            stack.enter_context(patch.object(module,'remove_folder_import_caches',side_effect=lambda:record('clear')))
+            stack.enter_context(patch.object(module,'run_diag_headless',side_effect=lambda:record('headless')))
+            summary=stack.enter_context(patch.object(module,'print_setup_summary'))
+            stack.enter_context(patch.object(module.time,'sleep'));stack.enter_context(patch('builtins.print'))
+            try:module.main()
+            except SystemExit as result:exit_code=result.code
+            self.assertEqual(module.AUTO_MODE,auto)
+        summary.assert_called_once()
+        return events,summary.call_args.args[0],exit_code
+
+    def test_common_diag_local_order_in_manual_and_auto_modes(self):
+        for auto in (False,True):
+            with self.subTest(auto=auto):
+                events,errors,code=self.run_setup_order(auto=auto)
+                self.assertEqual(events,['prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless'])
+                self.assertEqual(errors,[]);self.assertEqual(code,0)
+
+    def test_setup_selection_skips_only_unselected_stages(self):
+        for common in (False,True):
+            for diag in (False,True):
+                for local in (False,True):
+                    with self.subTest(common=common,diag=diag,local=local):
+                        events,errors,code=self.run_setup_order(common=common,diag=diag,local=local)
+                        expected=['prerequisites']+(['common','common-wait'] if common else [])+(['diag-launcher','diag-desktop'] if diag else [])+(['local','download'] if local else [])+['clear']+(['headless'] if diag else [])
+                        self.assertEqual(events,expected);self.assertEqual(errors,[]);self.assertEqual(code,0)
+
+    def test_diag_and_local_failures_preserve_continue_or_abort_policy(self):
+        labels={'diag-launcher':'バックエンド(Diag)','diag-desktop':'バックエンド(Diag): Electron','local':'バックエンド(local)'}
+        normal=['prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless']
+        for failure,label in labels.items():
+            for keep_going in (False,True):
+                with self.subTest(failure=failure,keep_going=keep_going):
+                    events,errors,code=self.run_setup_order(failure=failure,keep_going=keep_going)
+                    self.assertEqual(events,normal if keep_going else normal[:normal.index(failure)+1])
+                    self.assertEqual(errors,[label]);self.assertEqual(code,0 if keep_going else 1)
+
+    def test_common_errors_keep_existing_summary_and_continuation_behavior(self):
+        for failure,label in [('common','common-error'),('common-wait','共通: AI CLI ツール導入 (fixture-package)')]:
+            events,errors,code=self.run_setup_order(failure=failure)
+            self.assertLess(events.index('common-wait'),events.index('diag-launcher'))
+            self.assertEqual(events[-2:],['clear','headless']);self.assertEqual(errors,[label]);self.assertEqual(code,0)
     def test_cancel_does_not_check_or_install_prerequisites(self):
         module=self.root_module('_setup')
         with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):

@@ -738,15 +738,7 @@ def main():
     error_locations: list[str] = []
 
     print()
-    if choices.get("diag"):
-        if not _load_folder_module("backend_diag").setup(choices, desktop=False):
-            error_locations.append("バックエンド(Diag)")
-            if not continue_on_error:
-                print_setup_summary(error_locations)
-                sys.exit(1)
-
-    print()
-    # ランチャー配置には Node.js / Git が不要。前提ツールの導入失敗より先に配置する。
+    # 共通・Diag・local のセットアップ前に Git / Node.js の前提を確認する。
     # 従来は a=auto 選択前の対話だったため、OS ツール導入は自動承認に変えない。
     selected_auto_mode = AUTO_MODE
     try:
@@ -754,13 +746,6 @@ def main():
         ensure_prerequisites()
     finally:
         AUTO_MODE = selected_auto_mode
-
-    if choices.get("diag"):
-        if not _load_folder_module("backend_diag").setup_desktop():
-            error_locations.append("バックエンド(Diag): Electron")
-            if not continue_on_error:
-                print_setup_summary(error_locations)
-                sys.exit(1)
 
     if choices["common"]:
         error_locations.extend(setup_common_global_tools(choices))
@@ -770,6 +755,20 @@ def main():
             error_locations.extend([f"共通: AI CLI ツール導入 ({package})" for package in failed_packages])
     else:
         print_warning("共通セットアップをスキップしました。")
+
+    # 表示順と同じく、共通処理（CLI 導入待機も含む）→ Diag → local の順で実行する。
+    print()
+    if choices.get("diag"):
+        if not _load_folder_module("backend_diag").setup(choices, desktop=False):
+            error_locations.append("バックエンド(Diag)")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+        if not _load_folder_module("backend_diag").setup_desktop():
+            error_locations.append("バックエンド(Diag): Electron")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
 
     print()
     if choices["local"]:

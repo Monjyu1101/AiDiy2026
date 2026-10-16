@@ -19,14 +19,15 @@ test('OAuth fallback reuses exactly the existing four Copilot OpenAI defaults in
   assert.deepEqual(Object.keys(COPILOT_FALLBACK_MODELS).filter(id=>id.startsWith('gpt-')),expected);
   assert.equal(Object.keys(COPILOT_FALLBACK_MODELS).length,8);
 });
-test('empty API list, network failure and invalid authentication use unverified candidates without claiming success',async()=>{
+test('empty API list, network failure and invalid authentication pass with unverified fallback candidates',async()=>{
   for(const fetch of [async()=>({models:[]}),async()=>{throw new Error('network');},
     async()=>{throw Object.assign(new Error('http'),{status:401});},async()=>{throw Object.assign(new Error('http'),{status:403});}]) {
     const result=await inspect(fetch);
-    assert.equal(result.id,'openai_oauth');assert.equal(result.状態,'NG');assert.equal(result.認証確認,false);
+    assert.equal(result.id,'openai_oauth');assert.equal(result.状態,'PASS');assert.equal(result.認証確認,false);
     assert.deepEqual(result.モデル,expected);assert.match(result.補完,/未検証/);
     const info=await modelsInfo(provider,result);
-    assert.equal(info.状態,'NG');assert.equal(info.認証確認,false);assert.equal(info.プロバイダ,'openai_oauth');
+    assert.equal(info.状態,'PASS');assert.equal(info.認証確認,false);assert.equal(info.プロバイダ,'openai_oauth');
+    assert.match(info.説明,/空|失敗/);assert.ok(info.警告.some(text=>text.includes('認証・生成可否は未検証')));
     assert.deepEqual(Object.keys(info.chat.openai_oauth.models),expected);
     for(const label of Object.values(info.chat.openai_oauth.models))assert.match(label,/仮設定（未検証）/);
     assert.deepEqual(Object.keys(info.code.aidiy_hermes.models),expected.map(id=>'openai_oauth/'+id));
@@ -34,6 +35,13 @@ test('empty API list, network failure and invalid authentication use unverified 
     assert.ok(!JSON.stringify(info).includes('fixture-token'));
     assert.deepEqual(oauthModelFallback(result),result,'fallback is idempotent');
   }
+});
+test('unattempted OAuth, runner failures and other providers are not promoted to PASS',async()=>{
+  for(const result of [{id:'openai_oauth',状態:'未実施',モデル:[]},{id:'openai',状態:'NG',モデル:[]}]) {
+    assert.deepEqual(oauthModelFallback(result),result);
+  }
+  const result=await testKey('openai_oauth',{run:async()=>({error:'timeout'})});
+  assert.equal(result.状態,'未実施');assert.deepEqual(result.モデル,[]);
 });
 test('successful API acquisition remains unchanged and does not add fallback models',async()=>{
   const result=await inspect(async()=>({models:[{slug:'actual-api-model'}]}));
@@ -58,6 +66,9 @@ test('saved OAuth fallback precedes local, suppresses duplicate config fallback 
     const local={id:'local',名前:'Local'};
     const failure=await inspect(async()=>{throw new Error('network');});
     await writeModelsInfo([provider,local],{openai_oauth:failure,local:{状態:'PASS'}},options);
+    const saved=JSON.parse(await readFile(path.join(directory,'openai_oauth_models_info.json'),'utf8'));
+    assert.equal(saved.状態,'PASS');assert.equal(saved.認証確認,false);
+    assert.deepEqual(Object.keys(saved.code.aidiy_hermes.models),expected.map(id=>'openai_oauth/'+id));
     let chat=await load();
     assert.deepEqual(Object.keys(chat),['openai_oauth','local_chat']);
     assert.deepEqual(Object.keys(chat.openai_oauth.models),expected);
