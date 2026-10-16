@@ -3,13 +3,23 @@ import {openSync,closeSync,fstatSync,ftruncateSync,writeSync,constants} from 'no
 import {fileURLToPath} from 'node:url';
 export const DESKTOP_LOG=new URL('../.desktop-errors.log',import.meta.url);
 const codes=new Set(['IPC','TIMEOUT','URL','WINDOW','LOAD','RENDERER','SPAWN','EXIT']);
+function resetLog(fd,file) {
+  if(process.platform!=='win32')return ftruncateSync(fd,0);
+  // Windows の追記専用ハンドルは切り詰め不可。同じファイルの書込ハンドルを使う。
+  const resetFd=openSync(file,constants.O_WRONLY|(constants.O_NOFOLLOW || 0)|(constants.O_NONBLOCK || 0));
+  try {
+    const original=fstatSync(fd),target=fstatSync(resetFd);
+    if(!target.isFile() || original.dev!==target.dev || original.ino!==target.ino)throw Error('Log file changed');
+    ftruncateSync(resetFd,0);
+  }finally{closeSync(resetFd);}
+}
 function appendSafeLine(body,file=DESKTOP_LOG) {
   let fd;
   try {
     fd=openSync(file,constants.O_WRONLY|constants.O_CREAT|constants.O_APPEND|(constants.O_NOFOLLOW || 0)|(constants.O_NONBLOCK || 0),0o600);
     if(!fstatSync(fd).isFile())return false;
     const line=new Date().toISOString()+' '+body+'\n';
-    if(fstatSync(fd).size+Buffer.byteLength(line)>65536)ftruncateSync(fd,0);
+    if(fstatSync(fd).size+Buffer.byteLength(line)>65536)resetLog(fd,file);
     writeSync(fd,line);return true;
   }catch{return false;}finally{if(fd!==undefined){try{closeSync(fd);}catch{}}}
 }
