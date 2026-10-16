@@ -484,7 +484,7 @@ test('2D文字の折り返し: ページ幅で日時を次行へ送り、長い�
   assert.ok(queries.includes('folder-page (max-height:360px)'), 'プレビューを除いた高さで補足欄を抑える');
 });
 
-test('2D行間: 16pxのサイズ・日時2行をフォルダと同じ48pxへ収め、狭幅は省略せず折り返す', () => {
+test('2Dファイル行間: 16pxのサイズ・日時2行を48pxへ収め、狭幅は省略せず折り返す', () => {
   // CSS値から通常行の必要高さを計算する。実ブラウザーのレイアウト測定ではない。
   const css = require('postcss').parse(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'));
   const values = (selector, parent = 'root') => {
@@ -515,7 +515,7 @@ test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし�
   const rules = new Map();
   css.walkRules(rule => { if (rule.parent.type === 'root') rules.set(rule.selector, Object.fromEntries(rule.nodes.map(decl => [decl.prop, decl.value]))); });
   const folder = '.mode-2d .folder-page-entry.folder', stripe = '.mode-2d .folder-page-entry.striped';
-  assert.equal(rules.get(folder).background, '#eae2d5'); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
+  assert.equal(rules.get(folder).background, 'linear-gradient(150deg,#ece5d6 0%,#e0d5c0 55%,#d6c9b0 100%)'); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
   assert.equal(rules.get(folder)['border-color'], '#d8d0c4');
   const selectors = [...rules.keys()];
   for (const state of [':hover', '[data-cursor=true]', '.selected']) {
@@ -530,11 +530,37 @@ test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし�
     const value = parseInt(hex.slice(index, index + 2), 16) / 255;
     return sum + [.2126, .7152, .0722][component] * (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
   }, 0);
-  const backgrounds = ['#faf7f2', '#f5f1e8', rules.get(folder).background, ...[':hover', '[data-cursor=true]', '.selected'].map(state => rules.get('.mode-2d .folder-page-entry' + state).background)];
-  for (const background of backgrounds) for (const foreground of ['#5a4a3a', rules.get('.mode-2d .folder-page-meta').color, '#7a4908']) {
+  const folderColors = rules.get(folder).background.match(/#[\da-f]{6}/g);
+  const backgrounds = ['#faf7f2', '#f5f1e8', ...folderColors, ...[':hover', '[data-cursor=true]', '.selected'].map(state => rules.get('.mode-2d .folder-page-entry' + state).background)];
+  for (const background of backgrounds) for (const foreground of ['#5a4a3a', rules.get(folderColors.includes(background) ? '.mode-2d .folder-page-entry.folder .folder-page-meta' : '.mode-2d .folder-page-meta').color, '#7a4908']) {
     assert.ok((luminance(background) + .05) / (luminance(foreground) + .05) >= 4.5, `${foreground} on ${background}`);
   }
-  assert.ok(luminance(rules.get(folder).background) < luminance('#f5f1e8'), 'フォルダとファイルの境目を区別する');
+  assert.ok(folderColors.every(color => luminance(color) < luminance('#f5f1e8')), 'フォルダとファイルの境目を区別する');
+});
+
+test('2Dカード: 多数・長い日本語名もフォルダ先の同じ選択順を保ち、ファイルと空表示を残す', async () => {
+  const { app, root, props, emitted, walk, find, warnings } = await mountedPages();
+  const all = (node, predicate) => [...(predicate(node) ? [node] : []), ...(node.children || []).flatMap(child => all(child, predicate))];
+  const rows = () => all(find('folder-page-body'), element => element.props.class?.split(' ').includes('folder-page-entry'));
+  const longName = '非常に長い日本語の設計資料と開発手順'.repeat(5);
+  try {
+    props.tree = { n: 'project', d: Array.from({ length: 80 }, (_, i) => ({ n: i === 0 ? longName : `フォルダ${i}`, d: [], f: [] })), f: [['README.md', 10, 1000]] };
+    await flush();
+    assert.equal(rows().length, 81);
+    assert.ok(rows().slice(0, 80).every(row => row.props.class.split(' ').includes('folder')));
+    assert.equal(rows().at(-1).props.title, 'README.md');
+    const folder = rows().find(row => row.props.title === longName);
+    assert.equal(walk(folder, element => element.props.class === 'folder-page-name').text, longName);
+    folder.props.onClick(); await flush(); assert.equal(props.current, longName);
+    assert.ok(find('folder-page-empty'));
+    walk(find('folder-page-heading'), element => element.props.title?.startsWith('親フォルダ')).props.onClick(); await flush();
+    assert.equal(props.current, '');
+    assert.equal(rows().find(row => row.props['data-cursor']).props.title, longName);
+    rows().at(-1).props.onClick(); await flush();
+    assert.equal(emitted.at(-1).type, 'file'); assert.equal(props.selected, 'README.md');
+    props.tree = { n: 'project', d: [], f: [] }; props.selected = ''; await flush();
+    assert.equal(rows().length, 0); assert.ok(find('folder-page-empty')); assert.deepEqual(warnings, []);
+  } finally { app.unmount(); }
 });
 
 test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の戻る抑止・軌跡バー高さ追従', async () => {

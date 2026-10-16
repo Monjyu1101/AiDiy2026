@@ -796,6 +796,7 @@ def start_service(
 
     try:
         if name == "バックエンド(tools)":
+            print_header("バックエンド(tools) 起動")
             process = TOOLS.start()
         elif name == "バックエンド(local)":
             process = LOCAL.start()
@@ -883,7 +884,6 @@ def start_initial_services(
         wait_for_services_quiet(last_output_times, ["バックエンド(local)"], label="バックエンド(local)")
 
     if start_backend_tools_enabled:
-        print_header("バックエンド(tools) 起動")
         start_service("バックエンド(tools)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["バックエンド(tools)"], label="バックエンド(tools)")
 

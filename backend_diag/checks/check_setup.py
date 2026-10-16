@@ -116,6 +116,46 @@ class RootIntegrationTests(unittest.TestCase):
             for _ in range(2):self.assertTrue(module.start_service('バックエンド(tools)',{}, {},None))
         self.assertEqual(events,['diag','tools','diag','tools'])
 
+    def test_tools_headers_follow_completed_diagnosis_before_start_and_wait(self):
+        from types import SimpleNamespace
+        for initial in (True,False):
+            module=self.root_module('_start');output=io.StringIO()
+            def diagnose():print('diag-start');print('diag-complete')
+            def start():print('tools-process-start');return object()
+            with patch.object(module,'DIAG',SimpleNamespace(run_headless=diagnose)),patch.object(module,'TOOLS',SimpleNamespace(start=start)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet',side_effect=lambda *a,**kw:print('tools-wait')),redirect_stdout(output):
+                if initial:module.start_initial_services(False,True,False,False,False,False,{}, {},None)
+                else:
+                    for _ in range(2):self.assertTrue(module.start_service('バックエンド(tools)',{}, {},None))
+            text=output.getvalue();count=1 if initial else 2
+            self.assertEqual(text.count('バックエンド(Diag) [y]'),count)
+            self.assertEqual(text.count('バックエンド(tools) 起動'),count)
+            for part in text.split('バックエンド(Diag) [y]')[1:]:
+                self.assertLess(part.index('diag-complete'),part.index('バックエンド(tools) 起動'))
+                self.assertLess(part.index('バックエンド(tools) 起動'),part.index('tools-process-start'))
+            if initial:self.assertLess(text.index('tools-process-start'),text.index('tools-wait'))
+
+    def test_tools_not_selected_cleanup_skipped_or_diag_failed_has_no_start_header(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        for mode in ('unselected','cleanup','diag-failed'):
+            module=self.root_module('_start');output=io.StringIO()
+            diag=Mock(side_effect=RuntimeError('fixture-failure') if mode=='diag-failed' else None);start=Mock()
+            with patch.object(module,'DIAG',SimpleNamespace(run_headless=diag)),patch.object(module,'TOOLS',SimpleNamespace(start=start)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value={'バックエンド(tools)'} if mode=='cleanup' else set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),redirect_stdout(output):
+                if mode=='diag-failed':
+                    with self.assertRaises(SystemExit):module.start_service('バックエンド(tools)',{}, {},None)
+                else:module.start_initial_services(False,mode!='unselected',False,False,False,False,{}, {},None)
+            self.assertNotIn('バックエンド(tools) 起動',output.getvalue());start.assert_not_called()
+            self.assertEqual(diag.call_count,int(mode=='diag-failed'))
+
+    def test_monitor_does_not_rediagnose_or_reprint_header_for_running_tools(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        module=self.root_module('_start');output=io.StringIO();diag=Mock();start=Mock()
+        process=SimpleNamespace(poll=lambda:None)
+        with patch.object(module,'DIAG',SimpleNamespace(run_headless=diag)),patch.object(module,'TOOLS',SimpleNamespace(start=start)),patch.object(module,'suspend_services_for_cleanup'),patch.object(module.time,'sleep',side_effect=KeyboardInterrupt),redirect_stdout(output):
+            with self.assertRaises(KeyboardInterrupt):module.monitor_and_restart({'バックエンド(tools)':True},{'バックエンド(tools)':process},{},None)
+        diag.assert_not_called();start.assert_not_called();self.assertNotIn('バックエンド(tools) 起動',output.getvalue())
+
     def test_headless_failure_stops_startup_and_cleans_started_processes(self):
         from types import SimpleNamespace
         from unittest.mock import Mock

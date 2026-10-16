@@ -261,7 +261,7 @@ Windowsの `aidiy_term/powershell-init.ps1` は、その端末セッションだ
 
 共通ビルドはViteのpublicコピーでSVGを外部ファイルとして配布し、Code / Liveのdevelopment/assetsにも原文・帰属ごとコピーします。VS Codeでは `host/src/vscode-html.ts` のwebview URI、単独Liveではtoken配下の相対URLを起動設定に渡します。HTTPは `catppuccinAsset()` の許可集合だけを配信し、SVGへ `default-src 'none'; sandbox` とnosniffを付けます。
 
-ライセンス集は `viewer/scripts/licenses.mjs`、共通配布物の通知は `scripts/build.mjs` が `scripts/icon-notices.mjs` を共有します。変更後は `node frontend_ide/viewer/scripts/licenses.mjs` と、`frontend_ide/host` で `npm run check && npm run compile` を実行して配布物を検証します。`node --test frontend_ide/checks/file-icons.test.mjs` はマッピング、SVGハッシュと安全な要素、Vueの実レンダー、IDE/Code/LiveのHTTP・VS Code URI、ライセンス同梱を確認します。実画面ではツリー・ルート・最終更新と2Dページの整列、開閉、選択・更新マークを別途確認してください。2Dの先頭ページでは無効な「親へ」ボタンを出さず、子ページでは親への移動を保ちます。通常行は48pxを下限とし、16pxのサイズ・日時を行高18px・間隔0の2行と上下5pxの余白へ収めて、フォルダ行だけを広げず揃えます。ページ幅520px以下では名前の下でサイズ・日時を横並びから折り返し、長い文字を切り捨てず文字サイズを維持します。フォルダは少し濃いクリーム、ファイルだけは自然順のインデックスで薄いゼブラにし、旧・経由ページへも同じ状態を複製します。hover・カーソル・選択と検索文字の色を縞より優先してください。`checks/folder-pages.test.mjs` は2Dの実Vueマウントで通常・旧・経由ページのアイコンと操作境界、18px/16pxの文字、狭幅の折り返しを確認し、同梱SVGの色とクリーム色のコントラストも数値検証します。
+ライセンス集は `viewer/scripts/licenses.mjs`、共通配布物の通知は `scripts/build.mjs` が `scripts/icon-notices.mjs` を共有します。変更後は `node frontend_ide/viewer/scripts/licenses.mjs` と、`frontend_ide/host` で `npm run check && npm run compile` を実行して配布物を検証します。`node --test frontend_ide/checks/file-icons.test.mjs` はマッピング、SVGハッシュと安全な要素、Vueの実レンダー、IDE/Code/LiveのHTTP・VS Code URI、ライセンス同梱を確認します。実画面ではツリー・ルート・最終更新と2Dページの整列、開閉、選択・更新マークを別途確認してください。2Dの先頭ページでは無効な「親へ」ボタンを出さず、子ページでは親への移動を保ちます。通常ファイル行は48pxを下限とし、16pxのサイズ・日時を行高18px・間隔0の2行と上下5pxの余白へ収めます。フォルダは上部のカードとして最小高さ111px・角丸10px・AiDiyメニューと同じクリームのグラデーションで表示します。既存のフォルダ先のDOM順・option ID・選択処理は変えず、CSS Gridでカードを折り返し、ファイル行は全幅にします。長い日本語名は省略せずカードの高さを広げ、多数時はページ本文でスクロールします。ページ幅520px以下では名前の下でサイズ・日時を横並びから折り返し、長い文字を切り捨てず文字サイズを維持します。フォルダの件数は濃い文字でカード上のコントラストを保ち、ファイルだけは自然順のインデックスで薄いゼブラにし、旧・経由ページへも同じ状態を複製します。hover・カーソル・選択と検索文字の色を縞より優先してください。`checks/folder-pages.test.mjs` は2Dの実Vueマウントで通常・旧・経由ページのアイコンと操作境界、18px/16pxの文字、狭幅の折り返しを確認し、同梱SVGの色とクリーム色のコントラストも数値検証します。
 
 
 ## 閲覧・検索軌跡の明細と分岐
@@ -299,3 +299,6 @@ IDEから開いたTermは、既存の `reserveTermSlot()` が確保した配置�
 判定にはホストが同時に通知する実行状態と進捗を使います。単独版 `host/aidiy_code/src/server.ts` と拡張版 `host/src/extension.ts` は依頼開始時に進捗を空にします。生の `output_stream` パケットだけで待機判定を更新すると、終了後や次の依頼へ移った後の遅延通知を前回から持ち越すので避けてください。保存済み進捗を伴う実行中のstateを復元した場合は、本文ありとして表示します。判定のリセットはstate受信中に同期で行い、終了→開始が同じ描画周期に届いても区別します。会話変更、実行終了、新しい依頼、ホストの非空進捗→空進捗への初期化でリセットしてください。
 
 `node --test frontend_ide/checks/code-progress-motion.test.mjs` で実Vueスクリプトとテンプレートを使い、最初の本文・後続本文・非ストリーム・空白/制御通知・完了/停止/エラー・次の依頼/会話・再接続・Provider共通動作・入力と停止の維持を確認します。これはコンポーネント回帰テストであり、実Providerの接続や画面撮影の代わりにはなりません。
+
+
+カード配置の実画面確認は、Vue配布物の生成後に `node frontend_ide/scripts/check-folder-cards.mjs` を使います。オフラインの一時プロジェクトで1280×800・768×1000・390×844・1280×420、多数カード・長い日本語名・空フォルダ・親への戻り・選択復元・キーボードでのファイル表示を検証し、日本時間の日時付き画像と測定結果を `temp/folder-card-check/` に保存します。実APIやAIの起動は不要です。
