@@ -51,7 +51,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
    child.stdout.on('data',chunk=>{output+=chunk;const match=output.match(/http:\/\/127\.0\.0\.1:\d+\/#token=/);if(match)resolve(match[0].split('#')[0]);});
    child.once('exit',()=>reject(new Error('Startup ended: '+errors)));
   });
-  for(const asset of ['','app.js','style.css']){const response=await fetch(address+asset);assert.equal(response.status,200);assert.ok((await response.text()).length>0);}
+  for(const asset of ['','app.js','style.css','AiDiy_diag.png']){const response=await fetch(address+asset);assert.equal(response.status,200);assert.ok((await response.text()).length>0);}
   assert.equal((await fetch(address+'api/'+encodeURIComponent('キー設定'))).status,401);
   // Windows の kill(SIGTERM) は正常終了処理を通さないため、既存の停止通知を使う。
   if(process.platform==='win32')await writeFile(path.join(root,'.stop-request'),randomBytes(16).toString('hex'));

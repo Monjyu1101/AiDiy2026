@@ -10,6 +10,7 @@ import { searchReference, fileDraftReference } from '../ファイル閲覧/フ�
 import { copyBrowserText, fullFilePath } from '../ファイル閲覧/ファイル操作.js';
 import {createViewerActivity} from '../ファイル閲覧/閲覧待機.js';
 import {openBrowser} from '../ブラウザ/起動.js';
+import {MEDIA_PATTERN} from '../../viewer/media-types.mjs';
 const browserAvailable=inject('browserAvailable',false);
 // pinned: 右側のプレビューではなく、ピン留めした独立ウィンドウの中身として全面に表示する
 const props=defineProps({file:Object,root:String,pinned:Boolean,pinBusy:Boolean});const emit=defineEmits(['close','pin','activity']);
@@ -33,6 +34,8 @@ onMounted(bindActivityWindow);
 watch(()=>props.pinned,()=>nextTick(bindActivityWindow));
 // HTML / SVG / Vue / Markdown はコードとプレビューを切り替える。文書は別オリジンで表示する。
 // 最後に選んだ方を種類ごとに覚える（SVG / Markdownは表示が既定）。
+// 音声・動画はビューア内で再生せず、「ブラウザ」で開いて再生する。
+const mediaFile=computed(()=>MEDIA_PATTERN.test(props.file?.name||''));
 const previewKind=computed(()=>/\.(md|markdown)$/i.test(props.file?.name||'')?'markdown':/\.html?$/i.test(props.file?.name||'')?'html':/\.svg$/i.test(props.file?.name||'')?'svg':/\.vue$/i.test(props.file?.name||'')?'vue':'');
 const modeKey=kind=>`aidiy-ide-preview-mode:${kind}`;
 const readMode=kind=>{try{const saved=localStorage.getItem(modeKey(kind));if(saved==='view'||saved==='code')return saved;}catch{}return ['svg','markdown'].includes(kind)?'view':'code';};
@@ -108,7 +111,7 @@ async function openFile(){
   finally{if(run===actionRevision)actionBusy.value='';}
 }
 async function browse(){
-  if(actionBusy.value||previewKind.value!=='html')return;
+  if(actionBusy.value||(previewKind.value!=='html'&&!mediaFile.value))return;
   const run=++actionRevision;actionBusy.value='browser';actionError.value='';
   try{const result=await openBrowser(props.file.path);if(!result?.ok)throw Error(result?.error||'ブラウザを開けませんでした。');}
   catch(e){if(run===actionRevision)actionError.value=e.message;}
@@ -137,7 +140,7 @@ defineExpose({moved:bindActivityWindow});
 <template>
   <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @touchstart.capture.passive="activity" @touchmove.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
       <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">{{ previewKind==='markdown'?'プレビュー':'表示' }}</button></span>
-      <button v-if="previewKind==='html'" class="viewer-browser" :disabled="!!actionBusy||!browserAvailable" :title="browserAvailable?'ブラウザで開く':'tools接続中のみ起動できます'" @click="browse">{{ actionBusy==='browser'?'起動中…':'ブラウザ' }}</button>
+      <button v-if="previewKind==='html'||mediaFile" class="viewer-browser" :disabled="!!actionBusy||!browserAvailable" :title="browserAvailable?'ブラウザで開く':'tools接続中のみ起動できます'" @click="browse">{{ actionBusy==='browser'?'起動中…':'ブラウザ' }}</button>
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
@@ -164,6 +167,7 @@ defineExpose({moved:bindActivityWindow});
         </template>
         <div v-show="mode!=='view'" class="viewer-code"><p v-if="data.truncated" class="input-hint">先頭の一部を表示しています。</p><pre v-if="fallback" ref="fallbackHost"><template v-if="fallbackParts">{{ fallbackParts.before }}<mark ref="fallbackMatch">{{ fallbackParts.match }}</mark>{{ fallbackParts.after }}</template><template v-else>{{ data.text }}</template></pre><div v-else ref="host" class="monaco-host"></div></div>
       </template>
+      <p v-else-if="mediaFile">音声・動画は「ブラウザ」で開いて再生できます。</p>
       <p v-else>この形式はプレビューできません。</p>
     </div>
   </aside>

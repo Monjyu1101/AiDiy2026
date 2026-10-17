@@ -102,17 +102,17 @@ test('手動開始後はtools停止でも作業を維持し、復帰時に同じ
   try {
     assert.equal(calls, 0); // 起動だけでは接続を作らない
     assert.equal((await get('api/connection').then(r => r.json())).connected, false);
-    for (const path of ['api/galaxy', 'api/file?path=app.js', 'api/raw?path=a.png', 'api/document?path=a.pdf']) assert.equal((await get(path)).status, 503);
-    assert.equal((await get('connection.js')).status, 200);
+    for (const path of ['api/galaxy', 'api/file?path=layout.js', 'api/raw?path=a.png', 'api/document?path=a.pdf']) assert.equal((await get(path)).status, 503);
+    assert.equal((await get('office.js')).status, 200);
     assert.equal((await get('licenses.html')).status, 200);
     assert.equal((await post('connect').then(r => r.json())).connected, true);
     assert.equal((await get('api/galaxy')).status, 200);
-    assert.equal((await get('api/file?path=app.js')).status, 200);
+    assert.equal((await get('api/file?path=layout.js')).status, 200);
     const startedAt = connection.state().startedAt;
     healthy = false;
     await connection.check();
     assert.equal(connection.state().connected, false);
-    assert.equal((await get('api/file?path=app.js')).status, 200);
+    assert.equal((await get('api/file?path=layout.js')).status, 200);
     assert.equal(connection.state().mode, 'online');
     assert.equal(connection.state().wanted, true);
     assert.equal(connection.state().active, true);
@@ -138,7 +138,7 @@ test('手動開始後はtools停止でも作業を維持し、復帰時に同じ
     await connection.check();
     assert.equal(calls, previous); // オフラインではtoolsを呼ばない
     assert.equal((await get('api/galaxy')).status, 200);
-    assert.equal((await get('api/file?path=app.js')).status, 200);
+    assert.equal((await get('api/file?path=layout.js')).status, 200);
     assert.equal((await get('api/connection/offline')).status, 405);
     await post('disconnect');
     assert.equal((await get('api/galaxy')).status, 503);

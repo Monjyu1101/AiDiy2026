@@ -8,9 +8,16 @@ const {pathToFileURL,fileURLToPath}=require('node:url');
 const {relative,isAbsolute,sep}=require('node:path');
 const {previewFile}=require('./native-preview-actions.cjs');
 function browserFileURL(root,path){return pathToFileURL(previewFile(root,path).full).href;}
+// Browser で開けるのは HTML と音声・動画。
+async function browserOpenable(path){
+ const {MEDIA_PATTERN}=await import('../viewer/media-types.mjs');
+ return /\.html?$/i.test(path)||MEDIA_PATTERN.test(path);
+}
+// AiDiy 保守中の登録HTML・public の音声・動画は正式なリンク、それ以外は file:// で開く。
 async function browserFileTarget(root,path){
  const fileURL=browserFileURL(root,path);
- const {registeredHTMLURL}=await import('../viewer/登録HTMLルート.mjs');
+ const [{registeredHTMLURL,publicMediaURL},{MEDIA_PATTERN}]=await Promise.all([import('../viewer/登録HTMLルート.mjs'),import('../viewer/media-types.mjs')]);
+ if(MEDIA_PATTERN.test(path))return await publicMediaURL(root,path)||fileURL;
  return await registeredHTMLURL(root,path)||fileURL;
 }
 function browserURL(value){
@@ -87,4 +94,4 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
  function setAvailable(owner,available){for(const [record,entry]of entries)if(record.owner===owner&&entry.available!==available){entry.available=available;if(!available)entry.view.webContents.stop();entry.layout();entry.notify();}}
  return{attach,action,setAvailable,allowedURL:allowed};
 }
-module.exports={HOME,browserURL,browserFileURL,browserFileTarget,createBrowserViews};
+module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews};

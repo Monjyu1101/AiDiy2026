@@ -7,12 +7,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
 import { createPanels } from '../panels.mjs';
 import { startServer } from '../server.mjs';
 import { createCoreConnection } from '../core-connection.mjs';
-const require = createRequire(import.meta.url);
-const { audioRequest, audioCheck } = require('../panel-permissions.cjs');
 const listen = server => new Promise(done => server.listen(0, '127.0.0.1', done));
 
 test('パネルは手動で遅延起動し、オフラインでLiveを拒否し、利用終了で破棄する', async () => {
@@ -57,9 +54,10 @@ test('IDEの同一公開元から実Codeのオフライン画面・SSEを使い�
     connection.offline();
     const result = await fetch(app.url + 'api/panels/code', { method: 'POST' }).then(r => r.json());
     const base = new URL(result.url, app.url).href;
-    const page = await fetch(base);
-    assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'self'/);
-    assert.match(await page.text(), /AiDiy Code/);
+    // Code サーバーは API だけを返す（画面は IDE の Vue 画面）。同一公開元の中継で API を使える。
+    const catalog = await fetch(base + 'catalog');
+    assert.equal(catalog.status, 200);
+    assert.deepEqual((await catalog.json()).providers.map(item => item.id), ['aidiy_hermes']);
     const events = await fetch(base + 'events'); reader = events.body.getReader();
     const first = new TextDecoder().decode((await reader.read()).value);
     assert.match(first, /"実行モード":"offline"/);
@@ -78,17 +76,6 @@ test('IDEの同一公開元から実Codeのオフライン画面・SSEを使い�
     await new Promise(done => app.server.close(done));
     core.closeAllConnections(); await new Promise(done => core.close(done));
   }
-});
-
-test('Electron音声許可はIDE内のLiveフレーム・音声だけに限定する', () => {
-  const contents = {}, origin = 'http://127.0.0.1:12345';
-  const details = { isMainFrame: false, requestingUrl: `${origin}/panels/live/${'a'.repeat(48)}/`, mediaTypes: ['audio'], mediaType: 'audio' };
-  assert.equal(audioRequest(contents, contents, 'media', details, origin), true);
-  assert.equal(audioCheck(contents, contents, 'media', origin, details, origin), true);
-  for (const override of [{ mediaTypes: ['video'] }, { isMainFrame: true }, { requestingUrl: origin + '/office.html' }, { requestingUrl: details.requestingUrl.replace('/live/', '/code/') }]) {
-    assert.equal(audioRequest(contents, contents, 'media', { ...details, ...override }, origin), false);
-  }
-  assert.equal(audioCheck(contents, contents, 'media', 'https://foreign.invalid', details, origin), false);
 });
 
 test('Liveの設定とWebSocketをIDEの公開元で中継し、切断するとソケットを閉じる', async () => {

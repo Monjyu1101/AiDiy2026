@@ -62,7 +62,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
-  const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']]]);
+  const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
   return async (req,res) => {
     const reply = (status, body, type='application/json; charset=utf-8') => {
       if (res.destroyed) return;

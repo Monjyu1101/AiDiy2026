@@ -13,10 +13,10 @@
 import { build } from 'esbuild';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 
-await build({ entryPoints: ['src/extension.ts'], outfile: 'dist/extension.js', bundle: true, platform: 'node', target: 'node22', format: 'cjs', external: ['vscode'] });
+const extension = await build({ entryPoints: ['src/extension.ts'], outfile: 'dist/extension.js', bundle: true, platform: 'node', target: 'node22', format: 'cjs', external: ['vscode'], metafile: true });
 await import('../aidiy_code/build.mjs');
-const webview = await build({ entryPoints: ['src/webview.ts'], outfile: 'dist/webview.js', bundle: true, platform: 'browser', target: 'es2022', minify: true, metafile: true });
-const packages = new Set(Object.keys(webview.metafile.inputs).filter(path => path.startsWith('node_modules/')).map(path => path.split('/')[1]));
+// 画面は frontend_ide の Vue bundle（dist/development）を使う。ここでは拡張本体に同梱したパッケージの通知を出力する。
+const packages = new Set(Object.keys(extension.metafile.inputs).filter(path => path.startsWith('node_modules/')).map(path => path.split('/')[1]));
 const notices = [];
 for (const name of [...packages].sort()) {
   const root = `node_modules/${name}`;

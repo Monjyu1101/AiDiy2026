@@ -26,7 +26,7 @@ async function start(value) {
   isolated.webRequest.onBeforeRequest((details,callback)=>{
     try {const target=new URL(details.url);callback({cancel:target.origin!==url.origin});} catch {callback({cancel:true});}
   });
-  window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+  window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
   ipcMain.handle('diag:window',(event,action)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;

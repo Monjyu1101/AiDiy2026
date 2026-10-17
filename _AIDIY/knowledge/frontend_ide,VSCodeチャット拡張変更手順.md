@@ -1,6 +1,6 @@
 # VS Code チャット拡張変更手順
 
-> 文書: `frontend_ide,VSCodeチャット拡張変更手順.md` | 実装: `frontend_ide/host/package.json`, `frontend_ide/host/scripts/test.mjs`, `frontend_ide/host/src/extension.ts`, `frontend_ide/host/src/code-connection.ts`, `frontend_ide/host/src/forwarded-origin.ts`, `frontend_ide/host/src/runner.ts`, `frontend_ide/host/src/protocol.ts`, `frontend_ide/host/src/webview.ts`, `frontend_ide/host/aidiy_code/src/offline.ts`, `frontend_ide/host/aidiy_code/src/server.ts`, `frontend_ide/host/aidiy_code/launch.mjs`, `frontend_ide/host/src/model-preferences.ts`, `frontend_ide/host/aidiy_live/`, `frontend_ide/host/_setup.py`, `frontend_ide/host/_cleanup.py`
+> 文書: `frontend_ide,VSCodeチャット拡張変更手順.md` | 実装: `frontend_ide/host/package.json`, `frontend_ide/host/scripts/test.mjs`, `frontend_ide/host/src/extension.ts`, `frontend_ide/host/src/code-connection.ts`, `frontend_ide/host/src/forwarded-origin.ts`, `frontend_ide/host/src/runner.ts`, `frontend_ide/host/src/protocol.ts`, `frontend_ide/host/aidiy_code/src/offline.ts`, `frontend_ide/host/aidiy_code/src/server.ts`, `frontend_ide/host/aidiy_code/launch.mjs`, `frontend_ide/host/src/model-preferences.ts`, `frontend_ide/host/aidiy_live/`, `frontend_ide/host/_setup.py`, `frontend_ide/host/_cleanup.py`
 
 ## このメモを使う場面
 
@@ -13,22 +13,24 @@
 - `out/*.cjs` と `out/aidiy_code/server.cjs` だけが差分一覧に出たとき、生成元との整合性を再検証する。
 - `out/aidiy_code/<起動ID>.json` だけが変更通知に出たとき、起動完了通知として検証する。
 
+> Code / Live の画面は frontend_ide の Vue 画面に統一済み（VS Code の Webview・単独起動・IDE で共用）。Vue 移行前の画面（`media/chat.html` / `chat.css`、`src/webview.ts`、`aidiy_code/bridge.js` / `theme.css`、`aidiy_live/src/view.ts` / `bridge.ts`、`aidiy_live/media/index.html` / `style.css`、`src/scroll-follow.ts`）と旧 Electron 本体（`aidiy_code` / `aidiy_live` の `desktop.cjs` / `preload.cjs`、`aidiy_live/permissions.cjs`）は 2026-10-18 に削除した。
+
 ## 変更箇所の選び方
 
 | 変更内容 | 主なファイル | 同時に確認するもの |
 |----------|--------------|--------------------|
-| ビュー、コマンド、設定 | `package.json`, `src/extension.ts` | `README.md`, `media/chat.html` |
+| ビュー、コマンド、設定 | `package.json`, `src/extension.ts`, `src/vscode-html.ts` | `README.md`, `frontend_ide/src/コード/コードパネル.vue` |
 | CLI 探索、引数、標準入出力、停止 | `src/runner.ts` | `checks/runner.test.cjs` |
 | AIコード互換 packet | `src/protocol.ts` | `backend_server/AIコア/AIコード.py`, `backend_server/AIコア/AIコード_cli.py` |
-| チャット表示、入力 | `src/webview.ts`, `media/chat.html`, `media/chat.css` | `aidiy_code/bridge.js`, `checks/aidiy_code.test.cjs` |
+| チャット表示、入力 | `frontend_ide/src/コード/コードパネル.vue`, `frontend_ide/src/コード/コード通信.js`, `frontend_ide/src/共通表示/会話表示.css` | `checks/aidiy_code.test.cjs`, frontend_ide の `checks/` |
 | Code の接続・モデル候補 | `src/code-connection.ts` | `aidiy_live/local-backend.cjs`, AIコアのモデル情報API、`checks/code-connection.test.cjs`、`checks/code-extension.test.cjs` |
-| 最終手動モデルの保存・復元 | `src/model-preferences.ts`, `src/extension.ts`, `aidiy_code/src/server.ts`, `aidiy_live/src/extension.ts`, `aidiy_live/src/server.ts`, `aidiy_live/src/bridge.ts`, `aidiy_live/src/view.ts` | Code / Live の画面・サーバー検証、両 README |
-| 単独試用サーバー | `aidiy_code/src/server.ts`, `aidiy_code/bridge.js` | `checks/aidiy_code.test.cjs` |
-| 単独ウィンドウ、タイトルバー | `aidiy_code/desktop.cjs`, `aidiy_code/preload.cjs`, `aidiy_code/launch.mjs` | `media/chat.html`, `media/chat.css`, `aidiy_code/theme.css` |
+| 最終手動モデルの保存・復元 | `src/model-preferences.ts`, `src/extension.ts`, `aidiy_code/src/server.ts`, `aidiy_live/src/extension.ts`, `aidiy_live/src/server.ts`, `frontend_ide/src/ライブ/ライブパネル.vue` | Code / Live の画面・サーバー検証、両 README |
+| 単独起動・IDE の API サーバー（画面は返さない） | `aidiy_code/src/server.ts` | `checks/aidiy_code.test.cjs`, `checks/browser-mode.test.cjs` |
+| 単独ウィンドウ、タイトルバー | `frontend_ide/desktop.cjs`, `frontend_ide/デスクトップ/`, `aidiy_code/launch.mjs` | `frontend_ide/src/コード/コードパネル.vue`, `frontend_ide/src/共通表示/会話表示.css` |
 | bundle / VSIX | `scripts/build.mjs`, `scripts/package.mjs`, `package.json`, `aidiy_live/build.mjs`, `aidiy_live/package.json` | 両 `.vscodeignore`, `dist/THIRD_PARTY_NOTICES.txt` |
-| Live 拡張、通信、マイク | `aidiy_live/src/extension.ts`, `src/host.ts`, `src/bridge.ts`, `microphone.py`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/host.test.cjs`, `aidiy_live/checks/extension.test.cjs`, `aidiy_live/README.md` |
-| Live 画面、音声、音量表示 | `aidiy_live/src/view.ts`, `src/audio.ts`, `src/visualizer.ts`, `src/protocol.ts`, `media/`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/view.test.cjs`, `aidiy_live/checks/live.test.cjs` |
-| Live 単独起動、中継、マイク許可 | `aidiy_live/launch.mjs`, `desktop.cjs`, `permissions.cjs`, `src/server.ts`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/launcher.test.cjs`, `aidiy_live/checks/permissions.test.cjs`, `checks/desktop.test.cjs` |
+| Live 拡張、通信、マイク | `aidiy_live/src/extension.ts`, `src/host.ts`, `microphone.py`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/host.test.cjs`, `aidiy_live/checks/extension.test.cjs`, `aidiy_live/README.md` |
+| Live 画面、音声、音量表示 | `frontend_ide/src/ライブ/ライブパネル.vue`, `aidiy_live/src/audio.ts`, `src/visualizer.ts`, `src/protocol.ts`, `media/capture.js`（`aidiy_live/` 内） | frontend_ide の `checks/`, `aidiy_live/checks/live.test.cjs` |
+| Live 単独起動、中継、マイク許可 | `aidiy_live/launch.mjs`, `aidiy_live/src/server.ts`, `frontend_ide/desktop.cjs`（`audioAllowed`） | `aidiy_live/checks/launcher.test.cjs`, `aidiy_live/checks/live.test.cjs` |
 | セットアップ、ランチャー、クリーンアップ | `_setup.py`, `_cleanup.py`, `scripts/vscode_extensions.py`, `scripts/standalone_processes.py`, ルートの `vscode_code.bat` / `vscode_live.bat` | `checks/test_setup.py`, `checks/test_extensions.py`, `checks/test_cleanup_processes.py` |
 
 ## 実装上の維持事項
@@ -43,7 +45,7 @@
 - `.cmd` は AiDiy `_setup.py` が生成する `PY` / `CLI` 形式だけを解析し、任意の batch を実行しない。
 - ワークスペース未信頼時、仮想ワークスペース、Web 版では CLI を実行しない。
 - Webview では Markdown の HTML と外部画像を無効のまま維持し、外部リンクは `http` / `https` のみにする。
-- `webview.ts` を変えた場合は VS Code 拡張モードと単独試用モードの両方を確認する。
+- Vue 画面を変えた場合は VS Code 拡張（Webview）・単独起動・IDE の 3 つで確認する。
 - `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts`、`scripts/model-catalog.py` を変えた場合は、これらを直接共有する `frontend_discord` で `npm run check` / `npm test` も実行する。詳細は [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) を参照する。
 - 初回は最初の状態通知を反映してから黒い画面からフェードインする。履歴復元時の保存済み回答にはタイプ表示を再適用せず、新しい回答だけを演出する。状態更新や会話切り替えではフェードインを繰り返さない。
 - スタンドアロンの専用ウィンドウは中心を保ちながら初回だけ拡大する。拡大中は `opening` 通知で内容と初期画面の演出を止め、拡大後に最小サイズを戻して内容を表示する。ブラウザモードは CSS の拡大表示を使う。
@@ -55,32 +57,32 @@
 - Code / Live の最終手動選択はユーザーのホームフォルダの `.aidiy/aidiy_code_model.json` / `.aidiy/aidiy_live_model.json` に分けて保存し、それぞれ VS Code 拡張・単独画面で共用する。保存は画面で確定したときだけ行い、起動引数・接続・新規会話・キャンセルでは上書きしない。モデル未指定なら保存済み選択を復元し、明示モデルは優先する。Provider のみ指定した場合は同じ Provider の保存値を復元し、異なる場合はその Provider の既定値（Code は `auto`）を使う。Code の自動選択（空の Provider / モデル）も復元する。Live は音声も保存するが、保存値の復元だけでは自動接続しない。未保存・破損時は既定設定を使い、保存失敗時は現在設定を変更せずエラーを表示する。JSON は一時ファイルへ書いて原子的に置換する。`AiDiy_key.json` と会話履歴はこの選択記録へ保存しない。
 - Code の説明は `frontend_ide/host/README.md`、Live の説明は `frontend_ide/host/aidiy_live/README.md` に分ける。VSIX 作成時はそれぞれの `extension/readme.md` が各拡張だけを説明していることを確認する。
 - Code / Live の起動画面は中央の文字を `--terminal`（緑 `#00ff00`）にし、3行のタイプ表示を12秒周期に揃える。各行の文字送りは周期の4〜16%、26〜38%、48〜60%（それぞれ1.44秒）とし、行間は1.2秒待機する。文字とカーソルの開始・終了位置を同時に変更する。
-- Code は新規会話で入力欄と保存済み下書きを空にし、`welcome-input-started` を引き継がず起動画面のターミナル演出を最初から再開する。同じ会話の状態通知では演出を再開せず、初回の下書き復元時は入力済みとして演出を停止する。VS Code / 単独画面の共通処理は `src/webview.ts` に置く。
+- Code は新規会話で入力欄と保存済み下書きを空にし、`welcome-input-started` を引き継がず起動画面のターミナル演出を最初から再開する。同じ会話の状態通知では演出を再開せず、初回の下書き復元時は入力済みとして演出を停止する。VS Code / 単独画面の共通処理は `frontend_ide/src/コード/コードパネル.vue` に置く。
 - Live は手動切断・接続断で、会話欄を初期の案内（ターミナル演出を再開始）、入力欄を空へ戻す。確定したモデル・音声の表示とプロジェクト表示は保持する。接続中の「新しい会話」は会話欄と入力をクリアし、現在のモデル・音声・作業フォルダで新規セッションへ接続し直す。マイクとスピーカーの ON/OFF は保持する。未接続時は表示と入力だけをクリアする。未接続の「接続」は黒文字で背景を白〜水色（`--voice`）へ変化させ、接続済みの「切断」は白背景と黒文字で固定する（ホバー時も同じ）。
-- Code / Live / Discord パネルは OS の「動きを減らす」設定に従わず、Windows / macOS / Linux で同じ演出にする（`media/chat.css`・`aidiy_live/media/style.css` に `prefers-reduced-motion` の分岐を置かず、`aidiy_live/src/visualizer.ts` と `frontend_discord/panel/visualizer.js`・`view.js` でも参照しない）。
-- 発言の登場演出とターミナル演出は `src/arrival-effect.ts` に置き、Code（`src/webview.ts`）と Live（`aidiy_live/src/view.ts`）で共用する。見た目のクラスは `media/chat.css` と `aidiy_live/media/style.css` の両方に定義し、変更時は両方を揃える。テストでは画面と同じ vm 文脈で評価する（`checks/code-screen.cjs` の `moduleInContext`、Live の `view.test.cjs` も同じ関数を使う）。
+- Code / Live / Discord パネルは OS の「動きを減らす」設定に従わず、Windows / macOS / Linux で同じ演出にする（`frontend_ide/src/共通表示/会話表示.css` に `prefers-reduced-motion` の分岐を置かず、`aidiy_live/src/visualizer.ts` と `frontend_discord/panel/visualizer.js`・`view.js` でも参照しない）。
+- 発言の登場演出とターミナル演出は `src/arrival-effect.ts` に置き、Code（`frontend_ide/src/コード/コードパネル.vue`）と Live（`frontend_ide/src/ライブ/ライブパネル.vue`）で共用する。見た目のクラスは `frontend_ide/src/共通表示/会話表示.css`に定義し、変更時は両方を揃える。テストでは画面と同じ vm 文脈で評価する（`checks/code-screen.cjs` の `moduleInContext`、Live の `view.test.cjs` も同じ関数を使う）。
 - Live は送信した文字入力の位置を覚え、バックエンドから戻った同じ本文の `input_text` 行へ入力枠を飛ばす（15秒以内・1回だけ）。AI回答（`output_text` / `output_request` / `output` / `recognition_output`）は会話欄に全文の行を非表示（`arrival-waiting`）で置き、画面中央の受信通知でターミナル演出で全文を表示し終えてから3秒止め、その行へ飛ばす。受信通知の本文の文字色は回答の種類に合わせる（コードエージェントはシアン、音声字幕は淡い緑）。枠・背景は Code と同じ黒地・白枠で固定する。次の発言の到着・切断・新しい会話・画面終了では受信通知を閉じ、行をすぐに表示する（`回答演出停止`）。Live は行そのものが発言の枠なので、飛行先・浮かび上がりは行に付ける。
 - Code のターミナル演出は、frontend_web の `AIコード.vue`（`演出初期化` / `演出キュー追加` / `演出実行` / `速度設定`）と同じ実装を `src/arrival-effect.ts` の `演出初期化` / `速度設定` に置き、AI回答の受信通知とストリーム受信枠（`#progress`）で共用する。文字列をキューに積み、通常は500ms待ってから10msごとに `floor(文字数 / 50) + 1` 文字、ストリームは30ms待ってから2msごとに `max(8, floor(文字数 / 12) + 2)` 文字ずつ追記する（長いほど速い）。カーソルは表示文字の右に置く半角スペース1文字の `inline-block`（幅8px）で、背景をカーソル色（通常は緑、ストリームはシアン）にして JS で0.3秒ごとに明滅させ、キューを流し切った完了時に外す。見た目は frontend_web の AIコード.vue で実際に表示されるものに揃える。同ファイルの `.terminal-text` / `.terminal-cursor` は `<style scoped>` で `:deep()` が無く、JS で作った要素には当たらない。そのため文字は親の `.agent-content`（Courier New / 11px / 行間1.5）を継承し、カーソルは JS の指定だけで細いブロックになる。ソースの CSS（`display: inline` / 左右2px / 太字）をそのまま移すと、半角1文字＋余白の太いカーソルになるので移さない。Code では `#progress` と `.answer-popup-text` を Courier New / 11px / 行間1.5 にし、CSS アニメーションのカーソルを重ねない。ストリーム受信枠は AIコード.vue と同じく `output_stream` パケットを起点にし、開始の制御コードで演出を作り、受信した1行ごとに `行\n` を積み、終了・中断の制御コードでだけ流し切ってカーソルを外す（`進捗演出開始` / `進捗行受信` / `進捗演出終了`）。状態通知の実行中フラグでは終えない（回答・検証の途中通知で演出が終わり、作り直しで全文が一瞬で出るため）。拡張は次の送信まで進捗を貯めるので、検証などで再び開始されても枠を消さずに続きから流す。状態通知の進捗全文との差分で積まない。差分は複数行が1つの塊になって速度が跳ね上がり、直近100行への切り詰めで続きとも判定できなくなるため。状態通知の進捗全文は、初回表示・会話の切替と、演出していない間の表示合わせにだけ使う（`進捗表示更新`）。
-- Code の発言の登場演出（`src/arrival-effect.ts` の `枠飛行` / `到着表示` / `入力枠作成` / `受信通知作成`、`media/chat.css` の `.input-flight` / `.answer-popup` / `arrival-waiting` / `arrival-pending` / `arrival-reveal`）は、発言を透明（`arrival-pending`）のまま通常どおり配置して場所を確保し、そこへ枠を Web Animations で560msかけて飛ばしてから、白い光とぼかしから0.9秒で表示する。ユーザー発言は送信時の入力欄の位置から入力枠を飛ばす。AI回答は画面中央に受信通知（ヘッダーや受信時刻は付けず本文欄だけ、上から降りる登場のみで走査線や明滅などのフラッシュ的要素は付けない）として出す。受信通知は黒地・白枠で固定し、流し込む本文の文字だけを回答の色にする。高さは画面の30%（最小96px）で、本文は縦スクロールで常に最下部を表示する。そのうえで、上記のターミナル演出で本文を表示し、全文を表示し終えてから3秒止めて飛ばす。通知の表示中は履歴側の発言を `arrival-waiting`（非表示）にし、飛行開始時に `arrival-pending` へ切り替える。演出中に状態通知で再描画されても、`入力演出` / `応答演出` が段階を引き継ぐ。画面が非表示のとき、飛行先の大きさが取れないときは演出せずに表示する（OS の「動きを減らす」設定では省かない）。描画更新が止まっても発言を残さないよう、飛行は1.5秒の安全期限で必ず完了させる。
+- Code の発言の登場演出（`src/arrival-effect.ts` の `枠飛行` / `到着表示` / `入力枠作成` / `受信通知作成`、`frontend_ide/src/共通表示/会話表示.css` の `.input-flight` / `.answer-popup` / `arrival-waiting` / `arrival-pending` / `arrival-reveal`）は、発言を透明（`arrival-pending`）のまま通常どおり配置して場所を確保し、そこへ枠を Web Animations で560msかけて飛ばしてから、白い光とぼかしから0.9秒で表示する。ユーザー発言は送信時の入力欄の位置から入力枠を飛ばす。AI回答は画面中央に受信通知（ヘッダーや受信時刻は付けず本文欄だけ、上から降りる登場のみで走査線や明滅などのフラッシュ的要素は付けない）として出す。受信通知は黒地・白枠で固定し、流し込む本文の文字だけを回答の色にする。高さは画面の30%（最小96px）で、本文は縦スクロールで常に最下部を表示する。そのうえで、上記のターミナル演出で本文を表示し、全文を表示し終えてから3秒止めて飛ばす。通知の表示中は履歴側の発言を `arrival-waiting`（非表示）にし、飛行開始時に `arrival-pending` へ切り替える。演出中に状態通知で再描画されても、`入力演出` / `応答演出` が段階を引き継ぐ。画面が非表示のとき、飛行先の大きさが取れないときは演出せずに表示する（OS の「動きを減らす」設定では省かない）。描画更新が止まっても発言を残さないよう、飛行は1.5秒の安全期限で必ず完了させる。
 - Code は処理中（STOP 表示中、状態通知の `実行中`）に `#composer` へ `running` を付け、入力欄を包む `#prompt-frame` の疑似要素（入力欄の上下の1pxの枠線に重ねた帯）で、シアンと白の光を左右の外から反対側の外へ、すれ違ってゆっくり一定の速さで突き抜けさせる（4.2秒周期の `linear`、前後20%ずつ枠の外で止めるので、横切るのは約2.5秒、抜けた後は約1.7秒の間を空ける）。`alternate` の折り返しは枠の外（光の幅35%に対して `background-position` -60% / 160%）で行い、次の回は色の進む向きが入れ替わって反射して戻るように見せる。枠の中で折り返す（中で揺れる）動きにはしない。光は1pxの細い線のままにし、`drop-shadow` などのにじみや帯を太くする指定、入力欄の枠の色替えは付けない。ストリーム枠（`#progress-section` / IDE の `.code-component .progress`）が開いて `running` の間は、同じ光を入力欄ではなくストリーム枠の上下の枠線（疑似要素を枠線の幅だけ外へ出して重ねる）に流す。入力欄側は、Code 拡張は `body:has(#progress-section.running:not([hidden]))` で止め、IDE は `コードパネル.vue` の `waitingForStream` で `進捗表示.vue` の `visible` を見て止める（`scripts/check-chat-effects.mjs` で確認）。
 - Code / Live の AIコア接続エラー（`#error`）は、フッターの最下部ではなく入力欄（Code の `#composer`、Live の `#text-form`）の直前に置き、入力欄の上に表示する。
-- Code のタイトル行はアイコンを置かず、`media/chat.css` の3列グリッドで接続状態を左端、名前を中央、ウィンドウ操作を右端に置く（`.title-right` は `display: contents`）。VS Code 内では非表示だが、単独起動（`aidiy_code/theme.css` は高さと文字サイズだけ上書き）と同じ配置を保つ。Live のタイトル行も同じ並びで、単独起動でだけ表示する。
+- Code のタイトル行はアイコンを置かず、`frontend_ide/src/共通表示/会話表示.css` の3列グリッドで接続状態を左端、名前を中央、ウィンドウ操作を右端に置く（`.title-right` は `display: contents`）。VS Code 内では非表示だが、単独起動（`aidiy_code/theme.css` は高さと文字サイズだけ上書き）と同じ配置を保つ。Live のタイトル行も同じ並びで、単独起動でだけ表示する。
 - Code / Live の手入力メッセージは白文字（`#fff`）で表示し、クリックで本文を入力欄へコピーしてフォーカスとカーソルを末尾へ移す。Live の `recognition_input` は灰色（`#e5e7eb`）、`recognition_output` は淡い緑（`#9ae6b4`）にし、同じクリック操作でコピーする。演出中・表示文字数の制限中でも元の全文をコピーし、この操作だけで送信は行わない。
-- Live の文字表示には通常回答と音声認識に加え、コードエージェントの `output_request` を含める。旧バックエンドの `output_text: !` は送信エラーとして案内する。`aidiy_live/checks/view.test.cjs` で VS Code / 単独画面の両方を検証する。
+- Live の文字表示には通常回答と音声認識に加え、コードエージェントの `output_request` を含める。旧バックエンドの `output_text: !` は送信エラーとして案内する。frontend_ide の `checks/` で VS Code / 単独画面の両方を検証する。
 - 送信ボタンは Code / Live とも未接続・入力不可時は灰色と白い紙ヒコーキ（`ws-disabled`）。接続済みの空欄・空白入力では白背景（`rgba(255, 255, 255, .95)`）、青紫の枠（`#667eea`）、黒い紙ヒコーキ。送信可能時は `frontend_web/src/components/AiDiy/compornents/AIコード.vue` と同じ青紫（`#667eea`）、ホバー時は `#5a6fd8` にする。紙ヒコーキ画像は `brightness(0)` で黒、`brightness(0) invert(1)` で白にする。空欄・空白だけでは無効にし、VS Code テーマで色を上書きしない。
 - 入力欄の Enter は通常の改行。Tab で送信ボタンへ移動し、そこで Enter を押すと送信する。日本語 IME の変換確定では送信しない。
 - Code / Live の入力欄は共通の `field-sizing: content` で改行・折り返しに合わせて上へ伸縮する。最小高さは 76px、上限は 220px と画面高さの 35% の小さい方にし、上限を超えた内容は入力欄内でスクロールする。下書き復元・会話からのコピー・送信後のクリアにも自動で反映する。
-- Code / Live の会話末尾への追従は `src/scroll-follow.ts` を共用する。メッセージ追加・入力・送信受理・ストリーム枠の更新／開閉で即時と次の描画フレームに末尾へ移動し、`ResizeObserver` で会話領域の伸縮にも追従する。Code は会話履歴と進捗の両方を揃え、一覧から会話へ戻る際も末尾へ移す。確認は `checks/webview.test.cjs` と `aidiy_live/checks/view.test.cjs` で、入力直後・表示枠の開閉・描画後の高さ変更を検証する。
+- Code / Live の会話末尾への追従は Vue 画面（`frontend_ide/src/コード/コードパネル.vue` / `frontend_ide/src/ライブ/ライブパネル.vue`）で同じ規則にする。メッセージ追加・入力・送信受理・ストリーム枠の更新／開閉で即時と次の描画フレームに末尾へ移動し、`ResizeObserver` で会話領域の伸縮にも追従する。Code は会話履歴と進捗の両方を揃え、一覧から会話へ戻る際も末尾へ移す。確認は frontend_ide の `checks/` で、入力直後・表示枠の開閉・描画後の高さ変更を検証する。
 - Code の接続表示は Live と同じタイトル左側の配置・文字色・10px文字・5pxの丸印に揃える。未接続は灰色、接続済みは緑、オンライン実行中は水色とし、文字は `未接続` / `接続中` / `接続済み` とする。CodeConnectionの接続開始・成功・失敗通知を単独版と拡張の `接続中` / `接続済み` に反映し、5秒の再試行待ちは未接続とする。シアンバーは実行状態ではなく接続状態へ連動させ、AIコアの入力・コード出力ソケットの初期化とモデル設定完了後に表示し、切断時に消す。オフライン中もタイトル左側は `未接続` を表示し、専用のオフライン表示・モードボタンは設けない。入力欄下は「上段：Enter の操作説明」「下段：モデル選択とモデル名」の2段にし、右端の送信／停止ボタンは2段分の高さにする。両モードで共通の HTML / CSS を使う。
-- 履歴削除の確認は `media/chat.html` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
+- 履歴削除の確認は `frontend_ide/src/コード/コードパネル.vue` のパネル内ダイアログで共通処理し、確認後に `deleteHistory` を送る。拡張ホストや単独画面のブリッジで別の確認ダイアログを出さない。
 - 「新規」「一覧」、モデル選択、履歴削除、送信、停止は Webview 内の共通 UI を主操作にする。VS Code 固有のコマンドは外部からの呼び出しやエディター連携用に残す。
 - 単独画面の上部はタイトルバー、実行状態バー、会話操作行の順に置く。VS Code 拡張では接続状態の文字を含むタイトル行を省略し、シアンバーを表示する。「今の会話／会話一覧」、フォルダ名、「新規」「一覧」は会話操作行にまとめる。単独ウィンドウのドラッグ領域はタイトルバーだけに指定し、会話操作行を含めない。
-- Code / Live の上部シアンバーは Web の `frontend_web/src/components/_TopBar.vue` と同じ `abs(sin(2πt / 9))` の明滅に揃える。`media/chat.css` と `aidiy_live/media/style.css` の `cyan-bar-breathe` は、4.5秒の周期を2.5%刻みで標本化したRGB値を `linear` で補間する。`ease-in-out` に戻すとカーブが変わるため、`linear` を維持する。
-- Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `media/chat.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
+- Code / Live の上部シアンバーは Web の `frontend_web/src/components/_TopBar.vue` と同じ `abs(sin(2πt / 9))` の明滅に揃える。`frontend_ide/src/共通表示/会話表示.css` の `cyan-bar-breathe` は、4.5秒の周期を2.5%刻みで標本化したRGB値を `linear` で補間する。`ease-in-out` に戻すとカーブが変わるため、`linear` を維持する。
+- Code の正式回答の緑はスタンドアロンと共通の `#00ff00` を `frontend_ide/src/共通表示/会話表示.css` で定義する。VS Code の明暗・高コントラストテーマでも、この色を上書きしない。
 - Code の実行状況枠は CSS の `--stream`（シアン `#00ffff`）を基調にした枠線と薄い背景を使い、文字と点滅カーソルもシアンにする。Web / Avatar の `AIコード.vue` の `.stream-output .line-content` も同じ配色に揃える。Live の会話は `メッセージ識別` を行のクラスに残し、AIチャットパネルと同じく通常出力（`output_text`）は緑 `#00ff00`、コードエージェントの回答（`output_request`）はシアン `#00ffff`、音声出力認識は淡い緑で分ける。本文・文字送りカーソル・枠・背景はその種別の色を基調にし、文字送り完了後もクラスを保持する。
 - 拡張機能一覧のアイコンは `package.json` 直下の `icon`、サイドバーのアイコンは `contributes.viewsContainers` の `icon` で指定する。両方とも `media/AiDiy.png`（`frontend_web/public/icons/AiDiy.png` と同じ画像）を使い、変更後は VSIX を再生成・再配置する。
 - Live のマイク・スピーカーは `frontend_web/public/icons/microphone.png` / `speaker.png` を `aidiy_live/media/` にコピーし、CSS のマスクで赤／水色に表示する。画像追加時は Live の `.vscodeignore` と `src/server.ts` のリソース許可一覧へ含め、配布ディレクトリだけで読み込めることを確認する。
-- Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`media/chat.html` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
+- Provider / モデル選択は VS Code 上部の Quick Pick ではなく、`frontend_ide/src/コード/コードパネル.vue` のチャットパネル内ダイアログで行う。候補は `chooseModel` / `modelCatalog` / `modelCatalogError`、確定値は `setModel` で Webview と実行層の間を受け渡す。
 - Discord の直接CLI用 Provider と API モデルは `scripts/model-catalog.py` から Hermes の picker を再利用する。外部 CLI のモデルは `_config/AiDiy_code_*.json` を読み、設定がないか `auto` のみなら対応する `scripts/cli_bat` の `MODEL` 値を読む。`claude-code` は `AiDiy_code_claude_cli.json` に対応し、`claude_sdk` は Hermes の外部 CLI Provider には含まれない。
 - Code は選択画面を開くたび `/core/AIコア/モデル情報/取得` の `available_models.code_models` を取得する。`aidiy_hermes` は `openai_oauth/gpt-6.1-sol` のような組み合わせID、`copilot_cli` はCLIのモデルIDをそのまま渡す。
 - 外部 CLI Provider のモデルが `auto` の場合は `--model auto` を渡さず、各 CLI 自身の既定モデル選択へ任せる。明示モデルを選んだ場合は Hermes の外部 CLI 実行まで `--model <ID>` を渡す。
@@ -90,7 +92,7 @@
 
 ## セットアップと配置
 
-VS Code の Code Webview では `<body class="vscode-host">` を拡張側で付け、`#title-bar` を非表示にする。Live は `view.ts` が同じクラスを付け、`aidiy_live/media/style.css` の `.vscode-host > header` を非表示にする。両方とも接続状態の文字を含むタイトル行を省略し、シアンバーとプロジェクト・会話操作行は表示する。単独版にはこのクラスを付けず、ウィンドウのタイトル行と操作を維持する。
+VS Code の Code Webview では `<body class="vscode-host">` を拡張側で付け、`#title-bar` を非表示にする。Live は `frontend_ide/src/ライブ/ライブパネル.vue` が同じクラスを付け、`frontend_ide/src/共通表示/会話表示.css` の `.vscode-host > header` を非表示にする。両方とも接続状態の文字を含むタイトル行を省略し、シアンバーとプロジェクト・会話操作行は表示する。単独版にはこのクラスを付けず、ウィンドウのタイトル行と操作を維持する。
 
 プロジェクト全体ではルートから実行し、`command_hermes` の次に `frontend_ide/host` を選ぶ。
 
@@ -133,21 +135,20 @@ Electron は VSIX 生成・単独画面コンパイルより前に `scripts/_set
 | 関連ファイル | 確認箇所 |
 |--------------|----------|
 | `aidiy_code/launch.mjs` | `main` の `runId` / `readyPath`、`AIDIY_CODE_READY`、通知ファイルの読込と `windowShown` の確認。起動IDはハイフンを除いたUUIDで、起動ごとに新しいファイルを使う |
-| `aidiy_code/desktop.cjs` | `ready` の取得、ページ読み込みと拡大表示、`isVisible()` の確認後に `{ url, pid, windowShown: true }` をUTF-8で保存する箇所 |
+| `frontend_ide/desktop.cjs` | `ready` の取得、ページ読み込みと拡大表示、`isVisible()` の確認後に `{ url, pid, windowShown: true }` をUTF-8で保存する箇所 |
 | `aidiy_code/src/server.ts` | `単独起動` の `randomBytes(24)` によるURLパス、`listen(0, '127.0.0.1')`、ブラウザ起動時の `{ url, publicUrl, pid }` 保存箇所 |
 | `checks/launcher.test.cjs` | 通知読込、表示完了フラグがない場合の拒否、起動失敗時のログ案内 |
-| `checks/desktop.test.cjs` | 画面表示後の通知、読み込み失敗・非表示時に成功通知を書かないこと |
 
 ### 次回の検証方法と修正判断
 
 1. 対象JSONをUTF-8で読み、構文とBOMの有無を確認する。内容を再保存せず、生成側と読込側の項目を照合する。
-2. `url` が `http://127.0.0.1:<ポート>/<トークン>/`、ポートが1〜65535、トークンが24バイト由来の48桁の小文字16進数であることを確認する。`pid` は正の整数。これらの同期元は上表の `server.ts` と `desktop.cjs` であり、起動時の実値をナレッジへ固定しない。
+2. `url` が `http://127.0.0.1:<ポート>/<トークン>/`、ポートが1〜65535、トークンが24バイト由来の48桁の小文字16進数であることを確認する。`pid` は正の整数。これらの同期元は上表の `server.ts` と `frontend_ide/desktop.cjs` であり、起動時の実値をナレッジへ固定しない。
 3. Electronの通知は `windowShown: true` を持つ。ブラウザ版は `windowShown` を保存せず、`publicUrl` を保存する場合があるため、Electronの3項目だけを全起動モードの必須形式にしない。
 4. バックアップとの比較は [`command_hermes,共通,MCPバックアップ検証手順.md`](./command_hermes,共通,MCPバックアップ検証手順.md) に従う。取得された `before.timestamp` を確認する。同一内容ならその保存版との一致を示すだけで、起動前から無変更だったことや動作の正しさまでは示さない。
 5. 起動通知の生成と読込を確かめる場合は、プロジェクトルートから次の既存テストを直接実行する。`npm test` による `.cjs` の再生成は、このJSONの検証には不要。
 
 ```powershell
-node --test frontend_ide/host/checks/launcher.test.cjs frontend_ide/host/checks/desktop.test.cjs
+node --test frontend_ide/host/checks/launcher.test.cjs
 ```
 
 このテストは模擬Electron・一時フォルダを使った起動通知の検証であり、実画面の表示や実AI接続の確認とは区別する。自己改善の文書更新時に、以前のテスト成功を新しい実行結果として記録しない。
@@ -221,13 +222,13 @@ node --test checks/runner.test.cjs checks/code-connection.test.cjs checks/code-e
 
 Code の停止・接続切替は、通常回答・検証途中・知見整理中・停止後のAI再開待ちを分けて確認する。`src/code-connection.ts` は要求に `実行状態通知: true` を付け、`backend_server/AIコア/AIコード.py` が要求全体の開始に `実行中: true`、後始末完了に `output_end` / `実行中: false` を通知する。途中の `output_text`、`cancel_run`、CANだけでは操作を再開しない。通知に未対応の旧AIコアは従来動作へ戻るため、この変更の反映にはAIコアも再起動する。
 
-停止の連打、送信直後のOFF、モデル候補確認中の新規・OFF、同じON通知の重複、Hermes実行中の自動再接続を確認する。画面中継のSSE切断はAIコアの切断と区別し、モデル・実行中状態を維持して操作を止める。検証入口は `checks/aidiy_code.test.cjs`、`checks/code-extension.test.cjs`、`checks/code-connection.test.cjs`、`checks/webview.test.cjs`、`backend_server/tests/test_code_execution_state.py`。模擬AIと実HTTP/SSEで確認し、実機のWindows画面や実AIの確認と区別する。
+停止の連打、送信直後のOFF、モデル候補確認中の新規・OFF、同じON通知の重複、Hermes実行中の自動再接続を確認する。画面中継のSSE切断はAIコアの切断と区別し、モデル・実行中状態を維持して操作を止める。検証入口は `checks/aidiy_code.test.cjs`、`checks/code-extension.test.cjs`、`checks/code-connection.test.cjs`、`backend_server/tests/test_code_execution_state.py`。模擬AIと実HTTP/SSEで確認し、実機のWindows画面や実AIの確認と区別する。
 
 `aidiy_code` 単独起動版とVS Code拡張は未接続中の送信を自動的にHermesへ渡す。拡張の `src/extension.ts` も `aidiy_code/src/offline.ts` の固定候補・既定値探索・実行処理を共用する。表示用のprovider/modelだけを接続状態で切り替え、会話内のオンラインモデルへオフライン選択を代入しない。通常起動は自動接続ONを既定とし、10秒ごとの再接続を継続する。プロジェクトバー右側の「自動接続」「新規」「一覧」のスイッチでOFFにすると接続・再試行を止め、新規・履歴復帰・ready通知でも再開しない。ONへ戻すと接続を再開し、OFFの選択は次回起動へ保存しない。実行中・モデル変更中の切り替えはUIとホスト側の両方で拒否する。バーはONの未接続で黒、接続済みで従来のシアン明滅、OFFで赤の明滅にする。復帰時も実行中のHermesジョブを維持する。AIコアとHermesのセッションID・保存モデルは分離し、次の送信からAIコアへ戻す。`executionMode` または `--offline` で明示したオフラインは自動接続OFFにし、再接続しない。この場合にスイッチをONへ戻すと新しいオンライン会話へ切り替え、HermesセッションIDをAIコアへ渡さない。明示オフラインの履歴復帰でもOFFへ切り替える。画面に専用のオフライン表示・モードボタンは設けない。`aidiy_code/src/offline.ts` は既存の `runner.ts` / `protocol.ts` を使ってHermesを直接実行し、AIコア・バックアップ・検証ループは呼ばない。コードAIは `aidiy_hermes` に限定し、モデルIDはオンラインのHermesと同じ形式を使う。オンライン用の `aidiy_code_model.json` はそのまま保持し、オフライン用を `aidiy_code_model_offline.json` に別保存する。両ファイルを拡張・単独版で共用し、未接続のモデル変更はオフライン用ファイルだけへ保存する。Hermesの再開IDは `HermesセッションID` に保持し、`コアセッションID` と混在させない。オフラインのコードAI欄は `aidiy_hermes` 固定・変更不可とし、モデル候補は `auto` と同梱の `_hermes_cli.bat` の選択値（`codex_cli/auto`、`copilot_cli/auto`、`openai_oauth/` 付きの4モデル）だけにする。既定値・保存値から候補を追加しない。候補外の保存値は共通設定の既定値へ戻し、既定値も候補外なら `auto` を使う。bat未配置でも同じ固定候補を使う。モデルAPIへの接続・モデルIDの手入力は不要。単独版の初期モデルは明示した起動引数、モード別の保存値、`_config/AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL` の順に優先し、共通設定が未配置・未指定の場合だけ `auto` を使う。既定値は配置先、作業フォルダの順で親へ探索し、AIコア接続前から表示する。候補外の起動引数・モデル変更要求は拒否する。
 
 モード変更は実行中に拒否する。切り替え後は新規会話とし、一覧の各会話に実行モードを保持してAIコアのセッションIDをHermesへ渡さない。CLIジョブ終了前のモード変更・新規・モデル変更も拒否し、停止／サーバー終了では子プロセスを停止する。明示オフラインへオンライン接続の遅延通知を反映しない。自動オフラインでは再接続通知で実行中フラグを解除せず、停止を進行中のHermesジョブへ渡す。共通Webviewは `オフライン対応` が真の単独版・拡張で未接続時のHermes送信を許可し、オフライン中は検証0固定、オンライン復帰時は直前の検証回数へ戻す。
 
-Code の検証ループ選択（0〜3回、オンライン・オフラインとも初期値0回。オフラインの間は0回に固定し、オンラインへ戻ると直前のオンラインの回数を `オンライン検証回数` から戻す。オンラインで選び直した回数は画面から `setSelfCheckLoop` で送り、拡張と単独起動版が `src/model-preferences.ts` の `検証回数保存` で `~/.aidiy/aidiy_code_options.json`（`コード設定保存先`、モデルの保存先から決める）へ保存する。次回は状態通知の `検証回数` を最初の1回だけ画面へ復元する。モデルは従来どおりオンライン `aidiy_code_model.json`・オフライン `aidiy_code_model_offline.json` に最後の手動選択を保存する）は `media/chat.html` / `src/webview.ts` で扱い、送信パケットに `self_check_loop` を含める。単独版の `aidiy_code/src/server.ts` と拡張の `src/extension.ts` の両方でAIコアまで渡す。0回はバックアップ・検証を省略する。UI・HTTP中継・拡張中継の確認は `checks/webview.test.cjs`、`checks/aidiy_code.test.cjs`、`checks/code-extension.test.cjs` を使う。単独版は既存のbundleを使うため、変更後に `npm run compile` で生成物を更新する。
+Code の検証ループ選択（0〜3回、オンライン・オフラインとも初期値0回。オフラインの間は0回に固定し、オンラインへ戻ると直前のオンラインの回数を `オンライン検証回数` から戻す。オンラインで選び直した回数は画面から `setSelfCheckLoop` で送り、拡張と単独起動版が `src/model-preferences.ts` の `検証回数保存` で `~/.aidiy/aidiy_code_options.json`（`コード設定保存先`、モデルの保存先から決める）へ保存する。次回は状態通知の `検証回数` を最初の1回だけ画面へ復元する。モデルは従来どおりオンライン `aidiy_code_model.json`・オフライン `aidiy_code_model_offline.json` に最後の手動選択を保存する）は `frontend_ide/src/コード/コードパネル.vue` / `frontend_ide/src/コード/コードパネル.vue` で扱い、送信パケットに `self_check_loop` を含める。単独版の `aidiy_code/src/server.ts` と拡張の `src/extension.ts` の両方でAIコアまで渡す。0回はバックアップ・検証を省略する。UI・HTTP中継・拡張中継の確認は `checks/aidiy_code.test.cjs`、`checks/code-extension.test.cjs` を使う。単独版は既存のbundleを使うため、変更後に `npm run compile` で生成物を更新する。
 
 ```powershell
 Set-Location frontend_ide/host
@@ -271,7 +272,7 @@ Code / Live の単独起動では、Electron の引数をエントリファイ�
 
 ルートの `vscode_code.bat` / `vscode_live.bat` は `scripts/cli_bat/_hermes_cli.bat` と同じ形式でモデルを選び、セットアップ済みの `aidiy_code` / `aidiy_live` コマンドを呼ぶ。`%USERPROFILE%\.local\bin\` の生成済み `.cmd` があれば使い、無ければ PATH 上の同名コマンドを呼ぶ。bat を別プロジェクトのルートへコピーすると、bat の配置先が作業フォルダになる。コピー先に `frontend_ide/host` を置く必要はない。起動失敗時は `pause` し、終了コードを保持する。ダブルクリックで起動した場合も、閉じる前に表示されたエラーを確認できる。Electron が未配置なら AiDiy の配置先で `python frontend_ide/host/_setup.py` を実行して準備する。ブラウザ版を確認する場合は、各 bat に `--browser` を付ける。bat 本体の案内とメニューは ASCII、改行は CRLF で保存する。Node.js の日本語出力とパス表示が文字化けしないよう、bat / `.cmd` の先頭では `chcp 65001 >nul` を実行する。生成済みランチャーだけを更新する場合は `python frontend_ide/host/_setup.py --launchers-only` を使う。
 
-Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、または `--connect` が指定された場合、初期設定の読み込み後に1回だけ自動接続する。`--connect` は Electron の `AIDIY_LIVE_CONNECT` とブラウザ起動引数を通り、中継の画面設定 `自動接続` へ渡す。モデル未指定なら保存済み選択（未保存なら Core の既定設定）を使う。モデル未指定・Provider だけの指定で `--connect` が無い場合と、VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。`aidiy_live/checks/view.test.cjs` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
+Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、または `--connect` が指定された場合、初期設定の読み込み後に1回だけ自動接続する。`--connect` は Electron の `AIDIY_LIVE_CONNECT` とブラウザ起動引数を通り、中継の画面設定 `自動接続` へ渡す。モデル未指定なら保存済み選択（未保存なら Core の既定設定）を使う。モデル未指定・Provider だけの指定で `--connect` が無い場合と、VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。frontend_ide の `checks/` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
 
 ルート `_start.py` の Code / Live は `frontend_ide/host/_start.py` から同じコマンド入口を使う。Code は待機指定を付けず独立起動し、Live は `--foreground --connect` で起動する。手動で閉じた画面は自動再表示せず、全体起動の起動前整理・終了時は Code / Discord とその配下を継続し、Live を `scripts/standalone_processes.py` で照合して停止する。明示的な cleanup では Code / Discord も停止する。共通の Electron バイナリだけで判定して未選択の Code / Live を止めない。起動選択・既定値・コマンド引数・停止対象は `checks/test_start.py` と Discord の `checks/test_lifecycle.py` で外部接続なしに検証する。
 
@@ -308,14 +309,14 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 |------|----------|
 | `code` が見つからず VSIX を配置できない | VS Code CLI の PATH、`frontend_ide/host/_setup.py` の `find_vscode_cli()`。単独画面はセットアップ可能 |
 | Electron が未配置 | `python frontend_ide/host/_setup.py` を再実行する。Avatar の同じバージョン、共有 ZIP を優先して再利用する。`dist/version`・実行ファイル・`path.txt` の照合まで成功しているか確認する |
-| 専用ウィンドウが表示されない | ターミナルに出る起動エラーと `out/aidiy_code/*.stderr.log` を確認する。`aidiy_code/desktop.cjs` の表示後通知と `aidiy_code/launch.mjs` の表示確認を両方使う |
+| 専用ウィンドウが表示されない | ターミナルに出る起動エラーと `out/aidiy_code/*.stderr.log` を確認する。`frontend_ide/desktop.cjs` の表示後通知と `aidiy_code/launch.mjs` の表示確認を両方使う |
 | Hermes が見つからない | `aidiyHermes.cliPath`、`~/.local/bin`、`command_hermes/.venv` |
 | Provider / モデルが空 | `scripts/model-catalog.py`、Hermes 設定、Cli Path が AiDiy CLI を指すか |
 | 送信できない | ワークスペース信頼、フォルダが開かれているか、実行中状態 |
 | 回答が出ない | VS Code 出力パネルの `AiDiy Code`、CLI の終了コード、認証が必要なら「対話 CLI」 |
 | `Session not found` | 古い拡張では新しい会話を開始する。更新版では `--resume` を外して一度だけ自動再試行するため、実行ログと保存セッション ID を確認する |
 | VSIX に変更が入らない | `npm run package` の prepublish、Code の `dist/extension.js` / `dist/webview.js`、Live の `aidiy_live/dist/extension.js` / `aidiy_live/dist/view.js`、`--force` 配置 |
-| Live の専用ウィンドウでマイクが ON にならない | `aidiy_live/permissions.cjs` の origin 正規化と音声・メインフレーム制限。Windows のサウンド入力にデバイスがあるかを確認する。リモートデスクトップでは録音転送を有効にして再接続する。詳細は `aidiy_live/README.md` の「マイクを ON にできない場合」 |
+| Live の専用ウィンドウでマイクが ON にならない | `frontend_ide/desktop.cjs` の `audioAllowed` の origin 正規化と音声・メインフレーム制限。Windows のサウンド入力にデバイスがあるかを確認する。リモートデスクトップでは録音転送を有効にして再接続する。詳細は `aidiy_live/README.md` の「マイクを ON にできない場合」 |
 
 ## Live のローカル接続先
 
@@ -339,4 +340,4 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 - Codeの `lockedMode: true` はIDE専用。接続切り替えと別モードの履歴復帰を拒否し、画面不在60秒での自動終了を止める。終了管理はIDEが担当する。
 - オフラインではLiveを表示・起動しない。CodeのHermes直接実行は単独版と共通で、オフライン開始からAIコアへの通信を行わないことを確認する。
 - 埋め込み表示だけ `frame-ancestors 'self'` にする。単独版のCSPは変更しない。CodespacesのHost / Origin検証はIDEで行い、内部への転送時にローカルのHost / Originへ揃える。
-- 確認は `node --test frontend_ide/viewer/checks/panels.test.mjs`。Liveの音声許可は `frontend_ide/viewer/panel-permissions.cjs` の同一公開元・Live子フレーム・音声限定を維持する。マイク実機を使わない確認にはElectronの `use-fake-device-for-media-stream` を使い、許可判定を省く `use-fake-ui-for-media-stream` は付けない。
+- 確認は `node --test frontend_ide/viewer/checks/panels.test.mjs`。Liveの音声許可は `frontend_ide/desktop.cjs` の `audioAllowed` の同一公開元・Live子フレーム・音声限定を維持する。マイク実機を使わない確認にはElectronの `use-fake-device-for-media-stream` を使い、許可判定を省く `use-fake-ui-for-media-stream` は付けない。

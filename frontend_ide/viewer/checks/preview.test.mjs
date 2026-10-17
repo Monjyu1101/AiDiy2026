@@ -15,7 +15,7 @@ import {tmpdir} from 'node:os';
 import {join,relative,isAbsolute} from 'node:path';
 import {createPreview} from '../preview.mjs';
 import {startServer} from '../server.mjs';
-import {request} from 'node:http';
+import {request,createServer} from 'node:http';
 
 const getWithHeaders=(url,headers)=>new Promise((done,reject)=>{
   const req=request(url,{headers},res=>{const chunks=[];res.on('data',part=>chunks.push(part));res.on('end',()=>done(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:res.headers})));});
@@ -97,5 +97,31 @@ test('Codespaces: HTML/SVG/Markdownは別の転送公開元、ローカル閲覧
     }
   }finally{
     await app.close();await rm(root,{recursive:true,force:true});
+  }
+});
+
+test('音声・動画: プレビューAPIは AiDiy の public を正式なリンク、それ以外を Range 対応のプレビューで返す',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'aidiy-preview-media-'));
+  const app=await startServer(root,0,{});
+  const web=createServer((req,res)=>{res.writeHead(req.url==='/@vite/client'?200:404);res.end();});
+  try{
+    await mkdir(join(root,'media'),{recursive:true});await mkdir(join(root,'frontend_web/public/動画'),{recursive:true});await mkdir(join(root,'_config'));
+    await writeFile(join(root,'media/曲 1.mp3'),Buffer.from(Array.from({length:1000},(_,i)=>i%256)));
+    await writeFile(join(root,'frontend_web/public/動画/clip.mp4'),'video');
+    await writeFile(join(root,'_config/secret.mp3'),'secret');
+    await fetch(new URL('/api/connection/offline',app.url),{method:'POST'});
+    const preview=async path=>(await fetch(new URL('/api/preview?'+new URLSearchParams({path}),app.url))).json();
+    const audio=await preview('media/曲 1.mp3');
+    assert.equal(audio.kind,'media');assert.equal(new URL(audio.url).hostname,'127.0.0.1');
+    const part=await fetch(audio.url,{headers:{range:'bytes=0-9'}});
+    assert.equal(part.status,206);assert.equal(part.headers.get('content-type'),'audio/mpeg');assert.equal((await part.arrayBuffer()).byteLength,10);
+    // frontend_web が起動中なら public の動画は正式なリンク。設定がない・停止中はプレビューで開く。
+    assert.match((await preview('frontend_web/public/動画/clip.mp4')).url,/\/p\/[^/]+\/frontend_web\/public\//);
+    await new Promise(resolve=>web.listen(0,'127.0.0.1',resolve));
+    await writeFile(join(root,'frontend_web/vite.config.ts'),`const PORT_WEB = ${web.address().port}`);
+    assert.equal((await preview('frontend_web/public/動画/clip.mp4')).url,`http://127.0.0.1:${web.address().port}/${encodeURIComponent('動画')}/clip.mp4`);
+    assert.match((await preview('_config/secret.mp3')).error,/表示できません/);
+  }finally{
+    web.closeAllConnections();web.close();await app.close();await rm(root,{recursive:true,force:true});
   }
 });

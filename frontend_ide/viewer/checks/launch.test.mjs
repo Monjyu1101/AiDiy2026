@@ -82,7 +82,7 @@ test('CLI はポート未指定でも別々の空きポートを取得し、起�
     assert.equal(data.project.path, projectFolder([], undefined, codeRoot));
     assert.equal(data.connected, false);
     assert.equal((await fetch(url + 'api/galaxy')).status, 503);
-    assert.equal((await fetch(url + 'desktop.js')).status, 200);
+    assert.equal((await fetch(url + 'development/app.js')).status, 200);
   } finally {
     child.kill(); await ended;
     existing.server.closeAllConnections(); await new Promise(done => existing.server.close(done));

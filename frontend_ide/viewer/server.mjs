@@ -19,6 +19,8 @@ import { createCoreConnection } from './core-connection.mjs';
 import { createPanels } from './panels.mjs';
 import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
+import { publicMediaURL } from './登録HTMLルート.mjs';
+import { MEDIA_PATTERN } from './media-types.mjs';
 import { latestFile, latestFiles } from '../src/ファイル閲覧/最新ファイル.js';
 import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
 export { scanTree, createScanPool } from './file-scan.mjs';
@@ -54,17 +56,8 @@ const DOCUMENTS = {
   '.pptx': 'powerpoint', '.pptm': 'powerpoint', '.pdf': 'pdf',
 };
 
+// 画面本体（/）は frontend_ide/server.mjs が Vue 画面を返す。ここは文書表示とライセンス表示だけを配信する。
 const STATIC = {
-  '/': ['index.html', 'text/html; charset=utf-8'],
-  '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
-  '/desktop.js': ['desktop.js', 'text/javascript; charset=utf-8'],
-  '/connection.js': ['connection.js', 'text/javascript; charset=utf-8'],
-  '/connection.css': ['connection.css', 'text/css; charset=utf-8'],
-  '/panels.js': ['panels.js', 'text/javascript; charset=utf-8'],
-  '/panels.css': ['panels.css', 'text/css; charset=utf-8'],
-  '/AiDiy.png': ['AiDiy.png', 'image/png'],
-  '/layout.js': ['layout.js', 'text/javascript; charset=utf-8'],
-  '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/office.html': ['office.html', 'text/html; charset=utf-8'],
   '/office.js': ['office.js', 'text/javascript; charset=utf-8'],
   '/office.css': ['office.css', 'text/css; charset=utf-8'],
@@ -318,6 +311,17 @@ export async function startServer(root, port = 0, { strict = false, env = proces
           const forwarded = !!publicOrigin && (req.headers.host === new URL(publicOrigin).host || req.headers.origin === publicOrigin || refererOrigin === publicOrigin);
           const address = full ? await preview.url(path, { forwarded }) : null;
           return address ? json({ kind, url: address }) : json({ kind, error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
+        }
+        // 音声・動画は「ブラウザ」で開く。AiDiy 保守中の public は正式なリンク、それ以外は Range 対応のプレビューサーバー。
+        if (MEDIA_PATTERN.test(path)) {
+          const full = await insideRoot(root, path);
+          const publicOrigin = forwardedOrigin(server.address().port, env);
+          let refererOrigin;
+          try { refererOrigin = new URL(req.headers.referer || '').origin; } catch {}
+          const forwarded = !!publicOrigin && (req.headers.host === new URL(publicOrigin).host || req.headers.origin === publicOrigin || refererOrigin === publicOrigin);
+          // 転送経由の画面からは 127.0.0.1 の正式なリンクへ届かないため、プレビューサーバーを使う。
+          const address = full ? (!forwarded && await publicMediaURL(root, path)) || await preview.url(path, { forwarded }) : null;
+          return address ? json({ kind: 'media', url: address }) : json({ kind: 'media', error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
         }
         if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));
         return fail(404, 'not found');

@@ -42,3 +42,25 @@ test('実際のAiDiy登録：別名HTMLとiframe画面、未登録の除外',asy
  assert.equal(await registeredHTMLRoute(fileURLToPath(root),'frontend_web/public/Xテトリス/index.html'),'/Xその他/Xテトリス/ゲーム');
  assert.equal(await registeredHTMLRoute(fileURLToPath(root),'docs/index.html'),null);
 });
+
+test('音声・動画: Browser で開け、AiDiy 保守中の public は正式なリンク、それ以外は file:// で開く',async t=>{
+ for(const path of ['a.html','曲.mp3','声.opus','動画.MP4','clip.webm','x.mov'])assert.equal(await browser.browserOpenable(path),true,path);
+ for(const path of ['a.txt','a.mkv','a.avi','a.png'])assert.equal(await browser.browserOpenable(path),false,path);
+ const root=await mkdtemp(join(tmpdir(),'aidiy-media-route-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));
+ async function put(path,text){await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),text);}
+ for(const path of ['frontend_web/public/動画/宇宙 # 1.mp4','docs/曲.mp3'])await put(path,'media');
+ const fileURL=path=>pathToFileURL(join(root,path)).href;
+ const server=createServer((req,res)=>{res.writeHead(req.url==='/@vite/client'?200:404);res.end();});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const port=server.address().port;
+ // frontend_web の Vite 設定がないフォルダは AiDiy とみなさず file:// で開く。
+ assert.equal(await browser.browserFileTarget(root,'frontend_web/public/動画/宇宙 # 1.mp4'),fileURL('frontend_web/public/動画/宇宙 # 1.mp4'));
+ await put('frontend_web/vite.config.ts',`const PORT_WEB = ${port}`);
+ assert.equal(await browser.browserFileTarget(root,'frontend_web/public/動画/宇宙 # 1.mp4'),`http://127.0.0.1:${port}/`+['動画','宇宙 # 1.mp4'].map(encodeURIComponent).join('/'));
+ assert.equal(await browser.browserFileTarget(root,'docs/曲.mp3'),fileURL('docs/曲.mp3'));
+ // frontend_web が止まっていても、HTML と違い file:// で再生できる。
+ await new Promise(resolve=>server.close(resolve));
+ assert.equal(await browser.browserFileTarget(root,'frontend_web/public/動画/宇宙 # 1.mp4'),fileURL('frontend_web/public/動画/宇宙 # 1.mp4'));
+ await assert.rejects(browser.browserFileTarget(root,'frontend_web/public/存在しない.mp4'));
+});

@@ -11,7 +11,7 @@
  */
 
 import { createServer, type ServerResponse } from 'node:http';
-import { readFileSync, writeFileSync, statSync } from 'node:fs';
+import { writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
@@ -308,26 +308,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         } else { reply(400, {error:'Unknown message'}); return; }
         reply(200, {ok:true}); return;
       }
-      const assets: Record<string, [string, string]> = {
-        'AiDiy.png':['media/AiDiy.png','image/png'],
-        'chat.css':['media/chat.css','text/css'], 'theme.css':['aidiy_code/theme.css','text/css'], 'sending.png':['media/sending.png','image/png'], 'abort.png':['media/abort.png','image/png'],
-        'bridge.js':['aidiy_code/bridge.js','text/javascript'], 'webview.js':['dist/webview.js','text/javascript']
-      };
-      if (req.method === 'GET' && Object.hasOwn(assets, route)) {
-        const [file, type] = assets[route]; res.writeHead(200, {'Content-Type':`${type}; charset=utf-8`}); res.end(readFileSync(join(root,file))); return;
-      }
-      if (req.method === 'GET' && route === '') {
-        const nonce = randomBytes(16).toString('hex');
-        const html = readFileSync(join(root,'media/chat.html'),'utf8')
-          .replaceAll('{{CSP}}', "'self'").replaceAll('{{NONCE}}',nonce)
-          .replaceAll('{{APP_ICON}}','AiDiy.png')
-          .replaceAll('{{STYLE}}','chat.css').replaceAll('{{SCRIPT}}','webview.js').replaceAll('{{SEND_ICON}}','sending.png').replaceAll('{{STOP_ICON}}','abort.png')
-          .replace("connect-src 'none'", "connect-src 'self'")
-          .replace('</head>', '<link rel="icon" type="image/png" href="AiDiy.png"><link rel="stylesheet" href="theme.css"></head>')
-          .replace('<script nonce=', `<script nonce="${nonce}" src="bridge.js"></script><script nonce=`);
-        res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
-        res.writeHead(200, {'Content-Type':'text/html; charset=utf-8'}); res.end(html); return;
-      }
+      // 画面は frontend_ide の Vue 画面（IDE / Code 単独起動）が提供し、このサーバーは API だけを返す。
       reply(404, {error:'Not found'});
     } catch (error) { if (!res.headersSent) reply(500, {error: error instanceof Error ? error.message : '処理に失敗しました。'}); else res.end(); }
   });

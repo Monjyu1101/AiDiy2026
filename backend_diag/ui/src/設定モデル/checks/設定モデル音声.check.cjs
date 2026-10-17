@@ -11,6 +11,14 @@ test('Liveの1秒以上の音声だけ手動ロード・ネイティブ再生を
  for(const row of ['CHAT','LIVE']){html=await render('設定モデル/設定モデルパネル.vue',{...props,data:{項目:[{id:row}]},selected:row,results:{[row]:{音声ファイル:{...result.音声ファイル,長さms:999}}}});assert.doesNotMatch(html,/音声を読み込む/);}
 });
 
+test('Liveの試行結果に音声があれば、受信時に取得して再生ボタンをすぐ表示できる',async()=>{
+ const {設定モデル状態を作成}=await import('../設定モデル状態.mjs');const snapshot={版:'v1',項目:[{id:'LIVE',区分:'LIVE',状態:'未実行'}]};const calls=[];
+ const state=設定モデル状態を作成({接続可能:()=>true,api:async(path,method,_signal,format)=>{calls.push([path,method,format]);if(method==='GET'&&path==='api/モデル試行')return snapshot;if(path.endsWith('/開始'))return {...snapshot,実行ID:'r',実行順:['LIVE']};if(method==='DELETE')return {};if(path.startsWith('api/モデル試行/音声/'))return new Blob([new Uint8Array(100)],{type:'audio/wav'});return {...result,id:'LIVE'};}});
+ await state.読込();await state.開始();await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(calls.filter(([path])=>path.startsWith('api/モデル試行/音声/')),[[`api/モデル試行/音声/${id}`,'GET','blob']]);
+ assert.match(state.音声状態.value[id].url,/^blob:/);state.終了();
+});
+
 test('音声は認証APIで一度取得して共有し、破棄時にURLを解放',async()=>{
  const {設定モデル音声を作成}=await import('../設定モデル音声.mjs');const calls=[],revoked=[];
  const state=設定モデル音声を作成({api:async(...args)=>{calls.push(args);return new Blob([new Uint8Array(100)],{type:'audio/wav'});},接続可能:()=>true,createURL:()=> 'blob:test',revokeURL:url=>revoked.push(url)});

@@ -207,40 +207,6 @@ try {
   assert.equal(await evaluate(`fixtureMessages.filter(m=>m.type==='socket-close').length`),6);
   assert.equal(await evaluate(`document.querySelectorAll('.answer-popup,.input-flight').length`),0);
   assert.deepEqual(errors,[]);
-  // 復旧された旧フォルダがあるときは、元のHTML/CSSも同じ寸法・時計で撮影する。
-  // 読取専用で表示し、旧通信スクリプトは起動しない。
-  if (existsSync('frontend_vscode/media/chat.html')) {
-    const reference = createServer((req, res) => {
-      const files = {
-        '/code.css': ['frontend_vscode/media/chat.css','text/css'], '/theme.css': ['frontend_vscode/aidiy_code/theme.css','text/css'], '/style.css': ['frontend_vscode/aidiy_live/media/style.css','text/css'],
-        '/AiDiy.png': ['frontend_vscode/media/AiDiy.png','image/png'], '/sending.png': ['frontend_vscode/media/sending.png','image/png'],
-        '/abort.png': ['frontend_vscode/media/abort.png','image/png'], '/speaker.png': ['frontend_vscode/aidiy_live/media/speaker.png','image/png'],
-        '/microphone.png': ['frontend_vscode/aidiy_live/media/microphone.png','image/png'],
-      };
-      if (files[req.url]) { const [path,type]=files[req.url];res.writeHead(200,{'content-type':type}).end(readFileSync(path));return; }
-      if (!['/code','/live'].includes(req.url)) { res.writeHead(404).end();return; }
-      let html=readFileSync(req.url==='/code'?'frontend_vscode/media/chat.html':'frontend_vscode/aidiy_live/media/index.html','utf8');
-      html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/g,'').replace('<body>','<body class="ui-ready">');
-      if(req.url==='/code')html=html.replace('</head>','<link rel="stylesheet" href="/theme.css"></head>');
-      for (const [from,to] of Object.entries({'{{STYLE}}':'/code.css','{{APP_ICON}}':'/AiDiy.png','{{SEND_ICON}}':'/sending.png','{{STOP_ICON}}':'/abort.png'})) html=html.replaceAll(from,to);
-      res.writeHead(200,{'content-type':'text/html; charset=utf-8'}).end(html);
-    });
-    await new Promise(resolve=>reference.listen(0,'127.0.0.1',resolve));
-    try {
-      for (const kind of ['code','live']) {
-        await send('Page.navigate',{url:`http://127.0.0.1:${reference.address().port}/${kind}`});await sleep(300);
-        await evaluate(`document.querySelector('#project-folder').textContent='fixture';document.querySelector('#desktop-controls,#window-controls').hidden=false;document.getAnimations().forEach(a=>{a.pause();a.currentTime=7500;});`);
-        if(kind==='live') { await evaluate(`document.querySelector('#send').classList.add('ws-disabled')`); await sleep(200); }
-        await capture(`nn-effects-reference-${kind}.png`);
-        if(kind==='live') assert.deepEqual(liveAppearance,await liveMetrics({audio:'#speaker',label:'#speaker strong',input:'textarea',send:'#send',footer:'#chat-footer'}),'Liveの音声ボタン・入力欄・送信・余白が旧版と一致');
-        if(kind==='code') {
-          await evaluate(`document.querySelector('#stop').hidden=false;document.querySelector('#send').hidden=true;`);
-          await capture('nn-effects-reference-code-stop.png');
-          assert.deepEqual(stopAppearance,await stopMetrics('#stop'),'停止ボタンの画像寸法・赤色・文字書体・配置が旧版と一致する');
-        }
-      }
-    } finally { reference.closeAllConnections(); await new Promise(resolve=>reference.close(resolve)); }
-  }
   console.log('Vue Code / Live: 初期文字送り・紙ヒコーキ・入力飛行・上下バー・進捗・中央回答・着地・再送・会話切替・Live種別色を確認');
   ws.close();
 } finally {

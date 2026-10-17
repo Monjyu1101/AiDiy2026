@@ -42,12 +42,9 @@ export async function ライブ起動(root: string, backend?: string, packaged =
   let allowed: 接続元許可 | undefined;
   const apiPaths = new Set(['/core/AIコア/モデル情報/取得', '/core/AIコア/モデル情報/設定']);
   const assets: Record<string, [string, string]> = {
-    '': [join(root, packaged ? 'media/index.html' : 'aidiy_live/media/index.html'), 'text/html; charset=utf-8'],
     'development/app.js': [join(root, 'dist/development/app.js'), 'text/javascript; charset=utf-8'],
     'development/app.css': [join(root, 'dist/development/app.css'), 'text/css; charset=utf-8'],
     'development/THIRD_PARTY_NOTICES.txt': [join(root, 'dist/development/THIRD_PARTY_NOTICES.txt'), 'text/plain; charset=utf-8'],
-    'view.js': [join(root, packaged ? 'dist/view.js' : 'dist/aidiy_live/view.js'), 'text/javascript; charset=utf-8'],
-    'style.css': [join(root, packaged ? 'media/style.css' : 'aidiy_live/media/style.css'), 'text/css; charset=utf-8'],
     'sending.png': [join(root, packaged ? 'dist/sending.png' : 'media/sending.png'), 'image/png'],
     'AiDiy.png': [join(root, packaged ? 'dist/AiDiy.png' : 'media/AiDiy.png'), 'image/png'],
     'microphone.png': [join(root, packaged ? 'media/microphone.png' : 'aidiy_live/media/microphone.png'), 'image/png'],
@@ -75,7 +72,8 @@ export async function ライブ起動(root: string, backend?: string, packaged =
         自動接続,
         ...(Object.keys(モデル設定).length ? { モデル設定 } : {}) })); return;
     }
-    if (packaged && path === '' && req.method === 'GET') {
+    // 画面は拡張の単独起動・IDE とも Vue 画面だけを返す。
+    if (path === '' && req.method === 'GET') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'");
       res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="development/app.css"><script id="development-config" type="application/json">{"kind":"live","host":false,"base":"./","icon":"AiDiy.png","iconAssets":"development/assets/catppuccin_icons/"}</script><div id="app"></div><script src="development/app.js" defer></script></html>');

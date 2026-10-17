@@ -13,6 +13,7 @@ import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as actions from '../src/ファイル閲覧/ファイル操作.js';
 import * as browserLaunch from '../src/ブラウザ/起動.js';
+import * as mediaTypes from '../viewer/media-types.mjs';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -24,7 +25,7 @@ const hasClass = (node, name) => String(node.props?.class || '').split(/\s+/).in
 const textOf = node => [node.text || '', ...(node.children || []).map(textOf)].join('');
 
 // Vueの実テンプレートをメモリ上にマウントする。OSアプリ・ブラウザは起動しない。
-async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false, root = 'C:\\作業 フォルダ' } = {}) {
+async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false, root = 'C:\\作業 フォルダ', file = { name: '日本語 & #.txt', path: '資料/日本語 & #.txt' }, fileData = { kind: 'text', text: '本文は消えません', size: 24 }, browser = browserLaunch } = {}) {
   const window = new EventTarget(); window.aidiyWindow = desktop;
   const timers = new Map(), warnings = [], copies = [];
   let sequence = 0, state;
@@ -54,15 +55,15 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
   vm.runInNewContext(transformSync(`${script.content}\n${template.code}\ncomponent.render=render;module.exports=component;`, { format: 'cjs' }).code, {
     module, window, console, AbortController, URLSearchParams, Date,
     localStorage: { getItem: () => null },
-    fetch: async () => ({ ok: true, json: async () => ({ kind: 'text', text: '本文は消えません', size: 24 }) }),
+    fetch: async () => ({ ok: true, json: async () => fileData }),
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     require: id => id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
       : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
-        : id === '../ブラウザ/起動.js' ? browserLaunch : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
+        : id === '../ブラウザ/起動.js' ? browser : id === '../../viewer/media-types.mjs' ? mediaTypes : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });
   const component = module.exports, setup = component.setup;
   component.setup = (props, context) => { state = setup(props, context); return state; };
-  const props = vue.reactive({ root, pinned, file: { name: '日本語 & #.txt', path: '資料/日本語 & #.txt' } });
+  const props = vue.reactive({ root, pinned, file });
   const container = node('root');
   const app = renderer.createApp({ render: () => vue.h(component, props) });
   app.config.warnHandler = message => warnings.push(message);
@@ -144,4 +145,19 @@ test('プレビュー実Vue: 起動の取消・OSエラーを区別し、古い�
   const closing = deferred(); result = closing.promise;
   const last = f.click('viewer-open-app'); f.dispose(); closing.resolve({ ok: false, error: 'late' }); await last;
   assert.equal(f.state.actionError.value, ''); assert.equal(f.timers.size, 0);
+});
+
+test('プレビュー実Vue: 音声・動画は案内と「ブラウザ」ボタンを出し、押すとBrowserで開く（ビューア内では再生しない）', async t => {
+  for (const name of ['曲 1.mp3', '動画.MP4']) {
+    const opened = [];
+    const f = await viewer(t, { browser: { openBrowser: async path => { opened.push(path); return { ok: true }; } }, file: { name, path: '素材/' + name }, fileData: { kind: 'binary', size: 1000 } });
+    assert.match(f.text(), /音声・動画は「ブラウザ」で開いて再生できます。/); assert.doesNotMatch(f.text(), /この形式はプレビューできません/);
+    assert.ok(f.find('viewer-browser')); assert.deepEqual(opened, []);
+    await f.click('viewer-browser'); await flush();
+    assert.deepEqual(opened, ['素材/' + name]); assert.equal(f.state.actionError.value, '');
+    f.dispose();
+  }
+  // 音声・動画・HTML 以外は「ブラウザ」ボタンを出さない。
+  const other = await viewer(t, { file: { name: 'a.bin', path: 'a.bin' }, fileData: { kind: 'binary', size: 10 } });
+  assert.equal(other.find('viewer-browser'), undefined); assert.match(other.text(), /この形式はプレビューできません/);
 });

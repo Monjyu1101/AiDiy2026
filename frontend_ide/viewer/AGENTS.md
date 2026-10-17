@@ -61,18 +61,14 @@
 | `package.json` | Monaco・文書表示ライブラリの依存と構文チェック・自動テスト |
 | `_setup.py` / `_start.py` / `_cleanup.py` | ルートから呼ばれる「フロントエンド(IDE)」のセットアップ・起動・クリーンアップ（単独実行も可） |
 | `launcher.py` | `aidiy_ide` の PATH ランチャー（`~/.local/bin/aidiy_ide.cmd`）の登録・解除 |
-| `aidiy_ide.cmd` | フォルダ内の起動入口（`node launch.mjs` を呼ぶ） |
 | `launch.mjs` / `launch-options.mjs` | 引数（作業フォルダ・`--project`・`--browser`・`--port`・`--strict-port`・`--no-open`）、サーバー起動、Electron / Web 切り替えと終了処理 |
-| `desktop.cjs` / `preload.cjs` / `web/desktop.js` | Electron ウィンドウとデスクトップ用タイトルバー。Node integration 無効、context isolation / sandbox 有効。親プロセスの IPC 切断で終了 |
-| `core-connection.mjs` / `web/connection.js` / `web/connection.css` | 配置先の `PORT_TOOLS` による稼働確認、Code / Live用の `PORT_CORE` 解決、手動開始、初期画面と接続／オフラインの状態バー |
-| `panels.mjs` / `web/panels.js` / `web/panels.css` | Code / Live の遅延起動・同一公開元中継・右上タブパネル。オフライン時はCodeだけ。エクスプローラーより背面に表示 |
-| `panel-permissions.cjs` | Electronのマイク許可を同一公開元のLive子フレーム・音声入力だけへ限定 |
-| `server.mjs` | `127.0.0.1` だけで待ち受け。ツリー（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`・`/api/document`）、表示の準備（`/api/preview`）、Monaco（`/monaco/`）・文書表示資産（`/office-vendor/`）、`web/` を配信 |
+| `core-connection.mjs` | 配置先の `PORT_TOOLS` による稼働確認、Code / Live用の `PORT_CORE` 解決、手動開始、初期画面と接続／オフラインの状態バー |
+| `panels.mjs` | Code / Live の遅延起動・同一公開元中継。オフライン時はCodeだけ |
+| `server.mjs` | `127.0.0.1` だけで待ち受け。ツリー（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`・`/api/document`）、表示の準備（`/api/preview`）、Monaco（`/monaco/`）・文書表示資産（`/office-vendor/`）、`web/` の文書ビューア・ライセンス表示を配信。画面本体（`/`）は `frontend_ide/server.mjs` が Vue 画面を返す |
 | `preview.mjs` | HTML の「表示」用の別オリジン静的サーバー。最初の要求で起動し、`server.mjs` の close で停止。ファイルは書き出さない |
 | `vue-preview.mjs` | `.vue` の「表示」。`frontend_web` の Vite 開発サーバーが起動中の時だけ、その部品を使う画面（ルート）を返す |
-| `web/index.html` / `web/style.css` | 画面の骨組みとパネル類 |
-| `web/app.js` | 宇宙の組み立て・描画・操作 |
-| `web/layout.js` | 名前のハッシュによる球内の固定3D配置・基準視点・回転と平行移動 |
+| `media-types.mjs` | 「ブラウザ」で再生する音声・動画の拡張子（mp3 / wav / ogg / oga / opus / flac / aac / m4a / mp4 / m4v / webm / mov）。Vue 画面・IDE サーバー・Electron で共用 |
+| `web/layout.js` | 名前のハッシュによる球内の固定3D配置・基準視点・回転と平行移動（Vue 画面の `src/開発スペース/宇宙描画.js` が取り込む） |
 | `web/office.html` / `web/office.js` / `web/office.css` | Word / Excel / PowerPoint / PDF の読み取り専用ビューア |
 | `checks/` | 文書APIの自動テストと一時フォルダ用の検証データ生成 |
 | `scripts/shot.mjs` | 画面確認用スクリーンショット（ヘッドレス Chrome を DevTools Protocol で操作） |
@@ -86,6 +82,7 @@
 - `/api/preview?path=` は「表示」の準備。`.html` は `preview.mjs` の URL を返す。静的サーバーは IDE と別ポート（別オリジン）で、URL に起動ごとの token を含め、Host を `127.0.0.1` / `localhost` に限る。HTML には `CSP: sandbox allow-scripts …` を付け、画面側の iframe も `allow-same-origin` なしの sandbox にして、ページのスクリプトを IDE のファイル API から隔離する。`_config`・隠しファイル（`.` 始まり）・鍵らしいファイル・`node_modules`・`.venv`・`backup` は配らない。`/…` 始まりの参照は Referer のページの `public` を根に解決し、Range に対応する。
 - `.vue` の「表示」は **AiDiy の `frontend_web/src` の .vue だけ、かつ `frontend_web` の Vite 開発サーバー（`vite.config.ts` の `PORT_WEB`、既定 8090）が起動中の時だけ**。`frontend_web/src/router/` のルート定義（`path` と `component`。日本語の識別子にも対応）と import の関係をたどり、その部品を使う画面の URL を返す。HTTP で見に行くだけで、`frontend_web` の `node_modules` は借りない。他プロジェクト・他フォルダの .vue は理由を表示する。
 - `/api/file?path=` はテキスト（先頭 1MB、UTF-8 → Shift_JIS の順に判定）・画像・Office文書・バイナリを判定して返す。`/api/raw` は画像だけを生で返す（SVG は CSP でスクリプトを止める）。`/api/document` は対応するOffice文書・PDFだけを最大50MBまで返す。
+- 音声・動画はビューア内で再生せず、ファイルビューアの「ブラウザ」で開く。Electron は AiDiy 保守中（`frontend_web/public/` 内、`frontend_web/vite.config.ts` があり Vite 起動中）なら正式なリンク、それ以外は `file://` で Browser ウィンドウを開く（`デスクトップ/ブラウザ.cjs` の `browserFileTarget`）。Web 版の `/api/preview` は同じ条件で正式なリンク、それ以外（転送経由を含む）は Range 対応の `preview.mjs` の URL を返す。
 - 安全策: 相対パスは `realpath` で解決し、作業フォルダの外（`..`・別ドライブ・リンク先）は 404。Host / Origin は localhost と、Codespaces 環境変数から特定した当該転送先だけを許可し、cross-site 要求を拒否する。
 
 ### 全体起動での扱い
@@ -94,28 +91,9 @@
 - 全体起動ではリポジトリ直下を空きポートで独立起動し、ログをファイルへ保存する。親の終了後も継続し、自動再起動はしない。
 - 全体起動の起動前整理・終了・リブートでは IDE とその子孫を停止しない。cleanup 時だけ `kill_ports()` でこの配置先の実行入口を照合して停止する。ポート番号による停止は行わない。
 
-### web/app.js の主な入口
+### 画面
 
-| 関数・変数 | 役割 |
-|---|---|
-| `buildWorld()` | 今の階層（`trail`）から銀河・星・惑星・戻る入口を組み立てる。配置は名前の3つのハッシュから球座標変換で決まり、件数・列挙順に依存しない |
-| `galaxyRadius` / `WORLD_RADIUS` | 銀河半径160・宇宙半径1750で固定。件数が変わっても既存座標・全景倍率を維持 |
-| 銀河の形 | 名前で決まる球状の星群。内部の星も3D座標を持ち、移動しない |
-| フォルダ・惑星の位置 | 球内の3D座標へ固定配置。衝突時の押し出しや公転は行わない |
-| `frame()` | 毎フレームの描画。`drawFarSky` → `drawGalaxies` → `drawGate` → `drawPlanets` → `drawVoyage` → `drawLabels` |
-| `travelTo()` / `enterWorld()` | 移動方向に応じた拡大・縮小フェード、次の宇宙のぼかし出現。不可視の時点で階層とURLを切り替え、連続要求は最後の移動を優先 |
-| `dive(g)` / `ascend(n)` / `goTo(entry)` | フォルダへ入る / n 階層目まで戻る / 履歴からその場所へ移動 |
-| `flyTo(g)` / `approach(body)` / `flyHome()` | フォルダへ寄る / ファイルへフォーカスして追尾 / 全体表示 |
-| `remember()` / `voyages` / `journal` | 移動経路（階層ごと）と履歴（全体）。localStorage `aidiy_ide:<ルート>` |
-| `since` / `isFresh()` / `recountFresh()` | 起点日時と更新判定。既定は接続成立／オフライン利用開始時刻。「起動・10分・1時間・今日・解除」を切り替える |
-| `renderExplorer()` / `revealPath()` / `revealCurrent()` | エクスプローラーの描画と、選択中の場所までフォルダを開いて表示。開閉状態・展開フォルダは localStorage `aidiy_ide:explorer:<ルート>` |
-| `measureCover()` | プレビュー中は左右パネルの間の中央へ視点・パンくずを更新。左エクスプローラー非表示なら25%。プレビューがなければ画面中央を維持 |
-| `updateSide()` / `showFile()` | 右側のファイルビューアの開閉と中身の表示。`loadMonaco()` は `/monaco/vs/loader.js` を読み、失敗時は簡易表示 |
-| `window.aidiyIDE` | 開発者ツール・確認スクリプト用の入口（`world` / `trail` / `labels` / `galaxyHits` / `flyTo` / `dive` / `goTo` など） |
-
-- 左エクスプローラーはフローティング表示。起点検索（既定）とgrep検索を切り替え、選んだ条件に一致したファイル・親フォルダを宇宙とツリーの両方でマークする。grepは `/api/grep` の文字列部分一致検索で、表示APIと同じ利用状態・アクセス境界を適用する。
-- フォルダ名の配置は、更新のあるフォルダを優先し、重なる時は 下 → 上 → 右 → 左 の順に空きを探す。
-- 遠景の星は色ごとに1本のパスへまとめて描く（描画回数を減らすため）。
+画面（宇宙表示・エクスプローラー・ファイルビューア・Code / Live パネル）は `frontend_ide/src/` の Vue 画面です。Electron ウィンドウ・タイトルバー・マイク許可は `frontend_ide/desktop.cjs` と `frontend_ide/デスクトップ/` が担当します。Vue 移行前の Canvas 画面（`web/app.js` など）と Electron 本体（`desktop.cjs` / `preload.cjs`）は削除済みです。
 
 ## 確認方法
 

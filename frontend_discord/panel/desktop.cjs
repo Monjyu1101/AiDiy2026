@@ -139,7 +139,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       title: 'AiDiy Discord', width, height, minWidth: size.最小幅, minHeight: size.パネル高さ,
       x: area.x + Math.round((area.width - width) / 2), y: area.y + 8,
       frame: false, roundedCorners: false, show: false, backgroundColor: '#101217', autoHideMenuBar: true,
-      icon: join(root, '../frontend_ide/host/media/AiDiy.png'),
+      icon: join(__dirname, 'AiDiy_discord.png'),
       webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
     });
     window.setMenu(null);

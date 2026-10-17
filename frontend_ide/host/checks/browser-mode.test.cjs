@@ -63,7 +63,8 @@ test('Code ブラウザ版: Codespaces は初回接続まで終了せず、転�
     assert.equal(app.publicUrl, `https://aidiy-test-${port}.app.github.dev${path}`);
     const get = headers => fetch(app.url, { headers }).then(response => response.status);
     // fetch は Host を変更できないため、Origin で転送元の許可・拒否を確認する。
-    assert.equal(await get({ origin: `https://aidiy-test-${port}.app.github.dev` }), 200);
+    // 画面は frontend_ide の Vue 画面が返すため、許可した転送元でもルートは API の 404 になる。
+    assert.equal(await get({ origin: `https://aidiy-test-${port}.app.github.dev` }), 404);
     assert.equal(await get({ origin: 'https://evil.example' }), 403);
   } finally {
     await app.close();

@@ -43,6 +43,10 @@ _AI_TABLE = {
     "gemini_chat": ("AIコア.AIチャット_gemini", "CHAT_GEMINI_MODEL", "gemini_key_id"),
     "freeai_chat": ("AIコア.AIチャット_gemini", "CHAT_FREEAI_MODEL", "freeai_key_id"),
     "ollama_chat": ("AIコア.AIチャット_ollama", "CHAT_OLLAMA_MODEL", "ollama_key_id"),
+    # 本体 AIチャット._select_ai_module と同じ対応。自動選択の候補には含めない。
+    "openai_chat": ("AIコア.AIチャット_openai", "CHAT_OPENAI_MODEL", "openai_key_id"),
+    "openai_oauth": ("AIコア.AIチャット_openai", "CHAT_OPENAI_MODEL", ""),
+    "local_chat": ("AIコア.AIチャット_local", "CHAT_LOCAL_MODEL", ""),
 }
 
 # ai_name 候補（key.json の並びに依らず固定の優先順）
@@ -143,9 +147,11 @@ class ChatLLM:
             return (key.get("freeai_key_id", "") or key.get("gemini_key_id", "")).strip()
         if ai_name == "ollama_chat":
             return (key.get("ollama_key_id", "") or "ollama").strip()
+        if ai_name == "local_chat":
+            return "local"  # backend_local は認証なし（ダミーキー）
         entry = _AI_TABLE.get(ai_name)
-        if not entry:
-            return ""
+        if not entry or not entry[2]:
+            return ""  # openai_oauth は command_hermes の OAuth auth store から取得
         _, _, key_id = entry
         return str(key.get(key_id, "") or "").strip()
 

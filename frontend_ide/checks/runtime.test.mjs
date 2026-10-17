@@ -76,10 +76,10 @@ test('Vueが管理するCodeサーバーは画面を閉じても勝手に終了�
  const app=await 単独起動(project,'http://127.0.0.1:1',{offline:true,keepAlive:true});let reader;
  try{
   t.mock.timers.tick(180001);
-  assert.equal((await fetch(app.url)).status,200);
+  assert.equal((await fetch(new URL('catalog',app.url))).status,200);
   reader=(await fetch(new URL('events',app.url))).body.getReader();await reader.read();await reader.cancel();reader=null;
   await new Promise(resolve=>setImmediate(resolve));t.mock.timers.tick(60001);
-  assert.equal((await fetch(app.url)).status,200);
+  assert.equal((await fetch(new URL('catalog',app.url))).status,200);
  }finally{t.mock.timers.reset();await reader?.cancel();await app.close();}
 });
 

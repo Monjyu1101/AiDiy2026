@@ -14,7 +14,7 @@ const { createHash } = require('node:crypto');
 const { existsSync, readFileSync, readdirSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 
-const outputs = ['dist/aidiy_live/server.cjs', 'dist/aidiy_live/view.js', 'aidiy_live/dist/extension.js', 'aidiy_live/dist/view.js'];
+const outputs = ['dist/aidiy_live/server.cjs', 'aidiy_live/dist/extension.js'];
 const record = 'dist/aidiy_live/build-state.json';
 function sourceHash(root) {
   const files = ['aidiy_live/build.mjs', 'aidiy_live/build-state.cjs', 'aidiy_live/local-backend.cjs',

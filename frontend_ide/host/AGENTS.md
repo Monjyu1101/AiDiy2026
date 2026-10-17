@@ -67,19 +67,16 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `src/protocol.ts` | AIコード互換 packet と開始・進捗・終了・回答の変換 |
 | `src/stream-control.ts` | STX / ETX / CAN 制御コードの判定と表示用除去 |
 | `src/model-preferences.ts` | Code / Live の最終手動モデルを `~/.aidiy/aidiy_*_model.json` へ読込・保存（Live bundle にも内包） |
-| `src/scroll-follow.ts` | Code / Live 共通の会話末尾への自動追従 |
-| `src/webview.ts` | チャット描画、入力、モデル表示、Webview IPC |
-| `aidiy_code/src/server.ts` | 単独試用用の localhost HTTP / SSE サーバー |
-| `media/chat.html` / `media/chat.css` | Webview の HTML と見た目 |
-| `aidiy_code/bridge.js` / `aidiy_code/theme.css` | 単独試用画面と HTTP / SSE の橋渡しと、VS Code テーマ変数の代替値 |
-| `aidiy_code/desktop.cjs` / `aidiy_code/preload.cjs` | 単独ウィンドウ、終了処理、限定したウィンドウ操作 IPC |
+| `src/vscode-html.ts` | Webview に frontend_ide の Vue 画面（`dist/development`）を読み込む HTML |
+| `aidiy_code/src/server.ts` | IDE / 単独起動の Vue 画面が使う localhost HTTP / SSE の API サーバー（画面は返さない） |
+| `media/` | 拡張アイコンと、Vue 画面へ同梱する送信・停止ボタン画像 |
 | `scripts/model-catalog.py` | Hermes 既存 picker から Provider / モデル候補を取得 |
-| `aidiy_code/launch.mjs` | 作業フォルダから専用ウィンドウを起動する。`--browser` ではブラウザで開く |
-| `scripts/build.mjs` | Code 拡張、単独試用、Webview の bundle と第三者ライセンス生成。続けて `aidiy_live/build.mjs` で Live も生成 |
+| `aidiy_code/launch.mjs` | 作業フォルダから frontend_ide の Code 画面を起動する。`--browser` ではブラウザで開く |
+| `scripts/build.mjs` | Code 拡張・API サーバーの bundle と第三者ライセンス生成。続けて `aidiy_live/build.mjs` で Live、frontend_ide の Vue 画面も生成 |
 | `scripts/package.mjs` | Code / Live の 2 つの VSIX を `dist/` へ生成 |
 | `scripts/vscode_extensions.py` / `scripts/standalone_processes.py` | セットアップ・クリーンアップ共通の `aidiy-*` 拡張解除と、この作業コピーの単独起動プロセス停止 |
-| `checks/` | CLI 実行、protocol、停止、単独試用、起動、Webview の Node.js テスト（`npm test`）と、セットアップ・クリーンアップ・モデル候補の Python テスト。Live のテストは `aidiy_live/checks/`（`npm run live:test`） |
-| `aidiy_live/` | Live 拡張（`package.json` を別に持つ）、専用画面、AudioWorklet 音声処理、localhost 通信中継、Windows マイク補助、Electron 起動 |
+| `checks/` | CLI 実行、protocol、停止、API サーバー、起動、拡張の Node.js テスト（`npm test`）と、セットアップ・クリーンアップ・モデル候補の Python テスト。Live のテストは `aidiy_live/checks/`（`npm run live:test`） |
+| `aidiy_live/` | Live 拡張（`package.json` を別に持つ）、AudioWorklet 音声処理、localhost 通信中継、Windows マイク補助 |
 | `aidiy_code.cmd` / `aidiy_live.cmd`、ルートの `vscode_code.bat` / `vscode_live.bat` | 単独起動の入口。bat はモデル選択メニューから `--provider` / `--model` を渡す |
 | `_setup.py` / `_cleanup.py` | 依存・Electron の準備、VSIX の生成・配置、`aidiy_code` / `aidiy_live` ランチャーの作成と、拡張・単独起動プロセス・ランチャー・生成物の解除 |
 | `launch-extension-dev.ps1` | Code / Live を読み込んだ VS Code 開発ホストの Windows 起動入口 |
@@ -89,13 +86,13 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 1. `extension.ts` または `aidiy_code/src/server.ts` が対象フォルダ・会話・モデル・添付コードを管理する。
 2. `src/code-connection.ts` が Live と共通のローカル接続先を解決し、入力・コード出力ソケットとモデルAPIを管理する。
-3. 送信・停止はAIコアへ渡し、`webview.ts` が進捗・正式回答と接続状態を表示する。
+3. 送信・停止はAIコアへ渡し、frontend_ide の Vue 画面（`src/コード/`）が進捗・正式回答と接続状態を表示する。
 
-単独起動では `aidiy_code/src/server.ts` と `aidiy_code/bridge.js` が VS Code API の代わりを担当し、接続層と描画を共用します。
+画面は VS Code の Webview・単独起動・IDE とも frontend_ide の Vue 画面だけです。単独起動・IDE では `aidiy_code/src/server.ts` が VS Code API の代わりに HTTP / SSE の API を提供し、接続層を共用します。
 
 AiDiy IDE はCode / Liveの単独サーバーと画面を同一公開元への中継で埋め込みます。Codeの `lockedMode` 起動オプションは、IDEの利用モードを維持し、サーバー寿命を親のIDEに委ねます。未指定の単独版の動作は従来どおりです。
 
-Live では `aidiy_live/src/view.ts` が画面と音声を担当し、`bridge.ts` の `LiveEnvironment` が実行環境に応じて接続方法を切り替えます。VS Code 拡張では `host.ts`（拡張ホスト）が AIコアの WebSocket、モデル情報 API、Windows マイク（`microphone.py`）を扱い、Webview へ中継します。単独起動では `src/server.ts` の localhost 中継が同じ役割を担います。接続時は input / 0 / audio の 3 本の WebSocket を開き、`connect` パケットで作業フォルダ（`CODE_BASE_PATH`）と選択したモデル設定を渡します。
+Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声処理は `aidiy_live/src/audio.ts`・`visualizer.ts` を共用します。VS Code 拡張では `host.ts`（拡張ホスト）が AIコアの WebSocket、モデル情報 API、Windows マイク（`microphone.py`）を扱い、Webview へ中継します。単独起動では `src/server.ts` の localhost 中継が同じ役割を担います。接続時は input / 0 / audio の 3 本の WebSocket を開き、`connect` パケットで作業フォルダ（`CODE_BASE_PATH`）と選択したモデル設定を渡します。
 
 ## 接続と会話
 
@@ -121,10 +118,10 @@ Live では `aidiy_live/src/view.ts` が画面と音声を担当し、`bridge.ts
 - VS Code のビュー、コマンド、設定を変える場合は `package.json` と `src/extension.ts` をセットで見る。
 - CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `checks/runner.test.cjs` をセットで見る。
 - packet を変える場合は `src/protocol.ts` と既存 AIコード実装との互換性を確認する。
-- チャット UI を変える場合は `media/chat.html`、`media/chat.css`、`src/webview.ts` をセットで見て、単独試用側も確認する。
+- チャット UI を変える場合は frontend_ide の Vue 画面（`src/コード/`・`src/共通表示/`）を変更し、拡張の Webview・単独起動・IDE の 3 つで同じ画面になることを確認する。
 - Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord の直接CLI候補は `scripts/model-catalog.py` を使う。
 - モデル選択の保存・復元を変える場合は `src/model-preferences.ts` と、Code / Live それぞれの拡張・単独起動の読込箇所をセットで見る。
-- Live の画面・音声を変える場合は `aidiy_live/src/view.ts`、`audio.ts`、`visualizer.ts`、`aidiy_live/media/` をセットで見て、`aidiy_live/checks/view.test.cjs` で VS Code / 単独画面の両方を確認する。
+- Live の画面を変える場合は frontend_ide の Vue 画面（`src/ライブ/`）、音声を変える場合は `aidiy_live/src/audio.ts`・`visualizer.ts`・`aidiy_live/media/capture.js` をセットで見る。
 - Live の通信を変える場合は、拡張ホスト（`aidiy_live/src/host.ts`）と単独起動の中継（`aidiy_live/src/server.ts`）の許可範囲を揃える。
 - 具体的な変更手順と検証項目は `_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md` を参照する。
 

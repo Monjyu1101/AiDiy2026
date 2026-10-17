@@ -67,12 +67,15 @@ try{
  assert.equal(await evaluate(`document.querySelector('#model-trial-start').textContent`),'動作確認');
  assert.equal(await evaluate(`!!document.querySelector('#model-trial-single')`),false);
  assert.equal(await evaluate(`document.querySelector('.trial-reload').textContent`),'再読込');
- const header=await evaluate(`(()=>{const h=document.querySelector('.trial-heading'),title=h.querySelector('h2').getBoundingClientRect(),button=h.querySelector('.trial-reload').getBoundingClientRect();return {inline:Math.abs((title.top+title.bottom)-(button.top+button.bottom))<2,reloadInHeading:h.contains(document.querySelector('.trial-reload'))};})()`);
- assert.deepEqual(header,{inline:true,reloadInHeading:true});
+ const header=await evaluate(`(()=>{const h=document.querySelector('.trial-heading'),title=h.querySelector('h2').getBoundingClientRect(),button=h.querySelector('.trial-reload').getBoundingClientRect(),start=h.querySelector('#model-trial-start').getBoundingClientRect();return {inline:Math.abs((title.top+title.bottom)-(button.top+button.bottom))<2,reloadInHeading:h.contains(document.querySelector('.trial-reload')),reloadLeft:button.left>title.right&&button.right<start.left};})()`);
+ assert.deepEqual(header,{inline:true,reloadInHeading:true,reloadLeft:true});
  await evaluate(`document.querySelector('.trial-select').click()`);assert.equal(calls,0);
  await evaluate(`document.querySelector('[data-trial-id="CODE4"]').click();document.querySelector('[data-trial-id="CODE4"]').click()`);
  await until(`document.querySelectorAll('.trial-row .badge[data-state="実行中"]').length===12`);
  assert.equal(calls,1);assert.equal(await evaluate(`[...document.querySelectorAll('[data-trial-id]')].every(b=>b.disabled)`),true);
+ assert.deepEqual(await evaluate(`[...document.querySelectorAll('.trial-group-title')].map(h=>h.firstChild.textContent)`),['チャット','ライブ','コード','タスク','チーム']);
+ const follow=await evaluate(`(()=>{const aside=document.querySelector('.model-trial-panel aside'),row=document.querySelector('.trial-row.selected').getBoundingClientRect(),box=aside.getBoundingClientRect();return {scrolled:aside.scrollTop>0,visible:row.top>=box.top&&row.bottom<=box.bottom};})()`);
+ assert.deepEqual(follow,{scrolled:true,visible:true});
  await capture('pending-desktop');release();
  await until(`document.querySelectorAll('.trial-row .badge[data-state="OK"]').length===12`);
  assert.equal(calls,1);await capture('result-desktop');

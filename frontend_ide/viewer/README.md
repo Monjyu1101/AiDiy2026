@@ -92,10 +92,9 @@ VS Code の [Office Viewer](https://github.com/cweijan/vscode-office) が採用�
 
 - `_setup.py` / `_start.py` / `_cleanup.py` / `launcher.py`: セットアップ・起動・クリーンアップと `aidiy_ide` コマンド
 - `launch.mjs` / `launch-options.mjs`: プロジェクト指定、Electron / Web の選択、終了処理
-- `desktop.cjs` / `preload.cjs`: Electron ウィンドウと画面環境の通知（Node integration 無効、context isolation / sandbox 有効）
-- `core-connection.mjs` / `web/connection.js` / `web/connection.css`: AiDiy toolsの接続確認、接続画面とシアンバー
-- `server.mjs`: フォルダ走査（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`）、Monaco と画面の配信
-- `web/`: 画面（Canvas 2D）。開発者ツールの `aidiyIDE` から状態を覗けます。
+- `core-connection.mjs`: AiDiy toolsの接続確認
+- `server.mjs`: フォルダ走査（`/api/galaxy`）、ファイルの中身（`/api/file`・`/api/raw`）、Monaco と文書ビューアの配信
+- 画面: `frontend_ide/src/` の Vue 画面（`frontend_ide/server.mjs` が配信）。`web/layout.js` の3D配置を取り込みます。
 - `web/office.html` / `office.js` / `office.css`: 独立した iframe 内で表示する文書ビューア。
 - `checks/`: 文書API・アクセス境界の自動テストと検証用データ生成。
 - `scripts/shot.mjs`: 画面確認用のスクリーンショット（ヘッドレス Chrome）

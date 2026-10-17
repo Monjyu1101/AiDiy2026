@@ -104,11 +104,14 @@ test('ブラウザ版の起動コマンドがURLを返し、終了できる', { 
 test('Live の配布ディレクトリだけで専用画面の全リソースを提供できる', async t => {
   const live = await ライブ起動(join(root, 'aidiy_live'), 'http://127.0.0.1:8091', true);
   t.after(() => live.close());
-  for (const path of ['', 'style.css', 'view.js', 'capture.js', 'sending.png', 'AiDiy.png', 'microphone.png', 'speaker.png']) {
+  for (const path of ['', 'development/app.js', 'development/app.css', 'capture.js', 'sending.png', 'AiDiy.png', 'microphone.png', 'speaker.png']) {
     const response = await fetch(new URL(path, live.url));
     assert.equal(response.status, 200, path);
     assert.ok((await response.arrayBuffer()).byteLength > 0, path);
   }
+  // 画面は Vue 画面だけを返し、Vue 移行前の画面は配信しない。
+  assert.match(await (await fetch(live.url)).text(), /<script src="development\/app\.js" defer><\/script>/);
+  for (const path of ['view.js', 'style.css']) assert.equal((await fetch(new URL(path, live.url))).status, 404, path);
   assert.equal((await (await fetch(new URL('config', live.url))).json()).backend, 'http://127.0.0.1:8091');
 });
 
@@ -213,7 +216,7 @@ test('localhost中継: API、音声WebSocket、Origin拒否、終了', { timeout
   t.after(() => live.close().catch(() => undefined));
   const origin = new URL(live.url).origin;
   assert.equal((await fetch(live.url)).status, 200);
-  assert.match(await (await fetch(live.url)).text(), /マイク OFF/);
+  assert.match(await (await fetch(live.url)).text(), /"kind":"live"/);
   assert.equal((await fetch(origin + '/')).status, 404);
   assert.equal((await fetch(live.url, { headers: { origin: 'https://evil.example' } })).status, 403);
   const apiUrl = new URL('api/core/AIコア/モデル情報/取得', live.url);

@@ -60,7 +60,9 @@ test('文書API・依存配信・アクセス境界', async t => {
       }
       assert.equal((await get('office-vendor/package.json')).status, 404);
       assert.equal((await get('office-vendor/cmaps/..%2fpackage.json')).status, 404);
-      for (const path of ['office.html', 'office.css', 'office.js', 'layout.js']) assert.equal((await get(path)).status, 200);
+      for (const path of ['office.html', 'office.css', 'office.js', 'licenses.html']) assert.equal((await get(path)).status, 200);
+      // 画面本体は frontend_ide の Vue 画面が配信し、Vue 移行前の画面ファイルは配信しない。
+      for (const path of ['app.js', 'style.css', 'layout.js', 'connection.js', 'panels.js', 'desktop.js']) assert.equal((await get(path)).status, 404, path);
       const html = await get('office.html');
       assert.match(html.headers['content-security-policy'], /connect-src 'self' blob:/);
       assert.match(html.headers['content-security-policy'], /frame-ancestors 'self'/);

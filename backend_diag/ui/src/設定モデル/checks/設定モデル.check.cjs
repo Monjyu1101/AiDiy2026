@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {render,source,component}=require('../../../../checks/ui-components.cjs');
 const ids=['CHAT','LIVE',...Array.from({length:6},(_,i)=>`CODE${i+1}`),'TASK_plan','TASK_do','TASK_check','TEAM_plan','TEAM_do','TEAM_check'];
-const snapshot={版:'v1',項目:ids.map(id=>({id,区分:id,役割:'',プロバイダ:'synthetic',モデル:'model-a',状態:'未実行'}))};
+const snapshot={版:'v1',項目:ids.map(id=>({id,区分:id.replace(/\d+$|_.*$/,''),役割:'',プロバイダ:'synthetic',モデル:'model-a',状態:'未実行'}))};
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};};
 async function setup(api){const {設定モデル状態を作成}=await import('../設定モデル状態.mjs');let online=true;return {state:設定モデル状態を作成({api,接続可能:()=>online}),offline:()=>{online=false;}};}
@@ -101,6 +101,13 @@ test('個別テストで設定版が変われば旧結果を破棄し、オフ�
  let posts=0;const {state,offline}=await setup(async(path,method)=>{if(method==='GET')return grouped;if(method==='DELETE')return {};posts++;if(path.includes('/開始/'))return {...grouped,版:'v2',実行ID:'r',実行順:['CHAT']};return {状態:'OK'};});
  await state.読込();state.結果.value={CODE1:{状態:'OK'}};await state.個別開始();assert.equal(state.結果.value.CODE1,undefined);assert.equal(posts,2);
  offline();await state.個別開始();assert.equal(posts,2);
+});
+
+test('左の一覧はチャット・ライブ・コード・タスク・チームの見出しで区分ごとに並べる',async()=>{
+ const html=await render('設定モデル/設定モデルパネル.vue',{data:snapshot,results:{},selected:'CHAT',online:true});
+ assert.deepEqual([...html.matchAll(/class="trial-group-title">([^<]+)<span> · (\d+)<\/span>/g)].map(m=>[m[1],Number(m[2])]),[['チャット',1],['ライブ',1],['コード',6],['タスク',3],['チーム',3]]);
+ const groups=[...html.matchAll(/<section class="trial-group" aria-label="([^"]+)">([\s\S]*?)<\/section>/g)].map(m=>[m[1],[...m[2].matchAll(/data-trial-id="([^"]+)"/g)].map(x=>x[1])]);
+ assert.deepEqual(groups,[['チャット',['CHAT']],['ライブ',['LIVE']],['コード',ids.slice(2,8)],['タスク',ids.slice(8,11)],['チーム',ids.slice(11)]]);
 });
 
 test('全14行のテストボタンは接続・読込・実行状態で制御し、見出しの個別ボタンは置かない',async()=>{

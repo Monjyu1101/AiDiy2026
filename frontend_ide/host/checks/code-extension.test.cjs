@@ -18,7 +18,6 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { transformSync } = require('esbuild');
 const { core } = require('./fake-core.cjs');
-const { screen } = require('./code-screen.cjs');
 const flush = async () => { for (let i=0;i<8;i++) await new Promise(resolve=>setImmediate(resolve)); };
 
 test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存し、再起動後も全文を復元する', async t => {
@@ -116,9 +115,8 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     },setTimeout,clearTimeout,console,
   });
   loaded.exports.activate(context);
-  const ui = screen(message => receive?.(message));
   const view = {visible:true,webview:{options:{},cspSource:'self',asWebviewUri:uri=>uri.fsPath,
-    postMessage(packet){const state=JSON.parse(JSON.stringify(packet));posts.push(state);ui.notify(state);return Promise.resolve();},
+    postMessage(packet){posts.push(JSON.parse(JSON.stringify(packet)));return Promise.resolve();},
     onDidReceiveMessage(callback){receive=callback;return subscription;}},
     onDidDispose(callback){disposed=callback;return subscription;}, onDidChangeVisibility(callback){visibility=callback;return subscription;}};
   provider.resolveWebviewView(view);
@@ -127,29 +125,22 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     let latest = () => posts.findLast(p=>p.type==='state');
     assert.equal(latest().provider,'aidiy_hermes');assert.equal(latest().model,'openai_oauth/gpt-6.1-sol');
     assert.equal(latest().実行モード,'offline');assert.equal(latest().オフライン対応,true);
-    assert.equal(ui.element('choose-model').disabled,false);
-    ui.element('choose-model').listeners.get('click')();await flush();
-    assert.equal(ui.element('model-picker').open,true);
-    assert.equal(ui.element('model-select').disabled,false);
-    assert.equal(ui.element('apply-model').disabled,false);
-    ui.element('model-select').value='same';ui.element('apply-model').listeners.get('click')();await flush();
+    // 画面（Vue）が送るメッセージを直接送り、拡張が返す状態を確認する。
+    receive({type:'chooseModel',provider:''});await flush();
+    assert.ok(posts.findLast(p=>p.type==='modelCatalog'));
+    receive({type:'setModel',provider:'aidiy_hermes',model:'same'});await flush();
     assert.equal(latest().model,'same');
     // 作業フォルダを開くと、接続失敗・再試行中も入力とモデル選択を許可する。
     vscode.workspace.workspaceFolders=[folder];backend.unavailable=true;
     receive({type:'ready'});await flush();
-    assert.equal(ui.element('error').hidden,false);
-    assert.match(ui.element('error').textContent,/接続できません/);
-    ui.input('未接続で送信');assert.equal(ui.element('send').disabled,false);
-    assert.equal(ui.element('choose-model').disabled,false);
-    assert.equal(ui.element('self-check-loop').value,'0');
-    assert.equal(ui.element('self-check-loop').disabled,true);
-    receive({type:'connect'});ui.input('接続試行中も送信');
-    assert.equal(ui.element('send').disabled,false);assert.equal(ui.element('choose-model').disabled,false);
+    assert.match(String(latest().接続エラー),/接続できません/);
+    assert.equal(latest().実行モード,'offline');
+    receive({type:'connect'});
     await flush();
     receive({type:'setModel',provider:'aidiy_hermes',model:'openai_oauth/gpt-6.1-sol'});await flush();
     backend.unavailable=false;
     receive({type:'connect'});await flush();
-    assert.equal(ui.element('error').hidden,true);assert.equal(ui.element('error').textContent,'');
+    assert.equal(latest().接続エラー || '','');
     receive({type:'ready'});await flush();
     assert.ok(posts.some(p=>p.type==='state' && p.接続中 && !p.接続済み));
     assert.equal(posts.findLast(p=>p.type==='state').接続済み,true);
@@ -157,7 +148,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.equal(latest().自動接続,true);
     const sessionBeforeToggle = latest().コアセッションID;
     const conversationBeforeToggle = latest().会話ID;
-    ui.element('auto-connect').listeners.get('click')();await flush();
+    receive({type:'autoConnect',enabled:false});await flush();
     assert.equal(latest().自動接続,false);assert.equal(latest().接続済み,false);
     assert.ok(backend.sockets.every(socket=>socket.readyState===3));
     const socketCount = backend.sockets.length;
@@ -166,7 +157,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     receive({type:'selectHistory',id:conversationBeforeToggle});await flush();
     assert.equal(latest().会話ID,conversationBeforeToggle);
     assert.equal(backend.sockets.length,socketCount);
-    ui.element('auto-connect').listeners.get('click')();await flush();
+    receive({type:'autoConnect',enabled:true});await flush();
     assert.equal(latest().自動接続,true);assert.equal(latest().接続済み,true);
     assert.equal(latest().コアセッションID,sessionBeforeToggle);
     receive({type:'chooseModel',provider:'aidiy_hermes'});await flush();
@@ -205,9 +196,8 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.equal(latest().自動接続,true);assert.equal(latest().接続済み,true);
     for(const type of ['connect','disconnect']) {receive({type});await flush();assert.equal(latest().接続済み,true);assert.equal(latest().実行中,true);}
     backend.holdCancel=true;
-    ui.element('stop').listeners.get('click')();await flush();
+    receive({セッションID:latest().会話ID,チャンネル:'code1',メッセージ識別:'cancel_run',メッセージ内容:'強制停止！'});await flush();
     assert.equal(latest().停止中,true);assert.equal(latest().実行中,true);
-    assert.equal(ui.element('auto-connect').disabled,true);assert.equal(ui.element('stop').disabled,true);
     const stopsBefore=backend.sockets.flatMap(s=>s.sent).filter(p=>p.メッセージ識別==='cancel_run').length;
     receive({メッセージ識別:'cancel_run'});await flush();
     assert.equal(backend.sockets.flatMap(s=>s.sent).filter(p=>p.メッセージ識別==='cancel_run').length,stopsBefore);
@@ -228,8 +218,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.deepEqual(preferences.get('online.json'),{provider:'copilot_cli',model:'gpt-6-sol'});
     assert.deepEqual(preferences.get('online_offline.json'),{provider:'aidiy_hermes',model:'copilot_cli/auto'});
     backend.unavailable=true;receive({type:'autoConnect',enabled:true});await flush();
-    ui.input('切断中');assert.equal(ui.element('send').disabled,false);
-    ui.element('composer').listeners.get('submit')({preventDefault(){}});await flush();
+    receive({セッションID:latest().会話ID,チャンネル:'code1',メッセージ識別:'input_text',メッセージ内容:'切断中',self_check_loop:0});await flush();
     assert.equal(runs.length,1);assert.equal(runs[0].model,'copilot_cli/auto');assert.equal(runs[0].session,undefined);
     assert.equal(runs[0].project,'/project');assert.equal(latest().実行中,true);
     backend.unavailable=false;t.mock.timers.tick(10000);await flush();assert.equal(latest().接続済み,true);

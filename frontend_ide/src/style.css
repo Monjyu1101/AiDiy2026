@@ -55,7 +55,7 @@
 .ide-heading .ai-launchers button:focus-visible{outline:2px solid #8cecff;outline-offset:2px}
 .ide-heading .ai-launchers button:disabled{background:#26303d;border-color:#455263;color:#a8b3c2;box-shadow:none;opacity:.6}
 .space-motion-toggle{position:fixed;right:16px;bottom:16px;z-index:35;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#080c1af2;border:1px solid #334058;font:11px var(--mono)}.space-motion-toggle>span:last-child{min-width:3ch}.motion-switch{width:28px;height:14px;border:1px solid #566077;position:relative;background:#1b2230}.motion-switch:after{content:'';position:absolute;top:2px;left:2px;width:8px;height:8px;background:#8897b1;transition:transform .15s}.space-motion-toggle[aria-checked=true]{color:#85e9e9}.space-motion-toggle[aria-checked=true] .motion-switch{border-color:#6bcbcc;background:#183638}.space-motion-toggle[aria-checked=true] .motion-switch:after{background:#85e9e9;transform:translateX(14px)}.space-view .viewer-popup,.development-app.ide .ai-popup{bottom:60px}
-.space-view{--portrait-panel-gap:8px;--explorer-width:25vw;--route-width:360px}
+.space-view{--portrait-panel-gap:8px;--explorer-width:25vw;--route-width:400px}
 .space-view .explorer-panel{width:var(--explorer-width)}
 @media (orientation:portrait){
   .space-view .explorer-panel{right:auto;bottom:calc(50dvh + var(--portrait-panel-gap));overflow:auto}
@@ -260,3 +260,20 @@
 .all-restore-icon{display:block;width:11px;height:11px;border:1px solid currentColor;box-shadow:2px -2px 0 -1px #080a10,2px -2px 0 0 currentColor}
 .all-transition{position:fixed;inset:0;z-index:150;display:grid;place-items:center;background:#0002;cursor:progress;-webkit-app-region:no-drag}.all-transition p{margin:0;padding:12px 20px;border:1px solid #426073;background:#080c1af2;color:#d9f5ff;font-size:14px}
 @media(prefers-reduced-motion:reduce){.all-restore-button{transition:none}}
+/* バーガー: 横三本＝エクスプローラー、縦三本＝軌跡バー。元の ☰ と同じ文字色の線で、向きだけを変える。線の太さ・間隔は main.js が表示倍率の整数画素へそろえる。 */
+.burger{display:grid;gap:var(--burger-gap,4px);place-content:center;pointer-events:none}
+.burger i{display:block;background:currentColor}
+.burger-h i{width:14px;height:var(--burger-line,2px)}
+.burger-v{grid-auto-flow:column}.burger-v i{width:var(--burger-line,2px);height:14px}
+.route-restore-toggle.burger-button{width:40px;height:40px;padding:0;display:grid;place-items:center}
+.explorer-panel header .explorer-burger,.route-controls>.route-burger{flex:none;width:26px;height:26px;min-width:26px;padding:0;display:grid;place-items:center}
+/* 軌跡バーの高さを左のエクスプローラーの開くボタン（40px）とそろえる。 */
+.explorer-routes{box-sizing:border-box;min-height:40px}.explorer-routes .route-controls{min-height:38px}
+/* 軌跡バーを閉じた時の縦三本は、軌跡バーと同じ場所（エクスプローラーを開いていればその右隣、縦長画面は右端）に出す。 */
+.route-restore-toggle.explorer-open{left:calc(24px + var(--explorer-width))}
+@media (orientation:portrait){.route-restore-toggle,.route-restore-toggle.explorer-open{left:auto;right:16px}}
+
+
+/* 開いた軌跡バーの先頭の縦三本は、閉じている時の正方形ボタンと同じ位置・大きさの枠（右端は区切り線）にする。 */
+.explorer-routes .route-controls>.route-burger{width:39px;min-width:39px;height:38px;margin:-5px 5px -5px -5px;border:0;border-right:1px solid #343943;background:transparent}
+.explorer-routes .route-controls>.route-burger:hover{background:#202737}

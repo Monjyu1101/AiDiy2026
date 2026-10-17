@@ -15,7 +15,7 @@
 // ユーザー発言は送信した入力枠、AI回答は画面中央の受信通知（ターミナル演出）を飛ばす。
 // OS の「動きを減らす」設定には従わず、Windows / macOS / Linux で同じ演出にする。
 // 見た目のクラス（.input-flight / .answer-popup / arrival-waiting / arrival-pending / arrival-reveal）は
-// media/chat.css と aidiy_live/media/style.css の両方に定義する。
+// Code / Live 共通の Vue 画面の frontend_ide/src/共通表示/会話表示.css に定義する。
 
 // ターミナル演出。frontend_web の AIコード.vue（演出初期化 / 演出キュー追加 / 演出実行 / 速度設定）と同じ実装。
 // 文字列をキューに積み、ストリームは2msごとに max(8, floor(文字数 / 12) + 2) 文字、通常メッセージは10msごとに

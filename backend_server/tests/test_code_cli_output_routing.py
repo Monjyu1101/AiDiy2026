@@ -8,6 +8,7 @@ import logging
 import os
 from pathlib import Path
 import sys
+import tempfile
 import time
 import types
 import unittest
@@ -98,11 +99,34 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
             parent.モデル設定 = {"CODE_CLAUDE_OLLAMA_MODEL": "configured", "CODE_CODEX_OLLAMA_MODEL": "configured", "CHAT_OLLAMA_MODEL": "fallback"}
             for first in (True, False):
                 for model in ("same", "SAME"):
-                    with self.subTest(provider=provider, first=first, model=model), patch.dict(os.environ, {f"{provider.upper()}_CLI_PATH": "test_cli"}):
+                    # opencode の最終選択の記録が無い状態（空の state フォルダ）で確認する。
+                    with self.subTest(provider=provider, first=first, model=model), tempfile.TemporaryDirectory() as state, patch.dict(os.environ, {f"{provider.upper()}_CLI_PATH": "test_cli", "XDG_STATE_HOME": state}):
                         code_ai.code_model = model
                         command = code_ai._コマンド構築("質問", 初回=first)
                         self.assertNotIn("--model", command)
                         self.assertNotIn(model, command)
+
+    def test_opencode_auto_and_same_use_last_tui_model(self):
+        # opencode run は --model を省くと TUI で選んだモデルを使わないため、最終選択を明示して渡す。
+        code_ai, _ = self._code_ai("opencode_cli")
+        with tempfile.TemporaryDirectory() as state:
+            (Path(state) / "opencode").mkdir()
+            (Path(state) / "opencode" / "model.json").write_text(json.dumps({"recent": [{"providerID": "openai", "modelID": "gpt-6-luna"}, {"providerID": "ollama-cloud", "modelID": "kimi-k2.6"}]}), encoding="utf-8")
+            with patch.dict(os.environ, {"OPENCODE_CLI_PATH": "test_cli", "XDG_STATE_HOME": state}):
+                for model in ("auto", "same", "AUTO", ""):
+                    with self.subTest(model=model):
+                        code_ai.code_model = model
+                        command = code_ai._コマンド構築("質問", 初回=True)
+                        self.assertEqual(command[command.index("--model") + 1], "openai/gpt-6-luna")
+                # 明示したモデルは最終選択より優先する。
+                code_ai.code_model = "ollama-cloud/qwen3.5:397b"
+                command = code_ai._コマンド構築("質問", 初回=True)
+                self.assertEqual(command[command.index("--model") + 1], "ollama-cloud/qwen3.5:397b")
+            # 記録が壊れていれば指定しない。
+            (Path(state) / "opencode" / "model.json").write_text("{", encoding="utf-8")
+            with patch.dict(os.environ, {"OPENCODE_CLI_PATH": "test_cli", "XDG_STATE_HOME": state}):
+                code_ai.code_model = "auto"
+                self.assertNotIn("--model", code_ai._コマンド構築("質問", 初回=True))
 
     def test_antigravity_has_no_separate_fixed_deadline(self):
         code_ai, _ = self._code_ai("antigravity_cli")
@@ -285,6 +309,12 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
                 streamed = [m["メッセージ内容"] for m in parent.接続.messages]
                 self.assertEqual("（応答なし）", result)
                 self.assertEqual(["ERROR_ONLY"], streamed)
+
+    async def test_opencode_process_failure_reports_stderr_error_line(self):
+        code_ai, parent = self._code_ai("opencode_cli")
+        script = "import sys; print('\\x1b[0m', file=sys.stderr); print('> build', file=sys.stderr); print('Error: usage limit', file=sys.stderr); sys.exit(1)"
+        result = await code_ai._subprocess実行([sys.executable, "-c", script], cwd=str(PROJECT_ROOT), timeout=10)
+        self.assertEqual("実行エラー: opencode_cli Error: usage limit", result)
 
     async def test_antigravity_streams_only_stderr(self):
         code_ai, parent = self._code_ai("antigravity_cli")

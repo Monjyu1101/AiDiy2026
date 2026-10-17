@@ -13,6 +13,7 @@ from log_config import get_logger
 logger = get_logger(__name__)
 
 import os
+import re
 import time
 import datetime
 import asyncio
@@ -420,6 +421,25 @@ class CodeAI:
                 return model[: -len(suffix)]
         return model
 
+    @staticmethod
+    def _opencode最終選択モデル() -> str:
+        """opencode が最後に選んだモデル（TUI の選択、state の model.json の recent 先頭）を provider/model で返す。
+
+        `opencode run` は --model を省くと TUI の選択を使わず別の既定モデルになるため、
+        auto / same（AiDiy 側で指定しない）では opencode 自身の選択を明示して渡す。記録が無ければ空文字。
+        """
+        state_home = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
+        try:
+            with open(os.path.join(state_home, "opencode", "model.json"), encoding="utf-8") as f:
+                recent = json.load(f).get("recent") or []
+            provider = str(recent[0].get("providerID", "")).strip()
+            model = str(recent[0].get("modelID", "")).strip()
+        except Exception:
+            return ""
+        if not provider or not model or any(c.isspace() for c in provider + model):
+            return ""
+        return f"{provider}/{model}"
+
     def _ollama起動モデル取得(self, provider_key: str) -> str:
         """claude_ollama/codex_ollama 用のモデルを解決する"""
         if self.code_model and self.code_model.lower() == "same":
@@ -580,7 +600,9 @@ class CodeAI:
 
         if self.code_ai == "opencode_cli":
             _model = self._ollama_cloud_suffix除去(self.code_model)
-            model_args = ["--model", _model] if _model and _model.lower() not in ("auto", "same") else []
+            if not _model or _model.lower() in ("auto", "same"):
+                _model = self._opencode最終選択モデル()
+            model_args = ["--model", _model] if _model else []
             cmd_args = base + ["run"]
             cmd_args += model_args + [プロンプト]
             if not 初回:
@@ -1457,6 +1479,11 @@ class CodeAI:
             result = full_output.strip()
             if copilot_output is not None and not result and process.returncode != 0:
                 return f"Copilot実行エラー: {stderr_output.strip() or f'終了コード {process.returncode}'}"
+            # stdout を正式回答とする CLI が失敗した場合は、stderr のエラー行を理由として返す。
+            if not result and process.returncode != 0 and self.code_ai in _STDERR_STREAM_STDOUT_FINAL_AI:
+                stderr_text = [line.strip() for line in re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", stderr_output).splitlines() if line.strip()]
+                detail = [line for line in stderr_text if re.match(r"(?i)error\b", line)] or stderr_text[-3:]
+                return f"実行エラー: {self.code_ai} {' / '.join(detail)[:500] or f'終了コード {process.returncode}'}"
             # stdout を正式回答とする CLI では stderr を最終回答へ混ぜない。
             # その他の CLI は、非TTY環境で stderr に回答を出す場合に備えて従来挙動を維持する。
             if (

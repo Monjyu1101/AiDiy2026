@@ -97,13 +97,12 @@ AIコアのモデル情報を取得できない場合は、実際の接続先と
 | `src/protocol.ts` | 既存 AIコアの init / input / 0 / audio 接続とパケット |
 | `src/audio.ts`, `media/capture.js` | AudioWorklet で入力を16/24kHz PCM16へ変換、24kHz出力を順次再生 |
 | `src/visualizer.ts` | 実音声に連動する円形の音量雲を Canvas へ描画 |
-| `src/view.ts`, `media/index.html`, `media/style.css` | 会話・音声操作・モデル選択の共通画面 |
+| frontend_ide の `src/ライブ/`（Vue） | 会話・音声操作・モデル選択の共通画面。拡張の Webview・単独起動・IDE で共用 |
 | `src/server.ts` | localhost の HTTP / WebSocket 中継。接続先は起動時に固定 |
-| `src/extension.ts`, `src/host.ts`, `src/bridge.ts` | 独立 Live 拡張、拡張側の通信、共通画面への IPC |
+| `src/extension.ts`, `src/host.ts` | 独立 Live 拡張、拡張側の通信、共通画面への IPC |
 | `../src/model-preferences.ts` | ユーザーごとの最終手動選択のJSON読込・保存（bundleへ内包） |
 | `microphone.py`, `src/microphone-error.ts` | Windows のネイティブマイクを48kHz PCM16で取り込む。マイクエラーの案内文 |
-| `desktop.cjs`, `preload.cjs`, `launch.mjs` | Electron の専用ウィンドウと起動処理 |
-| `permissions.cjs` | 専用ウィンドウのマイク許可を、専用画面のメインフレームの音声入力だけに限定する |
+| `launch.mjs` | frontend_ide の Live 画面（Electron 専用ウィンドウ）の起動入口 |
 
 中継はランダムポート・ランダムURLで `127.0.0.1` にだけ公開し、Host / Origin を照合します。バックエンドへの REST 中継はモデル取得とモデル設定の2経路に限定します。ローカルの `POST model` は Live の AI 名・モデル・音声だけを検証して専用JSONへ保存し、バックエンドへ転送しません。WebSocket は `/core/ws/AIコア` にだけ接続します。
 
@@ -113,7 +112,7 @@ AIコアのモデル情報を取得できない場合は、実際の接続先と
 
 ### マイクを ON にできない場合
 
-専用ウィンドウの許可判定は URL の `origin` を比較します。Electron が返す末尾 `/` 付きの origin を文字列の完全一致で拒否しないようにし、専用画面のメインフレームからの音声入力だけを許可します。
+専用ウィンドウ（frontend_ide の `desktop.cjs`）の許可判定は URL の `origin` を比較します。Electron が返す末尾 `/` 付きの origin を文字列の完全一致で拒否しないようにし、専用画面のメインフレームからの音声入力だけを許可します。
 
 `Requested device not found` は、実行中の Windows に入力デバイスが見えていない状態です。まず Windows の「設定 → システム → サウンド → 入力」でマイクが選べることを確認します。出力に「リモート オーディオ」があるだけではマイク転送の確認にはなりません。
 

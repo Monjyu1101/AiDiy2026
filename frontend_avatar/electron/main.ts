@@ -233,7 +233,7 @@ function getRendererUrl(role: WindowRole): string {
 
 function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): BrowserWindow {
   const appPath = app.getAppPath()
-  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
+  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
   const window = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
@@ -512,7 +512,7 @@ function closeTeamWindow() {
 async function openTeamWindow(): Promise<boolean> {
   if (!teamWindow || teamWindow.isDestroyed()) {
     const appPath = app.getAppPath()
-    const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
+    const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
     teamWindow = new BrowserWindow({
       width: TEAM_BOUNDS.width,
       height: TEAM_BOUNDS.height,
@@ -724,7 +724,7 @@ function openSettingsWindow(sessionId: string) {
   }
 
   const appPath = app.getAppPath()
-  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy.ico')
+  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
 
   settingsWindow = new BrowserWindow({
     width: SETTINGS_BOUNDS.width,

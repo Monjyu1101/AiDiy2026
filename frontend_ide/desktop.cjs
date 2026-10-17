@@ -50,7 +50,7 @@ const {keepInFront}=require('./デスクトップ/前面維持.cjs');
 const {createVRPanelPlacement}=require('./デスクトップ/VRパネル配置.cjs');
 const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
 const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{for(const child of windows.values())if(child.owner===owner)keepInFront(child.window);}});
-const {createBrowserViews,browserFileTarget,HOME}=require('./デスクトップ/ブラウザ.cjs');
+const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デスクトップ/ブラウザ.cjs');
 const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
 let browserViews;
 const browserBridges=new WeakMap();
@@ -133,7 +133,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  }catch(error){placement?.close();throw error;}
  const title=kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),...(owner?{parent:owner.window}:{}),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),...(owner?{parent:owner.window}:{}),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
@@ -229,7 +229,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:open-browser',async(event,path,displayId)=>{
   const source=trustedEvent(event),owner=source?.kind==='viewer'?source.owner:source;
   if(!owner||owner.kind!=='ide'||owner.owner||!['ide','viewer'].includes(source.kind))return{ok:false,error:'IDEから開いてください。'};
-  if(path!==undefined&&(!validPreviewPath(path)||! /\.html?$/i.test(path)))return{ok:false,error:'HTML / HTMファイルを選んでください。'};
+  if(path!==undefined&&(!validPreviewPath(path)||!await browserOpenable(path)))return{ok:false,error:'HTML / HTM・音声・動画ファイルを選んでください。'};
   const revision=owner.revision;
   try{
    if(displayId!==undefined&&source!==owner)throw Error('画面の選択はIDE本体から行ってください。');
