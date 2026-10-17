@@ -31,6 +31,46 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
   const state=scope.run(()=>module.exports.setup(reactive,{expose(){},emit:(...args)=>emitted.push(args)}));
   return{state,props:reactive,emitted,async mount(){for(const callback of mounted)await callback();await flush();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
 }
+test('ALL中新規選択: IDE内で1件ずつ差し替え、手動でピン留めした窓だけを保持する',async()=>{
+ const f=component('SpaceView',{props:{startedAt:1,viewMode:'3d',allDisplays:true},globals:{document:new EventTarget()}}),calls=[];
+ try{
+  f.state.viewerRefs.set('one.txt',{pin:()=>calls.push('pin'),focus:()=>calls.push('focus')});
+  f.state.selected.value={name:'one.txt',path:'one.txt'};await flush();
+  f.state.selected.value={name:'two.txt',path:'two.txt'};await flush();
+  assert.deepEqual(calls,[]);assert.equal(f.state.viewerSessions.value.length,1);assert.equal(f.state.viewerSessions.value[0].file.path,'two.txt');
+  f.state.selected.value={name:'one.txt',path:'one.txt'};await flush();
+  const pinned=f.state.viewerSessions.value[0];f.state.pinningViewer(pinned,true);
+  f.state.selected.value={name:'two.txt',path:'two.txt'};await flush();
+  assert.equal(f.state.viewerSessions.value.length,2,'手動ピン留めの表示待ち中に選び替えても元セッションを破棄しない');
+  f.state.detachedViewer(pinned);f.state.pinningViewer(pinned,false);
+  assert.equal(f.state.viewerSessions.value.length,2);assert.equal(f.state.viewerSessions.value.filter(entry=>!entry.detached).length,1);
+  f.state.selected.value={name:'one.txt',path:'one.txt'};await flush();assert.deepEqual(calls,['focus']);
+  assert.equal(f.state.viewerSessions.value.length,1);assert.equal(f.state.viewerSessions.value[0],pinned);
+ }finally{f.dispose();}
+});
+
+test('ALL準備: 比較を含む閲覧セッションを維持し、Explorerと軌跡のピン留めだけを待つ',async()=>{
+ const f=component('SpaceView',{props:{startedAt:1,viewMode:'3d'},globals:{document:new EventTarget()}}),calls=[];
+ try{
+  f.state.selected.value={name:'one.txt',path:'one.txt'};await flush();const entry=f.state.viewerSessions.value[0];
+  f.state.viewerRefs.set('one.txt',{pin:()=>{throw Error('閲覧は自動ピン留めしない');}});
+  f.state.explorer.value={pinForAll:async()=>calls.push('bars')};
+  await f.state.prepareAll();assert.deepEqual(calls,['bars']);assert.equal(f.state.viewerSessions.value[0],entry);assert.equal(entry.detached,false);
+ }finally{f.dispose();}
+});
+
+test('ALLの宇宙中心: パネル寸法を参照せず画面中央へ固定し、解除後は従来の補正に戻る',()=>{
+ const fixture=component('SpaceView',{props:{startedAt:1,viewMode:'3d',allDisplays:true},globals:{innerWidth:3840,innerHeight:2160,document:new EventTarget()}});
+ let measured=0;
+ fixture.state.root.value={style:{setProperty(){}},querySelector:selector=>{measured++;return selector==='.viewer-popup'?{}:{getBoundingClientRect:()=>({right:1000,left:16})};}};
+ fixture.state.open.value=true;
+ try{
+  for(const preview of [true,false]){const value=fixture.state.layout({preview});assert.equal(value.centerX,1920);assert.equal(value.centerY,1080);assert.equal(value.preview,false);}
+  assert.equal(measured,0);
+  fixture.props.allDisplays=false;assert.notEqual(fixture.state.layout({preview:true}).centerX,1920);assert.ok(measured>0);
+ }finally{fixture.dispose();}
+});
+
 function viewerFixture({fetcher,fallback=false,file={name:'sample.md',path:'sample.md',line:2,column:1,query:'日本語'}}={}){
   const revealed=[],selections=[],drafts=[],requests=[];let selected=null;
   const editor={getModel:()=>({dispose(){},getValueInRange:()=>selected?.text||''}),dispose(){},onDidScrollChange:()=>({dispose(){}}),setSelection:range=>selections.push(range),revealLineInCenter:line=>revealed.push(line),getSelection:()=>selected};

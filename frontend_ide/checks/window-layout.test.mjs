@@ -8,7 +8,31 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import layout from '../デスクトップ/window-layout.cjs';
-const {windowBounds,windowMinimumSize}=layout;
+import frontModule from '../デスクトップ/前面維持.cjs';
+const {windowBounds,windowMinimumSize,allWindowBounds}=layout;
+test('ALL選択画面: 負座標・縦画面・狭い画面でもTerm下部、Code右上、Live左上',()=>{
+ for(const area of [{x:-1920,y:-1080,width:1920,height:1040},{x:0,y:90,width:1080,height:1880},{x:0,y:0,width:320,height:240}]){
+  const term=allWindowBounds('term',area),code=allWindowBounds('code',area),live=allWindowBounds('live',area);
+  assert.equal(term.y+term.height,area.y+area.height-8);
+  assert.equal(code.x+code.width,area.x+area.width-8);assert.equal(code.y,area.y+8);
+  assert.equal(live.x,area.x+8);assert.equal(live.y,area.y+8);
+  for(const kind of ['term','code','live'])for(let slot=0;slot<12;slot++){
+   const b=allWindowBounds(kind,area,slot);
+   assert.ok(b.x>=area.x&&b.y>=area.y&&b.x+b.width<=area.x+area.width&&b.y+b.height<=area.y+area.height);
+  }
+ }
+});
+
+test('ALL起動先: IDEがALL中の実在する画面IDだけを許可する',()=>{
+ const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
+ const body=source.slice(source.indexOf('function selectedAllDisplay('),source.indexOf('async function createWindow('));
+ const owner={},display={id:17,workArea:{x:-1600,y:0,width:1600,height:900}};let active=true,displays=[display];
+ const context={allDisplays:{state:record=>({active:record===owner&&active})},screen:{getAllDisplays:()=>displays}};
+ vm.runInNewContext(body+';globalThis.select=selectedAllDisplay;',context);
+ assert.equal(context.select(owner,undefined),null);assert.equal(context.select(owner,17),display);
+ for(const id of [null,'17',{},18])assert.throws(()=>context.select(owner,id));
+ active=false;assert.throws(()=>context.select(owner,17));active=true;displays=[];assert.throws(()=>context.select(owner,17));
+});
 for(const area of [{x:0,y:0,width:1920,height:1040},{x:-1600,y:80,width:1600,height:900},{x:0,y:-900,width:1024,height:728},{x:0,y:0,width:640,height:480},{x:-1080,y:-300,width:1080,height:1880},{x:120,y:50,width:640,height:640}]){
  test(`配置が画面内に収まり、IDEに余白を残す: ${JSON.stringify(area)}`,()=>{
   const ide=windowBounds('ide',area);
@@ -46,13 +70,14 @@ test('最小寸法: Termだけ高さ180、横幅・Code/Live/IDE/ビューアは
 });
 test('Electron生成: 単独Term・IDE子Termの双方へ最小寸法を渡し、初期サイズを維持する',async()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey,anchor){'),source.indexOf("process.on('disconnect'"));
+ const body=source.slice(source.indexOf('function selectedAllDisplay(owner,displayId){'),source.indexOf("process.on('disconnect'"));
  const area={x:0,y:0,width:1920,height:1040},windows=new Map();
  class Window{
   constructor(options){this.options=options;this.webContents={on(){},setWindowOpenHandler(){},async executeJavaScript(){}};}
   once(){} on(){} setBounds(bounds){this.bounds=bounds;} getBounds(){return this.bounds;} setAlwaysOnTop(){} isDestroyed(){return false;} async loadURL(){}
  }
- const context={BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:0,y:0})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}})};
+ const context={allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:0,y:0})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}})};
+ Window.prototype.isAlwaysOnTop=()=>false;context.keepInFront=frontModule.keepInFront;
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>windowBounds('ide',area),isDestroyed:()=>false},revision:0};
  for(const parent of [undefined,owner])for(const kind of ['term','code','live','ide','viewer']){
@@ -94,23 +119,26 @@ test('狭い画面でも全窓と最小寸法を作業領域内へ収め、Term�
 
 test('Electron生成: 親IDE側の画面を選び、Code番号・閉鎖後のslot再利用・手動配置を維持する',async()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf('async function createWindow(kind,url,server,owner,linkKey,anchor){'),source.indexOf("process.on('disconnect'"));
+ const body=source.slice(source.indexOf('function selectedAllDisplay(owner,displayId){'),source.indexOf("process.on('disconnect'"));
  const primary={x:0,y:0,width:1920,height:1040},secondary={x:-1080,y:-200,width:1080,height:1880},windows=new Map(),matched=[];
  class Window{
   constructor(options){this.options=options;this.closed=[];this.webContents={on(){},setWindowOpenHandler(){},async executeJavaScript(){}};}
   once(name,fn){if(name==='closed')this.closed.push(fn);} on(){} setBounds(bounds){this.bounds=bounds;} getBounds(){return this.bounds;} setAlwaysOnTop(){} isDestroyed(){return !!this.destroyed;} async loadURL(){}
   destroy(){this.destroyed=true;for(const fn of this.closed)fn();} isMinimized(){return true;} restore(){} show(){} focus(){}
  }
- const context={BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:bounds=>{matched.push(bounds);return{workArea:secondary};},getDisplayNearestPoint:()=>({workArea:primary}),getCursorScreenPoint:()=>({x:100,y:100})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}}),clearInterval(){},draftRouter:{invalidate(){}},nativePreviewActions:{invalidate(){}},closeChildren(){},closeServer(){}};
+ const context={allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:bounds=>{matched.push(bounds);return{workArea:secondary};},getDisplayNearestPoint:()=>({workArea:primary}),getCursorScreenPoint:()=>({x:100,y:100})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}}),clearInterval(){},draftRouter:{invalidate(){}},nativePreviewActions:{invalidate(){}},closeChildren(){},closeServer(){}};
+ Window.prototype.isAlwaysOnTop=()=>false;context.keepInFront=frontModule.keepInFront;
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>({x:-900,y:150,width:700,height:800}),isDestroyed:()=>false},revision:0};
  const create=kind=>context.create(kind,'http://127.0.0.1:1234/',undefined,owner,'offline:1');
  const first=await create('code'),second=await create('code'),third=await create('code');
+ assert.equal(first.options.parent,owner.window);
  assert.deepEqual([first,second,third].map(w=>w.options.title),['AiDiy IDE / Code 1','AiDiy IDE / Code 2','AiDiy IDE / Code 3']);
  assert.deepEqual(first.bounds,windowBounds('code',secondary));
  assert.equal(second.bounds.x,first.bounds.x+24);assert.equal(second.bounds.y,first.bounds.y+24);
  second.destroy();const reopened=await create('code');assert.deepEqual(reopened.bounds,second.bounds);assert.equal(reopened.options.title,second.options.title);
  const live=await create('live'),term=await create('term');
+ assert.equal(live.options.parent,owner.window);assert.equal(term.options.parent,owner.window);
  assert.deepEqual(live.bounds,windowBounds('live',secondary));assert.equal(term.bounds.height,470);
  assert.ok(matched.length>=6);assert.deepEqual(matched[0],owner.window.getBounds());
  const standalone=await context.create('code','http://127.0.0.1:1234/');assert.deepEqual(standalone.bounds,windowBounds('code',primary));

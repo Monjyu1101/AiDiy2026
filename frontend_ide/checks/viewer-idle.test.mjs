@@ -56,7 +56,7 @@ test('実Vue session: pinBusyは同期解除、比較/再描画/子reloadで再�
  const props=vue.reactive({file:{path:'a.js',name:'a.js'},root:'/project',autoSpin:true}),scope=vue.effectScope();
  const state=scope.run(()=>module.exports.setup(props,{expose(){},emit:(...args)=>emitted.push(args)}));
  try{
-  f.advance(179900);const old=[...f.tasks.values()][0].fn;const pin=state.pin();assert.equal(f.tasks.size,0);old();assert.equal(emitted.length,0);
+  f.advance(179900);const old=[...f.tasks.values()][0].fn;const pin=state.pin();assert.equal(f.tasks.size,0);old();assert.deepEqual(emitted,[['pinning',true]]);
   f.advance(5000);pinResolve(false);await pin;assert.equal(f.tasks.size,1,'失敗したpinは3分から再開');
   f.advance(179900);props.file={...props.file,mtime:99};provided.openFileHistory(props.file,props.root);await flush();assert.equal([...f.tasks.values()][0].at-f.now,100,'同じ対象の再描画や比較切替だけで延長しない');
   const next=state.pin();panelOptions.changed(true);pinResolve(true);await next;assert.equal(f.tasks.size,0);

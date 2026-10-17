@@ -47,7 +47,7 @@ const IDENT = '[\\p{L}_$][\\p{L}\\p{N}_$]*';
 const STATIC_IMPORT = new RegExp(`\\bimport\\s+(${IDENT})\\s+from\\s+['"]([^'"]+\\.vue)['"]`, 'gu');
 
 /** 各ルート定義（path と、その直後の component）を読む。:param やワイルドカードのルートは開けないので除く。 */
-function readRoutes(file, text) {
+export function readRoutes(file, text) {
   const named = new Map([...text.matchAll(STATIC_IMPORT)].map(m => [m[1], resolveImport(file, m[2])]));
   const marks = [...text.matchAll(/\bpath\s*:\s*['"]([^'"]*)['"]/g)];
   const routes = [];
@@ -62,7 +62,7 @@ function readRoutes(file, text) {
   return routes;
 }
 
-async function webPort(root) {
+export async function webPort(root) {
   try {
     const config = await readFile(join(root, WEB, 'vite.config.ts'), 'utf8');
     const port = /PORT_WEB\s*=\s*(\d+)/.exec(config)?.[1];

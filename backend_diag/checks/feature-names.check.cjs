@@ -20,7 +20,7 @@ test('headings and main actions match each tab and valid write/refresh actions r
  const models=await render('モデル一覧/モデル一覧パネル.vue',{data:{項目:[]},results:{},connected:true});
  assert.match(models,/<h2>モデル一覧取得<\/h2>/);assert.match(models,/id="latest-models"[^>]*>一覧再取得<\/button>/);assert.match(models,/id="models-write"/);
  const external=await render('外部連携/外部連携パネル.vue',{data:{項目:[]},connected:true});
- assert.match(external,/<h2>外部連携確認<\/h2>/);assert.match(external,/>設定状況を更新<\/button>/);assert.doesNotMatch(external,/>テスト<\/button>/);
+ assert.match(external,/<h2>外部連携確認<\/h2>/);assert.match(external,/id="integration-run"[^>]*>状況確認<\/button>/);assert.match(external,/id="integration-write"/);assert.doesNotMatch(external,/設定状況を更新/);
  const configured=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[]},results:{},online:true});
  assert.match(configured,/<h2>モデル動作確認<\/h2>/);assert.match(configured,/id="model-trial-start"[^>]*>動作確認<\/button>/);
  assert.match(configured,/<div class="panel-heading trial-heading">[^]*?class="trial-reload"[^>]*>再読込<\/button>/);

@@ -12,6 +12,7 @@ import vm from 'node:vm';
 import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as actions from '../src/ファイル閲覧/ファイル操作.js';
+import * as browserLaunch from '../src/ブラウザ/起動.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -57,7 +58,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     require: id => id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
       : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
-        : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
+        : id === '../ブラウザ/起動.js' ? browserLaunch : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });
   const component = module.exports, setup = component.setup;
   component.setup = (props, context) => { state = setup(props, context); return state; };

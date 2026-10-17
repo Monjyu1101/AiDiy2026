@@ -45,7 +45,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
   // 外部通信のみを差し替え。実際の引数処理・検証・HTTP listen・静的配信を実行する。
   await writeFile(path.join(root,'モデル情報/public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
   if(crlf)await convert(root);
-  child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),'--browser','--no-open','--port','0'],{stdio:['ignore','pipe','pipe']});
+  child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),'--browser','--no-open','--port','0'],{stdio:['ignore','pipe','pipe'],windowsHide:true});
   const exited=once(child,'exit');let output='',errors='';child.stderr.on('data',chunk=>errors+=chunk);
   const address=await new Promise((resolve,reject)=>{
    child.stdout.on('data',chunk=>{output+=chunk;const match=output.match(/http:\/\/127\.0\.0\.1:\d+\/#token=/);if(match)resolve(match[0].split('#')[0]);});
@@ -63,7 +63,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
 test('CLI errors report actionable categories without echoing arguments or file contents',{timeout:15000},async()=>{
  const root=await fixture();
  const run=async args=>{
-  const child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),...args],{stdio:['ignore','pipe','pipe']});let stderr='',stdout='';
+  const child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),...args],{stdio:['ignore','pipe','pipe'],windowsHide:true});let stderr='',stdout='';
   child.stderr.on('data',value=>stderr+=value);child.stdout.on('data',value=>stdout+=value);const [code]=await once(child,'exit');assert.equal(code,1);assert.equal(stdout,'');assert.ok(!stderr.includes('PRIVATE'));return stderr;
  };
  try {

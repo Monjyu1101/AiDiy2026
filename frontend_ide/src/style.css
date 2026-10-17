@@ -55,7 +55,7 @@
 .ide-heading .ai-launchers button:focus-visible{outline:2px solid #8cecff;outline-offset:2px}
 .ide-heading .ai-launchers button:disabled{background:#26303d;border-color:#455263;color:#a8b3c2;box-shadow:none;opacity:.6}
 .space-motion-toggle{position:fixed;right:16px;bottom:16px;z-index:35;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#080c1af2;border:1px solid #334058;font:11px var(--mono)}.space-motion-toggle>span:last-child{min-width:3ch}.motion-switch{width:28px;height:14px;border:1px solid #566077;position:relative;background:#1b2230}.motion-switch:after{content:'';position:absolute;top:2px;left:2px;width:8px;height:8px;background:#8897b1;transition:transform .15s}.space-motion-toggle[aria-checked=true]{color:#85e9e9}.space-motion-toggle[aria-checked=true] .motion-switch{border-color:#6bcbcc;background:#183638}.space-motion-toggle[aria-checked=true] .motion-switch:after{background:#85e9e9;transform:translateX(14px)}.space-view .viewer-popup,.development-app.ide .ai-popup{bottom:60px}
-.space-view{--portrait-panel-gap:8px;--explorer-width:25vw;--route-width:25vw}
+.space-view{--portrait-panel-gap:8px;--explorer-width:25vw;--route-width:360px}
 .space-view .explorer-panel{width:var(--explorer-width)}
 @media (orientation:portrait){
   .space-view .explorer-panel{right:auto;bottom:calc(50dvh + var(--portrait-panel-gap));overflow:auto}
@@ -189,6 +189,11 @@
 @keyframes panel-fade-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.panel-opening,.viewer-popup,.route-file-list{animation:none}}
 
+/* 登場完了後の一度だけの光沢。操作・寸法・スクロールに影響を与えない。 */
+.opening-shine{position:fixed;z-index:2147483646;overflow:hidden;pointer-events:none;contain:strict}
+.opening-shine-band{position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 36%,#83eaff0d 43%,#e6fcff70 49.5%,#a0efff30 53%,transparent 62%)}
+@media(prefers-reduced-motion:reduce){.opening-shine{display:none}}
+
 /* 今日/本日最新は文字色・選択色と独立した縁だけを重ねる。 */
 .folder-page-entry{position:relative}
 .folder-page-entry.updated-today::after{content:"";position:absolute;inset:1px;pointer-events:none;border:1px solid #b8965530;box-shadow:inset 0 0 12px #e0b86818}
@@ -207,31 +212,51 @@
 .viewer-window .viewer-pin-error{position:relative;inset:auto;margin:0}
 
 /* Code のElectron窓だけで、長押し成立後に表示する移動目印。 */
-.code-window-moving,.code-window-moving *{user-select:none!important;cursor:move!important}
-.code-move-indicator{position:fixed;z-index:2147483647;width:64px;height:64px;transform:translate(-50%,-50%);pointer-events:none;color:#d8ecff;filter:drop-shadow(0 1px 3px #091424);font:22px/1 sans-serif}
-.code-move-pair{position:absolute;inset:0;animation:code-move-orbit var(--move-duration) linear infinite;animation-delay:var(--move-phase)}
-.code-move-pair i{position:absolute;left:24px;top:22px;font-style:normal;transform:rotate(var(--arrow-angle)) translateY(-23px)}
-.code-move-direction{display:none;position:absolute;left:24px;top:20px;transform:rotate(var(--move-angle))}
-.code-move-indicator.moving .code-move-pair{display:none}
-.code-move-indicator.moving .code-move-direction{display:block}
-@keyframes code-move-orbit{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.code-move-pair{animation:none}}
+.window-moving,.window-moving *{user-select:none!important;cursor:move!important}
 
 /* 軌跡は同じ3分類・ツリーを小さな別窓へ移す。閉じても記録は残す。 */
 .route-restore-toggle{position:fixed;left:64px;top:var(--workspace-top);z-index:41;background:#080c1af2;padding:7px 10px;font-size:11px}
 
 /* 展開の高さ・本文を見せるタイミングは本体と別窓で共通。 */
-.explorer-routes{display:block;padding:0}
-.route-controls{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding:5px}
-.route-controls .route-choice{grid-column:span 2;min-width:0;padding:5px 2px;white-space:nowrap;font-size:10px}
-.route-controls>button{min-width:0;padding:4px 2px}
+.explorer-routes{display:block;padding:0;min-width:min(360px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
+.route-controls{display:flex;align-items:center;flex-wrap:nowrap;gap:3px;padding:5px;overflow-x:auto;scrollbar-width:thin}
+.route-controls .route-choice{flex:1 0 auto;min-width:0;padding:5px 2px;white-space:nowrap;font-size:10px}
+.route-controls>button{flex:none;min-width:20px;padding:5px 2px;white-space:nowrap;font-size:10px;line-height:14px}
+.route-controls .route-choice{line-height:14px}
 .route-drag-handle{display:none}
 .route-reveal{overflow:hidden;transition:height 260ms cubic-bezier(.2,.75,.25,1)}
 .explorer-routes .route-file-list{position:relative;inset:auto;width:100%;height:100%;box-sizing:border-box;overflow:auto;margin:0;box-shadow:none;animation:none}
 .route-window-document,.route-window-document body,.development-app.routes-window{background:transparent!important;overflow:hidden}
 .development-app.routes-window{height:100vh}
-.routes-window .explorer-routes,.routes-window .explorer-routes.explorer-collapsed{position:relative;inset:auto;width:100%;height:auto;box-sizing:border-box;background:#080c1a;box-shadow:none}
-.native-route-window .route-drag-handle{display:block;grid-column:1/-1;height:6px;-webkit-app-region:drag;cursor:move;background:#334058;border-radius:3px;width:36px;justify-self:center}
+.routes-window .explorer-routes,.routes-window .explorer-routes.explorer-collapsed{position:relative;inset:auto;width:100%;min-width:0;max-width:none;height:auto;box-sizing:border-box;background:#080c1a;box-shadow:none}
+.native-route-window .route-controls{-webkit-app-region:drag;background:#080c1a}
+.native-route-window .route-drag-handle{display:block;flex:none;width:8px;height:18px;cursor:move;border-left:2px solid #9aa7b8;border-right:2px solid #9aa7b8}
 .native-route-window .route-controls button{-webkit-app-region:no-drag}
 .routes-window .route-tree{min-width:0}
 @media(prefers-reduced-motion:reduce){.route-reveal{transition:none}}
+
+/* 既存の独立Viewerと同じ状態バー・窓操作。本文は残りの高さに収める。 */
+.native-panel-window{display:flex;flex-direction:column}
+.panel-window-title{flex:none;min-width:0;background:#000}
+.panel-window-title .panel-brand{grid-template-columns:auto minmax(0,1fr) auto}
+.panel-window-title .panel-brand strong{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.native-panel-window>.explorer-panel,.native-panel-window>.viewer-session{flex:1;min-height:0;height:auto}
+.native-panel-window>.explorer-panel{border-top:0;box-shadow:none}
+.routes-window .route-controls>button{border-color:#242424;background:transparent;color:#e3e9f2}
+.routes-window .route-controls>button:hover{background:#202737}
+.routes-window .route-controls>button[aria-pressed=true]{color:#a7f6ff;border-color:#6bcbcc}
+.panel-pin-preview{position:fixed;z-index:90;display:block;pointer-events:none;user-select:none;object-fit:fill}
+
+/* ALLは銀河を全面に表示し、各画面の右上を復帰・部品起動の入口にする。別窓へ移した部品には適用しない。 */
+.all-displays .space-view :is(.explorer-toggle,.explorer-routes,.route-restore-toggle,.space-flight-controls,.space-filter-toggle,.space-breadcrumb){display:none}
+/* ALLの閲覧・比較は中心星の右で1件ずつ表示する。別窓の部品にはこの配置を持ち込まない。 */
+.all-displays .space-view :is(.viewer-popup,.history-embedded){box-sizing:border-box;left:clamp(16px,calc(var(--focus-x,50vw) + 128px),calc(100vw - min(640px,50vw - 64px) - 16px));right:auto;top:clamp(16px,calc(var(--focus-y,50vh) - 360px),max(16px,100vh - 736px));bottom:auto;width:min(640px,calc(50vw - 64px));max-width:none;height:min(720px,calc(100vh - 32px));max-height:none;margin:0}
+.all-restore-zone{position:fixed;right:0;top:0;z-index:95;width:88px;min-height:48px;display:flex;flex-direction:column;align-items:flex-end;padding:4px;-webkit-app-region:no-drag}
+.all-restore-button{display:grid;place-items:center;width:34px;height:30px;padding:0;border:1px solid #343943;background:#080a10e6;color:#d9e0f2;opacity:0;transition:opacity 120ms ease-out}
+.all-launchers{display:flex;flex-direction:column;gap:4px;margin-top:4px;visibility:hidden;pointer-events:none}
+.all-launchers button{width:80px;padding:6px 4px;background:#080a10e6;border:1px solid #343943;color:#d9e0f2;font-size:12px}
+.all-restore-zone:hover .all-restore-button,.all-restore-zone:focus-within .all-restore-button{opacity:1}
+.all-restore-zone:hover .all-launchers,.all-restore-zone:focus-within .all-launchers{visibility:visible;pointer-events:auto}
+.all-restore-icon{display:block;width:11px;height:11px;border:1px solid currentColor;box-shadow:2px -2px 0 -1px #080a10,2px -2px 0 0 currentColor}
+.all-transition{position:fixed;inset:0;z-index:150;display:grid;place-items:center;background:#0002;cursor:progress;-webkit-app-region:no-drag}.all-transition p{margin:0;padding:12px 20px;border:1px solid #426073;background:#080c1af2;color:#d9f5ff;font-size:14px}
+@media(prefers-reduced-motion:reduce){.all-restore-button{transition:none}}

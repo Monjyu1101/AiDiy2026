@@ -7,7 +7,7 @@ import {probe,resolveProgram,scan,catalog,expandPath} from '../診断/probes.mjs
 
 async function fixture(code,options={}) {
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-test-'));
- try {const script=path.join(directory,'fixture.cjs');await writeFile(script,code);return await probe({id:'fixture',version_args:[script]}, {resolve:async()=>process.execPath,timeout:250,...options});}
+ try {const script=path.join(directory,'fixture.cjs');await writeFile(script,code);return await probe({id:'fixture',version_args:[script]}, {resolve:async()=>process.execPath,timeout:5000,...options});}
  finally {await rm(directory,{recursive:true,force:true});}
 }
 test('missing and unsupported are separate',async()=>{
@@ -23,7 +23,7 @@ test('safe actual Node version',async()=>{
 });
 test('failure, timeout and output caps',async()=>{
  assert.equal((await fixture('process.exit(9)')).状態,'NG');
- assert.match((await fixture('setInterval(()=>{},1000)')).説明,/タイムアウト/);
+ assert.match((await fixture('setInterval(()=>{},1000)',{timeout:250})).説明,/タイムアウト/);
  assert.match((await fixture('process.stdout.write("x".repeat(1000000))')).説明,/上限/);
 });
 test('parent exit with inherited pipe holder is bounded',{skip:process.platform==='win32'},async()=>{
@@ -55,8 +55,10 @@ test('Windows disk converter is not ImageMagick',async()=>{
 test('coverage is pinned to complete selected-source manifest and exact catalog bytes',async()=>{
  const {readFile}=await import('node:fs/promises');const {createHash}=await import('node:crypto');
  const coverage=JSON.parse(await readFile(new URL('../診断/coverage.json',import.meta.url),'utf8'));
- const manifestBytes=await readFile(new URL('../reference/source-manifest.json',import.meta.url));
- const catalogBytes=await readFile(new URL('../診断/catalog.json',import.meta.url));
+ // Windows の改行変換（CRLF）でチェックアウトされても、記録時の LF の内容と比較する。
+ const lf=bytes=>Buffer.from(bytes.toString('utf8').replaceAll('\r\n','\n'),'utf8');
+ const manifestBytes=lf(await readFile(new URL('../reference/source-manifest.json',import.meta.url)));
+ const catalogBytes=lf(await readFile(new URL('../診断/catalog.json',import.meta.url)));
  assert.equal(coverage.complete,true);assert.equal(coverage.sourceTargetFiles,3333);assert.equal(coverage.scannedSourceFiles,3333);
  assert.equal(JSON.parse(manifestBytes).length,3333);assert.equal(createHash('sha256').update(manifestBytes).digest('hex'),coverage.sourceTargetManifestSha256);
  assert.equal(JSON.parse(catalogBytes).length,19);assert.equal(createHash('sha256').update(catalogBytes).digest('hex'),coverage.catalogSha256);

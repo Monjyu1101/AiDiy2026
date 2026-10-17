@@ -11,7 +11,7 @@ test('Vue component source and precompiled runtime use no remote scripts or unsa
 test('all-tests and install panel share only installation action, key tests require explicit row action',()=>{
  const app=source('App.vue');const install=source('導入状況/導入状況状態.mjs');
  assert.match(install,/api\/診断/);assert.doesNotMatch(install,/キーテスト|testKey|loadKeys/);
- assert.match(app,/<button id="run"[^>]*@click="全診断"/);assert.match(app,/async function 全診断\(\)\{if\(!await 全テスト\(\)\)return;await 一覧再取得\(\);await モデル書込\(\);\}/);
+ assert.match(app,/<button id="run"[^>]*@click="全診断"/);assert.match(app,/async function 全診断\(\)\{tab\.value='install';if\(!await 全テスト\(\)\)return;tab\.value='keys';await 一覧再取得\(\);await モデル書込\(\);tab\.value='integrations';await 外部連携確認\(\{再読込:false\}\);await 外部連携書込\(\);tab\.value='install';\}/);
  assert.match(app,/@確認="状況確認"/);assert.match(app,/@書込="書込"/);assert.match(install,/全テスト\(\) \{ return await 状況確認\(\) && await 書込\(\); \}/);assert.match(app,/@test="testKey"/);
  assert.match(app,/onMounted\(\(\)=>\{if\(key.value\)connect\(\);\}\)/);
  assert.match(source('モデル一覧/モデル一覧パネル.vue'),/まだモデルを取得していません/);

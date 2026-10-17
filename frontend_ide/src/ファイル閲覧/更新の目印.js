@@ -10,18 +10,16 @@ export const UPDATE_FLASH_MS = 1200;
 // 入力は表示中フォルダの直下・フィルター適用済みファイルだけ。子フォルダの日時は競わせない。
 export function fileRecency(files, now = Date.now()) {
   const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const yesterday = new Date(start); yesterday.setDate(yesterday.getDate() - 1);
-  const end = nextLocalMidnight(now), today = +start, previous = +yesterday;
+  const end = nextLocalMidnight(now), today = +start;
   let latest = -Infinity;
   for (const file of files) if (typeof file.path === 'string' && Number.isFinite(file.mtime) && file.mtime >= today && file.mtime < end) latest = Math.max(latest, file.mtime);
-  const levels = Object.create(null), electrons = Object.create(null);
+  const levels = Object.create(null);
   for (const file of files) {
     const time = file.mtime;
     if (typeof file.path !== 'string' || !Number.isFinite(time)) continue;
-    if (time >= today && time < end) { levels[file.path] = time === latest ? 2 : 1; electrons[file.path] = time === latest ? 4 : 2; }
-    else if (time >= previous && time < today) electrons[file.path] = 1;
+    if (time >= today && time < end) levels[file.path] = time === latest ? 2 : 1;
   }
-  return { levels, electrons, latest: Number.isFinite(latest) ? latest : null };
+  return { levels, latest: Number.isFinite(latest) ? latest : null };
 }
 
 // フォルダ・filter・sessionの切替は基準を取り直す。初回と変更なしでは光らせない。

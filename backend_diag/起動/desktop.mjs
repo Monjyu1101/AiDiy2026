@@ -22,13 +22,13 @@ const failures={
   LOAD:'診断画面を読み込めません。',
   RENDERER:'画面プロセスが終了しました。',
 };
-export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000, onReady=()=>{}) {
+export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=15000, onReady=()=>{}, onExisting=()=>{}) {
   // Windows Electron の stdin は常に EOF。IDE と同じ専用 IPC を使い、秘密 URL は argv/env/log に出さない。
   // GUI には SW_HIDE を引き継がせない（windowsHide:true だと Windows で show() 後も非表示のまま）。
   const env={...process.env};
   for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH)$/i.test(key))delete env[key];
   const child=spawnFn(executable,[fileURLToPath(new URL('./electron-main.cjs',import.meta.url))],{shell:false,stdio:['ignore','ignore','pipe','ipc'],env,windowsHide:false,detached:process.platform!=='win32'});
-  let ended=false, sent=false, shown=false, reported=false, disconnectTimer;
+  let ended=false, sent=false, shown=false, reported=false, existing=false, disconnectTimer;
   const finish=()=>{if(ended)return;ended=true;clearTimeout(timer);clearTimeout(disconnectTimer);onClose();};
   const report=(code,detail='')=>{
     if(reported || child.diagClosing)return;reported=true;process.exitCode=1;
@@ -52,6 +52,8 @@ export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=150
       try {child.send({type:'diag-start',url},error=>{if(error && !ended)abort('IPC');});}catch{abort('IPC');}
     }else if(message?.type==='diag-shown' && sent){if(!shown){shown=true;clearTimeout(timer);onReady();}}
     else if(message?.type==='diag-failed' && Object.hasOwn(failures,message.code)){report(message.code);}
+    // 既に起動中の診断ウィンドウを前面に出した。秘密 URL は送らずに終了させる。
+    else if(message?.type==='diag-existing' && !sent){existing=true;clearTimeout(timer);onExisting();}
   });
   child.once('disconnect',()=>{
     // 正常終了でも IPC は exit より先に閉じる。終了イベントを待ち、残存した子だけ停止する。
@@ -62,7 +64,7 @@ export function openDesktop(executable, url, onClose, spawnFn=spawn, timeout=150
     report('SPAWN',code);closeDesktop(child);finish();
   });
   child.once('exit',(code,signal)=>{
-    if(!shown || code!==0 || signal)report('EXIT',` (exit=${Number.isInteger(code)?code:'none'}, signal=${['SIGTERM','SIGKILL','SIGABRT','SIGSEGV'].includes(signal)?signal:'none'})${child.diagNativeReason || ''}`);
+    if(!existing && (!shown || code!==0 || signal))report('EXIT',` (exit=${Number.isInteger(code)?code:'none'}, signal=${['SIGTERM','SIGKILL','SIGABRT','SIGSEGV'].includes(signal)?signal:'none'})${child.diagNativeReason || ''}`);
     if(process.platform!=='win32' && child.pid){try{process.kill(-child.pid,'SIGKILL');}catch{}}
     finish();
   });return child;

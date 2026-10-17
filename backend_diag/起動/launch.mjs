@@ -13,6 +13,7 @@ export async function launchDetached(args, {spawnFn=spawn, timeout=30000,
     cwd:process.cwd(),env,detached:true,windowsHide:true,shell:false,stdio:['ignore','ignore','ignore','ipc']
   });
   try {
+    let existing=false;
     await new Promise((resolve,reject)=>{
       let done=false;
       const finish=error=>{if(done)return;done=true;clearTimeout(timer);child.off('message',message);child.off('exit',exit);child.off('error',failure);child.off('disconnect',disconnect);error?reject(error):resolve();};
@@ -21,6 +22,8 @@ export async function launchDetached(args, {spawnFn=spawn, timeout=30000,
       const message=value=>{
         if(value?.type==='diag-launch-ready') {
           try {child.send({type:'diag-launch-release'},error=>error?failure():finish());}catch{failure();}
+        } else if(value?.type==='diag-launch-existing') {
+          existing=true;finish();
         } else if(value?.type==='diag-launch-error') {
           const codes=['ARGUMENTS','UI','ELECTRON','DESKTOP','CATALOG','EADDRINUSE','EACCES'];
           finish(Object.assign(Error('Diagnostic startup failed'),{diagCode:codes.includes(value.code)?value.code:'DESKTOP'}));
@@ -31,6 +34,7 @@ export async function launchDetached(args, {spawnFn=spawn, timeout=30000,
     });
     if(child.connected)child.disconnect();
     child.unref();
+    if(existing){console.log('AiDiy 診断は既に起動しています。既存のウィンドウを前面に表示しました。');return;}
     console.log('AiDiy 診断を起動しました。ウィンドウを閉じると終了します。');
     console.log('診断 NG / ERR・異常終了の記録（保存可能な場合）: '+desktopLogPath);
     console.log('ターミナルで起動状態を確認する場合: aidiy_diag --foreground');

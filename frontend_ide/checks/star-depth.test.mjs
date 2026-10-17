@@ -495,7 +495,7 @@ test('更新の目印: 30秒監視スナップショットと手動更新が同�
   const h=space(t,snapshot(dir('project',[['a.txt',1,100],['b.txt',1,200]],[dir('child',[['nested.txt',1,300]])])));
   try {
     h.engine.setViewMode('2d');await h.ready();
-    assert.deepEqual({...h.engine.updateMarks.electrons},{'a.txt':2,'b.txt':4});
+    assert.deepEqual({...h.engine.updateMarks.levels},{'a.txt':1,'b.txt':2});
     assert.deepEqual(h.engine.updateMarks.flashes,{});
     await h.engine.goTo({type:'file',path:'a.txt'});h.engine.setAutoSpin(true);
     const tree=dir('project',[['a.txt',2,400],['b.txt',1,200],['added.txt',1,400]],[dir('child',[['nested.txt',1,300]])]);
@@ -507,9 +507,9 @@ test('更新の目印: 30秒監視スナップショットと手動更新が同�
     assert.equal(h.engine.updateMarks.flashes['a.txt'].id,id);
     await h.pump(1200);assert.deepEqual(h.engine.updateMarks.flashes,{});
     h.data(snapshot(tree));await h.engine.refresh();assert.deepEqual(h.engine.updateMarks.flashes,{});
-    await h.engine.goTo({type:'dir',path:'child'});assert.deepEqual({...h.engine.updateMarks.electrons},{'child/nested.txt':4});
+    await h.engine.goTo({type:'dir',path:'child'});assert.deepEqual({...h.engine.updateMarks.levels},{'child/nested.txt':2});
     assert.deepEqual(h.engine.updateMarks.flashes,{});
     await h.pump(86400000);assert.deepEqual({...h.engine.updateMarks.levels},{});
-    assert.equal(h.engine.updateMarks.electrons['child/nested.txt'],1);
+    assert.equal(h.engine.updateMarks.latest,null);
   } finally {h.dispose();}
 });

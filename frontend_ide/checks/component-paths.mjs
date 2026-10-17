@@ -15,6 +15,7 @@ export const componentPaths = {
   "FileExplorer": "ファイル閲覧/ファイル一覧.vue",
   "FileTypeIcon": "ファイル閲覧/ファイル種別アイコン.vue",
   "ViewerWindow": "ファイル閲覧/閲覧ウィンドウ.vue",
+  "BrowserPanel": "ブラウザ/ブラウザパネル.vue",
   "FolderPages": "ファイル閲覧/フォルダページ.vue",
   "FileViewer": "ファイル閲覧/ファイルビューア.vue",
   "ViewerSession": "ファイル閲覧/閲覧セッション.vue",

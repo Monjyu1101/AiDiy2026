@@ -14,26 +14,49 @@ import { createSpace, ORBIT_PATH_SCALE } from '../src/開発スペース/宇宙�
 import { validConnectionState } from '../src/共通表示/接続状態.js';
 import { createDraftTargetRegistry } from '../src/下書き連携/連携先登録.js';
 import { createTextWidthCache } from '../src/開発スペース/文字幅キャッシュ.js';
+import { installWindowMove } from '../src/共通表示/長押し窓移動.js';
+import { installOpeningShine } from '../src/共通表示/登場光沢.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let n=0;n<12;n++)await Promise.resolve();};
 
-function component(name,{props={},windowAPI,fetcher=async()=>({ok:true,json:async()=>({active:true})})}={}){
+function component(name,{props={},windowAPI,hash='',fetcher=async()=>({ok:true,json:async()=>({active:true})})}={}){
   const {descriptor}=parse(readFileSync(new URL(`../src/${name}.vue`,import.meta.url),'utf8'));
   const script=compileScript(descriptor,{id:name,genDefaultAs:'component'});
   const {code}=transformSync(`${script.content}\nmodule.exports=component;`,{format:'cjs'});
-  const mounted=[],unmounted=[],timers=new Map(),document=new EventTarget(),window=new EventTarget();
-  document.hidden=false;if(windowAPI)window.aidiyWindow=windowAPI;let id=0;
+  const mounted=[],unmounted=[],moveInstalls=[],timers=new Map(),document=new EventTarget(),window=new EventTarget();
+  document.hidden=false;window.document=document;if(windowAPI)window.aidiyWindow=windowAPI;let id=0;
   const module={exports:{}};
   vm.runInNewContext(code,{
-    module,document,window,fetch:fetcher,AbortSignal,AbortController,Date,location:{hash:''},
+    module,document,window,fetch:fetcher,AbortSignal,AbortController,Date,location:{hash},
     setInterval:(callback,ms)=>{timers.set(++id,{callback,ms});return id;},clearInterval:key=>timers.delete(key),
-    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.endsWith('/接続状態.js')?{validConnectionState}:id==='./下書き連携/連携先登録.js'?{createDraftTargetRegistry}:{},
+    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.endsWith('/接続状態.js')?{validConnectionState}:id==='./下書き連携/連携先登録.js'?{createDraftTargetRegistry}:id==='./共通表示/登場光沢.js'?{installOpeningShine:()=>installOpeningShine(window)}:id==='./共通表示/長押し窓移動.js'?{installWindowMove:options=>{moveInstalls.push(options);return installWindowMove({...options,win:window});}}:{},
   });
   const reactive=vue.reactive(props),scope=vue.effectScope();
   const state=scope.run(()=>module.exports.setup(reactive,{expose(){}}));
-  return {state,timers,document,props:reactive,async mount(){for(const callback of mounted)await callback();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
+  return {state,timers,document,moveInstalls,props:reactive,async mount(){for(const callback of mounted)await callback();},dispose(){for(const callback of unmounted)callback();scope.stop();}};
 }
+
+test('独立ビューアのhash起動もIDE本体と区別して共通の窓移動へ接続する',async()=>{
+ const f=component('App',{props:{config:{kind:'ide'}},hash:'#viewer=sample.txt',fetcher:async()=>{throw Error('独立ビューアはIDEの監視を起動しない');}});
+ try{await f.mount();assert.equal(f.moveInstalls[0].kind,'viewer');assert.equal(f.timers.size,0);}finally{f.dispose();}
+});
+
+test('VR移行: ピン留め完了まで巨大化せず、失敗時は元の窓を維持する',async()=>{
+ const calls=[];let release;
+ const f=component('App',{props:{config:{kind:'ide'}},windowAPI:{allDisplays:async action=>{calls.push(action);return{ok:true,active:true};}}});
+ try{
+  f.state.state.value={active:true};
+  f.state.spaceView.value={prepareAll:()=>new Promise(resolve=>{release=resolve;})};
+  const pending=f.state.toggleAllDisplays();await flush();
+  assert.equal(f.state.allBusy.value,true);assert.match(f.state.allMessage.value,/VR空間へ移行中/);assert.deepEqual(calls,[]);
+  await f.state.toggleAllDisplays();assert.deepEqual(calls,[]);
+  release();await pending;assert.deepEqual(calls,['toggle']);assert.equal(f.state.allBusy.value,false);
+  f.state.allDisplayState.value={active:false};calls.length=0;
+  f.state.spaceView.value={prepareAll:async()=>{throw Error('ピン留め失敗');}};
+  await f.state.toggleAllDisplays();assert.deepEqual(calls,[]);assert.equal(f.state.allBusy.value,false);assert.match(f.state.error.value,/ピン留め失敗/);
+ }finally{f.dispose();}
+});
 
 test('IDE: 初回即時・以後10秒の状態取得、手動開始は待たず、破棄中の初回応答でタイマーを残さない',async()=>{
   const calls=[];

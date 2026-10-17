@@ -88,7 +88,7 @@ test('failure stderr logs contain OS codes and bounded reasons, never child outp
     assert.match(missing.説明,/ENOENT/);
     const script = path.join(root,'private-script-token.cjs');
     await writeFile(script, 'console.error("Authorization: Bearer private-token\\nhttps://example.invalid/?key=private-token#secret"); process.exit(7)');
-    const failure = await probe({id:'npm',version_args:[script]}, {resolve:async()=>process.execPath});
+    const failure = await probe({id:'uv',version_args:[script]}, {resolve:async()=>process.execPath});
     assert.equal(failure.状態,'NG');
     await writeFile(script, 'setInterval(()=>{},1000)');
     await probe({id:'python',version_args:[script]}, {resolve:async()=>process.execPath,timeout:40});

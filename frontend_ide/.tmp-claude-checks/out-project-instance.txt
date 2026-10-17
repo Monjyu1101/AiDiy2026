@@ -1,0 +1,34 @@
+✔ IDE識別: 完全パス・相対表記・末尾区切り・リンクを揃え、同名の別プロジェクトを分ける (49.6541ms)
+✔ IDE識別: Windowsの大小文字・斜線・UNC・長いパスは同一、大小文字を区別する別実体は独立 (3.0837ms)
+✖ IDE二重起動: 同一実体は元窓を復元・前面化し、別プロジェクトは独立、終了後は再起動できる (114.0101ms)
+✔ IDE同時起動: 最初の画面作成を待っている間も同じプロジェクトの追加窓を作らない (35.6902ms)
+✔ Code / Liveの種別ごとの既存窓再利用を維持する (34.2788ms)
+✔ IDE並行サーバー: 自動ポート・走査キャッシュ・接続・終了をプロジェクト間で共有しない (441.8659ms)
+✔ 起動引数: 明示プロジェクトを解決してからElectronへ渡し、重複側のサーバーだけ停止する (358.8217ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2031.0012
+
+✖ failing tests:
+
+test at project-instance.test.mjs:89:1
+✖ IDE二重起動: 同一実体は元窓を復元・前面化し、別プロジェクトは独立、終了後は再起動できる (114.0101ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/project-instance.test.mjs:104:9)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

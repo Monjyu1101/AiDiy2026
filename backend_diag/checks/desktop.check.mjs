@@ -10,11 +10,11 @@ import vm from 'node:vm';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from '../起動/desktop.mjs';
 const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
-async function mainFixture({opening,load}={}){
+async function mainFixture({opening,load,primary=true}={}){
  const source=await readFile(new URL('../起動/electron-main.cjs',import.meta.url),'utf8');
  const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={},scripts=[],openings=[];
  Object.assign(proc,{stdin,pid:42,platform:'win32',connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
- let options,win,loaded;app.whenReady=async()=>{};app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
+ let options,win,loaded;app.whenReady=async()=>{};app.requestSingleInstanceLock=()=>primary;app.restored=0;app.focused=0;app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
  class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
  vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
@@ -58,6 +58,21 @@ test('unexpected exit is failure; normal disconnect/exit and intentional close s
   child.emit('exit',mode==='normal'?0:7,null);assert.equal(process.exitCode,mode==='failure'?1:0);assert.equal(closes,1);
  }assert.equal(errors.length,1);assert.match(errors[0],/exit=7/);}finally{process.exitCode=original;console.error=originalError;}
 });
+test('second instance focuses the existing window and exits quietly without receiving the URL',async()=>{
+ const second=await mainFixture({primary:false});
+ assert.equal(JSON.stringify(second.sent),JSON.stringify([{type:'diag-existing'}]));assert.deepEqual(second.exits,[0]);
+ const first=await mainFixture();first.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ Object.assign(first.win,{isMinimized:()=>true,restore(){this.restored=true;},focus(){this.focused=true;}});
+ first.app.emit('second-instance');assert.equal(first.win.restored,true);assert.equal(first.win.shown,true);assert.equal(first.win.focused,true);
+ const original=process.exitCode,originalError=console.error;const errors=[];console.error=value=>errors.push(value);
+ try{
+  const child=childFixture();const starts=[];child.send=value=>starts.push(value);let closes=0,existing=0;process.exitCode=0;
+  openDesktop('/fixture',url,()=>closes++,()=>child,10,()=>{},()=>existing++);
+  child.emit('message',{type:'diag-existing'});await new Promise(r=>setTimeout(r,25));
+  assert.equal(existing,1);assert.equal(child.diagClosing,undefined,'期限切れで停止しない');
+  child.emit('exit',0,null);assert.equal(closes,1);assert.equal(process.exitCode,0);assert.deepEqual(errors,[]);assert.deepEqual(starts,[]);
+ }finally{process.exitCode=original;console.error=originalError;}
+});
 test('startup timeout and send errors stop children once; stderr secrets never escape',async()=>{
  const original=process.exitCode,originalError=console.error;const errors=[];console.error=value=>errors.push(value);
  try {for(const mode of ['timeout','send']){
@@ -72,7 +87,7 @@ test('real child-process IPC readiness and secret transport smoke',{timeout:1000
  try{
   const file=path.join(root,'child.cjs');await writeFile(file,`process.send({type:'diag-ready'});process.once('message',m=>{if(m.type!=='diag-start'||!m.url.includes('#token=')||JSON.stringify(process.argv).includes('#token=')||JSON.stringify(process.env).includes('#token='))process.exit(1);process.send({type:'diag-shown'},()=>process.exit(0));});`);
   let done;const closed=new Promise(resolve=>done=resolve);
-  child=openDesktop('/fixture',url,done,(_exe,_args,options)=>spawn(process.execPath,[file],options));await closed;assert.equal(child.exitCode,0);
+  child=openDesktop('/fixture',url,done,(_exe,_args,options)=>spawn(process.execPath,[file],{...options,windowsHide:true}));await closed;assert.equal(child.exitCode,0);
  }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
 });
 test('desktop teardown escalates after bounded grace period',async()=>{
@@ -92,7 +107,7 @@ test('mixed-case Windows Node bootstrap environment cannot change Electron mode'
 
 test('frameless controls are fixed, main-frame-only and preserve sandbox',async()=>{
  const f=await mainFixture();f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
- assert.equal(f.options.frame,false);assert.equal(f.options.webPreferences.preload,'/fixture/preload.cjs');
+ assert.equal(f.options.frame,false);assert.equal(f.options.webPreferences.preload,path.join('/fixture','preload.cjs'));
  const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
  control({...event,senderFrame:{}},'close');assert.equal(f.win.closed,undefined);
  control({...event,sender:{}},'close');assert.equal(f.win.closed,undefined);

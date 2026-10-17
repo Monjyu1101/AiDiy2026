@@ -4,8 +4,9 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import { ref, reactive, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { installCodeMove } from './コード/長押し窓移動.js';
+import { ref, reactive, computed, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { installWindowMove } from './共通表示/長押し窓移動.js';
+import { installOpeningShine } from './共通表示/登場光沢.js';
 import CodePanel from './コード/コードパネル.vue';
 import TermPanel from './ターミナル/ターミナルパネル.vue';
 import LivePanel from './ライブ/ライブパネル.vue';
@@ -13,6 +14,8 @@ import SpaceView from './開発スペース/開発スペース.vue';
 import StatusBar from './共通表示/状態バー.vue';
 import TerminalWelcome from './ターミナル/開始表示.vue';
 import ViewerWindow from './ファイル閲覧/閲覧ウィンドウ.vue';
+import BrowserPanel from './ブラウザ/ブラウザパネル.vue';
+import {openBrowser} from './ブラウザ/起動.js';
 import FileAnalysisDialog from './ファイル検索/ファイル解析ダイアログ.vue';
 import FileHistoryDialog from './ファイル検索/ファイル履歴ダイアログ.vue';
 import DraftHandoffDialog from './下書き連携/下書き連携ダイアログ.vue';
@@ -30,11 +33,39 @@ provide('openFileAnalysis',(file,root)=>{analysis.value={file:{path:file.path,na
 const { config }=defineProps({config:Object});
 // IDEのピン留めで開いた独立ウィンドウ（URLの #viewer=ファイル）。IDE本体の画面・接続監視は動かさない。
 const viewerPath=config.kind==='ide'&&location.hash.startsWith('#viewer=')?decodeURIComponent(location.hash.slice('#viewer='.length)):'';
+const browserPanel=config.kind==='ide'&&location.hash==='#browser'&&!!window.aidiyWindow;
 const state=ref({active:false}),base=reactive({term:'',code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
 const statusError=ref('');
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false),viewMode=ref('3d');
-let stopCodeMove=()=>{};
+let stopWindowMove=()=>{};
+let stopOpeningShine=()=>{};
 const desktop=!!window.aidiyWindow;let timer,disposed=false,revision=0,polling=false,session='';
+const allDisplayState=ref({active:false}),allBusy=ref(false),allMessage=ref(''),spaceView=ref();
+const canEnterAll=computed(()=>desktop&&state.value.active&&viewMode.value==='3d');
+const browserAvailable=computed(()=>state.value.active&&state.value.mode==='online'&&state.value.connected===true);
+provide('browserAvailable',browserAvailable);
+let stopAllDisplays=()=>{},allUpdate=0;
+const allToolbars=computed(()=>allDisplayState.value.toolbars||[]);
+const allRestoreStyle=toolbar=>({right:(100-toolbar.left-toolbar.width)+'%',top:toolbar.top+'%'});
+function updateAllDisplays(value){
+  if(disposed||!value)return;allUpdate++;
+  if(value.ok)allDisplayState.value=value;
+  if(value.error)error.value=value.error;
+}
+async function toggleAllDisplays(){
+  if(allBusy.value||!desktop)return;
+  const entering=!allDisplayState.value.active,space=spaceView.value,own=session;
+  if(entering&&!canEnterAll.value)return;
+  allBusy.value=true;allMessage.value=entering?'VR空間へ移行中…':'VRモードを終了しています…';error.value='';
+  try{
+    await nextTick();
+    if(entering&&space)await space.prepareAll();
+    if(disposed||space!==spaceView.value||own!==session||(entering&&!canEnterAll.value))throw Error('利用状態が変わったためVR空間への移行を中止しました。');
+    updateAllDisplays(await window.aidiyWindow.allDisplays('toggle'));
+  }
+  catch(e){if(!disposed)error.value=e.message||'VRモードを切り替えられませんでした。';}
+  finally{allBusy.value=false;}
+}
 const lifetime=new AbortController();
 async function status(){
   if(polling||pending.value||disposed)return;polling=true;const run=revision,own=session;
@@ -64,9 +95,10 @@ async function start(action){
   catch(e){error.value=e.message;}finally{pending.value=false;}
 }
 const launching=ref('');
-async function openWindow(kind){
+async function openWindow(kind,displayId){
+  if(kind==='browser'&&!browserAvailable.value){error.value='tools接続中のみBrowserを起動できます。';return{ok:false,error:error.value};}
   if(launching.value)return;launching.value=kind;error.value='';
-  try{const result=await window.aidiyWindow.openApp(kind);if(!result?.ok)throw Error(result?.error||'画面を開けません。');if(kind==='live')liveOpen.value=true;return result;}
+  try{const result=kind==='browser'?await openBrowser(undefined,displayId):await window.aidiyWindow.openApp(kind,displayId);if(!result?.ok)throw Error(result?.error||'画面を開けません。');if(kind==='live')liveOpen.value=true;return result;}
   catch(e){error.value=e.message;return{ok:false,error:e.message};}finally{launching.value='';}
 }
 const opening={};
@@ -132,37 +164,54 @@ const draftLink={
   async launch(sender,kind,request){const linked=verifyPinned(sender,request);await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return launchDraftTarget(kind,{...request,sessionKey:linked.sessionKey});},
 };
 onMounted(async()=>{
-  stopCodeMove=installCodeMove({kind:config.kind,host:config.host});
+  if(!config.host)stopOpeningShine=installOpeningShine();
+  stopWindowMove=installWindowMove({kind:browserPanel?'browser':viewerPath?'viewer':config.kind,host:config.host});
+  if(config.kind==='ide'&&desktop&&!viewerPath&&!browserPanel){
+    stopAllDisplays=window.aidiyWindow.onAllDisplaysChanged?.(updateAllDisplays)||(()=>{});
+    const version=allUpdate;
+    void window.aidiyWindow.allDisplays?.('state').then(value=>{if(version===allUpdate)updateAllDisplays(value);}).catch(()=>{});
+  }
   if(config.kind==='ide'&&!desktop&&!viewerPath)window.aidiyDraftLink=draftLink;
-  if(config.host||viewerPath)return;
+  if(config.host||viewerPath||browserPanel)return;
   if(config.kind==='ide'){await status();if(!disposed)timer=setInterval(status,10000);}
   else if(!base[config.kind])await openPanel(config.kind);
 });
-onBeforeUnmount(()=>{stopCodeMove();disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
+onBeforeUnmount(()=>{stopOpeningShine();stopWindowMove();stopAllDisplays();disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
 </script>
 <template>
   <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertFileDraft" :launch-target="launchDraftTarget" @close="draftRequest=null" />
   <FileAnalysisDialog v-if="analysis" :key="analysis.root+'|'+analysis.file.path" :file="analysis.file" :root="analysis.root" @close="analysis=null" />
   <FileHistoryDialog v-if="history" :key="history.root+'|'+history.file.path" :file="history.file" :root="history.root" @close="history=null" />
-  <ViewerWindow v-if="viewerPath" :path="viewerPath" :desktop="desktop" />
-  <div v-else class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop}]" :data-app="config.kind">
+  <BrowserPanel v-if="browserPanel" />
+  <ViewerWindow v-else-if="viewerPath" :path="viewerPath" :desktop="desktop" />
+  <div v-else class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop,'all-displays':allDisplayState.active}]" :data-app="config.kind">
     <template v-if="config.kind==='ide'">
-      <div class="ide-heading"><StatusBar title="AiDiy IDE" :connected="state.connected" :mode="state.mode" :busy="state.connecting||pending" :desktop="desktop" clock-pulse />
+      <div v-show="!allDisplayState.active" class="ide-heading"><StatusBar title="AiDiy IDE" :connected="state.connected" :mode="state.mode" :busy="state.connecting||pending" :desktop="desktop" :allow-all="canEnterAll" :all-displays="allDisplayState.active" :all-busy="allBusy" @toggle-all="toggleAllDisplays" :clock-pulse="!allDisplayState.active" />
         <div class="component-toolbar">
           <div class="ide-project-actions">
             <span class="ide-project-name" :title="state.project?.path">プロジェクト: {{ state.project?.name }}</span>
             <nav v-if="state.active" class="ide-view-modes" aria-label="ファイルの表示モード"><button :aria-pressed="viewMode==='3d'" @click="viewMode='3d'">3D</button><button :aria-pressed="viewMode==='2d'" @click="viewMode='2d'">2D</button></nav>
           </div>
           <div class="ide-toolbar-right">
-            <nav v-if="state.active&&desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" title="ターミナルを別ウィンドウで開く" @click="openWindow('term')">{{ launching==='term'?'起動中…':'＋ Term' }}</button><button :disabled="!!launching" title="コード支援を別ウィンドウで開く" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" title="音声会話を別ウィンドウで開く" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button></nav>
-            <nav v-else-if="state.active" class="ai-launchers" aria-label="パネルを開く"><button :aria-pressed="panelOpen&&tab==='term'" @click="openPanel('term')">Term</button><button :aria-pressed="panelOpen&&tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" :aria-pressed="panelOpen&&tab==='live'" @click="openPanel('live')">Live</button></nav>
+            <nav v-if="state.active&&desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" title="ターミナルを別ウィンドウで開く" @click="openWindow('term')">{{ launching==='term'?'起動中…':'＋ Term' }}</button><button :disabled="!!launching" title="コード支援を別ウィンドウで開く" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" title="音声会話を別ウィンドウで開く" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button><button :disabled="!!launching||!browserAvailable" :title="browserAvailable?'ブラウザを別ウィンドウで開く':'tools接続中のみ起動できます'" @click="openWindow('browser')">{{ launching==='browser'?'起動中…':'＋ Browser' }}</button></nav>
+            <nav v-else-if="state.active" class="ai-launchers" aria-label="パネルを開く"><button :aria-pressed="panelOpen&&tab==='term'" @click="openPanel('term')">Term</button><button :aria-pressed="panelOpen&&tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" :aria-pressed="panelOpen&&tab==='live'" @click="openPanel('live')">Live</button><button :disabled="!browserAvailable||!!launching" @click="openWindow('browser')" :title="browserAvailable?'新しいブラウザタブでGoogle検索を開く':'tools接続中のみ起動できます'">＋ Browser</button></nav>
             <nav><template v-if="!state.active"><button :disabled="pending" @click="start('connect')">AiDiy接続利用</button><button :disabled="pending" @click="start('offline')">オフライン利用</button></template><button v-else :disabled="pending" @click="start('disconnect')">{{ desktop?'終了':'利用終了' }}</button></nav>
           </div>
         </div>
       </div>
+      <template v-if="allDisplayState.active"><nav v-for="toolbar in allToolbars" :key="toolbar.displayId" class="all-restore-zone" :data-display-id="toolbar.displayId" :style="allRestoreStyle(toolbar)" aria-label="この画面のVR操作" @mouseenter="status" @focusin="status">
+        <button class="all-restore-button" :disabled="allBusy" aria-label="VRモードを終了して元の表示に戻す" title="VRモードを終了" @click="toggleAllDisplays"><span class="all-restore-icon" aria-hidden="true"></span></button>
+        <div class="all-launchers">
+          <button :disabled="!!launching||allBusy" title="この画面の下部にターミナルを開く" @click="openWindow('term',toolbar.displayId)">{{ launching==='term'?'起動中…':'＋ Term' }}</button>
+          <button :disabled="!!launching||allBusy" title="この画面の右上にコード支援を開く" @click="openWindow('code',toolbar.displayId)">{{ launching==='code'?'起動中…':'＋ Code' }}</button>
+          <button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching||allBusy" title="この画面の左上に音声会話を開く" @click="openWindow('live',toolbar.displayId)">{{ launching==='live'?'起動中…':'＋ Live' }}</button>
+          <button :disabled="!!launching||allBusy||!browserAvailable" :title="browserAvailable?'この画面にブラウザを開く':'tools接続中のみ起動できます'" @click="openWindow('browser',toolbar.displayId)">{{ launching==='browser'?'起動中…':'＋ Browser' }}</button>
+        </div>
+      </nav></template>
+      <div v-if="allBusy" class="all-transition" role="status" aria-live="polite"><p>{{ allMessage }}</p></div>
       <TerminalWelcome v-if="!state.active" kind="ide" :icon="config.icon" />
       <template v-else>
-        <SpaceView :key="`${state.mode}:${state.startedAt}:${state.project?.path||''}`" :started-at="state.startedAt" :view-mode="viewMode" />
+        <SpaceView ref="spaceView" :key="`${state.mode}:${state.startedAt}:${state.project?.path||''}`" :started-at="state.startedAt" :view-mode="viewMode" :all-displays="allDisplayState.active" />
         <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='term'" @click="openPanel('term')">Term</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false">×</button></nav>
           <CodePanel ref="codePanel" v-if="base.code" v-show="tab==='code'" :key="base.code" :base="base.code" :icon="config.icon" embedded />
           <LivePanel ref="livePanel" v-if="base.live&&state.mode==='online'" v-show="panelOpen&&tab==='live'" :visible="panelOpen&&tab==='live'" :key="base.live" :base="base.live" :icon="config.icon" />

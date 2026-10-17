@@ -22,3 +22,20 @@ test('確認不要（Azure・GitHub Copilot）以外の登録キーを重複な�
  const html=await render('モデル一覧/モデル一覧パネル.vue',{...props,connected:true});
  assert.match(html,/OpenAI/);assert.doesNotMatch(html,/Discord|Hugging Face|Azure|GitHub Copilot/);
 });
+test('テスト後は確認内容の「接続は未確認」を接続確認済みの表現へ置き換える', async () => {
+ const { モデル一覧表示を作成 } = await import('../モデル一覧表示.mjs');
+ const props = reactive({ data: { 項目: [{ id: 'gemini', 名前: 'Gemini', 説明: '設定有無のみ。接続は未確認です。' }] }, results: {} });
+ const model = モデル一覧表示を作成(props); model.selected.value = 'gemini';
+ assert.equal(model.確認内容.value, '設定有無のみ。接続は未確認です。');
+ props.results = { gemini: { 状態: 'OK' } }; assert.equal(model.確認内容.value, '設定有無のみ。接続はテストで確認しました（結果は「テスト」欄）。');
+ props.results = { gemini: { 状態: 'NG' } }; assert.match(model.確認内容.value, /接続はテストで確認しました/);
+ props.results = { gemini: { 状態: '未実施' } }; assert.equal(model.確認内容.value, '設定有無のみ。接続は未確認です。');
+});
+test('一覧再取得の完了後は1項目目を表示する', async () => {
+ const { モデル一覧表示を作成 } = await import('../モデル一覧表示.mjs');
+ const { nextTick } = createRequire(path.join(__dirname, '../../../package.json'))('vue');
+ const props = reactive({ data: { 項目: [{ id: 'gemini' }, { id: 'claude' }] }, results: {}, testing: '', latestBusy: false });
+ const model = モデル一覧表示を作成(props);
+ props.latestBusy = true; props.testing = 'claude'; await nextTick(); assert.equal(model.selected.value, 'claude');
+ props.testing = ''; props.latestBusy = false; await nextTick(); assert.equal(model.selected.value, 'gemini'); assert.equal(model.row.value.id, 'gemini');
+});

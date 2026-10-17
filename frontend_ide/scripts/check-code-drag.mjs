@@ -48,7 +48,7 @@ try{
  await main.send('Emulation.setDeviceMetricsOverride',{width:800,height:850,deviceScaleFactor:1.5,mobile:false});
  await main.send('Page.addScriptToEvaluateOnNewDocument',{source:`
   window.moves=[];window.messages=[];
-  window.aidiyWindow={title:async()=> 'AiDiy Code',isMaximized:async()=>false,minimize:async()=>{},maximize:async()=>{},close:async()=>{},beginCodeMove:async()=>{moves.push('begin');return 'mock-code';},moveCode:async token=>{moves.push('move');return true;},endCodeMove:async token=>{moves.push('end');}};
+  window.aidiyWindow={title:async()=> 'AiDiy Code',isMaximized:async()=>false,minimize:async()=>{},maximize:async()=>{},close:async()=>{},beginWindowMove:async()=>{moves.push('begin');return 'mock-code';},moveWindow:async token=>{moves.push('move');return true;},endWindowMove:async token=>{moves.push('end');}};
   window.fixtureState={type:'state',会話ID:'fixture-code',信頼済み:true,接続済み:true,自動接続:true,実行モード:'online',作業フォルダ:{名前:'fixture',パス:'/fixture'},メッセージ:[{種別:'assistant',本文:'窓の中央にある読み取り専用の回答です。通常の文字選択も維持します。\\n\\nconst result = 42;'}],履歴:[],進捗:[],provider:'codex_cli',model:'auto'};
   window.EventSource=class{constructor(){window.fixtureNotify=packet=>this.onmessage?.({data:JSON.stringify(packet)});setTimeout(()=>fixtureNotify(fixtureState),40);}close(){}};
   const original=window.fetch;
@@ -60,30 +60,53 @@ try{
   };
  `});
  await main.send('Page.navigate',{url});await main.until(`!!document.querySelector('.message.assistant p')&&!!document.querySelector('textarea')`);
+ // 登場完了通知の後だけ光り、本文の寸法・入力・ヒット判定を変えない。
+ await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+ const beforeShine=await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`);
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0);
+ await main.evaluate(`document.querySelector('.code-component').style.animation='startup-fade-in 2s linear both';window.startupAnimation=document.querySelector('.code-component').getAnimations()[0];startupAnimation.pause();window.dispatchEvent(new Event('aidiy-window-shown'));`);
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0,'登場フェード完了前は光らせない');
+ await main.evaluate(`startupAnimation.finish()`);await main.until(`!!document.querySelector('.opening-shine-band')`);
+ await main.evaluate(`window.shineAnimation=document.querySelector('.opening-shine-band').getAnimations()[0];shineAnimation.pause();shineAnimation.currentTime=200;new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));`);
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),1);
+ const shineStyle=await main.evaluate(`(()=>{const node=document.querySelector('.opening-shine-band'),s=getComputedStyle(node);return{opacity:s.opacity,transform:s.transform,time:shineAnimation.currentTime,state:shineAnimation.playState,rect:node.getBoundingClientRect().toJSON()};})()`);
+ assert.ok(Number(shineStyle.opacity)>.9,JSON.stringify(shineStyle));
+ await main.capture('code-opening-shine');
+ assert.equal(await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`),beforeShine);
+ assert.ok(await main.evaluate(`(()=>{const input=document.querySelector('textarea'),r=input.getBoundingClientRect();return document.elementFromPoint(r.left+10,r.top+10)===input;})()`));
+ await main.evaluate(`shineAnimation.play()`);await main.until(`!document.querySelector('.opening-shine')`);
+ await main.evaluate(`document.querySelector('.code-component').style.animation=''`);
+ await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+ await main.evaluate(`window.dispatchEvent(new Event('aidiy-window-shown'))`);
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0);
  const point=await main.evaluate(`(()=>{const r=document.querySelector('.message.assistant p').getBoundingClientRect();return{x:r.left+Math.min(r.width/2,180),y:r.top+r.height/2};})()`);
  const mouse=(type,x=point.x,y=point.y,buttons=1)=>main.send('Input.dispatchMouseEvent',{type,x,y,button:'left',buttons,clickCount:type==='mouseMoved'?0:1});
- await mouse('mousePressed');await sleep(1100);await main.until(`!!document.querySelector('.code-move-indicator')`);
- assert.equal(await main.evaluate(`document.querySelectorAll('.code-move-pair i').length`),4);
- assert.equal(await main.evaluate(`getComputedStyle(document.querySelector('.code-move-pair')).animationName`),'none');
- await main.capture('code-four-arrows-reduced');
- await mouse('mouseMoved',point.x+70,point.y+20);await sleep(80);assert.equal(await main.evaluate(`document.querySelector('.code-move-indicator').classList.contains('moving')`),true);await main.capture('code-direction');
- await mouse('mouseReleased',point.x+70,point.y+20,0);await main.until(`!document.querySelector('.code-move-indicator')`);
- await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
- await mouse('mousePressed');await sleep(1100);await main.until(`!!document.querySelector('.code-move-indicator')`);
- const pairs=await main.evaluate(`Array.from(document.querySelectorAll('.code-move-pair'),el=>{const s=getComputedStyle(el);return {direction:s.animationDirection,duration:s.animationDuration,phase:s.animationDelay,name:s.animationName};})`);
- assert.notEqual(pairs[0].duration,pairs[1].duration);assert.notEqual(pairs[0].direction,pairs[1].direction);assert.notEqual(pairs[0].phase,pairs[1].phase);assert.equal(pairs[0].name,'code-move-orbit');await main.capture('code-four-arrows');
- await main.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await main.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await mouse('mouseReleased',point.x,point.y,0);await main.until(`!document.querySelector('.code-move-indicator')`);
+ for(const preference of ['reduce','no-preference']){
+  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:preference}]});
+  await mouse('mousePressed');await sleep(600);await main.until(`document.documentElement.classList.contains('window-moving')`);
+  assert.equal(await main.evaluate(`getComputedStyle(document.querySelector('.message.assistant p')).cursor`),'move');
+  assert.equal(await main.evaluate(`document.querySelectorAll('.code-move-indicator,.code-move-pair,.code-move-direction').length`),0);
+  await mouse('mouseMoved',point.x+70,point.y+20);await sleep(80);
+  assert.ok(await main.evaluate(`moves.includes('move')`));
+  await main.capture('code-drag-'+preference);
+  if(preference==='no-preference'){
+   await main.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+   await main.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  }
+  await mouse('mouseReleased',point.x+70,point.y+20,0);
+  await main.until(`!document.documentElement.classList.contains('window-moving')`);
+ }
  const starts=await main.evaluate(`moves.filter(x=>x==='begin').length`);
- // 1秒前の通常選択は止めない。
- await mouse('mousePressed');await mouse('mouseMoved',point.x+100,point.y);await sleep(1100);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);await mouse('mouseReleased',point.x+100,point.y,0);assert.ok(await main.evaluate(`getSelection().toString().length>0`));
+ // 0.5秒前の通常選択は止めない。
+ await mouse('mousePressed');await mouse('mouseMoved',point.x+100,point.y);await sleep(600);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);await mouse('mouseReleased',point.x+100,point.y,0);assert.ok(await main.evaluate(`getSelection().toString().length>0`));
  const input=await main.evaluate(`(()=>{const r=document.querySelector('textarea').getBoundingClientRect();return{x:r.left+30,y:r.top+15};})()`);
- await mouse('mousePressed',input.x,input.y);await sleep(1100);await mouse('mouseReleased',input.x,input.y,0);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);
+ await mouse('mousePressed',input.x,input.y);await sleep(600);await mouse('mouseReleased',input.x,input.y,0);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);
  await main.send('Input.insertText',{text:'送信とストリームの確認'});
  const sendPoint=await main.evaluate(`(()=>{const r=document.querySelector('.send').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()`);
- await mouse('mousePressed',sendPoint.x,sendPoint.y);await sleep(1100);await mouse('mouseReleased',sendPoint.x,sendPoint.y,0);await main.until(`messages.some(m=>m.type==='input_text')`);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);
+ await mouse('mousePressed',sendPoint.x,sendPoint.y);await sleep(600);await mouse('mouseReleased',sendPoint.x,sendPoint.y,0);await main.until(`messages.some(m=>m.type==='input_text')`);assert.equal(await main.evaluate(`moves.filter(x=>x==='begin').length`),starts);
  await main.evaluate(`fixtureNotify({type:'accepted'});fixtureState.実行中=true;fixtureState.メッセージ.push({種別:'user',本文:'送信とストリームの確認'});fixtureNotify({...fixtureState});fixtureNotify({メッセージ識別:'output_stream',メッセージ内容:'\\u0002検証ストリーム'});`);
  await main.until(`document.querySelector('.progress pre')?.textContent.includes('検証ストリーム')`);await main.capture('code-input-stream');
- assert.deepEqual(errors,[]);const result={ok:true,native:'mock only; Electron execution not attempted',pairs,starts,sendCount:await main.evaluate(`messages.filter(m=>m.type==='input_text').length`),errors,shots};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ assert.deepEqual(errors,[]);const result={ok:true,native:'mock only; Electron execution not attempted',starts,sendCount:await main.evaluate(`messages.filter(m=>m.type==='input_text').length`),errors,shots};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }finally{
  for(const ws of sockets)ws.close();chrome.kill();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await sleep(400);try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch{}
 }

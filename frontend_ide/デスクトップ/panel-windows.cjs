@@ -4,6 +4,8 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 const {randomUUID}=require('node:crypto');
+const {windowBounds}=require('./window-layout.cjs');
+const {keepInFront}=require('./前面維持.cjs');
 
 // getContentBounds / screen.workArea はDIP。CSS pxにzoomだけ掛け、OSのDPI倍率は掛けない。
 function panelBounds(rect,owner,screen,kind='explorer'){
@@ -18,20 +20,41 @@ function panelBounds(rect,owner,screen,kind='explorer'){
 
 // Explorerは同じDOMを親から移すため、許可したabout:blankだけwindow.openで作る。
 // 任意URL・別フレーム・別セッションからの要求は許可しない。
-function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,BrowserWindow,拡大表示,isQuitting}){
+function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,BrowserWindow,拡大表示,isQuitting,isAllDisplays=()=>false,attachWindowMove=()=>{}}){
  const requests=new WeakMap();
- async function prepare(event,rect,kind='explorer'){
+ async function prepare(event,rect,kind='explorer',previewRect){
   if(!['explorer','panel-viewer','panel-routes'].includes(kind))return{ok:false,error:'対応していないパネルです。'};
   const owner=trustedEvent(event);if(!owner||owner.kind!=='ide')return{ok:false,error:'この画面からは開けません。'};
   const revision=owner.revision;
   try{
    const state=await readState(owner);
    if(!state.active||isQuitting()||owner.window.isDestroyed()||revision!==owner.revision||trustedEvent(event)!==owner)throw Error('IDEの利用状態が変わりました。');
-   const bounds=panelBounds(rect,owner,screen,kind);if(!bounds)throw Error('パネルの位置を取得できません。');
+   const separate=isAllDisplays(owner);
+   let bounds;
+   if(separate){
+    // ALLの仮想的な右端には実画面がないことがある。操作した画面の作業領域へ新規窓を収める。
+    const area=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    const slot=[...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).length;
+    bounds=kind==='panel-viewer'?windowBounds('viewer',area,undefined,slot):{x:area.x+8,y:area.y+8,width:Math.min(kind==='panel-routes'?360:340,area.width-16),height:Math.min(kind==='panel-routes'?40:700,area.height-16)};
+   }else bounds=panelBounds(rect,owner,screen,kind);
+   if(!bounds)throw Error('パネルの位置を取得できません。');
    const existing=[...windows.values()].find(item=>item.owner===owner&&item.kind==='explorer'&&!item.window.isDestroyed());
    if(kind==='explorer'&&existing)throw Error('Explorerはすでに別窓で開いています。');
+   let preview;
+   if(previewRect&&!separate){
+    if(!panelBounds(previewRect,owner,screen,kind))throw Error('元の表示範囲を取得できません。');
+    const zoom=owner.window.webContents.getZoomFactor(),content=owner.window.getContentBounds();
+    const x=Math.max(0,Math.floor(previewRect.left*zoom)),y=Math.max(0,Math.floor(previewRect.top*zoom));
+    const width=Math.min(content.width,Math.ceil((previewRect.left+previewRect.width)*zoom))-x;
+    const height=Math.min(content.height,Math.ceil((previewRect.top+previewRect.height)*zoom))-y;
+    if(width<=0||height<=0)throw Error('元の表示が画面内にありません。');
+    const image=await owner.window.webContents.capturePage({x,y,width,height},{stayHidden:true});
+    if(image.isEmpty())throw Error('元の表示を保持できません。');
+    if(isQuitting()||owner.window.isDestroyed()||revision!==owner.revision||trustedEvent(event)!==owner)throw Error('IDEの利用状態が変わりました。');
+    preview={src:image.toDataURL(),rect:{left:x/zoom,top:y/zoom,width:width/zoom,height:height/zoom}};
+   }
    const name='aidiy-explorer-'+randomUUID();
-   requests.set(owner,{name,bounds,kind,key:sessionKey(state),revision,expires:Date.now()+10000});return{ok:true,name};
+   requests.set(owner,{name,bounds,kind,key:sessionKey(state),revision,expires:Date.now()+10000});return{ok:true,name,preview};
   }catch(error){return{ok:false,error:error.message};}
  }
  function open(owner,details){
@@ -39,14 +62,16 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   if(!request||request.used||details.url!=='about:blank'||details.frameName!==request.name||Date.now()>request.expires||request.revision!==owner.revision||isQuitting())return null;
   request.used=true;
   const route=request.kind==='panel-routes';
-  return{action:'allow',overrideBrowserWindowOptions:{...request.bounds,show:false,frame:!route,...(route?{transparent:true,resizable:false,hasShadow:false,roundedCorners:false,minWidth:300,minHeight:40}:{}),title:'AiDiy IDE / Explorer',backgroundColor:route?'#00000000':'#080c1a',autoHideMenuBar:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}}};
+  return{action:'allow',overrideBrowserWindowOptions:{...request.bounds,show:false,frame:false,roundedCorners:false,...(route?{transparent:true,resizable:false,hasShadow:false,minWidth:300,minHeight:40}:{minWidth:300,minHeight:320}),title:'AiDiy IDE / Explorer',backgroundColor:route?'#00000000':'#080c1a',autoHideMenuBar:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}}};
  }
  function created(owner,window,details){
   const request=requests.get(owner);requests.delete(owner);
   if(!request?.used||request.name!==details.frameName||owner.window.isDestroyed()||owner.revision!==request.revision||isQuitting()){window.destroy();return;}
-  window.setBounds(request.bounds);window.setAlwaysOnTop(true);
+  // ネイティブの所有関係でもIDEより手前を保証する。フォーカスやALL解除で子窓を動かさない。
+  window.setParentWindow(owner.window);window.setBounds(request.bounds);keepInFront(window);
   const contents=window.webContents;
   const record={window,owner,kind:request.kind,url:'about:blank',linkKey:request.key,revision:0,ownerRevision:request.revision,barHeight:request.bounds.height,pending:new Map(),name:request.name};windows.set(contents,record);
+  attachWindowMove(record);
   contents.setWindowOpenHandler(()=>({action:'deny'}));
   contents.on('will-navigate',(event,url)=>{if(url!=='about:blank')event.preventDefault();});
   contents.on('will-redirect',event=>event.preventDefault());contents.on('will-attach-webview',event=>event.preventDefault());
@@ -57,7 +82,12 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   const owner=trustedEvent(event),child=[...windows.values()].find(item=>['explorer','panel-viewer','panel-routes'].includes(item.kind)&&item.owner===owner&&item.name===name&&!item.window.isDestroyed());
   if(!owner||owner.kind!=='ide'||!child||isQuitting())return{ok:false,error:'Explorerの利用が終了しました。'};
   try{if(child.linkKey!==sessionKey(await readState(owner))||owner.window.isDestroyed()||child.window.isDestroyed())return{ok:false,error:'IDEの利用状態が変わりました。'};}catch{return{ok:false,error:'IDEの利用状態を確認できません。'};}
-  if(!child.shown){child.shown=true;clearTimeout(child.timeout);if(reduced===true||child.kind==='panel-routes'){child.window.show();child.window.focus();}else await 拡大表示(BrowserWindow,child.window,{background:'#080c1a'});}
+  if(!child.shown){child.shown=true;clearTimeout(child.timeout);if(reduced===true||child.kind==='panel-routes'){
+   child.window.show();child.window.focus();
+   // 枠なし軌跡と演出省略時も、別窓が描画されるまでは元の表示を残す。
+   let timeout;try{await Promise.race([child.window.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))').catch(()=>{}),new Promise(resolve=>{timeout=setTimeout(resolve,300);})]);}finally{clearTimeout(timeout);}
+  }else await 拡大表示(BrowserWindow,child.window,{background:'#080c1a'});}
+  keepInFront(child.window);
   return{ok:!child.window.isDestroyed()};
  }
  function resizeRoutes(event,name,height){
@@ -69,9 +99,23 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   if(height<160)child.barHeight=Math.max(40,Math.ceil(height*zoom));
   const y=Math.max(area.y+margin,Math.min(current.y,area.y+area.height-margin-child.barHeight));
   const next={...current,y,height:Math.max(1,Math.min(Math.ceil(height*zoom),area.y+area.height-margin-y))};
-  if(next.height!==current.height||next.y!==current.y)win.setBounds(next);
+  if(next.height!==current.height||next.y!==current.y){win.setBounds(next);keepInFront(win);}
   return{ok:true,height:win.getContentBounds().height/zoom};
  }
- return{prepare,open,created,show,resizeRoutes};
+ function action(event,name,value){
+  const owner=trustedEvent(event),child=[...windows.values()].find(item=>item.owner===owner&&item.name===name&&['explorer','panel-viewer','panel-routes'].includes(item.kind)&&!item.window.isDestroyed());
+  if(!owner||owner.kind!=='ide'||!child||owner.revision!==child.ownerRevision||isQuitting()||!['minimize','maximize','isMaximized','close'].includes(value))return false;
+  const target=child.window;
+  if(value==='close'){target.close();return true;}
+  if(child.kind==='panel-routes')return false;
+  if(value==='minimize')target.minimize();
+  if(value==='maximize'){if(target.isMaximized())target.unmaximize();else target.maximize();}
+  return target.isMaximized();
+ }
+ function dragTarget(owner,name){
+  if(!owner||owner.kind!=='ide'||owner.window.isDestroyed()||isQuitting())return null;
+  return [...windows.values()].find(child=>child.owner===owner&&child.name===name&&['explorer','panel-viewer','panel-routes'].includes(child.kind)&&child.shown&&child.ownerRevision===owner.revision&&!child.window.isDestroyed())||null;
+ }
+ return{prepare,open,created,show,resizeRoutes,action,dragTarget};
 }
 module.exports={panelBounds,createPanelWindows};

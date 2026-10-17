@@ -50,15 +50,29 @@ async function start(value) {
   await window.webContents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
   if(!failed && !window.isDestroyed() && process.connected)process.send({type:'diag-shown'},error=>{if(error)fail('IPC');});
 }
-// Electron on Windows replaces stdin with an empty EOF stream. Use the inherited Node IPC channel.
-const timer=setTimeout(()=>fail('TIMEOUT'),10000);
-process.once('message',message=>{
-  clearTimeout(timer);
-  if(message?.type!=='diag-start' || typeof message.url!=='string' || message.url.length>4096){fail('IPC');return;}
-  start(message.url).catch(()=>fail('WINDOW'));
-});
-process.once('disconnect',()=>{clearTimeout(timer);app.quit();});
-if(process.connected && process.send){
-  try{process.send({type:'diag-ready'},error=>{if(error)fail('IPC');});}catch{fail('IPC');}
-}else{clearTimeout(timer);fail('IPC');}
-app.on('window-all-closed',()=>app.quit());
+// 同じ作業環境の診断ウィンドウは1つだけ。2つ目は既存ウィンドウを前面に出し、起動元へ固定の通知だけ返して終了する。
+function existing() {
+  const done=()=>app.exit(0);
+  if(process.connected && process.send){const fallback=setTimeout(done,250);fallback.unref?.();try{process.send({type:'diag-existing'},()=>{clearTimeout(fallback);done();});}catch{done();}}
+  else done();
+}
+function primary() {
+  app.on('second-instance',()=>{
+    if(!window || window.isDestroyed())return;
+    if(window.isMinimized())window.restore();
+    window.show();window.focus();
+  });
+  // Electron on Windows replaces stdin with an empty EOF stream. Use the inherited Node IPC channel.
+  const timer=setTimeout(()=>fail('TIMEOUT'),10000);
+  process.once('message',message=>{
+    clearTimeout(timer);
+    if(message?.type!=='diag-start' || typeof message.url!=='string' || message.url.length>4096){fail('IPC');return;}
+    start(message.url).catch(()=>fail('WINDOW'));
+  });
+  process.once('disconnect',()=>{clearTimeout(timer);app.quit();});
+  if(process.connected && process.send){
+    try{process.send({type:'diag-ready'},error=>{if(error)fail('IPC');});}catch{fail('IPC');}
+  }else{clearTimeout(timer);fail('IPC');}
+  app.on('window-all-closed',()=>app.quit());
+}
+if(app.requestSingleInstanceLock())primary();else existing();

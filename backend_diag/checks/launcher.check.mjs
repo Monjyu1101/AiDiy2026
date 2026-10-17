@@ -8,6 +8,10 @@ import {once} from 'node:events';
 import {launchDetached} from '../起動/launch.mjs';
 import {parseArgs} from '../diag_main.mjs';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// Windows の SIGTERM は TerminateProcess で、終了コードではなくシグナル終了として報告される。
+const stoppedBySigterm=([code,signal])=>process.platform==='win32'?signal==='SIGTERM':code===0;
+// 実プロセス試験は fixture の作業コピー作成を含むため、Windows の低速なファイルコピーでも収まる期限にする。
+const REAL_TIMEOUT=30000;
 async function until(fn){for(let n=0;n<150;n++){const value=await fn();if(value)return value;await pause(20);}throw Error('fixture readiness timeout');}
 async function fixture(mode='normal') {
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-launch-'));
@@ -17,6 +21,7 @@ async function fixture(mode='normal') {
  await writeFile(path.join(root,'ui/verify.mjs'),'export async function verify(){return true;}');
  const desktop=path.join(root,'起動/desktop.mjs');
  await writeFile(desktop,(await readFile(desktop,'utf8')).replace(/export async function desktopBinary[\s\S]*?\nconst failures=/,"export async function desktopBinary(){return process.execPath;}\nconst failures="));
+ if(mode==='existing'){await writeFile(path.join(root,'起動/electron-main.cjs'),"process.send({type:'diag-existing'},()=>process.exit(0));");return root;}
  await writeFile(path.join(root,'起動/electron-main.cjs'),`
  const fs=require('node:fs');
  process.on('disconnect',()=>process.exit(0));
@@ -34,7 +39,7 @@ async function fixture(mode='normal') {
  return root;
 }
 function start(root,args=[]){
- const child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),...args],{env:{...process.env,DISPLAY:':fixture',CI:'false',CODESPACES:'false'},stdio:['ignore','pipe','pipe']});
+ const child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),...args],{env:{...process.env,DISPLAY:':fixture',CI:'false',CODESPACES:'false'},stdio:['ignore','pipe','pipe'],windowsHide:true});
  child.output='';child.errors='';child.stdout.on('data',x=>child.output+=x);child.stderr.on('data',x=>child.errors+=x);child.finished=once(child,'exit');return child;
 }
 async function state(root){return until(async()=>{try{return JSON.parse(await readFile(path.join(root,'state.json'),'utf8'));}catch{return null;}});}
@@ -48,7 +53,7 @@ test('foreground/wait options are explicit; browser/no-open retain foreground mo
  assert.equal(parseArgs(['--foreground']).foreground,true);assert.equal(parseArgs(['--wait']).foreground,true);
  assert.equal(parseArgs([]).foreground,undefined);
 });
-test('real desktop launcher returns after shown while supervisor owns HTTP and Electron',{timeout:10000},async()=>{
+test('real desktop launcher returns after shown while supervisor owns HTTP and Electron',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child,info;
  try{
   child=start(root);info=await state(root);const [code]=await child.finished;
@@ -57,29 +62,34 @@ test('real desktop launcher returns after shown while supervisor owns HTTP and E
   process.kill(info.pid,'SIGTERM');await gone(info.url);
  }finally{await cleanup(root,child,info);}
 });
-for(const flag of ['--foreground','--wait'])test(`real ${flag} stays attached until Electron closes`,{timeout:10000},async()=>{
+for(const flag of ['--foreground','--wait'])test(`real ${flag} stays attached until Electron closes`,{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child,info;
  try{child=start(root,[flag]);info=await state(root);await pause(100);assert.equal(child.exitCode,null);assert.equal(info.parent,child.pid);
  process.kill(info.pid,'SIGTERM');await child.finished;await gone(info.url);
  }finally{await cleanup(root,child,info);}
 });
-test('real no-open HTTP process stays in foreground and stops on SIGTERM',{timeout:10000},async()=>{
+test('real no-open HTTP process stays in foreground and stops on SIGTERM',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child;
  try{child=start(root,['--browser','--no-open']);const url=await until(()=>child.output.match(/http:\/\/127\.0\.0\.1:\d+\//)?.[0]);
- assert.equal(child.exitCode,null);assert.equal((await fetch(url)).status,200);child.kill('SIGTERM');assert.equal((await child.finished)[0],0);await gone(url);
+ assert.equal(child.exitCode,null);assert.equal((await fetch(url)).status,200);child.kill('SIGTERM');assert.ok(stoppedBySigterm(await child.finished));await gone(url);
  }finally{await cleanup(root,child);}
 });
-test('real desktop failure returns nonzero and cleans HTTP without exposing token',{timeout:10000},async()=>{
+test('real desktop launcher with an already running window returns zero without a new window',{timeout:REAL_TIMEOUT},async()=>{
+ const root=await fixture('existing');let child;
+ try{child=start(root);const [code]=await child.finished;assert.equal(code,0,child.errors);assert.match(child.output,/既に起動しています/);assert.ok(!child.output.includes('#token='));assert.equal(child.errors,'');}
+ finally{await cleanup(root,child);}
+});
+test('real desktop failure returns nonzero and cleans HTTP without exposing token',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture('fail');let child,info;
  try{child=start(root);info=await state(root);assert.equal((await child.finished)[0],1);assert.ok(!child.errors.includes('#token='));await gone(info.url);}
  finally{await cleanup(root,child,info);}
 });
-test('launcher death before readiness cleans pending supervisor and desktop',{timeout:10000},async()=>{
+test('launcher death before readiness cleans pending supervisor and desktop',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture('hang');let child,info;
  try{child=start(root);info=await state(root);child.kill('SIGTERM');await child.finished;await gone(info.url);}
  finally{await cleanup(root,child,info);}
 });
-test('detached startup timeout and early child failure reject and reap fixture processes',{timeout:10000},async()=>{
+test('detached startup timeout and early child failure reject and reap fixture processes',{timeout:REAL_TIMEOUT},async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-launch-fail-'));
  try{for(const script of ['process.exit(4);','setInterval(()=>{},1000);']){
  const entry=path.join(root,'child.cjs');await writeFile(entry,script);let child;
@@ -97,7 +107,7 @@ test('safe diagnostic log accepts only fixed codes and stays within 64 KiB',asyn
   const text=await readFile(file,'utf8');assert.match(text,/^\d{4}-.* Electron LOAD\n$/);assert.ok(text.length<65536);assert.ok(!text.includes('SECRET'));
  }finally{await rm(root,{recursive:true,force:true});}
 });
-test('failure after detach leaves a fixed safe log and closes the server',{timeout:10000},async()=>{
+test('failure after detach leaves a fixed safe log and closes the server',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child,info;
  try{
   child=start(root);info=await state(root);assert.equal((await child.finished)[0],0);
@@ -117,12 +127,12 @@ test('probe diagnostic log retains safe structured failure fields only',async()=
   assert.ok(!text.includes('SECRET'));assert.ok(!text.includes('/private'));
  }finally{await rm(root,{recursive:true,force:true});}
 });
-test('detached-mode real version failure writes safe log as well as stderr',{timeout:10000},async()=>{
+test('detached-mode real version failure writes safe log as well as stderr',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child;
  try {
   const script=path.join(root,'probe-fixture.mjs');
   await writeFile(script,`import {runVersion} from './診断/probes.mjs';await runVersion('/definitely/missing/SECRET',['--version'],process.cwd(),{probeId:'fixture'});`);
-  child=spawn(process.execPath,[script],{env:{...process.env,AIDIY_DIAG_LAUNCHER_CHILD:'1'},stdio:['ignore','ignore','pipe']});let stderr='';child.stderr.on('data',x=>stderr+=x);
+  child=spawn(process.execPath,[script],{env:{...process.env,AIDIY_DIAG_LAUNCHER_CHILD:'1'},stdio:['ignore','ignore','pipe'],windowsHide:true});let stderr='';child.stderr.on('data',x=>stderr+=x);
   assert.equal((await once(child,'exit'))[0],0);const log=await readFile(path.join(root,'.desktop-errors.log'),'utf8');
   for(const text of [log,stderr]){assert.match(text,/aidiy-diag:probe/);assert.match(text,/spawn_error/);assert.match(text,/ENOENT/);assert.ok(!text.includes('SECRET'));}
  }finally{await cleanup(root,child);}

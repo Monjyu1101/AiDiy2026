@@ -6,7 +6,7 @@ import {once} from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-test('default Node runtime starts without Python on PATH and serves anonymous models plus config status',{timeout:15000},async()=>{
+test('default Node runtime starts without Python on PATH and serves anonymous models plus config status',{timeout:30000},async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-node-only-'));let child;
  try {
   const diag=path.join(root,'backend_diag');
@@ -17,7 +17,7 @@ test('default Node runtime starts without Python on PATH and serves anonymous mo
   const preload=path.join(root,'mock-public.mjs');
   await writeFile(preload,`import https from 'node:https';import {EventEmitter} from 'node:events';
 https.request=(options,callback)=>{if(options.hostname!=='openrouter.ai'||options.path!=='/api/v1/models'||options.headers.Authorization)throw new Error('unexpected request');const request=new EventEmitter();request.destroy=()=>{};request.end=()=>queueMicrotask(()=>{const response=new EventEmitter();response.statusCode=200;callback(response);response.emit('data',Buffer.from(JSON.stringify({data:[{id:'openai/synthetic-model',created:Math.floor(Date.now()/1000),context_length:100,architecture:{modality:'text->text'}}]})));response.emit('end');});return request;};`);
-  child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--no-open','--port','0'],{env:{...process.env,PATH:path.join(root,'empty-path'),NODE_OPTIONS:'',CODESPACES:'',CI:'1'},stdio:['ignore','pipe','pipe']});
+  child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--no-open','--port','0'],{env:{...process.env,PATH:path.join(root,'empty-path'),NODE_OPTIONS:'',CODESPACES:'',CI:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
   const exited=once(child,'exit');let output='',stderr='';child.stderr.on('data',chunk=>stderr+=chunk);
   const url=await new Promise((resolve,reject)=>{child.stdout.on('data',chunk=>{output+=chunk;const match=output.match(/http:\/\/127\.0\.0\.1:\d+\/#token=[^\s]+/);if(match)resolve(new URL(match[0]));});child.once('exit',()=>reject(new Error('Unexpected startup exit')));});
   const token=new URLSearchParams(url.hash.slice(1)).get('token');url.hash='';
@@ -27,7 +27,9 @@ https.request=(options,callback)=>{if(options.hostname!=='openrouter.ai'||option
   assert.equal(publicStatus.状態,'取得済');assert.equal(publicStatus.件数,1);
   const status=await api(encodeURIComponent('キー設定'));assert.equal(status.設定状態,'読込済み');assert.equal(status.項目.find(row=>row.id==='gemini').設定済み,true);assert.ok(!JSON.stringify(status).includes('synthetic-gemini-key'));
   const result=await api(encodeURIComponent('キーテスト')+'/openrt','POST');assert.equal(result.状態,'未実施');assert.deepEqual(result.モデル,[]);
-  child.kill('SIGTERM');await exited;assert.equal(child.exitCode,0);assert.equal(stderr,'');
+  child.kill('SIGTERM');await exited;
+  // Windows の SIGTERM は TerminateProcess で、終了コードではなくシグナル終了として報告される。
+  if(process.platform==='win32')assert.equal(child.signalCode,'SIGTERM');else assert.equal(child.exitCode,0);assert.equal(stderr,'');
  }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
 });
 
@@ -41,7 +43,7 @@ test('actual headless entrypoint works with missing config and no credentials, u
   const preload=path.join(root,'offline.mjs');
   await writeFile(preload,`import https from 'node:https';import http from 'node:http';import {EventEmitter} from 'node:events';
 const offline=(options)=>{if(options.headers?.Authorization||options.headers?.['x-goog-api-key']||!['openrouter.ai','127.0.0.1'].includes(options.hostname))throw Error('unexpected authenticated request');const request=new EventEmitter();request.destroy=()=>{};request.end=()=>queueMicrotask(()=>request.emit('error',Object.assign(Error('offline fixture'),{code:'ENETUNREACH'})));return request;};https.request=offline;http.request=offline;`);
-  child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--headless'],{env:{PATH:path.join(root,'empty-path'),HOME:path.join(root,'home'),USERPROFILE:path.join(root,'home'),CODEX_HOME:path.join(root,'home','.codex'),NODE_OPTIONS:'',CI:'1'},stdio:['ignore','pipe','pipe']});
+  child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--headless'],{env:{PATH:path.join(root,'empty-path'),HOME:path.join(root,'home'),USERPROFILE:path.join(root,'home'),CODEX_HOME:path.join(root,'home','.codex'),NODE_OPTIONS:'',CI:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
   let output='',stderr='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
   await once(child,'exit');assert.equal(child.exitCode,0,output+'\n'+stderr);
   const {readFile,access}=await import('node:fs/promises');

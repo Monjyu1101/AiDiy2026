@@ -175,7 +175,7 @@ test('最前面: 新規窓の登録前focusを保持し、非同期一覧取得�
 
 test('Electron配線: 各窓のfocusを信頼済みホストで記録する',()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- assert.match(source,/window\.on\('focus',\(\)=>draftRouter\.focused\(record\)\)/);
+ assert.match(source,/window\.on\('focus',\(\)=>\{\s*draftRouter\.focused\(record\);/);
  const preload=readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8');
  assert.doesNotMatch(preload,/draftRouter\.focused|frontmostTargetId/);
 });

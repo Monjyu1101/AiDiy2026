@@ -3,6 +3,8 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import {installWindowMove} from '../共通表示/長押し窓移動.js';
+import {openingShine,stopOpeningShine} from '../共通表示/登場光沢.js';
 
 // ブラウザーのscreen座標はCSS px。devicePixelRatio（OS拡大率を含む）は重ねて掛けない。
 // 外枠/表示領域の差からツールバーを見積もる。配置要求の最終判断はブラウザーが行う。
@@ -29,15 +31,20 @@ const fades = new WeakMap();
 export function fadePanel(element) {
   if (!element?.animate) return;
   fades.get(element)?.cancel();
+  stopOpeningShine(element);
   if (element.ownerDocument?.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  fades.set(element, element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' }));
+  const doc=element.ownerDocument,animation=element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+  fades.set(element,animation);
+  animation.finished.then(()=>{if(fades.get(element)===animation&&element.ownerDocument===doc){fades.delete(element);openingShine(element);}},()=>{});
 }
 
 // Vueのインスタンス・DOM・イベントをそのまま移動する。検索ジョブを再発行せず、
 // AI入力、検索結果、展開、選択、スクロールも同じ実体を保持する。
 export function createPanelWindow({ element, changed, report, closed = () => {}, recovered = () => {}, moved = () => {}, title = 'Explorer', kind = 'explorer', className = 'explorer-window', rectangle = element, win = window }) {
-  let child, parent, anchor, timer, opening = false, disposed = false, detached = false, documentSeen;
+  let child, parent, anchor, timer, pinRequest, opening = false, disposed = false, detached = false, documentSeen;
   let cleanupDocument = () => {};
+  let preview;
+  const clearPreview = () => { preview?.remove(); preview = undefined; };
   const restoreScroll = () => {
     const positions = [element(), ...element().querySelectorAll('*')].map(node => [node, node.scrollTop, node.scrollLeft]);
     return () => positions.forEach(([node, top, left]) => { node.scrollTop = top; node.scrollLeft = left; });
@@ -52,6 +59,7 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
     const closing = child; child = undefined;
     if (closing && !closing.closed) closing.close();
     if (detached) { detached = false; changed(false); }
+    clearPreview();
   }
   async function attach() {
     const target = child, doc = target.document;
@@ -73,26 +81,50 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
       if (disposed || child !== target || target.closed || target.document !== doc) return;
       const host = doc.createElement('main'); host.className = 'development-app ' + className;
       doc.body.replaceChildren(host);
+      let removeTitle = () => {};
+      if (win.aidiyWindow?.panelAction && kind !== 'panel-routes') {
+        const { mountPanelTitle } = await import('./別窓タイトル.js');
+        if (disposed || child !== target || target.closed || target.document !== doc) return;
+        host.classList.add('native-panel-window');
+        removeTitle = mountPanelTitle(host, target, win, title, kind);
+      }
       if(kind==='panel-routes'){doc.documentElement.classList.add('route-window-document');if(win.aidiyWindow?.resizeRoutes)doc.documentElement.classList.add('native-route-window');}
       // 元Documentのタイムラインを別窓へ持ち込まない（裏のIDEでは停止し得る）。
       fades.get(element())?.cancel(); fades.delete(element());
+      stopOpeningShine(element());
       const scroll = restoreScroll(); host.append(element()); scroll();
       documentSeen = doc;
+      const ownerApi=win.aidiyWindow;
+      const stopMove=installWindowMove({kind,win:target,api:ownerApi?.beginWindowMove?{
+        nativeWindowMove:ownerApi.nativeWindowMove,
+        beginWindowMove:()=>ownerApi.beginWindowMove(target.name),
+        moveWindow:token=>ownerApi.moveWindow(token,target.name),
+        endWindowMove:token=>ownerApi.endWindowMove(token,target.name),
+      }:null});
       if (!detached) { detached = true; changed(true); }
       // リロードで旧Documentが消える前にDOMを親へ退避する。次のDocumentに同じ実体を戻す。
       const leaving = () => { if (!parent || !element()) return; const keepScroll = restoreScroll(); parent.insertBefore(element(), anchor); element().style.visibility = 'hidden'; keepScroll(); };
       target.addEventListener('beforeunload', leaving);
-      cleanupDocument = () => { target.removeEventListener('beforeunload', leaving); if (element()) element().style.visibility = ''; };
+      cleanupDocument = () => { stopOpeningShine(host);stopOpeningShine(element());fades.get(host)?.cancel();stopMove(); removeTitle(); target.removeEventListener('beforeunload', leaving); if (element()) element().style.visibility = ''; };
       element().style.visibility = '';
       moved();
       if (win.aidiyWindow?.showExplorer) {
         const result = await win.aidiyWindow.showExplorer(target.name, win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        // 表示演出の途中で閉じた窓を「表示失敗」として本体へ復元しない。
+        if (child !== target || disposed) return;
+        if (target.closed) { dismiss(); return; }
         if (!result?.ok) throw Error(result?.error || '別窓を表示できません。');
-      } else host.classList.add('panel-opening');
+        clearPreview();
+        openingShine(kind==='panel-routes'?element():host);
+      } else fadePanel(host);
       target.focus();
     } finally { opening = false; }
   }
-  async function pin() {
+  function pin() {
+    // 手動ピン留めの途中でALL移行が始まっても、別窓の表示完了まで同じ要求を待つ。
+    return pinRequest ??= openPanel().finally(() => { pinRequest = undefined; });
+  }
+  async function openPanel() {
     if (disposed) return;
     if (child && !child.closed) { child.focus(); return true; }
     if (opening) return;
@@ -101,9 +133,20 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
       const node = element(), rect = panelRect(rectangle());
       let name = 'aidiy-explorer-' + win.crypto.randomUUID();
       if (win.aidiyWindow?.prepareExplorer) {
-        const result = await win.aidiyWindow.prepareExplorer(rect, kind);
+        const result = await win.aidiyWindow.prepareExplorer(rect, kind, kind === 'panel-routes' ? panelRect(node) : rect);
         if (!result?.ok) throw Error(result?.error || '別窓を準備できません。');
+        if (disposed) return;
         name = result.name;
+        if (result.preview) {
+          // DOMやiframeを複製せず、元の描画だけを別窓の表示完了まで保持する。
+          const image = win.document.createElement('img'), bounds = result.preview.rect;
+          image.className = 'panel-pin-preview'; image.alt = ''; image.setAttribute('aria-hidden', 'true');
+          image.src = result.preview.src;
+          Object.assign(image.style, { left: bounds.left + 'px', top: bounds.top + 'px', width: bounds.width + 'px', height: bounds.height + 'px' });
+          await image.decode();
+          if (disposed) return;
+          preview = image; win.document.body.append(image);
+        }
       }
       if (disposed) return;
       child = win.open('about:blank', name, popupFeatures(rect, win, kind === 'panel-routes'));

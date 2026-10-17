@@ -69,9 +69,9 @@ try{
  assert.equal(await main.evaluate('diffEditors.length'),1);
  await main.evaluate(`window.open=function(...args){window.popupArgs=args;return nativeOpen.apply(window,args)};const button=document.querySelector('[aria-label="ソース比較をピン留め"]');button.click();button.click()`);
  await main.until(`!document.querySelector('.viewer-session')`);
- let childTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Viewer');assert.ok(childTarget);
+ let childTarget=(await targets()).find(t=>t.title.startsWith('AiDiy IDE / Viewer'));assert.ok(childTarget);
  const child=await connect(childTarget);await child.until(`!!document.querySelector('.history-embedded')`);
- assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Viewer').length,1);
+ assert.equal((await targets()).filter(t=>t.title.startsWith('AiDiy IDE / Viewer')).length,1);
  assert.equal(await main.evaluate(`initialDiff.getModel()===initialModel&&diffEditors.length===1&&originalCompare.ownerDocument!==document`),true);
  assert.equal(await main.evaluate('initialDiff.getOriginalEditor().getScrollTop()'),700);
  assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationName`),'none');
@@ -100,7 +100,7 @@ try{
  // 通常viewerのpin経路も、比較を同じ窓に開く。Xは復元しない。
  await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/sample.txt'})`);await main.until(`!!document.querySelector('.viewer-history')`);
  await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);await main.until(`!document.querySelector('.viewer-session')`);
- childTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Viewer');const again=await connect(childTarget);
+ childTarget=(await targets()).find(t=>t.title.startsWith('AiDiy IDE / Viewer'));const again=await connect(childTarget);
  await again.until(`!!document.querySelector('.viewer-history')`);await again.evaluate(`document.querySelector('.viewer-history').click()`);await again.until(`!!document.querySelector('.file-history-changes')`);
  // Explorer Xは折畳み。バーガーで再表示しても入力は保持する。
  await main.evaluate(`document.querySelector('.explorer-toggle').click();window.explorerNode=document.querySelector('.explorer-panel');document.querySelector('input[value="grep"]').click()`);
@@ -111,7 +111,7 @@ try{
  assert.equal(await main.evaluate(`explorerNode.querySelector('input[type=search]').value`),'保持する検索');
  await main.capture('explorer-reopened');
  await main.send('Page.close');await sleep(700);
- assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer'||t.title==='AiDiy IDE / Viewer').length,0);
+ assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer'||t.title.startsWith('AiDiy IDE / Viewer')).length,0);
  assert.deepEqual(errors,[]);
  const result={shots,errors,operations:['比較から直接pin','pin失敗時保持','連打1窓','比較model/左右scroll保持','子reload同一model','古い比較応答を破棄','別窓で比較解除/開始/対象変更','Xでviewer/model破棄・再open','通常viewerから比較は同じ窓','本体に重複なし','Explorer X折畳み・入力保持・再表示','親終了で子終了']};
  writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

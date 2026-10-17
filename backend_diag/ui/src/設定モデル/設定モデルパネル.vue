@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { 先頭へスクロール, 完了時 } from '../共通表示/先頭表示.mjs';
 import { 再生可能な音声 } from './設定モデル音声.mjs';
 import 状態バッジ from '../共通表示/状態バッジ.vue';
 import './設定モデル.css';
@@ -12,9 +13,12 @@ const audio=computed(()=>row.value?.id==='LIVE'?再生可能な音声(result.val
 const audioState=computed(()=>props.audioStates?.[audio.value?.id]);
 const 状態=item=>props.results?.[item.id]?.状態 || (item.状態==='未実行'?'未実施':item.状態) || '未実施';
 const 名前=item=>`${item.区分 || item.id}${item.役割 ? ` / ${item.役割}` : ''}`;
+const パネル=ref(null);
+// 動作確認が終わって先頭行へ戻ったら、一覧・詳細を先頭までスクロールする。
+watch(()=>props.running,完了時(()=>{if(props.selected===items.value[0]?.id)先頭へスクロール(パネル.value);}));
 </script>
 <template>
-<section class="panel model-trial-panel" aria-label="設定モデル">
+<section ref="パネル" class="panel model-trial-panel" aria-label="設定モデル">
  <div class="panel-heading trial-heading"><h2>モデル動作確認</h2><div class="panel-actions trial-actions"><button class="trial-reload" :disabled="!online || loading || running" @click="$emit('refresh')">再読込</button><button id="model-trial-start" :disabled="!online || loading || running || !items.length" @click="$emit('start')">動作確認</button><button :disabled="!running" @click="$emit('cancel')">中止</button></div></div>
  <p class="panel-note">設定中のモデルで短い応答を確認します。試行は料金が発生する場合があります。同じ接続経路・プロバイダ・モデル・音声設定の試行結果はサーバーで共有します。</p>
  <p v-if="!online" class="panel-note warning" role="status">Tools 接続時に利用できます。</p>

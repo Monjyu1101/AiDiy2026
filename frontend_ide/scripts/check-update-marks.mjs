@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-// オフラインfixtureで更新強調・電子周回・日付境界・描画停止を実画面検証する。
+// オフラインfixtureで更新強調・光輪・日付境界・描画停止を実画面検証する。
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {existsSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,utimesSync,unlinkSync} from 'node:fs';
@@ -56,7 +56,7 @@ try{
  await main.until('!!window.aidiyIDE?.world');await main.evaluate('aidiyIDE.setAutoSpin(false);aidiyIDE.interact()');
  await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='2D').click()`);
  await main.until(`document.querySelectorAll('.updated-latest').length===2`);
- const first=await main.evaluate('aidiyIDE.updateMarks');assert.equal(first.electrons['latest-a.js'],4);assert.equal(first.electrons['latest-b.py'],4);assert.equal(first.electrons['earlier.txt'],2);assert.equal(first.electrons['yesterday.md'],1);assert.equal(first.electrons['old.json'],undefined);assert.deepEqual(first.flashes,{});
+ const first=await main.evaluate('aidiyIDE.updateMarks');assert.deepEqual(first.levels,{'earlier.txt':1,'latest-a.js':2,'latest-b.py':2});assert.deepEqual(first.flashes,{});
  assert.equal(await main.evaluate(`document.querySelectorAll('.updated-today').length`),3);
  await main.capture('2d-today-and-tied-latest');
  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
@@ -76,27 +76,18 @@ try{
  await main.evaluate(`aidiyIDE.goTo({type:'dir',path:'child'})`);assert.deepEqual(await main.evaluate('aidiyIDE.updateMarks.flashes'),{});
  await main.evaluate(`aidiyIDE.goTo({type:'dir',path:''})`);assert.deepEqual(await main.evaluate('aidiyIDE.updateMarks.flashes'),{});
  await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click()`);
- await main.evaluate(`Object.assign(aidiyIDE.cam,{tx:0,ty:0,tz:0,dist:aidiyIDE.world.radius*2.5,yaw:0,pitch:0,roll:0});Object.assign(aidiyIDE.goal,aidiyIDE.cam)`);await sleep(2500);await main.capture('galaxy-electrons');
- await main.evaluate(`const body=aidiyIDE.world.planets.find(file=>file.path==='earlier.txt');Object.assign(aidiyIDE.cam,{tx:body.x,ty:body.y,tz:body.z,dist:350});Object.assign(aidiyIDE.goal,aidiyIDE.cam)`);await sleep(100);await main.capture('galaxy-four-electrons-close');
- const gpu=await main.evaluate('aidiyIDE.electronStats');assert.equal(gpu.mode,'webgl');assert.equal(gpu.total,5);
- const before=await main.evaluate('aidiyIDE.electronStats');await sleep(300);const after=await main.evaluate('aidiyIDE.electronStats');assert.ok(after.draws>before.draws);assert.equal(after.uploads,before.uploads);
+ await main.evaluate(`Object.assign(aidiyIDE.cam,{tx:0,ty:0,tz:0,dist:aidiyIDE.world.radius*2.5,yaw:0,pitch:0,roll:0});Object.assign(aidiyIDE.goal,aidiyIDE.cam)`);await sleep(2500);await main.capture('galaxy-update-halos');
+ await main.evaluate(`const body=aidiyIDE.world.planets.find(file=>file.path==='earlier.txt');Object.assign(aidiyIDE.cam,{tx:body.x,ty:body.y,tz:body.z,dist:350});Object.assign(aidiyIDE.goal,aidiyIDE.cam)`);await sleep(100);await main.capture('galaxy-latest-halo-close');
+ await main.evaluate(`const todayBody=aidiyIDE.world.planets.find(file=>file.path==='latest-a.js');Object.assign(aidiyIDE.cam,{tx:todayBody.x,ty:todayBody.y,tz:todayBody.z,dist:350});Object.assign(aidiyIDE.goal,aidiyIDE.cam)`);await sleep(300);await main.capture('galaxy-today-halo-close');
  await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='2D').click()`);
- const stopped=await main.evaluate('aidiyIDE.electronStats.draws');await sleep(300);assert.equal(await main.evaluate('aidiyIDE.electronStats.draws'),stopped);
  // 日跨ぎは実時間を待たず、復帰時の再判定経路で確認する。
  const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
  await main.evaluate(`window.originalNow=Date.now;Date.now=()=>${+tomorrow+1000};document.dispatchEvent(new Event('visibilitychange'))`);
  await main.until(`document.querySelectorAll('.updated-today').length===0`);
- assert.equal(await main.evaluate(`aidiyIDE.updateMarks.electrons['earlier.txt']`),1);
+ assert.deepEqual(await main.evaluate('aidiyIDE.updateMarks.levels'),{});
  await main.evaluate(`Date.now=originalNow;document.dispatchEvent(new Event('visibilitychange'))`);
- // 大量件数でも対象バッファは一度だけ転送し、フレーム数分だけ単一drawを実行する。
- await main.evaluate(`window.originalFetch=fetch;window.fetch=async(url,...args)=>String(url).startsWith('/api/galaxy')?{ok:true,json:async()=>({root:${JSON.stringify(project)},tree:{n:'large',d:[],f:Array.from({length:5000},(_,i)=>['file-'+i+'.txt',30,${now}])},truncated:false})}:originalFetch(url,...args);aidiyIDE.refresh()`);
- assert.equal(await main.evaluate('aidiyIDE.electronStats.files'),2048);assert.equal(await main.evaluate('aidiyIDE.electronStats.electrons'),8192);
- await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click()`);await sleep(300);
- const large=await main.evaluate('aidiyIDE.electronStats');assert.equal(large.total,5000);
- await main.evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))`);
- const hidden=await main.evaluate('aidiyIDE.electronStats.draws');await sleep(300);assert.equal(await main.evaluate('aidiyIDE.electronStats.draws'),hidden);
  assert.deepEqual(errors,[]);
- const result={first,gpu,large,shots,errors,operations:['初回は静的','同率最新2件','子フォルダ除外','無差分発光なし','変更行だけ1200ms','追加・削除と選択保持','移動時発光なし','GPU一括描画・再転送なし','2D・非表示停止','ローカル日跨ぎ','5000件で2048対象/8192電子上限']};
+ const result={first,shots,errors,operations:['初回は静的','同率最新2件','子フォルダ除外','無差分発光なし','変更行だけ1200ms','追加・削除と選択保持','移動時発光なし','黄金色・薄い黄色の外側へ薄くなるオーラ','衛星なし','ローカル日跨ぎ']};
  writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{
  for(const ws of sockets)ws.close();chrome.kill();await app.close();await sleep(300);

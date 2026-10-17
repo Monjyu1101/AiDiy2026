@@ -17,6 +17,36 @@ async function until(check,label){for(let i=0;i<150;i++){if(await check())return
 const output=join(__dirname,'../../temp/panel-pin-check');mkdirSync(output,{recursive:true});
 const results=[];let running=false;
 const nearBounds=(actual,expected)=>{for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=2,`${key}: ${actual[key]} / ${expected[key]}`);};
+async function dragPanel(window,selector,label,frame=false){
+ const originalFocus=window.isFocused,originalCursor=screen.getCursorScreenPoint;
+ let cursor=originalCursor();window.isFocused=()=>true;screen.getCursorScreenPoint=()=>cursor;
+ const doc=frame?"document.querySelector('#drag-fixture').contentDocument":'document';
+ try{
+  const point=await evaluate(window,`(()=>{const doc=${doc},r=doc.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(),f=${frame?"document.querySelector('#drag-fixture').getBoundingClientRect()":"{left:0,top:0}"};return{x:Math.round(f.left+r.left+Math.min(20,r.width/2)),y:Math.round(f.top+r.top+r.height/2)}})()`);
+  const before=window.getBounds();
+  await evaluate(window,`window.holdInputs=0;window.holdListener=()=>window.holdInputs++;document.addEventListener('mousedown',holdListener,true);document.addEventListener('click',holdListener,true);`);
+  const zoom=window.webContents.getZoomFactor(),inputPoint={x:Math.round(point.x*zoom),y:Math.round(point.y*zoom)};
+  window.webContents.sendInputEvent({type:'mouseDown',...inputPoint,button:'left',clickCount:1});
+  await until(()=>evaluate(window,`!!document.querySelector('[data-aidiy-window-move]:popover-open')`),label+'移動表示');
+  const hitCursor=await evaluate(window,`(()=>{let doc=document,node=doc.elementFromPoint(${point.x},${point.y});if(node?.tagName==='IFRAME'&&node.contentDocument){const r=node.getBoundingClientRect();doc=node.contentDocument;node=doc.elementFromPoint(${point.x}-r.x,${point.y}-r.y);}return doc.defaultView.getComputedStyle(node).cursor;})()`);
+  assert.equal(hitCursor,'move',label+'押している場所の移動カーソル');
+  assert.equal(await evaluate(window,`document.elementFromPoint(${point.x},${point.y}).hasAttribute('data-aidiy-window-move')`),true,label+'iframeより手前に表示');
+  // 非表示窓ではChromiumがpopoverの描画を省略するため、実際に表示して撮影する。
+  window.setIgnoreMouseEvents(true);showInactive.call(window);await sleep(150);
+  writeFileSync(join(output,'marker-'+label+'.png'),(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
+  assert.equal(await evaluate(window,'holdInputs'),0,label+'押下時に選択しない');
+  cursor={x:cursor.x+30,y:cursor.y+20};
+  window.webContents.sendInputEvent({type:'mouseMove',x:inputPoint.x+2,y:inputPoint.y+2,button:'left',modifiers:['leftButtonDown']});
+  await until(()=>Math.abs(window.getBounds().x-before.x-30)<=1,label+'窓移動');
+  const after=window.getBounds();assert.ok(Math.abs(after.width-before.width)<=1&&Math.abs(after.height-before.height)<=1,label+'サイズ維持');
+  window.webContents.sendInputEvent({type:'mouseUp',x:inputPoint.x+2,y:inputPoint.y+2,button:'left',clickCount:1});
+  await until(()=>evaluate(window,`!document.querySelector('[data-aidiy-window-move]')`),label+'移動表示解除');
+  window.hide();window.setIgnoreMouseEvents(false);
+  assert.equal(await evaluate(window,'holdInputs'),0,label+'移動後のクリックを抑止');
+  await evaluate(window,`document.removeEventListener('mousedown',holdListener,true);document.removeEventListener('click',holdListener,true)`);
+  results.push({drag:label,before,after});
+ }finally{window.isFocused=originalFocus;screen.getCursorScreenPoint=originalCursor;}
+}
 app.on('browser-window-created',(_,owner)=>{
  owner.webContents.setBackgroundThrottling(false);
  if(running)return;running=true;
@@ -34,11 +64,18 @@ app.on('browser-window-created',(_,owner)=>{
     owner.webContents.setZoomFactor(zoom);await sleep(150);
     const rect=await evaluate(owner,`(()=>{const r=document.querySelector('.explorer-panel').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`);
     const expected=require('../デスクトップ/panel-windows.cjs').panelBounds(rect,{window:owner},screen);
-    await evaluate(owner,`(()=>{window.originalExplorer=document.querySelector('.explorer-panel');const pin=document.querySelector('[aria-label="エクスプローラーをピン留め"]');pin.click();pin.click()})()`);
+    await evaluate(owner,`(()=>{window.originalExplorer=document.querySelector('.explorer-panel');window.pinPreviewObserved=false;const observer=new MutationObserver(()=>{if(!document.querySelector('.explorer-panel')){window.pinPreviewObserved=!!document.querySelector('.panel-pin-preview');observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});const pin=document.querySelector('[aria-label="エクスプローラーをピン留め"]');pin.click();pin.click()})()`);
     await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'Explorer移動');
+    assert.equal(await evaluate(owner,`pinPreviewObserved`),true,'別窓へDOMを移す時点では元位置の表示を残す');
+    if(zoom===1)writeFileSync(join(output,'electron-pin-before-show.png'),(await owner.webContents.capturePage()).toPNG());
     const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');assert.ok(child);
     await until(()=>evaluate(child,`!!document.querySelector('.explorer-panel')`),'Explorer DOM');
+    await until(()=>evaluate(child,`!!document.querySelector('.panel-window-title .window-actions')`),'共通タイトルバー');
+    assert.equal(await evaluate(child,`document.querySelector('.panel-window-title .connection-bar').classList.contains('offline')`),true);
     nearBounds(child.getBounds(),expected);
+    await until(()=>evaluate(owner,`!document.querySelector('.panel-pin-preview')`),'別窓表示後に元表示を除去');
+    if(zoom===1){await dragPanel(child,'.explorer-panel','Explorer');await dragPanel(child,'[data-path="sample.txt"] .file-name','Explorerファイル項目');}
+    if(zoom===1)writeFileSync(join(output,'electron-explorer-title.png'),(await child.webContents.capturePage()).toPNG());
     await evaluate(child,`document.querySelector('input[value="grep"]').click()`);
     await evaluate(child,`const input=document.querySelector('input[type=search]');input.value='Electron';input.dispatchEvent(new Event('input',{bubbles:true}));Array.from(document.querySelectorAll('form button')).find(b=>b.textContent==='検索').click()`);
     await until(()=>evaluate(child,`document.querySelector('form [role=status]')?.textContent.includes('1ファイル一致')`),'検索結果');
@@ -65,11 +102,43 @@ app.on('browser-window-created',(_,owner)=>{
     await until(()=>evaluate(owner,`!document.querySelector('.viewer-popup')`),'Viewer移動');
     const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');assert.ok(child);
     nearBounds(child.getBounds(),expected);await until(()=>evaluate(child,`!!document.querySelector('.viewer-pinned .viewer-meta')`),'Viewer表示');
+    await until(()=>evaluate(owner,`!document.querySelector('.panel-pin-preview')`),'Viewer表示完了');
     writeFileSync(join(output,`electron-viewer-${zoom}.png`),(await child.webContents.capturePage()).toPNG());
-    child.close();await until(()=>evaluate(owner,`!document.querySelector('.viewer-session')`),'Viewer X終了');
+    if(zoom===1){
+     await until(()=>evaluate(child,`!!document.querySelector('.viewer-code .view-line')`),'Monaco本文');
+     await dragPanel(child,'.viewer-code .view-line','Viewer本文');
+     await until(()=>evaluate(child,`!!document.querySelector('.viewer-history')`),'比較入口');
+     await evaluate(child,`document.querySelector('.viewer-history').click()`);
+     await until(()=>evaluate(child,`!!document.querySelector('.history-embedded .file-history-changes')&&!document.querySelector('.file-history-changes').textContent.includes('計算中')`),'比較表示');
+     assert.equal(await evaluate(child,`document.querySelectorAll('.panel-window-title').length`),1);
+     child.webContents.invalidate();await child.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});await sleep(300);
+     writeFileSync(join(output,'electron-compare-title.png'),(await child.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
+     await dragPanel(child,'.history-embedded .original .view-line','比較左本文');
+     await dragPanel(child,'.history-embedded .modified .view-line','比較右本文');
+     await evaluate(child,`(()=>{const f=document.createElement('iframe');f.id='drag-fixture';f.style='position:fixed;inset:100px auto auto 20px;width:260px;height:180px;border:0;z-index:99999';f.srcdoc='<p>HTML / Office の本文</p><input>';document.body.append(f);})()`);
+     await until(()=>evaluate(child,`!!document.querySelector('#drag-fixture')?.contentDocument?.querySelector('p')`),'iframe本文');
+     await dragPanel(child,'p','iframe本文',true);
+     await evaluate(child,`document.querySelector('#drag-fixture').remove()`);
+     const preview=await evaluate(owner,`fetch('/api/preview?path=sample.html').then(r=>r.json())`);
+     await evaluate(child,`(()=>{const f=document.createElement('iframe');f.id='drag-cross';f.style='position:fixed;inset:100px auto auto 20px;width:260px;height:180px;border:0;z-index:99999';f.src=${JSON.stringify(preview.url)};document.body.append(f);})()`);
+     await sleep(500);assert.equal(await evaluate(child,`document.querySelector('#drag-cross').contentDocument===null`),true,'別オリジンで検証');
+     await dragPanel(child,'#drag-cross','別オリジンHTML本文');
+     await evaluate(child,`document.querySelector('#drag-cross').remove()`);
+    }
+    await evaluate(child,`document.querySelector('.panel-window-title [aria-label="終了"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.viewer-session')`),'Viewer X終了');
     await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'Viewer再open');
     results.push({kind:'viewer',zoom,bounds:expected,dismiss:true,reopen:true});
    }
+   await evaluate(owner,`document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);
+   await until(()=>evaluate(owner,`!document.querySelector('.explorer-routes')`),'軌跡pin');
+   const routes=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
+   await until(()=>evaluate(routes,`!!document.querySelector('.route-controls')`),'軌跡表示');
+   await sleep(350);
+   const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')];return{rows:new Set(buttons.map(b=>Math.round(b.getBoundingClientRect().top))).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
+   assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40);
+   await dragPanel(routes,'.route-choice','軌跡ボタン');
+   writeFileSync(join(output,'electron-routes-single-row.png'),(await routes.webContents.capturePage()).toPNG());
+   await evaluate(routes,`document.querySelector('[aria-label="軌跡バーを閉じる"]').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
    await evaluate(owner,`document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'終了前pin');
    const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await evaluate(owner,`Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent==='終了').click()`);
@@ -78,5 +147,5 @@ app.on('browser-window-created',(_,owner)=>{
   }catch(error){console.error(error);try{console.error(await evaluate(owner,'document.body.innerText'));}catch{}app.exit(1);}
  });
 });
-setTimeout(()=>{console.error('Electron確認期限');app.exit(1);},60000).unref();
+setTimeout(()=>{console.error('Electron確認期限');app.exit(1);},90000).unref();
 require('../desktop.cjs');

@@ -13,11 +13,11 @@ import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新�
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
-const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
+const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, allDisplays: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached']);
 const panel=ref(),detached=ref(false),pinError=ref('');
 let panelWindow,routeWindow;
-const routeDetached=ref(false),routeClosed=ref(false);
+const routeDetached=ref(false),routeClosed=ref(false),preparingAll=ref(false);
 function pinRoutes(){
   routeClosed.value=false;
   routeWindow??=createPanelWindow({element:()=>routeElement.value,title:'軌跡',kind:'panel-routes',className:'routes-window',
@@ -33,6 +33,23 @@ function pinExplorer(){
   return panelWindow.pin();
 }
 function closeExplorer(){if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
+watch(()=>props.allDisplays,(active,previous)=>{
+  if(previous&&!active){
+    // DOM・履歴を本体へ回収してから別窓を閉じ、通常画面では閉じた状態へ戻す。
+    closeExplorer();closeRoutes();
+  }
+});
+async function pinForAll(){
+  // 非表示の矩形を測らない。元の窓サイズのまま開いてから、別窓の表示完了を待つ。
+  // Explorerを切り離した後も、軌跡の位置はExplorerの右側に保つ。
+  preparingAll.value=true;
+  try{
+    emit('update:open',true);await nextTick();
+    if(!await pinExplorer())throw Error(pinError.value||'エクスプローラーをピン留めできませんでした。');
+    routeClosed.value=false;await nextTick();
+    if(!await pinRoutes())throw Error(pinError.value||'軌跡バーをピン留めできませんでした。');
+  }finally{preparingAll.value=false;}
+}
 watch([()=>props.open,detached],async([open,away])=>{if(open&&!away){await nextTick();fadePanel(panel.value);}});
 // 一覧は宇宙と同じ（props.tree）。フィルター（星空画面の左下）が ON なら、宇宙もこの一覧もバックアップ対象だけになる。
 const tree = computed(() => props.tree);
@@ -286,18 +303,18 @@ watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,matches,aiResult],emitMarks,{immediate:true});
 onBeforeUnmount(()=>{routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
-defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false});
+defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 </script>
 <template>
   <div class="explorer-component" data-component="FileExplorer">
     <button v-if="!open||detached" class="explorer-toggle" aria-label="エクスプローラーを開く" :aria-expanded="false" @click="detached?panelWindow.focus():emit('update:open',true)">☰</button>
     <button v-if="routeClosed||routeDetached" class="route-restore-toggle" aria-label="軌跡バーを開く" @click="openRoutes">軌跡</button>
-    <div ref="routeElement" v-show="!routeClosed" class="explorer-routes" :class="{'explorer-collapsed':!open||detached}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
+    <div ref="routeElement" v-show="!routeClosed" class="explorer-routes" :class="{'explorer-collapsed':!open||(detached&&!preparingAll)}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
       <div class="route-controls"><span class="route-drag-handle" aria-hidden="true"></span>
       <button v-for="[value,label] in [['view','閲覧軌跡'],['search','検索軌跡'],['ai','AiDiy検索軌跡']]" :key="value" class="route-choice" :aria-pressed="routeMode===value" :aria-expanded="routeMode===value&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute(value)">{{ label }}</button>
       <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':routeMode==='search'?'前の検索ファイル':'前の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':routeMode==='search'?'次の検索ファイル':'次の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===routeSteps.length-1" @click="stepRoute(1)">&gt;</button>
-      <button :aria-label="routeDetached?'軌跡バーを本体へ戻す':'軌跡バーをピン留め'" :title="routeDetached?'本体へ戻す':'小さな別ウィンドウで開く'" @click="routeDetached?routeWindow.restore():pinRoutes()">{{ routeDetached?'↙':'📌' }}</button>
-      <button aria-label="軌跡バーを閉じる" @click="closeRoutes">×</button>
+      <button v-if="!allDisplays||!routeDetached" :aria-label="routeDetached?'軌跡バーを本体へ戻す':'軌跡バーをピン留め'" :title="routeDetached?'本体へ戻す':'小さな別ウィンドウで開く'" @click="routeDetached?routeWindow.restore():pinRoutes()">{{ routeDetached?'↙':'📌' }}</button>
+      <button v-if="!allDisplays" aria-label="軌跡バーを閉じる" @click="closeRoutes">×</button>
       </div>
       <div class="route-reveal" :data-phase="routeMotionState.phase" :style="{height:routeMotionState.height+'px'}">
       <section v-if="routeListOpen" :inert="!routeMotionState.visible" :aria-hidden="!routeMotionState.visible" :style="{visibility:routeMotionState.visible?'visible':'hidden'}" id="route-file-list" class="route-file-list" :aria-label="routeLabel+'のファイル一覧'">
@@ -311,7 +328,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false});
       </div>
     </div>
     <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
-      <header><button aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer">☰</button><span>エクスプローラー</span><button :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
+      <header><button v-if="!allDisplays" aria-label="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer">☰</button><span>エクスプローラー</span><button v-if="!allDisplays||!detached" :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
       <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">起点検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>

@@ -17,7 +17,8 @@ if(options.localPort){
  http.request=(request,callback)=>{assert.equal(request.hostname,'127.0.0.1');assert.equal(request.agent,false);return original({...request,port:options.localPort},callback);};
 }
 const abort=new AbortController();
-if(options.abort)setTimeout(()=>abort.abort(),100);
+// 子プロセスの起動・プロキシ接続が高負荷で遅れても、接続後に中断する（通信期限 8 秒より十分短い）。
+if(options.abort)setTimeout(()=>abort.abort(),2000);
 try{
  const data=await fetchMetadata(options.provider||'openai',{Authorization:'Bearer synthetic-api-secret'},undefined,abort.signal);
  assert.equal(options.reason,undefined);assert.deepEqual(data,{data:[]});

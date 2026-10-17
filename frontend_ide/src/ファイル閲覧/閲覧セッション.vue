@@ -10,25 +10,28 @@ import FileHistoryDialog from '../ファイル検索/ファイル履歴ダイア
 import {createPanelWindow} from '../ファイル閲覧/パネル別窓.js';
 import {createViewerIdle} from '../ファイル閲覧/閲覧待機.js';
 const props=defineProps({file:Object,root:String,autoSpin:Boolean});
-const emit=defineEmits(['close','detached','recover','activity']);
+const emit=defineEmits(['close','detached','recover','activity','pinning']);
 const panel=ref(),viewer=ref(),history=ref(null),detached=ref(false),pinBusy=ref(false),error=ref('');
-let windowPanel,disposed=false;
+let windowPanel,pinRequest,disposed=false;
 const idle=createViewerIdle({close});
+watch(pinBusy,value=>emit('pinning',value),{flush:'sync'});
 watch([detached,pinBusy,()=>props.autoSpin],()=>idle.configure({inline:!detached.value,autoSpin:props.autoSpin,pinning:pinBusy.value}),{immediate:true,flush:'sync'});
 watch(()=>JSON.stringify([props.file?.path,props.file?.navigationId]),()=>idle.activity());
 provide('openFileHistory',(file,root)=>{history.value={file:{path:file.path,name:file.name},root};});
-async function pin(){
-  if(pinBusy.value||disposed)return;pinBusy.value=true;
+function pin(){
+  if(pinRequest)return pinRequest;
+  if(disposed)return Promise.resolve(false);pinBusy.value=true;
   windowPanel??=createPanelWindow({element:()=>panel.value,
     rectangle:()=>panel.value?.querySelector('.history-embedded')||panel.value?.querySelector('.viewer-popup, .viewer-pinned'),
-    title:'Viewer',kind:'panel-viewer',className:'viewer-window',
+    title:`Viewer - ${props.file.name}`,kind:'panel-viewer',className:'viewer-window',
     changed:value=>{detached.value=value;},closed:()=>emit('close'),moved:()=>viewer.value?.moved(),
     recovered:()=>emit('recover'),report:message=>{error.value=message;}});
-  try{if(await windowPanel.pin())emit('detached');}finally{pinBusy.value=false;}
+  pinRequest=windowPanel.pin().then(ok=>{if(ok)emit('detached');return !!ok;}).finally(()=>{pinBusy.value=false;pinRequest=undefined;});
+  return pinRequest;
 }
 function close(){windowPanel?.close();emit('close');}
 onBeforeUnmount(()=>{disposed=true;idle.dispose();windowPanel?.close();history.value=null;});
-defineExpose({focus:()=>windowPanel?.focus()||false});
+defineExpose({focus:()=>windowPanel?.focus()||false,pin});
 </script>
 <template>
   <div ref="panel" class="viewer-session" :class="{detached}" :data-viewer-path="file.path">

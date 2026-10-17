@@ -11,6 +11,7 @@
 // 自動運転の最終更新追跡と5分プレビューを実画面・仮想時計で検証する。
 // ルートから node frontend_ide/scripts/check-autodrive.mjs。オフラインだけを使いAI接続はしない。
 import assert from 'node:assert/strict';
+import {checkOrbitRoutes} from '../checks/orbit-route-probe.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -121,6 +122,29 @@ try {
   await until(`document.querySelector('.viewer-popup')?.textContent.includes('first.txt')`,'起動時の最終更新へ移動');
   assert.equal(await evaluate('window.autoAnimations'),0,'同階層の自動追跡にはワープ演出を使わない');
   await capture('nn-autodrive-preview.png');
+  if(process.env.AIDIY_SELECTED_ORBIT_ONLY==='1'){
+    await advance(3000);
+    await evaluate(`window.selectedOrbitOffset=()=>{const v=aidiyIDE.cam,s=aidiyIDE.selected;return [v.tx-Math.sin(v.yaw)*Math.cos(v.pitch)*v.dist-s.x,v.ty-Math.sin(v.pitch)*v.dist-s.y,v.tz-Math.cos(v.yaw)*Math.cos(v.pitch)*v.dist-s.z]};`);
+    const start=await evaluate('selectedOrbitOffset()');
+    const near=(actual,expected,label)=>assert.ok(Math.hypot(...actual.map((v,i)=>v-expected[i]))<1e-5,label);
+    await capture('nn-selected-orbit-start.png');
+    await advance(45000);await capture('nn-selected-orbit-quarter.png');
+    await advance(45000);near(await evaluate('selectedOrbitOffset()'),start.map(v=>-v),'90秒で反対側');
+    await capture('nn-selected-orbit-half.png');
+    await advance(90000);near(await evaluate('selectedOrbitOffset()'),start,'180秒でちょうど1周');
+    await capture('nn-selected-orbit-full.png');
+    assert.equal(await evaluate('aidiyIDE.selected.path'),'first.txt');
+    assert.ok((await preview()).includes('first.txt'),'周回中もビューアの選択を維持');
+    await evaluate('aidiyIDE.setAutoSpin(false)');const held=await view();
+    await advance(5000);const stopped=await view();
+    for(const key of Object.keys(held))assert.ok(Math.abs(stopped[key]-held[key])<1e-9,'OFF中は停止: '+key);
+    assert.deepEqual(errors,[]);console.log('SELECTED ORBIT PASS: 180 seconds / 1 revolution, preview retained, OFF stops, errors=[]');
+  }else if(process.env.AIDIY_ORBIT_ROUTES_ONLY==='1'){
+    await evaluate(`window.eyeOf=v=>({x:v.tx-Math.sin(v.yaw)*Math.cos(v.pitch)*v.dist,y:v.ty-Math.sin(v.pitch)*v.dist,z:v.tz-Math.cos(v.yaw)*Math.cos(v.pitch)*v.dist});aidiyIDE.clear();aidiyIDE.setAutoSpin(true);`);
+    await until(`aidiyIDE.orbitPhase==='flying'`,'巡回開始');
+    const targets=await checkOrbitRoutes({evaluate,advance,capture});
+    assert.deepEqual(errors,[]);console.log('ORBIT ROUTES PASS: '+JSON.stringify({targets,errors}));
+  }else{
   await advance(500);assert.equal(await evaluate(`document.querySelector('[aria-label="自動探索"]').classList.contains('driving')`),true);
   await evaluate(`window.aidiyIDE.requestFollow('first.txt')`);await advance(250);await sleep(50);await advance(250);
   assert.equal(await evaluate(`document.querySelector('.space-canvas').classList.contains('warping')`),false,'同じ最終更新の通知で再ジャンプしない');
@@ -162,6 +186,7 @@ try {
   })()`);
   assert.ok(curvature.count>10 && curvature.spread>4,'船の下へ表示した軌道が一本線に潰れず曲がる: '+JSON.stringify(curvature));
   await capture('nn-autodrive-space.png');
+  await checkOrbitRoutes({evaluate,advance,capture});
   // 遠点で旧軌道を消してから機体を回し、新しい軌道を表示する。
   await evaluate(`(()=>{for(let i=0;i<6000&&window.aidiyIDE.orbitPhase!=='hiding';i++)window.orbitTestAdvance(250);})()`);
   assert.equal(await evaluate('window.aidiyIDE.orbitPhase'),'hiding');
@@ -269,6 +294,7 @@ try {
   await capture('nn-updates-scroll.png');
   assert.deepEqual(errors,[]);
   console.log('AUTODRIVE PASS: 起動時ジャンプ、到着済み重複抑制、手動移動先・ルートで彗星軌道再開、5分消去、新しい更新追従、移動中の予約変更、新規ファイル、OFF中保留、秒境界の重複除外、複数更新の保持・経路保存・最後だけ移動・小さいスクロール');
+  }
   ws.close();
 } finally {
   chrome.kill();

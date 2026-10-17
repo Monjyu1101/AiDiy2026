@@ -5,12 +5,13 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 // ピン留めしたファイルの独立ウィンドウ。宇宙パネルの外で、同じIDEのファイルAPIを使って1ファイルを表示する。
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, provide, onMounted, onBeforeUnmount } from 'vue';
 import { validConnectionState } from '../共通表示/接続状態.js';
 import StatusBar from '../共通表示/状態バー.vue';
 import FileViewer from '../ファイル閲覧/ファイルビューア.vue';
 const props=defineProps({path:String,desktop:Boolean});
 const state=ref({}),error=ref('');
+provide('browserAvailable',computed(()=>state.value.active&&state.value.mode==='online'&&state.value.connected===true));
 const name=props.path.split('/').at(-1);
 const file={name,path:props.path,mtime:0};
 let timer,disposed=false,polling=false,boundSession='',ended=false;

@@ -51,7 +51,7 @@ try{
  for(let i=0;i<80&&!port;i++){try{port=Number(readFileSync(join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);}catch{await sleep(100);}}
  assert.ok(port);const targets=async()=>await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
  const main=await connect((await targets()).find(t=>t.type==='page'));
- await main.send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+ await main.send('Emulation.setDeviceMetricsOverride',{width:1920,height:800,deviceScaleFactor:1,mobile:false});
  await main.send('Page.navigate',{url:app.url});
  await main.until(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='オフライン利用')`);
  await main.evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='オフライン利用').click()`);
@@ -62,14 +62,14 @@ try{
 
  await main.evaluate('aidiyIDE.clear()');
  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
- const trace=async(page,action)=>page.evaluate(`(async()=>{${action};const records=[],start=performance.now();await new Promise(resolve=>{function tick(){const panel=document.querySelector('.explorer-routes'),body=document.querySelector('.route-reveal'),content=document.querySelector('.route-file-list');records.push({t:performance.now()-start,height:body.getBoundingClientRect().height,top:panel.getBoundingClientRect().top,visible:!!content&&getComputedStyle(content).visibility==='visible',phase:body.dataset.phase});if(performance.now()-start<550)requestAnimationFrame(tick);else resolve();}requestAnimationFrame(tick);});return records;})()`);
+ const trace=async(page,action)=>page.evaluate(`(async()=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));getComputedStyle(document.querySelector('.route-reveal')).height;${action};const records=[],start=performance.now();await new Promise(resolve=>{function tick(){const panel=document.querySelector('.explorer-routes'),body=document.querySelector('.route-reveal'),content=document.querySelector('.route-file-list');records.push({t:performance.now()-start,height:body.getBoundingClientRect().height,top:panel.getBoundingClientRect().top,visible:!!content&&getComputedStyle(content).visibility==='visible',phase:body.dataset.phase});if(performance.now()-start<550)requestAnimationFrame(tick);else resolve();}requestAnimationFrame(tick);});return records;})()`);
  const inlineOpen=await trace(main,`document.querySelector('.route-choice').click()`);
  assert.ok(inlineOpen.some(r=>r.height>2&&r.height<290));assert.ok(inlineOpen.some(r=>r.visible));assert.ok(inlineOpen.filter(r=>r.height<299).every(r=>!r.visible));assert.equal(new Set(inlineOpen.map(r=>r.top)).size,1);
  const inlineClose=await trace(main,`document.querySelector('.route-choice').click()`);assert.ok(inlineClose.every(r=>!r.visible));assert.equal(inlineClose.at(-1).height,0);
- assert.ok(await main.evaluate(`document.querySelector('.explorer-routes').getBoundingClientRect().height<100`));await main.capture('inline-small-bar');
+ assert.ok(await main.evaluate(`(()=>{const buttons=[...document.querySelectorAll('.route-controls>button')];return new Set(buttons.map(b=>Math.round(b.getBoundingClientRect().top))).size===1&&document.querySelector('.explorer-routes').getBoundingClientRect().height<50})()`));await main.capture('inline-small-bar');
  // 下端では上端を動かさず、入る分だけ展開する。
  await main.evaluate(`document.querySelector('.explorer-routes').style.top=(innerHeight-100)+'px'`);
- const bottomOpen=await trace(main,`document.querySelector('.route-choice').click()`);assert.ok(bottomOpen.at(-1).height<=40);assert.equal(new Set(bottomOpen.map(r=>r.top)).size,1);
+ const bottomOpen=await trace(main,`document.querySelector('.route-choice').click()`);assert.ok(await main.evaluate(`document.querySelector('.explorer-routes').getBoundingClientRect().bottom<=innerHeight-8`));assert.equal(new Set(bottomOpen.map(r=>r.top)).size,1);
  await trace(main,`document.querySelector('.route-choice').click()`);await main.evaluate(`document.querySelector('.explorer-routes').style.top=''`);
  // 途中反転後、分類を切り替えても最後の開閉だけを反映する。
  const reverse=await trace(main,`const button=document.querySelector('.route-choice');button.click();setTimeout(()=>button.click(),80);setTimeout(()=>button.click(),140);setTimeout(()=>document.querySelectorAll('.route-choice')[1].click(),180)`);

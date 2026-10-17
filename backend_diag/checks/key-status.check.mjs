@@ -13,8 +13,28 @@ test('Node status uses only bounded config reader and never contacts a provider'
  assert.ok(!JSON.stringify(response).includes('fixture-secret'));
 });
 test('unknown and unsupported IDs never read config or fetch',async()=>{
- for(const id of ['../arbitrary','azure','discord'])assert.equal((await testKey(id,{run:forbidden})).状態,'未実施');
+ for(const id of ['../arbitrary','azure','copilot'])assert.equal((await testKey(id,{run:forbidden})).状態,'未実施');
  assert.equal((await runModels('test','bad',{reader:forbidden,fetch:forbidden})).error,'unsupported');
+});
+test('external integrations: read-only auth GET with fixed headers, role checks, safe names, unset keys never fetch',async()=>{
+ const keys={huggingface_key_read:'hf-read-secret',huggingface_key_write:'hf-write-secret',DISCORD_BOT_TOKEN:'discord-secret'};
+ const run=async(id,body,values=keys)=>{const calls=[];const response=await runModels('test',id,{reader:reader(values),fetch:async(provider,headers)=>{calls.push([provider,headers]);if(body instanceof Error)throw body;return body;}});return {...response.data,calls};};
+ let r=await run('huggingface_read',{name:'alice',email:'a@example.invalid',auth:{accessToken:{role:'read',displayName:'token-name'}}});
+ assert.equal(r.状態,'OK');assert.match(r.説明,/alice/);assert.match(r.説明,/read/);assert.deepEqual(r.calls.map(([provider,headers])=>[provider,headers.Authorization]),[['huggingface','Bearer hf-read-secret']]);
+ assert.ok(!JSON.stringify({...r,calls:undefined}).match(/secret|example\.invalid|token-name/));assert.deepEqual(r.モデル,[]);
+ assert.equal((await run('huggingface_write',{name:'alice',auth:{accessToken:{role:'read'}}})).状態,'NG');
+ assert.equal((await run('huggingface_write',{name:'alice',auth:{accessToken:{role:'write'}}})).状態,'OK');
+ assert.equal((await run('huggingface_write',{auth:{accessToken:{role:'fineGrained',fineGrained:{scoped:[{permissions:['repo.content.read','repo.write']}]}}}})).状態,'PASS');
+ assert.equal((await run('huggingface_write',{auth:{accessToken:{role:'fineGrained',fineGrained:{global:['discussion.read']}}}})).状態,'NG');
+ r=await run('discord',{bot:true,username:'my_bot.1'});assert.equal(r.状態,'OK');assert.match(r.説明,/my_bot\.1/);
+ assert.equal(r.calls[0][0],'discord');assert.equal(r.calls[0][1].Authorization,'Bot discord-secret');assert.match(r.calls[0][1]['User-Agent'],/^DiscordBot \(/);
+ assert.equal((await run('discord',{bot:false,username:'person'})).状態,'NG');
+ r=await run('discord',{bot:true,username:'<b>discord-secret</b>'});assert.equal(r.状態,'OK');assert.doesNotMatch(r.説明,/secret|<b>/);
+ r=await run('discord',new Error('auth'));assert.equal(r.状態,'NG');assert.match(r.説明,/認証/);
+ for(const id of ['huggingface_read','huggingface_write','discord']){r=await run(id,{},{});assert.equal(r.状態,'未実施');assert.equal(r.説明,'キーが未設定です。');assert.deepEqual(r.calls,[]);}
+ const status=await runModels('status',undefined,{reader:reader({DISCORD_BOT_TOKEN:'discord-secret'}),fetch:forbidden});
+ const rows=Object.fromEntries(status.data.項目.map(row=>[row.id,row]));
+ assert.equal(rows.discord.テスト可能,true);assert.equal(rows.huggingface_read.テスト可能,false);assert.equal(rows.huggingface_read.理由,'キーが未設定です。');
 });
 test('safe runner schema discards unknown fields and formats model details',async()=>{
  const status=await getKeyStatus({run:async()=>({data:{設定状態:'読込済み',項目:[null,{id:'openrt',設定済み:false,キー不要:true,テスト可能:true,secret:'hidden'}]}})});

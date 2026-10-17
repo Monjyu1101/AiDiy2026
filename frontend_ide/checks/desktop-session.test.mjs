@@ -62,11 +62,11 @@ test('Electron IPC: 同じメインフレーム・正確なURLだけを信用し
 
 function launchFixture(){
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const body=source.slice(source.indexOf(" ipcMain.handle('development:open-app'"),source.indexOf(" ipcMain.handle('development:prepare-explorer'"))
+ const body=source.slice(source.indexOf(" ipcMain.handle('development:open-app'"),source.indexOf(" ipcMain.handle('development:code-move-begin'"))
   .replace("const {startDevelopment}=await import('./server.mjs');","const {startDevelopment}=testServer;");
  const windows=new Map(),state={...valid,project:{...valid.project}},starts=[],created=[],focused=[],closed=[];let launch,hold;
  const owner={kind:'ide',window:{isDestroyed:()=>false},revision:0,pending:new Map()},viewer={kind:'viewer',owner,linkKey:'online:10',window:{isDestroyed:()=>false}};
- const context={ipcMain:{handle:(_name,handler)=>{launch=handler;}},windows,quitting:false,trustedEvent:event=>event.record,
+ const context={selectedAllDisplay:()=>null,ipcMain:{handle:(_name,handler)=>{launch=handler;}},windows,quitting:false,trustedEvent:event=>event.record,
   readState:async()=>structuredClone(state),sessionKey:value=>value.active?`${value.mode}:${value.startedAt}`:'',
   focusWindow:window=>focused.push(window),closeServer:server=>{if(server)closed.push(server);},
   testServer:{startDevelopment:async(path,options)=>{starts.push({path,options});await hold;return{url:'http://127.0.0.1:1234/'};}},

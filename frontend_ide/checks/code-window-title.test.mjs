@@ -11,6 +11,10 @@ import vm from 'node:vm';
 import routerModule from '../デスクトップ/draft-router.cjs';
 import panelModule from '../デスクトップ/panel-windows.cjs';
 import codeDragModule from '../デスクトップ/code-drag.cjs';
+import browserModule from '../デスクトップ/ブラウザ.cjs';
+import nativeMoveModule from '../デスクトップ/長押し窓移動.cjs';
+import frontModule from '../デスクトップ/前面維持.cjs';
+import placementModule from '../デスクトップ/VRパネル配置.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 async function desktopFixture(){
@@ -21,7 +25,8 @@ async function desktopFixture(){
   isDestroyed(){return !!this.destroyed;}
   getBounds(){return this.bounds;}
   setBounds(bounds){this.bounds=bounds;}
-  setAlwaysOnTop(){}
+  setAlwaysOnTop(value,level){this.top=value;this.topLevel=level;this.topCalls=(this.topCalls||0)+1;}
+  isAlwaysOnTop(){return !!this.top;}
   setTitle(title){this.title=title;}
   getTitle(){return this.title;}
   async loadURL(url){this.webContents.mainFrame.url=url.split('#')[0];}
@@ -39,6 +44,11 @@ async function desktopFixture(){
   './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
   './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
   './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
+  './デスクトップ/ブラウザ.cjs':browserModule,
+  './デスクトップ/長押し窓移動.cjs':nativeMoveModule,
+  './デスクトップ/前面維持.cjs':frontModule,
+  './デスクトップ/VRパネル配置.cjs':placementModule,
+  './デスクトップ/全画面横断.cjs':{createAllDisplays:()=>({register(){},attachExitKey:()=>()=>{},leave:()=>false,handle:()=>({ok:true,active:false})})},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:{env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:'ide'},cwd:()=>'/project',on(){}},__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});
@@ -63,6 +73,14 @@ test('IDE Code番号: 実createWindowのslotをタイトル・限定IPC・連携
  first.window.destroy();third.window.destroy();reopened.window.destroy();const restarted=await f.code();assert.equal(restarted.slot,0);await verify([restarted]);
  assert.equal(f.handlers.get('development:window')({sender:{},senderFrame:{}},'title'),undefined);
  const standalone=await f.createWindow('code','http://127.0.0.1:6789/');assert.equal(standalone.getTitle(),'AiDiy Code');
+});
+
+test('IDE再フォーカスは自分の子パネルだけを手前に戻し、位置と単独窓を変えない',async()=>{
+ const f=await desktopFixture(),child=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
+ const bounds=child.window.getBounds();child.window.top=false;standalone.top=false;
+ f.owner.window.focus();assert.equal(child.window.top,true);assert.equal(standalone.top,false);assert.equal(child.window.getBounds(),bounds);assert.equal(child.window.options.parent,f.owner.window);
+ assert.equal(child.window.topLevel,process.platform==='win32'?'pop-up-menu':'floating');
+ const count=child.window.topCalls;f.owner.window.focus();assert.equal(child.window.topCalls,count,'既に手前の子窓には最前面設定を繰り返さない');
 });
 
 test('preloadタイトル: 任意IPCを公開せずホストの同一ウィンドウタイトルだけを取得する',async()=>{

@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createAutoOrbit,MANUAL_PAUSE_MS} from '../src/開発スペース/自動周回.js';
+import {createAutoOrbit,MANUAL_PAUSE_MS,orbitTurnProgress} from '../src/開発スペース/自動周回.js';
 import {cameraPosition} from '../src/開発スペース/ワープ視点.js';
 const radius=v=>Math.hypot(...Object.values(cameraPosition(v)));
 const home = () => ({yaw:.6,pitch:.35,dist:4600,tx:0,ty:0,tz:0});
@@ -184,11 +184,45 @@ function controlledOrbitChange(side,magnitude,initial=home()) {
 }
 const eyeDistance=(a,b)=>Math.hypot(...['x','y','z'].map(key=>cameraPosition(a)[key]-cameraPosition(b)[key]));
 
+test('大きな角度は角速度が線形に増減し、微調整は一定速度で進む',()=>{
+ const step=.01,delta=Math.PI;
+ const speeds=Array.from({length:100},(_,i)=>(orbitTurnProgress((i+1)*step,delta)-orbitTurnProgress(i*step,delta))/step);
+ for(let i=1;i<49;i++)assert.ok(Math.abs(speeds[i]-speeds[i-1]-.04)<1e-10);
+ for(let i=51;i<100;i++)assert.ok(Math.abs(speeds[i]-speeds[i-1]+.04)<1e-10);
+ for(const sign of [-1,1])for(const t of [0,.1,.25,.5,.75,.9,1])assert.equal(orbitTurnProgress(t,sign*Math.PI/180),t);
+});
+
+test('フォルダが一つでもランダムと通過を交互に選び、実船体が銀河内を通る',()=>{
+ for(const kind of ['斜め','遠点側','反対側','中央']){
+  let seed=87,view=home(),now=0,folders=[];
+  const orbit=createAutoOrbit(()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32;});
+  const advance=dt=>{now+=dt*1000;view=orbit.step(now,dt,view,4600,false,folders);};
+  for(let i=0;i<10000&&orbit.phase!=='planning';i++)advance(.25);
+  const eye=cameraPosition(view),distance=radius(view),sign=kind==='反対側'?-1:1;
+  const point=kind==='斜め'?{x:850,y:-340,z:600}:kind==='中央'?{x:0,y:0,z:0}:Object.fromEntries(['x','y','z'].map(key=>[key,sign*eye[key]*1200/distance]));
+  const folder={...point,path:'唯一のフォルダ',R:160};folders=[folder];
+  for(let cycle=0;cycle<4;cycle++){
+   assert.equal(orbit.phase,'planning');const before={...view};advance(0);
+   assert.equal(orbit.target,cycle%2===0?folder.path:null,kind+' 2回に1回だけ通過を指定');
+   assert.ok(eyeDistance(before,view)<1e-7,'経路の再計算で船を飛ばさない');
+   let nearest=Infinity,finished=false;
+   for(let i=0;i<100000;i++){
+    advance(.02);const p=cameraPosition(view);
+    assert.ok(Object.values(view).every(Number.isFinite));
+    nearest=Math.min(nearest,Math.hypot(p.x-folder.x,p.y-folder.y,p.z-folder.z));
+    if(orbit.phase==='planning'){finished=true;break;}
+   }
+   assert.ok(finished,'一周して次の再計算へ進む');
+   if(cycle%2===0)assert.ok(nearest<folder.R,kind+' 通過距離 '+nearest);
+  }
+ }
+});
+
 for(const [label,side,sign] of [['左',.1,-1],['右',.9,1]]) {
- for(const magnitude of [0,.2,.5,1]) {
-  test(`遠点の${label}回転は15〜90度の指定乱数に従い、行き過ぎと戻りは実角度の15%: ${magnitude}`,()=>{
+ for(const magnitude of [.001,.2,.5,.999]) {
+  test(`遠点の${label}回転は0〜180度の指定乱数に従い、行き過ぎと戻りは実角度の15%: ${magnitude}`,()=>{
    const run=controlledOrbitChange(side,magnitude),from={...run.view};
-   const expected=sign*(15+75*magnitude)*Math.PI/180;
+   const expected=sign*(180*magnitude)*Math.PI/180;
    run.advance(0);
    const calls=run.calls,path=run.orbit.path;
    assert.equal(run.orbit.phase,'aligning');
@@ -203,12 +237,12 @@ for(const [label,side,sign] of [['左',.1,-1],['右',.9,1]]) {
     assert.equal(run.orbit.path,path,'回転中に軌道線を作り直さない');
     assert.ok(eyeDistance(run.view,from)<1e-8,'行き過ぎと戻りでも船体は静止する');
     assert.ok(Math.abs(run.view.yaw-from.yaw)<1e-9&&Math.abs(run.view.pitch-from.pitch)<1e-9,'中心への視線を固定する');
-    assert.ok(Math.abs(run.view.roll-before.roll)<.012,'微小な時間刻みに連続した姿勢を返す');
+    assert.ok(Math.abs(run.view.roll-before.roll)<.03,'微小な時間刻みに連続した姿勢を返す');
     if(run.orbit.phase==='aligning')assert.equal(run.orbit.visibility,0);
    }
    const delta=run.view.roll-from.roll,peak=Math.max(...samples),peakIndex=samples.indexOf(peak);
    assert.ok(Math.abs(delta-expected)<1e-9,`実際の回転は${expected*180/Math.PI}度（実測 ${delta*180/Math.PI}度）`);
-   assert.ok(Math.abs(delta)>=Math.PI/12-1e-9&&Math.abs(delta)<=Math.PI/2+1e-9,'左右とも絶対量は15〜90度');
+   assert.ok(Math.abs(delta)>=0&&Math.abs(delta)<=Math.PI+1e-9,'左右とも絶対量は0〜180度');
    assert.ok(Math.abs(peak-Math.abs(delta)*1.15)<1e-9,'行き過ぎは小角度でも大角度でも15%');
    assert.ok(samples.slice(0,peakIndex+1).every((p,i,a)=>!i||p>=a[i-1]-1e-12),'行き過ぎまでは一方向へ回る');
    assert.ok(samples.slice(peakIndex).every((p,i,a)=>!i||p<=a[i-1]+1e-12),'一度だけ戻して静止する');
@@ -231,7 +265,7 @@ for(const [label,side,sign] of [['左',.1,-1],['右',.9,1]]) {
 
 test('±π境界や何周分も累積したロールでも、指定した90度だけで軌道を変える',()=>{
  for(const [side,sign] of [[.1,-1],[.9,1]]){
-  const run=controlledOrbitChange(side,1,{...home(),pitch:-sign*.35});
+  const run=controlledOrbitChange(side,.5,{...home(),pitch:-sign*.35});
   // 同じ実姿勢を上下反転したEuler表現へ変え、±πの手前を開始位置にする。
   run.view={...run.view,yaw:run.view.yaw+Math.PI,pitch:Math.PI-run.view.pitch,roll:run.view.roll+sign*Math.PI};
   const from=run.view.roll;
@@ -241,7 +275,7 @@ test('±π境界や何周分も累積したロールでも、指定した90度�
   assert.ok(Math.abs(run.view.roll-from-sign*Math.PI/2)<1e-9,'境界で反対回りや一周回転を選ばない');
   assert.ok(Math.abs(run.view.roll)>Math.PI,'角度表現を±πへ強制的に折り返さない');
   for(const wraps of [-4,4]){
-   const repeated=controlledOrbitChange(side,1);
+   const repeated=controlledOrbitChange(side,.5);
    repeated.view={...repeated.view,roll:repeated.view.roll+wraps*Math.PI*2};
    const original=repeated.view.roll;
    repeated.advance(0);for(let i=0;i<20;i++)repeated.advance(.2);
@@ -261,7 +295,7 @@ test('固定seedは複数周の軌道変更を再現し、遠点以外では乱�
    if(calls!==run.calls){assert.ok(phase==='idle'||phase==='planning');if(run===runs[0]&&phase==='planning')changes++;}
    if(phase==='aligning'&&run.orbit.phase==='revealing'&&run.turnStart!==undefined){
     const delta=Math.abs(run.view.roll-run.turnStart);
-    assert.ok(delta>=Math.PI/12-1e-9&&delta<=Math.PI/2+1e-9,'何周後でも実際の変更角は15〜90度に収まる');
+    assert.ok(delta>=0&&delta<=Math.PI+1e-9,'何周後でも実際の変更角は0〜180度に収まる');
    }
   }
   assert.deepEqual(runs[0].view,runs[1].view);

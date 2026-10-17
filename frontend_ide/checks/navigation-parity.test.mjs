@@ -20,6 +20,7 @@ import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import * as browserLaunch from '../src/ブラウザ/起動.js';
 import * as routeExpansion from '../src/ファイル閲覧/軌跡パネル展開.js';
 import * as panelWindows from '../src/ファイル閲覧/パネル別窓.js';
 import { scanWarning } from '../src/ファイル閲覧/走査警告.js';
@@ -95,6 +96,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
+    '../ブラウザ/起動.js': browserLaunch,
     '../ファイル閲覧/閲覧待機.js':viewerIdle,
     '../ファイル閲覧/軌跡パネル展開.js':routeExpansion,'../ファイル閲覧/パネル別窓.js':panelWindows,
     './ファイル日時.js': fileDates,

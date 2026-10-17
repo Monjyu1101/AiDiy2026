@@ -5,16 +5,17 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { catalog, scan, cancelProbes } from './診断/probes.mjs';
+import { catalog, scan, probe, cancelProbes } from './診断/probes.mjs';
 import {getToolsStatus} from './診断/tools_status.mjs';
 import {createModelTrials} from './モデル試行/trials.mjs';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from './起動/desktop.mjs';
 import {createPublicModelCache} from './モデル情報/public_models.mjs';
-import {getKeyStatus,testKey,KEY_PROVIDERS,cancelKeyProbes} from './モデル情報/key_status.mjs';
+import {getKeyStatus,testKey,KEY_PROVIDERS,INTEGRATION_PROBES,cancelKeyProbes} from './モデル情報/key_status.mjs';
 import {verify as verifyUi} from './ui/verify.mjs';
 import {stopRevision,watchStop} from './起動/lifecycle.mjs';
 import {launchDetached} from './起動/launch.mjs';
 import {headlessMain,writeInstallReport,INSTALL_FILE} from './診断/headless.mjs';
+import {writeIntegrationInfo,INTEGRATION_FILE} from './モデル情報/integration_info.mjs';
 import {writeModelsInfo} from './モデル情報/models_info.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
@@ -57,8 +58,8 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, modelTrials=createModelTrials()}) {
-  let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false;
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials()}) {
+  let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']]]);
@@ -108,7 +109,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       }
       if (req.method === 'GET' && route === 'api/一覧') return reply(200,{項目:entries,結果:results,調査:coverage});
       // 設定の読み直しで、画面と同じくサーバー側のキーテスト結果も破棄する。
-      if (req.method === 'GET' && route === 'api/キー設定') {if(!modelWriting)modelResults={};return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});}
+      if (req.method === 'GET' && route === 'api/キー設定') {if(!modelWriting)modelResults={};if(!integrationWriting)integrationResults={};return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});}
       if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
       if (req.method === 'POST' && route === 'api/公開モデル/再取得') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
@@ -120,14 +121,18 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
         if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
         keyBusy=true;
-        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if((['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
+        // 外部連携（Hugging Face / Discord）の認証確認はモデル情報の保存対象にしない。
+        const integration=INTEGRATION_PROBES.includes(KEY_PROVIDERS.find(provider=>provider.id===id)?.probe);
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
         return;
       }
+      // 確認中に終わった項目だけを返す（画面の逐次表示用。引数・任意コマンドは受け付けない）。
+      if (req.method === 'GET' && route === 'api/診断/進捗') return reply(200,{実行中:busy,結果:busy?progress:[]});
       if (req.method === 'POST' && route === 'api/診断') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
         if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
         busy=true;
-        try { results=[];scanStarted=new Date();results=await scanFn(entries);scanFinished=new Date(); reply(200,{結果:results}); } finally { busy=false; }
+        try { results=[];progress=[];scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date(); reply(200,{結果:results}); } finally { busy=false;progress=[]; }
         return;
       }
       // モデル情報: このサーバーが直前に取得したキーテスト結果だけを、プロバイダ別ファイルへ保存する。
@@ -139,6 +144,17 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         try { const status=await keyStatusFn();const saved=await modelsWriteFn(status.項目,modelResults); reply(200,{保存先:saved.map(file=>'_AIDIY/aidiy_diag/'+file),件数:saved.length}); }
         catch { reply(500,{エラー:'モデル情報の書き込みに失敗しました。書き込めなかったファイルは以前の内容のままです。'}); }
         finally { modelWriting=false; }
+        return;
+      }
+      // 外部連携: このサーバーが直前に確認した認証結果だけを保存する（画面の値・キーは受け取らない）。
+      if (req.method === 'POST' && route === 'api/外部連携書込') {
+        if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
+        if (keyBusy || integrationWriting) return reply(409,{エラー:'確認または書込の実行中です。完了後に再試行してください。'});
+        if (!Object.keys(integrationResults).length) return reply(409,{エラー:'先に外部連携の状況確認を実行してください。'});
+        integrationWriting=true;
+        try { const status=await keyStatusFn();const report=await integrationWriteFn(status.項目,integrationResults); reply(200,{保存先:'_AIDIY/aidiy_diag/'+INTEGRATION_FILE,件数:report.件数,集計:report.集計}); }
+        catch { reply(500,{エラー:'書き込みに失敗しました。既存のファイルは変更していません。'}); }
+        finally { integrationWriting=false; }
         return;
       }
       // 画面からは値を受け取らず、このサーバーが直前に確認した結果だけを保存する。
@@ -205,14 +221,14 @@ export async function main(args=process.argv.slice(2)) {
   // 公開一覧だけを起動時に取得。キー設定や他 provider の API は自動で呼ばない。
   void publicCache.refresh();
   const url=publicUrl(server.address().port,options.prefix)+'#token='+token;
-  let stopWatching=()=>{}, desktop, closed=false, ready=false;
+  let stopWatching=()=>{}, desktop, closed=false, ready=false, existing=false;
   const onRelease=message=>{if(message?.type==='diag-launch-release' && ready)process.off('disconnect',close);};
   const close=()=>{
     if(closed)return;closed=true;
     stopWatching();cancelProbes();cancelKeyProbes();closeDesktop(desktop);server.close();server.closeAllConnections();
     process.off('SIGINT',close);process.off('SIGTERM',close);process.off('disconnect',close);process.off('message',onRelease);
     if(launcherChild && process.connected) {
-      if(!ready)process.send({type:'diag-launch-error',code:'DESKTOP'},()=>{if(process.connected)process.disconnect();});
+      if(!ready)process.send(existing?{type:'diag-launch-existing'}:{type:'diag-launch-error',code:'DESKTOP'},()=>{if(process.connected)process.disconnect();});
       else process.disconnect();
     }
   };
@@ -228,7 +244,9 @@ export async function main(args=process.argv.slice(2)) {
     if (!options.noOpen && process.env.CODESPACES !== 'true') openBrowser(url);
   } else {
     console.log('AiDiy 診断: Electron ウィンドウを開きます。Ctrl+C で終了。');
-    try {desktop=openDesktop(executable,url,close,undefined,undefined,notifyReady);} catch {close();throw startupError('DESKTOP');}
+    // 既に起動中なら、そのウィンドウを前面に出してこの起動は正常終了する。
+    const onExisting=()=>{existing=true;if(!launcherChild)console.log('AiDiy 診断は既に起動しています。既存のウィンドウを前面に表示しました。');close();};
+    try {desktop=openDesktop(executable,url,close,undefined,undefined,notifyReady,onExisting);} catch {close();throw startupError('DESKTOP');}
   }
   stopWatching=watchStop(initialStop,close);
   server.once('close',()=>stopWatching());

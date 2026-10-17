@@ -6,6 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSpace} from '../src/開発スペース/宇宙描画.js';
+import {cameraPosition} from '../src/開発スペース/ワープ視点.js';
 
 const flush=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
@@ -65,6 +66,40 @@ function space(t,{fetcher=async()=>reply(snapshot()),holdAnimations=false,hash='
     dispose(){engine.dispose();for(const [key,descriptor] of old)if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];},
   };
 }
+
+test('選択星の周回: 3分で1周し、距離・選択を保って手動と表示停止を優先する',async t=>{
+  const h=space(t);
+  const advance=async seconds=>{for(let n=0;n<seconds*4;n++)await h.pump(250);};
+  const offset=()=>{const eye=cameraPosition(h.engine.cam),star=h.engine.selected;return ['x','y','z'].map(key=>eye[key]-star[key]);};
+  const near=(a,b,message)=>assert.ok(Math.hypot(...a.map((v,i)=>v-b[i]))<1e-6,message);
+  try{
+    await h.engine.refresh(1);h.engine.setAutoSpin(false);
+    await h.finish(h.engine.goTo({type:'file',path:'root.js'}));await advance(3);
+    const initial=offset(),radius=Math.hypot(...initial),distance=h.engine.cam.dist;
+    h.engine.setAutoSpin(true);
+    await advance(90);near(offset(),initial.map(v=>-v),'90秒で星の反対側');
+    assert.ok(Math.abs(Math.hypot(...offset())-radius)<1e-6,'星との距離を維持');
+    await advance(90);near(offset(),initial,'3分で元の位置');
+    assert.equal(h.engine.selected.path,'root.js');assert.equal(h.engine.cam.dist,distance);
+    for(const mode of ['off','2d','hidden']){
+      if(mode==='off')h.engine.setAutoSpin(false);
+      if(mode==='2d')h.engine.setViewMode('2d');
+      if(mode==='hidden')h.visibility(true);
+      const held={...h.engine.cam};await advance(5);assert.deepEqual(h.engine.cam,held,mode+'中は停止');
+      h.engine.setAutoSpin(true);h.engine.setViewMode('3d');h.visibility(false);
+    }
+    h.canvas.dispatchEvent(event('pointerdown',{pointerId:1,clientX:300,clientY:300}));
+    const held={...h.engine.cam};await advance(5);assert.deepEqual(h.engine.cam,held,'押下中は周回しない');
+    h.canvas.dispatchEvent(event('pointermove',{pointerId:1,clientX:330,clientY:310}));
+    h.canvas.dispatchEvent(event('pointerup',{pointerId:1,clientX:330,clientY:310}));
+    await advance(5);const resumed=offset();await advance(1);
+    assert.ok(Math.hypot(...offset().map((v,i)=>v-resumed[i]))>0.01,'手動操作後に周回を再開');
+    await h.finish(h.engine.goTo({type:'file',path:'src/main.js'}));await advance(3);
+    const next=offset();await advance(180);near(offset(),next,'別の星への移動後は新しい星を中心に1周');
+    assert.equal(h.engine.selected.path,'src/main.js');
+    h.engine.clear();assert.equal(h.engine.selected,null);
+  }finally{h.dispose();}
+});
 
 test('既定3D: オープニングと軌道飛行は維持し、2D中だけ描画・軌道の進行を止める',async t=>{
   const h=space(t);
@@ -241,7 +276,8 @@ for(const action of ['selection','clear','filter','session','mode','dispose'])te
     assert.equal(await first,false);if(newer)await newer;
     assert.notEqual(h.engine.selected?.path,'new.js');if(action==='selection')assert.equal(h.engine.selected.path,'root.js');
     if(action==='filter'||action==='session'||action==='dispose')assert.equal(h.requests[1].signal.aborted,true);
-    assert.equal(h.timers.size,['clear','filter','session'].includes(action)?1:0,'猶予終了時の表示復帰だけが残る');assert.equal(h.animations.length,0);assert.equal(h.frames.size,action==='mode'?1:0);
+    const flashExpiry=Object.keys(h.engine.updateMarks.flashes).length?1:0;
+    assert.equal(h.timers.size,(['clear','filter','session'].includes(action)?1:0)+flashExpiry,'新規ファイルの発光期限と猶予終了の表示復帰だけが残る');assert.equal(h.animations.length,0);assert.equal(h.frames.size,action==='mode'?1:0);
   }finally{h.dispose();}
 });
 

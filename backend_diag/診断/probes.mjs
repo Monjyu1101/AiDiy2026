@@ -63,13 +63,16 @@ export async function resolveProgram(entry, options = {}) {
       const expanded = expandPath(value, env, undefined, platform); if (expanded) candidates.push(expanded);
     }
   }
-  for (const candidate of [...new Set(candidates)]) {
-    if (entry.id === 'python' && platform === 'win32' && /[\\/]Microsoft[\\/]WindowsApps[\\/]/i.test(candidate)) continue;
+  const usable = [...new Set(candidates)].filter(candidate =>
+    !(entry.id === 'python' && platform === 'win32' && /[\\/]Microsoft[\\/]WindowsApps[\\/]/i.test(candidate)) &&
     // Windows 標準 convert.exe はディスク変換ツールで ImageMagick ではない。
-    if (entry.id === 'convert' && platform === 'win32' && /[\\/](System32|SysWOW64)[\\/]convert(?:\.exe)?$/i.test(candidate)) continue;
-    try { await access(candidate, platform === 'win32' ? constants.F_OK : constants.X_OK); if ((await stat(candidate)).isFile()) return path.resolve(candidate); } catch {}
-  }
-  return null;
+    !(entry.id === 'convert' && platform === 'win32' && /[\\/](System32|SysWOW64)[\\/]convert(?:\.exe)?$/i.test(candidate)));
+  // 候補（PATH × コマンド × 拡張子で数百件）を並列に確認し、優先順で先頭の実在ファイルを採用する。
+  const found = await Promise.all(usable.map(async candidate => {
+    try { await access(candidate, platform === 'win32' ? constants.F_OK : constants.X_OK); return (await stat(candidate)).isFile(); } catch { return false; }
+  }));
+  const index = found.indexOf(true);
+  return index < 0 ? null : path.resolve(usable[index]);
 }
 
 function childEnvironment(directory) {

@@ -225,6 +225,8 @@
 .window-actions { gap: 2px; -webkit-app-region: no-drag; }
 .window-actions button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; color: var(--muted); font-size: 21px; background: transparent; }
 .window-actions button:hover { background: var(--hover-surface); }
+.window-actions .window-all { width: 36px; font-size: 11px; font-weight: 600; }
+.window-actions .window-all[aria-pressed=true] { color: #a7f6ff; background: #113039; }
 .window-actions button:last-child:hover { color: #fff; background: #cc415714; }
 .window-minimize { width: 10px; border-top: 1px solid currentColor; }
 .window-maximize { width: 10px; height: 10px; border: 1px solid currentColor; }

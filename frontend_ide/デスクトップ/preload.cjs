@@ -5,12 +5,23 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
+ nativeWindowMove:true,
+ onSpaceCenterMove:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('development:space-center-move',listener);return()=>ipcRenderer.removeListener('development:space-center-move',listener);},
+ openBrowser:(path,displayId)=>ipcRenderer.invoke('development:open-browser',path,displayId),
+ browserAction:(action,value)=>ipcRenderer.invoke('development:browser-action',action,value),
+ onBrowserChanged:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('development:browser-changed',listener);return()=>ipcRenderer.removeListener('development:browser-changed',listener);},
+ beginWindowMove:name=>ipcRenderer.invoke('development:window-move-begin',name),
+ moveWindow:(token,name)=>ipcRenderer.invoke('development:window-move',token,name),
+ endWindowMove:(token,name)=>ipcRenderer.invoke('development:window-move-end',token,name),
+ allDisplays:action=>ipcRenderer.invoke('development:all-displays',action),
+ onAllDisplaysChanged:callback=>{const listener=(_event,state)=>callback(state);ipcRenderer.on('development:all-displays-changed',listener);return()=>ipcRenderer.removeListener('development:all-displays-changed',listener);},
  beginCodeMove:()=>ipcRenderer.invoke('development:code-move-begin'),
  moveCode:token=>ipcRenderer.invoke('development:code-move',token),
  endCodeMove:token=>ipcRenderer.invoke('development:code-move-end',token),
- prepareExplorer:(rect,kind)=>ipcRenderer.invoke('development:prepare-explorer',rect,kind),
+ prepareExplorer:(rect,kind,previewRect)=>ipcRenderer.invoke('development:prepare-explorer',rect,kind,previewRect),
  resizeRoutes:(name,height)=>ipcRenderer.invoke('development:resize-routes',name,height),
  showExplorer:(name,reduced)=>ipcRenderer.invoke('development:show-explorer',name,reduced),
+ panelAction:(name,action)=>ipcRenderer.invoke('development:panel-action',name,action),
  onViewerClosed:callback=>{const listener=(_event,path)=>callback(path);ipcRenderer.on('development:viewer-closed',listener);return()=>ipcRenderer.removeListener('development:viewer-closed',listener);},
  title:()=>ipcRenderer.invoke('development:window','title'),
  copyFilePath:path=>ipcRenderer.invoke('development:copy-file-path',path),
@@ -31,4 +42,4 @@ contextBridge.exposeInMainWorld('aidiyWindow',{
   ipcRenderer.on('development:draft-handoff',listener);
   return()=>ipcRenderer.removeListener('development:draft-handoff',listener);
  },
- childWindows:()=>ipcRenderer.invoke('development:child-windows'),endSession:()=>ipcRenderer.invoke('development:end-session'),openApp:kind=>ipcRenderer.invoke('development:open-app',kind),openViewer:(path,rect)=>ipcRenderer.invoke('development:open-viewer',path,rect),maximize:()=>ipcRenderer.invoke('development:window','maximize'),isMaximized:()=>ipcRenderer.invoke('development:window','isMaximized'),minimize:()=>ipcRenderer.invoke('development:window','minimize'),close:()=>ipcRenderer.invoke('development:window','close')});
+ childWindows:()=>ipcRenderer.invoke('development:child-windows'),endSession:()=>ipcRenderer.invoke('development:end-session'),openApp:(kind,displayId)=>ipcRenderer.invoke('development:open-app',kind,displayId),openViewer:(path,rect)=>ipcRenderer.invoke('development:open-viewer',path,rect),maximize:()=>ipcRenderer.invoke('development:window','maximize'),isMaximized:()=>ipcRenderer.invoke('development:window','isMaximized'),minimize:()=>ipcRenderer.invoke('development:window','minimize'),close:()=>ipcRenderer.invoke('development:window','close')});

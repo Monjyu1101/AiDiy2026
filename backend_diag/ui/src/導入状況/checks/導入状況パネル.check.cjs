@@ -24,6 +24,6 @@ test('write button is enabled only after a completed check', async () => {
 
 test('エラーは共通通知欄へ表示する', () => {
   const controller = source('導入状況/導入状況状態.mjs');
-  assert.match(controller, /catch \(error\) \{ 結果.value = 前回; 通知.value = error.message;/);
+  assert.match(controller, /catch \(error\) \{ 待機中 = false; 結果.value = 前回; 通知.value = error.message;/);
   assert.match(source('App.vue'), /<p v-if="message" id="message" role="status"/);
 });

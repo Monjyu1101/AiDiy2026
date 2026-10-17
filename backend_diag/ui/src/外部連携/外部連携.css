@@ -1,5 +1,8 @@
 @import "../キー設定共通/キー設定.css";
 .integration-row{border-bottom:1px solid #304253;padding:12px 4px;display:flex;align-items:center;gap:12px}
 .integration-row.selected{background:#25403d}
-.integration-test{display:grid;grid-template-columns:1fr;align-items:center;justify-items:center;gap:6px;max-width:220px}
+.integration-test{display:grid;grid-template-columns:auto auto;align-items:center;justify-items:center;gap:6px;max-width:220px;margin-left:auto}
+.integration-test button{padding:5px 10px;font-size:12px}
+.integration-test>.badge{min-width:60px}
 .integration-reason{grid-column:1/-1;font-size:11px;color:#94afc5}
+.integration-panel .panel-actions{align-items:center}

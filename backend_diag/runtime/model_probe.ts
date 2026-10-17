@@ -28,8 +28,8 @@ export const KEY_PROVIDERS=Object.freeze([
  ['openai_oauth','OpenAI OAuth','~/.codex/auth.json','codex'],['grok','Grok（xAI）','~/.grok/auth.json','grok'],
  ['azure','Azure OpenAI','azure_key_id',null],['copilot','GitHub Copilot','copilot_key_id',null],
  ['openrt','OpenRouter','openrt_key_id','openrouter'],['ollama','Ollama（ローカル）','ollama list','ollama-local'],['local','ローカル（backend_local）','固定候補','local-fixed'],
- ['huggingface_read','Hugging Face 読取','huggingface_key_read',null],['huggingface_write','Hugging Face 書込','huggingface_key_write',null],
- ['discord','Discord Bot','DISCORD_BOT_TOKEN',null],
+ ['huggingface_read','Hugging Face 読取','huggingface_key_read','huggingface'],['huggingface_write','Hugging Face 書込','huggingface_key_write','huggingface'],
+ ['discord','Discord Bot','DISCORD_BOT_TOKEN','discord'],
 ].map(([id,名前,キー名,probe])=>Object.freeze({id:id!,名前:名前!,キー名:キー名!,probe,oauth:probe==='codex'||probe==='grok'?probe as OAuthKind:null})));
 // モデル名に紛れたキー値を伏せる対象（行の追加・変更とは独立）。
 const SECRET_CONFIG_KEYS=Object.freeze(['gemini_key_id','freeai_key_id','claude_key_id','openai_key_id','azure_key_id','copilot_key_id','openrt_key_id','ollama_key_id','huggingface_key_read','huggingface_key_write','DISCORD_BOT_TOKEN','openai_organization']);
@@ -95,6 +95,8 @@ export async function readCodexLocal(reader?:CodexLocalReader,env:NodeJS.Process
  try {cacheIds=codexSlugs(parseJson(await read('models_cache.json'),RESPONSE_LIMIT));}catch{}
  return {defaultModel,cacheIds};
 }
+// 外部連携（モデル一覧なし）。認証確認の GET だけを行い、送信・書込・Gateway 接続はしない。
+export const INTEGRATION_PROBES=Object.freeze(['huggingface','discord']);
 export function configured(value:unknown,id:string):value is string {return typeof value==='string'&&!!value.trim()&&!value.trim().startsWith('<')&&!(id==='ollama'&&value.trim().toLowerCase()==='ollama');}
 export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:OAuthReader}={}) {
  const [state,values]=await readConfig(reader);
@@ -106,12 +108,12 @@ export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:O
   if(p.oauth){const present=oauth[p.oauth];return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:present?'':`ログイン情報がありません。${OAUTH_CLI[p.oauth]} CLI でログインしてください。`,テスト可能:present,説明:'ログイン情報（OAuth）の有無のみ。接続は未確認です。'};}
   const present=state==='読込不可'?null:configured(values[p.キー名],p.id);
   const reason=state==='読込不可'?'設定を読み取れません。':!present?'キーが未設定です。':!p.probe?'この項目の接続テストは未対応です。':'';
-  return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:reason,テスト可能:state!=='読込不可'&&!!p.probe&&!!present,説明:p.id==='openrt'?'設定キーを確認し、公開モデル一覧キャッシュから候補を表示します。':'設定有無のみ。接続は未確認です。'};
+  return {id:p.id,名前:p.名前,キー名:p.キー名,設定済み:present,キー不要:false,状態:'未実施',理由:reason,テスト可能:state!=='読込不可'&&!!p.probe&&!!present,説明:p.id==='openrt'?'設定キーを確認し、公開モデル一覧キャッシュから候補を表示します。':INTEGRATION_PROBES.includes(p.probe as string)?'設定有無のみ。接続はテストで確認します（読み取り専用の認証確認）。':'設定有無のみ。接続は未確認です。'};
  }),モデル:[]};
 }
 // ローカル Ollama は ollama list と同じ API を loopback 固定で読む（プロセスは起動しない）。
 const LOCAL_ENDPOINTS:Record<string,readonly [string,number,string]>={'ollama-local':['127.0.0.1',11434,'/api/tags']};
-const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],'openrouter-key':['openrouter.ai','/api/v1/key'],ollama:['ollama.com','/v1/models']};
+const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],'openrouter-key':['openrouter.ai','/api/v1/key'],ollama:['ollama.com','/v1/models'],huggingface:['huggingface.co','/api/whoami-v2'],discord:['discord.com','/api/v10/users/@me']};
 export type Fetch=(provider:string,headers:Record<string,string>,pageToken?:unknown,signal?:AbortSignal)=>Promise<Dictionary>;
 export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promise((resolve,reject)=>{
  const local=LOCAL_ENDPOINTS[provider],endpoint=local?[local[0],local[2]] as const:ENDPOINTS[provider];if(!endpoint)return reject(new Error('provider'));
@@ -225,6 +227,7 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
  const [state,values]=await readConfig(reader);if(state==='読込不可')return {...output,説明:'設定を読み取れません。'};
  const keyValue=values[selected.キー名];if(!configured(keyValue,id))return {...output,説明:'キーが未設定です。'};
  const key=keyValue.trim(),provider=selected.probe,timestamp=new Date().toISOString();
+ if(INTEGRATION_PROBES.includes(provider))return integrationProbe(id,provider,key,{...output,確認日時:timestamp},secretValues(values),fetch,signal);
  // 公開 /models はキー認証の証拠にならない。生成せず専用 GET /key で確認する。
  if(id==='openrt'){
   try {
@@ -257,4 +260,35 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
   const details=safeDetails(models,secrets),liveCandidates=[...new Set(live)].filter(id=>/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)&&!secrets.some(secret=>id.includes(secret))).slice(0,200);
   return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,ライブ候補:liveCandidates,ライブ候補作成日:Object.fromEntries(liveCandidates.map(id=>[id,liveDate(id)])),確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
  }catch(error){return {...output,状態:'NG',説明:'モデル一覧APIの通信または診断用モデル処理に失敗しました。'+connectionFailureDescription(error),確認日時:timestamp,警告:warnings};}
+}
+// 表示名は固定の文字種・長さだけを通し、キー値を含むものは出さない（メール・組織・トークン名は返さない）。
+function safeName(value:unknown,secrets:string[]):string {
+ return typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9._\-]{0,63}$/.test(value)&&!secrets.some(secret=>value.includes(secret))?value:'';
+}
+async function integrationProbe(id:string,provider:string,key:string,output:Dictionary,secrets:string[],fetch:Fetch,signal?:AbortSignal) {
+ const name=provider==='discord'?'Discord':'Hugging Face';
+ try {
+  if(provider==='discord'){
+   // Discord API の User-Agent 規約に合わせる。Bot トークン以外（ユーザートークン）は NG。
+   const body=await fetch('discord',{Authorization:'Bot '+key,'User-Agent':'DiscordBot (aidiy-diag, 0.1.0)'},undefined,signal);
+   if(body.bot!==true)return {...output,状態:'NG',説明:'Bot トークンとして認証できませんでした。Discord Developer Portal の Bot トークンを設定してください。'};
+   const bot=safeName(body.username,secrets);
+   return {...output,状態:'OK',説明:`Bot トークンで認証できました${bot?`（Bot: ${bot}）`:''}。メッセージ送信・Gateway 接続・チャンネル権限は未確認です。`};
+  }
+  const body=await fetch('huggingface',{Authorization:'Bearer '+key,'User-Agent':'aidiy-diag'},undefined,signal);
+  const user=safeName(body.name,secrets),token=record(body.auth)&&record(body.auth.accessToken)?body.auth.accessToken:{};
+  const role=typeof token.role==='string'&&['read','write','fineGrained'].includes(token.role)?token.role:'';
+  const label=`（${user?`ユーザー: ${user}、`:''}権限: ${role||'不明'}）`;
+  if(id==='huggingface_write'){
+   if(role==='write')return {...output,状態:'OK',説明:`書込権限のあるトークンで認証できました${label}。リポジトリへの実際の書込は未確認です。`};
+   if(role==='fineGrained'){
+    const permissions=record(token.fineGrained)?[...(Array.isArray(token.fineGrained.global)?token.fineGrained.global:[]),...(Array.isArray(token.fineGrained.scoped)?token.fineGrained.scoped.flatMap(item=>record(item)&&Array.isArray(item.permissions)?item.permissions:[]):[])]:[];
+    return permissions.some(item=>typeof item==='string'&&item.endsWith('.write'))
+     ?{...output,状態:'PASS',説明:`細粒度トークンで認証できました${label}。一部に書込権限がありますが、対象リポジトリの範囲は未確認です。`}
+     :{...output,状態:'NG',説明:`認証はできましたが、書込権限がありません${label}。書込用には write 権限のトークンを設定してください。`};
+   }
+   return {...output,状態:'NG',説明:`認証はできましたが、書込権限がありません${label}。書込用には write 権限のトークンを設定してください。`};
+  }
+  return {...output,状態:'OK',説明:`トークンで認証できました${label}。個別リポジトリ・ゲート付きモデルへのアクセスは未確認です。`};
+ }catch(error){return {...output,状態:'NG',説明:`${name} の認証を確認できませんでした。`+connectionFailureDescription(error)};}
 }

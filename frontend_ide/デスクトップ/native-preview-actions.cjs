@@ -100,4 +100,4 @@ function createNativePreviewActions({records,trustedEvent,readState,sessionKey,c
  }
  return{copyFilePath:(event,path)=>perform(event,path,'copy'),openFile:(event,path)=>perform(event,path,'open'),invalidate};
 }
-module.exports={createNativePreviewActions,validPreviewPath};
+module.exports={createNativePreviewActions,validPreviewPath,previewFile};

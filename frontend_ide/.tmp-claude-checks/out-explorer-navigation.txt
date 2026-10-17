@@ -1,0 +1,84 @@
+✖ 最新通知: 自動追跡と独立して一覧更新を要求し、フィルターOFFでも新規ファイルを手動選択できる (630.0662ms)
+✖ 最新取得: 重複取得しない。フィルター・セッション変更と破棄の後に古い応答を反映しない (187.6572ms)
+✖ grep: 行・列・検索時の条件を選択へ渡し、ツリーマークを保持する (143.7358ms)
+✖ grep: 再検索・解除・フィルター変更・セッション変更・終了で遅い結果を破棄する (141.3445ms)
+✖ 走査上限は一覧・最新・grepに未表示の候補があることを明示する (97.0669ms)
+✔ 手動Latest: 自動探索OFFでも新規パスを再走査して開く。最新mtimeとgrep再クリック位置も反映する (169.2925ms)
+✔ 手動Latest: 再走査中の新しい選択・閉じる・フィルター変更・セッション変更・破棄を優先する (171.621ms)
+✔ grep: フィルター外の一致も現在の視点を維持して開き、後続の一覧更新で閉じない (17.0249ms)
+✔ 手動Latest: 古い進行中の走査へ合流しても、未発見なら新しい走査で新規ファイルを開く (37.2966ms)
+✔ 手動Latest: 連打は最後のファイルだけ開き、遅いバックグラウンド更新で選択を奪わない (37.2471ms)
+✔ 手動Latest: 新しい深いフォルダを再走査して通常・高速ワープの両方から開く (268.2568ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 6
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2646.4241
+
+✖ failing tests:
+
+test at explorer-navigation.test.mjs:43:1
+✖ 最新通知: 自動追跡と独立して一覧更新を要求し、フィルターOFFでも新規ファイルを手動選択できる (630.0662ms)
+  ReferenceError: window is not defined
+      at syncRouteDocument (evalmachine.<anonymous>:207:70)
+      at explorer (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:39:33)
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:45:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.start (node:internal/test_runner/test:1191:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+
+test at explorer-navigation.test.mjs:58:1
+✖ 最新取得: 重複取得しない。フィルター・セッション変更と破棄の後に古い応答を反映しない (187.6572ms)
+  ReferenceError: window is not defined
+      at syncRouteDocument (evalmachine.<anonymous>:207:70)
+      at explorer (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:39:33)
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:59:29)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+
+test at explorer-navigation.test.mjs:71:1
+✖ grep: 行・列・検索時の条件を選択へ渡し、ツリーマークを保持する (143.7358ms)
+  ReferenceError: window is not defined
+      at syncRouteDocument (evalmachine.<anonymous>:207:70)
+      at explorer (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:39:33)
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:73:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)
+
+test at explorer-navigation.test.mjs:84:1
+✖ grep: 再検索・解除・フィルター変更・セッション変更・終了で遅い結果を破棄する (141.3445ms)
+  ReferenceError: window is not defined
+      at syncRouteDocument (evalmachine.<anonymous>:207:70)
+      at explorer (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:39:33)
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:85:29)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)
+
+test at explorer-navigation.test.mjs:98:1
+✖ 走査上限は一覧・最新・grepに未表示の候補があることを明示する (97.0669ms)
+  ReferenceError: window is not defined
+      at syncRouteDocument (evalmachine.<anonymous>:207:70)
+      at explorer (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:39:33)
+      at TestContext.<anonymous> (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/.tmp-claude-checks/explorer-navigation.test.mjs:101:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)

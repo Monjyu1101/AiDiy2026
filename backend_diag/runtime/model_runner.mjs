@@ -1,4 +1,4 @@
-// backend_diag/runtime/model_probe.ts
+// ../runtime/model_probe.ts
 import { open, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -7,7 +7,7 @@ import path from "node:path";
 import https2 from "node:https";
 import http2 from "node:http";
 
-// backend_diag/runtime/environment_proxy.ts
+// ../runtime/environment_proxy.ts
 import http from "node:http";
 import https from "node:https";
 import tls from "node:tls";
@@ -113,7 +113,7 @@ function networkFailure(error) {
   return "network";
 }
 
-// backend_diag/runtime/model_catalog.ts
+// ../runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {
@@ -335,7 +335,7 @@ function ollamaLocalCatalog(body) {
   return out;
 }
 
-// backend_diag/runtime/model_probe.ts
+// ../runtime/model_probe.ts
 var CONFIG_LIMIT = 128 * 1024;
 var RESPONSE_LIMIT = 1024 * 1024;
 var PUBLIC_RESPONSE_LIMIT = 16 * 1024 * 1024;
@@ -362,9 +362,9 @@ var KEY_PROVIDERS = Object.freeze([
   ["openrt", "OpenRouter", "openrt_key_id", "openrouter"],
   ["ollama", "Ollama\uFF08\u30ED\u30FC\u30AB\u30EB\uFF09", "ollama list", "ollama-local"],
   ["local", "\u30ED\u30FC\u30AB\u30EB\uFF08backend_local\uFF09", "\u56FA\u5B9A\u5019\u88DC", "local-fixed"],
-  ["huggingface_read", "Hugging Face \u8AAD\u53D6", "huggingface_key_read", null],
-  ["huggingface_write", "Hugging Face \u66F8\u8FBC", "huggingface_key_write", null],
-  ["discord", "Discord Bot", "DISCORD_BOT_TOKEN", null]
+  ["huggingface_read", "Hugging Face \u8AAD\u53D6", "huggingface_key_read", "huggingface"],
+  ["huggingface_write", "Hugging Face \u66F8\u8FBC", "huggingface_key_write", "huggingface"],
+  ["discord", "Discord Bot", "DISCORD_BOT_TOKEN", "discord"]
 ].map(([id, \u540D\u524D, \u30AD\u30FC\u540D, probe2]) => Object.freeze({ id, \u540D\u524D, \u30AD\u30FC\u540D, probe: probe2, oauth: probe2 === "codex" || probe2 === "grok" ? probe2 : null })));
 var SECRET_CONFIG_KEYS = Object.freeze(["gemini_key_id", "freeai_key_id", "claude_key_id", "openai_key_id", "azure_key_id", "copilot_key_id", "openrt_key_id", "ollama_key_id", "huggingface_key_read", "huggingface_key_write", "DISCORD_BOT_TOKEN", "openai_organization"]);
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -448,6 +448,7 @@ async function readCodexLocal(reader, env = process.env, home = os.homedir()) {
   }
   return { defaultModel, cacheIds };
 }
+var INTEGRATION_PROBES = Object.freeze(["huggingface", "discord"]);
 function configured(value, id) {
   return typeof value === "string" && !!value.trim() && !value.trim().startsWith("<") && !(id === "ollama" && value.trim().toLowerCase() === "ollama");
 }
@@ -463,11 +464,11 @@ async function status({ reader, oauthReader } = {}) {
     }
     const present = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? null : configured(values[p.\u30AD\u30FC\u540D], p.id);
     const reason = state === "\u8AAD\u8FBC\u4E0D\u53EF" ? "\u8A2D\u5B9A\u3092\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3002" : !present ? "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" : !p.probe ? "\u3053\u306E\u9805\u76EE\u306E\u63A5\u7D9A\u30C6\u30B9\u30C8\u306F\u672A\u5BFE\u5FDC\u3067\u3059\u3002" : "";
-    return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present, \u30AD\u30FC\u4E0D\u8981: false, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: reason, \u30C6\u30B9\u30C8\u53EF\u80FD: state !== "\u8AAD\u8FBC\u4E0D\u53EF" && !!p.probe && !!present, \u8AAC\u660E: p.id === "openrt" ? "\u8A2D\u5B9A\u30AD\u30FC\u3092\u78BA\u8A8D\u3057\u3001\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u304B\u3089\u5019\u88DC\u3092\u8868\u793A\u3057\u307E\u3059\u3002" : "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
+    return { id: p.id, \u540D\u524D: p.\u540D\u524D, \u30AD\u30FC\u540D: p.\u30AD\u30FC\u540D, \u8A2D\u5B9A\u6E08\u307F: present, \u30AD\u30FC\u4E0D\u8981: false, \u72B6\u614B: "\u672A\u5B9F\u65BD", \u7406\u7531: reason, \u30C6\u30B9\u30C8\u53EF\u80FD: state !== "\u8AAD\u8FBC\u4E0D\u53EF" && !!p.probe && !!present, \u8AAC\u660E: p.id === "openrt" ? "\u8A2D\u5B9A\u30AD\u30FC\u3092\u78BA\u8A8D\u3057\u3001\u516C\u958B\u30E2\u30C7\u30EB\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u304B\u3089\u5019\u88DC\u3092\u8868\u793A\u3057\u307E\u3059\u3002" : INTEGRATION_PROBES.includes(p.probe) ? "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u30C6\u30B9\u30C8\u3067\u78BA\u8A8D\u3057\u307E\u3059\uFF08\u8AAD\u307F\u53D6\u308A\u5C02\u7528\u306E\u8A8D\u8A3C\u78BA\u8A8D\uFF09\u3002" : "\u8A2D\u5B9A\u6709\u7121\u306E\u307F\u3002\u63A5\u7D9A\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
   }), \u30E2\u30C7\u30EB: [] };
 }
 var LOCAL_ENDPOINTS = { "ollama-local": ["127.0.0.1", 11434, "/api/tags"] };
-var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], "openrouter-key": ["openrouter.ai", "/api/v1/key"], ollama: ["ollama.com", "/v1/models"] };
+var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], "openrouter-key": ["openrouter.ai", "/api/v1/key"], ollama: ["ollama.com", "/v1/models"], huggingface: ["huggingface.co", "/api/whoami-v2"], discord: ["discord.com", "/api/v10/users/@me"] };
 var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resolve, reject) => {
   const local = LOCAL_ENDPOINTS[provider], endpoint = local ? [local[0], local[2]] : ENDPOINTS[provider];
   if (!endpoint) return reject(new Error("provider"));
@@ -617,6 +618,7 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
   const keyValue = values[selected.\u30AD\u30FC\u540D];
   if (!configured(keyValue, id)) return { ...output, \u8AAC\u660E: "\u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002" };
   const key = keyValue.trim(), provider = selected.probe, timestamp = (/* @__PURE__ */ new Date()).toISOString();
+  if (INTEGRATION_PROBES.includes(provider)) return integrationProbe(id, provider, key, { ...output, \u78BA\u8A8D\u65E5\u6642: timestamp }, secretValues(values), fetch, signal);
   if (id === "openrt") {
     try {
       const body = await fetch("openrouter-key", { Authorization: "Bearer " + key }, void 0, signal);
@@ -674,8 +676,37 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
     return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u306E\u901A\u4FE1\u307E\u305F\u306F\u8A3A\u65AD\u7528\u30E2\u30C7\u30EB\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002" + connectionFailureDescription(error), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings };
   }
 }
+function safeName(value, secrets) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._\-]{0,63}$/.test(value) && !secrets.some((secret) => value.includes(secret)) ? value : "";
+}
+async function integrationProbe(id, provider, key, output, secrets, fetch, signal) {
+  const name = provider === "discord" ? "Discord" : "Hugging Face";
+  try {
+    if (provider === "discord") {
+      const body2 = await fetch("discord", { Authorization: "Bot " + key, "User-Agent": "DiscordBot (aidiy-diag, 0.1.0)" }, void 0, signal);
+      if (body2.bot !== true) return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "Bot \u30C8\u30FC\u30AF\u30F3\u3068\u3057\u3066\u8A8D\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002Discord Developer Portal \u306E Bot \u30C8\u30FC\u30AF\u30F3\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002" };
+      const bot = safeName(body2.username, secrets);
+      return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: `Bot \u30C8\u30FC\u30AF\u30F3\u3067\u8A8D\u8A3C\u3067\u304D\u307E\u3057\u305F${bot ? `\uFF08Bot: ${bot}\uFF09` : ""}\u3002\u30E1\u30C3\u30BB\u30FC\u30B8\u9001\u4FE1\u30FBGateway \u63A5\u7D9A\u30FB\u30C1\u30E3\u30F3\u30CD\u30EB\u6A29\u9650\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002` };
+    }
+    const body = await fetch("huggingface", { Authorization: "Bearer " + key, "User-Agent": "aidiy-diag" }, void 0, signal);
+    const user = safeName(body.name, secrets), token = record(body.auth) && record(body.auth.accessToken) ? body.auth.accessToken : {};
+    const role = typeof token.role === "string" && ["read", "write", "fineGrained"].includes(token.role) ? token.role : "";
+    const label = `\uFF08${user ? `\u30E6\u30FC\u30B6\u30FC: ${user}\u3001` : ""}\u6A29\u9650: ${role || "\u4E0D\u660E"}\uFF09`;
+    if (id === "huggingface_write") {
+      if (role === "write") return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: `\u66F8\u8FBC\u6A29\u9650\u306E\u3042\u308B\u30C8\u30FC\u30AF\u30F3\u3067\u8A8D\u8A3C\u3067\u304D\u307E\u3057\u305F${label}\u3002\u30EA\u30DD\u30B8\u30C8\u30EA\u3078\u306E\u5B9F\u969B\u306E\u66F8\u8FBC\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002` };
+      if (role === "fineGrained") {
+        const permissions = record(token.fineGrained) ? [...Array.isArray(token.fineGrained.global) ? token.fineGrained.global : [], ...Array.isArray(token.fineGrained.scoped) ? token.fineGrained.scoped.flatMap((item) => record(item) && Array.isArray(item.permissions) ? item.permissions : []) : []] : [];
+        return permissions.some((item) => typeof item === "string" && item.endsWith(".write")) ? { ...output, \u72B6\u614B: "PASS", \u8AAC\u660E: `\u7D30\u7C92\u5EA6\u30C8\u30FC\u30AF\u30F3\u3067\u8A8D\u8A3C\u3067\u304D\u307E\u3057\u305F${label}\u3002\u4E00\u90E8\u306B\u66F8\u8FBC\u6A29\u9650\u304C\u3042\u308A\u307E\u3059\u304C\u3001\u5BFE\u8C61\u30EA\u30DD\u30B8\u30C8\u30EA\u306E\u7BC4\u56F2\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002` } : { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: `\u8A8D\u8A3C\u306F\u3067\u304D\u307E\u3057\u305F\u304C\u3001\u66F8\u8FBC\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093${label}\u3002\u66F8\u8FBC\u7528\u306B\u306F write \u6A29\u9650\u306E\u30C8\u30FC\u30AF\u30F3\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002` };
+      }
+      return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: `\u8A8D\u8A3C\u306F\u3067\u304D\u307E\u3057\u305F\u304C\u3001\u66F8\u8FBC\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093${label}\u3002\u66F8\u8FBC\u7528\u306B\u306F write \u6A29\u9650\u306E\u30C8\u30FC\u30AF\u30F3\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002` };
+    }
+    return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: `\u30C8\u30FC\u30AF\u30F3\u3067\u8A8D\u8A3C\u3067\u304D\u307E\u3057\u305F${label}\u3002\u500B\u5225\u30EA\u30DD\u30B8\u30C8\u30EA\u30FB\u30B2\u30FC\u30C8\u4ED8\u304D\u30E2\u30C7\u30EB\u3078\u306E\u30A2\u30AF\u30BB\u30B9\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002` };
+  } catch (error) {
+    return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: `${name} \u306E\u8A8D\u8A3C\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002` + connectionFailureDescription(error) };
+  }
+}
 
-// backend_diag/runtime/model_runner.ts
+// ../runtime/model_runner.ts
 function createModelRunner() {
   const active = /* @__PURE__ */ new Set();
   let stopping = false;

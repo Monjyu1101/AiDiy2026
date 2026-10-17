@@ -13,6 +13,10 @@ function windowBounds(kind,area,owner,slot=0){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
+ if(kind==='browser'){
+  const width=Math.min(1100,Math.round(available.width*.8)),height=Math.min(820,Math.round(available.height*.85)),offset=(slot%6)*24;
+  return{x:Math.round(Math.min(available.x+(available.width-width)/2+offset,available.x+available.width-width)),y:Math.round(Math.min(available.y+(available.height-height)/2+offset,available.y+available.height-height)),width,height};
+ }
  if(kind==='term'){
   const width=Math.min(Math.round(area.width*2/3),available.width),height=Math.min(Math.round(area.height/(area.width>area.height?3:4)),available.height);
   const originX=area.x+(area.width-width)/2,originY=available.y+available.height-height;
@@ -35,4 +39,10 @@ function windowBounds(kind,area,owner,slot=0){
  const y=available.y+offset;
  return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
 }
-module.exports={windowBounds,windowMinimumSize};
+// ALLの選択画面ではTermを下部、Codeを右上、Liveを左上へ置く。
+function allWindowBounds(kind,area,slot=0){
+ const bounds=windowBounds(kind,area,area,slot);
+ if(kind==='code'||kind==='live')bounds.x=area.x+area.width-(bounds.x-area.x)-bounds.width;
+ return bounds;
+}
+module.exports={windowBounds,windowMinimumSize,allWindowBounds};

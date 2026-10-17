@@ -9,6 +9,8 @@ import { loadMonaco, monacoLanguage } from '../ファイル閲覧/コード表�
 import { searchReference, fileDraftReference } from '../ファイル閲覧/ファイル参照.js';
 import { copyBrowserText, fullFilePath } from '../ファイル閲覧/ファイル操作.js';
 import {createViewerActivity} from '../ファイル閲覧/閲覧待機.js';
+import {openBrowser} from '../ブラウザ/起動.js';
+const browserAvailable=inject('browserAvailable',false);
 // pinned: 右側のプレビューではなく、ピン留めした独立ウィンドウの中身として全面に表示する
 const props=defineProps({file:Object,root:String,pinned:Boolean,pinBusy:Boolean});const emit=defineEmits(['close','pin','activity']);
 const openAnalysis=inject('openFileAnalysis',null),openDraft=inject('openFileDraft',null);
@@ -105,6 +107,13 @@ async function openFile(){
   catch(e){if(run===actionRevision)actionError.value=e.message||'関連付けられたアプリで開けませんでした。';}
   finally{if(run===actionRevision)actionBusy.value='';}
 }
+async function browse(){
+  if(actionBusy.value||previewKind.value!=='html')return;
+  const run=++actionRevision;actionBusy.value='browser';actionError.value='';
+  try{const result=await openBrowser(props.file.path);if(!result?.ok)throw Error(result?.error||'ブラウザを開けませんでした。');}
+  catch(e){if(run===actionRevision)actionError.value=e.message;}
+  finally{if(run===actionRevision)actionBusy.value='';}
+}
 function selectedReference(){
   if(mode.value==='view'||data.value?.kind!=='text')return null;
   const selection=editor?.getSelection();
@@ -128,6 +137,7 @@ defineExpose({moved:bindActivityWindow});
 <template>
   <aside ref="viewer" :class="pinned?'viewer-pinned':'viewer-popup'" data-component="FileViewer" @pointerdown.capture="activity" @pointermove.capture="pointerActivity" @click.capture="activity" @keydown.capture="activity" @wheel.capture.passive="activity" @touchstart.capture.passive="activity" @touchmove.capture.passive="activity" @scroll.capture.passive="activity" @change.capture="activity" @load.capture="bindFrame"><header><span :title="file.path">{{ file.name }}</span>
       <span v-if="previewKind" class="viewer-mode" role="group" aria-label="表示の切り替え"><button :aria-pressed="mode==='code'" @click="setMode('code')">コード</button><button :aria-pressed="mode==='view'" @click="setMode('view')">{{ previewKind==='markdown'?'プレビュー':'表示' }}</button></span>
+      <button v-if="previewKind==='html'" class="viewer-browser" :disabled="!!actionBusy||!browserAvailable" :title="browserAvailable?'ブラウザで開く':'tools接続中のみ起動できます'" @click="browse">{{ actionBusy==='browser'?'起動中…':'ブラウザ' }}</button>
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>

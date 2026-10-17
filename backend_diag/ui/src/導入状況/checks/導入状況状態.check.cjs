@@ -27,6 +27,25 @@ test('未接続・重複クリックを抑止し、全項目を確認中にし�
   assert.equal(state.確認中.value, false); assert.equal(state.確認済み.value, true);
   assert.deepEqual(state.結果.value.map(r => r.状態), ['OK', 'OK', 'OK']);
 });
+test('応答を待つ間も、確認が終わった項目から結果を表示する', async () => {
+  const { 導入状況状態を作成 } = await import('../導入状況状態.mjs');
+  let finish; const calls = [];
+  const api = (url, method) => {
+    calls.push(url);
+    if (url === 'api/診断/進捗') return Promise.resolve({ 実行中: true, 結果: [{ id: 'claude', 状態: 'OK' }] });
+    assert.equal(method, 'POST'); return new Promise(resolve => { finish = resolve; });
+  };
+  const state = 導入状況状態を作成({ api, 接続済み: ref(true), 通知: ref(''), 間隔: 0, 進捗間隔: 5 });
+  state.一覧を反映(一覧);
+  const pending = state.状況確認();
+  for (let i = 0; i < 100 && state.結果.value.find(r => r.id === 'claude').状態 !== 'OK'; i++) await new Promise(r => setTimeout(r, 5));
+  assert.deepEqual(state.結果.value.map(r => r.状態), ['確認中', 'OK', '確認中']); assert.equal(state.確認中.value, true);
+  finish({ 結果: 一覧.項目.map(e => ({ id: e.id, 状態: 'NG' })) });
+  assert.equal(await pending, true);
+  const polled = calls.length; await new Promise(r => setTimeout(r, 30));
+  assert.equal(calls.length, polled, '完了後は進捗を問い合わせない');
+  assert.deepEqual(state.結果.value.map(r => r.状態), ['NG', 'NG', 'NG']);
+});
 test('結果は画面の上から順（ベース→CLI群→その他拡張）に反映する', async () => {
   const seen = [];
   const state = await 状態を作成(async () => ({ 結果: 一覧.項目.map(e => ({ id: e.id, 状態: 'OK' })) }));
@@ -81,4 +100,14 @@ test('演出中は表示中の項目へ選択（右側の詳細）を順に切�
   assert.equal(view.折り畳み.value.has('その他拡張'), true);
   props.表示中 = 'claude'; await Promise.resolve(); assert.equal(view.選択ID.value, 'claude');
   props.表示中 = 'ffmpeg'; await Promise.resolve(); assert.equal(view.選択ID.value, 'ffmpeg'); assert.equal(view.折り畳み.value.has('その他拡張'), false);
+});
+
+test('状況確認の完了後は一覧の1項目目（分類順の先頭）を表示し、その分類を開く', async () => {
+  const { 導入状況表示を作成 } = await import('../導入状況表示.mjs');
+  const props = reactive({ 項目: 一覧.項目, 結果: [], 表示中: null, 確認中: false });
+  const view = 導入状況表示を作成(props);
+  view.選択ID.value = 'node'; props.確認中 = false; await Promise.resolve(); assert.equal(view.選択ID.value, 'node');
+  props.確認中 = true; props.表示中 = 'ffmpeg'; await Promise.resolve(); assert.equal(view.選択ID.value, 'ffmpeg');
+  view.折り畳み.value = new Set(['ベース']);
+  props.確認中 = false; await Promise.resolve(); assert.equal(view.選択ID.value, 'node', '一覧順ではなく画面の分類順（ベース）の先頭'); assert.equal(view.折り畳み.value.has('ベース'), false);
 });

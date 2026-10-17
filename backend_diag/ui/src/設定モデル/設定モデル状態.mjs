@@ -50,7 +50,8 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
   }catch(error){
    if(現在===世代){通知.value=error.message||'通信に失敗しました。設定を再読込してください。';結果.value=Object.fromEntries(Object.entries(結果.value).map(([id,value])=>[id,value.状態==='実行中'?{id,状態:'ERR',説明:通知.value}:value]));}
   }finally{
-   if(現在===世代){実行中.value=false;制御=undefined;実行ID='';await サーバー中止(id);}
+   // 全行の動作確認が終わったら、1項目目（先頭行）を表示する（個別テスト・中止では選択を維持）。
+   if(現在===世代){if(rowId===undefined&&設定.value?.項目?.length)選択.value=設定.value.項目[0].id;実行中.value=false;制御=undefined;実行ID='';await サーバー中止(id);}
   }
  }
  function 切断(){中止('Tools または診断への接続が切れたため、試行を中止しました。');設定.value=null;結果.value={};選択.value='';}

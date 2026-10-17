@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-const {app,BrowserWindow,ipcMain,shell,clipboard,session,screen,dialog}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,shell,clipboard,session,screen,dialog}=require('electron');
 const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
@@ -20,7 +20,7 @@ if(kind==='term'){
  app.setPath('userData',temporaryProfile);
  app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
 }
-const {windowBounds,windowMinimumSize}=require('./デスクトップ/window-layout.cjs');
+const {windowBounds,windowMinimumSize,allWindowBounds}=require('./デスクトップ/window-layout.cjs');
 const {reserveTermSlot}=require('./デスクトップ/term-window-slot.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
 // IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
@@ -36,9 +36,42 @@ const {createNativePreviewActions}=require('./デスクトップ/native-preview-
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false;
 const {panelBounds,createPanelWindows}=require('./デスクトップ/panel-windows.cjs');
-const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting});
+const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting,isAllDisplays:record=>allDisplays.state(record).active,attachWindowMove});
 const {createCodeDrag}=require('./デスクトップ/code-drag.cjs');
-const codeDrag=createCodeDrag({trustedEvent,screen});
+const codeDrag=createCodeDrag({trustedEvent,screen,resolvePanel:panelWindows.dragTarget,isCenterMove:record=>allDisplays.isActive(record)});
+const {installNativeWindowMove}=require('./デスクトップ/長押し窓移動.cjs');
+function attachWindowMove(record,contents){
+ const stopMove=installNativeWindowMove({record,contents,drag:codeDrag,screen});
+ const stopExit=allDisplays.attachExitKey(record,contents);
+ return()=>{stopExit();stopMove();};
+}
+const {createAllDisplays}=require('./デスクトップ/全画面横断.cjs');
+const {keepInFront}=require('./デスクトップ/前面維持.cjs');
+const {createVRPanelPlacement}=require('./デスクトップ/VRパネル配置.cjs');
+const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
+const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{for(const child of windows.values())if(child.owner===owner)keepInFront(child.window);}});
+const {createBrowserViews,browserFileTarget,HOME}=require('./デスクトップ/ブラウザ.cjs');
+const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
+let browserViews;
+const browserBridges=new WeakMap();
+const browserConnected=state=>state.active&&state.mode==='online'&&state.connected===true;
+async function ensureBrowserBridge(owner){
+ if(browserBridges.has(owner))return browserBridges.get(owner);
+ const pending=(async()=>{
+  const {createBrowserCDP}=require('./デスクトップ/ブラウザCDP.cjs');
+  const bridge=await createBrowserCDP({directory:process.env.AIDIY_BROWSER_SESSIONS_DIR||join(__dirname,'../backend_tools/temp/_ide_browser_sessions'),
+   canUse:async()=>!quitting&&!owner.window.isDestroyed()&&browserConnected(await readState(owner)),
+   allowedURL:url=>browserViews.allowedURL(url),
+   openPanel:async target=>{
+    const state=await readState(owner);if(!browserConnected(state)||owner.window.isDestroyed())throw Error('tools接続中のみ起動できます。');
+    const window=await createWindow('browser',owner.url+'#browser',undefined,owner,sessionKey(state),undefined,undefined,target);return windows.get(window.webContents);
+   }});
+  if(owner.window.isDestroyed()){bridge.close();throw Error('IDEの利用が終了しました。');}
+  owner.window.once('closed',()=>bridge.close());return bridge;
+ })();
+ browserBridges.set(owner,pending);
+ try{return await pending;}catch(error){browserBridges.delete(owner);throw error;}
+}
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
  if(window.isMinimized())window.restore();window.show();window.focus();
@@ -62,6 +95,7 @@ async function checkChildren(owner){
  try{
   const state=await readState(owner);
   if(owner.window.isDestroyed()||owner.revision!==revision)return;
+  browserViews?.setAvailable(owner,browserConnected(state));
   if(!sessionKey(state)||[...windows.values()].some(child=>child.owner===owner&&child.linkKey!==sessionKey(state)))closeChildren(owner);
  }catch{ /* 一時的な通信断・不正応答は終了の根拠にせず、次回の監視で再確認する。 */ }finally{owner.checking=false;}
 }
@@ -73,7 +107,14 @@ function audioAllowed(contents,permission,details){
  const record=windows.get(contents);
  return !!record&&record.kind==='live'&&permission==='media'&&details?.isMainFrame===true&&details.requestingUrl?.split('#')[0]===record.url;
 }
-async function createWindow(kind,url,server,owner,linkKey,anchor){
+function selectedAllDisplay(owner,displayId){
+ if(displayId===undefined)return null;
+ if(!owner||!allDisplays.state(owner).active||!Number.isInteger(displayId))throw Error('VRモードの表示状態が変わりました。');
+ const display=screen.getAllDisplays().find(display=>display.id===displayId);
+ if(!display)throw Error('選んだディスプレイが見つかりません。');
+ return display;
+}
+async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,browserTarget){
  // ピン留めのビューアは #viewer=ファイル で開く。照合・遷移の判定は # より前の URL で行う。
  const [base,hash='']=url.split('#');
  const viewerPath=kind==='viewer'&&hash.startsWith('viewer=')?decodeURIComponent(hash.slice('viewer='.length)):'';
@@ -83,21 +124,33 @@ async function createWindow(kind,url,server,owner,linkKey,anchor){
  const ownerRevision=owner?.revision;
  const placement=kind==='term'?await reserveTermSlot():null;
  if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
- let slot=placement?.slot||0;if(owner&&(kind==='code'||kind==='viewer'))while(used.has(slot))slot++;
- const bounds=(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot);
- const title=kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
+ let slot=placement?.slot||0;if(owner&&['code','viewer','browser'].includes(kind))while(used.has(slot))slot++;
+ let bounds,displaySlot;
+ try{
+  const display=selectedAllDisplay(owner,displayId);
+  if(display){displaySlot=0;const occupied=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&item.displayId===displayId&&!item.window.isDestroyed()).map(item=>item.displaySlot));while(occupied.has(displaySlot))displaySlot++;}
+  bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot);
+ }catch(error){placement?.close();throw error;}
+ const title=kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),...(owner?{parent:owner.window}:{}),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'dist/AiDiy.png'),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
  window.setBounds(bounds);
  // IDEから開いたCode / Liveは、IDEや他アプリを操作中も手前に保つ。
- if(owner)window.setAlwaysOnTop(true);
+ if(owner)keepInFront(window);
  const contents=window.webContents;
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
- const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,revision:0,pending:new Map()};windows.set(contents,record);
- window.on('focus',()=>draftRouter.focused(record));
+ // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
+ const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,revision:0,pending:new Map()};windows.set(contents,record);
+ attachWindowMove(record);
+ if(kind==='ide')allDisplays.register(record);
+ window.on('focus',()=>{
+  draftRouter.focused(record);
+  // ALLの拡張・復帰やWindowsの透明窓の再配置後も、IDEへのクリックでパネルを隠さない。
+  if(kind==='ide')for(const child of windows.values())if(child.owner===record)keepInFront(child.window);
+ });
  // IDEの×・Alt+F4は、利用中（接続利用・オフライン利用の開始後）だけ確認してから全体を閉じる。
  // 初期画面と「終了」で起動画面へ戻った後は、守る作業がないので確認しない（状態が不明な時は作業を守るため確認する）。利用終了は子窓だけを閉じる。
  if(kind==='ide'){
@@ -123,12 +176,19 @@ async function createWindow(kind,url,server,owner,linkKey,anchor){
  contents.setWindowOpenHandler(details=>{const allowed=kind==='ide'?panelWindows.open(record,details):null;if(allowed)return allowed;if(/^https?:\/\//i.test(details.url))void shell.openExternal(details.url);return{action:'deny'};});
  contents.on('did-create-window',(child,details)=>panelWindows.created(record,child,details));
  try{
+  if(kind==='browser'){
+   browserViews??=createBrowserViews({WebContentsView,session,trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
+   const bridge=await ensureBrowserBridge(owner);
+   const current=await readState(owner);
+   if(window.isDestroyed()||owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current))throw Error('tools接続中のみBrowserを起動できます。');
+   record.browserSession=bridge.name;const page=browserViews.attach(record,browserTarget);attachWindowMove(record,page);bridge.add(record,page);
+  }
   await window.loadURL(url);
   if(!window.isDestroyed()){
    await contents.executeJavaScript("document.documentElement.classList.add('desktop-opening')");
-   const reduced=kind==='viewer'&&await contents.executeJavaScript("matchMedia('(prefers-reduced-motion: reduce)').matches");
+   const reduced=await contents.executeJavaScript("matchMedia('(prefers-reduced-motion: reduce)').matches");
    if(reduced){window.show();window.focus();}
-   if(reduced||await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
+   if(reduced||await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening');window.dispatchEvent(new Event('aidiy-window-shown'))");
   }
   return window;
  }
@@ -154,9 +214,39 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:window',(event,action)=>{
   const record=trustedEvent(event);if(!record)return;
   if(action==='minimize')record.window.minimize();else if(action==='close')record.window.close();
-  else if(action==='maximize'){if(record.window.isMaximized())record.window.unmaximize();else record.window.maximize();}
+  else if(action==='maximize'){if(!allDisplays.leave(record,{maximize:true})){if(record.window.isMaximized())record.window.unmaximize();else record.window.maximize();}}
   if(action==='title')return record.window.getTitle();
   if(action==='maximize'||action==='isMaximized')return record.window.isMaximized();
+ });
+ ipcMain.handle('development:all-displays',(event,action)=>allDisplays.handle(event,action));
+ ipcMain.handle('development:browser-action',async(event,action,value)=>{
+  const record=trustedEvent(event);
+  if(record?.kind==='browser'&&!['bounds','state'].includes(action)){
+   try{if(!browserConnected(await readState(record.owner)))return{ok:false,error:'tools接続中のみBrowserを操作できます。'};}catch{return{ok:false,error:'toolsの接続を確認できません。'};}
+  }
+  return browserViews?.action(event,action,value)||{ok:false,error:'ブラウザが起動していません。'};
+ });
+ ipcMain.handle('development:open-browser',async(event,path,displayId)=>{
+  const source=trustedEvent(event),owner=source?.kind==='viewer'?source.owner:source;
+  if(!owner||owner.kind!=='ide'||owner.owner||!['ide','viewer'].includes(source.kind))return{ok:false,error:'IDEから開いてください。'};
+  if(path!==undefined&&(!validPreviewPath(path)||! /\.html?$/i.test(path)))return{ok:false,error:'HTML / HTMファイルを選んでください。'};
+  const revision=owner.revision;
+  try{
+   if(displayId!==undefined&&source!==owner)throw Error('画面の選択はIDE本体から行ってください。');
+   selectedAllDisplay(owner,displayId);
+   const state=await readState(owner),key=sessionKey(state);
+   const valid=()=>!quitting&&!owner.window.isDestroyed()&&!source.window.isDestroyed()&&trustedEvent(event)===source&&owner.revision===revision;
+   if(!valid()||!key||!state.project?.path||(source!==owner&&source.linkKey!==key))throw Error('IDEの利用を開始してください。');
+   if(!browserConnected(state))throw Error('tools接続中のみBrowserを起動できます。');
+   let target=HOME;
+   if(path!==undefined){
+    target=await browserFileTarget(state.project.path,path);
+   }
+   const current=await readState(owner);
+   if(!valid()||sessionKey(current)!==key||current.project?.path!==state.project.path||!browserConnected(current))throw Error('IDEの利用状態が変わりました。');
+   await createWindow('browser',owner.url+'#browser',undefined,owner,key,undefined,displayId,target);
+   return{ok:true};
+  }catch(error){return{ok:false,error:error.message};}
  });
  ipcMain.handle('development:draft-target-register',(event,value)=>draftRouter.register(trustedEvent(event),value));
  ipcMain.handle('development:copy-file-path',(event,path)=>nativePreviewActions.copyFilePath(event,path));
@@ -172,12 +262,14 @@ app.whenReady().then(async()=>{
   const owner=trustedEvent(event);
   return{live:!!owner&&owner.kind==='ide'&&[...windows.values()].some(child=>child.owner===owner&&child.kind==='live'&&!child.window.isDestroyed())};
  });
- ipcMain.handle('development:open-app',async(event,type)=>{
+ ipcMain.handle('development:open-app',async(event,type,displayId)=>{
   const source=trustedEvent(event),record=source?.kind==='viewer'?source.owner:source;
   if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','term'].includes(type))return{ok:false,error:'この画面からは開けません。'};
   // ピン留めからの明示起動も、元のIDEと同じ利用セッションだけに限定する。
   const revision=record.revision;let state;
   try{
+   if(displayId!==undefined&&source!==record)throw Error('画面の選択はIDE本体から行ってください。');
+   selectedAllDisplay(record,displayId);
    state=await readState(record);
    if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.window.isDestroyed()||record.revision!==revision||!state.active||!state.project?.path||(source!==record&&source.linkKey!==sessionKey(state)))throw Error('IDEの利用状態が変わりました。');
    if(type==='live'&&state.mode!=='online')throw Error('LiveはAiDiy接続利用で開けます。');
@@ -194,7 +286,7 @@ app.whenReady().then(async()=>{
     child=await startDevelopment(state.project.path,{kind:type,offline:state.mode==='offline',linked:true});
     const current=await readState(record);
     if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.revision!==revision||record.window.isDestroyed()||!current.active||current.project?.path!==state.project.path||sessionKey(current)!==key||(source!==record&&source.linkKey!==key))throw Error('IDEの利用状態が変わりました。もう一度開いてください。');
-    await createWindow(type,child.url,child,record,key);child=undefined;
+    await createWindow(type,child.url,child,record,key,undefined,displayId);child=undefined;
     return{ok:true};
    }catch(error){closeServer(child);return{ok:false,error:error.message};}
   })();
@@ -204,9 +296,13 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:code-move-begin',event=>codeDrag.begin(event));
  ipcMain.handle('development:code-move',(event,token)=>codeDrag.move(event,token));
  ipcMain.handle('development:code-move-end',(event,token)=>codeDrag.end(event,token));
- ipcMain.handle('development:prepare-explorer',(event,rect,kind)=>panelWindows.prepare(event,rect,kind));
+ ipcMain.handle('development:window-move-begin',(event,name)=>codeDrag.begin(event,name));
+ ipcMain.handle('development:window-move',(event,token,name)=>codeDrag.move(event,token,name));
+ ipcMain.handle('development:window-move-end',(event,token,name)=>codeDrag.end(event,token,name));
+ ipcMain.handle('development:prepare-explorer',(event,rect,kind,previewRect)=>panelWindows.prepare(event,rect,kind,previewRect));
  ipcMain.handle('development:show-explorer',(event,name,reduced)=>panelWindows.show(event,name,reduced));
  ipcMain.handle('development:resize-routes',(event,name,height)=>panelWindows.resizeRoutes(event,name,height));
+ ipcMain.handle('development:panel-action',(event,name,action)=>panelWindows.action(event,name,action));
  // ピン留め: IDEのプレビューを、同じIDEサーバーのファイルAPIを使う独立ウィンドウ（IDEの子ウィンドウ）で開く。
  // 同じファイルは既存の窓を前面へ出す。利用終了・セッション切り替えでは他の子ウィンドウと一緒に閉じる。
  ipcMain.handle('development:open-viewer',async(event,path,anchor)=>{
