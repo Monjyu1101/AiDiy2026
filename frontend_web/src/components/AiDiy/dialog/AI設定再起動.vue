@@ -509,10 +509,10 @@ function copyTaskSettingsToTeam() {
 }
 
 function handleTaskAiChange() {
-  const models = Object.keys(availableModels.value?.code_models?.[selections.taskAi] || {});
-  for (const key of ['taskModelPlan', 'taskModelDo', 'taskModelCheck'] as const) {
-    selections[key] = chooseAvailable(selections[key], models);
-  }
+  const model = codeDefaultModel(selections.taskAi);
+  selections.taskModelPlan = model;
+  selections.taskModelDo = model;
+  selections.taskModelCheck = model;
   copyTaskSettingsToTeam();
 }
 
@@ -527,114 +527,33 @@ function handleTeamPlanChange() {
   selections.teamModelCheck = selections.teamModelPlan;
 }
 
-watch(
-  () => selections.codeAi1,
-  (newValue) => {
-    if (isInitializing.value) return;
-    const models = availableModels.value?.code_models?.[newValue] || {};
-    const newModel = chooseAvailable(currentSettings.value.CODE_AI1_MODEL, Object.keys(models));
-    selections.codeModel1 = newModel;
-    // AI1変更時、AI2-6に両方（AIとMODEL）をコピー
-    selections.codeAi2 = newValue;
-    selections.codeAi3 = newValue;
-    selections.codeAi4 = newValue;
-    selections.codeAi5 = newValue;
-    selections.codeAi6 = newValue;
-    selections.codeModel2 = selections.codeModel1;
-    selections.codeModel3 = selections.codeModel1;
-    selections.codeModel4 = selections.codeModel1;
-    selections.codeModel5 = selections.codeModel1;
-    selections.codeModel6 = selections.codeModel1;
-  }
-);
+// プロバイダの手動変更時だけ規定モデルを選ぶ。読込・連動コピーでは個別値を上書きしない。
+function codeDefaultModel(aiName: string) {
+  const models = Object.keys(availableModels.value?.code_models?.[aiName] || {});
+  const key = CODE_MODEL_KEYS[aiName];
+  return chooseAvailable(key && currentSettings.value[key], models);
+}
 
-watch(
-  () => selections.codeModel1,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI1_MODEL変更時、AI2-6に両方（AIとMODEL）をコピー
-    selections.codeAi2 = selections.codeAi1;
-    selections.codeAi3 = selections.codeAi1;
-    selections.codeAi4 = selections.codeAi1;
-    selections.codeAi5 = selections.codeAi1;
-    selections.codeAi6 = selections.codeAi1;
-    selections.codeModel2 = newValue;
-    selections.codeModel3 = newValue;
-    selections.codeModel4 = newValue;
-    selections.codeModel5 = newValue;
-    selections.codeModel6 = newValue;
+function copyCode1Settings() {
+  for (const index of [2, 3, 4, 5, 6] as const) {
+    selections[`codeAi${index}`] = selections.codeAi1;
+    selections[`codeModel${index}`] = selections.codeModel1;
   }
-);
+}
 
-watch(
-  () => selections.codeAi2,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI2個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel2)) {
-      selections.codeModel2 = models[0];
-    }
-  }
-);
+function handleCodeAiChange(index: 1 | 2 | 3 | 4 | 5 | 6) {
+  if (isInitializing.value) return;
+  selections[`codeModel${index}`] = codeDefaultModel(selections[`codeAi${index}`]);
+  if (index === 1) copyCode1Settings();
+  if (index === 4) copyCode4Settings();
+}
 
-watch(
-  () => selections.codeAi3,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI3個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel3)) {
-      selections.codeModel3 = models[0];
-    }
-  }
-);
-
-watch(
-  () => selections.codeAi4,
-  (newValue) => {
-    if (isInitializing.value) return;
-    // AI4個別変更時は、現在のモデル値を維持（AI1の影響を受けない）
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length > 0 && !models.includes(selections.codeModel4)) {
-      selections.codeModel4 = models[0];
-    }
-  }
-);
-
-watch(
-  () => selections.taskAi,
-  (newValue) => {
-    if (isInitializing.value) return;
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length === 0) return;
-    // plan / do / check は同じ AI の候補から選ぶため、AI名変更時はまとめて寄せ直す
-    for (const key of ['taskModelPlan', 'taskModelDo', 'taskModelCheck'] as const) {
-      if (!models.includes(selections[key])) {
-        selections[key] = models[0]!;
-      }
-    }
-  }
-);
-
-watch(
-  () => selections.teamAi,
-  (newValue) => {
-    if (isInitializing.value) return;
-    if (!availableModels.value?.code_models?.[newValue]) return;
-    const models = Object.keys(availableModels.value.code_models[newValue]);
-    if (models.length === 0) return;
-    for (const key of ['teamModelPlan', 'teamModelDo', 'teamModelCheck'] as const) {
-      if (!models.includes(selections[key])) {
-        selections[key] = models[0]!;
-      }
-    }
-  }
-);
+function handleTeamAiChange() {
+  const model = codeDefaultModel(selections.teamAi);
+  selections.teamModelPlan = model;
+  selections.teamModelDo = model;
+  selections.teamModelCheck = model;
+}
 
 watch(
   () => [props.isOpen, props.sessionId] as const,
@@ -821,7 +740,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai1-select">CODE_AI1_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai1-select" v-model="selections.codeAi1" class="config-panel-select">
+                      <select id="config-code-ai1-select" v-model="selections.codeAi1" class="config-panel-select" @change="handleCodeAiChange(1)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -829,7 +748,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-model1-select">CODE_MODEL1:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-model1-select" v-model="selections.codeModel1" class="config-panel-select">
+                      <select id="config-code-model1-select" v-model="selections.codeModel1" class="config-panel-select" @change="copyCode1Settings">
                         <option v-for="model in codeModelOptions1" :key="model.value" :value="model.value">{{ model.label }}</option>
                       </select>
                     </div>
@@ -837,7 +756,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai2-select">CODE_AI2_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai2-select" v-model="selections.codeAi2" class="config-panel-select">
+                      <select id="config-code-ai2-select" v-model="selections.codeAi2" class="config-panel-select" @change="handleCodeAiChange(2)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -853,7 +772,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai3-select">CODE_AI3_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai3-select" v-model="selections.codeAi3" class="config-panel-select">
+                      <select id="config-code-ai3-select" v-model="selections.codeAi3" class="config-panel-select" @change="handleCodeAiChange(3)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -871,7 +790,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai4-select">CODE_AI4_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai4-select" v-model="selections.codeAi4" class="config-panel-select" @change="copyCode4Settings">
+                      <select id="config-code-ai4-select" v-model="selections.codeAi4" class="config-panel-select" @change="handleCodeAiChange(4)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -887,7 +806,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai5-select">CODE_AI5_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai5-select" v-model="selections.codeAi5" class="config-panel-select">
+                      <select id="config-code-ai5-select" v-model="selections.codeAi5" class="config-panel-select" @change="handleCodeAiChange(5)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -903,7 +822,7 @@ onMounted(() => {
                   <div class="config-panel-field">
                     <label class="config-panel-label" for="config-code-ai6-select">CODE_AI6_NAME:</label>
                     <div class="config-panel-control">
-                      <select id="config-code-ai6-select" v-model="selections.codeAi6" class="config-panel-select">
+                      <select id="config-code-ai6-select" v-model="selections.codeAi6" class="config-panel-select" @change="handleCodeAiChange(6)">
                         <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                       </select>
                     </div>
@@ -961,7 +880,7 @@ onMounted(() => {
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-team-ai-select">TEAM_AI_NAME:</label>
                 <div class="config-panel-control">
-                  <select id="config-team-ai-select" v-model="selections.teamAi" class="config-panel-select">
+                  <select id="config-team-ai-select" v-model="selections.teamAi" class="config-panel-select" @change="handleTeamAiChange">
                     <option v-for="ai in codeAiOptions" :key="ai" :value="ai">{{ ai }}</option>
                   </select>
                 </div>

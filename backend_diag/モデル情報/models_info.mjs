@@ -11,6 +11,7 @@ import {currentOpenRouterProof, readConfig} from '../runtime/model_probe.mjs';
 import {LIVE_VOICES_FILE, liveVoicesInfo} from './voices_info.mjs';
 import {DECISIONS_MODELS_FILE,decisionsModelsInfo} from './decisions_info.mjs';
 import {COPILOT_FALLBACK_MODELS, OAUTH_FALLBACK_SOURCE, oauthModelFallback} from './model_fallbacks.mjs';
+import {antigravityModels} from './antigravity_models.mjs';
 
 // 順序はHermesの先頭候補にも使う。存在確認のみでCLIは実行しない。
 const CODE_CLIS = Object.freeze({copilot_cli:'copilot', claude_cli:'claude', codex_cli:'codex',
@@ -23,17 +24,23 @@ export async function installedCodeClis({loadEntries = catalog, resolve = resolv
   })));
 }
 
+export function openCodeModels(models) {
+  return Object.fromEntries(Object.entries(models).map(([id, label]) => {
+    const model = id.startsWith('openai/') || ['auto', 'same'].includes(id) ? id : `openai/${id}`;
+    return [model, model === id ? label : label.endsWith(id) ? label.slice(0, -id.length) + model : `${label} - ${model}`];
+  }));
+}
+
 function availableCodeModels(code, installedClis) {
   const filtered = Object.fromEntries(Object.entries(code).filter(([key]) => key === 'aidiy_hermes'
     || installedClis[key === 'claude_sdk' ? 'claude_cli' : key] === true));
-  // 共通候補を使い、OpenCodeへの書き出しだけClaude系を除く。導入判定は独立。
-  const sharedModels = Object.keys(code.copilot_cli?.models ?? {}).length
-    ? code.copilot_cli.models : COPILOT_FALLBACK_MODELS;
-  for (const key of ['copilot_cli', 'opencode_cli']) {
-    if (installedClis[key] === true) filtered[key] = {models:Object.fromEntries(Object.entries(sharedModels).filter(([id]) => key !== 'opencode_cli' || !/(^|\/)claude(?:[-_.:/]|$)/i.test(id)))};
+  // OpenCodeはCodex用の候補を共有。空の場合の規定値と導入判定はCopilotと同じ方式。
+  for (const [key, source] of [['copilot_cli', 'copilot_cli'], ['opencode_cli', 'codex_cli']]) {
+    const models = Object.keys(code[source]?.models ?? {}).length ? code[source].models : COPILOT_FALLBACK_MODELS;
+    if (installedClis[key] === true) filtered[key] = {models:key === 'opencode_cli' ? openCodeModels(models) : {...models}};
   }
   const routes = Object.fromEntries(Object.keys(CODE_CLIS).filter(key => installedClis[key])
-    .map(key => [`${key}/auto`, `yyyy/mm/dd - ${key}/auto`]));
+    .map(key => [`${key}/same`, `yyyy/mm/dd - ${key}/same`]));
   if (Object.keys(routes).length || filtered.aidiy_hermes) {
     filtered.aidiy_hermes = {models:{...routes, ...filtered.aidiy_hermes?.models}};
   }
@@ -60,7 +67,7 @@ export const FIXED_MODELS = Object.freeze({
 const fixedSection = key => ({models:{...FIXED_MODELS[key].models}});
 // 区分名は本体 get_chat_models / get_live_models / get_code_models に合わせる。
 const LAYOUT = Object.freeze({
-  gemini: {chat:'gemini_chat', live:'gemini_live', code:{antigravity_cli:'取得結果'}},
+  gemini: {chat:'gemini_chat', live:'gemini_live'},
   freeai: {chat:'freeai_chat', live:'freeai_live'},
   claude: {chat:null, code:{claude_sdk:'取得結果', claude_cli:'取得結果', copilot_cli:'取得結果'}},
   openai: {chat:'openai_chat', live:'openai_live', code:{codex_cli:'取得結果', copilot_cli:'取得結果'}},
@@ -188,7 +195,7 @@ function mergeModelsInfo(infos) {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !entry.models || typeof entry.models !== 'object' || Array.isArray(entry.models)) continue;
         const target = merged[group][key] ??= {models:{}};
         for (const [id, label] of Object.entries(entry.models)) {
-          // 合成時に付ける xx/auto（旧 xx/same）はプロバイダ別ファイルから引き継がない。
+          // 合成時に付ける xx/same（旧 xx/auto）はプロバイダ別ファイルから引き継がない。
           if (typeof label !== 'string' || /\/(?:auto|same)$/.test(id)) continue;
           if (!Object.hasOwn(target.models, id) || labelDate(label) > labelDate(target.models[id])) target.models[id] = label;
         }
@@ -217,6 +224,14 @@ async function writeMergedModelsInfo(directory, installedClis, providers, result
   }
   const saved = [];
   const merged = mergeModelsInfo(infos);
+  // 旧Geminiファイル由来の候補も必ず置換する。Geminiキーの有無とは独立。
+  delete merged.code.antigravity_cli;
+  if (installedClis.antigravity_cli === true) {
+    const models = await (options.antigravityModelsReader ?? antigravityModels)();
+    merged.code.antigravity_cli = {models:Object.keys(models).length ? models : {
+      auto:'auto (自動判定)', same:'same (変更なし)',
+    }};
+  }
   merged.code = availableCodeModels(merged.code, installedClis);
   for (const [group, info] of Object.entries(merged)) {
     // 無効ラベルや旧 auto/same の除外後、CLI の補完後に空区分を落とす。

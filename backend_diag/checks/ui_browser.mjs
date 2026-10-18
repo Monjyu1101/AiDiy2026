@@ -74,7 +74,7 @@ try{
  await page.screenshot({path:path.join(output,'integrations.png'),fullPage:true});
  await page.getByRole('button',{name:'モデル一覧',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
  await page.getByRole('button',{name:'外部連携',exact:true}).click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');
- await page.locator('#integration-run').click();await page.waitForFunction(()=>document.querySelectorAll('.models li').length===0&&document.querySelector('#integration-run').textContent==='状況確認');
+ await page.locator('#integration-run').click();await page.waitForFunction(()=>document.querySelectorAll('.models li').length===2&&document.querySelector('#integration-run').textContent==='状況確認');
  assert.equal(await page.locator('.integration-row').filter({hasText:'Discord Bot'}).locator('.badge').getAttribute('data-state'),'OK');
  // 状況確認が終わったら、1項目目を表示する。
  await page.locator('.integration-panel article h2',{hasText:'Hugging Face 読取'}).waitFor({timeout:5000});

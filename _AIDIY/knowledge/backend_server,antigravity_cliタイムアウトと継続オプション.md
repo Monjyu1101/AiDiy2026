@@ -8,6 +8,12 @@
 - `antigravity_cli` のタイムアウト延長や継続フラグの動作を理解する
 - Code AI 設定で `antigravity_cli` を選んだときの挙動を調整する
 
+## モデルIDの確認
+
+`invalid model selection` が出た場合は `agy models` でCLIが受け付けるIDを確認します。Gemini APIのモデル一覧とは別体系です。`backend_diag/モデル情報/antigravity_models.mjs` がこの一覧を取得し、モデル情報の書込時に `code_models_info.json` の `antigravity_cli` を置換します。取得失敗時は `auto` / `same` だけを残し、古いGemini候補は再利用しません。AIモデル試験・AI設定再起動は同じ合成ファイルを使います。
+
+現行実装の `auto` / `same` は `--model` を付けず、CLIの既定選択を使います。明示モデルはIDをそのまま渡すため、古いIDを手動保存している場合は設定画面で選び直します。
+
 ## パス解決
 
 `_コマンドパス取得()` 内の `antigravity_cli` 専用分岐:
@@ -61,7 +67,8 @@ elif self.code_ai == "antigravity_cli":
 - stderr: 進捗・警告として `output_stream` へ随時送る
 - stdout は `output_stream` へ送らない。途中表示と最終回答の二重表示を防ぐため
 - stdout が空でも stderr を正式回答へ転用しない。stderr の内容はストリームと `last_stderr_output` に残る
-- `antigravity_cli` はコンソール直書きを避けるため専用の `_antigravity実行()` を使うが、出力の役割は `copilot_cli` / `opencode_cli` と同じ
+- `antigravity_cli` の `_antigravity実行()` は共通の非表示起動を使う。Windowsでは監視プロセス・CLIとも `CREATE_NO_WINDOW` で起動する。`DETACHED_PROCESS` は子コマンドに表示コンソールが作られるため使わない。出力の役割は `copilot_cli` / `opencode_cli` と同じ
+- 非表示実行と出力分離は `backend_server/tests/test_code_cli_output_routing.py` で確認する。WindowsではCLIが通常起動した子コマンドの `GetConsoleWindow` / `IsWindowVisible` も検査する
 
 ## 注意点
 

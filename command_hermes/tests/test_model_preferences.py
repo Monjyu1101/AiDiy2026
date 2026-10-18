@@ -118,7 +118,7 @@ class ModelPreferencesTests(unittest.TestCase):
         current = instance()
         with patch.object(cli, '_cprint'):
             self.assertTrue(cli._configure_aidiy_cli_provider(current, restored['provider'], requested_model=restored['model']))
-        self.assertEqual(current.model, 'auto')
+        self.assertEqual(current.model, 'same')
         for width in (60, 80, 120):
             with self.subTest(width=width), redirect_stdout(io.StringIO()):
                 output = io.StringIO()
@@ -128,7 +128,7 @@ class ModelPreferencesTests(unittest.TestCase):
                 with patch.dict(cli.os.environ, {'HERMES_DEFER_AGENT_STARTUP': '1'}), patch.object(cli.shutil, 'get_terminal_size', return_value=os.terminal_size((width, 30))), patch('hermes_cli.banner.load_banner_snapshot', return_value=snapshot), patch.object(cli.threading, 'Thread'):
                     current.show_banner()
                 rendered = output.getvalue()
-                self.assertIn('copilot-cli (auto)', rendered)
+                self.assertIn('copilot-cli (same)', rendered)
                 self.assertNotIn('自動選択', rendered)
                 self.assertNotIn('unknown', rendered.lower())
 

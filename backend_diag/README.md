@@ -55,14 +55,14 @@ aidiy_diag --headless       # 画面を開かず全診断を最速で実行し�
 
 - `chat`: API から取得し本体と同じ条件で絞り込んだ一覧。`モデル` は作成日・トークン数・モダリティ付きの詳細配列として残します。選択候補は `gemini_chat` など本体の区分名をキーにした要素の `models` に置き、「モデルID: YYYY/MM/DD - モデルID」の一覧（作成日が無いものは `yyyy/mm/dd`、backend_local は固定候補の表示名）にします。詳細・選択候補とも作成日の新しい順です。Claude / Grok は本体に chat の選択区分がないため詳細だけを残し、CLI の選択候補は `code` に置きます。
 - `live`（gemini / freeai / openai）: API で取得した live 対応モデル（Gemini は `bidiGenerateContent` 対応、OpenAI は `realtime`）から、`gemini_live` などの区分名をキーにした要素の `models` を直接生成します。Gemini / FreeAI はモデルIDに `native-audio` または `live` を含み、`transcribe` または `translate` を含むものを除外し、モデルIDの文字列降順で並べます。OpenAI は `whisper` または `translate` を含むものを除外し、作成日の新しい順です。表示名は「YYYY/MM/DD - モデルID」で、日付は API / OpenRouter の作成日 → モデル名の日付 → `yyyy/mm/dd` の順に採用します。設定ファイル由来のボイス・設定案・差分は保存しません。
-- `code`: `claude_sdk` / `claude_cli` は Claude、`antigravity_cli` は Gemini、`codex_cli` は各ファイルの OpenAI API / OpenAI OAuth、`opencode_cli` は Ollama の取得モデルから `models` を生成します。`codex_cli` は `realtime` を含むモデルを除外し、同じ系列（`sol` / `luna` / `pro` など）は数値として比較した最新バージョンだけを残します。例: `gpt-6.1-sol` があれば `gpt-5.6-sol` は除外します。`-900k` などの別仕様は独立した系列として扱います。`aidiy_hermes` も OpenAI OAuth の取得モデルを使い、モデルIDに `openai_oauth/` を付けます。合成の `aidiy_hermes.models` には、導入済みCLIの `xx/auto`（CLI のモデルを維持して呼び出す選択肢）を追加します（下記）。Claude SDK / CLI はモデルIDから `haiku`・`sonnet`・`opus`・`fable` などの名前を抽出してキーに使い、同名は最新の1件へまとめます。表示名は「YYYY/MM/DD - バージョン付きモデルID」とし、最新バージョンを残します。`copilot_cli` は Claude / OpenAI / OpenAI OAuth のファイルに出力し、Claude は系列ごとの最新モデルをバージョン付きIDのキーで保存し、数字間の `-` を `.` に変換します（キー・表示名とも `claude-haiku-5.5` など）。OpenAI / OpenAI OAuth は `codex_cli` と同じ候補で保存します。詳細配列には元のモデルIDを保持します。作成日・並び順は chat と共通です。
+- `code`: `claude_sdk` / `claude_cli` は Claude、`antigravity_cli` は Gemini、`codex_cli` は各ファイルの OpenAI API / OpenAI OAuth、`opencode_cli` は Ollama の取得モデルから `models` を生成します。`codex_cli` は `realtime` を含むモデルを除外し、同じ系列（`sol` / `luna` / `pro` など）は数値として比較した最新バージョンだけを残します。例: `gpt-6.1-sol` があれば `gpt-5.6-sol` は除外します。`-900k` などの別仕様は独立した系列として扱います。`aidiy_hermes` も OpenAI OAuth の取得モデルを使い、モデルIDに `openai_oauth/` を付けます。合成の `aidiy_hermes.models` には、導入済みCLIの `xx/same`（CLI のモデルを維持して呼び出す選択肢）を追加します（下記）。Claude SDK / CLI はモデルIDから `haiku`・`sonnet`・`opus`・`fable` などの名前を抽出してキーに使い、同名は最新の1件へまとめます。表示名は「YYYY/MM/DD - バージョン付きモデルID」とし、最新バージョンを残します。`copilot_cli` は Claude / OpenAI / OpenAI OAuth のファイルに出力し、Claude は系列ごとの最新モデルをバージョン付きIDのキーで保存し、数字間の `-` を `.` に変換します（キー・表示名とも `claude-haiku-5.5` など）。OpenAI / OpenAI OAuth は `codex_cli` と同じ候補で保存します。詳細配列には元のモデルIDを保持します。作成日・並び順は chat と共通です。
 - 固定候補は Grok（`grok_cli`）と backend_local（`local_chat`）だけです。aidiy_diag が管理し、本体は合成JSONから読みます。それ以外は取得に失敗した場合に候補を空にし、状態・説明・警告を残します。
 
 Gemini / FreeAI はモデルIDに `lyria` を含むものを詳細・chat・live・code すべての出力対象から除外します。`antigravity_cli` もこの絞り込み後の候補から生成します。
 
 モデル情報の生成・保存は `_config` 上のモデル設定ファイルに依存しません。API 接続用のキー・ログイン情報の読み取りは従来どおりです。保存するのは、このサーバーが直前に取得した結果と Grok / local の固定候補だけで、画面から値は送りません。
 
-プロバイダ別ファイルへ `xx/auto` は挿入しません（旧表記 `xx/same` が残っていても合成時に除外します）。合成の `code_models_info.json` は導入済みCLIの区分だけを出力します（`claude_sdk` もClaude CLIの導入が必要）。`aidiy_hermes.models` だけは特別に、導入済みCLIの `xx/auto` をCopilot → Claude → Codex → Antigravity → Grok → OpenCodeの順で先頭へ追加し、その後に取得したモデルを並べます。導入判定はインストール診断と同じ探索先での実行ファイルの存在確認です。
+プロバイダ別ファイルへ `xx/same` は挿入しません（旧表記 `xx/auto` が残っていても合成時に除外します）。合成の `code_models_info.json` は導入済みCLIの区分だけを出力します（`claude_sdk` もClaude CLIの導入が必要）。`aidiy_hermes.models` だけは特別に、導入済みCLIの `xx/same` をCopilot → Claude → Codex → Antigravity → Grok → OpenCodeの順で先頭へ追加し、その後に取得したモデルを並べます。導入判定はインストール診断と同じ探索先での実行ファイルの存在確認です。
 
 音声候補は `live_voices_info.json` に `{gemini_live: {voices: {...}}, freeai_live: {voices: {...}}, openai_live: {voices: {...}}}` の形式で保存します。固定定義は `モデル情報/voices_info.mjs` で管理します。キーの確認成功と現在の設定状態に合わせて出力し、未設定・確認失敗のプロバイダは含めません。FreeAIの声はGeminiと同じ定義です。個別更新では他の有効な確認済み候補を保持し、キーが無効化された場合は除外します。
 
@@ -74,9 +74,11 @@ Copilot単独契約向けの例外として、Copilot CLIが導入済みで合�
 
 Electron の初回表示は Code / Live / Term / IDE / Discord と共通の `frontend_ide/host/scripts/window-opening.cjs` を使います。中央55%から750msで拡大し、描画を待ってから本画面を表示、内容を450msでフェード表示します。実ウィンドウを連続リサイズしないため、Windowsの未描画の白い縁を避けます。ブラウザ版・headlessには適用しません。`desktop-opening` 中は内容を隠し、演出完了後に起動済みを通知します。共通演出の仕様を変更する場合は6種類への影響を確認してください。`node --test backend_diag/checks/desktop.check.mjs` で読込・演出・表示通知の順序、演出中の終了・描画失敗と既存IPCの安全境界を確認できます。実OSでの拡大・DPI・最前面表示は別途目視確認が必要です。
 
-上部は Term と同じ高さのタイトルバー・ウィンドウ操作・接続バーです。シアンの線は Tools の接続成功、黒は未接続を示します（Tools の確認は常に有効で、ON/OFF・再確認の操作はありません）。診断自体の接続とは別です。Tools は `_config/AiDiy_key.json` の `PORT_TOOLS`（省略時8095）に対して、固定 loopback の `/aidiy_code_agents/ping` だけを10秒間隔で確認します。キー・モデル・エージェントの実行は行いません。切断・画面破棄で確認を停止します。
+上部は Term と同じ高さのタイトルバー・ウィンドウ操作・接続バーです。シアンバーは `frontend_ide/src/共通表示/シアンバー.css` を共有し、Web / Code / Live と同じ正弦波（4.5秒周期、黒→シアン→黒）で明滅します。透明度の `ease-in-out` へ戻さず、標本化したRGB値を `linear` で補間します。共有CSSも配布UIの整合性検証に含みます。シアンの接続バーはWindowsのアニメーション設定がOFF（`prefers-reduced-motion: reduce`）でも明滅を維持します。ブラウザ確認ではreduce / no-preferenceの両条件で、時間経過による色の変化を検査します。シアンの線は Tools の接続成功、黒は未接続を示します（Tools の確認は常に有効で、ON/OFF・再確認の操作はありません）。診断自体の接続とは別です。Tools は `_config/AiDiy_key.json` の `PORT_TOOLS`（省略時8095）に対して、固定 loopback の `/aidiy_code_agents/ping` だけを10秒間隔で確認します。キー・モデル・エージェントの実行は行いません。切断・画面破棄で確認を停止します。
 
-「導入状況」「モデル一覧」「外部連携」「設定モデル」の Vue タブです。初期状態は未確認です。導入状況パネル右上の「状況確認」で検出・更新します。タブ欄右の「全テスト」は、導入状況・モデル一覧・外部連携をそれぞれ確認して書き込みます（前述）。左側でカテゴリを開閉し、項目を選ぶと右側でパス・バージョン・利用機能・参照ソースを表示します。
+「導入状況」「モデル一覧」「外部連携」「設定モデル」の Vue タブです。導入状況・モデル一覧・外部連携は保存済みの前回結果があれば初期表示し、なければ未確認です。各パネルの実行ボタン左側に「前回実行日時」を表示します。導入状況パネル右上の「状況確認」で検出・更新します。タブ欄右の「全テスト」は、導入状況・モデル一覧・外部連携をそれぞれ確認して書き込みます（前述）。左側でカテゴリを開閉し、項目を選ぶと右側でパス・バージョン・利用機能・参照ソースを表示します。
+
+保存結果の読込は `診断/前回結果.mjs` に集約します。`install_info.json`、プロバイダ別 `*_models_info.json`、`integration_info.json` の結果・確認日時を表示に使います。通常の確認・一覧再取得ではファイルを自動保存せず、headless または確認後の「書込」（全テスト内の書込を含む）で保存します。未保存で再起動すると、最後に保存した結果へ戻ります。読込だけでは外部APIを再試験せず、保存結果を今回の認証証跡や書込可能な新規結果として扱いません。欠損・不正なJSONは読み飛ばします。
 
 ## Codespaces / リモートブラウザ
 
@@ -137,6 +139,8 @@ Playwright と Chromium が利用できる検証環境では `node backend_diag/
 Python/Node のライブラリ、内部スクリプト、shell builtin、Git subcommand、モデル ID を外部実行ファイルと混同しません。19 項目すべてが必須ではなく、選択機能に応じて必要な項目を含みます。ユーザー設定の任意コマンドや動的生成、リモート・コンテナ・WSL・Android 側の導入状態は、ホストの PATH 確認だけでは保証できません。
 
 ## キー設定状況とモデル一覧
+
+AntigravityのCode候補はモデル情報を書き込む際に、導入済みの `agy models` から取得します（15秒で打ち切り、会話生成なし）。Gemini APIのモデルIDとは別体系のため、Geminiの取得結果は流用しません。旧保存ファイルのAntigravity候補もCLIの取得結果で置換し、取得できない場合は `auto` / `same` だけを残します。AIモデル試験とAI設定再起動は同じ `code_models_info.json` を読みます。確認は `node --test backend_diag/checks/antigravity-models.check.mjs backend_diag/checks/models-info.check.mjs` で行います。
 
 「キー設定状況」は診断サーバーの TypeScript 実装から固定ファイル `_config/AiDiy_key.json` の既知キーだけを読み取り、設定済 / 未設定を表示します。設定 JSON の値、長さ、末尾、ハッシュはブラウザに返しません。ファイル未作成は未設定、JSON 不正や読込不可は確認不可です。既存 conf クラスの初期化・設定変更は行いません。
 
@@ -297,7 +301,7 @@ Diagは認証付きGET一覧に候補配列のIDそのものがある方式だ�
 
 ## OpenCode / Copilot のCode候補
 
-`code_models_info.json` の `opencode_cli.models` は `copilot_cli.models` を共通元とし、OpenCode出力時だけClaude系を除外する。残るモデルのID・表示名・順序を揃える。合成したCopilot用モデルが空なら共通の `COPILOT_FALLBACK_MODELS` を使い、OpenCode側だけ同じClaude除外を適用する。Copilot側の取得候補・固定8候補は変更しない。OpenCodeの出力条件はOpenCode自身の導入検出であり、Copilotの導入や認証には依存しない。OpenCodeは独自認証を使う前提で、候補の補完を認証・生成成功へ昇格させない。Ollamaの取得モデルはChat用に維持するが、合成CodeのOpenCode候補は上記の共通定義を使う。
+`code_models_info.json` の `opencode_cli.models` はCodex用に合成した候補を共通元とし、OpenCode側のIDと表示名のモデル部分に `openai/` を付ける（例: `openai/gpt-6.1-sol`）。日付・順序は保持し、既存の接頭辞は二重に付けない。Codex候補が0件ならCopilotと同じ `COPILOT_FALLBACK_MODELS` の規定8モデルに同じ `openai/` を付けて補完する。Copilot側の取得候補・規定値は変更しない。OpenCodeの出力条件は自身の導入検出だけで、Codex / Copilotの導入には依存しない。補完はモデル候補の書き出しだけで、認証・実行成功を意味しない。検証は `checks/models-info.check.mjs` で行う。
 
 ## 判断モデルの手動試行
 
@@ -324,6 +328,6 @@ AIモデルタブのタイトルバー「一括試行」は4画面の入力を�
 
 Decisionは1問ずつpredicate / choice / scoreを選び、質問名・質問文と、必要な選択肢／段階（2〜32件、重複不可）を編集します。戻り値全体はJSONを読めればインデント付き、読めなければ元文字列を安全なテキストとして表示します。表示できることと回答スキーマの成功判定は別です。既知の秘密値は伏せます。
 
-Liveの応答テキストと1秒以上のWAVを表示し、認証付き音声APIからBlobを取得してネイティブプレーヤーで再生します。自動再生しません。一括試行中はLiveの一時音声を保持し、完了後も再読込可能です。再試行・画面移動では再生を停止し、Object URLを解放します。短い音声・音声なし・取得失敗は明示し、音声だけを再読込できます。
+Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付き音声APIからBlobを自動取得してネイティブプレーヤーで再生できる状態にします。自動再生しません。AIモデル・設定モデルとも、完了後のタブ移動では再生だけを停止し、結果と取得済み音声を保持します。再実行・設定再読込・切断・終了ではObject URLを解放します。通常は音声再読込の操作を求めず、取得・再生失敗時だけ「音声取得を再試行」を表示します。短い音声・音声なしは明示します。
 
 検証は実AIを使わず、`checks/manual-models.check.mjs`、`ui/src/AIモデル/checks/manual-state.check.mjs`、`backend_tools/tests/test_live_model_check.py` を使います。`DIAG_TEST_PYTHON` をTools依存環境のPythonへ設定すると `checks/model-trials-sdk.check.mjs` が実MCP SDKと合成AIで経路を確認します。`checks/manual-models-browser.mjs` は既存Chrome/Edgeの隔離プロファイルで4画面・幅1280/720/390・合成音声再生・破棄・一括試行・非JSON表示を確認します。UI変更後は依頼に応じて `backend_diag/ui` のビルドと `node backend_diag/ui/verify.mjs` で配布物を同期します。

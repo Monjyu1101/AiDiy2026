@@ -123,3 +123,15 @@ test('screen uses latest installation result to skip Ollama and replaces prior a
  state='OK';await request(h,'/api/診断','POST',auth);
  assert.equal((await run()).状態,'OK');assert.equal(calls,2);
 });
+
+test('片方の設定再読込は他方の書込対象を保持し、対象側の古い認証結果だけ破棄する',async()=>{
+ const saved=[];
+ const h=createHandler({token:'test-key',keyStatusFn:async()=>({項目:[{id:'openai'},{id:'discord'}]}),keyTestFn:async id=>({id,状態:'OK'}),modelsWriteFn:async(_rows,results)=>{saved.push(Object.keys(results));return [];},integrationWriteFn:async(_rows,results)=>{saved.push(Object.keys(results));return {件数:1};}});
+ for(const route of ['api/キー設定/モデル一覧','api/キー設定/外部連携'])assert.equal((await request(h,'/'+route)).status,401);
+ await request(h,'/api/キーテスト/openai','POST',auth);await request(h,'/api/キーテスト/discord','POST',auth);
+ await request(h,'/api/キー設定/外部連携','GET',auth);
+ assert.equal((await request(h,'/api/モデル書込','POST',auth)).status,200);assert.equal((await request(h,'/api/外部連携書込','POST',auth)).status,409);
+ await request(h,'/api/キーテスト/discord','POST',auth);await request(h,'/api/キー設定/モデル一覧','GET',auth);
+ assert.equal((await request(h,'/api/モデル書込','POST',auth)).status,409);assert.equal((await request(h,'/api/外部連携書込','POST',auth)).status,200);
+ assert.deepEqual(saved,[['openai'],['discord']]);assert.equal((await request(h,'/api/キー設定/未知','GET',auth)).status,404);
+});

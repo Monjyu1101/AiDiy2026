@@ -14,7 +14,7 @@ test('15行と共有元・経路・応答を描画し、未設定は成功にし
  for(const id of ids)assert.ok(html.includes(id));
  assert.match(html,/未設定/);assert.match(html,/共有元/);assert.match(html,/Tools 内部 HTTP/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad/);
  const empty=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[]},online:false});
- assert.match(empty,/設定項目がありません/);assert.match(empty,/id="model-trial-start" disabled/);assert.match(empty,/Tools 接続時/);
+ assert.match(empty,/設定項目がありません/);assert.match(empty,/id="model-trial-start"[^>]* disabled/);assert.match(empty,/Tools 接続時/);
 });
 
 test('読込はGETのみ・手動開始後は厳密な順番で15行、共有はサーバー結果だけを使用',async()=>{

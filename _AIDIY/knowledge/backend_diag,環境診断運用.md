@@ -13,6 +13,14 @@
 - Web 版でも全機能を使えます。Codespaces の転送ポートは Private にし、起動時の認証 URL を共有しないでください。確認対象はブラウザ端末ではなく診断サーバーです。
 - カタログ追加ではソース参照と必要な機能を必ず記載します。設定ファイルのキー、ログイン情報、環境変数全体を返す診断は追加しません。
 
+## 保存済み結果の初期表示
+
+導入状況・モデル一覧・外部連携は `診断/前回結果.mjs` から既存の保存ファイルを読み、実行ボタン左側に前回実行日時を表示します。通常の確認・再取得では画面上だけ更新し、自動保存はしません。保存は headless と確認後の書込ボタン（全テスト内の書込を含む）です。保存前に再起動すれば最後に保存した内容へ戻ります。
+
+タブ移動では今回の結果・実行日時・書込済み表示を保持します。モデル一覧と外部連携の再確認はそれぞれ `api/キー設定/モデル一覧` / `api/キー設定/外部連携` を使い、対象側だけ結果と書込済みを解除します。サーバーの書込対象も同じ範囲で破棄し、別タブの未保存結果を失わないようにします。
+
+欠損・破損JSONは未確認として扱い、表示用の結果を今回の認証証跡や書込対象へ戻しません。回帰確認は `node --test backend_diag/checks/previous-results.check.mjs`、実ブラウザの位置・表示・再起動確認は `node backend_diag/checks/previous-results-browser.mjs`（既存Chrome/Edgeを使用、外部APIを呼ばない合成データ）です。
+
 ## 内部ファイルの配置
 
 - ルートには公開入口 `diag_main.mjs` / `aidiy_diag` / `aidiy_diag.cmd` と `_setup.py` / `_start.py` / `_cleanup.py`、パッケージ設定・案内を残します。
@@ -75,7 +83,7 @@ Diagは認証付きGET一覧に候補配列のIDそのものがある方式だ�
 
 ## OpenCode / Copilot のCode候補
 
-`code_models_info.json` の `opencode_cli.models` はCopilot候補を共通元とし、OpenCode出力側だけClaude系を除外する。残るID・表示名・順序は保持する。取得モデルが空なら共通の `COPILOT_FALLBACK_MODELS` から同じClaude除外で補完する。Copilot側の取得候補・固定8候補は変更しない。OpenCodeは独自認証を使う前提で、出力可否は自身の導入検出だけで決め、Copilot未導入でも出力できる。補完はモデル候補の書き出しだけで、認証・実行成功のステータスへ変更しない。検証は `checks/models-info.check.mjs` のOpenCode各ケースで行う。
+`code_models_info.json` の `opencode_cli.models` はCodex用に合成した候補を共通元とし、OpenCode側のIDと表示名のモデル部分に `openai/` を付ける（例: `openai/gpt-6.1-sol`）。日付・順序は保持し、既存の接頭辞は二重に付けない。Codex候補が0件ならCopilotと同じ `COPILOT_FALLBACK_MODELS` の規定8モデルに同じ `openai/` を付けて補完する。Copilot側の取得候補・規定値は変更しない。OpenCodeの出力条件は自身の導入検出だけで、Codex / Copilotの導入には依存しない。補完はモデル候補の書き出しだけで、認証・実行成功を意味しない。検証は `checks/models-info.check.mjs` で行う。
 
 ## 判断モデルの手動試行
 
@@ -94,7 +102,7 @@ Chat/Live/Codeと判断結果は共有しない。MCPの初期化・セッショ
 
 「AIモデル」はChat / Live / Decision / Codeの4画面です。初期値はconfigのCHAT・LIVE・DECISION各設定とCODE1を使います。Decisionの方式autoはモデルもautoとしてTools側で解決します。入力の「おはよう」とDecisionのpoliteness / high・medium・lowは `モデル試行/defaults.mjs` を既存設定モデル試行と共用し、手動画面では自由に編集できます。
 
-候補は `_AIDIY/aidiy_diag/{chat,live,decisions,code}_models_info.json` と `live_voices_info.json` の保存済み内容だけです。画面初期読込・再読込は認証付きローカルDiag APIを使い、外部モデル取得は行いません。プロバイダ変更は画面内で候補を連動し、一覧外の設定保持値を未確認として残します。候補の存在は認証・モデル利用成功の保証ではありません。選択や入力をconfigへ書き戻しません。
+候補は `_AIDIY/aidiy_diag/{chat,live,decisions,code}_models_info.json` と `live_voices_info.json` の保存済み内容を使います。Codeのモデル候補には、Web / Avatarの「AI設定・再起動」と同じ実行方法 `auto (自動判定)`、`same (変更なし)` をこの順で先頭に補い、重複を除きます。これらはモデル一覧JSONへ書き戻しません。画面初期読込・再読込は認証付きローカルDiag APIを使い、外部モデル取得は行いません。プロバイダ変更は画面内で候補を連動し、一覧外の設定保持値を未確認として残します。 Code初回表示はCODE1の設定を使い、プロバイダ切替時は `CODE_<プロバイダ大文字>_MODEL`（例: `CODE_GROK_CLI_MODEL`）を優先します。そのキーがない場合だけCODE1〜6の同プロバイダ設定、次に候補の先頭へ戻します。画面内で手動選択した値は再読込まで優先して保持します。候補の存在は認証・モデル利用成功の保証ではありません。選択や入力をconfigへ書き戻しません。
 
 試行はTools接続中の明示操作だけです。既存 `モデル試行/trials.mjs` のMCP初期化・呼出し・セッション終了、逐次実行ロック、設定変更検知、期限、音声保存を共用します。Chatは `chat_llms_run`、Codeは `code_agents_run`、Decisionは `decisions_check` をHTTP MCPで呼び、Liveだけは既存 `/internal/live_model_check` へ明示した方式・モデル・音声・入力を渡します。Liveの接続後10秒待機とアダプター終了処理は共通です。空JSONの従来Live試行は従来のconfigと固定挨拶を使います。
 
@@ -102,6 +110,6 @@ AIモデルタブのタイトルバー「一括試行」は4画面の入力を�
 
 Decisionは1問ずつpredicate / choice / scoreを選び、質問名・質問文と、必要な選択肢／段階（2〜32件、重複不可）を編集します。戻り値全体はJSONを読めればインデント付き、読めなければ元文字列を安全なテキストとして表示します。表示できることと回答スキーマの成功判定は別です。既知の秘密値は伏せます。
 
-Liveの応答テキストと1秒以上のWAVを表示し、認証付き音声APIからBlobを取得してネイティブプレーヤーで再生します。自動再生しません。一括試行中はLiveの一時音声を保持し、完了後も再読込可能です。再試行・画面移動では再生を停止し、Object URLを解放します。短い音声・音声なし・取得失敗は明示し、音声だけを再読込できます。
+Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付き音声APIからBlobを自動取得してネイティブプレーヤーで再生できる状態にします。自動再生しません。AIモデル・設定モデルとも、完了後のタブ移動では再生だけを停止し、結果と取得済み音声を保持します。再実行・設定再読込・切断・終了ではObject URLを解放します。通常は音声再読込の操作を求めず、取得・再生失敗時だけ「音声取得を再試行」を表示します。短い音声・音声なしは明示します。
 
 検証は実AIを使わず、`checks/manual-models.check.mjs`、`ui/src/AIモデル/checks/manual-state.check.mjs`、`backend_tools/tests/test_live_model_check.py` を使います。`DIAG_TEST_PYTHON` をTools依存環境のPythonへ設定すると `checks/model-trials-sdk.check.mjs` が実MCP SDKと合成AIで経路を確認します。`checks/manual-models-browser.mjs` は既存Chrome/Edgeの隔離プロファイルで4画面・幅1280/720/390・合成音声再生・破棄・一括試行・非JSON表示を確認します。UI変更後は依頼に応じて `backend_diag/ui` のビルドと `node backend_diag/ui/verify.mjs` で配布物を同期します。

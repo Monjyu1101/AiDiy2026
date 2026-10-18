@@ -6,10 +6,12 @@ const 待機 = ms => new Promise(resolve => setTimeout(resolve, ms));
 // 認証付き API と通知欄は App と共有し、キー試験には触れません。
 export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 = 80, 進捗間隔 = 250 }) {
   const 確認中 = ref(false), 確認済み = ref(false), 書込中 = ref(false), 書込済み = ref(false), 表示中 = ref(null);
+  const 前回実行日時 = ref(null);
   const 項目 = ref([]), 結果 = ref([]), 調査 = ref({});
   function 一覧を反映(data) {
     項目.value = data.項目;
     結果.value = data.結果;
+    前回実行日時.value = data.前回実行日時 || null;
     調査.value = data.調査 || {};
     確認済み.value = false; 書込済み.value = false;
   }
@@ -43,6 +45,7 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
         if (間隔) await 待機(間隔);
       }
       結果.value = data.結果;
+      前回実行日時.value = data.前回実行日時 || new Date().toISOString();
       確認済み.value = true;
       return true;
     } catch (error) { 待機中 = false; 結果.value = 前回; 通知.value = error.message; return false; }
@@ -58,5 +61,5 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
   }
   // 全テスト: 確認してから書き込む。
   async function 全テスト() { return await 状況確認() && await 書込(); }
-  return { 確認中, 確認済み, 書込中, 書込済み, 表示中, 項目, 結果, 調査, 一覧を反映, 状況確認, 書込, 全テスト };
+  return { 前回実行日時, 確認中, 確認済み, 書込中, 書込済み, 表示中, 項目, 結果, 調査, 一覧を反映, 状況確認, 書込, 全テスト };
 }

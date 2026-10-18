@@ -20,6 +20,33 @@ test('saved catalogs only, preserve outside values and auto, redact secrets, no 
  const reads=[],trials=createModelTrials({reader:()=>JSON.stringify(config),request:()=>assert.fail('network'),catalogReader:async name=>{reads.push(name);if(name==='chat_models')return {freeai_chat:{models:{catalog:'一覧', 'synthetic-secret':'bad'}}};throw Error('missing');}});
  try{const data=await trials.catalogs();assert.deepEqual(reads,['chat_models','live_models','decisions_models','code_models','live_voices']);assert.equal(data.区分.CHAT.プロバイダ[0].現在モデル,'saved-chat');assert.equal(data.区分.LIVE.状態,'未取得');assert.equal(data.区分.LIVE.プロバイダ[0].現在音声,'Zephyr');assert.ok(data.区分.DECISION.プロバイダ.find(p=>p.id==='auto').モデル.some(m=>m.id==='auto'));assert.ok(!JSON.stringify(data).includes('synthetic-secret'));}finally{await trials.close();}
 });
+test('Code controls lead every provider once, including saved controls and missing catalogs',async()=>{
+ for(const saved of ['auto','same','saved-code'])for(const missing of [false,true]){
+  const source={codex_cli:{models:{model:'Model',same:'old same',auto:'old auto'}},aidiy_hermes:{models:{'codex_cli/auto':'Codex'}}};
+  const before=JSON.stringify(source),settings={...config,CODE_AI1_MODEL:saved};
+  const trials=createModelTrials({reader:()=>JSON.stringify(settings),request:()=>assert.fail('network'),catalogReader:async name=>{if(missing)throw Error('missing');return name==='code_models'?source:{};}});
+  try{
+   const data=await trials.catalogs();
+   for(const provider of data.区分.CODE.プロバイダ){
+    const ids=provider.モデル.map(m=>m.id);
+    assert.deepEqual(ids.slice(0,2),['auto','same']);
+    assert.equal(ids.filter(id=>id==='auto').length,1);assert.equal(ids.filter(id=>id==='same').length,1);
+    assert.ok(provider.モデル.slice(0,2).every(m=>m.保存値===false));
+   }
+   assert.equal(data.初期値.CODE.model,saved);
+   assert.equal(data.区分.CODE.プロバイダ.find(p=>p.id==='codex_cli').現在モデル,saved);
+   if(!missing)assert.deepEqual(data.区分.CODE.プロバイダ.find(p=>p.id==='aidiy_hermes').モデル.map(m=>m.id),['auto','same','codex_cli/auto']);
+   assert.equal(JSON.stringify(source),before);
+  }finally{await trials.close();}
+ }
+});
+test('Code auto and same reach the existing MCP without replacement',async()=>{
+ const calls=[],trials=createModelTrials({reader:()=>JSON.stringify(config),statusFn:async()=>({online:true}),request:wire(calls)});
+ try{
+  for(const model of ['auto','same']){const start=await trials.start({manual:{...input('CODE'),model}});assert.equal((await trials.next(start.実行ID,'CODE1')).状態,'OK');}
+  assert.deepEqual(calls.filter(c=>c.body?.params?.name==='code_agents_run').map(c=>c.body.params.arguments.ai_model),['auto','same']);
+ }finally{await trials.close();}
+});
 test('invalid manual requests and offline fail before any transport call',async()=>{
  let online=true;const trials=createModelTrials({reader:()=>JSON.stringify(config),statusFn:async()=>({online}),request:()=>assert.fail('request')});
  try{for(const manual of [{...input(),provider:'unknown'},{...input(),prompt:''},{...input(),family:'TASK'},{...input(),extra:'bad'},{...input('LIVE'),voice:''},{...input('DECISION'),questions:[]}])await assert.rejects(()=>trials.start({manual}));online=false;await assert.rejects(()=>trials.start({manual:input()}),/Tools/);}finally{await trials.close();}

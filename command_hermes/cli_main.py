@@ -5006,6 +5006,40 @@ _AIDIY_WELCOME_TEXT = "Welcome to AiDiy Hermes! Type your message or /help for c
 
 _AIDIY_CONFIG_DIR = _PROJECT_ROOT.parent / "_config"
 _AIDIY_KEY_JSON = _AIDIY_CONFIG_DIR / "AiDiy_key.json"
+_AIDIY_CODE_CATALOG_KEYS = {
+    "claude-code": "claude_cli", "antigravity-cli": "antigravity_cli",
+    "codex-cli": "codex_cli", "copilot-cli": "copilot_cli",
+    "opencode": "opencode_cli", "grok-cli": "grok_cli",
+    "openai_oauth": "aidiy_hermes",
+}
+
+
+def _aidiy_code_model_labels(provider: str) -> List[Tuple[str, str]]:
+    """DiagのCode候補を毎回読み、Hermesの表示名・実行IDへ変換する。"""
+    key = _AIDIY_CODE_CATALOG_KEYS.get(provider)
+    if not key:
+        return []
+    filename = _AIDIY_CONFIG_DIR.parent / "_AIDIY" / "aidiy_diag" / "code_models_info.json"
+    try:
+        with filename.open(encoding="utf-8-sig") as source:
+            models = json.load(source)[key]["models"]
+        if not isinstance(models, dict):
+            return []
+        rows = []
+        for model, label in models.items():
+            if not isinstance(label, str) or not model.strip():
+                continue
+            if provider == "openai_oauth":
+                if not model.startswith("openai_oauth/"):
+                    continue
+                model = model.removeprefix("openai_oauth/")
+            if model.lower() not in {"auto", "same"}:
+                rows.append((label, model))
+        return rows
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 _OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
 _OLLAMA_CLOUD_SUFFIXES = (":cloud", ":cloude", ":clude")
@@ -12518,7 +12552,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         if provider == "local_chat":
             return cfg.get("CHAT_LOCAL_MODEL") or "google/gemma-4-E2B-it"
         if provider == _OPENAI_OAUTH_SLUG:
-            return _resolve_openai_oauth_model(cfg)
+            models = _aidiy_code_model_labels(provider)
+            return models[0][1] if models else _OPENAI_OAUTH_FALLBACK_MODEL
         if provider == _XAI_OAUTH_SLUG:
             return _XAI_OAUTH_DEFAULT_MODEL
         return cfg.get("CODE_AIDIY_HERMES_MODEL") or cfg.get("CHAT_OLLAMA_MODEL") or "deepseek-v4-flash:cloud"
@@ -12647,11 +12682,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     "base_url": "",
                     "api_key": "",
                     "api_mode": cli_def["api_mode"],
-                    "default_model": "auto",
+                    "default_model": "same",
                     "is_cli": True,
-                    "models": [("auto", "auto")],
-                    "total_models": 1,
+                    "models": [("same (変更なし)", "same"), *_aidiy_code_model_labels(provider)],
                 }
+                entry["total_models"] = len(entry["models"])
                 return entry
             return None
 
@@ -12989,7 +13024,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # hermes の auth store / credential pool に解決させる。
         auth_runtime = provider_entry.get("auth_runtime", False)
         if is_cli:
-            model_name = str(model_name or "").strip() or "auto"
+            model_name = str(model_name or "").strip() or "same"
+            if model_name.lower() in {"auto", "same"}:
+                model_name = "same"
         else:
             model_name = _model_from_display_label(model_name) or provider_entry.get("default_model") or self.model
             if provider_entry.get("slug") == "ollama" and provider_entry.get("base_url", "").rstrip("/") == _OLLAMA_CLOUD_BASE_URL:
@@ -13052,7 +13089,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 marker = "*" if entry.get("is_current") else " "
                 _cprint(f"   {marker} {entry['slug']:<12} {entry['name']}")
         if cli_entries:
-            _cprint("  CLI Providers (external, auto model):")
+            _cprint("  CLI Providers (external, same = default model):")
             for entry in cli_entries:
                 marker = "*" if entry.get("is_current") else " "
                 _cprint(f"   {marker} {entry['slug']:<12} {entry['name']}")
@@ -13101,7 +13138,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 _cprint(f"  Provider is not available: {explicit_provider}")
                 return True
             if provider_entry.get("is_cli"):
-                self._apply_aidiy_provider_model(provider_entry, "auto")
+                self._apply_aidiy_provider_model(provider_entry, "same")
                 return True
             models = provider_entry.get("models") or []
             if not models:
@@ -13165,7 +13202,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     def _fetch_aidiy_provider_model_labels(self, provider_entry: Dict[str, Any], limit: int = 12) -> List[Tuple[str, str]]:
         try:
             if provider_entry.get("slug") == _OPENAI_OAUTH_SLUG:
-                return self._fetch_aidiy_codex_model_labels(limit=limit)
+                return _aidiy_code_model_labels(_OPENAI_OAUTH_SLUG)[:limit]
             if provider_entry.get("slug") == _XAI_OAUTH_SLUG:
                 return [(model_id, model_id) for model_id in _xai_oauth_model_ids()[:limit]]
             if provider_entry.get("api_mode") == "anthropic_messages":
@@ -13260,11 +13297,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     self._close_model_picker()
                     return
                 provider_data = providers[selected]
-                # CLI providers use "auto" model — skip model selection stage
-                if provider_data.get("is_cli"):
-                    self._close_model_picker()
-                    self._apply_aidiy_provider_model(provider_data, "auto")
-                    return
                 state["stage"] = "model"
                 state["provider_data"] = provider_data
                 state["model_list"] = provider_data.get("models") or []
@@ -22011,8 +22043,8 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 _providers = state.get("providers")
                 for p in _providers if isinstance(_providers, list) else []:
                     if p.get("is_cli"):
-                        # AiDiy の外部 CLI provider はモデル固定（auto）。
-                        label = f"{p['name']} [CLI / auto]"
+                        count = p.get("total_models", len(p.get("models", [])))
+                        label = f"{p['name']} [CLI / {count} models]"
                     else:
                         count = p.get("total_models", len(p.get("models", [])))
                         label = f"{p['name']} ({count} model{'s' if count != 1 else ''})"
@@ -23220,7 +23252,7 @@ def _configure_aidiy_cli_provider(
     entry = cli._get_aidiy_provider_entry(slug, include_models=False)
     if not entry or not entry.get("is_cli"):
         return False
-    cli._apply_aidiy_provider_model(entry, requested_model or "auto")
+    cli._apply_aidiy_provider_model(entry, requested_model or "same")
     if resumed:
         cli._aidiy_cli_session_started[slug] = True
     return True

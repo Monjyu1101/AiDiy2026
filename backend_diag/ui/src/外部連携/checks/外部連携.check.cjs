@@ -30,10 +30,10 @@ test('外部連携の状況確認は設定を読み直してテストできる�
  const { キー設定状態を作成 } = await import('../../キー設定共通/キー設定状態.mjs');
  const 項目 = [{ id: 'openai', テスト可能: true }, { id: 'huggingface_read', テスト可能: true }, { id: 'huggingface_write', テスト可能: false }, { id: 'discord', テスト可能: true }];
  const calls = [];
- const api = async (url, method) => { calls.push(decodeURIComponent(url)); if (url === 'api/キー設定') return { 設定状態: '読込済み', 項目, 公開モデル: { 状態: '取得済', 件数: 0, 世代: 0 } }; if (url.startsWith('api/キーテスト/')) return { 状態: 'OK' }; return { 件数: 3 }; };
+ const api = async (url, method) => { calls.push(decodeURIComponent(url)); if (url.startsWith('api/キー設定')) return { 設定状態: '読込済み', 項目, 公開モデル: { 状態: '取得済', 件数: 0, 世代: 0 } }; if (url.startsWith('api/キーテスト/')) return { 状態: 'OK' }; return { 件数: 3 }; };
  const state = キー設定状態を作成({ api, connected: ref(true), message: ref('') });
  await state.外部連携確認();
- assert.deepEqual(calls, ['api/キー設定', 'api/キーテスト/huggingface_read', 'api/キーテスト/discord']);
+ assert.deepEqual(calls, ['api/キー設定/外部連携', 'api/キーテスト/huggingface_read', 'api/キーテスト/discord']);
  assert.equal(await state.外部連携書込(), true); assert.equal(state.integrationWritten.value, true); assert.equal(calls.at(-1), 'api/外部連携書込');
  calls.length = 0; state.keyResults.value = { ...state.keyResults.value, openai: { 状態: 'OK' } };
  await state.外部連携確認({ 再読込: false });

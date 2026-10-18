@@ -11,8 +11,20 @@ from unittest.mock import AsyncMock, patch
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from AIコア.AIコードモデル選択 import MODEL_CHOICES, select_model
+from AIコア.AIコードモデル選択 import MODEL_CHOICES, select_model, model_choices, fallback_model
 from test_code_cli_output_routing import _load_code_ai_module, _親
+
+
+GPT_MODELS = ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-astra"]
+CATALOG = {provider: dict.fromkeys(GPT_MODELS, "fixture") for provider in ("codex_cli", "copilot_cli", "opencode_cli")}
+
+CATALOG["opencode_cli"] = {f"openai/{model}": "fixture" for model in GPT_MODELS}
+CATALOG["aidiy_hermes"] = {f"openai_oauth/{model}": "fixture" for model in GPT_MODELS}
+
+def patch_catalog(case):
+    patcher = patch("AIコア.AIコードモデル選択.read_model_catalog", return_value=CATALOG)
+    patcher.start()
+    case.addCleanup(patcher.stop)
 
 
 def answer(model, **kwargs):
@@ -20,8 +32,71 @@ def answer(model, **kwargs):
 
 
 class SelectorTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        patch_catalog(self)
+
+    async def test_latest_numeric_versions_only_and_old_answers_rejected(self):
+        ids = ['auto', 'same', 'gpt-8.9-sol', 'gpt-8.10-sol', 'gpt-8.10-sol-900k',
+               'gpt-7-terra', 'gpt-7.2-terra', 'gpt-8-luna', 'gpt-8-astra',
+               'gpt-99-pro', 'claude-sonnet-99', 'openai/gpt-99-sol']
+        expected = ['gpt-8.10-sol', 'gpt-7.2-terra', 'gpt-8-luna', 'gpt-8-astra']
+        for provider in ('codex_cli', 'copilot_cli'):
+            choices = model_choices(provider, {provider: dict.fromkeys(ids, 'fixture')})
+            self.assertEqual([item['value'] for item in choices], expected)
+            self.assertEqual(fallback_model(provider, choices), expected[0])
+            for returned in (expected[0], 'gpt-8.9-sol'):
+                def handler(req):
+                    if req.method == 'GET':
+                        return httpx.Response(200, json={'status': 'OK', 'data': {'available': True}})
+                    question = json.loads(req.content)['questions'][0]
+                    self.assertEqual([item['value'] for item in question['choices']], expected)
+                    self.assertIn('astraは明示指定時だけ', question['instructions'])
+                    self.assertIn('言及・比較・引用・否定', question['instructions'])
+                    return httpx.Response(200, json=answer(returned))
+                self.assertEqual(await select_model(provider, '', '依頼', choices=choices,
+                    transport=httpx.MockTransport(handler)), returned if returned == expected[0] else '')
+
+    async def test_missing_families_are_not_invented_and_empty_catalog_skips_http(self):
+        for provider in ('codex_cli', 'copilot_cli'):
+            choices = model_choices(provider, {provider: {'gpt-9-luna': '', 'gpt-10-astra': ''}})
+            self.assertEqual([item['value'] for item in choices], ['gpt-9-luna', 'gpt-10-astra'])
+            self.assertEqual(fallback_model(provider, choices), 'gpt-9-luna')
+            self.assertEqual(fallback_model(provider, choices[1:]), 'same')
+            with patch('AIコア.AIコードモデル選択.read_model_catalog', return_value={}):
+                self.assertEqual(await select_model(provider, '', '依頼',
+                    transport=httpx.MockTransport(lambda req: self.fail('HTTP must not run'))), '')
+
+    async def test_prefixed_models_use_latest_own_catalog_and_require_exact_prefix(self):
+        for provider, prefix in (('aidiy_hermes', 'openai_oauth/'), ('opencode_cli', 'openai/')):
+            catalog = {
+                'codex_cli': {'gpt-99-sol': ''},
+                provider: dict.fromkeys([
+                    prefix+'gpt-8.9-sol', prefix+'gpt-8.10-sol',
+                    prefix+'gpt-7-terra', prefix+'gpt-8-luna', prefix+'gpt-8-astra',
+                    prefix+'gpt-99-sol-900k', prefix+'gpt-99-pro',
+                    'openrouter/gpt-99-sol', 'codex_cli/auto', 'gpt-99-sol', 'auto', 'same'], ''),
+            }
+            expected = [prefix+'gpt-8.10-sol', prefix+'gpt-7-terra',
+                        prefix+'gpt-8-luna', prefix+'gpt-8-astra']
+            choices = model_choices(provider, catalog)
+            self.assertEqual([item['value'] for item in choices], expected)
+            self.assertEqual(fallback_model(provider, choices), expected[0])
+            self.assertEqual(model_choices(provider, {'codex_cli': catalog['codex_cli']}), [])
+            for returned in (expected[0], 'gpt-8.10-sol', prefix+'gpt-8.9-sol'):
+                def handler(req):
+                    if req.method == 'GET':
+                        return httpx.Response(200, json={'status': 'OK', 'data': {'available': True}})
+                    question = json.loads(req.content)['questions'][0]
+                    self.assertEqual([item['value'] for item in question['choices']], expected)
+                    self.assertIn('astraは明示指定時だけ', question['instructions'])
+                    return httpx.Response(200, json=answer(returned))
+                self.assertEqual(await select_model(provider, '', '依頼', choices=choices,
+                    transport=httpx.MockTransport(handler)), returned if returned == expected[0] else '')
+
     async def test_candidate_mapping_and_full_history(self):
         expected = {"codex_cli": ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-astra"], "copilot_cli": ["gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-astra"], "claude_cli": ["sonnet", "haiku", "fable"]}
+        expected["opencode_cli"] = list(CATALOG["opencode_cli"])
+        expected["aidiy_hermes"] = list(CATALOG["aidiy_hermes"])
         for provider, models in expected.items():
             for model in models:
                 calls = []
@@ -65,6 +140,9 @@ class SelectorTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        patch_catalog(self)
+
     @classmethod
     def setUpClass(cls):
         cls.module = _load_code_ai_module()
@@ -78,6 +156,24 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def run_code(self, code, text, **kwargs):
         with patch.dict(os.environ, {f"{code.code_ai.upper()}_CLI_PATH": "test_cli"}), redirect_stdout(io.StringIO()):
             return await code.実行(text, **kwargs)
+
+    async def test_copilot_and_opencode_use_latest_catalog_each_turn(self):
+        for provider in ('copilot_cli', 'opencode_cli'):
+            code, parent = self.instance(provider)
+            for version in ('8.9', '8.10'):
+                prefix = 'openai/' if provider == 'opencode_cli' else ''
+                model = f'{prefix}gpt-{version}-sol'
+                catalog = {provider: {prefix+'gpt-6.1-sol': '', model: '', prefix+'gpt-8-astra': ''}}
+                for selected in (model, ''):
+                    with patch('AIコア.AIコードモデル選択.read_model_catalog', return_value=catalog), patch(
+                        'AIコア.AIコードモデル選択.select_model', new=AsyncMock(return_value=selected)
+                    ) as select, patch.object(code, '_subprocess実行', new=AsyncMock(return_value='ok')) as process:
+                        await self.run_code(code, '作業を続けて')
+                    self.assertEqual([item['value'] for item in select.call_args.kwargs['choices']], [model, prefix+'gpt-8-astra'])
+                    command = process.call_args.kwargs['command']
+                    self.assertEqual(command[command.index('--model') + 1], model)
+                    self.assertEqual(code.code_model, 'auto')
+                    self.assertEqual(code.最終実行モデル, model)
 
     async def test_history_selection_is_per_turn_and_notification_precedes_stream(self):
         code, parent = self.instance()
@@ -103,9 +199,9 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([m["メッセージ内容"] for m in parent.接続.messages], ["[選択モデル: gpt-5.6-terra]\n", "CLI先頭", "[選択モデル: gpt-6.1-sol]\n", "CLI先頭"])
 
     async def test_failed_selection_notifies_before_cli_and_uses_fallback(self):
-        fallback = {"codex_cli": "gpt-6.1-sol", "copilot_cli": "gpt-6.1-sol",
+        fallback = {"codex_cli": "gpt-6.1-sol", "copilot_cli": "gpt-6.1-sol", "opencode_cli": "openai/gpt-6.1-sol",
                     "claude_cli": "sonnet", "aidiy_hermes": "openai_oauth/gpt-6.1-sol"}
-        for provider in (*MODEL_CHOICES, "antigravity_cli", "grok_cli", "opencode_cli", "aidiy_hermes", "claude_ollama", "codex_ollama"):
+        for provider in (*MODEL_CHOICES, "antigravity_cli", "grok_cli", "claude_ollama", "codex_ollama"):
             code, parent = self.instance(provider)
             parent.モデル設定 = {"CHAT_OLLAMA_MODEL": "must-not-be-used"}
             async def run(**kwargs):
@@ -128,9 +224,9 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(parent.接続.messages, [])
 
     async def test_explicit_and_same_skip_selection(self):
-        for provider, model in (("codex_cli", "gpt-6-astra"), ("copilot_cli", "gpt-6-astra"), ("claude_cli", "fable"), ("claude_cli", "same"), ("aidiy_hermes", "openai_oauth/gpt-6-astra"), ("aidiy_hermes", "same")):
+        for provider, model in (("codex_cli", "gpt-6-astra"), ("copilot_cli", "gpt-6-astra"), ("copilot_cli", "same"), ("opencode_cli", "openai/gpt-6-astra"), ("opencode_cli", "same"), ("claude_cli", "fable"), ("claude_cli", "same"), ("aidiy_hermes", "openai_oauth/gpt-6-astra"), ("aidiy_hermes", "same")):
             code, parent = self.instance(provider, model)
-            with patch("AIコア.AIコードモデル選択.select_model", new=AsyncMock()) as select, patch.object(code, "_subprocess実行", new=AsyncMock(return_value="ok")) as process:
+            with patch("AIコア.AIコードモデル選択.select_model", new=AsyncMock()) as select, patch.object(code, "_opencode最終選択モデル", return_value=""), patch.object(code, "_subprocess実行", new=AsyncMock(return_value="ok")) as process:
                 await self.run_code(code, "依頼")
             select.assert_not_awaited()
             command = process.call_args.kwargs["command"]
@@ -143,21 +239,36 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("--model", command)
             self.assertEqual(parent.接続.messages, [])
 
-    async def test_hermes_uses_codex_selection_with_oauth_prefix_each_turn(self):
+    async def test_hermes_uses_own_catalog_with_oauth_prefix_each_turn(self):
         code, parent = self.instance("aidiy_hermes")
-        for choice in MODEL_CHOICES["codex_cli"]:
+        for choice in model_choices("aidiy_hermes"):
             model = choice["value"]
             with self.subTest(model=model), patch("AIコア.AIコードモデル選択.select_model", new=AsyncMock(return_value=model)) as select, patch.object(code, "_subprocess実行", new=AsyncMock(return_value="前の回答")) as process:
                 await self.run_code(code, "今回の依頼")
-            self.assertEqual(select.call_args.args[0], "codex_cli")
+            self.assertEqual(select.call_args.args[0], "aidiy_hermes")
             command = process.call_args.kwargs["command"]
-            expected = f"openai_oauth/{model}"
+            expected = model
             self.assertEqual(command[command.index("--model") + 1], expected)
             self.assertEqual(select.call_args.args[2], process.call_args.kwargs["stdin_text"])
             self.assertEqual(code.最終実行モデル, expected)
             self.assertEqual(parent.接続.messages[-1]["メッセージ内容"], f"[選択モデル: {expected}]\n")
             self.assertEqual(code.code_model, "auto")
         self.assertIn("前の回答", select.call_args.args[1])
+
+    async def test_hermes_failure_uses_latest_oauth_and_empty_catalog_keeps_same(self):
+        for models, expected in (({'openai_oauth/gpt-8-sol': '', 'openai_oauth/gpt-9-sol': ''},
+                                  'openai_oauth/gpt-9-sol'), ({}, 'same')):
+            code, parent = self.instance('aidiy_hermes')
+            with patch('AIコア.AIコードモデル選択.read_model_catalog', return_value={
+                'aidiy_hermes': models, 'codex_cli': {'gpt-99-sol': ''}
+            }), patch('AIコア.AIコードモデル選択.select_model', new=AsyncMock(return_value='')), patch.object(
+                code, '_subprocess実行', new=AsyncMock(return_value='ok')
+            ) as process:
+                await self.run_code(code, '依頼')
+            command = process.call_args.kwargs['command']
+            self.assertEqual(command[command.index('--model') + 1], expected)
+            self.assertEqual(code.code_model, 'auto')
+            self.assertEqual(code.最終実行モデル, '' if expected == 'same' else expected)
 
     async def test_new_conversation_drops_old_history(self):
         code, _ = self.instance()
@@ -170,7 +281,7 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_stop_during_selection_does_not_launch_cli(self):
         code, parent = self.instance()
-        async def stop(*args):
+        async def stop(*args, **kwargs):
             parent.強制停止フラグ = True
             return "gpt-6.1-sol"
         with patch("AIコア.AIコードモデル選択.select_model", side_effect=stop), patch.object(code, "_subprocess実行", new=AsyncMock()) as process:

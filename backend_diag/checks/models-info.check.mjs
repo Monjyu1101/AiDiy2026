@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {modelsInfo,writeModelsInfo as saveModelsInfo,installedCodeClis,MODEL_PROVIDER_IDS,modelsInfoFile} from '../モデル情報/models_info.mjs';
+import {modelsInfo,writeModelsInfo as saveModelsInfo,installedCodeClis,openCodeModels,MODEL_PROVIDER_IDS,modelsInfoFile} from '../モデル情報/models_info.mjs';
 import {probe} from '../runtime/model_probe.mjs';
 import {createHandler} from '../diag_main.mjs';
 
@@ -13,7 +13,7 @@ const read=async name=>{reads.push(name);throw Error('must not read model config
 const now=()=>new Date('2026-10-15T00:00:00Z');
 const emptyDefaults={chat:{},live:{},code:{aidiy_hermes:{models:{auto:'仮設定（未検証） - auto'}}}};
 const allClis={copilot_cli:true,claude_cli:true,codex_cli:true,antigravity_cli:true,grok_cli:true,opencode_cli:true};
-const writeModelsInfo=(providers,results,options={})=>saveModelsInfo(providers,results,{installedClis:allClis,configReader:()=> '{}',...options});
+const writeModelsInfo=(providers,results,options={})=>saveModelsInfo(providers,results,{installedClis:allClis,configReader:()=> '{}',antigravityModelsReader:async()=>({'gemini-cli':'yyyy/mm/dd - gemini-cli'}),...options});
 const ok=(extra={})=>({状態:'OK',説明:'ok',確認日時:'2026-10-15T00:00:00Z',モデル:['m1'],モデル詳細:[{model_id:'m1',作成日:'2026/10/01',トークン数:'100',モダリティ:'text'}],...extra});
 
 test('no provider inserts xx/auto and partial merges discard old inserted records',async()=>{
@@ -30,7 +30,7 @@ test('no provider inserts xx/auto and partial merges discard old inserted record
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('merged code includes only installed CLIs and Hermes starts with installed auto routes',async()=>{
+test('merged code includes only installed CLIs and Hermes starts with installed same routes',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-enabled-clis-'));
  const providers=MODEL_PROVIDER_IDS.map(id=>({id,名前:id}));
  const results=Object.fromEntries(providers.map(({id})=>[id,ok()]));
@@ -38,14 +38,14 @@ test('merged code includes only installed CLIs and Hermes starts with installed 
  try{
   await writeModelsInfo(providers,results,{directory,now});
   let code=await load();
-  assert.deepEqual(Object.keys(code.aidiy_hermes.models),[...Object.keys(allClis).map(key=>key+'/auto'),'openai_oauth/m1']);
+  assert.deepEqual(Object.keys(code.aidiy_hermes.models),[...Object.keys(allClis).map(key=>key+'/same'),'openai_oauth/m1']);
   for(const cli of Object.keys(allClis)){
    // 保存済みデータも、今回の導入状況に合わせて絞る。
    await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{...allClis,[cli]:false}});
    code=await load();
    assert.equal(Object.hasOwn(code,cli),false,cli);
    if(cli==='claude_cli')assert.equal(Object.hasOwn(code,'claude_sdk'),false);
-   assert.deepEqual(Object.keys(code.aidiy_hermes.models),[...Object.keys(allClis).filter(key=>key!==cli).map(key=>key+'/auto'),'openai_oauth/m1']);
+   assert.deepEqual(Object.keys(code.aidiy_hermes.models),[...Object.keys(allClis).filter(key=>key!==cli).map(key=>key+'/same'),'openai_oauth/m1']);
   }
   await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{}});
   code=await load();
@@ -83,13 +83,12 @@ test('Copilot standalone fallback is used only when installed and merged models 
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('Gemini generates chat, live and code candidates from acquired models',async()=>{
+test('Gemini generates chat and live candidates, independently of Antigravity',async()=>{
  const info=await modelsInfo({id:'gemini',名前:'Gemini'},ok({ライブ候補:['gemini-3.8-live']}),{read,now});
  assert.equal(info.プロバイダ,'gemini');assert.equal(info.chat.件数,1);assert.deepEqual(info.chat.モデル[0],{model_id:'m1',作成日:'2026/10/01',トークン数:'100',モダリティ:'text'});
  assert.equal(info.形式,2);assert.deepEqual(info.chat.gemini_chat.models,{m1:'2026/10/01 - m1'});
  assert.deepEqual(info.live,{gemini_live:{models:{'gemini-3.8-live':'yyyy/mm/dd - gemini-3.8-live'}}});
- assert.deepEqual(info.code.antigravity_cli.models,info.chat.gemini_chat.models);
- assert.deepEqual(Object.keys(info.code),['antigravity_cli']);
+ assert.equal(info.code,undefined);
  const candidates=['gemini-2.5-native-audio','gemini-robotics-er-2-streaming-preview','gemini-3.8-live','gemini-3.5-transcribe-live','gemini-3.5-live-translate-preview','gemini-4-live-translate','gemini-native-audio-translate','gemini-3.1-live','gemini-chat','lyria-live'];
  for(const id of ['gemini','freeai']){
   const filtered=await modelsInfo({id,名前:id},ok({モデル詳細:[{model_id:'gemini-chat'},{model_id:'lyria-3-pro-preview'}],ライブ候補:candidates,ライブ候補作成日:{'gemini-2.5-native-audio':'2026/10/15','gemini-3.8-live':'2025/01/01'}}),{now});
@@ -102,7 +101,7 @@ test('Gemini generates chat, live and code candidates from acquired models',asyn
 test('each provider follows the main app grouping without reading model configuration',async()=>{
  const shapes={};
  for(const id of MODEL_PROVIDER_IDS){const info=await modelsInfo({id,名前:id},ok(),{read,now});shapes[id]=[!!info.chat,!!info.live,Object.keys(info.code??{})];}
- assert.deepEqual(shapes,{gemini:[true,true,['antigravity_cli']],freeai:[true,true,[]],claude:[true,false,['claude_sdk','claude_cli','copilot_cli']],openai:[true,true,['codex_cli','copilot_cli']],openai_oauth:[true,false,['codex_cli','copilot_cli','aidiy_hermes']],grok:[true,false,['grok_cli']],openrt:[true,false,[]],ollama:[true,false,['opencode_cli']],local:[true,false,[]]});
+ assert.deepEqual(shapes,{gemini:[true,true,[]],freeai:[true,true,[]],claude:[true,false,['claude_sdk','claude_cli','copilot_cli']],openai:[true,true,['codex_cli','copilot_cli']],openai_oauth:[true,false,['codex_cli','copilot_cli','aidiy_hermes']],grok:[true,false,['grok_cli']],openrt:[true,false,[]],ollama:[true,false,['opencode_cli']],local:[true,false,[]]});
  const local=await modelsInfo({id:'local',名前:'local'},{状態:'PASS',モデル詳細:[{model_id:'google/gemma-4-E2B-it'}]},{read:async name=>{throw Error('must not read '+name);},now});
  assert.match(local.chat.取得元,/固定候補/);assert.equal(local.chat.local_chat.models['google/gemma-4-E2B-it'],'google/gemma-4-E2B-it / 約10GB bf16 / 速い (default)');
  const claude=await modelsInfo({id:'claude',名前:'Claude'},ok({モデル詳細:[{model_id:'claude-haiku-5-5',作成日:'2026/10/07'},{model_id:'claude-opus-5',作成日:'2026/07/24'},{model_id:'claude-haiku-5',作成日:'2026/06/01'}]}),{read,now});
@@ -307,7 +306,7 @@ test('empty Live without configuration stays empty and Code keeps its fixed prov
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('OpenCode keeps non-Claude Copilot IDs, labels and order with independent installation gates',async()=>{
+test('OpenCode mirrors Codex IDs, labels and order with independent installation gates',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-opencode-mirror-'));
  const load=async kind=>JSON.parse(await readFile(path.join(directory,modelsInfoFile(kind)),'utf8'));
  const providers=['claude','openai','ollama'].map(id=>({id,名前:id}));
@@ -315,21 +314,23 @@ test('OpenCode keeps non-Claude Copilot IDs, labels and order with independent i
  try {
   await writeModelsInfo(providers,results,{directory,installedClis:{copilot_cli:true,opencode_cli:true,codex_cli:true}});
   const both=await load('code'),chat=await load('chat'),decisions=await load('decisions');
-  assert.deepEqual(Object.entries(both.opencode_cli.models),Object.entries(both.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
+  assert.deepEqual(Object.entries(both.opencode_cli.models),Object.entries(openCodeModels(both.codex_cli.models)));
   assert.equal(both.opencode_cli.models['ollama-only'],undefined);
-  assert.ok(Object.keys(both.copilot_cli.models).some(id=>id.startsWith('claude-')));assert.ok(!Object.keys(both.opencode_cli.models).some(id=>id.startsWith('claude-')));assert.ok(both.opencode_cli.models['gpt-6-luna']);
+  assert.ok(Object.keys(both.copilot_cli.models).some(id=>id.startsWith('claude-')));assert.ok(!Object.keys(both.opencode_cli.models).some(id=>id.startsWith('claude-')));assert.ok(both.opencode_cli.models['openai/gpt-6-luna']);
   await writeModelsInfo([],{}, {directory,installedClis:{opencode_cli:true,codex_cli:true}});
   const only=await load('code');
   assert.equal(only.copilot_cli,undefined);
-  assert.deepEqual(Object.entries(only.opencode_cli.models),Object.entries(both.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
+  assert.deepEqual(Object.entries(only.opencode_cli.models),Object.entries(openCodeModels(both.codex_cli.models)));
   assert.deepEqual(only.codex_cli,both.codex_cli);
+  await writeModelsInfo([],{}, {directory,installedClis:{opencode_cli:true}});
+  const independent=await load('code');assert.equal(independent.codex_cli,undefined);assert.deepEqual(independent.opencode_cli.models,openCodeModels(both.codex_cli.models));
   assert.deepEqual(await load('chat'),chat);assert.deepEqual(await load('decisions'),decisions);
   await writeModelsInfo([],{}, {directory,installedClis:{copilot_cli:true}});
   assert.equal((await load('code')).opencode_cli,undefined);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('OpenCode alone filters Claude from the shared empty-source fallback',async()=>{
+test('OpenCode alone uses the same eight-model fallback as Copilot',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-opencode-fallback-'));
  const load=async()=>JSON.parse(await readFile(path.join(directory,modelsInfoFile('code')),'utf8'));
  try {
@@ -337,8 +338,8 @@ test('OpenCode alone filters Claude from the shared empty-source fallback',async
   const models=(await load()).copilot_cli.models;assert.equal(Object.keys(models).length,8);assert.ok(Object.keys(models).some(id=>id.startsWith('claude-')));
   await writeModelsInfo([],{}, {directory,installedClis:{opencode_cli:true}});
   const code=await load();assert.equal(code.copilot_cli,undefined);
-  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(models).filter(([id])=>!id.startsWith('claude-')));
-  assert.ok(code.aidiy_hermes.models['opencode_cli/auto']);
+  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(openCodeModels(models)));
+  assert.ok(code.aidiy_hermes.models['opencode_cli/same']);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
@@ -350,10 +351,17 @@ test('failed model acquisition supplements both CLIs without claiming authentica
   const results={openai:{状態:'NG',認証確認:false,説明:'fixture unavailable',モデル詳細:[]}};
   await writeModelsInfo(providers,results,{directory,installedClis:{copilot_cli:true,opencode_cli:true}});
   const code=await load('code');
-  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(code.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
-  assert.equal(Object.keys(code.opencode_cli.models).length,4);assert.equal(Object.keys(code.copilot_cli.models).length,8);
+  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(openCodeModels(code.copilot_cli.models)));
+  assert.equal(Object.keys(code.opencode_cli.models).length,8);assert.equal(Object.keys(code.copilot_cli.models).length,8);
   assert.deepEqual(Object.keys(code.opencode_cli),['models']);
   const source=await load('openai');assert.equal(source.状態,'NG');assert.notEqual(source.認証確認,true);
   assert.deepEqual(await load('decisions'),{});
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+
+test('OpenCode prefixes model IDs and labels once, preserving date and control options',()=>{
+ const expected={'openai/gpt-8-sol':'2026/10/18 - openai/gpt-8-sol',auto:'auto',same:'same'};
+ assert.deepEqual(openCodeModels({'gpt-8-sol':'2026/10/18 - gpt-8-sol',auto:'auto',same:'same'}),expected);
+ assert.deepEqual(openCodeModels(expected),expected);
 });

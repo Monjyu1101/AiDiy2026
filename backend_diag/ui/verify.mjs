@@ -5,7 +5,7 @@ import path from 'node:path';
 const root=fileURLToPath(new URL('.',import.meta.url));
 async function files(directory){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const filename=path.join(directory,entry.name);if(entry.name==='checks' && entry.isDirectory())continue;if(entry.isDirectory())result.push(...await files(filename));else result.push(filename);}return result;}
 export async function manifest(directory=root){
-  const names=[...await files(path.join(directory,'src')),...await files(path.join(directory,'../runtime')),path.join(directory,'../モデル試行/defaults.mjs'),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),path.join(directory,'tsconfig.runtime.json'),...['app.js','style.css','index.html','AiDiy_diag.png'].map(name=>path.join(directory,'../static',name))];
+  const names=[path.join(directory,'../../frontend_ide/src/共通表示/シアンバー.css'),...await files(path.join(directory,'src')),...await files(path.join(directory,'../runtime')),path.join(directory,'../モデル試行/defaults.mjs'),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),path.join(directory,'tsconfig.runtime.json'),...['app.js','style.css','index.html','AiDiy_diag.png'].map(name=>path.join(directory,'../static',name))];
   // Git の Windows checkout による CRLF だけを正規化。将来の画像等は生バイトで比較する。
   const entries=await Promise.all(names.map(async name=>{
     const relative=path.relative(directory,name).replaceAll('\\','/');

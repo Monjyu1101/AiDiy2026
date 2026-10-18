@@ -1,4 +1,4 @@
-// ../runtime/environment_proxy.ts
+// backend_diag/runtime/environment_proxy.ts
 import http from "node:http";
 import https from "node:https";
 import tls from "node:tls";

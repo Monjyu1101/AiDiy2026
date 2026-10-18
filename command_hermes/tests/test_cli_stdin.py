@@ -209,7 +209,7 @@ class CliStdinTest(unittest.TestCase):
                     resumed=True,
                 )
                 self.assertIs(configured, True)
-                self.assertEqual(({"slug": provider, "is_cli": True}, "auto"), fake.applied)
+                self.assertEqual(({"slug": provider, "is_cli": True}, "same"), fake.applied)
                 self.assertIs(fake._aidiy_cli_session_started[provider], True)
 
     def test_external_cli_explicit_model_is_preserved(self):
@@ -300,7 +300,10 @@ class CliStdinTest(unittest.TestCase):
         self.assertEqual("統合回答\n", stdout.getvalue())
         self.assertIn("session_id: main-external-session", stderr.getvalue())
 
-    def test_external_cli_commands_leave_model_selection_to_each_cli(self):
+    @patch.object(cli_main, "_aidiy_cli_command_path", side_effect=lambda slug: {
+        "copilot-cli":"copilot", "codex-cli":"codex", "claude-code":"claude", "antigravity-cli":"agy",
+    }[slug])
+    def test_external_cli_commands_leave_model_selection_to_each_cli(self, _path):
         with patch.object(cli_main, "_aidiy_cli_code_permissions", return_value="none"):
             commands = {
                 provider: cli_main._aidiy_cli_build_command(

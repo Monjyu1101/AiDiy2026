@@ -31,7 +31,8 @@ class HermesCliModelRoutesTests(unittest.IsolatedAsyncioTestCase):
             for model in ("auto", "same", "fixture-model"):
                 with self.subTest(name=name, model=model):
                     command = self.command(name+"/"+model)
-                    self.assertEqual(command, ["fixture-cli", "-Q", "--provider", slug, "--model", model, "--oneshot-stdin"])
+                    model_args = [] if model in {"auto", "same"} else ["--model", model]
+                    self.assertEqual(command, ["fixture-cli", "-Q", "--provider", slug] + model_args + ["--oneshot-stdin"])
 
     def test_api_models_auto_same_and_local_chat_keep_existing_arguments(self):
         for model in ("openai_oauth/fixture-model", "freeai/fixture-model", "xai-oauth/fixture-model", "some/model"):
@@ -65,7 +66,7 @@ class HermesCliModelRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "OK")
         self.assertEqual(module.CodeAgent.call_args.kwargs["AI_MODEL"], "copilot_cli/auto")
         call = code._subprocess実行.call_args.kwargs
-        self.assertEqual(call["command"], ["fixture-cli", "-Q", "--provider", "copilot-cli", "--model", "auto", "--oneshot-stdin"])
+        self.assertEqual(call["command"], ["fixture-cli", "-Q", "--provider", "copilot-cli", "--oneshot-stdin"])
         self.assertIn("おはよう", call["stdin_text"])
         self.assertNotIn("おはよう", call["command"])
         code.終了.assert_awaited_once()

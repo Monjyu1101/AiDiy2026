@@ -330,6 +330,28 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["STDERR_PROGRESS"], streamed)
         self.assertEqual("STDERR_PROGRESS", code_ai.last_stderr_output)
 
+    @unittest.skipUnless(os.name == "nt", "Windows console visibility")
+    async def test_antigravity_child_command_has_no_visible_console(self):
+        code_ai, parent = self._code_ai("antigravity_cli")
+        # CLIが通常の子コマンドを起動するケース。親だけの非表示では不足する。
+        inspect_console = (
+            "import ctypes,json,sys; "
+            "kernel=ctypes.windll.kernel32; user=ctypes.windll.user32; "
+            "kernel.GetConsoleWindow.restype=ctypes.c_void_p; "
+            "user.IsWindowVisible.argtypes=[ctypes.c_void_p]; "
+            "print(json.dumps({'visible':bool(user.IsWindowVisible(kernel.GetConsoleWindow()))})); "
+            "print('CHILD_PROGRESS',file=sys.stderr)"
+        )
+        script = (
+            "import subprocess,sys; "
+            f"sys.exit(subprocess.call([sys.executable,'-c',{inspect_console!r}]))"
+        )
+        result = await code_ai._antigravity実行(
+            [sys.executable, "-c", script], cwd=str(PROJECT_ROOT), timeout=10,
+        )
+        self.assertFalse(json.loads(result)["visible"])
+        self.assertEqual(["CHILD_PROGRESS"], [m["メッセージ内容"] for m in parent.接続.messages])
+
     async def test_codex_and_claude_keep_existing_stdout_stream_behavior(self):
         for provider in ("codex_cli", "claude_cli"):
             with self.subTest(provider=provider):

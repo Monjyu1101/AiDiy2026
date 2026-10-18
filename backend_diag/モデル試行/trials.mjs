@@ -153,10 +153,16 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         if(family==='CODE'&&!providers.some(p=>p.id==='auto'))providers.unshift({id:'auto',モデル:[]});
         for(const provider of providers){
           const prefix=family==='CHAT'?CHAT[provider.id]:family==='LIVE'?LIVE[provider.id]:null;
-          const configKey=prefix?`${family}_${prefix}_MODEL`:family==='DECISION'?{openai_oauth:'DECISION_OAUTH_MODEL',openai_jsonchat:'DECISION_OAUTH_MODEL',openai_decisions:'DECISION_OPENAI_MODEL',freeai_chat:'DECISION_FREEAI_MODEL',gemini_chat:'DECISION_GEMINI_MODEL'}[provider.id]:null;
-          const saved=label(configKey?s.config[configKey]??(family==='DECISION'?s.config.DECISION_AI_MODEL:''):s.rows.find(row=>row.区分===family&&row.プロバイダ===provider.id)?.モデル);
+          const configKey=prefix?`${family}_${prefix}_MODEL`:family==='DECISION'?{openai_oauth:'DECISION_OAUTH_MODEL',openai_jsonchat:'DECISION_OAUTH_MODEL',openai_decisions:'DECISION_OPENAI_MODEL',freeai_chat:'DECISION_FREEAI_MODEL',gemini_chat:'DECISION_GEMINI_MODEL'}[provider.id]:family==='CODE'&&!['auto','same'].includes(provider.id)?`CODE_${provider.id.toUpperCase()}_MODEL`:null;
+          const rowModel=s.rows.find(row=>row.区分===family&&row.プロバイダ===provider.id)?.モデル;
+          const saved=label(configKey?s.config[configKey]??(family==='DECISION'?s.config.DECISION_AI_MODEL:family==='CODE'?rowModel:''):rowModel);
           if(saved&&redact(saved,s.config)===saved){provider.現在モデル=saved;if(!provider.モデル.some(m=>m.id===saved))provider.モデル.push({id:saved,名前:saved+'（保持値・Diag一覧外／未確認）',保存値:true});}
-          if(['DECISION','CODE'].includes(family)&&!provider.モデル.some(m=>m.id==='auto'))provider.モデル.unshift({id:'auto',名前:'auto（既定モデル）',保存値:false});
+          if(family==='CODE')provider.モデル=[
+            {id:'auto',名前:'auto (自動判定)',保存値:false},
+            {id:'same',名前:'same (変更なし)',保存値:false},
+            ...provider.モデル.filter(m=>!['auto','same'].includes(m.id)),
+          ];
+          if(family==='DECISION'&&!provider.モデル.some(m=>m.id==='auto'))provider.モデル.unshift({id:'auto',名前:'auto（既定モデル）',保存値:false});
         }
         families[family]={状態:state,プロバイダ:providers};
       }

@@ -579,8 +579,8 @@ class CodeAI:
             }
             provider, separator, model = (self.code_model or "").partition("/")
             if separator and provider in cli_providers and model:
-                return base + ["-Q", "--provider", cli_providers[provider],
-                               "--model", model, "--oneshot-stdin"]
+                model_args = [] if model.lower() in {"auto", "same"} else ["--model", model]
+                return base + ["-Q", "--provider", cli_providers[provider]] + model_args + ["--oneshot-stdin"]
 
             _model = self._ollama_cloud_suffix除去(self.code_model)
             if (_model or "").lower() == "same":
@@ -1121,17 +1121,16 @@ class CodeAI:
             実行モデル = self.code_model
             if (self.code_model or "").strip().lower() == "auto":
                 実行モデル = "same"
-                判断CLI = "codex_cli" if self.code_ai == "aidiy_hermes" else self.code_ai
-                if 判断CLI in ("codex_cli", "claude_cli", "copilot_cli"):
-                    from AIコア.AIコードモデル選択 import select_model
+                判断CLI = self.code_ai
+                if 判断CLI in ("codex_cli", "claude_cli", "copilot_cli", "opencode_cli", "aidiy_hermes"):
+                    from AIコア.AIコードモデル選択 import select_model, model_choices, fallback_model
+                    候補 = model_choices(判断CLI)
                     選択モデル = await select_model(
-                        判断CLI, "" if 初回送信 else 履歴テキスト, 完全プロンプト,
+                        判断CLI, "" if 初回送信 else 履歴テキスト, 完全プロンプト, choices=候補,
                     )
                     モデル選択失敗 = not 選択モデル
                     if モデル選択失敗:
-                        選択モデル = "sonnet" if 判断CLI == "claude_cli" else "gpt-6.1-sol"
-                    if self.code_ai == "aidiy_hermes":
-                        選択モデル = f"openai_oauth/{選択モデル}"
+                        選択モデル = fallback_model(判断CLI, 候補)
                     実行モデル = 選択モデル
             self.最終実行モデル = "" if (実行モデル or "").lower() in ("", "auto", "same") else 実行モデル
             if self._強制停止要求あり():
@@ -1183,7 +1182,7 @@ class CodeAI:
             except Exception:
                 pass
 
-            # subprocess実行（antigravity_cli は DETACHED_PROCESS 専用メソッド）
+            # subprocess実行（antigravity_cli も共通の非表示起動を使用）
             if self.code_ai == "antigravity_cli":
                 result_text = await self._antigravity実行(
                     command=command,
@@ -1517,11 +1516,10 @@ class CodeAI:
                 self.current_process = None
 
     async def _antigravity実行(self, command: list, cwd: str, timeout: int) -> str:
-        """CONOUT$ を切り離し、共通の親監視・終了処理で Antigravity を実行する。"""
-        return await self._subprocess実行(
-            command, cwd, timeout,
-            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
-        )
+        """子コマンドにも表示コンソールを作らせず、回答・進捗をパイプで受け取る。"""
+        # DETACHED_PROCESS では子コマンドが新しいコンソールを作るため、
+        # 共通処理の CREATE_NO_WINDOW を使う（両フラグの併用はしない）。
+        return await self._subprocess実行(command, cwd, timeout)
 
 
 # ===== 使用例とテストコード =====

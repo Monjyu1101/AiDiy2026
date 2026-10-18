@@ -1,4 +1,4 @@
-// ../runtime/model_catalog.ts
+// backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {

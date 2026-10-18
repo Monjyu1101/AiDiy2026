@@ -95,7 +95,11 @@ AiDiy の `/model` picker と `--provider` では、API provider に加えて次
 | `opencode` | `opencode` |
 | `grok-cli` | `grok` |
 
-VS Code 拡張から外部 CLI Provider を選ぶと、モデル候補は対応する `_config/AiDiy_code_*.json` から取得します。`auto` は各 CLI の既定モデルを使い、明示指定したモデルは `--model <ID>` で外部 CLI に渡します。Hermes の対話 `/model` picker は従来どおり外部 CLI に `auto` を表示します。
+Hermesの `/model` は `_AIDIY/aidiy_diag/code_models_info.json` の各CLI区分から候補・表示名・順序を読みます。CLIを選んだ後もモデル選択へ進み、先頭は `same (変更なし)`、`auto` は候補に出しません。`same` は外部CLIへの `--model` を省略し、明示モデルだけ `--model <ID>` を渡します。OpenCodeの `openai/` は維持します。旧保存値 `auto` も受け付け、手動選択時は `same` へ正規化します。一覧未作成・破損時のCLI候補はsameだけです。
+
+OpenAI OAuthは同じファイルの `aidiy_hermes.models` から `openai_oauth/` の候補だけを読み、Hermes内部へ渡す際はその接頭辞を外します。他のAPI providerは既存の取得経路を使います。ファイルは候補を開くたびに読み、実行中に更新された一覧も再表示時に反映します。Diagが生成するHermesのCLI経路も `xx/same` に統一し、バックエンドからHermesを呼ぶ際はモデル引数を省略します。
+
+検証は `test_code_model_catalog.py`、`test_cli_stdin.py`、`test_model_preferences.py`（command_hermes/tests）、`test_hermes_cli_model_routes.py`（backend_server/tests）、`models-info.check.mjs`（backend_diag/checks）で行います。
 
 `antigravity-cli` は本体の `antigravity_cli` と同じ引数規則を使います。初回は `-p <prompt>`、継続時はその後ろに `-c` を付け、`--add-dir <cwd>` と `--print-timeout 20m` を指定します。`CODE_PERMISSIONS` が `none` 以外なら `--dangerously-skip-permissions` も指定します。Windowsでは `%USERPROFILE%\AppData\Local\agy\bin\agy.exe` を優先し、`DETACHED_PROCESS` で親コンソールから切り離します。
 

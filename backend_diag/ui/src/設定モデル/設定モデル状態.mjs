@@ -56,7 +56,8 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
    if(現在===世代){if(rowId===undefined&&設定.value?.項目?.length)選択.value=設定.value.項目[0].id;実行中.value=false;制御=undefined;実行ID='';await サーバー中止(id);}
   }
  }
+ function 表示を離れる(){if(実行中.value||読込中.value)中止();}
  function 切断(){中止('Tools または診断への接続が切れたため、試行を中止しました。');設定.value=null;結果.value={};選択.value='';}
  function 終了(){中止();破棄済み=true;}
- return {音声状態:音声.音声状態,音声読込:音声.読込,音声再生失敗:音声.再生失敗,設定,結果,読込中,実行中,選択,通知,読込,開始,個別開始:(id=選択.value)=>開始(id),中止,切断,終了};
+ return {音声状態:音声.音声状態,音声読込:音声.読込,音声再生失敗:音声.再生失敗,設定,結果,読込中,実行中,選択,通知,読込,開始,個別開始:(id=選択.value)=>開始(id),中止,表示を離れる,切断,終了};
 }

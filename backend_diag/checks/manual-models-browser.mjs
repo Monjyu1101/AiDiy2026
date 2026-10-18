@@ -43,25 +43,52 @@ try{
  async function evaluate(expression){const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true});assert.equal(result.result?.exceptionDetails,undefined,JSON.stringify(result));return result.result.result.value;}
  async function until(expression){for(let i=0;i<120;i++){if(await evaluate(expression))return;await sleep(50);}assert.fail(expression);}
  const panel='.ai-model-panel',q=selector=>`document.querySelector(${JSON.stringify(selector)})`;
- async function family(name){await evaluate(`[...document.querySelectorAll('.ai-model-tabs button')].find(b=>b.textContent==='${name.toLowerCase()}').click()`);}
+ async function family(name){await evaluate(`[...document.querySelectorAll('.ai-model-tabs button')].find(b=>b.textContent==='${name.toUpperCase()}').click()`);}
  async function set(label,value,type='change'){await evaluate(`(()=>{const e=${q(`${panel} [aria-label="${label}"]`)};e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('${type}',{bubbles:true}));})()`);}
- async function run(){await evaluate(`${q('#ai-model-start')}.click()`);await until(`${q('#ai-model-start')}.textContent==='再試行'`);assert.notEqual(await evaluate(`${q(`${panel} [role="status"]`)}?.textContent`),'一括試行が完了しました。');}
+ async function run(){
+  const selected=await evaluate("document.querySelector('.ai-model-tabs .active').textContent"),before=calls.length;
+  await evaluate(`${q('#ai-model-start')}.click()`);await until(`${q('#ai-model-start')}.textContent==='動作確認'&&!${q('#ai-model-start')}.disabled`);
+  assert.equal(await evaluate(`${q(`${panel} [role="status"]`)}?.textContent`),'一括試行が完了しました。');
+  assert.deepEqual(calls.slice(before).map(c=>c.name),['chat_llms_run','live','decisions_check','code_agents_run']);
+  assert.equal(await evaluate("document.querySelector('.ai-model-tabs .active').textContent"),'CHAT');
+  if(selected!=='CHAT')await family(selected);
+  if(selected==='LIVE'&&mode==='ok'&&!audioFailure)assert.equal(await evaluate(`Boolean(${q('.ai-model-audio button')})`),false,'通常は音声の手動再読込不要');
+ }
  async function capture(name){const result=await send('Page.captureScreenshot',{format:'png'});writeFileSync(join(output,name+'.png'),Buffer.from(result.result.data,'base64'));}
  await send('Runtime.enable');await send('Page.enable');await send('Network.enable');await send('Network.setBlockedURLs',{urls:['https://*']});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.__revoked=[];window.__paused=0;const revoke=URL.revokeObjectURL;URL.revokeObjectURL=function(url){window.__revoked.push(url);return revoke.call(this,url)};const pause=HTMLMediaElement.prototype.pause;HTMLMediaElement.prototype.pause=function(){window.__paused++;return pause.call(this)};`});
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
  await send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/#token=manual-fixture`});
+ for(const motion of ['reduce','no-preference']){
+ await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:motion}]});
+ await until("document.querySelector('.connection-bar.online')?.getAnimations().length===1");
+ const cyanSamples=await evaluate(`(()=>{const bar=document.querySelector('.connection-bar.online'),animation=bar.getAnimations()[0];animation.pause();return [0,562.5,1125,2250,3375,4500].map(time=>{animation.currentTime=time;return {color:getComputedStyle(bar).backgroundColor,opacity:getComputedStyle(bar).opacity};});})()`);
+ assert.deepEqual(cyanSamples.map(s=>s.color),['rgb(0, 0, 0)','rgb(0, 98, 98)','rgb(0, 180, 180)','rgb(0, 255, 255)','rgb(0, 180, 180)','rgb(0, 0, 0)']);
+ assert.ok(cyanSamples.every(s=>s.opacity==='1'));
+ await evaluate("document.querySelector('.connection-bar').getAnimations()[0].currentTime=2250");await capture('cyan-peak');
+ await evaluate("(()=>{const a=document.querySelector('.connection-bar').getAnimations()[0];a.currentTime=0;a.play();})()");
+ await sleep(500);
+ const moving=await evaluate("(()=>{const bar=document.querySelector('.connection-bar'),a=bar.getAnimations()[0];return {time:a.currentTime,state:a.playState,color:getComputedStyle(bar).backgroundColor};})()");
+ assert.equal(moving.state,'running',motion);assert.ok(moving.time>100,motion);assert.notEqual(moving.color,'rgb(0, 0, 0)',motion);
+ }
+
  await until(`[...document.querySelectorAll('.tabs button')].some(b=>b.textContent==='AIモデル'&&!b.disabled)`);await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='AIモデル').click()`);await until(`${q(`${panel} [aria-label="モデル"]`)}.value==='saved-chat'`);
  assert.equal(calls.length,0);assert.equal(await evaluate(`${q('#run')}.textContent`),'一括試行');
  for(const [f,model] of [['CHAT','saved-chat'],['LIVE','saved-live'],['DECISION','saved-decision'],['CODE','saved-code']]){await family(f);assert.equal(await evaluate(`${q(`${panel} [aria-label="モデル"]`)}.value`),model);assert.equal(await evaluate(`${q(`${panel} [aria-label="自由プロンプト"]`)}.value`),'おはよう');}
  await family('CHAT');let count=requests.filter(r=>!r.url.includes('tools-status')).length;await set('プロバイダ','openai_chat');await set('モデル','catalog-model');await set('プロバイダ','freeai_chat');await sleep(150);assert.equal(requests.filter(r=>!r.url.includes('tools-status')).length,count);assert.equal(calls.length,0);
  await run();await capture('chat-1280');await family('LIVE');await run();await until(`${q(`${panel} audio`)}?.readyState>=1`);assert.equal(await evaluate(`${q(`${panel} audio`)}.controls`),true);assert.ok(await evaluate(`${q(`${panel} audio`)}.duration>=1`));await evaluate(`${q(`${panel} audio`)}.muted=true;${q(`${panel} audio`)}.play()`);await sleep(150);assert.ok(await evaluate(`${q(`${panel} audio`)}.currentTime>0`));await capture('live-1280');
- const revoked=await evaluate('window.__revoked.length');await family('DECISION');assert.ok(await evaluate('window.__revoked.length')>revoked);assert.ok(await evaluate('window.__paused')>0);assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);await run();assert.match(await evaluate(`${q('.ai-model-reply')}.textContent`),/\n  "status": "OK"/);assert.match(await evaluate(`${q('.ai-model-reply')}.textContent`),/"usage"/);await capture('decision-1280');
+ const revoked=await evaluate('window.__revoked.length');await family('DECISION');assert.equal(await evaluate('window.__revoked.length'),revoked);assert.ok(await evaluate('window.__paused')>0);assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);await run();assert.match(await evaluate(`${q('.ai-model-reply')}.textContent`),/\n  "status": "OK"/);assert.match(await evaluate(`${q('.ai-model-reply')}.textContent`),/"usage"/);await capture('decision-1280');
  mode='raw';await run();assert.match(await evaluate(`${q('.ai-model-reply')}.textContent`),/<script>/);assert.equal(await evaluate('window.__injected||null'),null);mode='ok';await family('CODE');await run();await capture('code-1280');
- const before=calls.length;await evaluate(`${q('#run')}.click();${q('#run')}.click()`);await until(`${q(`${panel} [role="status"]`)}?.textContent==='一括試行が完了しました。'`);assert.deepEqual(calls.slice(before).map(c=>c.name),['chat_llms_run','live','decisions_check','code_agents_run']);await family('LIVE');await evaluate(`${q('.ai-model-audio button')}.click()`);await until(`${q(`${panel} audio`)}?.readyState>=1`);
+ await evaluate(`window.__batchTabs=[];window.__batchObserver=new MutationObserver(()=>{const name=document.querySelector('.ai-model-tabs .active')?.textContent;if(name&&window.__batchTabs.at(-1)!==name)window.__batchTabs.push(name)});window.__batchObserver.observe(document.querySelector('.ai-model-tabs'),{subtree:true,attributes:true,attributeFilter:['class']});`);
+ const before=calls.length;await evaluate(`${q('#run')}.click();${q('#run')}.click()`);await until(`${q(`${panel} [role="status"]`)}?.textContent==='一括試行が完了しました。'`);assert.deepEqual(calls.slice(before).map(c=>c.name),['chat_llms_run','live','decisions_check','code_agents_run']);assert.deepEqual(await evaluate('window.__batchTabs'),['CHAT','LIVE','DECISION','CODE','CHAT']);await evaluate('window.__batchObserver.disconnect()');await family('LIVE');assert.equal(await evaluate(`Boolean(${q('.ai-model-audio button')})`),false);await until(`${q(`${panel} audio`)}?.readyState>=1`);
+ const audioRequests=requests.filter(r=>r.url.includes('/音声/')).length,modelCalls=calls.length;
+ const audioSrc=await evaluate(`${q(`${panel} audio`)}.src`);
+ for(const name of ['設定モデル','AIモデル'])await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='${name}').click()`);
+ await until(`${q(`${panel} audio`)}?.readyState>=1`);assert.equal(await evaluate(`${q(`${panel} audio`)}.src`),audioSrc);
+ assert.equal(requests.filter(r=>r.url.includes('/音声/')).length,audioRequests);assert.equal(calls.length,modelCalls,'タブ往復でモデルを再実行しない');
  for(const [width,height] of [[720,1000],[390,844]]){await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});assert.equal(await evaluate(`document.documentElement.scrollWidth>innerWidth`),false);await capture(`live-${width}`);await evaluate(`${q('.ai-model-audio')}.scrollIntoView({block:'center'})`);await capture(`live-output-${width}`);}
  mode='short';await run();assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);assert.match(await evaluate(`${q('.ai-model-audio')}.textContent`),/1秒以上/);mode='none';await run();assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);
  mode='ok';audioFailure=true;await run();await until(`${q('.ai-model-audio')}.textContent.includes('取得できません')`);audioFailure=false;await evaluate(`${q('.ai-model-audio button')}.click()`);await until(`${q(`${panel} audio`)}?.readyState>=1`);
- mode='pending';const startCount=calls.length;await evaluate(`${q('#ai-model-start')}.click()`);for(let i=0;i<100&&calls.length===startCount;i++)await sleep(20);await set('自由プロンプト','変更で中止','input');await until(`${q('#ai-model-start')}.textContent==='試行'`);mode='ok';assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);
+ mode='pending';const startCount=calls.length;await evaluate(`${q('#ai-model-start')}.click()`);for(let i=0;i<100&&calls.length===startCount;i++)await sleep(20);await set('自由プロンプト','変更で中止','input');await until(`${q('#ai-model-start')}.textContent==='動作確認'`);mode='ok';assert.equal(await evaluate(`${q(`${panel} audio`)}===null`),true);
  assert.deepEqual(errors,[]);const result={passed:true,calls:calls.map(c=>c.name),requests:requests.length,layouts:[1280,720,390],audioPlayback:true,revoked:await evaluate('window.__revoked.length'),paused:await evaluate('window.__paused'),noSelectionRequests:true,errors};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
 }finally{ws?.close();chrome.kill();await trials.close();server.closeAllConnections();await new Promise(r=>server.close(r));await sleep(300);if(!resolve(profile).startsWith(resolve(tmpdir())+sep))throw Error('invalid profile');try{rmSync(profile,{recursive:true,force:true});}catch{}}

@@ -9,9 +9,16 @@ import {randomBytes} from 'node:crypto';
 import {verify,manifest} from '../ui/verify.mjs';
 import {startupMessage} from '../diag_main.mjs';
 async function fixture(){
- const root=await mkdtemp(path.join(os.tmpdir(),'diag-startup-'));
+ const workspace=await mkdtemp(path.join(os.tmpdir(),'diag-startup-'));
+ const root=path.join(workspace,'backend_diag');
  await cp(new URL('../',import.meta.url),root,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
+ await cp(new URL('../../frontend_ide/src/共通表示/シアンバー.css',import.meta.url),path.join(workspace,'frontend_ide/src/共通表示/シアンバー.css'));
  return root;
+}
+async function cleanup(root){
+ const workspace=path.resolve(root,'..');
+ if(path.dirname(workspace)!==path.resolve(os.tmpdir()) || !path.basename(workspace).startsWith('diag-startup-'))throw Error('invalid fixture workspace');
+ await rm(workspace,{recursive:true,force:true});
 }
 async function convert(dir){for(const entry of await readdir(dir,{withFileTypes:true})){
  const name=path.join(dir,entry.name);if(entry.isDirectory())await convert(name);
@@ -24,14 +31,14 @@ test('LF and Windows CRLF checkouts verify without rebuilding; actual edits stil
   assert.ok(Object.hasOwn(lf, 'src/導入状況/導入状況パネル.vue'));
   assert.deepEqual(Object.keys(lf), Object.keys(lf).sort());
   assert.ok(!Object.keys(lf).some(name => name.includes('/checks/')));
-  await convert(root);assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
+  await convert(path.dirname(root));assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
   const manifestFile=path.join(root,'static/build-manifest.json');
   await writeFile(manifestFile,JSON.stringify(Object.fromEntries(Object.entries(lf).reverse())));assert.equal(await verify(ui),true);
-  for(const relative of ['ui/src/App.vue','ui/src/導入状況/導入状況パネル.vue','ui/src/導入状況/導入状況状態.mjs','ui/src/導入状況/導入状況表示.mjs','ui/src/導入状況/導入状況.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
+  for(const relative of ['../frontend_ide/src/共通表示/シアンバー.css','ui/src/App.vue','ui/src/導入状況/導入状況パネル.vue','ui/src/導入状況/導入状況状態.mjs','ui/src/導入状況/導入状況表示.mjs','ui/src/導入状況/導入状況.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html']){
    const file=path.join(root,relative),before=await readFile(file);await writeFile(file,Buffer.concat([before,Buffer.from('\nchanged')]));assert.equal(await verify(ui),false,relative);await writeFile(file,before);
   }
   await rm(path.join(root,'static/app.js'));assert.equal(await verify(ui),false);
- }finally {await rm(root,{recursive:true,force:true});}
+ }finally {await cleanup(root);}
 });
 test('startup failure messages categorize causes and never echo raw errors',()=>{
  for(const code of ['UI','ELECTRON','DESKTOP','CATALOG','ARGUMENTS']){const msg=startupMessage({diagCode:code,message:'PRIVATE KEY',stack:'SECRET'});assert.ok(!msg.includes('PRIVATE'));assert.ok(!msg.includes('SECRET'));assert.notEqual(msg,startupMessage({}));}
@@ -44,7 +51,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
  try {
   // 外部通信のみを差し替え。実際の引数処理・検証・HTTP listen・静的配信を実行する。
   await writeFile(path.join(root,'モデル情報/public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
-  if(crlf)await convert(root);
+  if(crlf)await convert(path.dirname(root));
   child=spawn(process.execPath,[path.join(root,'diag_main.mjs'),'--browser','--no-open','--port','0'],{stdio:['ignore','pipe','pipe'],windowsHide:true});
   const exited=once(child,'exit');let output='',errors='';child.stderr.on('data',chunk=>errors+=chunk);
   const address=await new Promise((resolve,reject)=>{
@@ -57,7 +64,7 @@ for(const crlf of [false,true])test(`real Node browser startup and all static as
   if(process.platform==='win32')await writeFile(path.join(root,'.stop-request'),randomBytes(16).toString('hex'));
   else child.kill('SIGTERM');
   await exited;assert.equal(child.exitCode,0);assert.equal(errors,'');
- }finally{if(child?.exitCode===null)child.kill('SIGKILL');await rm(root,{recursive:true,force:true});}
+ }finally{if(child?.exitCode===null)child.kill('SIGKILL');await cleanup(root);}
 });
 
 test('CLI errors report actionable categories without echoing arguments or file contents',{timeout:15000},async()=>{
@@ -71,5 +78,5 @@ test('CLI errors report actionable categories without echoing arguments or file 
   const app=path.join(root,'static/app.js'),before=await readFile(app);await writeFile(app,'PRIVATE');
   assert.match(await run(['--no-open']),/Vue UI/);await writeFile(app,before);
   await writeFile(path.join(root,'診断/catalog.json'),'PRIVATE');assert.match(await run(['--no-open']),/catalog.json/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await cleanup(root);}
 });

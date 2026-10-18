@@ -1,20 +1,22 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
+import 前回実行日時 from '../共通表示/前回実行日時.vue';
 import 状態バッジ from '../共通表示/状態バッジ.vue';
 import { 先頭へスクロール, 完了時 } from '../共通表示/先頭表示.mjs';
 import { 外部連携表示を作成 } from './外部連携表示.mjs';
 import './外部連携.css';
-const props=defineProps(['data','results','loading','testing','connected','busy','writeBusy','written']);
+const props=defineProps(['lastRun','data','results','loading','testing','connected','busy','writeBusy','written']);
 defineEmits(['check','write','test']);
 const { selected,items,row,result,config } = 外部連携表示を作成(props);
 const パネル=ref(null);
+const 確認済み=computed(()=>items.value.some(item=>props.results?.[item.id] && !props.results[item.id].前回結果));
 // 確認中の行が一覧で見える位置へスクロールし、状況確認が終わったら一覧・詳細を先頭（1項目目の表示）へスクロールする。
 watch(()=>props.testing,async id=>{if(!id)return;await nextTick();パネル.value?.querySelector('.integration-row.selected')?.scrollIntoView({block:'center'});});
 watch(()=>props.busy,完了時(()=>先頭へスクロール(パネル.value)));
 </script>
 <template>
 <section ref="パネル" class="panel integration-panel" aria-label="外部連携">
- <div class="panel-heading"><h2>外部連携確認</h2><div class="panel-actions"><button id="integration-run" :disabled="!connected || busy || loading || Boolean(testing) || writeBusy" title="設定状況を読み直し、テストできる行を上から順に認証確認します" @click="$emit('check')">{{busy?'確認中…':'状況確認'}}</button><button id="integration-write" :disabled="!connected || busy || loading || Boolean(testing) || writeBusy || !items.some(item=>results?.[item.id])" title="直前の確認結果を _AIDIY/aidiy_diag/integration_info.json に保存します" @click="$emit('write')">{{writeBusy?'書込中…':written?'書込済':'書込'}}</button></div></div>
+ <div class="panel-heading"><h2>外部連携確認</h2><div class="panel-actions"><component :is="前回実行日時" :value="lastRun"/><button id="integration-run" :class="{'check-next': !確認済み}" :disabled="!connected || busy || loading || Boolean(testing) || writeBusy" title="設定状況を読み直し、テストできる行を上から順に認証確認します" @click="$emit('check')">{{busy?'確認中…':'状況確認'}}</button><button id="integration-write" :class="{'write-next': 確認済み && !written}" :disabled="!connected || busy || loading || Boolean(testing) || writeBusy || !確認済み" title="直前の確認結果を _AIDIY/aidiy_diag/integration_info.json に保存します" @click="$emit('write')">{{writeBusy?'書込中…':written?'書込済':'書込'}}</button></div></div>
  <main class="key-layout"><aside aria-label="外部連携の一覧">
   <p v-if="loading">設定状況を確認中…</p><p v-else-if="!data">接続すると設定状況を表示します。</p>
   <template v-else><p v-if="data.設定状態!=='読込済み'" role="status">設定ファイル: {{data.設定状態}}</p><p v-if="data.説明" role="status">{{data.説明}}</p>

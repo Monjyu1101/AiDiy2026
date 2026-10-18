@@ -111,3 +111,11 @@ test('状況確認の完了後は一覧の1項目目（分類順の先頭）を�
   view.折り畳み.value = new Set(['ベース']);
   props.確認中 = false; await Promise.resolve(); assert.equal(view.選択ID.value, 'node', '一覧順ではなく画面の分類順（ベース）の先頭'); assert.equal(view.折り畳み.value.has('ベース'), false);
 });
+
+test('前回結果と日時を初期表示し、再実行したときだけ日時と書込可否を更新する',async()=>{
+ const old='2026-10-17T01:02:03Z',now='2026-10-18T04:05:06Z';
+ const state=await 状態を作成(async()=>({結果:[{id:'node',状態:'NG'}],前回実行日時:now}));
+ state.一覧を反映({項目:[{id:'node'}],結果:[{id:'node',状態:'OK'}],前回実行日時:old});
+ assert.equal(state.結果.value[0].状態,'OK');assert.equal(state.前回実行日時.value,old);assert.equal(state.確認済み.value,false);
+ await state.状況確認();assert.equal(state.前回実行日時.value,now);assert.equal(state.結果.value[0].状態,'NG');assert.equal(state.確認済み.value,true);
+});

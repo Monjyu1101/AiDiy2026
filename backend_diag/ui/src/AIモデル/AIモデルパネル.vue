@@ -15,9 +15,9 @@ const change=(key,event)=>s.変更(key,event.target.value);
 </script>
 <template>
 <section class="panel ai-model-panel" aria-label="AIモデル">
- <div class="panel-heading"><h2>AIモデルを試す</h2><button :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込">候補を再読込</button></div>
- <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family.toLowerCase()}}</button></nav>
- <p class="panel-note">モデルと入力を選んで手動で試します。選択は設定へ保存されません。候補は保存済みのDiag一覧です。</p>
+ <div class="panel-heading ai-model-heading"><div class="heading-title"><h2>AIモデルを試す</h2><button class="ai-model-reload" :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込">候補を再読込</button></div><div class="panel-actions"><button id="ai-model-start" :class="{'check-next': !s.結果.value}" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value" title="CHAT → LIVE → DECISION → CODE を順に確認します" @click="s.開始(true)">{{s.実行中.value?'実行中…':'動作確認'}}</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div></div>
+ <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family}}</button></nav>
+ <p class="panel-note">各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。</p>
  <div class="ai-model-scroll">
   <div class="ai-model-form">
    <h3>{{s.区分.value}} / 入力</h3>
@@ -34,13 +34,13 @@ const change=(key,event)=>s.変更(key,event.target.value);
     <label v-if="s.入力.type!=='predicate'" class="ai-input-label">{{s.入力.type==='choice'?'選択肢（1行に1件）':'スコアの段階（低い順に1行に1件）'}}<textarea aria-label="選択肢・段階" :value="s.入力.choices" rows="4" @input="change('choices',$event)"></textarea></label>
    </fieldset>
    <p v-if="s.区分.value==='LIVE'" class="ai-help">接続後10秒待機して送信します。1秒以上の応答音声を一時保存し、ここで再生できます。</p>
-   <div class="ai-model-actions"><button id="ai-model-start" :disabled="!online || s.実行中.value || s.読込中.value || !s.入力.provider || !s.入力.model || !s.入力.prompt.trim() || (s.区分.value==='LIVE'&&!s.入力.voice)" @click="s.開始()">{{s.実行中.value?'実行中…':s.結果.value?'再試行':'試行'}}</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div>
+
    <p class="ai-help">試行時に選択したAIへ送信します。料金が発生する場合があります。</p>
   </div>
-  <section class="ai-model-output" aria-label="試行結果" aria-live="polite"><h3>出力</h3><component :is="状態バッジ" :state="s.実行中.value?'実行中':s.結果.value?.状態||'未実施'"/><p role="status">{{s.通知.value || '入力して「試行」を押してください。'}}</p>
+  <section class="ai-model-output" aria-label="試行結果" aria-live="polite"><h3>出力</h3><component :is="状態バッジ" :state="s.実行中.value?'実行中':s.結果.value?.状態||'未実施'"/><p role="status">{{s.通知.value || '入力して「動作確認」を押してください。'}}</p>
    <dl v-if="s.結果.value"><dt>指定プロバイダ</dt><dd>{{s.結果.value.指定プロバイダ || '—'}}</dd><dt>実行プロバイダ</dt><dd>{{s.結果.value.実行プロバイダ || '応答に情報なし'}}</dd><dt>指定モデル</dt><dd>{{s.結果.value.指定モデル || '—'}}</dd><dt>実行モデル</dt><dd>{{s.結果.value.実行モデル || '応答に情報なし'}}</dd></dl>
    <section v-if="s.区分.value==='LIVE' && s.結果.value" class="ai-model-audio" aria-label="Live 応答音声"><h3>応答音声</h3>
-    <template v-if="audio"><p>{{(audio.長さms/1000).toFixed(2)}} 秒 · 一時保存</p><audio v-if="audioState?.url && visible" ref="player" :key="audio.id" :src="audioState.url" controls preload="metadata" aria-label="Live 応答音声の再生" @error="s.音声再生失敗(audio.id)"></audio><button v-if="!audioState?.url" :disabled="!online || audioState?.読込中" @click="s.音声読込(s.結果.value)">{{audioState?.読込中?'音声を読込中…':'音声を再読込'}}</button><p v-if="audioState?.エラー" class="warning">{{audioState.エラー}}</p></template>
+    <template v-if="audio"><p>{{(audio.長さms/1000).toFixed(2)}} 秒 · 一時保存</p><audio v-if="audioState?.url && visible" ref="player" :key="audio.id" :src="audioState.url" controls preload="metadata" aria-label="Live 応答音声の再生" @error="s.音声再生失敗(audio.id)"></audio><span v-if="!audioState?.url && !audioState?.エラー">音声を準備中…</span><button v-if="audioState?.エラー" :disabled="!online || audioState?.読込中" @click="s.音声読込(s.結果.value)">音声取得を再試行</button><p v-if="audioState?.エラー" class="warning">{{audioState.エラー}}</p></template>
     <p v-else class="warning">1秒以上の再生可能な音声がありません。</p>
    </section>
    <h3>{{s.区分.value==='DECISION'?'戻り値（JSON / テキスト）':'応答テキスト'}}</h3><pre class="ai-model-reply">{{s.結果.value?.応答 || '応答はまだありません。'}}</pre><p v-if="s.結果.value?.説明">{{s.結果.value.説明}}</p>

@@ -17,6 +17,7 @@ import {launchDetached} from './起動/launch.mjs';
 import {headlessMain,writeInstallReport,INSTALL_FILE} from './診断/headless.mjs';
 import {writeIntegrationInfo,INTEGRATION_FILE} from './モデル情報/integration_info.mjs';
 import {writeModelsInfo} from './モデル情報/models_info.mjs';
+import {createPreviousResults} from './診断/前回結果.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -58,7 +59,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials()}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
@@ -120,9 +121,16 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         try {const state=await toolsStatusFn({signal:controller.signal});return reply(200,{online:state.online===true});}
         finally {res.removeListener('close',abort);}
       }
-      if (req.method === 'GET' && route === 'api/一覧') return reply(200,{項目:entries,結果:results,調査:coverage});
-      // 設定の読み直しで、画面と同じくサーバー側のキーテスト結果も破棄する。
-      if (req.method === 'GET' && route === 'api/キー設定') {if(!modelWriting)modelResults={};if(!integrationWriting)integrationResults={};return reply(200,{...await keyStatusFn(),公開モデル:publicCache.snapshot()});}
+      if (req.method === 'GET' && route === 'api/一覧') {
+        const previous=(await previousResults?.snapshot())?.導入状況;
+        return reply(200,{項目:entries,結果:results.length?results:(previous?.結果||[]).filter(item=>entries.some(entry=>entry.id===item.id)),前回実行日時:scanFinished?.toISOString()||previous?.前回実行日時||null,調査:coverage});
+      }
+      // 明示的に読み直す側だけ破棄し、別タブの確認結果は書込まで保持する。
+      if (req.method === 'GET' && ['api/キー設定','api/キー設定/モデル一覧','api/キー設定/外部連携'].includes(route)) {
+        if(route!=='api/キー設定/外部連携'&&!modelWriting)modelResults={};
+        if(route!=='api/キー設定/モデル一覧'&&!integrationWriting)integrationResults={};
+        return reply(200,{...await keyStatusFn(),前回結果:await previousResults?.snapshot(),公開モデル:publicCache.snapshot()});
+      }
       if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
       if (req.method === 'POST' && route === 'api/公開モデル/再取得') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
@@ -136,7 +144,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         keyBusy=true;
         // 外部連携（Hugging Face / Discord）の認証確認はモデル情報の保存対象にしない。
         const integration=INTEGRATION_PROBES.includes(KEY_PROVIDERS.find(provider=>provider.id===id)?.probe);
-        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};reply(200,result);} finally {keyBusy=false;}
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {keyBusy=false;}
         return;
       }
       // 確認中に終わった項目だけを返す（画面の逐次表示用。引数・任意コマンドは受け付けない）。
@@ -145,7 +153,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
         if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
         busy=true;
-        try { results=[];progress=[];scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date(); reply(200,{結果:results}); } finally { busy=false;progress=[]; }
+        try { results=[];progress=[];scanFinished=null;scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date();reply(200,{結果:results,前回実行日時:scanFinished.toISOString()}); } finally { busy=false;progress=[]; }
         return;
       }
       // モデル情報: このサーバーが直前に取得したキーテスト結果だけを、プロバイダ別ファイルへ保存する。
@@ -229,7 +237,7 @@ export async function main(args=process.argv.slice(2)) {
   try {entries=await catalog();coverage=JSON.parse(await readFile(new URL('./診断/coverage.json',import.meta.url),'utf8'));}
   catch {throw startupError('CATALOG');}
   const publicCache=createPublicModelCache();
-  const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache});
+  const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache,previousResults:createPreviousResults()});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port,'127.0.0.1',resolve);});
   // 公開一覧だけを起動時に取得。キー設定や他 provider の API は自動で呼ばない。
   void publicCache.refresh();
