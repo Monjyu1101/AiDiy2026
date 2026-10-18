@@ -31,6 +31,9 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_VSCODE_DIR = THIS_DIR
 
+sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
+from _setup_path import remove_launcher_path
+
 sys.path.insert(0, str(THIS_DIR / "scripts"))
 from vscode_extensions import aidiy_extension_ids, uninstall_aidiy_extensions
 from standalone_processes import stop_standalone
@@ -354,7 +357,7 @@ def cleanup_app(module: str, *, report: bool = True) -> bool:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     elif report:
         print_info(f"{label}: 削除対象はありませんでした")
-    return cleanup_ok
+    return remove_launcher_path() and cleanup_ok
 
 
 def cleanup_shared(*, report: bool = True) -> bool:
@@ -378,7 +381,7 @@ def cleanup_shared(*, report: bool = True) -> bool:
     for path in sorted(FRONTEND_VSCODE_DIR.glob('*.vsix')):
         if not remove_file(path, 'VSIX (共有通信基盤)'):
             ok = False
-    return ok
+    return remove_launcher_path() and ok
 
 
 def cleanup(choices: dict | None = None) -> bool:

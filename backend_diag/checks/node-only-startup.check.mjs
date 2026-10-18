@@ -11,6 +11,7 @@ test('default Node runtime starts without Python on PATH and serves anonymous mo
  try {
   const diag=path.join(root,'backend_diag');
   await cp(new URL('../',import.meta.url),diag,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
+  await cp(new URL('../../frontend_ide/src/共通表示/シアンバー.css',import.meta.url),path.join(root,'frontend_ide/src/共通表示/シアンバー.css'));
   await mkdir(path.join(root,'_config'));await writeFile(path.join(root,'_config/AiDiy_key.json'),JSON.stringify({gemini_key_id:'synthetic-gemini-key'}));
   await mkdir(path.join(root,'empty-path'));
   // Keep production startup/cache/runner/catalog. Replace HTTPS transport alone, not model behavior.

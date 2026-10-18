@@ -51,6 +51,7 @@ try{
  await send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/#token=synthetic-row-ui`});
  await until(`[...document.querySelectorAll('.tabs button')].some(b=>b.textContent==='設定モデル'&&!b.disabled)`);
  assert.deepEqual(await evaluate(`[...document.querySelectorAll('.tabs button')].slice(0,4).map(b=>b.textContent)`),['導入状況','モデル一覧','外部連携','設定モデル']);
+ await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='導入状況').click()`);
  assert.equal(await evaluate(`document.querySelector('#install-run').textContent`),'状況確認');
  assert.equal(await evaluate(`document.querySelector('[aria-label="導入状況"] .panel-heading h2').textContent`),'導入状況');
  await capture('install-desktop');await evaluate(`document.querySelector('#install-run').click()`);await until(`!document.querySelector('#install-write').disabled`);assert.equal(scanCalls,1);

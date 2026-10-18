@@ -84,7 +84,7 @@ def get_npm_command() -> str | None:
     candidates = [f"{FRONTEND_COMMAND}.cmd", FRONTEND_COMMAND] if sys.platform == "win32" else [FRONTEND_COMMAND]
     for candidate in candidates:
         try:
-            subprocess.run([candidate, "--version"], capture_output=True, timeout=5, check=True)
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True)
             return candidate
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             continue
@@ -156,9 +156,10 @@ def kill_electron_processes() -> None:
             result = subprocess.run(
                 [
                     "powershell", "-NoProfile", "-Command",
+                    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); "
                     "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId),$($_.ExecutablePath)\" }",
                 ],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, encoding="utf-8", errors="replace", timeout=10,
             )
             killed_pids = []
             for line in result.stdout.splitlines():
@@ -192,7 +193,7 @@ def kill_electron_processes() -> None:
 # ポート整理
 # ============================================================
 def _listening_pids_windows(port: int) -> list[str]:
-    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5)
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, encoding="oem", errors="replace", timeout=5)
     if result.returncode != 0:
         return []
     pids = set()
@@ -241,7 +242,7 @@ def kill_process_on_port(port: int) -> bool:
     try:
         if sys.platform == "win32":
             finder = _listening_pids_windows
-            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, text=True, timeout=8)
+            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, encoding="oem", errors="replace", timeout=8)
         else:
             finder = _listening_pids_linux
             killer = lambda pid: subprocess.run(["kill", "-9", pid], capture_output=True, text=True, timeout=5)

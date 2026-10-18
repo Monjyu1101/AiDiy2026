@@ -8,7 +8,7 @@ test('install list keeps categories and badges without search, legend or state f
     結果: [{ id: 'node', 状態: 'OK' }], 確認中: false, 接続済み: true,
   });
   assert.match(html, /id="install-run"/);
-  assert.match(html, /<button id="install-write" disabled[^>]*>書込<\/button>/);
+  assert.match(html, /<button id="install-write"[^>]*\bdisabled[^>]*>書込<\/button>/);
   assert.match(html, /ベース/);
   assert.doesNotMatch(html, /class="legend"|<select|状態で絞り込む|<input|プログラムを検索/);
   assert.equal((html.match(/data-state="OK"/g) || []).length, 1);
@@ -17,9 +17,9 @@ test('install list keeps categories and badges without search, legend or state f
 test('write button is enabled only after a completed check', async () => {
   const props = { 項目: [{ id: 'node', name: 'Node.js', commands: ['node'], menuGroup: 'ベース' }], 結果: [{ id: 'node', 状態: 'OK' }], 確認中: false, 接続済み: true, 確認済み: true, 書込中: false, 書込済み: false };
   assert.match(await render('導入状況/導入状況パネル.vue', props), /<button id="install-write"[^>]*>書込<\/button>/);
-  assert.doesNotMatch(await render('導入状況/導入状況パネル.vue', props), /id="install-write" disabled/);
+  assert.doesNotMatch(await render('導入状況/導入状況パネル.vue', props), /id="install-write"[^>]*\bdisabled/);
   assert.match(await render('導入状況/導入状況パネル.vue', { ...props, 書込済み: true }), />書込済<\/button>/);
-  assert.match(await render('導入状況/導入状況パネル.vue', { ...props, 確認中: true }), /id="install-write" disabled/);
+  assert.match(await render('導入状況/導入状況パネル.vue', { ...props, 確認中: true }), /id="install-write"[^>]*\bdisabled/);
 });
 
 test('エラーは共通通知欄へ表示する', () => {

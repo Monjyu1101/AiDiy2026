@@ -1,0 +1,116 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {EventEmitter} from 'node:events';
+import {PassThrough} from 'node:stream';
+import {createStartManager} from '../起動/サービス管理.mjs';
+import {createServer} from '../diag_main.mjs';
+
+const targets=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(target=>target.起動管理!==false);
+async function fixture(t,{hold=false,fail=false}={}){
+ const root=await mkdtemp(join(tmpdir(),'aidiy-start-'));await mkdir(join(root,'scripts'));await writeFile(join(root,'scripts','起動対象.json'),JSON.stringify(targets));
+ const calls=[],children=[];
+ const spawnFn=(command,args,options)=>{
+  calls.push({command,args,options,id:args.at(-1)});
+  const child=new EventEmitter();child.pid=100000+children.length;child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new PassThrough();child.closed=false;
+  child.stdin.on('data',data=>{if(JSON.parse(data).action==='stop'&&!child.closed){child.closed=true;setImmediate(()=>child.emit('close',0));}});
+  child.ready=()=>{child.stdout.write(JSON.stringify({type:'log',data:'日本語の出力\n'})+'\n');child.stdout.write(JSON.stringify(fail?{type:'error',message:'fixture failure'}:{type:'ready'})+'\n');};
+  children.push(child);if(!hold)setImmediate(child.ready);return child;
+ };
+ const manager=createStartManager({root,python:'fixture-python',spawnFn,stopTimeout:200,readyTimeout:500});
+ t.after(async()=>{await manager.close();await rm(root,{recursive:true,force:true});});
+ return {root,manager,calls,children};
+}
+test('auto defaults are shared, ordered, and viewing never starts a process',async t=>{
+ const {manager,calls}=await fixture(t);const snapshot=await manager.snapshot();
+ assert.deepEqual(snapshot.対象.filter(item=>item.設定.起動対象).map(item=>item.id),['tools','core','apps','taskteam','web']);assert.equal(calls.length,0);
+ assert.deepEqual(snapshot.対象.map(item=>item.id),targets.map(item=>item.id));
+ assert.equal(snapshot.終了時停止あり,false);
+});
+test('settings persist across manager instances and reject arbitrary commands',async t=>{
+ const {root,manager,calls}=await fixture(t);const defaults=targets.find(item=>item.id==='local').初期設定;
+ await manager.save('local',{...defaults,起動対象:true});
+ const other=createStartManager({root});t.after(()=>other.close());assert.equal((await other.snapshot()).対象.find(item=>item.id==='local').設定.起動対象,true);
+ for(const value of [{起動対象:true,自動再起動:true,command:'evil'},{起動対象:'true',自動再起動:true}])await assert.rejects(()=>manager.save('local',value),{status:400});
+ await assert.rejects(()=>manager.save('../unknown',defaults),{status:400});assert.equal(calls.length,0);
+ await assert.rejects(()=>manager.restart('avatar'),{status:400});
+ await assert.rejects(()=>manager.restart('ide'),{status:400});
+});
+
+test('Web has one browser option and migrates saved chrome_devtools settings',async t=>{
+ const {root,manager}=await fixture(t);
+ await mkdir(join(root,'_config'));await writeFile(join(root,'_config','AiDiy_diag_start.json'),JSON.stringify({version:1,設定:{web:{起動対象:true,自動再起動:false,ブラウザ表示:true,'chrome_devtoolsで開く':false}}}));
+ const web=(await manager.snapshot()).対象.find(item=>item.id==='web');
+ assert.deepEqual(web.設定,{起動対象:true,自動再起動:false,ブラウザ表示:true});
+ await manager.save('web',{...web.設定,ブラウザ表示:false});
+ const other=createStartManager({root});t.after(()=>other.close());
+ assert.deepEqual((await other.snapshot()).対象.find(item=>item.id==='web').設定,{起動対象:true,自動再起動:false,ブラウザ表示:false});
+ assert.equal(Object.hasOwn(JSON.parse(await readFile(join(root,'_config','AiDiy_diag_start.json'),'utf8')).設定.web,'chrome_devtoolsで開く'),false);
+});
+test('bulk restart waits for each target and follows root order without a shell',async t=>{
+ const {manager,calls}=await fixture(t);await manager.restart();await manager.settled();
+ assert.deepEqual(calls.map(call=>call.id),['tools','core','apps','taskteam','web']);
+ for(const call of calls){assert.equal(call.options.shell,false);assert.equal(call.args.at(-2),'--diag-start');assert.ok(call.args[3].endsWith('_start.py'));}
+ const tail=await manager.logSnapshot('core');assert.match(tail.ログ,/日本語の出力/);assert.equal((await manager.logSnapshot('core',tail.位置)).ログ,'');
+ assert.equal((await manager.snapshot()).実行中,false);
+});
+
+test('startup focus follows each target and distinguishes another run of the same target',async t=>{
+ const {manager,children}=await fixture(t,{hold:true});assert.equal((await manager.snapshot()).起動表示,null);
+ await manager.restart();const ids=['tools','core','apps','taskteam','web'],runs=new Set();
+ for(let index=0;index<ids.length;index++){
+  while(children.length<=index)await new Promise(resolve=>setTimeout(resolve,2));
+  const snapshot=await manager.snapshot();assert.equal(snapshot.実行中,true);assert.equal(snapshot.起動表示.対象,ids[index]);
+  assert.ok(snapshot.起動表示.実行ID);runs.add(snapshot.起動表示.実行ID);children[index].ready();
+ }
+ await manager.settled();assert.equal(runs.size,5);assert.equal((await manager.snapshot()).起動表示.対象,'web');
+ const previous=(await manager.snapshot()).起動表示.実行ID;
+ await manager.restart('web');while(children.length<6)await new Promise(resolve=>setTimeout(resolve,2));
+ assert.notEqual((await manager.snapshot()).起動表示.実行ID,previous);children[5].ready();await manager.settled();
+});
+test('restart closes the old owned console before creating another',async t=>{
+ const {manager,calls,children}=await fixture(t);await manager.restart('local');await manager.settled();
+ await manager.restart('local');await manager.settled();assert.equal(children[0].closed,true);assert.equal(calls.length,2);assert.equal(children[1].closed,false);
+ assert.equal((await manager.snapshot()).終了時停止あり,true,'起動処理完了後も稼働中なら終了確認が必要');
+ await manager.stop('local');assert.equal(children[1].closed,true);assert.equal((await manager.snapshot()).対象.find(item=>item.id==='local').状態,'停止済み');
+ assert.equal((await manager.snapshot()).終了時停止あり,false);
+});
+test('individual restart clears only its console and invalidates previous log cursors',async t=>{
+ const {manager,children}=await fixture(t);await manager.restart();await manager.settled();
+ const toolsBefore=await manager.logSnapshot('tools');
+ children[4].stdout.write(JSON.stringify({type:'log',data:'前回だけの出力\n'})+'\n');
+ const before=await manager.logSnapshot('web');await manager.restart('web');await manager.settled();
+ const after=await manager.logSnapshot('web',before.位置);
+ assert.equal(after.切替,true);assert.ok(after.位置>before.位置);assert.doesNotMatch(after.ログ,/前回だけの出力/);assert.match(after.ログ,/日本語の出力/);
+ assert.deepEqual(await manager.logSnapshot('tools'),toolsBefore);
+ assert.doesNotMatch((await manager.logSnapshot('web',0)).ログ,/前回だけの出力/);
+ await manager.restart();await manager.settled();
+ assert.ok((await manager.logSnapshot('tools')).ログ.startsWith(toolsBefore.ログ),'一括起動では履歴を維持する');
+});
+test('a duplicate bulk action is rejected and a stop cancels pending startup',async t=>{
+ const {manager,calls,children}=await fixture(t,{hold:true});await manager.restart();
+ assert.equal((await manager.snapshot()).終了時停止あり,true,'準備中で子がまだ無い場合も確認する');
+ while(!children.length)await new Promise(resolve=>setTimeout(resolve,5));
+ await assert.rejects(()=>manager.restart(),{status:409});await manager.stop('tools');await manager.settled();assert.equal(calls.length,1);assert.equal(children[0].closed,true);
+});
+test('a startup failure stops later targets and reports the failure',async t=>{
+ const {manager,calls}=await fixture(t,{fail:true});await manager.restart();await manager.settled();assert.equal(calls.length,1);assert.match((await manager.snapshot()).通知,/fixture failure/);
+});
+test('bounded per-feature console logs do not leak to other consoles',async t=>{
+ const {manager,children}=await fixture(t);await manager.restart('local');await manager.settled();
+ children[0].stdout.write(JSON.stringify({type:'log',data:'x'.repeat(125000)})+'\n');
+ const log=await manager.logSnapshot('local',0);assert.ok(log.ログ.length<=120000);assert.equal(log.切替,true);assert.equal((await manager.logSnapshot('apps',0)).ログ,'');
+});
+test('the start API requires auth, JSON and fixed inputs; read-only calls do not restart',async t=>{
+ const {manager,calls}=await fixture(t);const server=createServer({token:'fixture-auth',startManager:manager,modelTrials:{close(){}}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+ const url=`http://127.0.0.1:${server.address().port}/`,headers={Authorization:'Bearer fixture-auth','Content-Type':'application/json'};
+ assert.equal((await fetch(url+'api/'+encodeURIComponent('起動'))).status,401);
+ assert.equal((await fetch(url+'api/'+encodeURIComponent('起動'),{headers})).status,200);assert.equal(calls.length,0);
+ const endpoint='api/'+encodeURIComponent('起動')+'/'+encodeURIComponent('再起動');
+ assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({対象:'../bad'})})).status,400);
+ assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({command:'evil'})})).status,400);
+ assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({対象:'local'})})).status,202);await manager.settled();assert.equal(calls.length,1);
+});

@@ -18,6 +18,7 @@ import {headlessMain,writeInstallReport,INSTALL_FILE} from './診断/headless.mj
 import {writeIntegrationInfo,INTEGRATION_FILE} from './モデル情報/integration_info.mjs';
 import {writeModelsInfo} from './モデル情報/models_info.mjs';
 import {createPreviousResults} from './診断/前回結果.mjs';
+import {createStartManager} from './起動/サービス管理.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -59,7 +60,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager()}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
@@ -80,6 +81,24 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if(route==='api/起動'&&req.method==='GET')return reply(200,await startManager.snapshot());
+      if(route?.startsWith('api/起動/')&&req.method==='POST'){
+        if(!['api/起動/設定','api/起動/再起動','api/起動/停止','api/起動/ログ'].includes(route))return reply(404,{エラー:'見つかりません。'});
+        if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
+        const chunks=[];let size=0;
+        for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
+        if(!body||typeof body!=='object'||Array.isArray(body))return reply(400,{エラー:'入力が不正です。'});
+        const keys=route.endsWith('/設定')?['対象','設定']:route.endsWith('/ログ')?['対象','位置']:['対象'];
+        if(Object.keys(body).some(key=>!keys.includes(key)))return reply(400,{エラー:'指定できない項目があります。'});
+        try{
+          if(route.endsWith('/設定'))return reply(200,await startManager.save(body.対象,body.設定));
+          if(route.endsWith('/再起動')){if(body.対象!==undefined&&typeof body.対象!=='string')return reply(400,{エラー:'起動対象が不正です。'});return reply(202,await startManager.restart(body.対象));}
+          if(typeof body.対象!=='string')return reply(400,{エラー:'起動対象が不正です。'});
+          if(route.endsWith('/停止'))return reply(200,await startManager.stop(body.対象));
+          return reply(200,await startManager.logSnapshot(body.対象,body.位置??0));
+        }catch(error){return reply(error.status||500,{エラー:error.status?error.message:'起動処理に失敗しました。コンソールを確認してください。'});}
+      }
       if (req.method==='GET' && route?.startsWith('api/モデル試行/音声/')) {
         const id=route.slice('api/モデル試行/音声/'.length);
         if(!/^[a-f0-9]{32}$/.test(id))return reply(404,{エラー:'音声が見つかりません。'});
@@ -198,8 +217,9 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
 }
 export function createServer(options) {
   const modelTrials=options.modelTrials || createModelTrials();
-  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},createHandler({...options,modelTrials}));
-  server.once('close',()=>modelTrials.close());
+  const startManager=options.startManager || createStartManager();
+  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},createHandler({...options,modelTrials,startManager}));
+  server.once('close',()=>{modelTrials.close();void startManager.close();});
   server.maxConnections=16; server.maxRequestsPerSocket=20; server.keepAliveTimeout=2000;
   // 診断は最大 4 並列 × 登録数分。slow connection は下の期限で切断する。
   server.setTimeout(Math.max(95000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());

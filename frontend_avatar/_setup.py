@@ -38,6 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
 from _setup_electron import setup_dependencies
+from _setup_path import ensure_launcher_path
 
 AUTO_MODE = False
 
@@ -173,9 +174,7 @@ def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
         print_error(f"ランチャーを登録できません: {launcher_path} ({exc})")
         return False
     print_success(f"起動ランチャーを登録しました: {launcher_path}")
-    if str(launcher_dir).lower() not in (entry.lower() for entry in os.environ.get("PATH", "").split(os.pathsep)):
-        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_avatar を実行してください。")
-    return True
+    return ensure_launcher_path(launcher_dir)
 
 
 # ============================================================

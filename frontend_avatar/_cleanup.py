@@ -10,10 +10,11 @@
 
 """フロントエンド(Avatar) クリーンアップスクリプト
 
+この作業コピーの起動ランチャーを解除し、
 node_modules / dist / dist-electron / __pycache__ / .pytest_cache を削除します。
 
 公開 API:
-    cleanup(choices: dict | None = None) -> None
+    cleanup(choices: dict | None = None) -> bool
 """
 
 import os
@@ -32,6 +33,9 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_AVATAR_DIR = THIS_DIR
 FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
+
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _setup_path import remove_launcher_path
 
 AUTO_MODE = False
 
@@ -166,13 +170,32 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
 # ============================================================
 # クリーンアップ本体
 # ============================================================
-def cleanup(choices: dict | None = None) -> None:
+def remove_standalone_launcher() -> bool:
+    """この作業コピーの Avatar ランチャーだけを解除する。"""
+    directory = Path.home() / '.local' / 'bin'
+    script = str(FRONTEND_AVATAR_DIR.resolve() / '_start.py')
+    try:
+        for name in ('aidiy_avatar.cmd', 'aidiy_avatar'):
+            launcher = directory / name
+            if launcher.is_file() and script in launcher.read_text(encoding='utf-8'):
+                launcher.unlink()
+                print_success(f'起動ランチャーを解除しました: {launcher}')
+        return remove_launcher_path(directory)
+    except OSError as exc:
+        print_error(f'Avatar ランチャーの解除に失敗しました: {exc}')
+        return False
+
+
+def cleanup(choices: dict | None = None) -> bool:
     label = "フロントエンド(Avatar)"
     print_header(f"{label} のクリーンアップ")
 
+    if not remove_standalone_launcher():
+        return False
+
     if not FRONTEND_AVATAR_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
-        return
+        return True
 
     deleted_count = 0
 
@@ -194,6 +217,7 @@ def cleanup(choices: dict | None = None) -> None:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
+    return True
 
 
 def main():
@@ -203,7 +227,8 @@ def main():
     if not run_cleanup:
         print_info("クリーンアップをキャンセルしました")
         return
-    cleanup()
+    if not cleanup():
+        sys.exit(1)
     print_success("クリーンアップが完了しました")
 
 

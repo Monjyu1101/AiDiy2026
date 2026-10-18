@@ -33,7 +33,8 @@ class LauncherTests(unittest.TestCase):
                     modules = {folder: load(folder, '_setup') for folder in order}
                     paths = {}
                     for folder, module in modules.items():
-                        module.install_launcher(ROOT / folder)
+                        with patch.object(module._launcher, 'ensure_launcher_path', return_value=True):
+                            module.install_launcher(ROOT / folder)
                         paths[folder] = module._launcher.launcher_path()
                     self.assertNotEqual(*paths.values())
                     for folder, path in paths.items():

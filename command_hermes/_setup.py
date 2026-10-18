@@ -12,13 +12,14 @@
 
 このフォルダ (command_hermes) 単体のセットアップを行います。
 仮想環境作成・依存関係インストールに加え、`aidiy_hermes` ランチャーの作成と
-（非 Windows では）シェル PATH への登録を行います。
+Windows ではユーザー PATH、非 Windows ではシェル PATH への登録を行います。
 
 公開 API:
     setup(choices=None) -> bool
 """
 
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -33,8 +34,8 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_HERMES_DIR = THIS_DIR
 BACKEND_HERMES_ENV = ".venv"
-SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
-SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
+sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+from _setup_path import ensure_launcher_path
 
 AUTO_MODE = False
 
@@ -143,57 +144,6 @@ def check_uv_installed():
     return shutil.which("uv") is not None
 
 
-def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
-    lines = content.splitlines()
-    result: list[str] = []
-    skipping = False
-    for line in lines:
-        stripped = line.strip()
-        if stripped == begin_marker:
-            skipping = True
-            continue
-        if skipping and stripped == end_marker:
-            skipping = False
-            continue
-        if not skipping:
-            result.append(line)
-    while result and result[-1].strip() == "":
-        result.pop()
-    return "\n".join(result).rstrip() + ("\n" if result else "")
-
-
-def get_shell_profile_paths() -> list[Path]:
-    if sys.platform == "win32":
-        return []
-    home = Path.home()
-    if sys.platform == "darwin":
-        return [home / ".zprofile", home / ".zshrc", home / ".bash_profile"]
-    return [home / ".profile", home / ".bashrc"]
-
-
-def ensure_shell_path_entry(bin_dir: Path, label: str) -> bool:
-    if sys.platform == "win32":
-        return True
-
-    export_line = f'export PATH="{bin_dir}:$PATH"'
-    block = "\n".join([SHELL_PATH_MARKER_BEGIN, export_line, SHELL_PATH_MARKER_END]) + "\n"
-    updated_any = False
-
-    for profile_path in get_shell_profile_paths():
-        try:
-            original = profile_path.read_text(encoding="utf-8") if profile_path.exists() else ""
-            cleaned = _remove_marked_block(original, SHELL_PATH_MARKER_BEGIN, SHELL_PATH_MARKER_END).rstrip()
-            updated = (cleaned + "\n\n" if cleaned else "") + block
-            profile_path.parent.mkdir(parents=True, exist_ok=True)
-            profile_path.write_text(updated, encoding="utf-8")
-            print_success(f"{label}: PATH 設定を書き込みました: {profile_path}")
-            updated_any = True
-        except Exception as e:
-            print_warning(f"{label}: PATH 設定の書き込みに失敗しました: {profile_path} ({e})")
-
-    return updated_any
-
-
 # ============================================================
 # セットアップ本体
 # ============================================================
@@ -230,6 +180,12 @@ def setup(choices: dict | None = None) -> bool:
         print_error(f"{label}: uv sync --upgrade に失敗しました。")
         return False
 
+    return install_standalone_launcher()
+
+
+def install_standalone_launcher() -> bool:
+    """依存の再導入なしでランチャーと共通 PATH 登録を修復する。"""
+    label = 'コマンド(hermes)'
     hermes_dir = BACKEND_HERMES_DIR.resolve()
     cli_path = hermes_dir / "cli_main.py"
     launcher_dir = Path.home() / ".local" / "bin"
@@ -259,8 +215,8 @@ def setup(choices: dict | None = None) -> bool:
         py_path = hermes_dir / BACKEND_HERMES_ENV / "bin" / "python"
         launcher_content = (
             "#!/usr/bin/env sh\n"
-            f'PY="{py_path}"\n'
-            f'CLI="{cli_path}"\n'
+            f'PY={shlex.quote(str(py_path))}\n'
+            f'CLI={shlex.quote(str(cli_path))}\n'
             'if [ ! -x "$PY" ]; then\n'
             '  echo "Python virtual environment was not found:"\n'
             '  echo "  $PY"\n'
@@ -269,20 +225,17 @@ def setup(choices: dict | None = None) -> bool:
             'exec "$PY" "$CLI" "$@"\n'
         )
     try:
-        launcher_path.write_text(launcher_content, encoding="utf-8")
+        launcher_path.write_bytes(launcher_content.replace('\n', '\r\n').encode('utf-8') if sys.platform == 'win32' else launcher_content.encode('utf-8'))
         if sys.platform != "win32":
             launcher_path.chmod(0o755)
         print_success(f"{label}: {launcher_path.name} を作成しました: {launcher_path}")
         print_info(f"  Python: {py_path}")
         print_info(f"  CLI   : {cli_path}")
-        if sys.platform != "win32" and str(launcher_dir) not in os.environ.get("PATH", "").split(os.pathsep):
-            print_warning(f"{label}: {launcher_dir} が PATH に見つかりません。")
-            if ensure_shell_path_entry(launcher_dir, label):
-                print_info("  シェル設定へ PATH を追記しました。ターミナル再起動後に有効です。")
-            else:
-                print_info(f"  例: export PATH=\"{launcher_dir}:$PATH\"")
+        if not ensure_launcher_path(launcher_dir):
+            return False
     except Exception as e:
         print_warning(f"{label}: {launcher_path.name} の作成に失敗しました: {e}")
+        return False
 
     print_success(f"{label}: セットアップが完了しました。")
     return True

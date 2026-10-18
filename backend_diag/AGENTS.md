@@ -1,9 +1,10 @@
 # backend_diag 実装概要
 
-Node.js 標準モジュールの読み取り専用診断サーバーと Electron / Web 表示です。AIコアや DB が未設定でも起動できます。
+Node.js 標準モジュールの診断・起動管理サーバーと Electron / Web 表示です。AIコアや DB が未設定でも診断画面を起動できます。起動管理は明示操作時だけ Python の既存起動基盤を使用します。
 
 - `起動/desktop.mjs` / `起動/electron-main.cjs`: 既存共有セットアップで用意した Electron を通常表示に使います。ブラウザ・Codespaces は Node.js のみです。
 - `diag_main.mjs`: ループバック HTTP、起動単位の認証、ブラウザ起動。
+- `起動/サービス管理.mjs` / `ui/src/起動/`: 起動対象の保存、機能別コンソール、順次再起動と停止。起動順・既定値はルートと共通の `scripts/起動対象.json`、各 `_start.py` の Diag 経路は `scripts/_diag_start.py` が担当します。
 - `モデル情報/models_info.mjs`: プロバイダ別モデル情報とchat / live / codeの合成JSON。取得モデルから `models` を生成し、API の詳細情報も保持。Grok / backend_local の固定候補と、Copilot導入済み・合成候補なし時の固定8モデルを管理。本体・クライアントは合成JSONを読み、`_config` 上のモデル設定ファイルには依存しません。
 - `モデル情報/voices_info.mjs`: Gemini / FreeAI / OpenAIの固定音声候補。取得・認証状態にかかわらず3区分の `live_voices_info.json` を生成します。候補の存在は認証成功を意味しません。
 - `診断/headless.mjs`: `--headless` の全診断と、画面の書込と共通の保存形式。画面・待受なしで最速実行し、`_AIDIY/aidiy_diag/*.json` へ成功時だけ保存します（現在は `install_info.json`）。
@@ -20,6 +21,6 @@ Node.js 標準モジュールの読み取り専用診断サーバーと Electron
 - `checks/reference/`: 移植前の Python 実装から生成・凍結した合成ゴールデン。比較専用で本番実行から参照しません。
 - `_setup.py` / `_cleanup.py`: この作業コピーのランチャー配置・解除。
 
-インストール・設定ファイル変更・ログインは行いません。全テストは導入状況・モデル一覧・外部連携の確認と書込を順に行い、終わると導入状況タブへ切り替えます。会話生成を伴う config モデル試行は Tools 接続中の明示操作専用で、起動・headless・全テストには含めません。匿名の公開 OpenRouter 一覧だけを起動時に取得し、キーを使うモデル API と外部連携（Hugging Face / Discord）の読み取り専用の認証確認は、画面の明示操作（各行のテスト・一覧再取得・状況確認・全テスト）時だけ接続します。外部連携の結果は `_AIDIY/aidiy_diag/integration_info.json` へ保存し、headless では確認しません。API は起動時の認証が必須で、公開する静的ファイルに診断結果や認証キーを埋め込みません。
+診断機能はインストール・接続設定の変更・ログインを行いません。起動タブだけは利用者の明示操作で起動設定を保存し、サービスを起動・停止します。全テストは導入状況・モデル一覧・外部連携の確認と書込を順に行い、終わると導入状況タブへ切り替えます。起動管理と、会話生成を伴う config モデル試行は headless・全テストには含めません。モデル試行は Tools 接続中の明示操作専用です。匿名の公開 OpenRouter 一覧だけを起動時に取得し、キーを使うモデル API と外部連携（Hugging Face / Discord）の読み取り専用の認証確認は、画面の明示操作（各行のテスト・一覧再取得・状況確認・全テスト）時だけ接続します。外部連携の結果は `_AIDIY/aidiy_diag/integration_info.json` へ保存し、headless では確認しません。API は起動時の認証が必須で、公開する静的ファイルに診断結果や認証キーを埋め込みません。
 
 起動・検証・追加手順は [README.md](./README.md) を参照してください。

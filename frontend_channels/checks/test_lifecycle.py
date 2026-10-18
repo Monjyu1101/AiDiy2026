@@ -296,6 +296,10 @@ class DiscordProcessMatchingTest(unittest.TestCase):
 
 
 class DiscordLauncherTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(launcher, 'ensure_launcher_path', return_value=True))
+        self.enterContext(patch.object(launcher, 'remove_launcher_path', return_value=True))
+
     def test_new_folder_loads_through_root_entrypoints_without_renaming_discord_modules(self):
         self.assertTrue(FRONTEND.is_dir())
         self.assertEqual(json.loads((FRONTEND / 'package.json').read_text(encoding='utf-8'))['name'], 'aidiy-discord')

@@ -1,8 +1,10 @@
 'use strict';
-const {app,BrowserWindow,session,ipcMain}=require('electron');
+const {app,BrowserWindow,session,ipcMain,dialog}=require('electron');
 const path=require('node:path');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
-let window, failed=false;
+const {ミニ表示を作成}=require('./ミニ表示.cjs');
+const {起動状態を読む,終了確認を作成}=require('./終了確認.cjs');
+let window, failed=false,終了確認;
 function fail(code) {
   if(failed)return;failed=true;
   // 例外本文や loadURL の URL は返さず、固定の原因コードだけを IPC へ送る。
@@ -28,11 +30,15 @@ async function start(value) {
   });
   window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
-  ipcMain.handle('diag:window',(event,action)=>{
+  終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
+  const mini=ミニ表示を作成(window);
+  window.webContents.on('did-start-loading',()=>mini.set(false));
+  ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
+    if(action==='startMini')return mini.set(value);
     if(action==='isMaximized')return window.isMaximized();
     if(action==='minimize')window.minimize();
-    else if(action==='maximize'){if(window.isMaximized())window.unmaximize();else window.maximize();}
+    else if(action==='maximize'&&!mini.active){if(window.isMaximized())window.unmaximize();else window.maximize();}
     else if(action==='close')window.close();
     return false;
   });
@@ -69,7 +75,7 @@ function primary() {
     if(message?.type!=='diag-start' || typeof message.url!=='string' || message.url.length>4096){fail('IPC');return;}
     start(message.url).catch(()=>fail('WINDOW'));
   });
-  process.once('disconnect',()=>{clearTimeout(timer);app.quit();});
+  process.once('disconnect',()=>{clearTimeout(timer);終了確認?.許可();app.quit();});
   if(process.connected && process.send){
     try{process.send({type:'diag-ready'},error=>{if(error)fail('IPC');});}catch{fail('IPC');}
   }else{clearTimeout(timer);fail('IPC');}

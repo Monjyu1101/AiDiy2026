@@ -14,7 +14,7 @@
 キャッシュ / 仮想環境 / temp の削除を行います。
 
 公開 API:
-    cleanup(choices: dict) -> None
+    cleanup(choices: dict) -> bool
     collect_choices() -> dict | None
 """
 
@@ -34,6 +34,8 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 BACKEND_HERMES_DIR = THIS_DIR
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
+sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+from _setup_path import remove_launcher_path
 SHELL_PATH_MARKER_BEGIN = "# >>> AiDiy Hermes PATH >>>"
 SHELL_PATH_MARKER_END = "# <<< AiDiy Hermes PATH <<<"
 
@@ -220,6 +222,8 @@ def cleanup_shell_path_entries(label: str) -> int:
             continue
         try:
             original = profile_path.read_text(encoding="utf-8")
+            if SHELL_PATH_MARKER_BEGIN not in original:
+                continue
             updated = _remove_marked_block(original, SHELL_PATH_MARKER_BEGIN, SHELL_PATH_MARKER_END)
             if updated == original:
                 continue
@@ -234,7 +238,7 @@ def cleanup_shell_path_entries(label: str) -> int:
 # ============================================================
 # クリーンアップ本体
 # ============================================================
-def cleanup(choices: dict) -> None:
+def cleanup(choices: dict) -> bool:
     label = "コマンド(hermes)"
     print_header(f"{label} のクリーンアップ")
 
@@ -244,6 +248,8 @@ def cleanup(choices: dict) -> None:
     for launcher_path in launcher_paths:
         if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
             deleted_count += 1
+    if not remove_launcher_path(launcher_dir):
+        return False
     deleted_count += cleanup_shell_path_entries(label)
 
     if not BACKEND_HERMES_DIR.exists():
@@ -252,7 +258,7 @@ def cleanup(choices: dict) -> None:
             print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
         else:
             print_info(f"{label}: 削除対象はありませんでした")
-        return
+        return True
 
     deleted_count += cleanup_common_python_caches(BACKEND_HERMES_DIR, label)
 
@@ -281,6 +287,7 @@ def cleanup(choices: dict) -> None:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
+    return True
 
 
 def collect_choices() -> dict | None:
@@ -304,7 +311,8 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
     choices = collect_choices()
-    cleanup(choices)
+    if not cleanup(choices):
+        sys.exit(1)
     print_success("クリーンアップが完了しました")
 
 

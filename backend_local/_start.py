@@ -115,12 +115,12 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
     print_info(f"[{name}] コマンド: {' '.join(command)}")
     if sys.platform == "win32":
         process = subprocess.Popen(
-            command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            command, cwd=str(cwd), stdout=subprocess.PIPE, stdin=(subprocess.DEVNULL if os.environ.get("AIDIY_DIAG_CONSOLE") == "1" else None), stderr=subprocess.STDOUT,
             bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     else:
         process = subprocess.Popen(
-            command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            command, cwd=str(cwd), stdout=subprocess.PIPE, stdin=(subprocess.DEVNULL if os.environ.get("AIDIY_DIAG_CONSOLE") == "1" else None), stderr=subprocess.STDOUT,
             bufsize=0, preexec_fn=os.setpgrp,
         )
     print_success(f"[{name}] 起動しました")
@@ -136,7 +136,7 @@ def start() -> subprocess.Popen[bytes]:
 # ポート整理
 # ============================================================
 def _listening_pids_windows(port: int) -> list[str]:
-    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5)
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, encoding="oem", errors="replace", timeout=5)
     if result.returncode != 0:
         return []
     pids = set()
@@ -185,7 +185,7 @@ def kill_process_on_port(port: int) -> bool:
     try:
         if sys.platform == "win32":
             finder = _listening_pids_windows
-            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, text=True, timeout=8)
+            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, encoding="oem", errors="replace", timeout=8)
         else:
             finder = _listening_pids_linux
             killer = lambda pid: subprocess.run(["kill", "-9", pid], capture_output=True, text=True, timeout=5)
@@ -292,4 +292,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if '--diag-start' in sys.argv:
+        import runpy
+        runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts' / '_diag_start.py'),
+                       init_globals={'START_MODULE': sys.modules[__name__]}, run_name='__main__')
+    else:
+        main()

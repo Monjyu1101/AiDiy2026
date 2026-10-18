@@ -259,7 +259,8 @@ class ViewerSetupTests(unittest.TestCase):
                 self.assertTrue(common.prepare_electron_binary(target, 'test', allow_download=False))
                 self.assertTrue(common.electron_binary_ready(target))
                 self.assertEqual(archive.read_bytes(), before)
-                if platform_name != 'win32':
+                # sys.platform の模擬だけでは、Windows のファイル権限は POSIX にならない。
+                if platform_name != 'win32' and os.name != 'nt':
                     self.assertEqual((electron / 'dist' / executable).stat().st_mode & 0o777, 0o755)
         self.download.assert_not_called()
 

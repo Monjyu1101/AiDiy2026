@@ -41,6 +41,12 @@ def launcher_content(script, windows=None):
             f'exec node {shlex.quote(str(script))} "$@"\n')
 
 
+_path_spec = importlib.util.spec_from_file_location('aidiy_diag_setup_path', THIS_DIR.parent / 'scripts' / '_setup_path.py')
+_path_helper = importlib.util.module_from_spec(_path_spec)
+_path_spec.loader.exec_module(_path_helper)
+ensure_launcher_path = _path_helper.ensure_launcher_path
+
+
 def setup(choices=None, *, desktop=True):
     if choices is not None and choices.get('diag') is False:
         return True
@@ -58,8 +64,8 @@ def setup(choices=None, *, desktop=True):
         print(f'診断ランチャーを配置できません: {exc}')
         return False
     print(f'診断ランチャーを作成しました: {launcher}')
-    if str(directory) not in os.environ.get('PATH', '').split(os.pathsep):
-        print(f'{directory} を PATH に追加してください。')
+    if not ensure_launcher_path(directory):
+        return False
     print('起動: aidiy_diag（Electron） / aidiy_diag --browser（ブラウザ）')
     return setup_desktop() if desktop else True
 

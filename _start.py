@@ -122,6 +122,8 @@ def print_info(message: str) -> None:
 # 設定
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
+STARTUP_DEFAULTS = {item['id']: item['初期設定']['起動対象'] for item in
+                    json.loads((BASE_DIR / 'scripts/起動対象.json').read_text(encoding='utf-8'))}
 
 FRONTEND_COMMAND = "npm"
 QUIET_WAIT_SECONDS = 20
@@ -267,7 +269,7 @@ def get_npm_command() -> str | None:
     candidates = [f"{FRONTEND_COMMAND}.cmd", FRONTEND_COMMAND] if sys.platform == "win32" else [FRONTEND_COMMAND]
     for candidate in candidates:
         try:
-            subprocess.run([candidate, "--version"], capture_output=True, timeout=5, check=True)
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True)
             return candidate
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             continue
@@ -278,7 +280,7 @@ def get_npm_command() -> str | None:
 # ポート整理（監視・初期整理用）
 # ============================================================
 def _listening_pids_windows(port: int) -> list[str]:
-    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5)
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, encoding="oem", errors="replace", timeout=5)
     if result.returncode != 0:
         return []
     pids = set()
@@ -327,7 +329,7 @@ def kill_process_on_port(port: int) -> bool:
     try:
         if sys.platform == "win32":
             finder = _listening_pids_windows
-            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, text=True, timeout=8)
+            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, encoding="oem", errors="replace", timeout=8)
         else:
             finder = _listening_pids_linux
             killer = lambda pid: subprocess.run(["kill", "-9", pid], capture_output=True, text=True, timeout=5)
@@ -481,21 +483,21 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 def collect_startup_choices() -> tuple[bool, ...]:
     print_header("起動条件の確認")
     print("バックエンド")
-    local_enabled         = prompt_choice("  local     : 起動しますか?", default_yes=False)
-    backend_tools_enabled = prompt_choice("  tools     : 起動しますか?", default_yes=True)
-    backend_enabled       = prompt_choice("  core,apps : 起動しますか?", default_yes=True)
-    backend_taskteam_enabled = prompt_choice("  task,team : 起動しますか?", default_yes=True)
+    local_enabled         = prompt_choice("  local     : 起動しますか?", default_yes=STARTUP_DEFAULTS['local'])
+    backend_tools_enabled = prompt_choice("  tools     : 起動しますか?", default_yes=STARTUP_DEFAULTS['tools'])
+    backend_enabled       = prompt_choice("  core,apps : 起動しますか?", default_yes=STARTUP_DEFAULTS['core'])
+    backend_taskteam_enabled = prompt_choice("  task,team : 起動しますか?", default_yes=STARTUP_DEFAULTS['taskteam'])
     print("フロントエンド")
-    web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=True)
-    avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=False)
+    web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=STARTUP_DEFAULTS['web'])
+    avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=STARTUP_DEFAULTS['avatar'])
     print("フロントエンド(IDE)")
     diag_enabled          = False  # 診断はTools起動直前にheadless実行する。
-    term_enabled          = prompt_choice("  Term      : 起動しますか?", default_yes=False)
-    code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=False)
-    live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=False)
-    dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=False)
+    term_enabled          = prompt_choice("  Term      : 起動しますか?", default_yes=STARTUP_DEFAULTS['term'])
+    code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=STARTUP_DEFAULTS['code'])
+    live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=STARTUP_DEFAULTS['live'])
+    dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=STARTUP_DEFAULTS['ide'])
     print("フロントエンド(その他)")
-    discord_enabled       = prompt_choice("  Discord   : 起動しますか?", default_yes=False)
+    discord_enabled       = prompt_choice("  Discord   : 起動しますか?", default_yes=STARTUP_DEFAULTS['discord'])
     return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, diag_enabled, term_enabled, code_enabled, live_enabled, dev_enabled, discord_enabled
 
 

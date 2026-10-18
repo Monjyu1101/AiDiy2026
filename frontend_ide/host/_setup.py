@@ -38,6 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
 from _setup_electron import setup_dependencies
+from _setup_path import ensure_launcher_path
 
 sys.path.insert(0, str(THIS_DIR / "scripts"))
 from vscode_extensions import uninstall_aidiy_extensions
@@ -293,9 +294,7 @@ def install_standalone_launcher() -> bool:
     except OSError as exc:
         print_error(f"単独起動ランチャーを更新できません: {launcher_dir} ({exc})")
         return False
-    if str(launcher_dir).lower() not in (entry.lower() for entry in os.environ.get("PATH", "").split(os.pathsep)):
-        print_warning(f"{launcher_dir} を PATH に追加し、新しいターミナルから aidiy_code / aidiy_live を実行してください。")
-    return True
+    return ensure_launcher_path(launcher_dir)
 
 
 def install_extensions(vscode_cli: str) -> bool:

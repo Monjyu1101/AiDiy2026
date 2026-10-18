@@ -53,6 +53,11 @@ if sys.platform == "win32":
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
 
+_path_spec = importlib.util.spec_from_file_location("aidiy_cleanup_path", BASE_DIR / "scripts" / "_setup_path.py")
+_path_helper = importlib.util.module_from_spec(_path_spec)
+_path_spec.loader.exec_module(_path_helper)
+remove_launcher_path = _path_helper.remove_launcher_path
+
 BACKEND_PATH = "backend_server"
 BACKEND_ENV_LIST = [".venv", "venv"]
 BACKEND_TASKTEAM_PATH = "backend_taskteam"
@@ -719,13 +724,15 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     print()
     if choices["avatar"]:
-        _run_folder_cleanup("frontend_avatar", choices)
+        if not _run_folder_cleanup("frontend_avatar", choices):
+            cleanup_errors.append("フロントエンド(Avatar)")
     else:
         print_info("フロントエンド(Avatar)のクリーンアップをスキップしました")
 
     print()
     if choices["hermes"]:
-        _run_folder_cleanup("command_hermes", choices)
+        if not _run_folder_cleanup("command_hermes", choices):
+            cleanup_errors.append("コマンド(hermes)")
     else:
         print_info("コマンド(hermes) のクリーンアップをスキップしました")
 
@@ -742,6 +749,10 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
             cleanup_errors.append("フロントエンド(Discord)")
     else:
         print_info("フロントエンド(Discord)のクリーンアップをスキップしました")
+
+    # Diag の解除時点では他のランチャーが残るため、全項目の解除後に再確認する。
+    if not remove_launcher_path():
+        cleanup_errors.append("ランチャー PATH 登録の解除")
 
     print()
     if not cleanup_temp_directories(base_dir):

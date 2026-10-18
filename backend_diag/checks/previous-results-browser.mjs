@@ -24,7 +24,7 @@ try{
  async function until(expression){for(let i=0;i<120;i++){if(await evaluate(expression))return;await sleep(50);}assert.fail(expression);}
  await send('Runtime.enable');await send('Page.enable');
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
- async function open(){await send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/#token=previous-fixture`});await until("document.querySelector('#list .badge')?.dataset.state==='OK'");}
+ async function open(){await send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/#token=previous-fixture`});await until("document.querySelector('#list .badge')?.dataset.state==='OK'");await tab('導入状況');}
  async function tab(name){await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='${name}').click()`);}
  async function check(panel,button){
   await until(`document.querySelector('${panel} .previous-run time')?.dateTime==='${old}'`);
@@ -34,7 +34,7 @@ try{
  await tab('モデル一覧');await until("document.querySelector('.key-row .badge')?.dataset.state==='OK'");await check('.model-key-panel','#latest-models');
  await evaluate("document.querySelector('.key-row .key-select').click()");await until("document.querySelector('.models')?.textContent.includes('saved-model')");
  await tab('外部連携');await until("document.querySelector('.integration-row .badge')?.dataset.state==='NG'");await check('.integration-panel','#integration-run');
- assert.equal(requests.filter(r=>r.method==='POST').length,0);
+ assert.equal(requests.filter(r=>r.method==='POST'&&!r.url.endsWith('/起動/ログ')).length,0);
  assert.ok(await evaluate("document.querySelector('#install-write').disabled&&document.querySelector('#models-write').disabled&&document.querySelector('#integration-write').disabled"));
  for(const [name,panel,button] of [['導入状況','[aria-label="導入状況"]','#install-run'],['モデル一覧','.model-key-panel','#latest-models'],['外部連携','.integration-panel','#integration-run']]){
   await tab(name);await evaluate(`document.querySelector('${button}').click()`);await until(`document.querySelector('${panel} .previous-run time')?.dateTime!=='${old}'&&!document.querySelector('${button}').disabled`);

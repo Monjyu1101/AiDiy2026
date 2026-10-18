@@ -2,6 +2,13 @@
 from pathlib import Path
 import hashlib
 import secrets
+import importlib.util
+
+
+_path_spec = importlib.util.spec_from_file_location('aidiy_diag_cleanup_path', Path(__file__).resolve().parent.parent / 'scripts' / '_setup_path.py')
+_path_helper = importlib.util.module_from_spec(_path_spec)
+_path_spec.loader.exec_module(_path_helper)
+remove_launcher_path = _path_helper.remove_launcher_path
 
 
 def cleanup(choices=None):
@@ -20,7 +27,7 @@ def cleanup(choices=None):
                 launcher.unlink()
                 print(f'診断ランチャーを解除しました: {launcher}')
         print('この作業コピーの診断へ停止を通知しました。')
-        return True
+        return remove_launcher_path()
     except OSError as exc:
         print(f'診断ランチャーの解除に失敗しました: {exc}')
         return False

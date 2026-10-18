@@ -39,8 +39,7 @@ class StartupTest(unittest.TestCase):
         with patch.object(start, 'prompt_choice', side_effect=lambda text, default_yes: default_yes) as ask:
             flags = start.collect_startup_choices()
         self.assertEqual(flags, (False, True, True, True, True, False, False, False, False, False, False, False))
-        self.assertEqual([c.args[0] for c in ask.call_args_list][-6:], [
-            '  Diag      : 起動しますか?',
+        self.assertEqual([c.args[0] for c in ask.call_args_list][-5:], [
             '  Term      : 起動しますか?',
             '  Code      : 起動しますか?',
             '  Live      : 起動しますか?',

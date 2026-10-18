@@ -76,6 +76,18 @@ taskkill /PID <pid> /F
 
 `8098`、`8095`、`8093`、`8096` も同じ手順で確認する。
 
+### Windows の出力文字コード
+
+Diag は Python を `-X utf8` で起動するが、`netstat` / `taskkill` の出力は Windows の OEM コードページを使う。この出力を既定の `text=True` だけで読むと、読取スレッドの `UnicodeDecodeError` に続いて `stdout` が `None` になり、PID 解析の `splitlines` でも失敗する。ルートと Local / Tools / Core・Apps / Task・Team / Web / Avatar の起動スクリプトでは、Windows のこの2コマンドだけ `encoding="oem", errors="replace"` を明示する。Python・Node のログや JSON は引き続き UTF-8 とし、macOS / Linux の読み取り方法は変更しない。PowerShell で日本語の実行パスを返す場合は送信側を `[Console]::OutputEncoding` で UTF-8 に揃えて読み取る。
+
+再検証は `python -B -X utf8 scripts/checks/test_start_native_output.py`。CP932 の日本語見出しと不正バイトを含む標準エラーを出す合成プロセスで、本物の subprocess 読取スレッド・PID 抽出・停止失敗時のメッセージ・ポート解放後の再確認を検証する。実際のサービスや PID は停止しない。POSIX では Windows 専用 codec の実行試験をスキップし、既存の lsof 経路と模擬出力による試験を行う。
+
+### Web が「確認中」から進まない場合
+
+Diag は標準入力を停止要求用のパイプとして読み続ける。Web / Avatar / ルートの `get_npm_command()` で `npm --version` の標準入力を継承すると、Windows で確認処理が戻らなくなる場合がある。サーバー本体の起動処理だけでなく、バージョン確認にも `stdin=subprocess.DEVNULL` を指定する。タイムアウト指定だけで対処しない。
+
+再検証は `python -B -X utf8 scripts/checks/test_diag_start.py`。標準入力の EOF を待つ模擬 npm を使い、監視側の制御パイプを開いたまま確認が完了することを別プロセスで検証する。実際の npm / サービスや GUI を使わずに同じ条件を作れる。
+
 ## 起動時処理
 
 - `core_main.py` は C系/A系、`apps_main.py` は M/T/V/S系を担当する。

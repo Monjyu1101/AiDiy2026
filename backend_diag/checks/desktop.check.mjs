@@ -8,17 +8,19 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from '../起動/desktop.mjs';
+import miniWindow from '../起動/ミニ表示.cjs';
+import closeWindow from '../起動/終了確認.cjs';
 const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
-async function mainFixture({opening,load,primary=true}={}){
+async function mainFixture({opening,load,primary=true,startStatus={終了時停止あり:false},confirmClose=async()=>({response:1})}={}){
  const source=await readFile(new URL('../起動/electron-main.cjs',import.meta.url),'utf8');
- const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={},scripts=[],openings=[];
+ const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={},scripts=[],openings=[],dialogs=[];
  Object.assign(proc,{stdin,pid:42,platform:'win32',connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
  let options,win,loaded;app.whenReady=async()=>{};app.requestSingleInstanceLock=()=>primary;app.restored=0;app.focused=0;app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
- vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
- return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
+ vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,dialog:{showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
+ return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,dialogs,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
 test('desktop default; explicit browser, Codespaces, headless remain Node-only',()=>{
  assert.equal(browserMode({}, {DISPLAY:':1'},'linux'),false);assert.equal(browserMode({}, {},'win32'),false);
@@ -111,13 +113,23 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
  control({...event,senderFrame:{}},'close');assert.equal(f.win.closed,undefined);
  control({...event,sender:{}},'close');assert.equal(f.win.closed,undefined);
+ assert.equal(control({...event,senderFrame:{}},'startMini',true),false);
+ assert.equal(control(event,'startMini',{width:100}),false);
  control(event,'openFile');assert.equal(f.win.closed,undefined);
- control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');assert.equal(f.win.closed,true);
+ control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,0);
  const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
- assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','isMaximized','maximize','minimize']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','isMaximized','maximize','minimize','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.deepEqual(Array.from(exposed.aidiyWindow.startMini(true)),['diag:window','startMini',true]);assert.equal(await exposed.aidiyWindow.startMini({width:100}),false);
 });
 
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+test('closing a running Diag confirms from both native window close and the titlebar button',async()=>{
+ let response=1;const f=await mainFixture({startStatus:{終了時停止あり:true},confirmClose:async()=>({response})});
+ f.proc.emit('message',{type:'diag-start',url});await flush();f.win.close();await flush();
+ assert.equal(f.win.closed,undefined);assert.equal(f.dialogs.length,1);assert.equal(f.dialogs[0].parent,f.win);assert.equal(f.dialogs[0].options.cancelId,1);
+ response=0;f.handlers['diag:window']({sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame},'close');await flush();
+ assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,2);
+});
 test('Diag waits for load and shared expansion before revealing content and reporting shown',async()=>{
  let loaded,expanded;const f=await mainFixture({load:()=>new Promise(resolve=>loaded=resolve),opening:window=>new Promise(resolve=>expanded=()=>{window.show();resolve(true);})});
  f.proc.emit('message',{type:'diag-start',url});await flush();

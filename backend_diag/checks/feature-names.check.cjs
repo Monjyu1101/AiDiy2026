@@ -4,9 +4,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {render,source}=require('./ui-components.cjs');
 
-test('four tabs and feature modules use the requested names while stable tab IDs remain',()=>{
+test('six tabs and feature modules use the requested names while stable tab IDs remain',()=>{
  const tabs=[...source('App.vue').matchAll(/@click="changeTab\('([^']+)'\)">([^<]+)<\/button>/g)].map(([,id,name])=>[id,name]);
- assert.deepEqual(tabs,[['install','導入状況'],['keys','モデル一覧'],['integrations','外部連携'],['trials','設定モデル']]);
+ assert.deepEqual(tabs,[['install','導入状況'],['keys','モデル一覧'],['integrations','外部連携'],['trials','設定モデル'],['manual','AIモデル'],['start','起動']]);
  for(const name of tabs.map(([,name])=>name))assert.ok(fs.existsSync(path.join(__dirname,'../ui/src',name,`${name}パネル.vue`)));
  for(const name of ['インストール','モデルキー設定','外部連携設定','configモデル試行'])assert.equal(fs.existsSync(path.join(__dirname,'../ui/src',name)),false);
  assert.match(source('導入状況/導入状況状態.mjs'),/api\/診断/);

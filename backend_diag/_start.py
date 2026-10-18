@@ -14,7 +14,9 @@ def check_environment():
     if not (ROOT / 'diag_main.mjs').is_file() or not (ROOT / '診断' / 'catalog.json').is_file():
         return False, '診断のソースファイルが見つかりません。'
     try:
-        version = subprocess.run([node, '--version'], capture_output=True, text=True, timeout=5, check=True).stdout.strip()
+        version = subprocess.run([node, '--version'], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0,
+                                 timeout=5, check=True).stdout.strip()
         if int(version.lstrip('v').split('.')[0]) < 18:
             return False, 'Node.js 18 以降が必要です: https://nodejs.org/'
     except (ValueError, OSError, subprocess.SubprocessError):
@@ -28,6 +30,7 @@ def run_headless():
     if not node:
         raise RuntimeError('Node.js が見つかりません: https://nodejs.org/')
     result = subprocess.run([node, str(ROOT / 'diag_main.mjs'), '--headless'], cwd=ROOT,
+                            stdin=subprocess.DEVNULL,
                             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
     if result.returncode:
         raise RuntimeError(f'aidiy_diag --headless に失敗しました（終了コード {result.returncode}）。')

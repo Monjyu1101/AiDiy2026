@@ -39,6 +39,8 @@ import _setup_electron as common
 
 class ElectronSetupTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(vscode, 'ensure_launcher_path', return_value=True))
+        self.enterContext(patch.object(avatar, 'ensure_launcher_path', return_value=True))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.project = Path(temporary.name)

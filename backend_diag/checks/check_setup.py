@@ -183,8 +183,17 @@ class RootIntegrationTests(unittest.TestCase):
             module.run_headless()
             self.assertEqual(run.call_args.args[0],['node',str(ROOT/'diag_main.mjs'),'--headless'])
             self.assertEqual(run.call_args.kwargs['cwd'],ROOT)
+            self.assertEqual(run.call_args.kwargs['stdin'],module.subprocess.DEVNULL)
+            self.assertEqual(run.call_args.kwargs['creationflags'],module.subprocess.CREATE_NO_WINDOW if module.sys.platform=='win32' else 0)
             run.return_value.returncode=1
             with self.assertRaises(RuntimeError):module.run_headless()
+    def test_node_version_probe_is_hidden_and_does_not_inherit_input(self):
+        from types import SimpleNamespace
+        module=load('_start')
+        with patch.object(module.shutil,'which',return_value='node'),patch.object(module.subprocess,'run',return_value=SimpleNamespace(stdout='v24.0.0')) as execute:
+            self.assertTrue(module.check_environment()[0])
+        self.assertEqual(execute.call_args.kwargs['stdin'],module.subprocess.DEVNULL)
+        self.assertEqual(execute.call_args.kwargs['creationflags'],module.subprocess.CREATE_NO_WINDOW if module.sys.platform=='win32' else 0)
     def test_diag_only_start_no_core_dependency_or_auto_restart(self):
         module=self.root_module('_start');started=[]
         with patch.object(module,'stop_all_tasks'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'start_service',side_effect=lambda name,*args:started.append(name) or True),patch('builtins.print'):
@@ -324,6 +333,9 @@ class SetupOrderingTests(unittest.TestCase):
 class SetupDisplayTests(unittest.TestCase):
     root_module = RootIntegrationTests.root_module
 
+    def setUp(self):
+        self.enterContext(patch.object(setup, 'ensure_launcher_path', return_value=True))
+
     def assert_diag_display(self, output):
         self.assertEqual(output.count('バックエンド(Diag) セットアップ'), 1)
         self.assertIn(setup.Colors.HEADER + '=' * 60 + setup.Colors.ENDC, output)
@@ -364,6 +376,9 @@ class SetupDisplayTests(unittest.TestCase):
 
 
 class ElectronSetupTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(setup, 'ensure_launcher_path', return_value=True))
+
     def test_browser_environment_skips_electron_installs(self):
         with patch.dict('os.environ',{'CODESPACES':'true'}),patch.object(setup.shutil,'which') as which,patch('builtins.print'):
             self.assertTrue(setup.setup_desktop());which.assert_not_called()

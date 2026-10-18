@@ -13,6 +13,13 @@ from pathlib import Path
 import shlex
 import shutil
 import sys
+import importlib.util
+
+_path_spec = importlib.util.spec_from_file_location('aidiy_discord_launcher_path', Path(__file__).resolve().parent.parent / 'scripts' / '_setup_path.py')
+_path_helper = importlib.util.module_from_spec(_path_spec)
+_path_spec.loader.exec_module(_path_helper)
+ensure_launcher_path = _path_helper.ensure_launcher_path
+remove_launcher_path = _path_helper.remove_launcher_path
 
 
 def launcher_path() -> Path:
@@ -35,6 +42,8 @@ def install_launcher(root: Path) -> None:
         path.write_text(f'#!/bin/sh\nexec {shlex.quote(node)} {shlex.quote(str(script))} "$@"\n', encoding='utf-8')
         path.chmod(0o755)
     print(f'[OK] ランチャーを登録しました: {path}')
+    if not ensure_launcher_path(path.parent):
+        raise OSError('ランチャーの PATH 登録に失敗しました。')
 
 
 def remove_launcher(root: Path) -> bool:
@@ -42,7 +51,7 @@ def remove_launcher(root: Path) -> bool:
     try:
         if path.is_file() and str(root.resolve() / 'panel' / 'launch.mjs') in path.read_text(encoding='utf-8'):
             path.unlink()
-        return True
+        return remove_launcher_path(path.parent)
     except OSError:
         print(f'[NG] ランチャーを削除できません: {path}')
         return False

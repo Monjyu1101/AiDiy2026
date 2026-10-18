@@ -782,8 +782,35 @@ def setup_node_refresh() -> list[str]:
 # ============================================================
 # メイン
 # ============================================================
+def setup_launchers_only() -> list[str]:
+    """全8コマンドの登録を修復する。依存導入・ビルド・サービス起動は行わない。"""
+    steps = [
+        ('Diag', lambda: _load_folder_module('backend_diag').setup(desktop=False)),
+        ('Avatar', lambda: _load_folder_module('frontend_avatar').install_standalone_launcher()),
+        ('Hermes', lambda: _load_folder_module('command_hermes').install_standalone_launcher()),
+        ('Term', lambda: _load_folder_module('frontend_ide/aidiy_term').setup()),
+        ('Code / Live', lambda: _load_folder_module('frontend_ide/host').install_standalone_launcher()),
+        ('IDE', lambda: _load_folder_module('frontend_ide/viewer').install_launcher(BASE_DIR / 'frontend_ide/viewer')),
+        ('Discord', lambda: _load_folder_module('frontend_channels').install_launcher(BASE_DIR / 'frontend_channels')),
+    ]
+    errors = []
+    for label, action in steps:
+        try:
+            if action() is not False:
+                continue
+        except (OSError, RuntimeError, ValueError, ImportError) as exc:
+            print_error(f'{label}: {exc}')
+        errors.append(label)
+    return errors
+
+
 def main():
     global AUTO_MODE
+    if sys.argv[1:] == ['--launchers-only']:
+        print_header('起動コマンドと PATH の修復')
+        errors = setup_launchers_only()
+        print_setup_summary(errors)
+        raise SystemExit(1 if errors else 0)
     print_header("プロジェクト セットアップ")
     print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")

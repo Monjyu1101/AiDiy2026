@@ -1,0 +1,48 @@
+import {ref,computed,watch} from 'vue';
+
+export function 起動状態を作成({api}){
+ const 項目=ref([]),選択=ref(''),読込中=ref(false),保存中=ref(false),処理中=ref(false),起動中=ref(false),通知=ref(''),保存表示=ref('');
+ const 更新失敗=ref(false);
+ const ログ=ref({}),位置=new Map();let visible=false,logsVisible=true,timer,controller,version=0,最後の起動表示='';
+ const 選択対象=computed(()=>項目.value.find(item=>item.id===選択.value));
+ const コンソール=computed(()=>ログ.value[選択.value]||'コンソールのログは、起動後にここへ表示されます。\n');
+ async function refresh(){
+  if(!visible)return;const revision=version;controller=new AbortController();
+  try{
+   const data=await api('api/起動','GET',controller.signal);if(revision!==version)return;更新失敗.value=false;
+   項目.value=data.対象.map(item=>保存中.value?{...item,設定:項目.value.find(old=>old.id===item.id)?.設定||item.設定}:item);
+   起動中.value=data.実行中;if(data.通知)通知.value=data.通知;
+   const follow=data.起動表示;
+   if(follow?.実行ID&&follow.実行ID!==最後の起動表示&&項目.value.some(item=>item.id===follow.対象)){
+    最後の起動表示=follow.実行ID;選択.value=follow.対象;
+   }
+   if(!選択.value&&項目.value.length)選択.value=項目.value[0].id;
+   const id=選択.value;if(id&&logsVisible){const tail=await api('api/起動/ログ','POST',controller.signal,'json',{対象:id,位置:位置.get(id)||0});if(revision!==version)return;
+    ログ.value={...ログ.value,[id]:((tail.切替?'':ログ.value[id]||'')+tail.ログ).slice(-120000)};位置.set(id,tail.位置);
+   }
+  }catch(error){if(error.name!=='AbortError'&&revision===version){通知.value=error.message;更新失敗.value=true;}}
+  finally{if(revision===version){読込中.value=false;controller=undefined;if(visible)timer=setTimeout(refresh,800);}}
+ }
+ function 表示(value,logs=true){visible=value;logsVisible=logs;version++;clearTimeout(timer);controller?.abort();if(value){読込中.value=!項目.value.length;void refresh();}}
+ watch(選択,()=>{if(visible){version++;clearTimeout(timer);controller?.abort();void refresh();}});
+ async function 設定変更(id,key,value){
+  if(保存中.value)return;const item=項目.value.find(item=>item.id===id);if(!item)return;
+  const old={...item.設定};item.設定={...old,[key]:value};保存中.value=true;保存表示.value='保存中…';
+  try{await api('api/起動/設定','POST',undefined,'json',{対象:id,設定:{...item.設定}});保存表示.value='設定を保存しました';}
+  catch(error){item.設定=old;保存表示.value='保存できませんでした';通知.value=error.message;}
+  finally{保存中.value=false;}
+ }
+ async function 再起動(id){
+  if(保存中.value||処理中.value||起動中.value)return;処理中.value=true;
+  try{await api('api/起動/再起動','POST',undefined,'json',id?{対象:id}:{});if(id){ログ.value={...ログ.value,[id]:''};位置.delete(id);}起動中.value=true;通知.value='順番に再起動しています。';if(visible)表示(true,logsVisible);}
+  catch(error){通知.value=error.message;}finally{処理中.value=false;}
+ }
+ async function 停止(){
+  const id=選択.value;if(!id||処理中.value)return;処理中.value=true;
+  const item=項目.value.find(item=>item.id===id);if(item)item.状態='停止中';
+  try{await api('api/起動/停止','POST',undefined,'json',{対象:id});通知.value=(item?.名前||id)+' を停止しました。';}
+  catch(error){通知.value=error.message;}finally{処理中.value=false;}
+ }
+ function 終了(){表示(false);}
+ return {項目,選択,選択対象,読込中,保存中,処理中,起動中,通知,保存表示,更新失敗,コンソール,表示,設定変更,再起動,停止,終了};
+}
