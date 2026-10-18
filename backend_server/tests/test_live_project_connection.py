@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 BACKEND = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND))  # 抽出したルーターから判断用モデル候補も実装を読み込む。
 
 
 def load(filename, stubs):
@@ -139,7 +140,7 @@ class ProjectConnectionTest(unittest.IsolatedAsyncioTestCase):
             '_backend_local稼働中': lambda conf: True, '取得_コードベース選択肢': lambda conf: {},
         }
         exec(compile(ast.Module(body=nodes, type_ignores=[]), 'AIコア.py', 'exec'), namespace)
-        self.conf.models = types.SimpleNamespace(get_chat_models=lambda: {}, get_live_models=lambda: {'gemini_live': {'model': 'model'}}, get_live_voices=lambda: {}, get_code_models=lambda: {})
+        self.conf.models = types.SimpleNamespace(get_chat_models=lambda: {}, get_live_models=lambda: {'gemini_live': {'model': 'model'}}, get_live_voices=lambda: {}, get_code_models=lambda: {}, get_decisions_models=lambda: {})
         http = types.SimpleNamespace(app=types.SimpleNamespace(conf=self.conf))
         result = await namespace['モデル情報取得'](http, namespace['モデル情報取得リクエスト']())
         self.assertEqual(result['status'], 'OK')

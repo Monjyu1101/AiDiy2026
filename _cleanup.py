@@ -28,7 +28,7 @@ Code / Live の単独実行と tools の MCP 接続プロセスも強制終了�
 - frontend_avatar/_cleanup.py  cleanup(choices)
 - command_hermes/_cleanup.py   cleanup(choices)（ランチャー/PATH も解除）
 - frontend_ide/_cleanup.py   cleanup(choices)（IDE群の拡張・ランチャー・依存物・共通UIを解除）
-- frontend_discord/_cleanup.py cleanup(choices)（Bot 停止・依存物削除）
+- frontend_channels/_cleanup.py cleanup(choices)（Bot 停止・依存物削除）
 
 Usage:
     python _cleanup.py
@@ -203,7 +203,7 @@ SERVICE_CLEANUP_TARGETS = (
     ),
     ("ide", "frontend_ide/aidiy_term", "フロントエンド(term)", ("フロントエンド(term)",)),
     ("ide", "frontend_ide/viewer", "フロントエンド(IDE)", ("フロントエンド(IDE)",)),
-    ("discord", "frontend_discord", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
+    ("discord", "frontend_channels", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
 )
 
 # `_start.py` / `_cleanup.py` を import するフォルダ（= `__pycache__` が生成される）。
@@ -223,7 +223,7 @@ def cleanup_stop_request(choices: dict, services: list[str] | None = None):
         services = [
             service_name
             for _choice_key, _folder, _description, service_names in SERVICE_CLEANUP_TARGETS
-            if _folder not in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord")
+            if _folder not in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_channels")
             for service_name in service_names
         ] + ["バックエンド(Diag)", "フロントエンド(term)", "フロントエンド(code)", "フロントエンド(live)", "フロントエンド(IDE)", "フロントエンド(Discord)"]
     payload = {
@@ -283,7 +283,7 @@ def stop_all_services(
             failures.append(description)
 
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
-        if folder in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_discord"):
+        if folder in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_channels"):
             continue
         print_info(f"{description} の既存プロセスを停止します")
         run_stop(description, lambda folder=folder: _load_folder_start_module(folder).kill_ports())
@@ -305,7 +305,7 @@ def stop_all_services(
             lambda: _load_folder_module("frontend_ide/host").stop_standalone_processes(),
         )
     for folder, description, keep in (("frontend_ide/viewer", "フロントエンド(IDE)", keep_dev),
-                                      ("frontend_discord", "フロントエンド(Discord)", keep_discord)):
+                                      ("frontend_channels", "フロントエンド(Discord)", keep_discord)):
         if keep:
             print_info(f"{description} は継続します")
         else:
@@ -321,7 +321,7 @@ def stop_all_services(
                 protected_pids.update(_load_folder_start_module("frontend_ide/aidiy_term").process_tree_pids())
                 protected_pids.update(_load_folder_start_module("frontend_ide/viewer").process_tree_pids())
             if keep_discord:
-                protected_pids.update(_load_folder_start_module("frontend_discord").process_tree_pids())
+                protected_pids.update(_load_folder_start_module("frontend_channels").process_tree_pids())
         except Exception as e:
             # 継続対象の配下を判別できないときは、巻き込まないよう MCP 接続を止めない。
             print_warning(f"継続対象の配下を確認できないため、tools の MCP 接続は停止しません: {e}")
@@ -738,7 +738,7 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     print()
     if choices.get("discord"):
-        if not _run_folder_cleanup("frontend_discord", choices):
+        if not _run_folder_cleanup("frontend_channels", choices):
             cleanup_errors.append("フロントエンド(Discord)")
     else:
         print_info("フロントエンド(Discord)のクリーンアップをスキップしました")

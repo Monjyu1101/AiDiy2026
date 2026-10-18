@@ -25,7 +25,7 @@
 - frontend_ide/aidiy_term/_start.py  check_environment / start / kill_ports
 - frontend_ide/host/_start.py  check_environment / start_code / start_live / kill_ports
 - frontend_ide/viewer/_start.py     check_environment / start / kill_ports（空きポート）
-- frontend_discord/_start.py check_environment / start / kill_ports（パネルから自動接続）
+- frontend_channels/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
 起動前と Ctrl+C 終了時は、常駐サービス・Live の単独実行・tools の MCP 接続を
 `_cleanup.stop_all_services` と同じ手順で停止します。aidiy_term / aidiy_code / aidiy_ide / aidiy_discord とその配下は
@@ -185,10 +185,10 @@ def _init_modules() -> None:
     TERM = _load_folder_module("frontend_ide/aidiy_term")
     VSCODE = _load_folder_module("frontend_ide/host")
     DEV = _load_folder_module("frontend_ide/viewer")
-    DISCORD = _load_folder_module("frontend_discord")
+    DISCORD = _load_folder_module("frontend_channels")
 
     # 起動そのものには不要なので、import で残ったキャッシュは畳んでおく。
-    for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
+    for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels"):
         _remove_folder_import_cache(folder)
 
 
@@ -619,7 +619,7 @@ def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
         print_warning(f"一部のタスクを停止できませんでした: {exc}")
     finally:
         # 停止用に import したフォルダ側スクリプトのキャッシュを畳む。
-        for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_discord"):
+        for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels"):
             _remove_folder_import_cache(folder)
 
 

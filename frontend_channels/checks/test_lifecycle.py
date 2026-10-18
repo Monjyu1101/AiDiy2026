@@ -20,7 +20,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
-FRONTEND = ROOT / 'frontend_discord'
+FRONTEND = ROOT / 'frontend_channels'
 NAME = 'フロントエンド(Discord)'
 
 
@@ -87,10 +87,10 @@ class DiscordLifecycleTest(unittest.TestCase):
         self.assertEqual(next(call.kwargs['default'] for call in ask.call_args_list if 'Discord' in call.args[0]), 'y')
         with patch.object(start, 'prompt_choice', side_effect=lambda _prompt, default_yes: default_yes) as ask:
             flags = start.collect_startup_choices()
-        self.assertEqual(len(flags), 10)
-        self.assertFalse(flags[8])
-        self.assertIn('IDE', ask.call_args_list[8].args[0])
-        self.assertIn('Discord', ask.call_args_list[9].args[0])
+        self.assertEqual(len(flags), 12)
+        self.assertFalse(flags[-1])
+        self.assertIn('IDE', ask.call_args_list[-2].args[0])
+        self.assertIn('Discord', ask.call_args_list[-1].args[0])
         with tempfile.TemporaryDirectory() as folder, patch.object(cleanup, 'ask_start_mode', return_value=(True, False)), patch.object(
             cleanup, 'ask_yes_no', side_effect=setup_answer
         ):
@@ -148,7 +148,7 @@ class DiscordLifecycleTest(unittest.TestCase):
             cleanup, '_load_folder_module', return_value=Mock()
         ), patch.object(cleanup.time, 'sleep'):
             cleanup.stop_all_services({'discord': False})
-        modules['frontend_discord'].kill_ports.assert_called_once()
+        modules['frontend_channels'].kill_ports.assert_called_once()
 
     def test_root_cleanup_reports_discord_deletion_failure(self):
         choices = dict.fromkeys(('npm_uninstall', 'backup', 'local', 'tools', 'backend', 'taskteam', 'web', 'avatar', 'hermes', 'vscode'), False)
@@ -159,7 +159,7 @@ class DiscordLifecycleTest(unittest.TestCase):
             cleanup, '_remove_root_python_caches'
         ), patch.object(cleanup.time, 'sleep'):
             self.assertFalse(cleanup.execute_cleanup(Path(folder), choices))
-        remove.assert_called_once_with('frontend_discord', choices)
+        remove.assert_called_once_with('frontend_channels', choices)
 
     def test_stop_failure_preserves_dependencies(self):
         with patch.object(discord_cleanup, 'stop_discord_processes', return_value=False), patch.object(
@@ -174,7 +174,7 @@ class DiscordLifecycleTest(unittest.TestCase):
     def test_cleanup_only_removes_generated_files_inside_component(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()
-            component = root / 'frontend_discord'; component.mkdir()
+            component = root / 'frontend_channels'; component.mkdir()
             for name in discord_cleanup.TARGETS:
                 target = component / name; target.mkdir(); (target / 'dummy').write_text('test', encoding='utf-8')
             source = component / 'src'; source.mkdir(); (source / 'main.ts').write_text('source', encoding='utf-8')
@@ -213,17 +213,17 @@ class DiscordLifecycleTest(unittest.TestCase):
             modules = {folder: Mock() for _, folder, _, _ in cleanup.SERVICE_CLEANUP_TARGETS}
             modules['frontend_ide/host'] = Mock()
             modules['frontend_ide/host'].process_tree_pids.return_value = {100, 101}
-            modules['frontend_discord'].process_tree_pids.return_value = {200, 201, 202}
+            modules['frontend_channels'].process_tree_pids.return_value = {200, 201, 202}
             tools = Mock()
             with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(
                 cleanup, '_load_folder_module', return_value=tools
             ), patch.object(cleanup.time, 'sleep'):
                 self.assertTrue(cleanup.stop_all_services({}, strict=False, keep_code=keep_code, keep_discord=True))
-            modules['frontend_discord'].kill_ports.assert_not_called()
+            modules['frontend_channels'].kill_ports.assert_not_called()
             expected = {200, 201, 202} | ({100, 101} if keep_code else set())
             tools.stop_tools_processes.assert_called_once_with(exclude_pids=frozenset(expected))
 
-        modules['frontend_discord'].process_tree_pids.side_effect = OSError('一覧取得失敗')
+        modules['frontend_channels'].process_tree_pids.side_effect = OSError('一覧取得失敗')
         tools.stop_tools_processes.reset_mock()
         with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(
             cleanup, '_load_folder_module', return_value=tools
@@ -284,8 +284,8 @@ class DiscordProcessMatchingTest(unittest.TestCase):
         self.assertFalse(self.owned(f'Code.exe "{main}"', 'Code.exe'))
 
     def test_unix_entry_with_spaces(self):
-        root = Path('/tmp/AiDiy project/frontend_discord')
-        command = 'node --import "file:///tmp/AiDiy%20project/frontend_discord/node_modules/tsx/dist/loader.mjs" "/tmp/AiDiy project/frontend_discord/src/main.ts"'
+        root = Path('/tmp/AiDiy project/frontend_channels')
+        command = 'node --import "file:///tmp/AiDiy%20project/frontend_channels/node_modules/tsx/dist/loader.mjs" "/tmp/AiDiy project/frontend_channels/src/main.ts"'
         self.assertTrue(processes.is_discord_process(dict(Name='node', CommandLine=command), root, False))
 
     def test_panel_worker_and_electron_match_only_this_checkout(self):
@@ -296,10 +296,36 @@ class DiscordProcessMatchingTest(unittest.TestCase):
 
 
 class DiscordLauncherTest(unittest.TestCase):
+    def test_new_folder_loads_through_root_entrypoints_without_renaming_discord_modules(self):
+        self.assertTrue(FRONTEND.is_dir())
+        self.assertEqual(json.loads((FRONTEND / 'package.json').read_text(encoding='utf-8'))['name'], 'aidiy-discord')
+        original_load = start._load_folder_module
+        with patch.object(start, '_load_folder_module', side_effect=lambda folder: original_load(folder) if folder == 'frontend_channels' else Mock()) as loader, patch.object(start, '_remove_folder_import_cache'):
+            start._init_modules()
+        self.assertIn(('frontend_channels',), [call.args for call in loader.call_args_list])
+        self.assertEqual(start.DISCORD.THIS_DIR, FRONTEND)
+        self.assertEqual(setup._load_folder_module('frontend_channels')._launcher.__name__, 'aidiy_frontend_discord_launcher')
+        self.assertEqual(cleanup._load_folder_module('frontend_channels')._launcher.__name__, 'aidiy_frontend_discord_launcher')
+
+    def test_launcher_keeps_command_and_new_folder_for_windows_and_linux(self):
+        for platform in ('win32', 'linux'):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / 'project with spaces' / 'frontend_channels'
+                (root / 'panel').mkdir(parents=True)
+                (root / 'panel/launch.mjs').write_text('// fixture', encoding='utf-8')
+                command = Path(directory) / ('aidiy_discord.cmd' if platform == 'win32' else 'aidiy_discord')
+                with patch.object(launcher, 'launcher_path', return_value=command), patch.object(launcher.sys, 'platform', platform), patch.object(launcher.shutil, 'which', return_value='node'):
+                    launcher.install_launcher(root)
+                    content = command.read_text(encoding='utf-8')
+                    self.assertIn(str(root / 'panel/launch.mjs'), content)
+                    self.assertIn('%*' if platform == 'win32' else '"$@"', content)
+                    self.assertTrue(launcher.remove_launcher(root))
+                    self.assertFalse(command.exists())
+
     def test_cleanup_preserves_launcher_for_another_checkout(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / 'aidiy_discord.cmd'
-            file.write_text('node "D:/Other/frontend_discord/panel/launch.mjs"', encoding='utf-8')
+            file.write_text('node "D:/Other/frontend_channels/panel/launch.mjs"', encoding='utf-8')
             with patch.object(launcher, 'launcher_path', return_value=file):
                 self.assertTrue(launcher.remove_launcher(FRONTEND))
                 self.assertTrue(file.exists())

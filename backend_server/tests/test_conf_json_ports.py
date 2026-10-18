@@ -45,19 +45,59 @@ class ConfJsonPortKeyTest(unittest.TestCase):
                 config = self.conf_json(json=str(config_path))
                 saved = json.loads(config_path.read_text(encoding="utf-8"))
                 self.assertEqual(saved["DECISION_AI_NAME"], (original or {}).get("DECISION_AI_NAME", "auto"))
-                self.assertEqual(saved["DECISION_AI_MODEL"], (original or {}).get("DECISION_AI_MODEL", "auto"))
-                for key in ("DECISION_FREEAI_MODEL", "DECISION_GEMINI_MODEL"):
-                    self.assertEqual(saved[key], (original or {}).get(key, "gemini-flash-lite-latest" if key == "DECISION_FREEAI_MODEL" else "gemini-3.8-flash"))
+                if not original or "DECISION_AI_MODEL" not in original:
+                    self.assertNotIn("DECISION_AI_MODEL", saved)
+                for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"):
+                    self.assertEqual(saved[key], (original or {}).get(key, (original or {}).get("DECISION_AI_MODEL", "auto")))
                 for key, value in (original or {}).items():
                     self.assertEqual(saved[key], value)
                 keys = list(saved)
                 self.assertEqual(keys.index("LIVE_OPENAI_VOICE") + 1, keys.index("DECISION_AI_NAME"))
-                self.assertEqual(keys.index("DECISION_AI_MODEL"), keys.index("DECISION_AI_NAME") + 1)
-                self.assertLess(keys.index("DECISION_AI_MODEL"), keys.index("CODE_BASE_PATH"))
-                self.assertEqual(config.DECISION_AI_MODEL, saved["DECISION_AI_MODEL"])
+                self.assertEqual(keys[keys.index("DECISION_AI_NAME"):keys.index("DECISION_AI_NAME")+5],
+                                 ["DECISION_AI_NAME", "DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"])
+                order=[keys.index(key) for key in ("CHAT_AI_NAME", "LIVE_AI_NAME", "DECISION_AI_NAME", "CODE_BASE_PATH", "TASK_AI_NAME", "TEAM_AI_NAME")]
+                self.assertEqual(order,sorted(order))
                 before = config_path.read_bytes()
                 self.conf_json(json=str(config_path))
                 self.assertEqual(config_path.read_bytes(), before)
+
+    def test_requested_defaults_write_reload_and_preserve_every_existing_value(self):
+        expected = {
+            'CHAT_AI_NAME':'freeai_chat', 'CHAT_GEMINI_MODEL':'gemini-3.1-flash-image',
+            'CHAT_FREEAI_MODEL':'gemini-3.8-flash', 'CHAT_OPENRT_MODEL':'google/gemini-3.1-flash-image',
+            'CHAT_OPENAI_MODEL':'gpt-6.1-sol', 'CHAT_OLLAMA_MODEL':'deepseek-v4-flash:cloud',
+            'CHAT_LOCAL_MODEL':'google/gemma-4-E2B-it', 'CHAT_LOCAL_DTYPE':'bfloat16',
+            'LIVE_AI_NAME':'freeai_live', 'LIVE_GEMINI_MODEL':'gemini-2.5-flash-native-audio-preview-12-2025',
+            'LIVE_GEMINI_VOICE':'Zephyr', 'LIVE_FREEAI_MODEL':'gemini-2.5-flash-native-audio-preview-09-2025',
+            'LIVE_FREEAI_VOICE':'Zephyr', 'LIVE_OPENAI_MODEL':'gpt-realtime-2.1-mini', 'LIVE_OPENAI_VOICE':'marin',
+            'DECISION_AI_NAME':'auto', 'DECISION_OPENAI_MODEL':'auto', 'DECISION_OAUTH_MODEL':'auto',
+            'DECISION_GEMINI_MODEL':'auto', 'DECISION_FREEAI_MODEL':'auto',
+            'CODE_BASE_PATH':'../', 'CODE_PERMISSIONS':'auto',
+            'CODE_AI1_NAME':'codex_cli', 'CODE_AI1_MODEL':'auto',
+            'CODE_AI2_NAME':'copilot_cli', 'CODE_AI2_MODEL':'auto',
+            'CODE_AI3_NAME':'claude_cli', 'CODE_AI3_MODEL':'auto',
+            'CODE_AI4_NAME':'antigravity_cli', 'CODE_AI4_MODEL':'same',
+            'CODE_AI5_NAME':'opencode_cli', 'CODE_AI5_MODEL':'same',
+            'CODE_AI6_NAME':'aidiy_hermes', 'CODE_AI6_MODEL':'auto',
+            'CODE_CLAUDE_SDK_MODEL':'auto', 'CODE_CLAUDE_CLI_MODEL':'auto', 'CODE_CLAUDE_OLLAMA_MODEL':'auto',
+            'CODE_COPILOT_CLI_MODEL':'auto', 'CODE_ANTIGRAVITY_CLI_MODEL':'auto',
+            'CODE_CODEX_CLI_MODEL':'auto', 'CODE_CODEX_OLLAMA_MODEL':'auto', 'CODE_GROK_CLI_MODEL':'auto',
+            'CODE_AIDIY_HERMES_MODEL':'auto', 'CODE_OPENCODE_CLI_MODEL':'auto',
+            'CODE_MAX_TURNS':999, 'CODE_PLAN':'auto', 'CODE_VERIFY':'auto', 'CODE_SELF_CHECK_LOOP':1,
+            'TASK_AI_NAME':'codex_cli', 'TASK_AI_MODEL_plan':'auto', 'TASK_AI_MODEL_do':'auto', 'TASK_AI_MODEL_check':'auto',
+            'TEAM_AI_NAME':'codex_cli', 'TEAM_AI_MODEL_plan':'auto', 'TEAM_AI_MODEL_do':'auto', 'TEAM_AI_MODEL_check':'auto',
+        }
+        for original in (None, {}, {**{key:'custom-'+key for key in expected},
+                                   'openai_key_id':'fixture-secret','CUSTOM':'retain'}):
+            with self.subTest(existing=original is not None), tempfile.TemporaryDirectory() as directory:
+                path=Path(directory)/'AiDiy_key.json'
+                if original is not None:path.write_text(json.dumps(original),encoding='utf-8')
+                self.conf_json(json=str(path))
+                saved=json.loads(path.read_text(encoding='utf-8'))
+                self.assertEqual({key:saved[key] for key in expected}, {key:(original or {}).get(key,value) for key,value in expected.items()})
+                self.assertEqual([key for key in saved if key in expected],list(expected))
+                for key,value in (original or {}).items():self.assertEqual(saved[key],value)
+                before=path.read_bytes();self.conf_json(json=str(path));self.assertEqual(path.read_bytes(),before)
 
     def test_default_port_keys_and_values(self):
         expected = {

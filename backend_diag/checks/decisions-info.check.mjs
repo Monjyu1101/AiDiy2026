@@ -6,7 +6,7 @@ import path from 'node:path';
 import {probe} from '../runtime/model_probe.mjs';
 import {createModelRunner} from '../runtime/model_runner.mjs';
 import {testKey} from '../モデル情報/key_status.mjs';
-import {decisionsModelsInfo,DECISIONS_MODELS_FILE,FREEAI_DECISION_MODEL} from '../モデル情報/decisions_info.mjs';
+import {decisionsModelsInfo,DECISIONS_MODELS_FILE,FREEAI_DECISION_MODEL,OPENAI_DECISION_MODEL,DECISION_MODEL_CANDIDATES} from '../モデル情報/decisions_info.mjs';
 import {writeModelsInfo} from '../モデル情報/models_info.mjs';
 import {modelsStep} from '../診断/headless.mjs';
 
@@ -18,8 +18,8 @@ const oauthReader=()=>JSON.stringify({tokens:{access_token:'fixture-oauth',accou
 const options={configReader,oauthReader};
 const cache={公開状態:'取得済',公開モデル:{'google/public-only':{作成日:'2026/10/17'},'openai/public-only':{トークン数:'100',モダリティ:'text'}}};
 const fetch=async(provider,headers,token)=>{
- if(provider==='codex')return {models:[{slug:'gpt-5.4',priority:0},{slug:'gpt-hidden',visibility:'hide'}]};
- if(provider==='openai')return {data:['gpt-decision-test','gpt-audio','text-embedding-3'].map(id=>({id,created}))};
+ if(provider==='codex')return {models:[{slug:'gpt-6-luna',priority:0},{slug:'gpt-hidden',visibility:'hide'}]};
+ if(provider==='openai')return {data:['gpt-6-luna','gpt-audio','text-embedding-3'].map(id=>({id,created}))};
  assert.equal(provider,'google');
  return {models:[{name:`models/gemini-${token?'second':'first'}`,supportedGenerationMethods:['generateContent']},
   ...(!token?[FREEAI_DECISION_MODEL,'gemini-image','gemini-live','lyria-3','gemma-4'].map(id=>({name:'models/'+id,supportedGenerationMethods:['generateContent']})):[])],...(!token?{nextPageToken:'page2'}:{})};
@@ -32,10 +32,10 @@ test('four methods use authenticated raw lists without public, synthetic or nont
  assert.deepEqual(results.gemini.モデル,['gemini-live'],'legacy public filtering is unchanged');
  const info=await decisionsModelsInfo(providers,results,options);
  assert.deepEqual(Object.keys(info),['openai_oauth','freeai_chat','openai_decisions','gemini_chat']);
- assert.deepEqual(Object.keys(info.openai_oauth.models),['gpt-5.4'],'no forward compatibility or 900k additions');
- assert.deepEqual(Object.keys(info.openai_decisions.models),['gpt-decision-test']);
+ assert.deepEqual(Object.keys(info.openai_oauth.models),['gpt-6-luna'],'no forward compatibility or 900k additions');
+ assert.deepEqual(Object.keys(info.openai_decisions.models),['gpt-6-luna']);
  assert.deepEqual(Object.keys(info.freeai_chat.models),[FREEAI_DECISION_MODEL]);
- assert.deepEqual(Object.keys(info.gemini_chat.models),['gemini-first',FREEAI_DECISION_MODEL,'gemini-second']);
+ assert.deepEqual(Object.keys(info.gemini_chat.models),[FREEAI_DECISION_MODEL]);
  assert.doesNotMatch(JSON.stringify(info),/fixture|public-only|gpt-hidden|gpt-audio|image|live|lyria|gemma/);
 });
 
@@ -107,4 +107,18 @@ test('FreeAI never invents latest alias from a versioned, public or unavailable 
  }
  const python=await readFile(new URL('../../backend_server/AIコア/AI判断共通.py',import.meta.url),'utf8');
  assert.equal(/FREEAI_DECISION_MODEL = "([^"]+)"/.exec(python)?.[1],FREEAI_DECISION_MODEL);
+ assert.equal(/OPENAI_DECISION_MODEL = "([^"]+)"/.exec(python)?.[1],OPENAI_DECISION_MODEL);
+});
+
+test('all four methods omit providers when authenticated lists lack the fixed model',async()=>{
+ const results=Object.fromEntries(await Promise.all(providers.map(async({id})=>[id,await acquire(id,{fetch:async provider=>provider==='google'?{models:[{name:'models/gemini-expensive',supportedGenerationMethods:['generateContent']}]}:provider==='codex'?{models:[{slug:'gpt-expensive'}]}:{data:[{id:'gpt-expensive',created}]}})])));
+ assert.deepEqual(await decisionsModelsInfo(providers,results,options),{});
+});
+
+test('changing writer candidates exposes an authenticated new model without changing runtime or UI',async()=>{
+ const result=await acquire('openai',{fetch:async()=>({data:[{id:'gpt-next-candidate',created}]})});
+ assert.equal((await decisionsModelsInfo(providers,{openai:result},options)).openai_decisions,undefined);
+ DECISION_MODEL_CANDIDATES.openai_decisions.push('gpt-next-candidate');
+ try {assert.deepEqual(Object.keys((await decisionsModelsInfo(providers,{openai:result},options)).openai_decisions.models),['gpt-next-candidate']);}
+ finally {DECISION_MODEL_CANDIDATES.openai_decisions.pop();}
 });

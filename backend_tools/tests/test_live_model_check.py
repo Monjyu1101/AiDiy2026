@@ -72,6 +72,32 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('[redacted]', out['reply'])
         self.assertNotIn('secret-key-value', json.dumps(out))
         self.assertTrue(FakeLive.instances[-1].closed)
+    async def test_manual_override_prompt_audio_and_config_unchanged(self):
+        events=[]
+        class ManualLive(FakeLive):
+            async def テキスト送信(inner, text):
+                events.append(('prompt',text))
+                await inner.queue.put({'text':'手動応答'})
+                await inner.queue.put({'bytes_data':b'\x00\x00'*24000,'mime_type':'audio/pcm;rate=24000'})
+                await inner.queue.put({'diagnostic_turn_complete':True})
+                return True
+        async def sleep(seconds): events.append(('settle',seconds))
+        before=(self.root/'_config'/'AiDiy_key.json').read_bytes()
+        checker=LiveModelCheck(self.root,ManualLive,timeout=.04,sleep=sleep)
+        manual={'ai_name':'freeai_live','ai_model':'manual-model','voice':'Puck','prompt':'自由入力\n2行目'}
+        app=FastAPI();register_live_model_check(app,checker)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app,client=('127.0.0.1',1234)),base_url='http://127.0.0.1') as client:
+            response=await client.post('/internal/live_model_check',json=manual,headers={'X-AiDiy-Diag':'model-trial'})
+            self.assertEqual(response.status_code,200)
+            out=response.json();self.assertEqual(out['status'],'OK');self.assertEqual(out['model'],'manual-model')
+            self.assertEqual(out['audio']['duration_ms'],1000)
+            for invalid in [{**manual,'ai_name':[]},{**manual,'prompt':''},{**manual,'extra':'bad'}]:
+                self.assertEqual((await client.post('/internal/live_model_check',json=invalid,headers={'X-AiDiy-Diag':'model-trial'})).status_code,400)
+        self.assertEqual(events,[('settle',10),('prompt',manual['prompt'])])
+        self.assertEqual(FakeLive.instances[-1].kwargs['live_voice'],'Puck')
+        self.assertTrue(FakeLive.instances[-1].closed)
+        self.assertEqual((self.root/'_config'/'AiDiy_key.json').read_bytes(),before)
+
     async def test_failures(self):
         for mode, reason in [('start_failure','connection_failed'), ('send_failure','send_failed'), ('exception','live_check_failed'), ('silence','timeout')]:
             with self.subTest(mode=mode):
@@ -111,7 +137,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
                 response=await client.post('/internal/live_model_check',content=json.dumps(body),headers={**hdr,'Content-Type':'application/json'})
                 self.assertEqual(response.status_code,400)
             self.assertEqual((await client.post('/internal/live_model_check?model=x',json={},headers=hdr)).status_code,400)
-            self.assertEqual((await client.post('/internal/live_model_check',content=' '*65,headers={**hdr,'Content-Type':'application/json'})).status_code,413)
+            self.assertEqual((await client.post('/internal/live_model_check',content=' '*65537,headers={**hdr,'Content-Type':'application/json'})).status_code,413)
         transport=httpx.ASGITransport(app=app,client=('192.0.2.1',1234))
         async with httpx.AsyncClient(transport=transport,base_url='http://127.0.0.1:8095') as client:
             self.assertEqual((await client.post('/internal/live_model_check',json={},headers=hdr)).status_code,403)

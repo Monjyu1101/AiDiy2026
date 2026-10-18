@@ -8,7 +8,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 
-# Google公式のFlash-Lite最新追従alias。FreeAI判断だけで固定する。
+# 判断系専用の低コスト既定値。明示モデル/設定値で変更できる。
+OPENAI_DECISION_MODEL = "gpt-6-luna"
 FREEAI_DECISION_MODEL = "gemini-flash-lite-latest"
 
 

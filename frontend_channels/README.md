@@ -1,5 +1,7 @@
 # AiDiy Discord
 
+配置フォルダは `frontend_channels` です。将来の外部接続チャンネル拡張に備えたフォルダ名で、現在の Discord 機能・内部モジュール名・`aidiy_discord` コマンドは変わりません。
+
 自分と AiDiy の専用テキストチャンネルに普通に話しかけると、`aidiy_hermes` が返信します。専用ボイスチャンネルに参加すると、AIコアの LiveAI と音声会話できます。チャットは `frontend_ide/host` の Code と同じ CLI 実行処理、ライブは同じ Live WebSocket 処理を使います。
 
 ## 導入
@@ -12,10 +14,12 @@
 プロジェクトルートで実行します。
 
 ```powershell
-python frontend_discord/_setup.py
+python frontend_channels/_setup.py
 ```
 
 ルート `_setup.py` の「フロントエンド(Discord)」からも導入できます。セットアップは既定 Yes（`[y]/n`）で、Electron の事前配置と `~/.local/bin/aidiy_discord`（Windows は `.cmd`）の登録も行います。ルート `_start.py` の Discord 起動は既定 No（`[n]/y`）で、Yes を選ぶとパネルを開いて自動接続します。
+
+フォルダ移動前に登録した `aidiy_discord` は旧絶対パスを含むため、移動後にルート `_setup.py` の `r`（Node.js再配置）または上記のセットアップで再登録してください。既存の `node_modules` はフォルダごと移動して再利用でき、Git管理には追加しません。
 
 ## プロキシが必要なネットワーク
 
@@ -31,7 +35,7 @@ aidiy_discord
 
 REST、Gateway（再接続・resumeを含む）、音声用 WebSocket をそれぞれプロキシ対応します。音声用はDiscordが通知したホスト・ポートへ接続します。環境変数を変更したら **パネルを閉じ、環境変数を設定した端末から起動し直してください**。既存パネルを呼び出すだけでは新しい環境は継承されません。OSのGUIから起動する場合も、その起動元に設定が必要です。プロキシURLを共通キーJSONやソースに追加する必要はありません。
 
-認証不要の疎通確認は `frontend_discord` で次を実行します。環境変数の存在有無、公開RESTのHTTP状態、Gatewayの認証前HELLOを確認し、URLや認証情報は表示しません。外部通信を使うため `npm test` とは分けて実行します。
+認証不要の疎通確認は `frontend_channels` で次を実行します。環境変数の存在有無、公開RESTのHTTP状態、Gatewayの認証前HELLOを確認し、URLや認証情報は表示しません。外部通信を使うため `npm test` とは分けて実行します。
 
 ```text
 node checks/network-diagnostic.mjs
@@ -109,7 +113,7 @@ aidiy_discord
 
 最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json`、Live の ON/OFF は `~/.aidiy/aidiy_discord_features.json`（未保存時は ON）に保存します。単独起動でも全体起動からの自動接続でも、これらを復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
-`cd frontend_discord` 後の `npm start`、`python frontend_discord/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_discord/out/aidiy_discord/` に保存します。
+`cd frontend_channels` 後の `npm start`、`python frontend_channels/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_channels/out/aidiy_discord/` に保存します。
 
 ### ブラウザ版（Codespaces など）
 
@@ -119,7 +123,7 @@ aidiy_discord
 
 ルート `python _cleanup.py` の Discord 項目は既定 Yes です。削除前にこの作業コピーの Bot を子孫プロセスごと停止し、終了できない場合は削除を中止します。Discord の削除を選ばない場合でも、全体 cleanup の開始時には他サービスと同じく Bot を停止します。
 
-削除対象は `frontend_discord` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、共通 `_config/AiDiy_key.json`、前回のモデル・機能の選択は残ります。単独 cleanup は `python frontend_discord/_cleanup.py` です。
+削除対象は `frontend_channels` 内の `node_modules`、生成物、temp、Python キャッシュと、この作業コピーを指す `aidiy_discord` ランチャーです。ソース、`package-lock.json`、共通 `_config/AiDiy_key.json`、前回のモデル・機能の選択は残ります。単独 cleanup は `python frontend_channels/_cleanup.py` です。
 
 ## 会話のしかた
 

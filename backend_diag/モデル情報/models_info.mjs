@@ -26,8 +26,11 @@ export async function installedCodeClis({loadEntries = catalog, resolve = resolv
 function availableCodeModels(code, installedClis) {
   const filtered = Object.fromEntries(Object.entries(code).filter(([key]) => key === 'aidiy_hermes'
     || installedClis[key === 'claude_sdk' ? 'claude_cli' : key] === true));
-  if (installedClis.copilot_cli === true && !Object.keys(filtered.copilot_cli?.models ?? {}).length) {
-    filtered.copilot_cli = {models:{...COPILOT_FALLBACK_MODELS}};
+  // 共通候補を使い、OpenCodeへの書き出しだけClaude系を除く。導入判定は独立。
+  const sharedModels = Object.keys(code.copilot_cli?.models ?? {}).length
+    ? code.copilot_cli.models : COPILOT_FALLBACK_MODELS;
+  for (const key of ['copilot_cli', 'opencode_cli']) {
+    if (installedClis[key] === true) filtered[key] = {models:Object.fromEntries(Object.entries(sharedModels).filter(([id]) => key !== 'opencode_cli' || !/(^|\/)claude(?:[-_.:/]|$)/i.test(id)))};
   }
   const routes = Object.fromEntries(Object.keys(CODE_CLIS).filter(key => installedClis[key])
     .map(key => [`${key}/auto`, `yyyy/mm/dd - ${key}/auto`]));

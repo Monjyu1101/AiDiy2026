@@ -1,6 +1,6 @@
 # Discord 接続変更手順
 
-> 文書: `frontend_discord,Discord接続変更手順.md` | 実装: `frontend_discord/src/ライブ/音声処理.ts`, `frontend_discord/checks/audio.test.ts`, `frontend_discord/src/`, `frontend_ide/host/src/runner.ts`, `frontend_ide/host/src/protocol.ts`, `frontend_ide/host/aidiy_live/src/protocol.ts`, `backend_server/conf/conf_json.py`
+> 文書: `frontend_discord,Discord接続変更手順.md` | 実装: `frontend_channels/src/ライブ/音声処理.ts`, `frontend_channels/checks/audio.test.ts`, `frontend_channels/src/`, `frontend_ide/host/src/runner.ts`, `frontend_ide/host/src/protocol.ts`, `frontend_ide/host/aidiy_live/src/protocol.ts`, `backend_server/conf/conf_json.py`
 
 ## このメモを使う場面
 
@@ -11,8 +11,8 @@
 
 ## 変更箇所
 
-1. `frontend_discord/AGENTS.md` で構成を確認し、導入・操作は `frontend_discord/README.md` を参照する。
-2. Discord 専用設定はトークン、サーバー ID、`DISCORD_ALLOWED_USER_ID`、`DISCORD_TEXT_CHANNEL_ID`、`DISCORD_VOICE_CHANNEL_ID` の5項目とする。ID は配列ではなく単一文字列で指定する。`backend_server/conf/conf_json.py` の `DEFAULT_CONFIG`、`frontend_discord/src/接続/接続設定.ts`、README を揃える。旧1件配列は `LEGACY_DISCORD_IDS` で移行し、複数件なら新キーを明示するまで元ファイルを保持する。旧上書きキーは `REMOVED_DISCORD_KEYS` で読み込み・保存時に除去し、共通設定は変更しない。実トークンの内容は出力しない。
+1. `frontend_channels/AGENTS.md` で構成を確認し、導入・操作は `frontend_channels/README.md` を参照する。
+2. Discord 専用設定はトークン、サーバー ID、`DISCORD_ALLOWED_USER_ID`、`DISCORD_TEXT_CHANNEL_ID`、`DISCORD_VOICE_CHANNEL_ID` の5項目とする。ID は配列ではなく単一文字列で指定する。`backend_server/conf/conf_json.py` の `DEFAULT_CONFIG`、`frontend_channels/src/接続/接続設定.ts`、README を揃える。旧1件配列は `LEGACY_DISCORD_IDS` で移行し、複数件なら新キーを明示するまで元ファイルを保持する。旧上書きキーは `REMOVED_DISCORD_KEYS` で読み込み・保存時に除去し、共通設定は変更しない。実トークンの内容は出力しない。
 3. CLI 実行・停止・resume は `frontend_ide/host` の共通実装を使用する。CommonJS の日本語 export は `src/共通連携/IDE連携.ts` を通す。初回のモデルは共通 `CODE_AIDIY_HERMES_MODEL`（`openai_oauth/gpt-6.1-sol`）、実行回数は `CODE_MAX_TURNS`、作業フォルダは `CODE_BASE_PATH` を使う。パネルで選んだコード AI（Provider）とモデルは `~/.aidiy/aidiy_discord_code_model.json` に保存し、単独起動・全体起動の両方で優先する。候補は `frontend_ide/host/scripts/model-catalog.py` を共用する。OAuth の provider は CLI に明示し、認証切れを別 provider への退避で隠さない。
 4. Live は既存の input / 0 / audio 接続を使用する。入力レートは `init` のモデル設定に追従する。
    接続先はローカルの `PORT_CORE`、初回の AI とモデル・音声は共通の `LIVE_AI_NAME` / `LIVE_*_MODEL` / `LIVE_*_VOICE` を使う。手動選択は `~/.aidiy/aidiy_discord_model.json` に保存し、次回以降は優先する。検証・原子的保存は `frontend_ide/host/src/model-preferences.ts` を `src/共通連携/IDE連携.ts` 経由で共用する。共通キー JSON に Discord 専用のモデル項目を追加しない。
@@ -23,9 +23,9 @@
 
 ## 確認
 
-独自実装のソース・パネル・起動スクリプト・検証コードには、README にある AiDiy の著作権・ライセンス定型文を付ける。JS / TS / CSS は `/*! ... */`、その他は各言語のコメント形式を使う。`frontend_discord/LICENSE` はルート `LICENSE` の全文と揃え、`package.json` の `license` は `SEE LICENSE IN LICENSE` とする。第三者ライブラリの表記には独自実装の定型文を適用しない。
+独自実装のソース・パネル・起動スクリプト・検証コードには、README にある AiDiy の著作権・ライセンス定型文を付ける。JS / TS / CSS は `/*! ... */`、その他は各言語のコメント形式を使う。`frontend_channels/LICENSE` はルート `LICENSE` の全文と揃え、`package.json` の `license` は `SEE LICENSE IN LICENSE` とする。第三者ライブラリの表記には独自実装の定型文を適用しない。
 
-`frontend_discord` で `npm run check` と `npm test` を実行する。通常起動には同梱の配布物を使うためビルド不要。Vue の画面・状態管理・描画ソースや依存関係を変更した場合だけ `npm run build:panel` で `panel/view.js` と `panel/build-manifest.json` を更新する。`npm run check:panel` はソースと配布物の一致を確認する。
+`frontend_channels` で `npm run check` と `npm test` を実行する。通常起動には同梱の配布物を使うためビルド不要。Vue の画面・状態管理・描画ソースや依存関係を変更した場合だけ `npm run build:panel` で `panel/view.js` と `panel/build-manifest.json` を更新する。`npm run check:panel` はソースと配布物の一致を確認する。
 
 - `checks/code.test.ts`: stdin、ユーザー別・チャンネル別の resume、停止・終了。
 - `checks/bot.test.ts`: 通常投稿→CLI→返信、連続投稿の順序、許可拒否、長文添付、起動・入室時の自動接続と準備中の退出、手動操作との競合、Live OFF / Code OFF 時の接続制御。
@@ -38,7 +38,7 @@
 
 本物の Bot の疎通には `AiDiy_key.json` に接続情報が必要。`npm run config:check` は外部に接続しない。実接続では専用チャンネルへの通常投稿、ボイス参加→自動接続→発話→退出による自動終了を確認する。mock の成功だけで Discord Gateway / DAVE / AI Provider まで検証済みとは扱わない。
 
-全体スクリプトの検証はルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"` を実行する。プロセス停止はモック、削除は一時ディレクトリで確認し、実環境の `_cleanup.py` を検証目的で実行しない。全体 `_setup.py` は Discord 既定 Yes、`_start.py` の Discord 選択は既定 No、`_cleanup.py` の削除選択は既定 Yes。
+全体スクリプトの検証はルートで `python -X utf8 -m unittest discover -s frontend_channels/checks -p "test_*.py"` を実行する。プロセス停止はモック、削除は一時ディレクトリで確認し、実環境の `_cleanup.py` を検証目的で実行しない。全体 `_setup.py` は Discord 既定 Yes、`_start.py` の Discord 選択は既定 No、`_cleanup.py` の削除選択は既定 Yes。
 
 `aidiy_discord` / `npm start` は `panel/launch.mjs` から Electron の小型パネルを開く。プロジェクトフォルダ（Code の作業フォルダ）は aidiy_code / aidiy_live と共通の `frontend_ide/host/scripts/launch-project.mjs` で決め、`[作業フォルダ]` / `--project` 未指定時は起動したフォルダとする。worker へは `AIDIY_DISCORD_PROJECT` で渡し、未設定（`src/main.ts` 直接実行など）の場合だけ `CODE_BASE_PATH` を使う。全体起動はリポジトリ直下で起動する。画面位置はマウスのあるディスプレイの workArea 上部中央とする。単独起動は未接続、全体 `_start.py` で Yes の場合は `--connect` を渡して自動接続する。`--wait` を付けず独立起動し、起動前整理・Ctrl+C 終了時には Discord 本体と Hermes / MCP の子孫を保護して継続する。明示的な `_cleanup.py` は停止対象に含める。接続開始時に共通設定を再読込し、前回のモデルを適用する。接続・再接続中でも停止でき、終了時は worker に shutdown を送り、Code CLI・Live・Gateway を回収する。正常終了に応答しない場合だけ worker の子孫を停止する。Electron はセットアップで事前配置し、起動中にはダウンロードしない。
 
@@ -48,7 +48,7 @@
 
 ## 接続に失敗する場合
 
-- パネルのエラー詳細欄を選択してコピーし、失敗段階（設定読込 / Hermes確認 / モデル確認 / Bot作成 / Discord接続 / 準備完了待ち）、経過時間、エラー名・コード・本文・入れ子の原因を確認する。同じ情報を `frontend_discord/out/aidiy_discord/*.stderr.log` にも出力する。
+- パネルのエラー詳細欄を選択してコピーし、失敗段階（設定読込 / Hermes確認 / モデル確認 / Bot作成 / Discord接続 / 準備完了待ち）、経過時間、エラー名・コード・本文・入れ子の原因を確認する。同じ情報を `frontend_channels/out/aidiy_discord/*.stderr.log` にも出力する。
 - `src/接続/接続エラー.ts` は Bot トークンなどの認証情報を伏せ字にし、HTTP要求オブジェクト全体・本文・スタックを出力しない。エラーを拡張する場合もこの範囲を維持する。
 - `TokenInvalid` / `Authentication failed` はトークン認証、`Used disallowed intents` は Message Content Intent、`ENOTFOUND` はDNS、`UND_ERR_CONNECT_TIMEOUT` / `ETIMEDOUT` は通信タイムアウトの切り分けに使う。経過時間だけで原因を断定しない。パネルの接続待ち上限は40秒で、それ以前にもSDK側のエラーが返る。
 - `Hermes確認` の失敗は、実際に動かしているPCで `aidiy_discord --check` を実行してPython・CLIの起動パスを確認する。開発環境の不足を別PCの原因とみなさない。
@@ -61,7 +61,7 @@
 - ローカルAIコアは常に直接接続する。プロキシURL・資格情報をIPCやログへ渡さず、`connection-error.ts` でも環境プロキシURLを伏せる。
 - 音声用WebSocketは通常Gatewayとは別経路。`src/ライブ/ライブ会話.ts` のvoice adapterは `onVoiceServerUpdate` のendpointを `src/接続/ネットワーク接続.ts` の `Discord音声通信.接続先登録` へ渡してからSDKへ通知する。voice 0.19.2にはagent指定APIがないため、通知されたホスト・ポートへの `https.request` だけを捕捉する。非443ポート、NO_PROXY、音声サーバー変更・再接続を維持し、Live終了時にrequest関数・CONNECT待ち・ソケットを回収する。SDK更新時は正規のagent指定APIの有無を再確認する。
 - 「WebSocket接続中」のタイムアウトでは「音声接続先」のホスト・ポートと「プロキシ経由／直接接続」を照合し、プロキシのCONNECT許可も確認する。HTTPプロキシ対応はUDP中継を含まない。「UDP接続・IP検出中」の失敗はUDP経路を別途確認する。音声のトークン・セッションID・暗号鍵・プロキシURLはログへ出さない。
-- 設定方法は `frontend_discord/README.md` を参照する。環境変更後は旧パネルを閉じ、設定済みの起動元から開き直す。`panel/desktop.cjs` の fork は親環境を標準で継承する。GUIの起動元が端末と同じ環境を持つかは実機で確認する。
+- 設定方法は `frontend_channels/README.md` を参照する。環境変更後は旧パネルを閉じ、設定済みの起動元から開き直す。`panel/desktop.cjs` の fork は親環境を標準で継承する。GUIの起動元が端末と同じ環境を持つかは実機で確認する。
 - `checks/network.test.ts` は外部通信なしで大小文字・NO_PROXY・直接経路・失敗後の回収を検証する。模擬HTTP CONNECTプロキシとHTTPS/Gatewayを用い、実際の discord.js ClientReady と resume、認証付きプロキシ、ローカル通信の除外、実SDKの接続途中停止とスレッド終了も確認する。`checks/fixtures/network-*.fixture` はテスト専用の自己署名証明書・秘密鍵であり、製品には使用しない。子プロセスの `NODE_EXTRA_CA_CERTS` だけで信頼し、TLS検証を無効化しない。
 - `node checks/network-diagnostic.mjs` はBot設定を読まず、直接経路と環境経路の公開REST・認証前Gateway HELLOを比較する。通常テストから分離し、経路の失敗だけでは非ゼロ終了しない。Bot認証、対象PCのGUI接続、Hermes返信、音声UDPと実通話は別途確認する。
 - `checks/fixtures/network-runner.ts` は実際のLive adapterとvoice SDKを使い、模擬CONNECTプロキシ経由の非443ポートへの音声WSS接続、ローカル通信の除外、接続待ち中の停止も確認する。模擬音声WSSの成功を、UDP・DAVE・実通話の成功とは扱わない。
@@ -105,7 +105,7 @@
 1. 編集前に `_index.md` と本手順を読み、上記クラス・テストの現行実装を照合する。行番号ではなくクラス名・テスト名を入口にする。
 2. 60msは発話末尾を推定する猶予であり、明示的な終了通知でも `_read` 内の待機タイマーでもない。空チャンクで猶予を延長せず、無音パケットの送出とPCM端数の消費を混同しない。
 3. 回帰テストを追加する場合は実時間の sleep に依存せず、モック時刻とフレーム比較を使う。59ms/60msの境界や空チャンクも、変更対象に応じて確認候補にする。既存テストが全候補を網羅済みとは扱わない。
-4. 本体を変更する作業では `frontend_discord` で `npm run check` と `npm test` を実行する。単体テスト成功と実通話での試聴を区別する。知見整理だけの依頼では、本体・テスト・設定・再起動ファイルを変更しない。
+4. 本体を変更する作業では `frontend_channels` で `npm run check` と `npm test` を実行する。単体テスト成功と実通話での試聴を区別する。知見整理だけの依頼では、本体・テスト・設定・再起動ファイルを変更しない。
 
 ## ライブモデル・声の候補
 

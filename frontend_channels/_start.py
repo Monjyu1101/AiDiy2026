@@ -34,11 +34,11 @@ def launch_command() -> list[str]:
 
 def check_environment() -> tuple[bool, str]:
     if not (THIS_DIR / 'node_modules/tsx/dist/loader.mjs').is_file():
-        return False, '依存関係がありません。python frontend_discord/_setup.py を実行してください。'
+        return False, '依存関係がありません。python frontend_channels/_setup.py を実行してください。'
     sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
     from _setup_electron import electron_binary_ready
     if not electron_binary_ready(THIS_DIR):
-        return False, 'Electron が未準備です。python frontend_discord/_setup.py を実行してください。'
+        return False, 'Electron が未準備です。python frontend_channels/_setup.py を実行してください。'
     try:
         result = subprocess.run(launch_command() + ['--check'], cwd=THIS_DIR, capture_output=True,
                                 encoding='utf-8', errors='replace', timeout=30)
@@ -46,7 +46,7 @@ def check_environment() -> tuple[bool, str]:
         return False, 'Node.js / Discord 設定を確認できません。npm run config:check で確認してください。'
     if result.returncode:
         # Node/依存ライブラリの出力全体には実行環境の情報が含まれるため転記しない。
-        return False, 'Discord 設定または Hermes が未準備です。frontend_discord で npm run config:check を実行してください。'
+        return False, 'Discord 設定または Hermes が未準備です。frontend_channels で npm run config:check を実行してください。'
     return True, 'Node.js / Discord 設定 / Hermes（外部接続なし）'
 
 

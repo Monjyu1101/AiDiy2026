@@ -53,13 +53,13 @@ def register_tools(mcp, decisions):
 
         model: openai_decisions/gpt-6-luna（APIキー）または
         openai_oauth/gpt-6-luna（Codex OAuthのResponses JSON Schema）。
-        freeai_chat/gemini-flash-lite-latest / gemini_chat/gemini-3.8-flashもJSON判断に対応。
-        明示引数を優先し、省略・autoはAiDiy_key.jsonの
-        DECISION_AI_NAME / DECISION_AI_MODELを参照する。
+        freeai_chat/gemini-flash-lite-latest / gemini_chat/gemini-flash-lite-latestもJSON判断に対応。
+        方式は明示引数を優先し、省略・autoはAiDiy_key.jsonのDECISION_AI_NAMEを参照する。
         NAME設定もautoなら起動チェック成功のopenai_oauthを優先し、
         次にfreeai_chat、openai_decisions、gemini_chatの順。明示プロバイダは変更しない。
-        FreeAIは明示model・設定値に関係なくgemini-flash-lite-latest固定。
-        他方式はMODEL設定もautoなら方式別の既定モデル名に解決する。
+        モデルは明示model/ai_model → 方式別MODEL設定（未存在時のみ旧DECISION_AI_MODEL）→ 既定値。
+        低コスト既定値はOpenAI両方式gpt-6-luna、FreeAI/Geminiはgemini-flash-lite-latest。
+        Diagの書き出し候補で絞るが、モデル指定を実行側で固定・上書きしない。通常Chat等には適用しない。
         questions: type・name・instructionsを持つ配列。
         type=predicate は真の確率、choice はchoices=[{value,description}]、
         score はlevels=[{label,description}]を指定する。nameは一意。

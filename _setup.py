@@ -24,7 +24,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
 - frontend_ide/_setup.py     IDE群(Term / Code / Live / IDE)
-- frontend_discord/_setup.py フロントエンド(Discord、任意)
+- frontend_channels/_setup.py フロントエンド(Discord、任意)
 
 Usage:
     python _setup.py
@@ -163,7 +163,7 @@ IMPORT_CACHE_FOLDERS = (
     "frontend_ide",
     "frontend_ide/host",
     "frontend_ide/viewer",
-    "frontend_discord",
+    "frontend_channels",
 )
 
 
@@ -763,9 +763,9 @@ def setup_node_refresh() -> list[str]:
         ("IDEビューア: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
         ("IDE: ランチャー", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
         ("Term: ランチャー", lambda: _load_folder_module("frontend_ide/aidiy_term").setup()),
-        ("Discord: 依存", lambda: dependencies("frontend_discord", electron=True)),
-        ("Discord: ビルド", lambda: build("frontend_discord", "build:panel")),
-        ("Discord: ランチャー", lambda: _load_folder_module("frontend_discord").install_launcher(BASE_DIR / "frontend_discord")),
+        ("Discord: 依存", lambda: dependencies("frontend_channels", electron=True)),
+        ("Discord: ビルド", lambda: build("frontend_channels", "build:panel")),
+        ("Discord: ランチャー", lambda: _load_folder_module("frontend_channels").install_launcher(BASE_DIR / "frontend_channels")),
     ]
     for label, action in steps:
         print_info(label)
@@ -956,7 +956,7 @@ def main():
 
     print()
     if choices.get("discord"):
-        if not _load_folder_module("frontend_discord").setup(choices):
+        if not _load_folder_module("frontend_channels").setup(choices):
             error_locations.append("フロントエンド(Discord)")
             if not continue_on_error:
                 print_setup_summary(error_locations)

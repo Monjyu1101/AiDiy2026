@@ -34,6 +34,6 @@ export async function 配布物確認() {
   } catch { return false; }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  if (!await 配布物確認()) { console.error('Discord Vue のソースと配布物が一致しません。frontend_discord で npm ci && npm run build:panel を実行してください。'); process.exitCode = 1; }
+  if (!await 配布物確認()) { console.error('Discord Vue のソースと配布物が一致しません。frontend_channels で npm ci && npm run build:panel を実行してください。'); process.exitCode = 1; }
   else console.log('Discord Vue のソースと配布物は一致しています。');
 }

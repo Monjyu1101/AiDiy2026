@@ -23,7 +23,7 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
   // 実際のキーには触れず、起動コードと設定検証を一時作業コピーで実行する。
   // Electron は配置しないため、検証を飛ばす退行もエラーメッセージの違いで検出できる。
   const root = mkdtempSync(join(tmpdir(), 'aidiy-discord-preflight-'));
-  const source = join(プロジェクトルート, 'frontend_discord'), frontend = join(root, 'frontend_discord');
+  const source = join(プロジェクトルート, 'frontend_channels'), frontend = join(root, 'frontend_channels');
   try {
     mkdirSync(join(frontend, 'panel'), { recursive: true });
     mkdirSync(join(root, '_config'));

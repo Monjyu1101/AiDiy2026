@@ -56,17 +56,32 @@ async def validate_request(request):
     if len(headers.getlist('host')) != 1 or len(headers.getlist('x-aidiy-diag')) != 1 or headers.get('x-aidiy-diag') != 'model-trial':
         raise HTTPException(403, 'diagnostic header required')
     if request.url.query or headers.get('content-type', '').split(';')[0].strip().lower() != 'application/json':
-        raise HTTPException(400, 'empty JSON object required')
+        raise HTTPException(400, 'valid diagnostic JSON required')
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
-        if len(body) > 64:
+        if len(body) > 65536:
             raise HTTPException(413, 'request too large')
     try:
-        if json.loads(body) != {}:
-            raise ValueError()
+        value = json.loads(body)
+        return validate_manual(value)
     except (ValueError, UnicodeError):
-        raise HTTPException(400, 'empty JSON object required')
+        raise HTTPException(400, 'valid diagnostic JSON required')
+
+
+def validate_manual(value):
+    if not isinstance(value, dict):
+        raise ValueError('request')
+    if not value:
+        return None
+    if set(value) != {'ai_name', 'ai_model', 'voice', 'prompt'}:
+        raise ValueError('fields')
+    if not isinstance(value['ai_name'], str) or value['ai_name'] not in TABLE or not valid_string(value['ai_model']) or not valid_string(value['voice']):
+        raise ValueError('model')
+    prompt = value['prompt']
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 16000 or any(ord(c) < 32 and c not in '\n\r\t' for c in prompt):
+        raise ValueError('prompt')
+    return dict(value)
 
 
 async def close_adapter(adapter):
@@ -151,7 +166,7 @@ class LiveModelCheck:
         self.sleep = sleep
         self.busy = False
 
-    async def run(self):
+    async def run(self, manual=None):
         started = time.monotonic()
         provider = model = ''
         adapter = None
@@ -166,12 +181,13 @@ class LiveModelCheck:
                 config = read_config(self.root)
             except Exception:
                 return result('ERR', 'config_unavailable')
-            selected = config.get('LIVE_AI_NAME')
+            manual = validate_manual(manual) if manual is not None else None
+            selected = manual['ai_name'] if manual else config.get('LIVE_AI_NAME')
             if selected not in TABLE:
                 return result('NG', 'unsupported_provider')
             provider = selected
             module, prefix, key_id, fallback = TABLE[selected]
-            selected_model = config.get('LIVE_'+prefix+'_MODEL')
+            selected_model = manual['ai_model'] if manual else config.get('LIVE_'+prefix+'_MODEL')
             if not valid_string(selected_model):
                 return result('NG', 'model_not_configured')
             model = selected_model
@@ -180,7 +196,7 @@ class LiveModelCheck:
                 key = config.get(fallback)
             if not valid_string(key, 8192):
                 return result('NG', 'key_not_configured')
-            voice = config.get('LIVE_'+prefix+'_VOICE')
+            voice = manual['voice'] if manual else config.get('LIVE_'+prefix+'_VOICE')
             if not valid_string(voice):
                 return result('NG', 'voice_not_configured')
             backend = str(self.root / 'backend_server')
@@ -189,7 +205,7 @@ class LiveModelCheck:
             factory = self.factory or getattr(importlib.import_module(module), 'LiveAI')
             adapter = factory(セッションID='diag-'+uuid.uuid4().hex, parent_manager=None,
                               live_ai=prefix.lower(), live_model=model, live_voice=voice,
-                              api_key=key, system_instruction='挨拶に日本語で短く一文だけ返答してください。', diagnostic=True)
+                              api_key=key, system_instruction='入力に日本語で簡潔に返答してください。' if manual else '挨拶に日本語で短く一文だけ返答してください。', diagnostic=True)
             queue = DiagnosticOutput()
             async with asyncio.timeout(self.connection_timeout):
                 if not await adapter.開始(音声受信処理Ｑ=queue, テキスト受信処理Ｑ=queue):
@@ -203,7 +219,7 @@ class LiveModelCheck:
             async with asyncio.timeout(self.response_timeout):
                 # 送信前に届いた通知・出力を試行の応答として数えない。
                 queue.clear_before_send()
-                if not await adapter.テキスト送信('おはよう'):
+                if not await adapter.テキスト送信(manual['prompt'] if manual else 'おはよう'):
                     return result('NG', 'send_failed')
                 reply = ''
                 while True:
@@ -247,8 +263,8 @@ def register_live_model_check(app, checker=None):
     @app.post('/internal/live_model_check', include_in_schema=False)
     async def live_model_check(request: Request):
         async with asyncio.timeout(3):
-            await validate_request(request)
-        task = asyncio.create_task(checker.run())
+            manual = await validate_request(request)
+        task = asyncio.create_task(checker.run(manual) if manual else checker.run())
         async def disconnected():
             while True:
                 message = await request.receive()

@@ -46,7 +46,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 - [ ] 自動テストは現存するディレクトリと実行方法に合わせて書く。
   - Python: `backend_server/tests/`、`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/`。各プロジェクトで `python -m unittest discover -s tests -v`。
   - VS Code: `frontend_ide/host/checks/`（Code の Node.js / Python）、`frontend_ide/host/aidiy_live/checks/`（Live の Node.js）。実行は `frontend_ide/host` で `npm test` / `npm run live:test` / `python -m unittest discover -s checks -p "test_*.py"`。
-  - Discord: `frontend_discord/checks/`（Node.js / Python）。`frontend_discord` で `npm run check` / `npm test`、ルートで `python -X utf8 -m unittest discover -s frontend_discord/checks -p "test_*.py"`。
+  - Discord: `frontend_channels/checks/`（Node.js / Python）。`frontend_channels` で `npm run check` / `npm test`、ルートで `python -X utf8 -m unittest discover -s frontend_channels/checks -p "test_*.py"`。
   - Avatar / Web の接続: `frontend_avatar/checks/` の Node.js テスト。ルートで `node --test frontend_avatar/checks/*.test.cjs`。
   - ルート起動: `scripts/test_start_output.py`。ルートで `python -m unittest discover -s scripts -p test_start_output.py`。
   - X系にも個別テストがある。実行条件は各画面の README を確認し、存在しないテスト名を案内しない。

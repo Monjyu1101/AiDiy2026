@@ -3,7 +3,7 @@
 > 文書: `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` | 実装: `_config/AiDiy_key.json`, `backend_server/conf/conf_json.py`, `backend_server/AIコア/AIチャット_openai.py`, `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
 
 ## このメモを使う場面
-- Chat / Live / Code / Task / Team AI のモデルや API キーを変更する
+- Chat / Live / Decision / Code / Task / Team AI のモデルや API キーを変更する
 - `AiDiy_key.json` と設定 UI の整合を確認する
 - 新しい AI 種別や Code CLI を追加した後、設定として選べるようにする
 
@@ -23,6 +23,7 @@
 |------|-----------|----|
 | `CHAT_AI_NAME` | 原則 `_chat`（OAuth は例外） | `gemini_chat`, `openrt_chat`, `openai_chat`, `openai_oauth`, `freeai_chat`, `ollama_chat`, `local_chat` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `freeai_live`, `openai_live` |
+| `DECISION_AI_NAME` | 判断用の方式 | `auto`, `openai_oauth`, `freeai_chat`, `openai_decisions`, `gemini_chat` |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `grok_cli`, `opencode_cli`, `aidiy_hermes` |
 | `TASK_AI_NAME` / `TEAM_AI_NAME` | Code AI と同じ候補を使用 | `claude_cli`, `codex_cli`, `aidiy_hermes` |
 
@@ -90,6 +91,8 @@ Code CLIの `same（変更無し）` は、CLI起動時に `--model` を渡さ�
 {
   "CHAT_AI_NAME": "gemini_chat",
   "LIVE_AI_NAME": "gemini_live",
+  "DECISION_AI_NAME": "auto",
+  "DECISION_AI_MODEL": "auto",
   "CODE_PERMISSIONS": "auto",
   "CODE_AI1_NAME": "codex_cli",
   "CODE_AI1_MODEL": "auto",
@@ -124,7 +127,17 @@ Code CLIの `same（変更無し）` は、CLI起動時に `--model` を渡さ�
 - `再起動要求`: `reboot_core` / `reboot_apps` / `reboot_tools` / `reboot_local` / `reboot_task` / `reboot_team` の指定先だけに再起動を要求する。Task / Team は同じ統合プロセスが対象。
 - `リセット: true`: 設定を既定値へ戻して保存する。UI のリセット操作では全バックエンドの再起動も要求する。
 
-Web / Avatar とも「保存(json書換)」は `save: true`、再起動要求なし。「設定/再起動」は apps / tools の再起動を要求するが、現行実装では Web は `save: true`、Avatar は `save: false` で送る。Avatar で次回起動にも設定を残す場合は「保存(json書換)」を使う。
+Web / Avatar とも「保存(json書換)」は `save: true`、再起動要求なし。「設定/再起動」も `save: true` でJSONを保存してから apps / tools の再起動を要求する。
+
+判断用の `DECISION_AI_NAME` と方式別4モデル（`DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL`） は、JSON・両設定画面ともLIVEブロック全体の直後（CHAT → LIVE → DECISION → CODE）に置く。初期値・欠落時は `auto` / `auto`。方式のautoは起動チェック成功のものから OAuth → FreeAI → Decisions API → Gemini の順で選ぶ。
+
+候補は `conf_models.get_decisions_models()` が毎回読む `_AIDIY/aidiy_diag/decisions_models_info.json` を、取得APIの `available_models.decision_models` へ渡す。方式がautoなら全方式の取得済み候補を合わせる。外部APIへの照会や、実行時の既定モデルを利用可能候補として補う処理はしない。ファイルが未取得・空・不正でもautoと現在設定を保持する。未掲載のモデルは「保持値・Diag一覧外／未確認」と表示し、旧別名 `openai_jsonchat` はOAuthの候補を使いながら保存値を維持する。
+
+画面はDiag候補・auto・保持中の現在値からモデルを選べる。候補が1件ならその1件を表示し、方式名に基づくモデルIDのハードコードや選択欄の恒久無効化は行わない。Diag書き出し候補が変われば再取得後に新モデルを選択・保存でき、実行側もその指定を使う。候補掲載は利用可否の保証ではなく、Toolsの判断チェックで確認する。
+
+取得時の代替表示は保存値と区別する。判断だけを編集して保存した際に、他項目の未取得候補による空欄や先頭候補で既存設定を書き換えない。
+
+判断はTools側が共通JSONを読むため、取得APIはセッションの古い判断設定より保存済みの値を優先する。保存だけでも次回の判断リクエストは新設定を読み、利用可否の再チェックにはToolsの再起動が必要。明示引数がある実行は引数を優先する。
 
 Electron では settings 専用ウィンドウ、Web では同じコンポーネントのモーダル表示を使う。`AI設定再起動.vue` に `window.desktopApi` 前提の処理を直接入れない。
 
@@ -132,7 +145,7 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 
 1. frontend が `POST /core/AIコア/モデル情報/取得` を呼ぶ
 2. backend が現在設定と `available_models` を返す
-3. 設定 UI が `chat_models` / `live_models` / `code_models` から選択肢を作る
+3. 設定 UI が `chat_models` / `live_models` / `decision_models` / `code_models` から選択肢を作る
 4. 設定時に `POST /core/AIコア/モデル情報/設定` へ送り、保存する場合は `save: true` を指定する
 5. モデル情報の再取得で設定を確認し、再起動を要求した場合は再接続後も確認する
 
@@ -182,5 +195,8 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 ## 確認方法
 
 - `POST http://127.0.0.1:8091/core/AIコア/モデル情報/取得` に `{"セッションID": "対象セッションID"}` を送り、現在設定と利用可能モデル一覧を確認する。接続前は `{}` を送り、共通設定の既定値と候補を取得できる
-- 設定 UI で Chat / Live / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
+- 設定 UI で Chat / Live / Decision / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
+- `node --test scripts/checks/decision-settings.test.cjs` で両実SFCの候補・保存・互換を確認する。任意のブラウザQAは `node scripts/checks/decision-settings-browser.cjs`。既存Chrome/Edgeを一時プロファイルで起動し、合成設定APIだけを使う。`SETTINGS_QA_OUTPUT` でスクリーンショット保存先を指定できる。
 - 「保存(json書換)」で `AiDiy_key.json` が更新され、サーバーが再起動しないことを確認する。再起動を要求した場合は、指定したサーバーの再起動と再接続を確認する
+
+設定の生成・不足補完・画面順は CHAT → LIVE → DECISION → CODE → TASK → TEAM。判断の新規既定値は方式と4モデルとも `auto`。旧 `DECISION_AI_MODEL` は削除せず、不足する方式別キーにだけ引き継ぐ。既存方式別キーの `auto` は旧共通値で上書きしない。設定取得・保存APIは `/core/AIコア/モデル情報/取得` と `/core/AIコア/モデル情報/設定`。

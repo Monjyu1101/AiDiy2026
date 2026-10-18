@@ -66,7 +66,7 @@ def area_names(parts):
             names.add("Code")
         else:
             names.add("IDE")
-    elif top == "frontend_discord":
+    elif top in ("frontend_discord", "frontend_channels"):
         names.add("Discord")
     return names
 
@@ -164,7 +164,7 @@ def day_summary_and_changes(date_key, day_commits):
                 if "VRM" in part: feature_names.add("VRM")
         elif top in ("frontend_vscode", "frontend_ide"):
             cat_count["Code・Live・IDE"] += 1
-        elif top == "frontend_discord":
+        elif top in ("frontend_discord", "frontend_channels"):
             cat_count["Discord"] += 1
         elif top == ".aidiy":
             cat_count["ナレッジ"] += 1

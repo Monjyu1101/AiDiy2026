@@ -1,6 +1,8 @@
-# frontend_discord 実装概要
+# frontend_channels 実装概要
 
 ## 役割
+
+外部接続チャンネルを配置するフォルダです。現在は Discord 接続を提供し、内部モジュール名と `aidiy_discord` コマンドは維持します。
 
 Discord Bot を AiDiy の Code / Live へ接続する Node.js / TypeScript クライアントです。
 Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコアの WebSocket へ接続します。

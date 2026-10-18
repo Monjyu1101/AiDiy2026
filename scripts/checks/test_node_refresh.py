@@ -94,7 +94,7 @@ class NodeRefreshTests(unittest.TestCase):
             "frontend_ide/viewer": SimpleNamespace(install_launcher=Mock(return_value=None)),
             "frontend_ide/aidiy_term": SimpleNamespace(setup=Mock(return_value=True)),
             # setup()やconf_jsonは用意しない。設定補完経路へ入れば失敗する。
-            "frontend_discord": SimpleNamespace(install_launcher=Mock(return_value=None)),
+            "frontend_channels": SimpleNamespace(install_launcher=Mock(return_value=None)),
         }
         self.enterContext(patch.object(setup, "_load_folder_module", side_effect=modules.__getitem__))
         return run, prepare, modules
@@ -111,12 +111,12 @@ class NodeRefreshTests(unittest.TestCase):
         builds = [(call.kwargs["cwd"].relative_to(ROOT).as_posix(), call.args[0][-1])
                   for call in run.call_args_list if call.args[0][1] == "run"]
         self.assertEqual(builds, [("backend_diag/ui", "build"), ("frontend_web", "build"),
-                                 ("frontend_avatar", "build"), ("frontend_discord", "build:panel")] * 2)
+                                 ("frontend_avatar", "build"), ("frontend_channels", "build:panel")] * 2)
         self.assertEqual(prepare.call_count, 10)
         modules["backend_diag"].setup.assert_called_with(desktop=False)
         self.assertEqual(modules["frontend_ide/host"].setup_assets.call_count, 2)
         modules["frontend_ide/host"].setup_assets.assert_called_with("npm")
-        self.assertEqual(modules["frontend_discord"].install_launcher.call_count, 2)
+        self.assertEqual(modules["frontend_channels"].install_launcher.call_count, 2)
 
     def test_browser_environment_skips_electron_binary_but_builds(self):
         run, prepare, _ = self.fixture(desktop=False)
@@ -133,7 +133,7 @@ class NodeRefreshTests(unittest.TestCase):
 
     def test_launcher_exception_is_not_reported_as_success(self):
         _, _, modules = self.fixture()
-        modules["frontend_discord"].install_launcher.side_effect = OSError("fixture")
+        modules["frontend_channels"].install_launcher.side_effect = OSError("fixture")
         self.assertEqual(setup.setup_node_refresh(), ["Discord: ランチャー"])
 
     def test_missing_node_stops_without_installation(self):

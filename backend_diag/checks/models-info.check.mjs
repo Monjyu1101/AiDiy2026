@@ -306,3 +306,54 @@ test('empty Live without configuration stays empty and Code keeps its fixed prov
   assert.equal(Object.keys((await load('code')).copilot_cli.models).length,8);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
+
+test('OpenCode keeps non-Claude Copilot IDs, labels and order with independent installation gates',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-opencode-mirror-'));
+ const load=async kind=>JSON.parse(await readFile(path.join(directory,modelsInfoFile(kind)),'utf8'));
+ const providers=['claude','openai','ollama'].map(id=>({id,名前:id}));
+ const results={claude:ok({モデル詳細:[{model_id:'claude-haiku-5-5',作成日:'2026/10/07'}]}),openai:ok({モデル詳細:[{model_id:'gpt-6-luna',作成日:'2026/10/08'}]}),ollama:ok({モデル詳細:[{model_id:'ollama-only'}]})};
+ try {
+  await writeModelsInfo(providers,results,{directory,installedClis:{copilot_cli:true,opencode_cli:true,codex_cli:true}});
+  const both=await load('code'),chat=await load('chat'),decisions=await load('decisions');
+  assert.deepEqual(Object.entries(both.opencode_cli.models),Object.entries(both.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
+  assert.equal(both.opencode_cli.models['ollama-only'],undefined);
+  assert.ok(Object.keys(both.copilot_cli.models).some(id=>id.startsWith('claude-')));assert.ok(!Object.keys(both.opencode_cli.models).some(id=>id.startsWith('claude-')));assert.ok(both.opencode_cli.models['gpt-6-luna']);
+  await writeModelsInfo([],{}, {directory,installedClis:{opencode_cli:true,codex_cli:true}});
+  const only=await load('code');
+  assert.equal(only.copilot_cli,undefined);
+  assert.deepEqual(Object.entries(only.opencode_cli.models),Object.entries(both.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
+  assert.deepEqual(only.codex_cli,both.codex_cli);
+  assert.deepEqual(await load('chat'),chat);assert.deepEqual(await load('decisions'),decisions);
+  await writeModelsInfo([],{}, {directory,installedClis:{copilot_cli:true}});
+  assert.equal((await load('code')).opencode_cli,undefined);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('OpenCode alone filters Claude from the shared empty-source fallback',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-opencode-fallback-'));
+ const load=async()=>JSON.parse(await readFile(path.join(directory,modelsInfoFile('code')),'utf8'));
+ try {
+  await writeModelsInfo([],{}, {directory,installedClis:{copilot_cli:true}});
+  const models=(await load()).copilot_cli.models;assert.equal(Object.keys(models).length,8);assert.ok(Object.keys(models).some(id=>id.startsWith('claude-')));
+  await writeModelsInfo([],{}, {directory,installedClis:{opencode_cli:true}});
+  const code=await load();assert.equal(code.copilot_cli,undefined);
+  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(models).filter(([id])=>!id.startsWith('claude-')));
+  assert.ok(code.aidiy_hermes.models['opencode_cli/auto']);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('failed model acquisition supplements both CLIs without claiming authentication success',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-opencode-failed-'));
+ const load=async group=>JSON.parse(await readFile(path.join(directory,modelsInfoFile(group)),'utf8'));
+ try {
+  const providers=[{id:'openai',名前:'OpenAI',設定済み:false}];
+  const results={openai:{状態:'NG',認証確認:false,説明:'fixture unavailable',モデル詳細:[]}};
+  await writeModelsInfo(providers,results,{directory,installedClis:{copilot_cli:true,opencode_cli:true}});
+  const code=await load('code');
+  assert.deepEqual(Object.entries(code.opencode_cli.models),Object.entries(code.copilot_cli.models).filter(([id])=>!id.startsWith('claude-')));
+  assert.equal(Object.keys(code.opencode_cli.models).length,4);assert.equal(Object.keys(code.copilot_cli.models).length,8);
+  assert.deepEqual(Object.keys(code.opencode_cli),['models']);
+  const source=await load('openai');assert.equal(source.状態,'NG');assert.notEqual(source.認証確認,true);
+  assert.deepEqual(await load('decisions'),{});
+ }finally{await rm(directory,{recursive:true,force:true});}
+});

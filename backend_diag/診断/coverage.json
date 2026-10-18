@@ -144,7 +144,7 @@
   "executionReferenceCount": 10439,
   "literalCandidateCount": 321,
   "uniqueSelectedBlobs": 3283,
-  "catalogSha256": "5e41ae9080b88e83dcf282aa9fa80bf1fff8a413d9ff4e3666a87a614ddbda63",
+  "catalogSha256": "555f057c3987694226d98a1dbfbe8cbcd2ec2849bc2b92a8768069e6eb033644",
   "shellAudit": {
     "shellBatchDockerfileFiles": 66,
     "makefiles": 1,

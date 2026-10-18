@@ -550,12 +550,26 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
                 "live_models": モデル一覧.get_live_models(),
                 "live_voices": モデル一覧.get_live_voices(),
                 "code_models": モデル一覧.get_code_models(),
+                "decision_models": モデル一覧.get_decisions_models(),
             }
             if not _backend_local稼働中(http_request.app.conf):
                 利用可能モデル = _local_chat候補除外(利用可能モデル)
 
         # ソケットのモデル設定を取得
-        現在設定 = 接続.モデル設定 if 接続 else 初期モデル設定生成(getattr(http_request.app, "conf", None))
+        現在設定 = dict(接続.モデル設定) if 接続 else 初期モデル設定生成(getattr(http_request.app, "conf", None))
+        # 判断はToolsが共通JSONを読むため、保存後の再取得でもセッションの古い値を返さない。
+        from AIコア.AI判断 import Decision
+        共通設定 = getattr(getattr(http_request.app, "conf", None), "json", None)
+        判断設定 = 共通設定 if 共通設定 is not None else 現在設定
+        現在設定["DECISION_AI_NAME"] = 判断設定.get("DECISION_AI_NAME", "auto") or "auto"
+        for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"):
+            現在設定[key] = 判断設定.get(key, 判断設定.get("DECISION_AI_MODEL", "auto")) or "auto"
+        # 旧キーは既存ファイルにある場合だけ返し、新規設定には追加しない。
+        if 判断設定.get("DECISION_AI_MODEL") is not None:
+            現在設定["DECISION_AI_MODEL"] = 判断設定.get("DECISION_AI_MODEL")
+        else:
+            現在設定.pop("DECISION_AI_MODEL", None)
+        利用可能モデル["decision_models"] = Decision.model_options(利用可能モデル.get("decision_models"))
 
         return {
             "status": "OK",
@@ -695,6 +709,9 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "LIVE_AI_NAME", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
             "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE",
             "LIVE_OPENAI_MODEL", "LIVE_OPENAI_VOICE",
+            # DecisionAI設定
+            "DECISION_AI_NAME", "DECISION_AI_MODEL",
+            "DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL",
             # CodeAI設定
             "CODE_AI1_NAME", "CODE_AI2_NAME", "CODE_AI3_NAME", "CODE_AI4_NAME", "CODE_AI5_NAME", "CODE_AI6_NAME",
             "CODE_AI1_MODEL", "CODE_AI2_MODEL", "CODE_AI3_MODEL", "CODE_AI4_MODEL", "CODE_AI5_MODEL", "CODE_AI6_MODEL",

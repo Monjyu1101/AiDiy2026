@@ -72,7 +72,7 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | カテゴリ | 主なキー |
 |---------|---------|
 | サービス / WebUI | `PORT_WEB`, `PORT_CORE`, `PORT_AVATAR`, `PORT_TASKTEAM`, `PORT_TOOLS`, `PORT_LOCAL`, `PORT_APPS`, `WEBUI_FIRST_PAGE` |
-| Discord | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_USER_ID`, `DISCORD_TEXT_CHANNEL_ID`, `DISCORD_VOICE_CHANNEL_ID` の接続情報5項目。ID は単一文字列。旧 `*_IDS` の1件配列は自動移行。Live / Code は共通設定を使用（詳細は `frontend_discord/README.md`） |
+| Discord | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_USER_ID`, `DISCORD_TEXT_CHANNEL_ID`, `DISCORD_VOICE_CHANNEL_ID` の接続情報5項目。ID は単一文字列。旧 `*_IDS` の1件配列は自動移行。Live / Code は共通設定を使用（詳細は `frontend_channels/README.md`） |
 | API Key | `gemini_key_id`, `freeai_key_id`, `claude_key_id`, `openai_key_id`, `copilot_key_id`, `openrt_key_id`, `ollama_key_id` |
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |

@@ -22,7 +22,7 @@ class GeminiDecisionTests(unittest.IsolatedAsyncioTestCase):
             def handler(req):
                 calls.append(req)
                 self.assertEqual(req.headers["x-goog-api-key"], key + "-fixture")
-                self.assertEqual(str(req.url), "https://generativelanguage.googleapis.com/v1beta/models/" + (FREEAI_DECISION_MODEL if name == "freeai_chat" else "custom") + ":generateContent")
+                self.assertEqual(str(req.url), "https://generativelanguage.googleapis.com/v1beta/models/" + "custom" + ":generateContent")
                 body = json.loads(req.content)
                 self.assertEqual(body["generationConfig"]["responseMimeType"], "application/json")
                 self.assertIn("answers", body["generationConfig"]["responseJsonSchema"]["properties"])
@@ -117,29 +117,15 @@ class GeminiDecisionTests(unittest.IsolatedAsyncioTestCase):
             service.availability = {key: {"ok": True} for key in order[index:]}
             self.assertEqual(service.resolve(request(), {})[0], name)
         config = {"DECISION_AI_NAME": "freeai_chat", "DECISION_AI_MODEL": "common", "DECISION_FREEAI_MODEL": "provider"}
-        self.assertEqual(service.resolve(request(), config), ("freeai_chat", FREEAI_DECISION_MODEL))
-        self.assertEqual(service.resolve(request(ai_model="explicit"), config), ("freeai_chat", FREEAI_DECISION_MODEL))
+        self.assertEqual(service.resolve(request(), config), ("freeai_chat", "provider"))
+        self.assertEqual(service.resolve(request(ai_model="explicit"), config), ("freeai_chat", "explicit"))
         config["DECISION_AI_MODEL"] = "auto"
-        self.assertEqual(service.resolve(request(), config), ("freeai_chat", FREEAI_DECISION_MODEL))
+        self.assertEqual(service.resolve(request(), config), ("freeai_chat", "provider"))
 
-    async def test_freeai_fixed_model_overrides_all_inputs_and_config_but_not_other_methods(self):
-        config = {"DECISION_AI_NAME": "freeai_chat", "DECISION_AI_MODEL": "wrong-common", "DECISION_FREEAI_MODEL": "wrong-provider", "freeai_key_id": "fixture"}
-        calls = []
-        def handler(req):
-            calls.append(req)
-            self.assertEqual(req.url.path, "/v1beta/models/" + FREEAI_DECISION_MODEL + ":generateContent")
-            self.assertEqual(json.loads(req.content)["generationConfig"]["responseMimeType"], "application/json")
-            return httpx.Response(200, json=envelope())
-        service = Decision(config=config, transport=httpx.MockTransport(handler))
-        for params in ({}, {"ai_name": "freeai_chat", "model": "wrong"}, {"model": "freeai_chat/wrong"}, {"ai_model": "wrong"}, {"ai_name": "freeai_chat", "model": "auto"}):
-            result = await service.実行(request(**params))
-            self.assertEqual(result["data"]["ai_model"], FREEAI_DECISION_MODEL)
-        shown = next(row for row in service.get_config()["providers"] if row["ai_name"] == "freeai_chat")
-        self.assertEqual(shown["fixed_model"], FREEAI_DECISION_MODEL)
-        self.assertEqual(shown["default_model"], FREEAI_DECISION_MODEL)
-        for name in ("gemini_chat", "openai_oauth", "openai_decisions"):
-            self.assertEqual(service.resolve(request(ai_name=name, ai_model="explicit"), config), (name, "explicit"))
+    async def test_freeai_direct_adapter_respects_model_parameter(self):
         from AIコア.AI判断_freeai_jsonchat import DecisionAI
+        def handler(req):
+            self.assertEqual(req.url.path, '/v1beta/models/selected-direct:generateContent')
+            return httpx.Response(200, json=envelope())
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            await DecisionAI().実行(request(), "wrong-direct", config, client)
-        self.assertEqual(len(calls), 6)
+            await DecisionAI().実行(request(), 'selected-direct', {'freeai_key_id':'fixture'}, client)

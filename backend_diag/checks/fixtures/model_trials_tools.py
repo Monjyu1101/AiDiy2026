@@ -32,12 +32,12 @@ class Model:
 
     async def run_async(self, *args, **kwargs):
         prompt = args[0] if args else kwargs["prompt"]
-        assert prompt == "おはよう"
+        assert prompt in ("おはよう", "手動SDK入力")
         if args:
             assert args[6] is False and args[10] is False
         else:
             assert kwargs["resume"] is False and kwargs["self_check_loop"] == 0
-        return {"status": "OK", "result": "おはようございます", "ai_model": "chat-test", "selected_model": "code-test"}
+        return {"status": "OK", "result": "おはようございます", "ai_model": "chat-test", "selected_model": "code-test", "ai_name": "freeai_chat"}
 
 
 class Live:
@@ -53,8 +53,9 @@ class Live:
         return True
 
     async def テキスト送信(self, text):
-        assert text == "おはよう"
+        assert text in ("おはよう", "手動SDK入力")
         await self.queue.put({"text": "おはようございます"})
+        await self.queue.put({"bytes_data": b"\x00\x00"*24000, "mime_type": "audio/pcm;rate=24000"})
         await self.queue.put({"diagnostic_turn_complete": True})
         return True
 

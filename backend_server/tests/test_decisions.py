@@ -64,7 +64,8 @@ class DecisionContractTests(unittest.TestCase):
         for params, expected in cases:
             with self.subTest(params=params):
                 self.assertEqual(service.resolve(request(**params), config), expected)
-        self.assertEqual(service.get_config()["configured_defaults"], config)
+        self.assertEqual(service.get_config()["configured_defaults"], {
+            **config, **dict.fromkeys(("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"), "configured-model")})
         self.assertEqual(service.get_config()["default_model"], "openai_decisions/configured-model")
 
     def test_missing_and_auto_settings_keep_legacy_model_fallback(self):
@@ -72,7 +73,7 @@ class DecisionContractTests(unittest.TestCase):
         for value in (None, "", "auto", "AUTO", "  auto  "):
             config = {"DECISION_AI_NAME": value, "DECISION_AI_MODEL": value, "DECISION_OAUTH_MODEL": "legacy"}
             self.assertEqual(service.resolve(request(), config), ("openai_oauth", "legacy"))
-        self.assertEqual(service.get_config()["configured_defaults"], {"DECISION_AI_NAME": "auto", "DECISION_AI_MODEL": "auto"})
+        self.assertEqual(service.get_config()["configured_defaults"], {'DECISION_AI_NAME': 'auto', 'DECISION_OPENAI_MODEL': 'auto', 'DECISION_OAUTH_MODEL': 'auto', 'DECISION_GEMINI_MODEL': 'auto', 'DECISION_FREEAI_MODEL': 'auto'})
 
     def test_configured_provider_does_not_silently_fall_back(self):
         service = Decision(config={})

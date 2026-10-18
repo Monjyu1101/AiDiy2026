@@ -122,7 +122,7 @@ class ElectronSetupTest(unittest.TestCase):
         self.assertTrue(common.electron_binary_ready(self.root))
 
     def test_discord_binary_is_reused_without_network(self):
-        peer = self.make_app('frontend_discord')
+        peer = self.make_app('frontend_channels')
         self.make_ready(peer)
         with patch.object(common.urllib.request, 'urlopen') as download:
             self.assertTrue(common.prepare_electron_binary(self.root, 'test'))

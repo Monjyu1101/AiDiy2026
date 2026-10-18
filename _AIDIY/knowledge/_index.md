@@ -25,7 +25,7 @@
 | `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_discord` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
+| `frontend_channels` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
 | `frontend_ide` | Term / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
 
 例:

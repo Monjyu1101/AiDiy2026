@@ -25,7 +25,7 @@ def load(folder, name):
 
 class LauncherTests(unittest.TestCase):
     def test_setup_and_cleanup_keep_commands_separate_in_both_orders(self):
-        for order in [('frontend_ide/viewer', 'frontend_discord'), ('frontend_discord', 'frontend_ide/viewer')]:
+        for order in [('frontend_ide/viewer', 'frontend_channels'), ('frontend_channels', 'frontend_ide/viewer')]:
             with self.subTest(order=order), tempfile.TemporaryDirectory() as temp:
                 # 先に別フォルダの launcher が import 済みでも影響しない。
                 cached = load(order[0], 'launcher')
@@ -37,7 +37,7 @@ class LauncherTests(unittest.TestCase):
                         paths[folder] = module._launcher.launcher_path()
                     self.assertNotEqual(*paths.values())
                     for folder, path in paths.items():
-                        entry = ROOT / folder / ('panel/launch.mjs' if folder == 'frontend_discord' else 'launch.mjs')
+                        entry = ROOT / folder / ('panel/launch.mjs' if folder == 'frontend_channels' else 'launch.mjs')
                         self.assertIn(str(entry), path.read_text(encoding='utf-8'))
                     first, second = order
                     self.assertTrue(load(first, '_cleanup').remove_launcher(ROOT / first))
@@ -47,7 +47,7 @@ class LauncherTests(unittest.TestCase):
                     self.assertFalse(paths[second].exists())
 
     def test_missing_entry_does_not_overwrite_registered_command(self):
-        for folder in ('frontend_ide/viewer', 'frontend_discord'):
+        for folder in ('frontend_ide/viewer', 'frontend_channels'):
             with self.subTest(folder=folder), tempfile.TemporaryDirectory() as temp:
                 launcher = load(folder, 'launcher')
                 path = Path(temp) / 'command'

@@ -49,7 +49,7 @@ test('設定変更エラーで残りを送らず、更新で前の結果を破�
 });
 
 test('Appは接続でタブを制御し、全診断へ試行を含めない',()=>{
- const app=source('App.vue');assert.match(app,/:disabled="!connected \|\| !toolsOnline"/);assert.match(app,/if\(!value\)試行.切断\(\)/);assert.doesNotMatch(app.match(/async function 全診断\(\)[^\r\n]*/)[0],/試行/);
+ const app=source('App.vue');assert.match(app,/:disabled="!connected \|\| !toolsOnline"/);assert.match(app,/if\(!value\)\{試行.切断\(\);手動.中止\(\)/);assert.doesNotMatch(app.match(/async function 全診断\(\)[^\r\n]*/)[0],/試行/);
 });
 
 test('Tools再確認中は接続を保持し、失敗確定時だけオフライン',async()=>{

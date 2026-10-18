@@ -1,5 +1,5 @@
 {
-  "package-lock.json": "845b3fa4916a0ba1a322690ae5aabcbd61b124640d22f165ab229ccd0ad5416b",
+  "package-lock.json": "12b9dc511d87f5c55865287ae0f803d723aad6733b0c49033fa33c2ba714c7a0",
   "package.json": "a31006abc78a8118e8cdcad3ef1780da9b6290b72127af9c376f93bca2286ae9",
   "panel/THIRD_PARTY_NOTICES.txt": "991f108cf9b45856e7f9864d918cb66c1f6f9ab41f18dd885f0c95bf8aa10d12",
   "panel/index.html": "a6bd2ff29d8416ec53d3b3b0f572d4278b75a3be8ad24c8cbb3459df520bfe74",
@@ -12,5 +12,5 @@
   "panel/画面/接続パネル.vue": "212532bf01d3c8cf365088d37d3193cbec868ce8cf95b0b0e522029db5e5685f",
   "panel/画面/機能切替.vue": "1cd911c0dac6c2f3fc14c810c5c4bcbdb8d54e0f02959b3d65b0a7fa459051f2",
   "scripts/build-panel.mjs": "187a9c9a943f5f226e0bc17bc8130da8ce852c3c2b524f216c6b5327b1afe973",
-  "scripts/verify-panel.mjs": "f72938b77e1de0e95ebd0e8e25beb7048912f76fe8b47c77b36653de2927ce91"
+  "scripts/verify-panel.mjs": "dbe9f4dd8f3df7d41d1e04bcabc8a76932325a63700ebd930e0bc3f293b37619"
 }

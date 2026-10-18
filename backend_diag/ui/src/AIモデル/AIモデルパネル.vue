@@ -1,0 +1,51 @@
+<script setup>
+import {computed,ref,watch,onBeforeUnmount} from 'vue';
+import {再生可能な音声} from '../設定モデル/設定モデル音声.mjs';
+import 状態バッジ from '../共通表示/状態バッジ.vue';
+import './AIモデル.css';
+const props=defineProps(['state','online','visible']);
+const s=props.state;
+const audio=computed(()=>再生可能な音声(s.結果.value));
+const audioState=computed(()=>s.音声状態.value[audio.value?.id]);
+const player=ref(null);
+function stop(){const p=player.value;if(p){p.pause();p.removeAttribute('src');p.load();}}
+watch(()=>[props.visible,audio.value?.id,audioState.value?.url],stop,{flush:'sync'});
+onBeforeUnmount(stop);
+const change=(key,event)=>s.変更(key,event.target.value);
+</script>
+<template>
+<section class="panel ai-model-panel" aria-label="AIモデル">
+ <div class="panel-heading"><h2>AIモデルを試す</h2><button :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込">候補を再読込</button></div>
+ <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family.toLowerCase()}}</button></nav>
+ <p class="panel-note">モデルと入力を選んで手動で試します。選択は設定へ保存されません。候補は保存済みのDiag一覧です。</p>
+ <div class="ai-model-scroll">
+  <div class="ai-model-form">
+   <h3>{{s.区分.value}} / 入力</h3>
+   <p v-if="!online" class="warning" role="status">Tools 接続時に利用できます。</p>
+   <p v-if="s.一覧.value?.区分?.[s.区分.value]?.状態==='未取得'" class="warning">モデル一覧が未取得です。設定保持値がある場合だけ表示します。</p>
+   <label class="ai-config-row"><span>{{s.区分.value}}_AI:</span><select aria-label="プロバイダ" :value="s.入力.provider" :disabled="s.読込中.value" @change="change('provider',$event)"><option v-if="!s.プロバイダ.value.length" value="">候補なし</option><option v-for="p in s.プロバイダ.value" :key="p.id" :value="p.id">{{p.id}}</option></select></label>
+   <label class="ai-config-row"><span>{{s.区分.value}}_MODEL:</span><select aria-label="モデル" :value="s.入力.model" :disabled="s.読込中.value" @change="change('model',$event)"><option v-if="!s.モデル.value.length" value="">候補なし</option><option v-for="m in s.モデル.value" :key="m.id" :value="m.id">{{m.名前}}</option></select></label>
+   <label v-if="s.区分.value==='LIVE'" class="ai-config-row"><span>LIVE_VOICE:</span><select aria-label="音声" :value="s.入力.voice" @change="change('voice',$event)"><option v-if="!s.音声候補.value.length" value="">候補なし</option><option v-for="v in s.音声候補.value" :key="v.id" :value="v.id">{{v.名前}}</option></select></label>
+   <label class="ai-input-label">{{s.区分.value==='DECISION'?'判断対象の入力':'自由プロンプト'}}<textarea aria-label="自由プロンプト" :value="s.入力.prompt" maxlength="16000" rows="5" @input="change('prompt',$event)"></textarea></label>
+   <fieldset v-if="s.区分.value==='DECISION'"><legend>質問</legend>
+    <label class="ai-config-row"><span>形式</span><select aria-label="質問形式" :value="s.入力.type" @change="change('type',$event)"><option value="choice">選択（choice）</option><option value="predicate">判定（predicate）</option><option value="score">スコア（score）</option></select></label>
+    <label class="ai-config-row"><span>質問名</span><input aria-label="質問名" :value="s.入力.name" maxlength="100" @input="change('name',$event)"></label>
+    <label class="ai-input-label">質問文<textarea aria-label="質問文" :value="s.入力.instructions" maxlength="4000" rows="3" @input="change('instructions',$event)"></textarea></label>
+    <label v-if="s.入力.type!=='predicate'" class="ai-input-label">{{s.入力.type==='choice'?'選択肢（1行に1件）':'スコアの段階（低い順に1行に1件）'}}<textarea aria-label="選択肢・段階" :value="s.入力.choices" rows="4" @input="change('choices',$event)"></textarea></label>
+   </fieldset>
+   <p v-if="s.区分.value==='LIVE'" class="ai-help">接続後10秒待機して送信します。1秒以上の応答音声を一時保存し、ここで再生できます。</p>
+   <div class="ai-model-actions"><button id="ai-model-start" :disabled="!online || s.実行中.value || s.読込中.value || !s.入力.provider || !s.入力.model || !s.入力.prompt.trim() || (s.区分.value==='LIVE'&&!s.入力.voice)" @click="s.開始()">{{s.実行中.value?'実行中…':s.結果.value?'再試行':'試行'}}</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div>
+   <p class="ai-help">試行時に選択したAIへ送信します。料金が発生する場合があります。</p>
+  </div>
+  <section class="ai-model-output" aria-label="試行結果" aria-live="polite"><h3>出力</h3><component :is="状態バッジ" :state="s.実行中.value?'実行中':s.結果.value?.状態||'未実施'"/><p role="status">{{s.通知.value || '入力して「試行」を押してください。'}}</p>
+   <dl v-if="s.結果.value"><dt>指定プロバイダ</dt><dd>{{s.結果.value.指定プロバイダ || '—'}}</dd><dt>実行プロバイダ</dt><dd>{{s.結果.value.実行プロバイダ || '応答に情報なし'}}</dd><dt>指定モデル</dt><dd>{{s.結果.value.指定モデル || '—'}}</dd><dt>実行モデル</dt><dd>{{s.結果.value.実行モデル || '応答に情報なし'}}</dd></dl>
+   <section v-if="s.区分.value==='LIVE' && s.結果.value" class="ai-model-audio" aria-label="Live 応答音声"><h3>応答音声</h3>
+    <template v-if="audio"><p>{{(audio.長さms/1000).toFixed(2)}} 秒 · 一時保存</p><audio v-if="audioState?.url && visible" ref="player" :key="audio.id" :src="audioState.url" controls preload="metadata" aria-label="Live 応答音声の再生" @error="s.音声再生失敗(audio.id)"></audio><button v-if="!audioState?.url" :disabled="!online || audioState?.読込中" @click="s.音声読込(s.結果.value)">{{audioState?.読込中?'音声を読込中…':'音声を再読込'}}</button><p v-if="audioState?.エラー" class="warning">{{audioState.エラー}}</p></template>
+    <p v-else class="warning">1秒以上の再生可能な音声がありません。</p>
+   </section>
+   <h3>{{s.区分.value==='DECISION'?'戻り値（JSON / テキスト）':'応答テキスト'}}</h3><pre class="ai-model-reply">{{s.結果.value?.応答 || '応答はまだありません。'}}</pre><p v-if="s.結果.value?.説明">{{s.結果.value.説明}}</p>
+
+  </section>
+ </div>
+</section>
+</template>

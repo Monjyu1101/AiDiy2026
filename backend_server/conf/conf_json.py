@@ -68,7 +68,7 @@ class conf_json:
 
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
-        'CHAT_GEMINI_MODEL': 'gemini-nano-banana-2.1',
+        'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',
         'CHAT_FREEAI_MODEL': 'gemini-3.8-flash',
         'CHAT_OPENRT_MODEL': 'google/gemini-3.1-flash-image',
         'CHAT_OPENAI_MODEL': 'gpt-6.1-sol',
@@ -85,13 +85,12 @@ class conf_json:
         'LIVE_OPENAI_MODEL': 'gpt-realtime-2.1-mini',
         'LIVE_OPENAI_VOICE': 'marin',
 
-        # DecisionAI設定（共通の既定値と方式別のフォールバック）
+        # DecisionAI設定（方式別モデル。autoは各方式の既定値）
         'DECISION_AI_NAME': 'auto',
-        'DECISION_AI_MODEL': 'auto',
-        'DECISION_OPENAI_MODEL': 'gpt-6-luna',
-        'DECISION_OAUTH_MODEL': 'gpt-6-luna',
-        'DECISION_FREEAI_MODEL': 'gemini-flash-lite-latest',
-        'DECISION_GEMINI_MODEL': 'gemini-3.8-flash',
+        'DECISION_OPENAI_MODEL': 'auto',
+        'DECISION_OAUTH_MODEL': 'auto',
+        'DECISION_GEMINI_MODEL': 'auto',
+        'DECISION_FREEAI_MODEL': 'auto',
 
         # CodeAI設定
         'CODE_BASE_PATH': '../',
@@ -103,9 +102,9 @@ class conf_json:
         'CODE_AI3_NAME': 'claude_cli',
         'CODE_AI3_MODEL': 'auto',
         'CODE_AI4_NAME': 'antigravity_cli',
-        'CODE_AI4_MODEL': 'auto',
+        'CODE_AI4_MODEL': 'same',
         'CODE_AI5_NAME': 'opencode_cli',
-        'CODE_AI5_MODEL': 'auto',
+        'CODE_AI5_MODEL': 'same',
         'CODE_AI6_NAME': 'aidiy_hermes',
         'CODE_AI6_MODEL': 'auto',
         'CODE_CLAUDE_SDK_MODEL': 'auto',
@@ -116,7 +115,7 @@ class conf_json:
         'CODE_CODEX_CLI_MODEL': 'auto',
         'CODE_CODEX_OLLAMA_MODEL': 'auto',
         'CODE_GROK_CLI_MODEL': 'auto',
-        'CODE_AIDIY_HERMES_MODEL': 'openai_oauth/gpt-6.1-sol',
+        'CODE_AIDIY_HERMES_MODEL': 'auto',
         'CODE_OPENCODE_CLI_MODEL': 'auto',
         'CODE_MAX_TURNS': 999,
         'CODE_PLAN': 'auto',
@@ -229,6 +228,10 @@ class conf_json:
             object.__setattr__(self, '_config_data', normalized)
             保存要否 = True
 
+        # 旧共通モデルは不足する方式別キーにだけ引き継ぐ。旧キー自体も保持する。
+        if self._migrate_decision_models():
+            保存要否 = True
+
         # 既存設定に不足しているデフォルト項目を補完
         if self._apply_default_keys():
             保存要否 = True
@@ -285,6 +288,18 @@ class conf_json:
                     変更あり = True
 
         return 変更あり
+
+    def _migrate_decision_models(self) -> bool:
+        """旧共通値を失わず、既存の方式別値（autoを含む）は上書きしない。"""
+        config_data = object.__getattribute__(self, '_config_data')
+        if 'DECISION_AI_MODEL' not in config_data:
+            return False
+        changed = False
+        for key in ('DECISION_OPENAI_MODEL', 'DECISION_OAUTH_MODEL', 'DECISION_GEMINI_MODEL', 'DECISION_FREEAI_MODEL'):
+            if key not in config_data:
+                config_data[key] = config_data['DECISION_AI_MODEL']
+                changed = True
+        return changed
 
     def _migrate_chat_ai_name(self) -> bool:
         """openai_oauth_chat を簡潔な現行名 openai_oauth へ移行する。"""
@@ -398,6 +413,8 @@ class conf_json:
         for key in self.DEFAULT_CONFIG:
             if key in config_data:
                 ordered[key] = config_data[key]
+            if key == 'DECISION_FREEAI_MODEL' and 'DECISION_AI_MODEL' in config_data:
+                ordered['DECISION_AI_MODEL'] = config_data['DECISION_AI_MODEL']
         for key, value in config_data.items():
             if key not in ordered and key not in self.REMOVED_DISCORD_KEYS and key not in self.LEGACY_DISCORD_IDS:
                 ordered[key] = value

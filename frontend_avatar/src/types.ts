@@ -48,9 +48,48 @@ export interface Column {
 }
 
 export interface ModelSettings {
+  CHAT_GEMINI_MODEL?: string;
+  CHAT_FREEAI_MODEL?: string;
+  CHAT_OPENRT_MODEL?: string;
+  CHAT_OPENAI_MODEL?: string;
+  CHAT_OLLAMA_MODEL?: string;
+  CHAT_LOCAL_MODEL?: string;
+  CHAT_LOCAL_DTYPE?: string;
+  LIVE_GEMINI_MODEL?: string;
+  LIVE_GEMINI_VOICE?: string;
+  LIVE_FREEAI_MODEL?: string;
+  LIVE_FREEAI_VOICE?: string;
+  LIVE_OPENAI_MODEL?: string;
+  LIVE_OPENAI_VOICE?: string;
+  CODE_AI1_MODEL?: string;
+  CODE_AI2_MODEL?: string;
+  CODE_AI3_MODEL?: string;
+  CODE_AI4_MODEL?: string;
+  CODE_AI5_MODEL?: string;
+  CODE_AI6_MODEL?: string;
+  CODE_CLAUDE_SDK_MODEL?: string;
+  CODE_CLAUDE_CLI_MODEL?: string;
+  CODE_CLAUDE_OLLAMA_MODEL?: string;
+  CODE_COPILOT_CLI_MODEL?: string;
+  CODE_ANTIGRAVITY_CLI_MODEL?: string;
+  CODE_CODEX_CLI_MODEL?: string;
+  CODE_CODEX_OLLAMA_MODEL?: string;
+  CODE_GROK_CLI_MODEL?: string;
+  CODE_AIDIY_HERMES_MODEL?: string;
+  CODE_OPENCODE_CLI_MODEL?: string;
+  CODE_MAX_TURNS?: number;
+  CODE_PLAN?: string;
+  CODE_VERIFY?: string;
+  CODE_SELF_CHECK_LOOP?: number;
   CODE_BASE_PATH?: string;
   CHAT_AI_NAME: string;
   LIVE_AI_NAME: string;
+  DECISION_AI_NAME?: string;
+  DECISION_AI_MODEL?: string; // 旧設定の互換読込用
+  DECISION_OPENAI_MODEL?: string;
+  DECISION_OAUTH_MODEL?: string;
+  DECISION_GEMINI_MODEL?: string;
+  DECISION_FREEAI_MODEL?: string;
   CODE_AI1_NAME: string;
   CODE_AI2_NAME: string;
   CODE_AI3_NAME: string;

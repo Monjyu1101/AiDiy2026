@@ -85,6 +85,19 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const bytes=await modelTrials.audio(id);
         return bytes?reply(200,bytes,'audio/wav'):reply(404,{エラー:'音声の保存期限が切れたか、音声が見つかりません。'});
       }
+      if(route==='api/AIモデル'&&req.method==='GET')return reply(200,await modelTrials.catalogs());
+      if(route==='api/AIモデル/開始'&&req.method==='POST'){
+        const controller=new AbortController(),abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
+        try{
+          if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
+          const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>65536)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+          let manual;try{manual=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
+          if(!manual||typeof manual!=='object'||Array.isArray(manual))return reply(400,{エラー:'入力が不正です。'});
+          if(Object.hasOwn(manual,'items')){if(Object.keys(manual).length!==1)return reply(400,{エラー:'一括試行の入力が不正です。'});return reply(200,await modelTrials.start({signal:controller.signal,manuals:manual.items}));}
+          return reply(200,await modelTrials.start({signal:controller.signal,manual}));
+        }catch(error){return reply(error?.status||500,{エラー:error?.status?error.message:'試行を開始できませんでした。'});}
+        finally{res.removeListener('close',abort);}
+      }
       if (route === 'api/モデル試行' && req.method === 'GET') return reply(200,await modelTrials.snapshot());
       if (route?.startsWith('api/モデル試行/') && ['POST','DELETE'].includes(req.method)) {
         if (hasBody(req)) return reply(400,{エラー:'モデル試行への引数は指定できません。'});

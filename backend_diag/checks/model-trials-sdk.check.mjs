@@ -1,5 +1,6 @@
 // DIAG_TEST_PYTHON must have backend_tools' MCP 2.x, FastAPI and uvicorn dependencies.
 import test from 'node:test';
+import {decisionQuestions} from '../モデル試行/defaults.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -35,5 +36,12 @@ test('actual MCP SDK and production Chat/Code/Decision registrations return vali
   const trials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true})});
   try{const start=await trials.start();for(const row of start.項目){const result=await trials.next(start.実行ID,row.id);if(['CHAT','CODE1','LIVE','DECISION'].includes(row.id))assert.equal(result.状態,'OK',`${row.id}: ${result.説明}`);if(row.id==='DECISION'){assert.equal(result.判断結果,'medium');assert.equal(result.実行モデル,'freeai_chat/gemini-flash-lite-latest');}}}
   finally{await trials.close();}
+  const manualTrials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true})});
+  try{
+   const manuals=[['CHAT','freeai_chat','chat-test'],['LIVE','freeai_live','live-test'],['DECISION','freeai_chat','gemini-flash-lite-latest'],['CODE','codex_cli','auto']].map(([family,provider,model])=>({family,provider,model,voice:family==='LIVE'?'Zephyr':'',prompt:'手動SDK入力',...(family==='DECISION'?{questions:decisionQuestions()}:{})}));
+   const start=await manualTrials.start({manuals});let audio;
+   for(const row of start.実行順){const result=await manualTrials.next(start.実行ID,row);assert.equal(result.状態,'OK',JSON.stringify(result));if(row==='LIVE'){audio=result.音声ファイル;assert.equal(audio.長さms,1000);}if(row==='DECISION'){assert.equal(JSON.parse(result.応答).data.answers[0].choice,'medium');assert.equal(result.実行プロバイダ,'freeai_chat');}}
+   assert.ok(await manualTrials.audio(audio.id),'batch retains Live audio after Decision and Code');
+  }finally{await manualTrials.close();}
  }finally{lines.close();child.kill();}
 });

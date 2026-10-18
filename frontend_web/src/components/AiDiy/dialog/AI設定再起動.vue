@@ -37,9 +37,12 @@ const rebootWaitSeconds = ref(15);
 const isInitializing = ref(false);
 const hasLoadedConfig = ref(false);
 
+let loadedFormSettings: Record<string, any> = {};
+
 const selections = reactive({
   chatAi: '',
   chatModel: '',
+  decisionAi: 'auto',
   liveAi: '',
   liveModel: '',
   liveVoice: '',
@@ -103,6 +106,29 @@ const CODE_MODEL_KEYS: Record<string, string> = {
 };
 
 const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}));
+// 判断の候補はDiag取得値だけ。方式・モデルの保存値は一覧外でも失わない。
+const decisionAiOptions = computed(() => [...new Set([
+  'auto', 'openai_oauth', 'freeai_chat', 'openai_decisions', 'gemini_chat', selections.decisionAi,
+])].filter(Boolean));
+const decisionFields = [
+  { key: 'DECISION_OPENAI_MODEL', provider: 'openai_decisions' },
+  { key: 'DECISION_OAUTH_MODEL', provider: 'openai_oauth' },
+  { key: 'DECISION_GEMINI_MODEL', provider: 'gemini_chat' },
+  { key: 'DECISION_FREEAI_MODEL', provider: 'freeai_chat' },
+];
+const decisionModels = reactive<Record<string, string>>({});
+const decisionHasCandidates = computed(() => decisionFields.some(field =>
+  Object.keys(availableModels.value?.decision_models?.[field.provider] || {}).some(model => model !== 'auto')));
+const decisionModelOptions = (field: { key: string; provider: string }) => {
+  const choices: Record<string, string> = {
+    auto: 'auto（方式別の既定モデル）',
+    ...availableModels.value?.decision_models?.[field.provider],
+  };
+  const current = decisionModels[field.key];
+  if (current && !choices[current]) choices[current] = current + '（保持値・Diag一覧外／未確認）';
+  return Object.entries(choices).map(([value, label]) => ({ value, label }));
+};
+
 const liveAiOptions = computed(() => Object.keys(availableModels.value?.live_models || {}));
 const codeAiOptions = computed(() => Object.keys(availableModels.value?.code_models || {}));
 
@@ -222,6 +248,10 @@ const loadConfig = async () => {
       const codeModels = availableModels.value.code_models || {};
 
       selections.chatAi = chooseAvailable(currentSettings.value.CHAT_AI_NAME, chatAiOptions.value);
+      selections.decisionAi = String(currentSettings.value.DECISION_AI_NAME || 'auto').trim() || 'auto';
+      for (const { key } of decisionFields) {
+        decisionModels[key] = String(currentSettings.value[key] ?? currentSettings.value.DECISION_AI_MODEL ?? 'auto').trim() || 'auto';
+      }
       selections.liveAi = chooseAvailable(currentSettings.value.LIVE_AI_NAME, liveAiOptions.value);
       selections.codeAi1 = chooseAvailable(currentSettings.value.CODE_AI1_NAME, codeAiOptions.value);
       selections.codeAi2 = chooseAvailable(currentSettings.value.CODE_AI2_NAME, codeAiOptions.value);
@@ -259,6 +289,7 @@ const loadConfig = async () => {
       selections.teamModelCheck = chooseAvailable(currentSettings.value.TEAM_AI_MODEL_check || 'auto', teamModelKeys);
       await nextTick();
       isInitializing.value = false;
+      loadedFormSettings = buildFormSettings();
       hasLoadedConfig.value = true;
     } else {
       errorMessage.value = response?.data?.message || '取得に失敗しました';
@@ -282,9 +313,11 @@ const handleCancel = () => {
   emit('close');
 };
 
-const buildNextSettings = () => {
+const buildFormSettings = () => {
     const nextSettings = { ...currentSettings.value };
     nextSettings.CHAT_AI_NAME = selections.chatAi;
+    nextSettings.DECISION_AI_NAME = selections.decisionAi || 'auto';
+    for (const { key } of decisionFields) nextSettings[key] = decisionModels[key] || 'auto';
     nextSettings.LIVE_AI_NAME = selections.liveAi;
     nextSettings.CODE_AI1_NAME = selections.codeAi1;
     nextSettings.CODE_AI1_MODEL = selections.codeModel1;
@@ -328,6 +361,19 @@ const buildNextSettings = () => {
     }
     return nextSettings;
 };
+
+// 未編集のフィールドは取得した保存値を維持する（候補なしでも空欄を書き戻さない）。
+function buildNextSettings() {
+  const next = buildFormSettings();
+  for (const key of Object.keys(next)) {
+    if (key === 'DECISION_AI_NAME' || decisionFields.some(field => field.key === key)) continue;
+    if (next[key] === loadedFormSettings[key]) {
+      if (Object.prototype.hasOwnProperty.call(currentSettings.value, key)) next[key] = currentSettings.value[key];
+      else delete next[key];
+    }
+  }
+  return next;
+}
 
 const submitSettings = async (
   再起動要求: { reboot_core: boolean; reboot_apps: boolean; reboot_tools?: boolean; reboot_local?: boolean; reboot_task?: boolean; reboot_team?: boolean },
@@ -688,6 +734,32 @@ onMounted(() => {
             </div>
 
             <div class="config-panel-section">
+              <div class="config-panel-section-header">Decision AI Model（判断）</div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-decision-ai-select">DECISION_AI_NAME:</label>
+                <div class="config-panel-control">
+                  <select id="config-decision-ai-select" v-model="selections.decisionAi" class="config-panel-select">
+                    <option v-for="ai in decisionAiOptions" :key="ai" :value="ai">{{ ai }}</option>
+                  </select>
+                </div>
+              </div>
+              <div v-for="field in decisionFields" :key="field.key" class="config-panel-field">
+                <label class="config-panel-label" :for="'config-' + field.key">{{ field.key }}:</label>
+                <div class="config-panel-control">
+                  <select :id="'config-' + field.key" v-model="decisionModels[field.key]" aria-describedby="config-decision-note" class="config-panel-select">
+                    <option v-for="model in decisionModelOptions(field)" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+                <div id="config-decision-note" class="config-decision-note" role="note">
+                  <p>autoは起動チェック成功の方式からOAuth → FreeAI → Decisions API → Geminiの順で選びます。</p>
+
+                  <p v-if="!decisionHasCandidates">Diagの取得済み候補はありません。現在設定とautoを保持しています。設定値は利用可能の保証ではありません。</p>
+                  <p v-else>候補はDiagの取得済み一覧です。モデルを変更するときはDiagの書き出し候補を調整してください。現在の利用可否はToolsの判断チェックで確認します。</p>
+                </div>
+            </div>
+
+            <div class="config-panel-section">
               <div class="config-panel-section-header">Code AI Setting</div>
               <div class="config-panel-code-base-field">
                 <div v-if="codeBaseOptionsList.length > 0" class="config-panel-field">
@@ -941,6 +1013,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.config-decision-note { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; opacity: 0.85; }
+.config-decision-note p { margin: 6px 0; }
 .config-panel-overlay {
   position: fixed;
   inset: 0;

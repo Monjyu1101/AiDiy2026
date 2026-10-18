@@ -157,7 +157,7 @@ class DecisionMCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("generativelanguage.googleapis.com", str(req.url))
                 return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": json.dumps({"answers": [{"name": "blue", "type": "predicate", "probability": 1}]})}]}}]})
             instance = Decision(config={"DECISION_AI_NAME": name, "gemini_key_id": "fixture"}, transport=httpx.MockTransport(handler))
-            instance.availability = {name: {"ok": True, "model": "gemini-flash-lite-latest" if name == "freeai_chat" else "gemini-3.8-flash"}}
+            instance.availability = {name: {"ok": True, "model": "gemini-flash-lite-latest"}}
             mcp = MCPServer("google-decision-test")
             register_tools(mcp, instance)
             result = await mcp._tool_manager._tools["decisions_check"].fn(**dict(REQUEST, model="auto"))

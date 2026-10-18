@@ -25,7 +25,7 @@ test('Diag / Discord も境界線込み3pxに揃う', () => {
   const diagBar = rules(diag).find(([_, selector]) => selector.trim() === '.connection-bar')[2];
   assert.equal(declaration(diagBar, 'height'), '3px');
   assert.equal(declaration(diagBar, 'border-top'), '1px solid #242424');
-  const discordBar = rules(read('../../frontend_discord/panel/style.css')).find(([_, selector]) => selector.trim() === '#activity-bar')[2];
+  const discordBar = rules(read('../../frontend_channels/panel/style.css')).find(([_, selector]) => selector.trim() === '#activity-bar')[2];
   assert.equal(declaration(discordBar, 'box-sizing'), 'content-box');
   assert.equal(declaration(discordBar, 'height'), '2px');
   assert.equal(declaration(discordBar, 'border-top'), '1px solid #242424');
