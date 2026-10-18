@@ -571,6 +571,10 @@ async function publicCatalog({ fetch = fetchMetadata, now, signal } = {}) {
   }
 }
 var ROUTER_PROOF = Symbol.for("aidiy.diag.openrouter-proof");
+var DECISIONS_PROOF = Symbol.for("aidiy.diag.decisions-proof");
+function decisionResult(result, id, models, valid) {
+  return Object.defineProperty(result, DECISIONS_PROOF, { value: async (selected, reader, oauthReader) => selected === id && await valid(reader, oauthReader) ? models.map((row2) => ({ ...row2 })) : [] });
+}
 function authenticatedRouterResult(result, key) {
   return Object.defineProperty(result, ROUTER_PROOF, { value: async (reader) => {
     const [state, values] = await readConfig(reader);
@@ -591,7 +595,11 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
       if (credential.account) headers["ChatGPT-Account-Id"] = credential.account;
       const body = await fetch(kind, headers, void 0, signal);
       const details = safeDetails(kind === "codex" ? codexCatalog(body) : grokCatalog(body), [credential.token, ...credential.account ? [credential.account] : []]);
-      return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u8B66\u544A: expired ? [expiredNote] : [], \u8AAC\u660E: "OAuth \u306E\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u3067\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\u3002\u751F\u6210\u53EF\u5426\u30FB\u5229\u7528\u4E0A\u9650\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: kind === "codex" ? "\u672C\u4F53\uFF08get_codex_model_ids\uFF09\u3068\u540C\u3058\u304F\u3001\u975E\u8868\u793A\u30FB\u5EC3\u6B62\u30E2\u30C7\u30EB\u3092\u9664\u3044\u3066\u512A\u5148\u5EA6\u9806\u306B\u4E26\u3079\u3001\u5C06\u6765\u7248\u3068 -900k \u7248\u3092\u88DC\u5B8C\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" : "\u672C\u4F53\u306B API \u4E00\u89A7\u306E\u7D5E\u308A\u8FBC\u307F\u306F\u7121\u3044\u305F\u3081\u3001\u975E\u8868\u793A\u30E2\u30C7\u30EB\u3060\u3051\u3092\u9664\u5916\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" };
+      const result = { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u78BA\u8A8D\u65E5\u6642: timestamp2, \u8B66\u544A: expired ? [expiredNote] : [], \u8AAC\u660E: "OAuth \u306E\u30ED\u30B0\u30A4\u30F3\u60C5\u5831\u3067\u30E2\u30C7\u30EB\u4E00\u89A7\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\u3002\u751F\u6210\u53EF\u5426\u30FB\u5229\u7528\u4E0A\u9650\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: kind === "codex" ? "\u672C\u4F53\uFF08get_codex_model_ids\uFF09\u3068\u540C\u3058\u304F\u3001\u975E\u8868\u793A\u30FB\u5EC3\u6B62\u30E2\u30C7\u30EB\u3092\u9664\u3044\u3066\u512A\u5148\u5EA6\u9806\u306B\u4E26\u3079\u3001\u5C06\u6765\u7248\u3068 -900k \u7248\u3092\u88DC\u5B8C\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" : "\u672C\u4F53\u306B API \u4E00\u89A7\u306E\u7D5E\u308A\u8FBC\u307F\u306F\u7121\u3044\u305F\u3081\u3001\u975E\u8868\u793A\u30E2\u30C7\u30EB\u3060\u3051\u3092\u9664\u5916\u3002\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002" };
+      return kind !== "codex" ? result : decisionResult(result, id, safeDetails(idsCatalog(codexSlugs(body)), [credential.token, ...credential.account ? [credential.account] : []]), async (_reader, currentOAuthReader) => {
+        const current = await readOAuth(kind, currentOAuthReader);
+        return current?.token === credential.token && current?.account === credential.account;
+      });
     } catch (error) {
       const fallback = kind === "codex" ? await readCodexLocal(codexLocalReader).then((local) => codexFallbackCatalog(local.defaultModel, local.cacheIds)) : idsCatalog(GROK_CLI_MODELS);
       const details = safeDetails(fallback, [credential.token, ...credential.account ? [credential.account] : []]);
@@ -634,7 +642,7 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
   try {
     const headers = provider === "google" ? { "x-goog-api-key": key } : provider === "anthropic" ? { "x-api-key": key, "anthropic-version": "2023-06-01" } : { Authorization: "Bearer " + key };
     if (provider === "openai" && configured(values.openai_organization, "")) headers["OpenAI-Organization"] = values.openai_organization.trim();
-    let body = await fetch(provider, headers, void 0, signal), models, live = [];
+    let body = await fetch(provider, headers, void 0, signal), models, decisionModels = {}, live = [];
     if (provider === "google") {
       if (!Array.isArray(body.models)) throw new Error("shape");
       const entries2 = [...body.models];
@@ -652,6 +660,10 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
         if (!record(item) || typeof item.name !== "string" || item.supportedGenerationMethods !== void 0 && (!Array.isArray(item.supportedGenerationMethods) || item.supportedGenerationMethods.some((x) => typeof x !== "string"))) throw new Error("shape");
         return { name: item.name, supported_actions: item.supportedGenerationMethods ?? [], input_token_limit: item.inputTokenLimit ?? null };
       }), router);
+      decisionModels = googleCatalog(entries2.map((item) => {
+        const value = item;
+        return { name: value.name, supported_actions: value.supportedGenerationMethods ?? [], input_token_limit: value.inputTokenLimit ?? null };
+      }));
     } else {
       if (!Array.isArray(body.data)) throw new Error("shape");
       if (provider === "openai") models = withoutRetired(openaiCatalog(body.data.map((item) => {
@@ -663,6 +675,7 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
         return { id: item.id, created_at: item.created_at };
       }) }, router, now);
       else models = ollamaCatalog(body, now);
+      if (provider === "openai") decisionModels = withoutRetired(openaiCatalog(body.data, {}, now));
     }
     const secrets = secretValues(values);
     if (provider === "openai") live = Object.keys(models).filter((id2) => id2.toLowerCase().includes("realtime"));
@@ -671,7 +684,11 @@ async function probe(id, { reader, oauthReader, codexLocalReader, fetch = fetchM
       return typeof value === "string" && /^\d{4}\/\d{2}\/\d{2}$/.test(value) ? value : null;
     };
     const details = safeDetails(models, secrets), liveCandidates = [...new Set(live)].filter((id2) => /^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id2) && !secrets.some((secret) => id2.includes(secret))).slice(0, 200);
-    return { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u30E9\u30A4\u30D6\u5019\u88DC: liveCandidates, \u30E9\u30A4\u30D6\u5019\u88DC\u4F5C\u6210\u65E5: Object.fromEntries(liveCandidates.map((id2) => [id2, liveDate(id2)])), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings, \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u53D6\u5F97\u6210\u529F\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7D5E\u308A\u8FBC\u307F\u30FB\u88DC\u5B8C\u3092\u9069\u7528\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3092\u79FB\u690D\u3057\u305F\u53D6\u5F97\u30E2\u30C7\u30EB\u306E\u7D5E\u308A\u8FBC\u307F\u7D50\u679C\u3001\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002\u9759\u7684\u30FBOAuth\u5019\u88DC\u306F\u542B\u307F\u307E\u305B\u3093\u3002", \u88DC\u5B8C: ["google", "openai", "anthropic"].includes(provider) ? "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u5229\u7528\u3002\u30C6\u30B9\u30C8\u6642\u306E\u8FFD\u52A0\u53D6\u5F97\u306F\u884C\u3044\u307E\u305B\u3093\u3002" : "" };
+    const result = { ...output, \u72B6\u614B: "OK", \u30E2\u30C7\u30EB: details.map((item) => item.model_id), \u30E2\u30C7\u30EB\u8A73\u7D30: details, \u30E9\u30A4\u30D6\u5019\u88DC: liveCandidates, \u30E9\u30A4\u30D6\u5019\u88DC\u4F5C\u6210\u65E5: Object.fromEntries(liveCandidates.map((id2) => [id2, liveDate(id2)])), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings, \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u53D6\u5F97\u6210\u529F\u3002\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3068\u540C\u3058\u7D5E\u308A\u8FBC\u307F\u30FB\u88DC\u5B8C\u3092\u9069\u7528\u3002\u751F\u6210\u53EF\u5426\u30FB\u8AB2\u91D1\u72B6\u614B\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002", \u4E00\u89A7\u7BC4\u56F2: "\u5143\u306E\u30E2\u30C7\u30EB\u51E6\u7406\u3092\u79FB\u690D\u3057\u305F\u53D6\u5F97\u30E2\u30C7\u30EB\u306E\u7D5E\u308A\u8FBC\u307F\u7D50\u679C\u3001\u8868\u793A\u306F\u6700\u5927500\u4EF6\u3002\u9759\u7684\u30FBOAuth\u5019\u88DC\u306F\u542B\u307F\u307E\u305B\u3093\u3002", \u88DC\u5B8C: ["google", "openai", "anthropic"].includes(provider) ? "\u8D77\u52D5\u6642\u306E\u516C\u958BOpenRouter\u4E00\u89A7\u30AD\u30E3\u30C3\u30B7\u30E5\u3092\u5229\u7528\u3002\u30C6\u30B9\u30C8\u6642\u306E\u8FFD\u52A0\u53D6\u5F97\u306F\u884C\u3044\u307E\u305B\u3093\u3002" : "" };
+    return decisionResult(result, id, safeDetails(decisionModels, secrets), async (currentReader) => {
+      const [currentState, current] = await readConfig(currentReader);
+      return currentState === "\u8AAD\u8FBC\u6E08\u307F" && configured(current[selected.\u30AD\u30FC\u540D], id) && current[selected.\u30AD\u30FC\u540D].trim() === key && (provider !== "openai" || (configured(current.openai_organization, "") ? current.openai_organization.trim() : "") === (headers["OpenAI-Organization"] ?? ""));
+    });
   } catch (error) {
     return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "\u30E2\u30C7\u30EB\u4E00\u89A7API\u306E\u901A\u4FE1\u307E\u305F\u306F\u8A3A\u65AD\u7528\u30E2\u30C7\u30EB\u51E6\u7406\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002" + connectionFailureDescription(error), \u78BA\u8A8D\u65E5\u6642: timestamp, \u8B66\u544A: warnings };
   }

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
 import {callMcp,createModelTrials,localRequest} from '../モデル試行/trials.mjs';
 
-test('actual MCP SDK and production Chat/Code registrations return successful string results', {skip:!process.env.DIAG_TEST_PYTHON,timeout:20000},async()=>{
+test('actual MCP SDK and production Chat/Code/Decision registrations return valid results', {skip:!process.env.DIAG_TEST_PYTHON,timeout:20000},async()=>{
  const child=spawn(process.env.DIAG_TEST_PYTHON,[fileURLToPath(new URL('./fixtures/model_trials_tools.py',import.meta.url))],{stdio:['ignore','pipe','pipe'],windowsHide:true});
  let errors='';child.stderr.on('data',chunk=>errors+=chunk);
  const lines=createInterface({input:child.stdout});
@@ -33,7 +33,7 @@ test('actual MCP SDK and production Chat/Code registrations return successful st
   }
   assert.equal(wire.filter(x=>x.options.method==='DELETE').length,2);
   const trials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true})});
-  try{const start=await trials.start();for(const row of start.項目){const result=await trials.next(start.実行ID,row.id);if(['CHAT','CODE1','LIVE'].includes(row.id))assert.equal(result.状態,'OK',`${row.id}: ${result.説明}`);}}
+  try{const start=await trials.start();for(const row of start.項目){const result=await trials.next(start.実行ID,row.id);if(['CHAT','CODE1','LIVE','DECISION'].includes(row.id))assert.equal(result.状態,'OK',`${row.id}: ${result.説明}`);if(row.id==='DECISION'){assert.equal(result.判断結果,'medium');assert.equal(result.実行モデル,'freeai_chat/gemini-flash-lite-latest');}}}
   finally{await trials.close();}
  }finally{lines.close();child.kill();}
 });

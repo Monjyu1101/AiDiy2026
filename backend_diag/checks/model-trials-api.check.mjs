@@ -9,7 +9,7 @@ import {createAudioStore} from '../モデル試行/audio_store.mjs';
 import {createHandler} from '../diag_main.mjs';
 import {createModelTrials} from '../モデル試行/trials.mjs';
 
-test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body rejection and cancellation',async()=>{
+test('authenticated HTTP trial contract: 15 ordered rows, deduplication, body rejection and cancellation',async()=>{
   const config={CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr',CODE_AI1_NAME:'claude_cli',CODE_AI1_MODEL:'auto',TASK_AI_NAME:'claude_cli',TEAM_AI_NAME:'claude_cli'};
   for(let i=2;i<=6;i++)config[`CODE_AI${i}_NAME`]='auto';
   for(const family of ['TASK','TEAM'])for(const phase of ['plan','do','check'])config[`${family}_AI_MODEL_${phase}`]='auto';
@@ -23,7 +23,7 @@ test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body re
     const {id,method}=request.body;let result;
     if(method==='initialize')result={protocolVersion:'2024-11-05'};
     else if(method==='notifications/initialized')return {body:null};
-    else {assert.equal(method,'tools/call');assert.equal(request.body.params.name,request.path.includes('chat_llms')?'chat_llms_run':'code_agents_run');assert.equal(Object.hasOwn(request.body.params.arguments,'diagnostic_mode'),false);assert.equal(request.body.params.arguments.prompt,'おはよう');calls++;result={structuredContent:{status:'OK',result:'おはよう',ai_model:'chat-test',selected_model:'resolved-code'}};}
+    else {assert.equal(method,'tools/call');assert.equal(request.body.params.name,request.path.includes('decisions_check')?'decisions_check':request.path.includes('chat_llms')?'chat_llms_run':'code_agents_run');assert.equal(Object.hasOwn(request.body.params.arguments,'diagnostic_mode'),false);assert.equal(request.body.params.arguments.prompt??request.body.params.arguments.input,'おはよう');calls++;result={structuredContent:request.path.includes('decisions_check')?{status:'OK',data:{model:'freeai_chat/gemini-flash-lite-latest',answers:[{type:'choice',name:'politeness',choice:'high',confidence:1,probabilities:[{value:'high',probability:1},{value:'medium',probability:0},{value:'low',probability:0}]}]}}:{status:'OK',result:'おはよう',ai_model:'chat-test',selected_model:'resolved-code'}};}
     return {session:'synthetic-session',body:{jsonrpc:'2.0',id,result}};
   }});
   const server=http.createServer(createHandler({token:'synthetic-token',prefix:'/test/',modelTrials:trials}));
@@ -31,7 +31,7 @@ test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body re
   const base=`http://127.0.0.1:${server.address().port}/test/api/モデル試行`;
   async function call(suffix='',method='GET',authenticated=true,body){const response=await fetch(base+suffix,{method,headers:authenticated?{authorization:'Bearer synthetic-token'}:{},...(body===undefined?{}:{body})});return {status:response.status,data:await response.json()};}
   try{
-    assert.equal((await call()).data.項目.length,14);
+    assert.equal((await call()).data.項目.length,15);
     for(const [suffix,method] of [['','GET'],['/開始','POST']])assert.equal((await call(suffix,method,false)).status,401);
     assert.equal((await call('/開始','POST',true,'{}')).status,400);assert.equal(calls,0);
     const start=await call('/開始','POST');assert.equal(start.status,200);const id=start.data.実行ID;
@@ -39,7 +39,7 @@ test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body re
     assert.equal((await call(`/${id}/LIVE`,'POST')).status,409);
     for(const row of start.data.項目){const next=await call(`/${id}/${row.id}`,'POST');assert.equal(next.status,200);assert.equal(next.data.id,row.id);assert.equal(next.data.状態,'OK');if(row.id==='LIVE'){audioId=next.data.音声ファイル.id;assert.equal(next.data.音声ファイル.長さms,1000);}if(row.id==='TEAM_check')assert.equal(next.data.共有元,'CODE1');}
     const audioUrl=base+'/音声/'+audioId;assert.equal((await fetch(audioUrl)).status,401);const audio=await fetch(audioUrl,{headers:{authorization:'Bearer synthetic-token'}});assert.equal(audio.status,200);assert.equal(audio.headers.get('content-type'),'audio/wav');assert.deepEqual(Buffer.from(await audio.arrayBuffer()),wav);
-    assert.equal(calls,3);assert.equal((await call(`/${id}`,'DELETE')).status,404);
+    assert.equal(calls,4);assert.equal((await call(`/${id}`,'DELETE')).status,404);
     const again=await call('/開始','POST');assert.equal((await call(`/${again.data.実行ID}`,'DELETE')).data.状態,'中止');
     assert.equal((await call(`/${again.data.実行ID}/CHAT`,'POST')).status,404);
     assert.equal((await call('/開始/arbitrary','POST')).status,404);
@@ -47,7 +47,9 @@ test('authenticated HTTP trial contract: 14 ordered rows, deduplication, body re
     assert.equal((await call('/開始/CODE4','POST',true,'{}')).status,400);
     const single=await call('/開始/CODE4','POST');assert.equal(single.status,200);assert.deepEqual(single.data.実行順,['CODE4']);
     assert.equal((await call(`/${single.data.実行ID}/CHAT`,'POST')).status,409);
-    assert.equal((await call(`/${single.data.実行ID}/CODE4`,'POST')).data.状態,'OK');assert.equal(calls,4);
+    assert.equal((await call(`/${single.data.実行ID}/CODE4`,'POST')).data.状態,'OK');assert.equal(calls,5);
     assert.equal((await call(`/${single.data.実行ID}/CODE4`,'POST')).status,404);
+    const decision=await call('/開始/DECISION','POST');assert.equal(decision.status,200);assert.deepEqual(decision.data.実行順,['DECISION']);
+    const judgment=await call(`/${decision.data.実行ID}/DECISION`,'POST');assert.equal(judgment.data.状態,'OK');assert.equal(judgment.data.判断結果,'high');assert.equal(calls,6);
   }finally{await trials.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(temp,{recursive:true,force:true});}
 });

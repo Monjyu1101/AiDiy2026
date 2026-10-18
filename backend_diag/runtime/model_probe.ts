@@ -172,6 +172,21 @@ export async function publicCatalog({fetch=fetchMetadata,now,signal}:{fetch?:Fet
 // 認証証跡はプロセス内の非列挙 Symbol のみ。JSON・ブラウザ・保存ファイルにキーや指紋を含めない。
 // runner は bundle されるため、同一プロセスの共有 Symbol で安全化後の結果へ引き継ぐ。
 const ROUTER_PROOF=Symbol.for('aidiy.diag.openrouter-proof');
+// 判断用は公開補完前の取得一覧と認証を実行中だけ保持する。保存済みJSONは証跡にしない。
+const DECISIONS_PROOF=Symbol.for('aidiy.diag.decisions-proof');
+export function carryDecisionsProof<T extends object>(source:object,target:T):T {
+ const proof=Object.getOwnPropertyDescriptor(source,DECISIONS_PROOF);
+ if(proof)Object.defineProperty(target,DECISIONS_PROOF,proof);
+ return target;
+}
+export async function currentDecisionModels(result:unknown,id:string,reader?:Reader,oauthReader?:OAuthReader):Promise<Dictionary[]> {
+ if(!record(result)||result.状態!=='OK')return [];
+ const proof=Object.getOwnPropertyDescriptor(result,DECISIONS_PROOF)?.value;
+ return typeof proof==='function'?await proof(id,reader,oauthReader):[];
+}
+function decisionResult<T extends object>(result:T,id:string,models:Dictionary[],valid:(reader?:Reader,oauthReader?:OAuthReader)=>Promise<boolean>):T {
+ return Object.defineProperty(result,DECISIONS_PROOF,{value:async(selected:string,reader?:Reader,oauthReader?:OAuthReader)=>selected===id&&await valid(reader,oauthReader)?models.map(row=>({...row})):[]});
+}
 export function carryOpenRouterProof<T extends object>(source:object,target:T):T {
  const proof=Object.getOwnPropertyDescriptor(source,ROUTER_PROOF);
  if(proof)Object.defineProperty(target,ROUTER_PROOF,proof);
@@ -201,7 +216,10 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
    if(credential.account)headers['ChatGPT-Account-Id']=credential.account;
    const body=await fetch(kind,headers,undefined,signal);
    const details=safeDetails(kind==='codex'?codexCatalog(body):grokCatalog(body),[credential.token,...(credential.account?[credential.account]:[])]);
-   return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,警告:expired?[expiredNote]:[],説明:'OAuth のログイン情報でモデル一覧を取得しました。生成可否・利用上限は未確認です。',一覧範囲:kind==='codex'?'本体（get_codex_model_ids）と同じく、非表示・廃止モデルを除いて優先度順に並べ、将来版と -900k 版を補完。表示は最大500件。':'本体に API 一覧の絞り込みは無いため、非表示モデルだけを除外。表示は最大500件。'};
+   const result={...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,確認日時:timestamp,警告:expired?[expiredNote]:[],説明:'OAuth のログイン情報でモデル一覧を取得しました。生成可否・利用上限は未確認です。',一覧範囲:kind==='codex'?'本体（get_codex_model_ids）と同じく、非表示・廃止モデルを除いて優先度順に並べ、将来版と -900k 版を補完。表示は最大500件。':'本体に API 一覧の絞り込みは無いため、非表示モデルだけを除外。表示は最大500件。'};
+   return kind!=='codex'?result:decisionResult(result,id,safeDetails(idsCatalog(codexSlugs(body)),[credential.token,...(credential.account?[credential.account]:[])]),async(_reader,currentOAuthReader)=>{
+    const current=await readOAuth(kind,currentOAuthReader);return current?.token===credential.token&&current?.account===credential.account;
+   });
   }catch(error){
    // 本体は API で取れない場合も代替候補で続行する。OpenAI OAuth は API 一覧を使う系統なので NG とし、本体が使う候補を併せて示す。
    // Grok は本体がもともと固定候補を流し込む系統なので、固定候補を示して PASS（黄）とする。
@@ -242,23 +260,30 @@ export async function probe(id:string,{reader,oauthReader,codexLocalReader,fetch
  try {
   const headers:Record<string,string>=provider==='google'?{'x-goog-api-key':key}:provider==='anthropic'?{'x-api-key':key,'anthropic-version':'2023-06-01'}:{Authorization:'Bearer '+key};
   if(provider==='openai'&&configured(values.openai_organization,''))headers['OpenAI-Organization']=values.openai_organization.trim();
-  let body=await fetch(provider,headers,undefined,signal),models:Catalog,live:string[]=[];
+  let body=await fetch(provider,headers,undefined,signal),models:Catalog,decisionModels:Catalog={},live:string[]=[];
   if(provider==='google'){
    if(!Array.isArray(body.models))throw new Error('shape');const entries=[...body.models];let token=body.nextPageToken,pages=1;
    while(token){if(pages>=20)throw new Error('pages');body=await fetch(provider,headers,token,signal);if(!Array.isArray(body.models))throw new Error('shape');entries.push(...body.models);token=body.nextPageToken;pages++;}
    live=entries.filter(item=>record(item)&&typeof item.name==='string'&&Array.isArray(item.supportedGenerationMethods)&&item.supportedGenerationMethods.includes('bidiGenerateContent')).map(item=>String((item as Dictionary).name).replaceAll('models/',''));
    models=googleCatalog(entries.map(item=>{if(!record(item)||typeof item.name!=='string'||(item.supportedGenerationMethods!==undefined&&(!Array.isArray(item.supportedGenerationMethods)||item.supportedGenerationMethods.some(x=>typeof x!=='string'))))throw new Error('shape');return {name:item.name,supported_actions:item.supportedGenerationMethods??[],input_token_limit:item.inputTokenLimit??null};}),router);
+   decisionModels=googleCatalog(entries.map(item=>{const value=item as Dictionary;return {name:value.name as string,supported_actions:(value.supportedGenerationMethods??[]) as string[],input_token_limit:value.inputTokenLimit??null};}));
   }else {
    if(!Array.isArray(body.data))throw new Error('shape');
    if(provider==='openai')models=withoutRetired(openaiCatalog(body.data.map(item=>{if(!record(item)||typeof item.id!=='string'||typeof item.created!=='number')throw new Error('shape');return {id:item.id,created:item.created};}),router,now));
    else if(provider==='anthropic')models=claudeCatalog({data:body.data.map(item=>{if(!record(item)||typeof item.id!=='string')throw new Error('shape');return {id:item.id,created_at:item.created_at};})},router,now);
    else models=ollamaCatalog(body,now);
+   if(provider==='openai')decisionModels=withoutRetired(openaiCatalog(body.data as {id:string;created:number}[],{},now));
   }
   const secrets=secretValues(values);
   if(provider==='openai')live=Object.keys(models).filter(id=>id.toLowerCase().includes('realtime'));
   const liveDate=(id:string)=>{const value=provider==='google'?router[`google/${id}`]?.作成日:models[id]?.作成日;return typeof value==='string'&&/^\d{4}\/\d{2}\/\d{2}$/.test(value)?value:null;};
   const details=safeDetails(models,secrets),liveCandidates=[...new Set(live)].filter(id=>/^~?[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$/.test(id)&&!secrets.some(secret=>id.includes(secret))).slice(0,200);
-  return {...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,ライブ候補:liveCandidates,ライブ候補作成日:Object.fromEntries(liveCandidates.map(id=>[id,liveDate(id)])),確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
+  const result={...output,状態:'OK',モデル:details.map(item=>item.model_id!),モデル詳細:details,ライブ候補:liveCandidates,ライブ候補作成日:Object.fromEntries(liveCandidates.map(id=>[id,liveDate(id)])),確認日時:timestamp,警告:warnings,説明:'モデル一覧API取得成功。元のモデル処理と同じ絞り込み・補完を適用。生成可否・課金状態は未確認です。',一覧範囲:'元のモデル処理を移植した取得モデルの絞り込み結果、表示は最大500件。静的・OAuth候補は含みません。',補完:['google','openai','anthropic'].includes(provider)?'起動時の公開OpenRouter一覧キャッシュを利用。テスト時の追加取得は行いません。':''};
+  return decisionResult(result,id,safeDetails(decisionModels,secrets),async currentReader=>{
+   const [currentState,current]=await readConfig(currentReader);
+   return currentState==='読込済み'&&configured(current[selected.キー名],id)&&(current[selected.キー名] as string).trim()===key
+    &&(provider!=='openai'||(configured(current.openai_organization,'')?current.openai_organization.trim():'')===(headers['OpenAI-Organization']??''));
+  });
  }catch(error){return {...output,状態:'NG',説明:'モデル一覧APIの通信または診断用モデル処理に失敗しました。'+connectionFailureDescription(error),確認日時:timestamp,警告:warnings};}
 }
 // 表示名は固定の文字種・長さだけを通し、キー値を含むものは出さない（メール・組織・トークン名は返さない）。

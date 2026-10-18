@@ -46,7 +46,7 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
     // Live の音声はサーバー側の保存期限（10分）があるため、受け取った時点で取得し、再生ボタンですぐ聴けるようにする。
     if(result.音声ファイル)void 音声.読込(結果.value[item.id]);
     for(const id of 対象)完了.add(id);
-    if(result.状態==='中止'){通知.value=result.説明||'試行を中止しました。';return;}
+    if(result.状態==='中止'||result.実行終了===true){通知.value=result.説明||'試行を中止しました。';return;}
    }
    通知.value='試行が完了しました。';
   }catch(error){

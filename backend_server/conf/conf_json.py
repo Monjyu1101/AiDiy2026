@@ -76,11 +76,6 @@ class conf_json:
         'CHAT_LOCAL_MODEL': 'google/gemma-4-E2B-it',
         'CHAT_LOCAL_DTYPE': 'bfloat16',
 
-        # DecisionAI設定（OAuthとDecisions APIでモデル設定を分離）
-        'DECISION_AI_NAME': 'openai_oauth',
-        'DECISION_OPENAI_MODEL': 'gpt-6-luna',
-        'DECISION_OAUTH_MODEL': 'gpt-6-luna',
-
         # LiveAI設定
         'LIVE_AI_NAME': 'freeai_live',
         'LIVE_GEMINI_MODEL': 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -89,6 +84,14 @@ class conf_json:
         'LIVE_FREEAI_VOICE': 'Zephyr',
         'LIVE_OPENAI_MODEL': 'gpt-realtime-2.1-mini',
         'LIVE_OPENAI_VOICE': 'marin',
+
+        # DecisionAI設定（共通の既定値と方式別のフォールバック）
+        'DECISION_AI_NAME': 'auto',
+        'DECISION_AI_MODEL': 'auto',
+        'DECISION_OPENAI_MODEL': 'gpt-6-luna',
+        'DECISION_OAUTH_MODEL': 'gpt-6-luna',
+        'DECISION_FREEAI_MODEL': 'gemini-flash-lite-latest',
+        'DECISION_GEMINI_MODEL': 'gemini-3.8-flash',
 
         # CodeAI設定
         'CODE_BASE_PATH': '../',

@@ -257,7 +257,7 @@ Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環�
 
 ## 設定モデル（手動のみ）
 
-Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の現在の CHAT / LIVE / CODE1〜6 / TASK plan・do・check / TEAM plan・do・check の14行へ、固定の「おはよう」を順番に送ります。設定ファイルは読み取りだけで、既存 conf クラスの初期化・補完保存は行いません。CODE2〜6 の NAME=auto は CODE1 の NAME と MODEL を継承します。モデルや音声だけを表示し、キーや作業パスは返しません。
+Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の現在の CHAT / LIVE / CODE1〜6 / TASK plan・do・check / TEAM plan・do・check の15行へ、固定の「おはよう」を順番に送ります。設定ファイルは読み取りだけで、既存 conf クラスの初期化・補完保存は行いません。CODE2〜6 の NAME=auto は CODE1 の NAME と MODEL を継承します。モデルや音声だけを表示し、キーや作業パスは返しません。
 
 見出し行の「再読込」で一覧を更新し、各項目の「テスト」でその1行だけ、または「動作確認」で全行を確認できます。同一設定の共有対象はサーバーが返し、その全行を同時に「テスト中」・結果へ更新します。個別テストでは設定版が同じ他の行のテキスト結果を残しますが、以前の音声は次の開始時に失効します。
 
@@ -267,8 +267,42 @@ Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の�
 - 同じ実行内で transport・プロバイダ・モデル・音声と設定版が同じ行だけ結果を共有します。Chat と Live は共有しません。auto は動的選択のまま渡し、実行モデルが返らなければ未確認として表示します。
 - 空応答・エラー・未設定・未対応は OK にしません。API キーの利用と料金が発生する場合があります。開始は利用者の明示操作だけで、起動・タブ表示・headless・既存「全テスト」から実行しません。
 - 認証付き GET `/api/モデル試行` は表示情報だけ、POST `/api/モデル試行/開始` は一時実行を作成し、POST `/api/モデル試行/{実行ID}/{行ID}` は順序を確認して1行だけ実行します。いずれも利用者指定の本文・URL・プロンプトを受け付けません。DELETE `/api/モデル試行/{実行ID}`、画面切断、タイムアウトで中止し、MCP セッションを破棄します。設定変更時は結果を流用せず再開始します。
-- 個別テストは POST `/api/モデル試行/開始/{行ID}` で1行の実行順を作成します。行IDは上記14役割のみ受け付け、全件と同じ認証・Tools接続・設定版・重複判定・中止処理を使います。
+- 個別テストは POST `/api/モデル試行/開始/{行ID}` で1行の実行順を作成します。行IDは上記15役割のみ受け付け、全件と同じ認証・Tools接続・設定版・重複判定・中止処理を使います。
 - MCP SDK は文字列戻り値を `structuredContent.result` に包むため、その中の JSON を解析して `status` と応答を判定します。オブジェクト形式の `structuredContent` と従来の `content[].text` にも対応します。外側の MCP 成功だけで会話を OK にしません。
-- 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。14行、継承、重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
+- 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。15行、継承、重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
 - 実 SDK 契約確認: Tools と同じ `mcp>=2,<3`・FastAPI・uvicorn を持つ Python を環境変数 `DIAG_TEST_PYTHON` に指定し、`node --test backend_diag/checks/model-trials-sdk.check.mjs` を実行します。実際の Chat / Code ツール登録と MCP SDK の初期化・セッション・SSE・文字列結果、実 Live 内部 HTTP ルートを一時 loopback サーバーで検証します。モデル実行と Live アダプターだけを合成し、キー・有料 API・稼働中の Tools は使いません。環境変数未指定時はこの契約テストをスキップします。
 - 行別ボタンと配色は `node --test backend_diag/checks/status-badge.check.cjs backend_diag/ui/src/設定モデル/checks/設定モデル.check.cjs` で確認します。実ブラウザの任意確認は `node backend_diag/checks/model-trials-browser.mjs`。既存 Chrome / Edge（必要なら `CHROME_PATH`）を使い、合成データで1回だけの実行・共有表示・見出し配置・狭幅を確認し、`temp/diag-trial-browser/`（`DIAG_SCREENSHOT_DIR` で変更可）へ画像と結果を保存します。
+
+## 判断用モデル一覧
+
+`モデル情報/decisions_info.mjs` が `_AIDIY/aidiy_diag/decisions_models_info.json` を生成する。既存の `*_models_info.json` 命名を使用し、`desisions_model_info.json` は作成しない。スキーマは `{openai_oauth: {models: {モデルID: 表示名}}, openai_decisions: ..., freeai_chat: ..., gemini_chat: ...}`。表示名は `YYYY/MM/DD - ID`、取得日が不明なら `yyyy/mm/dd - ID`。認証付き一覧を取得できた方式だけを含める。
+
+- 既存のキー確認と同じGET・ページング・proxy/TLS・制限時間・キャンセルを使い、追加の生成API試行は行わない。判断用の元一覧は公開補完前に分離する。OpenAIは既存の240日・廃止モデル除外、OAuthはAPIが返した表示対象IDのみ、GoogleはgenerateContent対応モデルから候補を作る。明らかな音声・画像・Live・埋込などの専用モデルを除く。JSON/Decisions対応の保証ではなく、実行可否はToolsの既存起動チェックで確認する。
+- 公開OpenRouter一覧・同梱キャッシュ・OAuthの固定候補・将来版や900kの合成候補・設定モデルからの補完は行わない。認証の証跡は実行中のメモリだけに保持し、キー値や指紋をJSONへ保存しない。
+- 書込時に現在のキー（OpenAIは組織も）またはOAuthトークン・アカウントが取得時と一致することを確認する。キー変更・削除、一覧取得失敗、旧JSONだけが残っている状態は候補にしない。個別確認後は同じDiag実行内で保持する他方式の有効な取得結果を使うが、再起動や設定再読込後は再確認が必要。
+- FreeAI/Geminiは判断実行と同じ優先キーを使い、優先キー未設定時だけ他方の認証付き取得結果を代用する。キーが設定済みで認証に失敗した場合は代用しない。
+- 空の方式は省略し、全方式が空なら `{}` を保存する。設定・autoの選択順・方式別既定値は書き換えない。生成確認済みの利用可能モデルとこの候補一覧を混同しない。
+- headlessと画面のモデル書込は共通処理で生成し、保存先一覧にもファイル名を含める。Pythonの読込口は `conf_models.get_decisions_models()`。4方式への設定画面拡張は保留している。
+- モック検証: `node --test backend_diag/checks/decisions-info.check.mjs`。4方式、認証変更、公開/固定/旧保存候補の排除、キー代用、失敗・空一覧、共通書込とheadlessの保存先を確認する。
+
+### FreeAI判断の固定モデル（2026-10-18）
+
+autoの優先順は `openai_oauth` → `freeai_chat` → `openai_decisions` → `gemini_chat`。起動チェックに成功した方式だけを優先対象にする。
+
+FreeAI判断は公式alias `gemini-flash-lite-latest` に固定する。明示 `model` / `ai_model`、共通 `DECISION_AI_MODEL`、互換 `DECISION_FREEAI_MODEL` に他モデルがあっても実行モデルは変えない。結果・起動チェック・設定診断にも固定IDを返す。設定JSONの既存値は保持し、Gemini・OpenAI等の他方式は従来の指定優先順を維持する。
+
+[Google公式alias説明](https://developers.googleblog.com/en/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/) でIDを確認した。最新への追従はGoogle側のalias更新を利用し、番号を推測・並べ替えしてモデルを生成しない。[公式モデル一覧](https://ai.google.dev/gemini-api/docs/models) では現時点の安定版Flash-Liteは `gemini-3.5-flash-lite`。latestは安定版専用aliasではなくプレビュー等を指す場合もあるため、現在の解決先バージョンはこの実装で断定しない。
+
+Diagの `freeai_chat.models` は、認証付きGET一覧に `gemini-flash-lite-latest` 自体がgenerateContent対応として含まれた場合だけ、その1候補を保存する。バージョン付きFlash-Lite・公開一覧・設定値からaliasを補わない。未取得・認証なし・取得失敗・alias不在ならFreeAI区分を省略する。空一覧でも固定実行モデルと既存の生成起動チェックは変更しない。
+
+## 判断モデルの手動試行
+
+設定モデル動作確認のLIVE直後に `DECISION / 挨拶の丁寧さ` を表示する。個別「テスト」と全体「動作確認」の両方で、既存MCP `/aidiy_decisions_check/mcp` の `decisions_check` を呼ぶ。HTTP `/check` への代替直結は行わない。Tools接続中の明示操作に限定し、headless・起動・全診断では実行しない。
+
+`DECISION_AI_NAME` / `DECISION_AI_MODEL` を使用し、不足時はauto。FreeAI明示時は `gemini-flash-lite-latest` 固定。他方式やautoの解決は既存判断サービスに委ね、OAuth → FreeAI → Decisions API → Geminiの順を維持する。
+
+入力は「おはよう」、質問は挨拶としての丁寧さ、choice名は `politeness`、選択肢は `high / medium / low`。3値すべてを正常な選択として受け付け、特定値を正解とはしない。MCPのJSON内のstatus、回答名・型・選択値、3候補の確率分布・合計、confidenceを検証する。不正JSON・欠落・未知選択肢・通信エラーはNG。結果詳細に選択値と検証済みJSON、実際の実行モデルを表示する。
+
+Chat/Live/Codeと判断結果は共有しない。MCPの初期化・セッション破棄、設定変更による結果破棄、既存のタイムアウトを共用する。判断の行期限を超えた場合はNGと理由を表示し、その全体実行を終了する。ユーザーによる中止は従来の中止表示を維持する。
+
+検証は `checks/decision-trials.check.mjs`、既存モデル試行/API/音声/UIテスト、`DIAG_TEST_PYTHON` を指定する実MCP SDK fixtureで行う。fixtureの生成APIはMockTransportへ置換し、外部の生成サービスを使わない。Web/Avatarの設定画面拡張の保留とは別に、このDiag試行UIは実装済み。

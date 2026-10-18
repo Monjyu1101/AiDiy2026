@@ -16,20 +16,27 @@
 |---|---|---|
 | `openai_decisions/gpt-6-luna` | `AI判断_openai_decisions.py` | `https://api.openai.com/v1/decisions`、`openai_key_id` |
 | `openai_oauth/gpt-6-luna` | `AI判断_openai_jsonchat.py` | `https://chatgpt.com/backend-api/codex/responses`、Codex OAuth |
+| `freeai_chat/gemini-flash-lite-latest` | `AI判断_freeai_jsonchat.py` | Google generateContent JSON、`freeai_key_id`優先 |
+| `gemini_chat/gemini-3.8-flash` | `AI判断_gemini_jsonchat.py` | Google generateContent JSON、`gemini_key_id`優先 |
 
 `openai_jsonchat` は `openai_oauth` の別名として受け付ける。`ai_name` / `ai_model` での個別指定も可能。結合形式との矛盾や未知のプロバイダはエラーにする。明示指定した方式から別方式へ自動フォールバックしない。
 
-プロバイダ未指定（空欄 / `auto`）では、起動チェックに成功した `openai_oauth` を優先し、利用不可なら成功した `openai_decisions` を使う。利用可否未確認の直接利用時は `DECISION_AI_NAME` を参照する。実行中の通信エラーによる再送・方式変更は行わない。
+プロバイダ未指定（空欄 / `auto`）では `DECISION_AI_NAME` を使う。設定も空欄 / `auto` なら、起動チェックに成功した `openai_oauth` を優先し、利用不可なら成功した `freeai_chat` → `openai_decisions` → `gemini_chat` の順で使う。利用可否未確認の直接利用時は `openai_oauth` を使う。引数や設定で指定した方式からの自動変更、実行中の通信エラーによる再送は行わない。
 
-モデルの `auto` は選択方式の設定済み既定モデルを使う。設定自体も空欄 / `auto` ならプロバイダ定義の既定値（現在は `gpt-6-luna`）を使う。CLIと異なりAPIにはモデル名が必須なので、省略せず具体名を送る。`decisions_config.default_model` で自動選択先を確認できる。
+モデル未指定（空欄 / `auto`）では `DECISION_AI_MODEL` を使う。設定も空欄 / `auto` なら選択方式の `DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_FREEAI_MODEL` / `DECISION_GEMINI_MODEL`、それも空欄 / `auto` ならプロバイダ定義の既定値（OpenAI系は `gpt-6-luna`、Google系は `gemini-3.8-flash`）を使う。明示した `model` / `ai_model` は設定より優先する。CLIと異なりAPIにはモデル名が必須なので、具体名へ解決して送る。`decisions_config.configured_defaults` でNAME / MODEL設定、`default_model` で解決後の選択先を確認できる。
 
-`AiDiy_key.json` の設定は `conf/conf_json.py` の既定値と同期する。
+`AiDiy_key.json` の設定は `conf/conf_json.py` の既定値と同期し、LIVE設定ブロックの直後に保存する。不足したNAME / MODELキーは `auto` で補完する。設定管理を経由せず旧ファイルを直接読んだ場合も、不足キーを `auto` と扱う。既存の値や方式別モデル設定は上書きしない。
 
 | キー | 既定値 |
 |---|---|
-| `DECISION_AI_NAME` | `openai_oauth` |
+| `DECISION_AI_NAME` | `auto` |
+| `DECISION_AI_MODEL` | `auto` |
 | `DECISION_OPENAI_MODEL` | `gpt-6-luna` |
 | `DECISION_OAUTH_MODEL` | `gpt-6-luna` |
+| `DECISION_FREEAI_MODEL` | `gemini-flash-lite-latest`（互換キー。FreeAI判断は値に関係なく固定） |
+| `DECISION_GEMINI_MODEL` | `gemini-3.8-flash` |
+
+`DECISION_AI_NAME` には `auto` / `openai_oauth` / `openai_decisions` / `freeai_chat` / `gemini_chat`、`DECISION_AI_MODEL` には `auto` またはモデル名だけ（例: `gpt-6-luna`）を指定する。`provider/model` の結合形式は呼出し引数 `model` 用。NAMEとMODELは独立して補完するため、引数でNAMEだけを変更した場合も、MODEL未指定なら共通設定を使う。
 
 OAuthは既存の `AIチャット_openai._oauth_access_token` を呼び、Hermes / Codex共有ストアの更新処理・排他制御を共用する。トークンを独自保存しない。backend_server / backend_tools の環境には `httpx` と、Hermes設定読込用の `PyYAML` が必要。
 
@@ -37,7 +44,7 @@ OAuthは既存の `AIチャット_openai._oauth_access_token` を呼び、Hermes
 
 `backend_tools/tools_main.py` のFastAPI lifespanで `Decision.check_availability()` を1回実行する。モジュールimport時やbackend_serverの起動時には重複実行しない。
 
-- 各プロバイダの既定モデルに「おはよう」を渡し、`choice` で「挨拶 / その他」へ分類する。共通の応答検証を通過し「挨拶」が返れば利用可能とする。
+- 各プロバイダの既定モデル（`DECISION_AI_MODEL` を優先し、`auto` なら方式別設定）に「おはよう」を渡し、`choice` で「挨拶 / その他」へ分類する。共通の応答検証を通過し「挨拶」が返れば利用可能とする。
 - APIキーが空欄・空白・`<`始まりのひな形・空引用符（`""` / `“”`等）の場合は、通信せず利用不可にする。OAuthはキーの有無で判定せず実行確認する。
 - 方式ごとに最大15秒、並行してチェックする。認証・課金・通信・JSON形式の失敗、回答拒否、期待結果の不一致は利用不可。失敗しても他MCPの起動を止めない。
 - 起動ログに方式・モデル・利用可能/不可・理由を出す。`decisions_config` とHTTP `/config` の `availability` に `ok/model/reason/answer/checked_at/elapsed_ms`、`available_models` に成功したモデルを返す。未実行時は `availability_checked=false`。
@@ -90,7 +97,7 @@ answers = response.json()["data"]["answers"]
 
 成功レスポンスは `status/message/data`、`data` に `ai_name`, `ai_model`, `model`, `method`, `answers`, `usage`, `elapsed_ms` を持つ。`answers` は質問順へ整列する。
 
-OAuth側は Responses の `text.format.type=json_schema`, `strict=true` を使う。両経路とも回答名・型・候補の一致、確率の範囲と合計、段階評価の加重平均を検証する。JSON不正・途中切断・タイムアウト・未完了は成功として返さない。HTTP入力不正は422、処理エラーは400と `status=NG`。MCPではToolErrorを返す。
+OAuth側は Responses の `text.format.type=json_schema`, `strict=true` を使う。全経路とも回答名・型・候補の一致、確率の範囲と合計、段階評価の加重平均を検証する。JSON不正・途中切断・タイムアウト・未完了は成功として返さない。HTTP入力不正は422、処理エラーは400と `status=NG`。MCPではToolErrorを返す。
 
 互換なのは入出力形式である。OAuth側の確率・confidenceは生成モデルの推定値で、Decisions APIと同じ校正値や実測頻度を保証しない。方式別に閾値を評価する。`method` は `decisions_api` または `responses_json_schema`。
 
@@ -112,3 +119,27 @@ backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_tools/tes
 実接続では同一入力と3種の質問を両方式に送り、名前・型・候補が一致することを確認する。数値の完全一致は要件にしない。APIキー・OAuthトークンを出力に残さず、認証エラーと入力不正を区別して確認する。
 
 参考: [Decisions API](https://developers.openai.com/api/docs/guides/decisions)、[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)。
+
+## Gemini / FreeAI のJSON判断
+
+両方式は `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` にJSON Schemaと質問を渡す。優先キーが未設定（空欄・ひな形・空引用符）の場合だけ他方のキーを代用し、認証失敗時に別キーで再試行しない。モデルはChat用画像モデルから流用せず判断用の設定を使う。共有httpx clientの環境proxy・TLS・timeoutを利用する。
+
+`generationConfig.responseMimeType=application/json` と `responseJsonSchema` を指定し、完了理由 `STOP` の1候補だけを受け付ける。思考部分を除いた本文をJSONとして読み、共通の回答検証を通す。拒否・打切り・JSONコードフェンス・欠落・型不一致は成功扱いしない。確率とconfidenceはOAuthと同じく生成モデルの推定値で、Decisions APIと同じ校正値ではない。仕様は [Google structured output](https://ai.google.dev/gemini-api/docs/structured-output) と [generateContent](https://ai.google.dev/api/generate-content) を参照。
+
+## Diagの判断モデル情報
+
+`_AIDIY/aidiy_diag/decisions_models_info.json` を `conf_models.get_decisions_models()` で読む。形式は `{方式名: {models: {モデルID: 表示名}}}`。4方式のうち認証付き取得候補があるものだけを保存する。詳細は [Diag運用](./backend_diag,環境診断運用.md) を参照。
+
+候補のない方式は省略、全体が空なら `{}`。ファイル未作成・不正も読込口では空一覧として扱う。設定値や方式別既定モデルは変更せず、明示引数 > 共通設定 > 方式別設定 > 方式既定値の順と既存の生成起動チェックを維持する。Diagの候補と `decisions_config.available_models`（生成確認済み）は別の意味を持つ。
+
+Web/Avatar設定画面の4方式対応と、Diag一覧を画面の候補へ接続する作業は別途行う。
+
+### FreeAI判断の固定モデル（2026-10-18）
+
+autoの優先順は `openai_oauth` → `freeai_chat` → `openai_decisions` → `gemini_chat`。起動チェックに成功した方式だけを優先対象にする。
+
+FreeAI判断は公式alias `gemini-flash-lite-latest` に固定する。明示 `model` / `ai_model`、共通 `DECISION_AI_MODEL`、互換 `DECISION_FREEAI_MODEL` に他モデルがあっても実行モデルは変えない。結果・起動チェック・設定診断にも固定IDを返す。設定JSONの既存値は保持し、Gemini・OpenAI等の他方式は従来の指定優先順を維持する。
+
+[Google公式alias説明](https://developers.googleblog.com/en/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/) でIDを確認した。最新への追従はGoogle側のalias更新を利用し、番号を推測・並べ替えしてモデルを生成しない。[公式モデル一覧](https://ai.google.dev/gemini-api/docs/models) では現時点の安定版Flash-Liteは `gemini-3.5-flash-lite`。latestは安定版専用aliasではなくプレビュー等を指す場合もあるため、現在の解決先バージョンはこの実装で断定しない。
+
+Diagの `freeai_chat.models` は、認証付きGET一覧に `gemini-flash-lite-latest` 自体がgenerateContent対応として含まれた場合だけ、その1候補を保存する。バージョン付きFlash-Lite・公開一覧・設定値からaliasを補わない。未取得・認証なし・取得失敗・alias不在ならFreeAI区分を省略する。空一覧でも固定実行モデルと既存の生成起動チェックは変更しない。

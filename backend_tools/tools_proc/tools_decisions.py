@@ -53,17 +53,20 @@ def register_tools(mcp, decisions):
 
         model: openai_decisions/gpt-6-luna（APIキー）または
         openai_oauth/gpt-6-luna（Codex OAuthのResponses JSON Schema）。
-        ai_name / model / ai_modelの省略・autoは自動/既定値。
-        プロバイダ未指定時は起動チェック成功のopenai_oauthを優先し、
-        利用不可ならopenai_decisionsを選ぶ。明示プロバイダは変更しない。
-        APIには具体的なモデル名が必要なのでautoは既定モデル名に解決する。
+        freeai_chat/gemini-flash-lite-latest / gemini_chat/gemini-3.8-flashもJSON判断に対応。
+        明示引数を優先し、省略・autoはAiDiy_key.jsonの
+        DECISION_AI_NAME / DECISION_AI_MODELを参照する。
+        NAME設定もautoなら起動チェック成功のopenai_oauthを優先し、
+        次にfreeai_chat、openai_decisions、gemini_chatの順。明示プロバイダは変更しない。
+        FreeAIは明示model・設定値に関係なくgemini-flash-lite-latest固定。
+        他方式はMODEL設定もautoなら方式別の既定モデル名に解決する。
         questions: type・name・instructionsを持つ配列。
         type=predicate は真の確率、choice はchoices=[{value,description}]、
         score はlevels=[{label,description}]を指定する。nameは一意。
         input: テキスト、またはuserメッセージ配列（input_text / input_image）。
         画像はdata:image/...;base64,...のみ。URLやファイルIDは不可。
         戻り値はstatus/message/data。data.answersは共通形式。
-        OAuth側の確率は生成モデルの推定で、Decisions APIと同じ校正値ではない。
+        OAuth / FreeAI / Geminiの確率は生成モデルの推定で、Decisions APIと同じ校正値ではない。
         """
         if not decisions.get_availability_status()["available"]:
             raise ToolError(decisions.get_availability_status()["message"])

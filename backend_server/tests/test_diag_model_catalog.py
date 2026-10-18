@@ -98,6 +98,17 @@ class DiagModelCatalogTest(unittest.TestCase):
         self.write("live", {})
         self.assertEqual(self.models.get_live_models(), {})
 
+    def test_decisions_catalog_refreshes_without_synthetic_defaults_or_setting_changes(self):
+        settings = {"DECISION_AI_NAME": "auto", "DECISION_AI_MODEL": "custom"}
+        self.assertEqual(self.models.get_decisions_models(), {})
+        self.write("decisions", {"freeai_chat": {"models": {"gemini-test": "取得済み"}}, "openai_oauth": {"models": {"gpt-test": "OAuth"}}})
+        self.assertEqual(self.models.get_decisions_models(), {"freeai_chat": {"gemini-test": "取得済み"}, "openai_oauth": {"gpt-test": "OAuth"}})
+        self.assertEqual(self.models.normalize_initial_settings(settings), settings)
+        for value in ({}, {"bad": {"models": []}}, {"bad": {"models": {"model": False}}}):
+            self.write("decisions", value)
+            self.assertEqual(self.models.get_decisions_models(), {})
+            self.assertEqual(self.models.normalize_initial_settings(settings), settings)
+
     def test_loading_never_creates_or_updates_model_configs_and_never_fetches(self):
         config = Path(self.temp.name) / "_config"
         old = config / "AiDiy_code_codex_cli.json"

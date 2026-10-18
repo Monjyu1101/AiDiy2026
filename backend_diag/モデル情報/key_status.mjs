@@ -1,6 +1,6 @@
 // 設定値を返さず、UI用の固定スキーマだけを公開する。
 import {oauthModelFallback} from './model_fallbacks.mjs';
-import {KEY_PROVIDERS,INTEGRATION_PROBES,carryOpenRouterProof} from '../runtime/model_probe.mjs';
+import {KEY_PROVIDERS,INTEGRATION_PROBES,carryOpenRouterProof,carryDecisionsProof} from '../runtime/model_probe.mjs';
 import {runModels,cancelKeyProbes,createModelRunner} from '../runtime/model_runner.mjs';
 export {KEY_PROVIDERS,INTEGRATION_PROBES,runModels,cancelKeyProbes,createModelRunner};
 const reason=code=>({timeout:'モデル確認がタイムアウトしました。',output:'モデル確認の応答が上限を超えました。',busy:'別のキー確認が実行中です。',stopped:'診断を終了しました。'}[code] || 'モデル確認処理を利用できません。配布ファイルと通信状態を確認してください。');
@@ -25,5 +25,5 @@ export async function testKey(id,options={}) {
   const models=[...new Set(data.モデル.filter(v=>typeof v==='string' && /^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(v)))].slice(0,500);
   const details=Array.isArray(data.モデル詳細)?data.モデル詳細.filter(row=>row && models.includes(row.model_id)).slice(0,500).map(row=>({model_id:row.model_id,作成日:text(row.作成日,20),トークン数:text(String(row.トークン数 ?? ''),30),モダリティ:text(row.モダリティ,200)})):[];
   const safe = carryOpenRouterProof(data,{...result,認証確認:data.認証確認===true,状態:data.状態,説明:text(data.説明),モデル:models,モデル詳細:details,確認日時:typeof data.確認日時==='string' && Number.isFinite(Date.parse(data.確認日時))?data.確認日時:null,一覧範囲:text(data.一覧範囲),ライブ候補作成日:data.ライブ候補作成日&&typeof data.ライブ候補作成日==='object'&&!Array.isArray(data.ライブ候補作成日)?Object.fromEntries(Object.entries(data.ライブ候補作成日).filter(([id,date])=>/^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(id)&&(date===null||/^\d{4}\/\d{2}\/\d{2}$/.test(date))).slice(0,200)):{},ライブ候補:Array.isArray(data.ライブ候補)?data.ライブ候補.filter(v=>typeof v==='string' && /^~?[a-zA-Z0-9][a-zA-Z0-9._:/@+\-]{0,199}$/.test(v)).slice(0,200):[],補完:text(data.補完),警告:Array.isArray(data.警告)?data.警告.map(v=>text(v)).slice(0,5):[]});
-  return oauthModelFallback(safe);
+  return carryDecisionsProof(data,oauthModelFallback(safe));
 }

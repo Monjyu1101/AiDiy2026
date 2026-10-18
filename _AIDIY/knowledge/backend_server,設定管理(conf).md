@@ -77,7 +77,7 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |
 | ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OPENAI_MODEL`, `CHAT_OLLAMA_MODEL`, `CHAT_LOCAL_MODEL` |
-| DecisionAI | `DECISION_AI_NAME`, `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
+| DecisionAI | LIVE設定ブロックの直後に `DECISION_AI_NAME`, `DECISION_AI_MODEL`（初期値はともに `auto`）。方式別の予備設定は `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`, `DECISION_FREEAI_MODEL`, `DECISION_GEMINI_MODEL`（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
 | LiveAI | `LIVE_AI_NAME`, `LIVE_GEMINI_MODEL/VOICE`, `LIVE_FREEAI_MODEL/VOICE`, `LIVE_OPENAI_MODEL/VOICE` |
 | CodeAI | `CODE_BASE_PATH`, `CODE_AI1~6_NAME/MODEL`, `CODE_CLAUDE_SDK_MODEL`, `CODE_MAX_TURNS`, `CODE_PLAN`, `CODE_VERIFY` |
 | TaskAI / TeamAI | `TASK_AI_NAME`, `TEAM_AI_NAME`, `TASK_AI_MODEL_plan/do/check`, `TEAM_AI_MODEL_plan/do/check`（各フェーズを別キーで保持） |

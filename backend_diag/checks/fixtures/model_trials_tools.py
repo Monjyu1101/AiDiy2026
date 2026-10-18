@@ -9,6 +9,7 @@ import sys
 import types
 from unittest.mock import patch
 
+import httpx
 import uvicorn
 from fastapi import FastAPI
 from mcp.server.mcpserver import MCPServer
@@ -18,7 +19,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "backend_tools"))
 # Import the production registrations without creating real service logs.
 sys.modules["log_config"] = types.SimpleNamespace(get_logger=logging.getLogger)
-from tools_proc import tools_agents, tools_chat
+from tools_proc import tools_agents, tools_chat, tools_decisions
+from tools_proc.decisions_check import Decision
 from tools_proc.live_model_check import LiveModelCheck, register_live_model_check
 
 
@@ -68,6 +70,17 @@ async def main():
     chat, code = MCPServer("aidiy_chat_llms"), MCPServer("aidiy_code_agents")
     tools_chat.register_tools(chat, Model())
     tools_agents.register_tools(code, Model())
+    decision = MCPServer("aidiy_decisions_check")
+    def judgment(req):
+        assert req.url.host == "generativelanguage.googleapis.com"
+        assert req.url.path.endswith("/gemini-flash-lite-latest:generateContent")
+        value = {"answers": [{"type": "choice", "name": "politeness", "choice": "medium", "confidence": 1,
+            "probabilities": [{"value": "high", "probability": 0}, {"value": "medium", "probability": 1}, {"value": "low", "probability": 0}]}]}
+        return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": json.dumps(value)}]}}]})
+    service = Decision(config={"DECISION_AI_NAME": "freeai_chat", "freeai_key_id": "synthetic-only"}, transport=httpx.MockTransport(judgment))
+    service.availability = {"freeai_chat": {"ok": True, "model": "gemini-flash-lite-latest"}}
+    tools_decisions.register_tools(decision, service)
+    decision_app = decision.streamable_http_app()
     chat_app, code_app = chat.streamable_http_app(), code.streamable_http_app()
 
     @asynccontextmanager
@@ -75,9 +88,10 @@ async def main():
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(chat.session_manager.run())
             await stack.enter_async_context(code.session_manager.run())
+            await stack.enter_async_context(decision.session_manager.run())
             yield
 
-    app = FastAPI(routes=[Mount("/aidiy_chat_llms", chat_app), Mount("/aidiy_code_agents", code_app)], lifespan=lifespan)
+    app = FastAPI(routes=[Mount("/aidiy_chat_llms", chat_app), Mount("/aidiy_code_agents", code_app), Mount("/aidiy_decisions_check", decision_app)], lifespan=lifespan)
     register_live_model_check(app, LiveModelCheck(factory=Live, sleep=skip_sleep))
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))

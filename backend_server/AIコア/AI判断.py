@@ -13,7 +13,7 @@ import time
 import httpx
 from pydantic import ValidationError
 
-from AIコア.AI判断共通 import DecisionError, DecisionRequest, configured_api_key, validate_answers
+from AIコア.AI判断共通 import DecisionError, DecisionRequest, FREEAI_DECISION_MODEL, first_configured_api_key, validate_answers
 
 
 @dataclass(frozen=True)
@@ -25,11 +25,15 @@ class Provider:
     aliases: tuple[str, ...] = ()
     api_key_field: str | None = None
     auto_priority: int = 100
+    fallback_key_fields: tuple[str, ...] = ()
+    fixed_model: str | None = None
 
 
 PROVIDERS = {
     "openai_decisions": Provider("AIコア.AI判断_openai_decisions", "DECISION_OPENAI_MODEL", "gpt-6-luna", "api_key", api_key_field="openai_key_id"),
     "openai_oauth": Provider("AIコア.AI判断_openai_jsonchat", "DECISION_OAUTH_MODEL", "gpt-6-luna", "oauth", ("openai_jsonchat",), auto_priority=0),
+    "freeai_chat": Provider("AIコア.AI判断_freeai_jsonchat", "DECISION_FREEAI_MODEL", FREEAI_DECISION_MODEL, "api_key", api_key_field="freeai_key_id", auto_priority=50, fallback_key_fields=("gemini_key_id",), fixed_model=FREEAI_DECISION_MODEL),
+    "gemini_chat": Provider("AIコア.AI判断_gemini_jsonchat", "DECISION_GEMINI_MODEL", "gemini-3.8-flash", "api_key", api_key_field="gemini_key_id", auto_priority=300, fallback_key_fields=("freeai_key_id",)),
 }
 
 
@@ -79,21 +83,28 @@ class Decision:
             if not model:
                 raise DecisionError("モデル名が空です")
         if is_default(name):
+            name = str(config.get("DECISION_AI_NAME") or "auto").strip()
+        if is_default(name):
             available = [key for key in PROVIDERS if self.availability.get(key, {}).get("ok")]
             if available:
                 name = min(available, key=lambda key: PROVIDERS[key].auto_priority)
             else:
-                name = str(config.get("DECISION_AI_NAME") or "openai_oauth")
-                if is_default(name):
-                    name = "openai_oauth"
+                name = "openai_oauth"
         name = self._canonical(name)
         provider = PROVIDERS[name]
-        if is_default(model):
+        if provider.fixed_model:
+            model = provider.fixed_model
+        elif is_default(model):
             model = self._default_model(provider, config)
         return name, model
 
     @staticmethod
     def _default_model(provider: Provider, config: dict) -> str:
+        if provider.fixed_model:
+            return provider.fixed_model
+        model = str(config.get("DECISION_AI_MODEL") or "auto").strip()
+        if not is_default(model):
+            return model
         model = str(config.get(provider.model_key) or provider.default_model).strip()
         return provider.default_model if is_default(model) else model
 
@@ -103,8 +114,9 @@ class Decision:
         return {
             **self.get_availability_status(),
             "default_model": f"{name}/{model}",
-            "providers": [{"ai_name": key, "implementation": provider.module.rsplit(".", 1)[-1], "aliases": list(provider.aliases), "auth": provider.auth, "default_model": self._default_model(provider, config), "model_config_key": provider.model_key} for key, provider in PROVIDERS.items()],
-            "selection_note": "省略 / autoは起動チェック成功の方式からOpenAI OAuthを優先。モデルは選択方式の既定値。明示したプロバイダは変更しません。",
+            "configured_defaults": {key: str(config.get(key) or "auto").strip() or "auto" for key in ("DECISION_AI_NAME", "DECISION_AI_MODEL")},
+            "providers": [{"ai_name": key, "implementation": provider.module.rsplit(".", 1)[-1], "aliases": list(provider.aliases), "auth": provider.auth, "default_model": self._default_model(provider, config), "model_config_key": provider.model_key, "fixed_model": provider.fixed_model} for key, provider in PROVIDERS.items()],
+            "selection_note": "明示引数を優先。省略 / autoはDECISION_AI_NAME / DECISION_AI_MODELを参照。設定もautoなら起動チェック成功の方式からOAuth → FreeAI → Decisions API → Geminiの順。FreeAIモデルはgemini-flash-lite-latest固定（明示model・設定値でも変更不可）。他方式のモデルは方式別の既定値。指定したプロバイダは変更しません。",
             "question_types": ["predicate", "choice", "score"],
             "availability": deepcopy(self.availability),
             "availability_checked": bool(self.availability),
@@ -112,7 +124,7 @@ class Decision:
                 f"{key}/{info['model']}"
                 for key, info in self.availability.items() if info["ok"]
             ],
-            "probability_note": "Responses互換の確率・confidenceは生成モデルの推定値で、Decisions APIと同じ校正値ではありません。",
+            "probability_note": "OAuth / FreeAI / GeminiのJSON判断の確率・confidenceは生成モデルの推定値で、Decisions APIと同じ校正値ではありません。",
         }
 
     def get_availability_status(self) -> dict:
@@ -147,8 +159,9 @@ class Decision:
             try:
                 if config_error:
                     raise DecisionError(config_error)
-                if provider.api_key_field and not configured_api_key(config.get(provider.api_key_field)):
-                    raise DecisionError(f"{provider.api_key_field} が未設定です（空欄・<...>・空引用符）")
+                key_fields = (provider.api_key_field, *provider.fallback_key_fields)
+                if provider.api_key_field and not first_configured_api_key(config, *key_fields):
+                    raise DecisionError(f"{' / '.join(key_fields)} が未設定です（空欄・<...>・空引用符）")
                 check = DecisionRequest(
                     ai_name=name, ai_model=model, timeout_sec=timeout_sec,
                     input="おはよう",

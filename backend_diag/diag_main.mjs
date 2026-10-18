@@ -93,10 +93,10 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
         try {
           if(req.method==='POST' && parts.length===1 && parts[0]==='開始')return reply(200,await modelTrials.start({signal:controller.signal}));
-          if(req.method==='POST' && parts.length===2 && parts[0]==='開始' && /^(CHAT|LIVE|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.start({signal:controller.signal,rowId:parts[1]}));
+          if(req.method==='POST' && parts.length===2 && parts[0]==='開始' && /^(CHAT|LIVE|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.start({signal:controller.signal,rowId:parts[1]}));
           if(!/^[a-f0-9]{32}$/.test(parts[0]))return reply(404,{エラー:'試行が見つかりません。'});
           if(req.method==='DELETE' && parts.length===1)return reply(200,modelTrials.cancel(parts[0]));
-          if(req.method==='POST' && parts.length===2 && /^(CHAT|LIVE|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.next(parts[0],parts[1],{signal:controller.signal}));
+          if(req.method==='POST' && parts.length===2 && /^(CHAT|LIVE|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.next(parts[0],parts[1],{signal:controller.signal}));
           return reply(404,{エラー:'試行が見つかりません。'});
         } catch(error) {return reply(error?.status || 500,{エラー:error?.status ? error.message : 'モデル試行に失敗しました。'});}
         finally {res.removeListener('close',abort);}

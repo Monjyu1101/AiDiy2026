@@ -55,7 +55,7 @@ class conf_models:
 
     def fetch_all_models(self):
         """互換入口。外部API・CLIは呼ばず、合成ファイルの読込だけを確認する。"""
-        for kind in ("chat", "live", "code"):
+        for kind in ("chat", "live", "decisions", "code"):
             self._get_diag_models(kind)
         self.get_live_voices()
 
@@ -68,6 +68,11 @@ class conf_models:
     def get_live_models(self) -> Dict[str, Dict[str, str]]:
         """live合成ファイルの候補を取得する。"""
         return self._get_diag_models("live") or {}
+
+
+    def get_decisions_models(self) -> Dict[str, Dict[str, str]]:
+        """認証付き取得一覧の判断候補。空でも設定値や実行時既定値は補完・変更しない。"""
+        return self._get_diag_models("decisions") or {}
 
 
     def get_live_voices(self) -> Dict[str, Dict[str, str]]:

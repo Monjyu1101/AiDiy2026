@@ -1,23 +1,23 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {render,source,component}=require('../../../../checks/ui-components.cjs');
-const ids=['CHAT','LIVE',...Array.from({length:6},(_,i)=>`CODE${i+1}`),'TASK_plan','TASK_do','TASK_check','TEAM_plan','TEAM_do','TEAM_check'];
+const ids=['CHAT','LIVE','DECISION',...Array.from({length:6},(_,i)=>`CODE${i+1}`),'TASK_plan','TASK_do','TASK_check','TEAM_plan','TEAM_do','TEAM_check'];
 const snapshot={版:'v1',項目:ids.map(id=>({id,区分:id.replace(/\d+$|_.*$/,''),役割:'',プロバイダ:'synthetic',モデル:'model-a',状態:'未実行'}))};
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};};
 async function setup(api){const {設定モデル状態を作成}=await import('../設定モデル状態.mjs');let online=true;return {state:設定モデル状態を作成({api,接続可能:()=>online}),offline:()=>{online=false;}};}
 
-test('14行と共有元・経路・応答を描画し、未設定は成功にしない',async()=>{
+test('15行と共有元・経路・応答を描画し、未設定は成功にしない',async()=>{
  const data=structuredClone(snapshot);data.項目[0].状態='未設定';
  const html=await render('設定モデル/設定モデルパネル.vue',{data,results:{LIVE:{状態:'OK',共有元:'CHAT',応答:'<script>bad</script>'}},selected:'LIVE',online:true});
- assert.equal((html.match(/class="trial-row(?: selected)?"/g)||[]).length,14);
+ assert.equal((html.match(/class="trial-row(?: selected)?"/g)||[]).length,15);
  for(const id of ids)assert.ok(html.includes(id));
  assert.match(html,/未設定/);assert.match(html,/共有元/);assert.match(html,/Tools 内部 HTTP/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad/);
  const empty=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[]},online:false});
  assert.match(empty,/設定項目がありません/);assert.match(empty,/id="model-trial-start" disabled/);assert.match(empty,/Tools 接続時/);
 });
 
-test('読込はGETのみ・手動開始後は厳密な順番で14行、共有はサーバー結果だけを使用',async()=>{
+test('読込はGETのみ・手動開始後は厳密な順番で15行、共有はサーバー結果だけを使用',async()=>{
  const calls=[];let active=0;
  const {state}=await setup(async(path,method)=>{calls.push([path,method]);if(method==='GET')return snapshot;if(path.endsWith('/開始'))return {...snapshot,実行ID:'r1'};if(method==='DELETE')return {};assert.equal(++active,1);await tick();active--;const id=path.split('/').pop();return {id,状態:id==='CHAT'?'NG':'OK',共有元:id==='CODE2'?'CODE1':''};});
  assert.deepEqual(calls,[]);await state.読込();assert.deepEqual(calls,[['api/モデル試行','GET']]);
@@ -68,7 +68,7 @@ test('個別テストは選択行だけ要求し、サーバー指定の同一�
  for(const id of group)assert.equal(state.結果.value[id].状態,'実行中');
  assert.equal(state.結果.value.CHAT.応答,'previous');assert.equal(state.結果.value.CODE3,undefined);
  const html=await render('設定モデル/設定モデルパネル.vue',{data:grouped,results:state.結果.value,selected:'TASK_do',online:true,running:true});
- assert.match(html,/テスト中/);assert.match(html,/>再読込<\/button>/);assert.equal((html.match(/data-trial-id="[^"]+"[^>]* disabled/g)||[]).length,14);assert.doesNotMatch(html,/model-trial-single/);
+ assert.match(html,/テスト中/);assert.match(html,/>再読込<\/button>/);assert.equal((html.match(/data-trial-id="[^"]+"[^>]* disabled/g)||[]).length,15);assert.doesNotMatch(html,/model-trial-single/);
  pending.resolve({id:'TASK_do',状態:'OK',応答:'おはよう',所要ms:123});await run;
  for(const id of group){assert.equal(state.結果.value[id].状態,'OK');assert.equal(state.結果.value[id].共有元,id==='TASK_do'?'':'TASK_do');}
  assert.deepEqual(calls.filter(x=>x[1]==='POST').map(x=>x[0]),['api/モデル試行/開始/TASK_do','api/モデル試行/single/TASK_do']);assert.equal(state.実行中.value,false);
@@ -103,18 +103,18 @@ test('個別テストで設定版が変われば旧結果を破棄し、オフ�
  offline();await state.個別開始();assert.equal(posts,2);
 });
 
-test('左の一覧はチャット・ライブ・コード・タスク・チームの見出しで区分ごとに並べる',async()=>{
+test('左の一覧はチャット・ライブ・判断・コード・タスク・チームの見出しで区分ごとに並べる',async()=>{
  const html=await render('設定モデル/設定モデルパネル.vue',{data:snapshot,results:{},selected:'CHAT',online:true});
- assert.deepEqual([...html.matchAll(/class="trial-group-title">([^<]+)<span> · (\d+)<\/span>/g)].map(m=>[m[1],Number(m[2])]),[['チャット',1],['ライブ',1],['コード',6],['タスク',3],['チーム',3]]);
+ assert.deepEqual([...html.matchAll(/class="trial-group-title">([^<]+)<span> · (\d+)<\/span>/g)].map(m=>[m[1],Number(m[2])]),[['チャット',1],['ライブ',1],['判断',1],['コード',6],['タスク',3],['チーム',3]]);
  const groups=[...html.matchAll(/<section class="trial-group" aria-label="([^"]+)">([\s\S]*?)<\/section>/g)].map(m=>[m[1],[...m[2].matchAll(/data-trial-id="([^"]+)"/g)].map(x=>x[1])]);
- assert.deepEqual(groups,[['チャット',['CHAT']],['ライブ',['LIVE']],['コード',ids.slice(2,8)],['タスク',ids.slice(8,11)],['チーム',ids.slice(11)]]);
+ assert.deepEqual(groups,[['チャット',['CHAT']],['ライブ',['LIVE']],['判断',['DECISION']],['コード',ids.slice(3,9)],['タスク',ids.slice(9,12)],['チーム',ids.slice(12)]]);
 });
 
-test('全14行のテストボタンは接続・読込・実行状態で制御し、見出しの個別ボタンは置かない',async()=>{
+test('全15行のテストボタンは接続・読込・実行状態で制御し、見出しの個別ボタンは置かない',async()=>{
  for(const flags of [{online:true},{online:false},{online:true,loading:true},{online:true,running:true}]){
   const html=await render('設定モデル/設定モデルパネル.vue',{data:grouped,results:{},selected:'CHAT',...flags});
   const buttons=html.match(/<button[^>]*data-trial-id="[^"]+"[^>]*>テスト<\/button>/g)||[];
-  assert.equal(buttons.length,14);
+  assert.equal(buttons.length,15);
   assert.ok(buttons.every(button=>button.includes(' disabled')===(!flags.online||!!flags.loading||!!flags.running)));
   assert.doesNotMatch(html,/model-trial-single|選択項目をテスト/);
   assert.match(html,/>再読込<\/button>/);assert.match(html,/動作確認/);
@@ -151,4 +151,17 @@ test('実Vueイベントで行選択は実行せず、行テストは対象IDを
   assert.ok(descendants(root).filter(node=>node.props['data-trial-id']).every(node=>!node.props.disabled));
   for(const id of group)assert.equal(state.結果.value[id].状態,'OK');
  }finally{app.unmount();state.終了();}
+});
+
+
+test('判断の選択値とJSON応答を表示し、タイムアウトNGで全体実行を止める',async()=>{
+ for(const choice of ['high','medium','low']){
+  const html=await render('設定モデル/設定モデルパネル.vue',{data:snapshot,results:{DECISION:{状態:'OK',判断結果:choice,応答:JSON.stringify({choice})}},selected:'DECISION',online:true});
+  assert.match(html,/判断結果<\/dt>/);assert.ok(html.includes('<dd>'+choice+'</dd>'));assert.match(html,/high \/ medium \/ low/);assert.match(html,/おはよう/);assert.match(html,/Tools MCP/);
+ }
+ const calls=[];const {state}=await setup(async(path,method)=>{
+  if(method==='GET')return snapshot;if(method==='DELETE')return {};if(path.endsWith('/開始'))return {...snapshot,実行ID:'timeout'};
+  const id=path.split('/').pop();calls.push(id);return id==='DECISION'?{状態:'NG',実行終了:true,説明:'判断試行が制限時間を超えました。'}:{状態:'OK'};
+ });
+ await state.読込();await state.開始();assert.deepEqual(calls,['CHAT','LIVE','DECISION']);assert.equal(state.結果.value.DECISION.状態,'NG');assert.match(state.通知.value,/制限時間/);
 });

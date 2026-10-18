@@ -38,7 +38,7 @@ def sse(answers=ANSWERS, *, kind="response.completed", status="completed", text=
 class DecisionContractTests(unittest.TestCase):
     def test_auto_prefers_healthy_oauth_then_native(self):
         service = Decision(config={})
-        config = {"DECISION_AI_NAME": "openai_decisions", "DECISION_OAUTH_MODEL": "oauth-model", "DECISION_OPENAI_MODEL": "native-model"}
+        config = {"DECISION_AI_NAME": "auto", "DECISION_OAUTH_MODEL": "oauth-model", "DECISION_OPENAI_MODEL": "native-model"}
         for oauth_ok, native_ok, expected in ((True, True, ("openai_oauth", "oauth-model")), (True, False, ("openai_oauth", "oauth-model")), (False, True, ("openai_decisions", "native-model"))):
             service.availability = {"openai_oauth": {"ok": oauth_ok}, "openai_decisions": {"ok": native_ok}}
             for params in ({}, {"ai_name": "auto", "ai_model": "auto"}, {"model": ""}, {"ai_model": "AUTO"}):
@@ -47,6 +47,39 @@ class DecisionContractTests(unittest.TestCase):
         service.availability["openai_oauth"]["ok"] = True
         self.assertEqual(service.resolve(request(model="openai_decisions/auto"), config), ("openai_decisions", "native-model"))
         self.assertEqual(service.resolve(request(ai_name="openai_decisions", ai_model="auto"), config), ("openai_decisions", "native-model"))
+
+    def test_configured_defaults_and_explicit_overrides(self):
+        config = {"DECISION_AI_NAME": "openai_decisions", "DECISION_AI_MODEL": "configured-model"}
+        service = Decision(config=config)
+        service.availability = {"openai_oauth": {"ok": True, "model": "m"}, "openai_decisions": {"ok": True, "model": "m"}}
+        cases = [
+            ({}, ("openai_decisions", "configured-model")),
+            ({"ai_name": "auto", "model": "auto"}, ("openai_decisions", "configured-model")),
+            ({"ai_name": "openai_oauth"}, ("openai_oauth", "configured-model")),
+            ({"ai_model": "explicit"}, ("openai_decisions", "explicit")),
+            ({"model": "explicit"}, ("openai_decisions", "explicit")),
+            ({"model": "openai_oauth/explicit"}, ("openai_oauth", "explicit")),
+            ({"model": "openai_oauth/auto"}, ("openai_oauth", "configured-model")),
+        ]
+        for params, expected in cases:
+            with self.subTest(params=params):
+                self.assertEqual(service.resolve(request(**params), config), expected)
+        self.assertEqual(service.get_config()["configured_defaults"], config)
+        self.assertEqual(service.get_config()["default_model"], "openai_decisions/configured-model")
+
+    def test_missing_and_auto_settings_keep_legacy_model_fallback(self):
+        service = Decision(config={})
+        for value in (None, "", "auto", "AUTO", "  auto  "):
+            config = {"DECISION_AI_NAME": value, "DECISION_AI_MODEL": value, "DECISION_OAUTH_MODEL": "legacy"}
+            self.assertEqual(service.resolve(request(), config), ("openai_oauth", "legacy"))
+        self.assertEqual(service.get_config()["configured_defaults"], {"DECISION_AI_NAME": "auto", "DECISION_AI_MODEL": "auto"})
+
+    def test_configured_provider_does_not_silently_fall_back(self):
+        service = Decision(config={})
+        service.availability = {"openai_oauth": {"ok": True}, "openai_decisions": {"ok": False}}
+        self.assertEqual(service.resolve(request(), {"DECISION_AI_NAME": "openai_decisions"})[0], "openai_decisions")
+        with self.assertRaises(DecisionError):
+            service.resolve(request(), {"DECISION_AI_NAME": "unknown"})
 
     def test_default_model_aliases_never_reach_api(self):
         service = Decision(config={})
@@ -217,6 +250,21 @@ class DecisionAvailabilityTests(unittest.IsolatedAsyncioTestCase):
             "confidence": 1.0,
         }]}
 
+    async def test_common_model_is_used_for_startup_checks(self):
+        models = []
+        def handler(req):
+            models.append(json.loads(req.content)["model"])
+            if "/v1/decisions" in str(req.url):
+                return httpx.Response(200, json=self.greeting_response())
+            return sse(answers=self.greeting_response()["answers"])
+        service = Decision(config={"openai_key_id": "test", "DECISION_AI_MODEL": "configured-model"}, transport=httpx.MockTransport(handler))
+        with patch("AIコア.AI判断_openai_jsonchat.oauth_headers", return_value={"Authorization": "Bearer test"}):
+            results = await service.check_availability()
+        self.assertEqual(models, ["configured-model", "configured-model"])
+        self.assertTrue(all(results[name]["ok"] and results[name]["model"] == "configured-model" for name in ("openai_decisions", "openai_oauth")))
+        self.assertFalse(results["freeai_chat"]["ok"])
+        self.assertFalse(results["gemini_chat"]["ok"])
+
     async def test_both_providers_execute_greeting_check(self):
         calls = []
 
@@ -236,8 +284,9 @@ class DecisionAvailabilityTests(unittest.IsolatedAsyncioTestCase):
         with patch("AIコア.AI判断_openai_jsonchat.oauth_headers", return_value={"Authorization": "Bearer test"}):
             results = await service.check_availability()
         self.assertEqual(len(calls), 2)
-        self.assertTrue(all(info["ok"] for info in results.values()))
-        self.assertTrue(all(info["answer"] == "挨拶" and info["checked_at"] for info in results.values()))
+        self.assertTrue(all(results[name]["ok"] and results[name]["answer"] == "挨拶" and results[name]["checked_at"] for name in ("openai_decisions", "openai_oauth")))
+        self.assertFalse(results["freeai_chat"]["ok"])
+        self.assertFalse(results["gemini_chat"]["ok"])
         self.assertEqual(service.get_config()["available_models"], ["openai_decisions/custom-decision-model", "openai_oauth/custom-oauth-model"])
         results["openai_oauth"]["ok"] = False
         self.assertTrue(service.get_config()["availability"]["openai_oauth"]["ok"])

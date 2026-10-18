@@ -34,6 +34,31 @@ class ConfJsonPortKeyTest(unittest.TestCase):
         cls.module = _load_conf_json_module()
         cls.conf_json = cls.module.conf_json
 
+    def test_decision_defaults_created_and_completed_after_live(self):
+        cases = [None, {}, {"CHAT_AI_NAME": "custom-chat", "LIVE_AI_NAME": "custom-live", "CUSTOM": "keep"},
+                 {"DECISION_AI_NAME": "openai_decisions", "DECISION_AI_MODEL": "custom", "DECISION_OPENAI_MODEL": "legacy"}]
+        for original in cases:
+            with self.subTest(original=original), tempfile.TemporaryDirectory() as temp_dir:
+                config_path = Path(temp_dir) / "AiDiy_key.json"
+                if original is not None:
+                    config_path.write_text(json.dumps(original), encoding="utf-8")
+                config = self.conf_json(json=str(config_path))
+                saved = json.loads(config_path.read_text(encoding="utf-8"))
+                self.assertEqual(saved["DECISION_AI_NAME"], (original or {}).get("DECISION_AI_NAME", "auto"))
+                self.assertEqual(saved["DECISION_AI_MODEL"], (original or {}).get("DECISION_AI_MODEL", "auto"))
+                for key in ("DECISION_FREEAI_MODEL", "DECISION_GEMINI_MODEL"):
+                    self.assertEqual(saved[key], (original or {}).get(key, "gemini-flash-lite-latest" if key == "DECISION_FREEAI_MODEL" else "gemini-3.8-flash"))
+                for key, value in (original or {}).items():
+                    self.assertEqual(saved[key], value)
+                keys = list(saved)
+                self.assertEqual(keys.index("LIVE_OPENAI_VOICE") + 1, keys.index("DECISION_AI_NAME"))
+                self.assertEqual(keys.index("DECISION_AI_MODEL"), keys.index("DECISION_AI_NAME") + 1)
+                self.assertLess(keys.index("DECISION_AI_MODEL"), keys.index("CODE_BASE_PATH"))
+                self.assertEqual(config.DECISION_AI_MODEL, saved["DECISION_AI_MODEL"])
+                before = config_path.read_bytes()
+                self.conf_json(json=str(config_path))
+                self.assertEqual(config_path.read_bytes(), before)
+
     def test_default_port_keys_and_values(self):
         expected = {
             "PORT_WEB": "8090",
