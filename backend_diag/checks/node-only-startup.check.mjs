@@ -42,7 +42,8 @@ test('actual headless entrypoint works with missing config and no credentials, u
   await mkdir(path.join(root,'home'));await mkdir(path.join(root,'empty-path'));
   // 本物の設定・OAuthを読ませない。通信は匿名公開一覧とloopbackのみ許容し、接続せず失敗させる。
   const preload=path.join(root,'offline.mjs');
-  await writeFile(preload,`import https from 'node:https';import http from 'node:http';import {EventEmitter} from 'node:events';
+  await writeFile(preload,`import https from 'node:https';import http from 'node:http';import net from 'node:net';import {EventEmitter} from 'node:events';
+let toolsChecks=0;const connect=net.createConnection;net.createConnection=(...args)=>{if(args[0]?.port===8095||args[0]===8095){toolsChecks++;throw Error('headless must not check Tools startup');}return connect(...args);};net.Server.prototype.listen=function(){process.exitCode=89;throw Error('headless must not open a listener');};process.on('exit',()=>{if(toolsChecks)process.exitCode=90;});
 const offline=(options)=>{if(options.headers?.Authorization||options.headers?.['x-goog-api-key']||!['openrouter.ai','127.0.0.1'].includes(options.hostname))throw Error('unexpected authenticated request');const request=new EventEmitter();request.destroy=()=>{};request.end=()=>queueMicrotask(()=>request.emit('error',Object.assign(Error('offline fixture'),{code:'ENETUNREACH'})));return request;};https.request=offline;http.request=offline;`);
   child=spawn(process.execPath,['--import',pathToFileURL(preload).href,path.join(diag,'diag_main.mjs'),'--headless'],{env:{PATH:path.join(root,'empty-path'),HOME:path.join(root,'home'),USERPROFILE:path.join(root,'home'),CODEX_HOME:path.join(root,'home','.codex'),NODE_OPTIONS:'',CI:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});
   let output='',stderr='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);

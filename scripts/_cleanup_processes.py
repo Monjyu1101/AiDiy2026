@@ -25,7 +25,8 @@ def list_processes() -> list[dict]:
             'Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress'
         )
         result = subprocess.run(['powershell', '-NoProfile', '-Command', script],
-                                check=True, capture_output=True, encoding='utf-8', timeout=15)
+                                check=True, capture_output=True, encoding='utf-8', timeout=15,
+                                creationflags=subprocess.CREATE_NO_WINDOW)
         records = json.loads(result.stdout or '[]')
         return records if isinstance(records, list) else [records]
     result = subprocess.run(['ps', '-axo', 'pid=,ppid=,comm=,args='], check=True,
@@ -76,7 +77,7 @@ def stop_matching(matches, info, error, label: str) -> bool:
             info(f"{label}を強制終了します: {target['Name']} (PID={pid})")
             if windows:
                 subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)],
-                               capture_output=True, timeout=10)
+                               capture_output=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
             else:
                 try:
                     os.kill(pid, signal.SIGKILL)

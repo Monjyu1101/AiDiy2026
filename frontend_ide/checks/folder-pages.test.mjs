@@ -163,14 +163,14 @@ test('ページをめくる演出: 旧ページの下に移動先を用意し、
   } finally { h.dispose(); }
 });
 
-test('ページ演出: reduce-motionではアニメーション状態を残さず、同時モード/パス切替も旧ページに保存する', async () => {
+test('ページ演出: OS設定でもページ繰りを保ち、同時モード/パス切替も旧ページに保存する', async () => {
   const h = pageFixture({ matchMedia: () => ({ matches: true }) });
   try {
     await h.mount(); h.body.scrollTop = 180; h.state.save();
     h.props.current = 'src'; h.props.active = false; await flush(); assert.equal(h.state.pageTurn.value, '');
     h.props.active = true; await flush(); assert.equal(h.body.scrollTop, 0);
-    h.props.current = ''; await flush(); assert.equal(h.body.scrollTop, 180); assert.equal(h.state.pageTurn.value, '');
-    h.props.current = 'src/nested'; await flush(); assert.equal(h.state.pageTurn.value, '');
+    h.props.current = ''; await flush(); assert.equal(h.body.scrollTop, 180); assert.equal(h.state.pageTurn.value, 'back');
+    h.props.current = 'src/nested'; await flush(); assert.ok(h.state.turn.value);
   } finally { h.dispose(); }
 });
 
@@ -234,7 +234,7 @@ test('ページ演出: 表示途中の決定キーは演出だけを終え、隠
   } finally { h.dispose(); }
 });
 
-test('ページ演出: 動きを減らす設定の途中変更は即時確定し、購読と演出を破棄する', async () => {
+test('ページ演出: OS設定を途中変更してもページ繰りを保ち、破棄時には終了する', async () => {
   const query = new EventTarget(); query.matches = false;
   const removed = [], remove = query.removeEventListener.bind(query);
   query.removeEventListener = (...args) => { removed.push(args[0]); remove(...args); };
@@ -242,11 +242,11 @@ test('ページ演出: 動きを減らす設定の途中変更は即時確定し
   try {
     await h.mount(); h.props.current = 'src/nested'; await flush(); assert.ok(h.state.turn.value);
     query.matches = true; const changed = new Event('change'); changed.matches = true; query.dispatchEvent(changed);
-    assert.equal(h.state.turn.value, null); assert.equal(h.state.layers.value[0].path, 'src/nested');
-    h.props.current = ''; await flush(); assert.equal(h.state.turn.value, null);
+    assert.ok(h.state.turn.value); assert.equal(h.state.layers.value[0].path, 'src/nested');
+    h.props.current = ''; await flush(); assert.ok(h.state.turn.value);
     query.matches = false; h.props.current = 'src'; await flush(); assert.ok(h.state.turn.value);
-    h.dispose(); assert.equal(h.state.turn.value, null); assert.deepEqual(removed, ['change']);
-  } finally { if (!removed.length) h.dispose(); }
+    h.dispose(); assert.equal(h.state.turn.value, null); assert.deepEqual(removed, []);
+  } finally { h.dispose(); }
 });
 
 test('2D部品: 新規・削除・検索マーク・外部選択・フィルター変更をイベントだけで反映する', async () => {
@@ -318,13 +318,13 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.ok(app.indexOf('class="ide-project-name"') < app.indexOf('class="ide-view-modes"'));
   assert.ok(app.indexOf('class="ide-view-modes"') < app.indexOf('class="ide-toolbar-right"'));
   assert.match(app, /class="ide-toolbar-right">\s*<nav[^>]+class="ai-launchers"/);
-  assert.match(app, /<SpaceView :key="[^"\n]+" :started-at="state.startedAt" :view-mode="viewMode"/);
+  assert.match(app, /<SpaceView\b[^>]*:key="[^"\n]+" :started-at="state.startedAt" :view-mode="viewMode"/);
   assert.doesNotMatch(app, /<SpaceView[^>]*:key="[^"\n]*viewMode/);
   assert.equal((view.match(/<ViewerSession /g) || []).length, 1); assert.equal((view.match(/<FileExplorer /g) || []).length, 1);
   assert.match(view, /<SpaceCanvas :mode="viewMode"/); assert.match(view, /<FolderPages v-if="scan&&pagesReady" :active="viewMode==='2d'"/);
   assert.match(view, /<ViewerSession v-for="entry in viewerSessions"/);
   const session = readFileSync(new URL('../src/ファイル閲覧/閲覧セッション.vue', import.meta.url), 'utf8');
-  assert.equal((session.match(/<FileViewer /g) || []).length, 1); assert.match(css, /prefers-reduced-motion:reduce\)\{\.folder-page-sheet,\.folder-page-turn-edge\{display:none;animation:none/);
+  assert.equal((session.match(/<FileViewer /g) || []).length, 1); assert.doesNotMatch(css, /prefers-reduced-motion/);
   assert.match(css, /animation:folder-page-forward var\(--page-turn-duration,800ms\)/); assert.match(css, /animation:folder-page-back var\(--page-turn-duration,800ms\)/);
   assert.match(css, /@keyframes folder-page-forward\{from\{clip-path:polygon\(/);
   assert.match(css, /@keyframes folder-page-back\{from\{clip-path:polygon\(/);
@@ -926,7 +926,7 @@ test('2Dアイコン: 24px表示は既存32px列内に収まり、クリーム�
 });
 
 
-test('更新シート: 上から下へ切替、位置と選択を保持し連続更新・取消・reduced-motionに対応する', async()=>{
+test('更新シート: 上から下へ切替、位置と選択を保持し、OS設定による省略なし', async()=>{
  const query={matches:false,addEventListener(){},removeEventListener(){}};
  const {app,root,props,walk,find}=await mountedPages({matchMedia:()=>query});
  const layer=kind=>walk(root,e=>e.props['data-page-layer']===kind);
@@ -940,7 +940,7 @@ test('更新シート: 上から下へ切替、位置と選択を保持し連続
   props.tree={...tree(),f:[['root2.js',100,6000]]};await flush();const newest=layer('outgoing');
   old.props.onAnimationend({type:'animationend',target:old,currentTarget:old,animationName:'folder-page-refresh'});await flush();assert.equal(layer('outgoing'),newest);
   find('folder-page-stack').props.onWheelCapturePassive();await flush();assert.equal(layer('outgoing'),undefined);assert.equal(live.scrollTop,220);
-  query.matches=true;props.tree={...tree(),f:[['root2.js',101,7000]]};await flush();assert.equal(layer('outgoing'),undefined);
+  query.matches=true;props.tree={...tree(),f:[['root2.js',101,7000]]};await flush();assert.ok(layer('outgoing').props.class.includes('page-turn-refresh'));
  } finally {app.unmount();}
 });
 

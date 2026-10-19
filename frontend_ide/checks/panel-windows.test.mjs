@@ -9,11 +9,11 @@ import {EventEmitter} from 'node:events';
 import native from '../デスクトップ/panel-windows.cjs';
 import {popupFeatures,fadePanel} from '../src/ファイル閲覧/パネル別窓.js';
 const {panelBounds,createPanelWindows}=native;
-test('表示開始フェード: opacityだけ260ms、再実行で古い演出解除、reduced-motionは演出なし',()=>{
+test('表示開始フェード: opacityだけ260ms、再実行で古い演出解除、OS設定にかかわらず表示',()=>{
  let reduced=false,cancelled=0;const calls=[];
- const element={ownerDocument:{defaultView:{matchMedia:()=>({matches:reduced})}},animate:(frames,options)=>{calls.push({frames,options});return{cancel:()=>cancelled++};}};
+ const element={ownerDocument:{defaultView:{matchMedia:()=>({matches:reduced})}},animate:(frames,options)=>{calls.push({frames,options});return{cancel:()=>cancelled++,finished:new Promise(()=>{})};}};
  fadePanel(element);assert.deepEqual(calls,[{frames:[{opacity:0},{opacity:1}],options:{duration:260,easing:'ease-out'}}]);
- fadePanel(element);assert.equal(cancelled,1);reduced=true;fadePanel(element);assert.equal(cancelled,2);assert.equal(calls.length,2);
+ fadePanel(element);assert.equal(cancelled,1);reduced=true;fadePanel(element);assert.equal(cancelled,2);assert.equal(calls.length,3);
 });
 for(const zoom of [.8,1,1.25,2])test(`パネル配置: zoom=${zoom}、負座標・別画面・画面外をDIPへ変換`,()=>{
  const area={x:-1600,y:-100,width:1600,height:1000};let requested;
@@ -85,11 +85,11 @@ test('元表示の保持: zoomだけを掛けて撮影し、画面外を切り�
  assert.equal((await f.controller.prepare(f.event,rect,'panel-viewer',rect)).ok,false);
 });
 
-test('Explorer: reduced-motionでは演出なし、終了済み・別親のshowを拒否',async()=>{
+test('Explorer: 旧省略フラグでも共通ズーム、終了済み・別親のshowを拒否',async()=>{
  const f=fixture(),request=await f.controller.prepare(f.event,f.rect),details={url:'about:blank',frameName:request.name};
  f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
  assert.equal((await f.controller.show({owner:{kind:'ide'}},request.name,true)).ok,false);
- assert.equal((await f.controller.show(f.event,request.name,true)).ok,true);assert.equal(child.shown,true);assert.equal(f.animations(),0);
+ assert.equal((await f.controller.show(f.event,request.name,true)).ok,true);assert.equal(f.animations(),1);
  f.state({active:false});assert.equal((await f.controller.show(f.event,request.name,true)).ok,false);child.destroy();
 });
 test('Explorer: 非IDE・無効位置・セッション終了・古い起動予約を拒否',async()=>{
@@ -108,7 +108,7 @@ test('Viewer/比較/軌跡: Explorerと共存し、同じ予約・配置・ズ�
   assert.equal(f.windows.get(child.webContents).kind,kind);
   assert.equal((await f.controller.show(f.event,request.name,false)).ok,true);
  }
- assert.equal(f.windows.size,4);assert.equal(f.animations(),3,'軌跡の展開は共通UIで行い、不透明なnative zoomを使わない');
+ assert.equal(f.windows.size,4);assert.equal(f.animations(),4,'軌跡の別窓も表示開始ズームを共用する');
  assert.equal((await f.controller.prepare(f.event,f.rect,'explorer')).ok,false);
  assert.equal((await f.controller.prepare(f.event,f.rect,'untrusted')).ok,false);
  for(const child of children)child.destroy();assert.equal(f.windows.size,0);

@@ -130,6 +130,20 @@ class AidiyHermesSubprocessTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expected, result)
         self.assertIsNone(self.code_ai.current_process)
 
+    async def test_trailing_memory_delimiter_is_removed_from_answer(self):
+        # Hermes の記憶ファイルの区切り「§」を真似た末尾だけを除き、本文中の「§」は残す。
+        for printed, expected in (
+            ("おはようございます。§", "おはようございます。"),
+            ("おはようございます。\n§\n", "おはようございます。"),
+            ("第3§を参照してください。", "第3§を参照してください。"),
+        ):
+            with self.subTest(printed=printed):
+                script = f"import sys;sys.stdout.reconfigure(encoding='utf-8');print({printed!r})"
+                result = await self.code_ai._subprocess実行(
+                    [sys.executable, "-c", script], cwd=str(PROJECT_ROOT), timeout=10,
+                )
+                self.assertEqual(expected, result)
+
     async def test_execute_passes_complete_prompt_to_hermes_stdin(self):
         subprocess_mock = AsyncMock(return_value="応答")
 
@@ -199,7 +213,7 @@ class AidiyHermesSubprocessTest(unittest.IsolatedAsyncioTestCase):
             timeout=8,
         )
 
-        self.assertEqual("処理タイムアウト(1秒)が発生しました。", result)
+        self.assertEqual("! 処理タイムアウト(1秒)が発生しました。", result)
         self.assertEqual("timeout-stderr", self.code_ai.last_stderr_output)
         self.assertIsNone(self.code_ai.current_process)
 

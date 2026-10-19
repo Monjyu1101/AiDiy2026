@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-10-19T00:44:18.341Z",
+  "ideClosed": true,
+  "windows": [
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\backend_diag\\node_modules\\electron\\dist\\electron.exe",
+      "id": 5113680,
+      "title": "AiDiy 診断"
+    },
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 68426,
+      "title": "AiDiy Live"
+    },
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_channels\\node_modules\\electron\\dist\\electron.exe",
+      "id": 5573610,
+      "title": "AiDiy Discord"
+    },
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 2819902,
+      "title": "AiDiy Code"
+    },
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_avatar\\node_modules\\electron\\dist\\electron.exe",
+      "id": 2165220,
+      "title": "AiDiy Avatar"
+    },
+    {
+      "app": "Chrome",
+      "id": 5900192,
+      "title": "AiDiy - ログイン - Google Chrome"
+    },
+    {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 1574810,
+      "title": "AiDiy Term"
+    }
+  ]
+}

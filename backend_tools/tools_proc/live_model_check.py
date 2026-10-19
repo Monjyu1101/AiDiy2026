@@ -17,8 +17,9 @@ from fastapi import HTTPException, Request
 
 ROOT = Path(__file__).resolve().parents[2]
 CONNECTION_TIMEOUT = 20
-RESPONSE_TIMEOUT = 30
-SETTLE_SECONDS = 10
+# 長い返答の生成・音声ターン完了まで待つ。接続・初回安定待機とは別枠。
+RESPONSE_TIMEOUT = 60
+SETTLE_SECONDS = 15
 MAX_CONFIG = 1024 * 1024
 TABLE = {
     'freeai_live': ('AIコア.AIライブ_gemini', 'FREEAI', 'freeai_key_id', 'gemini_key_id'),
@@ -214,7 +215,8 @@ class LiveModelCheck:
                     if getattr(adapter, 'エラーフラグ', False):
                         return result('NG', 'connection_failed')
                     await self.sleep(.05)
-            # 接続が確立しても直ちに送信しない。ユーザー指定の安定待機。
+            # 設定モデル・AIモデルとも試行ごとに新規セッションを作るため、
+            # 接続確立後、初回送信前に15秒待つ。同じセッションの毎送信待機ではない。
             await self.sleep(SETTLE_SECONDS)
             async with asyncio.timeout(self.response_timeout):
                 # 送信前に届いた通知・出力を試行の応答として数えない。

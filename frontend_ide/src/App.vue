@@ -6,7 +6,6 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, reactive, computed, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { installWindowMove } from './共通表示/長押し窓移動.js';
-import { installOpeningShine } from './共通表示/登場光沢.js';
 import CodePanel from './コード/コードパネル.vue';
 import TermPanel from './ターミナル/ターミナルパネル.vue';
 import LivePanel from './ライブ/ライブパネル.vue';
@@ -38,7 +37,6 @@ const state=ref({active:false}),base=reactive({term:'',code:config.kind==='code'
 const statusError=ref('');
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false),viewMode=ref('3d');
 let stopWindowMove=()=>{};
-let stopOpeningShine=()=>{};
 const desktop=!!window.aidiyWindow;let timer,disposed=false,revision=0,polling=false,session='';
 const allDisplayState=ref({active:false}),allBusy=ref(false),allMessage=ref(''),spaceView=ref();
 const canEnterAll=computed(()=>desktop&&state.value.active&&viewMode.value==='3d');
@@ -164,7 +162,6 @@ const draftLink={
   async launch(sender,kind,request){const linked=verifyPinned(sender,request);await confirmDraftSession(request,linked.sessionKey);verifyPinned(sender,request);return launchDraftTarget(kind,{...request,sessionKey:linked.sessionKey});},
 };
 onMounted(async()=>{
-  if(!config.host)stopOpeningShine=installOpeningShine();
   stopWindowMove=installWindowMove({kind:browserPanel?'browser':viewerPath?'viewer':config.kind,host:config.host});
   if(config.kind==='ide'&&desktop&&!viewerPath&&!browserPanel){
     stopAllDisplays=window.aidiyWindow.onAllDisplaysChanged?.(updateAllDisplays)||(()=>{});
@@ -176,7 +173,7 @@ onMounted(async()=>{
   if(config.kind==='ide'){await status();if(!disposed)timer=setInterval(status,10000);}
   else if(!base[config.kind])await openPanel(config.kind);
 });
-onBeforeUnmount(()=>{stopOpeningShine();stopWindowMove();stopAllDisplays();disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
+onBeforeUnmount(()=>{stopWindowMove();stopAllDisplays();disposed=true;revision++;lifetime.abort();clearInterval(timer);pinnedViewers.clear();if(window.aidiyDraftLink===draftLink)delete window.aidiyDraftLink;});
 </script>
 <template>
   <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertFileDraft" :launch-target="launchDraftTarget" @close="draftRequest=null" />
@@ -212,7 +209,7 @@ onBeforeUnmount(()=>{stopOpeningShine();stopWindowMove();stopAllDisplays();dispo
       <TerminalWelcome v-if="!state.active" kind="ide" :icon="config.icon" />
       <template v-else>
         <SpaceView ref="spaceView" :key="`${state.mode}:${state.startedAt}:${state.project?.path||''}`" :started-at="state.startedAt" :view-mode="viewMode" :all-displays="allDisplayState.active" />
-        <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='term'" @click="openPanel('term')">Term</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false">×</button></nav>
+        <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='term'" @click="openPanel('term')">Term</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false"><span class="close-icon" aria-hidden="true"></span></button></nav>
           <CodePanel ref="codePanel" v-if="base.code" v-show="tab==='code'" :key="base.code" :base="base.code" :icon="config.icon" embedded />
           <LivePanel ref="livePanel" v-if="base.live&&state.mode==='online'" v-show="panelOpen&&tab==='live'" :visible="panelOpen&&tab==='live'" :key="base.live" :base="base.live" :icon="config.icon" />
           <TermPanel v-if="base.term" v-show="tab==='term'" :key="base.term" :base="base.term" :icon="config.icon" :visible="panelOpen&&tab==='term'" linked />

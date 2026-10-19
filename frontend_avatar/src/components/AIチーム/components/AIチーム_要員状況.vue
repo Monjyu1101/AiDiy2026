@@ -446,12 +446,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .agent-card.state-working,
-  .agent-card.state-meditating {
-    animation: none;
-  }
-}
+
 
 .agent-avatar {
   width: 34px;

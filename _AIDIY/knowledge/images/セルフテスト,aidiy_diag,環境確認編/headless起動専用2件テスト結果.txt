@@ -1,0 +1,10 @@
+✔ default Node runtime starts without Python on PATH and serves anonymous models plus config status (1645.0505ms)
+✔ actual headless entrypoint works with missing config and no credentials, using bundled catalog only (1578.6218ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3377.7193

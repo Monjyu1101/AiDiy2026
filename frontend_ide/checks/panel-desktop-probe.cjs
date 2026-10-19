@@ -59,7 +59,7 @@ app.on('browser-window-created',(_,owner)=>{
    await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);
    await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'Viewer');
    await evaluate(owner,`document.querySelector('.explorer-toggle').click()`);
-   for(const zoom of [1,1.25]){
+   for(const zoom of process.env.AIDIY_PANEL_ROUTES_ONLY==='1'?[]:[1,1.25]){
     console.log('Explorer zoom',zoom);
     owner.webContents.setZoomFactor(zoom);await sleep(150);
     const rect=await evaluate(owner,`(()=>{const r=document.querySelector('.explorer-panel').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`);
@@ -93,7 +93,7 @@ app.on('browser-window-created',(_,owner)=>{
     assert.equal(await evaluate(owner,`document.querySelector('.explorer-panel')===originalExplorer`),true);
     results.push({kind:'explorer',zoom,bounds:expected,reload:true,restore:true});
    }
-   for(const zoom of [1,1.25]){
+   for(const zoom of process.env.AIDIY_PANEL_ROUTES_ONLY==='1'?[]:[1,1.25]){
     console.log('Viewer zoom',zoom);
     owner.webContents.setZoomFactor(zoom);await sleep(150);
     const rect=await evaluate(owner,`(()=>{const r=document.querySelector('.viewer-popup').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`);
@@ -129,13 +129,18 @@ app.on('browser-window-created',(_,owner)=>{
     await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'Viewer再open');
     results.push({kind:'viewer',zoom,bounds:expected,dismiss:true,reopen:true});
    }
+   // 閉じたバーの非表示ボタンを直接押さず、利用者と同じ順で展開してからpinする。
+   await evaluate(owner,`document.querySelector('[aria-label="軌跡バーを開く"]')?.click()`);
+   await until(()=>evaluate(owner,`document.querySelector('.explorer-routes').getBoundingClientRect().height>0`),'軌跡展開');
    await evaluate(owner,`document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);
    await until(()=>evaluate(owner,`!document.querySelector('.explorer-routes')`),'軌跡pin');
    const routes=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await until(()=>evaluate(routes,`!!document.querySelector('.route-controls')`),'軌跡表示');
+   await until(()=>evaluate(owner,`!document.querySelector('.panel-pin-preview')`),'軌跡ズーム完了');
    await sleep(350);
-   const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')];return{rows:new Set(buttons.map(b=>Math.round(b.getBoundingClientRect().top))).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
-   assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40);
+   // 大きいバーガーボタンも同じ行。高さが異なるボタンは上端でなく縦中心で整列を検査する。
+   const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')];return{rows:new Set(buttons.map(b=>{const r=b.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
+   assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40.01,JSON.stringify(row));
    await dragPanel(routes,'.route-choice','軌跡ボタン');
    writeFileSync(join(output,'electron-routes-single-row.png'),(await routes.webContents.capturePage()).toPNG());
    await evaluate(routes,`document.querySelector('[aria-label="軌跡バーを閉じる"]').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});

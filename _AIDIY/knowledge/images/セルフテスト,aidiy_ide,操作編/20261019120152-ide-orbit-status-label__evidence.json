@@ -1,0 +1,60 @@
+{
+  "status": "✅ OK",
+  "os": "Windows",
+  "date": "2026-10-19",
+  "method": "隔離Chromeの実描画・仮想時計",
+  "tests": 46,
+  "passed": 46,
+  "failed": 0,
+  "label": "軌道計算と姿勢制御中",
+  "evidence": [
+    {
+      "file": "ide-操作_101_最終更新への接近表示画面.png",
+      "description": "最終更新への接近表示",
+      "status": "✅ OK",
+      "sha256": "fdfa1265ae55487ac131f250d0bef35d72e9eff1c801fbe3d6e403afc19c3693"
+    },
+    {
+      "file": "20261019120152-ide-orbit-status-label__ide-操作_102_周回軌道航行表示画面.png",
+      "description": "周回軌道航行表示",
+      "status": "✅ OK",
+      "sha256": "005e0a51beebfaf367560ad739c2c57fd12a236f9f2fab2601c2a14362793e3f"
+    },
+    {
+      "file": "ide-操作_103_周回45秒表示画面.png",
+      "description": "周回45秒表示",
+      "status": "✅ OK",
+      "sha256": "61a82245d4667e1a3d8372f55836d7209e04cccedf1f63aeb4ecf51f57d56cc8"
+    },
+    {
+      "file": "ide-操作_104_周回90秒表示画面.png",
+      "description": "周回90秒表示",
+      "status": "✅ OK",
+      "sha256": "ceb2ff1aba8b9c5ce7d2eb71e3caa489a97d54865e6de8901499b9b43c246a32"
+    },
+    {
+      "file": "ide-操作_105_周回135秒表示画面.png",
+      "description": "周回135秒表示",
+      "status": "✅ OK",
+      "sha256": "a84f4c77d4b4052477696770743d3d8a20b2c4796016bc0e2479d598aa6a1b42"
+    },
+    {
+      "file": "ide-操作_106_周回180秒表示画面.png",
+      "description": "周回180秒表示",
+      "status": "✅ OK",
+      "sha256": "d868928b38277e88d1003d6cf6f25003839fabb6f2f1d71fcc348bb2140ac690"
+    },
+    {
+      "file": "ide-操作_107_軌道計算と姿勢制御中表示画面.png",
+      "description": "軌道計算と姿勢制御中表示",
+      "status": "✅ OK",
+      "sha256": "88c741510b047324ae3de04cdabce66b4ecd06474ce9df3a06791eaafe170255"
+    },
+    {
+      "file": "20261019120152-ide-orbit-status-label__ide-操作_108_探索軌道航行表示画面.png",
+      "description": "探索軌道航行表示",
+      "status": "✅ OK",
+      "sha256": "27039dd64a4cbf2d4212bf2237b39417234bd2ac7111ac393e119fd49544b057"
+    }
+  ]
+}

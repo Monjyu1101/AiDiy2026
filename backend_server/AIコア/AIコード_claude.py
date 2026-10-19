@@ -9,6 +9,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+from AIコア.AI応答 import 応答正規化, エラー応答
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -353,7 +354,7 @@ class CodeAI:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("ClaudeSDK実行:ClaudeSDKが開始されていません")
-                return "ClaudeSDKが停止状態です。開始してください。"
+                return "! ClaudeSDKが停止状態です。開始してください。"
 
             # 履歴管理（セッション内で自動管理されるが、独自履歴も維持）
             if not resume:
@@ -542,7 +543,9 @@ class CodeAI:
                                 logger.error(f"[CodeClaud] output_stream送信エラー(stream): {e}")
 
                         # 最終結果を取得
-                        if hasattr(message, 'result') and message.result:
+                        if getattr(message, 'is_error', False):
+                            result_text = エラー応答(getattr(message, 'result', None) or 'ClaudeSDKの実行に失敗しました。')
+                        elif hasattr(message, 'result') and message.result:
                             result_text = str(message.result)
                 
                 # タイムアウト監視
@@ -579,17 +582,17 @@ class CodeAI:
                 
             except asyncio.TimeoutError:
                 logger.warning(f"ClaudeSDK タイムアウト ({タイムアウト秒数}秒)")
-                result_text = f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
+                result_text = f"! 処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
 
             except Exception as sdk_error:
                 logger.error(f"ClaudeSDK エラー: {sdk_error}")
-                result_text = f"ClaudeSDK実行エラー: {str(sdk_error)}"
+                result_text = f"! ClaudeSDK実行エラー: {str(sdk_error)}"
 
             if self._停止マーカー送信済み and result_text.strip() == "":
                 result_text = "!"
 
             # 履歴に結果を追加
-            final_result = result_text.strip() if result_text.strip() else "!"
+            final_result = 応答正規化(result_text)
             self._履歴追加(final_result, "agent")
 
             return final_result
@@ -598,7 +601,7 @@ class CodeAI:
             # ツールエラーログ（必須）
             セッションID_str = (self.セッションID[:10] + '...') if self.セッションID else '新規'
             logger.error(f"ClaudeSDK実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={セッションID_str}")
-            エラーメッセージ = f"実行エラー: {str(e)}"
+            エラーメッセージ = f"! 実行エラー: {str(e)}"
 
             return エラーメッセージ
     

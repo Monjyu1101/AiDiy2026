@@ -43,4 +43,4 @@ def start():
     # 認証 URL は直接ターミナルへ。集約出力のバッファ・ファイルへ保存しない。
     return subprocess.Popen([node, str(ROOT / 'diag_main.mjs'), '--foreground'], cwd=ROOT,
                             start_new_session=sys.platform != 'win32',
-                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0)
+                            creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if sys.platform == 'win32' else 0)

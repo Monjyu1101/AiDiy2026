@@ -17,8 +17,8 @@ if(process.env.AIDIY_ALL_CENTER_ONLY!=='1')app.disableHardwareAcceleration();
 // 完全透明だとOSが描画を停止する環境があるため、撮影とviewport更新に必要な最小の不透明度を残す。
 const nativeShowInactive=BrowserWindow.prototype.showInactive,nativeOpacity=BrowserWindow.prototype.setOpacity;
 const shownWindows=[];
-BrowserWindow.prototype.setOpacity=function(){nativeOpacity.call(this,process.env.AIDIY_ALL_PANEL_POSITION_ONLY==='1'?1:.01);};
-BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){this.setOpacity(0);this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);nativeShowInactive.call(this);shownWindows.push(this.id);};
+BrowserWindow.prototype.setOpacity=function(value){nativeOpacity.call(this,this.isAiDiyOpeningCanvas?value:process.env.AIDIY_ALL_PANEL_POSITION_ONLY==='1'?1:.01);};
+BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){if(!this.isAiDiyOpeningCanvas){this.setOpacity(0);this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);shownWindows.push(this.id);}nativeShowInactive.call(this);};
 BrowserWindow.prototype.focus=function(){};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const evaluate=async(window,source)=>{try{return await window.webContents.executeJavaScript(source,true);}catch(error){throw new Error(`ALL確認の実行失敗: ${source}`,{cause:error});}};
@@ -42,6 +42,19 @@ app.on('browser-window-created',(_,owner)=>{
     const shot=await owner.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
     writeFileSync(join(output,`${stamp}_${name}.png`),shot.crop({x:0,y:0,width:shot.getSize().width,height:160}).toPNG());
    };
+   const viewerSpacingChecks=[],viewerSpacingShots=[];
+   const checkViewerSpacing=async(selector,vr)=>{
+    const measured=await evaluate(owner,`(()=>{const box=e=>{const r=e.getBoundingClientRect();return{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};},r=box(document.querySelector(${JSON.stringify(selector)})),heading=box(document.querySelector('.ide-heading')),controls=[...document.querySelectorAll(${JSON.stringify(vr?'.all-restore-zone':'.ide-heading .ai-launchers')})].map(box).filter(b=>b.width&&b.height);return{selector:${JSON.stringify(selector)},vr:${vr},viewport:{width:innerWidth,height:innerHeight},panel:r,explorer:${vr}?null:box(document.querySelector('.explorer-panel')),topGap:r.top-( ${vr} ? 0 : heading.bottom),bottomGap:innerHeight-r.bottom,controls,overlaps:controls.filter(b=>r.left<b.right&&r.right>b.left&&r.top<b.bottom&&r.bottom>b.top).length};})()`);
+    assert.ok(measured.topGap>=(vr?48:0),JSON.stringify(measured));
+    assert.ok(measured.bottomGap>=(vr?47.5:59.5),JSON.stringify(measured));
+    if(!vr){for(const edge of ['top','bottom'])assert.ok(Math.abs(measured.panel[edge]-measured.explorer[edge])<1,'通常横画面はExplorerと上下端をそろえる: '+JSON.stringify(measured));}
+    assert.equal(measured.overlaps,0,'ビューア・比較を上部の起動・VR操作に重ねない');
+    assert.ok(measured.panel.height>100);viewerSpacingChecks.push(measured);return measured;
+   };
+   const spacingShot=async name=>{
+    await owner.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});await sleep(300);
+    const file=join(output,`${stamp}_${name}.png`);writeFileSync(file,(await owner.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());viewerSpacingShots.push(file);
+   };
    const checkWeb=async()=>{
     const web=new BrowserWindow({show:false,width:1100,height:800,webPreferences:{sandbox:true,contextIsolation:true}});
     try{
@@ -52,8 +65,8 @@ app.on('browser-window-created',(_,owner)=>{
    };
    const buttonsOnly=process.env.AIDIY_ALL_BUTTONS_ONLY==='1';
    if(buttonsOnly||viewerOnly||process.env.AIDIY_ALL_PANEL_POSITION_ONLY==='1'){nativeOpacity.call(owner,1);await sleep(500);}
-   const buttons=await evaluate(owner,`[...document.querySelectorAll('.ide-heading .window-actions button')].map(button=>button.textContent.trim()||button.getAttribute('aria-label'))`);
-   assert.deepEqual(buttons,['最小化','最大化','×']);
+   const buttons=await evaluate(owner,`[...document.querySelectorAll('.ide-heading .window-actions button')].map(button=>button.getAttribute('aria-label')||button.textContent.trim())`);
+   assert.deepEqual(buttons,['最小化','最大化','終了']);
    if(buttonsOnly)await headingShot('startup-no-all');
    await evaluate(owner,`[...document.querySelectorAll('button')].find(b=>b.textContent==='オフライン利用').click()`);
    await until(()=>evaluate(owner,'!!window.aidiyIDE'),'宇宙表示');
@@ -71,11 +84,36 @@ app.on('browser-window-created',(_,owner)=>{
     writeFileSync(join(output,'buttons-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);return;
    }
    await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);
+   if(viewerOnly){
+    await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'余白確認のビューア表示');
+    await checkViewerSpacing('.viewer-popup',false);await spacingShot('normal-viewer-spacing');
+    const saved=owner.getBounds();
+    for(const [width,height] of [[900,500],[1280,720]]){
+     owner.setBounds({...saved,width,height});await sleep(250);await checkViewerSpacing('.viewer-popup',false);await spacingShot(`normal-viewer-spacing-${width}x${height}`);
+    }
+    owner.setBounds(saved);await sleep(250);
+   }
+   if(process.env.AIDIY_OPENING_ONLY==='1'){
+    await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'ビューア表示');
+    const shots=[],capture=async(window,name)=>{const shot=join(output,`${stamp}_opening-clean-${name}.png`);writeFileSync(shot,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());shots.push(shot);};
+    await sleep(850);assert.equal(await evaluate(owner,`document.querySelectorAll('.opening-shine,.opening-shine-band').length`),0);await capture(owner,'inline');
+    for(const [label,title] of [['エクスプローラーをピン留め','Explorer']]){
+     const before=new Set(BrowserWindow.getAllWindows().map(window=>window.id));
+     await evaluate(owner,`document.querySelector('[aria-label="${label}"]').click()`);
+     let child;await until(()=>{child=BrowserWindow.getAllWindows().find(w=>!before.has(w.id)&&w.webContents.getURL()==='about:blank');return child&&shownWindows.includes(child.id);},title+'表示');
+     await sleep(850);assert.equal(await evaluate(child,'window.openingShines'),0);assert.equal(await evaluate(child,`document.querySelectorAll('.opening-shine,.opening-shine-band').length`),0);await capture(child,title);
+    }
+    const result={testPassed:true,scope:'opening without shine',shots};writeFileSync(join(output,'opening-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);return;
+   }
    await until(()=>evaluate(owner,`!!document.querySelector('.viewer-history')`),'比較入口');
    await evaluate(owner,`document.querySelector('.viewer-history').click()`);
    await until(()=>evaluate(owner,`!!document.querySelector('.history-embedded .file-history-changes')&&!document.querySelector('.file-history-changes').textContent.includes('計算中')`),'比較表示');
    await evaluate(owner,`document.querySelectorAll('.ide-view-modes button')[0].click();window.originalCompare=document.querySelector('.history-embedded');window.originalViewer=document.querySelector('.viewer-session');window.originalExplorer=document.querySelector('.explorer-panel');window.originalRoutes=document.querySelector('.explorer-routes')`);
    await until(()=>evaluate(owner,`!!document.querySelector('.window-all')`),'3Dへ戻すとALLを再表示');
+   if(viewerOnly){await checkViewerSpacing('.history-embedded',false);await spacingShot('normal-comparison-spacing');}
+   // 閉じた軌跡バーの矩形は0になる。移行前の位置を比較するため先に表示する。
+   await evaluate(owner,`document.querySelector('.route-restore-toggle')?.click()`);
+   await until(()=>evaluate(owner,`document.querySelector('.explorer-routes')?.getBoundingClientRect().width>0`),'軌跡バーを表示して位置を測定');
    const originals=await evaluate(owner,`['.explorer-panel','.explorer-routes','.history-embedded'].map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{left:r.left,top:r.top,width:r.width,height:r.height}})`);
    const expectedPanels=originals.map((rect,index)=>panelBounds(index===1?{...rect,width:360,height:38}:rect,{window:owner},screen,index===1?'panel-routes':index===2?'panel-viewer':'explorer'));
    const original=owner.getBounds(),displays=screen.getAllDisplays(),expected=displayBounds(displays);
@@ -99,8 +137,7 @@ app.on('browser-window-created',(_,owner)=>{
    };
    for(const child of children){assert.equal(child.getParentWindow(),owner);assert.equal(child.isAlwaysOnTop(),true,`${child.webContents.getTitle()} の前面維持`);}
    for(const child of children){
-    const reduced=await evaluate(child,`matchMedia('(prefers-reduced-motion: reduce)').matches`);
-    assert.equal(await evaluate(child,'window.openingShines'),reduced?0:1,`${child.webContents.getTitle()} の登場光沢は一度だけ（動きを減らす場合は省略）`);
+    assert.equal(await evaluate(child,'window.openingShines'),0,`${child.webContents.getTitle()} に登場後の光沢を出さない`);
    }
    const assertPinOrder=windows=>{
     const explorer=windows.find(w=>w.webContents.getTitle().includes('/ Explorer')),routes=windows.find(w=>w.webContents.getTitle().includes('/ 軌跡'));
@@ -113,7 +150,7 @@ app.on('browser-window-created',(_,owner)=>{
     const child=children.find(window=>window.webContents.getTitle().includes(index===0?'Explorer':index===1?'軌跡':'Viewer'));assert.ok(child);
     const bounds=child.getBounds(),target=expectedPanels[index];
     // 軌跡は内容に合わせて高さを更新する。位置と幅は切替前の矩形を保つ。
-    if(index===1){assert.ok(Math.abs(bounds.x-target.x)<=2);assert.ok(Math.abs(bounds.y-target.y)<=2);assert.ok(Math.abs(bounds.width-target.width)<=4,'透明窓の外枠・DPI丸めを含む軌跡の幅');}else near(bounds,target);
+    if(index===1){assert.ok(Math.abs(bounds.x-target.x)<=2,JSON.stringify({bounds,target}));assert.ok(Math.abs(bounds.y-target.y)<=2);assert.ok(Math.abs(bounds.width-target.width)<=4,'透明窓の外枠・DPI丸めを含む軌跡の幅');}else near(bounds,target);
    }
    assert.equal(await evaluate(owner,`originalViewer.ownerDocument===document&&originalCompare===originalViewer.querySelector('.history-embedded')`),true,'ALL移行で閲覧・比較DOMを別窓にしない');
    assert.equal(await evaluate(owner,'aidiyIDE===originalSpace'),true);
@@ -149,20 +186,24 @@ app.on('browser-window-created',(_,owner)=>{
     if(process.platform==='win32'){assert.ok(actual.x<area.x&&actual.y<area.y);assert.ok(actual.x+actual.width>area.x+area.width&&actual.y+actual.height>area.y+area.height);}
     const shot=join(output,`${stamp}_vr-top.png`);
     writeFileSync(shot,(await owner.webContents.capturePage({x:0,y:0,width:1000,height:80},{stayHidden:true,stayAwake:true})).toPNG());
-    for(let i=0;i<3;i++){
+    const roundTrips=[];
+    for(let i=0;i<5;i++){
      await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
-     await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'VR復帰');near(owner.getBounds(),original);await checkBarsClosed();
-     if(i<2){await evaluate(owner,`document.querySelector('.window-all').click()`);await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-transition')`),'VR再移行');near(owner.getBounds(),expected);}
+     await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'VR復帰');assert.deepEqual(owner.getBounds(),original,'VR往復で通常窓の位置・寸法を完全に維持');await checkBarsClosed();
+     roundTrips.push(owner.getBounds());
+     if(i<4){await evaluate(owner,`document.querySelector('.window-all').click()`);await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-transition')`),'VR再移行');near(owner.getBounds(),expected);}
     }
-    const result={testPassed:true,scope:'VR frame coverage',displayCount:displays.length,coverage:actual,restored:owner.getBounds(),roundTrips:3,shot};
+    const result={testPassed:true,scope:'VR frame coverage',displayCount:displays.length,displays:displays.map(d=>({bounds:d.bounds,scaleFactor:d.scaleFactor})),coverage:actual,original,restored:owner.getBounds(),roundTrips:5,restoredBounds:roundTrips,shot};
     writeFileSync(join(output,'edge-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);return;
    }
    assert.equal(await evaluate(owner,`document.querySelector('.ide-heading').getBoundingClientRect().height`),0);
    assert.equal(await evaluate(owner,`[...document.querySelectorAll('.space-flight-controls,.space-filter-toggle,.space-breadcrumb,.explorer-toggle,.route-restore-toggle')].every(node=>getComputedStyle(node).display==='none')`),true);
    const checkInline=async selector=>{
     const r=await evaluate(owner,`(()=>{const node=document.querySelector(${JSON.stringify(selector)}),r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,center:parseFloat(document.querySelector('.space-view').style.getPropertyValue('--focus-x'))||innerWidth/2,viewportWidth:innerWidth,viewportHeight:innerHeight,visible:getComputedStyle(node).visibility!=='hidden'&&getComputedStyle(node).display!=='none',count:document.querySelectorAll('.viewer-session').length};})()`);
-    assert.equal(r.visible,true);assert.equal(r.count,1);assert.ok(Math.abs(r.x-r.center-128)<2,'中心星の128px右から表示');
-    assert.ok(r.width<=641&&r.width>100&&r.right<=r.viewportWidth+1&&r.bottom<=r.viewportHeight+1,JSON.stringify(r));return r;
+    assert.equal(r.visible,true);assert.equal(r.count,1);
+    const expectedLeft=Math.max(16,Math.min(r.center+128,r.viewportWidth-r.width-16));
+    assert.ok(Math.abs(r.x-expectedLeft)<2,'中心星の128px右を基本に、画面右端の余白へ収める: '+JSON.stringify(r));
+    assert.ok(r.width<=641&&r.width>100&&r.right<=r.viewportWidth+1&&r.bottom<=r.viewportHeight+1,JSON.stringify(r));if(viewerOnly)await checkViewerSpacing(selector,true);return r;
    };
    await checkInline('.history-embedded');
    const checkInlineViewer=async()=>{
@@ -221,11 +262,12 @@ app.on('browser-window-created',(_,owner)=>{
     assert.equal(await evaluate(owner,`originalExplorer===document.querySelector('.explorer-panel')&&originalRoutes===document.querySelector('.explorer-routes')`),true,'再表示でもDOMと状態を維持');
     await headingShot('normal-bars-reopened');shots.push(join(output,`${stamp}_normal-bars-reopened.png`));
     assert.equal(await evaluate(owner,`inlineBeforeRestore===document.querySelector('.viewer-session')&&getComputedStyle(document.querySelector('.viewer-popup')).visibility==='visible'`),true,'ALL解除後も閲覧を維持');
+    await checkViewerSpacing('.viewer-popup',false);await spacingShot('restored-viewer-spacing');
     await evaluate(owner,`document.querySelector('.window-all').click()`);
     await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-transition')`),'再表示後のALL再開始');
     await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
     await checkBarsClosed();
-    const result={testPassed:true,scope:'ALL inline viewer',displayCount:displays.length,autoPinned:['explorer','routes'],barCloseHiddenInAll:true,barsClosedOnExit:true,barsReopened:true,repeatedExit:true,viewerClosePreserved:true,inlineComparison:true,reuseSingleViewer:true,manualPin:true,shots};
+    const result={testPassed:true,scope:'ALL inline viewer',displayCount:displays.length,autoPinned:['explorer','routes'],barCloseHiddenInAll:true,barsClosedOnExit:true,barsReopened:true,repeatedExit:true,viewerClosePreserved:true,inlineComparison:true,reuseSingleViewer:true,manualPin:true,viewerSpacingChecks,viewerSpacingShots,shots};
     writeFileSync(join(output,'viewer-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);return;
    }
    const zone=await evaluate(owner,`(()=>{const r=document.querySelector('.all-restore-zone[data-display-id="${screen.getPrimaryDisplay().id}"]').getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,width:r.width}})()`),area=screen.getPrimaryDisplay().workArea,zoom=owner.webContents.getZoomFactor();

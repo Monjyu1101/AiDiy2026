@@ -1,0 +1,34 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
+// build:electron の出力を検証。ネットワーク・音声・実GUIは起動しない。
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {EventEmitter}=require('node:events');
+const {readFileSync}=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const {createRequire}=require('node:module');
+const filename=path.join(__dirname,'../dist-electron/main.js'),load=createRequire(filename);
+
+function fixture(platform){
+ const app=new EventEmitter();let ready,menu,quit=0,icon;
+ Object.assign(app,{setName(value){app.name=value;},setAppUserModelId(){},getAppPath:()=>path.join(__dirname,'..'),requestSingleInstanceLock:()=>true,whenReady:()=>({then(callback){ready=callback;}}),quit(){quit++;},dock:{setMenu(value){app.dock.menu=value;},setIcon(value){icon=value;}}});
+ const stop=new Error('fixture: stop before display/media initialization');
+ const Menu={buildFromTemplate:items=>items,setApplicationMenu(value){menu=value;}};
+ const electron={app,Menu,session:{defaultSession:{setDisplayMediaRequestHandler(){throw stop;}}}};
+ vm.runInNewContext(readFileSync(filename,'utf8'),{__dirname:path.dirname(filename),exports:{},process:{platform,env:{}},console,URL,
+  require:id=>id==='electron'?electron:id.endsWith('window-opening.cjs')?{拡大表示:async()=>true}:load(id)});
+ assert.throws(()=>ready(),error=>error===stop);
+ return{app,menu,icon,quits:()=>quit};
+}
+test('Avatar の実行出力はMacの名前・最小メニュー・Dockを設定し、閉じるは全ウィンドウ終了へ渡す',()=>{
+ const f=fixture('darwin');assert.equal(f.app.name,'AiDiy Avatar');assert.equal(f.menu[0].label,'AiDiy Avatar');assert.match(f.icon,/AiDiy_avatar\.png$/);
+ f.menu[0].submenu[0].click();f.app.dock.menu[0].click();assert.equal(f.quits(),2);
+ assert.equal(f.menu[0].submenu.filter(item=>item.visible!==false).length,1);
+});
+test('Avatar の Windows / Linux はMac専用メニューを設定しない',()=>{
+ for(const platform of ['win32','linux']){const f=fixture(platform);assert.equal(f.menu,undefined);assert.equal(f.icon,undefined);assert.equal(f.quits(),0);}
+});

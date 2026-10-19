@@ -277,7 +277,7 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
             {"type": "session.error", "data": {"message": "認証エラー"}},
         ]
         result = await code_ai._subprocess実行(self._jsonl_command(events), cwd=str(PROJECT_ROOT), timeout=10)
-        self.assertEqual("Copilot実行エラー: 認証エラー", result)
+        self.assertEqual("! Copilot実行エラー: 認証エラー", result)
         streamed = [m["メッセージ内容"] for m in parent.接続.messages]
         self.assertIn("[Copilot tool] 端末出力", streamed)
         self.assertIn("[Copilot tool] bash 失敗: ツールエラー", streamed)
@@ -292,8 +292,14 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
         code_ai, parent = self._code_ai("copilot_cli")
         command = [sys.executable, "-c", "import sys; print('起動エラー',file=sys.stderr); sys.exit(1)"]
         result = await code_ai._subprocess実行(command, cwd=str(PROJECT_ROOT), timeout=10)
-        self.assertEqual("Copilot実行エラー: 起動エラー", result)
+        self.assertEqual("! 実行エラー: copilot_cli 起動エラー", result)
         self.assertEqual(["起動エラー"], [m["メッセージ内容"] for m in parent.接続.messages])
+
+    def test_copilot_session_error_overrides_partial_answer(self):
+        output = self.module._CopilotJSON出力()
+        output.解析(json.dumps({"type": "assistant.message", "data": {"messageId": "m", "content": "途中の回答"}}))
+        output.解析(json.dumps({"type": "session.error", "data": {"message": "利用上限"}}))
+        self.assertEqual(output.回答, "! Copilot実行エラー: 利用上限")
 
     async def test_copilot_and_opencode_do_not_use_stderr_as_final_answer(self):
         for provider in ("copilot_cli", "opencode_cli"):
@@ -307,14 +313,23 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
                 )
 
                 streamed = [m["メッセージ内容"] for m in parent.接続.messages]
-                self.assertEqual("（応答なし）", result)
+                self.assertEqual("!", result)
                 self.assertEqual(["ERROR_ONLY"], streamed)
 
     async def test_opencode_process_failure_reports_stderr_error_line(self):
         code_ai, parent = self._code_ai("opencode_cli")
         script = "import sys; print('\\x1b[0m', file=sys.stderr); print('> build', file=sys.stderr); print('Error: usage limit', file=sys.stderr); sys.exit(1)"
         result = await code_ai._subprocess実行([sys.executable, "-c", script], cwd=str(PROJECT_ROOT), timeout=10)
-        self.assertEqual("実行エラー: opencode_cli Error: usage limit", result)
+        self.assertEqual("! 実行エラー: opencode_cli Error: usage limit", result)
+
+    async def test_partial_stdout_with_nonzero_exit_is_an_error(self):
+        for provider in ("opencode_cli", "claude_cli", "codex_cli"):
+            with self.subTest(provider=provider):
+                code_ai, _ = self._code_ai(provider)
+                command = [sys.executable, "-c", "import sys; print('partial answer'); print('Error: denied', file=sys.stderr); sys.exit(2)"]
+                result = await code_ai._subprocess実行(command, cwd=str(PROJECT_ROOT), timeout=10)
+                self.assertTrue(result.startswith("!"), result)
+                self.assertIn("denied", result)
 
     async def test_antigravity_streams_only_stderr(self):
         code_ai, parent = self._code_ai("antigravity_cli")
@@ -413,7 +428,7 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
                     cwd=str(PROJECT_ROOT),
                     timeout=1,
                 )
-                self.assertEqual("処理タイムアウト(1秒)が発生しました。", result)
+                self.assertEqual("! 処理タイムアウト(1秒)が発生しました。", result)
                 self.assertGreaterEqual(time.monotonic() - start, 1.5)
 
 

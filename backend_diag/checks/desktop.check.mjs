@@ -10,21 +10,36 @@ import vm from 'node:vm';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from '../起動/desktop.mjs';
 import miniWindow from '../起動/ミニ表示.cjs';
 import closeWindow from '../起動/終了確認.cjs';
+import macMenu from '../起動/MacOS-Menu.cjs';
 const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
-async function mainFixture({opening,load,primary=true,startStatus={終了時停止あり:false},confirmClose=async()=>({response:1})}={}){
+async function mainFixture({opening,load,toolsOpen=false,primary=true,platform='win32',startStatus={終了時停止あり:false},confirmClose=async()=>({response:1}),selectFolder=async()=>({canceled:true,filePaths:[]})}={}){
  const source=await readFile(new URL('../起動/electron-main.cjs',import.meta.url),'utf8');
+ const moves=[];
  const stdin=Readable.from([]),proc=new EventEmitter(),app=new EventEmitter(),policy={},sent=[],exits=[],handlers={},scripts=[],openings=[],dialogs=[];
- Object.assign(proc,{stdin,pid:42,platform:'win32',connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
- let options,win,loaded;app.whenReady=async()=>{};app.requestSingleInstanceLock=()=>primary;app.restored=0;app.focused=0;app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
+ Object.assign(proc,{stdin,pid:42,platform,connected:true,send:(message,callback)=>{sent.push(message);callback?.();}});
+ let options,win,loaded;app.whenReady=async()=>{};
+ app.getPath=name=>{assert.equal(name,'appData');return '/fixture/appData';};
+ app.setPath=(name,value)=>{assert.equal(name,'userData');app.userData=value;};
+ app.requestSingleInstanceLock=()=>{assert.equal(app.userData,path.join('/fixture/appData','aidiy_diag'));return primary;};
+ app.restored=0;app.focused=0;app.quit=()=>{app.quitting=true;};app.exit=code=>exits.push(code);
+ app.setName=name=>{app.name=name;};app.dock={setMenu(menu){app.dock.menu=menu;},setIcon(icon){app.dock.icon=icon;}};
+ const Menu={buildFromTemplate:items=>items,setApplicationMenu(menu){app.menu=menu;}};
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
- vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,dialog:{showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
- return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,dialogs,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}getNormalBounds(){return this.bounds||{x:150,y:100,width:1160,height:820};}getMinimumSize(){return this.minimum||[420,320];}isMaximizable(){return true;}setMinimumSize(...value){this.minimum=value;}setMaximizable(value){this.maximizable=value;}setBounds(value){this.bounds=value;}isAlwaysOnTop(){return !!this.top;}setAlwaysOnTop(value){this.top=value;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
+ vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./MacOS-Menu.cjs'?{...macMenu,Macメニューを設定:options=>macMenu.Macメニューを設定({...options,platform})}:id==='../../frontend_ide/デスクトップ/長押し窓移動.cjs'?{attachNativeWindowMove:(window,screen,kind)=>moves.push({window,screen,kind})}:id==='./ポート接続.cjs'?{checkPort:async port=>{assert.equal(port,8095);return toolsOpen;}}:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,Menu,screen:{getPrimaryDisplay:()=>({workArea:{x:0,y:28,width:1920,height:1052}})},dialog:{showOpenDialog:selectFolder,showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
+ return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,dialogs,moves,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
 test('desktop default; explicit browser, Codespaces, headless remain Node-only',()=>{
  assert.equal(browserMode({}, {DISPLAY:':1'},'linux'),false);assert.equal(browserMode({}, {},'win32'),false);
  for(const [options,env] of [[{browser:true},{}],[{noOpen:true},{}],[{},{CODESPACES:'true'}],[{},{}]])assert.equal(browserMode(options,env,'linux'),true);
+});
+test('Diag separates its profile from Avatar before locking on every OS',async()=>{
+ for(const platform of ['win32','darwin','linux']){
+  const f=await mainFixture({platform});
+  assert.equal(f.app.userData,path.join('/fixture/appData','aidiy_diag'));
+  assert.notEqual(path.basename(f.app.userData),'Electron');
+ }
 });
 test('desktop binary requires matching installed package and dist',async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'diag-electron-'));const folder=path.join(root,'node_modules/electron');
@@ -39,11 +54,46 @@ test('desktop auth travels IPC only after readiness, never stdin/argv/env',()=>{
 test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',async()=>{
  const f=await mainFixture();f.stdin.resume();await once(f.stdin,'end');assert.deepEqual(f.exits,[]);assert.equal(f.sent[0].type,'diag-ready');assert.equal(f.options,undefined);
  f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ assert.equal(f.moves.length,1);assert.equal(f.moves[0].window,f.win);assert.equal(f.moves[0].kind,'diag');
  assert.equal(f.options.webPreferences.nodeIntegration,false);assert.equal(f.options.webPreferences.contextIsolation,true);assert.equal(f.options.webPreferences.sandbox,true);assert.equal(f.loaded,url);
  const {policy,win}=f;assert.equal(policy.check(),false);policy.permission(null,'camera',allowed=>assert.equal(allowed,false));assert.equal(policy.window().action,'deny');
  let blocked=false;win.webContents.emit('will-navigate',{preventDefault(){blocked=true;}});assert.ok(blocked);policy.request({url:'https://outside.test/'},value=>assert.equal(value.cancel,true));
  assert.equal(f.openings.length,1);assert.equal(win.shown,true);assert.equal(f.sent.at(-1).type,'diag-shown');
  f.proc.emit('disconnect');assert.equal(f.app.quitting,true);
+});
+
+test('Tools 8095 open starts mini at primary work-area top-left before show, while closed/unknown use normal',async()=>{
+ for(const toolsOpen of [true,false,null]){
+  const f=await mainFixture({toolsOpen,opening:window=>{
+   if(toolsOpen===true){assert.equal(window.bounds.width,240);assert.equal(window.bounds.height,130);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
+   else assert.equal(window.bounds,undefined);
+   window.show();return true;
+  }});
+  f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+  assert.equal(JSON.stringify(f.options.webPreferences.additionalArguments),JSON.stringify(toolsOpen===true?['--aidiy-diag-initial-mini']:[]));
+  assert.equal(f.win.shown,true);assert.equal(f.sent.at(-1).type,'diag-shown');
+  if(toolsOpen===true){const event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};f.handlers['diag:window'](event,'startMini',false);assert.equal(f.win.bounds.width,1160);assert.equal(f.win.bounds.x,150);assert.equal(f.win.top,false);}
+ }
+});
+test('Mac has a minimal named menu and Dock close keeps the running-process confirmation',async()=>{
+ let answer=1;
+ const f=await mainFixture({platform:'darwin',startStatus:{終了時停止あり:true},confirmClose:async()=>({response:answer})});
+ assert.equal(f.app.name,'AiDiy 診断');f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ assert.equal(f.app.menu.length,1);assert.equal(f.app.menu[0].label,'AiDiy 診断');
+ assert.equal(f.app.menu[0].submenu.filter(item=>item.visible!==false).length,1);assert.equal(f.app.menu[0].submenu[0].label,'閉じる');
+ assert.equal(f.app.menu[0].submenu[0].accelerator,'Command+Q');assert.match(f.app.dock.icon,/AiDiy_diag\.png$/);
+ f.app.dock.menu[0].click();await new Promise(r=>setImmediate(r));assert.equal(f.dialogs.length,1);assert.equal(f.win.closed,undefined);
+ answer=0;f.app.menu[0].submenu[0].click();await new Promise(r=>setImmediate(r));assert.equal(f.dialogs.length,2);assert.equal(f.win.closed,true);
+});
+test('Mac native clipboard shortcuts remain available without an Edit menu and Cmd+W confirms closing',async()=>{
+ const f=await mainFixture({platform:'darwin',startStatus:{終了時停止あり:true}});f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ const edit=f.app.menu[0].submenu.filter(item=>item.role);
+ assert.deepEqual(edit.map(item=>item.role),['undo','redo','cut','copy','paste','pasteAndMatchStyle','selectAll']);
+ assert.ok(edit.every(item=>item.visible===false&&item.acceleratorWorksWhenHidden));
+ assert.equal(f.win.webContents.listenerCount('before-input-event'),0,'IME・Term・エディタのキー入力は横取りしない');assert.equal(f.dialogs.length,0);
+ f.app.menu[0].submenu.find(item=>item.accelerator==='Command+W').click(null,f.win);await new Promise(r=>setImmediate(r));
+ assert.equal(f.dialogs.length,1);assert.equal(f.win.closed,undefined);
+ const other=await mainFixture();other.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));assert.equal(other.app.menu,undefined);assert.equal(other.app.dock.icon,undefined);
 });
 test('Electron invalid message / URL and page failure emit fixed secret-free causes',async()=>{
  for(const [message,code] of [[{type:'other',url},'IPC'],[{type:'diag-start',url:'https://private.test/SECRET'},'URL'],[{type:'diag-start',url:'x'.repeat(4097)},'IPC']]){
@@ -117,9 +167,21 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  assert.equal(control(event,'startMini',{width:100}),false);
  control(event,'openFile');assert.equal(f.win.closed,undefined);
  control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,0);
- const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
- assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','isMaximized','maximize','minimize','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{process:{argv:[]},require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','initialMini','isMaximized','maximize','minimize','selectProject','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.equal(exposed.aidiyWindow.initialMini,false);
+ assert.deepEqual(Array.from(exposed.aidiyWindow.selectProject()),['diag:window','selectProject']);
  assert.deepEqual(Array.from(exposed.aidiyWindow.startMini(true)),['diag:window','startMini',true]);assert.equal(await exposed.aidiyWindow.startMini({width:100}),false);
+});
+
+test('project picker is main-frame-only, one at a time and cancel leaves no path',async()=>{
+ let resolve,calls=0;const f=await mainFixture({selectFolder:async(parent,options)=>{calls++;assert.equal(parent,f.win);assert.equal(JSON.stringify(options.properties),JSON.stringify(['openDirectory']));return new Promise(done=>resolve=done);}});
+ f.proc.emit('message',{type:'diag-start',url});await new Promise(r=>setImmediate(r));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ assert.equal(control({...event,senderFrame:{}},'selectProject'),false);assert.equal(calls,0);
+ const selected=control(event,'selectProject');assert.equal(control(event,'selectProject'),null);assert.equal(calls,1);
+ resolve({canceled:false,filePaths:['C:/日本語 空白']});assert.equal(await selected,'C:/日本語 空白');
+ const canceled=control(event,'selectProject');resolve({canceled:true,filePaths:[]});assert.equal(await canceled,null);
 });
 
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
@@ -147,10 +209,10 @@ test('closed window or renderer failure during expansion never reports shown',as
   finish(failure!=='closed');await flush();assert.equal(f.sent.some(m=>m.type==='diag-shown'),false);assert.equal(f.scripts.length,1);
  }
 });
-test('load failure skips expansion and content fade is desktop-only with reduced-motion override',async()=>{
+test('load failure skips expansion and content fade is desktop-only without an OS-motion override',async()=>{
  const f=await mainFixture({load:async()=>{throw Error('SECRET');}});f.proc.emit('message',{type:'diag-start',url});await flush();assert.equal(f.openings.length,0);assert.equal(f.sent.at(-1).code,'LOAD');
  const css=await readFile(new URL('../ui/src/style.css',import.meta.url),'utf8');
  assert.match(css,/\.desktop-window #app\{animation:startup-fade-in \.45s ease-out both\}/);
  assert.match(css,/\.desktop-opening #app\{opacity:0;animation:none\}/);
- assert.match(css,/@media\(prefers-reduced-motion:reduce\)\{\.desktop-window #app\{animation:none\}\}/);
+ assert.doesNotMatch(css,/prefers-reduced-motion/);
 });

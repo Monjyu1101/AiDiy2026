@@ -19,6 +19,7 @@ import json
 import os
 from typing import Optional
 
+from AIコア.AI応答 import 応答正規化, エラー応答
 from log_config import get_logger
 
 logger = get_logger(__name__)
@@ -280,7 +281,7 @@ class Chat:
                 await self.接続.send_to_channel(self.チャンネル, {
                     "セッションID": self.セッションID,
                     "メッセージ識別": "output_text",
-                    "メッセージ内容": "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
+                    "メッセージ内容": "! ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
                 })
             return
         await self.チャット処理Ｑ.put(受信データ)
@@ -369,13 +370,12 @@ class Chat:
                     # AI側が保存したファイル一覧を取得
                     出力ファイル一覧 = getattr(ai_instance, "last_output_files", []) or []
                 elif self.初期化エラー:
-                    出力メッセージ内容 = self.初期化エラー
+                    出力メッセージ内容 = エラー応答(self.初期化エラー)
             except Exception as e:
                 logger.error(f"[Chat] AI実行エラー: {e}")
-                出力メッセージ内容 = "!"
+                出力メッセージ内容 = エラー応答(e)
 
-            if not 出力メッセージ内容:
-                出力メッセージ内容 = "!"
+            出力メッセージ内容 = 応答正規化(出力メッセージ内容)
 
             # テキストから [画像ファイル: ...] 行を除去（ファイルは別途output_fileで送る）
             if 出力ファイル一覧:
@@ -478,6 +478,22 @@ class Chat:
             if file_path:
                 logger.info(f"[Chat] 添付ファイル渡し: {file_path}")
 
+            # Chat の各 Provider が直接扱えるのは画像だけ。テキストとして読める添付は
+            # 本文をメッセージに含め、読めない形式はその旨を明記して黙って捨てない。
+            画像拡張子 = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+            for パス in 添付ファイル一覧:
+                if not os.path.exists(パス) or os.path.splitext(パス)[1].lower() in 画像拡張子:
+                    continue
+                本文 = self._添付テキスト読込(パス)
+                名前 = os.path.basename(パス)
+                if 本文 is None:
+                    元のメッセージ内容 += f"\n\n[添付ファイル: {名前}（この形式はChatでは読み取れません）]"
+                else:
+                    元のメッセージ内容 += f"\n\n[添付ファイル: {名前}]\n```\n{本文}\n```"
+                logger.info(f"[Chat] 添付ファイルの本文をメッセージに追加: {パス} 読取={'不可' if 本文 is None else '可'}")
+                if file_path == パス:
+                    file_path = None
+
         # 添付ファイルがなく、ファイルパネルで選択中のパスがある場合はメッセージに追加
         if not 添付ファイル一覧:
             選択ファイル情報 = 受信データ.get("選択ファイル情報")
@@ -488,6 +504,28 @@ class Chat:
         # AI実行と応答送信（エコーバックは core_router/AIコア.py で既に実施済み）
         受信データ["メッセージ内容"] = 元のメッセージ内容
         await self._AI実行と応答送信(受信データ, file_path=file_path)
+
+    @staticmethod
+    def _添付テキスト読込(パス: str, 上限バイト: int = 200_000):
+        """テキストとして読める添付なら本文（上限で切詰め）を、読めなければ None を返す。"""
+        try:
+            with open(パス, "rb") as f:
+                データ = f.read(上限バイト + 1)
+        except OSError:
+            return None
+        if b"\x00" in データ[:4096]:
+            return None
+        切詰め = len(データ) > 上限バイト
+        for 符号 in ("utf-8-sig", "cp932"):
+            try:
+                # 切詰めた末尾で多バイト文字が割れても、UTF-8 として読めるよう末尾だけ許容する
+                本文 = データ[:上限バイト].decode(符号, errors="ignore" if 切詰め and 符号 == "utf-8-sig" else "strict")
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            return None
+        return 本文 + ("\n…（以下省略）" if 切詰め else "")
 
     async def _処理_input_file(self, 受信データ: dict):
         """input_file処理: AIにファイルを渡して実行 → output_text + output_file送信"""

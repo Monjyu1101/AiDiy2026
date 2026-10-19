@@ -21,6 +21,12 @@
    if(message.type==='ready')notify(state);
    if(message.type==='input_text'&&!window.fixtureManual){state.メッセージ=[{種別:'user',本文:message.メッセージ内容},{種別:'assistant',本文:'**テスト回答**'}];notify({type:'accepted'});notify({...state});}
    if(message.type==='chooseModel')notify({type:'modelCatalog',provider:message.provider||'',items:message.provider?[{id:'auto',label:'自動'}]:[{id:'codex_cli',label:'Codex'}]});
+   // 現在の会話を削除したホストは、切替完了と新しい状態を両方通知する。
+   if(message.type==='deleteHistory'){
+    state.履歴=state.履歴.filter(item=>item.id!==message.id);
+    if(message.id===state.会話ID){state.会話ID='fixture-code-after-delete';state.メッセージ=[];notify({type:'conversationChangeResult',requestId:message.requestId,ok:true,会話ID:state.会話ID,projectPath:state.作業フォルダ.パス});}
+    notify({...state});
+   }
   }else{
    if(message.type==='mic-start')notify({type:'reply',id:message.id,value:{ok:true}});
    if(message.type==='api'&&window.fixtureApiError)notify({type:'reply',id:message.id,error:window.fixtureApiError});

@@ -1,6 +1,7 @@
 <script setup>
 import {ref,watch,nextTick} from 'vue';
 import './起動.css';
+import {明滅値} from './明滅.mjs';
 const props=defineProps({state:Object,online:Boolean,visible:Boolean});
 defineEmits(['mini']);
 const consoleView=ref(),targetTabs=ref();
@@ -9,10 +10,10 @@ watch(()=>props.state.選択.value,async()=>{await nextTick();if(props.visible)t
 function tone(state){return state==='稼働中'?'running':state==='エラー'?'error':['起動中','再起動中','確認中','再起動待ち','停止中'].includes(state)?'busy':'idle';}
 </script>
 <template>
-<section class="panel start-panel" v-show="visible" aria-label="起動管理">
- <div class="panel-heading"><div><h2>起動</h2><p>機能ごとに設定を保存し、右上の「設定起動」で順番に再起動します。</p></div><div class="start-view-actions"><span class="start-save" role="status">{{state.保存表示.value}}</span><button class="start-mini-switch" :disabled="!online||!state.項目.value.length" @click="$emit('mini')">ミニ表示</button></div></div>
+<section class="panel start-panel" v-show="visible" aria-label="システム起動管理">
+ <div class="panel-heading"><div><h2>システム起動</h2><p>機能ごとに設定を保存し、右上の「設定起動」で順番に再起動します。</p></div><div class="start-view-actions"><span class="start-save" role="status">{{state.保存表示.value}}</span><button class="start-mini-switch" :disabled="!online||!state.項目.value.length" @click="$emit('mini')">ミニ表示</button></div></div>
  <nav ref="targetTabs" class="start-targets" aria-label="起動する機能">
-  <button v-for="item in state.項目.value" :key="item.id" :class="{active:state.選択.value===item.id}" :aria-pressed="state.選択.value===item.id" @click="state.選択.value=item.id"><span class="start-dot" :data-tone="tone(item.状態)"></span>{{item.名前}}<span v-if="item.設定.起動対象" class="start-enabled" title="設定起動の対象">✓</span></button>
+  <button v-for="(item,index) in state.項目.value" :key="item.id" :class="{active:state.選択.value===item.id}" :data-tone="tone(item.状態)" :style="明滅値(index,'start')" :aria-pressed="state.選択.value===item.id" @click="state.選択.value=item.id"><span class="start-dot" :data-tone="tone(item.状態)"></span>{{item.名前}}<span v-if="item.設定.起動対象" class="start-enabled" title="設定起動の対象">✓</span></button>
  </nav>
  <div v-if="state.読込中.value" class="start-empty">起動設定を読み込んでいます…</div>
  <div v-else-if="!state.選択対象.value" class="start-empty">診断に接続すると、起動する機能を設定できます。</div>

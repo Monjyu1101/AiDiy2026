@@ -1,0 +1,95 @@
+{
+  "status": "✅ OK",
+  "date": "2026-10-19",
+  "os": "Windows",
+  "method": "隔離Chrome・実Canvas描画・仮想時計。Computer Useの実時間操作試験ではありません。",
+  "distinctTests": 117,
+  "passed": 117,
+  "failed": 0,
+  "evidence": [
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_101_目的地へ接近中表示画面.png",
+      "description": "最終更新への接近中も現在の状態を表示します。",
+      "status": "✅ OK",
+      "sha256": "22adf6236485374cb66863a5eba4d68f5c28a1f0b8d164c320c7380f6ba3207c"
+    },
+    {
+      "file": "ide-操作_102_周回軌道航行再開待ち表示画面.png",
+      "description": "閲覧終了後は再開待ちの周回航行を表示します。",
+      "status": "✅ OK",
+      "sha256": "1500b0b1dad57ebb810d154c1027fa44e25163b42e6cd060aa3cb1eafa0b4547"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_103_待機周回45秒表示画面.png",
+      "description": "45秒後も再開待ちの表示と周回が続きます。",
+      "status": "✅ OK",
+      "sha256": "a92d3a71c6c659fa206ac6bbe61d5ec258e9744427c71680961e73140373817f"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_104_待機周回90秒表示画面.png",
+      "description": "半周後も同じ中心星を保ちます。",
+      "status": "✅ OK",
+      "sha256": "92071462fb3db4ecd6d1e4631a7b6e6ac971697ecb67ff67f64c1f82b953b987"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_105_待機周回135秒表示画面.png",
+      "description": "四分の三周でも表示と航行状態が一致します。",
+      "status": "✅ OK",
+      "sha256": "fb95a26f1001cc812d3b8d880d18d7e76777bc5c221f9928fb87f4b298ef62c0"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_106_待機周回180秒表示画面.png",
+      "description": "一周後も再開待ちの周回表示を維持します。",
+      "status": "✅ OK",
+      "sha256": "3b1c7ace4e76b9c575ce98fed68c2d27b57775a0deda0996bb17c535ce500633"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_107_探索航行準備表示画面.png",
+      "description": "手動待機が明けると探索航行の準備を表示します。",
+      "status": "✅ OK",
+      "sha256": "732ca076bd633bb4933f2db453a2fe14a056f67f7e4f56823584418ea49ccf37"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_108_探索軌道航行表示画面.png",
+      "description": "準備後は探索軌道航行中へ切り替わります。",
+      "status": "✅ OK",
+      "sha256": "c2df23960dc33dd96566baa1fd6fe015c6e720538d936b376872c35a9636fad1"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_109_起動先ファイル表示画面.png",
+      "description": "起動時の最終更新ファイルへの移動を確認します。",
+      "status": "✅ OK",
+      "sha256": "40b8c7d0888e12230d841385684ee9d88333dbe586d77aaacce2be62afe2115a"
+    },
+    {
+      "file": "ide-操作_110_周回軌道航行観測表示画面.png",
+      "description": "ファイル選択中は観測中の周回表示になります。",
+      "status": "✅ OK",
+      "sha256": "585db096c70cb991847efb078bdbd213b931096fe7f04174ca4d72fd47fb93b6"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_111_観測周回45秒表示画面.png",
+      "description": "観測中の周回を45秒進めます。",
+      "status": "✅ OK",
+      "sha256": "1582640926ae35851a4dbf5f88d1eedf06f6cf21ab889918e3df38ff7f5cf18d"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_112_観測周回90秒表示画面.png",
+      "description": "観測中の半周後も表示とファイルを維持します。",
+      "status": "✅ OK",
+      "sha256": "08675094ebe8b4574fd9a88021952d8fc3ba51c548dc5f518029cf3c2731ec6d"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_113_観測周回180秒表示画面.png",
+      "description": "観測中の一周後も表示とファイルを維持します。",
+      "status": "✅ OK",
+      "sha256": "7c1c1248559189cb457b2b58eb6a603d25cce60a8fdcb535a41303b0e7bfe2bf"
+    },
+    {
+      "file": "20261019115434-ide-exploration-status__ide-操作_114_自動探索OFF表示画面.png",
+      "description": "自動探索OFFで状態表示が消えます。",
+      "status": "✅ OK",
+      "sha256": "e749d0683ad355e2a1d23f76cbb3d5bdb1ed57bab5f7469263f3a9ff8e1f55c9"
+    }
+  ]
+}

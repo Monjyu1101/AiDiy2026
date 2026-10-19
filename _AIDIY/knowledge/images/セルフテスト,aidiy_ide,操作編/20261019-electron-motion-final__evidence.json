@@ -1,0 +1,24 @@
+[
+  {
+    "book": "ide",
+    "id": "601",
+    "paragraph": 6,
+    "sequence": 1,
+    "file": "ide-操作_601_Windows上で透明な領域にIDEの実画面を拡大する画面.png",
+    "title": "Windows上で透明な領域にIDEの実画面を拡大する画面",
+    "status": "✅ OK",
+    "note": "本番の共通表示処理を使用。目視用にアニメーションの200ms位置で静止し、Windows Graphics Captureで取得。外側には背後のIDE/Word画面が透け、内側にIDEの実画面が表示される。読み込み中の時点で、IDE操作完了の証跡とは区別。クリック透過と1%不透明度は演出窓へ適用しない。",
+    "time": "2026-10-19T05:47:19.501Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 13502030,
+      "title": "AiDiy IDE 透明ズーム確認"
+    },
+    "width": 1255,
+    "height": 780,
+    "sha256": "f4893583f2c4aa4dac736e1536f8b83ed631d7459c5f5e085a22fb67684da953",
+    "accessibility": {
+      "tree": "Window: \"AiDiy IDE 透明ズーム確認\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE 透明ズーム確認 Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE 透明ズーム確認\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t9 領域"
+    }
+  }
+]

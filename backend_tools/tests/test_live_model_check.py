@@ -64,7 +64,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self): self.temp.cleanup()
     def checker(self):
         async def sleep(delay):
-            if delay != 10: await asyncio.sleep(delay)
+            if delay != 15: await asyncio.sleep(delay)
         return LiveModelCheck(self.root, FakeLive, timeout=.04, sleep=sleep)
     async def test_real_text_only_and_cleanup(self):
         out = await self.checker().run()
@@ -93,7 +93,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(out['audio']['duration_ms'],1000)
             for invalid in [{**manual,'ai_name':[]},{**manual,'prompt':''},{**manual,'extra':'bad'}]:
                 self.assertEqual((await client.post('/internal/live_model_check',json=invalid,headers={'X-AiDiy-Diag':'model-trial'})).status_code,400)
-        self.assertEqual(events,[('settle',10),('prompt',manual['prompt'])])
+        self.assertEqual(events,[('settle',15),('prompt',manual['prompt'])])
         self.assertEqual(FakeLive.instances[-1].kwargs['live_voice'],'Puck')
         self.assertTrue(FakeLive.instances[-1].closed)
         self.assertEqual((self.root/'_config'/'AiDiy_key.json').read_bytes(),before)
@@ -171,7 +171,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.checker().run())['reason'],'key_not_configured')
         (self.root/'_config'/'AiDiy_key.json').write_bytes(b' '*1048577)
         self.assertEqual((await self.checker().run())['reason'],'config_unavailable')
-    async def test_ready_then_ten_second_settle_then_send(self):
+    async def test_ready_then_fifteen_second_settle_then_send(self):
         events=[]
         class Ordered(FakeLive):
             async def 開始(self,**kwargs):
@@ -183,11 +183,11 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         async def sleep(delay): events.append(('sleep',delay))
         result=await LiveModelCheck(self.root,Ordered,timeout=.04,sleep=sleep).run()
         self.assertEqual(result['status'],'OK')
-        self.assertEqual(events,['ready',('sleep',10),'send'])
+        self.assertEqual(events,['ready',('sleep',15),'send'])
     async def test_cancel_during_settle(self):
         settling=asyncio.Event()
         async def sleep(delay):
-            self.assertEqual(delay,10);settling.set();await asyncio.Event().wait()
+            self.assertEqual(delay,15);settling.set();await asyncio.Event().wait()
         checker=LiveModelCheck(self.root,FakeLive,sleep=sleep)
         task=asyncio.create_task(checker.run());await settling.wait();task.cancel()
         with self.assertRaises(asyncio.CancelledError):await task
@@ -262,7 +262,9 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
                 if hasattr(self,'producer'):
                     await self.producer
         async def sleep(delay): pass
-        result=await LiveModelCheck(self.root,Delayed,timeout=.04,sleep=sleep).run()
+        # 応答の到着順を確認する試験。OSのタイマー精度を40msの期限で判定しない。
+        result=await LiveModelCheck(self.root,Delayed,timeout=1,sleep=sleep).run()
+        self.assertEqual(result['status'],'OK')
         self.assertEqual(result['audio']['duration_ms'],1000)
         self.assertTrue(FakeLive.instances[-1].producer.done())
     async def test_cancel_during_audio_discards_partial(self):
@@ -289,7 +291,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['status'],'OK');self.assertNotIn('audio',result)
     async def test_gemini_turn_marker_follows_audio_and_transcript(self):
         path=Path(__file__).resolve().parents[2]/'backend_server/AIコア/AIライブ_gemini.py'
-        tree=ast.parse(path.read_text())
+        tree=ast.parse(path.read_text(encoding='utf-8'))
         cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='LiveAI')
         method=next(n for n in cls.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='_サーバーコンテンツ処理')
         namespace={}
@@ -303,7 +305,7 @@ class LiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await sink.get(),{'diagnostic_turn_complete':True})
         self.assertEqual(sink.audio_result()['duration_ms'],1000)
     def test_registry_not_changed(self):
-        text=(Path(__file__).resolve().parents[1]/'tools_main.py').read_text()
+        text=(Path(__file__).resolve().parents[1]/'tools_main.py').read_text(encoding='utf-8')
         self.assertNotIn('mcp_live',text)
         self.assertEqual(text.count('register_live_model_check(app)'),1)
 

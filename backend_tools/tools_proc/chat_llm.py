@@ -32,6 +32,13 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+def _応答結果(応答):
+    # backend_serverの共通規約を使う。呼出前に_setup_sys_pathで所有元を登録する。
+    from AIコア.AI応答 import 応答正規化, エラー応答判定
+    本文 = 応答正規化(応答)
+    return 本文, "NG" if エラー応答判定(本文) else "OK"
+
+
 class ChatLLMError(Exception):
     """ChatLLM 実行エラー"""
     pass
@@ -377,7 +384,7 @@ Args:
             reason = self.version_info[ai_name].get("version", "利用不可")
             return {
                 "status": "NG",
-                "result": f"ai_name='{ai_name}' は利用できません: {reason}",
+                "result": f"! ai_name='{ai_name}' は利用できません: {reason}",
                 "project_path": resolved_path,
                 "ai_name": ai_name,
                 "ai_model": ai_model,
@@ -423,7 +430,7 @@ Args:
                 if instance is None:
                     return {
                         "status": "NG",
-                        "result": f"AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
+                        "result": f"! AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
                         "project_path": resolved_path,
                         "ai_name": ai_name,
                         "ai_model": ai_model,
@@ -444,6 +451,10 @@ Args:
                 file_path=file_path,
             )
             output_files = list(getattr(instance, "last_output_files", []) or [])
+        except Exception as e:
+            from AIコア.AI応答 import エラー応答
+            result_text = エラー応答(e)
+            output_files = []
         finally:
             if not resume and instance is not None:
                 try:
@@ -451,9 +462,10 @@ Args:
                 except Exception:
                     pass
 
+        result_text, result_status = _応答結果(result_text)
         return {
-            "status": "OK",
-            "result": result_text or "（応答なし）",
+            "status": result_status,
+            "result": result_text,
             "project_path": resolved_path,
             "ai_name": ai_name,
             "ai_model": ai_model,
@@ -487,7 +499,7 @@ Args:
         if instance is None:
             return {
                 "status": "NG",
-                "result": f"AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
+                "result": f"! AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
                 "project_path": resolved_path,
                 "ai_name": ai_name,
                 "ai_model": ai_model,
@@ -506,15 +518,20 @@ Args:
             tool_trace = list(getattr(instance, "last_tool_trace", []) or [])
             turns = int(getattr(instance, "last_tool_turns", 0) or 0)
             stopped = bool(getattr(instance, "last_tool_stopped", False))
+        except Exception as e:
+            from AIコア.AI応答 import エラー応答
+            result_text = エラー応答(e)
+            output_files, tool_trace, turns, stopped = [], [], 0, False
         finally:
             try:
                 await instance.終了()
             except Exception:
                 pass
 
+        result_text, result_status = _応答結果(result_text)
         return {
-            "status": "OK",
-            "result": result_text or "（応答なし）",
+            "status": result_status,
+            "result": result_text,
             "project_path": resolved_path,
             "ai_name": ai_name,
             "ai_model": ai_model,
@@ -655,7 +672,7 @@ Args:
             reason = self.version_info[ai_name].get("version", "利用不可")
             return {
                 "status": "NG",
-                "content": f"ai_name='{ai_name}' は利用できません: {reason}",
+                "content": f"! ai_name='{ai_name}' は利用できません: {reason}",
                 "ai_name": ai_name,
                 "ai_model": ai_model,
             }
@@ -719,7 +736,7 @@ Args:
         if instance is None:
             return {
                 "status": "NG",
-                "content": f"AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
+                "content": f"! AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
                 "ai_name": ai_name,
                 "ai_model": ai_model,
             }
@@ -755,6 +772,10 @@ Args:
             )
             output_files = list(getattr(instance, "last_output_files", []) or [])
             tool_calls = list(getattr(instance, "last_tool_calls", []) or [])
+        except Exception as e:
+            from AIコア.AI応答 import エラー応答
+            result_text = エラー応答(e)
+            output_files, tool_calls = [], []
         finally:
             try:
                 await instance.終了()
@@ -772,8 +793,9 @@ Args:
         # tool_calls のみでテキストが無い場合、ChatAI は "!" を返すため空に正規化する
         if tool_calls and content.strip() in ("", "!"):
             content = ""
+        content, result_status = ("", "OK") if tool_calls and content == "" else _応答結果(content)
         return {
-            "status": "OK",
+            "status": result_status,
             "content": content,
             "ai_name": ai_name,
             "ai_model": ai_model,

@@ -28,6 +28,9 @@ from AIコア.AIバックアップ import コードベース絶対パス取得
 # ロガー取得
 logger = get_logger(__name__)
 
+# 同じセッション・チャンネルの新しい接続へ置き換えるときの切断コード（クライアントは再接続しない）
+REPLACED_CLOSE_CODE = 4000
+
 
 def _is_disconnect_like_error(e: Exception) -> bool:
     msg = str(e)
@@ -179,11 +182,11 @@ class WebSocketConnection:
                 return None
         return None
 
-    async def close(self):
+    async def close(self, code: int = 1000, reason: str = ""):
         """接続を閉じる"""
         if self.is_connected:
             try:
-                await self.websocket.close()
+                await self.websocket.close(code=code, reason=reason)
             except Exception:
                 pass
             self.is_connected = False
@@ -572,7 +575,9 @@ class WebSocketManager:
             # 差し替えをロック内で完了し、旧接続のfinallyには所有者照合をさせる。
             old_conn = session.get_socket(socket_no)
             if old_conn:
-                await old_conn.close()
+                # 置き換えであることをクライアントへ伝え、旧接続側が再接続して新接続を閉じ返す
+                # 置き換え合いの繰り返しを防ぐ（frontend_avatar の REPLACED_CLOSE_CODE と対応）。
+                await old_conn.close(code=REPLACED_CLOSE_CODE, reason="replaced")
             connection = WebSocketConnection(websocket, セッションID, socket_no)
             if accept_in_connect:
                 await connection.accept()

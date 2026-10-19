@@ -12,7 +12,7 @@ const Module=require('node:module');
 const {allWindowBounds}=require('../デスクトップ/window-layout.cjs');
 app.disableHardwareAcceleration();app.setPath('appData',process.env.AIDIY_TEST_PROFILE);
 const nativeShow=BrowserWindow.prototype.showInactive;
-BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);nativeShow.call(this);};
+BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){if(!this.isAiDiyOpeningCanvas){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);}nativeShow.call(this);};
 BrowserWindow.prototype.focus=function(){};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const evaluate=(window,source)=>window.webContents.executeJavaScript(source,true);

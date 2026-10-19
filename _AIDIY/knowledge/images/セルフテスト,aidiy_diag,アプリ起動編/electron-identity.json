@@ -1,0 +1,14 @@
+[
+  {
+    "name": "avatar",
+    "code": 0,
+    "out": "\r\n{\"name\":\"Electron\",\"userData\":\"C:\\\\Users\\\\admin\\\\AppData\\\\Roaming\\\\Electron\",\"sessionData\":\"C:\\\\Users\\\\admin\\\\AppData\\\\Roaming\\\\Electron\"}\n",
+    "err": ""
+  },
+  {
+    "name": "diag",
+    "code": 0,
+    "out": "\r\n{\"name\":\"Electron\",\"userData\":\"C:\\\\Users\\\\admin\\\\AppData\\\\Roaming\\\\Electron\",\"sessionData\":\"C:\\\\Users\\\\admin\\\\AppData\\\\Roaming\\\\Electron\"}\n",
+    "err": ""
+  }
+]

@@ -458,8 +458,27 @@ for(const mode of ['2d','3d'])test(`${mode}実部品の探索枠: 更新候補�
     h.document.hidden=false;h.document.dispatchEvent(new Event('visibilitychange'));await h.frame();assert.equal(spinning(),true);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),false);
     await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.equal(spinning(),true);
-    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,mode==='2d'?3:1,'共通の更新目印の深夜予約に加え、2Dだけ監視と日時更新を予約');assert.equal(h.intervals.size,1);
+    assert.equal(h.frames.size,mode==='2d'?0:1);assert.equal(h.timers.size,mode==='2d'?2:0,'空フォルダは更新目印の予約がなく、2Dだけ監視と日時更新を予約');assert.equal(h.intervals.size,1);
   } finally {h.dispose();}
+});
+
+for(const mode of ['2d','3d'])test(`${mode}自動探索の状態表示: ボタン上に実状態を表示し、OFFでは外す`,async t=>{
+  const h=await workspace(t,{auto:true,mode,fetcher:url=>url.startsWith('/api/galaxy')?reply({root:'/project',tree:directory('project'),truncated:false}):undefined});
+  const status=()=>h.find(node=>hasClass(node,'space-orbit-status'));
+  try{
+    await h.frame(250);
+    assert.ok(status());assert.equal(status().props.role,'status');
+    const group=h.find(node=>hasClass(node,'space-auto-explore'));
+    assert.equal(group.children[0],status(),'自動探索ボタンより上へ配置');
+    h.engine.interact();await h.frame();
+    assert.equal(textOf(status()),mode==='2d'?'更新待ち':'出航準備中');
+    if(mode==='3d'){
+      for(let n=0;n<12;n++)await h.frame(250);
+      assert.equal(textOf(status()),'周回軌道航行中');
+    }
+    await h.click(node=>node.props?.['aria-label']==='自動探索');assert.equal(status(),undefined);
+    await h.click(node=>node.props?.['aria-label']==='自動探索');await h.frame();assert.ok(status());
+  }finally{h.dispose();}
 });
 
 const finishFollow=async(h,predicate)=>{for(let n=0;n<220&&!predicate();n++)await h.frame();assert.equal(predicate(),true,'有限のフレームで移動を完了する');};

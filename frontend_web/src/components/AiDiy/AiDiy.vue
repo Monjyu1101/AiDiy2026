@@ -782,6 +782,8 @@ onBeforeUnmount(() => {
   justify-items: stretch;
   align-items: stretch;
   align-content: stretch;
+  /* 7枚以上で増える行も、明示した行と同じ割合で高さを分け合う（中身の高さで他の行を潰さない） */
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 /* レイアウト: 0枚（空） */
@@ -822,7 +824,6 @@ onBeforeUnmount(() => {
 .layout-triple {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: minmax(0, 1fr);
-  padding-top: 40px;
   padding-bottom: 40px;
 }
 
@@ -836,6 +837,15 @@ onBeforeUnmount(() => {
 .layout-multi {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+/* 3枚以上は右端まで並ぶため、右上の接続状態・音声メーター（上端から約72px）と
+   右端のアイコン列（右端から約52px）に右端パネルの見出しが隠れないよう余白を取る */
+.layout-triple,
+.layout-quad,
+.layout-multi {
+  padding-top: 84px;
+  padding-right: 72px;
 }
 
 .component-panel {
@@ -877,6 +887,7 @@ onBeforeUnmount(() => {
   .layout-multi {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(auto-fit, minmax(320px, 1fr));
+    padding-right: 64px;
   }
 
   .component-panel {

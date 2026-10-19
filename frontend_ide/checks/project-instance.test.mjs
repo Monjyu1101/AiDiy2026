@@ -54,7 +54,7 @@ test('IDE識別: Windowsの大小文字・斜線・UNC・長いパスは同一�
 });
 
 // Electron自体は起動せず、実desktop.cjsを各プロセスに相当する別コンテキストで実行する。
-function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',appData,locks}){
+function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',appData,locks,newWindow=false}){
  const app=new EventEmitter(),process=new EventEmitter(),windows=[],messages=[],paths={appData,temp:appData},order=[];
  const ipcMain=new EventEmitter(),handlers=new Map();ipcMain.handle=(name,handler)=>handlers.set(name,handler);
  let ready=Promise.resolve();
@@ -67,7 +67,7 @@ function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',a
  app.exit=code=>{app.exitCode=code;if(locks.get(paths.userData)===app)locks.delete(paths.userData);app.emit('quit');};
  app.quit=()=>{let prevented=false;app.emit('before-quit',{preventDefault(){prevented=true;}});if(!prevented)app.exit(0);};
  app.whenReady=()=>({then:callback=>ready=Promise.resolve().then(callback)});
- process.env={AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_URL:url,...(project?{AIDIY_DEVELOPMENT_PROJECT:project}:{})};
+ process.env={AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_URL:url,AIDIY_DEVELOPMENT_NEW_WINDOW:newWindow?'1':'0',...(project?{AIDIY_DEVELOPMENT_PROJECT:project}:{})};
  process.cwd=()=>cwd;process.send=(message,callback)=>{messages.push(message);callback?.();};
  class Window extends EventEmitter{
   constructor(options){super();this.options=options;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};windows.push(this);}
@@ -75,11 +75,11 @@ function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',a
   isDestroyed(){return !!this.destroyed;}isMinimized(){return !!this.minimized;}
   minimize(){this.minimized=true;}restore(){this.minimized=false;this.restored=true;}
   show(){this.visible=true;}focus(){this.focused=true;this.focusCount=(this.focusCount||0)+1;}
-  async loadURL(url){this.url=url;this.webContents.mainFrame.url=url;}setAlwaysOnTop(){}
+  async loadURL(url){this.url=url;this.webContents.mainFrame.url=url;}setAlwaysOnTop(){}isAlwaysOnTop(){return false;}
   destroy(){if(this.destroyed)return;this.destroyed=true;this.emit('closed');}
  }
  const area={x:0,y:0,width:1920,height:1080};
- const electron={app,BrowserWindow:Window,ipcMain,shell:{},dialog:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getCursorScreenPoint:()=>({x:0,y:0}),getDisplayNearestPoint:()=>({workArea:area}),getDisplayMatching:()=>({workArea:area})}};
+ const electron={app,BrowserWindow:Window,ipcMain,shell:{},dialog:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:Object.assign(new EventEmitter(),{getCursorScreenPoint:()=>({x:0,y:0}),getDisplayNearestPoint:()=>({workArea:area}),getDisplayMatching:()=>({workArea:area})})};
  const load=name=>name==='electron'?electron:name==='./host/scripts/window-opening.cjs'?{拡大表示:async(_type,window)=>{window.show();window.focus();return true;}}
   :name==='./デスクトップ/desktop-session.cjs'?{readDevelopmentState:async()=>({active:true,mode:'offline',startedAt:1,project:{path:project}})}:desktopRequire(name);
  vm.runInNewContext(`(function(require,__dirname,process){${desktopSource}\n})`,{console,setInterval,clearInterval,URL})(load,dirname(desktopPath),process);
@@ -127,6 +127,16 @@ test('Code / Liveの種別ごとの既存窓再利用を維持する',async t=>{
   const second=desktop({project:two,kind,appData,locks});await second.ready();
   assert.equal(second.windows.length,0);assert.equal(second.messages[0].existingWindow,true);
   assert.equal(first.paths.userData,join(appData,`aidiy_${kind}_vue`));
+ }
+});
+
+test('Diagの別窓起動: IDE / Codeは同じプロジェクトでも別窓、Liveは既存の排他を維持する',async t=>{
+ const {root,one}=folders(t),locks=new Map(),appData=join(root,'profiles');mkdirSync(appData);
+ for(const kind of ['ide','code','live']){
+  const first=desktop({project:one,kind,appData,locks,newWindow:true});await first.ready();t.after(()=>first.app.quit());
+  const second=desktop({project:one,kind,appData,locks,newWindow:true});await second.ready();t.after(()=>second.app.quit());
+  assert.equal(first.windows.length,1);assert.equal(second.windows.length,kind==='live'?0:1);
+  if(kind!=='live'){assert.notEqual(first.paths.userData,second.paths.userData);assert.equal(first.paths.userData,first.paths.sessionData);}
  }
 });
 

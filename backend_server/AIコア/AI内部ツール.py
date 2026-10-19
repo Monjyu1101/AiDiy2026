@@ -539,9 +539,15 @@ async def 自己ループ実行(ai_instance, messages: List[Dict[str, Any]], ブ
             自己ループ=False,
         )
         content = (result_text or "").strip()
-        if content == "!":
-            content = ""
         tool_calls = list(getattr(ai_instance, "last_tool_calls", []) or [])
+        if content.startswith("!") and content != "!":
+            completed = True
+            break
+        if content == "!":
+            if not tool_calls:
+                completed = True
+                break
+            content = ""
 
         if not tool_calls:
             completed = True

@@ -6,10 +6,10 @@ import {readConfig} from '../runtime/model_probe.mjs';
 import {getToolsStatus} from '../診断/tools_status.mjs';
 import {createAudioStore,validateAudio} from './audio_store.mjs';
 
-// Live: 接続20秒 + 安定待ち10秒 + 応答30秒 + cleanup9秒 + 通信余裕。
-export const LIVE_HTTP_TIMEOUT_MS=75000;
-export const TRIAL_ROW_TIMEOUT_MS=90000;
-export const TRIAL_RUN_TTL_MS=30*60*1000;
+// Live: 接続20秒 + 安定待ち15秒 + 応答60秒 + cleanup9秒 + 通信余裕。
+export const LIVE_HTTP_TIMEOUT_MS=135000;
+export const TRIAL_ROW_TIMEOUT_MS=150000;
+export const TRIAL_RUN_TTL_MS=45*60*1000;
 
 const CHAT = {gemini_chat:'GEMINI',freeai_chat:'FREEAI',openrt_chat:'OPENRT',openai_chat:'OPENAI',openai_oauth:'OPENAI',ollama_chat:'OLLAMA',local_chat:'LOCAL'};
 const LIVE = {gemini_live:'GEMINI',freeai_live:'FREEAI',openai_live:'OPENAI'};
@@ -220,7 +220,7 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
           const result={...base,状態:'OK',判断結果:answer.choice,応答:redact(JSON.stringify(manual?payload:answer,null,2),current.config,manual?4*1024*1024:1500),実行プロバイダ:label(redact(payload.data.ai_name||payload.data.provider,current.config)),実行モデル:label(redact(payload.data.model||payload.data.ai_model,current.config)),所要ms:Date.now()-started,説明:manual?(answer.type==='refusal'?'モデルが回答を拒否しました。':'判断応答を受信しました。'):`挨拶の丁寧さ: ${answer.choice}（JSON回答形式を確認。選択内容の正誤判定は行いません）`};
           current.cache.set(key,result);return result;
         }
-        const answer=text(payload?.result ?? payload?.reply),textOk=payload?.status==='OK' && !!answer && !['（応答なし）','(応答なし)','!'].includes(answer) && !/^(?:(?:api|ClaudeSDK|Copilot|subprocess)?実行エラー:|(?:Local |Ollama )?ChatAIが停止状態です。|処理タイムアウト\([0-9.]+秒\)が発生しました。|処理がキャンセルされました。|OpenAI OAuth 初期化エラー:|エラー[:：]|error[:：]|exception[:：]|traceback|APIエラー[:：]|認証エラー[:：]|接続エラー[:：]|\[error\])/i.test(answer);
+        const answer=text(payload?.result ?? payload?.reply),textOk=payload?.status==='OK' && !!answer && !answer.startsWith('!') && !['（応答なし）','(応答なし)'].includes(answer) && !/^(?:(?:api|ClaudeSDK|Copilot|subprocess)?実行エラー:|(?:Local |Ollama )?ChatAIが停止状態です。|処理タイムアウト\([0-9.]+秒\)が発生しました。|処理がキャンセルされました。|OpenAI OAuth 初期化エラー:|エラー[:：]|error[:：]|exception[:：]|traceback|APIエラー[:：]|認証エラー[:：]|接続エラー[:：]|\[error\])/i.test(answer);
         let audio;
         const live=row.区分==='LIVE';
         if(live && payload?.status==='OK')try{validateAudio(payload.audio);audio=await audioStore.put(payload.audio,current.id);}catch{}

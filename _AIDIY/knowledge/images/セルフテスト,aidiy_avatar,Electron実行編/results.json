@@ -1,0 +1,125 @@
+[
+  {
+    "recorded_at": "2026-10-19T08:01:26.617Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-101",
+    "target": "Electron版Avatar ログイン",
+    "operation": "Diagミニ表示のAvatarから起動し、ログイン窓の「ログイン」を押す",
+    "expected": "ログインからコア等の実画面へ進む",
+    "actual": "「ログイン中...」の後、約20秒以内にコア窓（TEAM・TASK・0〜6・ファイル・イメージ・設定）とチャット窓を表示",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_101_Electron版Avatarのログイン画面.png",
+      "aidiy_avatar-Electron実行_102_ログイン後のコア画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T08:01:26.617Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-301",
+    "target": "Electron チャット窓 freeai_chat",
+    "operation": "Chatを選び「おはよう」を送信",
+    "expected": "返答がある",
+    "actual": "「おはようございます。清々しい朝ですね。…」。コア窓のアバター下に同じ字幕",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_201_チャット窓のChatがおはように応答画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T08:01:26.617Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-303",
+    "target": "Electron Code1窓 codex_cli / Code6窓 aidiy_hermes",
+    "operation": "コア窓の「1」「6」で窓を開き、それぞれ「おはよう」を送信",
+    "expected": "各窓が返答する",
+    "actual": "Code1「おはようございます。今日はどんなことをお手伝いしましょうか？」、Code6「おはようございます。今日は何をお手伝いしましょうか？」（約52秒以内）",
+    "verdict": "OK",
+    "note": "Code6窓は(390,390)に650x777で開き、下端がタスクバーより下へはみ出して入力欄が見えない（所見）",
+    "images": [
+      "aidiy_avatar-Electron実行_202_Code1とCode6の窓がおはように応答画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T08:01:26.617Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-401-初回",
+    "target": "Electron Live freeai_live",
+    "operation": "Liveを選び15秒待って「おはよう」を送信（最大60秒）",
+    "expected": "返答がある",
+    "actual": "60秒以内に返答・字幕なし",
+    "verdict": "NG",
+    "images": [
+      "aidiy_avatar-Electron実行_401_チャット窓のLiveが60秒以内に応答なし画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T08:01:26.617Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-401",
+    "retest_of": "AE-401-初回",
+    "target": "Electron Live freeai_live",
+    "operation": "15秒待って同じ窓から「おはよう」を再送",
+    "expected": "返答がある",
+    "actual": "「おはようございます！今日も一緒に開発しましょう！」",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_402_再送したLiveがおはように応答画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T09:15:15.588Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-所見-窓位置-再試験",
+    "retest_of": "AE-303 所見",
+    "target": "Electron窓の初期位置（electron/main.ts）",
+    "operation": "修正をTypeScript監視で反映し、Avatarを自動再起動後にCode6窓・チャット窓の位置を取得",
+    "expected": "Code6窓が作業領域内、チャット窓がコア窓と重ならない",
+    "actual": "Code6窓 (390,390)→(390,258)、下端1035が作業領域1040以内。チャット窓 (635,129)→(570,129)、右端1220がコア窓左端1240より左",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_203_修正後はCode6窓が画面内でチャット窓がコア窓と重ならない画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T09:15:15.588Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-所見-再接続",
+    "target": "Electron版Avatarの接続（Core再起動時）",
+    "operation": "backend修正の反映でCoreをreboot_core.txtで再起動（約30秒停止）",
+    "expected": "Core復帰後に接続が戻る",
+    "actual": "全窓が「切断」のまま。見出しの「↺」は「再表示」ボタンで再接続ではなく、押しても接続要求なし。自動再接続は3秒間隔5回（約15秒）で打ち切り",
+    "verdict": "NG",
+    "images": [
+      "aidiy_avatar-Electron実行_203_修正後はCode6窓が画面内でチャット窓がコア窓と重ならない画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T09:15:15.588Z",
+    "method": "Windows UI Automation 実画面操作",
+    "case_id": "AE-所見-再接続-再試験",
+    "retest_of": "AE-所見-再接続",
+    "target": "Electron版Avatarの接続（frontend_avatar/src/api/websocket.ts）",
+    "operation": "自動再接続を回数で打ち切らず最大15秒間隔で継続する修正後、Coreを再起動",
+    "expected": "利用者の操作なしで接続が戻る",
+    "actual": "Core停止約20秒→復帰後13秒で、コア窓・チャット窓とも「接続中」へ自動復帰。その後に開いた窓もすべて「接続中」",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_204_Core再起動後に自動再接続し窓が画面内に並ぶ画面.png"
+    ]
+  },
+  {
+    "recorded_at": "2026-10-19T09:59:31.295Z",
+    "method": "実画面のOSマウス・キーボード操作（実画面操作.ps1）と画面全体の撮影",
+    "case_id": "AE-所見-履歴繰り返し-再試験",
+    "target": "Electron版Avatar（セッション3e71f0b5dd）",
+    "operation": "実画面のクリックでログインし、チャット窓のLiveへ「おはよう」。その後Coreを再起動",
+    "expected": "返答は1回。Core再起動後に自動で戻り、接続が繰り返されない",
+    "actual": "Live「おはようございます！どのような設計作業をお手伝いしましょうか。…」が1回目の送信で返答。Core再起動後20秒以内に全窓が「接続中」へ戻り、各チャンネルの接続はログイン時と再接続時の2回のみ",
+    "verdict": "OK",
+    "images": [
+      "aidiy_avatar-Electron実行_501_再起動後に実画面からLiveへおはようを送信画面.png",
+      "aidiy_avatar-Electron実行_502_Core再起動後に自動で接続中へ戻る画面.png"
+    ]
+  }
+]

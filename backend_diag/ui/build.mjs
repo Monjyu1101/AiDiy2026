@@ -11,5 +11,6 @@ await build({entryPoints:[path.join(root,'src/main.js')],outfile:path.join(root,
 await copyFile(path.join(root,'../static/app.css'),path.join(root,'../static/style.css'));
 await unlink(path.join(root,'../static/app.css')); 
 await copyFile(path.join(root,'src/index.html'),path.join(root,'../static/index.html'));
+for(const id of ['avatar','ide','term','code','live','discord'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
 await writeFile(path.join(root,'../static/build-manifest.json'),JSON.stringify(await manifest(),null,2)+'\n');
 console.log('Vue UI を static/ に生成しました。');

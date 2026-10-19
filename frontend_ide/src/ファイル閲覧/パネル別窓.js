@@ -4,7 +4,6 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import {installWindowMove} from '../共通表示/長押し窓移動.js';
-import {openingShine,stopOpeningShine} from '../共通表示/登場光沢.js';
 
 // ブラウザーのscreen座標はCSS px。devicePixelRatio（OS拡大率を含む）は重ねて掛けない。
 // 外枠/表示領域の差からツールバーを見積もる。配置要求の最終判断はブラウザーが行う。
@@ -31,11 +30,9 @@ const fades = new WeakMap();
 export function fadePanel(element) {
   if (!element?.animate) return;
   fades.get(element)?.cancel();
-  stopOpeningShine(element);
-  if (element.ownerDocument?.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const doc=element.ownerDocument,animation=element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+  const animation=element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
   fades.set(element,animation);
-  animation.finished.then(()=>{if(fades.get(element)===animation&&element.ownerDocument===doc){fades.delete(element);openingShine(element);}},()=>{});
+  animation.finished.then(()=>{if(fades.get(element)===animation)fades.delete(element);},()=>{});
 }
 
 // Vueのインスタンス・DOM・イベントをそのまま移動する。検索ジョブを再発行せず、
@@ -91,7 +88,6 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
       if(kind==='panel-routes'){doc.documentElement.classList.add('route-window-document');if(win.aidiyWindow?.resizeRoutes)doc.documentElement.classList.add('native-route-window');}
       // 元Documentのタイムラインを別窓へ持ち込まない（裏のIDEでは停止し得る）。
       fades.get(element())?.cancel(); fades.delete(element());
-      stopOpeningShine(element());
       const scroll = restoreScroll(); host.append(element()); scroll();
       documentSeen = doc;
       const ownerApi=win.aidiyWindow;
@@ -105,17 +101,16 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
       // リロードで旧Documentが消える前にDOMを親へ退避する。次のDocumentに同じ実体を戻す。
       const leaving = () => { if (!parent || !element()) return; const keepScroll = restoreScroll(); parent.insertBefore(element(), anchor); element().style.visibility = 'hidden'; keepScroll(); };
       target.addEventListener('beforeunload', leaving);
-      cleanupDocument = () => { stopOpeningShine(host);stopOpeningShine(element());fades.get(host)?.cancel();stopMove(); removeTitle(); target.removeEventListener('beforeunload', leaving); if (element()) element().style.visibility = ''; };
+      cleanupDocument = () => { fades.get(host)?.cancel();stopMove(); removeTitle(); target.removeEventListener('beforeunload', leaving); if (element()) element().style.visibility = ''; };
       element().style.visibility = '';
       moved();
       if (win.aidiyWindow?.showExplorer) {
-        const result = await win.aidiyWindow.showExplorer(target.name, win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        const result = await win.aidiyWindow.showExplorer(target.name);
         // 表示演出の途中で閉じた窓を「表示失敗」として本体へ復元しない。
         if (child !== target || disposed) return;
         if (target.closed) { dismiss(); return; }
         if (!result?.ok) throw Error(result?.error || '別窓を表示できません。');
         clearPreview();
-        openingShine(kind==='panel-routes'?element():host);
       } else fadePanel(host);
       target.focus();
     } finally { opening = false; }

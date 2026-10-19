@@ -1,0 +1,122 @@
+{
+  "runId": "20261019110533-ide-vr",
+  "platform": "Windows",
+  "method": "computer-use @oai/sky",
+  "status": "✅ OK（VR移行と2種類の復帰）",
+  "time": "2026-10-19T02:07:56.501Z",
+  "checks": [
+    "通常3DからVRへ移行",
+    "VR中のExplorer・軌跡の別パネル表示",
+    "右上復帰ボタンをキーボードフォーカスで表示しクリックして復帰",
+    "通常画面でExplorer・軌跡の再表示と起点・展開・選択保持",
+    "2回目のVR移行",
+    "F11による通常画面復帰",
+    "ファイル閲覧と接続状態を維持"
+  ],
+  "geometry": [
+    {
+      "stage": "移行前",
+      "screenshots": [
+        {
+          "height": 981,
+          "id": "screenshot-0",
+          "originX": 26,
+          "originY": 26,
+          "width": 1870,
+          "zIndex": 0
+        }
+      ]
+    },
+    {
+      "stage": "VR 1回目",
+      "screenshots": [
+        {
+          "height": 1080,
+          "id": "screenshot-0",
+          "originX": -3,
+          "originY": -3,
+          "width": 1920,
+          "zIndex": 0
+        },
+        {
+          "height": 809,
+          "id": "screenshot-1",
+          "originX": 47,
+          "originY": 124,
+          "width": 469,
+          "zIndex": 1
+        },
+        {
+          "height": 64,
+          "id": "screenshot-2",
+          "originX": 525,
+          "originY": 124,
+          "width": 450,
+          "zIndex": 2
+        }
+      ]
+    },
+    {
+      "stage": "ボタン復帰",
+      "screenshots": [
+        {
+          "height": 981,
+          "id": "screenshot-0",
+          "originX": 26,
+          "originY": 26,
+          "width": 1871,
+          "zIndex": 0
+        }
+      ]
+    },
+    {
+      "stage": "VR 2回目",
+      "screenshots": [
+        {
+          "height": 1080,
+          "id": "screenshot-0",
+          "originX": -3,
+          "originY": -3,
+          "width": 1920,
+          "zIndex": 0
+        },
+        {
+          "height": 809,
+          "id": "screenshot-1",
+          "originX": 47,
+          "originY": 124,
+          "width": 469,
+          "zIndex": 1
+        },
+        {
+          "height": 64,
+          "id": "screenshot-2",
+          "originX": 525,
+          "originY": 124,
+          "width": 450,
+          "zIndex": 2
+        }
+      ]
+    },
+    {
+      "stage": "F11復帰",
+      "screenshots": [
+        {
+          "height": 981,
+          "id": "screenshot-0",
+          "originX": 26,
+          "originY": 26,
+          "width": 1872,
+          "zIndex": 0
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "通常画面のキャプチャ幅は1870→1871→1872、高さ981と原点26,26は維持。幅の完全一致は未達。キャプチャの丸めか実ウィンドウ幅の変化かはこの試験では切り分けていない。",
+    "現在のWindowsディスプレイ構成で実施。複数ディスプレイへの配置・Mac・Linuxは別途実機確認を推奨。",
+    "VR中はアクセシビリティ本文が取得できず、画像で確認。復帰後は本文取得が回復。",
+    "長押しドラッグやパネルを移動した後の位置復元、検索履歴の内容比較は今回の対象外。"
+  ],
+  "finalState": "通常3D、接続済み、同じファイルを表示。IDEを開いたまま。"
+}

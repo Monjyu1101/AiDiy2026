@@ -41,7 +41,8 @@ def check_environment() -> tuple[bool, str]:
         return False, 'Electron が未準備です。python frontend_channels/_setup.py を実行してください。'
     try:
         result = subprocess.run(launch_command() + ['--check'], cwd=THIS_DIR, capture_output=True,
-                                encoding='utf-8', errors='replace', timeout=30)
+                                encoding='utf-8', errors='replace', timeout=30,
+                                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
     except (OSError, RuntimeError, subprocess.SubprocessError):
         return False, 'Node.js / Discord 設定を確認できません。npm run config:check で確認してください。'
     if result.returncode:
@@ -61,7 +62,7 @@ def process_tree_pids() -> set[int]:
 
 
 def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
-    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
+    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if sys.platform == 'win32' else {'start_new_session': True}
     # パネルはログファイルを使って独立起動し、全体起動の終了後も継続する。
     args = ['--connect'] if auto_connect else []
     # aidiy_code / aidiy_live と同じく、全体起動ではリポジトリ直下をプロジェクトにする。
@@ -72,7 +73,8 @@ def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
 def main() -> None:
     print_header('フロントエンド(Discord) パネル起動')
     try:
-        sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR.parent))
+        sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR.parent,
+                                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0))
     except (OSError, RuntimeError) as error:
         print(error)
         sys.exit(1)

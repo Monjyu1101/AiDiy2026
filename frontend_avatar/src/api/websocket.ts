@@ -74,13 +74,18 @@ export interface IWebSocketClient {
   onStateChange(handler: StateHandler): () => void
 }
 
+/** backend_server の AIセッション管理 が、同じチャンネルの新しい接続へ置き換えるときに使う切断コード */
+export const REPLACED_CLOSE_CODE = 4000
+
 export class AIWebSocket implements IWebSocketClient {
   private socket: WebSocket | null = null
   private sessionId: string | null = null
   private readonly handlers = new Map<string, Set<MessageHandler>>()
   private readonly stateHandlers = new Set<StateHandler>()
   private reconnectAttempts = 0
-  private readonly maxReconnectAttempts = 5
+  // Avatar には手動の再接続ボタンがないため、回数で打ち切らず間隔を延ばしながら再接続を続ける。
+  // バックエンドの再起動（約30秒）後も、利用者の操作なしで接続を戻す。
+  private readonly maxReconnectDelayMs = 15000
   private reconnectTimer: number | null = null
   private intentionallyClosed = false
 
@@ -177,11 +182,18 @@ export class AIWebSocket implements IWebSocketClient {
 
         if (!settled) return
 
-        if (!this.intentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
+        // 4000: サーバーが同じセッション・チャンネルの新しい接続へ置き換えた。
+        // 再接続すると新しい接続を閉じ返し、互いに置き換え合う繰り返しになるため再接続しない。
+        if (event.code === REPLACED_CLOSE_CODE) {
+          this.intentionallyClosed = true
+          return
+        }
+
+        if (!this.intentionallyClosed) {
           this.reconnectAttempts += 1
           this.reconnectTimer = window.setTimeout(() => {
             void this.connect().catch(() => undefined)
-          }, 3000)
+          }, Math.min(3000 * this.reconnectAttempts, this.maxReconnectDelayMs))
         }
       }
     })

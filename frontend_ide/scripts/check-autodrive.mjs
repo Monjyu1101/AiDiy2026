@@ -110,6 +110,7 @@ try {
     assert.fail(message+' '+JSON.stringify(await evaluate(`({trail:window.aidiyIDE.trail,warping:document.querySelector('.space-canvas').classList.contains('warping'),preview:document.querySelector('.viewer-popup')?.textContent?.slice(0,100)})`)));
   }
   const preview=()=>evaluate(`document.querySelector('.viewer-popup')?.textContent||''`);
+  const explorationStatus=()=>evaluate(`document.querySelector('.space-orbit-status')?.textContent||''`);
   await evaluate(`window.autoAnimations=0;const canvas=document.querySelector('.space-canvas'),animate=canvas.animate;canvas.animate=function(...args){window.autoAnimations++;return animate.apply(this,args)};`);
   await evaluate(`window.orbitStrokes=0;window.orbitAlphas=[];{const context=document.querySelector('.space-canvas').getContext('2d'),stroke=context.stroke;context.stroke=function(...args){if(this.strokeStyle==='#8aa9ed'){window.orbitStrokes++;if(this.lineWidth<2)window.orbitAlphas.push(this.globalAlpha);}return stroke.apply(this,args)};}`);
   await evaluate(`{const context=document.querySelector('.space-canvas').getContext('2d');let points=[];
@@ -122,8 +123,28 @@ try {
   await until(`document.querySelector('.viewer-popup')?.textContent.includes('first.txt')`,'起動時の最終更新へ移動');
   assert.equal(await evaluate('window.autoAnimations'),0,'同階層の自動追跡にはワープ演出を使わない');
   await capture('nn-autodrive-preview.png');
-  if(process.env.AIDIY_SELECTED_ORBIT_ONLY==='1'){
+  if(process.env.AIDIY_STATUS_STYLE_ONLY==='1'){
+    await advance(3000);await evaluate('aidiyIDE.clear();aidiyIDE.interact()');await advance(250);
+    const textStyle=()=>evaluate(`(()=>{const e=document.querySelector('.space-orbit-status'),s=getComputedStyle(e),g=document.querySelector('.space-flight-controls');return {background:s.backgroundColor,border:s.borderTopWidth,shadow:s.boxShadow,pointer:s.pointerEvents,z:Number(getComputedStyle(g).zIndex)};})()`);
+    const plain=style=>{assert.equal(style.background,'rgba(0, 0, 0, 0)');assert.equal(style.border,'0px');assert.equal(style.shadow,'none');assert.equal(style.pointer,'none');};
+    const threeD=await textStyle();plain(threeD);await capture('nn-status-transparent-3d.png');
+    await evaluate(`void aidiyIDE.goTo({type:'file',path:'first.txt'})`);
+    await until(`!!document.querySelector('.viewer-popup')&&!document.querySelector('.space-canvas').classList.contains('warping')`,'ビューアを表示');
+    await advance(1000);
+    // 重なり検証ではパネル位置だけを動かし、本番の重なり順・背景・入力設定を使う。
+    await evaluate(`document.querySelector('.viewer-popup').style.bottom='16px'`);
+    const covered=kind=>evaluate(`(()=>{const g=document.querySelector('.space-flight-controls'),b=g.querySelector('[aria-label="自動探索"]'),p=document.querySelector('${kind}'),r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return {controlZ:Number(getComputedStyle(g).zIndex),panelZ:Number(getComputedStyle(p).zIndex),covered:p.contains(document.elementFromPoint(x,y))};})()`);
+    const viewer=await covered('.viewer-popup');assert.ok(viewer.controlZ<viewer.panelZ);assert.equal(viewer.covered,true);await capture('nn-status-behind-viewer.png');
+    await evaluate(`document.querySelector('.explorer-toggle').click()`);
+    await evaluate(`Object.assign(document.querySelector('.explorer-panel').style,{left:'auto',right:'16px',top:'auto',bottom:'16px',height:'180px',width:'260px'})`);
+    const explorer=await covered('.explorer-panel');assert.ok(explorer.controlZ<explorer.panelZ);assert.equal(explorer.covered,true);await capture('nn-status-behind-explorer.png');
+    await evaluate(`document.querySelector('[aria-label="エクスプローラーを閉じる"]').click();aidiyIDE.clear();Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='2D').click()`);
+    const twoD=await textStyle();plain(twoD);await capture('nn-status-transparent-2d.png');
+    assert.deepEqual(errors,[]);writeFileSync(join(shots,`${stamp}_status-style-result.json`),JSON.stringify({status:'✅ OK',threeD,twoD,viewer,explorer,method:'隔離Chrome。重なりの確認時だけパネル位置を調整し、本番CSSの重なり順で検証。',errors},null,2));
+    console.log('STATUS STYLE PASS: transparent text, no border/shadow, controls behind viewer/explorer, 2D/3D, errors=[]');
+  }else if(process.env.AIDIY_SELECTED_ORBIT_ONLY==='1'){
     await advance(3000);
+    assert.equal(await explorationStatus(),'観測中');
     await evaluate(`window.selectedOrbitOffset=()=>{const v=aidiyIDE.cam,s=aidiyIDE.selected;return [v.tx-Math.sin(v.yaw)*Math.cos(v.pitch)*v.dist-s.x,v.ty-Math.sin(v.pitch)*v.dist-s.y,v.tz-Math.cos(v.yaw)*Math.cos(v.pitch)*v.dist-s.z]};`);
     const start=await evaluate('selectedOrbitOffset()');
     const near=(actual,expected,label)=>assert.ok(Math.hypot(...actual.map((v,i)=>v-expected[i]))<1e-5,label);
@@ -138,7 +159,44 @@ try {
     await evaluate('aidiyIDE.setAutoSpin(false)');const held=await view();
     await advance(5000);const stopped=await view();
     for(const key of Object.keys(held))assert.ok(Math.abs(stopped[key]-held[key])<1e-9,'OFF中は停止: '+key);
+    assert.equal(await explorationStatus(),'','OFFでは状態表示を外す');
+    await capture('nn-selected-orbit-off.png');
     assert.deepEqual(errors,[]);console.log('SELECTED ORBIT PASS: 180 seconds / 1 revolution, preview retained, OFF stops, errors=[]');
+  }else if(process.env.AIDIY_IDLE_ORBIT_ONLY==='1'){
+    await advance(3000);
+    await evaluate(`window.idlePivot={...aidiyIDE.selected};window.idleEye=()=>{const v=aidiyIDE.cam,p=idlePivot;return [v.tx-Math.sin(v.yaw)*Math.cos(v.pitch)*v.dist-p.x,v.ty-Math.sin(v.pitch)*v.dist-p.y,v.tz-Math.cos(v.yaw)*Math.cos(v.pitch)*v.dist-p.z]};aidiyIDE.clear();aidiyIDE.interact();`);
+    const start=await evaluate('idleEye()'),radius=Math.hypot(...start);
+    // 閲覧後は中心を斜めに見ているため、回転軸に沿う成分は半周後も反転しない。
+    const axis=await evaluate(`(()=>{const v=aidiyIDE.cam,cy=Math.cos(v.yaw),sy=Math.sin(v.yaw),cp=Math.cos(v.pitch),sp=Math.sin(v.pitch),cr=Math.cos(v.roll||0),sr=Math.sin(v.roll||0);return [-cy*sr-sy*sp*cr,cp*cr,sy*sr-cy*sp*cr]})()`);
+    const axial=start.reduce((sum,v,i)=>sum+v*axis[i],0),half=start.map((v,i)=>2*axial*axis[i]-v);
+    const near=(actual,expected,label)=>assert.ok(Math.hypot(...actual.map((v,i)=>v-expected[i]))<1e-5,label);
+    const samples=[];
+    assert.equal(await explorationStatus(),'周回軌道航行中');
+    await capture('nn-idle-orbit-start.png');
+    for(let n=1;n<=4;n++){
+      await advance(45000);
+      const eye=await evaluate('idleEye()');samples.push({seconds:n*45,eye});
+      assert.equal(await evaluate('aidiyIDE.orbitPhase'),'idle','手動待機中は航行しない');
+      assert.equal(await explorationStatus(),'周回軌道航行中');
+      assert.equal(await evaluate('aidiyIDE.selected'),null,'ファイル未選択のまま回転');
+      assert.ok(Math.abs(Math.hypot(...eye)-radius)<1e-5,'閲覧終了後も同じ中心星との距離を維持');
+      if(n===2)near(eye,half,'90秒で回転軸の反対側');
+      await capture(`nn-idle-orbit-${n*45}s.png`);
+      await evaluate('aidiyIDE.interact()');
+    }
+    near(samples.at(-1).eye,start,'180秒でちょうど1周');
+    await advance(59750);assert.equal(await evaluate('aidiyIDE.orbitPhase'),'idle');
+    const before=await evaluate('idleEye()');await advance(250);
+    assert.equal(await evaluate('aidiyIDE.orbitPhase'),'centering');
+    assert.equal(await explorationStatus(),'軌道計算と姿勢制御中');
+    await capture('nn-idle-orbit-preparing.png');
+    near(await evaluate('idleEye()'),before,'航行再開時に船体位置が飛ばない');
+    await until(`aidiyIDE.orbitPhase==='flying'`,'低速回転から通常航行へ復帰');
+    assert.equal(await explorationStatus(),'探索軌道航行中');
+    await capture('nn-idle-orbit-resumed.png');
+    assert.deepEqual(errors,[]);
+    writeFileSync(join(shots,`${stamp}_idle-orbit-result.json`),JSON.stringify({status:'✅ OK',clock:'仮想時計・実ブラウザー描画',start,radius,samples,resumedPhase:await evaluate('aidiyIDE.orbitPhase'),errors},null,2));
+    console.log('IDLE ORBIT PASS: 180 seconds / 1 revolution, manual pause rotates, 60s resumes flight, errors=[]');
   }else if(process.env.AIDIY_ORBIT_ROUTES_ONLY==='1'){
     await evaluate(`window.eyeOf=v=>({x:v.tx-Math.sin(v.yaw)*Math.cos(v.pitch)*v.dist,y:v.ty-Math.sin(v.pitch)*v.dist,z:v.tz-Math.cos(v.yaw)*Math.cos(v.pitch)*v.dist});aidiyIDE.clear();aidiyIDE.setAutoSpin(true);`);
     await until(`aidiyIDE.orbitPhase==='flying'`,'巡回開始');
@@ -190,7 +248,7 @@ try {
   // 遠点で旧軌道を消してから機体を回し、新しい軌道を表示する。
   await evaluate(`(()=>{for(let i=0;i<6000&&window.aidiyIDE.orbitPhase!=='hiding';i++)window.orbitTestAdvance(250);})()`);
   assert.equal(await evaluate('window.aidiyIDE.orbitPhase'),'hiding');
-  assert.equal(await evaluate(`!!document.querySelector('.space-orbit-status')`),false,'旧軌道の消去中は計算表示を出さない');
+  assert.equal(await explorationStatus(),'軌道計算と姿勢制御中','旧軌道の消去も準備状態として表示');
   await advance(500);await capture('nn-orbit-hide.png');
   await until(`window.aidiyIDE.orbitPhase==='aligning'`,'暗転後に次の軌道へ機体回転');
   const alignEye=await evaluate('window.eyeOf(window.aidiyIDE.cam)');
@@ -199,9 +257,9 @@ try {
   const turningEye=await evaluate('window.eyeOf(window.aidiyIDE.cam)');
   for(const key of ['x','y','z'])assert.ok(Math.abs(alignEye[key]-turningEye[key])<1e-6);
   await capture('nn-orbit-align.png');
-  assert.equal(await evaluate(`document.querySelector('.space-orbit-status')?.textContent`),'探索軌道計算中…','軌道を消した後の姿勢調整中に計算表示');
+  assert.equal(await explorationStatus(),'軌道計算と姿勢制御中','軌道を消した後の姿勢調整も準備状態として表示');
   await until(`window.aidiyIDE.orbitPhase==='flying'`,'新しい軌道の表示後に航行再開');
-  assert.equal(await evaluate(`!!document.querySelector('.space-orbit-status')`),false,'航行再開時には計算表示を消す');
+  assert.equal(await explorationStatus(),'探索軌道航行中','航行再開時は航行状態へ切替');
   await capture('nn-orbit-next.png');
   // 自動運転を入り直しても、到着済みの最終更新へは戻らない。
   await evaluate(`window.aidiyIDE.setAutoSpin(false)`);

@@ -54,6 +54,23 @@ node --test frontend_ide/host/checks/code-connection.test.cjs
 
 ## 主要メッセージ形式
 
+### AIチャット・AIコードのエラー応答
+
+最終応答の本文は、`backend_server/AIコア/AI応答.py` の規約に揃えます。
+
+| 本文 | 判定 |
+|---|---|
+| `!` | 無応答・詳細なしのエラー |
+| `! エラーメッセージ` | 理由が分かるエラー。例：`! 実行エラー: 認証失敗` |
+| 空文字・空白だけ | エラーとして扱い、送信時は `!` へ正規化 |
+| `!`で始まる文字列 | 内容にかかわらずエラーとして扱う |
+
+判定前に前後の空白を除きます。通常の返答の途中にある`!`はエラーにしません。`!`で始まる本文はエラー用に予約します。ストリームの途中の空断片には、この判定を適用しません。
+
+WebSocketの`output_text`とMCPの`result`／`content`で同じ本文を返します。MCPではエラー応答の`status`も`NG`とし、Diagも空文字・`!`始まりを成功扱いしません。Code CLIは途中の回答があっても終了コードが0以外ならエラーとし、失敗後の検証・自己改善へ進みません。標準Chat Completionsの`tool_calls`だけの中間応答は、有効なツール要求なので空の`content`を許可します。
+
+確認は外部AIへ接続せず、`backend_server/tests/test_ai_response_errors.py`、`test_code_cli_output_routing.py`、`test_claude_sdk_auto_model.py`と`backend_diag/checks/model-trials.check.mjs`で行います。Pythonの試験は`backend_server`を作業ディレクトリにし、Windowsでは子Pythonの出力もUTF-8になるよう`PYTHONUTF8=1`を指定します。変更の反映にはCoreとTools、Diagの再起動が必要です。
+
 ```typescript
 // テキスト入力
 {

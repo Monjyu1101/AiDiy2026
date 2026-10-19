@@ -17,7 +17,7 @@
 | モジュール名 | 対象 |
 |-------------|------|
 | `共通` | プロジェクト全体、横断的な話題 |
-| `backend_diag` | Diag の環境診断・モデル情報・Vue 画面 |
+| `backend_diag` | aidiy_diag の環境診断・モデル情報・Vue 画面 |
 | `backend_server` | FastAPI サーバー（core_main / apps_main） |
 | `command_hermes` | `aidiy_hermes` CLI 基盤 |
 | `backend_tools` | MCP サーバー群 |
@@ -36,6 +36,14 @@
 - `共通,開発環境運用手順.md` — プロジェクト全体の話題
 
 メタファイル（`_index.md`、`_最終変更.md`）は接頭辞をつけず、`_` 始まりのままにします。
+
+総合テストの手順・実施結果・エビデンスは `セルフテスト,アプリコマンド,xx編.md` とします。主目的は総合テストで、記録した操作と画面は副産物として操作手順書の素材に再利用します。例は `セルフテスト,aidiy_diag,システム起動編.md`。エビデンスは `aidiy_diag-システム起動_101_起動直後画面.png` のようにアプリ・編名・章内連番を含め、本文にインラインで掲載します。各冊のテスト通過後に、同名のPDFも作成します。
+
+説明資料の構成・文体・画像説明は[説明資料の書き方](./セルテスト,_説明資料の書き方.md)にまとめます。文書全体を簡潔で丁寧に書き、先頭に総合評価、各画像の直前に短い説明を添えます。再試験後は本文と総合評価を一緒に更新します。
+
+画像は `images/<参照元Markdownの拡張子なしファイル名>/<ファイル名>` に保存します。例は `images/セルフテスト,aidiy_diag,システム起動編/` です。実施日時・結果・操作上の注意・画像説明は参照元のMarkdownへ直接記載します。JSON・ログ・結果テキストや、整理作業の台帳は説明資料として残さず、照合した事実と判定だけを本文に記載します。実施IDのサブフォルダは作らず、新しい画像は `<実施ID>__<元のファイル名>` とします。再試験でも既存画像は上書きせず、旧画像の同名衝突時は実施IDなどを補います。`temp/` は作業用で、正式な証跡の保存先には使いません。
+
+今回の必須対象はWindowsです。Mac／Linuxの実機試験は別途実施を推奨し、今回は未実施でも合格判定・PDF発行を妨げません。各冊に対象OSと推奨試験の扱いを明記します。
 
 ## ファイル内容先頭書式
 
@@ -82,7 +90,7 @@
 
 | 話題 | 使い分け |
 |------|----------|
-| Node.js 外部 API の proxy / TLS / 安全な失敗ログ | [`共通,Node.js外部API通信の注意点.md`](./共通,Node.js外部API通信の注意点.md) を参照する。Discord と Diag の実装差、環境変数の優先順位、loopback mock による再検証をまとめる。 |
+| Node.js 外部 API の proxy / TLS / 安全な失敗ログ | [`共通,Node.js外部API通信の注意点.md`](./共通,Node.js外部API通信の注意点.md) を参照する。Discord と aidiy_diag の実装差、環境変数の優先順位、loopback mock による再検証をまとめる。 |
 | 音声処理 | `AudioController` 単体、マイク、再生、エコー抑制、音声 WebSocket は [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) に集約する。 |
 | VRM / VRMA | モデルやモーションファイルを追加する場合は [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、表示サイズ・向き・表示選択 UI は [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、描画内部やカメラワークは [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) を使う。 |
 | MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、MCP サーバー構成は [`backend_tools,構成.md`](./backend_tools,構成.md)、Code CLI への MCP 登録は [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を使う。 |
@@ -97,6 +105,16 @@
 
 | 症状・依頼 | 最初に見るファイル |
 |-----------|------------------|
+| 総合テストの説明資料を、簡潔・丁寧に、画像説明を添えてまとめる | [説明資料の書き方](./セルテスト,_説明資料の書き方.md) |
+| aidiy_diagの起動・停止を総合テストし、操作手順書素材を残す | [システム起動編](./セルフテスト,aidiy_diag,システム起動編.md) |
+| aidiy_diagのプロジェクト選択・アプリ起動を総合テストし、操作手順書素材を残す | [アプリ起動編](./セルフテスト,aidiy_diag,アプリ起動編.md) |
+| aidiy_diagの導入状況・モデル・外部連携を総合テストし、操作手順書素材を残す | [環境確認編](./セルフテスト,aidiy_diag,環境確認編.md) |
+| IDEの利用開始・閲覧・Code/Live連携を総合テストし、操作手順書素材を残す | [IDE操作編](./セルフテスト,aidiy_ide,操作編.md) |
+| WebのAI機能を確認する | [AiDiy編](./セルフテスト,frontend_web,AiDiy編.md) |
+| WebのAIタスク・AIチームを確認する | [taskteam編](./セルフテスト,frontend_web,taskteam編.md) |
+| Webの配車・生産・在庫を確認する | [業務アプリ編](./セルフテスト,frontend_web,業務アプリ編.md) |
+| Avatarを実行方式ごとに確認する | [Electron実行編](./セルフテスト,aidiy_avatar,Electron実行編.md)、[Web実行編](./セルフテスト,aidiy_avatar,Web実行編.md) |
+| Electron画面の0.5秒長押しドラッグ、透明パネルで領域を先に確保する表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
 | 今後の改善提案を比較し、採用条件を検討する | [`共通,明日のために,改善提案.md`](./共通,明日のために,改善提案.md) |
 | 未解決の改善課題と再現条件・検証限界を確認する | [`共通,明日のために,改善課題.md`](./共通,明日のために,改善課題.md) |
 | AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
@@ -179,6 +197,7 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
+| Electron全アプリ・関連パネルの0.5秒長押しドラッグと、透明パネルで領域確保する表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
 | Avatar / VS Code の Electron を事前導入し、バイナリ・ZIP を再利用する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md)（「Electron の共通セットアップ」） |
 | Vite proxy / CORS / ポートを調整する | [`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
 | Axios API クライアントのパターン・token 付与・401 ハンドリングを確認する | [`frontend_web,frontend_avatar,共通APIクライアントパターン.md`](./frontend_web,frontend_avatar,共通APIクライアントパターン.md) |
@@ -207,11 +226,11 @@
 | Electron ウィンドウの位置・サイズ・IPC・ライフサイクルを変更する | [`frontend_avatar,Electronウィンドウ管理.md`](./frontend_avatar,Electronウィンドウ管理.md) |
 | 3D アバター描画・VRMA 再生・視線補助・カメラワークを調整する | [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) |
 
-## Diag 環境診断
+## aidiy_diag 環境診断
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Diag の診断・Vue 画面・配布物・起動を変更・検証する | [`backend_diag,環境診断運用.md`](./backend_diag,環境診断運用.md) |
+| aidiy_diag の診断・Vue 画面・配布物・起動を変更・検証する | [`backend_diag,環境診断運用.md`](./backend_diag,環境診断運用.md) |
 
 ## Frontend IDE
 

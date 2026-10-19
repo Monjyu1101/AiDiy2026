@@ -1,0 +1,365 @@
+{
+  "testPassed": true,
+  "roles": [
+    "login",
+    "core",
+    "chat",
+    "file",
+    "image",
+    "code1",
+    "code2",
+    "code3",
+    "code4",
+    "code5",
+    "code6",
+    "task1",
+    "task2",
+    "task3",
+    "taskDialog",
+    "team",
+    "settings"
+  ],
+  "openingCount": 17,
+  "results": [
+    {
+      "label": "Avatar_login",
+      "before": {
+        "x": 608,
+        "y": 293,
+        "width": 320,
+        "height": 242
+      },
+      "after": {
+        "x": 656,
+        "y": 321,
+        "width": 320,
+        "height": 242
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 517.3655999999996,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_login.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_core",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 528.4007999999994,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_core.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_chat",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 521.3904000000002,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_chat.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_file",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 540.0082000000002,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_file.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_image",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 532.1864000000005,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_image.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code1",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 524.8719999999994,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code1.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code2",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 529.8202999999994,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code2.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code3",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 539.9232000000011,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code3.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code4",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 526.0830999999998,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code4.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code5",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 538.3708999999981,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code5.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_code6",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 531.1150999999991,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_code6.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_task1",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 541.4923999999992,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_task1.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_task2",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 539.9019999999982,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_task2.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_task3",
+      "before": {
+        "x": 508,
+        "y": 103,
+        "width": 520,
+        "height": 621
+      },
+      "after": {
+        "x": 556,
+        "y": 131,
+        "width": 520,
+        "height": 621
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 518.8139999999985,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_task3.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_taskDialog",
+      "before": {
+        "x": 128,
+        "y": 13,
+        "width": 1280,
+        "height": 802
+      },
+      "after": {
+        "x": 176,
+        "y": 41,
+        "width": 1280,
+        "height": 802
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 531.4979999999996,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_taskDialog.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_team",
+      "before": {
+        "x": 128,
+        "y": 13,
+        "width": 1280,
+        "height": 802
+      },
+      "after": {
+        "x": 176,
+        "y": 41,
+        "width": 1280,
+        "height": 802
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 526.3859999999986,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_team.png",
+      "ending": "release"
+    },
+    {
+      "label": "Avatar_settings",
+      "before": {
+        "x": 407,
+        "y": 121,
+        "width": 724,
+        "height": 585
+      },
+      "after": {
+        "x": 455,
+        "y": 149,
+        "width": 724,
+        "height": 586
+      },
+      "noSelectionOnRelease": true,
+      "noMoveBeforeMs": 400,
+      "holdDetectedAfterMs": 532.5771000000022,
+      "markerShot": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\window-move-check\\markers\\Avatar_settings.png",
+      "ending": "blur"
+    }
+  ]
+}

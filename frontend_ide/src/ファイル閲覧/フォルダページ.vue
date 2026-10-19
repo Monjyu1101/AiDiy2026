@@ -19,9 +19,6 @@ const pageTurn = computed(() => turn.value?.direction || '');
 const turnPath = computed(() => turn.value?.incoming.path || ''), turnSkipped = computed(() => turn.value?.skipped || 0);
 const turnDuration = ref(800);
 let turnSteps = [], turnSerial = 0, pointerTurn = false;
-const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
-function motionChanged(event) { if (event.matches) cancelTurns(); }
-motionQuery?.addEventListener?.('change', motionChanged);
 // 操作・現在地は常に最終目的地。重ねる経由ページと旧ページは表示専用にする。
 const layers = computed(() => {
   const live = { id: `live:${props.current}`, path: props.current, entries: entries.value, cursor: cursor.value, selected: props.selected, live: true };
@@ -41,7 +38,7 @@ async function refreshPage() {
   manualRefresh.value = true;
   try {
     const ok = await props.reload();
-    if (ok !== false && !disposed && props.active && props.current === path && !motionQuery?.matches) {
+    if (ok !== false && !disposed && props.active && props.current === path) {
       cancelTurns(); turnDuration.value = 650;
       turn.value = { id: ++turnSerial, direction: 'refresh', outgoing, incoming: snapshot(path) };
     }
@@ -150,11 +147,11 @@ watch([() => props.current, () => props.active, pages, () => props.tree], ([path
   // 一覧更新と移動が同じtickでも、旧ページのカーソルを保存してから一度だけ復元する。
   const moved = path !== previous || active !== wasActive;
   if (moved && wasActive) save(previous);
-  if (moved) startTurns(previous || '', path, active && wasActive && index === previousIndex && !motionQuery?.matches);
+  if (moved) startTurns(previous || '', path, active && wasActive && index === previousIndex);
   else {
     save(path); cancelTurns();
     const oldEntries = previousIndex?.get(path)?.entries || [];
-    if (active && !manualRefresh.value && previousTree && tree !== previousTree && !motionQuery?.matches && JSON.stringify(oldEntries) !== JSON.stringify(entries.value)) {
+    if (active && !manualRefresh.value && previousTree && tree !== previousTree && JSON.stringify(oldEntries) !== JSON.stringify(entries.value)) {
       turnDuration.value = 650;
       turn.value = { id: ++turnSerial, direction: 'refresh', incoming: snapshot(path),
         outgoing: { path, entries: oldEntries.map(entry=>({...entry})), cursor: cursor.value, selected: props.selected, scrollTop: body.value?.scrollTop || 0 } };
@@ -166,7 +163,7 @@ watch([() => props.current, () => props.active, pages, () => props.tree], ([path
 watch(() => props.selected, selected => {
   if (presentedPath === props.current && entries.value.some(entry => entry.path === selected)) { cursor.value = selected; memory.save(props.current, { cursor: selected }); }
 });
-onBeforeUnmount(() => { disposed = true; clearTimeout(dateTimer); if(typeof document!=='undefined')document.removeEventListener('visibilitychange',syncDateClock); restoration++; cancelTurns(); motionQuery?.removeEventListener?.('change', motionChanged); memory.clear(); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(dateTimer); if(typeof document!=='undefined')document.removeEventListener('visibilitychange',syncDateClock); restoration++; cancelTurns(); memory.clear(); });
 </script>
 <template>
   <section v-if="active" class="folder-pages" aria-label="2D フォルダページ" @keydown="keydown" @wheel.passive="activity" @touchmove.passive="activity" @pointerdown="activity" @pointermove="pointerMove">

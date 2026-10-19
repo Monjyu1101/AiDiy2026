@@ -23,6 +23,15 @@ class ClaudeSdkAutoModelTests(unittest.IsolatedAsyncioTestCase):
         with redirect_stdout(io.StringIO()):
             return await code.実行(text, **kwargs)
 
+    async def test_sdk_error_result_is_marked_even_without_an_exception(self):
+        code, _ = self.instance("sonnet")
+
+        async def query(*, prompt, options):
+            yield SimpleNamespace(is_error=True, result="利用上限に達しました")
+
+        with patch.object(sdk, "query", query):
+            self.assertEqual(await self.run_code(code), "! 利用上限に達しました")
+
     async def test_each_turn_uses_cli_selector_history_and_sdk_model(self):
         code, parent = self.instance()
         calls = []

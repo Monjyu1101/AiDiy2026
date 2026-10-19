@@ -34,6 +34,13 @@ from typing import Any, Optional
 _VERSION_CHECK_TIMEOUT = 10
 
 
+def _応答結果(応答):
+    # backend_serverの共通規約を使う。呼出前に_setup_sys_pathで所有元を登録する。
+    from AIコア.AI応答 import 応答正規化, エラー応答判定
+    本文 = 応答正規化(応答)
+    return 本文, "NG" if エラー応答判定(本文) else "OK"
+
+
 class CodeAgentsError(Exception):
     """CodeAgents 実行エラー"""
     pass
@@ -326,7 +333,7 @@ Args:
             reason = self.version_info[ai_name].get("version", "利用不可")
             return {
                 "status": "NG",
-                "result": f"ai_name='{ai_name}' は利用できません: {reason}",
+                "result": f"! ai_name='{ai_name}' は利用できません: {reason}",
                 "project_path": resolved_path,
                 "ai_name": ai_name,
                 "ai_model": ai_model,
@@ -359,7 +366,7 @@ Args:
         if not ai_instance:
             return {
                 "status": "NG",
-                "result": f"AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
+                "result": f"! AIインスタンスの初期化に失敗しました (ai_name={ai_name})",
                 "project_path": resolved_path,
                 "ai_name": ai_name,
                 "ai_model": ai_model,
@@ -377,15 +384,20 @@ Args:
             )
             selected_model = getattr(ai_instance, "最終実行モデル", "")
 
-            if self_check_loop > 0:
+            if self_check_loop > 0 and _応答結果(result_text)[1] == "OK":
                 self_check_updated = await agent._バックアップ検証ループ(ai_instance, self_check_loop)
                 self_check_files = list(agent.累積変更ファイル)
+        except Exception as e:
+            from AIコア.AI応答 import エラー応答
+            result_text = エラー応答(e)
+            selected_model = getattr(ai_instance, "最終実行モデル", "")
         finally:
             await ai_instance.終了()
 
+        result_text, result_status = _応答結果(result_text)
         return {
-            "status": "OK",
-            "result": result_text or "（応答なし）",
+            "status": result_status,
+            "result": result_text,
             "project_path": resolved_path,
             "ai_name": ai_name,
             "ai_model": ai_model,

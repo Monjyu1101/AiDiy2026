@@ -1,0 +1,155 @@
+{
+  "status": "✅ OK",
+  "date": "2026-10-19T05:50:46.379Z",
+  "os": "win32",
+  "method": "隔離Chromeの実CSS・Canvas描画。CSSの途中時刻を固定して撮影します。最終更新の通知データは試験用に指定し、ページ・ツリー・ビューアは実物を使います。",
+  "checks": [
+    {
+      "name": "2D初期表示は不要なページめくりなし",
+      "status": "✅ OK"
+    },
+    {
+      "name": "進む・戻るページ切替",
+      "status": "✅ OK",
+      "forwardMs": 800,
+      "backMs": 800,
+      "forwardA": {
+        "clip": "polygon(0px 0px, calc(0px + (0.906535 * (100% + min(20%, 160px)))) 0px, calc(90.6535% + (0.0934647 * (0% - min(20%, 160px)))) 100%, 0px 100%)",
+        "left": 1131.578125,
+        "top": 222,
+        "path": "資料",
+        "liveLists": 1
+      },
+      "forwardB": {
+        "clip": "polygon(0px 0px, calc(0px + (0.378138 * (100% + min(20%, 160px)))) 0px, calc(37.8138% + (0.621862 * (0% - min(20%, 160px)))) 100%, 0px 100%)",
+        "left": 388.65625,
+        "top": 222,
+        "path": "資料",
+        "liveLists": 1
+      },
+      "backA": {
+        "clip": "polygon(calc(0px + (0.0934647 * (100% + min(20%, 160px)))) 0px, 100% 0px, 100% 100%, calc(9.34647% + (0.906535 * (0% - min(20%, 160px)))) 100%)",
+        "left": -11.578125,
+        "top": 222,
+        "path": "",
+        "liveLists": 1
+      },
+      "backB": {
+        "clip": "polygon(calc(0px + (0.621862 * (100% + min(20%, 160px)))) 0px, 100% 0px, 100% 100%, calc(62.1862% + (0.378138 * (0% - min(20%, 160px)))) 100%)",
+        "left": 731.328125,
+        "top": 222,
+        "path": "",
+        "liveLists": 1
+      }
+    },
+    {
+      "name": "ユーザー操作による演出中断",
+      "status": "✅ OK"
+    },
+    {
+      "name": "エクスプローラーのファイル選択と複数階層の連続切替",
+      "status": "✅ OK",
+      "perPageMs": 266.6666666666667,
+      "totalMs": 800
+    },
+    {
+      "name": "一覧更新の縦方向切替",
+      "status": "✅ OK",
+      "refreshMs": 650,
+      "refreshA": {
+        "clip": "inset(12.9162% 0px 0px)",
+        "left": 17,
+        "top": 283.46875,
+        "path": "資料/内部/詳細",
+        "liveLists": 1
+      },
+      "refreshB": {
+        "clip": "inset(87.0838% 0px 0px)",
+        "left": 17,
+        "top": 636.515625,
+        "path": "資料/内部/詳細",
+        "liveLists": 1
+      }
+    },
+    {
+      "name": "OS設定によるページ繰り省略なし",
+      "status": "✅ OK"
+    },
+    {
+      "name": "最終更新欄のファイル選択とページ切替",
+      "status": "✅ OK"
+    },
+    {
+      "name": "2Dと3Dの切替・選択維持",
+      "status": "✅ OK"
+    }
+  ],
+  "shots": [
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_601_2D初期表示画面.png",
+      "description": "2Dへ切り替えた初回は、ページめくりを挟まず一覧を表示します。",
+      "sha256": "b78218339296133de04428d1ad95d7a93da1357522972020e5eaf8a0e2d540ea"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_602_進むページ切替25パーセント画面.png",
+      "description": "子フォルダへ進む途中です。斜線と旧ページの切り抜きを確認します。",
+      "sha256": "8289f62805e28014510badc9b03a22f7008cf24411b2ccb0309f915a3ad2ce80"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_603_進むページ切替75パーセント画面.png",
+      "description": "斜線が右から左へ進み、移動先の一覧が現れます。",
+      "sha256": "ba227f9d9aaa371568c4a8dcc5722c1708a4c76d78b4b791935e6e8e26ad5685"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_604_戻るページ切替画面.png",
+      "description": "親へ戻る時は、同じ斜線が左から右へ進みます。",
+      "sha256": "6f5a40c807cf05cb9c2cc4c7220de9eb6c9f4c3f5112ffd2fb6f09ef7c79c7fe"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_605_スクロールでページ演出中断画面.png",
+      "description": "スクロール操作で切替演出だけを終え、現在のフォルダを保ちます。",
+      "sha256": "1788f907d102e2b29643627a25a1e0ae44c3ba77cdef8fb106f47345d1e39b77"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_606_エクスプローラー選択で複数階層移動画面.png",
+      "description": "エクスプローラーで深いファイルを選ぶと、経由ページを順に表示します。",
+      "sha256": "c9848da0d23d1d7ef9487be191fd5a916b5ae0bdd2a737352a5f114f2512e14e"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_607_エクスプローラー選択先のファイル表示画面.png",
+      "description": "切替完了後は、エクスプローラーで選んだファイルとビューアの名前が一致します。",
+      "sha256": "0a4450436c63033bccc3345bbee28709f6a02481a1d14f5ea6ef00d248409b3a"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_608_一覧更新の途中画面.png",
+      "description": "一覧更新は、上から下へ旧ページを切り替えます。",
+      "sha256": "cce38dd25b484cd6ae3e2dc4336720103690da8b78f23cae6826db6285d6f14e"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_609_OS設定でも規定のページ繰り画面.png",
+      "description": "OSが動きを減らす設定でも、規定のページ繰りを省略しません。",
+      "sha256": "991b481be17f33a552d7a07dd436db06b1f21efa0f0e4cbb03849a0d51276fa4"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_610_最終更新ファイルの選択前画面.png",
+      "description": "最終更新欄に出たファイルを選び、別フォルダへのページ切替を確認します。",
+      "sha256": "7bec2d5939e499cec285339610d0623065074a62ff33a0fdaf469f6b1f34daf2"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_611_最終更新選択でページ切替画面.png",
+      "description": "最終更新欄からの選択でも、移動先へ同じページめくりを使います。",
+      "sha256": "d1fc955b4927a6b1ebe20ffa3b1e57f6f744709b43b229bcaf7ef0c2ea03f4d0"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_612_最終更新選択先のファイル表示画面.png",
+      "description": "移動先の一覧と、選んだ更新ファイルのビューアを表示します。",
+      "sha256": "cd80d414d42903da8f33bfb51a93e170ff8a7a168836dfded076f6ec4c4ff690"
+    },
+    {
+      "file": "20261019145036-ide-2d-motion__ide-操作_613_3D復帰と選択維持画面.png",
+      "description": "3Dへ戻っても、同じフォルダと選択ファイルを維持します。",
+      "sha256": "32d353e35607d275a4e980e17f738cad8141c6fdbd2751f175243b941397e9be"
+    }
+  ],
+  "errors": []
+}

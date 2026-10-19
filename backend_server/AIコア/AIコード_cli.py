@@ -9,6 +9,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+from AIコア.AI応答 import 応答正規化, エラー応答
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -75,13 +76,15 @@ class _CopilotJSON出力:
 
     @property
     def 回答(self):
+        if self.エラー:
+            return f"! Copilot実行エラー: {self.エラー}"
         for message in reversed(list(self.メッセージ.values())):
             if message.get("toolRequests") or message.get("phase") in ("thinking", "analysis", "commentary"):
                 continue
             content = message.get("content", "".join(message["断片"]))
             if isinstance(content, str) and content.strip():
                 return content.strip()
-        return f"Copilot実行エラー: {self.エラー}" if self.エラー else ""
+        return ""
 
     def 解析(self, line):
         if not line.strip():
@@ -1066,11 +1069,11 @@ class CodeAI:
                     開始成功 = await self.開始()
                     if (開始成功 is False) or (not self.is_alive):
                         logger.warning("CodeAI実行:自動再開始に失敗")
-                        return "CodeAIが停止状態です。開始してください。"
+                        return "! CodeAIが停止状態です。開始してください。"
                     logger.info("CodeAI実行:自動再開始に成功")
                 except Exception as start_error:
                     logger.error(f"CodeAI実行:自動再開始エラー {start_error}")
-                    return "CodeAIが停止状態です。開始してください。"
+                    return "! CodeAIが停止状態です。開始してください。"
 
             # 履歴管理
             if not resume:
@@ -1135,7 +1138,7 @@ class CodeAI:
             self.最終実行モデル = "" if (実行モデル or "").lower() in ("", "auto", "same") else 実行モデル
             if self._強制停止要求あり():
                 await self._停止マーカー送信()
-                return ""
+                return "!"
 
             # 履歴に今回の要求を追加（完全プロンプト生成後：重複送信を避ける）
             self._履歴追加(要求テキスト, "user")
@@ -1169,7 +1172,7 @@ class CodeAI:
                     logger.warning("Code CLI選択モデル通知を送信できませんでした")
             if self._強制停止要求あり():
                 await self._停止マーカー送信()
-                return ""
+                return "!"
 
             # テスト用：送信コンテキスト（完全プロンプト）を標準出力に表示（平文）
             try:
@@ -1196,6 +1199,39 @@ class CodeAI:
                     timeout=タイムアウト秒数,
                     stdin_text=完全プロンプト if self.code_ai == "aidiy_hermes" else None,
                 )
+                # 候補一覧は複数の一覧を合成しているため、契約上使えないモデルが含まれる場合がある。
+                # auto で選んだモデルを CLI が拒否したときだけ、CLI 既定（same）で1回やり直す。
+                if (
+                    選択モデル
+                    and (result_text or "").startswith("!")
+                    and re.search(r"(?i)\bmodel\b.*\b(not available|not supported|unknown|invalid)\b", result_text or "")
+                    and not self._強制停止要求あり()
+                ):
+                    logger.warning(f"[CodeAI] 選択モデルが使えないためCLI既定で再実行: ai={self.code_ai} model={選択モデル}")
+                    if self.parent_manager and hasattr(self.parent_manager, '接続'):
+                        try:
+                            await self.parent_manager.接続.send_to_channel(self.チャンネル, {
+                                "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+                                "メッセージ識別": "output_stream",
+                                "メッセージ内容": f"[{選択モデル} は使えないため、CLIの既定モデルで再実行します]\n",
+                                "ファイル名": None, "サムネイル画像": None,
+                            })
+                        except Exception:
+                            logger.warning("Code CLI再実行通知を送信できませんでした")
+                    try:
+                        self.code_model = "same"
+                        command = self._コマンド構築(
+                            プロンプト=完全プロンプト, 初回=初回送信, repo_path=repo_path, 読取専用=読取専用
+                        )
+                    finally:
+                        self.code_model = 設定モデル
+                    self.最終実行モデル = ""
+                    result_text = await self._subprocess実行(
+                        command=command,
+                        cwd=作業ディレクトリ,
+                        timeout=タイムアウト秒数,
+                        stdin_text=完全プロンプト if self.code_ai == "aidiy_hermes" else None,
+                    )
 
             # codexの場合、セッションIDを抽出して保存（stderr から抽出）
             if self.code_ai == "codex_cli":
@@ -1210,7 +1246,7 @@ class CodeAI:
                     logger.info(f"codexセッションID保存: {セッションID}")
 
             # 履歴に結果を追加
-            final_result = result_text.strip() if result_text.strip() else "!"
+            final_result = 応答正規化(result_text)
             self._履歴追加(final_result, "agent")
 
             return final_result
@@ -1220,7 +1256,7 @@ class CodeAI:
             logger.error(
                 f"CodeAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] AI={self.code_ai} モデル={self.code_model}"
             )
-            エラーメッセージ = f"実行エラー: {str(e)}"
+            エラーメッセージ = f"! 実行エラー: {str(e)}"
 
             return エラーメッセージ
 
@@ -1476,13 +1512,15 @@ class CodeAI:
                 return "!"
 
             result = full_output.strip()
-            if copilot_output is not None and not result and process.returncode != 0:
-                return f"Copilot実行エラー: {stderr_output.strip() or f'終了コード {process.returncode}'}"
-            # stdout を正式回答とする CLI が失敗した場合は、stderr のエラー行を理由として返す。
-            if not result and process.returncode != 0 and self.code_ai in _STDERR_STREAM_STDOUT_FINAL_AI:
+            if self.code_ai == "aidiy_hermes":
+                # Hermes の記憶ファイルは項目区切りに「§」を使う。モデルがこれを真似て
+                # 回答末尾へ付けることがあるため、末尾に単独で付いた区切りだけを除く。
+                result = re.sub(r"\s*§+\s*$", "", result)
+            if process.returncode != 0:
                 stderr_text = [line.strip() for line in re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", stderr_output).splitlines() if line.strip()]
                 detail = [line for line in stderr_text if re.match(r"(?i)error\b", line)] or stderr_text[-3:]
-                return f"実行エラー: {self.code_ai} {' / '.join(detail)[:500] or f'終了コード {process.returncode}'}"
+                reason = ' / '.join(detail) or result or f'終了コード {process.returncode}'
+                return エラー応答(f"実行エラー: {self.code_ai} {reason[:500]}")
             # stdout を正式回答とする CLI では stderr を最終回答へ混ぜない。
             # その他の CLI は、非TTY環境で stderr に回答を出す場合に備えて従来挙動を維持する。
             if (
@@ -1492,15 +1530,15 @@ class CodeAI:
             ):
                 logger.info(f"[CodeAI] stdout空のためstderrを戻り値に使用: ai={self.code_ai}")
                 result = stderr_output.strip()
-            return result if result else "（応答なし）"
+            return 応答正規化(result)
 
         except asyncio.TimeoutError as e:
             logger.warning(f"subprocess タイムアウト: {e}")
-            return f"処理タイムアウト({timeout}秒)が発生しました。"
+            return f"! 処理タイムアウト({timeout}秒)が発生しました。"
 
         except Exception as e:
             logger.error(f"subprocess実行エラー (command={command}, cwd={cwd}): {e}")
-            return f"subprocess実行エラー: {str(e)}"
+            return f"! subprocess実行エラー: {str(e)}"
 
         finally:
             pending_tasks = [task for task in tasks if not task.done()]

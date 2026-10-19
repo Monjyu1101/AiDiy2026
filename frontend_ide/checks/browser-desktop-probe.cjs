@@ -11,7 +11,7 @@ const {pathToFileURL}=require('node:url');
 const {holdMove,shortClick}=require('./window-move-probe.cjs');
 app.setPath('appData',process.env.AIDIY_TEST_PROFILE);app.disableHardwareAcceleration();
 const nativeShow=BrowserWindow.prototype.showInactive;
-BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);nativeShow.call(this);};
+BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){if(!this.isAiDiyOpeningCanvas){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);}nativeShow.call(this);};
 BrowserWindow.prototype.focus=function(){};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const evaluate=async(win,code)=>{try{return await win.webContents.executeJavaScript(code,true);}catch(error){throw Error('画面操作失敗: '+code,{cause:error});}};
@@ -114,7 +114,9 @@ app.on('browser-window-created',(_,owner)=>{
     let child;await until(()=>{child=browsers().find(w=>!before.has(w));return child?.isVisible();},'選択画面Browser');
     const b=child.getBounds(),area=display.workArea;assert.ok(b.x>=area.x-3&&b.y>=area.y-3&&b.x+b.width<=area.x+area.width+3&&b.y+b.height<=area.y+area.height+3,JSON.stringify({b,area}));
     await until(()=>guest(child).getURL().startsWith('https://www.google.')&&!guest(child).isLoading(),'VR Browser本文');
-    moves.push(await holdMove(child,guest(child),'[name=q]','VR Browser画面'+display.id));
+    // 外部ページ自身のURL更新を窓移動の誤操作と混同しない。実ファイルの安定した本文で長押しを検査する。
+    await guest(child).loadURL(pathToFileURL(join(process.env.AIDIY_DEVELOPMENT_PROJECT,'index.html')).href);
+    moves.push(await holdMove(child,guest(child),'h1','VR Browser画面'+display.id));
     displayIds.push(display.id);child.close();
    }
    await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'VR終了');

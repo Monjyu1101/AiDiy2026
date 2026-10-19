@@ -13,7 +13,7 @@ const assert=require('node:assert/strict');
 const {holdMove,shortClick,until,sleep}=require('./window-move-probe.cjs');
 app.setPath('appData',process.env.AIDIY_TEST_PROFILE);app.disableHardwareAcceleration();
 const nativeShow=BrowserWindow.prototype.showInactive;
-BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);nativeShow.call(this);};BrowserWindow.prototype.focus=function(){};
+BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){if(!this.isAiDiyOpeningCanvas){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);}nativeShow.call(this);};BrowserWindow.prototype.focus=function(){};
 const evaluate=(win,code)=>win.webContents.executeJavaScript(code,true);
 const output=join(__dirname,'../../temp/window-move-check');mkdirSync(output,{recursive:true});
 const results=[],shots=[];

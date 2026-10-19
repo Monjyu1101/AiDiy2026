@@ -1,0 +1,34 @@
+{
+  "tabs": [
+    "導入状況",
+    "モデル一覧",
+    "外部連携",
+    "設定モデル"
+  ],
+  "header": {
+    "inline": true,
+    "reloadInHeading": true,
+    "reloadLeft": true
+  },
+  "layouts": [
+    {
+      "width": 768,
+      "height": 1000,
+      "overflow": false,
+      "noButtonWrap": true,
+      "rowButtons": 15
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "noButtonWrap": true,
+      "rowButtons": 15
+    }
+  ],
+  "modelCalls": 1,
+  "keyCalls": 1,
+  "scanCalls": 1,
+  "errors": [],
+  "output": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\diag-trial-browser"
+}

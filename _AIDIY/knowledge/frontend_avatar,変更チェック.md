@@ -33,6 +33,14 @@
 
 修正後は Electron と Web の両方を確認する。
 
+Electronの操作・表示は [共通の基本方針](./共通,Electronウィンドウ基本方針.md) に従う。全17種類の表示は `electron/main.ts` の `ウィンドウ表示` に集約し、読込・配置後に最終寸法の透明パネルで領域を確保して、その内側だけをズームする。表示中の再要求はフォーカスのみ、連打は同じ処理を共有する。`ウィンドウ非表示` と共通 `拡大表示` の `canShow` で、待機中に閉じた画面を再表示しない。`checks/window-opening.test.cjs` は全表示経路と連打・取消・読込中の破棄を、同期済みの `dist-electron` から検査する。
+
+Electron の全17種類の窓（ログイン、AIコア、Chat / File / Image / Code1〜6、Task1〜3、タスク詳細、設定、チーム）は、同じ位置で左ボタンを0.5秒押すと窓をドラッグできる。`electron/main.ts` の `createBaseWindow` と、独立した `openSettingsWindow` / `openTeamWindow` が `frontend_ide/デスクトップ/長押し窓移動.cjs` の `attachNativeWindowMove` を取り付ける。短押しはクリック、判定前の移動は通常の文字選択・ドラッグ、成立後の解放はクリックへ渡さない。Esc・フォーカス喪失・破棄で終了し、最大化・全画面では開始しない。Web版のタブへは適用しない。IPC・preloadの公開APIは増やさない。
+
+変更後は `npm run build:electron` で実行出力を同期する。リポジトリルートで `node frontend_avatar/checks/window-move-desktop.mjs` を実行すると、導入済みDiag Electronの隔離プロファイルで全17種類の本番生成関数・移動処理を検査する。本文だけ無害な合成ボタン・入力欄に置換し、AI・音声・実サービスへ接続しない。カーソル位置とフォーカス判定だけを模擬し、Electron入力、0.5秒の判定、実OSの位置・サイズ、移動後の誤クリック防止、短押し、窓破棄時の購読解除を確認する。結果は `temp/window-move-check/avatar-result.json` とマーカー画像へ保存する。Mac / Linux 実機での確認は別途行う。
+
+Mac のアプリ名と最小メニューは `electron/main.ts` から `frontend_ide/host/scripts/MacOS-Menu.cjs` を共用する。表示名は `AiDiy Avatar`。メニューの閉じる・⌘Q は `app.quit()` で主窓と子窓を閉じ、⌘W はフォーカス中の窓だけを閉じる。コピー等は非表示の native role を維持し、キー入力を横取りしない。変更後は `npm run build:electron` で `dist-electron` を同期し、`node --test checks/macos-menu.test.cjs` で実行出力を確認する。Mac 実機の描画確認は別途行う。
+
 ## WindowRole / PanelKey を増やす場合
 
 連動修正:

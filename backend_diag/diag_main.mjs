@@ -19,6 +19,8 @@ import {writeIntegrationInfo,INTEGRATION_FILE} from './モデル情報/integrati
 import {writeModelsInfo} from './モデル情報/models_info.mjs';
 import {createPreviousResults} from './診断/前回結果.mjs';
 import {createStartManager} from './起動/サービス管理.mjs';
+import {createAppLauncher} from './起動/アプリ起動.mjs';
+import {createPortStatusChecker} from './起動/ポート状態.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -60,11 +62,12 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager()}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),portStatusFn=createPortStatusChecker()}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
+  for(const id of ['avatar','ide','term','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
   return async (req,res) => {
     const reply = (status, body, type='application/json; charset=utf-8') => {
       if (res.destroyed) return;
@@ -81,7 +84,24 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if(route==='api/アプリ起動'&&req.method==='GET')return reply(200,appLauncher.catalog());
+      if(route?.startsWith('api/アプリ起動/')&&req.method==='POST'){
+        if(!['api/アプリ起動/開始','api/アプリ起動/フォルダ'].includes(route))return reply(404,{エラー:'見つかりません。'});
+        if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
+        const chunks=[];let size=0;
+        for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
+        const keys=route.endsWith('/開始')?['対象','フォルダ']:['フォルダ'];
+        if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!keys.includes(key)))return reply(400,{エラー:'入力が不正です。'});
+        try{return route.endsWith('/開始')?reply(202,await appLauncher.launch(body.対象,body.フォルダ)):reply(200,await appLauncher.folders(body.フォルダ));}
+        catch(error){return reply(error.status||500,{エラー:error.status?error.message:'アプリの起動処理に失敗しました。'});}
+      }
       if(route==='api/起動'&&req.method==='GET')return reply(200,await startManager.snapshot());
+      if(route==='api/起動/ポート'&&req.method==='GET'){
+        if(hasBody(req))return reply(400,{エラー:'入力は指定できません。'});
+        const controller=new AbortController(),abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
+        try{return reply(200,await portStatusFn({signal:controller.signal}));}finally{res.off('close',abort);}
+      }
       if(route?.startsWith('api/起動/')&&req.method==='POST'){
         if(!['api/起動/設定','api/起動/再起動','api/起動/停止','api/起動/ログ'].includes(route))return reply(404,{エラー:'見つかりません。'});
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});

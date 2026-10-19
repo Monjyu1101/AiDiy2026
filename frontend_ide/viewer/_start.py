@@ -172,7 +172,8 @@ def process_tree_pids(*, kind='ide') -> set[int]:
 def _stop(process: subprocess.Popen[bytes]) -> None:
     print_info(f"[{NAME}] 停止しています")
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, timeout=5)
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, timeout=5,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
     else:
         try:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)

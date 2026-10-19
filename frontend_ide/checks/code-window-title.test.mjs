@@ -15,13 +15,14 @@ import browserModule from '../デスクトップ/ブラウザ.cjs';
 import nativeMoveModule from '../デスクトップ/長押し窓移動.cjs';
 import frontModule from '../デスクトップ/前面維持.cjs';
 import placementModule from '../デスクトップ/VRパネル配置.cjs';
+import macMenuModule from '../host/scripts/MacOS-Menu.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
-async function desktopFixture(){
+async function desktopFixture({platform='win32',kind='ide',active=true,response=1}={}){
  const reserved=new Set();
- const handlers=new Map(),state={active:true,mode:'online',startedAt:10,project:{path:'/project'}};
+ const handlers=new Map(),state={active,mode:'online',startedAt:10,project:{path:'/project'}},created=[],dialogs=[];
  class Window extends EventEmitter{
-  constructor(options){super();this.options=options;this.title=options.title;this.bounds=options;this.webContents=new EventEmitter();this.webContents.mainFrame={url:''};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};}
+  constructor(options){super();created.push(this);this.options=options;this.title=options.title;this.bounds=options;this.webContents=new EventEmitter();this.webContents.mainFrame={url:''};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};}
   isDestroyed(){return !!this.destroyed;}
   getBounds(){return this.bounds;}
   setBounds(bounds){this.bounds=bounds;}
@@ -31,16 +32,19 @@ async function desktopFixture(){
   getTitle(){return this.title;}
   async loadURL(url){this.webContents.mainFrame.url=url.split('#')[0];}
   destroy(){this.destroyed=true;this.emit('closed');}
+  close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented){this.destroy();if(created.every(window=>window.destroyed))app.emit('window-all-closed');}}
   isMinimized(){return false;}
   show(){}
   focus(){this.emit('focus');}
  }
- const app={setName(){},getPath:()=>'/tmp',setPath(){},requestSingleInstanceLock:()=>true,on(){},whenReady:()=>Promise.resolve(),quit(){}};
+ const app=new EventEmitter();Object.assign(app,{setName(name){this.name=name;},getPath:()=>'/tmp',setPath(){},requestSingleInstanceLock:()=>true,whenReady:()=>Promise.resolve(),quit(){const event={preventDefault(){this.prevented=true;}};app.emit('before-quit',event);if(!event.prevented)app.quitComplete=true;},dock:{setMenu(value){this.menu=value;},setIcon(value){this.icon=value;}}});
+ const Menu={buildFromTemplate:items=>items,setApplicationMenu(value){app.menu=value;}};
  const modules={
-  electron:{app,BrowserWindow:Window,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{}}),getDisplayNearestPoint:()=>({workArea:{}}),getCursorScreenPoint:()=>({})},dialog:{}},
-  'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){}},
+  electron:{app,BrowserWindow:Window,Menu,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{}}),getDisplayNearestPoint:()=>({workArea:{}}),getCursorScreenPoint:()=>({})},dialog:{showMessageBox:async(_window,options)=>{dialogs.push(options);return{response};}}},
+  'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){},mkdtempSync:()=>'/tmp/term-fixture',rmSync(){}},
   './デスクトップ/project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./デスクトップ/window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./デスクトップ/term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
+  './host/scripts/MacOS-Menu.cjs':macMenuModule,
   './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
   './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
   './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
@@ -51,11 +55,26 @@ async function desktopFixture(){
   './デスクトップ/全画面横断.cjs':{createAllDisplays:()=>({register(){},attachExitKey:()=>()=>{},leave:()=>false,handle:()=>({ok:true,active:false})})},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:{env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:'ide'},cwd:()=>'/project',on(){}},__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});
+ const proc=new EventEmitter();Object.assign(proc,{platform,env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:kind},cwd:()=>'/project'});
+ const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:proc,__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});
  await tick();const owner=[...api.windows.values()][0];
- return{...api,owner,handlers,event:record=>({sender:record.window.webContents,senderFrame:record.window.webContents.mainFrame}),
+ return{...api,app,proc,dialogs,owner,handlers,event:record=>({sender:record.window.webContents,senderFrame:record.window.webContents.mainFrame}),
   async code(){const window=await api.createWindow('code','http://127.0.0.1:5678/',undefined,owner,'online:10');const record=api.windows.get(window.webContents);api.draftRouter.register(record,{kind:'code',contextId:`context-${record.slot}`,projectPath:'/project',label:'Code'});return record;}};
 }
+
+test('Mac のTerm / Code / Live / IDEは名称と最小メニューを各起動入口から設定する',async()=>{
+ for(const [kind,name] of [['term','Term'],['code','Code'],['live','Live'],['ide','IDE']]){
+  const f=await desktopFixture({platform:'darwin',kind,active:false});assert.equal(f.app.name,'AiDiy '+name);assert.equal(f.app.menu[0].label,'AiDiy '+name);
+  f.app.menu[0].submenu[0].click();await tick();await tick();assert.equal(f.owner.window.isDestroyed(),true);assert.equal(f.app.quitComplete,true);assert.equal(f.dialogs.length,0);
+ }
+});
+test('Mac のDock終了はIDEの利用中確認を通り、親切断だけは既存の回収へ進む',async()=>{
+ const f=await desktopFixture({platform:'darwin'}),child=await f.code();
+ f.app.quit();await tick();assert.equal(f.dialogs.length,1);assert.equal(f.owner.window.isDestroyed(),false);assert.equal(child.window.isDestroyed(),false);assert.equal(f.app.quitComplete,undefined);
+ const closeChild=f.app.menu[0].submenu.find(item=>item.accelerator==='Command+W');closeChild.click(null,child.window);await tick();assert.equal(child.window.isDestroyed(),true);assert.equal(f.owner.window.isDestroyed(),false);
+ f.proc.emit('disconnect');await tick();await tick();assert.equal(f.owner.window.isDestroyed(),true);assert.equal(f.app.quitComplete,true);assert.equal(f.dialogs.length,1);
+ const accepted=await desktopFixture({platform:'darwin',response:0});accepted.app.dock.menu[0].click();await tick();await tick();assert.equal(accepted.owner.window.isDestroyed(),true);assert.equal(accepted.app.quitComplete,true);
+});
 
 test('IDE Code番号: 実createWindowのslotをタイトル・限定IPC・連携先一覧で共有し、閉鎖後の再利用も一致する',async()=>{
  const f=await desktopFixture();const first=await f.code(),second=await f.code(),third=await f.code();

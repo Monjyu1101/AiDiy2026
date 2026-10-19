@@ -24,7 +24,7 @@ import { createRequire } from 'node:module';
 async function desktop(platform = 'win32', owned = true) {
   const file = fileURLToPath(new URL('../panel/desktop.cjs', import.meta.url));
   const timers = new Map<number, { at: number; callback: () => void }>();
-  const files = new Map<string, any>(), requests: any[] = [], kills: any[] = [], states: any[] = [];
+  const files = new Map<string, any>(), requests: any[] = [], kills: any[] = [], states: any[] = [], moves: any[] = [];
   const handlers = new Map<string, (...args: any[]) => any>();
   let clock = 0, sequence = 0, window: any, exited = false, locked = false;
   const worker = Object.assign(new EventEmitter(), {
@@ -33,7 +33,8 @@ async function desktop(platform = 'win32', owned = true) {
     kill(signal?: string) { kills.push(['worker', signal]); },
   });
   const app = Object.assign(new EventEmitter(), {
-    setName() {}, setPath() {}, setAppUserModelId() {}, getPath: () => '/tmp', whenReady: async () => {},
+    name: '', menu: [] as any[], dock: {menu: [] as any[], icon: '', setMenu(value: any[]) {this.menu = value;}, setIcon(value: string) {this.icon = value;}},
+    setName(name: string) {this.name = name;}, setPath() {}, setAppUserModelId() {}, getPath: () => '/tmp', whenReady: async () => {},
     requestSingleInstanceLock() { locked = true; return true; },
     quit() {
       let prevented = false;
@@ -69,6 +70,7 @@ async function desktop(platform = 'win32', owned = true) {
     clearTimeout(id: number) { timers.delete(id); },
     require(name: string) {
       if (name === 'node:path') return path;
+      if (name === '../../frontend_ide/デスクトップ/長押し窓移動.cjs') return {attachNativeWindowMove: (window: any, screen: any, kind: string) => moves.push({window, screen, kind})};
       if (name === '../../frontend_ide/host/scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
       // 3本共通のウィンドウ大きさ・初回演出は実物を使う。
       if (name.startsWith('../../frontend_ide/host/scripts/')) return createRequire(import.meta.url)(name);
@@ -77,7 +79,7 @@ async function desktop(platform = 'win32', owned = true) {
       if (name === 'node:child_process') return { fork: () => worker, spawn: (...args: any[]) => {
         kills.push(args); return Object.assign(new EventEmitter(), { kill() {} });
       } };
-      if (name === 'electron') return { app, BrowserWindow: Window, ipcMain: { handle(name: string, callback: (...args: any[]) => any) { handlers.set(name, callback); } },
+      if (name === 'electron') return { app, BrowserWindow: Window, Menu: {buildFromTemplate: (value: any[]) => value, setApplicationMenu(value: any[]) {app.menu = value;}}, ipcMain: { handle(name: string, callback: (...args: any[]) => any) { handlers.set(name, callback); } },
         screen: { getCursorScreenPoint: () => ({}), getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) } };
       throw new Error(name);
     },
@@ -88,7 +90,7 @@ async function desktop(platform = 'win32', owned = true) {
   for (let entry; (entry = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0]) && entry[1].at <= 1000;) {
     clock = entry[1].at; timers.delete(entry[0]); entry[1].callback(); await flush();
   }
-  return { app, worker, window, files, requests, kills, states, timers, flush,
+  return { app, worker, window, files, requests, kills, states, timers, flush, moves,
     exited: () => exited, locked: () => locked,
     exitWorker(code: number | null, signal: string | null = null) {
       worker.exitCode = code; worker.signalCode = signal; worker.connected = false; worker.emit('exit', code, signal);
@@ -104,6 +106,10 @@ async function desktop(platform = 'win32', owned = true) {
     },
   };
 }
+
+test('Discord の主窓にも共通の0.5秒長押しを一度取り付ける', async () => {
+  const f = await desktop();assert.equal(f.moves.length,1);assert.equal(f.moves[0].window,f.window);assert.equal(f.moves[0].kind,'discord');
+});
 
 test('ブラウザ版が起動中なら Electron の画面・worker を増やさない', async () => {
   const f = await desktop('win32', false);
@@ -123,6 +129,13 @@ test('閉じる連打でも接続回収は1回、完了までは画面を保持�
   assert.deepEqual(f.files.get('/reopen-ready'), { closing: true, pid: 999 });
   f.exitWorker(0); await f.flush();
   assert.equal(f.exited(), true); assert.equal(f.locked(), false); assert.equal(f.timers.size, 0);
+});
+test('Mac のDiscord最小メニュー・Dock終了は接続回収を待つ', async () => {
+  const f = await desktop('darwin');
+  assert.equal(f.app.name, 'AiDiy Discord');assert.equal(f.app.menu[0].label, 'AiDiy Discord');assert.match(f.app.dock.icon, /AiDiy_discord\.png$/);
+  f.app.menu[0].submenu[0].click();f.app.dock.menu[0].click();
+  assert.equal(f.exited(), false);assert.equal(f.requests.filter(item => item.action === 'shutdown').length, 1);
+  f.exitWorker(0);await f.flush();assert.equal(f.exited(), true);assert.equal(f.locked(), false);
 });
 
 test('workerが先にシグナル終了・起動失敗していても存在しないexitイベントを待たない', async () => {

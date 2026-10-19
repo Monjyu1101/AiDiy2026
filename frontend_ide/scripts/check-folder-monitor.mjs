@@ -118,12 +118,12 @@ try{
  await until(`folderCalls.at(-1)?.includes(encodeURIComponent('開発資料1'))`);
  writeFileSync(join(project,'開発資料1','new.txt'),'nested new');
  await until(`!!document.querySelector('[data-page-layer="live"] [title="開発資料1/new.txt"]')`);
- // reduced-motion更新はシート・線を作らない。
+ // OS設定でも更新シートと線を省略しない。
  await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
  await evaluate(`window.sweepSeen=false;window.sweepObserver=new MutationObserver(()=>{if(document.querySelector('.page-turn-refresh'))window.sweepSeen=true;});sweepObserver.observe(document.body,{childList:true,subtree:true});`);
  writeFileSync(join(project,'開発資料1','quiet.txt'),'quiet');
  await until(`!!document.querySelector('[data-page-layer="live"] [title="開発資料1/quiet.txt"]')`);
- assert.equal(await evaluate('sweepSeen'),false);await evaluate('sweepObserver.disconnect()');await capture('reduced-motion');
+ assert.equal(await evaluate('sweepSeen'),true);await evaluate('sweepObserver.disconnect()');await capture('OS設定でも更新シート');
  // 閲覧軌跡のクリアはこの一時プロジェクトの閲覧一覧だけを対象にする。
  await evaluate(`aidiyIDE.interact();aidiyIDE.goTo({type:'file',path:'開発資料1/new.txt'})`);
  await until(`!!document.querySelector('.viewer-popup')`);

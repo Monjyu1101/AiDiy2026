@@ -81,7 +81,7 @@ try{
  const explorer=await connect(explorerTarget);
  await explorer.until(`!!document.querySelector('.explorer-panel')`);
  const detached=await explorer.evaluate(`({scroll:document.querySelector('[role=tree]').scrollTop,html:document.querySelector('[role=tree]').innerHTML,background:getComputedStyle(document.querySelector('.explorer-panel')).backgroundColor,blur:getComputedStyle(document.querySelector('.explorer-panel')).backdropFilter,animation:getComputedStyle(document.querySelector('main')).animationName})`);
- assert.equal(detached.html,before.html);assert.equal(detached.scroll,before.scroll);assert.equal(detached.blur,'none');assert.equal(detached.animation,'none');
+ assert.equal(detached.html,before.html);assert.equal(detached.scroll,before.scroll);assert.equal(detached.blur,'none');assert.equal(detached.animation,'panel-fade-in');
  assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer').length,1);
  assert.equal(await main.evaluate(`explorerNode.ownerDocument!==document&&treeNode===explorerNode.querySelector('[role=tree]')`),true);
  await explorer.evaluate(`document.querySelector('[data-path="src/file-01.txt"]').click()`);
@@ -117,7 +117,7 @@ try{
  let viewerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Viewer');assert.ok(viewerTarget);const viewer=await connect(viewerTarget);
  await viewer.until(`!!document.querySelector('.viewer-pinned .viewer-meta')`);
  const features=await main.evaluate('pinFeatures');assert.match(features,/left=-?\d+,top=-?\d+,width=\d+,height=\d+/);
- assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationName`),'none');
+ assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationName`),'panel-fade-in');
  await viewer.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationDuration`),'0.26s');
  await viewer.capture('viewer-pinned');await viewer.send('Page.close');

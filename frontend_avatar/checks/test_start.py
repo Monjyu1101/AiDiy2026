@@ -14,6 +14,13 @@ spec.loader.exec_module(start)
 
 
 class AvatarStartTest(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Windowsのコンソール非表示")
+    def test_child_has_no_console_and_output_is_captured(self):
+        process = start.launch_process("非表示試験", [sys.executable, "-c", "import ctypes; print(ctypes.windll.kernel32.GetConsoleWindow())"], SCRIPT.parent)
+        output, _ = process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(output.strip(), b"0")
+
     def test_other_process_is_rejected_and_exit_releases_lock(self):
         with tempfile.TemporaryDirectory(prefix="avatar start ") as folder:
             path = Path(folder) / "avatar.lock"

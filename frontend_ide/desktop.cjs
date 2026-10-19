@@ -3,28 +3,31 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-const {app,BrowserWindow,WebContentsView,ipcMain,shell,clipboard,session,screen,dialog}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,shell,clipboard,session,screen,dialog,Menu}=require('electron');
 const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
 if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
-app.setName(`aidiy_${kind}`);
+const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':'Term'}`;
+app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
 const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
 if(kind==='ide')mkdirSync(profile,{recursive:true});
 app.setPath('userData',profile);
 if(kind==='ide')app.setPath('sessionData',profile);
-if(kind==='term'){
- const temporaryProfile=mkdtempSync(join(app.getPath('temp'),'aidiy-term-profile-'));
+const independent=kind==='term'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
+if(independent){
+ const temporaryProfile=mkdtempSync(join(app.getPath('temp'),`aidiy-${kind}-profile-`));
  app.setPath('userData',temporaryProfile);
+ app.setPath('sessionData',temporaryProfile);
  app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
 }
 const {windowBounds,windowMinimumSize,allWindowBounds}=require('./デスクトップ/window-layout.cjs');
 const {reserveTermSlot}=require('./デスクトップ/term-window-slot.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
 // IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
-if(kind!=='term'&&!app.requestSingleInstanceLock()){
+if(!independent&&!app.requestSingleInstanceLock()){
  if(process.send)process.send({existingWindow:true},()=>app.exit(0));else app.exit(0);
  return;
 }
@@ -34,7 +37,11 @@ const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs')
 const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
 const {createNativePreviewActions}=require('./デスクトップ/native-preview-actions.cjs');
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
-let quitting=false;
+let quitting=false,forcedQuit=false;
+function closeApplication(){
+ const main=[...windows.values()].find(record=>!record.owner&&!record.window.isDestroyed())?.window;
+ if(main)main.close();else app.quit();
+}
 const {panelBounds,createPanelWindows}=require('./デスクトップ/panel-windows.cjs');
 const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting,isAllDisplays:record=>allDisplays.state(record).active,attachWindowMove});
 const {createCodeDrag}=require('./デスクトップ/code-drag.cjs');
@@ -186,23 +193,26 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   await window.loadURL(url);
   if(!window.isDestroyed()){
    await contents.executeJavaScript("document.documentElement.classList.add('desktop-opening')");
-   const reduced=await contents.executeJavaScript("matchMedia('(prefers-reduced-motion: reduce)').matches");
-   if(reduced){window.show();window.focus();}
-   if(reduced||await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening');window.dispatchEvent(new Event('aidiy-window-shown'))");
+   if(await 拡大表示(BrowserWindow,window,{background:'#000'}))await contents.executeJavaScript("document.documentElement.classList.remove('desktop-opening');window.dispatchEvent(new Event('aidiy-window-shown'))");
   }
   return window;
  }
  catch(error){if(!window.isDestroyed())window.destroy();throw error;}
 }
-process.on('disconnect',()=>app.quit());
+process.on('disconnect',()=>{forcedQuit=true;app.quit();});
 app.on('window-all-closed',()=>app.quit());
 app.on('before-quit',event=>{
  if(quitting)return;
+ // Mac の Dock「終了」でも、IDE本体の close にある利用中確認を経由する。
+ if(process.platform==='darwin'&&!forcedQuit&&[...windows.values()].some(record=>!record.owner&&!record.window.isDestroyed())){
+  event.preventDefault();closeApplication();return;
+ }
  event.preventDefault();quitting=true;
  for(const {window} of windows.values())window.destroy();
  void Promise.allSettled([...closing]).finally(()=>app.quit());
 });
 app.whenReady().then(async()=>{
+ if(process.platform==='darwin')require('./host/scripts/MacOS-Menu.cjs').Macメニューを設定({app,Menu,名前:appName,閉じる:closeApplication,icon:join(__dirname,'public',`AiDiy_${kind}.png`),platform:process.platform});
  // 同一Electronプロセスの複数窓を識別し、Liveのメインフレームだけ音声入力を許可する。
  session.defaultSession.setPermissionCheckHandler((contents,permission,origin,details)=>{
   const record=windows.get(contents);if(!record)return false;

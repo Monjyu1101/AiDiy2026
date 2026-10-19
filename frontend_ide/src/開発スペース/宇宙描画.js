@@ -52,9 +52,7 @@ const $ = id => elements[id];
 const ctx = canvas.getContext('2d');
 const textWidths = createTextWidthCache(ctx);
 const updateTracker = createUpdateMarks();
-const motionPreference = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 let updateMarks = updateTracker.snapshot(), updateTimer = 0;
-const reducedMotion = () => !!motionPreference?.matches;
 function scheduleUpdateMarks() {
   clearTimeout(updateTimer); updateTimer = 0;
   if (disposed || document.hidden || !world) return;
@@ -65,10 +63,9 @@ function scheduleUpdateMarks() {
   updateTimer = setTimeout(() => { syncUpdateMarks(); notify(); }, Math.max(1, next - now));
 }
 function syncUpdateMarks() {
-  updateMarks = updateTracker.snapshot(Date.now(), !reducedMotion());
+  updateMarks = updateTracker.snapshot(Date.now());
   scheduleUpdateMarks();
 }
-if (motionPreference?.addEventListener) listen(motionPreference, 'change', () => { syncUpdateMarks(); notify(); });
 if (document.fonts) listen(document.fonts, 'loadingdone', () => textWidths.clear());
 let W = 0, H = 0, DPR = 1, F = 800;
 let CX = 0, CY = 0;          // 宇宙の画面中心。縦表示は上側の領域へ寄せる。
@@ -282,7 +279,7 @@ function buildWorld() {
     x: 0, y: 0, z: 0, R: 60,
     name: node.n,
   };
-  updateMarks = updateTracker.update(planets, JSON.stringify([scan.root, prefix, fileFilter, sessionStartedAt]), now, !reducedMotion());
+  updateMarks = updateTracker.update(planets, JSON.stringify([scan.root, prefix, fileFilter, sessionStartedAt]), now);
   // buildWorldの戻り値がworldへ代入された後、notifyで日付/発光の期限を予約する。
   return { galaxies, stars, planets, radius, byPath, gate };
 }
@@ -435,18 +432,19 @@ function frame(now) {
       Object.assign(cam,interpolateCamera(cam,goal,ease));
     }
   }
-  // 閲覧中は選択した星の周りを3分でちょうど1周する。
-  // 通常巡回の手動待機とは分け、到着後すぐ開始。手動ドラッグ・移動を優先する。
-  if (autoSpin && selected && !following && !diving && !dragging && !introFlight && !turnFlight && !manualOrbit) {
+  // 航行していない間の基本表示は3分で1周する低速回転。閲覧を閉じても現在の中心星を引き継ぐ。
+  // 巡回の60秒待機中も回し、航行・姿勢合わせ・手動ドラッグ・ワープとは重ねない。
+  if (autoSpin && world && !flight && !following && !diving && !dragging && !introFlight && !turnFlight && !manualOrbit) {
     const angle = Math.PI * 2 * dt / 180;
-    Object.assign(cam, orbitAround(cam, selected, angle, 0));
-    Object.assign(goal, orbitAround(goal, selected, angle, 0));
+    const pivot = selected || orbitPivot;
+    Object.assign(cam, orbitAround(cam, pivot, angle, 0));
+    Object.assign(goal, orbitAround(goal, pivot, angle, 0));
   }
   // 予約された最終更新ファイルへの移動は、オープニングが終わり、追いかけてよい状態になってから始める
   if (pendingFollow && !introFlight && canFollow()) { const path = pendingFollow; pendingFollow = null; void follow(path); }
   // 自動運転中（視点移動 ON で、彗星の軌道か最終更新ファイルへの移動・表示をしている）かを UI へ知らせる
   const nowDriving = isDriving(now);
-  if (nowDriving !== driving || notifiedOrbitPhase !== autoOrbit.phase) { driving = nowDriving; notify(); }
+  if (nowDriving !== driving || notifiedOrbitPhase !== autoOrbit.phase || notifiedExplorationStatus !== explorationStatus()) { driving = nowDriving; notify(); }
   // パネル配置に合わせて操縦席から見回す。投影面は画面中央に固定する。
   const measured = measureCover(), center = measured.fixedCenter ? measured : warpProjection || measured;
   // VRの手動中心はワープ中も優先し、ドラッグ量へ遅延なく追従する。
@@ -683,7 +681,7 @@ function drawPlanets(t, now) {
       const diameter = Math.max(22, size);
       ctx.drawImage(RECENCY_HALO[level], x - diameter / 2, y - diameter / 2, diameter, diameter);
     }
-    const pulse = reducedMotion() ? 0 : updateFlash(updateMarks.flashes[planet.path]);
+    const pulse = updateFlash(updateMarks.flashes[planet.path]);
     if (pulse) {
       ctx.globalAlpha = alpha * pulse * .32;
       ctx.drawImage(FLARE, x - size, y - size, size * 2, size * 2);
@@ -1599,7 +1597,23 @@ function formatAge(ms) {
 
 
 /** 自動運転中か: 視点移動 ON で、手動操作の直後でなく、ユーザーが自分で開いたファイルを見ていない（自動で開いたファイルの表示中は含む）。 */
-let driving = false, notifiedOrbitPhase = 'idle';
+let driving = false, notifiedOrbitPhase = 'idle', notifiedExplorationStatus = '';
+// 表示は実際に視点を管理している処理を優先する。手動待機と低速回転を「停止」と混同しない。
+function explorationStatus() {
+  if (!autoSpin || document.hidden) return '';
+  if (!world || introFlight) return '出航準備中';
+  if (dragging || manualOrbit) return '手動操縦中';
+  if (diving || turnFlight) return warpTravel ? '目的地へワープ中' : '目的地へ接近中';
+  if (following) return '航路確認中';
+  if (viewMode === '2d') {
+    if (selected) return '閲覧中';
+    return '更新待ち';
+  }
+  if (autoOrbit.phase === 'flying') return '探索軌道航行中';
+  if (autoOrbit.phase !== 'idle') return '軌道計算と姿勢制御中';
+  if (selected) return '観測中';
+  return '周回軌道航行中';
+}
 function isDriving(now) {
   if (!autoSpin || !world || document.hidden) return false;
   if (following) return true;
@@ -1609,8 +1623,9 @@ function notify() {
   if (disposed) return;
   scheduleUpdateMarks();
   notifiedOrbitPhase = autoOrbit.phase;
+  notifiedExplorationStatus = explorationStatus();
   if (viewMode === '2d') driving = isDriving(performance.now());
-  change({ scan, updateMarks, trail: [...trail], selected, focus, journal, voyages: Object.fromEntries(Object.entries(voyages).map(([base,records])=>[base,records.map(record=>({...record}))])), autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, loading: !scan });
+  change({ scan, updateMarks, trail: [...trail], selected, focus, journal, voyages: Object.fromEntries(Object.entries(voyages).map(([base,records])=>[base,records.map(record=>({...record}))])), autoSpin, viewMode, driving, orbitPhase: notifiedOrbitPhase, explorationStatus: notifiedExplorationStatus, loading: !scan });
   scheduleFollow2D();
 }
 function updateSide() { notify(); }

@@ -1,0 +1,11 @@
+{
+  "readyObservedAt": "2026-10-19T01:19:29.253Z",
+  "sentAt": "2026-10-19T01:20:49.677Z",
+  "replyObservedAt": "2026-10-19T01:21:50.371Z",
+  "waitBeforeSendSeconds": 80.424,
+  "reply": "おはようございます！",
+  "status": "✅ OK",
+  "evidence": "aidiy_diag-アプリ起動_405_単独Live初回待機後の実回答画面.png",
+  "inputEvidence": "aidiy_diag-アプリ起動_404_単独Live初回待機後の挨拶入力画面.png",
+  "note": "表示で回答を確認した時刻。モデル内部の回答生成完了時刻ではない。初回の無応答を待機不足と断定する比較試験ではない。"
+}

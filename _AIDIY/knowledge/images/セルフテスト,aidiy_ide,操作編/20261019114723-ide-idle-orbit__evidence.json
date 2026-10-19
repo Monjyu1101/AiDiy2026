@@ -1,0 +1,90 @@
+{
+  "status": "✅ OK",
+  "date": "2026-10-19",
+  "os": "Windows",
+  "method": "隔離Chrome・実Canvas描画・仮想時計。Computer Useによる実時間操作試験ではありません。",
+  "tests": 119,
+  "passed": 119,
+  "failed": 0,
+  "manualPauseSeconds": 60,
+  "revolutionSeconds": 180,
+  "notes": [
+    "待機中は45秒ごとに手動操作通知で航行の待機期限を延長し、180秒の回転を測定しました。",
+    "その後は操作通知を止め、最後の通知から60秒で通常航行へ復帰することを確認しました。",
+    "起動時の最終更新ファイル表示と、ファイル選択中の一周・選択維持・OFFでの停止も別の実ブラウザー試験で確認しました。"
+  ],
+  "evidence": [
+    {
+      "file": "ide-操作_101_起動後の最終更新表示画面.png",
+      "description": "起動時に最終更新ファイルを表示",
+      "sha256": "6dd30fc85fdce6d3de3ef14d4a1b3fdb95bd692544e0812d9c5165992b883c3f",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_102_閲覧終了直後の待機回転画面.png",
+      "description": "選択を解除して手動待機を開始",
+      "sha256": "2406b36b02c3143e33665735650b716cc32ac34fe20f1ed8d33bf9c1d96f1343",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_103_待機回転45秒画面.png",
+      "description": "手動待機中の四分の一周",
+      "sha256": "48e3d67e89a123744c12eceece55e9b2dd2ea811ce31c69950783a08affd7e3d",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_104_待機回転90秒画面.png",
+      "description": "手動待機中の半周",
+      "sha256": "209263944b6409445c2afec3265c1818156582e3ccb7586d18f82818f33a064c",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_105_待機回転135秒画面.png",
+      "description": "手動待機中の四分の三周",
+      "sha256": "c7ff38926da1df28cab4b8532cbeba2e6aec2c5127d96ad971e9647403a4d6d9",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_106_待機回転180秒で一周画面.png",
+      "description": "手動待機を延長しながら一周",
+      "sha256": "e7b7a5fb6d5fb997c0a633e4ee07fef6881aeced0820fff1fa38ec4b3a08840b",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_107_手動待機終了後の通常航行画面.png",
+      "description": "最後の操作から60秒後に通常航行を再開",
+      "sha256": "35264f583b0e1e9835835c45a99927007d4aa03892da5649089274e5a2469171",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_108_起動時ジャンプの再確認画面.png",
+      "description": "最終更新へのジャンプを再確認",
+      "sha256": "b59bee4bd599a1cab0ac1c23cc2f2854d40c42a4c984ad13043e3d274981128c",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_109_ファイル選択中の回転開始画面.png",
+      "description": "選択中の星の回転を開始",
+      "sha256": "19f6f25979af9e7928ccf51d31545a5a94d14e42fc4e2acd6018134efbb72113",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_110_ファイル選択中の四分の一周画面.png",
+      "description": "ファイル選択中の45秒",
+      "sha256": "bb85cc646f98d74e901236b432c7284a8494922eae466df9437ef0ff909ea249",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_111_ファイル選択中の半周画面.png",
+      "description": "ファイル選択中の90秒",
+      "sha256": "0821d5bab2949ece9d46b87d25e6d48f36441848216433f84720c0d114253bf1",
+      "status": "✅ OK"
+    },
+    {
+      "file": "ide-操作_112_ファイル選択中の一周画面.png",
+      "description": "180秒の一周後もビューアと選択を維持",
+      "sha256": "199341c00ac4ff1e2a3376d9689dbb174a4887a0776b64f417add4459f512819",
+      "status": "✅ OK"
+    }
+  ]
+}

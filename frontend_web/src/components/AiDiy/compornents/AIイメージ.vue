@@ -993,6 +993,10 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 8px;
+  box-sizing: border-box;
+  /* 多数のパネルを並べた低いパネルでも、ダイアログをパネル内に収める */
+  container-type: size;
 }
 
 .selection-dialog {
@@ -1000,7 +1004,11 @@ onBeforeUnmount(() => {
   border-radius: 2px;
   padding: 30px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  min-width: 300px;
+  min-width: min(300px, 100%);
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
   text-align: center;
 }
 
@@ -1049,6 +1057,32 @@ onBeforeUnmount(() => {
 
 .selection-cancel:hover {
   background: #e0e0e0;
+}
+
+@container (max-height: 360px) {
+  .selection-dialog {
+    padding: 8px 12px;
+  }
+
+  .selection-title {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .selection-options {
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .selection-option {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+
+  .selection-cancel {
+    padding: 2px 12px;
+    font-size: 12px;
+  }
 }
 
 /* テキスト入力エリア */

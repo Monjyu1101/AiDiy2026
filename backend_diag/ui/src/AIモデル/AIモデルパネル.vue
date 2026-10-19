@@ -33,7 +33,7 @@ const change=(key,event)=>s.変更(key,event.target.value);
     <label class="ai-input-label">質問文<textarea aria-label="質問文" :value="s.入力.instructions" maxlength="4000" rows="3" @input="change('instructions',$event)"></textarea></label>
     <label v-if="s.入力.type!=='predicate'" class="ai-input-label">{{s.入力.type==='choice'?'選択肢（1行に1件）':'スコアの段階（低い順に1行に1件）'}}<textarea aria-label="選択肢・段階" :value="s.入力.choices" rows="4" @input="change('choices',$event)"></textarea></label>
    </fieldset>
-   <p v-if="s.区分.value==='LIVE'" class="ai-help">接続後10秒待機して送信します。1秒以上の応答音声を一時保存し、ここで再生できます。</p>
+   <p v-if="s.区分.value==='LIVE'" class="ai-help">接続後15秒待機して送信し、応答を最大60秒待ちます。1秒以上の応答音声を一時保存し、ここで再生できます。</p>
 
    <p class="ai-help">試行時に選択したAIへ送信します。料金が発生する場合があります。</p>
   </div>

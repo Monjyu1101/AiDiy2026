@@ -18,15 +18,17 @@ function fixture(kind='viewer'){
  return{emit,contents,window,timers,ticks,inputs,calls,dispose,advance:async()=>{for(const fn of [...timers.values()])fn();await Promise.resolve();},cursor:value=>cursor=value};
 }
 test('全パネル: 押下で選択せず、短押しを離した時だけdown/upを一度渡す',()=>{
- for(const kind of ['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes']){
+ for(const kind of ['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']){
   const f=fixture(kind);assert.equal(f.emit('mouseDown').prevented,true);assert.equal(f.inputs.length,0);assert.equal(f.calls.length,0);
   assert.equal(f.emit('mouseUp').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.equal(f.timers.size,0);f.dispose();
  }
 });
 test('長押し移動: button/linkの押下・クリック・upをページへ流さず、解除後の次のクリックは有効',async()=>{
- const f=fixture('browser');f.emit('mouseDown');f.emit('mouseMove');await f.advance();assert.deepEqual(f.calls,[['begin']]);
+ for(const kind of ['browser','diag','avatar','discord']){
+ const f=fixture(kind);f.emit('mouseDown');f.emit('mouseMove');await f.advance();assert.deepEqual(f.calls,[['begin']]);
  f.cursor({x:-300,y:70});f.emit('mouseMove');assert.ok(f.calls.some(c=>c[0]==='move'));f.emit('mouseUp');assert.ok(f.inputs.every(i=>i.type==='mouseMove'));f.inputs.length=0;assert.equal(f.ticks.size,0);
  f.emit('mouseDown');f.emit('mouseUp');assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);f.dispose();
+ }
 });
 test('通常の文字選択・スライダーdragとダブルクリックは維持',async()=>{
  const f=fixture();f.emit('mouseDown');f.cursor({x:101,y:100});f.emit('mouseMove',{x:21});f.cursor({x:100,y:100});await f.advance();f.emit('mouseUp',{x:20});

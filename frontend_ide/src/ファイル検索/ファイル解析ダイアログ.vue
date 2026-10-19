@@ -70,7 +70,7 @@ onBeforeUnmount(()=>{closed=true;clearTimeout(timer);controller.abort();dialog.v
 <template>
   <Teleport to="body">
     <dialog ref="dialog" class="file-analysis-dialog" aria-labelledby="file-analysis-title" @keydown.stop @cancel.prevent="close">
-      <header><img :src="'/development/AiDiy.png'" alt=""><h2 id="file-analysis-title">AiDiy解析</h2><button aria-label="AiDiy解析を閉じる" :disabled="saving" @click="close">×</button></header>
+      <header><img :src="'/development/AiDiy.png'" alt=""><h2 id="file-analysis-title">AiDiy解析</h2><button aria-label="AiDiy解析を閉じる" :disabled="saving" @click="close"><span class="close-icon" aria-hidden="true"></span></button></header>
       <p class="analysis-path" :title="root">{{ file.path }}</p>
       <section class="analysis-instruction">
         <label for="file-analysis-instruction">AIへの解析指示</label>

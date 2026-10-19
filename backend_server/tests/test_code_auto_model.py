@@ -279,6 +279,33 @@ class CodeAutoIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("旧会話", select.call_args.args[1] + select.call_args.args[2])
         self.assertNotIn("旧会話", code._履歴取得())
 
+    async def test_rejected_auto_model_retries_once_with_cli_default(self):
+        rejected = '! 実行エラー: copilot_cli Error: Model "gpt-6.1-sol" from --model flag is not available.'
+        code, parent = self.instance('copilot_cli')
+        process = AsyncMock(side_effect=[rejected, '再実行の回答'])
+        with patch('AIコア.AIコードモデル選択.select_model', new=AsyncMock(return_value='gpt-6.1-sol')), patch.object(code, '_subprocess実行', process):
+            result = await self.run_code(code, 'おはよう')
+        self.assertEqual(result, '再実行の回答')
+        first, second = (call.kwargs['command'] for call in process.call_args_list)
+        self.assertEqual(first[first.index('--model') + 1], 'gpt-6.1-sol')
+        self.assertNotIn('--model', second)
+        self.assertIn('は使えないため', parent.接続.messages[-1]['メッセージ内容'])
+        self.assertEqual(code.code_model, 'auto')
+        self.assertEqual(code.最終実行モデル, '')
+
+    async def test_other_errors_and_explicit_models_are_not_retried(self):
+        rejected = '! 実行エラー: copilot_cli Error: Model "gpt-6-astra" from --model flag is not available.'
+        for provider, model, selected, output in (
+            ('copilot_cli', 'auto', 'gpt-6.1-sol', '! 実行エラー: copilot_cli 認証に失敗しました'),
+            ('copilot_cli', 'gpt-6-astra', None, rejected),
+        ):
+            code, _ = self.instance(provider, model)
+            process = AsyncMock(return_value=output)
+            with patch('AIコア.AIコードモデル選択.select_model', new=AsyncMock(return_value=selected)), patch.object(code, '_subprocess実行', process):
+                result = await self.run_code(code, 'おはよう')
+            self.assertEqual(process.await_count, 1)
+            self.assertTrue(result.startswith('!'))
+
     async def test_stop_during_selection_does_not_launch_cli(self):
         code, parent = self.instance()
         async def stop(*args, **kwargs):

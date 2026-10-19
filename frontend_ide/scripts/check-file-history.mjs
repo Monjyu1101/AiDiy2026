@@ -50,8 +50,8 @@ try{
  await until(`window.historyDiff?.getLineChanges()?.length>0`,'再試行でMonacoと比較を復旧');
  assert.equal(await evaluate(`document.querySelector('.file-history-message.error')===null`),true);
  await evaluate(`document.querySelector('[aria-label="更新履歴を閉じる"]').click();window.historyDiff=null;`);
- // 5分タイマーだけ仮想時計に置き換え、実際のダイアログの操作・破棄を検証する。
- await evaluate(`{const timeout=window.setTimeout.bind(window),clear=window.clearTimeout.bind(window);window.historyClock={now:0,timers:new Map(),id:-1,advance(ms){this.now+=ms;for(const [id,timer] of [...this.timers])if(timer.at<=this.now){this.timers.delete(id);timer.fn();}}};window.setTimeout=(fn,ms,...args)=>{if(ms!==300000)return timeout(fn,ms,...args);const id=historyClock.id--;historyClock.timers.set(id,{at:historyClock.now+ms,fn:()=>fn(...args)});return id;};window.clearTimeout=id=>{if(!historyClock.timers.delete(id))clear(id);};}`);
+ // 独立ビューアの履歴は自動消去しない。旧仕様の5分タイマーが復活しないことも検証する。
+ await evaluate(`{const timeout=window.setTimeout.bind(window),clear=window.clearTimeout.bind(window);window.historyClock={now:0,timers:new Map(),id:-1,advance(ms){this.now+=ms;for(const [id,timer] of [...this.timers])if(timer.at<=this.now){this.timers.delete(id);timer.fn();}}};window.setTimeout=(fn,ms,...args)=>{if(ms!==300000&&ms!==180000)return timeout(fn,ms,...args);const id=historyClock.id--;historyClock.timers.set(id,{at:historyClock.now+ms,fn:()=>fn(...args)});return id;};window.clearTimeout=id=>{if(!historyClock.timers.delete(id))clear(id);};}`);
  await evaluate(`document.querySelector('.viewer-history').click()`);
  await until(`window.historyDiff?.getLineChanges()?.length>0`,'差分計算完了');
  assert.equal(await evaluate(`document.querySelectorAll('.file-history-toolbar option').length`),2);
@@ -75,19 +75,12 @@ try{
  assert.equal(await evaluate(`historyClock.timers.size`),0,'手動で閉じるとタイマーを解除');
  await evaluate(`document.querySelector('.viewer-history').click()`);
  await until(`!!document.querySelector('.file-history-changes')`,'再表示');
- await evaluate(`historyClock.advance(299000);document.querySelector('.file-history-dialog').dispatchEvent(new WheelEvent('wheel',{deltaY:100,bubbles:true}));historyClock.advance(299000)`);
- assert.equal(await evaluate(`!!document.querySelector('.file-history-dialog[open]')`),true,'ホイール操作で5分延長');
- await evaluate(`historyDiff.getModifiedEditor().setScrollTop(600)`);await sleep(200);
- await evaluate(`historyClock.advance(299000)`);
- assert.equal(await evaluate(`!!document.querySelector('.file-history-dialog[open]')`),true,'Monacoスクロールで5分延長');
- await evaluate(`document.querySelector('.file-history-toolbar>button').click()`);
- await until(`!!document.querySelector('.file-history-changes')`,'再読み込み完了');
- await evaluate(`historyClock.advance(299000)`);
- assert.equal(await evaluate(`!!document.querySelector('.file-history-dialog[open]')`),true,'再読み込みで5分延長');
- await evaluate(`historyClock.advance(1000)`);
- await until(`!document.querySelector('.file-history-dialog')`,'無操作5分で自動消去');
- assert.equal(await evaluate(`monaco.editor.getModels().length`),0,'自動消去でも比較モデルを解放');
- assert.equal(await evaluate(`historyClock.timers.size`),0,'自動消去後タイマーが残らない');
+ await evaluate(`historyClock.advance(600000)`);
+ assert.equal(await evaluate(`!!document.querySelector('.file-history-dialog[open]')`),true,'独立ビューアの比較は10分後も保持');
+ assert.equal(await evaluate(`historyClock.timers.size`),0,'独立ビューアには3分・5分の自動消去を登録しない');
+ await evaluate(`document.querySelector('[aria-label="更新履歴を閉じる"]').click()`);
+ await until(`!document.querySelector('.file-history-dialog')`,'比較を閉じる');
+ assert.equal(await evaluate(`monaco.editor.getModels().length`),0,'再表示後の手動終了でも比較モデルを解放');
  await send('Page.navigate',{url:app.url+'?check=no-history#viewer=no-history.ts'});
  await until(`document.querySelector('.viewer-pinned>header>span')?.textContent==='no-history.ts'&&!!document.querySelector('.monaco-editor')`,'履歴なしのソース表示');await sleep(250);
  assert.equal(await evaluate(`!!document.querySelector('.viewer-history')`),false);

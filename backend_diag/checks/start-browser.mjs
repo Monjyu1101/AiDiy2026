@@ -19,7 +19,10 @@ const manager=createStartManager({root,python:'fixture-python',spawnFn(_command,
  child.ready=()=>{child.stdout.write(JSON.stringify({type:'log',data:'合成コンソールの日本語出力\n<文字列はHTMLとして実行しません>\n'})+'\n');child.stdout.write(JSON.stringify({type:'ready'})+'\n');};
  return child;
 }});
-const server=createServer({token:'start-browser-fixture',prefix:'/proxy/8097/',startManager:manager,
+const portCatalog=JSON.parse(readFileSync(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(item=>item.起動管理!==false);
+const openPorts=new Set(portCatalog.map(item=>item.id));const portSamples=[];
+const portStatusFn=async()=>{portSamples.push(Date.now());return {対象:portCatalog.map(({id,名前,ポート})=>({id,名前,ポート,開放:openPorts.has(id)}))};};
+const server=createServer({token:'start-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,
  entries:[{id:'node',name:'Node.js',menuGroup:'ベース',commands:['node']}],
  toolsStatusFn:async()=>({online:false}),previousResults:{snapshot:async()=>({})},
  publicCache:{snapshot:()=>({状態:'未取得'}),input:()=>({})},modelTrials:{close(){}},
@@ -41,17 +44,17 @@ try{
  const send=(method,params={})=>new Promise(resolve=>{pending.set(++seq,resolve);ws.send(JSON.stringify({id:seq,method,params}));});
  async function evaluate(expression){const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.equal(response.result?.exceptionDetails,undefined,JSON.stringify(response));return response.result.result.value;}
  async function until(expression){for(let i=0;i<140;i++){if(await evaluate(expression))return;await sleep(50);}assert.fail(expression);}
- const click=text=>evaluate(`[...document.querySelectorAll('button')].find(button=>button.textContent.trim()===${JSON.stringify(text)}).click()`);
+ const click=text=>evaluate(`[...document.querySelectorAll('button')].find(button=>(button.textContent.trim()===${JSON.stringify(text)}||button.getAttribute('aria-label')===${JSON.stringify(text)})).click()`);
  async function capture(name){const response=await send('Page.captureScreenshot',{format:'png'});writeFileSync(join(output,name+'.png'),Buffer.from(response.result.data,'base64'));}
  await send('Runtime.enable');await send('Page.enable');await send('Network.enable');await send('Network.setBlockedURLs',{urls:['https://*']});
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  const url=`http://127.0.0.1:${server.address().port}/proxy/8097/#token=start-browser-fixture`;
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);
- await until(`document.querySelector('nav.tabs button.active')?.textContent==='起動'&&document.querySelectorAll('.start-targets button').length===6`);
+ await until(`document.querySelector('nav.tabs button.active')?.textContent==='システム起動'&&document.querySelectorAll('.start-targets button').length===6`);
  assert.deepEqual(calls,[],'初期表示ではサービスを起動しない');
  await click('導入状況');
  assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0,'ミニ切替は起動画面だけ');
- assert.deepEqual(calls,[]);await click('起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
+ assert.deepEqual(calls,[]);await click('システム起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
  assert.equal(await evaluate(`document.querySelector('#run').textContent`),'設定起動');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);
  const browserOption=`[...document.querySelectorAll('.start-settings label')].find(label=>label.textContent==='ブラウザで開く').querySelector('input')`;
@@ -65,7 +68,7 @@ try{
  await until(`document.querySelector('.start-console-heading strong')?.textContent==='Local コンソール'`);
  await evaluate(`document.querySelector('.start-settings input').click()`);await until(`document.querySelector('.start-save').textContent==='設定を保存しました'`);
  assert.equal(JSON.parse(readFileSync(join(root,'_config/AiDiy_diag_start.json'),'utf8')).設定.local.起動対象,true);
- await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);await click('起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
+ await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);await click('システム起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);await until(`document.querySelector('.start-console-heading strong')?.textContent==='Web コンソール'`);
  assert.equal(await evaluate(`${browserOption}.checked`),false,'Web のブラウザ設定を再読込後も保持する');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);await until(`document.querySelector('.start-settings input')?.checked`);
@@ -88,7 +91,7 @@ try{
  const desktop=await evaluate(`(()=>{const consoleView=document.querySelector('.start-console');return {page:document.documentElement.scrollHeight>innerHeight,height:consoleView.clientHeight,overflow:getComputedStyle(consoleView).overflowY}})()`);
  assert.equal(desktop.page,false);assert.ok(desktop.height>200,JSON.stringify(desktop));assert.equal(desktop.overflow,'auto');
  await click('ミニ表示');await until(`document.querySelector('.start-mini')`);
- await send('Emulation.setDeviceMetricsOverride',{width:340,height:320,deviceScaleFactor:1,mobile:false});await sleep(100);await capture('start-mini');
+ await send('Emulation.setDeviceMetricsOverride',{width:240,height:130,deviceScaleFactor:1,mobile:false});await sleep(100);await capture('start-mini');
  assert.equal(await evaluate(`document.querySelectorAll('.mini-service').length`),6);
  assert.equal(await evaluate(`document.querySelector('nav.tabs').getClientRects().length`),0);
  assert.equal(await evaluate(`document.querySelector('footer').getClientRects().length`),0);
@@ -96,17 +99,17 @@ try{
  const fits=await evaluate(`(()=>{const view=document.querySelector('.start-mini');return {height:view.clientHeight,scroll:view.scrollHeight};})()`);
  assert.ok(fits.scroll<=fits.height,JSON.stringify(fits));
  await sleep(150);const previousLogs=requests.filter(route=>route.endsWith('/起動/ログ')).length;
- children[1].stdout.write(JSON.stringify({type:'status',state:'再起動待ち'})+'\n');
- await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='busy')`);
+ children[1].stdout.write(JSON.stringify({type:'status',state:'再起動待ち'})+'\n');openPorts.delete('tools');
+ await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='idle'&&element.title.includes('未開放'))`);
+ assert.ok(portSamples.at(-1)-portSamples.at(-2)>=4900,'ミニのTCP確認は約5秒間隔');
  assert.equal(requests.filter(route=>route.endsWith('/起動/ログ')).length,previousLogs,'ミニ表示は状態だけを取得');
- children[1].stdout.write(JSON.stringify({type:'ready'})+'\n');
- await until(`document.querySelectorAll('.mini-service[data-tone="running"]').length===6`);
+ children[1].stdout.write(JSON.stringify({type:'ready'})+'\n');openPorts.add('tools');
  await evaluate(`[...document.querySelectorAll('.mini-service')].find(button=>button.textContent.includes('Core')).click()`);
  await until(`!document.querySelector('.start-mini')&&document.querySelector('.start-console-heading strong').textContent==='Core コンソール'`);
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  assert.deepEqual(calls,['local','tools','core','apps','taskteam','web'],'表示切替は起動・停止しない');assert.ok(children.every(child=>!child.closed));
  await click('ミニ表示');await until(`document.querySelector('.start-mini')`);await click('通常表示');await until(`!document.querySelector('.start-mini')`);
- await click('導入状況');assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0);await click('起動');
+ await click('導入状況');assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0);await click('システム起動');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);
  await until(`document.querySelector('.start-console-heading strong').textContent==='Local コンソール'`);
  await until(`document.querySelector('.start-console').textContent.includes('合成コンソール')`);
@@ -144,7 +147,7 @@ try{
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:780,deviceScaleFactor:1,mobile:true});await sleep(100);await capture('start-mobile');
  assert.equal(await evaluate(`document.documentElement.scrollWidth>innerWidth`),false);
  assert.equal(await evaluate(`document.querySelector('.start-console').clientHeight>100`),true);
- assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・340/390/1280px表示 OK');
+ assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・240/390/1280px表示 OK');
 }finally{
  ws?.close();browser.kill();await manager.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
  const safeBase=resolve(tmpdir())+sep;for(const path of [root,profile]){assert.ok(resolve(path).startsWith(safeBase));for(let i=0;i<20;i++){try{rmSync(path,{recursive:true,force:true});break;}catch{await sleep(100);}}}

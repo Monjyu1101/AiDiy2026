@@ -81,6 +81,7 @@ test('選択星の周回: 3分で1周し、距離・選択を保って手動と�
     assert.ok(Math.abs(Math.hypot(...offset())-radius)<1e-6,'星との距離を維持');
     await advance(90);near(offset(),initial,'3分で元の位置');
     assert.equal(h.engine.selected.path,'root.js');assert.equal(h.engine.cam.dist,distance);
+    assert.equal(h.state().explorationStatus,'観測中');
     for(const mode of ['off','2d','hidden']){
       if(mode==='off')h.engine.setAutoSpin(false);
       if(mode==='2d')h.engine.setViewMode('2d');
@@ -97,7 +98,70 @@ test('選択星の周回: 3分で1周し、距離・選択を保って手動と�
     await h.finish(h.engine.goTo({type:'file',path:'src/main.js'}));await advance(3);
     const next=offset();await advance(180);near(offset(),next,'別の星への移動後は新しい星を中心に1周');
     assert.equal(h.engine.selected.path,'src/main.js');
-    h.engine.clear();assert.equal(h.engine.selected,null);
+    const pivot={...h.engine.selected};h.engine.interact();h.engine.clear();assert.equal(h.engine.selected,null);
+    const beforeClose=cameraPosition(h.engine.cam);await advance(45);
+    const afterClose=cameraPosition(h.engine.cam);
+    assert.ok(Math.hypot(...['x','y','z'].map(key=>afterClose[key]-beforeClose[key]))>1,'閉じた直後も低速回転する');
+    assert.ok(Math.abs(Math.hypot(...['x','y','z'].map(key=>afterClose[key]-pivot[key]))-Math.hypot(...['x','y','z'].map(key=>beforeClose[key]-pivot[key])))<1e-6,'閲覧を閉じても中心星との距離を維持する');
+  }finally{h.dispose();}
+});
+
+test('待機中の基本表示: 未選択でも中心を180秒で1周し、航行の待機期限と表示停止を守る',async t=>{
+  const h=space(t);
+  const advance=async seconds=>{for(let n=0;n<seconds*4;n++)await h.pump(250);};
+  const eye=()=>Object.values(cameraPosition(h.engine.cam));
+  const near=(a,b,message)=>assert.ok(Math.hypot(...a.map((v,i)=>v-b[i]))<1e-6,message);
+  try{
+    h.engine.setViewMode('2d');await h.engine.refresh(1);h.engine.setViewMode('3d');
+    h.engine.interact();const initial=eye(),radius=Math.hypot(...initial);
+    assert.equal(h.state().explorationStatus,'周回軌道航行中');
+    // ユーザー操作で待機が続いても低速回転自体は止めない。
+    for(let n=0;n<4;n++){
+      await advance(45);
+      assert.equal(h.engine.orbitPhase,'idle');assert.equal(h.engine.orbitPath,null);
+      assert.equal(h.engine.selected,null);assert.equal(h.frames.size,1);
+      assert.ok(Math.abs(Math.hypot(...eye())-radius)<1e-6,'中心からの距離を維持');
+      if(n===1)near(eye(),initial.map(v=>-v),'90秒で中心の反対側');
+      h.engine.interact();
+    }
+    near(eye(),initial,'180秒で元の位置');
+    for(const mode of ['off','2d','hidden']){
+      if(mode==='off')h.engine.setAutoSpin(false);
+      if(mode==='2d')h.engine.setViewMode('2d');
+      if(mode==='hidden')h.visibility(true);
+      const held={...h.engine.cam};await advance(5);assert.deepEqual(h.engine.cam,held,mode+'中は停止');
+      h.engine.setAutoSpin(true);h.engine.setViewMode('3d');h.visibility(false);h.engine.interact();
+    }
+    await advance(59.75);assert.equal(h.engine.orbitPhase,'idle');
+    const before=eye();await advance(.25);assert.equal(h.engine.orbitPhase,'centering','手動待機が明けると通常航行へ移る');
+    assert.equal(h.state().explorationStatus,'軌道計算と姿勢制御中');
+    near(eye(),before,'航行開始の姿勢合わせで船体位置を飛ばさない');
+  }finally{h.dispose();}
+});
+
+test('自動探索の表示: 起動・移動・閲覧・手動・再開待ち・軌道航行を実状態から通知する',async t=>{
+  let pending;
+  const h=space(t,{fetcher:async()=>pending?pending.promise:reply(snapshot())});
+  const advance=async seconds=>{for(let n=0;n<seconds*4;n++)await h.pump(250);};
+  try{
+    await h.engine.refresh(1);assert.equal(h.state().explorationStatus,'出航準備中');
+    await advance(10);assert.equal(h.state().explorationStatus,'探索軌道航行中');
+    const moving=h.engine.goTo({type:'file',path:'root.js'});await h.pump();
+    assert.equal(h.state().explorationStatus,'目的地へ接近中');
+    await h.finish(moving);await advance(1);assert.equal(h.state().explorationStatus,'観測中');
+    h.canvas.dispatchEvent(event('pointerdown',{pointerId:1,clientX:300,clientY:300}));await h.pump();
+    assert.equal(h.state().explorationStatus,'手動操縦中');
+    h.canvas.dispatchEvent(event('pointercancel',{pointerId:1,clientX:300,clientY:300}));await advance(1);
+    assert.equal(h.state().explorationStatus,'観測中');
+    h.engine.interact();h.engine.clear();assert.equal(h.state().explorationStatus,'周回軌道航行中');
+    h.engine.setAutoSpin(false);assert.equal(h.state().explorationStatus,'');
+    h.engine.setAutoSpin(true);assert.equal(h.state().explorationStatus,'周回軌道航行中');
+    const warp=h.engine.goTo({type:'file',path:'src/main.js'});await h.pump();
+    assert.equal(h.state().explorationStatus,'目的地へワープ中');await h.finish(warp);
+    h.engine.setAutoSpin(true);pending=deferred();const following=h.engine.follow('root.js');await flush();
+    assert.equal(h.state().explorationStatus,'航路確認中','更新先を読み直している間は航路確認');
+    pending.resolve(reply(snapshot()));pending=null;await h.finish(following);await advance(1);
+    assert.equal(h.state().explorationStatus,'観測中');
   }finally{h.dispose();}
 });
 

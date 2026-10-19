@@ -100,9 +100,9 @@ try{
  child=await connect((await targets()).find(t=>t.title==='AiDiy IDE / 軌跡'));await child.until(`!!document.querySelector('[aria-label="閲覧軌跡をクリア"]')`);
  await child.evaluate(`document.querySelector('[aria-label="閲覧軌跡をクリア"]').click()`);await child.until(`document.querySelector('[aria-label="閲覧軌跡をクリア"]').disabled`);
  await child.evaluate(`Array.from(document.querySelectorAll('.route-choice')).find(b=>b.textContent==='AiDiy検索軌跡').click()`);await child.until(`!!document.querySelector('[data-route-path="README.txt"]')`);
- await child.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationName`),'none');
+ await child.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationName`),'panel-fade-in');
  await main.send('Page.close');await sleep(600);assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / 軌跡').length,0);assert.deepEqual(errors,[]);
- const result={ok:true,size,shots,errors,operations:['3分類と実ツリーを同一DOMで移動','blocked popup保持','連打1窓','reload保持','閲覧/grep/AiDiy検索から実ジャンプ','AI外部送信なし','本体へ戻す','Xで折畳みと記録保持','閲覧クリアは他分類を保持','Webfade/reduced-motion','親終了cleanup']};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+ const result={ok:true,size,shots,errors,operations:['3分類と実ツリーを同一DOMで移動','blocked popup保持','連打1窓','reload保持','閲覧/grep/AiDiy検索から実ジャンプ','AI外部送信なし','本体へ戻す','Xで折畳みと記録保持','閲覧クリアは他分類を保持','Webfade/OS設定による省略なし','親終了cleanup']};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{
  for(const ws of sockets)ws.close();chrome.kill();await app.close();await sleep(300);
  for(const folder of [project,profile]){if(!resolve(folder).startsWith(resolve(tmpdir())+sep))throw Error('一時パスが不正です');try{rmSync(folder,{recursive:true,force:true});}catch{}}

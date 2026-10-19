@@ -11,6 +11,8 @@
 
 ## 変更箇所
 
+Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.md](./共通,Electronウィンドウ基本方針.md) に従う。`panel/desktop.cjs` が本体窓へ共通の `attachNativeWindowMove(window,screen,'discord')` を一度取り付け、内容・配置の確定後に共通 `拡大表示` で透明パネル内をズームする。接続処理・終了時のworker回収は従来のまま。`node --test frontend_channels/checks/desktop.test.ts` は取り付け・最小メニュー・終了回収を確認する。
+
 1. `frontend_channels/AGENTS.md` で構成を確認し、導入・操作は `frontend_channels/README.md` を参照する。
 2. Discord 専用設定はトークン、サーバー ID、`DISCORD_ALLOWED_USER_ID`、`DISCORD_TEXT_CHANNEL_ID`、`DISCORD_VOICE_CHANNEL_ID` の5項目とする。ID は配列ではなく単一文字列で指定する。`backend_server/conf/conf_json.py` の `DEFAULT_CONFIG`、`frontend_channels/src/接続/接続設定.ts`、README を揃える。旧1件配列は `LEGACY_DISCORD_IDS` で移行し、複数件なら新キーを明示するまで元ファイルを保持する。旧上書きキーは `REMOVED_DISCORD_KEYS` で読み込み・保存時に除去し、共通設定は変更しない。実トークンの内容は出力しない。
 3. CLI 実行・停止・resume は `frontend_ide/host` の共通実装を使用する。CommonJS の日本語 export は `src/共通連携/IDE連携.ts` を通す。初回のモデルは共通 `CODE_AIDIY_HERMES_MODEL`（`openai_oauth/gpt-6.1-sol`）、実行回数は `CODE_MAX_TURNS`、作業フォルダは `CODE_BASE_PATH` を使う。パネルで選んだコード AI（Provider）とモデルは `~/.aidiy/aidiy_discord_code_model.json` に保存し、単独起動・全体起動の両方で優先する。候補は `frontend_ide/host/scripts/model-catalog.py` を共用する。OAuth の provider は CLI に明示し、認証切れを別 provider への退避で隠さない。

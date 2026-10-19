@@ -1,0 +1,56 @@
+{
+  "testPassed": true,
+  "scope": "VR panel placement",
+  "displayCount": 1,
+  "sequentialMarkers": true,
+  "rememberAfterRecreation": true,
+  "updatedPosition": true,
+  "motion": [
+    {
+      "label": "Explorer",
+      "start": {
+        "x": 58,
+        "y": 115,
+        "width": 375,
+        "height": 647
+      },
+      "middle": {
+        "x": 85,
+        "y": 115,
+        "width": 376,
+        "height": 647
+      },
+      "target": {
+        "x": 330,
+        "y": 120,
+        "width": 375,
+        "height": 648
+      }
+    },
+    {
+      "label": "軌跡",
+      "start": {
+        "x": 455,
+        "y": 120,
+        "width": 360,
+        "height": 52
+      },
+      "middle": {
+        "x": 543,
+        "y": 146,
+        "width": 360,
+        "height": 52
+      },
+      "target": {
+        "x": 760,
+        "y": 210,
+        "width": 360,
+        "height": 52
+      }
+    }
+  ],
+  "shots": [
+    "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\all-displays-check\\20261019143235_vr-panel-moving-explorer.png",
+    "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\all-displays-check\\20261019143235_vr-panel-moving-routes.png"
+  ]
+}

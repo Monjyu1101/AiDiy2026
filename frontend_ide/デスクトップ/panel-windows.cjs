@@ -78,15 +78,12 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   window.once('closed',()=>{clearTimeout(record.timeout);windows.delete(contents);});
   record.timeout=setTimeout(()=>{if(!record.shown&&!window.isDestroyed())window.destroy();},12000);record.timeout.unref?.();
  }
- async function show(event,name,reduced){
+ async function show(event,name){
   const owner=trustedEvent(event),child=[...windows.values()].find(item=>['explorer','panel-viewer','panel-routes'].includes(item.kind)&&item.owner===owner&&item.name===name&&!item.window.isDestroyed());
   if(!owner||owner.kind!=='ide'||!child||isQuitting())return{ok:false,error:'Explorerの利用が終了しました。'};
   try{if(child.linkKey!==sessionKey(await readState(owner))||owner.window.isDestroyed()||child.window.isDestroyed())return{ok:false,error:'IDEの利用状態が変わりました。'};}catch{return{ok:false,error:'IDEの利用状態を確認できません。'};}
-  if(!child.shown){child.shown=true;clearTimeout(child.timeout);if(reduced===true||child.kind==='panel-routes'){
-   child.window.show();child.window.focus();
-   // 枠なし軌跡と演出省略時も、別窓が描画されるまでは元の表示を残す。
-   let timeout;try{await Promise.race([child.window.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))').catch(()=>{}),new Promise(resolve=>{timeout=setTimeout(resolve,300);})]);}finally{clearTimeout(timeout);}
-  }else await 拡大表示(BrowserWindow,child.window,{background:'#080c1a'});}
+  // 旧IPCの第3引数が届いても、全パネルで共通の表示開始演出を使う。
+  if(!child.shown){child.shown=true;clearTimeout(child.timeout);await 拡大表示(BrowserWindow,child.window,{background:'#080c1a'});}
   keepInFront(child.window);
   return{ok:!child.window.isDestroyed()};
  }

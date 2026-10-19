@@ -1,7 +1,7 @@
 import {ref} from 'vue';
 
-export function 起動ミニ表示を作成({利用可能,切替=enabled=>globalThis.window?.aidiyWindow?.startMini?.(enabled)??true}){
- const 表示中=ref(false),切替中=ref(false),エラー=ref('');let desired=false;
+export function 起動ミニ表示を作成({利用可能,初期表示=false,切替=enabled=>globalThis.window?.aidiyWindow?.startMini?.(enabled)??true}){
+ const 表示中=ref(初期表示===true),切替中=ref(false),エラー=ref('');let desired=表示中.value;
  async function 変更(enabled){
   desired=enabled===true&&利用可能();
   if(切替中.value)return;

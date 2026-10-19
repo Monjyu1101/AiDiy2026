@@ -1,0 +1,34 @@
+AiDiy 診断（ヘッドレス）: 全診断 2 件を実行します。
+[1/2] インストール状況
+  [ 1/19] OK  Python 3.14.4
+  [ 2/19] OK  uv 0.13.1
+  [ 3/19] OK  Node.js 24.18.0
+  [ 4/19] OK  npm 11.16.0
+  [ 5/19] OK  npx 11.16.0
+  [ 6/19] OK  Electron
+  [ 7/19] OK  Claude Code
+  [ 8/19] OK  OpenAI Codex CLI
+  [ 9/19] OK  GitHub Copilot CLI
+  [10/19] OK  Antigravity CLI
+  [11/19] OK  Grok Build
+  [12/19] OK  OpenCode
+  [13/19] OK  Ollama
+  [14/19] OK  ffmpeg 13.2.0
+  [15/19] OK  ffprobe 13.2.0
+  [16/19] OK  ffplay 13.2.0
+  [17/19] OK  Chrome
+  [18/19] OK  OBS Studio
+  [19/19] OK  VS Code
+  → C:\Users\admin\Desktop\AiDiy2026_dev\_AIDIY\aidiy_diag\install_info.json に保存しました。OK 19（1123ms）
+[2/2] モデル情報（プロバイダ別）
+  OK  Gemini（18 件）
+  OK  FreeAI（Gemini）（18 件）
+  OK  Claude（9 件）
+  OK  OpenAI API（17 件）
+  OK  OpenAI OAuth（9 件）
+  OK  Grok（xAI）（4 件）
+  OK  OpenRouter（183 件）
+  NG  Ollama（ローカル）（0 件）
+  PASS ローカル（backend_local）（4 件）
+  → C:\Users\admin\Desktop\AiDiy2026_dev\_AIDIY\aidiy_diag\（gemini_models_info.json, freeai_models_info.json, claude_models_info.json, openai_models_info.json, openai_oauth_models_info.json, grok_models_info.json, openrt_models_info.json, ollama_models_info.json, local_models_info.json, chat_models_info.json, live_models_info.json, code_models_info.json, decisions_models_info.json, live_voices_info.json） に保存しました。OK 7 / NG 1 / PASS 1（5056ms）
+完了しました。

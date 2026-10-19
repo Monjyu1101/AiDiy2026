@@ -7,17 +7,30 @@ import {起動状態を作成} from '../ui/src/起動/起動状態.mjs';
 
 function fakeWindow(maximized=false){
  const window={bounds:{x:140,y:100,width:1160,height:820},minimum:[420,320],maximized,maximizable:true,
-  isDestroyed(){return !!this.destroyed;},getNormalBounds(){return {...this.bounds};},getMinimumSize(){return [...this.minimum];},isMaximized(){return this.maximized;},isMaximizable(){return this.maximizable;},
+  isAlwaysOnTop(){return !!this.top;},setAlwaysOnTop(value){this.top=value;},isDestroyed(){return !!this.destroyed;},getNormalBounds(){return {...this.bounds};},getMinimumSize(){return [...this.minimum];},isMaximized(){return this.maximized;},isMaximizable(){return this.maximizable;},
   unmaximize(){this.maximized=false;},maximize(){this.maximized=true;},setMinimumSize(...value){this.minimum=value;},setMaximizable(value){this.maximizable=value;},setBounds(value){this.bounds={...value};}};
  return window;
 }
 test('mini window has fixed dimensions and restores original bounds and minimum',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window),original=structuredClone(window.bounds);
- assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:340,height:320});assert.deepEqual(window.minimum,[300,280]);assert.equal(window.maximizable,false);
+ assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:240,height:130});assert.deepEqual(window.minimum,[220,130]);assert.equal(window.maximizable,false);
  controller.set(true);controller.set(false);assert.deepEqual(window.bounds,original);assert.deepEqual(window.minimum,[420,320]);assert.equal(window.maximizable,true);assert.equal(controller.active,false);
 });
 test('maximized windows restore their normal bounds and maximized state',()=>{
  const window=fakeWindow(true),controller=miniWindow.ミニ表示を作成(window);controller.set(true);assert.equal(window.maximized,false);controller.set(false);assert.equal(window.maximized,true);assert.equal(window.bounds.width,1160);
+});
+
+test('startup mini uses primary work-area origin and restores original topmost, location and size',()=>{
+ for(const top of [true,false]){
+  const window=fakeWindow();window.top=top;const original=structuredClone(window.bounds),controller=miniWindow.ミニ表示を作成(window,{screen:{getPrimaryDisplay:()=>({workArea:{x:-1920,y:32}})}});
+  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:240,height:130});assert.equal(window.top,true);
+  controller.set(false);assert.deepEqual(window.bounds,original);assert.equal(window.top,top);
+ }
+});
+
+test('initial mini renders immediately even before connection and can restore without resetting the mode first',async()=>{
+ const calls=[];const state=起動ミニ表示を作成({利用可能:()=>true,初期表示:true,切替:async value=>{calls.push(value);return true;}});
+ assert.equal(state.表示中.value,true);assert.equal(state.切替中.value,false);await state.変更(false);assert.equal(state.表示中.value,false);assert.deepEqual(calls,[false]);
 });
 test('invalid requests and destroyed windows cannot change bounds',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window);assert.equal(controller.set({width:999}),false);assert.equal(window.bounds.width,1160);window.destroyed=true;assert.equal(controller.set(true),false);
@@ -35,8 +48,12 @@ test('failed native switch keeps UI in the current mode and exposes a message',a
  const state=起動ミニ表示を作成({利用可能:()=>true,切替:async()=>false});assert.equal(await state.変更(true),false);assert.equal(state.表示中.value,false);assert.ok(state.エラー.value);
 });
 test('mini polling refreshes statuses without reading logs or mutating services',async t=>{
- const calls=[],state=起動状態を作成({api:async route=>{calls.push(route);return route==='api/起動'?{対象:[{id:'core',名前:'Core',状態:'稼働中',設定:{起動対象:true}}],実行中:false}: {ログ:'fixture',位置:7};}});
- t.after(()=>state.終了());state.表示(true,false);await delay(30);state.表示(false);
- assert.equal(state.項目.value[0].状態,'稼働中');assert.ok(calls.length);assert.ok(calls.every(route=>route==='api/起動'));
+ const calls=[],scheduled=[],cleared=[];let open=true;
+ const state=起動状態を作成({setTimer:(callback,ms)=>{const handle={callback,ms};scheduled.push(handle);return handle;},clearTimer:timer=>cleared.push(timer),api:async route=>{calls.push(route);return route==='api/起動'?{対象:[{id:'core',名前:'Core',状態:'未起動',設定:{起動対象:true}}],実行中:false}:route==='api/起動/ポート'?{対象:[{id:'core',名前:'Core',ポート:8091,開放:open}]}: {ログ:'fixture',位置:7};}});
+ t.after(()=>state.終了());state.表示(true,false);await delay(30);
+ assert.equal(state.項目.value[0].状態,'未起動');assert.equal(state.ポート項目.value[0].開放,true,'Diagが管理していない外部サーバーの開放も表示する');assert.ok(calls.every(route=>['api/起動','api/起動/ポート'].includes(route)));
+ assert.equal(scheduled.at(-1).ms,5000);open=false;await scheduled.at(-1).callback();assert.equal(state.ポート項目.value[0].開放,false);assert.equal(scheduled.at(-1).ms,5000);
+ const timer=scheduled.at(-1);state.表示(false);assert.ok(cleared.includes(timer));const portCalls=calls.filter(route=>route==='api/起動/ポート').length;
  state.表示(true,true);await delay(30);state.表示(false);assert.ok(calls.includes('api/起動/ログ'));assert.ok(!calls.some(route=>/設定|再起動|停止/.test(route)));
+ assert.equal(calls.filter(route=>route==='api/起動/ポート').length,portCalls,'通常画面ではポート監視を止める');
 });

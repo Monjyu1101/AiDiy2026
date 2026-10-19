@@ -1,15 +1,17 @@
 import {ref,computed,watch} from 'vue';
 
-export function 起動状態を作成({api}){
+export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearTimeout}){
  const 項目=ref([]),選択=ref(''),読込中=ref(false),保存中=ref(false),処理中=ref(false),起動中=ref(false),通知=ref(''),保存表示=ref('');
  const 更新失敗=ref(false);
+ const ポート項目=ref([]);
  const ログ=ref({}),位置=new Map();let visible=false,logsVisible=true,timer,controller,version=0,最後の起動表示='';
  const 選択対象=computed(()=>項目.value.find(item=>item.id===選択.value));
  const コンソール=computed(()=>ログ.value[選択.value]||'コンソールのログは、起動後にここへ表示されます。\n');
  async function refresh(){
   if(!visible)return;const revision=version;controller=new AbortController();
   try{
-   const data=await api('api/起動','GET',controller.signal);if(revision!==version)return;更新失敗.value=false;
+   const [data,ports]=await Promise.all([api('api/起動','GET',controller.signal),logsVisible?null:api('api/起動/ポート','GET',controller.signal)]);if(revision!==version)return;更新失敗.value=false;
+   if(ports)ポート項目.value=ports.対象||[];
    項目.value=data.対象.map(item=>保存中.value?{...item,設定:項目.value.find(old=>old.id===item.id)?.設定||item.設定}:item);
    起動中.value=data.実行中;if(data.通知)通知.value=data.通知;
    const follow=data.起動表示;
@@ -21,10 +23,10 @@ export function 起動状態を作成({api}){
     ログ.value={...ログ.value,[id]:((tail.切替?'':ログ.value[id]||'')+tail.ログ).slice(-120000)};位置.set(id,tail.位置);
    }
   }catch(error){if(error.name!=='AbortError'&&revision===version){通知.value=error.message;更新失敗.value=true;}}
-  finally{if(revision===version){読込中.value=false;controller=undefined;if(visible)timer=setTimeout(refresh,800);}}
+  finally{if(revision===version){読込中.value=false;controller=undefined;if(visible)timer=setTimer(refresh,logsVisible?800:5000);}}
  }
- function 表示(value,logs=true){visible=value;logsVisible=logs;version++;clearTimeout(timer);controller?.abort();if(value){読込中.value=!項目.value.length;void refresh();}}
- watch(選択,()=>{if(visible){version++;clearTimeout(timer);controller?.abort();void refresh();}});
+ function 表示(value,logs=true){visible=value;logsVisible=logs;version++;clearTimer(timer);controller?.abort();if(value){読込中.value=!項目.value.length;if(!logs)ポート項目.value=[];void refresh();}}
+ watch(選択,()=>{if(visible){version++;clearTimer(timer);controller?.abort();void refresh();}});
  async function 設定変更(id,key,value){
   if(保存中.value)return;const item=項目.value.find(item=>item.id===id);if(!item)return;
   const old={...item.設定};item.設定={...old,[key]:value};保存中.value=true;保存表示.value='保存中…';
@@ -44,5 +46,5 @@ export function 起動状態を作成({api}){
   catch(error){通知.value=error.message;}finally{処理中.value=false;}
  }
  function 終了(){表示(false);}
- return {項目,選択,選択対象,読込中,保存中,処理中,起動中,通知,保存表示,更新失敗,コンソール,表示,設定変更,再起動,停止,終了};
+ return {項目,ポート項目,選択,選択対象,読込中,保存中,処理中,起動中,通知,保存表示,更新失敗,コンソール,表示,設定変更,再起動,停止,終了};
 }

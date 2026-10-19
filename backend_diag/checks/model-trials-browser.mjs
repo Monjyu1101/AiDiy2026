@@ -61,9 +61,9 @@ try{
  await capture('models-desktop');await evaluate(`document.querySelector('#latest-models').click()`);await until(`!document.querySelector('#models-write').disabled`);assert.equal(keyCalls,1);
  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='外部連携').click()`);await until(`document.querySelectorAll('.integration-row').length===1`);
  assert.equal(await evaluate(`document.querySelector('.integration-panel .panel-heading h2').textContent`),'外部連携確認');
- assert.equal(await evaluate(`document.querySelectorAll('.integration-test button').length`),0);await capture('integrations-desktop');
+ assert.equal(await evaluate(`document.querySelectorAll('.integration-test button').length`),1);assert.equal(await evaluate(`document.querySelector('.integration-test button').disabled`),true,'未対応の外部連携もテストボタンを表示し、無効にする');await capture('integrations-desktop');
  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='設定モデル').click()`);
- await until(`document.querySelectorAll('[data-trial-id]').length===14`);
+ await until(`document.querySelectorAll('[data-trial-id]').length===15`);
  assert.equal(await evaluate(`document.querySelector('.trial-heading h2').textContent`),'モデル動作確認');
  assert.equal(await evaluate(`document.querySelector('#model-trial-start').textContent`),'動作確認');
  assert.equal(await evaluate(`!!document.querySelector('#model-trial-single')`),false);
@@ -74,17 +74,17 @@ try{
  await evaluate(`document.querySelector('[data-trial-id="CODE4"]').click();document.querySelector('[data-trial-id="CODE4"]').click()`);
  await until(`document.querySelectorAll('.trial-row .badge[data-state="実行中"]').length===12`);
  assert.equal(calls,1);assert.equal(await evaluate(`[...document.querySelectorAll('[data-trial-id]')].every(b=>b.disabled)`),true);
- assert.deepEqual(await evaluate(`[...document.querySelectorAll('.trial-group-title')].map(h=>h.firstChild.textContent)`),['チャット','ライブ','コード','タスク','チーム']);
+ assert.deepEqual(await evaluate(`[...document.querySelectorAll('.trial-group-title')].map(h=>h.firstChild.textContent)`),['チャット','ライブ','判断','コード','タスク','チーム']);
  const follow=await evaluate(`(()=>{const aside=document.querySelector('.model-trial-panel aside'),row=document.querySelector('.trial-row.selected').getBoundingClientRect(),box=aside.getBoundingClientRect();return {scrolled:aside.scrollTop>0,visible:row.top>=box.top&&row.bottom<=box.bottom};})()`);
  assert.deepEqual(follow,{scrolled:true,visible:true});
  await capture('pending-desktop');release();
  await until(`document.querySelectorAll('.trial-row .badge[data-state="OK"]').length===12`);
- assert.equal(calls,1);await capture('result-desktop');
+ assert.equal(calls,1);assert.ok(await evaluate(`document.querySelector('.trial-layout article').textContent.includes('応答を確認しました。')`),'成功した試行の結果説明を未実施と表示しない');await capture('result-desktop');
  const layouts=[];
  for(const [width,height] of [[768,1000],[390,844]]){
   await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
   const layout=await evaluate(`(()=>{const panel=document.querySelector('.model-trial-panel'),buttons=[...panel.querySelectorAll('button')];return {overflow:document.documentElement.scrollWidth>innerWidth||panel.scrollWidth>panel.clientWidth,noButtonWrap:buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'||b.classList.contains('trial-select')),rowButtons:panel.querySelectorAll('[data-trial-id]').length};})()`);
-  assert.equal(layout.overflow,false);assert.equal(layout.noButtonWrap,true);assert.equal(layout.rowButtons,14);layouts.push({width,height,...layout});await capture(`result-${width}`);
+  assert.equal(layout.overflow,false);assert.equal(layout.noButtonWrap,true);assert.equal(layout.rowButtons,15);layouts.push({width,height,...layout});await capture(`result-${width}`);
  }
  assert.deepEqual(errors,[]);const result={tabs:['導入状況','モデル一覧','外部連携','設定モデル'],header,layouts,modelCalls:calls,keyCalls,scanCalls,errors,output};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));
 }finally{

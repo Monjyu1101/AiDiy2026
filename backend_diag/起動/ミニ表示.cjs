@@ -1,23 +1,26 @@
 'use strict';
 
 // 元の位置・サイズ・最大化状態を保持し、固定のミニ寸法だけを公開する。
-function ミニ表示を作成(window){
+function ミニ表示を作成(window,{screen}={}){
  let original;
  return {
   get active(){return !!original;},
-  set(enabled){
+  set(enabled,{topLeft=false}={}){
    if(typeof enabled!=='boolean'||!window||window.isDestroyed())return false;
    if(enabled===!!original)return true;
    if(enabled){
-    original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable()};
+    original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable(),alwaysOnTop:window.isAlwaysOnTop()};
     if(original.maximized)window.unmaximize();
-    window.setMinimumSize(300,280);
+    window.setMinimumSize(220,130);
     window.setMaximizable(false);
-    window.setBounds({...original.bounds,width:340,height:320});
+    const area=topLeft?screen.getPrimaryDisplay().workArea:null;
+    window.setBounds({...original.bounds,...(area?{x:area.x,y:area.y}:{}),width:240,height:130});
+    window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
    }else{
     const saved=original;original=undefined;
     window.setMinimumSize(...saved.minimum);
     window.setMaximizable(saved.maximizable);
+    window.setAlwaysOnTop(saved.alwaysOnTop);
     window.setBounds(saved.bounds);
     if(saved.maximized)window.maximize();
    }

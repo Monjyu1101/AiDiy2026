@@ -1,0 +1,60 @@
+[
+  {
+    "book": "ide",
+    "id": "601",
+    "paragraph": 6,
+    "sequence": 1,
+    "file": "aidiy_ide-操作_601_Windows上で透明な領域にIDEの実画面を拡大する画面.png",
+    "title": "Windows上で透明な領域にIDEの実画面を拡大する画面",
+    "status": "観測",
+    "note": "本番の共通表示処理を使用。目視用にアニメーションの200ms位置で静止し、Windows Graphics Captureで取得。外側には背後のIDE/Word画面が透け、内側にIDEの実画面が表示される。読み込み中の時点で、IDE操作完了の証跡とは区別。クリック透過と1%不透明度は演出窓へ適用しない。 最終確認には不適切な準備中画像のため、603へ差し替え。",
+    "time": "2026-10-19T05:47:19.501Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 13502030,
+      "title": "AiDiy IDE 透明ズーム確認"
+    },
+    "width": 1255,
+    "height": 780,
+    "sha256": "f4893583f2c4aa4dac736e1536f8b83ed631d7459c5f5e085a22fb67684da953",
+    "accessibility": {
+      "tree": "Window: \"AiDiy IDE 透明ズーム確認\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE 透明ズーム確認 Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE 透明ズーム確認\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t9 領域"
+    }
+  },
+  {
+    "book": "ide",
+    "id": "602",
+    "paragraph": 6,
+    "sequence": 2,
+    "file": "aidiy_ide-操作_602_透明パネル内で文字を含む実画面が広がる途中画面.png",
+    "title": "透明パネル内で文字を含む実画面が広がる途中",
+    "status": "✅ OK",
+    "note": "共通関数を実Electronで測定。拡大745.5ms、外側4隅alpha=0、実窓・キャンバスの矩形不変。試験用の本文で、IDE本体の画面とは区別。",
+    "width": 679,
+    "height": 430,
+    "sha256": "49e408265b95fa486d7afdf383adc7ef704a6b300e357126da2d20be91854ace"
+  },
+  {
+    "book": "ide",
+    "id": "603",
+    "paragraph": 6,
+    "sequence": 3,
+    "file": "aidiy_ide-操作_603_銀河描画完了後に透明領域内でIDE画面が広がる画面.png",
+    "title": "銀河描画完了後に透明領域内でIDE画面が広がる画面",
+    "status": "✅ OK",
+    "note": "読み込み表示が消え、出航準備中を抜け、Canvasへ銀河・ファイルの星が描画されたことを確認してから撮影。共通表示処理の200ms位置で静止。Windows上で前面へ出し、外側から背後のCode/Live等が透け、内側の銀河・ファイル名を確認。準備中の601は最終根拠から除外。",
+    "time": "2026-10-19T06:07:31.437Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 39193932,
+      "title": "AiDiy IDE 透明ズーム確認"
+    },
+    "width": 1255,
+    "height": 780,
+    "sha256": "770093550123b85c92d74817d24f53f645ed96c5589b92578761f87979b85aea",
+    "accessibility": {
+      "focused_element": "0 ウィンドウ AiDiy IDE 透明ズーム確認 Secondary Actions: Raise",
+      "tree": "Window: \"AiDiy IDE 透明ズーム確認\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE 透明ズーム確認 Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE 透明ズーム確認\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t9 領域\n\nThe focused UI element is 0 ウィンドウ AiDiy IDE 透明ズーム確認 Secondary Actions: Raise."
+    }
+  }
+]

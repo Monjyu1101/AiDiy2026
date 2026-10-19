@@ -36,13 +36,13 @@
 .mode-2d .folder-page-entry.folder .folder-page-meta{color:#5a4a3a}
 .mode-2d .folder-page-entry.folder:hover{transform:translateY(-3px);box-shadow:inset 0 0 22px 4px #8d744b66,0 8px 20px #00000026}
 .mode-2d .folder-page-entry.folder[data-cursor=true]{outline:2px solid #856848;outline-offset:-2px}
-@media(prefers-reduced-motion:reduce){.folder-page-entry.folder{transition:none}.mode-2d .folder-page-entry.folder:hover{transform:none}}
+
 /* 右へ傾いた斜線と切り抜きの上下端を揃え、ゆっくり始めて加速する。傾き分だけ外まで動かして四隅も覆う。 */
 @keyframes folder-page-forward{from{clip-path:polygon(0 0,calc(100% + var(--page-turn-slant)) 0,100% 100%,0 100%)}to{clip-path:polygon(0 0,0 0,calc(0% - var(--page-turn-slant)) 100%,0 100%)}}
 @keyframes folder-page-back{from{clip-path:polygon(0 0,100% 0,100% 100%,calc(0% - var(--page-turn-slant)) 100%)}to{clip-path:polygon(calc(100% + var(--page-turn-slant)) 0,100% 0,100% 100%,100% 100%)}}
 @keyframes folder-page-edge-forward{from{left:100%}to{left:calc(0% - var(--page-turn-slant))}}
 @keyframes folder-page-edge-back{from{left:calc(0% - var(--page-turn-slant))}to{left:100%}}
-@media(prefers-reduced-motion:reduce){.folder-page-sheet,.folder-page-turn-edge{display:none;animation:none}}
+
 @media(orientation:portrait){.mode-2d.viewing .folder-pages{right:16px;bottom:calc(50dvh + 8px)}}
 @media(max-width:600px){.ide-project-actions{gap:4px}.ide-toolbar-right{gap:4px}.ide-view-modes button{min-width:27px;padding-inline:4px}.ide-heading .ai-launchers button{padding-inline:5px}.folder-page-heading{gap:3px;padding:5px}.folder-page-entry{padding:5px 7px;gap:5px}}
 /* 16pxの補足2行も通常48pxの行内に収める。狭いページでは名前の下へ送り、サイズと日時を横並びから折り返す。 */
@@ -63,11 +63,16 @@
   .space-view .explorer-panel ul{min-height:60px}
   .space-view .viewer-popup{top:calc(50vh + var(--portrait-panel-gap));left:16px;right:16px;width:auto}
 }
+/* 通常の横表示は、閲覧・比較の上端と下端をエクスプローラーにそろえる。 */
+@media (orientation:landscape){
+  .space-view :is(.viewer-popup,.history-embedded){top:var(--workspace-top);bottom:60px}
+  .space-view .history-embedded{height:auto;max-height:none}
+}
 /* 視点移動の自動運転中: 枠の上を光がぐるぐる回る（ON でも手動操作の直後や自分で開いたファイルを見ている間は回らない） */
 @property --motion-spin{syntax:'<angle>';inherits:false;initial-value:0deg}
 @keyframes motion-spin{to{--motion-spin:360deg}}
 .space-motion-toggle.driving{border:1px solid transparent;background:linear-gradient(#080c1af2,#080c1af2) padding-box,conic-gradient(from var(--motion-spin),#2c5a5c 0deg,#2c5a5c 200deg,#85e9e9 300deg,#e8ffff 340deg,#2c5a5c 360deg) border-box;box-shadow:0 0 10px #85e9e940;animation:motion-spin 1.6s linear infinite}
-@media (prefers-reduced-motion:reduce){.space-motion-toggle.driving{animation-duration:6s}}
+
 
 /* AiDiy検索と閲覧軌跡の切替。操作はエクスプローラーの右側へ寄せる。 */
 .explorer-routes{position:fixed;top:var(--workspace-top);left:calc(24px + var(--explorer-width));z-index:41;display:flex;gap:4px;flex-wrap:wrap;width:var(--route-width);background:#070b17ed;padding:5px;border:1px solid #29334c}
@@ -104,11 +109,12 @@
 .explorer-panel .explorer-branch-enter-active,.explorer-panel .explorer-branch-leave-active{overflow:hidden;transition:height 240ms cubic-bezier(.22,.61,.36,1),opacity 200ms ease}
 .explorer-panel .explorer-branch-enter-from,.explorer-panel .explorer-branch-leave-to{height:0;opacity:0}
 .explorer-panel .explorer-branch-leave-active{pointer-events:none}
-@media(prefers-reduced-motion:reduce){.explorer-panel .explorer-branch-enter-active,.explorer-panel .explorer-branch-leave-active{transition:none}}
+
 .route-file-list .ai-route-title{color:#a7f6ff;font-weight:bold;overflow-wrap:anywhere;border-bottom:1px solid #29334c;padding-bottom:7px}
-.space-flight-controls{position:fixed;right:16px;bottom:16px;z-index:45;display:flex;align-items:flex-end;gap:6px}
+.space-flight-controls{position:fixed;right:16px;bottom:16px;z-index:5;display:flex;align-items:flex-end;gap:6px}
 .space-auto-explore{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.space-orbit-status{pointer-events:none;white-space:nowrap;color:#b8cbee;background:#080c1ad9;border:1px solid #344563;padding:7px 9px;font:10px var(--mono);box-shadow:0 0 24px #567ec51c}
+.space-orbit-status{pointer-events:none;white-space:nowrap;color:#b8cbee;background:transparent;border:0;padding:0;font:10px var(--mono);box-shadow:none}
+.mode-2d .space-orbit-status{color:#745b37}
 .space-flight-controls .space-motion-toggle{position:static;font-size:10px;gap:5px;padding:7px}
 @media (max-width:600px){.space-flight-controls{flex-direction:column;align-items:flex-end}}
 
@@ -119,7 +125,7 @@
 .file-history-dialog[open]{display:flex;flex-direction:column;transform-origin:50% 55%;animation:history-unfold 480ms cubic-bezier(.22,.72,.2,1) both}.file-history-dialog::backdrop{background:#000b;animation:history-backdrop 400ms ease-out both}
 @keyframes history-unfold{0%{opacity:0;transform:translateY(18px) scale(.84,.65)}72%{opacity:1;transform:translateY(-2px) scale(1.008,1.012)}100%{opacity:1;transform:none}}
 @keyframes history-backdrop{from{opacity:0}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.file-history-dialog[open],.file-history-dialog::backdrop{animation:none}}
+
 .file-history-dialog>header{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #35435c;flex:none}.file-history-dialog h2{font-size:15px;margin:0;white-space:nowrap}.file-history-dialog>header>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-history-dialog>header>button{font-size:16px}
 .file-history-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;flex:none}.file-history-toolbar label{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}.file-history-toolbar select{min-width:0;max-width:min(65vw,680px)}
 .file-history-changes{margin-left:auto;text-align:right;font-size:20px;font-weight:700;line-height:1.4;color:#b7f3ff}
@@ -162,13 +168,13 @@
   .development-app.ide .space-view .explorer-routes::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none}
 }
 
-/* 更新は上から下へ旧ページを剥がす。既存の移動と同じ操作中断・reduced-motionを使う。 */
+/* 更新は上から下へ旧ページを剥がす。既存の移動と同じ操作中断を使う。 */
 .folder-page-sheet.page-turn-refresh{animation:folder-page-refresh var(--page-turn-duration,650ms) ease-in-out both}
 .folder-page-turn-edge.page-turn-refresh{left:0;right:0;width:100%;height:100%;bottom:auto;animation:folder-page-edge-refresh var(--page-turn-duration,650ms) ease-in-out both}
 @keyframes folder-page-refresh{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}
 @keyframes folder-page-edge-refresh{from{top:0}to{top:100%}}
 .folder-page-monitor-status{flex:none;margin:0;padding:6px 12px;font-size:16px;background:#f5e8c9;color:#74521f}
-@media(prefers-reduced-motion:reduce){.folder-page-sheet.page-turn-refresh,.folder-page-turn-edge.page-turn-refresh{display:none;animation:none}}
+
 
 .mode-2d .folder-page-meta time.is-today{color:#b42318;font-weight:600}
 
@@ -187,12 +193,7 @@
 /* Web別窓・画面内の表示開始だけ。ページ更新線や本文の再描画とは独立する。 */
 .panel-opening,.viewer-popup,.route-file-list{animation:panel-fade-in 260ms ease-out}
 @keyframes panel-fade-in{from{opacity:0}to{opacity:1}}
-@media(prefers-reduced-motion:reduce){.panel-opening,.viewer-popup,.route-file-list{animation:none}}
 
-/* 登場完了後の一度だけの光沢。操作・寸法・スクロールに影響を与えない。 */
-.opening-shine{position:fixed;z-index:2147483646;overflow:hidden;pointer-events:none;contain:strict}
-.opening-shine-band{position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 36%,#83eaff0d 43%,#e6fcff70 49.5%,#a0efff30 53%,transparent 62%)}
-@media(prefers-reduced-motion:reduce){.opening-shine{display:none}}
 
 /* 今日/本日最新は文字色・選択色と独立した縁だけを重ねる。 */
 .folder-page-entry{position:relative}
@@ -200,7 +201,7 @@
 .folder-page-entry.updated-latest::after{border-color:#b58d4866;box-shadow:inset 0 0 16px #e0b86830}
 .file-update-pulse{position:absolute;inset:0;pointer-events:none;background:#e9bb6540;opacity:0;animation:file-update-pulse 1200ms ease-in-out both}
 @keyframes file-update-pulse{0%,100%{opacity:0}50%{opacity:.7}}
-@media(prefers-reduced-motion:reduce){.file-update-pulse{display:none;animation:none}}
+
 
 /* 同じ閲覧DOMを移すため、比較と通常表示は同じ別窓内に収める。 */
 .viewer-session{display:contents}
@@ -219,7 +220,7 @@
 
 /* 展開の高さ・本文を見せるタイミングは本体と別窓で共通。 */
 .explorer-routes{display:block;padding:0;min-width:min(360px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
-.route-controls{display:flex;align-items:center;flex-wrap:nowrap;gap:3px;padding:5px;overflow-x:auto;scrollbar-width:thin}
+.route-controls{display:flex;align-items:center;flex-wrap:nowrap;gap:2px;padding:5px;overflow-x:auto;scrollbar-width:thin}
 .route-controls .route-choice{flex:1 0 auto;min-width:0;padding:5px 2px;white-space:nowrap;font-size:10px}
 .route-controls>button{flex:none;min-width:20px;padding:5px 2px;white-space:nowrap;font-size:10px;line-height:14px}
 .route-controls .route-choice{line-height:14px}
@@ -233,7 +234,7 @@
 .native-route-window .route-drag-handle{display:block;flex:none;width:8px;height:18px;cursor:move;border-left:2px solid #9aa7b8;border-right:2px solid #9aa7b8}
 .native-route-window .route-controls button{-webkit-app-region:no-drag}
 .routes-window .route-tree{min-width:0}
-@media(prefers-reduced-motion:reduce){.route-reveal{transition:none}}
+
 
 /* 既存の独立Viewerと同じ状態バー・窓操作。本文は残りの高さに収める。 */
 .native-panel-window{display:flex;flex-direction:column}
@@ -250,7 +251,8 @@
 /* ALLは銀河を全面に表示し、各画面の右上を復帰・部品起動の入口にする。別窓へ移した部品には適用しない。 */
 .all-displays .space-view :is(.explorer-toggle,.explorer-routes,.route-restore-toggle,.space-flight-controls,.space-filter-toggle,.space-breadcrumb){display:none}
 /* ALLの閲覧・比較は中心星の右で1件ずつ表示する。別窓の部品にはこの配置を持ち込まない。 */
-.all-displays .space-view :is(.viewer-popup,.history-embedded){box-sizing:border-box;left:clamp(16px,calc(var(--focus-x,50vw) + 128px),calc(100vw - min(640px,50vw - 64px) - 16px));right:auto;top:clamp(16px,calc(var(--focus-y,50vh) - 360px),max(16px,100vh - 736px));bottom:auto;width:min(640px,calc(50vw - 64px));max-width:none;height:min(720px,calc(100vh - 32px));max-height:none;margin:0}
+.all-displays .space-view{--vr-viewer-top:192px;--vr-viewer-bottom:48px}
+.all-displays .space-view :is(.viewer-popup,.history-embedded){box-sizing:border-box;left:clamp(16px,calc(var(--focus-x,50vw) + 128px),calc(100vw - min(640px,50vw - 64px) - 16px));right:auto;top:clamp(var(--vr-viewer-top),calc(var(--focus-y,50vh) - 360px),max(var(--vr-viewer-top),calc(100vh - 720px - var(--vr-viewer-bottom))));bottom:auto;width:min(640px,calc(50vw - 64px));max-width:none;height:min(720px,calc(100vh - var(--vr-viewer-top) - var(--vr-viewer-bottom)));max-height:none;margin:0}
 .all-restore-zone{position:fixed;right:0;top:0;z-index:95;width:88px;min-height:48px;display:flex;flex-direction:column;align-items:flex-end;padding:4px;-webkit-app-region:no-drag}
 .all-restore-button{display:grid;place-items:center;width:34px;height:30px;padding:0;border:1px solid #343943;background:#080a10e6;color:#d9e0f2;opacity:0;transition:opacity 120ms ease-out}
 .all-launchers{display:flex;flex-direction:column;gap:4px;margin-top:4px;visibility:hidden;pointer-events:none}
@@ -259,7 +261,7 @@
 .all-restore-zone:hover .all-launchers,.all-restore-zone:focus-within .all-launchers{visibility:visible;pointer-events:auto}
 .all-restore-icon{display:block;width:11px;height:11px;border:1px solid currentColor;box-shadow:2px -2px 0 -1px #080a10,2px -2px 0 0 currentColor}
 .all-transition{position:fixed;inset:0;z-index:150;display:grid;place-items:center;background:#0002;cursor:progress;-webkit-app-region:no-drag}.all-transition p{margin:0;padding:12px 20px;border:1px solid #426073;background:#080c1af2;color:#d9f5ff;font-size:14px}
-@media(prefers-reduced-motion:reduce){.all-restore-button{transition:none}}
+
 /* バーガー: 横三本＝エクスプローラー、縦三本＝軌跡バー。元の ☰ と同じ文字色の線で、向きだけを変える。線の太さ・間隔は main.js が表示倍率の整数画素へそろえる。 */
 .burger{display:grid;gap:var(--burger-gap,4px);place-content:center;pointer-events:none}
 .burger i{display:block;background:currentColor}
@@ -277,3 +279,8 @@
 /* 開いた軌跡バーの先頭の縦三本は、閉じている時の正方形ボタンと同じ位置・大きさの枠（右端は区切り線）にする。 */
 .explorer-routes .route-controls>.route-burger{width:39px;min-width:39px;height:38px;margin:-5px 5px -5px -5px;border:0;border-right:1px solid #343943;background:transparent}
 .explorer-routes .route-controls>.route-burger:hover{background:#202737}
+
+/* 閉じる印は本文の文字サイズ・フォントに依存させず、各パネルで同じ2pxの線にする。 */
+.close-icon{position:relative;display:inline-block;width:14px;height:14px;flex:none;vertical-align:-2px;pointer-events:none}
+.close-icon::before,.close-icon::after{content:"";position:absolute;left:0;top:6px;width:14px;height:2px;background:currentColor;transform:rotate(45deg)}
+.close-icon::after{transform:rotate(-45deg)}

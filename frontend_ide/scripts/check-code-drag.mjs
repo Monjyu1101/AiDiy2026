@@ -60,21 +60,19 @@ try{
   };
  `});
  await main.send('Page.navigate',{url});await main.until(`!!document.querySelector('.message.assistant p')&&!!document.querySelector('textarea')`);
- // 登場完了通知の後だけ光り、本文の寸法・入力・ヒット判定を変えない。
+ // 開いた後の光沢は表示しない。通常のフェード・寸法・入力・ヒット判定は維持する。
  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
- const beforeShine=await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`);
+ const beforeOpening=await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`);
+ await main.evaluate(`window.openingShines=0;new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1&&node.classList.contains('opening-shine'))window.openingShines++;}).observe(document.body,{childList:true,subtree:true})`);
  assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0);
  await main.evaluate(`document.querySelector('.code-component').style.animation='startup-fade-in 2s linear both';window.startupAnimation=document.querySelector('.code-component').getAnimations()[0];startupAnimation.pause();window.dispatchEvent(new Event('aidiy-window-shown'));`);
- assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0,'登場フェード完了前は光らせない');
- await main.evaluate(`startupAnimation.finish()`);await main.until(`!!document.querySelector('.opening-shine-band')`);
- await main.evaluate(`window.shineAnimation=document.querySelector('.opening-shine-band').getAnimations()[0];shineAnimation.pause();shineAnimation.currentTime=200;new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));`);
- assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),1);
- const shineStyle=await main.evaluate(`(()=>{const node=document.querySelector('.opening-shine-band'),s=getComputedStyle(node);return{opacity:s.opacity,transform:s.transform,time:shineAnimation.currentTime,state:shineAnimation.playState,rect:node.getBoundingClientRect().toJSON()};})()`);
- assert.ok(Number(shineStyle.opacity)>.9,JSON.stringify(shineStyle));
- await main.capture('code-opening-shine');
- assert.equal(await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`),beforeShine);
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine').length`),0,'登場フェード中にも光らせない');
+ await main.evaluate(`startupAnimation.finish()`);await sleep(800);
+ assert.equal(await main.evaluate(`window.openingShines`),0,'登場完了後も光沢を生成しない');
+ assert.equal(await main.evaluate(`document.querySelectorAll('.opening-shine,.opening-shine-band').length`),0);
+ await main.capture('code-opening-clean');
+ assert.equal(await main.evaluate(`JSON.stringify(document.querySelector('.development-app').getBoundingClientRect().toJSON())`),beforeOpening);
  assert.ok(await main.evaluate(`(()=>{const input=document.querySelector('textarea'),r=input.getBoundingClientRect();return document.elementFromPoint(r.left+10,r.top+10)===input;})()`));
- await main.evaluate(`shineAnimation.play()`);await main.until(`!document.querySelector('.opening-shine')`);
  await main.evaluate(`document.querySelector('.code-component').style.animation=''`);
  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
  await main.evaluate(`window.dispatchEvent(new Event('aidiy-window-shown'))`);

@@ -1,0 +1,29 @@
+{
+  "testedAt": "2026-10-19T01:52:58.636Z",
+  "runId": "20261019104904-live1560",
+  "method": "Computer Use / @oai/sky / aidiy_diag実画面",
+  "initialSettleSeconds": 15,
+  "responseTimeoutSeconds": 60,
+  "connectionTimeoutSeconds": 20,
+  "httpTimeoutSeconds": 135,
+  "rowTimeoutSeconds": 150,
+  "status": "✅ OK",
+  "acceptance": "接続後15秒・応答待機60秒で実回答を確認。この設定で確定。",
+  "provider": "freeai_live",
+  "model": "gemini-2.5-flash-native-audio-preview-09-2025",
+  "voice": "Zephyr",
+  "input": "おはよう。稼働試験です。挨拶を一文だけ返してください。ファイル変更やコマンド実行はしないでください。",
+  "reply": "おはようございます。",
+  "audio": "1秒以上の再生可能な音声なし。音声再生の成功とは判定していない。",
+  "knownBehavior": "Gemini系Liveは接続直後の初回送信で失敗する場合がある。初回待機15秒を適用する。",
+  "checks": {
+    "pythonTests": 22,
+    "nodeTests": 29,
+    "failed": 0,
+    "uiDistribution": "ソースと配布物の一致を確認"
+  },
+  "evidence": [
+    "aidiy_diag-環境確認_601_接続後15秒応答60秒の設定で同一入力画面.png",
+    "aidiy_diag-環境確認_602_接続後15秒応答60秒でLive実回答OK画面.png"
+  ]
+}

@@ -1,9 +1,16 @@
 'use strict';
-const {app,BrowserWindow,session,ipcMain,dialog}=require('electron');
+const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron');
 const path=require('node:path');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
 const {ミニ表示を作成}=require('./ミニ表示.cjs');
+const {checkPort}=require('./ポート接続.cjs');
+const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
 const {起動状態を読む,終了確認を作成}=require('./終了確認.cjs');
+const {アプリ名,Macメニューを設定}=require('./MacOS-Menu.cjs');
+if(process.platform==='darwin')app.setName(アプリ名);
+// 単体ファイル起動では既定の Electron プロファイルが Avatar と重なり、
+// 相互に別インスタンスと誤認する。排他ロック・キャッシュを Diag 専用にする。
+app.setPath('userData',path.join(app.getPath('appData'),'aidiy_diag'));
 let window, failed=false,終了確認;
 function fail(code) {
   if(failed)return;failed=true;
@@ -21,6 +28,8 @@ function validUrl(value) {
 async function start(value) {
   let url;try{url=validUrl(value);}catch{fail('URL');return;}
   await app.whenReady();
+  const initialMini=await checkPort(8095)===true;
+  if(failed||!process.connected)return;
   // 非永続 session。preload は固定ウィンドウ操作だけ公開し、Node・任意IPCは公開しない。
   const isolated=session.fromPartition('aidiy-diag-'+process.pid,{cache:false});
   isolated.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -28,13 +37,20 @@ async function start(value) {
   isolated.webRequest.onBeforeRequest((details,callback)=>{
     try {const target=new URL(details.url);callback({cancel:target.origin!==url.origin});} catch {callback({cancel:true});}
   });
-  window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+  window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),additionalArguments:initialMini?['--aidiy-diag-initial-mini']:[],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
+  attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
-  const mini=ミニ表示を作成(window);
+  Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
+  const mini=ミニ表示を作成(window,{screen});
   window.webContents.on('did-start-loading',()=>mini.set(false));
+  let selectingFolder=false;
   ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
+    if(action==='selectProject'){
+      if(selectingFolder)return null;selectingFolder=true;
+      return dialog.showOpenDialog(window,{title:'プロジェクトフォルダを選択',properties:['openDirectory']}).then(result=>result.canceled?null:result.filePaths[0]||null).finally(()=>{selectingFolder=false;});
+    }
     if(action==='startMini')return mini.set(value);
     if(action==='isMaximized')return window.isMaximized();
     if(action==='minimize')window.minimize();
@@ -50,6 +66,7 @@ async function start(value) {
   window.webContents.once('render-process-gone',()=>fail('RENDERER'));
   try{await window.loadURL(url.href);}catch{fail('LOAD');return;}
   if(failed || window.isDestroyed())return;
+  if(initialMini)mini.set(true,{topLeft:true});
   // Code / Live / Term / IDE と同じ共通演出。内容は拡大完了後にフェード表示する。
   await window.webContents.executeJavaScript("document.documentElement.classList.add('desktop-opening','desktop-window')");
   if(!await 拡大表示(BrowserWindow,window,{background:'#080b10'}) || failed)return;

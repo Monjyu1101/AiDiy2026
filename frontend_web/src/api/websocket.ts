@@ -161,6 +161,13 @@ export class AIWebSocket implements IWebSocketClient {
             return;
           }
 
+          // 4000: サーバーが同じセッション・チャンネルの新しい接続へ置き換えた。
+          // 再接続すると新しい接続を閉じ返して置き換え合いになるため、再接続しない。
+          if (event.code === 4000) {
+            this.isIntentionallyClosed = true;
+            return;
+          }
+
           // 意図的な切断でない場合は再接続を試みる
           if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;

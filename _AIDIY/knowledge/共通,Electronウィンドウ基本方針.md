@@ -1,0 +1,89 @@
+# Electronウィンドウ基本方針
+
+> 文書: `共通,Electronウィンドウ基本方針.md` | 実装: `frontend_ide/デスクトップ/長押し窓移動.cjs`, `frontend_ide/デスクトップ/code-drag.cjs`, `frontend_ide/host/scripts/window-opening.cjs`, `frontend_ide/desktop.cjs`, `frontend_ide/デスクトップ/panel-windows.cjs`, `frontend_avatar/electron/main.ts`, `backend_diag/起動/electron-main.cjs`, `frontend_channels/panel/desktop.cjs`
+
+## このメモを使う場面
+
+- AiDiy の Electron アプリ・関連パネルを追加、変更する。
+- 長押しによる窓移動や、表示開始時のズームに適用漏れがないか確認する。
+- Windows の白い縁・ちらつき・DPIによるサイズ変化を防ぐ。
+
+## 共通の基本動作
+
+AiDiy が所有する Electron の操作画面は、**同じ位置で左ボタンを0.5秒長押しした後のドラッグ移動**と、**表示開始時のズーム**を基本とする。新規のアプリ・別窓にも最初から組み込む。光沢・影が走る追加の登場演出は入れない。
+
+対象は aidiy_diag、Avatar、Term、Code、Live、IDE、Discord と、その機能別ウィンドウ。IDE の Explorer、Viewer、ソース比較、軌跡バー、Browser 本文、Avatar の設定・タスク・チームも含む。Webブラウザ版・VS Code拡張の埋め込み画面にはOS窓移動を導入しない。演出用の短命な透明キャンバスは操作画面ではないため、長押しを取り付けない。
+
+## 0.5秒長押しドラッグ
+
+- `frontend_ide/デスクトップ/長押し窓移動.cjs` と `code-drag.cjs` を共用する。500msの静止判定をアプリごとに複製しない。
+- 本文・入力欄・ボタン・リンクで同じ判定を使う。短押しは解放時に元のクリックを渡す。判定前に位置が動いたら通常の文字選択・ドラッグへ戻す。コピー操作を停止操作へ置き換えない。
+- 成立後は移動カーソルと静止した四方向マーカーを表示し、解放をクリックとして渡さない。解放・Esc・フォーカス喪失・遷移・破棄で解除する。最大化・全画面では窓移動を開始しない。IDEのVR時は既存の中心点移動へ分岐する。
+- 他アプリは、mainが生成して所有する窓に `attachNativeWindowMove(window, screen, kind)` を一度だけ取り付ける。現在の外部アプリ種別は `diag` / `avatar` / `discord`。新種別を足す場合は両共通ファイルの許可リストを揃える。
+- rendererから任意の窓ID・座標を受け取るIPCを追加しない。Electronのカーソルと窓位置を同じDIP座標で扱い、既存の端数DPI補正・サイズ維持・購読解除を使う。
+
+## 透明パネルで領域を先に確保するズーム
+
+**最終位置・最終サイズの透明パネルを先に確保し、その内側だけをCSSでズームする。** 実ウィンドウの外枠をアニメーションの各フレームで拡大しない。
+
+1. 実画面は `show: false` で生成し、内容の読込・最小サイズ・最終配置を先に整える。
+2. `frontend_ide/host/scripts/window-opening.cjs` の `拡大表示` を使う。実画面の `getContentBounds()` と同じ領域へ、透明なキャンバス窓を作る。`transparent: true`、背景 `#00000000`、枠・影なし、タスクバー非表示を維持する。キャンバスの外枠は確定した領域のまま動かさない。
+3. 非表示の実画面を `capturePage`（`stayHidden` / `stayAwake`）で取り込む。登場待ちで隠している不透明度だけを一時解除し、取得後に必ず戻す。HTML / body と画像の外側は透明とし、実画面の画像だけを中央から55%→100%へ750msで拡大する。白や背景色だけの代用面は出さない。倍率と時間の同期元は同ファイルの `開始倍率` / `演出時間`。実画面の位置・サイズを連続変更しない。
+4. 実画面を透明度0で表示し、描画を待って透明度1へ戻す。実画面が見えてからキャンバスを破棄する。Windowsの白い縁や未描画フレームを露出させない。
+5. キャンバスは `showInactive()` を使う。Windowsで透明部分が白くなる組合せを避けるため、本番の演出用キャンバスへ `focusable: false` や `setIgnoreMouseEvents` を追加しない。
+
+非表示窓の初回取得はWindowsの描画待ちで失敗する場合があるため、再描画して最大3回取得する。拡大の終了は描画側のanimation.finishedで待つ。
+
+実画面を取得できない場合は、色だけの代用面を出さずに通常表示へ進む。試験用HTMLにも `html` / `body` の透明背景・余白0・全高を指定し、ブラウザ既定の白地を混ぜない。
+
+表示中の窓を手前へ戻す操作、再読込、aidiy_diagの通常・ミニ切替ではズームを重ねない。非表示から機能パネルを開く場合は表示開始として扱う。表示要求の連打はまとめ、ズーム待ちの非表示・破棄を優先する。共通 `拡大表示` の `canShow` は表示直前にも確認し、取り消された窓を遅れて再表示しない。
+
+現時点では「動きを減らす」への専用対応は行わず、OSの設定によって規定のズーム・ページ繰り・更新表示などを省略しない。アプリ側のCSSメディアクエリーや表示入口の分岐を追加しない。第三者ライブラリ内部の実装とは区別し、共通処理から各アプリ・関連パネルまで順に確認する。
+
+## 適用箇所
+
+| 対象 | 長押しの取り付け | 表示開始 |
+|------|------------------|----------|
+| aidiy_diag 通常・ミニ | `backend_diag/起動/electron-main.cjs` | 内容読込と初期ミニ寸法の確定後に共通 `拡大表示` |
+| Avatar 全17種類 | `createBaseWindow`、`openSettingsWindow`、`openTeamWindow` | `electron/main.ts` の `ウィンドウ表示` に集約。読込待ち、連打抑制、非表示要求を共用 |
+| Term / Code / Live / IDE / 独立Viewer / Browser | `frontend_ide/desktop.cjs` の `attachWindowMove`。BrowserのWebContentsView本文にも取り付ける | `createWindow` で内容・配置確定後に共通 `拡大表示` |
+| Explorer / 比較・Viewer / 軌跡の別窓 | `frontend_ide/デスクトップ/panel-windows.cjs` の `created` | `show` から共通 `拡大表示`。元DOM・状態・表示の保持を崩さない |
+| Discord | `frontend_channels/panel/desktop.cjs` | 内容・配置確定後に共通 `拡大表示`。Botの実接続は演出と独立 |
+
+## 再確認
+
+リポジトリルートで実行する。画面検証は隔離プロファイル・合成データを使い、ユーザーのアプリやサーバーを停止しない。
+
+- `node --test frontend_ide/checks/native-window-move.test.mjs frontend_ide/checks/code-drag.test.mjs frontend_ide/checks/panel-windows.test.mjs`：500ms、通常入力、解除、DPI、所有元・表示境界。
+- `node --test frontend_avatar/checks/window-opening.test.cjs frontend_channels/checks/desktop.test.ts backend_diag/checks/desktop.check.mjs`：全17種類の表示経路、連打・取消、Discordへの取り付け、aidiy_diagの初期表示・終了処理。
+- Avatarのmain変更後は `frontend_avatar` の `npm run build:electron` で `dist-electron` を同期する。`node frontend_avatar/checks/window-move-desktop.mjs` は全17種類の実生成関数と共通ズーム・長押しを検査する。本文だけを無害な合成画面へ置き換える。
+- `node backend_diag/checks/initial-mini-desktop.mjs`：実Vueの通常・ミニ表示、長押し、位置・サイズ・最前面・復元。
+- `node frontend_channels/checks/window-behavior-desktop.mjs`：Discordの本番Vue・preload・ズーム・本文と入力欄の長押し・短押し。Bot workerだけを合成し、接続・保存・外部送信をしない。
+- `node frontend_ide/scripts/check-module-move.mjs`：Code / Live / Termの単独・IDE連携、独立Viewer。`node frontend_ide/scripts/check-panel-desktop.mjs`：Explorer、Viewer、比較、iframe、軌跡。Monacoを含む既定の依存物を先にセットアップする。導入済みElectronの指定は各スクリプトの実装を確認する。
+- ズームの画像確認では、キャンバスの透明領域と内側の拡大、実画面のサイズ維持、終了後のキャンバス回収を区別する。光沢の掃引を追加しない。
+
+実Electronの入力とOSの窓位置・寸法を使う検証でも、無操作のためカーソル位置・フォーカス判定だけを模擬する場合がある。Windowsでの結果をMac / Linuxの実機確認として扱わない。異なるDPIの画面間移動やMac / Linuxの描画は各実機でも確認する。
+
+## アプリごとの保存先と排他
+
+単体ファイルをElectronへ渡す起動では、既定のアプリ名がElectronとなり、別アプリのuserDataと排他ロックが重なる場合がある。aidiy_diagは ready・requestSingleInstanceLock より前に、appData配下の `aidiy_diag` を専用userDataへ指定する。Avatarの既存保存先は変更しない。IDE共通とDiscordの既存アプリ別保存先も維持する。全アプリのMacメニューだけを確認して、Windowsの同時起動確認を省略しない。保存先APIは [Electron公式app API](https://www.electronjs.org/docs/latest/api/app) を参照する。
+
+再検証は `node --test backend_diag/checks/desktop.check.mjs`（3OS分岐と排他前の保存先指定、既存終了確認等）と、aidiy_diagとAvatarを同時に表示する実画面試験を分ける。
+
+## 大きな修正後の総合テスト
+
+[システム起動編](./セルフテスト,aidiy_diag,システム起動編.md) → [アプリ起動編](./セルフテスト,aidiy_diag,アプリ起動編.md) → [IDE操作編](./セルフテスト,aidiy_ide,操作編.md)の順に行う。IDE編に起動部分は再掲載しない。実画面と実モデルの結果を記録し、良好な結果は✅ OK、未到達は未実施とする。
+
+主目的は総合テストと実施記録であり、記録した操作と画面は副産物として操作手順書の素材に再利用する。各冊のテスト通過後、実施記録を同名のPDFにする。
+
+aidiy_diagの環境診断機能は別冊の[環境確認編](./セルフテスト,aidiy_diag,環境確認編.md)で試験する。起動が成功しても、導入確認・モデル取得・外部連携・モデル試行の合格には置き換えない。
+
+## 起動時のコマンド画面を出さない
+
+Windowsで画面を持たない子プロセスは、Pythonでは `CREATE_NO_WINDOW`、Nodeでは `windowsHide: true` を指定する。環境確認・プロセス一覧・taskkillなどの短命な処理にも適用する。Electron本体はGUI形式の実行ファイルなので通常表示を許可し、窓そのものを隠す指定と混同しない。
+
+AvatarのGUI起動は `electron/dev-start.cjs` がVite・TypeScript監視・Electron監視を直接管理する。npm/concurrentlyの入れ子のシェルを避ける。開発用の `npm run dev` も同じ入口を使う。
+
+回帰試験は `node scripts/checks/Electron表示統合確認.cjs`。Pythonの実子プロセス、GUIバイナリ、各Electron画面と関連パネルを順に確認し、実施ごとのフォルダへログと結果を保存する。`AIDIY_ELECTRON_AUDIT_DIR` で保存先を指定できる。
+
+試験用のクリック透過や1%不透明度を、共通ズームの `isAiDiyOpeningCanvas` が付いた窓へ適用しない。Windowsでは白い面になる条件がある。`capturePage`の透明な画像だけを根拠にせず、`Electron透明表示目視.cjs` とComputer UseでOS上の表示も確認する。目視用スクリプトへは、起動中IDEのURLを `AIDIY_PREVIEW_URL` で渡す。読み込み表示が消え、出航準備中を抜け、Canvasに星が描画されてから撮影する。撮影対象を前面に出し、別窓の重なりも確認する。ズーム途中を静止する試験なので、750msの時間測定には使わない。

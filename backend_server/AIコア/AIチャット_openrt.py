@@ -9,6 +9,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+from AIコア.AI応答 import 応答正規化, エラー応答
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -156,7 +157,7 @@ class ChatAI:
         try:
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
-                return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
+                return "! ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
 
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
@@ -180,7 +181,7 @@ class ChatAI:
                     self.last_tool_turns = 結果["turns"]
                     self.last_tool_stopped = 結果["stopped"]
                     self._履歴追加(role="assistant", text=結果["content"] or "!")
-                    return 結果["content"] or "!"
+                    return 応答正規化(結果["content"])
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 
             # ファイル添付処理
@@ -262,7 +263,9 @@ class ChatAI:
                 タイムアウトタスク.cancel()
 
                 # 応答がない場合のデフォルト値
-                final_result = 応答テキスト.strip() if 応答テキスト.strip() else "!"
+                if タイムアウトフラグ.is_set():
+                    応答テキスト = エラー応答(f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。")
+                final_result = 応答正規化(応答テキスト)
 
                 # 履歴追加（自己ループ中は呼び出し元がまとめて記録する）
                 if not 外部メッセージ:
@@ -285,11 +288,11 @@ class ChatAI:
 
             except asyncio.CancelledError:
                 logger.warning("ChatAI実行がキャンセルされました")
-                応答テキスト = "処理がキャンセルされました。"
+                応答テキスト = "! 処理がキャンセルされました。"
                 return 応答テキスト
             except Exception as e:
                 logger.error(f"ChatAI実行エラー: {e}")
-                エラーメッセージ = f"実行エラー: {str(e)}"
+                エラーメッセージ = f"! 実行エラー: {str(e)}"
 
                 if テキスト受信処理Ｑ:
                     data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
@@ -303,7 +306,7 @@ class ChatAI:
             # ツールエラーログ（必須）
             セッションID_str = self.セッションID[:10] + '...' if self.セッションID else '不明'
             logger.error(f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] セッション={セッションID_str}")
-            エラーメッセージ = f"実行エラー: {str(e)}"
+            エラーメッセージ = f"! 実行エラー: {str(e)}"
 
             if テキスト受信処理Ｑ:
                 data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
@@ -537,7 +540,7 @@ class ChatAI:
 
         except Exception as e:
             logger.error(f"同期実行エラー: {e}")
-            return ""
+            return エラー応答(e)
 
     def _メッセージ履歴構築(self, システムプロンプト: str = None) -> list:
         """

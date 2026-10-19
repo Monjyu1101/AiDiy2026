@@ -15,7 +15,6 @@ import { validConnectionState } from '../src/共通表示/接続状態.js';
 import { createDraftTargetRegistry } from '../src/下書き連携/連携先登録.js';
 import { createTextWidthCache } from '../src/開発スペース/文字幅キャッシュ.js';
 import { installWindowMove } from '../src/共通表示/長押し窓移動.js';
-import { installOpeningShine } from '../src/共通表示/登場光沢.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let n=0;n<12;n++)await Promise.resolve();};
@@ -30,7 +29,7 @@ function component(name,{props={},windowAPI,hash='',fetcher=async()=>({ok:true,j
   vm.runInNewContext(code,{
     module,document,window,fetch:fetcher,AbortSignal,AbortController,Date,location:{hash},
     setInterval:(callback,ms)=>{timers.set(++id,{callback,ms});return id;},clearInterval:key=>timers.delete(key),
-    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.endsWith('/接続状態.js')?{validConnectionState}:id==='./下書き連携/連携先登録.js'?{createDraftTargetRegistry}:id==='./共通表示/登場光沢.js'?{installOpeningShine:()=>installOpeningShine(window)}:id==='./共通表示/長押し窓移動.js'?{installWindowMove:options=>{moveInstalls.push(options);return installWindowMove({...options,win:window});}}:{},
+    require:id=>id==='vue'?{...vue,provide(){},onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.endsWith('/接続状態.js')?{validConnectionState}:id==='./下書き連携/連携先登録.js'?{createDraftTargetRegistry}:id==='./共通表示/長押し窓移動.js'?{installWindowMove:options=>{moveInstalls.push(options);return installWindowMove({...options,win:window});}}:{},
   });
   const reactive=vue.reactive(props),scope=vue.effectScope();
   const state=scope.run(()=>module.exports.setup(reactive,{expose(){}}));

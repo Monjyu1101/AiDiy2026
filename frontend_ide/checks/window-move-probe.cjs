@@ -17,10 +17,11 @@ async function holdMove(window,contents,selector,label,ending='release'){
   await until(()=>contents.executeJavaScript(`!!document.querySelector(${JSON.stringify(selector)})`),label+'対象');
   const cssPoint=await point(contents,selector),zoom=contents.getZoomFactor(),p={x:Math.round(cssPoint.x*zoom),y:Math.round(cssPoint.y*zoom)},before=window.getBounds(),url=contents.getURL();
   await contents.executeJavaScript(`window.moveInputs=[];window.moveInput=e=>moveInputs.push(e.type);for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])document.addEventListener(type,moveInput,true)`);
-  contents.sendInputEvent({type:'mouseDown',...p,button:'left',clickCount:1});
+  const pressedAt=performance.now();contents.sendInputEvent({type:'mouseDown',...p,button:'left',clickCount:1});
   await sleep(400);assert.deepEqual(await contents.executeJavaScript('moveInputs'),[],label+'押下で選択しない');
   assert.deepEqual(window.getBounds(),before,label+'0.5秒未満は移動しない');
   await until(()=>contents.executeJavaScript(`!!document.querySelector('[data-aidiy-window-move]:popover-open')`),label+'移動表示');
+  const holdDetectedAfterMs=performance.now()-pressedAt;
   assert.equal(await contents.executeJavaScript(`(()=>{const node=document.elementFromPoint(${cssPoint.x},${cssPoint.y});return node.hasAttribute('data-aidiy-window-move')&&getComputedStyle(node).cursor==='move';})()`),true,label+'押している場所を移動カーソルで覆う');
   const marker=await contents.executeJavaScript(`(()=>{const r=document.querySelector('[data-aidiy-move-marker]').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}})()`);
   assert.ok(Math.abs(marker.width-28)<.01&&Math.abs(marker.height-28)<.01);assert.ok(marker.x>=0&&marker.y>=0);
@@ -35,7 +36,7 @@ async function holdMove(window,contents,selector,label,ending='release'){
   assert.deepEqual(await contents.executeJavaScript('moveInputs'),[],label+'移動後の選択・リンクを抑止');assert.equal(contents.getURL(),url);
   const after=window.getBounds();assert.ok(Math.abs(before.width-after.width)<=1&&Math.abs(before.height-after.height)<=1,label+'サイズ維持');
   await contents.executeJavaScript(`for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])document.removeEventListener(type,moveInput,true)`);
-  return{label,before,after,noSelectionOnRelease:true,markerShot,ending};
+  return{label,before,after,noSelectionOnRelease:true,noMoveBeforeMs:400,holdDetectedAfterMs,markerShot,ending};
  }finally{window.isFocused=focus;screen.getCursorScreenPoint=cursorRead;}
 }
 async function shortClick(contents,selector){const p=await point(contents,selector);contents.sendInputEvent({type:'mouseDown',...p,button:'left',clickCount:1});await sleep(80);contents.sendInputEvent({type:'mouseUp',...p,button:'left',clickCount:1});await sleep(80);}

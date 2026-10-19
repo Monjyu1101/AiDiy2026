@@ -24,8 +24,8 @@ test('連打・途中反転・古い領域確保応答は最後の状態だけ�
  f.hold(false);await f.motion.set(true);await f.advance(32);const late=[...f.tasks.values()][0].fn;void f.motion.set(false);await f.advance(100);await f.motion.set(true);late();assert.equal(f.motion.state.visible,false);await f.advance(32);await f.advance(294);assert.equal(f.motion.state.visible,true);
  const count=f.reserved.length;await f.motion.set(true);assert.equal(f.reserved.length,count);assert.equal(f.tasks.size,0);
 });
-test('画面下端・reduced motion・reload再接続・X/破棄はタイマーと遅延応答を残さない',async()=>{
- const f=fixture();f.available(42);f.reduced(true);await f.motion.set(true);assert.deepEqual(f.motion.state,{height:42,visible:true,phase:'open'});assert.equal(f.tasks.size,0);
+test('画面下端・旧省略指定でも展開し、reload再接続・X/破棄は遅延応答を残さない',async()=>{
+ const f=fixture();f.available(42);f.reduced(true);await f.motion.set(true);assert.equal(f.motion.state.phase,'preparing');await f.advance(32);assert.equal(f.motion.state.phase,'opening');await f.advance(294);assert.deepEqual(f.motion.state,{height:42,visible:true,phase:'open'});assert.equal(f.tasks.size,0);
  f.available(20);f.motion.refresh();assert.equal(f.motion.state.height,20);
  f.reduced(false);await f.motion.set(true,{restart:true});assert.equal(f.motion.state.height,0);assert.equal(f.motion.state.visible,false);
  f.motion.dispose();await f.advance(2000);assert.equal(f.tasks.size,0);assert.equal(f.motion.state.visible,false);await f.motion.set(true);assert.equal(f.tasks.size,0);

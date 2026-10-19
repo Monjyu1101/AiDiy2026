@@ -31,6 +31,7 @@ import errno
 import os
 import re
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -80,11 +81,15 @@ PORT_AVATAR = 8092
 FRONTEND_COMMAND = "npm"
 
 
+def _hidden_process_options() -> dict:
+    return {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+
+
 def get_npm_command() -> str | None:
     candidates = [f"{FRONTEND_COMMAND}.cmd", FRONTEND_COMMAND] if sys.platform == "win32" else [FRONTEND_COMMAND]
     for candidate in candidates:
         try:
-            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True)
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True, **_hidden_process_options())
             return candidate
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             continue
@@ -122,7 +127,7 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
     if sys.platform == "win32":
         process = subprocess.Popen(
             command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, env=env,
+            bufsize=0, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW, env=env,
         )
     else:
         process = subprocess.Popen(
@@ -134,10 +139,11 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
 
 
 def start(npm_command: str | None = None) -> subprocess.Popen[bytes]:
-    npm_command = npm_command or get_npm_command()
-    if npm_command is None:
-        raise RuntimeError("npm コマンドが見つかりません")
-    return launch_process("フロントエンド(Avatar)", [npm_command, "run", "dev"], FRONTEND_AVATAR_DIR)
+    # npm_command引数は全体起動との互換用。GUI経路ではnpm配下の追加コンソールを避ける。
+    node = shutil.which('node')
+    if node is None:
+        raise RuntimeError("Node.js が見つかりません")
+    return launch_process("フロントエンド(Avatar)", [node, str(FRONTEND_AVATAR_DIR / 'electron/dev-start.cjs')], FRONTEND_AVATAR_DIR)
 
 
 def kill_electron_processes() -> None:
@@ -159,7 +165,7 @@ def kill_electron_processes() -> None:
                     "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); "
                     "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId),$($_.ExecutablePath)\" }",
                 ],
-                capture_output=True, encoding="utf-8", errors="replace", timeout=10,
+                capture_output=True, encoding="utf-8", errors="replace", timeout=10, **_hidden_process_options(),
             )
             killed_pids = []
             for line in result.stdout.splitlines():
@@ -171,7 +177,7 @@ def kill_electron_processes() -> None:
                     pid = parts[0].strip()
                     exe_path = parts[1].lower()
                     if electron_path_str in exe_path and pid.isdigit():
-                        subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, timeout=5)
+                        subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, timeout=5, **_hidden_process_options())
                         killed_pids.append(pid)
             if killed_pids:
                 print_success(f"[Electron] 残留プロセスを停止しました: PID={','.join(killed_pids)}")
@@ -193,7 +199,7 @@ def kill_electron_processes() -> None:
 # ポート整理
 # ============================================================
 def _listening_pids_windows(port: int) -> list[str]:
-    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, encoding="oem", errors="replace", timeout=5)
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, encoding="oem", errors="replace", timeout=5, **_hidden_process_options())
     if result.returncode != 0:
         return []
     pids = set()
@@ -242,7 +248,7 @@ def kill_process_on_port(port: int) -> bool:
     try:
         if sys.platform == "win32":
             finder = _listening_pids_windows
-            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, encoding="oem", errors="replace", timeout=8)
+            killer = lambda pid: subprocess.run(["taskkill", "/F", "/T", "/PID", pid], capture_output=True, encoding="oem", errors="replace", timeout=8, **_hidden_process_options())
         else:
             finder = _listening_pids_linux
             killer = lambda pid: subprocess.run(["kill", "-9", pid], capture_output=True, text=True, timeout=5)
@@ -304,7 +310,7 @@ def _stop(process: subprocess.Popen[bytes], name: str) -> None:
     try:
         print_info(f"[{name}] 停止しています")
         if sys.platform == "win32":
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, timeout=5)
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, timeout=5, **_hidden_process_options())
         else:
             try:
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)

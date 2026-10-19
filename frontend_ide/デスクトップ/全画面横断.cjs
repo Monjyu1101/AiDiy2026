@@ -26,11 +26,21 @@ function setBounds(window,bounds) {
  // 移動先が確定した同じ窓へ保存寸法を再適用する。
  let actual=window.getBounds();
  if(Math.abs(bounds.width-actual.width)>4||Math.abs(bounds.height-actual.height)>4){window.setBounds(bounds);actual=window.getBounds();}
- // Windowsのフレームレス窓はDPI変換で指定値より数DIP大きくなる場合がある。
- // 実寸との差を1回補正し、ALL往復のたびに通常窓が広がることを防ぐ。
- const corrected={};let changed=false;
- for(const key of ['x','y','width','height']){const delta=bounds[key]-actual[key];corrected[key]=bounds[key]+delta;changed ||= delta!==0;}
- if(changed&&corrected.width>0&&corrected.height>0)window.setBounds(corrected);
+ // 125%などの端数DPIでは、指定値を1 DIP変えても同じ実寸になることがある。
+ // 元の目標値ではなく直前の指定値へ残差を足し、実寸が一致するまで補正する。
+ // 整数DIPで表せない寸法もあるため、回数と同じ指定値の再訪を制限し、
+ // 一致しない場合は最も近かった指定値へ戻して振動を残さない。
+ const keys=['x','y','width','height'],error=rect=>keys.reduce((sum,key)=>sum+Math.abs(bounds[key]-rect[key]),0);
+ let request={...bounds},best={request:{...request},error:error(actual)};
+ const seen=new Set([JSON.stringify(request)]);
+ for(let attempt=0;attempt<4&&error(actual)!==0;attempt++){
+  const corrected=Object.fromEntries(keys.map(key=>[key,request[key]+bounds[key]-actual[key]]));
+  const signature=JSON.stringify(corrected);
+  if(corrected.width<=0||corrected.height<=0||seen.has(signature))break;
+  seen.add(signature);window.setBounds(corrected);request=corrected;actual=window.getBounds();
+  const distance=error(actual);if(distance<best.error)best={request:{...request},error:distance};
+ }
+ if(error(actual)>best.error)window.setBounds(best.request);
 }
 
 function createAllDisplays({screen,trustedEvent,syncChildren=()=>{},platform=process.platform,panels}) {

@@ -34,6 +34,7 @@ function pipeFiltered(input, output) {
 const args = process.argv.slice(2)
 
 const child = spawn(process.execPath, [electronmonCli, ...args], {
+  windowsHide: true,
   stdio: ['inherit', 'pipe', 'pipe'],
   env: process.env,
 })

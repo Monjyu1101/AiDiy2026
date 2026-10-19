@@ -1,0 +1,352 @@
+{
+  "testPassed": true,
+  "scope": "ALL inline viewer",
+  "displayCount": 1,
+  "autoPinned": [
+    "explorer",
+    "routes"
+  ],
+  "barCloseHiddenInAll": true,
+  "barsClosedOnExit": true,
+  "barsReopened": true,
+  "repeatedExit": true,
+  "viewerClosePreserved": true,
+  "inlineComparison": true,
+  "reuseSingleViewer": true,
+  "manualPin": true,
+  "viewerSpacingChecks": [
+    {
+      "selector": ".viewer-popup",
+      "vr": false,
+      "viewport": {
+        "width": 1495,
+        "height": 784
+      },
+      "panel": {
+        "left": 985.7875366210938,
+        "top": 94,
+        "right": 1479.2000427246094,
+        "bottom": 708,
+        "width": 493.4125061035156,
+        "height": 614
+      },
+      "topGap": 27.199996948242188,
+      "bottomGap": 76,
+      "controls": [
+        {
+          "left": 1245.0125732421875,
+          "top": 39,
+          "right": 1445.600082397461,
+          "bottom": 64,
+          "width": 200.58750915527344,
+          "height": 25
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": false,
+      "viewport": {
+        "width": 900,
+        "height": 552
+      },
+      "panel": {
+        "left": 587,
+        "top": 94,
+        "right": 884,
+        "bottom": 476,
+        "width": 297,
+        "height": 382
+      },
+      "topGap": 27.199996948242188,
+      "bottomGap": 76,
+      "controls": [
+        {
+          "left": 649.8125,
+          "top": 39,
+          "right": 850.4000091552734,
+          "bottom": 64,
+          "width": 200.58750915527344,
+          "height": 25
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": false,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "panel": {
+        "left": 841.6000366210938,
+        "top": 94,
+        "right": 1264.0000305175781,
+        "bottom": 644,
+        "width": 422.3999938964844,
+        "height": 550
+      },
+      "topGap": 27.199996948242188,
+      "bottomGap": 76,
+      "controls": [
+        {
+          "left": 1029.8125,
+          "top": 39,
+          "right": 1230.4000091552734,
+          "bottom": 64,
+          "width": 200.58750915527344,
+          "height": 25
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".history-embedded",
+      "vr": false,
+      "viewport": {
+        "width": 1496,
+        "height": 787
+      },
+      "panel": {
+        "left": 16,
+        "top": 94,
+        "right": 1480,
+        "bottom": 711.2000122070312,
+        "width": 1464,
+        "height": 617.2000122070312
+      },
+      "topGap": 27.199996948242188,
+      "bottomGap": 75.79998779296875,
+      "controls": [
+        {
+          "left": 1245.8125,
+          "top": 39,
+          "right": 1446.4000091552734,
+          "bottom": 64,
+          "width": 200.58750915527344,
+          "height": 25
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".history-embedded",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".history-embedded",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".history-embedded",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": true,
+      "viewport": {
+        "width": 1540,
+        "height": 867
+      },
+      "panel": {
+        "left": 884,
+        "top": 192,
+        "right": 1524,
+        "bottom": 819.2000122070312,
+        "width": 640,
+        "height": 627.2000122070312
+      },
+      "topGap": 192,
+      "bottomGap": 47.79998779296875,
+      "controls": [
+        {
+          "left": 1450.0125732421875,
+          "top": 1.9875000715255737,
+          "right": 1538.0125732421875,
+          "bottom": 144.7875031232834,
+          "width": 88,
+          "height": 142.8000030517578
+        }
+      ],
+      "overlaps": 0
+    },
+    {
+      "selector": ".viewer-popup",
+      "vr": false,
+      "viewport": {
+        "width": 1496,
+        "height": 787
+      },
+      "panel": {
+        "left": 986.3250122070312,
+        "top": 94,
+        "right": 1480.0000305175781,
+        "bottom": 711.2000122070312,
+        "width": 493.6750183105469,
+        "height": 617.2000122070312
+      },
+      "topGap": 27.199996948242188,
+      "bottomGap": 75.79998779296875,
+      "controls": [
+        {
+          "left": 1245.8125,
+          "top": 39,
+          "right": 1446.4000091552734,
+          "bottom": 64,
+          "width": 200.58750915527344,
+          "height": 25
+        }
+      ],
+      "overlaps": 0
+    }
+  ],
+  "viewerSpacingShots": [
+    "ide-操作_201_通常横画面のビューア余白画面.png",
+    "ide-操作_202_小さな横画面のビューア余白画面.png",
+    "ide-操作_203_横画面1280x720のビューア余白画面.png",
+    "ide-操作_204_通常比較パネルの上下余白画面.png",
+    "ide-操作_205_VR復帰後のビューア余白画面.png"
+  ],
+  "shots": [
+    "ide-操作_206_VR比較パネルの上下余白画面.png",
+    "ide-操作_207_VRビューアの上下余白画面.png",
+    "ide-操作_208_VRエクスプローラー表示画面.png",
+    "ide-操作_209_VR軌跡パネル表示画面.png",
+    "ide-操作_210_VR復帰後のパネル再表示画面.png"
+  ]
+}

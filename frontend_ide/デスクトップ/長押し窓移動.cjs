@@ -3,8 +3,9 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-const movableKinds=new Set(['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes']);
+const movableKinds=new Set(['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']);
 const {showWindowMoveFeedback}=require('./窓移動表示.cjs');
+const {createCodeDrag}=require('./code-drag.cjs');
 
 // DOMやページの権限に依存せず、Browser本文・別originのiframeも同じ入力境界で扱う。
 // 押下は一旦保留し、短押しならup時、通常の選択dragなら移動開始時に元の入力を渡す。
@@ -73,4 +74,10 @@ function installNativeWindowMove({record,contents=record.window.webContents,drag
  listen(contents,'destroyed',dispose);listen(win,'closed',dispose);
  return dispose;
 }
-module.exports={installNativeWindowMove};
+// 他アプリもmainが所有する窓だけを取り付ける。rendererへIPC・座標指定を追加しない。
+function attachNativeWindowMove(window,screen,kind){
+ const record={window,kind,revision:0};
+ const drag=createCodeDrag({trustedEvent:()=>null,screen});
+ return installNativeWindowMove({record,drag,screen});
+}
+module.exports={installNativeWindowMove,attachNativeWindowMove};

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session, Menu } from 'electron'
 import { readdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -7,10 +7,14 @@ import { pathToFileURL } from 'node:url'
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
 const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
+if (process.platform === 'darwin') app.setName('AiDiy Avatar')
 // aidiy_code / aidiy_live / aidiy_discord と共通の初回演出（透明キャンバスの中で中央から拡大してから表示する）。
 // ウィンドウを毎フレーム広げると Windows で未描画の縁が白くちらつくため、共通実装を使う。
 const { 拡大表示 } = require(path.join(__dirname, '../../frontend_ide/host/scripts/window-opening.cjs')) as {
-  拡大表示: (browserWindow: typeof BrowserWindow, window: BrowserWindow, options?: { background?: string }) => Promise<boolean>
+  拡大表示: (browserWindow: typeof BrowserWindow, window: BrowserWindow, options?: { background?: string; canShow?: () => boolean }) => Promise<boolean>
+}
+const { attachNativeWindowMove } = require(path.join(__dirname, '../../frontend_ide/デスクトップ/長押し窓移動.cjs')) as {
+  attachNativeWindowMove: (window: BrowserWindow, screen: typeof import('electron').screen, kind: 'avatar') => () => void
 }
 
 type WindowMode = 'login' | 'core'
@@ -84,6 +88,9 @@ let selectedDisplaySourceId: string | null = null
 let previousCpuTimes: { idle: number; total: number } | null = null
 // Electronのバグ回避: getMinimumSize()が初期サイズを返す場合があるため独自管理
 const windowMinSizes = new Map<number, { minWidth: number; minHeight: number }>()
+const 表示処理 = new WeakMap<BrowserWindow, Promise<boolean>>()
+const 表示希望 = new WeakMap<BrowserWindow, boolean>()
+let taskWindowsVisible = false
 
 function getWorkArea() {
   return screen.getPrimaryDisplay().workArea
@@ -145,14 +152,20 @@ function getCenteredPosition(width: number, height: number) {
 }
 
 function getPanelInitialPosition(panel: PanelKey, width: number, height: number) {
+  const area = getWorkArea()
   if (panel === 'chat') {
-    return getCenteredPosition(width, height)
+    // 中央を基本とし、右下のコア窓（右端から24）と重ならない位置までに留める
+    const centered = getCenteredPosition(width, height)
+    const coreLeft = area.x + area.width - CORE_BOUNDS.width - 24
+    return {
+      x: Math.max(area.x + 24, Math.min(centered.x, coreLeft - width - 16)),
+      y: centered.y,
+    }
   }
   if (panel === 'image') {
     return getBottomLeftPosition(width, height)
   }
 
-  const area = getWorkArea()
   const baseX = area.x + 24
   const baseY = area.y + 24
   const orderMap: Record<Exclude<PanelKey, 'image' | 'chat'>, number> = {
@@ -167,9 +180,10 @@ function getPanelInitialPosition(panel: PanelKey, width: number, height: number)
   const step = 48
   const order = orderMap[panel as Exclude<PanelKey, 'image' | 'chat'>] ?? 0
 
+  // 表示倍率が大きく作業領域が狭い場合も、後ろの番号の窓が画面外へはみ出さないよう収める
   return {
-    x: baseX + (step * order),
-    y: baseY + (step * order),
+    x: Math.max(area.x, Math.min(baseX + (step * order), area.x + area.width - width - 24)),
+    y: Math.max(area.y, Math.min(baseY + (step * order), area.y + area.height - height)),
   }
 }
 
@@ -239,7 +253,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
     height: bounds.height,
     minWidth: bounds.minWidth,
     minHeight: bounds.minHeight,
-    show,
+    show: false,
     backgroundColor: '#00000000',
     transparent: true,
     hasShadow: false,
@@ -259,6 +273,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
   })
 
   windowRoles.set(window.id, role)
+  attachNativeWindowMove(window, screen, 'avatar')
 
   // min サイズを独自管理し、ロード後に再適用（Electron Windowsバグ対策）
   windowMinSizes.set(window.id, { minWidth: bounds.minWidth, minHeight: bounds.minHeight })
@@ -280,6 +295,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
     window.loadURL(getRendererUrl(role))
   }
 
+  if (show) void ウィンドウ表示(window)
   return window
 }
 
@@ -291,16 +307,37 @@ function waitForReady(window: BrowserWindow) {
     return Promise.resolve()
   }
   return new Promise<void>((resolve) => {
-    window.once('ready-to-show', () => resolve())
-    window.webContents.once('did-finish-load', () => resolve())
+    const done = () => {
+      window.removeListener('ready-to-show', done)
+      window.removeListener('closed', done)
+      window.webContents.removeListener('did-finish-load', done)
+      resolve()
+    }
+    window.once('ready-to-show', done)
+    window.once('closed', done)
+    window.webContents.once('did-finish-load', done)
   })
 }
 
-// ログイン・コアの主ウィンドウを表示する。非表示から開く時だけ拡大演出を行う。
-async function 主ウィンドウ表示(window: BrowserWindow) {
-  if (window.isDestroyed()) return
-  if (window.isVisible()) { window.show(); window.focus(); return }
-  await 拡大表示(BrowserWindow, window, { background: '#000' })
+// 全パネル共通。読み込み・配置後に非表示の窓を拡大し、連打でも演出を重ねない。
+async function ウィンドウ表示(window: BrowserWindow, background = '#000', canShow = () => true): Promise<boolean> {
+  表示希望.set(window, true)
+  const pending = 表示処理.get(window)
+  if (pending) return pending
+  const operation = (async () => {
+    await waitForReady(window)
+    const allowed = () => 表示希望.get(window) === true && canShow()
+    if (window.isDestroyed() || !allowed()) return false
+    if (window.isVisible()) { window.show(); window.focus(); return true }
+    return 拡大表示(BrowserWindow, window, { background, canShow: allowed })
+  })()
+  表示処理.set(window, operation)
+  try { return await operation }
+  finally { if (表示処理.get(window) === operation) 表示処理.delete(window) }
+}
+function ウィンドウ非表示(window: BrowserWindow) {
+  表示希望.set(window, false)
+  window.hide()
 }
 
 function clampWindowBounds(window: BrowserWindow, nextBounds: WindowBounds): WindowBounds {
@@ -359,7 +396,7 @@ function notifyPanelStates() {
   })
 }
 
-function setPanelVisibility(panel: PanelKey, visible: boolean) {
+async function setPanelVisibility(panel: PanelKey, visible: boolean) {
   const window = panelWindows.get(panel)
   if (!window || window.isDestroyed()) {
     panelStates[panel] = false
@@ -367,16 +404,12 @@ function setPanelVisibility(panel: PanelKey, visible: boolean) {
     return
   }
 
-  if (visible) {
-    window.show()
-    window.focus()
-    window.webContents.send('window:shown')
-  } else {
-    window.hide()
-  }
-
   panelStates[panel] = visible
   notifyPanelStates()
+  if (!visible) { ウィンドウ非表示(window); return }
+  if (await ウィンドウ表示(window, '#000', () => panelStates[panel] && panelWindows.get(panel) === window)) {
+    window.webContents.send('window:shown')
+  }
 }
 
 function closePanelWindow(panel: PanelKey) {
@@ -420,6 +453,7 @@ function createTaskWindow(key: TaskKey): BrowserWindow {
   taskWindows.set(key, window)
   window.on('closed', () => {
     taskWindows.delete(key)
+    if (taskWindows.size === 0) taskWindowsVisible = false
     windowRoles.delete(window.id)
   })
 
@@ -440,13 +474,11 @@ function openTaskDialogWindow(payload: Record<string, any>) {
     height: TASK_DIALOG_BOUNDS.height,
   }, false)
 
-  dialogWindow.once('ready-to-show', () => {
+  dialogWindow.once('ready-to-show', async () => {
     if (dialogWindow.isDestroyed()) return
     dialogWindow.setMinimumSize(TASK_DIALOG_BOUNDS.minWidth, TASK_DIALOG_BOUNDS.minHeight)
-    dialogWindow.show()
-    dialogWindow.focus()
     dialogWindow.webContents.send('task-dialog:payload', payload)
-    dialogWindow.webContents.send('window:shown')
+    if (await ウィンドウ表示(dialogWindow, '#000', () => taskDialogWindow === dialogWindow)) dialogWindow.webContents.send('window:shown')
   })
 
   dialogWindow.on('closed', () => {
@@ -466,28 +498,29 @@ function anyTaskWindowVisible(): boolean {
 }
 
 async function toggleTaskWindows(): Promise<boolean> {
-  if (anyTaskWindowVisible()) {
+  if (taskWindowsVisible || anyTaskWindowVisible()) {
+    taskWindowsVisible = false
     TASK_KEYS.forEach((key) => {
       const window = taskWindows.get(key)
       if (window && !window.isDestroyed()) {
-        window.hide()
+        ウィンドウ非表示(window)
       }
     })
     return false
   }
 
+  taskWindowsVisible = true
   const windows = TASK_KEYS.map((key) => createTaskWindow(key))
-  await Promise.all(windows.map((window) => waitForReady(window)))
-  windows.forEach((window) => {
-    if (!window.isDestroyed()) {
-      window.show()
+  await Promise.all(windows.map(async (window) => {
+    if (await ウィンドウ表示(window, '#000', () => taskWindowsVisible)) {
       window.webContents.send('window:shown')
     }
-  })
-  return true
+  }))
+  return taskWindowsVisible
 }
 
 function closeAllTaskWindows() {
+  taskWindowsVisible = false
   TASK_KEYS.forEach((key) => {
     const window = taskWindows.get(key)
     if (window && !window.isDestroyed()) {
@@ -536,6 +569,7 @@ async function openTeamWindow(): Promise<boolean> {
       },
     })
     windowRoles.set(teamWindow.id, 'team')
+    attachNativeWindowMove(teamWindow, screen, 'avatar')
     windowMinSizes.set(teamWindow.id, {
       minWidth: TEAM_BOUNDS.minWidth,
       minHeight: TEAM_BOUNDS.minHeight,
@@ -561,10 +595,7 @@ async function openTeamWindow(): Promise<boolean> {
   }
 
   const targetWindow = teamWindow
-  await waitForReady(targetWindow)
-  if (!targetWindow.isDestroyed()) {
-    targetWindow.show()
-    targetWindow.focus()
+  if (await ウィンドウ表示(targetWindow, '#07111f', () => teamWindow === targetWindow)) {
     targetWindow.webContents.send('window:shown')
   }
   return true
@@ -634,7 +665,7 @@ function createLoginWindow(show = true) {
       loginWindow.restore()
     }
     loginWindow.center()
-    if (show) loginWindow.show()
+    if (show) void ウィンドウ表示(loginWindow)
     return loginWindow
   }
 
@@ -654,7 +685,7 @@ function createLoginWindow(show = true) {
 function createCoreWindow(show = true) {
   if (coreWindow && !coreWindow.isDestroyed()) {
     applyPrimaryMode(coreWindow, 'core')
-    if (show) coreWindow.show()
+    if (show) void ウィンドウ表示(coreWindow)
     return coreWindow
   }
 
@@ -679,14 +710,14 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
   ensureAllPanelWindows()
   await waitForReady(nextCoreWindow)
   if (!nextCoreWindow.isDestroyed()) {
-    await 主ウィンドウ表示(nextCoreWindow)
+    await ウィンドウ表示(nextCoreWindow)
     if (!nextCoreWindow.isDestroyed()) nextCoreWindow.webContents.send('window:shown')
   }
 
   if (loginWindow && !loginWindow.isDestroyed()) {
-    loginWindow.hide()
+    ウィンドウ非表示(loginWindow)
   } else if (sourceWindow && !sourceWindow.isDestroyed() && sourceWindow !== nextCoreWindow) {
-    sourceWindow.hide()
+    ウィンドウ非表示(sourceWindow)
   }
 
   return 'core' as const
@@ -703,7 +734,7 @@ async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
       nextLoginWindow.restore()
     }
     nextLoginWindow.center()
-    await 主ウィンドウ表示(nextLoginWindow)
+    await ウィンドウ表示(nextLoginWindow)
     if (!nextLoginWindow.isDestroyed()) nextLoginWindow.webContents.send('window:shown')
   }
 
@@ -717,9 +748,10 @@ async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
 function openSettingsWindow(sessionId: string) {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.webContents.send('settings:session-id', sessionId)
-    settingsWindow.show()
-    settingsWindow.focus()
-    settingsWindow.webContents.send('window:shown')
+    const existing = settingsWindow
+    void ウィンドウ表示(existing, '#f8fafc', () => settingsWindow === existing).then(shown => {
+      if (shown) existing.webContents.send('window:shown')
+    })
     return
   }
 
@@ -750,16 +782,16 @@ function openSettingsWindow(sessionId: string) {
   })
 
   windowRoles.set(settingsWindow.id, 'settings')
+  attachNativeWindowMove(settingsWindow, screen, 'avatar')
   windowMinSizes.set(settingsWindow.id, { minWidth: SETTINGS_BOUNDS.minWidth, minHeight: SETTINGS_BOUNDS.minHeight })
 
-  settingsWindow.once('ready-to-show', () => {
-    if (settingsWindow && !settingsWindow.isDestroyed()) {
-      settingsWindow.setMinimumSize(SETTINGS_BOUNDS.minWidth, SETTINGS_BOUNDS.minHeight)
-      settingsWindow.center()
-      settingsWindow.webContents.send('settings:session-id', sessionId)
-      settingsWindow.show()
-      settingsWindow.focus()
-      settingsWindow.webContents.send('window:shown')
+  const createdSettingsWindow = settingsWindow
+  settingsWindow.once('ready-to-show', async () => {
+    if (!createdSettingsWindow.isDestroyed()) {
+      createdSettingsWindow.setMinimumSize(SETTINGS_BOUNDS.minWidth, SETTINGS_BOUNDS.minHeight)
+      createdSettingsWindow.center()
+      createdSettingsWindow.webContents.send('settings:session-id', sessionId)
+      if (await ウィンドウ表示(createdSettingsWindow, '#f8fafc', () => settingsWindow === createdSettingsWindow)) createdSettingsWindow.webContents.send('window:shown')
     }
   })
 
@@ -786,11 +818,14 @@ app.on('second-instance', () => {
   const window = coreWindow ?? loginWindow ?? BrowserWindow.getAllWindows().find(item => item.isVisible())
   if (!window || window.isDestroyed()) return
   if (window.isMinimized()) window.restore()
-  window.show()
-  window.focus()
+  void ウィンドウ表示(window)
 })
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') {
+    const { Macメニューを設定 } = require(path.join(__dirname, '../../frontend_ide/host/scripts/MacOS-Menu.cjs'))
+    Macメニューを設定({ app, Menu, 名前: 'AiDiy Avatar', 閉じる: () => app.quit(), icon: path.join(app.getAppPath(), 'public/icons/AiDiy_avatar.png'), platform: process.platform })
+  }
   if (process.platform === 'win32') {
     app.setAppUserModelId(APP_USER_MODEL_ID)
   }
@@ -852,7 +887,7 @@ app.whenReady().then(() => {
     if (!window) return
     const role = windowRoles.get(window.id)
     if (role && TASK_KEYS.includes(role as TaskKey)) {
-      window.hide()
+      ウィンドウ非表示(window)
       return
     }
     if (role === 'taskDialog') {
@@ -927,17 +962,17 @@ app.whenReady().then(() => {
     return interactive
   })
 
-  ipcMain.handle('panel:toggle', (_event, panel: PanelKey) => {
+  ipcMain.handle('panel:toggle', async (_event, panel: PanelKey) => {
     createPanelWindow(panel)
-    setPanelVisibility(panel, !panelStates[panel])
+    await setPanelVisibility(panel, !panelStates[panel])
     return { ...panelStates }
   })
 
-  ipcMain.handle('panel:apply-states', (_event, states: Record<PanelKey, boolean>) => {
-    ;(Object.keys(states) as PanelKey[]).forEach((panel) => {
+  ipcMain.handle('panel:apply-states', async (_event, states: Record<PanelKey, boolean>) => {
+    await Promise.all((Object.keys(states) as PanelKey[]).map(async (panel) => {
       createPanelWindow(panel)
-      setPanelVisibility(panel, Boolean(states[panel]))
-    })
+      await setPanelVisibility(panel, Boolean(states[panel]))
+    }))
     return { ...panelStates }
   })
 
@@ -984,7 +1019,7 @@ app.whenReady().then(() => {
 
   // 起動時のログイン画面も、読み込み後に拡大演出で表示する。
   const startupLogin = createLoginWindow(false)
-  void waitForReady(startupLogin).then(() => 主ウィンドウ表示(startupLogin))
+  void ウィンドウ表示(startupLogin)
 
   app.on('activate', () => {
     if (!loginWindow && !coreWindow && BrowserWindow.getAllWindows().length === 0) {

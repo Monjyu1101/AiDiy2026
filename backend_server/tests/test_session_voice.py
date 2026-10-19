@@ -41,8 +41,9 @@ class Socket:
     async def send_json(self, data):
         self.messages.append(data)
 
-    async def close(self):
+    async def close(self, code=1000, reason=''):
         self.closed = True
+        self.close_code = code
         if self.on_close:
             self.on_close()
 
@@ -97,6 +98,19 @@ class SessionVoiceTest(unittest.IsolatedAsyncioTestCase):
         audio = Socket()
         await self.manager.connect(audio, セッションID=sid, socket_no='audio')
         self.assertIs(session.get_socket('audio').websocket, audio)
+
+    async def test_replaced_connection_is_closed_with_replaced_code(self):
+        # 同じセッション・チャンネルへ新しい接続が来たら、旧接続を4000で閉じる。
+        # クライアントは4000では再接続せず、互いに置き換え合う繰り返しを起こさない。
+        first = Socket()
+        sid = await self.manager.connect(first, socket_no='0')
+        second = Socket()
+        await self.manager.connect(second, セッションID=sid, socket_no='0')
+        self.assertTrue(first.closed)
+        self.assertEqual(first.close_code, self.module.REPLACED_CLOSE_CODE)
+        self.assertEqual(self.module.REPLACED_CLOSE_CODE, 4000)
+        self.assertFalse(second.closed)
+        self.assertIs(self.manager.sessions[sid].get_socket('0').websocket, second)
 
     async def test_disabled_session_never_allocates_audio_data(self):
         with patch.object(self.module, '初期化_音声データ', Mock(return_value={})) as initialize_audio:

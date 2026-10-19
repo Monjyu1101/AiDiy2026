@@ -11,7 +11,7 @@
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket, type IWebSocketClient } from '@/api/websocket'
 import apiClient from '@/api/client'
@@ -472,18 +472,25 @@ async function 出力ソケット接続() {
   出力WebSocket.value?.disconnect()
   チャットリセット()
   const nextSocket = new AIWebSocket(AI_WS_ENDPOINT, プロパティ.セッションID, チャンネル)
+  // 接続待ちのソケットも先に保持し、待機中に再度呼ばれた場合は確実に閉じる。
+  // （待機後に保持すると旧ソケットが残り、同じチャンネルへ2本つながってサーバー側で押し合いになる）
+  出力WebSocket.value = nextSocket
+  // ref は中身を Proxy で包むため、同一性は toRaw で比べる
+  const 現在のソケット = () => toRaw(出力WebSocket.value) === nextSocket
   nextSocket.onStateChange((connected) => {
+    if (!現在のソケット()) return
     出力接続済み.value = connected
     通知('chat-state', connected)
   })
   WSハンドラ登録(nextSocket)
   try {
     await nextSocket.connect()
-    出力WebSocket.value = nextSocket
   } catch {
-    出力WebSocket.value?.disconnect()
-    出力WebSocket.value = null
-    チャットリセット()
+    nextSocket.disconnect()
+    if (現在のソケット()) {
+      出力WebSocket.value = null
+      チャットリセット()
+    }
   }
 }
 

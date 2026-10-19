@@ -3,19 +3,22 @@
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE for full terms.
 
-"""Avatar / VS Code / Discord 共通の Electron 事前セットアップと ZIP キャッシュ。"""
+"""Diag / Avatar / IDE / Discord 共通の Electron 事前セットアップと ZIP キャッシュ。"""
 
 import json
 import os
 import platform
 import shutil
+import ssl
+import stat
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_cache" / "electron"
@@ -28,9 +31,13 @@ def _electron_platform_arch() -> tuple[str, str]:
         arch = "arm64"
     elif machine in ("x86", "i386", "i686"):
         arch = "ia32"
-    else:
+    elif machine in ("amd64", "x86_64", "x64"):
         arch = "x64"
-    plat = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "linux"
+    else:
+        raise ValueError(f"Electron が対応していない CPU です: {machine}")
+    if sys.platform not in ("win32", "darwin", "linux"):
+        raise ValueError(f"Electron が対応していない OS です: {sys.platform}")
+    plat = sys.platform
     return plat, arch
 
 
@@ -89,26 +96,76 @@ def _download_archive(archive: Path, version: str, label: str, info) -> None:
     with tempfile.TemporaryDirectory(prefix="download-", dir=archive.parent) as temporary:
         partial = Path(temporary) / archive.name
         started = last_report = time.monotonic()
-        with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response, partial.open("wb") as output:
-            total = int(response.headers.get("Content-Length", 0))
-            downloaded = 0
-            while block := response.read(1024 * 1024):
-                output.write(block)
-                downloaded += len(block)
-                now = time.monotonic()
-                if now - last_report >= 2:
-                    size = f"{downloaded / 1024 / 1024:.1f} MB"
-                    if total:
-                        size += f" / {total / 1024 / 1024:.1f} MB ({downloaded * 100 // total}%)"
-                    speed = downloaded / 1024 / 1024 / max(now - started, 0.001)
-                    info(f"  ダウンロード中: {size}, {speed:.1f} MB/秒")
-                    last_report = now
-        if total and downloaded != total:
-            raise OSError("Electron ZIP のダウンロードが完了していません。")
+        try:
+            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response, partial.open("wb") as output:
+                total = int(response.headers.get("Content-Length", 0))
+                downloaded = 0
+                while block := response.read(1024 * 1024):
+                    output.write(block)
+                    downloaded += len(block)
+                    now = time.monotonic()
+                    if now - last_report >= 2:
+                        size = f"{downloaded / 1024 / 1024:.1f} MB"
+                        if total:
+                            size += f" / {total / 1024 / 1024:.1f} MB ({downloaded * 100 // total}%)"
+                        speed = downloaded / 1024 / 1024 / max(now - started, 0.001)
+                        info(f"  ダウンロード中: {size}, {speed:.1f} MB/秒")
+                        last_report = now
+            if total and downloaded != total:
+                raise OSError("Electron ZIP のダウンロードが完了していません。")
+        except (ssl.SSLCertVerificationError, urllib.error.URLError) as exc:
+            reason = getattr(exc, "reason", exc)
+            if not isinstance(reason, ssl.SSLCertVerificationError):
+                raise
+            curl = shutil.which("curl")
+            if not curl:
+                raise OSError("Python の証明書を確認できません。macOS は Python の Install Certificates.command、Linux は CA 証明書を確認してください。curl の導入後も再実行できます。") from exc
+            info(f"{label}: Python の証明書確認に失敗したため、curl の証明書検証で取得します。")
+            subprocess.run([curl, "--disable", "--fail", "--location", "--show-error", "--progress-bar",
+                            "--proto", "=https", "--proto-redir", "=https",
+                            "--connect-timeout", str(DOWNLOAD_TIMEOUT), "--max-time", "600",
+                            "--speed-limit", "1024", "--speed-time", str(DOWNLOAD_TIMEOUT),
+                            "--output", str(partial), url], check=True, timeout=610,
+                           **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}))
         if not _archive_ready(partial, version):
             raise ValueError("Electron ZIP の実行ファイル・バージョンを確認できません。")
         partial.replace(archive)
     info(f"{label}: ダウンロード完了。ZIP を共有キャッシュに保存しました。")
+
+
+def _extract_archive(archive: Path, destination: Path) -> None:
+    """unzip の有無によらず、Mac のリンクと POSIX の実行権限を維持する。"""
+    root = destination.resolve()
+    links, directories = [], []
+    with zipfile.ZipFile(archive) as zipped:
+        for entry in zipped.infolist():
+            name = PurePosixPath(entry.filename)
+            if name.is_absolute() or ".." in name.parts or "\\" in entry.filename or ":" in entry.filename:
+                raise ValueError("Electron ZIP に不正な展開先が含まれています。")
+            target = root.joinpath(*name.parts)
+            if not target.resolve().is_relative_to(root):
+                raise ValueError("Electron ZIP の展開先が範囲外です。")
+            mode = entry.external_attr >> 16
+            if stat.S_ISLNK(mode):
+                links.append((target, zipped.read(entry).decode("utf-8")))
+            elif entry.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                directories.append((target, stat.S_IMODE(mode) & 0o777))
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zipped.open(entry) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                if sys.platform != "win32":
+                    target.chmod((stat.S_IMODE(mode) & 0o777) or 0o644)
+        for target, value in links:
+            link = PurePosixPath(value)
+            if link.is_absolute() or "\\" in value or ":" in value or not (target.parent / value).resolve().is_relative_to(root):
+                raise ValueError("Electron ZIP に範囲外のリンクが含まれています。")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.symlink_to(value)
+        if sys.platform != "win32":
+            for target, mode in reversed(directories):
+                target.chmod(mode or 0o755)
 
 
 def _place_dist(source: Path, frontend_dir: Path, *, move: bool = False) -> None:
@@ -168,12 +225,7 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
         with tempfile.TemporaryDirectory(prefix="extract-", dir=CACHE_DIR) as temporary:
             extracted = Path(temporary) / "dist"
             extracted.mkdir()
-            # macOS のシンボリックリンク、Linux の実行権限を保持する。
-            if sys.platform != "win32" and shutil.which("unzip"):
-                subprocess.run(["unzip", "-q", "-o", str(archive), "-d", str(extracted)], check=True)
-            else:
-                with zipfile.ZipFile(archive) as zipped:
-                    zipped.extractall(extracted)
+            _extract_archive(archive, extracted)
             if not _dist_ready(extracted, version):
                 raise ValueError("展開した Electron の実行ファイル・バージョンを確認できません。")
             _place_dist(extracted, frontend_dir, move=True)

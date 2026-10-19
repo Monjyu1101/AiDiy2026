@@ -35,8 +35,8 @@ function space(t,{offset=false}={}){
   return{engine,frames,timers,pump,
     pointer(type,x,y,pointerId=1){canvas.dispatchEvent(Object.assign(new Event(type,{cancelable:true}),{pointerId,clientX:x,clientY:y}));},
     wheel(ctrlKey,deltaY){const event=Object.assign(new Event('wheel',{cancelable:true}),{ctrlKey,deltaY});canvas.dispatchEvent(event);return event;},
-    // STAR 10枚、DISK 10枚、CORE/FLAREの後に、種類別PLANETを生成する。
-    planet:()=>draws.find(draw=>draw.image===sprites[22+engine.world.planets[0].kind]),
+    // 更新オーラ2枚、STAR 10枚、DISK 10枚、CORE/FLAREの後に、種類別PLANETを生成する。
+    planet:()=>draws.find(draw=>draw.image===sprites[24+engine.world.planets[0].kind]),
     gate:()=>arcs.find(([, , ,start,end])=>Math.abs(end-start-Math.PI*1.2)<1e-8),
     async ready(view={yaw:.6,pitch:.35,roll:0},side=0){engine.setAutoSpin(false);engine.setViewMode('2d');await engine.refresh(1);engine.setViewMode('3d');
       Object.assign(engine.cam,{tx:0,ty:0,tz:0,dist:2500,...view});Object.assign(engine.goal,engine.cam);
@@ -92,11 +92,13 @@ test('実pointer: 手動終了から1分の自動探索停止、2D中断・復�
     await h.ready({yaw:.5,pitch:1.4,roll:2.8});h.engine.setAutoSpin(true);
     h.pointer('pointerdown',650,420);h.pointer('pointermove',570,430);h.pointer('pointerup',570,430);
     for(let n=0;n<80;n++)await h.pump(100);const stopped={...h.engine.cam};
-    await h.pump(51000);assert.equal(h.engine.orbitPath,null);for(const key of Object.keys(stopped))near(h.engine.cam[key],stopped[key],1e-6);
+    await h.pump(51000);assert.equal(h.engine.orbitPath,null);
+    assert.ok(Math.hypot(...Object.values(cameraPosition(h.engine.cam)).map((v,i)=>v-Object.values(cameraPosition(stopped))[i]))>.01,'手動後の待機中も低速回転する');
+    near(Math.hypot(...Object.values(cameraPosition(h.engine.cam))),Math.hypot(...Object.values(cameraPosition(stopped))),1e-6);
     await h.pump(1001);assert.ok(h.engine.orbitPath?.length>0,'最後の操作から60秒経つと再開する');
     h.pointer('pointerdown',650,420);h.pointer('pointermove',600,470);await h.pump();
     h.engine.setViewMode('2d');const frozen={...h.engine.cam};h.pointer('pointermove',400,600);h.pointer('pointerup',400,600);
     for(let n=0;n<10;n++)await h.pump(1000);assert.deepEqual(h.engine.cam,frozen);assert.equal(h.frames.size,0);
-    h.engine.setViewMode('3d');await h.pump();assert.deepEqual(h.engine.cam,frozen);assert.equal(h.frames.size,1);
+    h.engine.setViewMode('3d');await h.pump();assert.notDeepEqual(h.engine.cam,frozen,'3D復帰後は低速回転を再開');assert.equal(h.frames.size,1);
   }finally{h.dispose();}
 });

@@ -59,6 +59,8 @@ try {
   ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
   const send = (method, params = {}) => new Promise(r => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  // OSのアクセシビリティ設定とは独立して通常アニメーションを検証する。
+  await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
   const errors = [];
   ws.addEventListener('message', e => { const m = JSON.parse(e.data); if(m.method==='Runtime.consoleAPICalled'&&m.params.type==='error')errors.push(JSON.stringify(m.params.args)); if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description||m.params.exceptionDetails.text); });
   await send('Runtime.enable');
@@ -130,13 +132,16 @@ try {
   await preset('10分');await capture('nn-since-matching-folders.png');
   // CSSの実時間で途中の高さを測り、一括表示・消去になっていないことを確認する。
   await evaluate(`document.querySelector('[data-path="recent"] .chevron').click()`);
-  await evaluate('window.orbitTestAdvance(500)');await sleep(80);
+  // Vueの二重rAFを別々の描画フレームへ進める。一括で進めるとCSS開始前に両方実行される。
+  await evaluate('window.orbitTestAdvance(16)');await sleep(32);
+  await evaluate('window.orbitTestAdvance(16)');await sleep(80);
   const collapsing=await evaluate(`document.querySelector('[data-path="recent/deep/changed.ts"]')?.getBoundingClientRect().height`);
-  assert.ok(collapsing>0&&collapsing<25,'折りたたみ途中で行の高さが連続して縮む');
+  assert.ok(collapsing>0&&collapsing<25,'折りたたみ途中で行の高さが連続して縮む: '+JSON.stringify(await evaluate(`({height:document.querySelector('[data-path="recent/deep/changed.ts"]')?.getBoundingClientRect().height,classes:document.querySelector('[data-path="recent/deep/changed.ts"]')?.className,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,animations:document.getAnimations().map(a=>({state:a.playState,time:a.currentTime,target:a.effect.target?.dataset?.path}))})`)));
   await settleTree();
   assert.equal(await evaluate(`!!document.querySelector('[data-path="recent/deep/changed.ts"]')`),false);
   await evaluate(`document.querySelector('[data-path="recent"] .chevron').click()`);
-  await evaluate('window.orbitTestAdvance(500)');await sleep(80);
+  await evaluate('window.orbitTestAdvance(16)');await sleep(32);
+  await evaluate('window.orbitTestAdvance(16)');await sleep(80);
   const expanding=await evaluate(`document.querySelector('[data-path="recent/deep/changed.ts"]')?.getBoundingClientRect().height`);
   assert.ok(expanding>0&&expanding<25,'展開途中で行の高さが連続して伸びる');
   await settleTree();
@@ -153,7 +158,7 @@ try {
     await evaluate(`document.querySelector('input[value=ai]').click()`);
     assert.equal(await treeVisible(),false);
   }
-  async function until(expression,message){const end=Date.now()+15000;while(Date.now()<end){await evaluate('window.orbitTestAdvance(250)');if(await evaluate(expression))return;await sleep(60);}throw Error(message);}
+  async function until(expression,message){const end=Date.now()+15000;while(Date.now()<end){await evaluate('window.orbitTestAdvance(250)');if(await evaluate(expression))return;await sleep(60);}await capture('failure.png');throw Error(message+' '+JSON.stringify(await evaluate(`({paths:[...document.querySelectorAll('.viewer-path')].map(x=>x.textContent),trail:aidiyIDE.trail,text:document.body.innerText.slice(-1600)})`)));}
   async function submit(query){await evaluate(`(()=>{const input=document.querySelector('.ai-search-panel textarea');input.value=${JSON.stringify(query)};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);await evaluate(`document.querySelector('.ai-search-panel form').requestSubmit()`);}
   async function waitRequest(count){for(let i=0;i<100&&requests.length<count;i++)await sleep(30);assert.equal(requests.length,count);return requests.at(-1);}
   function dataFor(args){const line=args.prompt.split('\n').find(line=>line.startsWith('形式: '));const data=JSON.parse(line.slice(4));return {...data,title:data.query==='認証機能に関わるファイル'?'認証処理の関連ファイル':data.query+'の関連ファイル',files:[{path:'main.ts',reason:'アプリの入口'},{path:'src/login.ts',reason:'認証処理'}],route:['main.ts','src/login.ts']};}
@@ -181,12 +186,12 @@ try {
   await evaluate(`document.querySelector('[aria-label="エクスプローラーを閉じる"]').click()`);
   assert.equal(await evaluate(`!!document.querySelector('.explorer-routes.explorer-collapsed')`),true);
   await evaluate(`document.querySelector('[data-route-path="src/login.ts"]').click()`);
-  await until(`document.querySelector('.viewer-path')?.textContent==='src/login.ts'`,'AiDiy検索軌跡の一覧からワープ');
+  await until(`document.querySelector('.viewer-session')?.dataset.viewerPath==='src/login.ts'`,'AiDiy検索軌跡の一覧からワープ');
   await evaluate(`[...document.querySelectorAll('.route-choice')].find(b=>b.textContent==='閲覧軌跡').click()`);
-  assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-route-path]')].map(b=>b.dataset.routePath)`),['src/login.ts','main.ts']);
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-route-point^="f:"]>[data-route-path]')].map(b=>b.dataset.routePath)`),['main.ts','src/login.ts']);
   await evaluate(`document.querySelector('[data-route-path="main.ts"]').click()`);
-  await until(`document.querySelector('.viewer-path')?.textContent==='main.ts'`,'閲覧軌跡の一覧からワープ');
-  assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-route-path]')].map(b=>b.dataset.routePath)`),['src/login.ts','main.ts'],'再訪で一覧の順序を動かさない');
+  await until(`document.querySelector('.viewer-session')?.dataset.viewerPath==='main.ts'`,'閲覧軌跡の一覧からワープ');
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-route-point^="f:"]>[data-route-path]')].map(b=>b.dataset.routePath)`),['main.ts','src/login.ts'],'再訪で一覧の順序を動かさない');
   assert.equal(await evaluate(`document.querySelector('[aria-label="前の閲覧ファイル"]').disabled`),false);
   await capture('nn-route-view-list.png');
   await evaluate(`[...document.querySelectorAll('.route-choice')].find(b=>b.textContent==='AiDiy検索軌跡').click()`);

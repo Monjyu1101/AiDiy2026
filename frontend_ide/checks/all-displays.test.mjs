@@ -95,6 +95,25 @@ test('画面移動時に旧DPIで縮む場合は保存寸法を再適用して�
  for(let i=0;i<3;i++){f.toggle();f.toggle();assert.deepEqual(f.window.getBounds(),original);}
  f.window.close();
 });
+
+test('125%で補正後も同じ幅になる場合、残差を直前の指定値へ加えて毎回同じ寸法へ戻す',()=>{
+ const f=fixture(four,'win32'),set=f.window.setBounds.bind(f.window);
+ set({x:21,y:21,width:1496,height:786});const original=f.window.getBounds();
+ // 実機での幅1496→1497、1495→1497、1494→1496という段差を再現する。
+ f.window.setBounds=bounds=>set({...bounds,width:bounds.width+1+(bounds.width%4>=2?1:0),height:bounds.height+2});
+ for(let i=0;i<10;i++){f.toggle();f.toggle();assert.deepEqual(f.window.getBounds(),original);}
+ f.window.close();
+});
+
+test('整数DIPで一致できない寸法では補正を打ち切り、最も近い寸法を維持する',()=>{
+ const f=fixture(),set=f.window.setBounds.bind(f.window);let calls=0;
+ f.window.setBounds=bounds=>{calls++;set({...bounds,width:2*Math.floor(bounds.width/2)+1});};
+ for(let i=0;i<10;i++){
+  const before=calls;f.toggle();f.toggle();assert.ok(calls-before<=12,'補正が無限に続かない');
+  assert.ok(Math.abs(f.window.getBounds().width-900)<=1,'一致不能な幅の誤差が累積しない');
+ }
+ f.window.close();
+});
 test('画面取り外し・最小化復帰: ALL領域を更新し、復帰先も見える画面内へ戻す',()=>{
  const f=fixture();f.window.setBounds({x:-1800,y:-1000,width:900,height:700});f.toggle();
  f.window.minimized=true;f.displays([display(0,0)]);f.window.restore();assert.deepEqual(f.window.getBounds(),displayBounds([display(0,0)]));

@@ -238,7 +238,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; ar
     </main>
     <TerminalProgress :hidden="history" ref="stream" :running="!!state.実行中" @resize="scroll" />
     <footer v-show="!history" class="composer">
-      <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" @click="send('removeAttachment')">×</button></div>
+      <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
       <form :class="{ running: waitingForStream }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する…" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>

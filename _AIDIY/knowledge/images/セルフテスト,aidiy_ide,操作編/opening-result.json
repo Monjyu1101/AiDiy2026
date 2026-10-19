@@ -1,0 +1,219 @@
+{
+  "status": "✅ OK",
+  "method": "隔離した実Electronで共通拡大表示を実行し、CSSイベントと実OS窓の矩形を測定。",
+  "durationMs": 758.1000000014901,
+  "elapsedMs": 1428.3608,
+  "transparent": true,
+  "mainBoundsUnchanged": true,
+  "canvasBoundsUnchanged": true,
+  "frames": [
+    {
+      "time": 281.19999999552965,
+      "transform": "matrix(0.55, 0, 0, 0.55, 0, 0)",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 356.19999999552965,
+      "transform": "matrix(0.55, 0, 0, 0.55, 0, 0)",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 427,
+      "transform": "matrix(0.55, 0, 0, 0.55, 0, 0)",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 496.59999999403954,
+      "transform": "matrix(0.55, 0, 0, 0.55, 0, 0)",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 562,
+      "transform": "matrix(0.55, 0, 0, 0.55, 0, 0)",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 623.0999999940395,
+      "transform": "matrix(0.608303, 0, 0, 0.608303, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 700.1999999955297,
+      "transform": "matrix(0.726978, 0, 0, 0.726978, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 777.2999999970198,
+      "transform": "matrix(0.814164, 0, 0, 0.814164, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 839.1999999955297,
+      "transform": "matrix(0.869231, 0, 0, 0.869231, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 899.5,
+      "transform": "matrix(0.912123, 0, 0, 0.912123, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 963.7999999970198,
+      "transform": "matrix(0.944444, 0, 0, 0.944444, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1041.6999999955297,
+      "transform": "matrix(0.972646, 0, 0, 0.972646, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1112.5999999940395,
+      "transform": "matrix(0.986137, 0, 0, 0.986137, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1177.6999999955297,
+      "transform": "matrix(0.995968, 0, 0, 0.995968, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1240.6999999955297,
+      "transform": "matrix(0.999162, 0, 0, 0.999162, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1310.3999999985099,
+      "transform": "matrix(0.999977, 0, 0, 0.999977, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1371.6999999955297,
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "end": 1364.5,
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    },
+    {
+      "time": 1433.1999999955297,
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "start": 606.3999999985099,
+      "duration": "0.75s",
+      "end": 1364.5,
+      "bounds": {
+        "x": 301,
+        "y": 220,
+        "width": 544,
+        "height": 344
+      }
+    }
+  ]
+}

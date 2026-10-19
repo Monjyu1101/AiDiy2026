@@ -1,0 +1,82 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+import {spawn,execFile} from 'node:child_process';
+import {stat,realpath,readdir,mkdir,open} from 'node:fs/promises';
+import {join,dirname,isAbsolute} from 'node:path';
+import {homedir} from 'node:os';
+import {fileURLToPath} from 'node:url';
+import {randomUUID} from 'node:crypto';
+
+const ROOT=fileURLToPath(new URL('../../',import.meta.url));
+const fail=(message,status=400)=>Object.assign(new Error(message),{status});
+export const アプリ一覧=Object.freeze(['avatar','ide','term','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',ide:'IDE',term:'Term',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
+const execute=(command,args,options={})=>new Promise((resolve,reject)=>execFile(command,args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:8*1024*1024,...options},(error,stdout)=>error?reject(error):resolve(stdout)));
+
+// 明示起動時だけ取得する。タスクのコマンドラインや一覧を画面・ログへ返さない。
+export async function タスク一覧(platform=process.platform){
+ if(platform==='win32'){
+  const script="$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(node|electron|python(?:w|3(?:\\.\\d+)?)?)\\.exe$' } | Select-Object ProcessId,CommandLine) | ConvertTo-Json -Compress";
+  const values=JSON.parse((await execute('powershell.exe',['-NoProfile','-NonInteractive','-Command',script])).trim()||'[]');
+  return (Array.isArray(values)?values:[values]).map(item=>({pid:item.ProcessId,command:item.CommandLine||''}));
+ }
+ const output=await execute('ps',['-ax','-o','pid=,args=']);
+ return output.split('\n').flatMap(line=>{const match=line.match(/^\s*(\d+)\s+(.+)$/);return match?[{pid:Number(match[1]),command:match[2]}]:[];});
+}
+export function アプリタスク(id,{command=''}){
+ const text=command.replaceAll('\\','/');
+ // 実行入口に限定。引用された文章やテストの検索語を起動済みと誤認しない。
+ if(/(?:^|\s)(?:--eval|-e|--test)(?:\s|$)/.test(text))return false;
+ const entry=path=>new RegExp('(?:^|[\\s"\'])[^\\s"\']*'+path+'(?=[\\s"\']|$)','i').test(text);
+ if(id==='avatar')return entry('frontend_avatar/(?:_start\\.py|dist-electron/main\\.js)')||entry('frontend_avatar/node_modules/[^\\s"\']*electron[^\\s"\']*')&&/\s\.\s*$/.test(text);
+ if(id==='live')return (entry('frontend_ide/desktop\\.cjs')||entry('frontend_ide/launch\\.mjs'))&&/--app(?:=|\s+)live(?:[\s"']|$)/.test(text)||entry('frontend_ide/(?:host/)?aidiy_live/(?:launch\\.mjs|desktop\\.cjs)');
+ if(id==='discord')return entry('frontend_channels/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
+ return false;
+}
+export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand}={}){
+ const pending=new Set();
+ async function folder(value){
+  if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
+  try{const path=await realpath(value);if(!(await stat(path)).isDirectory())throw Error();return path;}catch{throw fail('フォルダが見つからないか、アクセスできません。');}
+ }
+ async function folders(value){
+  const path=await folder(value||homedir());
+  try{return {フォルダ:path,親:dirname(path),子フォルダ:(await readdir(path,{withFileTypes:true})).filter(item=>item.isDirectory()).map(item=>({名前:item.name,パス:join(path,item.name)})).sort((a,b)=>a.名前.localeCompare(b.名前,'ja'))};}
+  catch{throw fail('このフォルダの一覧を取得できません。');}
+ }
+ async function python(){
+  if(pythonCommand)return [pythonCommand,[]];
+  for(const [cmd,args] of [[process.env.DIAG_START_PYTHON||'python',[]],['python3',[]],['py',['-3']]]){
+   try{if(/^Python 3\./.test((await execute(cmd,[...args,'--version'])).trim()))return [cmd,args];}catch{}
+  }throw fail('Python 3 が見つかりません。',503);
+ }
+ async function launch(id,project){
+  const app=アプリ一覧.find(item=>item.id===id);if(!app)throw fail('起動対象が不正です。');
+  const path=await folder(project); // Avatarも未選択では起動不可。
+  if(pending.has(id))throw fail('このアプリの起動処理中です。',409);
+  pending.add(id);
+  try{
+   if(app.単一起動){
+    let running;try{running=(await tasks()).some(task=>アプリタスク(id,task));}catch{throw fail('起動中のタスクを確認できませんでした。もう一度お試しください。',503);}
+    if(running)return {起動済み:true,通知:`${app.名前} は起動済みです。`};
+   }
+   let command=node,args,cwd=path;
+   if(id==='avatar'){const [cmd,initial]=await python();command=cmd;args=[...initial,'-u','-X','utf8',join(root,'frontend_avatar','_start.py')];cwd=root;}
+   else if(id==='discord')args=[join(root,'frontend_channels','panel','launch.mjs'),'--project',path];
+   else args=[join(root,'frontend_ide','launch.mjs'),'--app',id,'--project',path,...(id==='live'?[]:['--new-window'])];
+   const env={...process.env,PYTHONIOENCODING:'utf-8',PYTHONUNBUFFERED:'1'};
+   for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(key))delete env[key];
+   const logs=join(root,'_AIDIY','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
+   const logPath=join(logs,`${id}-${randomUUID()}.log`),output=await open(logPath,'a',0o600);
+   let child;
+   try{
+    child=spawnFn(command,args,{cwd,env,detached:true,windowsHide:true,shell:false,stdio:['ignore',output.fd,output.fd]});
+    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+    child.unref();
+   }catch{throw fail(`起動できませんでした。${app.名前} のセットアップを確認してください。`,503);}
+   finally{await output.close();}
+   // Diagの終了・システム停止に紐付けない。起動完了後の定時監視も行わない。
+   return {受付:true,通知:`${app.名前} の起動を要求しました。`,ログ:logPath};
+  }finally{pending.delete(id);}
+ }
+ return {catalog:()=>({対象:アプリ一覧}),folders,launch};
+}

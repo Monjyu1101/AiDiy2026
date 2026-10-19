@@ -25,6 +25,7 @@ from types import ModuleType
 from AIコア.AIバックアップ import バックアップ実行, コードベース絶対パス取得
 from AIコア.AIストリーム制御 import AIストリーム開始, AIストリーム終了, AIストリーム中断
 
+from AIコア.AI応答 import 応答正規化, エラー応答, エラー応答判定
 from log_config import get_logger
 
 logger = get_logger(__name__)
@@ -259,6 +260,8 @@ class CodeAgent:
 
     async def _自己改善書き込み実行(self, ai_instance: Any, 元要求: str, 最終応答: str) -> None:
         """検証・通知完了後に _AIDIY/knowledge へ知見を書き込ませる"""
+        if エラー応答判定(最終応答):
+            return
         if self.強制停止フラグ:
             logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止中のため自己改善をスキップ")
             return
@@ -292,10 +295,10 @@ class CodeAgent:
             自己改善結果 = await ai_instance.実行(
                 要求テキスト=自己改善プロンプト,
                 絶対パス=self.絶対パス or None,
-            ) or "（応答なし）"
+            ) or "!"
             await self._ストリーム終了通知送信()
 
-            if 自己改善結果 and 自己改善結果 != "!":
+            if not エラー応答判定(自己改善結果):
                 await self.接続.send_to_channel(self.チャンネル, {
                     "セッションID": self.セッションID,
                     "メッセージ識別": "output_text",
@@ -550,7 +553,7 @@ class CodeAgent:
                 "セッションID": self.セッションID,
                 "チャンネル": self.チャンネル,
                 "メッセージ識別": "output_text",
-                "メッセージ内容": "処理は強制中断しました。",
+                "メッセージ内容": "! 処理は強制中断しました。",
                 "ファイル名": None,
                 "サムネイル画像": None
             })
@@ -852,14 +855,13 @@ class CodeAgent:
                     )
             except Exception as e:
                 logger.error(f"[CodeAgent] AI実行エラー: {e}")
-                出力メッセージ内容 = "!"
-            if not 出力メッセージ内容:
-                出力メッセージ内容 = "!"
+                出力メッセージ内容 = エラー応答(e)
+            出力メッセージ内容 = 応答正規化(出力メッセージ内容)
 
             # 強制停止フラグチェック → 中断通知は強制停止()で送信済みなのでここでは戻り値のみ設定
             if self.強制停止フラグ:
                 logger.info(f"[CodeAgent] チャンネル{self.チャンネル} 強制停止フラグ検出（AI実行後）")
-                出力メッセージ内容 = "処理は強制中断しました。"
+                出力メッセージ内容 = "! 処理は強制中断しました。"
                 # _中断通知送信は強制停止()で既に送信済みのため、ここでは呼ばない
                 return 出力メッセージ内容
 
@@ -902,7 +904,7 @@ class CodeAgent:
                         self_check_loop = max(0, min(3, int(受信データ["self_check_loop"])))
                     except (TypeError, ValueError, OverflowError):
                         pass  # 不正な指定はセッション設定へフォールバック
-                if self_check_loop > 0:
+                if self_check_loop > 0 and not エラー応答判定(出力メッセージ内容):
                     logger.info(f"[CodeAgent] バックアップ検証ループを開始します（最大{self_check_loop}回）")
                     今回更新あり = await self._バックアップ検証ループ(ai_instance, self_check_loop)
                     logger.info(f"[CodeAgent] バックアップ検証ループ完了: 更新あり={今回更新あり}")
@@ -930,8 +932,9 @@ class CodeAgent:
 
         except Exception as e:
             logger.error(f"[CodeAgent] 基本AI処理エラー: {e}")
-        
-        return 出力メッセージ内容
+            出力メッセージ内容 = エラー応答(e)
+
+        return 応答正規化(出力メッセージ内容)
 
     async def _バックアップ検証ループ(self, ai_instance: Any, 最大ループ回数: int = 1) -> bool:
         """バックアップ→検証→修正を繰り返すシンプルループ（最大回数はself_check_loopで指定）"""
@@ -1015,8 +1018,9 @@ class CodeAgent:
                 要求テキスト=検証プロンプト,
                 変更ファイル一覧=差分ファイル,
                 絶対パス=実行パス,
-            ) or "（応答なし）"
+            ) or "!"
 
+            検証結果 = 応答正規化(検証結果)
             検証後保存先 = _バックアップ保存版パス確認(バックアップフォルダ)
             if 検証後保存先:
                 logger.info(f"[検証{n}回目] 検証後バックアップ保存先: {検証後保存先}")
@@ -1046,6 +1050,9 @@ class CodeAgent:
                     ファイル名=None,
                     サムネイル画像=None
                 )
+
+            if エラー応答判定(検証結果):
+                return False
 
         # 検証完了メッセージ送信（強制停止でなく、かつ検証を実行した場合のみ）
         if not self.強制停止フラグ and 今回更新あり:

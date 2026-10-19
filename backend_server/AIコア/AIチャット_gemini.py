@@ -9,6 +9,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+from AIコア.AI応答 import 応答正規化
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -265,7 +266,7 @@ class ChatAI:
             # 生存状態チェック
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
-                return "ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
+                return "! ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
 
             # 自己ループ（aidiy_chat_llms）: 自前 MCP 群をツールとして使い、
             # tool_calls をサーバー側で実行しながら応答が確定するまで回す。
@@ -292,7 +293,7 @@ class ChatAI:
                     self.last_tool_turns = 結果["turns"]
                     self.last_tool_stopped = 結果["stopped"]
                     self._履歴追加(結果["content"] or "!", "assistant")
-                    return 結果["content"] or "!"
+                    return 応答正規化(結果["content"])
                 # tools 無し（8095 未起動等）→ 通常処理にフォールバック
 
             # tools 指定時は function calling 経路へ（従来のテキスト生成には影響しない）
@@ -477,7 +478,7 @@ class ChatAI:
 
             except asyncio.TimeoutError:
                 logger.warning(f"api タイムアウト ({タイムアウト秒数}秒)")
-                result_text = f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
+                result_text = f"! 処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
 
                 if テキスト受信処理Ｑ:
                     data = {"type": "timeout", "content": "!!! 処理タイムアウト !!!", "timestamp": time.time()}
@@ -485,14 +486,14 @@ class ChatAI:
 
             except Exception as api_error:
                 logger.exception(f"ChatAI api エラー: {api_error}")
-                result_text = f"api実行エラー: {str(api_error)}"
+                result_text = f"! api実行エラー: {str(api_error)}"
 
                 if テキスト受信処理Ｑ:
                     data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
                     テキスト受信処理Ｑ.put_nowait({"text": "!!! 処理エラー !!!", "json": json.dumps(data, ensure_ascii=False)})
 
             # 履歴に結果を追加
-            final_result = result_text.strip() if result_text.strip() else "!"
+            final_result = 応答正規化(result_text)
             self._履歴追加(final_result, "assistant")
 
             # 返却文字が"!"の場合はクライアントにもエラーマーカーを送る
@@ -517,7 +518,7 @@ class ChatAI:
             logger.exception(
                 f"ChatAI実行エラー: {e} 要求=[{要求テキスト[:10]}...] AI={self.chat_ai} モデル={self.chat_model} セッション={セッションID_str}"
             )
-            エラーメッセージ = f"実行エラー: {str(e)}"
+            エラーメッセージ = f"! 実行エラー: {str(e)}"
 
             if テキスト受信処理Ｑ:
                 data = {"type": "error", "content": "!!! 処理エラー !!!", "timestamp": time.time()}
@@ -753,10 +754,10 @@ class ChatAI:
             )
         except asyncio.TimeoutError:
             logger.warning(f"ChatAI(gemini) function calling タイムアウト ({タイムアウト秒数}秒)")
-            return f"処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
+            return f"! 処理タイムアウト({タイムアウト秒数}秒)が発生しました。"
         except Exception as e:
             logger.exception(f"ChatAI(gemini) function calling エラー: {e}")
-            return f"api実行エラー: {str(e)}"
+            return f"! api実行エラー: {str(e)}"
 
         # 5) レスポンス解析（text と function_call を分離）
         result_text = ""

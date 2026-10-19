@@ -1,0 +1,26 @@
+[
+  {
+    "book": "apps",
+    "id": "401",
+    "paragraph": 4,
+    "sequence": 1,
+    "file": "aidiy_diag-アプリ起動_401_Avatarの利用者認証画面で手動ログイン待ち画面.png",
+    "title": "Avatarの利用者認証画面で手動ログイン待ち",
+    "status": "⏸ 未実施",
+    "note": "DiagからAvatarを起動して認証画面が表示。認証操作は利用者へ引継ぎ、会話試験は未実施。パスワードはマスク表示。",
+    "time": "2026-10-19T04:21:52.047Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_avatar\\node_modules\\electron\\dist\\electron.exe",
+      "id": 920122,
+      "title": "AiDiy Avatar"
+    },
+    "width": 400,
+    "height": 300,
+    "sha256": "66ca528c9269bd6d2b0e4152d454c1cb7489cf09f50937e3188e578a1568f085",
+    "accessibility": {
+      "document_text": "AiDiy Avatar\n−\n利用者認証\nadmin\n••••••••\nログイン",
+      "focused_element": "0 ウィンドウ AiDiy Avatar Secondary Actions: Raise",
+      "tree": "Window: \"AiDiy Avatar\", App: electron.exe.\n\t0 ウィンドウ AiDiy Avatar Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy Avatar\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t\t10 ドキュメント AiDiy Avatar Value: http://127.0.0.1:8092/?role=login ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t11 メイン\n\t\t\t\t\t\t\t\t\t\t\t12 グループ Description: ここをドラッグして移動\n\t\t\t\t\t\t\t\t\t\t\t\t13 テキスト AiDiy Avatar\n\t\t\t\t\t\t\t\t\t\t\t\t14 ボタン − Description: 最小化\n\t\t\t\t\t\t\t\t\t\t\t15 テキスト 利用者認証\n\t\t\t\t\t\t\t\t\t\t\t16 編集 (settable, string) Description: 利用者ID Value: admin\n\t\t\t\t\t\t\t\t\t\t\t17 編集 (settable, string) Description: パスワード Value: ••••••••\n\t\t\t\t\t\t\t\t\t\t\t18 ボタン ログイン\n\t\t\t\t\t\t\t\t9 領域\n\nDocument text: ```\nAiDiy Avatar\n−\n利用者認証\nadmin\n••••••••\nログイン\n```"
+    }
+  }
+]

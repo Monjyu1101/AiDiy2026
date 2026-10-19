@@ -113,14 +113,13 @@ const routeMotion=createRouteExpansion({measure:routeMeasure,
   schedule:(fn,delay)=>{const view=routeElement.value?.ownerDocument?.defaultView||window;return{view,id:view.setTimeout?view.setTimeout(fn,delay):setTimeout(fn,delay)};},
   cancel:timer=>{if(timer)try{timer.view.clearTimeout?timer.view.clearTimeout(timer.id):clearTimeout(timer.id);}catch{}},
   reserve:async height=>{const node=routeElement.value;if(routeDetached.value&&node?.ownerDocument!==document)return routeWindow.reserveRouteHeight(height);return{height:routeMeasure().bar+routeMeasure().available};},
-  reduced:()=>!!(routeElement.value?.ownerDocument?.defaultView||window).matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   changed:value=>{routeMotionState.value=value;},report:message=>{pinError.value=message;}});
 function syncRouteDocument(){
   routeDocumentCleanup();if(routeDisposed)return;
-  const view=routeElement.value?.ownerDocument?.defaultView||window,media=view.matchMedia?.('(prefers-reduced-motion: reduce)');
-  const resize=()=>routeMotion.refresh(),motion=()=>void routeMotion.set(routeListOpen.value&&!routeClosed.value,{restart:true});
-  view.addEventListener('resize',resize);media?.addEventListener?.('change',motion);
-  routeDocumentCleanup=()=>{view.removeEventListener('resize',resize);media?.removeEventListener?.('change',motion);};
+  const view=routeElement.value?.ownerDocument?.defaultView||window;
+  const resize=()=>routeMotion.refresh();
+  view.addEventListener('resize',resize);
+  routeDocumentCleanup=()=>{view.removeEventListener('resize',resize);};
   void routeMotion.set(routeListOpen.value&&!routeClosed.value,{restart:true});
 }
 watch([routeListOpen,routeClosed],async()=>{await nextTick();if(!routeDisposed)void routeMotion.set(routeListOpen.value&&!routeClosed.value);});
@@ -183,7 +182,7 @@ function finishSinceCollapse(){
   sinceExpandTimer=setTimeout(()=>{
     if(!pendingSince||leavingRows.size)return;
     expanded.value=pendingSince;pendingSince=null;rootExpanded.value=true;save();nextTick(scrollToTop);
-  },matchMedia('(prefers-reduced-motion: reduce)').matches?0:60);
+  },60);
 }
 function beforeTreeLeave(element){leavingRows.add(element);}
 function afterTreeLeave(element){leavingRows.delete(element);finishSinceCollapse();}

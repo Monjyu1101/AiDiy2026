@@ -74,7 +74,7 @@ try{
  assert.equal((await targets()).filter(t=>t.title.startsWith('AiDiy IDE / Viewer')).length,1);
  assert.equal(await main.evaluate(`initialDiff.getModel()===initialModel&&diffEditors.length===1&&originalCompare.ownerDocument!==document`),true);
  assert.equal(await main.evaluate('initialDiff.getOriginalEditor().getScrollTop()'),700);
- assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationName`),'none');
+ assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationName`),'panel-fade-in');
  await child.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  assert.equal(await child.evaluate(`getComputedStyle(document.querySelector('main')).animationDuration`),'0.26s');
  assert.ok(await child.evaluate(`innerWidth>500`),'比較は隠れたviewerではなく比較パネルの幅で開く');

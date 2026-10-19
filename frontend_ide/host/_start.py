@@ -44,7 +44,7 @@ def check_environment(module: str) -> tuple[bool, str]:
 
 
 def _start(module: str, args: list[str]) -> subprocess.Popen[bytes]:
-    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == 'win32' else {'start_new_session': True}
+    kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if sys.platform == 'win32' else {'start_new_session': True}
     return subprocess.Popen(launch_command(module) + args, cwd=THIS_DIR.parent.parent,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0, **kwargs)
 

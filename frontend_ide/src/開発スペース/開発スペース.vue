@@ -25,6 +25,7 @@ async function toggleExplorer(){
 }
 const open=ref(false),loading=ref(true),error=ref(''),root=ref(),marks=shallowRef({mode:'since',since:props.startedAt,paths:[]});
 const autoSpin=ref(true),driving=ref(false),orbitPhase=ref('idle');
+const explorationStatus=ref('出航準備中');
 const fastWarp=ref(false);
 watch(fastWarp,value=>engine?.setFastWarp(value));
 const route=shallowRef({mode:'view',paths:[]});
@@ -81,7 +82,7 @@ async function selectExplorer(entry){
   try{await engine?.goTo(entry);}
   finally{if(explorerNavigation.value===entry)explorerNavigation.value=null;}
 }
-function change(value){if('scan'in value){scan.value=value.scan;selected.value=value.selected;trail.value=value.trail;focus.value=value.focus;updateMarks.value=value.updateMarks||{levels:{},flashes:{}};viewHistory.value=value.journal||[];viewVoyages.value=value.voyages||{};}if('autoSpin'in value)autoSpin.value=value.autoSpin;if('driving'in value)driving.value=value.driving;if('orbitPhase'in value)orbitPhase.value=value.orbitPhase;loading.value=value.loading;if('error'in value)error.value=value.error||'';}
+function change(value){if('scan'in value){scan.value=value.scan;selected.value=value.selected;trail.value=value.trail;focus.value=value.focus;updateMarks.value=value.updateMarks||{levels:{},flashes:{}};viewHistory.value=value.journal||[];viewVoyages.value=value.voyages||{};}if('autoSpin'in value)autoSpin.value=value.autoSpin;if('driving'in value)driving.value=value.driving;if('orbitPhase'in value)orbitPhase.value=value.orbitPhase;if('explorationStatus'in value)explorationStatus.value=value.explorationStatus;loading.value=value.loading;if('error'in value)error.value=value.error||'';}
 // VRの手動補正は閲覧・階層移動で戻さず、通常画面の自動配置とは分けて保持する。
 const centerOffset={x:0,y:0};let centerGesture=null,unsubscribeCenter;
 function moveCenter({id,phase,x,y}){
@@ -164,7 +165,7 @@ onBeforeUnmount(()=>{disposed=true;unsubscribeCenter?.();viewerRefs.clear();fold
     <div class="space-flight-controls">
       <button v-show="viewMode==='3d'" class="space-motion-toggle space-fast-warp-toggle" role="switch" aria-label="高速ワープ" :aria-checked="fastWarp" title="別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動" @click="fastWarp=!fastWarp"><span>高速ワープ</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ fastWarp?'ON':'OFF' }}</span></button>
       <div class="space-auto-explore">
-        <div v-if="viewMode==='3d'&&autoSpin&&['planning','aligning'].includes(orbitPhase)" class="space-orbit-status" role="status" aria-live="polite">探索軌道計算中<span aria-hidden="true">…</span></div>
+        <div v-if="autoSpin&&explorationStatus" class="space-orbit-status" role="status" aria-live="polite" aria-atomic="true">{{ explorationStatus }}</div>
         <button class="space-motion-toggle" :class="{driving:autoSpin&&driving}" role="switch" aria-label="自動探索" :aria-checked="autoSpin" :title="viewMode==='2d'?'最終更新のファイルを自動で開く（手動操作中は待機）':autoSpin&&driving?'自動探索中':''" @click="engine?.setAutoSpin(!autoSpin)"><span>自動探索</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ autoSpin?'ON':'OFF' }}</span></button>
       </div>
     </div>
@@ -174,7 +175,7 @@ onBeforeUnmount(()=>{disposed=true;unsubscribeCenter?.();viewerRefs.clear();fold
     <ViewerSession v-for="entry in viewerSessions" :key="entry.file.path" :ref="value=>value?viewerRefs.set(entry.file.path,value):viewerRefs.delete(entry.file.path)" :file="entry.file" :root="scan?.root" :auto-spin="autoSpin" @close="closeViewer(entry)" @pinning="value=>pinningViewer(entry,value)" @detached="detachedViewer(entry)" @recover="recoverViewer(entry)" />
     <nav v-if="scan" v-show="viewMode==='3d'" class="space-breadcrumb"><button @click="engine.ascend(0)">{{ scan.tree.n }}</button><template v-for="(name,i) in trail" :key="i"><span>›</span><button @click="engine.ascend(i+1)">{{ name }}</button></template></nav>
     <div v-if="!scan&&(loading||error)" class="space-loading">{{ error||'読み込み中…' }}</div>
-    <div v-else-if="error" class="space-notice" role="status"><span>{{ error }}</span><button aria-label="案内を閉じる" @click="error=''">×</button></div>
+    <div v-else-if="error" class="space-notice" role="status"><span>{{ error }}</span><button aria-label="案内を閉じる" @click="error=''"><span class="close-icon" aria-hidden="true"></span></button></div>
   </section>
 </template>
 

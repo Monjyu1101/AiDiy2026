@@ -27,7 +27,7 @@ function 終了確認を作成({window,状態取得,確認}){
     const result=await 確認(window,{
      type:'question',title:'AiDiy Diag の終了',
      message:running===true?'起動中のプロセスを停止して Diag を閉じますか？':'起動状態を確認できません。Diag を閉じますか？',
-     detail:'この Diag から起動したプロセスも停止します。',
+     detail:'「システム起動」で管理するプロセスを停止します。「アプリ起動」で開いたアプリは動作を続けます。',
      buttons:['停止して閉じる','キャンセル'],defaultId:1,cancelId:1,noLink:true,
     });
     if(result.response!==0)return;

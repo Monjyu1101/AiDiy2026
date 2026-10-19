@@ -1,0 +1,114 @@
+[
+  {
+    "book": "ide",
+    "id": "101",
+    "paragraph": 1,
+    "sequence": 1,
+    "file": "ide-操作_101_修正後のVR往復前の基準寸法画面.png",
+    "title": "修正後のVR往復前の基準寸法",
+    "status": "✅ OK",
+    "note": "修正版IDEをDiagから再起動。接続済み、自動探索OFF。キャプチャの寸法と原点を再試験の基準として記録。",
+    "time": "2026-10-19T02:16:56.562Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 200040,
+      "title": "AiDiy IDE"
+    },
+    "width": 1870,
+    "height": 981,
+    "sha256": "ce6dbbc6c7450552855a62358954ba71425306a6d16772d2f11c1572e1f2c974",
+    "accessibility": {
+      "document_text": "接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev",
+      "focused_element": "0 ウィンドウ AiDiy IDE Secondary Actions: Raise",
+      "tree": "Window: \"AiDiy IDE\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t\t9 ドキュメント AiDiy IDE Value: http://127.0.0.1:65401/#/ ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t10 ヘッダー\n\t\t\t\t\t\t\t\t\t\t\t11 状態\n\t\t\t\t\t\t\t\t\t\t\t\t12 テキスト 接続済み\n\t\t\t\t\t\t\t\t\t\t\t13 テキスト AiDiy IDE\n\t\t\t\t\t\t\t\t\t\t\t26 切り替えボタン VRモード Description: VRモード：全ディスプレイに宇宙空間を広げる\n\t\t\t\t\t\t\t\t\t\t\t14 ボタン 最小化 Description: 最小化\n\t\t\t\t\t\t\t\t\t\t\t15 ボタン 最大化 Description: 最大化\n\t\t\t\t\t\t\t\t\t\t\t16 ボタン 終了 Description: 閉じる\n\t\t\t\t\t\t\t\t\t\t17 グループ Description: C:\\Users\\admin\\Desktop\\AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t\t18 テキスト プロジェクト: AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t27 ナビゲーション ファイルの表示モード\n\t\t\t\t\t\t\t\t\t\t\t28 切り替えボタン 3D\n\t\t\t\t\t\t\t\t\t\t\t29 切り替えボタン 2D\n\t\t\t\t\t\t\t\t\t\t30 ナビゲーション 別ウィンドウを開く\n\t\t\t\t\t\t\t\t\t\t\t31 ボタン ＋ Term Description: ターミナルを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t32 ボタン ＋ Code Description: コード支援を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t33 ボタン ＋ Live Description: 音声会話を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t34 ボタン ＋ Browser Description: ブラウザを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t19 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t35 ボタン 終了\n\t\t\t\t\t\t\t\t\t\t36 グループ 3D ファイル表示\n\t\t\t\t\t\t\t\t\t\t\t37 イメージ\n\t\t\t\t\t\t\t\t\t\t38 切り替え (settable, string) 高速ワープ Description: 別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動\n\t\t\t\t\t\t\t\t\t\t39 切り替え (settable, string) 自動探索\n\t\t\t\t\t\t\t\t\t\t40 ボタン エクスプローラーを開く Description: エクスプローラー\n\t\t\t\t\t\t\t\t\t\t41 ボタン 軌跡バーを開く Description: 軌跡バー\n\t\t\t\t\t\t\t\t\t\t42 切り替え (settable, string) フィルター Description: AiDiy のバックアップ対象のファイルだけを表示\n\t\t\t\t\t\t\t\t\t\t44 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t45 ボタン AiDiy2026_dev\n\t\t\t\t\t\t\t\t25 領域\n\nDocument text: ```\n接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev\n```"
+    }
+  },
+  {
+    "book": "ide",
+    "id": "102",
+    "paragraph": 1,
+    "sequence": 2,
+    "file": "ide-操作_102_修正後1回目のVR移行画面.png",
+    "title": "修正後1回目のVR移行",
+    "status": "✅ OK",
+    "note": "VR全画面とExplorer・軌跡の別パネルを確認。",
+    "time": "2026-10-19T02:17:17.428Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 200040,
+      "title": "AiDiy IDE"
+    },
+    "width": 1920,
+    "height": 1080,
+    "sha256": "2ab3c9123825c2a315dd7609442962ce747398fb4f989365c3f590d6c264706a",
+    "accessibility": null
+  },
+  {
+    "book": "ide",
+    "id": "103",
+    "paragraph": 1,
+    "sequence": 3,
+    "file": "ide-操作_103_修正後1回目F11復帰で基準寸法一致画面.png",
+    "title": "修正後1回目F11復帰で基準寸法一致",
+    "status": "✅ OK",
+    "note": "F11から通常画面へ戻り、キャプチャ1870×981・原点26,26で基準に完全一致。",
+    "time": "2026-10-19T02:17:39.468Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 200040,
+      "title": "AiDiy IDE"
+    },
+    "width": 1870,
+    "height": 981,
+    "sha256": "ab9367364041546bae1d9547da0f0dc0a276bef9ea0b9cfa1fdc965555f12ebb",
+    "accessibility": {
+      "document_text": "接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev",
+      "focused_element": "0 ウィンドウ AiDiy IDE Secondary Actions: Raise",
+      "tree": "Window: \"AiDiy IDE\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t\t9 ドキュメント AiDiy IDE Value: http://127.0.0.1:65401/#/ ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t120 ヘッダー\n\t\t\t\t\t\t\t\t\t\t\t121 状態\n\t\t\t\t\t\t\t\t\t\t\t\t122 テキスト 接続済み\n\t\t\t\t\t\t\t\t\t\t\t123 テキスト AiDiy IDE\n\t\t\t\t\t\t\t\t\t\t\t124 切り替えボタン VRモード Description: VRモード：全ディスプレイに宇宙空間を広げる\n\t\t\t\t\t\t\t\t\t\t\t125 ボタン 最小化 Description: 最小化\n\t\t\t\t\t\t\t\t\t\t\t126 ボタン 最大化 Description: 最大化\n\t\t\t\t\t\t\t\t\t\t\t127 ボタン 終了 Description: 閉じる\n\t\t\t\t\t\t\t\t\t\t128 グループ Description: C:\\Users\\admin\\Desktop\\AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t\t129 テキスト プロジェクト: AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t130 ナビゲーション ファイルの表示モード\n\t\t\t\t\t\t\t\t\t\t\t131 切り替えボタン 3D\n\t\t\t\t\t\t\t\t\t\t\t132 切り替えボタン 2D\n\t\t\t\t\t\t\t\t\t\t133 ナビゲーション 別ウィンドウを開く\n\t\t\t\t\t\t\t\t\t\t\t134 ボタン ＋ Term Description: ターミナルを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t135 ボタン ＋ Code Description: コード支援を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t136 ボタン ＋ Live Description: 音声会話を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t137 ボタン ＋ Browser Description: ブラウザを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t138 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t139 ボタン 終了\n\t\t\t\t\t\t\t\t\t\t36 グループ 3D ファイル表示\n\t\t\t\t\t\t\t\t\t\t\t37 イメージ\n\t\t\t\t\t\t\t\t\t\t140 切り替え (settable, string) 高速ワープ Description: 別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動\n\t\t\t\t\t\t\t\t\t\t141 切り替え (settable, string) 自動探索\n\t\t\t\t\t\t\t\t\t\t142 ボタン エクスプローラーを開く Description: エクスプローラー\n\t\t\t\t\t\t\t\t\t\t143 ボタン 軌跡バーを開く Description: 軌跡バー\n\t\t\t\t\t\t\t\t\t\t144 切り替え (settable, string) フィルター Description: AiDiy のバックアップ対象のファイルだけを表示\n\t\t\t\t\t\t\t\t\t\t145 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t146 ボタン AiDiy2026_dev\n\t\t\t\t\t\t\t\t25 領域\n\nDocument text: ```\n接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev\n```"
+    }
+  },
+  {
+    "book": "ide",
+    "id": "104",
+    "paragraph": 1,
+    "sequence": 4,
+    "file": "ide-操作_104_修正後2回目のVRで復帰ボタン表示画面.png",
+    "title": "修正後2回目のVRで復帰ボタン表示",
+    "status": "✅ OK",
+    "note": "2回目のVR移行も正常。Tabで右上復帰ボタンを表示。",
+    "time": "2026-10-19T02:18:20.979Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 200040,
+      "title": "AiDiy IDE"
+    },
+    "width": 1920,
+    "height": 1080,
+    "sha256": "1b3199128732a01bf3f7f29847e8ecdead69c7e4eb7b9fee17e3c9c4be5a8a50",
+    "accessibility": null
+  },
+  {
+    "book": "ide",
+    "id": "105",
+    "paragraph": 1,
+    "sequence": 5,
+    "file": "ide-操作_105_修正後2回目ボタン復帰で基準寸法一致画面.png",
+    "title": "修正後2回目ボタン復帰で基準寸法一致",
+    "status": "✅ OK",
+    "note": "右上復帰ボタンから通常画面へ戻り、キャプチャ1870×981・原点26,26で基準に完全一致。接続済み、自動探索OFF、プロジェクト直下を維持。",
+    "time": "2026-10-19T02:18:35.075Z",
+    "window": {
+      "app": "process:C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\frontend_ide\\host\\node_modules\\electron\\dist\\electron.exe",
+      "id": 200040,
+      "title": "AiDiy IDE"
+    },
+    "width": 1870,
+    "height": 981,
+    "sha256": "f4ce82bf080338953ef6aee55f8eb5a841c88abd7ebe5beeb1bc52fedd7b1edb",
+    "accessibility": {
+      "document_text": "接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev",
+      "focused_element": "0 ウィンドウ AiDiy IDE Secondary Actions: Raise",
+      "tree": "Window: \"AiDiy IDE\", App: electron.exe.\n\t0 ウィンドウ AiDiy IDE Secondary Actions: Raise\n\t\t1 ウィンドウ (disabled)\n\t\t2 領域 AiDiy IDE\n\t\t\t3 領域\n\t\t\t\t4 領域\n\t\t\t\t\t5 領域\n\t\t\t\t\t\t6 領域\n\t\t\t\t\t\t\t7 領域\n\t\t\t\t\t\t\t\t8 領域\n\t\t\t\t\t\t\t\t\t9 ドキュメント AiDiy IDE Value: http://127.0.0.1:65401/#/ ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t120 ヘッダー\n\t\t\t\t\t\t\t\t\t\t\t121 状態\n\t\t\t\t\t\t\t\t\t\t\t\t122 テキスト 接続済み\n\t\t\t\t\t\t\t\t\t\t\t123 テキスト AiDiy IDE\n\t\t\t\t\t\t\t\t\t\t\t124 切り替えボタン VRモード Description: VRモード：全ディスプレイに宇宙空間を広げる\n\t\t\t\t\t\t\t\t\t\t\t125 ボタン 最小化 Description: 最小化\n\t\t\t\t\t\t\t\t\t\t\t126 ボタン 最大化 Description: 最大化\n\t\t\t\t\t\t\t\t\t\t\t127 ボタン 終了 Description: 閉じる\n\t\t\t\t\t\t\t\t\t\t128 グループ Description: C:\\Users\\admin\\Desktop\\AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t\t129 テキスト プロジェクト: AiDiy2026_dev\n\t\t\t\t\t\t\t\t\t\t130 ナビゲーション ファイルの表示モード\n\t\t\t\t\t\t\t\t\t\t\t131 切り替えボタン 3D\n\t\t\t\t\t\t\t\t\t\t\t132 切り替えボタン 2D\n\t\t\t\t\t\t\t\t\t\t133 ナビゲーション 別ウィンドウを開く\n\t\t\t\t\t\t\t\t\t\t\t134 ボタン ＋ Term Description: ターミナルを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t135 ボタン ＋ Code Description: コード支援を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t136 ボタン ＋ Live Description: 音声会話を別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t\t137 ボタン ＋ Browser Description: ブラウザを別ウィンドウで開く\n\t\t\t\t\t\t\t\t\t\t138 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t139 ボタン 終了\n\t\t\t\t\t\t\t\t\t\t36 グループ 3D ファイル表示\n\t\t\t\t\t\t\t\t\t\t\t37 イメージ\n\t\t\t\t\t\t\t\t\t\t140 切り替え (settable, string) 高速ワープ Description: 別フォルダのファイルを選ぶと、1回のワープで目的フォルダへ移動\n\t\t\t\t\t\t\t\t\t\t141 切り替え (settable, string) 自動探索\n\t\t\t\t\t\t\t\t\t\t217 ボタン エクスプローラーを開く Description: エクスプローラー\n\t\t\t\t\t\t\t\t\t\t218 ボタン 軌跡バーを開く Description: 軌跡バー\n\t\t\t\t\t\t\t\t\t\t144 切り替え (settable, string) フィルター Description: AiDiy のバックアップ対象のファイルだけを表示\n\t\t\t\t\t\t\t\t\t\t145 ナビゲーション\n\t\t\t\t\t\t\t\t\t\t\t146 ボタン AiDiy2026_dev\n\t\t\t\t\t\t\t\t25 領域\n\nDocument text: ```\n接続済み\nAiDiy IDE\nVRモード\n最小化\n最大化\n×\nプロジェクト: AiDiy2026_dev\n3D\n2D\n＋ Term\n＋ Code\n＋ Live\n＋ Browser\n終了\n￼\n高速ワープ\n自動探索\nエクスプローラーを開く\n軌跡バーを開く\nフィルター\nAiDiy2026_dev\n```"
+    }
+  }
+]

@@ -1,0 +1,75 @@
+{
+  "status": "❌ NG",
+  "date": "2026-10-19T03:10:04.100Z",
+  "os": "win32",
+  "method": "隔離Chromeの実CSS・Canvas描画。CSSの途中時刻を固定し、60秒の再開待機は仮想時計で進めます。",
+  "checks": [
+    {
+      "name": "進む・戻るページ切替",
+      "status": "✅ OK",
+      "forwardMs": 800,
+      "backMs": 800,
+      "forwardA": {
+        "clip": "polygon(0px 0px, calc(0px + (0.906535 * (100% + min(20%, 160px)))) 0px, calc(90.6535% + (0.0934647 * (0% - min(20%, 160px)))) 100%, 0px 100%)",
+        "left": 1131.578125,
+        "top": 222,
+        "path": "資料",
+        "liveLists": 1
+      },
+      "forwardB": {
+        "clip": "polygon(0px 0px, calc(0px + (0.378138 * (100% + min(20%, 160px)))) 0px, calc(37.8138% + (0.621862 * (0% - min(20%, 160px)))) 100%, 0px 100%)",
+        "left": 388.65625,
+        "top": 222,
+        "path": "資料",
+        "liveLists": 1
+      },
+      "backA": {
+        "clip": "polygon(calc(0px + (0.0934647 * (100% + min(20%, 160px)))) 0px, 100% 0px, 100% 100%, calc(9.34647% + (0.906535 * (0% - min(20%, 160px)))) 100%)",
+        "left": -11.578125,
+        "top": 222,
+        "path": "",
+        "liveLists": 1
+      },
+      "backB": {
+        "clip": "polygon(calc(0px + (0.621862 * (100% + min(20%, 160px)))) 0px, 100% 0px, 100% 100%, calc(62.1862% + (0.378138 * (0% - min(20%, 160px)))) 100%)",
+        "left": 731.328125,
+        "top": 222,
+        "path": "",
+        "liveLists": 1
+      }
+    },
+    {
+      "name": "ユーザー操作による演出中断",
+      "status": "✅ OK"
+    }
+  ],
+  "shots": [
+    {
+      "file": "20261019120959-ide-2d-motion__ide-操作_601_2D初期表示画面.png",
+      "description": "2Dでは一覧を表示し、3Dの周回は進みません。",
+      "sha256": "7a1cc7c4428911e6707964239f5ac5be0e62d34d73c21a54bb90c19e4a023788"
+    },
+    {
+      "file": "20261019120959-ide-2d-motion__ide-操作_602_進むページ切替25パーセント画面.png",
+      "description": "子フォルダへ進む途中です。斜線と旧ページの切り抜きを確認します。",
+      "sha256": "fef851186db5d3a3d4dc112ae43c844400e85a417b0d081b23ed753307e46145"
+    },
+    {
+      "file": "20261019120959-ide-2d-motion__ide-操作_603_進むページ切替75パーセント画面.png",
+      "description": "斜線が右から左へ進み、移動先の一覧が現れます。",
+      "sha256": "71d54fa956ede5cf1baae258ba1811d3814c2db1314ab557ff8b8cd862e35895"
+    },
+    {
+      "file": "20261019120959-ide-2d-motion__ide-操作_604_戻るページ切替画面.png",
+      "description": "親へ戻る時は、同じ斜線が左から右へ進みます。",
+      "sha256": "ebe3a88faafb5d19094bb82b0a99784ae2b380cd7b59e572fd24ceba5532a5a9"
+    },
+    {
+      "file": "20261019120959-ide-2d-motion__ide-操作_605_スクロールでページ演出中断画面.png",
+      "description": "スクロール操作で切替演出だけを終え、現在のフォルダを保ちます。",
+      "sha256": "206a9bd842af5fe6aa76f29c2e37e24a8c40e7f894d70ed013b287c580a4887b"
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: {\"exceptionId\":1,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":70,\"scriptId\":\"26\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"26\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":70}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"TypeError\",\"description\":\"TypeError: Cannot read properties of undefined (reading 'effect')\\n    at <anonymous>:1:71\",\"objectId\":\"2923699229650055814.2.2\"}}\n+ actual - expected\n\n+ {\n+   columnNumber: 70,\n+   exception: {\n+     className: 'TypeError',\n+     description: \"TypeError: Cannot read properties of undefined (reading 'effect')\\n\" +\n+       '    at <anonymous>:1:71',\n+     objectId: '2923699229650055814.2.2',\n+     subtype: 'error',\n+     type: 'object'\n+   },\n+   exceptionId: 1,\n+   lineNumber: 0,\n+   scriptId: '26',\n+   stackTrace: {\n+     callFrames: [\n+       {\n+         columnNumber: 70,\n+         functionName: '',\n+         lineNumber: 0,\n+         scriptId: '26',\n+         url: ''\n+       }\n+     ]\n+   },\n+   text: 'Uncaught'\n+ }\n- undefined\n\n    at evaluate (file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/scripts/check-2d-motion.mjs:46:132)\n    at async file:///C:/Users/admin/Desktop/AiDiy2026_dev/frontend_ide/scripts/check-2d-motion.mjs:91:16"
+}

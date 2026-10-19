@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 export const ROUTE_EXPAND_MS=260;
 // 本体と別窓で同じ状態機械を使う。窓の透明な領域を確保してから下へ伸ばす。
-export function createRouteExpansion({measure,reserve,changed,report=()=>{},reduced=()=>false,schedule=setTimeout,cancel=clearTimeout}){
+export function createRouteExpansion({measure,reserve,changed,report=()=>{},schedule=setTimeout,cancel=clearTimeout}){
  let disposed=false,generation=0,timer,wanted=null,state={height:0,visible:false,phase:'closed'};
  const publish=value=>{state={...state,...value};changed({...state});};
  const valid=run=>!disposed&&run===generation;
@@ -15,7 +15,7 @@ export function createRouteExpansion({measure,reserve,changed,report=()=>{},redu
   wanted=open;const run=++generation;cancel(timer);timer=undefined;
   const {bar,target}=measure();
   if(!open){
-   const moving=state.height>0&&!reduced();publish({height:0,visible:false,phase:moving?'closing':'closed'});
+   const moving=state.height>0;publish({height:0,visible:false,phase:moving?'closing':'closed'});
    const shrink=async()=>{try{await reserve(bar);if(valid(run))publish({phase:'closed'});}catch(error){if(valid(run))report(error.message);}};
    if(moving)later(run,ROUTE_EXPAND_MS+34,()=>void shrink());else await shrink();return;
   }
@@ -23,9 +23,9 @@ export function createRouteExpansion({measure,reserve,changed,report=()=>{},redu
   try{
    const result=await reserve(bar+target);if(!valid(run))return;
    const height=Math.max(0,Math.min(target,(result?.height??measure().available+bar)-bar));
-   const expand=()=>{publish({height,phase:reduced()?'open':'opening',visible:reduced()});if(!reduced())later(run,ROUTE_EXPAND_MS+34,()=>publish({phase:'open',visible:true}));};
+   const expand=()=>{publish({height,phase:'opening',visible:false});later(run,ROUTE_EXPAND_MS+34,()=>publish({phase:'open',visible:true}));};
    // DOMが別Documentへ移った直後も高さ0を一度確定させる。
-   if(reduced())expand();else later(run,32,expand);
+   later(run,32,expand);
   }catch(error){if(valid(run)){wanted=null;publish({height:0,visible:false,phase:'closed'});report(error.message);}}
  }
  return{set,refresh(){if(!disposed&&state.phase==='open'){const m=measure();publish({height:Math.max(0,Math.min(m.target,m.available))});}},dispose(){disposed=true;generation++;cancel(timer);timer=undefined;},get state(){return{...state};}};
