@@ -11,7 +11,8 @@ defineEmits(['確認', '個別確認', '書込']);
 const { 選択ID, 折り畳み, 分類, 状態, 選択項目, 詳細項目, 参照箇所, 開閉 } = 導入状況表示を作成(props);
 const パネル = ref(null), 詳細表示 = ref(true), コンソール = ref(null);
 const 実行 = computed(() => unref(props.操作?.実行));
-const 選択実行 = computed(() => 実行.value?.対象 === 選択ID.value ? 実行.value : null);
+const 選択実行 = computed(() => 実行.value?.対象 === 選択ID.value || 実行.value?.関連項目?.includes(選択ID.value) ? 実行.value : null);
+const 操作後結果 = computed(() => 選択実行.value?.結果一覧 || (選択実行.value?.結果 ? [選択実行.value.結果] : []));
 const 操作受付 = computed(() => unref(props.操作?.受付)?.対象 === 選択ID.value ? unref(props.操作?.受付) : null);
 const 操作禁止 = computed(() => !props.接続済み || props.確認中 || Boolean(props.個別確認中) || props.書込中 || props.操作中);
 const 可能操作 = id => props.操作?.可能操作(id) || [];
@@ -44,7 +45,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
         <template v-if="!詳細表示">
           <div class="install-console-heading"><span>{{操作受付?.操作 || 選択実行?.操作 || '導入操作'}}</span><component v-if="選択実行 && !操作受付" :is="状態バッジ" :state="選択実行.状態"/><span v-if="操作受付">開始受付中…</span><button v-if="選択実行?.実行中" id="install-cancel" type="button" :disabled="!接続済み || unref(操作?.取消中) || unref(操作?.取消要求済み)" @click="操作.中止()">{{unref(操作?.取消要求済み)?'中止確認中…':'中止'}}</button></div>
           <pre ref="コンソール" class="install-console" aria-label="導入操作コンソール" tabindex="0">{{操作受付 ? '実行を受け付けています。\n' : 選択実行?.ログ || '実行ログはここに表示されます。'}}</pre>
-          <div v-if="選択実行?.結果 && !操作受付" class="install-recheck"><strong>操作後の確認</strong><component :is="状態バッジ" :state="選択実行.結果.状態"/><p>{{選択実行.結果.説明}}</p><p v-if="選択実行.結果.バージョン">バージョン: {{選択実行.結果.バージョン}}</p><p v-if="選択実行.結果.パス">検出パス: {{選択実行.結果.パス}}</p></div>
+          <div v-if="操作後結果.length && !操作受付" class="install-recheck"><strong>操作後の確認</strong><div v-for="result in 操作後結果" :key="result.id" :data-install-result="result.id"><strong v-if="操作後結果.length > 1">{{項目.find(item=>item.id===result.id)?.name || result.id}} </strong><component :is="状態バッジ" :state="result.状態"/><p>{{result.説明}}</p><p v-if="result.バージョン">バージョン: {{result.バージョン}}</p><p v-if="result.パス">検出パス: {{result.パス}}</p></div></div>
           <p v-if="選択実行?.説明 && !操作受付">{{選択実行.説明}}</p><p v-if="選択実行?.状態==='停止未確認'" class="warning">プロセスの停止を確認できません。ログを確認し、終了を確認するまで別の導入操作を行わないでください。</p>
         </template>
         <template v-else><component :is="状態バッジ" class="status" :state="状態(選択項目.id)"/><p>{{選択項目.description}}</p><p v-if="能力(選択項目.id)?.理由" class="install-capability-note">{{能力(選択項目.id).理由}}</p><dl><template v-for="[label,value] in 詳細項目" :key="label"><dt>{{label}}</dt><dd>{{value}}</dd></template></dl><h3>ソースの参照箇所</h3><ul><li v-for="source in 参照箇所" :key="source">{{source}}</li></ul></template>

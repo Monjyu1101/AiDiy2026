@@ -187,9 +187,12 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 ## 個別確認と導入管理
 
 - 各行の「確認」は認証付き `POST api/診断/<登録済みID>` を使用し、その項目だけ既存 probe で再確認する。全項目確認と書込は同じ実行排他を使う。今回確認していない前回保存済み結果は表示だけに使い、書込対象へ混ぜない。
-- 導入管理は `GET api/導入管理` で能力と実行状態を取得し、`POST api/導入管理/<登録済みID>/<導入・再導入・削除>` で開始、`DELETE api/導入管理/<実行ID>` で中止する。入力本文・クエリ・任意コマンドは不可。操作後は個別確認と共通の probe と結果反映を1回呼ぶ。
-- 対象は `scripts/cli_bat` と同じ npm4パッケージに限定する。BAT は複数製品・`start`・`PAUSE` を含むため実行しない。`__pip_uninstall.bat` は全パッケージ削除なので個別操作へ流用しない。Antigravity / Grok の固定フォルダ削除・PATH 編集には専用の所有元確認が必要で、現在は対象外。
+- 導入管理は `GET api/導入管理` で能力と実行状態を取得し、`POST api/導入管理/<登録済みID>/<導入・再導入・削除>` で開始、`DELETE api/導入管理/<実行ID>` で中止する。入力本文・クエリ・任意コマンドは不可。操作後は個別確認と共通の probe と結果反映を各対象に1回呼ぶ。FFmpeg は3行を確認し、`結果一覧` と対象行の `結果` を返す。
+- 対象は従来の npm4パッケージに加え、Windows の FFmpeg 一式・uv・Ollama（新規導入のみ）・OBS・VS Code Stable・Antigravity。複数製品を `start` する BAT、`__pip_uninstall.bat`、広いフォルダ削除・PATH 編集は流用しない。Grok / Chrome / Python / Node.js / npm / Electron の操作は追加しない。
+- WinGet は固定 ID・公式 source・実行ファイル・登録先・アンインストーラーを照合する。list の表示だけでは所有元としない。portable は WinGet 所有登録、native の OBS / Code は Diag の導入記録と実体ハッシュが一致する場合だけ破壊的操作を許す。scope 重複・別 PATH の優先・manual / 他方式・リンク・不明な process 状態では操作しない。Ollama は既定モデルの保持を保証できないため再導入・削除を許さない。
+- WinGet の標準インストーラーによる PATH 登録・UAC の可能性を操作確認へ表示する。`--accept-*`、強制・purge・権限回避を付けない。OBS の設定・シーン・録画は保持するが、本体内の追加プラグインは再導入が必要な場合がある。アプリや関連プロセスが動いている間は変更せず、利用者が終了して再確認する。
+- Antigravity は固定公式 installer のレビュー済み SHA256 を照合し、`--skip-path --skip-aliases` 付きで実行する。既存ありの no-op を避けるため所有確認した `agy.exe` だけを退避し、公式 manifest の SHA512 と実体を確認後に確定する。固定の OS CMD でレビュー済み installer だけを実行し、Windows 引用符は `windowsVerbatimArguments` で保持する。パスの展開・制御文字は事前に拒否する。失敗・中止時は旧バイナリを戻し、復旧ファイルが残れば次の操作を止めて手動確認を求める。共有 staging、`.gemini/antigravity-cli`、OS 資格情報、未知のファイルは削除しない。インストーラー更新時は [公式 CMD](https://antigravity.google/cli/install.cmd) と [オプション](https://www.antigravity.google/docs/cli/install/) を再レビューしてから digest を更新する。
 - npm の標準 prefix / root と実体を確認し、パッケージ外のリンク、別方式のランチャー、不正 manifest では操作しない。操作直前にも所有元を再確認する。再導入は削除後に導入するため、失敗時に元のパッケージが残る保証はない。利用者の認証・設定・履歴は削除しない。
-- コマンドは固定 argv・shell 無効・空の一時 npmrc・公式 registry で実行する。終了・失敗・中止時は一時領域を回収して再確認するが、停止未確認中は排他を保持する。同じ導入先のロックが異常終了で残った場合、自動削除しない。OS 上で対象 npm 処理の停止と所有権を確認してから運用者が復旧する。
-- 検証は `node --test backend_diag/checks/install-individual.check.mjs backend_diag/checks/install-manager.check.mjs backend_diag/checks/install-manager-api.check.mjs` と `node --test backend_diag/ui/src/導入状況/checks/*.check.cjs`。合成プロセス・一時 fixture・Vue イベントで確認し、実際のグローバル導入・削除・認証を行わない。Windows の shim と POSIX の実体は別ケースで検証する。
+- コマンドは固定 argv・shell 無効・空の一時 npmrc・公式 registry で実行する。終了・失敗・中止時は一時領域を回収して再確認するが、停止未確認中は排他を保持する。同じ OS 利用者の Diag 間では WinGet は全体、npm / Antigravity は同じ導入先で排他する。一時ロックは利用者別なので、別 OS 利用者間の競合は WinGet 自身の制御に従う。ロックが異常終了で残った場合、自動削除しない。OS 上で対象 npm 処理の停止と所有権を確認してから運用者が復旧する。
+- 検証は `node --test backend_diag/checks/install-*.check.mjs` と `node --test backend_diag/ui/src/導入状況/checks/*.check.cjs`。合成プロセス・一時 fixture・Vue イベントで確認し、実際のグローバル導入・削除・認証を行わない。Windows の shim と POSIX の実体は別ケースで検証する。
 - UI 変更時は配布画面へ反映するため `npm --prefix backend_diag/ui run build`、`npm --prefix backend_diag/ui run check` を実行する。実ブラウザ確認は別途許可された環境だけで行い、ソース・mock 成功と実OS画面検証を区別する。

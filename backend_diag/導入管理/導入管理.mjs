@@ -1,4 +1,4 @@
-// 明示操作専用の導入管理。登録済み npm パッケージだけを固定 argv で実行します。
+// 明示操作専用の導入管理。登録済みの固定プロバイダーだけを実行します。
 import {spawn,execFile} from 'node:child_process';
 import {readFile,realpath,stat,lstat,mkdtemp,writeFile,rm,open,unlink} from 'node:fs/promises';
 import {randomUUID,createHash} from 'node:crypto';
@@ -7,23 +7,27 @@ import {StringDecoder} from 'node:string_decoder';
 import path from 'node:path';
 import os from 'node:os';
 import {resolveProgram,probe} from '../診断/probes.mjs';
+import {WINGET_PACKAGES,inspectWinget,executeWinget} from './winget.mjs';
+import {inspectAntigravity,executeAntigravity} from './antigravity.mjs';
 
 // _setup.py の共通セットアップと同じ4パッケージ。クライアントから名前・コマンドを受け取らない。
 export const NPM_PACKAGES=Object.freeze({claude:'@anthropic-ai/claude-code',codex:'@openai/codex',copilot:'@github/copilot',opencode:'opencode-ai'});
 const packageFor=id=>typeof id==='string'&&Object.hasOwn(NPM_PACKAGES,id)?NPM_PACKAGES[id]:null;
 const ACTIONS=['導入','再導入','削除'];
+const providerFor=id=>packageFor(id)?'npm':typeof id==='string'&&Object.hasOwn(WINGET_PACKAGES,id)?'winget':id==='agy'?'antigravity':null;
+const affectedIds=id=>['ffmpeg','ffprobe','ffplay'].includes(id)?['ffmpeg','ffprobe','ffplay']:[id];
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 const noop=()=>{};
 export const LOG_LIMIT=120000;
 
-// 複数の Diag からも同じ npm 導入先を同時変更しない。異常終了で残ったロックを推測で削除しない。
+// 複数の Diag からも同じ導入先を同時変更しない。異常終了で残ったロックを推測で削除しない。
 export async function acquireInstallLock(prefix,{platform=process.platform,directory=os.tmpdir()}={}) {
   const resolved=await realpath(prefix).catch(()=>path.resolve(prefix));
   const key=createHash('sha256').update(platform==='win32'?resolved.toLowerCase():resolved).digest('hex').slice(0,32);
   const file=path.join(directory,`aidiy-npm-${key}.lock`);
   let handle;
   try{handle=await open(file,'wx',0o600);await handle.writeFile(String(process.pid));}
-  catch(error){if(handle){await handle.close();await unlink(file).catch(noop);}throw failure(error.code==='EEXIST'?'同じ npm 導入先で別の操作が実行中、または前回の停止確認が必要です。':'導入操作の排他ロックを作成できません。',409);}
+  catch(error){if(handle){await handle.close();await unlink(file).catch(noop);}throw failure(error.code==='EEXIST'?'同じ導入先で別の操作が実行中、または前回の停止確認が必要です。':'導入操作の排他ロックを作成できません。',409);}
   let released=false;return async()=>{if(released)return;released=true;await handle.close();await unlink(file);};
 }
 
@@ -39,7 +43,7 @@ export function safeInstallLog(text,env=process.env) {
 }
 
 // shell は使用しない。中止・期限超過後も終了確認まで待ち、停止未確認では排他を解除しない。
-export function runInstallCommand({executable,args,cwd,env,signal,onData=noop,onUncertain=noop,timeout=300000,outputLimit=4*1024*1024,spawnFn=spawn,platform=process.platform,killTree,isTreeRunning}) {
+export function runInstallCommand({executable,args,cwd,env,signal,onData=noop,onUncertain=noop,timeout=300000,outputLimit=4*1024*1024,spawnFn=spawn,platform=process.platform,killTree,isTreeRunning,windowsVerbatimArguments=false}) {
   return new Promise(resolve=>{
     let child,done=false,timedOut=false,stopped=false,overflow=false,processError=false,parentClosed=false,treeKilled=false,closeCode=null,bytes=0,timer,forceTimer,uncertainTimer,treeTimer;
     const treeGone=()=>{
@@ -64,7 +68,7 @@ export function runInstallCommand({executable,args,cwd,env,signal,onData=noop,on
     const stop=()=>{if(done||stopped)return;stopped=true;kill(false);forceTimer=setTimeout(()=>kill(true),1000);uncertainTimer=setTimeout(()=>{if(!done)onUncertain();},6000);};
     const finish=(code,error=false)=>{if(done)return;done=true;clearTimeout(timer);clearTimeout(forceTimer);clearTimeout(uncertainTimer);clearTimeout(treeTimer);signal?.removeEventListener('abort',stop);resolve({code,error,cancelled:Boolean(signal?.aborted),timedOut,overflow});};
     if(signal?.aborted){finish(null);return;}
-    try{child=spawnFn(executable,args,{cwd,env,shell:false,windowsHide:true,detached:platform!=='win32',stdio:['ignore','pipe','pipe']});}
+    try{child=spawnFn(executable,args,{cwd,env,shell:false,windowsHide:true,...(platform==='win32'&&windowsVerbatimArguments?{windowsVerbatimArguments:true}:{}),detached:platform!=='win32',stdio:['ignore','pipe','pipe']});}
     catch{finish(null,true);return;}
     signal?.addEventListener('abort',stop,{once:true});
     for(const stream of [child.stdout,child.stderr])if(stream){
@@ -150,19 +154,26 @@ export function npmCommands(npm,id,action,configFile) {
   return steps.map(step=>({executable:npm.executable,args:[npm.cli,step,...options,pkg],表示:`npm ${step} --global ${pkg}`}));
 }
 
-export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),env=process.env,platform=process.platform,findNpmFn=findNpm,capabilityFn=npmCapability,run=runInstallCommand,timeout=300000,acquireLock=acquireInstallLock}={}) {
+export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),env=process.env,platform=process.platform,findNpmFn=findNpm,capabilityFn=npmCapability,inspectWingetFn=inspectWinget,executeWingetFn=executeWinget,inspectAntigravityFn=inspectAntigravity,executeAntigravityFn=executeAntigravity,run=runInstallCommand,timeout=300000,acquireLock=acquireInstallLock}={}) {
   let current=null,controller=null,task=null,closed=false,cache=null,loading=null,generation=0;
   const busy=()=>Boolean(current?.実行中);
   const append=text=>{if(current)current.raw=(current.raw+String(text)).slice(-LOG_LIMIT*2);};
   async function inspect(){
-    let npm,reason;
-    try{npm=await findNpmFn({env,platform,run});}catch(error){reason=error.status?error.message:'npm の導入先を確認できません。';}
+    let npm,reason,winget,antigravity;
+    if(entries.some(entry=>packageFor(entry.id)))try{npm=await findNpmFn({env,platform,run});}catch(error){reason=error.status?error.message:'npm の導入先を確認できません。';}
+    const windowsEntries=entries.filter(entry=>providerFor(entry.id)==='winget');
+    if(windowsEntries.length)try{winget=await inspectWingetFn({entries:windowsEntries,env:installEnvironment(env),platform,run});}catch{winget={items:windowsEntries.map(entry=>({id:entry.id,操作:[],理由:'WinGet の導入元を確認できません。'}))};}
+    const agy=entries.find(entry=>entry.id==='agy');
+    if(agy)try{antigravity=await inspectAntigravityFn(agy,{env:installEnvironment(env),platform,run});}catch{antigravity={item:{id:'agy',操作:[],理由:'Antigravity の導入元を確認できません。'}};}
     const items=await Promise.all(entries.map(async entry=>{
-      if(!packageFor(entry.id))return {id:entry.id,操作:[],理由:'安全な導入・削除コマンドが登録されていません。'};
+      const provider=providerFor(entry.id);
+      if(provider==='winget')return winget.items.find(item=>item.id===entry.id)||{id:entry.id,操作:[],理由:'WinGet の導入元を確認できません。'};
+      if(provider==='antigravity')return antigravity.item;
+      if(provider!=='npm')return {id:entry.id,操作:[],理由:'安全な導入・削除コマンドが登録されていません。'};
       if(!npm)return {id:entry.id,パッケージ:NPM_PACKAGES[entry.id],操作:[],理由:reason};
       try{return await capabilityFn(entry,npm,{env,platform});}catch{return {id:entry.id,操作:[],理由:'導入元を確認できません。'};}
     }));
-    return {npm,items};
+    return {npm,winget:winget?.context,antigravity:antigravity?.context,items};
   }
   async function capabilities(){
     if(cache)return cache;
@@ -175,39 +186,71 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
     return {項目:state?.items||entries.map(entry=>({id:entry.id,操作:[],理由:'導入元を確認しています。'})),実行:publicJob()};
   }
   function invalidate(){if(!busy()){cache=null;generation++;}}
+  const ensureAllowed=(state,entry,action)=>{
+    if(!state.items.find(item=>item.id===entry.id)?.操作?.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
+  };
   async function execute(entry,action){
     let directory,releaseLock,status='完了',message='操作が完了しました。';
+    const provider=providerFor(entry.id);
+    const onUncertain=()=>{current.状態='停止未確認';current.説明='停止の完了を確認できません。実行中の処理が終了するまで新しい操作はできません。';};
+    const operationRun=async command=>{
+      if(command.表示)append(`$ ${command.表示}\n`);
+      const result=await run({...command,platform,cwd:command.cwd||directory,env:command.env||installEnvironment(env),signal:controller.signal,timeout:command.timeout??timeout,onData:command.onData||append,onUncertain});
+      // 変更後の読み取り照会（未導入等のコード）で、実操作の終了コードを上書きしない。
+      if(command.表示||!command.onData||command.onData===append)current.終了コード=result.code;
+      return result;
+    };
+    const checkedRun=async command=>{
+      const result=await operationRun(command);
+      if(result.cancelled||controller.signal.aborted)throw failure('操作を中止しました。');
+      if(result.timedOut)throw failure('実行時間の上限に達したため停止しました。');
+      if(result.overflow)throw failure('出力の上限に達したため停止しました。');
+      if(result.error||result.code!==0)throw failure(`コマンドが失敗しました（終了コード ${result.code??'起動不可'}）。`);
+      return result;
+    };
     try{
       await loading;
-      const fresh=await inspect();cache=fresh;
-      const allowed=fresh.items.find(item=>item.id===entry.id)?.操作||[];
-      if(!allowed.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
+      let fresh=await inspect();cache=fresh;ensureAllowed(fresh,entry,action);
       if(controller.signal.aborted)throw failure('操作を中止しました。');
-      releaseLock=await acquireLock(fresh.npm.prefix,{platform});
+      const context=fresh[provider],lockKey=context?.lockKey||context?.prefix;
+      if(!lockKey)throw failure('導入先の排他を確認できません。',409);
+      releaseLock=await acquireLock(lockKey,{platform});
       // ロック取得を待つ間に別の操作が完了していても、古い所有判定では実行しない。
-      const lockedCapability=await capabilityFn(entry,fresh.npm,{env,platform});
-      if(!lockedCapability.操作?.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
+      if(provider==='npm'){
+        const lockedCapability=await capabilityFn(entry,fresh.npm,{env,platform});
+        if(!lockedCapability.操作?.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
+      }else{
+        fresh=await inspect();cache=fresh;ensureAllowed(fresh,entry,action);
+        const lockedKey=fresh[provider]?.lockKey||fresh[provider]?.prefix;
+        if(lockedKey!==lockKey)throw failure('導入先が変わりました。操作せず再確認します。',409);
+      }
+      if(controller.signal.aborted)throw failure('操作を中止しました。');
       directory=await mkdtemp(path.join(os.tmpdir(),'aidiy-install-'));
-      const configFile=path.join(directory,'npmrc');await writeFile(configFile,'',{mode:0o600});await writeFile(configFile+'.global','',{mode:0o600});
-      for(const command of npmCommands(fresh.npm,entry.id,action,configFile)){
+      if(provider==='npm'){
+        const configFile=path.join(directory,'npmrc');await writeFile(configFile,'',{mode:0o600});await writeFile(configFile+'.global','',{mode:0o600});
+        for(const command of npmCommands(fresh.npm,entry.id,action,configFile))await checkedRun(command);
+      }else{
+        const executeProvider=provider==='winget'?executeWingetFn:executeAntigravityFn;
+        // 実コマンドは共通の期限・中止・終了確認を通す。プロバイダー内の照会も実行中として排他する。
+        const result=await executeProvider(entry,action,fresh[provider],{env:installEnvironment(env),platform,run:operationRun,signal:controller.signal,timeout,cwd:directory,onData:append,onUncertain});
+        if(result?.code!==undefined)current.終了コード=result.code;
         if(controller.signal.aborted)throw failure('操作を中止しました。');
-        append(`$ ${command.表示}\n`);
-        const result=await run({...command,cwd:directory,env:installEnvironment(env),signal:controller.signal,timeout,onData:append,onUncertain:()=>{current.状態='停止未確認';current.説明='停止の完了を確認できません。実行中の処理が終了するまで新しい操作はできません。';}});
-        current.終了コード=result.code;
-        if(result.cancelled)throw failure('操作を中止しました。');
-        if(result.timedOut)throw failure('実行時間の上限に達したため停止しました。');
-        if(result.overflow)throw failure('出力の上限に達したため停止しました。');
-        if(result.error||result.code!==0)throw failure(`コマンドが失敗しました（終了コード ${result.code??'起動不可'}）。`);
       }
     }catch(error){status=controller.signal.aborted?'中止':'失敗';message=error.status?error.message:'導入操作でエラーが発生しました。';}
     finally{
       if(directory)await rm(directory,{recursive:true,force:true}).catch(()=>append('一時ファイルの後片付けに失敗しました。\n'));
       current.状態='確認中';append(`\n${message}\n導入状況を再確認します。\n`);
-      try{
-        const result=await probeFn(entry);current.結果=result;Object.assign(current,onResult(result));
-        append(`確認結果: ${result.状態}\n${result.説明||''}\n`);
-        if(status==='完了'&&((action==='削除'&&result.パス)||(action!=='削除'&&result.状態!=='OK'))){status='失敗';message=action==='削除'?'別の導入先を含め、実行ファイルが残っています。確認結果を参照してください。':'コマンドは終了しましたが、導入を確認できませんでした。PATH の反映や確認結果を参照してください。';append(`${message}\n`);}
-      }catch{status='失敗';message='操作後の導入確認に失敗しました。確認ボタンで再試行してください。';append(`${message}\n`);}
+      const checked=[];
+      // FFmpeg は一度のパッケージ操作の後、3つとも個別確認と全く同じ probe / 結果反映を呼ぶ。
+      for(const target of entries.filter(item=>affectedIds(entry.id).includes(item.id))){
+        try{
+          const result=await probeFn(target);checked.push(result);Object.assign(current,onResult(result));
+          if(target.id===entry.id)current.結果=result;
+          append(`確認結果 [${target.name||target.id}]: ${result.状態}\n${result.説明||''}\n`);
+          if(status==='完了'&&((action==='削除'&&result.パス)||(action!=='削除'&&result.状態!=='OK'))){status='失敗';message=action==='削除'?'別の導入先を含め、実行ファイルが残っています。確認結果を参照してください。':'コマンドは終了しましたが、導入を確認できませんでした。PATH の反映や確認結果を参照してください。';append(`${message}\n`);}
+        }catch{status='失敗';message='操作後の導入確認に失敗しました。確認ボタンで再試行してください。';append(`${target.name||target.id}: ${message}\n`);}
+      }
+      current.結果一覧=checked;
       cache=null;try{await capabilities();}catch{}
       if(releaseLock)await releaseLock().catch(()=>{status='失敗';message='導入操作の排他ロックを解除できませんでした。';append(`${message}\n`);});
       current.状態=status;current.説明=message;current.終了日時=new Date().toISOString();current.実行中=false;
@@ -215,9 +258,9 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
   }
   async function start(id,action){
     const entry=entries.find(item=>item.id===id);
-    if(!entry||!packageFor(id)||!ACTIONS.includes(action))throw failure('未対応の導入操作です。',404);
+    if(!entry||!providerFor(id)||!ACTIONS.includes(action))throw failure('未対応の導入操作です。',404);
     if(closed||busy())throw failure('導入操作の実行中です。完了後に再試行してください。',409);
-    controller=new AbortController();current={実行ID:randomUUID(),対象:id,操作:action,状態:'実行中',実行中:true,開始日時:new Date().toISOString(),終了日時:null,raw:`${entry.name||id}: ${action}\n導入元を確認しています。\n`};
+    controller=new AbortController();current={実行ID:randomUUID(),対象:id,関連項目:affectedIds(id),操作:action,状態:'実行中',実行中:true,開始日時:new Date().toISOString(),終了日時:null,raw:`${entry.name||id}: ${action}\n導入元を確認しています。\n`};
     task=execute(entry,action);return snapshot();
   }
   async function cancel(id){

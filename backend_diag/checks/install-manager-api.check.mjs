@@ -125,3 +125,17 @@ test('サーバー終了は所有する導入処理だけを中止して最後�
   assert.equal(closedTrials,1);assert.equal(closedStarts,1);assert.equal(active.signal.aborted,true);assert.equal(manager.busy(),true);
   gate.resolve();const job=await settled(manager);assert.equal(job.状態,'中止');assert.equal(checks,1);await assert.rejects(()=>manager.start('codex','導入'),{status:409});
 });
+
+test('FFmpeg 一式は1操作・3個別確認を共有一覧へ反映し、他行と書込内容を保持する',async t=>{
+  const all=['ffmpeg','ffprobe','ffplay','uv'].map(id=>({id,name:id})),checked=[],operations=[];
+  const {handler,manager,writes}=fixture(t,{entries:all,scanFn:async()=>all.map(entry=>({id:entry.id,状態:'OK',バージョン:'before'})),
+    probeFn:async entry=>{checked.push(entry.id);return {id:entry.id,状態:'OK',バージョン:'after'};},managerOptions:{platform:'win32',
+      inspectWingetFn:async({entries})=>({items:entries.map(entry=>({id:entry.id,操作:['再導入']})),context:{lockKey:'fixture-winget'}}),
+      executeWingetFn:async(entry,action)=>{operations.push([entry.id,action]);return success;}}});
+  await request(handler,'api/診断');assert.equal((await request(handler,'api/導入管理/ffprobe/再導入')).status,200);
+  const job=await settled(manager);assert.equal(job.状態,'完了');assert.equal(job.確認済み,true);assert.deepEqual(operations,[['ffprobe','再導入']]);
+  assert.deepEqual(checked,['ffmpeg','ffprobe','ffplay']);assert.deepEqual(job.結果一覧.map(row=>row.id),checked);assert.equal(job.結果.id,'ffprobe');
+  const list=(await request(handler,'api/一覧',{method:'GET'})).body;
+  assert.deepEqual(list.結果.map(row=>row.バージョン),['after','after','after','before']);assert.equal(writes.length,0);
+  assert.equal((await request(handler,'api/書込')).status,200);assert.deepEqual(writes[0].map(row=>row.バージョン),['after','after','after','before']);
+});

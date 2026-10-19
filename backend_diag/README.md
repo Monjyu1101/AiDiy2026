@@ -11,7 +11,7 @@
 - `diag_main.mjs` / `aidiy_diag` / `aidiy_diag.cmd`: 外部から使う起動入口。
 - `起動/`: Electron ウィンドウ・preload・起動監視・安全な診断ログ。
 - `診断/`: インストール確認、MCP 状態、headless 実行、カタログと調査範囲。
-- `導入管理/`: 固定 npm パッケージの明示導入・再導入・削除と、終了後の個別確認。
+- `導入管理/`: 固定 npm / Windows WinGet / Antigravity の明示導入・再導入・削除と、終了後の個別確認。
 - `モデル情報/`: キー確認、モデル・音声 JSON の合成、公開モデル一覧。`openrouter_models/` はこの機能専用の同梱キャッシュです。
 - `runtime/`: モデル判定・通信の TypeScript と配布用 `.mjs`。
 - `ui/` / `static/`: Vue ソース・ビルド設定と配布画面。
@@ -54,15 +54,28 @@ aidiy_diag --headless       # 画面を開かず全診断を最速で実行し�
 
 ### 各項目の導入・再導入・削除
 
-名称の右に、安全にコマンド管理できる項目だけ「導入」または「再導入」「削除」を表示します。現在の対象は既存 `_setup.py` と `scripts/cli_bat/__install_cli.bat` / `__uninstall_cli.bat` と同じ npm グローバルの Claude Code（`@anthropic-ai/claude-code`）、Codex（`@openai/codex`）、Copilot（`@github/copilot`）、OpenCode（`opencode-ai`）です。
+名称の右に、安全な導入方法と所有元を確認できた項目だけ「導入」または「再導入」「削除」を表示します。初期表示・全テスト・headless は導入操作を実行しません。
 
-npm 本体・導入先・パッケージ所有元を確認し、未導入なら導入、現在の npm 管理下なら再導入・削除を許可します。native / Homebrew 等の別方式の実行ファイル、外部リンク、不明な所有元には操作を出しません。Antigravity / Grok の BAT 参照例は専用 uninstall ではなく Windows の手動フォルダ削除と PATH 編集のため、この管理には含めません。Node.js / npm / Electron 自体、その他の未対応項目も確認だけです。
+| 対象 | 導入方法・制限 |
+|---|---|
+| Claude Code / Codex / Copilot / OpenCode | 従来と同じ固定 npm グローバルパッケージ。標準 prefix / root と実体・shim を照合します。 |
+| FFmpeg 一式 | Windows の `Gyan.FFmpeg`。ffmpeg / ffprobe / ffplay のどの行からもパッケージ操作は1回だけ。終了後は3行を各1回確認します。 |
+| uv | Windows の `astral-sh.uv`。uv / uvx 本体を管理し、Python・仮想環境・キャッシュは削除しません。pip / standalone 等の別導入元は操作しません。 |
+| Ollama | Windows の `Ollama.Ollama` の新規導入のみ。モデル保持を保証できないため再導入・削除は表示しません。 |
+| OBS / VS Code Stable | Windows の `OBSProject.OBSStudio` / `Microsoft.VisualStudioCode`。標準配置と導入記録を確認できる場合のみ再導入・削除。設定・プロファイル・シーン・拡張機能を保持しますが、OBS 本体内の追加プラグインは再導入が必要になる場合があります。 |
+| Antigravity CLI | Windows の公式 `https://antigravity.google/cli/install.cmd`。標準の `%LOCALAPPDATA%\agy\bin\agy.exe` の署名・製品情報または一致する導入記録を照合します。 |
 
-操作前に対象と影響を確認します。再導入は対象 npm パッケージの削除→導入です。途中で失敗・中止すると未導入になることがあります。認証情報・利用者設定・履歴は削除せず、PATH の編集や管理者昇格は行いません。右パネルは実行コンソールへ切り替わり、完了・失敗・中止後に「確認」ボタンと同じ固定 probe と結果反映処理を1回実行します。別項目を選んだ場合はその選択を維持します。自動保存やモデル・認証試験は行いません。
+WinGet の一覧に出るだけでは所有確認にしません。公式 source、登録されたパッケージ・導入先・実行ファイル・アンインストーラーを照合し、native アプリはこの Diag が導入して記録したものだけを変更します。別の PATH 上の実行ファイル、手動導入、複数 scope、portable / Insiders、リンク・junction・所有不明の場合は再導入・削除を出しません。稼働中の対象・関連プロセスは利用者が終了してから再確認してください。自動でアプリを終了しません。Windows 以外の追加対象は確認だけです。Grok / Chrome / Python / Node.js / npm / Electron の管理範囲は増やしません。
 
-コマンドはサーバーの固定 ID→パッケージ対応表だけから構築し、任意シェル、本文、クエリ、クライアント指定コマンドは受け付けません。公式 npm registry と空の一時 npm 設定を使用し、秘密値を継承しない環境で実行します。1コマンド5分・出力4 MiB、表示ログ120,000文字が上限です。同じ Diag の診断・書込、別 Diag の同一 npm 導入先とも排他します。中止後も所有プロセスの終了・再確認まで排他を保ち、停止未確認では解除しません。
+Antigravity の公式インストーラーは既存バイナリがあると何もしないため、再導入では所有確認済みの `agy.exe` だけを退避してから実行し、公式 SHA512 を確認します。失敗・中止時は旧バイナリを復元し、未確認の出力や復旧が必要な退避ファイルを推測で削除しません。公式の `--skip-path --skip-aliases` を指定し、`.gemini/antigravity-cli`・認証・OS 資格情報を保持します。フォルダ全体の削除、共有 staging の削除、PATH の一括編集はしません。レビュー済み installer の SHA256 が変わった場合は安全確認の更新まで停止します。公式の [導入オプション](https://www.antigravity.google/docs/cli/install/) を参照してください。
 
-初期表示・全テスト・headless は導入操作を実行しません。確認時の npm 導入先照会は読み取り専用です。詳しい検証・運用上の注意は [環境診断運用](../_AIDIY/knowledge/backend_diag,環境診断運用.md#個別確認と導入管理) を参照してください。
+操作前に対象・一式の範囲・影響・提供元の案内を確認します。npm / WinGet の再導入は削除後に導入するため、失敗・中止すると本体が未導入になることがあります。WinGet の標準インストーラーが PATH 登録や OS の管理者承認を求める場合がありますが、利用規約への自動同意・権限回避・再起動・任意のコマンド入力は行いません。認証・利用者設定・履歴を削除するコマンドは実行しません。
+
+右パネルは共通の実行コンソールへ切り替わり、完了・失敗・中止後に「確認」ボタンと同じ固定 probe と結果反映を対象ごとに1回実行します。FFmpeg 一式では3行の結果を同じコンソールへ表示します。別項目・タブへ移った場合はその選択を維持し、新しい個別確認結果を古い実行結果で巻き戻しません。自動保存やモデル・認証試験は行いません。
+
+コマンドはサーバーの固定 ID 対応表だけから構築し、本文・クエリ・クライアント指定コマンドは受け付けません。秘密値を継承しない実行環境、1コマンド5分・出力4 MiB、表示ログ120,000文字の上限を使用します。npm は公式 registry と空の一時 npm 設定、WinGet は照合済み公式 source、Antigravity は固定の公式 URL と検証済み installer を使います。同じ Diag の診断・書込、同じ OS 利用者が起動した別 Diag の同一 npm / Antigravity 導入先、WinGet 全体と排他します。別 OS 利用者との競合は WinGet 自身の制御に従い、共用フォルダの権限は変更しません。停止未確認中はロックを解除しません。
+
+検証は合成プロセス・一時 fixture・Vue イベントで行い、実際のグローバル導入・削除は行いません。実 Windows のインストーラー・UAC・実アプリ・実ブラウザ画面は別途確認が必要です。詳しくは [環境診断運用](../_AIDIY/knowledge/backend_diag,環境診断運用.md#個別確認と導入管理) を参照してください。
 
 ### モデル情報ファイル（`<プロバイダ>_models_info.json`）
 

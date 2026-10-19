@@ -37,8 +37,8 @@ test('導入・再導入・削除は対象と影響を確認し、取り消し�
     assert.equal(await f.state.開始(id, action, '対象 CLI'), false);
     assert.equal(f.calls.length, 1); assert.equal(f.操作中.value, false);
     assert.match(prompts[0], new RegExp(`対象 CLI を${action}`));
-    assert.match(prompts[0], /対象パッケージ:/); assert.match(prompts[0], /グローバル/); assert.match(prompts[0], /認証情報・利用者設定・会話履歴は削除しません/);
-    assert.match(prompts[0], /終了後に「確認」ボタンと同じ処理を自動実行/);
+    assert.match(prompts[0], /対象パッケージ:/); assert.match(prompts[0], /パッケージ/); assert.match(prompts[0], /認証情報・利用者設定・会話履歴は削除しません/);
+    assert.match(prompts[0], /終了後に対象の各項目で「確認」ボタンと同じ処理を自動実行/);
     assert.match(prompts[0], action === '削除' ? /利用できなくなります/ : /ネットワーク.*取得.*実行/);
     if (action === '再導入') { assert.match(prompts[0], /削除してから、再度インストール/); assert.match(prompts[0], /再導入に失敗すると.*利用できなくなる/); }
     f.state.終了();
@@ -199,4 +199,27 @@ test('新しい対象行を反映しても別項目の後発確認日時を減�
   state.操作結果を反映(completed({ 結果: { id: 'claude', 状態: 'OK', バージョン: 'new-managed', 確認日時: '2026-10-19T22:00:00Z' } }));
   assert.equal(state.結果.value[0].バージョン, 'new-managed'); assert.equal(state.結果.value[1].確認日時, '2026-10-19T23:00:00Z');
   assert.equal(state.前回実行日時.value, '2026-10-19T23:00:00Z');
+});
+
+test('追加パッケージの確認は一式の対象・導入方式・案内を示し、未対応操作を作らない', async () => {
+  const f = await fixture();
+  f.setData({ 項目: [{ id: 'ffprobe', パッケージ: 'Gyan.FFmpeg', 操作: ['再導入', '削除'], 関連項目: ['ffmpeg', 'ffprobe', 'ffplay'], 確認説明: 'WinGet の一式を管理します。実行中は変更できません。', 規約URL: 'https://www.gyan.dev/ffmpeg/builds/' }, { id: 'ollama', 操作: [], 理由: 'モデル保持を保証できないため削除しません。' }], 実行: null });
+  await f.state.接続(true);
+  await f.state.開始('ffprobe', '再導入', 'ffprobe');
+  assert.match(f.approvals[0], /Gyan\.FFmpeg/); assert.match(f.approvals[0], /ffmpeg \/ ffprobe \/ ffplay/);
+  assert.match(f.approvals[0], /WinGet の一式/); assert.match(f.approvals[0], /https:\/\/www\.gyan\.dev/);
+  assert.match(f.approvals[0], /対象の各項目で「確認」ボタンと同じ処理/);
+  assert.deepEqual(f.state.可能操作('ollama'), []);
+  f.state.終了();
+});
+
+test('一式の完了結果をまとめて一度だけ反映し、他行・新しい確認・選択は維持する', async () => {
+  const { 導入状況状態を作成 } = await import('../導入状況状態.mjs');
+  const state = 導入状況状態を作成({ api: () => assert.fail('追加確認 API は呼ばない'), 接続済み: ref(true), 通知: ref('') });
+  const all = ['ffmpeg', 'ffprobe', 'ffplay', 'uv'].map(id => ({ id }));
+  state.一覧を反映({ 項目: all, 結果: all.map(({ id }) => ({ id, 状態: 'OK', バージョン: id === 'ffprobe' ? 'newer' : 'old', 確認日時: id === 'ffprobe' ? '2026-10-19T23:10:00Z' : '2026-10-19T23:00:00Z' })) });
+  state.書込済み.value = true;
+  state.操作結果を反映({ 対象: 'ffmpeg', 確認済み: true, 前回実行日時: '2026-10-19T23:05:00Z', 結果一覧: all.map(({ id }) => ({ id, 状態: 'OK', バージョン: 'installed', 確認日時: '2026-10-19T23:05:00Z' })) });
+  assert.deepEqual(state.結果.value.map(row => row.バージョン), ['installed', 'newer', 'installed', 'old']);
+  assert.equal(state.確認済み.value, true); assert.equal(state.書込済み.value, false); assert.equal(state.表示中.value, null);
 });

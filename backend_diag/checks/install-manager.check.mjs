@@ -386,3 +386,11 @@ test('管理処理は親 close 後も子孫停止まで prefix ロックを保�
   await new Promise(resolve=>setTimeout(resolve,20));assert.equal(released,0);assert.equal(checks,0);assert.equal(manager.busy(),true);await assert.rejects(()=>manager.start('claude','導入'),{status:409});
   alive=false;assert.equal((await settled(manager)).状態,'中止');assert.equal(released,1);assert.equal(checks,1);
 });
+
+
+test('固定 CMD だけは既に組み立てた引用符を Windows へ保持し、shell は無効のまま実行する',async()=>{
+  const child=syntheticProcess();let captured;
+  const args=['/d','/v:off','/s','/c','""C:\\fixture (space)\\install.cmd" --skip-path --skip-aliases"'];
+  const pending=runInstallCommand({platform:'win32',executable:'C:\\Windows\\System32\\cmd.exe',args,windowsVerbatimArguments:true,spawnFn:(_executable,actualArgs,options)=>{captured={actualArgs,options};return child;}});
+  child.emit('close',0);assert.equal((await pending).code,0);assert.deepEqual(captured.actualArgs,args);assert.equal(captured.options.windowsVerbatimArguments,true);assert.equal(captured.options.shell,false);
+});

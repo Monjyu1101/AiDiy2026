@@ -102,3 +102,18 @@ test('Appは接続・終了・全テストロックを配線し、管理完了�
   assert.match(app, /:操作="導入操作" :操作中="操作中"/);
   assert.doesNotMatch(source('導入状況/導入操作状態.mjs'), /tab\.value|表示中\.value|選択ID\.value/);
 });
+
+test('FFmpeg 一式のどの行からも共有コンソールと3行の確認結果を表示する', async () => {
+  const bundle = ['ffmpeg', 'ffprobe', 'ffplay'].map(id => ({ id, name: id, menuGroup: 'その他拡張', commands: [id] }));
+  const run = ref({ 実行ID: 'bundle-job', 対象: 'ffmpeg', 関連項目: bundle.map(row => row.id), 状態: '完了', 実行中: false, 操作: '導入', ログ: 'one winget package\n', 結果: { id: 'ffmpeg', 状態: 'OK' }, 結果一覧: bundle.map(row => ({ id: row.id, 状態: 'OK', 説明: `${row.id} checked` })) });
+  const operation = { 実行: run, 可能操作: () => [], 能力: () => ({}) };
+  const ui = mount(() => ({ 項目: bundle, 結果: [], 接続済み: true, 操作: operation, 操作中: false }));
+  try {
+    ui.select('ffprobe').props.onClick(); await flush();
+    const consoleButton = ui.nodes().find(node => node.tag === 'button' && text(node) === 'コンソール');
+    assert.ok(consoleButton); consoleButton.props.onClick(); await flush();
+    assert.match(text(ui.nodes().find(node => node.tag === 'pre')), /one winget package/);
+    assert.deepEqual(ui.nodes().filter(node => node.props['data-install-result']).map(node => node.props['data-install-result']), ['ffmpeg', 'ffprobe', 'ffplay']);
+    assert.equal(ui.select('ffprobe').props['aria-pressed'], true);
+  } finally { ui.app.unmount(); }
+});

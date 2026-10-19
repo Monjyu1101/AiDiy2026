@@ -21,7 +21,7 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
     if (!操作中.value) {
       取消要求済み.value = false;
       // 同じ完了応答を繰り返し取得しても、後から行った個別確認を上書きしない。
-      if (run?.結果 && run.実行ID !== merged) { 結果反映(run); merged = run.実行ID; }
+      if ((run?.結果 || run?.結果一覧?.length) && run.実行ID !== merged) { 結果反映(run); merged = run.実行ID; }
     }
   }
   async function 読込() {
@@ -52,8 +52,8 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
   }
   function 確認文(id, action, name) {
     const capability = 能力(id);
-    const change = action === '削除' ? 'グローバル導入されたパッケージを削除します。この CLI は利用できなくなります。' : action === '再導入' ? 'グローバル導入されたパッケージを削除してから、再度インストールします。再導入に失敗すると、この CLI が利用できなくなる場合があります。' : '診断サーバーの環境へパッケージをグローバル導入します。';
-    return `${name || id} を${action}しますか？\n対象パッケージ: ${capability?.パッケージ || id}\n\n${change}\n認証情報・利用者設定・会話履歴は削除しません。\n${action === '削除' ? 'パッケージ管理コマンドを実行します。' : 'ネットワークからパッケージを取得し、インストール処理を実行します。'}\n終了後に「確認」ボタンと同じ処理を自動実行します。`;
+    const change = action === '削除' ? '対象パッケージを削除します。このプログラムは利用できなくなります。' : action === '再導入' ? '対象パッケージを削除してから、再度インストールします。再導入に失敗すると、このプログラムが利用できなくなる場合があります。' : '診断サーバーの環境へパッケージを導入します。';
+    return `${name || id} を${action}しますか？\n対象パッケージ: ${capability?.パッケージ || id}\n\n${change}\n認証情報・利用者設定・会話履歴は削除しません。\n${[capability?.説明, capability?.確認説明].filter(Boolean).join('\n')}\n${capability?.関連項目?.length > 1 ? `一式の対象: ${capability.関連項目.join(' / ')}\n` : ''}${capability?.規約URL ? `提供元の案内・規約: ${capability.規約URL}\n` : ''}${action === '削除' ? 'パッケージ管理コマンドを実行します。' : 'ネットワークからパッケージを取得し、インストール処理を実行します。'}\n終了後に対象の各項目で「確認」ボタンと同じ処理を自動実行します。`;
   }
   async function 開始(id, action, name) {
     if (!enabled || disposed || !接続済み.value || 操作中.value || 読込中.value || 競合中() || !可能操作(id).includes(action)) return false;

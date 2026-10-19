@@ -73,17 +73,23 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
     } catch (error) { 結果.value = 前回; 通知.value = error.message; return false; }
     finally { 個別確認中.value = ''; }
   }
-  // 導入操作後はサーバー側の再確認1件だけを反映し、選択・他の項目は保つ。
+  // 操作後も各行を個別確認と同じ結果で更新する。FFmpeg 一式以外の結果は受け取らない。
   function 操作結果を反映(data) {
-    if (!data.結果 || data.結果.id !== data.対象 || !項目.value.some(entry => entry.id === data.対象)) return;
+    if (!項目.value.some(entry => entry.id === data.対象)) return;
+    const allowed = ['ffmpeg', 'ffprobe', 'ffplay'].includes(data.対象) ? ['ffmpeg', 'ffprobe', 'ffplay'] : [data.対象];
+    const incoming = Array.isArray(data.結果一覧) ? data.結果一覧 : data.結果 ? [data.結果] : [];
     const byId = new Map(結果.value.map(item => [item.id, item]));
-    const previousTime = Date.parse(byId.get(data.対象)?.確認日時), incomingTime = Date.parse(data.結果.確認日時);
-    // 再接続時に履歴の完了実行を取得しても、一覧の新しい個別確認結果へ巻き戻さない。
-    // 既存に日時があり、履歴側の日時が不明な場合も既存結果を優先する。
-    if (Number.isFinite(previousTime) && (!Number.isFinite(incomingTime) || incomingTime <= previousTime)) return;
-    byId.set(data.対象, data.結果);
+    let changed = false;
+    for (const result of incoming) {
+      if (!result || !allowed.includes(result.id) || !項目.value.some(entry => entry.id === result.id)) continue;
+      const previousTime = Date.parse(byId.get(result.id)?.確認日時), incomingTime = Date.parse(result.確認日時);
+      // 再接続時の古い完了実行で、新しい個別確認結果へ巻き戻さない。
+      if (Number.isFinite(previousTime) && (!Number.isFinite(incomingTime) || incomingTime <= previousTime)) continue;
+      byId.set(result.id, result); changed = true;
+    }
+    if (!changed) return;
     結果.value = 項目.value.flatMap(entry => byId.has(entry.id) ? [byId.get(entry.id)] : []);
-    const nextLastRun = data.前回実行日時 || data.結果.確認日時;
+    const nextLastRun = data.前回実行日時 || data.結果?.確認日時;
     const previousLastTime = Date.parse(前回実行日時.value), nextLastTime = Date.parse(nextLastRun);
     if (nextLastRun && (!Number.isFinite(previousLastTime) || Number.isFinite(nextLastTime) && nextLastTime >= previousLastTime)) 前回実行日時.value = nextLastRun;
     確認済み.value = data.確認済み === true; 書込済み.value = false;

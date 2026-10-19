@@ -114,7 +114,14 @@
       }
     ],
     "menuGroup": "ベース",
-    "usageTier": "base"
+    "usageTier": "base",
+    "paths": {
+      "win32": [
+        "$LOCALAPPDATA/Microsoft/WinGet/Links/uv.exe",
+        "$PROGRAMFILES/WinGet/Links/uv.exe",
+        "${PROGRAMFILES(X86)}/WinGet/Links/uv.exe"
+      ]
+    }
   },
   {
     "id": "node",
@@ -760,7 +767,12 @@
       }
     ],
     "menuGroup": "CLI群",
-    "usageTier": "cli"
+    "usageTier": "cli",
+    "paths": {
+      "win32": [
+        "$LOCALAPPDATA/Programs/Ollama/ollama.exe"
+      ]
+    }
   },
   {
     "id": "ffmpeg",
@@ -798,7 +810,14 @@
       }
     ],
     "menuGroup": "その他拡張",
-    "usageTier": "integration"
+    "usageTier": "integration",
+    "paths": {
+      "win32": [
+        "$LOCALAPPDATA/Microsoft/WinGet/Links/ffmpeg.exe",
+        "$PROGRAMFILES/WinGet/Links/ffmpeg.exe",
+        "${PROGRAMFILES(X86)}/WinGet/Links/ffmpeg.exe"
+      ]
+    }
   },
   {
     "id": "ffprobe",
@@ -844,7 +863,14 @@
       }
     ],
     "menuGroup": "その他拡張",
-    "usageTier": "integration"
+    "usageTier": "integration",
+    "paths": {
+      "win32": [
+        "$LOCALAPPDATA/Microsoft/WinGet/Links/ffprobe.exe",
+        "$PROGRAMFILES/WinGet/Links/ffprobe.exe",
+        "${PROGRAMFILES(X86)}/WinGet/Links/ffprobe.exe"
+      ]
+    }
   },
   {
     "id": "ffplay",
@@ -890,7 +916,14 @@
       }
     ],
     "menuGroup": "その他拡張",
-    "usageTier": "integration"
+    "usageTier": "integration",
+    "paths": {
+      "win32": [
+        "$LOCALAPPDATA/Microsoft/WinGet/Links/ffplay.exe",
+        "$PROGRAMFILES/WinGet/Links/ffplay.exe",
+        "${PROGRAMFILES(X86)}/WinGet/Links/ffplay.exe"
+      ]
+    }
   },
   {
     "id": "chrome",
@@ -1027,7 +1060,9 @@
     "paths": {
       "win32": [
         "$LOCALAPPDATA/Programs/Microsoft VS Code/bin/code.cmd",
-        "$LOCALAPPDATA/Programs/Microsoft VS Code Insiders/bin/code-insiders.cmd"
+        "$LOCALAPPDATA/Programs/Microsoft VS Code Insiders/bin/code-insiders.cmd",
+        "$PROGRAMFILES/Microsoft VS Code/bin/code.cmd",
+        "${PROGRAMFILES(X86)}/Microsoft VS Code/bin/code.cmd"
       ],
       "linux": [
         "$VSCODE_CWD/bin/remote-cli/code"
