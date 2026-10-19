@@ -18,6 +18,7 @@ import {headlessMain,writeInstallReport,INSTALL_FILE} from './診断/headless.mj
 import {writeIntegrationInfo,INTEGRATION_FILE} from './モデル情報/integration_info.mjs';
 import {writeModelsInfo} from './モデル情報/models_info.mjs';
 import {createPreviousResults} from './診断/前回結果.mjs';
+import {createInstallManager} from './導入管理/導入管理.mjs';
 import {createStartManager} from './起動/サービス管理.mjs';
 import {createAppLauncher} from './起動/アプリ起動.mjs';
 import {createPortStatusChecker} from './起動/ポート状態.mjs';
@@ -63,13 +64,20 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
+  const recordInstallResult=(result,started=new Date())=>{
+    const byId=new Map(results.map(item=>[item.id,item]));byId.set(result.id,result);
+    results=entries.flatMap(item=>byId.has(item.id)?[byId.get(item.id)]:[]);
+    scanStarted ??= started;scanFinished=new Date();
+    return {前回実行日時:scanFinished.toISOString(),確認済み:results.length===entries.length};
+  };
+  const management=installManagerFactory({entries,probeFn,onResult:recordInstallResult});
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
   for(const id of ['avatar','ide','term','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
-  return async (req,res) => {
+  const handler=async (req,res) => {
     const reply = (status, body, type='application/json; charset=utf-8') => {
       if (res.destroyed) return;
       const content = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
@@ -85,6 +93,17 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if(route==='api/導入管理'&&req.method==='GET')return reply(200,await management.snapshot());
+      if(route?.startsWith('api/導入管理/')&&['POST','DELETE'].includes(req.method)){
+        if(hasBody(req))return reply(400,{エラー:'導入操作への引数は指定できません。'});
+        const parts=route.slice('api/導入管理/'.length).split('/');
+        try{
+          if(req.method==='DELETE'&&parts.length===1)return reply(200,await management.cancel(parts[0]));
+          if(req.method!=='POST'||parts.length!==2)return reply(404,{エラー:'見つかりません。'});
+          if(busy||writing||management.busy())return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
+          return reply(200,await management.start(parts[0],parts[1]));
+        }catch(error){return reply(error.status||500,{エラー:error.status?error.message:'導入操作でエラーが発生しました。'});}
+      }
       if(route==='api/アプリ起動'&&req.method==='GET')return reply(200,appLauncher.catalog());
       if(route?.startsWith('api/アプリ起動/')&&req.method==='POST'){
         if(!['api/アプリ起動/開始','api/アプリ起動/フォルダ'].includes(route))return reply(404,{エラー:'見つかりません。'});
@@ -168,7 +187,9 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       }
       if (req.method === 'GET' && route === 'api/一覧') {
         const previous=(await previousResults?.snapshot())?.導入状況;
-        return reply(200,{項目:entries,結果:results.length?results:(previous?.結果||[]).filter(item=>entries.some(entry=>entry.id===item.id)),前回実行日時:scanFinished?.toISOString()||previous?.前回実行日時||null,調査:coverage});
+        // 個別確認後も、未確認の行は保存済みの表示を維持する。保存対象には混ぜない。
+        const byId=new Map([...(previous?.結果||[]),...results].map(item=>[item.id,item]));
+        return reply(200,{項目:entries,結果:entries.flatMap(entry=>byId.has(entry.id)?[byId.get(entry.id)]:[]),前回実行日時:scanFinished?.toISOString()||previous?.前回実行日時||null,調査:coverage});
       }
       // 明示的に読み直す側だけ破棄し、別タブの確認結果は書込まで保持する。
       if (req.method === 'GET' && ['api/キー設定','api/キー設定/モデル一覧','api/キー設定/外部連携'].includes(route)) {
@@ -194,11 +215,26 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       }
       // 確認中に終わった項目だけを返す（画面の逐次表示用。引数・任意コマンドは受け付けない）。
       if (req.method === 'GET' && route === 'api/診断/進捗') return reply(200,{実行中:busy,結果:busy?progress:[]});
+      // 登録済みの1項目だけを同じ固定 probe で再確認する。任意コマンド・引数は受け付けない。
+      if (req.method === 'POST' && route?.startsWith('api/診断/')) {
+        const entry=entries.find(item=>item.id===route.slice('api/診断/'.length));
+        if (!entry) return reply(404,{エラー:'未対応の項目です。'});
+        if (hasBody(req)) return reply(400,{エラー:'診断への引数は指定できません。'});
+        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
+        busy=true;
+        const started=new Date();
+        try {
+          const result=await probeFn(entry);
+          const state=recordInstallResult(result,started);management.invalidate();
+          reply(200,{結果:result,...state});
+        } finally { busy=false; }
+        return;
+      }
       if (req.method === 'POST' && route === 'api/診断') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
-        if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
+        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
         busy=true;
-        try { results=[];progress=[];scanFinished=null;scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date();reply(200,{結果:results,前回実行日時:scanFinished.toISOString()}); } finally { busy=false;progress=[]; }
+        try { results=[];progress=[];scanFinished=null;scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date();management.invalidate();reply(200,{結果:results,前回実行日時:scanFinished.toISOString()}); } finally { busy=false;progress=[]; }
         return;
       }
       // モデル情報: このサーバーが直前に取得したキーテスト結果だけを、プロバイダ別ファイルへ保存する。
@@ -226,7 +262,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       // 画面からは値を受け取らず、このサーバーが直前に確認した結果だけを保存する。
       if (req.method === 'POST' && route === 'api/書込') {
         if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
-        if (busy || writing) return reply(409,{エラー:'診断または書込の実行中です。完了後に再試行してください。'});
+        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
         if (!scanFinished || results.length !== entries.length) return reply(409,{エラー:'先にインストール確認を実行してください。'});
         writing=true;
         try { const report=await installWriteFn(entries,results,scanStarted,scanFinished); reply(200,{保存先:'_AIDIY/aidiy_diag/'+INSTALL_FILE,件数:report.件数,集計:report.集計}); }
@@ -240,12 +276,15 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       reply(404,{エラー:'見つかりません。'});
     } catch { reply(500,{エラー:'診断処理でエラーが発生しました。'}); }
   };
+  handler.close=()=>management.close();
+  return handler;
 }
 export function createServer(options) {
   const modelTrials=options.modelTrials || createModelTrials();
   const startManager=options.startManager || createStartManager();
-  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},createHandler({...options,modelTrials,startManager}));
-  server.once('close',()=>{modelTrials.close();void startManager.close();});
+  const handler=createHandler({...options,modelTrials,startManager});
+  const server=http.createServer({maxHeaderSize:8192,requestTimeout:10000,headersTimeout:10000,connectionsCheckingInterval:1000},handler);
+  server.once('close',()=>{modelTrials.close();void startManager.close();void handler.close();});
   server.maxConnections=16; server.maxRequestsPerSocket=20; server.keepAliveTimeout=2000;
   // 診断は最大 4 並列 × 登録数分。slow connection は下の期限で切断する。
   server.setTimeout(Math.max(95000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());

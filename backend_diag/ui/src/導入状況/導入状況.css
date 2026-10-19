@@ -5,4 +5,26 @@
 @media(max-width:700px){.welcome{padding-top:0}}
 #list > details > summary{font-size:15px;color:#c2e6df}
 #list > details > details{margin-left:10px}
-.item>.badge{min-width:60px}
+.install-item{border-radius:5px;margin-bottom:5px}
+.install-item.selected{background:#25403d}
+.install-check{display:flex;align-items:center;gap:8px;padding:0 10px 10px}
+.install-check button{padding:3px 10px;font-size:11px;white-space:nowrap}
+.install-check>.badge{min-width:60px}
+/* 名称の直後にサーバーが許可した操作だけを並べる。選択ボタンとは分離する。 */
+.install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 4px}
+.install-item>.item{min-width:0;overflow-wrap:anywhere;justify-content:flex-start}
+.install-manage{display:flex;flex-wrap:wrap;gap:4px;padding-right:8px}
+.install-manage button{padding:3px 7px;font-size:11px;white-space:nowrap}
+.install-manage .install-delete{border-color:#925064;color:#ffbdc8}
+.install-check{grid-column:1/-1}
+.install-progress{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.install-progress button,.install-detail-tabs button,.install-console-heading button{padding:4px 10px;font-size:12px}
+.install-detail-tabs{display:flex;gap:6px;margin-bottom:18px}
+.install-detail-tabs button[aria-pressed="true"]{background:#25403d;border-color:#5da99b;color:#b0eee2}
+.install-console-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.install-console-heading #install-cancel{margin-left:auto;border-color:#925064}
+.install-console{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:#060b10;border:1px solid #304253;border-radius:5px;color:#cde5dd;padding:14px;min-height:220px;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}
+.install-recheck{margin-top:18px;border-top:1px solid #304253;padding-top:15px}
+.install-recheck>strong{margin-right:10px}
+.install-recheck p,.install-capability-note{font-size:12px}
+@media(max-width:380px){.install-manage{gap:3px;padding-right:4px}.install-manage button{padding:3px 5px}}

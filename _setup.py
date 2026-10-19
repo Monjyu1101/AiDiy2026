@@ -244,11 +244,11 @@ def ask_yes_no(prompt, default="n"):
 
 def ask_start_mode(prompt, default="n"):
     """戻り値: (実行可否または "node", AUTO)。既存 y/n/a の戻り値は維持する。"""
-    bracket = "[y]/n/a=auto/r=Node.js系の再配置" if default.lower() == "y" else "y/[n]/a=auto/r=Node.js系の再配置"
+    bracket = "[y]/n/a=auto/b=build（Node.js系の再ビルド）" if default.lower() == "y" else "y/[n]/a=auto/b=build（Node.js系の再ビルド）"
     print(f"\n{prompt} ({bracket}): ", end="", flush=True)
     default_key = b"y" if default.lower() == "y" else b"n"
-    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A", b"r", b"R"), default_key)
-    if key in (b"r", b"R"):
+    key = _read_single_key((b"y", b"Y", b"n", b"N", b"a", b"A", b"b", b"B"), default_key)
+    if key in (b"b", b"B"):
         return "node", False
     if key in (b"a", b"A"):
         return True, True
@@ -714,16 +714,16 @@ def collect_setup_choices() -> dict | None:
 
 
 # ============================================================
-# git pull 後の Node.js 系再配置
+# git pull 後の Node.js 系再ビルド
 # ============================================================
 def setup_node_refresh() -> list[str]:
     """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
-    print_header("Node.js系の再配置（git pull 後の軽量更新）")
+    print_header("Node.js系の再ビルド（git pull 後の軽量更新）")
     print_info("対象: Diag / Web / Avatar / IDE群(Term・Code・Live・IDE) / Discord")
     print_info("依存を同期し、導入済みでも画面・拡張を再生成します。")
     print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
     if get_node_version() is None or get_npm_version() is None:
-        print_error("Node.js と npm が必要です。導入後に r を再実行してください。")
+        print_error("Node.js と npm が必要です。導入後に b（build）を再実行してください。")
         return ["Node.js / npm の確認"]
 
     spec = importlib.util.spec_from_file_location("aidiy_refresh_electron", BASE_DIR / "scripts" / "_setup_electron.py")
@@ -825,7 +825,7 @@ def main():
     print_info("  8. コマンド(hermes)")
     print_info("  9. IDE群(Term / Code / Live / IDE)")
     print_info(" 10. フロントエンド(Discord、任意)")
-    print_info("git pull 後の軽量更新は r=Node.js系の再配置 を選択してください。")
+    print_info("git pull 後の軽量更新は b=build（Node.js系の再ビルド）を選択してください。")
     print()
 
     choices = collect_setup_choices()

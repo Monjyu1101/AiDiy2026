@@ -183,3 +183,13 @@ Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付
 AIチャット・AIコードの最終応答が空文字・空白だけ、または前後の空白を除いて`!`で始まる場合はNGです。`!`単独は無応答、`! エラーメッセージ`は理由付きエラーです。MCP側の`status`が誤ってOKでも、本文がこの形式なら成功扱いにしません。旧版の「応答なし」や既知のエラー文の判定も互換性のため残します。共通規約は[AIコアWebSocket仕様](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md#aiチャットaiコードのエラー応答)を参照します。
 
 完了した冊子のPDFは `node scripts/checks/総合テストPDF.mjs <md名>` で作成できます。元のMarkdownと同じフォルダへ同名で保存し、本文の修正後は再生成します。本文の折りたたみ欄も開いて出力し、説明と画像を同じ図として配置します。生成後はPoppler等で全ページを画像化し、日本語・表・画像・改ページを確認してください。
+
+## 個別確認と導入管理
+
+- 各行の「確認」は認証付き `POST api/診断/<登録済みID>` を使用し、その項目だけ既存 probe で再確認する。全項目確認と書込は同じ実行排他を使う。今回確認していない前回保存済み結果は表示だけに使い、書込対象へ混ぜない。
+- 導入管理は `GET api/導入管理` で能力と実行状態を取得し、`POST api/導入管理/<登録済みID>/<導入・再導入・削除>` で開始、`DELETE api/導入管理/<実行ID>` で中止する。入力本文・クエリ・任意コマンドは不可。操作後は個別確認と共通の probe と結果反映を1回呼ぶ。
+- 対象は `scripts/cli_bat` と同じ npm4パッケージに限定する。BAT は複数製品・`start`・`PAUSE` を含むため実行しない。`__pip_uninstall.bat` は全パッケージ削除なので個別操作へ流用しない。Antigravity / Grok の固定フォルダ削除・PATH 編集には専用の所有元確認が必要で、現在は対象外。
+- npm の標準 prefix / root と実体を確認し、パッケージ外のリンク、別方式のランチャー、不正 manifest では操作しない。操作直前にも所有元を再確認する。再導入は削除後に導入するため、失敗時に元のパッケージが残る保証はない。利用者の認証・設定・履歴は削除しない。
+- コマンドは固定 argv・shell 無効・空の一時 npmrc・公式 registry で実行する。終了・失敗・中止時は一時領域を回収して再確認するが、停止未確認中は排他を保持する。同じ導入先のロックが異常終了で残った場合、自動削除しない。OS 上で対象 npm 処理の停止と所有権を確認してから運用者が復旧する。
+- 検証は `node --test backend_diag/checks/install-individual.check.mjs backend_diag/checks/install-manager.check.mjs backend_diag/checks/install-manager-api.check.mjs` と `node --test backend_diag/ui/src/導入状況/checks/*.check.cjs`。合成プロセス・一時 fixture・Vue イベントで確認し、実際のグローバル導入・削除・認証を行わない。Windows の shim と POSIX の実体は別ケースで検証する。
+- UI 変更時は配布画面へ反映するため `npm --prefix backend_diag/ui run build`、`npm --prefix backend_diag/ui run check` を実行する。実ブラウザ確認は別途許可された環境だけで行い、ソース・mock 成功と実OS画面検証を区別する。

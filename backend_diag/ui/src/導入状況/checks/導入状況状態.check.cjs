@@ -119,3 +119,59 @@ test('前回結果と日時を初期表示し、再実行したときだけ日�
  assert.equal(state.結果.value[0].状態,'OK');assert.equal(state.前回実行日時.value,old);assert.equal(state.確認済み.value,false);
  await state.状況確認();assert.equal(state.前回実行日時.value,now);assert.equal(state.結果.value[0].状態,'NG');assert.equal(state.確認済み.value,true);
 });
+
+test('個別確認は対象だけ確認中にし、連打・一括・書込を抑止して新しい結果だけ反映する',async()=>{
+ const calls=[];let finish;
+ const state=await 状態を作成((url,method)=>{calls.push([url,method]);return new Promise(resolve=>{finish=resolve;});},false);
+ const previous=一覧.項目.map(entry=>({id:entry.id,状態:'OK',バージョン:'old',前回結果:true}));
+ state.一覧を反映({...一覧,結果:previous});
+ assert.equal(await state.個別確認('node'),false);state.接続済み.value=true;
+ assert.equal(await state.個別確認('unknown'),false);assert.equal(calls.length,0);
+ const pending=state.個別確認('claude');
+ assert.equal(state.個別確認中.value,'claude');assert.equal(state.確認中.value,false);
+ assert.deepEqual(state.結果.value.map(row=>row.状態),['OK','確認中','OK']);
+ assert.deepEqual(state.結果.value.filter(row=>row.id!=='claude'),previous.filter(row=>row.id!=='claude'));
+ for(const run of [()=>state.個別確認('claude'),()=>state.個別確認('node'),state.状況確認,state.書込,state.全テスト])assert.equal(await run(),false);
+ assert.deepEqual(calls,[['api/診断/claude','POST']]);
+ finish({結果:{id:'claude',状態:'未検出',確認日時:'2026-10-19T00:00:00Z'},前回実行日時:'2026-10-19T00:00:00Z',確認済み:false});
+ assert.equal(await pending,true);assert.equal(state.個別確認中.value,'');assert.equal(state.確認済み.value,false);
+ assert.deepEqual(state.結果.value.map(row=>row.状態),['OK','未検出','OK']);assert.equal(state.表示中.value,null);
+ assert.equal(state.前回実行日時.value,'2026-10-19T00:00:00Z');assert.equal(state.書込済み.value,false);
+});
+
+test('個別確認は一括確認・書込中に実行せず、完了後の再確認で保存済み表示を解除する',async()=>{
+ const calls=[];let finish;
+ const state=await 状態を作成(async url=>{
+  calls.push(url);
+  if(url==='api/診断')return {結果:一覧.項目.map(entry=>({id:entry.id,状態:'OK'}))};
+  if(url==='api/書込')return new Promise(resolve=>{finish=resolve;});
+  return {結果:{id:'node',状態:'NG'},確認済み:true};
+ });
+ state.一覧を反映(一覧);state.確認中.value=true;assert.equal(await state.個別確認('node'),false);state.確認中.value=false;
+ await state.状況確認();const writing=state.書込();assert.equal(await state.個別確認('node'),false);finish({});await writing;
+ assert.equal(state.書込済み.value,true);assert.equal(await state.個別確認('node'),true);
+ assert.equal(state.確認済み.value,true);assert.equal(state.書込済み.value,false);assert.equal(state.結果.value.find(row=>row.id==='node').状態,'NG');
+ assert.deepEqual(calls,['api/診断','api/書込','api/診断/node']);
+});
+
+test('個別確認失敗は前回の結果・日時を保ち、通知してロックを解除し再試行できる',async()=>{
+ let fail=true;
+ const state=await 状態を作成(async()=>{if(fail)throw Error('通信失敗');return {結果:{id:'node',状態:'ERR',説明:'タイムアウト'},確認済み:true};});
+ const old='2026-10-17T01:02:03Z',previous=[{id:'node',状態:'OK',バージョン:'old'}];
+ state.一覧を反映({項目:[{id:'node'}],結果:previous,前回実行日時:old});
+ assert.equal(await state.個別確認('node'),false);assert.equal(state.通知.value,'通信失敗');assert.equal(state.個別確認中.value,'');
+ assert.deepEqual(state.結果.value,previous);assert.equal(state.前回実行日時.value,old);assert.equal(state.確認済み.value,false);
+ fail=false;assert.equal(await state.個別確認('node'),true);assert.equal(state.通知.value,'');assert.equal(state.結果.value[0].状態,'ERR');
+});
+
+test('個別確認の完了は選択・折り畳みを変更せず、待機中の新しい選択を維持する',async()=>{
+ const {導入状況表示を作成}=await import('../導入状況表示.mjs');
+ let finish;
+ const state=await 状態を作成(()=>new Promise(resolve=>{finish=resolve;}));state.一覧を反映(一覧);
+ const props=reactive({項目:一覧.項目,結果:state.結果,確認中:state.確認中,個別確認中:state.個別確認中,表示中:state.表示中});
+ const view=導入状況表示を作成(props);view.選択ID.value='ffmpeg';
+ const pending=state.個別確認('ffmpeg');await Promise.resolve();view.選択ID.value='claude';
+ finish({結果:{id:'ffmpeg',状態:'OK'},確認済み:false});await pending;await Promise.resolve();
+ assert.equal(view.選択ID.value,'claude');assert.equal(view.折り畳み.value.has('その他拡張'),true);
+ assert.equal(state.確認中.value,false);assert.equal(state.表示中.value,null);
+});

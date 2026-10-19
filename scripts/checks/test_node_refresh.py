@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""git pull後の再配置を、インストール・設定変更・OS窓起動なしで検証する。"""
+"""git pull後の再ビルドを、インストール・設定変更・OS窓起動なしで検証する。"""
 import contextlib
 import importlib.util
 import io
@@ -37,12 +37,29 @@ class NodeRefreshTests(unittest.TestCase):
 
     def test_existing_keys_and_new_key_are_case_insensitive(self):
         for key, expected in [(b"y", (True, False)), (b"n", (False, False)),
-                              (b"a", (True, True)), (b"r", ("node", False))]:
+                              (b"a", (True, True)), (b"b", ("node", False))]:
             for value in (key, key.upper()):
                 with self.subTest(key=value), patch.object(setup, "_read_single_key", return_value=value) as read:
                     self.assertEqual(setup.ask_start_mode("test"), expected)
                     self.assertIn(value, read.call_args.args[0])
                     self.assertEqual(read.call_args.args[1], b"n")
+
+    def test_start_prompt_describes_build_and_removes_old_key(self):
+        for default in ("n", "y"):
+            with self.subTest(default=default), contextlib.redirect_stdout(io.StringIO()) as output, patch.object(setup, "_read_single_key", return_value=b"b") as read:
+                self.assertEqual(setup.ask_start_mode("test", default=default), ("node", False))
+                self.assertIn("b=build（Node.js系の再ビルド）", output.getvalue())
+                self.assertNotIn("r=", output.getvalue())
+                self.assertEqual(set(read.call_args.args[0]), {b"y", b"Y", b"n", b"N", b"a", b"A", b"b", b"B"})
+                self.assertEqual(read.call_args.args[1], default.encode("ascii"))
+
+    def test_enter_keeps_default_and_old_key_does_not_start_build(self):
+        with patch.object(setup.sys, "platform", "linux"):
+            for response in ("", "r", "R"):
+                with self.subTest(response=response), patch("builtins.input", return_value=response):
+                    self.assertEqual(setup.ask_start_mode("test"), (False, False))
+            with patch("builtins.input", return_value=""):
+                self.assertEqual(setup.ask_start_mode("test", default="y"), (True, False))
 
     def test_cancel_and_auto_keep_existing_choices(self):
         with patch.object(setup, "_read_single_key", return_value=b"n"), patch.object(setup, "ask_yes_no") as ask:
@@ -66,7 +83,8 @@ class NodeRefreshTests(unittest.TestCase):
     def test_refresh_bypasses_full_setup_and_reports_failure_exit(self):
         for failures in ([], ["Web: ビルド"]):
             with self.subTest(failures=failures), contextlib.ExitStack() as stack:
-                stack.enter_context(patch.object(setup, "_read_single_key", return_value=b"r"))
+                stack.enter_context(patch.object(setup, "_read_single_key", return_value=b"b"))
+                output = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 refresh = stack.enter_context(patch.object(setup, "setup_node_refresh", return_value=failures))
                 for name in ("ask_yes_no", "ensure_prerequisites", "setup_common_global_tools", "run_diag_headless", "_load_folder_module"):
                     stack.enter_context(patch.object(setup, name, side_effect=AssertionError("full setup forbidden")))
@@ -77,6 +95,7 @@ class NodeRefreshTests(unittest.TestCase):
                 else:
                     setup.main()
                 refresh.assert_called_once()
+                self.assertIn("b=build（Node.js系の再ビルド）", output.getvalue())
 
     def fixture(self, *, desktop=True):
         self.enterContext(patch.object(setup, "get_node_version", return_value="v24"))
@@ -137,9 +156,11 @@ class NodeRefreshTests(unittest.TestCase):
         self.assertEqual(setup.setup_node_refresh(), ["Discord: ランチャー"])
 
     def test_missing_node_stops_without_installation(self):
-        with patch.object(setup, "get_node_version", return_value=None), patch.object(setup, "run_command") as run:
+        with patch.object(setup, "get_node_version", return_value=None), patch.object(setup, "run_command") as run, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(setup.setup_node_refresh(), ["Node.js / npm の確認"])
             run.assert_not_called()
+            self.assertIn("Node.js系の再ビルド", output.getvalue())
+            self.assertIn("導入後に b（build）を再実行", output.getvalue())
 
     def test_dependency_recovery_keeps_refresh_flags_and_rebuilds(self):
         run = Mock(side_effect=[False, True, True])

@@ -27,3 +27,64 @@ test('エラーは共通通知欄へ表示する', () => {
   assert.match(controller, /catch \(error\) \{ 待機中 = false; 結果.value = 前回; 通知.value = error.message;/);
   assert.match(source('App.vue'), /<p v-if="message" id="message" role="status"/);
 });
+
+test('全項目に独立した確認ボタンがあり、実行中の1行だけ確認中と表示する',async()=>{
+ const props={項目:[{id:'node',name:'Node.js',commands:['node'],menuGroup:'ベース'},{id:'ollama',name:'Ollama',commands:['ollama'],menuGroup:'CLI群'}],結果:[{id:'node',状態:'確認中'},{id:'ollama',状態:'OK'}],接続済み:true,確認済み:true,個別確認中:'node'};
+ const html=await render('導入状況/導入状況パネル.vue',props);
+ assert.equal((html.match(/data-install-check=/g)||[]).length,2);
+ assert.match(html,/<button data-install-check="node"[^>]*aria-label="Node.js の導入状況を確認"[^>]*disabled[^>]*>確認中…<\/button>/);
+ assert.match(html,/<button data-install-check="ollama"[^>]*disabled[^>]*>確認<\/button>/);
+ assert.match(html,/id="install-run"[^>]*disabled/);assert.match(html,/id="install-write"[^>]*disabled/);
+ assert.doesNotMatch(html,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/,'選択ボタンに確認ボタンを入れ子にしない');
+ const ready=await render('導入状況/導入状況パネル.vue',{...props,個別確認中:''});
+ assert.doesNotMatch(ready,/data-install-check="[^"]+"[^>]*disabled/);
+ for(const busy of [{接続済み:false},{確認中:true},{書込中:true}]){
+  const disabled=await render('導入状況/導入状況パネル.vue',{...props,個別確認中:'',...busy});
+  assert.equal((disabled.match(/data-install-check="[^"]+"[^>]*disabled/g)||[]).length,2);
+ }
+});
+
+test('Appは個別確認イベントと実行中IDを配線し、全テストの重複も抑止する',()=>{
+ const app=source('App.vue');
+ assert.match(app,/:個別確認中="個別確認中"/);assert.match(app,/@個別確認="個別確認"/);
+ assert.match(app,/id="run"[^>]*:disabled="[^"]*Boolean\(個別確認中\)/);
+ const panel=source('導入状況/導入状況パネル.vue');
+ assert.match(panel,/@click="選択ID=item.id;\$emit\('個別確認',item.id\)"/);
+});
+
+test('実Vueイベントで選択は確認せず、確認ボタンは対象だけ実行して完了後の選択を保持する',async()=>{
+ const {createRequire}=require('node:module');
+ const path=require('node:path');
+ const {createRenderer,h,nextTick,ref}=createRequire(path.join(__dirname,'../../../package.json'))('vue');
+ const {component}=require('../../../../checks/ui-components.cjs');
+ const {導入状況状態を作成}=await import('../導入状況状態.mjs');
+ const make=(tag,text='')=>({tag,text,children:[],props:{},parent:null});
+ const renderer=createRenderer({
+  createElement:tag=>make(tag),createText:text=>make('#text',text),createComment:text=>make('#comment',text),
+  setText:(node,text)=>node.text=text,setElementText:(node,text)=>{node.text=text;node.children=[];},
+  parentNode:node=>node.parent,nextSibling:node=>node.parent?.children[node.parent.children.indexOf(node)+1]||null,
+  patchProp:(node,key,_old,value)=>node.props[key]=value,
+  insert(node,parent,anchor){if(node.parent)node.parent.children.splice(node.parent.children.indexOf(node),1);node.parent=parent;const index=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(index<0?parent.children.length:index,0,node);},
+  remove(node){node.parent?.children.splice(node.parent.children.indexOf(node),1);},
+ });
+ let finish;const calls=[],runs=[];
+ const state=導入状況状態を作成({api:(url,method)=>{calls.push([url,method]);return new Promise(resolve=>{finish=resolve;});},接続済み:ref(true),通知:ref(''),間隔:0});
+ state.一覧を反映({項目:[{id:'node',name:'Node.js',commands:['node'],menuGroup:'ベース'},{id:'ollama',name:'Ollama',commands:['ollama'],menuGroup:'CLI群'}],結果:[{id:'node',状態:'OK'},{id:'ollama',状態:'未検出'}]});
+ const root=make('root');
+ const app=renderer.createApp({render:()=>h(component('導入状況/導入状況パネル.vue').default,{項目:state.項目.value,結果:state.結果.value,確認中:state.確認中.value,個別確認中:state.個別確認中.value,接続済み:true,確認済み:state.確認済み.value,書込中:state.書込中.value,表示中:state.表示中.value,on個別確認:id=>runs.push(state.個別確認(id))})});
+ const descendants=node=>[node,...node.children.flatMap(descendants)];
+ const select=id=>descendants(root).find(node=>node.props['data-install-check']===id).parent.parent.children.find(node=>node.tag==='button');
+ try{
+  app.mount(root);select('node').props.onClick();await nextTick();assert.equal(calls.length,0);
+  const check=descendants(root).find(node=>node.props['data-install-check']==='ollama');
+  for(let parent=check.parent;parent;parent=parent.parent)assert.notEqual(parent.tag,'button');
+  check.props.onClick();check.props.onClick();await nextTick();
+  assert.deepEqual(calls,[['api/診断/ollama','POST']]);assert.equal(select('ollama').props['aria-pressed'],true);
+  assert.ok(descendants(root).filter(node=>node.props['data-install-check']).every(node=>node.props.disabled));
+  select('node').props.onClick();await nextTick();
+  finish({結果:{id:'ollama',状態:'OK'},確認済み:false});await Promise.all(runs);await nextTick();
+  assert.equal(select('node').props['aria-pressed'],true);assert.equal(select('ollama').props['aria-pressed'],false);
+  assert.ok(descendants(root).filter(node=>node.props['data-install-check']).every(node=>!node.props.disabled));
+  assert.deepEqual(state.結果.value.map(row=>[row.id,row.状態]),[['node','OK'],['ollama','OK']]);
+ }finally{app.unmount();}
+});
