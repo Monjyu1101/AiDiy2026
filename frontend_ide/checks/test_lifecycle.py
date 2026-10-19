@@ -32,15 +32,16 @@ class IDEGroupTest(unittest.TestCase):
 
     def test_setup_and_cleanup_have_one_group_choice(self):
         for module, method in ((setup, 'collect_setup_choices'), (cleanup, 'collect_cleanup_choices')):
+            group_label = 'Term / Code / Live / IDE' if module is setup else 'IDE群'
             with self.subTest(method=method), tempfile.TemporaryDirectory() as tmp, patch.object(
                 module, 'ask_start_mode', return_value=(True, False)
-            ), patch.object(module, 'ask_yes_no', side_effect=lambda prompt, default='n': 'IDE群' in prompt) as ask:
+            ), patch.object(module, 'ask_yes_no', side_effect=lambda prompt, default='n': group_label in prompt) as ask:
                 choices = getattr(module, method)(*([Path(tmp)] if module is cleanup else []))
             self.assertTrue(choices['ide'])
             self.assertNotIn('vscode', choices)
-            self.assertEqual(sum('IDE群' in call.args[0] for call in ask.call_args_list), 1)
+            self.assertEqual(sum(group_label in call.args[0] for call in ask.call_args_list), 1)
             prompts = [call.args[0] for call in ask.call_args_list]
-            self.assertLess(next(i for i, p in enumerate(prompts) if 'IDE群' in p), next(i for i, p in enumerate(prompts) if 'Discord' in p))
+            self.assertLess(next(i for i, p in enumerate(prompts) if group_label in p), next(i for i, p in enumerate(prompts) if 'Discord' in p))
 
     def test_root_cleanup_delegates_group_once(self):
         choices = dict.fromkeys(('npm_uninstall', 'backup', 'local', 'tools', 'backend', 'taskteam', 'web', 'avatar', 'hermes', 'discord'), False)

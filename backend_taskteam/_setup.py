@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""バックエンド(task,team) セットアップスクリプト。"""
+"""Task / Team セットアップスクリプト。"""
 
 from __future__ import annotations
 
@@ -126,10 +126,10 @@ def check_uv_installed() -> bool:
 
 def setup(choices: dict | None = None) -> bool:
     del choices
-    label = "バックエンド(task,team)"
+    label = "Task / Team"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_TASKTEAM_DIR}")
-    print_info("対象: AIタスク実行 + AIチーム FastAPI (ポート 8093)")
+    print_info("対象: Python / uv / FastAPI / SQLite")
 
     if not BACKEND_TASKTEAM_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_TASKTEAM_DIR}")
@@ -157,17 +157,17 @@ def setup(choices: dict | None = None) -> bool:
 
 def main() -> None:
     global AUTO_MODE
-    print_header("バックエンド(task,team) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("バックエンド(task,team) のセットアップを実行しますか?", default="n")
+    print_header("Task / Team セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Task / Team のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
     if AUTO_MODE:
         print_info("AUTOモードで実行します。")
     if not setup():
-        print_error("バックエンド(task,team) のセットアップに失敗しました。")
+        print_error("Task / Team のセットアップに失敗しました。")
         sys.exit(1)
-    print_success("バックエンド(task,team) のセットアップが完了しました。")
+    print_success("Task / Team のセットアップが完了しました。")
 
 
 if __name__ == "__main__":

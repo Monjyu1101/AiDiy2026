@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""バックエンド(core,apps) セットアップスクリプト
+"""Core / Apps セットアップスクリプト
 
 このフォルダ (backend_server) 単体のセットアップを行います。
 ルートの `_setup.py` から import して `setup(choices)` を呼び出すことも、
@@ -170,12 +170,12 @@ def check_uv_installed():
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
-    """バックエンド(core,apps) をセットアップする。"""
+    """Core / Apps をセットアップする。"""
     choices = choices or {}
-    label = "バックエンド(core,apps)"
+    label = "Core / Apps"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_DIR}")
-    print_info("対象: FastAPI / SQLite / core_main / apps_main")
+    print_info("対象: Python / uv / FastAPI / SQLAlchemy / SQLite")
 
     if not BACKEND_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_DIR}")
@@ -233,7 +233,7 @@ def setup(choices: dict | None = None) -> bool:
 def _collect_standalone_choices() -> dict | None:
     """単体実行時の対話。キャンセル時は None。"""
     global AUTO_MODE
-    run_setup, AUTO_MODE = ask_start_mode("バックエンド(core,apps) のセットアップを実行しますか?", default="n")
+    run_setup, AUTO_MODE = ask_start_mode("Core / Apps のセットアップを実行しますか?", default="n")
     if not run_setup:
         return None
     if AUTO_MODE:
@@ -248,16 +248,16 @@ def _collect_standalone_choices() -> dict | None:
 
 
 def main():
-    print_header("バックエンド(core,apps) セットアップ")
+    print_header("Core / Apps セットアップ")
     choices = _collect_standalone_choices()
     if choices is None:
         print_warning("セットアップをキャンセルしました。")
         return
     ok = setup(choices)
     if ok:
-        print_success("バックエンド(core,apps) のセットアップが完了しました。")
+        print_success("Core / Apps のセットアップが完了しました。")
     else:
-        print_error("バックエンド(core,apps) のセットアップに失敗しました。")
+        print_error("Core / Apps のセットアップに失敗しました。")
         sys.exit(1)
 
 

@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""バックエンド(local) セットアップスクリプト
+"""Local セットアップスクリプト
 
 ローカル LLM (OpenAI 互換 Gemma サーバー) の依存関係 (uv sync --upgrade) を導入します。
 モデルの事前ダウンロードは時間がかかるため、`run_model_download(choices)` として
@@ -309,7 +309,7 @@ def copy_preloaded_backend_local_models(label: str) -> None:
 def run_model_download(choices: dict | None = None) -> None:
     """backend_local のモデル事前ダウンロードを行う（全体処理の最後に実行される想定）。"""
     choices = choices or {}
-    label = "バックエンド(local)"
+    label = "Local"
 
     mode = choices.get("local_download", "no")
     # 後方互換: 旧 bool 値も許容
@@ -351,7 +351,7 @@ def launch_model_download(choices: dict | None = None) -> bool:
     取得不要でスキップした場合 False を返す。
     """
     choices = choices or {}
-    label = "バックエンド(local)"
+    label = "Local"
 
     mode = choices.get("local_download", "no")
     # 後方互換: 旧 bool 値も許容
@@ -402,10 +402,10 @@ def launch_model_download(choices: dict | None = None) -> bool:
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
     choices = choices or {}
-    label = "バックエンド(local)"
+    label = "Local"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_LOCAL_DIR}")
-    print_info("対象: ローカル LLM / OpenAI 互換 API (ポート 8096)")
+    print_info("対象: Python / uv / FastAPI / PyTorch / Transformers / Gemma")
 
     if not BACKEND_LOCAL_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_LOCAL_DIR}")
@@ -451,8 +451,8 @@ def main():
         run_model_download({"local_download": mode})
         return
 
-    print_header("バックエンド(local) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("バックエンド(local) のセットアップを実行しますか?", default="n")
+    print_header("Local セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Local のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
@@ -465,10 +465,10 @@ def main():
     )
     choices = {"local_download": download}
     if not setup(choices):
-        print_error("バックエンド(local) のセットアップに失敗しました。")
+        print_error("Local のセットアップに失敗しました。")
         sys.exit(1)
     run_model_download(choices)
-    print_success("バックエンド(local) のセットアップが完了しました。")
+    print_success("Local のセットアップが完了しました。")
 
 
 if __name__ == "__main__":

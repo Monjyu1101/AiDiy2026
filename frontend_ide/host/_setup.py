@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""フロントエンド(vscode) セットアップスクリプト
+"""Code / Live セットアップスクリプト
 
 Node.js 依存関係と Electron バイナリを事前に導入して VSIX を配置し、
 単独起動用ランチャーも作成します。Electron は scripts/_setup_electron.py の
@@ -270,7 +270,7 @@ def install_standalone_launcher() -> bool:
     scripts = {name: FRONTEND_VSCODE_DIR / name / "launch.mjs" for name in ("aidiy_code", "aidiy_live")}
     for script_path in scripts.values():
         if not script_path.is_file():
-            print_error(f"単独起動スクリプトが見つかりません: {script_path}")
+            print_error(f"起動スクリプトが見つかりません: {script_path}")
             return False
     try:
         launcher_dir.mkdir(parents=True, exist_ok=True)
@@ -283,16 +283,16 @@ def install_standalone_launcher() -> bool:
             launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8") if sys.platform == "win32" else content.encode("utf-8"))
             if sys.platform != "win32":
                 launcher_path.chmod(0o755)
-            print_success(f"単独起動ランチャーを作成しました: {launcher_path}")
+            print_success(f"{name} を登録しました: {launcher_path}")
         # この配置先から作った旧名だけを解除する。他の作業コピーのランチャーは残す。
         old_script = FRONTEND_VSCODE_DIR / "scripts" / "launch-standalone.mjs"
         for name in ("aidiy_vscode.cmd", "aidiy_vscode"):
             legacy = launcher_dir / name
             if legacy.is_file() and str(old_script) in legacy.read_text(encoding="utf-8"):
                 legacy.unlink()
-                print_info(f"旧名のランチャーを解除しました: {legacy}")
+                print_info(f"旧コマンドを解除しました: {legacy}")
     except OSError as exc:
-        print_error(f"単独起動ランチャーを更新できません: {launcher_dir} ({exc})")
+        print_error(f"aidiy_code / aidiy_live を登録できません: {launcher_dir} ({exc})")
         return False
     return ensure_launcher_path(launcher_dir)
 
@@ -326,16 +326,16 @@ def install_extensions(vscode_cli: str) -> bool:
     if installed is None or not expected.issubset(installed):
         print_error(f"拡張機能の配置を確認できません: {', '.join(sorted(expected))}")
         return False
-    print_success('AiDiy Code / AiDiy Live を別々の拡張機能として配置しました。')
+    print_success('Code / Live: VS Code 拡張を配置しました。')
     return True
 
 
 def setup(choices: dict | None = None) -> bool:
-    label = "IDE群(Term / Code / Live / IDE)"
+    label = "Code / Live"
     if not (choices and choices.get("ide")):
         print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: VS Code 拡張（Code / Live） / Electron / 単独起動ランチャー / TypeScript / VSIX")
+    print_info("対象: Node.js / TypeScript / Electron / VS Code / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():
@@ -362,7 +362,7 @@ def setup(choices: dict | None = None) -> bool:
 
 def setup_assets(npm_path: str, *, choices=None) -> bool:
     """導入済み依存から共通UI・Code/Live拡張を必ず再生成し、既存配置処理を使う。"""
-    label = "IDE群(Term / Code / Live / IDE)"
+    label = "Code / Live"
     vscode_cli = find_vscode_cli()
     if vscode_cli is None:
         print_warning("vscode CLI が見つからないため、単独画面だけをセットアップします。")
@@ -380,11 +380,11 @@ def setup_assets(npm_path: str, *, choices=None) -> bool:
         return False
 
     if vscode_cli is not None:
-        print_success(f"{label}: Code / Live の2つを vscode 拡張機能として配置しました。")
+        print_success(f"{label}: VS Code 拡張のセットアップが完了しました。")
         print_info("  vscode 本体や AiDiy の常駐サービスは停止していません。")
         print_info("  vscode に反映されない場合は、ウィンドウを再読み込みしてください。")
     if not (choices and choices.get("ide")):
-        print_success(f"{label}: aidiy_code / aidiy_live で単独画面を起動できます。")
+        print_success(f"{label}: aidiy_code / aidiy_live で起動できます。")
     return True
 
 
@@ -398,9 +398,9 @@ def main():
             print_error('VS Code CLI が見つかりません。')
             raise SystemExit(1)
         raise SystemExit(0 if install_extensions(vscode_cli) else 1)
-    print_header("IDE群(Term / Code / Live / IDE) セットアップ")
+    print_header("Code / Live セットアップ")
     run_setup, AUTO_MODE = ask_start_mode(
-        "フロントエンド(vscode) のセットアップを実行しますか?", default="n"
+        "Code / Live のセットアップを実行しますか?", default="n"
     )
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
@@ -408,7 +408,7 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。")
     if not setup():
-        print_error("フロントエンド(vscode) のセットアップに失敗しました。")
+        print_error("Code / Live のセットアップに失敗しました。")
         sys.exit(1)
 
 

@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""バックエンド(tools) セットアップスクリプト
+"""Tools セットアップスクリプト
 
 このフォルダ (backend_tools) 単体のセットアップを行います。
 依存関係 (uv sync --upgrade / npm install) のインストールに加え、Claude / Copilot /
@@ -638,7 +638,7 @@ MCP_MODULES = [
         "name":        "backend_tools",
         "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
         "dir":         "backend_tools",
-        "desc":        "Python (uv) — Chrome DevTools Protocol + Desktop Capture",
+        "desc":        "Python / uv / FastAPI / MCP",
         "start":       "uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095",
         "sse_url":     "http://127.0.0.1:8095/aidiy_chrome_devtools/sse",
         # 同一プロセスで追加公開するサーバー（uv sync は不要、設定書き込みのみ）
@@ -678,7 +678,7 @@ CODE_CLI_MCP_EXCLUDE = {
 
 def setup_mcp_module(module: dict) -> bool:
     """tools モジュールを汎用的にセットアップする (uv sync --upgrade + npm install)"""
-    label = "バックエンド(tools)"
+    label = "Tools"
     mcp_dir = BASE_DIR / module["dir"]
 
     print_header(f"{label} セットアップ")
@@ -954,7 +954,7 @@ def configure_clients(module: dict | None = None) -> bool:
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
-    """バックエンド(tools) をセットアップする。
+    """Tools をセットアップする。
 
     choices["mcp_config"] が True の場合のみ各 CLI への MCP 設定を書き込む。
     """
@@ -970,26 +970,26 @@ def setup(choices: dict | None = None) -> bool:
         if not configure_clients():
             return False
     else:
-        print_warning("backend_tools の MCP 設定ファイル書き込みをスキップしました。")
+        print_warning("Tools の MCP 設定ファイル書き込みをスキップしました。")
     return True
 
 
 def main():
     global AUTO_MODE
-    print_header("バックエンド(tools) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("バックエンド(tools) のセットアップを実行しますか?", default="n")
+    print_header("Tools セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Tools のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
 
-    mcp_config = ask_yes_no("backend_tools の MCP 機能を使えるよう構成しますか？", default="y")
+    mcp_config = ask_yes_no("Tools の MCP 設定を各クライアントのグローバル設定へ書き込みますか？", default="y")
     ok = setup({"mcp_config": mcp_config})
     if ok:
-        print_success("バックエンド(tools) のセットアップが完了しました。")
+        print_success("Tools のセットアップが完了しました。")
     else:
-        print_error("バックエンド(tools) のセットアップに失敗しました。")
+        print_error("Tools のセットアップに失敗しました。")
         sys.exit(1)
 
 

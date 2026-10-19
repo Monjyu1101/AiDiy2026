@@ -59,11 +59,11 @@ class RootIntegrationTests(unittest.TestCase):
             with self.assertRaises(SystemExit):module.main()
         targets=[call.args[0].strip() for call in info.call_args_list if call.args[0].strip()[:1].isdigit()]
         self.assertEqual(targets,[
-            '0. 共通','1. バックエンド(Diag)','2. バックエンド(local)',
-            '3. バックエンド(tools)','4. バックエンド(core,apps)',
-            '5. バックエンド(task,team)','6. フロントエンド(Web)',
-            '7. フロントエンド(Avatar)','8. コマンド(hermes)',
-            '9. IDE群(Term / Code / Live / IDE)','10. フロントエンド(Discord、任意)',
+            '0. 共通','1. Diag','2. Local',
+            '3. Tools','4. Core / Apps',
+            '5. Task / Team','6. Web',
+            '7. Avatar','8. Hermes',
+            '9. Term / Code / Live / IDE','10. Discord',
         ])
     def test_cleanup_auto_includes_diag_first(self):
         module=self.root_module('_cleanup');calls=[];original=module.ask_yes_no
@@ -270,7 +270,7 @@ class SetupOrderingTests(unittest.TestCase):
                         self.assertEqual(events,expected);self.assertEqual(errors,[]);self.assertEqual(code,0)
 
     def test_diag_and_local_failures_preserve_continue_or_abort_policy(self):
-        labels={'diag-launcher':'バックエンド(Diag)','diag-desktop':'バックエンド(Diag): Electron','local':'バックエンド(local)'}
+        labels={'diag-launcher':'Diag','diag-desktop':'Diag: Electron','local':'Local'}
         normal=['prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless']
         for failure,label in labels.items():
             for keep_going in (False,True):
@@ -305,7 +305,7 @@ class SetupOrderingTests(unittest.TestCase):
                     else:module.main()
                 start=events.index('キャッシュクリア');self.assertEqual(events[start:start+3],['キャッシュクリア','clear','diag'])
                 self.assertEqual(events.count('diag'),1)
-                summary.assert_called_once_with([] if success else ['バックエンド(Diag): aidiy_diag --headless'])
+                summary.assert_called_once_with([] if success else ['Diag: aidiy_diag --headless'])
 
     def test_cleanup_backup_then_diag_after_safe_service_stop(self):
         module=self.root_module('_cleanup');events=[]
@@ -337,12 +337,12 @@ class SetupDisplayTests(unittest.TestCase):
         self.enterContext(patch.object(setup, 'ensure_launcher_path', return_value=True))
 
     def assert_diag_display(self, output):
-        self.assertEqual(output.count('バックエンド(Diag) セットアップ'), 1)
+        self.assertEqual(output.count('Diag セットアップ'), 1)
         self.assertIn(setup.Colors.HEADER + '=' * 60 + setup.Colors.ENDC, output)
         self.assertIn('[INFO] 作業ディレクトリ:', output)
-        self.assertIn('[INFO] 対象: 診断ランチャー（aidiy_diag）の配置 / Electron 実行環境の準備', output)
-        self.assertLess(output.index('セットアップ'), output.index('診断ランチャーを作成しました'))
-        self.assertLess(output.index('診断ランチャーを作成しました'), output.index('desktop-fixture'))
+        self.assertIn('[INFO] 対象: Node.js / Electron', output)
+        self.assertLess(output.index('セットアップ'), output.index('aidiy_diag を登録しました'))
+        self.assertLess(output.index('aidiy_diag を登録しました'), output.index('desktop-fixture'))
 
     def test_standalone_display_once_before_launcher_and_desktop(self):
         output=io.StringIO()
@@ -365,7 +365,7 @@ class SetupDisplayTests(unittest.TestCase):
             stack.enter_context(patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True))
             stack.enter_context(redirect_stdout(output));module.main()
         text=output.getvalue();self.assert_diag_display(text)
-        self.assertLess(text.index('common-wait-fixture'),text.index('バックエンド(Diag) セットアップ'))
+        self.assertLess(text.index('common-wait-fixture'),text.index('Diag セットアップ'))
         self.assertLess(text.index('desktop-fixture'),text.index('local-fixture'))
 
     def test_unselected_diag_has_no_display_or_install(self):

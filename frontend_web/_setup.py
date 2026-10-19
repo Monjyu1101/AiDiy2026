@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""フロントエンド(Web) セットアップスクリプト
+"""Web セットアップスクリプト
 
 Vue 3 / Vite / TypeScript の依存関係を導入し、宣言範囲内の最新版へ更新します。
 
@@ -146,7 +146,7 @@ def check_npm_installed():
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
-    label = "フロントエンド(Web)"
+    label = "Web"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_WEB_DIR}")
     print_info("対象: Vue 3 / Vite / TypeScript")
@@ -179,15 +179,15 @@ def setup(choices: dict | None = None) -> bool:
 
 def main():
     global AUTO_MODE
-    print_header("フロントエンド(Web) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("フロントエンド(Web) のセットアップを実行しますか?", default="n")
+    print_header("Web セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Web のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
     if AUTO_MODE:
         print_info("AUTOモードで実行します。")
     if not setup():
-        print_error("フロントエンド(Web) のセットアップに失敗しました。")
+        print_error("Web のセットアップに失敗しました。")
         sys.exit(1)
 
 

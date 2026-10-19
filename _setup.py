@@ -136,7 +136,7 @@ def _load_folder_module(folder: str):
 
 def run_diag_headless() -> bool:
     """`aidiy_diag --headless` を実行する。処理本体は全体起動と共通の `_start.py` を使う。"""
-    print_header("バックエンド(Diag): aidiy_diag --headless")
+    print_header("Diag: aidiy_diag --headless")
     path = BASE_DIR / "backend_diag" / "_start.py"
     spec = importlib.util.spec_from_file_location("aidiy_backend_diag_start", path)
     mod = importlib.util.module_from_spec(spec)
@@ -146,7 +146,7 @@ def run_diag_headless() -> bool:
     except (OSError, RuntimeError) as exc:
         print_error(str(exc))
         return False
-    print_success("バックエンド(Diag) の事前実行が完了しました。")
+    print_success("Diag の事前実行が完了しました。")
     return True
 
 
@@ -387,8 +387,7 @@ def ensure_prerequisites() -> bool:
     通常の導入ステップは git / Node.js が導入済みであることを前提とする。
     両方とも導入済み（または導入成功）なら True を返す。
     """
-    print_header("前提ツール確認: Git / Node.js")
-    print_info("通常のセットアップは Git と Node.js が導入済みであることを前提とします。")
+    print_header("Git / Node.js")
 
     all_ok = True
 
@@ -494,8 +493,7 @@ def cleanup_temp_file(path) -> None:
 
 
 def print_ai_cli_manual_setup():
-    print_info("共通: AI CLI ツールは個別にセットアップできます。")
-    print_info("  個別セットアップ例:")
+    print_info("AI CLI: 手動導入コマンド")
     if check_npm_installed():
         cmd = npm_command()
         print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
@@ -512,13 +510,11 @@ def print_ai_cli_manual_setup():
 
 
 def start_global_cli_tools_install():
-    print_header("共通セットアップ: AI CLI ツール投入")
-    print_info("対象: Anthropic / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity / Grok Build")
-    print_info("参考: Hermes Agent は npm ではなく、次の bash installer で導入します。")
-    print_info(f"      {HERMES_AGENT_INSTALL_COMMAND}")
-    print_info("参考: Ollama は次のコマンドで導入できます。")
-    print_info(f"      {OLLAMA_INSTALL_COMMAND}")
-    print_info("AI CLI ツールを並列で投入します。完了確認は最後にまとめて行います。")
+    print_header("AI CLI: 導入開始")
+    print_info("対象: Claude Code / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity / Grok Build")
+    print_info(f"参考: Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
+    print_info(f"参考: Ollama: {OLLAMA_INSTALL_COMMAND}")
+    print_info("AI CLI: 並列導入中（完了待ち）")
 
     targets = []
     if check_npm_installed():
@@ -567,8 +563,7 @@ def wait_global_cli_tools_install() -> list[str]:
     if not GLOBAL_CLI_INSTALL_PROCESSES:
         return []
 
-    print_header("共通セットアップ: AI CLI ツール完了確認")
-    print_info("並列投入した AI CLI ツールの導入結果を確認します...")
+    print_header("AI CLI: 導入結果")
 
     failed_packages = []
     for i, (package, process, temp_path) in enumerate(GLOBAL_CLI_INSTALL_PROCESSES, 1):
@@ -651,10 +646,9 @@ def collect_setup_choices() -> dict | None:
         return {"node_refresh": True}
 
     if AUTO_MODE:
-        print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
+        print_info("AUTO: 各項目の既定値で実行")
 
     print_header("セットアップ内容の選択")
-    print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
 
     choices: dict = {
         "common":                False,
@@ -684,29 +678,29 @@ def collect_setup_choices() -> dict | None:
         choices["common_npm_install"]    = ask_yes_no("共通: グローバル環境の AI CLI ツール(npm + Antigravity + Grok Build)をインストール/アップデートしますか？", default="n")
 
     choices["diag"] = True
-    print_info("バックエンド(Diag)のランチャー・Electronをセットアップします [y]")
+    print_info("Diag / Electron: セットアップ [y]")
 
-    choices["local"] = ask_yes_no("バックエンド(local)のセットアップを実行しますか？", default="y")
+    choices["local"] = ask_yes_no("Local のセットアップを実行しますか？", default="y")
     if choices["local"]:
-        choices["local_download"] = ask_download_mode("バックエンド(local): モデルを事前ダウンロードしますか？（n=しない / y=設定モデル / a=候補一括 ※劇遅注意）", default="n")
+        choices["local_download"] = ask_download_mode("Local: モデルを事前ダウンロードしますか？（n=しない / y=設定モデル / a=候補一括 ※劇遅注意）", default="n")
 
-    choices["mcp"] = ask_yes_no("バックエンド(tools) のセットアップを実行しますか？", default="y")
+    choices["mcp"] = ask_yes_no("Tools のセットアップを実行しますか？", default="y")
     if choices["mcp"]:
-        choices["mcp_config"] = ask_yes_no("バックエンド(tools): backend_tools の MCP 機能を使えるよう構成しますか？", default="y")
+        choices["mcp_config"] = ask_yes_no("Tools: MCP 設定を各クライアントのグローバル設定へ書き込みますか？", default="y")
 
-    choices["backend"] = ask_yes_no("バックエンド(core,apps)のセットアップを実行しますか？", default="y")
+    choices["backend"] = ask_yes_no("Core / Apps のセットアップを実行しますか？", default="y")
     if choices["backend"] and DATABASE_TYPE.lower() == "postgresql":
-        choices["pg_user_created"] = ask_yes_no("バックエンド: PostgreSQL ユーザー(appsuser)を作成しましたか？", default="y")
-        choices["pg_restore"]      = ask_yes_no("バックエンド: 初期データベースを復元しますか？", default="n")
-        choices["pg_migrate"]      = ask_yes_no("バックエンド: マイグレーション(alembic upgrade head)を実行しますか？", default="y")
+        choices["pg_user_created"] = ask_yes_no("PostgreSQL: ユーザー(appsuser)を作成しましたか？", default="y")
+        choices["pg_restore"]      = ask_yes_no("PostgreSQL: 初期データベースを復元しますか？", default="n")
+        choices["pg_migrate"]      = ask_yes_no("PostgreSQL: alembic upgrade head を実行しますか？", default="y")
 
-    choices["taskteam"] = ask_yes_no("バックエンド(task,team)のセットアップを実行しますか？", default="y")
+    choices["taskteam"] = ask_yes_no("Task / Team のセットアップを実行しますか？", default="y")
 
-    choices["web"] = ask_yes_no("フロントエンド(Web)のセットアップを実行しますか？", default="y")
-    choices["avatar"] = ask_yes_no("フロントエンド(Avatar)のセットアップを実行しますか？", default="y")
-    choices["hermes"] = ask_yes_no("コマンド(hermes)のセットアップを実行しますか？", default="y")
-    choices["ide"] = ask_yes_no("IDE群(Term / Code / Live / IDE)のセットアップを実行しますか？", default="y")
-    choices["discord"] = ask_yes_no("フロントエンド(Discord)のセットアップを実行しますか？", default="y")
+    choices["web"] = ask_yes_no("Web のセットアップを実行しますか？", default="y")
+    choices["avatar"] = ask_yes_no("Avatar のセットアップを実行しますか？", default="y")
+    choices["hermes"] = ask_yes_no("Hermes のセットアップを実行しますか？", default="y")
+    choices["ide"] = ask_yes_no("Term / Code / Live / IDE のセットアップを実行しますか？", default="y")
+    choices["discord"] = ask_yes_no("Discord のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
 
@@ -718,9 +712,9 @@ def collect_setup_choices() -> dict | None:
 # ============================================================
 def setup_node_refresh() -> list[str]:
     """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
-    print_header("Node.js系の再ビルド（git pull 後の軽量更新）")
-    print_info("対象: Diag / Web / Avatar / IDE群(Term・Code・Live・IDE) / Discord")
-    print_info("依存を同期し、導入済みでも画面・拡張を再生成します。")
+    print_header("Node.js系の再ビルド")
+    print_info("対象: Diag / Web / Avatar / Term / Code / Live / IDE / Discord")
+    print_info("依存同期 / 再ビルド / 起動コマンド登録")
     print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
     if get_node_version() is None or get_npm_version() is None:
         print_error("Node.js と npm が必要です。導入後に b（build）を再実行してください。")
@@ -750,22 +744,22 @@ def setup_node_refresh() -> list[str]:
         ("Diag: 依存", lambda: dependencies("backend_diag", electron=True)),
         ("Diag UI: 依存", lambda: dependencies("backend_diag/ui")),
         ("Diag UI: ビルド", lambda: build("backend_diag/ui")),
-        ("Diag: ランチャー", lambda: _load_folder_module("backend_diag").setup(desktop=False)),
+        ("Diag: aidiy_diag", lambda: _load_folder_module("backend_diag").setup(desktop=False)),
         ("Web: 依存", lambda: dependencies("frontend_web")),
         ("Web: ビルド", lambda: build("frontend_web")),
         ("Avatar: 依存", lambda: dependencies("frontend_avatar", electron=True)),
         ("Avatar: ビルド", lambda: build("frontend_avatar")),
-        ("Avatar: ランチャー", lambda: _load_folder_module("frontend_avatar").install_standalone_launcher()),
-        ("IDE共通UI: 依存", lambda: dependencies("frontend_ide")),
+        ("Avatar: aidiy_avatar", lambda: _load_folder_module("frontend_avatar").install_standalone_launcher()),
+        ("IDE UI: 依存", lambda: dependencies("frontend_ide")),
         ("Code / Live: 依存", lambda: dependencies("frontend_ide/host", electron=True)),
         # hostの既存compile/packageは共通Vueのビルドも行うため、二重ビルドしない。
         ("Code / Live / IDE: ビルド・配置", lambda: _load_folder_module("frontend_ide/host").setup_assets(npm)),
-        ("IDEビューア: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
-        ("IDE: ランチャー", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
-        ("Term: ランチャー", lambda: _load_folder_module("frontend_ide/aidiy_term").setup()),
+        ("IDE Viewer: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
+        ("IDE: aidiy_ide", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
+        ("Term: aidiy_term", lambda: _load_folder_module("frontend_ide/aidiy_term").setup()),
         ("Discord: 依存", lambda: dependencies("frontend_channels", electron=True)),
         ("Discord: ビルド", lambda: build("frontend_channels", "build:panel")),
-        ("Discord: ランチャー", lambda: _load_folder_module("frontend_channels").install_launcher(BASE_DIR / "frontend_channels")),
+        ("Discord: aidiy_discord", lambda: _load_folder_module("frontend_channels").install_launcher(BASE_DIR / "frontend_channels")),
     ]
     for label, action in steps:
         print_info(label)
@@ -812,20 +806,18 @@ def main():
         print_setup_summary(errors)
         raise SystemExit(1 if errors else 0)
     print_header("プロジェクト セットアップ")
-    print(f"{Colors.BOLD}このスクリプトは、プロジェクト全体の初期セットアップを実行します。{Colors.ENDC}")
     print_info("セットアップ対象:")
     print_info("  0. 共通")
-    print_info("  1. バックエンド(Diag)")
-    print_info("  2. バックエンド(local)")
-    print_info("  3. バックエンド(tools)")
-    print_info("  4. バックエンド(core,apps)")
-    print_info("  5. バックエンド(task,team)")
-    print_info("  6. フロントエンド(Web)")
-    print_info("  7. フロントエンド(Avatar)")
-    print_info("  8. コマンド(hermes)")
-    print_info("  9. IDE群(Term / Code / Live / IDE)")
-    print_info(" 10. フロントエンド(Discord、任意)")
-    print_info("git pull 後の軽量更新は b=build（Node.js系の再ビルド）を選択してください。")
+    print_info("  1. Diag")
+    print_info("  2. Local")
+    print_info("  3. Tools")
+    print_info("  4. Core / Apps")
+    print_info("  5. Task / Team")
+    print_info("  6. Web")
+    print_info("  7. Avatar")
+    print_info("  8. Hermes")
+    print_info("  9. Term / Code / Live / IDE")
+    print_info(" 10. Discord")
     print()
 
     choices = collect_setup_choices()
@@ -867,12 +859,12 @@ def main():
     print()
     if choices.get("diag"):
         if not _load_folder_module("backend_diag").setup(choices, desktop=False):
-            error_locations.append("バックエンド(Diag)")
+            error_locations.append("Diag")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
         if not _load_folder_module("backend_diag").setup_desktop():
-            error_locations.append("バックエンド(Diag): Electron")
+            error_locations.append("Diag: Electron")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -881,18 +873,18 @@ def main():
     if choices["local"]:
         local_mod = _load_folder_module("backend_local")
         if not local_mod.setup(choices):
-            error_locations.append("バックエンド(local)")
+            error_locations.append("Local")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("バックエンド(local)のセットアップをスキップしました。")
+        print_warning("Local のセットアップをスキップしました。")
 
     print()
     if choices["mcp"]:
         tools_mod = _load_folder_module("backend_tools")
         if not tools_mod.setup_dependencies():
-            error_locations.append("バックエンド(tools)")
+            error_locations.append("Tools")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -900,58 +892,58 @@ def main():
         tools_mod.show_current_config()
         if choices["mcp_config"]:
             if not tools_mod.configure_clients():
-                error_locations.append("tools: MCP 設定ファイル書き込み")
+                error_locations.append("Tools: MCP 設定ファイル書き込み")
                 if not continue_on_error:
                     print_setup_summary(error_locations)
                     sys.exit(1)
         else:
-            print_warning("backend_tools の MCP 設定ファイル書き込みをスキップしました。")
+            print_warning("Tools の MCP 設定ファイル書き込みをスキップしました。")
     else:
-        print_warning("バックエンド(tools) のセットアップをスキップしました。")
+        print_warning("Tools のセットアップをスキップしました。")
 
     print()
     if choices["backend"]:
         backend_mod = _load_folder_module("backend_server")
         if not backend_mod.setup(choices):
-            error_locations.append("バックエンド(core,apps)")
+            error_locations.append("Core / Apps")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("バックエンド(core,apps)のセットアップをスキップしました。")
+        print_warning("Core / Apps のセットアップをスキップしました。")
 
     print()
     if choices["taskteam"]:
         taskteam_mod = _load_folder_module("backend_taskteam")
         if not taskteam_mod.setup(choices):
-            error_locations.append("バックエンド(task,team)")
+            error_locations.append("Task / Team")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("バックエンド(task,team)のセットアップをスキップしました。")
+        print_warning("Task / Team のセットアップをスキップしました。")
 
     print()
     if choices["web"]:
         web_mod = _load_folder_module("frontend_web")
         if not web_mod.setup(choices):
-            error_locations.append("フロントエンド(Web)")
+            error_locations.append("Web")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("フロントエンド(Web)のセットアップをスキップしました。")
+        print_warning("Web のセットアップをスキップしました。")
 
     print()
     if choices["avatar"]:
         avatar_mod = _load_folder_module("frontend_avatar")
         if not avatar_mod.setup(choices):
-            error_locations.append("フロントエンド(Avatar)")
+            error_locations.append("Avatar")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("フロントエンド(Avatar)のセットアップをスキップしました。")
+        print_warning("Avatar のセットアップをスキップしました。")
 
     # モデル事前ダウンロードは時間がかかるため、別プロセスで投入する。
     # Hermes はセットアップ全体の最後に回すため、その前に投入だけ済ませる。
@@ -964,32 +956,32 @@ def main():
     if choices["hermes"]:
         hermes_mod = _load_folder_module("command_hermes")
         if not hermes_mod.setup(choices):
-            error_locations.append("コマンド(hermes)")
+            error_locations.append("Hermes")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("コマンド(hermes)のセットアップをスキップしました。")
+        print_warning("Hermes のセットアップをスキップしました。")
 
     print()
     if choices.get("ide"):
         if not _load_folder_module("frontend_ide").setup(choices):
-            error_locations.append("IDE群(Term / Code / Live / IDE)")
+            error_locations.append("Term / Code / Live / IDE")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("IDE群(Term / Code / Live / IDE)のセットアップをスキップしました。")
+        print_warning("Term / Code / Live / IDE のセットアップをスキップしました。")
 
     print()
     if choices.get("discord"):
         if not _load_folder_module("frontend_channels").setup(choices):
-            error_locations.append("フロントエンド(Discord)")
+            error_locations.append("Discord")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("フロントエンド(Discord)のセットアップをスキップしました。")
+        print_warning("Discord のセットアップをスキップしました。")
 
     print_header("キャッシュクリア")
     remove_folder_import_caches()
@@ -998,7 +990,7 @@ def main():
     print()
     if choices.get("diag"):
         if not run_diag_headless():
-            error_locations.append("バックエンド(Diag): aidiy_diag --headless")
+            error_locations.append("Diag: aidiy_diag --headless")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
@@ -1011,7 +1003,7 @@ def main():
     print_info(f"    MCP起動    : cd backend_tools && uv run uvicorn tools_main:app --reload --host 0.0.0.0 --port {PORT_TOOLS}")
     print_info(f"    Core起動   : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port {PORT_CORE}")
     print_info(f"    Apps起動   : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port {PORT_APPS}")
-    print_info("    バックエンド(task,team)起動:")
+    print_info("    Task / Team起動:")
     print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
     print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
@@ -1026,7 +1018,7 @@ def main():
     print()
     print_success("セットアップは正常終了しました。")
     if choices["local"] and choices.get("local_download") in ("one", "all"):
-        print_info("バックエンド(local) のモデルダウンロードは別プロセスで継続中です。")
+        print_info("Local のモデルダウンロードは別プロセスで継続中です。")
     print_info("5秒後に終了します...")
     time.sleep(5)
 

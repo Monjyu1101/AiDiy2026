@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""フロントエンド(Avatar) セットアップスクリプト
+"""Avatar セットアップスクリプト
 
 Vue 3 / Vite / TypeScript / Electron の依存関係を導入し、宣言範囲内の最新版へ更新します。
 Electron は scripts/_setup_electron.py の共通処理で準備し、配置済みバイナリと共有 ZIP を再利用します。
@@ -171,9 +171,9 @@ def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
             launcher_path.write_text(content, encoding="utf-8")
             launcher_path.chmod(0o755)
     except OSError as exc:
-        print_error(f"ランチャーを登録できません: {launcher_path} ({exc})")
+        print_error(f"aidiy_avatar を登録できません: {launcher_path} ({exc})")
         return False
-    print_success(f"起動ランチャーを登録しました: {launcher_path}")
+    print_success(f"aidiy_avatar を登録しました: {launcher_path}")
     return ensure_launcher_path(launcher_dir)
 
 
@@ -181,10 +181,10 @@ def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
-    label = "フロントエンド(Avatar)"
+    label = "Avatar"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_AVATAR_DIR}")
-    print_info("対象: Vue 3 / Vite / TypeScript / Electron / aidiy_avatar ランチャー")
+    print_info("対象: Vue 3 / Vite / TypeScript / Electron")
 
     if not FRONTEND_AVATAR_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {FRONTEND_AVATAR_DIR}")
@@ -213,15 +213,15 @@ def main():
     global AUTO_MODE
     if sys.argv[1:] == ["--launchers-only"]:
         raise SystemExit(0 if install_standalone_launcher() else 1)
-    print_header("フロントエンド(Avatar) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("フロントエンド(Avatar) のセットアップを実行しますか?", default="n")
+    print_header("Avatar セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Avatar のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
     if AUTO_MODE:
         print_info("AUTOモードで実行します。")
     if not setup():
-        print_error("フロントエンド(Avatar) のセットアップに失敗しました。")
+        print_error("Avatar のセットアップに失敗しました。")
         sys.exit(1)
 
 

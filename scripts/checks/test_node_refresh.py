@@ -153,7 +153,7 @@ class NodeRefreshTests(unittest.TestCase):
     def test_launcher_exception_is_not_reported_as_success(self):
         _, _, modules = self.fixture()
         modules["frontend_channels"].install_launcher.side_effect = OSError("fixture")
-        self.assertEqual(setup.setup_node_refresh(), ["Discord: ランチャー"])
+        self.assertEqual(setup.setup_node_refresh(), ["Discord: aidiy_discord"])
 
     def test_missing_node_stops_without_installation(self):
         with patch.object(setup, "get_node_version", return_value=None), patch.object(setup, "run_command") as run, contextlib.redirect_stdout(io.StringIO()) as output:

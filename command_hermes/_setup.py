@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-"""コマンド(hermes) セットアップスクリプト
+"""Hermes セットアップスクリプト
 
 このフォルダ (command_hermes) 単体のセットアップを行います。
 仮想環境作成・依存関係インストールに加え、`aidiy_hermes` ランチャーの作成と
@@ -148,10 +148,10 @@ def check_uv_installed():
 # セットアップ本体
 # ============================================================
 def setup(choices: dict | None = None) -> bool:
-    label = "コマンド(hermes)"
+    label = "Hermes"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {BACKEND_HERMES_DIR}")
-    print_info("対象: Hermes CLI / pyproject.toml / uv")
+    print_info("対象: Python / uv / Hermes CLI")
 
     if not BACKEND_HERMES_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {BACKEND_HERMES_DIR}")
@@ -185,7 +185,7 @@ def setup(choices: dict | None = None) -> bool:
 
 def install_standalone_launcher() -> bool:
     """依存の再導入なしでランチャーと共通 PATH 登録を修復する。"""
-    label = 'コマンド(hermes)'
+    label = 'Hermes'
     hermes_dir = BACKEND_HERMES_DIR.resolve()
     cli_path = hermes_dir / "cli_main.py"
     launcher_dir = Path.home() / ".local" / "bin"
@@ -243,8 +243,8 @@ def install_standalone_launcher() -> bool:
 
 def main():
     global AUTO_MODE
-    print_header("コマンド(hermes) セットアップ")
-    run_setup, AUTO_MODE = ask_start_mode("コマンド(hermes) のセットアップを実行しますか?", default="n")
+    print_header("Hermes セットアップ")
+    run_setup, AUTO_MODE = ask_start_mode("Hermes のセットアップを実行しますか?", default="n")
     if not run_setup:
         print_warning("セットアップをキャンセルしました。")
         return
@@ -252,7 +252,7 @@ def main():
         print_info("AUTOモードで実行します。")
     ok = setup()
     if not ok:
-        print_error("コマンド(hermes) のセットアップに失敗しました。")
+        print_error("Hermes のセットアップに失敗しました。")
         sys.exit(1)
 
 

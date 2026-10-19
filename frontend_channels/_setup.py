@@ -55,9 +55,9 @@ def print_info(message):
 
 def setup(choices=None) -> bool:
     del choices
-    print_header("フロントエンド(Discord) セットアップ")
+    print_header("Discord セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
-    print_info("対象: Discord Bot パネル / Electron / 単独起動ランチャー / TypeScript")
+    print_info("対象: Discord / Node.js / TypeScript / Electron")
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.12 以降と npm を導入してください。")
@@ -85,7 +85,7 @@ def setup(choices=None) -> bool:
     except (OSError, ValueError, ImportError, subprocess.CalledProcessError):
         print_error("Discord の依存導入または共通設定の補完に失敗しました。")
         return False
-    print_success("フロントエンド(Discord): aidiy_discord で起動できます。")
+    print_success("Discord: aidiy_discord で起動できます。")
     return True
 
 

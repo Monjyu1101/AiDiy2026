@@ -50,9 +50,9 @@ ensure_launcher_path = _path_helper.ensure_launcher_path
 def setup(choices=None, *, desktop=True):
     if choices is not None and choices.get('diag') is False:
         return True
-    print_header('バックエンド(Diag) セットアップ')
+    print_header('Diag セットアップ')
     print_info(f'作業ディレクトリ: {THIS_DIR}')
-    print_info('対象: 診断ランチャー（aidiy_diag）の配置 / Electron 実行環境の準備')
+    print_info('対象: Node.js / Electron')
     directory = Path.home() / '.local' / 'bin'
     launcher = directory / ('aidiy_diag.cmd' if sys.platform == 'win32' else 'aidiy_diag')
     try:
@@ -61,9 +61,9 @@ def setup(choices=None, *, desktop=True):
         if sys.platform != 'win32':
             launcher.chmod(0o755)
     except OSError as exc:
-        print(f'診断ランチャーを配置できません: {exc}')
+        print(f'aidiy_diag を登録できません: {exc}')
         return False
-    print(f'診断ランチャーを作成しました: {launcher}')
+    print(f'aidiy_diag を登録しました: {launcher}')
     if not ensure_launcher_path(directory):
         return False
     print('起動: aidiy_diag（Electron） / aidiy_diag --browser（ブラウザ）')
@@ -87,7 +87,7 @@ def setup_desktop():
             return True
         except (OSError, subprocess.SubprocessError):
             return False
-    return helper.setup_dependencies(THIS_DIR, npm, 'バックエンド(Diag)', run)
+    return helper.setup_dependencies(THIS_DIR, npm, 'Diag', run)
 
 
 if __name__ == '__main__':

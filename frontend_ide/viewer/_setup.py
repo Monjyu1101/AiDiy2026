@@ -63,9 +63,9 @@ def print_info(message):
 
 def setup(choices=None) -> bool:
     if not (choices and choices.get("ide")):
-        print_header("IDE群(Term / Code / Live / IDE) セットアップ")
+        print_header("IDE セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
-    print_info("対象: Electron / コード・Office文書ビューア（Monaco / docx-preview / SheetJS / PptxViewJS / PDF.js）")
+    print_info("対象: Electron / Monaco Editor / docx-preview / SheetJS / PptxViewJS / PDF.js")
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.13 以降と npm を導入してください。")
@@ -91,7 +91,7 @@ def setup(choices=None) -> bool:
         if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
             if not updated:
                 print_info("導入済みバージョンに一致する配置済み本体・共有 ZIP から復旧します（ダウンロードなし）。")
-            if not prepare_electron_binary(THIS_DIR, 'AiDiy IDE', allow_download=updated, info=print_info, error=print_error):
+            if not prepare_electron_binary(THIS_DIR, 'IDE', allow_download=updated, info=print_info, error=print_error):
                 return False
         vue = THIS_DIR.parent.parent / 'frontend_ide'
         if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
@@ -99,10 +99,10 @@ def setup(choices=None) -> bool:
         subprocess.run([npm, 'run', 'build'], cwd=vue, check=True)
         install_launcher(THIS_DIR)
     except (OSError, subprocess.CalledProcessError):
-        print_error("AiDiy IDE の依存導入またはランチャー登録に失敗しました。")
+        print_error("IDE の依存導入または aidiy_ide の登録に失敗しました。")
         return False
     if not (choices and choices.get("ide")):
-        print_success("IDE群(Term / Code / Live / IDE): aidiy_ide で起動できます。")
+        print_success("IDE: aidiy_ide で起動できます。")
     return True
 
 

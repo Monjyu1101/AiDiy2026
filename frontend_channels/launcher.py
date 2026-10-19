@@ -41,7 +41,7 @@ def install_launcher(root: Path) -> None:
     else:
         path.write_text(f'#!/bin/sh\nexec {shlex.quote(node)} {shlex.quote(str(script))} "$@"\n', encoding='utf-8')
         path.chmod(0o755)
-    print(f'[OK] ランチャーを登録しました: {path}')
+    print(f'[OK] aidiy_discord を登録しました: {path}')
     if not ensure_launcher_path(path.parent):
         raise OSError('ランチャーの PATH 登録に失敗しました。')
 
