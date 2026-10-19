@@ -1,0 +1,86 @@
+[
+  {
+    "index": 1,
+    "name": "セルフテスト,aidiy_avatar,Electron実行編.md",
+    "pages": 8,
+    "images": 9,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-01\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-01\\contact-02.jpg"
+    ]
+  },
+  {
+    "index": 2,
+    "name": "セルフテスト,aidiy_avatar,Web実行編.md",
+    "pages": 8,
+    "images": 9,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-02\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-02\\contact-02.jpg"
+    ]
+  },
+  {
+    "index": 3,
+    "name": "セルフテスト,aidiy_diag,アプリ起動編.md",
+    "pages": 21,
+    "images": 23,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-03\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-03\\contact-02.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-03\\contact-03.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-03\\contact-04.jpg"
+    ]
+  },
+  {
+    "index": 4,
+    "name": "セルフテスト,aidiy_diag,システム起動編.md",
+    "pages": 23,
+    "images": 26,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-04\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-04\\contact-02.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-04\\contact-03.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-04\\contact-04.jpg"
+    ]
+  },
+  {
+    "index": 5,
+    "name": "セルフテスト,aidiy_diag,環境確認編.md",
+    "pages": 17,
+    "images": 12,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-05\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-05\\contact-02.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-05\\contact-03.jpg"
+    ]
+  },
+  {
+    "index": 6,
+    "name": "セルフテスト,aidiy_ide,操作編.md",
+    "pages": 46,
+    "images": 65,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-02.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-03.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-04.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-05.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-06.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-07.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-06\\contact-08.jpg"
+    ]
+  },
+  {
+    "index": 7,
+    "name": "セルフテスト,frontend_web,AiDiy編.md",
+    "pages": 25,
+    "images": 31,
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-07\\contact-01.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-07\\contact-02.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-07\\contact-03.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-07\\contact-04.jpg",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\final-960-qa\\book-07\\contact-05.jpg"
+    ]
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "book": "セルフテスト,aidiy_avatar,Electron実行編.md",
+    "pages": 8,
+    "images": 9,
+    "links": 16,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_avatar,Electron実行編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_avatar,Electron実行編\\sheet-02.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,aidiy_avatar,Web実行編.md",
+    "pages": 8,
+    "images": 9,
+    "links": 14,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_avatar,Web実行編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_avatar,Web実行編\\sheet-02.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,aidiy_diag,アプリ起動編.md",
+    "pages": 21,
+    "images": 23,
+    "links": 31,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,アプリ起動編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,アプリ起動編\\sheet-02.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,アプリ起動編\\sheet-03.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,アプリ起動編\\sheet-04.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,aidiy_diag,システム起動編.md",
+    "pages": 16,
+    "images": 16,
+    "links": 20,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,システム起動編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,システム起動編\\sheet-02.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,システム起動編\\sheet-03.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,aidiy_diag,環境確認編.md",
+    "pages": 17,
+    "images": 12,
+    "links": 16,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,環境確認編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,環境確認編\\sheet-02.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_diag,環境確認編\\sheet-03.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,aidiy_ide,操作編.md",
+    "pages": 49,
+    "images": 70,
+    "links": 76,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-02.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-03.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-04.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-05.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-06.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-07.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-08.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,aidiy_ide,操作編\\sheet-09.png"
+    ]
+  },
+  {
+    "book": "セルフテスト,frontend_web,AiDiy編.md",
+    "pages": 24,
+    "images": 29,
+    "links": 40,
+    "issues": [],
+    "sheets": [
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,frontend_web,AiDiy編\\sheet-01.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,frontend_web,AiDiy編\\sheet-02.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,frontend_web,AiDiy編\\sheet-03.png",
+      "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\live-first-response\\qa-final\\セルフテスト,frontend_web,AiDiy編\\sheet-04.png"
+    ]
+  }
+]

@@ -1,0 +1,328 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><style>@page{size:A4;margin:17mm 16mm 19mm}*{box-sizing:border-box}body{font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9.5pt;line-height:1.65;color:#172b3b;margin:0}h1{font-size:19pt;line-height:1.4;margin:0 0 7mm;border-bottom:2px solid #167b85;padding-bottom:4mm}h2{font-size:14pt;margin:8mm 0 3mm;border-left:4px solid #167b85;padding-left:3mm}h3{font-size:11pt;margin:5mm 0 2mm}h1,h2,h3,summary{break-after:avoid}p{margin:2.5mm 0;orphans:3;widows:3}li{margin:1mm 0}a{color:#176f81;overflow-wrap:anywhere}table{border-collapse:collapse;width:100%;font-size:8.6pt;line-height:1.55;margin:3mm 0}th,td{border:1px solid #b9cbd1;padding:2mm;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf4f5;text-align:left}tr{break-inside:avoid}.small-table{break-inside:avoid}thead{display:table-header-group}code{font-size:8.5pt;overflow-wrap:anywhere;white-space:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:8pt;background:#edf3f5;padding:3mm}blockquote{border-left:2px solid #89b7c0;margin:3mm 0;padding:1mm 4mm;background:#f1f7f8}figure{margin:4mm 0 6mm;break-inside:avoid}figure img{display:block;max-width:100%;width:auto;max-height:165mm;object-fit:contain;margin:2mm auto;border:1px solid #bdcdd3}figcaption{font-size:9pt;line-height:1.6;margin-bottom:2mm}summary{font-weight:bold;list-style:none;margin:4mm 0 2mm}details{display:block}strong{font-weight:700}</style><body><h1>aidiy_diag 環境確認編<br>総合テストと操作手順書素材</h1>
+<blockquote>
+<p>文書: <code>セルフテスト,aidiy_diag,環境確認編.md</code> | 実装: <code>backend_diag/ui/src/App.vue</code>, <code>backend_diag/ui/src/導入状況/</code>, <code>backend_diag/ui/src/モデル一覧/</code>, <code>backend_diag/ui/src/外部連携/</code>, <code>backend_diag/ui/src/設定モデル/</code>, <code>backend_diag/ui/src/AIモデル/</code>, <code>backend_diag/診断/headless.mjs</code></p>
+</blockquote>
+<h2>総合評価</h2>
+<p><strong>総合評価：✅ OK (PASS 2件含む)。導入・保存・headless・設定15役割の応答を確認しました。</strong>（2026年10月19日・Windows）</p>
+<p>プログラムの導入、AIや外部サービスへの接続、結果の保存を調べます。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>知りたいこと</th>
+<th>現在の結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AIから実際に返答がある？</td>
+<td>✅ OK：今回選んだモデルで、チャット・Liveの挨拶・判断・コード支援の返答を確認しました。すべてのモデルを試した結果ではありません。</td>
+</tr>
+<tr>
+<td>Liveはどの条件で通過した？</td>
+<td>✅ OK：接続後15秒待って送信し、応答を最大60秒待つ設定で文字の返答を確認しました。この待機はDiagが自動で行います。</td>
+</tr>
+<tr>
+<td>音声も確認できた？</td>
+<td>✅ OK：追加試験で実音声を取得し、音声認識で「おはようございます」と照合しました。再生APIも正常です。人の耳での聴取とは区別します。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PASS (別途環境調整必要) は2件</strong>です。起動していないOllamaとLocalを、それぞれ1件と数えます。今回は設定済み7プロバイダを確認できています。今後キー未登録で試す場合もPASSとし、理由を添えます。設定済みの実接続と、音声の取得・認識照合は通過しました。すべてのモデルの動作保証ではありません。<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8.pdf">PDF版の総合テスト実施記録</a>も作成しました。Mac／Linuxの実機確認は別途推奨です。</p>
+<p>PDF版は本文に合わせて再生成し、全ページの日本語・表・画像・改ページを目視確認しました。</p>
+<h2>この冊子の進め方</h2>
+<p>必要なプログラムやAIへの接続を調べ、結果を保存する試験です。導入確認だけならシステム全体を起動する必要はありません。AIの返答を試す5〜6章では、先に<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E8%B5%B7%E5%8B%95%E7%B7%A8.md">システム起動編</a>でToolsを起動してから始めます。アプリを開く手順は<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%A2%E3%83%97%E3%83%AA%E8%B5%B7%E5%8B%95%E7%B7%A8.md">アプリ起動編</a>にあります。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>表示・用語</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>導入状況</td>
+<td>必要なプログラムが、このPCに入っているかを調べます。</td>
+</tr>
+<tr>
+<td>プロバイダ</td>
+<td>AIを提供しているサービスです。</td>
+</tr>
+<tr>
+<td>モデル</td>
+<td>そのサービスで使うAIの種類です。</td>
+</tr>
+<tr>
+<td>外部連携</td>
+<td>Discordなど、AiDiy以外のサービスとの接続です。</td>
+</tr>
+<tr>
+<td>書込</td>
+<td>画面で確認した結果を、ファイルに保存する操作です。</td>
+</tr>
+<tr>
+<td>キャッシュ利用</td>
+<td>今回新しく取得せず、以前に保存した情報を使った状態です。</td>
+</tr>
+<tr>
+<td>headless</td>
+<td>ウィンドウを開かず、文字のコマンドで診断する方法です。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>✅ OK</strong> は良好、<strong>❌ NG</strong> は不良、<strong>⏸ 未実施</strong> は未確認です。モデル一覧の取得と、AIからの返答は別に試します。</p>
+<h3>Liveを試すときの待ち方（現在の設定）</h3>
+<p>Diagが<strong>接続後15秒待って送信</strong>し、<strong>返答を最大60秒待ちます</strong>。再試験も同じです。利用者の追加待機は不要です。</p>
+<p>上記の設定で文字の返答を確認し、Live試験は <strong>✅ OK</strong> です。文字の返答が出たことと、音声を再生して聞けたことは別に記録します。</p>
+<p>「テスト中」は結果かエラーが出るまで待ちます。内部の待ち時間は、後半の試験担当者向け記録に掲載しています。</p>
+<h2>1. 環境確認の画面へ移る</h2>
+<h3>操作手順</h3>
+<ol>
+<li>Diagがミニ表示の場合は、タイトルバーの復帰ボタンを押して通常画面に戻します。</li>
+<li>上部の「導入状況」を押します。</li>
+<li>画面下部に「診断 接続済み」と表示されていることを確認します。5〜6章を試す場合は「tools オンライン」も確認します。</li>
+<li>前回実行日時が表示されている場合は、以前の結果です。今回の試験では、次章の「状況確認」を実行してから結果を読みます。</li>
+</ol>
+<h3>成功の見分け方と記録すること</h3>
+<p>「導入状況」が選ばれ、診断項目が表示されれば画面の確認ができます。調べる対象は、Diagを動かしているPCです。Toolsが止まっていても導入確認はできますが、AIの返答を試す「設定モデル」「AIモデル」にはToolsが必要です。</p>
+<p><strong>✅ OK</strong>：通常表示から「導入状況」へ移り、分類・項目・前回実行日時を確認しました。</p>
+
+<figure><figcaption>診断項目が並ぶ入口画面です。この後「状況確認」で今回の結果に更新します。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_101_%E5%B0%8E%E5%85%A5%E7%8A%B6%E6%B3%81%E3%81%AE%E4%B8%80%E8%A6%A7%E7%94%BB%E9%9D%A2.png" alt="1章：導入状況の項目一覧"></figure>
+<h2>2. 導入状況を確認して保存する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>「導入状況」画面で「状況確認」を押します。</li>
+<li>確認中の表示が終わり、項目ごとの結果が出るまで待ちます。</li>
+<li>左側の分類から、PythonやNode.jsなど、調べたいプログラムの名前を押します。</li>
+<li>右側で「何に使うか」「見つかった場所」「バージョン（プログラムの版）」を読みます。必要なら説明やソースの参照箇所も見ます。</li>
+<li>「書込」を押し、「書込済」となることを確認します。</li>
+<li>保存の試験では、保存ファイルを読み、今回の確認日時と結果が画面に合っていることを確かめます。保存先は下記の記録を参照します。</li>
+</ol>
+<h3>成功の見分け方と記録すること</h3>
+<p>右側に選んだ項目の詳細が出れば表示確認は完了です。保存先は <code>_AIDIY/aidiy_diag/install_info.json</code>。今回の結果・日時と一致するか比べます。</p>
+<p>「未検出」はプログラムが見つからない状態です。使わない追加機能なら全体の故障とは限りません。「検出済み」でも、起動やログインは別に確認します。</p>
+<p><strong>✅ OK（追加試験）</strong>：「状況確認」で19項目すべてOKとなり、Pythonの詳細を表示して「書込」を押しました。Python 3.14.4・検出パス・確認日時と、保存内容が一致しました。</p>
+
+<figure><figcaption>Pythonの詳細と診断済みの項目一覧です。「書込」により今回の結果を保存しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_202_%E5%B0%8E%E5%85%A5%E7%8A%B6%E6%B3%81%E3%81%AE%E6%9B%B8%E8%BE%BC%E6%B8%88%E3%81%BF%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="2章：導入状況の診断結果と保存"></figure>
+<h2>3. モデル一覧を取得して保存する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>上部の「モデル一覧」を押します。</li>
+<li>調べたいAIサービス（プロバイダ）の行を選び、設定済みか、何を調べる試験かを読みます。</li>
+<li>1件だけなら行の「テスト」、まとめて取得するなら「一覧再取得」を押します。</li>
+<li>取得中の表示が終わるまで待ち、モデル名・確認日時・説明を読みます。</li>
+<li>「書込」を押し、「書込済」となることを確認します。保存の試験では、保存内容と画面のモデル名・日時を比べます。</li>
+</ol>
+<p>「キャッシュ利用」は以前の一覧を使った状態です。今回インターネットから新しく取得できた場合とは分けて記録します。</p>
+<h3>成功の見分け方と記録すること</h3>
+<p>選んだサービスの結果と確認日時が更新され、モデル情報を <code>_AIDIY/aidiy_diag/</code> へ保存できれば、この章の確認ができます。取得できなかった場合は、設定がないのか、通信に失敗したのか、表示された理由を記録します。</p>
+<p>モデル名が出た場合でも、公開情報やあらかじめ用意された候補を表示しただけの場合があります。接続に使うキーが有効か、実際に文章や音声を作れるかは、5〜6章で別に試します。</p>
+<p><strong>✅ OK（取得・保存）</strong>：Geminiの個別テストと「一覧再取得」を実施し、9プロバイダの結果を書き込みました。設定済み7プロバイダはOK、backend_localは固定候補を示すPASSです。Ollamaはサーバー停止中のため、画面と保存内容にはNGが残っています。今回の総合テストでは環境条件としてPASS (別途環境調整必要)に分類します。Localも未起動なので同じ分類です。いずれも会話成功とは判定しません。</p>
+
+<figure><figcaption>一括取得と保存後のモデル一覧です。Geminiのモデル名2件と確認日時が保存内容に一致しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_303_%E3%83%A2%E3%83%87%E3%83%AB%E4%B8%80%E8%A6%A7%E3%81%AE%E6%9B%B8%E8%BE%BC%E6%B8%88%E3%81%BF%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="3章：モデル一覧の一括取得と保存"></figure>
+<h2>4. 外部連携を確認して保存する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>上部の「外部連携」を押します。</li>
+<li>Hugging FaceやDiscordなど、調べたいサービスの行を選びます。設定の有無と、何を確認するかの説明を読みます。</li>
+<li>1件だけなら行の「テスト」、まとめて調べるなら「状況確認」を押します。</li>
+<li>結果が出るまで待ち、結果・説明・確認日時を確認します。未設定なら、その理由も記録します。</li>
+<li>「書込」を押し、保存した結果と画面の内容を比べます。</li>
+</ol>
+<p>この操作は接続に使う情報が有効かを調べます。Discordのチャンネルへメッセージを送る試験は、この章には含みません。</p>
+<h3>成功の見分け方と記録すること</h3>
+<p>設定済みのサービスを調べ、接続の確認結果が表示されることを確かめます。未設定の行は、試せない理由と一緒に <strong>PASS (別途環境調整必要)</strong> と記録します。保存先は <code>_AIDIY/aidiy_diag/integration_info.json</code> です。</p>
+<p>Discordでは、Bot自身の情報が取得できるかを調べます。メッセージ投稿や音声会話まで成功したという結果ではありません。Hugging Faceでも、使う権限の確認と、ファイルを実際に書き込む操作は別に扱います。</p>
+<p><strong>✅ OK（認証確認・保存）</strong>：Hugging Face読取キーの個別テストと、外部連携の「状況確認」を実施しました。読取・書込キー、Discord Botの3件すべてOKで、「書込」後の保存内容と結果・確認日時が一致しました。投稿やリポジトリへの書込は試験範囲に含みません。</p>
+
+<figure><figcaption>3件の認証確認が終わった画面です。表示は認証と権限の確認結果です。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_402_%E5%A4%96%E9%83%A8%E9%80%A3%E6%90%BA3%E4%BB%B6%E3%81%AE%E7%A2%BA%E8%AA%8D%E3%81%A8%E6%9B%B8%E8%BE%BC%E6%B8%88%E3%81%BF%E7%94%BB%E9%9D%A2.png" alt="4章：外部連携3件の認証と保存"></figure>
+<h2>5. 設定中のモデルで応答を確認する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>画面下部の「tools オンライン」を確認し、上部の「設定モデル」を押します。押せない場合はToolsの起動状態を確認します。</li>
+<li>パネル見出しの「再読込」を押し、現在設定されているAIを読み直します。</li>
+<li>左の一覧から、今回試す役割を選びます。CHATは文字会話、LIVEは音声会話、DECISIONは選択や判断、CODEはコード支援です。プロバイダとモデル名も控えます。</li>
+<li>1行だけ試す場合は、その行の「テスト」を押します。設定中のモデルを順番に試す場合は、パネル内の「動作確認」を押します。</li>
+<li>テスト中の表示が終わるまで待ち、右側の「応答」にAIの返答が出たことを確認します。途中でやめる場合は「中止」を押します。</li>
+<li>Liveの音声プレーヤーが出た場合は、再生ボタンを押して、再生位置が進むか確認します。実際に聞こえた内容は、文字の返答とは別に記録します。</li>
+</ol>
+<p>画面の一番右上の「全テスト」は、AIの返答を試すボタンではありません。役割の違いは7章の表で確認できます。</p>
+<h3>成功の見分け方と記録すること</h3>
+<p>「応答」にAIの返答が出たことが成功の目印です。「テスト中」や「未設定」だけでは合格にしません。「共有元」がある行は、同じ接続条件で行った別の行の結果を使っています。その表示も記録します。AIサービスの利用条件によっては、試験にも料金がかかります。</p>
+<h3>最終結果と画面</h3>
+<p><strong>✅ OK</strong>：設定モデル15役割すべての応答を確認しました。TASK／TEAMの6役割は、同じ設定のCODE1結果を共有します。Live実行中の「中止」で試行を解除し、再実行できることも確認しました。</p>
+
+<figure><figcaption>全15役割が正常応答となった画面です。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_402_Antigravity%E3%81%AE%E5%86%8D%E8%A9%A6%E9%A8%93%E6%88%90%E5%8A%9F%E3%81%A8%E5%85%A815%E5%BD%B9%E5%89%B2%E3%81%AE%E6%AD%A3%E5%B8%B8%E5%BF%9C%E7%AD%94%E7%94%BB%E9%9D%A2.png" alt="5章: 設定モデル全15役割の最終結果"></figure>
+<h2>6. AIモデルと入力を選んで試す</h2>
+<h3>操作手順</h3>
+<ol>
+<li>「tools オンライン」を確認して、上部の「AIモデル」を押します。</li>
+<li>パネル内の「候補を再読込」を押します。</li>
+<li>CHAT・LIVE・DECISION・CODEのタブを1つずつ選び、使うプロバイダとモデルを確認します。LIVEでは音声の種類、DECISIONでは質問文や選択肢も確認します。</li>
+<li>会話の入力欄には、次の文を使います。</li>
+</ol>
+<blockquote>
+<p>おはよう。稼働試験です。挨拶を一文だけ返してください。ファイル変更やコマンド実行はしないでください。</p>
+</blockquote>
+<ol start="5">
+<li>各タブの入力を用意したら、パネル内の「動作確認」または画面右上の「一括試行」を1回押します。CHAT → LIVE → DECISION → CODEの順に進みます。</li>
+<li>完了するとCHATへ戻ります。他の3つのタブも押し直し、結果と返答を確認します。AIが返した文章や判断が表示されていれば、返答の確認ができます。</li>
+<li>選んだモデル名、入力、実際の返答、結果を記録します。この画面でのモデル選択は、本体の設定を書き換えません。</li>
+</ol>
+<h3>成功の見分け方と記録すること</h3>
+<p>選んだモデルと、実際に返したモデルの情報が表示される場合は、両方を記録します。「auto」は自動選択という意味なので、結果に出たモデル名も確認します。文字の返答・判断結果と、音声の取得・再生を分けて記録できれば、この章の結果を読み比べられます。</p>
+<h3>live_checkの最終確認（2026年10月19日）</h3>
+<p><strong>✅ OK</strong>：<code>backend_tools/tools_proc/live_model_check.py</code> は、接続準備完了を待った後に15秒待機し、送信後の応答を最大60秒待つ実装でした。条件に合っているため、今回の実装修正は不要でした。</p>
+<p>関連の <code>test_live_model_check.py</code> は22件すべて成功しました。さらに起動中の <code>/internal/live_model_check</code> へ直接HTTPで2回試行し、それぞれ新しいLive接続の初回送信で <code>status: OK</code>、<code>reason: response_received</code> と「おはようございます!」の返答を得ました。全処理時間（接続と15秒待機を含む）は34.15秒・21.13秒でした。2回目は1.24秒の音声も取得しました。これはAPIと自動テストの追加確認で、Diag画面の操作を今回再実施した記録ではありません。</p>
+<p>※注意:15s待機後送信しました。</p>
+<p>Providerは <code>freeai_live</code>、モデルは <code>gemini-2.5-flash-native-audio-preview-09-2025</code>、声は <code>Zephyr</code> です。本体設定は変更していません。</p>
+<h3>今回の最終結果：接続後15秒・応答待ち最大60秒</h3>
+<p><strong>✅ OK（追加試験）</strong>：「候補を再読込」後に候補が再表示され、CODEを <code>copilot_cli / same</code> へ変更できました。「動作確認」中の「中止」で実行を解除し、再び「動作確認」を押すと4種類の試行が終わり、CHATへ戻りました。本体のモデル設定は変更していません。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>種類</th>
+<th>選択した接続・モデル</th>
+<th>今回の結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CHAT</td>
+<td>freeai_chat / gemini-3.8-flash</td>
+<td>✅ OK：「おはようございます。」から始まる実回答</td>
+</tr>
+<tr>
+<td>LIVE</td>
+<td>freeai_live / gemini-2.5-flash-native-audio-preview-09-2025 / Zephyr</td>
+<td>✅ OK：「おはようございます。調子はいかがですか?」と返答。2.80秒の音声取得と再生位置の終端到達も確認</td>
+</tr>
+<tr>
+<td>DECISION</td>
+<td>auto / auto → openai_oauth/gpt-6-luna</td>
+<td>✅ OK：挨拶の丁寧さをlowと判断。confidenceは0.95</td>
+</tr>
+<tr>
+<td>CODE</td>
+<td>copilot_cli / same</td>
+<td>✅ OK：「おはようございます！」から始まる実回答。実行モデル名は応答に含まれず、推測していません。</td>
+</tr>
+</tbody>
+</table>
+
+<figure><figcaption>モデル候補を切り替えた画面です。<code>copilot_cli</code> と <code>same（変更なし）</code> を選択できました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_602_%E3%83%97%E3%83%AD%E3%83%90%E3%82%A4%E3%83%80%E3%81%A8%E3%83%A2%E3%83%87%E3%83%AB%E5%80%99%E8%A3%9C%E3%82%92%E5%88%87%E6%9B%BF%E7%94%BB%E9%9D%A2.png" alt="6章：Copilotの候補切替"></figure>
+
+<figure><figcaption>途中で「中止」を押した結果です。「試行を中止しました。」となり、「動作確認」を再び押せる状態に戻りました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_603_AI%E3%83%A2%E3%83%87%E3%83%AB%E8%A9%A6%E8%A1%8C%E3%81%AE%E4%B8%AD%E6%AD%A2%E3%81%A8%E5%86%8D%E5%AE%9F%E8%A1%8C%E5%8F%AF%E8%83%BD%E7%8A%B6%E6%85%8B%E7%94%BB%E9%9D%A2.png" alt="6章：中止後に再実行できる状態へ復帰"></figure>
+
+<figure><figcaption>再実行後のLiveです。15秒・60秒の説明、文字の返答、2.80秒の音声と再生完了位置を確認しました。音声内容の聴取は未実施です。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_606_%E7%8F%BE%E8%A8%AD%E5%AE%9A%E3%81%AELive%E9%9F%B3%E5%A3%B0%E5%86%8D%E7%94%9F%E3%81%8C%E7%B5%82%E7%AB%AF%E3%81%B8%E5%88%B0%E9%81%94%E7%94%BB%E9%9D%A2.png" alt="6章：Liveの実回答と音声再生完了"></figure>
+
+<figure><figcaption>CODEの結果です。<code>copilot_cli / same</code> の挨拶への返答が表示されています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_608_CopilotCLI%E3%81%AEsame%E3%81%A7%E6%8C%A8%E6%8B%B6%E3%81%AE%E5%AE%9F%E5%9B%9E%E7%AD%94OK%E7%94%BB%E9%9D%A2.png" alt="6章：CopilotCLIのsameで実回答OK"></figure>
+<p>再読込・CHAT・判断の追加画面も補助資料として保持しています。各操作の判定は本章に記載した結果のとおりです。</p>
+<h3>同じ待機設定で行った長い試験文の確認</h3>
+<p><strong>✅ OK</strong>：接続後15秒・応答待ち最大60秒の条件で、モデル・声・試験文を設定し、「動作確認」を押しました。内部処理を確認する自動テスト51件と、配布する画面への変更反映も確認済みです。</p>
+<p>AIから「おはようございます。」と返答があり、画面の結果もOKでした。今回のモデルは <code>freeai_live / gemini-2.5-flash-native-audio-preview-09-2025</code> です。現在の15秒・最大60秒の設定で、文字の返答の試験は通過しました。今回は保存できる長さの音声がないという表示だったため、音声再生まで成功した結果にはしていません。</p>
+
+<figure><figcaption>現在の15秒・最大60秒の設定で、前回と同じ試験文を用意した画面です。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_601_%E6%8E%A5%E7%B6%9A%E5%BE%8C15%E7%A7%92%E5%BF%9C%E7%AD%9460%E7%A7%92%E3%81%AE%E8%A8%AD%E5%AE%9A%E3%81%A7%E5%90%8C%E4%B8%80%E5%85%A5%E5%8A%9B%E7%94%BB%E9%9D%A2.png" alt="6章601: 新設定の説明と前回と同じ試験文"></figure>
+
+<figure><figcaption>現在の設定での最終結果です。LiveがOKとなり、「おはようございます。」と返答がありました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_602_%E6%8E%A5%E7%B6%9A%E5%BE%8C15%E7%A7%92%E5%BF%9C%E7%AD%9460%E7%A7%92%E3%81%A7Live%E5%AE%9F%E5%9B%9E%E7%AD%94OK%E7%94%BB%E9%9D%A2.png" alt="6章602: 接続後15秒・応答待ち60秒でLive実回答OK"></figure>
+<p>接続後15秒・応答待ち最大60秒の条件で、文字の返答を確認しました。この回は再生できる長さの音声がなく、音声再生の成功とは判定していません。</p>
+<h3>試験担当者向けの補足</h3>
+<p>接続準備は最大20秒、接続準備・待機・終了処理を含む内部の通信は最大135秒、1回の試験全体は最大150秒にしています。画面にmsと出る場合はミリ秒で、1000 msが1秒です。</p>
+<h3>追加確認：実音声の内容と再生</h3>
+<p><strong>✅ OK</strong>：接続後15秒・応答待ち最大60秒で、1.32秒・24kHz・モノラルの音声を取得しました。別の音声認識で「おはようございます」となり、実際の返答文と一致しました。Windowsの再生APIも正常終了しました。人の耳での聴取・スピーカーからの再録音は行っていません。</p>
+<p>1.32秒の<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/live-response.wav">実音声WAV</a>を保持しています。音声認識は返答文と一致し、Windowsの再生処理も正常終了しました。人の耳での聴取は未実施です。</p>
+<h2>7. 全テストとheadlessを使い分ける</h2>
+<h3>操作手順</h3>
+<p>同じ「まとめて実行」のように見えても、ボタンによって調べるものが違います。目的に合う行を選んでください。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>やりたいこと</th>
+<th>使う場所・操作</th>
+<th>完了したときに確認するもの</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>必要なプログラム・モデル一覧・外部接続をまとめて調べ、結果を保存する</td>
+<td>Diagの通常画面で右上の「全テスト」</td>
+<td>各結果と保存が完了し、最後に「導入状況」へ戻ったことを確認します。AIへの挨拶送信やシステム起動は含みません。</td>
+</tr>
+<tr>
+<td>AIに実際に入力して返答を試す</td>
+<td>「AIモデル」の右上「一括試行」</td>
+<td>CHAT・LIVE・DECISION・CODEの各タブで返答や判断結果を確認します。</td>
+</tr>
+<tr>
+<td>アプリに必要なシステムを起動する</td>
+<td>「システム起動」の右上「設定起動」</td>
+<td>選んだ機能の「稼働中」と起動完了を確認します。詳しくはシステム起動編へ進みます。</td>
+</tr>
+<tr>
+<td>画面を開かず診断結果だけ保存する</td>
+<td>ターミナルで <code>aidiy_diag --headless</code> を実行</td>
+<td>コマンドの終了結果と、保存された導入状況・モデル情報を確認します。外部連携の認証確認、AIの返答、システム起動は含みません。</td>
+</tr>
+</tbody>
+</table>
+<p>画面を開かない場合でも、モデル一覧の取得にはサービスへの通信が発生します。headlessの試験結果は、通常画面での試験と分けて記録します。</p>
+<h3>成功の見分け方と記録すること</h3>
+<p>「全テスト」は各段階の結果・書込・最後の表示タブを確認します。headlessは終了コード・出力・生成ファイルを照合します。終了コード0だけで、任意プログラムの未検出や全モデルの生成可否まで合格にしません。失敗した保存処理については前回結果を壊さないことも確認します。</p>
+<p><strong>✅ OK（追加試験）</strong>：画面右上の「全テスト」で、導入確認・保存、モデル一覧の再取得・保存、外部連携の確認・保存まで完了し、導入状況へ戻りました。3種類の保存ファイルが今回の日時に更新されていることも確認しました。</p>
+
+<figure><figcaption>全テスト完了後の画面です。導入状況は19項目すべてOKで、書込済みです。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D%E7%B7%A8/aidiy_diag-%E7%92%B0%E5%A2%83%E7%A2%BA%E8%AA%8D_701_%E5%85%A8%E3%83%86%E3%82%B9%E3%83%88%E5%AE%8C%E4%BA%86%E3%81%A7%E5%B0%8E%E5%85%A5%E7%8A%B6%E6%B3%81%E3%81%B8%E5%BE%A9%E5%B8%B0%E7%94%BB%E9%9D%A2.png" alt="7章：全テスト完了後に導入状況へ復帰"></figure>
+<p>続いてコマンドからheadlessを実行し、終了コード0を確認しました。画面とheadlessの導入結果19件は、項目名・状態・パス・バージョンが完全一致しました。headlessは外部連携の認証確認を行いません。</p>
+<h2>8. 試験担当者向け：次回の記録方法</h2>
+<details open="">
+<summary>画像の名前・保存先・自動試験の記録方法を開く</summary>
+<p>本書1〜7章を順に実施します。Computer Useは画面の観察 → 1操作 → 再観察で進め、確認できた結果だけを判定します。システム起動編6章の記録方法と <code>scripts/checks/実画面試験記録.mjs</code> を共用する。単体テストや合成画面と、実環境の実画面試験を分けます。</p>
+<p>保存先は <code>_AIDIY/knowledge/images/セルフテスト,aidiy_diag,環境確認編/</code> です。新しい画像名は、下の例の前に <code>&lt;実施ID&gt;__</code> を付けます。章番号を先頭1桁とし、章内で01から連番にします。既存画像は上書きせず、別冊内の番号とは独立させます。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>章</th>
+<th>ファイル名の例</th>
+<th>残す画面</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>aidiy_diag-環境確認_101_導入状況表示画面.png</code></td>
+<td>環境確認への切替と接続状態</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>aidiy_diag-環境確認_201_導入状況確認完了画面.png</code></td>
+<td>結果・選択項目の詳細・書込済</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>aidiy_diag-環境確認_301_モデル一覧取得完了画面.png</code></td>
+<td>取得結果・日時・保存状態</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>aidiy_diag-環境確認_401_外部連携確認完了画面.png</code></td>
+<td>認証確認の結果・説明</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>aidiy_diag-環境確認_501_設定モデル応答画面.png</code></td>
+<td>設定中モデルの実回答</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>aidiy_diag-環境確認_601_AIモデル応答画面.png</code></td>
+<td>選択したモデル・入力・実回答</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>aidiy_diag-環境確認_701_全テスト完了画面.png</code></td>
+<td>全処理後の導入状況表示</td>
+</tr>
+</tbody>
+</table>
+<p>各章の「未実施」を、実施日時・操作・期待結果・実際の結果・判定と、説明付き画像へ置き換えます。課題を解消した場合は、結果と画像を最終状態へ差し替えます。解消済みの経緯は記載しません。保存内容との照合やheadlessの結果は、比較した項目と一致・不一致を本文の表にまとめます。認証キーや秘密値を証跡へ含めません。</p>
+<p>2026年10月19日に1〜7章を実施しました。設定モデルは15役割、AIモデルは4種類の返答を確認しました。Liveは接続後15秒・応答待ち最大60秒で通過しました。6章のAIモデル試験では2.80秒の音声再生を確認し、同章の追加試験では1.32秒の音声を取得して、音声認識で返答文との一致を確認しました。人の耳での聴取は未実施です。上の画像名の表は次回の採番例で、取得済み画像と結果は各章の本文を参照します。</p>
+</details>
+</body></html>

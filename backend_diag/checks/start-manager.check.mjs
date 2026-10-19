@@ -9,7 +9,7 @@ import {createStartManager} from '../起動/サービス管理.mjs';
 import {createServer} from '../diag_main.mjs';
 
 const targets=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(target=>target.起動管理!==false);
-async function fixture(t,{hold=false,fail=false}={}){
+async function fixture(t,{hold=false,fail=false,open=[],stopFailure}={}){
  const root=await mkdtemp(join(tmpdir(),'aidiy-start-'));await mkdir(join(root,'scripts'));await writeFile(join(root,'scripts','起動対象.json'),JSON.stringify(targets));
  const calls=[],children=[];
  const spawnFn=(command,args,options)=>{
@@ -19,9 +19,12 @@ async function fixture(t,{hold=false,fail=false}={}){
   child.ready=()=>{child.stdout.write(JSON.stringify({type:'log',data:'日本語の出力\n'})+'\n');child.stdout.write(JSON.stringify(fail?{type:'error',message:'fixture failure'}:{type:'ready'})+'\n');};
   children.push(child);if(!hold)setImmediate(child.ready);return child;
  };
- const manager=createStartManager({root,python:'fixture-python',spawnFn,stopTimeout:200,readyTimeout:500});
+ const openPorts=new Set(open),stops=[];
+ const manager=createStartManager({root,python:'fixture-python',spawnFn,stopTimeout:200,readyTimeout:500,
+  portStatusFn:async()=>({対象:targets.map(target=>({...target,開放:openPorts.has(target.id)}))}),
+  forceStopFn:async target=>{stops.push(target.id);if(target.id===stopFailure)throw Error('fixture stop failure');openPorts.delete(target.id);}});
  t.after(async()=>{await manager.close();await rm(root,{recursive:true,force:true});});
- return {root,manager,calls,children};
+ return {root,manager,calls,children,openPorts,stops};
 }
 test('auto defaults are shared, ordered, and viewing never starts a process',async t=>{
  const {manager,calls}=await fixture(t);const snapshot=await manager.snapshot();
@@ -86,8 +89,44 @@ test('individual restart clears only its console and invalidates previous log cu
  assert.equal(after.切替,true);assert.ok(after.位置>before.位置);assert.doesNotMatch(after.ログ,/前回だけの出力/);assert.match(after.ログ,/日本語の出力/);
  assert.deepEqual(await manager.logSnapshot('tools'),toolsBefore);
  assert.doesNotMatch((await manager.logSnapshot('web',0)).ログ,/前回だけの出力/);
+ await assert.rejects(()=>manager.restart(),{status:409});
+ await manager.forceStopAll();await manager.settled();
  await manager.restart();await manager.settled();
  assert.ok((await manager.logSnapshot('tools')).ログ.startsWith(toolsBefore.ログ),'一括起動では履歴を維持する');
+});
+
+test('bulk start rejects externally running services and force stop skips idle targets in reverse tab order',async t=>{
+ const {manager,calls,stops,openPorts}=await fixture(t,{open:['local','tools','core','apps','taskteam','web']});
+ await assert.rejects(()=>manager.restart(),{status:409});assert.equal(calls.length,0);
+ await manager.forceStopAll();await manager.settled();
+ assert.deepEqual(stops,['web','taskteam','apps','core','tools','local']);assert.equal(openPorts.size,0);
+ assert.equal((await manager.snapshot()).一括停止中,false);assert.match((await manager.snapshot()).通知,/すべて停止/);
+ openPorts.add('tools');openPorts.add('web');stops.length=0;
+ await manager.forceStopAll();await manager.settled();assert.deepEqual(stops,['web','tools']);
+ await manager.restart();await manager.settled();assert.equal(calls.length,5);
+});
+
+test('force stop cancels startup and owned auto-restart sessions without launching later targets',async t=>{
+ const {manager,calls,children}=await fixture(t,{hold:true});await manager.restart();
+ while(!children.length)await new Promise(resolve=>setTimeout(resolve,2));
+ await manager.forceStopAll();await assert.rejects(()=>manager.forceStopAll(),{status:409});
+ await manager.settled();assert.equal(calls.length,1);assert.ok(children.every(child=>child.closed));
+ assert.equal((await manager.snapshot()).実行中,false);assert.match((await manager.snapshot()).通知,/すべて停止/);
+});
+
+test('force stop continues after a failed target and reports the remaining service',async t=>{
+ const {manager,stops,openPorts}=await fixture(t,{open:['web','tools','core'],stopFailure:'web'});
+ await manager.forceStopAll();await manager.settled();assert.deepEqual(stops,['web','core','tools']);
+ assert.deepEqual([...openPorts],['web']);assert.match((await manager.snapshot()).通知,/停止できない.*fixture stop failure/);
+ await assert.rejects(()=>manager.restart(),{status:409});
+});
+
+test('an errored but live managed process remains stoppable and force stop clears its running flag',async t=>{
+ const {manager,children}=await fixture(t);await manager.restart('tools');await manager.settled();
+ children[0].stdout.write(JSON.stringify({type:'error',message:'接続エラー'})+'\n');
+ assert.equal((await manager.snapshot()).対象.find(item=>item.id==='tools').管理中,true);
+ await manager.forceStopAll();await manager.settled();
+ const stopped=(await manager.snapshot()).対象.find(item=>item.id==='tools');assert.equal(stopped.管理中,false);assert.equal(stopped.状態,'停止済み');
 });
 test('a duplicate bulk action is rejected and a stop cancels pending startup',async t=>{
  const {manager,calls,children}=await fixture(t,{hold:true});await manager.restart();
@@ -113,4 +152,9 @@ test('the start API requires auth, JSON and fixed inputs; read-only calls do not
  assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({対象:'../bad'})})).status,400);
  assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({command:'evil'})})).status,400);
  assert.equal((await fetch(url+endpoint,{method:'POST',headers,body:JSON.stringify({対象:'local'})})).status,202);await manager.settled();assert.equal(calls.length,1);
+ const stopEndpoint=url+'api/'+encodeURIComponent('起動')+'/'+encodeURIComponent('強制停止');
+ assert.equal((await fetch(stopEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
+ assert.equal((await fetch(stopEndpoint,{method:'POST',headers,body:'{"対象":"web"}'})).status,400);
+ assert.equal((await fetch(stopEndpoint,{method:'POST',headers,body:'{}'})).status,202);await manager.settled();
+ assert.equal((await manager.snapshot()).終了時停止あり,false);
 });

@@ -21,6 +21,7 @@ import {createPreviousResults} from './診断/前回結果.mjs';
 import {createStartManager} from './起動/サービス管理.mjs';
 import {createAppLauncher} from './起動/アプリ起動.mjs';
 import {createPortStatusChecker} from './起動/ポート状態.mjs';
+import {createWebBrowserOpener} from './起動/Webブラウザ.mjs';
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -62,7 +63,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),portStatusFn=createPortStatusChecker()}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
 
@@ -103,16 +104,21 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         try{return reply(200,await portStatusFn({signal:controller.signal}));}finally{res.off('close',abort);}
       }
       if(route?.startsWith('api/起動/')&&req.method==='POST'){
-        if(!['api/起動/設定','api/起動/再起動','api/起動/停止','api/起動/ログ'].includes(route))return reply(404,{エラー:'見つかりません。'});
+        if(!['api/起動/設定','api/起動/再起動','api/起動/停止','api/起動/強制停止','api/起動/ログ','api/起動/ブラウザ'].includes(route))return reply(404,{エラー:'見つかりません。'});
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
         const chunks=[];let size=0;
         for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
         if(!body||typeof body!=='object'||Array.isArray(body))return reply(400,{エラー:'入力が不正です。'});
-        const keys=route.endsWith('/設定')?['対象','設定']:route.endsWith('/ログ')?['対象','位置']:['対象'];
+        const keys=route.endsWith('/ブラウザ')||route.endsWith('/強制停止')?[]:route.endsWith('/設定')?['対象','設定']:route.endsWith('/ログ')?['対象','位置']:['対象'];
         if(Object.keys(body).some(key=>!keys.includes(key)))return reply(400,{エラー:'指定できない項目があります。'});
         try{
+          if(route.endsWith('/ブラウザ')){
+            const controller=new AbortController(),abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
+            try{return reply(200,await webBrowserOpenFn({signal:controller.signal}));}finally{res.off('close',abort);}
+          }
           if(route.endsWith('/設定'))return reply(200,await startManager.save(body.対象,body.設定));
+          if(route.endsWith('/強制停止'))return reply(202,await startManager.forceStopAll());
           if(route.endsWith('/再起動')){if(body.対象!==undefined&&typeof body.対象!=='string')return reply(400,{エラー:'起動対象が不正です。'});return reply(202,await startManager.restart(body.対象));}
           if(typeof body.対象!=='string')return reply(400,{エラー:'起動対象が不正です。'});
           if(route.endsWith('/停止'))return reply(200,await startManager.stop(body.対象));

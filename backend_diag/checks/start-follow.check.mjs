@@ -44,6 +44,7 @@ test('individual restart clears cached logs and ignores an older in-flight log r
  let restarted=false,delay=false,release;
  const state=起動状態を作成({api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/起動')return {対象:['local','tools'].map(id=>({id,設定:{},状態:'稼働中'})),実行中:false};
+  if(route==='api/起動/ポート')return {対象:[]};
   if(route==='api/起動/再起動'){restarted=true;delay=false;return {受理:true};}
   if(delay)return new Promise(resolve=>{release=()=>resolve({ログ:'遅れて届いた古いログ\n',位置:99});});
   const text=body.対象==='tools'?'他の機能のログ\n':restarted?'新しい起動ログ\n':'前回のログ\n';
@@ -61,6 +62,7 @@ test('individual restart clears cached logs and ignores an older in-flight log r
 test('a rejected individual restart preserves its console',async t=>{
  const state=起動状態を作成({api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/起動')return {対象:[{id:'local',設定:{},状態:'稼働中'}],実行中:false};
+  if(route==='api/起動/ポート')return {対象:[]};
   if(route==='api/起動/再起動')throw new Error('起動要求を受け付けられませんでした。');
   return {ログ:body.位置?'':'既存のログ\n',位置:7};
  }});

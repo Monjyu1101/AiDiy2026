@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 // 完了した総合テストのMarkdownを、画像・折りたたみ欄を含むPDFにする。
 // node scripts/checks/総合テストPDF.mjs <knowledge内のmd名> ...
+// PDFは元のMarkdownと同じフォルダへ、拡張子だけを.pdfに替えて保存する。
 import {readFile,mkdir,writeFile,access} from 'node:fs/promises';
 import {resolve,join,basename,dirname,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -16,8 +17,8 @@ const require=createRequire(join(root,'frontend_ide','package.json'));
 const MarkdownIt=require('markdown-it');
 const {chromium}=await import(pathToFileURL(join(runtime,'playwright-core','index.mjs')).href);
 const sources=process.argv.slice(2);if(!sources.length)throw Error('対象のmd名を指定してください');
-const temp=join(root,'tmp','pdfs');const output=join(root,'output','pdf');
-await mkdir(temp,{recursive:true});await mkdir(output,{recursive:true});
+const temp=join(root,'tmp','pdfs');
+await mkdir(temp,{recursive:true});
 const md=new MarkdownIt({html:true,linkify:true});
 const chrome=join(process.env.PROGRAMFILES,'Google','Chrome','Application','chrome.exe');await access(chrome);
 const browser=await chromium.launch({executablePath:chrome,headless:true});
@@ -46,7 +47,7 @@ try{
   await page.goto(pathToFileURL(file).href);await page.evaluate(()=>document.fonts.ready);
   const images=await page.evaluate(async()=>{await Promise.all([...document.images].map(async i=>{try{await i.decode();}catch{throw Error('画像を読み込めません: '+i.src);}}));return [...document.images].map(i=>({src:i.src,ok:i.naturalWidth>0}));});
   if(images.some(i=>!i.ok))throw Error('読めない画像があります');
-  const pdf=join(output,basename(source,'.md')+'.pdf');
+  const pdf=join(dirname(source),basename(source,'.md')+'.pdf');
   await page.pdf({path:pdf,format:'A4',printBackground:true,preferCSSPageSize:true,displayHeaderFooter:true,headerTemplate:'<span></span>',footerTemplate:'<div style="font-size:8px;width:100%;margin:0 16mm;color:#637580;display:flex;justify-content:space-between"><span>AiDiy 総合テスト実施記録</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>'});
   console.log(JSON.stringify({pdf,images:images.length}));await page.close();
  }

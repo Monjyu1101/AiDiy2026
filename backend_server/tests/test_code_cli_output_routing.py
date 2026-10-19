@@ -235,7 +235,7 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
         parent.接続.send_to_channel = receive
         delta = json.dumps({"type": "assistant.reasoning_delta", "data": {"reasoningId": "r", "deltaContent": "あ" * 170}}, ensure_ascii=False)
         final = json.dumps({"type": "assistant.message", "data": {"messageId": "m", "content": "回答"}}, ensure_ascii=False)
-        script = f"import time; print({delta!r},flush=True); time.sleep(0.8); print({final!r},flush=True)"
+        script = f"import sys,time; sys.stdout.reconfigure(encoding='utf-8'); print({delta!r},flush=True); time.sleep(0.8); print({final!r},flush=True)"
         task = asyncio.create_task(code_ai._subprocess実行([sys.executable, "-c", script], cwd=str(PROJECT_ROOT), timeout=10))
         try:
             await asyncio.wait_for(received.wait(), timeout=5)
@@ -290,7 +290,7 @@ class CodeCliOutputRoutingTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_copilot_process_failure_is_reported(self):
         code_ai, parent = self._code_ai("copilot_cli")
-        command = [sys.executable, "-c", "import sys; print('起動エラー',file=sys.stderr); sys.exit(1)"]
+        command = [sys.executable, "-c", "import sys; sys.stderr.reconfigure(encoding='utf-8'); print('起動エラー',file=sys.stderr); sys.exit(1)"]
         result = await code_ai._subprocess実行(command, cwd=str(PROJECT_ROOT), timeout=10)
         self.assertEqual("! 実行エラー: copilot_cli 起動エラー", result)
         self.assertEqual(["起動エラー"], [m["メッセージ内容"] for m in parent.接続.messages])

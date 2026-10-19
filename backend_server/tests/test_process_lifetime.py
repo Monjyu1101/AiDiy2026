@@ -2,6 +2,7 @@
 """実プロセスの子・孫を作り、終了理由ごとの回収と他セッションの独立性を確認する。"""
 
 import asyncio
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -9,7 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import psutil
 
@@ -42,6 +43,45 @@ if mode in ('normal','root','guard'):
     print('READY',flush=True)
 if mode != 'normal': time.sleep(60)
 '''
+
+
+class ProcessLifetimeParentTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("parent_pid_test", SUPERVISOR)
+        cls.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.module)
+
+    def test_windows_redirector_uses_its_parent_for_implicit_and_saved_parent_pid(self):
+        parent = Mock(pid=20)
+        parent.exe.return_value = sys.executable
+        parent.cmdline.return_value = [sys.executable, "worker.py"]
+        parent.ppid.return_value = 10
+        process = Mock()
+        process.parent.return_value = parent
+        process.exe.return_value = "C:/base/python.exe"
+        process.cmdline.return_value = parent.cmdline.return_value
+        with (patch.object(self.module.os, "name", "nt"),
+              patch.object(self.module.os, "getppid", return_value=20),
+              patch.object(self.module.psutil, "Process", return_value=process)):
+            self.assertEqual(10, self.module._parent_pid())
+            self.assertEqual(10, self.module._parent_pid(20))
+            parent.cmdline.return_value = [sys.executable, "owner.py"]
+            self.assertEqual(20, self.module._parent_pid())
+
+    def test_explicit_other_parent_is_kept(self):
+        with (patch.object(self.module.os, "getppid", return_value=20),
+              patch.object(self.module.psutil, "Process") as process):
+            self.assertEqual(10, self.module._parent_pid(10))
+        process.assert_not_called()
+
+    def test_posix_parent_is_kept(self):
+        process = Mock()
+        process.parent.return_value.pid = 20
+        with (patch.object(self.module.os, "name", "posix"),
+              patch.object(self.module.psutil, "Process", return_value=process)):
+            self.assertEqual(20, self.module._parent_pid())
+        process.exe.assert_not_called()
 
 
 class ProcessLifetimeTest(unittest.IsolatedAsyncioTestCase):

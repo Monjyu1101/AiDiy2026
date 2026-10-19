@@ -8,11 +8,13 @@ import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createServer} from '../diag_main.mjs';
 import {createStartManager} from '../起動/サービス管理.mjs';
+import {createWebBrowserOpener} from '../起動/Webブラウザ.mjs';
 
 const root=mkdtempSync(join(tmpdir(),'diag-start-fixture-'));mkdirSync(join(root,'scripts'));
 writeFileSync(join(root,'scripts','起動対象.json'),readFileSync(new URL('../../scripts/起動対象.json',import.meta.url)));
 const calls=[],children=[];
-const manager=createStartManager({root,python:'fixture-python',spawnFn(_command,args){
+const stopCalls=[];
+const manager=createStartManager({root,python:'fixture-python',portStatusFn:()=>portStatusFn(),forceStopFn:async target=>{stopCalls.push(target.id);openPorts.delete(target.id);},spawnFn(_command,args){
  const child=new EventEmitter();child.pid=500000+children.length;child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.closed=false;
  calls.push(args.at(-1));children.push(child);
  child.stdin.on('data',()=>{if(!child.closed){child.closed=true;setImmediate(()=>child.emit('close',0));}});
@@ -22,7 +24,10 @@ const manager=createStartManager({root,python:'fixture-python',spawnFn(_command,
 const portCatalog=JSON.parse(readFileSync(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(item=>item.起動管理!==false);
 const openPorts=new Set(portCatalog.map(item=>item.id));const portSamples=[];
 const portStatusFn=async()=>{portSamples.push(Date.now());return {対象:portCatalog.map(({id,名前,ポート})=>({id,名前,ポート,開放:openPorts.has(id)}))};};
+const browserCalls=[];
+const webBrowserOpenFn=createWebBrowserOpener({portStatusFn,fetchFn:async(url,options)=>{browserCalls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({id:'fixture-page'})};}});
 const server=createServer({token:'start-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,
+ webBrowserOpenFn,
  entries:[{id:'node',name:'Node.js',menuGroup:'ベース',commands:['node']}],
  toolsStatusFn:async()=>({online:false}),previousResults:{snapshot:async()=>({})},
  publicCache:{snapshot:()=>({状態:'未取得'}),input:()=>({})},modelTrials:{close(){}},
@@ -55,12 +60,25 @@ try{
  await click('導入状況');
  assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0,'ミニ切替は起動画面だけ');
  assert.deepEqual(calls,[]);await click('システム起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
- assert.equal(await evaluate(`document.querySelector('#run').textContent`),'設定起動');
+ await until(`document.querySelector('#run').textContent==='強制停止'&&!document.querySelector('#run').disabled`);
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);
  const browserOption=`[...document.querySelectorAll('.start-settings label')].find(label=>label.textContent==='ブラウザで開く').querySelector('input')`;
  await until(`document.querySelector('.start-console-heading strong')?.textContent==='Web コンソール'`);
  assert.equal(await evaluate(`document.querySelectorAll('.start-settings input').length`),3,'Web は起動対象・自動再起動・ブラウザで開くの3項目');
  assert.equal(await evaluate(`${browserOption}.checked`),true);
+ await until(`!document.querySelector('.start-open-browser').disabled`);
+ const inline=await evaluate(`(()=>{const button=document.querySelector('.start-open-browser'),label=button.previousElementSibling;const b=button.getBoundingClientRect(),l=label.getBoundingClientRect();return {after:b.left>=l.right,sameRow:Math.abs(b.top-l.top)<12};})()`);
+ assert.deepEqual(inline,{after:true,sameRow:true},'手動ボタンはチェック欄のすぐ右側');
+ for(const id of ['tools','web']){
+  const name=id==='tools'?'Tools / MCP':'Web';
+  openPorts.delete(id);await until(`document.querySelector('.start-open-browser').disabled&&[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes(${JSON.stringify(name)})).dataset.tone==='stopped'`);
+  assert.equal(await evaluate(`getComputedStyle([...document.querySelectorAll('.start-targets button')].find(button=>button.dataset.tone==='stopped')).animationName`),'start-stopped-blink');
+  await capture('start-'+id+'-stopped');
+  openPorts.add(id);await until(`!document.querySelector('.start-open-browser').disabled&&[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes(${JSON.stringify(name)})).dataset.tone==='running'`);
+ }
+ await evaluate(`document.querySelector('.start-open-browser').click()`);await until(`document.querySelector('.start-message')?.textContent.includes('localhost:8090')`);
+ assert.deepEqual(browserCalls,[{url:'http://127.0.0.1:8095/aidiy_chrome_devtools/new_page',body:{url:'http://localhost:8090/',show_automation_banner:false}}]);
+ assert.deepEqual(calls,[],'手動で開く操作はサービスを起動しない');
  await evaluate(`${browserOption}.click()`);await until(`document.querySelector('.start-save').textContent==='設定を保存しました'`);
  assert.equal(JSON.parse(readFileSync(join(root,'_config/AiDiy_diag_start.json'),'utf8')).設定.web.ブラウザ表示,false);
  await capture('start-web-options');
@@ -73,7 +91,11 @@ try{
  assert.equal(await evaluate(`${browserOption}.checked`),false,'Web のブラウザ設定を再読込後も保持する');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);await until(`document.querySelector('.start-settings input')?.checked`);
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);await until(`document.querySelector('.start-console-heading strong')?.textContent==='Web コンソール'`);
+ openPorts.clear();await until(`document.querySelector('#run').textContent==='設定起動'&&!document.querySelector('#run').disabled`);
  await evaluate(`document.querySelector('#run').click()`);
+ await until(`document.querySelectorAll('.start-targets button[data-tone=stopped]').length===6`);
+ assert.equal(await evaluate(`Boolean(document.querySelector('.start-mini'))`),false,'設定起動ではミニへ自動切替しない');
+ await capture('start-waiting-tabs');
  for(const [index,name] of ['Local','Tools / MCP','Core','Apps','Task / Team','Web'].entries()){
   for(let attempt=0;children.length<=index&&attempt<140;attempt++)await sleep(50);
   assert.ok(children[index]);
@@ -83,10 +105,12 @@ try{
    await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);
    await sleep(1000);assert.equal(await evaluate(`document.querySelector('.start-console-heading strong').textContent`),'Web コンソール','起動対象が変わるまでは手動選択を保持する');
   }
-  children[index].ready();
+  openPorts.add(portCatalog[index].id);children[index].ready();
  }
  await until(`!document.querySelector('#run').disabled&&document.querySelector('.start-console').textContent.includes('合成コンソール')`);
  assert.deepEqual(calls,['local','tools','core','apps','taskteam','web']);
+ assert.equal(await evaluate(`document.querySelector('#run').textContent`),'強制停止');
+ for(const target of portCatalog)openPorts.add(target.id);
  await capture('start-desktop');
  const desktop=await evaluate(`(()=>{const consoleView=document.querySelector('.start-console');return {page:document.documentElement.scrollHeight>innerHeight,height:consoleView.clientHeight,overflow:getComputedStyle(consoleView).overflowY}})()`);
  assert.equal(desktop.page,false);assert.ok(desktop.height>200,JSON.stringify(desktop));assert.equal(desktop.overflow,'auto');
@@ -100,10 +124,12 @@ try{
  assert.ok(fits.scroll<=fits.height,JSON.stringify(fits));
  await sleep(150);const previousLogs=requests.filter(route=>route.endsWith('/起動/ログ')).length;
  children[1].stdout.write(JSON.stringify({type:'status',state:'再起動待ち'})+'\n');openPorts.delete('tools');
- await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='idle'&&element.title.includes('未開放'))`);
+ await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='stopped'&&element.title.includes('未開放'))`);
+ assert.equal(await evaluate(`getComputedStyle([...document.querySelectorAll('.mini-service')].find(button=>button.dataset.tone==='stopped')).animationName`),'mini-stopped-blink');
  assert.ok(portSamples.at(-1)-portSamples.at(-2)>=4900,'ミニのTCP確認は約5秒間隔');
  assert.equal(requests.filter(route=>route.endsWith('/起動/ログ')).length,previousLogs,'ミニ表示は状態だけを取得');
  children[1].stdout.write(JSON.stringify({type:'ready'})+'\n');openPorts.add('tools');
+ await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='running')`);
  await evaluate(`[...document.querySelectorAll('.mini-service')].find(button=>button.textContent.includes('Core')).click()`);
  await until(`!document.querySelector('.start-mini')&&document.querySelector('.start-console-heading strong').textContent==='Core コンソール'`);
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
@@ -147,6 +173,11 @@ try{
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:780,deviceScaleFactor:1,mobile:true});await sleep(100);await capture('start-mobile');
  assert.equal(await evaluate(`document.documentElement.scrollWidth>innerWidth`),false);
  assert.equal(await evaluate(`document.querySelector('.start-console').clientHeight>100`),true);
+ await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
+ await until(`document.querySelector('#run').textContent==='強制停止'&&!document.querySelector('#run').disabled`);
+ await click('強制停止');await until(`document.querySelector('#run').textContent==='設定起動'&&!document.querySelector('#run').disabled`);
+ assert.deepEqual(stopCalls,['web','taskteam','apps','core','tools','local']);assert.ok(children.every(child=>child.closed));
+ assert.equal(openPorts.size,0);await capture('start-all-stopped');
  assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・240/390/1280px表示 OK');
 }finally{
  ws?.close();browser.kill();await manager.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});

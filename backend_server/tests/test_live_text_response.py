@@ -48,11 +48,12 @@ class LiveTextResponseTest(unittest.IsolatedAsyncioTestCase):
         cls.audio_module = load_module("AI音声処理.py")
 
     def gemini(self):
-        ai = self.gemini_module.LiveAI.__new__(self.gemini_module.LiveAI)
-        ai.parent_manager = None
-        ai.SYSTEM_INSTRUCTION = "日本語で回答してください。"
-        ai.LIVE_VOICE = "Kore"
-        ai.tool_instance = None
+        # 通信クライアントだけを置き換え、診断フラグ等は本番と同じ初期化を通す。
+        with patch.object(self.gemini_module.genai, "Client", return_value=Mock()):
+            ai = self.gemini_module.LiveAI(
+                セッションID="session", api_key="test-key", live_voice="Kore",
+                system_instruction="日本語で回答してください。",
+            )
         ai.音声受信Ｑ = asyncio.Queue()
         ai.テキスト受信Ｑ = asyncio.Queue()
         ai._出力字幕 = ""

@@ -11,6 +11,7 @@
 import os
 import shutil
 import ctypes
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, List, TypedDict
@@ -385,7 +386,9 @@ def _最終バックアップ時刻取得(date_folder: str) -> Optional[float]:
             month = int(date_str[4:6])
             day = int(date_str[6:8])
             dt = datetime(year, month, day, hour, minute, second)
-            ts = dt.timestamp()
+            # Windowsのdatetime.timestamp()は1970年初日のローカル時刻で
+            # 失敗する場合があるため、ローカル時刻変換を直接使う。
+            ts = time.mktime(dt.timetuple())
             if ts > max_ts:
                 max_ts = ts
         return max_ts if max_ts > 0 else None

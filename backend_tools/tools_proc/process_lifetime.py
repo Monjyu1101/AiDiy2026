@@ -164,6 +164,24 @@ class ParentGuard:
         self._cleanup()
 
 
+def _parent_pid(parent_pid: int | None = None) -> int:
+    """Windows venvの中継python.exeを越えて、実際の起動元を取得する。"""
+    # 呼び出し側が保存した直近の親PIDも補正する。それ以外の明示指定は保持する。
+    if parent_pid is not None and parent_pid != os.getppid():
+        return parent_pid
+    process = psutil.Process()
+    parent = process.parent()
+    if os.name == "nt" and parent is not None:
+        try:
+            if (os.path.normcase(parent.exe()) == os.path.normcase(sys.executable)
+                    and parent.cmdline() == process.cmdline()
+                    and os.path.normcase(process.exe()) != os.path.normcase(parent.exe())):
+                return parent.ppid()
+        except psutil.Error:
+            pass
+    return parent.pid if parent is not None else os.getppid()
+
+
 def guard_parent(parent_pid: int | None = None) -> ParentGuard:
     """単独起動 Hermes / stdio bridge に親終了のデーモン監視を付ける。"""
     global _guard
@@ -172,7 +190,7 @@ def guard_parent(parent_pid: int | None = None) -> ParentGuard:
         if _OWNER_TOKEN not in os.environ:
             token = uuid.uuid4().hex
             os.environ[_OWNER_TOKEN] = token
-        _guard = ParentGuard(parent_pid if parent_pid is not None else os.getppid(), token=token)
+        _guard = ParentGuard(_parent_pid(parent_pid), token=token)
         atexit.register(_guard.close)
     return _guard
 

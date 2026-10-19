@@ -55,5 +55,5 @@ test('mini polling refreshes statuses without reading logs or mutating services'
  assert.equal(scheduled.at(-1).ms,5000);open=false;await scheduled.at(-1).callback();assert.equal(state.ポート項目.value[0].開放,false);assert.equal(scheduled.at(-1).ms,5000);
  const timer=scheduled.at(-1);state.表示(false);assert.ok(cleared.includes(timer));const portCalls=calls.filter(route=>route==='api/起動/ポート').length;
  state.表示(true,true);await delay(30);state.表示(false);assert.ok(calls.includes('api/起動/ログ'));assert.ok(!calls.some(route=>/設定|再起動|停止/.test(route)));
- assert.equal(calls.filter(route=>route==='api/起動/ポート').length,portCalls,'通常画面ではポート監視を止める');
+ assert.ok(calls.filter(route=>route==='api/起動/ポート').length>portCalls,'通常画面でも一括起動・停止の判定にポートを確認する');
 });

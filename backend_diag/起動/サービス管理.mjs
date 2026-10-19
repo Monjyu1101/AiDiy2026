@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {stripVTControlCharacters} from 'node:util';
+import {createPortStatusChecker} from './ポート状態.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -12,8 +13,8 @@ export function validateSettings(target,value){
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||keys.some(key=>typeof value[key]!=='boolean'))throw failure('起動設定は指定の項目を真偽値で設定してください。');
  return Object.fromEntries(keys.map(key=>[key,value[key]]));
 }
-export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=180000,stopTimeout=30000}={}){
- let targets,settings,loading,writing=Promise.resolve(),busy=false,closed=false,operation='',work=Promise.resolve(),focus=null;
+export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=180000,stopTimeout=30000,portStatusFn,forceStopFn}={}){
+ let targets,settings,loading,writing=Promise.resolve(),busy=false,stopping=false,closed=false,operation='',work=Promise.resolve(),focus=null,portChecker;
  const sessions=new Map(),cancelled=new Set(),logs=new Map();
  const settingsFile=join(root,'_config','AiDiy_diag_start.json'),runtime=join(root,'_AIDIY','aidiy_diag','起動');
  const log=(id,text)=>{const old=logs.get(id)||{text:'',offset:0};old.text+=stripVTControlCharacters(String(text));if(old.text.length>120000){const size=old.text.length-120000;old.offset+=size;old.text=old.text.slice(size);}logs.set(id,old);};
@@ -33,7 +34,9 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   try{return await loading;}catch(error){loading=undefined;throw error;}
  }
  function targetFor(id){const target=targets?.find(item=>item.id===id);if(!target)throw failure('起動対象が不正です。');return target;}
- async function snapshot(){await load();return {対象:targets.map(target=>({...target,設定:{...settings[target.id]},状態:sessions.get(target.id)?.state||'未起動'})),実行中:busy,通知:operation,起動表示:focus?{...focus}:null,終了時停止あり:busy||[...sessions.values()].some(session=>session.child&&!session.exited)};}
+ const hasOwned=()=>[...sessions.values()].some(session=>session.child&&!session.exited);
+ async function ports(){await load();portChecker??=portStatusFn||createPortStatusChecker({targets});return (await portChecker()).対象;}
+ async function snapshot(){await load();return {対象:targets.map(target=>({...target,設定:{...settings[target.id]},状態:sessions.get(target.id)?.state||'未起動',管理中:Boolean(sessions.get(target.id)?.child&&!sessions.get(target.id)?.exited)})),実行中:busy||stopping,一括停止中:stopping,通知:operation,起動表示:focus?{...focus}:null,終了時停止あり:busy||stopping||hasOwned()};}
  async function save(id,value){
   await load();const target=targetFor(id),validated=validateSettings(target,value);
   const task=writing.catch(()=>{}).then(async()=>{
@@ -100,7 +103,8 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   try{await started;}catch(error){await stop(id);throw error;}finally{clearTimeout(timeout);}
  }
  async function restart(id){
-  await load();await writing.catch(()=>{});if(closed)throw failure('起動画面を終了しています。',409);if(busy)throw failure('起動処理の完了を待ってください。',409);
+  await load();await writing.catch(()=>{});if(closed)throw failure('起動画面を終了しています。',409);if(busy||stopping)throw failure('起動・停止処理の完了を待ってください。',409);
+  if(!id){if(hasOwned()||(await ports()).some(item=>item.開放!==false))throw failure('稼働中または未確認の機能があります。強制停止してから設定起動してください。',409);if(busy||stopping||closed)throw failure('起動・停止処理の完了を待ってください。',409);}
   const ids=id?[targetFor(id).id]:targets.filter(target=>settings[target.id].起動対象).map(target=>target.id);
   if(!ids.length)throw failure('起動対象を選択してください。');
   if(id){const old=logs.get(id)||{text:'',offset:0};logs.set(id,{text:'',offset:old.offset+old.text.length+1});}
@@ -111,7 +115,35 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
    finally{busy=false;}
   })();return {受理:true};
  }
+ async function forceStopAll(){
+  await load();if(closed||stopping)throw failure('停止処理の完了を待ってください。',409);
+  stopping=true;for(const target of targets)cancelled.add(target.id);
+  const previous=work;operation='タブの逆順で停止しています。';
+  work=(async()=>{
+   const errors=[];
+   for(const target of [...targets].reverse()){
+    try{
+     const owned=sessions.get(target.id);const before=(await ports()).find(item=>item.id===target.id);
+     if(!owned?.child||owned.exited){if(before?.開放===false)continue;}
+     focus={対象:target.id,実行ID:randomUUID()};operation=target.名前+' を停止しています。';
+     await stop(target.id);
+     if((await ports()).find(item=>item.id===target.id)?.開放!==false){
+      if(forceStopFn)await forceStopFn(target);
+      else{
+       const [command,args]=await pythonCommand();
+       await new Promise((resolve,reject)=>execFile(command,[...args,'-u','-X','utf8',join(root,'scripts','_diag_stop.py'),target.id],{cwd:root,windowsHide:true,timeout:180000,maxBuffer:256000,env:{...process.env,PYTHONIOENCODING:'utf-8'}},(error,stdout,stderr)=>{log(target.id,stdout||'');log(target.id,stderr||'');error?reject(failure(target.名前+' の停止に失敗しました。コンソールを確認してください。',500)):resolve();}));
+      }
+     }
+     if((await ports()).find(item=>item.id===target.id)?.開放!==false)throw failure(target.名前+' のポート解放を確認できませんでした。',500);
+     if(owned)owned.state='停止済み';else sessions.set(target.id,{state:'停止済み',exited:true});
+    }catch(error){errors.push(error.message);log(target.id,'停止エラー: '+error.message+'\n');}
+   }
+   await previous;
+   operation=errors.length?'停止できない機能があります。'+errors.join(' '):'稼働中の機能をすべて停止しました。';
+  })().finally(()=>{stopping=false;});
+  return {受理:true};
+ }
  async function logSnapshot(id,cursor=0){await load();targetFor(id);if(!Number.isSafeInteger(cursor)||cursor<0)throw failure('ログ位置が不正です。');const value=logs.get(id)||{text:'',offset:0},end=value.offset+value.text.length;return {対象:id,ログ:value.text.slice(Math.max(0,Math.min(cursor,end)-value.offset)),位置:end,切替:cursor<value.offset||cursor>end};}
  async function close(){closed=true;await Promise.allSettled([...sessions.keys()].map(stop));await work;}
- return {snapshot,save,restart,stop,logSnapshot,close,settled:()=>work};
+ return {snapshot,save,restart,stop,forceStopAll,logSnapshot,close,settled:()=>work};
 }

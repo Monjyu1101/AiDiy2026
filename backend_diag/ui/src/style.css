@@ -45,3 +45,5 @@ html,body{height:100%;overflow:hidden}#app{height:100vh;height:100dvh;display:fl
 .panel-actions button.check-next:hover:not(:disabled),.trial-test button.check-next:hover:not(:disabled){background:#7dd3fc}
 .panel-actions button.write-next{background:#2563eb;border-color:#60a5fa;color:#fff}
 .panel-actions button.write-next:hover:not(:disabled){background:#1d4ed8}
+
+.tabs #run.run-all.force-stop{background:#ff4d6d;border-color:#ff8a9c;color:#30050d}.tabs #run.run-all.force-stop:hover:not(:disabled){background:#ff718b;border-color:#ffb0be}

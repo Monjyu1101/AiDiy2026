@@ -1,0 +1,536 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><style>@page{size:A4;margin:17mm 16mm 19mm}*{box-sizing:border-box}body{font-family:"Yu Gothic","Meiryo",sans-serif;font-size:9.5pt;line-height:1.65;color:#172b3b;margin:0}h1{font-size:19pt;line-height:1.4;margin:0 0 7mm;border-bottom:2px solid #167b85;padding-bottom:4mm}h2{font-size:14pt;margin:8mm 0 3mm;border-left:4px solid #167b85;padding-left:3mm}h3{font-size:11pt;margin:5mm 0 2mm}h1,h2,h3,summary{break-after:avoid}p{margin:2.5mm 0;orphans:3;widows:3}li{margin:1mm 0}a{color:#176f81;overflow-wrap:anywhere}table{border-collapse:collapse;width:100%;font-size:8.6pt;line-height:1.55;margin:3mm 0}th,td{border:1px solid #b9cbd1;padding:2mm;vertical-align:top;overflow-wrap:anywhere}th{background:#eaf4f5;text-align:left}tr{break-inside:avoid}.small-table{break-inside:avoid}thead{display:table-header-group}code{font-size:8.5pt;overflow-wrap:anywhere;white-space:normal}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:8pt;background:#edf3f5;padding:3mm}blockquote{border-left:2px solid #89b7c0;margin:3mm 0;padding:1mm 4mm;background:#f1f7f8}figure{margin:4mm 0 6mm;break-inside:avoid}figure img{display:block;max-width:100%;width:auto;max-height:165mm;object-fit:contain;margin:2mm auto;border:1px solid #bdcdd3}figcaption{font-size:9pt;line-height:1.6;margin-bottom:2mm}summary{font-weight:bold;list-style:none;margin:4mm 0 2mm}details{display:block}strong{font-weight:700}</style><body><h1>IDE 操作編<br>総合テストと操作手順書素材</h1>
+<blockquote>
+<p>文書: <code>セルフテスト,aidiy_ide,操作編.md</code> | 実装: <code>frontend_ide/src/App.vue</code>, <code>frontend_ide/src/開発スペース/</code>, <code>frontend_ide/src/ファイル閲覧/</code></p>
+</blockquote>
+<h2>総合評価</h2>
+<p><strong>総合評価：✅ OK (PASS 2件含む)。閲覧・検索・AI連携・VR復帰・表示モーションの試験を通過しました。</strong>（2026年10月19日・Windows）</p>
+<p>IDEは、プロジェクトのフォルダやファイルを見ながら、Code・Liveへ作業を頼む画面です。VRモードでは、その宇宙表示をディスプレイ全体に広げます。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>知りたいこと</th>
+<th>現在の結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基本の閲覧やAIとのやり取りはできる？</td>
+<td>✅ OK：接続利用・オフライン利用、3D／2D切替、日本語文書の閲覧、Code・Liveの文字の返答、終了確認を確認しました。</td>
+</tr>
+<tr>
+<td>VRから元の画面へ戻れる？</td>
+<td>✅ OK：右上の復帰ボタンとF11の両方で戻れました。復帰後の位置・サイズも完全一致しました。</td>
+</tr>
+<tr>
+<td>巡回を待つ間も画面は動く？</td>
+<td>✅ OK：自動探索ONでは、手動操作後の待機中も約3分で1周します。ボタン上で航行状態も確認できます。実ブラウザーと仮想時計で確認しました（6章）。</td>
+</tr>
+<tr>
+<td>2Dのページ繰りも動く？</td>
+<td>✅ OK：初期表示、最終更新欄・エクスプローラーからのファイル選択、戻る操作のページ切替を確認しました（6-3）。</td>
+</tr>
+<tr>
+<td>追加試験は？</td>
+<td>✅ OK：履歴・文字検索・実AI検索・画像・Office文書・VRパネルの保存位置・F11・長押しとズームを確認しました。音声は実応答WAVの内容を認識して照合しました。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PASS (別途環境調整必要) は2件</strong>です。マイク入力機器が0台のため実マイク入力、物理ディスプレイが1台のため複数画面配置を、この判定にしました。不具合を確認した結果ではありません。人の耳での聴取は行わず、音声ファイルの認識と再生APIで確認しています。</p>
+<p><a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8.pdf">PDF版</a>を作成しました。Mac／Linuxは別途実機確認を推奨し、今回の完了条件には含めません。「動きを減らす」への専用対応は追加せず、既存の演出省略処理が混じっていないか点検しました（6-4）。</p>
+<p>PDF版は本文に合わせて再生成し、全ページの日本語・表・画像・改ページを目視確認しました。</p>
+<h2>この冊子の進め方</h2>
+<p><a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E8%B5%B7%E5%8B%95%E7%B7%A8.md">システム起動編</a> → <a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%A2%E3%83%97%E3%83%AA%E8%B5%B7%E5%8B%95%E7%B7%A8.md">アプリ起動編</a>でIDEを開いてから始めます。</p>
+<p>1〜4章は「利用開始 → ファイル閲覧 → AIとの会話 → 終了」の機能試験です。銀河表示の周回・探索航行・状態表示は、末尾の6章でまとめて確認します。VRを使わない場合は、1章の追加操作を飛ばして2章へ進みます。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>表示・用語</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>プロジェクト</td>
+<td>今回作業するフォルダです。</td>
+</tr>
+<tr>
+<td>3D／2D</td>
+<td>宇宙のような立体表示／一覧の表示を切り替えます。初めてファイルを探すときは2Dが追いやすい表示です。</td>
+</tr>
+<tr>
+<td>エクスプローラー／Explorer</td>
+<td>フォルダやファイルを一覧でたどるパネルです。</td>
+</tr>
+<tr>
+<td>ビューア</td>
+<td>選んだファイルの中身を読む欄です。ここでは編集できません。</td>
+</tr>
+<tr>
+<td>軌跡</td>
+<td>これまで閲覧・検索した場所の履歴です。</td>
+</tr>
+<tr>
+<td>子ウィンドウ</td>
+<td>IDEの「＋ Code」などから開いた、IDEに属する別ウィンドウです。</td>
+</tr>
+</tbody>
+</table>
+<p>画像の名前や日時は試験時のものです。自分が選んだフォルダと見比べてください。<strong>✅ OK</strong> は確認済み、<strong>⏸ 未実施</strong> は未確認です。</p>
+<h2>1. 利用を開始する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>開いているIDEの開始画面で、表示されたプロジェクト名を確認します。</li>
+<li>AIへ接続して使う場合は「AiDiy接続利用」を押します。通信せずにファイルを読む場合は「オフライン利用」を押します。</li>
+<li>フォルダやファイルを宇宙のように表示する作業画面が出るまで待ちます。接続利用では、上部の「接続済み」も確認します。</li>
+<li>試験中に表示場所が自動で変わらないよう、右下の「自動探索」をOFFにします。</li>
+<li>上部の「3D」「2D」で表示を切り替えられます。ファイルを読む操作は2章へ進んでください。</li>
+</ol>
+<h3>成功の見分け方</h3>
+<p>接続利用ではTerm・Code・Live、オフラインではTerm・Codeを開けます。一時的に通信が切れても、作業画面や子ウィンドウは維持されます。</p>
+<h3>今回の結果と画面</h3>
+<p><strong>✅ OK（接続利用）</strong>：「AiDiy接続利用」を押すと「接続済み」となり、選んだプロジェクトの3D画面が出ました。自動探索をOFFにして、その後の操作を試しました。2Dで読む試験は2章に掲載しています。</p>
+
+<figure><figcaption>IDEの利用開始前です。プロジェクトを確認し、接続利用かオフライン利用を選びます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_101_%E5%88%A9%E7%94%A8%E9%96%8B%E5%A7%8B%E5%89%8D%E7%94%BB%E9%9D%A2.png" alt="1章: 起動済みIDEから利用を開始する"></figure>
+
+<figure><figcaption>接続利用を開始した3D画面です。上部に「接続済み」と表示されています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_102_%E6%8E%A5%E7%B6%9A%E6%B8%88%E3%81%BF%E3%81%AE3D%E4%BD%9C%E6%A5%AD%E7%94%BB%E9%9D%A2.png" alt="1章: 接続済みの作業画面"></figure>
+<p><strong>✅ OK（オフライン利用）</strong>：接続利用を終了してから「オフライン利用」を押すと、未接続のまま3D画面を使えました。Liveの起動ボタンは表示されず、Browser（別のブラウザ画面）のボタンは押せない状態でした。</p>
+
+<figure><figcaption>オフライン利用の画面です。3D表示は使えますが、Liveは表示されず、Browserは無効です。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_103_%E3%82%AA%E3%83%95%E3%83%A9%E3%82%A4%E3%83%B3%E5%88%A9%E7%94%A8%E3%81%A73D%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="1章: オフラインの3D表示"></figure>
+<h3>VRモードへの移行と通常画面への復帰</h3>
+<p>デスクトップ版の3D画面で試します。VRは宇宙表示を画面全体へ広げる機能です。</p>
+<p><strong>✅ OK</strong>：復帰ボタンとF11で戻れます。復帰後の位置・サイズも一致しました（1-D）。</p>
+<h4>1-A. 通常画面を確認してVRへ移行する</h4>
+<ol>
+<li>上部で「3D」を選び、右下の「自動探索」をOFFにします。表示中のフォルダ名を控えます。ファイル表示の保持も試す場合は、2章の手順で公開してよい文書を1つ開いておきます。</li>
+<li>タイトルバー（一番上の帯）の右側にある「VR」を押します。</li>
+<li>「VR空間へ移行中…」が消えるまで待ちます。</li>
+<li>宇宙表示が画面全体に広がり、通常の上部操作バーが隠れ、Explorerと軌跡が別パネルで出れば移行完了です。</li>
+</ol>
+<p><strong>✅ OK</strong>：接続済みの3D画面でファイルを開いてから、VRへ移行しました。同じファイルを引き続き読めて、Explorerと軌跡の専用パネルも表示されました。VR中のこの2パネルには、閉じる×は出ません。今回開いていたファイルは <code>backend_diag/static/build-manifest.json</code> です。</p>
+<h4>1-B. 右上のボタンで通常画面へ戻る</h4>
+<ol>
+<li>画面の一番右上へマウスポインターを移します。重なった四角の復帰ボタンが現れます。キーボードではTabで次、Shift+Tabで前のボタンへ移動し、復帰ボタンに枠が付くと表示されます。</li>
+<li>重なった四角のボタンを押します。</li>
+<li>通常のタイトルバーと操作バーが戻り、Explorerと軌跡の別パネルが閉じるまで待ちます。</li>
+<li>左上の☰（エクスプローラー）と、その隣の軌跡ボタンを押します。同じフォルダ・選択ファイルが残っているか確認します。「起点」は更新ファイルを探す基準日時なので、その値も比べます。</li>
+</ol>
+<p><strong>✅ OK</strong>：TabとShift+Tabで復帰ボタンを表示して押すと、通常画面へ戻りました。Explorerと軌跡の別パネルは閉じましたが、開いていたファイル、「接続済み」、自動探索OFFは変わりませんでした。</p>
+<p>パネルを再表示すると、<code>backend_diag/static</code>の開き方、<code>build-manifest.json</code>の選択、起点の日時 <code>2026-10-19 11:03:20</code> も残っていました。</p>
+<h4>1-C. 再度VRへ移行し、F11で戻る</h4>
+<ol>
+<li>通常画面の「VR」をもう一度押し、移行中の表示が消えるまで待ちます。</li>
+<li>IDEのメイン画面を操作している状態で、キーボードのF11を押します。</li>
+<li>通常のタイトルバーと操作バーが戻り、同じフォルダや開いていたファイルが残っていれば復帰成功です。</li>
+</ol>
+<p><strong>✅ OK</strong>：もう一度VRへ移行しても、専用パネルが表示されました。F11を押すと通常3Dへ戻り、現在地・開いていたファイル・接続状態も変わりませんでした。試験後は通常3DでIDEを開いたままにしました。</p>
+<h4>1-D. 復帰後の位置・サイズを確認する</h4>
+<ol>
+<li>IDEを終了し、Diagの「アプリ起動」からIDEを開き直します。接続利用を開始し、「自動探索」をOFFにします。</li>
+<li>通常3D画面を撮影し、幅・高さ・画面左上からの位置を記録します。</li>
+<li>VRへ移行してF11で戻り、同じ方法で撮影して比べます。</li>
+<li>もう一度VRへ移行します。今度は右上の復帰ボタンで戻り、同じ比較を行います。</li>
+</ol>
+<p><strong>✅ OK</strong>：画面を実際に操作するComputer Useで2往復しました。撮影した画面は、幅・高さ・左上からの位置がすべて移行前と一致しました。接続と現在地も維持され、Explorer・軌跡の別パネルは復帰時に閉じました。下表のpxは、画像の大きさを数える単位です。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>比較時点</th>
+<th>撮影した画面の幅×高さ（px）</th>
+<th>画面左上からの位置（横,縦）</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>移行前</td>
+<td>1870×981</td>
+<td>(26,26)</td>
+<td>基準</td>
+</tr>
+<tr>
+<td>F11による1回目の復帰</td>
+<td>1870×981</td>
+<td>(26,26)</td>
+<td>✅ OK</td>
+</tr>
+<tr>
+<td>右上ボタンによる2回目の復帰</td>
+<td>1870×981</td>
+<td>(26,26)</td>
+<td>✅ OK</td>
+</tr>
+</tbody>
+</table>
+
+<figure><figcaption>位置・サイズを比べる基準画面です。幅1870px・高さ981pxと、画面上の位置を基準にします。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_101_%E4%BF%AE%E6%AD%A3%E5%BE%8C%E3%81%AEVR%E5%BE%80%E5%BE%A9%E5%89%8D%E3%81%AE%E5%9F%BA%E6%BA%96%E5%AF%B8%E6%B3%95%E7%94%BB%E9%9D%A2.png" alt="1章VR・修正後の基準: 自動探索OFFの通常3D画面"></figure>
+
+<figure><figcaption>修正版でVRへ移行した画面です。全画面の表示と、専用パネルの表示を確認しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_102_%E4%BF%AE%E6%AD%A3%E5%BE%8C1%E5%9B%9E%E7%9B%AE%E3%81%AEVR%E7%A7%BB%E8%A1%8C%E7%94%BB%E9%9D%A2.png" alt="1章VR・修正後の移行: 全画面と専用パネルを表示"></figure>
+
+<figure><figcaption>修正後にF11で戻った画面です。幅・高さ・位置が、移行前と完全に一致しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_103_%E4%BF%AE%E6%AD%A3%E5%BE%8C1%E5%9B%9E%E7%9B%AEF11%E5%BE%A9%E5%B8%B0%E3%81%A7%E5%9F%BA%E6%BA%96%E5%AF%B8%E6%B3%95%E4%B8%80%E8%87%B4%E7%94%BB%E9%9D%A2.png" alt="1章VR・修正後のF11復帰: 位置とサイズが基準に一致"></figure>
+
+<figure><figcaption>修正後の2回目のVR移行です。今度は右上の復帰ボタンで戻ります。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_104_%E4%BF%AE%E6%AD%A3%E5%BE%8C2%E5%9B%9E%E7%9B%AE%E3%81%AEVR%E3%81%A7%E5%BE%A9%E5%B8%B0%E3%83%9C%E3%82%BF%E3%83%B3%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="1章VR・修正後の再移行: 右上の復帰ボタンを表示"></figure>
+
+<figure><figcaption>右上のボタンで戻った画面です。2回目も幅1870px・高さ981pxと元の位置を維持しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_105_%E4%BF%AE%E6%AD%A3%E5%BE%8C2%E5%9B%9E%E7%9B%AE%E3%83%9C%E3%82%BF%E3%83%B3%E5%BE%A9%E5%B8%B0%E3%81%A7%E5%9F%BA%E6%BA%96%E5%AF%B8%E6%B3%95%E4%B8%80%E8%87%B4%E7%94%BB%E9%9D%A2.png" alt="1章VR・修正後のボタン復帰: 位置とサイズが基準に一致"></figure>
+<details open="">
+<summary>試験担当者向け：内部の寸法確認と再試験データ</summary>
+<p>Electronはデスクトップ画面を動かす仕組み、DIPは表示拡大率を考慮した寸法の単位です。回帰テストは、修正後も以前の機能が動くかを繰り返し確かめる試験です。</p>
+<p>実Electronの隔離試験でも、5往復すべてで通常窓の位置・サイズは横21・縦21・幅1496・高さ786 DIPに一致しました。回帰テストは52件成功、失敗0件でした。</p>
+
+<figure><figcaption>実Electronの補助試験で撮影したVR中の上端です。5往復の寸法結果は、直前の検証データに記録しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_106_%E5%AE%9FElectron%E3%81%AEVR%E4%B8%8A%E7%AB%AF%E7%94%BB%E9%9D%A2.png" alt="1章VR・実Electron隔離試験: VR中の上端を撮影（Computer Useとは別の補助検証）"></figure>
+</details>
+<h3>1-E. F11と移動したパネルの位置を追加確認する</h3>
+<p><strong>✅ OK</strong>：実ElectronでIDE本体とExplorerの両方からF11を押し、元の位置・サイズへ戻りました。Explorerを動かした後、VRパネルを作り直しても保存位置へ戻り、移動し直した位置も反映されました。</p>
+
+<figure><figcaption>VRパネルを再表示し、保存した位置へ移動している途中です。OSのウィンドウ座標でも到着を確認しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_101_VR%E5%86%8D%E8%A1%A8%E7%A4%BA%E3%81%A7Explorer%E3%81%AE%E4%BF%9D%E5%AD%98%E4%BD%8D%E7%BD%AE%E3%81%B8%E7%A7%BB%E5%8B%95%E7%94%BB%E9%9D%A2.png" alt="VR再表示でExplorerの保存位置へ移動"></figure>
+
+<figure><figcaption>Explorer側からF11でVRを解除した後です。通常画面の位置と大きさが復元されました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_102_Explorer%E3%81%8B%E3%82%89F11%E3%82%92%E6%8A%BC%E3%81%97%E3%81%9F%E5%BE%8C%E3%81%AE%E9%80%9A%E5%B8%B8%E7%94%BB%E9%9D%A2%E7%94%BB%E9%9D%A2.png" alt="ExplorerからF11を押した後の通常画面"></figure>
+<p>VR中のパネルは画面内に収まり、通常表示へ戻しても位置が累積してずれないことを確認しました。物理画面は1台なので、複数画面への配置は <strong>PASS (別途環境調整必要)</strong> です。</p>
+<p>試験担当者向けの補足：VR中は画面の文字情報を自動で読み取れなかったため、撮影画像で確認しました。通常画面へ戻ると文字情報も読み取れました。</p>
+<h2>2. フォルダとファイルを読む</h2>
+<h3>操作手順</h3>
+<ol>
+<li>上部の「2D」を押して一覧表示にします。</li>
+<li>左上の☰（横線3本のボタン）を押し、エクスプローラーを開きます。</li>
+<li>フォルダの左の三角を押すと、その中の一覧が開きます。見たいファイル名を押します。試験にはREADME.mdなど公開してよい文書を使います。</li>
+<li>右側のビューアに、選んだファイルの名前と中身が出ることを確認します。Markdownは見出しや文章を書ける文書形式で、「表示」では整えた見た目、「コード」では元の文字を読めます。</li>
+<li>表示している場所を戻す場合は、画面内のフォルダ名の並び（パンくず）を使います。プロジェクト名を押すと一番上のフォルダへ戻れます。</li>
+<li>ビューア右上の×でファイル表示を閉じます。同じフォルダの一覧が残っていれば正常です。タイトルバーの×はIDE全体を閉じます。ファイル表示だけを閉じる場合は、ビューアの×を使います。</li>
+<li>閲覧履歴を試す場合は軌跡バーを開き、「閲覧軌跡」から直前のファイルを選びます。検索を試す場合は、エクスプローラーの「grep検索」（文字で探す）や「AiDiy検索」を使い、結果からファイルを開きます。検索結果からの移動と、履歴からの再表示を確認しました（2-3〜2-5）。</li>
+</ol>
+<h3>成功の見分け方</h3>
+<p>選んだファイル名とビューアの名前・内容が合っていることが成功の目印です。ビューアは読むための画面なので、ここでは編集入力を行いません。同じファイルを選び直したり表示を閉じたりしただけで、別のフォルダへ移動しないことも確認します。</p>
+<h3>今回の結果と画面</h3>
+<p><strong>✅ OK</strong>：2Dでプロジェクトの一番上のフォルダへ戻り、<code>AGENTS.md</code> を開きました。日本語の文書を整えた見た目と、元の文字の両方で読めました。ビューアを閉じても同じフォルダの一覧が残りました。ファイルの編集はしていません。</p>
+
+<figure><figcaption>2Dでプロジェクトの一番上を表示した画面です。フォルダとファイルを一覧で確認できます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_201_2D%E3%83%95%E3%82%A9%E3%83%AB%E3%83%80%E4%B8%80%E8%A6%A7%E7%94%BB%E9%9D%A2.png" alt="2章: 2Dでプロジェクト直下を表示"></figure>
+
+<figure><figcaption>日本語文書を整えた見た目で表示しています。見出しや本文を読めることを確認しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_202_Markdown%E3%83%97%E3%83%AC%E3%83%93%E3%83%A5%E3%83%BC%E3%81%A7%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%82%92%E9%96%B2%E8%A6%A7%E7%94%BB%E9%9D%A2.png" alt="2章: 日本語Markdownを閲覧"></figure>
+
+<figure><figcaption>同じ文書をコード表示へ切り替えた画面です。元の文字を読み取れます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_203_%E3%82%B3%E3%83%BC%E3%83%89%E8%A1%A8%E7%A4%BA%E3%81%B8%E5%88%87%E6%9B%BF%E7%94%BB%E9%9D%A2.png" alt="2章: 同じファイルをコード表示"></figure>
+
+<figure><figcaption>ビューアを閉じた後です。同じフォルダの一覧が残っています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_204_%E3%83%93%E3%83%A5%E3%83%BC%E3%82%A2%E3%82%92%E9%96%89%E3%81%98%E3%81%A6%E7%8F%BE%E5%9C%A8%E5%9C%B0%E3%82%92%E7%B6%AD%E6%8C%81%E7%94%BB%E9%9D%A2.png" alt="2章: ビューアを閉じても一覧を維持"></figure>
+<p><strong>✅ OK（追加試験）</strong>：文字検索・AiDiy検索・履歴、画像・Word・Excel・PDF・PowerPoint、バックアップ版とのソース比較まで確認しました。詳しい操作と結果は2-3〜2-5です。</p>
+<h3>2-1. 横画面とVRのビューア配置を確認する</h3>
+<p>通常の横長画面では、ビューアとエクスプローラーの上端・下端をそろえます。VRでは中心星の横に表示し、右上の復帰・アプリ起動領域を避けます。</p>
+<p><strong>✅ OK（2026年10月19日・Windows／実Electron）</strong>：通常横画面の3サイズ、比較パネル、VR表示と復帰を確認しました。通常表示ではExplorerとの上下端の差は0、操作領域との重なりも0件でした。</p>
+<ol>
+<li>横長の画面でエクスプローラーとファイルを開き、左右のパネルの上下端を確認します。</li>
+<li>VRへ切り替え、中心星の横にビューアがあり、右上の操作ボタンと重ならないことを確認します。</li>
+<li>通常表示へ戻り、再び左右の上下端がそろうことを確認します。</li>
+</ol>
+
+<figure><figcaption>小さな横画面でも、左右のパネルの上端・下端がそろいます。ビューアだけに追加していた上下16pxの余白は取り除きました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_214_%E5%B0%8F%E3%81%95%E3%81%AA%E6%A8%AA%E7%94%BB%E9%9D%A2%E3%81%AE%E4%B8%8A%E4%B8%8B%E7%AB%AF%E3%82%92%E7%B5%B1%E4%B8%80%E7%94%BB%E9%9D%A2.png" alt="2-1：通常横画面のExplorerとビューアの上下端を統一"></figure>
+
+<figure><figcaption>VRでは中心星の横という配置を維持します。右上の操作領域と下端には余白を残します。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_219_VR%E3%83%93%E3%83%A5%E3%83%BC%E3%82%A2%E3%81%AE%E6%93%8D%E4%BD%9C%E9%A0%98%E5%9F%9F%E3%82%92%E7%A2%BA%E4%BF%9D%E7%94%BB%E9%9D%A2.png" alt="2-1：VRの中心星横にビューアを表示"></figure>
+
+<figure><figcaption>VRから戻った画面です。ファイル表示を維持し、Explorerと同じ上下端に戻っています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_217_VR%E5%BE%A9%E5%B8%B0%E5%BE%8C%E3%81%AE%E4%B8%8A%E4%B8%8B%E7%AB%AF%E3%82%92%E7%B5%B1%E4%B8%80%E7%94%BB%E9%9D%A2.png" alt="2-1：VR復帰後も上下端が一致"></figure>
+<details open="">
+<summary>試験担当者向け：比較パネルと測定結果</summary>
+
+<figure><figcaption>通常表示のソース比較も、エクスプローラーと上下端をそろえます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_216_%E6%AF%94%E8%BC%83%E3%83%91%E3%83%8D%E3%83%AB%E3%81%AE%E4%B8%8A%E4%B8%8B%E7%AB%AF%E3%82%92%E7%B5%B1%E4%B8%80%E7%94%BB%E9%9D%A2.png" alt="2-1：通常の比較パネルも上下端を統一"></figure>
+
+<figure><figcaption>VRの比較パネルは、ビューアと同じく右上の操作領域を空けます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_218_VR%E6%AF%94%E8%BC%83%E3%83%91%E3%83%8D%E3%83%AB%E3%81%AE%E6%93%8D%E4%BD%9C%E9%A0%98%E5%9F%9F%E3%82%92%E7%A2%BA%E4%BF%9D%E7%94%BB%E9%9D%A2.png" alt="2-1：VRの比較パネルは操作領域を確保"></figure>
+<p>隔離した実ElectronをWindowsの1画面で実行しました。通常表示は約1495×784・900×552・1280×720で確認し、上端78・下端余白約60でした。Explorerとの差は上下とも0です。VRは表示領域1540×867で上端192・下端余白約48、中心星の右を基本に画面内へ収まりました。数値はCSS上の寸法です。複数画面は別途確認します。</p>
+<p>通常表示3サイズ・比較パネル・VR復帰の測定結果は上記のとおりです。判定に使った画面を本文に掲載しています。</p>
+</details>
+<h3>2-2. 閉じる×を確認する</h3>
+<p><strong>結果：✅ OK（2026年10月19日・Windows／隔離Chrome）</strong></p>
+<ol>
+<li>ファイルを開き、右上の×が見やすいことを確認します。</li>
+<li>×を押してビューアを閉じます。3D・2Dの両方で確認します。</li>
+</ol>
+
+<figure><figcaption>3Dでは、ファイル名の右側にある×でビューアを閉じます。本文の小さな文字サイズに影響されず、線がはっきり表示されます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_211_3D%E3%83%93%E3%83%A5%E3%83%BC%E3%82%A2%E3%81%AE%E9%96%89%E3%81%98%E3%82%8B%E5%8D%B0%E7%94%BB%E9%9D%A2.png" alt="2-2：3Dビューアの閉じる印"></figure>
+
+<figure><figcaption>2Dでも同じ大きさ・太さです。どちらもクリックで閉じられることを確認しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_212_2D%E3%83%93%E3%83%A5%E3%83%BC%E3%82%A2%E3%81%AE%E9%96%89%E3%81%98%E3%82%8B%E5%8D%B0%E7%94%BB%E9%9D%A2.png" alt="2-2：2Dビューアの閉じる印"></figure>
+<p>タイトルバー・履歴・分析・Liveのモデル選択・Web版のパネル・案内・Codeの添付解除も、同じ線の印を使います。これらはコード確認、ビューアは実画面と操作で確認しました。関連する既存テスト101件も通過しています。</p>
+<h3>2-3. 検索結果と履歴からファイルを開く</h3>
+<ol>
+<li>Explorerの「grep検索」を選び、ファイル内の文字を入力して「検索」を押します。</li>
+<li>結果を押し、ファイル名と行の位置が一致するか確認します。</li>
+<li>「AiDiy検索」では、探したい内容を文章で依頼します。結果の目印からファイルを開きます。</li>
+<li>軌跡の閲覧履歴やAiDiy検索の履歴から、以前のファイル・結果を選び直します。</li>
+</ol>
+<p><strong>✅ OK</strong>：実Electronで日本語の一致行を開けました。検索画面の自動試験では履歴の再選択・再読込後の保持・削除取消・期限切れからの再確認も通過しました。画面試験のAI回答は固定データですが、別の実接続試験でも2ファイルの認証処理を実AIが検索できました。</p>
+
+<figure><figcaption>日本語の「総合テスト検索印」で検索した結果です。検索確認.txtの2行目に一致し、結果から同じ行を選択できました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_201_%E6%97%A5%E6%9C%AC%E8%AA%9Egrep%E6%A4%9C%E7%B4%A2%E3%81%A7%E4%B8%80%E8%87%B4%E8%A1%8C%E3%82%92%E9%81%B8%E6%8A%9E%E3%81%97%E3%81%9F%E7%94%BB%E9%9D%A2.png" alt="日本語grep検索で一致行を選択した画面"></figure>
+
+<figure><figcaption>検索画面の自動試験です。受け取った2件の結果に目印を付け、結果を押したときだけファイルへ移動しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_213_AI%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C%E3%81%A8%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%81%AE%E7%9B%AE%E5%8D%B0%E7%94%BB%E9%9D%A2.png" alt="AI検索結果とファイルの目印"></figure>
+
+<figure><figcaption>閲覧軌跡で以前のファイルを選び直した画面です。同じファイルを開き、通ったフォルダもツリーで表示しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_214_%E9%96%B2%E8%A6%A7%E8%BB%8C%E8%B7%A1%E3%81%8B%E3%82%89%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%82%92%E5%86%8D%E9%81%B8%E6%8A%9E%E7%94%BB%E9%9D%A2.png" alt="閲覧軌跡からファイルを再選択"></figure>
+
+<figure><figcaption>以前のAI検索結果を履歴から選んだ画面です。目印と軌跡が戻り、再読込後も選択を保ちました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_215_%E9%81%8E%E5%8E%BB%E3%81%AEAI%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C%E3%82%92%E9%81%B8%E6%8A%9E%E7%94%BB%E9%9D%A2.png" alt="過去のAI検索結果を選択"></figure>
+<h3>2-4. 画像とOffice文書を読む</h3>
+<ol>
+<li>Explorerから確認したいファイルを選びます。</li>
+<li>画像は表示内容、文書は日本語の本文を確認します。</li>
+<li>文書の「次へ」「前へ」でページを移り、倍率やシートも切り替えます。</li>
+<li>別ファイルを選び直し、正常に表示が切り替わるか確認します。</li>
+</ol>
+<p><strong>✅ OK</strong>：実ElectronでPNGと日本語Wordを表示しました。実ブラウザの追加試験では、Wordの2ページ、Excelの計算結果3600・結合セル・205行のページ送り・シート、CSV、PDF、PowerPointのページ送りと倍率を確認しました。</p>
+
+<figure><figcaption>Explorerから選んだPNG画像です。右のビューアへ画像が表示されました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_202_%E3%82%A8%E3%82%AF%E3%82%B9%E3%83%97%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%BC%E3%81%8B%E3%82%89%E9%81%B8%E3%82%93%E3%81%A0PNG%E7%94%BB%E5%83%8F%E3%81%AE%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="エクスプローラーから選んだPNG画像の表示"></figure>
+
+<figure><figcaption>実際にDiagから起動したIDEでWordを開きました。日本語の見出しと「1 / 2」を確認できます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_203_%E8%B5%B7%E5%8B%95%E3%81%97%E3%81%9FIDE%E3%81%A7%E6%97%A5%E6%9C%AC%E8%AA%9EWord%E6%96%87%E6%9B%B8%E3%82%92%E8%AA%AD%E3%81%BF%E5%8F%96%E3%82%8A%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="起動したIDEで日本語Word文書を読み取り表示"></figure>
+
+<figure><figcaption>ページを送った自動試験の画面です。Wordの2ページ目の本文と「2 / 2」に変わりました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_205_Word%E3%81%AE2%E3%83%9A%E3%83%BC%E3%82%B8%E7%9B%AE%E7%94%BB%E9%9D%A2.png" alt="Wordの2ページ目"></figure>
+
+<figure><figcaption>Excelの表を開いた画面です。保存済みの計算結果3600が表示され、シートとページも切り替えられました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_206_Excel%E3%81%AE%E8%A8%88%E7%AE%97%E7%B5%90%E6%9E%9C%E3%81%A8%E8%A1%A8%E7%94%BB%E9%9D%A2.png" alt="Excelの計算結果と表"></figure>
+
+<figure><figcaption>PDFの1ページ目を表示しています。次のページへ送ると内容が変わり、200%表示にも切り替えられました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_207_PDF%E3%81%AE1%E3%83%9A%E3%83%BC%E3%82%B8%E7%9B%AE%E7%94%BB%E9%9D%A2.png" alt="PDFの1ページ目"></figure>
+
+<figure><figcaption>PowerPointのスライドです。次のスライドと150%表示への切替も通りました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_208_PowerPoint%E3%81%AE%E3%82%B9%E3%83%A9%E3%82%A4%E3%83%89%E7%94%BB%E9%9D%A2.png" alt="PowerPointのスライド"></figure>
+
+<figure><figcaption>試験用に壊した文書を開くと、理由を表示しました。その後、正常なWordへ戻すと読める状態に復旧しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_210_%E5%A3%8A%E3%82%8C%E3%81%9F%E6%96%87%E6%9B%B8%E3%81%AE%E8%AA%AC%E6%98%8E%E7%94%BB%E9%9D%A2.png" alt="壊れた文書の説明"></figure>
+<h3>2-5. バックアップ版と現在のソースを比較する</h3>
+<p>ファイルの履歴で日時を選び、以前の内容と現在の内容を比べます。左が以前、右が現在です。比較欄は読み取り専用です。</p>
+<p><strong>✅ OK</strong>：日時の切替・同じ内容の版・履歴のないファイル・再取得を確認しました。左右の差分行とスクロールが対応し、縦画面でも比較できました。試験用の隔離バックアップを使い、実際の <code>backup/</code> は参照していません。</p>
+
+<figure><figcaption>以前の版と現在のソースを左右に並べています。変更した行と、左右のスクロール位置を比較しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_211_%E3%83%90%E3%83%83%E3%82%AF%E3%82%A2%E3%83%83%E3%83%97%E7%89%88%E3%81%A8%E7%8F%BE%E5%9C%A8%E3%81%AE%E3%82%BD%E3%83%BC%E3%82%B9%E6%AF%94%E8%BC%83%E7%94%BB%E9%9D%A2.png" alt="バックアップ版と現在のソース比較"></figure>
+<h2>3. Code / Live / Term を使う</h2>
+<h3>操作手順</h3>
+<ol>
+<li>接続利用中のIDE上部で「＋ Code」を押します。開いた別ウィンドウが同じプロジェクトを使っていることを確認します。</li>
+<li>使うAIのモデル名を確認し、入力欄に次の文を入れて送信します。</li>
+</ol>
+<blockquote>
+<p>おはよう。稼働試験です。挨拶を一文だけ返してください。ファイル変更やコマンド実行はしないでください。</p>
+</blockquote>
+<ol start="3">
+<li>自分の入力に続いて、AI側の新しい返答が出るまで待ちます。長い返答は時間がかかるため、進行表示を見ながら待ち、エラーが出たらその文を記録します。</li>
+<li>IDEへ戻り、「＋ Live」を押します。「接続済み」と会話の準備完了を確認してから、初回だけ15秒程度待ち、同じ挨拶を文字で送ります。再接続や「新しい会話」の後も初回として待ちます。</li>
+<li>Liveの文字の返答を記録します。マイクの入力や声の聞こえ方は別の確認項目です。</li>
+<li>IDEへ戻り、「＋ Term」を押します。同じプロジェクトの端末が開き、文字を入力できる待機表示（プロンプト）が出ることを確認します。今回のComputer Use試験では、端末へコマンドは入力しません。</li>
+<li>ファイルの連携を試す場合は、2章で文書を開き、ビューアの「Code / Liveへ」を押します。起動中のCodeを選び、入力欄の下書きに参照ファイルが追加されることを確認します。確認だけなら送信しません。</li>
+</ol>
+<h3>成功の見分け方</h3>
+<p>IDEから開いた別ウィンドウが、同じプロジェクトを使っているか確認します。CodeとLiveではAIの返答が出れば、文字会話の確認ができます。ログインなど、人の操作が必要な画面で止まった場合は、その先は未実施として記録します。</p>
+<h3>今回の結果と画面</h3>
+<p><strong>✅ OK（Code）</strong>：「＋ Code」で同じプロジェクトの「AiDiy IDE / Code 1」が開きました。挨拶を送ると、「おはようございます。IDEの稼働試験、こちらは問題なく応答できています。」と返答がありました。今回使った接続方法とモデルは <code>grok_cli / grok-4.7</code> です。</p>
+
+<figure><figcaption>IDEの「＋ Code」で開いた画面です。同じプロジェクトで接続済みになっています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_301_IDE%E3%81%8B%E3%82%89Code%E3%82%92%E9%96%8B%E3%81%8D%E6%8E%A5%E7%B6%9A%E7%94%BB%E9%9D%A2.png" alt="3章: IDEに属するCodeを開く"></figure>
+
+<figure><figcaption>IDEから開いたCodeの返答です。挨拶への正式な回答を確認しました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_302_IDE%E3%81%AECode%E3%81%8B%E3%82%89%E6%8C%A8%E6%8B%B6%E3%81%AE%E5%AE%9F%E5%9B%9E%E7%AD%94%E7%94%BB%E9%9D%A2.png" alt="3章: Codeからの正式回答"></figure>
+<p><strong>✅ OK（Liveの文字応答）</strong>: ＋Liveで同じプロジェクトの「AiDiy IDE / Live」が開き、接続・会話準備完了を確認しました。同じ挨拶に「おはようございます！」と返答がありました。回答は画面から取得した文字情報で確認しました。回答時は最小化していたため、下の画像は接続時のものです。後の追加試験で、実Live音声の内容を認識して照合しました。マイク入力は機器未接続のためPASSです。</p>
+
+<figure><figcaption>IDEから開いたLiveの接続完了画面です。返答前の画像で、確認した返答は上の結果に記載しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_303_IDE%E3%81%AELive%E6%8E%A5%E7%B6%9A%E5%AE%8C%E4%BA%86%E7%94%BB%E9%9D%A2.png" alt="3章: IDE Liveの接続完了（回答前）"></figure>
+<p><strong>✅ OK（Termの表示）</strong>：「＋ Term」で同じプロジェクトの「AiDiy IDE / Term 2」が開きました。PowerShellという端末の待機表示と、toolsオンラインを確認しました。端末には入力していません。</p>
+
+<figure><figcaption>IDEから開いたTermです。同じプロジェクトの端末に入力待ち表示が出ています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_304_IDE%E3%81%AETerm%E3%83%97%E3%83%AD%E3%83%B3%E3%83%97%E3%83%88%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="3章: IDE Termの初期表示"></figure>
+<p><strong>✅ OK（ファイルを下書きへ渡す）</strong>：ビューアの「Code / Liveへ」からCode 1を選ぶと、入力欄の下書きに「参照ファイル: <a href="http://agents.md/">AGENTS.md</a>」が入りました。ファイルの情報は追加されましたが、その場でAIへ自動送信はされませんでした。</p>
+
+<figure><figcaption>閲覧中の文書をCodeの下書きへ追加した画面です。「参照ファイル: <a href="http://agents.md/">AGENTS.md</a>」が入り、自動送信はされていません。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_305_%E9%96%B2%E8%A6%A7%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%82%92Code%E3%81%AE%E4%B8%8B%E6%9B%B8%E3%81%8D%E3%81%B8%E8%BF%BD%E5%8A%A0%E7%94%BB%E9%9D%A2.png" alt="3章: ファイルをCodeの下書きへ追加"></figure>
+<h3>3-1. 0.5秒ドラッグと開始ズームを確認する</h3>
+<p>パネル内を約0.5秒押したままにしてから動かすと、ウィンドウが移動します。短いクリックや文字選択は通常どおり使えます。表示開始時は透明な領域を先に確保し、その中で画面を拡大します。</p>
+<p><strong>✅ OK</strong>：実Electronの13条件で、400ms時点では移動せず、約524〜560msで長押しが成立しました。Code・Live・Termの単独／IDE起動、独立ビューア、入力欄、Esc・フォーカス喪失を確認しました。表示開始の最終確認は6-4にまとめています。</p>
+
+<figure><figcaption>Codeパネルで長押しが成立した場面です。移動の目印が出て、窓を動かせました。入力欄の短押しや文字選択も試しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_301_0.5%E7%A7%92%E9%95%B7%E6%8A%BC%E3%81%97%E4%B8%AD%E3%81%AE%E7%A7%BB%E5%8B%95%E3%83%9E%E3%83%BC%E3%82%AB%E3%83%BC%E7%94%BB%E9%9D%A2.png" alt="0.5秒長押し中の移動マーカー"></figure>
+<p>透明な外側と実画面の拡大は、6-4のWindows実表示と計測画像で確認できます。Code・Live・Termの単独／IDE起動と独立ファイルビューアを対象に、長押し13条件も確認しました。</p>
+<h3>3-2. Liveの音声とマイクの状態を確認する</h3>
+<p><strong>✅ OK（音声応答）</strong>：実Live接続で15秒待って送信し、最大60秒待つ条件で「おはようございます。」と返答がありました。取得した1.32秒のWAVを音声認識にかけ、同じ挨拶と一致しました。Windowsの既定出力への再生APIも正常終了しました。これは人の耳で聞いた結果や、スピーカーから録音し直した結果とは区別します。</p>
+<p><strong>PASS (別途環境調整必要)</strong>：Windowsの入力機器数は0台でした。製品のマイク取得処理でも入力を開始できないことを確認しています。マイクを接続した環境で、初回15秒待ってから音声入力を再確認します。</p>
+<p><a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/live-response.wav">取得した音声</a>は、別の音声認識で返答文と一致し、Windowsの再生処理も正常終了しました。マイク入力機器は0台のため、実マイク入力は未確認です。</p>
+<h2>4. 利用を終了する</h2>
+<h3>操作手順</h3>
+<ol>
+<li>IDE上部の操作バーにある「終了」を押します。IDEから開いたCode・Live・Termが閉じ、最初の利用開始画面に戻れば、この操作は成功です。</li>
+<li>IDE全体を閉じる確認を試すため、もう一度利用を開始します。</li>
+<li>タイトルバー右上の×を押します。「AiDiy IDE を終了しますか？」という確認が出たら、まず「キャンセル」を押します。作業画面へ戻れれば取消の確認は成功です。</li>
+<li>もう一度タイトルバーの×を押し、終了してよい場合は「終了する」を押します。IDEのウィンドウが閉じるまで待ちます。</li>
+<li>システムも使い終わった場合は、Diagへ戻り、<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E8%B5%B7%E5%8B%95%E7%B7%A8.md">システム起動編の5章</a>で停止します。</li>
+</ol>
+<h3>成功の見分け方</h3>
+<p>画面内の「終了」は、IDEの利用開始画面へ戻る操作です。一番上のタイトルバーの×は、IDE全体を閉じる操作です。どちらの操作でも、共通のシステムを止める場合はDiag側で別に停止します。</p>
+<h3>今回の結果と画面</h3>
+<p><strong>✅ OK（利用終了）</strong>：画面内の「終了」で、最初の利用開始画面へ戻りました。IDEから開いたCode・Live・Termの別ウィンドウも閉じました。</p>
+
+<figure><figcaption>画面内の「終了」を押した後です。子ウィンドウが閉じ、利用開始画面へ戻りました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_401_%E5%88%A9%E7%94%A8%E7%B5%82%E4%BA%86%E3%81%A7%E9%96%8B%E5%A7%8B%E7%94%BB%E9%9D%A2%E3%81%B8%E6%88%BB%E3%82%8B%E7%94%BB%E9%9D%A2.png" alt="4章: 利用開始へ戻る"></figure>
+<p><strong>✅ OK（×の確認・キャンセル）</strong>：再びオフライン利用を開始してタイトルバーの×を押すと、終了確認が出ました。「キャンセル」で作業を続けられました。このときは自動探索がONだったため、画像ごとに表示場所は変わっています。</p>
+
+<figure><figcaption>タイトルバーの×を押した画面です。IDE全体を終了するか、確認が表示されています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_402_IDE%E5%85%A8%E4%BD%93%E3%81%AE%E7%B5%82%E4%BA%86%E7%A2%BA%E8%AA%8D%E7%94%BB%E9%9D%A2.png" alt="4章: IDE全体を閉じる確認"></figure>
+
+<figure><figcaption>終了確認をキャンセルした後です。IDEの作業画面で利用を続けられました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_403_%E7%B5%82%E4%BA%86%E3%82%AD%E3%83%A3%E3%83%B3%E3%82%BB%E3%83%AB%E3%81%A7%E5%88%A9%E7%94%A8%E7%B6%99%E7%B6%9A%E7%94%BB%E9%9D%A2.png" alt="4章: キャンセル後も利用継続"></figure>
+<p>「終了する」を押して閉じる操作も確認しました。終了後のウィンドウ一覧から、IDEの窓が閉じたことを確認しました。</p>
+<h2>5. 試験担当者向け：次回の記録方法</h2>
+<details open="">
+<summary>画像の名前・保存先・自動試験の記録方法を開く</summary>
+<p>システム起動編とアプリ起動編を済ませ、本書1〜4章を利用順に実施します。銀河表示のモーション試験は、機能試験の後に6章で実施します。1章ではVRへの移行、復帰ボタン、パネル再表示、再移行とF11復帰も繰り返します。通常画面の位置・サイズを毎回記録し、幅の差が累積しないかも比較します。</p>
+<p>画像は <code>images/セルフテスト,aidiy_ide,操作編/</code> に保存します。新しい画像名は <code>&lt;実施ID&gt;__aidiy_ide-操作_1nn_…画面.png</code> とし、先頭1桁は本書の章番号を使います。6章は <code>6nn</code> とします。既存画像は撮影時の名前を保持しているため、6章にも <code>1nn</code> の画像があります。</p>
+<p>起動手順・画像は再掲載しません。操作・期待結果・実際の結果・説明付き画像の順で残し、Code／Liveの入力表示と実回答を区別します。今回の基本操作に加え、閲覧・検索・VR位置復元・音声応答・長押しと開始ズームも確認済みです。マイクと複数の物理画面はPASSとして残します。</p>
+<p>追加の実ブラウザ試験は <code>check-office.mjs</code>、<code>check-file-history.mjs</code>、<code>check-ai-search.mjs</code>、実AI検索は <code>check-ai-search-live.mjs</code> です。いずれも <code>frontend_ide/scripts/</code> にあります。Electron試験は同フォルダの <code>check-module-move.mjs</code>、<code>check-panel-desktop.mjs</code>、<code>check-all-displays.mjs</code>（位置だけは <code>AIDIY_ALL_PANEL_POSITION_ONLY=1</code>、F11だけは <code>AIDIY_ALL_F11_ONLY=1</code>）で再実行できます。ホスト画面の <code>check-host.mjs</code> は通信を固定データで再現し、物理マイクの代わりにはしません。</p>
+<p>各章には実接続で確認した結果と、固定データを使った結果を分けて記載しています。確認した事実と判定は各章の本文にまとめ、画像は説明付きで掲載しています。</p>
+</details>
+<h2>6. 銀河表示のモーションを確認する</h2>
+<p>機能試験とは分けて、3Dの周回・航行と、2Dのページ繰りを最後に確認します。4章でIDEを終了している場合は、<a href="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_diag,%E3%82%A2%E3%83%97%E3%83%AA%E8%B5%B7%E5%8B%95%E7%B7%A8.md">アプリ起動編</a>からIDEを開き、1章の方法で利用を開始します。</p>
+<h3>操作手順</h3>
+<ol>
+<li>上部の「3D」を選び、右下の「自動探索」をONにします。</li>
+<li>起動時の最終更新ファイルへの移動と、到着後の「観測中」を確認します。</li>
+<li>ファイルを閉じ、ドラッグで視点を少し動かしてから離します。「周回軌道航行中」と表示され、ゆっくり回り続けることを確認します。</li>
+<li>最後の操作から60秒待ち、「軌道計算と姿勢制御中」を経て「探索軌道航行中」へ変わることを確認します。</li>
+<li>自動探索をOFFにし、自動の視点移動と状態表示が止まることを確認します。2Dへ切り替えた場合も、3Dの航行は止まります。</li>
+</ol>
+<h3>成功の見分け方</h3>
+<p>周回は中心星の周りを約3分で1周します。ドラッグや目的地への移動を優先し、操作後の待機から探索航行へ滑らかに戻れば正常です。ファイルの選択や内容は、周回だけでは変わりません。</p>
+<p>以下に実施結果とエビデンスをまとめます。仮想時計とは、実際の待ち時間を短縮して、描画に渡す時刻を進める試験方法です。実時間で待つ操作試験とは区別します。</p>
+<h3>6-1. 周回と探索航行を確認する</h3>
+<p>右下の「自動探索」をONにすると、航行していない待機中も、現在の中心星の周りを約3分で1周します。ファイルの閲覧を閉じても同じ中心を保ちます。手動操作後は60秒間この回転で待ち、その後に通常航行へ戻ります。</p>
+
+<figure><figcaption>起動時は最終更新ファイルが表示されます。表示されたファイル名と、右下の「自動探索」がONであることを確認します。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_101_%E8%B5%B7%E5%8B%95%E5%BE%8C%E3%81%AE%E6%9C%80%E7%B5%82%E6%9B%B4%E6%96%B0%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-1：起動後に最終更新ファイルを表示"></figure>
+
+<figure><figcaption>閲覧を閉じた直後の画面です。ファイルが未選択になっても、直前に見ていた星を中心に低速回転が続きます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_102_%E9%96%B2%E8%A6%A7%E7%B5%82%E4%BA%86%E7%9B%B4%E5%BE%8C%E3%81%AE%E5%BE%85%E6%A9%9F%E5%9B%9E%E8%BB%A2%E7%94%BB%E9%9D%A2.png" alt="6-1：閲覧終了直後の待機回転"></figure>
+
+<figure><figcaption>待機回転が半周した画面です。中心星の位置を保ち、その周囲の星々の見える方向が変わっています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_104_%E5%BE%85%E6%A9%9F%E5%9B%9E%E8%BB%A290%E7%A7%92%E7%94%BB%E9%9D%A2.png" alt="6-1：待機回転90秒の半周"></figure>
+
+<figure><figcaption>最後の手動操作から60秒が過ぎ、通常航行へ戻った画面です。低速回転から滑らかに姿勢を合わせ、軌道に沿って進みます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_107_%E6%89%8B%E5%8B%95%E5%BE%85%E6%A9%9F%E7%B5%82%E4%BA%86%E5%BE%8C%E3%81%AE%E9%80%9A%E5%B8%B8%E8%88%AA%E8%A1%8C%E7%94%BB%E9%9D%A2.png" alt="6-1：待機終了後に通常航行へ復帰"></figure>
+<p><strong>✅ OK</strong>：待機中の一周・中心星との距離維持・通常航行への復帰を確認しました。起動後のファイル選択中も一周し、選択と閲覧表示を保ちました。ドラッグや移動中は操作を優先し、2D・画面非表示・自動探索OFFでは回転を止めます。</p>
+<details open="">
+<summary>試験担当者向け：低速回転の検証条件</summary>
+<p>Windowsの隔離Chromeで実際のCanvasを描画し、仮想時計で時間を進めました。実時間で3分待つ操作試験とは区別します。待機回転は45秒ごとに手動操作の通知を入れて待機を延長し、180秒で1周することを測定しました。通知を止めると最後の通知から60秒で通常航行へ戻り、その開始時に船体位置が飛ばないことも確認しました。</p>
+<p>関連テストは119件成功・失敗0件です。仮想時計で45秒・90秒・135秒・180秒の位置を確認し、180秒で開始位置へ戻りました。待機を解除すると通常航行へ復帰し、ブラウザのエラーは0件でした。再検証の指定は <code>frontend_ide,Vue共通画面変更手順.md</code> の低速回転の項を参照してください。</p>
+</details>
+<h3>6-2. 航行状態の表示を確認する</h3>
+<p>航行状況は、透明背景・枠なしの文字だけで表示します。自動探索ボタンと同じくエクスプローラーやビューアより背面に置き、パネルが重なった部分は隠れます。</p>
+
+<figure><figcaption>3Dの現在の表示です。右下の自動探索ボタンの上に、航行状況の文字だけが出ています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_601_%E8%88%AA%E8%A1%8C%E7%8A%B6%E6%B3%81%E3%82%92%E6%96%87%E5%AD%97%E3%81%A0%E3%81%91%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-2：枠なし・透明背景の航行状況"></figure>
+
+<figure><figcaption>2Dでも背景や枠は付けません。明るい一覧の背景に合わせ、文字色を変えています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_604_2D%E8%88%AA%E8%A1%8C%E7%8A%B6%E6%B3%81%E3%82%92%E6%96%87%E5%AD%97%E3%81%A0%E3%81%91%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-2：2Dの文字だけの状態表示"></figure>
+<details open="">
+<summary>試験担当者向け：パネルとの重なりの確認</summary>
+
+<figure><figcaption>ビューアを下へ広げて重ねた画面です。航行状況と自動探索ボタンはビューアの背面に隠れ、操作もビューア側に届きました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_602_%E3%83%93%E3%83%A5%E3%83%BC%E3%82%A2%E3%81%AE%E8%83%8C%E9%9D%A2%E3%81%AB%E8%88%AA%E8%A1%8C%E7%8A%B6%E6%B3%81%E7%94%BB%E9%9D%A2.png" alt="6-2：ビューアを前面に表示"></figure>
+
+<figure><figcaption>エクスプローラーを試験用に右下へ配置した画面です。同じく、航行状況とボタンを覆っています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/ide-%E6%93%8D%E4%BD%9C_603_%E3%82%A8%E3%82%AF%E3%82%B9%E3%83%97%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%BC%E3%81%AE%E8%83%8C%E9%9D%A2%E3%81%AB%E8%88%AA%E8%A1%8C%E7%8A%B6%E6%B3%81%E7%94%BB%E9%9D%A2.png" alt="6-2：エクスプローラーを前面に表示"></figure>
+<p><strong>✅ OK</strong>：隔離Chromeで透明背景・枠なし・影なしと、2D／3Dの表示を確認しました。重なりの試験ではパネル位置だけを調整し、本番のCSSで確認しています。確認内容は上の画像説明に記載しています。</p>
+</details>
+<p>自動探索がONの間は、右下のボタンのすぐ上に現在の状態が表示されます。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>状態表示</th>
+<th>動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>観測中</td>
+<td>開いたファイルの星の周囲を回ります。</td>
+</tr>
+<tr>
+<td>周回軌道航行中</td>
+<td>中心星の周りを約3分で1周します。</td>
+</tr>
+<tr>
+<td>軌道計算と姿勢制御中</td>
+<td>手動操作後60秒で、探索航行の準備をします。</td>
+</tr>
+<tr>
+<td>探索軌道航行中</td>
+<td>探索用の軌道を進みます。</td>
+</tr>
+<tr>
+<td>目的地へワープ中／目的地へ接近中</td>
+<td>別の星系／同じ星系の目的地へ移動します。</td>
+</tr>
+<tr>
+<td>手動操縦中／航路確認中</td>
+<td>ドラッグ操作／更新先の確認中です。</td>
+</tr>
+<tr>
+<td>自動探索OFF</td>
+<td>ボタン上の状態表示が消えます。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>✅ OK</strong>：実ブラウザーと仮想時計で、周回・準備・探索航行・OFFの表示を確認しました。関連117件のテストでは、ボタン上の配置、手動操縦、接近とワープ、2Dの表示も確認しました。14枚の確認画像と測定記録を補助資料として保持しています。</p>
+<h3>6-3. 2Dのページ繰りを確認する</h3>
+<p>2Dには3Dのような周回・探索航行はありません。初期表示と、最終更新欄やエクスプローラーからファイルを選んだ時のページ繰りを中心に確認します。</p>
+<h4>操作手順</h4>
+<ol>
+<li>上部の「2D」を押し、一覧がそのまま表示されることを確認します。</li>
+<li>左上の☰からエクスプローラーを開き、別フォルダのファイルを選びます。ページが切り替わり、選んだファイルが右側に表示されることを確認します。</li>
+<li>エクスプローラー下部の「最終更新」にある、別フォルダのファイルを選びます。同じようにページが切り替わり、そのファイルが開けば正常です。</li>
+<li>「親へ」で戻る操作と、ページ切替中のスクロールも試します。最後に3Dへ戻し、現在のフォルダと選択ファイルが維持されることを確認します。</li>
+</ol>
+<h4>今回の結果</h4>
+<p><strong>✅ OK（Windows）</strong>：実ブラウザーで以下の7項目を確認し、関連125件のテストもすべて通りました。</p>
+<table class="small-table">
+<thead>
+<tr>
+<th>確認したこと</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>初期表示</td>
+<td>✅ OK：不要なページめくりを挟まず、2D一覧を表示しました。</td>
+</tr>
+<tr>
+<td>進む・戻る</td>
+<td>✅ OK：進む時は右から左、戻る時は左から右へ斜線が動きました。設定時間は800msです。</td>
+</tr>
+<tr>
+<td>操作による中断</td>
+<td>✅ OK：スクロールで演出だけを終え、移動先のフォルダを保ちました。</td>
+</tr>
+<tr>
+<td>エクスプローラーからの選択</td>
+<td>✅ OK：深いファイルへ3ページを順に切り替え、ファイル名が一致しました。全体の設定時間は800msです。</td>
+</tr>
+<tr>
+<td>一覧更新</td>
+<td>✅ OK：上から下へ切り替わりました。設定時間は650msです。</td>
+</tr>
+<tr>
+<td>最終更新欄からの選択</td>
+<td>✅ OK：別フォルダへページが切り替わり、選んだ更新ファイルが開きました。</td>
+</tr>
+<tr>
+<td>3Dとの切替</td>
+<td>✅ OK：フォルダと選択ファイルを維持しました。2D中は3Dカメラが進みませんでした。</td>
+</tr>
+</tbody>
+</table>
+<h4>初期表示とフォルダのページ繰り</h4>
+
+<figure><figcaption>2Dへ切り替えた最初の画面です。ページめくりを挟まず、フォルダとファイルの一覧が出ています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_601_2D%E5%88%9D%E6%9C%9F%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-3：2Dの初期表示"></figure>
+
+<figure><figcaption>子フォルダへ進む途中です。切替の25%の位置で、右側に斜線が現れています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_602_%E9%80%B2%E3%82%80%E3%83%9A%E3%83%BC%E3%82%B8%E5%88%87%E6%9B%BF25%E3%83%91%E3%83%BC%E3%82%BB%E3%83%B3%E3%83%88%E7%94%BB%E9%9D%A2.png" alt="6-3：進むページ切替の25%"></figure>
+
+<figure><figcaption>同じ切替の75%の位置です。斜線が左へ進み、移動先の一覧が見えてきます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_603_%E9%80%B2%E3%82%80%E3%83%9A%E3%83%BC%E3%82%B8%E5%88%87%E6%9B%BF75%E3%83%91%E3%83%BC%E3%82%BB%E3%83%B3%E3%83%88%E7%94%BB%E9%9D%A2.png" alt="6-3：進むページ切替の75%"></figure>
+<h4>エクスプローラーからファイルを選ぶ</h4>
+
+<figure><figcaption>エクスプローラーで深いフォルダのファイルを選んだ途中です。経由するフォルダのページを順に表示します。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_606_%E3%82%A8%E3%82%AF%E3%82%B9%E3%83%97%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%BC%E9%81%B8%E6%8A%9E%E3%81%A7%E8%A4%87%E6%95%B0%E9%9A%8E%E5%B1%A4%E7%A7%BB%E5%8B%95%E7%94%BB%E9%9D%A2.png" alt="6-3：エクスプローラー選択によるページ切替"></figure>
+
+<figure><figcaption>切替が完了した画面です。現在地が「資料／内部／詳細」になり、選んだ「深い資料.txt」が右側に開いています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_607_%E3%82%A8%E3%82%AF%E3%82%B9%E3%83%97%E3%83%AD%E3%83%BC%E3%83%A9%E3%83%BC%E9%81%B8%E6%8A%9E%E5%85%88%E3%81%AE%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-3：エクスプローラーで選んだファイルを表示"></figure>
+<h4>最終更新欄からファイルを選ぶ</h4>
+
+<figure><figcaption>左下の最終更新欄に「更新先.txt」が出た画面です。このファイルを選びます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_610_%E6%9C%80%E7%B5%82%E6%9B%B4%E6%96%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%81%AE%E9%81%B8%E6%8A%9E%E5%89%8D%E7%94%BB%E9%9D%A2.png" alt="6-3：最終更新ファイルの選択前"></figure>
+
+<figure><figcaption>最終更新欄から選んだ直後です。移動先の「別の資料」へページが切り替わっています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_611_%E6%9C%80%E7%B5%82%E6%9B%B4%E6%96%B0%E9%81%B8%E6%8A%9E%E3%81%A7%E3%83%9A%E3%83%BC%E3%82%B8%E5%88%87%E6%9B%BF%E7%94%BB%E9%9D%A2.png" alt="6-3：最終更新からのページ切替"></figure>
+
+<figure><figcaption>切替完了後は、現在地の一覧と「更新先.txt」のビューアが表示されました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_612_%E6%9C%80%E7%B5%82%E6%9B%B4%E6%96%B0%E9%81%B8%E6%8A%9E%E5%85%88%E3%81%AE%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E8%A1%A8%E7%A4%BA%E7%94%BB%E9%9D%A2.png" alt="6-3：最終更新で選んだファイルを表示"></figure>
+<details open="">
+<summary>試験担当者向け：戻る操作・中断・更新・3D復帰と検証条件</summary>
+
+<figure><figcaption>親へ戻る途中です。進む時と同じ斜線が、反対方向の左から右へ動きます。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_604_%E6%88%BB%E3%82%8B%E3%83%9A%E3%83%BC%E3%82%B8%E5%88%87%E6%9B%BF%E7%94%BB%E9%9D%A2.png" alt="6-3：戻るページ切替"></figure>
+
+<figure><figcaption>切替中にスクロールした後です。古いページと斜線が消え、移動先だけが残りました。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_605_%E3%82%B9%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%AB%E3%81%A7%E3%83%9A%E3%83%BC%E3%82%B8%E6%BC%94%E5%87%BA%E4%B8%AD%E6%96%AD%E7%94%BB%E9%9D%A2.png" alt="6-3：スクロールによる演出中断"></figure>
+
+<figure><figcaption>一覧更新の途中です。横方向の移動とは異なり、上から下へ切り替わります。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_608_%E4%B8%80%E8%A6%A7%E6%9B%B4%E6%96%B0%E3%81%AE%E9%80%94%E4%B8%AD%E7%94%BB%E9%9D%A2.png" alt="6-3：一覧更新の途中"></figure>
+
+<figure><figcaption>3Dへ戻った後です。同じ「別の資料」フォルダと「更新先.txt」の選択を維持しています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/20261019121154-ide-2d-motion__ide-%E6%93%8D%E4%BD%9C_613_3D%E5%BE%A9%E5%B8%B0%E3%81%A8%E9%81%B8%E6%8A%9E%E7%B6%AD%E6%8C%81%E7%94%BB%E9%9D%A2.png" alt="6-3：3Dへの復帰と選択維持"></figure>
+<p>隔離Chromeと一時プロジェクトを使い、自動探索はOFFでページ繰りを確認しました。最終更新の通知データは試験用に指定し、クリックからページ・ツリー・ビューアへ届く処理は実物を使っています。CSSアニメーションの途中時刻を固定して撮影したため、800ms・650msはCSSの設定時間で、実時間の滑らかさやフレーム数の測定値ではありません。Computer Useによる手動操作試験とは区別します。</p>
+<p>再実行は <code>node frontend_ide/scripts/check-2d-motion.mjs</code> です。8項目の確認はすべて成功し、進む・戻るのページ切替はともに設定800ms、ブラウザのエラーは0件でした。13枚の確認画像を保存し、関連する自動テスト125件も成功しました。</p>
+</details>
+<h3>6-4. 共通パネルの透明表示を確認する</h3>
+<p><strong>✅ OK（Windows）</strong>：Diag、Term、Code、Live、IDE、関連パネル、Avatarの17種類、Discordを順に確認しました。OSの「動きを減らす」による演出省略は、アプリ所有のソースから外しています。第三者ライブラリの内部処理は変更していません。</p>
+
+<figure><figcaption>読み込み表示が消え、銀河とファイルの星が描画された後に、ズーム途中を静止してWindows上で撮影しました。内側には銀河とファイル名が表示され、外側には背後のCodeやLiveなどが透けています。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/aidiy_ide-%E6%93%8D%E4%BD%9C_603_%E9%8A%80%E6%B2%B3%E6%8F%8F%E7%94%BB%E5%AE%8C%E4%BA%86%E5%BE%8C%E3%81%AB%E9%80%8F%E6%98%8E%E9%A0%98%E5%9F%9F%E5%86%85%E3%81%A7IDE%E7%94%BB%E9%9D%A2%E3%81%8C%E5%BA%83%E3%81%8C%E3%82%8B%E7%94%BB%E9%9D%A2.png" alt="6-4：Windows上の透明領域とIDEの実画面"></figure>
+
+<figure><figcaption>共通処理だけの計測画面です。文字を含む表示内容が広がり、外側4隅は完全に透明でした。拡大は実測745.5msで、実窓と透明パネルの位置・大きさは変わりませんでした。</figcaption><img src="file:///C:/Users/admin/Desktop/AiDiy2026_dev/_AIDIY/knowledge/images/%E3%82%BB%E3%83%AB%E3%83%95%E3%83%86%E3%82%B9%E3%83%88,aidiy_ide,%E6%93%8D%E4%BD%9C%E7%B7%A8/aidiy_ide-%E6%93%8D%E4%BD%9C_602_%E9%80%8F%E6%98%8E%E3%83%91%E3%83%8D%E3%83%AB%E5%86%85%E3%81%A7%E6%96%87%E5%AD%97%E3%82%92%E5%90%AB%E3%82%80%E5%AE%9F%E7%94%BB%E9%9D%A2%E3%81%8C%E5%BA%83%E3%81%8C%E3%82%8B%E9%80%94%E4%B8%AD%E7%94%BB%E9%9D%A2.png" alt="6-4：文字を含む実画面のズーム途中"></figure>
+<p>画面を取得できない場合は色だけの代用面を出さず、通常表示へ進みます。</p>
+<p>順次試験と追加9件の確認はすべて成功しました。</p>
+<p>確認が終わったら、4章の手順で利用を終了します。</p>
+</body></html>
