@@ -6,14 +6,14 @@ import {起動ミニ表示を作成} from '../ui/src/ウィンドウ/起動ミ�
 import {起動状態を作成} from '../ui/src/起動/起動状態.mjs';
 
 function fakeWindow(maximized=false){
- const window={bounds:{x:140,y:100,width:1160,height:820},minimum:[420,320],maximized,maximizable:true,
-  isAlwaysOnTop(){return !!this.top;},setAlwaysOnTop(value){this.top=value;},isDestroyed(){return !!this.destroyed;},getNormalBounds(){return {...this.bounds};},getMinimumSize(){return [...this.minimum];},isMaximized(){return this.maximized;},isMaximizable(){return this.maximizable;},
-  unmaximize(){this.maximized=false;},maximize(){this.maximized=true;},setMinimumSize(...value){this.minimum=value;},setMaximizable(value){this.maximizable=value;},setBounds(value){this.bounds={...value};}};
+ const window={bounds:{x:140,y:100,width:1160,height:820},minimum:[420,320],maximized,maximizable:true,resizes:0,minimumChanges:0,
+  isAlwaysOnTop(){return !!this.top;},setAlwaysOnTop(value){this.top=value;},isDestroyed(){return !!this.destroyed;},getBounds(){return {...this.bounds};},getNormalBounds(){return {...this.bounds};},getMinimumSize(){return [...this.minimum];},isMaximized(){return this.maximized;},isMaximizable(){return this.maximizable;},
+  unmaximize(){this.maximized=false;},maximize(){this.maximized=true;},setMinimumSize(...value){this.minimumChanges++;this.minimum=value;},setMaximizable(value){this.maximizable=value;},setBounds(value){this.resizes++;this.bounds={...value,width:Math.max(value.width,this.minimum[0]),height:Math.max(value.height,this.minimum[1])};}};
  return window;
 }
-test('mini window has fixed dimensions and restores original bounds and minimum',()=>{
+test('mini window has fixed width and compact fallback height, restoring original bounds and minimum',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window),original=structuredClone(window.bounds);
- assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:384,height:248});assert.deepEqual(window.minimum,[384,248]);assert.equal(window.maximizable,false);
+ assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:384,height:134});assert.deepEqual(window.minimum,[384,134]);assert.equal(window.maximizable,false);
  controller.set(true);controller.set(false);assert.deepEqual(window.bounds,original);assert.deepEqual(window.minimum,[420,320]);assert.equal(window.maximizable,true);assert.equal(controller.active,false);
 });
 test('maximized windows restore their normal bounds and maximized state',()=>{
@@ -23,9 +23,38 @@ test('maximized windows restore their normal bounds and maximized state',()=>{
 test('startup mini uses primary work-area origin and restores original topmost, location and size',()=>{
  for(const top of [true,false]){
   const window=fakeWindow();window.top=top;const original=structuredClone(window.bounds),controller=miniWindow.ミニ表示を作成(window,{screen:{getPrimaryDisplay:()=>({workArea:{x:-1920,y:32}})}});
-  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:384,height:248});assert.equal(window.top,true);
+  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:384,height:134});assert.equal(window.top,true);
   controller.set(false);assert.deepEqual(window.bounds,original);assert.equal(window.top,top);
  }
+});
+
+test('mini height follows zero CLI, CLI, error and zero CLI without losing saved normal state',()=>{
+ for(const maximized of [false,true])for(const top of [false,true]){
+  const window=fakeWindow(maximized);window.top=top;window.maximizable=!top;
+  const original=window.getBounds(),minimum=window.getMinimumSize(),maximizable=window.maximizable,controller=miniWindow.ミニ表示を作成(window);
+  controller.set(true);
+  // ミニ表示を移動したあとも高さ変更で位置を変えず、復帰先は最初の通常位置に保つ。
+  window.bounds.x=-400;window.bounds.y=20;
+  for(const height of [134,186,200,134]){
+   const before=window.resizes,minimumBefore=window.minimumChanges;
+   const previous=window.bounds.height;
+   assert.equal(controller.resize(height),true);assert.deepEqual(window.bounds,{x:-400,y:20,width:384,height});assert.deepEqual(window.minimum,[384,height]);
+   assert.equal(window.resizes,before+(previous===height?0:1));assert.equal(window.minimumChanges,minimumBefore+(previous===height?0:1));
+   assert.equal(controller.set(true),true);assert.equal(controller.resize(height),true);assert.equal(window.resizes,before+(previous===height?0:1),'同じ高さで再度リサイズしない');
+  }
+  assert.equal(controller.set(false),true);assert.deepEqual(window.bounds,original);assert.deepEqual(window.minimum,minimum);assert.equal(window.maximized,maximized);assert.equal(window.maximizable,maximizable);assert.equal(window.top,top);
+  assert.equal(controller.resize(186),false);assert.deepEqual(window.bounds,original);
+ }
+});
+
+test('mini resizing accepts only bounded integer heights on a live active mini window',()=>{
+ const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window),normal=window.getBounds();
+ assert.equal(controller.resize(186),false);assert.deepEqual(window.bounds,normal);
+ controller.set(true);const mini=window.getBounds(),before=window.resizes;
+ for(const height of [undefined,null,false,true,'134',{},[],[134],NaN,Infinity,-Infinity,0,79,361,134.5,Number.MAX_SAFE_INTEGER])assert.equal(controller.resize(height),false);
+ assert.deepEqual(window.bounds,mini);assert.equal(window.resizes,before);
+ for(const height of [80,360,80]){assert.equal(controller.resize(height),true);assert.equal(window.bounds.height,height);assert.deepEqual(window.minimum,[384,height]);}
+ window.destroyed=true;assert.equal(controller.resize(134),false);assert.equal(window.bounds.height,80);
 });
 
 test('initial mini renders immediately even before connection and can restore without resetting the mode first',async()=>{

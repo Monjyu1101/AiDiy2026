@@ -32,11 +32,19 @@ app.on('browser-window-created',(_event,window)=>{
  window.webContents.once('did-finish-load',async()=>{
   try{
    await until(()=>window.isVisible()&&window.webContents.executeJavaScript("!!document.querySelector('.start-mini .mini-app-button')&&!document.documentElement.classList.contains('desktop-opening')"));
-   assert.equal(checks,1);const area=screen.getPrimaryDisplay().workArea,bounds=window.getBounds();
-   near(bounds,{x:area.x,y:area.y,width:384,height:248});assert.equal(window.isAlwaysOnTop(),true);
+   assert.equal(checks,1);const area=screen.getPrimaryDisplay().workArea;
    assert.equal(await window.webContents.executeJavaScript('window.aidiyWindow.initialMini'),true);
    assert.equal(await window.webContents.executeJavaScript("document.querySelector('#app-project-folder').value"),'');
-   await sleep(650);window.webContents.invalidate();
+   await sleep(650);
+   // 検出されたCLIやエラーの有無に合わせ、内容の自然な高さが窓へ反映されるまで待つ。
+   let bounds,expectedHeight;
+   await until(async()=>{
+    const height=await window.webContents.executeJavaScript(`(()=>{const nodes=['.mini-content','.panel-brand','.connection-bar'].map(selector=>document.querySelector(selector));if(nodes.some(node=>!node))return null;const raw=nodes.reduce((sum,node)=>sum+node.getBoundingClientRect().height,0);return Number.isFinite(raw)&&raw>0?Math.max(80,Math.min(360,Math.ceil(raw))):null;})()`);
+    const current=window.getBounds();if(height===null||Math.abs(current.height-height)>2)return false;
+    bounds=current;expectedHeight=height;return true;
+   });
+   near(bounds,{x:area.x,y:area.y,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),true);
+   window.webContents.invalidate();
    writeFileSync(process.env.DIAG_TEST_SHOT,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
    openingMeasurement=await openingCheck;assert.ok(openingMeasurement);
    const miniMove=await holdMove(window,window.webContents,'.mini-service','Diagミニ');
@@ -46,7 +54,7 @@ app.on('browser-window-created',(_event,window)=>{
    catch(error){throw Error(JSON.stringify({bounds:window.getBounds(),original,ui:await window.webContents.executeJavaScript("({mini:!!document.querySelector('.start-mini'),message:document.querySelector('#message')?.textContent})")}),{cause:error});}
    assert.equal(window.isAlwaysOnTop(),false);near(window.getNormalBounds(),original);
    const normalMove=await holdMove(window,window.webContents,'.start-targets button','Diag通常','escape');
-   process.send({testPassed:true,bounds,alwaysOnTop:true,restored:true,openingMeasurement,miniMove,normalMove,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
+   process.send({testPassed:true,bounds,expectedHeight,alwaysOnTop:true,restored:true,openingMeasurement,miniMove,normalMove,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
   }catch(error){console.error(error);app.exit(1);}
  });
 });

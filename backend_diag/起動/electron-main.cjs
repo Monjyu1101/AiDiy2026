@@ -2,7 +2,7 @@
 const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron');
 const path=require('node:path');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
-const {ミニ表示を作成}=require('./ミニ表示.cjs');
+const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
 const {起動状態を読む,終了確認を作成}=require('./終了確認.cjs');
@@ -43,7 +43,12 @@ async function start(value) {
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
   const mini=ミニ表示を作成(window,{screen});
-  window.webContents.on('did-start-loading',()=>mini.set(false));
+  let firstLoad=true,opening=false,pendingMiniHeight;
+  window.webContents.on('did-start-loading',()=>{
+    // 初回の描画より先にミニ状態にし、初期表示の高さ通知を取りこぼさない。
+    // 再読込時は従来どおり通常表示へ戻す。
+    pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
+  });
   let selectingFolder=false;
   ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
@@ -51,7 +56,15 @@ async function start(value) {
       if(selectingFolder)return null;selectingFolder=true;
       return dialog.showOpenDialog(window,{title:'プロジェクトフォルダを選択',properties:['openDirectory']}).then(result=>result.canceled?null:result.filePaths[0]||null).finally(()=>{selectingFolder=false;});
     }
-    if(action==='startMini')return mini.set(value);
+    if(action==='startMini'){
+      if(value===false)pendingMiniHeight=undefined;
+      return mini.set(value);
+    }
+    if(action==='resizeMini'){
+      // 表示開始の拡大演出は撮影した寸法を保持し、最新の測定値だけを完了後に反映する。
+      if(opening&&mini.active){if(!ミニ高さは有効(value))return false;pendingMiniHeight=value;return true;}
+      return mini.resize(value);
+    }
     if(action==='isMaximized')return window.isMaximized();
     if(action==='minimize')window.minimize();
     else if(action==='maximize'&&!mini.active){if(window.isMaximized())window.unmaximize();else window.maximize();}
@@ -66,10 +79,12 @@ async function start(value) {
   window.webContents.once('render-process-gone',()=>fail('RENDERER'));
   try{await window.loadURL(url.href);}catch{fail('LOAD');return;}
   if(failed || window.isDestroyed())return;
-  if(initialMini)mini.set(true,{topLeft:true});
   // Code / Live / Term / IDE と同じ共通演出。内容は拡大完了後にフェード表示する。
   await window.webContents.executeJavaScript("document.documentElement.classList.add('desktop-opening','desktop-window')");
-  if(!await 拡大表示(BrowserWindow,window,{background:'#080b10'}) || failed)return;
+  opening=true;
+  const shown=await 拡大表示(BrowserWindow,window,{background:'#080b10'});opening=false;
+  if(!shown || failed)return;
+  if(pendingMiniHeight!==undefined){mini.resize(pendingMiniHeight);pendingMiniHeight=undefined;}
   await window.webContents.executeJavaScript("document.documentElement.classList.remove('desktop-opening')");
   if(!failed && !window.isDestroyed() && process.connected)process.send({type:'diag-shown'},error=>{if(error)fail('IPC');});
 }

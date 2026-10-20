@@ -38,6 +38,7 @@ const {表示中:ミニ表示}=ミニ;
 watch([tab,connected,ミニ表示],([value,online,mini])=>{起動.表示((value==='start'||mini)&&online,!mini);if(!online){CLI.切断();void ミニ.変更(false);}});
 watch(ミニ.エラー,error=>{if(error)message.value=error;});
 function コンソールへ戻る(id){起動.選択.value=id;tab.value='start';void ミニ.変更(false);}
+function アプリ起動へ戻る(){tab.value='apps';void ミニ.変更(false);}
 const 手動=AIモデル状態を作成({api,接続可能:()=>connected.value&&toolsOnline.value});
 watch(tab,(value,old)=>{if(old==='manual')手動.表示を離れる();if(old==='trials')試行.表示を離れる();},{flush:'sync'});
 const 試行=設定モデル状態を作成({api,接続可能:()=>connected.value&&toolsOnline.value});
@@ -72,6 +73,6 @@ onMounted(()=>{if(key.value)connect();});
 <component :is="AIモデルパネル" v-show="tab==='manual'&&!ミニ表示" :state="手動" :online="connected && toolsOnline" :visible="tab==='manual'&&!ミニ表示"/>
 <component :is="アプリ起動パネル" :state="アプリ" :online="connected" :visible="tab==='apps'&&!ミニ表示"/>
 <component :is="起動パネル" :state="起動" :online="connected" :visible="tab==='start'&&!ミニ表示"/>
-<component v-if="ミニ表示" :is="起動ミニパネル" :app-state="アプリ" :cli-state="CLI" :app-online="connected" :state="起動" :online="connected&&!起動.更新失敗.value" @select="コンソールへ戻る"/>
+<component v-if="ミニ表示" :is="起動ミニパネル" :app-state="アプリ" :cli-state="CLI" :app-online="connected" :state="起動" :online="connected&&!起動.更新失敗.value" @select="コンソールへ戻る" @open-apps="アプリ起動へ戻る"/>
 <footer v-show="!ミニ表示"><div class="diag-meta"><span>診断 {{connected?'接続済み':'未接続'}}</span><span>tools {{toolsOnline?'オンライン':'オフライン'}}</span></div><p id="coverage" v-if="調査.sourceTargetFiles">調査{{調査.complete ? '完了':'途中'}}: 対象ソース・設定 {{Number(調査.scannedSourceFiles || 0).toLocaleString()}} / {{Number(調査.sourceTargetFiles).toLocaleString()}} 件 · {{項目.length}} 項目 · {{String(調査.commit || '').slice(0,8)}}。通常の Markdown 本文・画像・音声・モデル等は除外。</p><p v-else>ソース調査情報は接続後に表示します。</p>対象はこの診断サーバーの実行環境です。存在確認は動作・認証・接続の保証ではありません。</footer>
 </template>

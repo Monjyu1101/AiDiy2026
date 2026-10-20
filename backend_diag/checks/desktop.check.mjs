@@ -26,7 +26,7 @@ async function mainFixture({opening,load,toolsOpen=false,primary=true,platform='
  app.setName=name=>{app.name=name;};app.dock={setMenu(menu){app.dock.menu=menu;},setIcon(icon){app.dock.icon=icon;}};
  const Menu={buildFromTemplate:items=>items,setApplicationMenu(menu){app.menu=menu;}};
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}getNormalBounds(){return this.bounds||{x:150,y:100,width:1160,height:820};}getMinimumSize(){return this.minimum||[420,320];}isMaximizable(){return true;}setMinimumSize(...value){this.minimum=value;}setMaximizable(value){this.maximizable=value;}setBounds(value){this.bounds=value;}isAlwaysOnTop(){return !!this.top;}setAlwaysOnTop(value){this.top=value;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;await load?.();}}
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}getBounds(){return {...this.getNormalBounds()};}getNormalBounds(){return this.bounds||{x:150,y:100,width:1160,height:820};}getMinimumSize(){return this.minimum||[420,320];}isMaximizable(){return true;}setMinimumSize(...value){this.minimum=value;}setMaximizable(value){this.maximizable=value;}setBounds(value){this.bounds=value;}isAlwaysOnTop(){return !!this.top;}setAlwaysOnTop(value){this.top=value;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;this.webContents.emit('did-start-loading');await load?.();}}
  vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./MacOS-Menu.cjs'?{...macMenu,Macメニューを設定:options=>macMenu.Macメニューを設定({...options,platform})}:id==='../../frontend_ide/デスクトップ/長押し窓移動.cjs'?{attachNativeWindowMove:(window,screen,kind)=>moves.push({window,screen,kind})}:id==='./ポート接続.cjs'?{checkPort:async port=>{assert.equal(port,8095);return toolsOpen;}}:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,Menu,screen:{getPrimaryDisplay:()=>({workArea:{x:0,y:28,width:1920,height:1052}})},dialog:{showOpenDialog:selectFolder,showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
  return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,dialogs,moves,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
@@ -65,7 +65,7 @@ test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',as
 test('Tools 8095 open starts mini at primary work-area top-left before show, while closed/unknown use normal',async()=>{
  for(const toolsOpen of [true,false,null]){
   const f=await mainFixture({toolsOpen,opening:window=>{
-   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,248);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
+   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,134);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
    else assert.equal(window.bounds,undefined);
    window.show();return true;
   }});
@@ -73,6 +73,51 @@ test('Tools 8095 open starts mini at primary work-area top-left before show, whi
   assert.equal(JSON.stringify(f.options.webPreferences.additionalArguments),JSON.stringify(toolsOpen===true?['--aidiy-diag-initial-mini']:[]));
   assert.equal(f.win.shown,true);assert.equal(f.sent.at(-1).type,'diag-shown');
   if(toolsOpen===true){const event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};f.handlers['diag:window'](event,'startMini',false);assert.equal(f.win.bounds.width,1160);assert.equal(f.win.bounds.x,150);assert.equal(f.win.top,false);}
+ }
+});
+test('initial mini accepts renderer height during loading and later reload restores the normal window',async()=>{
+ let loaded;
+ const f=await mainFixture({toolsOpen:true,load:()=>new Promise(resolve=>loaded=resolve)});
+ f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ assert.deepEqual(f.win.getBounds(),{x:0,y:28,width:384,height:134});assert.equal(f.openings.length,0);
+ assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);assert.equal(control({...event,sender:{}},'resizeMini',200),false);
+ assert.equal(control(event,'resizeMini',186),true);assert.equal(f.win.bounds.height,186);
+ loaded();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.win.bounds.height,186,'loadURL完了後に初回の測定高さを上書きしない');assert.equal(f.openings.length,1);assert.equal(f.win.shown,true);
+ f.win.webContents.emit('did-start-loading');
+ assert.deepEqual(f.win.getBounds(),{x:150,y:100,width:1160,height:820});assert.deepEqual(f.win.minimum,[420,320]);assert.equal(f.win.top,false);
+ assert.equal(control(event,'resizeMini',200),false);assert.equal(f.win.bounds.height,820);
+ f.win.webContents.emit('did-start-loading');assert.equal(f.win.bounds.height,820,'初回ミニを再読込で復活させない');
+});
+test('normal startup ignores measured mini heights before and after loading',async()=>{
+ let loaded;
+ const f=await mainFixture({load:()=>new Promise(resolve=>loaded=resolve)});
+ f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ assert.equal(control(event,'resizeMini',186),false);assert.equal(f.win.bounds,undefined);
+ loaded();await new Promise(resolve=>setImmediate(resolve));assert.equal(control(event,'resizeMini',186),false);assert.equal(f.win.bounds,undefined);
+});
+test('mini height stays stable during opening and applies only the latest valid main-frame measurement',async()=>{
+ let finish;
+ const f=await mainFixture({toolsOpen:true,opening:()=>new Promise(resolve=>finish=resolve)});
+ f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ for(const height of [186,200,186]){assert.equal(control(event,'resizeMini',height),true);assert.equal(f.win.bounds.height,134);}
+ assert.equal(control(event,'resizeMini',361),false);assert.equal(control(event,'resizeMini','200'),false);assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);
+ finish(true);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.bounds.height,186);assert.deepEqual(f.win.minimum,[384,186]);
+ control(event,'startMini',false);assert.deepEqual(f.win.getBounds(),{x:150,y:100,width:1160,height:820});
+});
+test('leaving mini during opening discards a queued height rather than changing normal bounds',async()=>{
+ for(const exit of ['restore','reload']){
+  let finish;
+  const f=await mainFixture({toolsOpen:true,opening:()=>new Promise(resolve=>finish=resolve)});
+  f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+  const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+  assert.equal(control(event,'resizeMini',200),true);
+  if(exit==='restore')control(event,'startMini',false);else f.win.webContents.emit('did-start-loading');
+  assert.equal(control(event,'resizeMini',186),false);
+  finish(true);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.win.getBounds(),{x:150,y:100,width:1160,height:820});assert.deepEqual(f.win.minimum,[420,320]);assert.equal(f.win.top,false);
  }
 });
 test('Mac has a minimal named menu and Dock close keeps the running-process confirmation',async()=>{
@@ -168,10 +213,25 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  control(event,'openFile');assert.equal(f.win.closed,undefined);
  control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,0);
  const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{process:{argv:[]},require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
- assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','initialMini','isMaximized','maximize','minimize','selectProject','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','initialMini','isMaximized','maximize','minimize','resizeMini','selectProject','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
  assert.equal(exposed.aidiyWindow.initialMini,false);
  assert.deepEqual(Array.from(exposed.aidiyWindow.selectProject()),['diag:window','selectProject']);
  assert.deepEqual(Array.from(exposed.aidiyWindow.startMini(true)),['diag:window','startMini',true]);assert.equal(await exposed.aidiyWindow.startMini({width:100}),false);
+ assert.deepEqual(Array.from(exposed.aidiyWindow.resizeMini(186)),['diag:window','resizeMini',186]);
+ for(const height of [undefined,null,false,'134',{},[],NaN,Infinity,-Infinity,79,361,134.5])assert.equal(await exposed.aidiyWindow.resizeMini(height),false);
+ for(const height of [80,360])assert.deepEqual(Array.from(exposed.aidiyWindow.resizeMini(height)),['diag:window','resizeMini',height]);
+});
+
+test('native mini height IPC stays main-frame-only, bounded and cannot resize normal windows',async()=>{
+ const f=await mainFixture();f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ const original=f.win.getBounds();assert.equal(control(event,'resizeMini',134),false);assert.deepEqual(f.win.getBounds(),original);
+ assert.equal(control(event,'startMini',true),true);
+ for(const height of [undefined,null,false,true,'134',{},[],NaN,Infinity,-Infinity,0,79,361,134.5])assert.equal(control(event,'resizeMini',height),false);
+ assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);assert.equal(control({...event,sender:{}},'resizeMini',200),false);assert.equal(f.win.bounds.height,134);
+ for(const height of [134,186,200,134]){assert.equal(control(event,'resizeMini',height),true);assert.equal(f.win.bounds.height,height);assert.equal(f.win.bounds.width,384);assert.equal(control(event,'startMini',true),true);}
+ assert.equal(control(event,'startMini',false),true);assert.deepEqual(f.win.getBounds(),original);assert.deepEqual(f.win.minimum,[420,320]);assert.equal(f.win.top,false);
+ assert.equal(control(event,'resizeMini',186),false);assert.deepEqual(f.win.getBounds(),original);
 });
 
 test('project picker is main-frame-only, one at a time and cancel leaves no path',async()=>{

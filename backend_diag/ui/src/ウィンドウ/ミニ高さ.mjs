@@ -1,0 +1,21 @@
+// 内容の自然な高さだけを測る。窓の高さを測らないので、縮小後も余白やresize循環が残らない。
+export function ミニ高さを合わせる(content,{api=globalThis.window?.aidiyWindow,Observer=globalThis.ResizeObserver}={}){
+ if(!content?.getBoundingClientRect||typeof api?.resizeMini!=='function')return()=>{};
+ const root=content.closest('#app'),title=root?.querySelector('.panel-brand'),bar=root?.querySelector('.connection-bar');
+ if(!title||!bar)return()=>{};
+ let stopped=false,scheduled=false,last=0;
+ function measure(){
+  if(stopped||scheduled)return;scheduled=true;
+  Promise.resolve().then(()=>{
+   scheduled=false;if(stopped)return;
+   const raw=[content,title,bar].reduce((sum,node)=>sum+node.getBoundingClientRect().height,0);
+   if(!Number.isFinite(raw)||raw<=0)return;
+   const height=Math.max(80,Math.min(360,Math.ceil(raw)));if(height===last)return;last=height;
+   try{Promise.resolve(api.resizeMini(height)).then(accepted=>{if(accepted!==true&&last===height)last=0;},()=>{if(last===height)last=0;});}catch{last=0;}
+  });
+ }
+ const observer=Observer?new Observer(measure):null;
+ for(const node of [content,title,bar])observer?.observe(node);
+ measure();
+ return()=>{stopped=true;observer?.disconnect();};
+}

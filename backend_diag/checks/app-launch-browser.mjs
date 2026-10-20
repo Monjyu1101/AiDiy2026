@@ -49,13 +49,17 @@ try{
  async function until(expression){for(let i=0;i<140;i++){if(await evaluate(expression))return;await sleep(50);}assert.fail(expression);}
  const click=text=>evaluate(`[...document.querySelectorAll('button')].find(button=>button.getClientRects().length&&(button.textContent.trim()===${JSON.stringify(text)}||button.getAttribute('aria-label')===${JSON.stringify(text)})).click()`);
  async function capture(name){const response=await send('Page.captureScreenshot',{format:'png'});writeFileSync(join(output,name+'.png'),Buffer.from(response.result.data,'base64'));}
+ async function fitMiniViewport(){
+  const height=await evaluate(`Math.ceil(['.mini-content','.panel-brand','.connection-bar'].reduce((sum,selector)=>sum+document.querySelector(selector).getBoundingClientRect().height,0))`);
+  assert.ok(height>=80&&height<=360);await send('Emulation.setDeviceMetricsOverride',{width:384,height,deviceScaleFactor:1,mobile:false});
+ }
  await send('Runtime.enable');await send('Page.enable');await send('Network.enable');await send('Network.setBlockedURLs',{urls:['https://*']});
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  const url=`http://127.0.0.1:${server.address().port}/proxy/8097/#token=app-browser-fixture`;
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);
  assert.equal(await evaluate(`document.querySelector('nav.tabs button.active').textContent`),'システム起動');
  await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
- await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});
+ await fitMiniViewport();
  await until(`[...document.querySelectorAll('.mini-app-button img')].every(img=>img.complete&&img.naturalWidth>0)`);
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.disabled)`),true);
  assert.equal(await evaluate(`document.querySelector('.mini-app-message .mini-app-marquee').textContent`),'SELECT YOUR PROJECT  ▸▸  READY FOR LAUNCH');
@@ -71,8 +75,16 @@ try{
  assert.equal(await evaluate(`(()=>{const items=[...document.querySelectorAll('.mini-service[data-tone=running]')].map(element=>getComputedStyle(element));return items.length>0&&items.every(style=>style.animationName==='mini-blink')&&document.querySelectorAll('.mini-indicator').length===0;})()`),true);
  assert.equal(await evaluate(`new Set([...document.querySelectorAll('.mini-service')].map(element=>element.style.getPropertyValue('--mini-blink'))).size`),6);
  assert.equal(appCalls.length,0);assert.equal(taskChecks,0);await capture('app-mini-no-project');
- await click('通常表示');await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
- await click('アプリ起動');await until(`document.querySelectorAll('.app-launch-card').length===6`);
+ await click('アプリ起動パネルでプロジェクトを選択');await until(`!document.querySelector('.start-mini')&&document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
+ await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
+ for(const [key,code,keyCode] of [['Enter','Enter',13],[' ','Space',32]]){
+  await click('導入状況');await click('ミニ表示');await until(`document.querySelector('.mini-project-link')`);await fitMiniViewport();
+  await evaluate(`document.querySelector('.mini-project-link').focus()`);
+  for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key,code,windowsVirtualKeyCode:keyCode,nativeVirtualKeyCode:keyCode});
+  await until(`!document.querySelector('.start-mini')&&document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
+  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
+ }
+ await until(`document.querySelectorAll('.app-launch-card').length===6`);
  assert.equal(await evaluate(`document.querySelector('#run').getClientRects().length`),0);
  assert.equal(await evaluate(`[...document.querySelectorAll('.app-launch-button')].every(button=>button.disabled)`),true);
  assert.equal(appCalls.length,0);assert.equal(taskChecks,0);
@@ -105,7 +117,7 @@ try{
  await evaluate(`[...document.querySelectorAll('.mini-service')].find(button=>button.textContent==='Core').click()`);
  await until(`document.querySelector('nav.tabs button.active').textContent==='システム起動'&&!document.querySelector('.start-mini')`);
  await click('システム起動');await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
- await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});
+ await fitMiniViewport();
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>!button.disabled)`),true);
  await evaluate(`document.querySelector('.mini-app-button[data-app="live"]').click()`);
  await until(`!document.querySelector('.mini-app-button[data-app="live"]').disabled&&document.querySelector('.mini-app-message').textContent===${JSON.stringify(project)}`);
@@ -127,7 +139,7 @@ try{
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);await click('アプリ起動');
  assert.equal(await evaluate(`document.querySelector('#app-project-folder').value`),'','再起動・再読込では毎回フォルダ未選択');
  assert.equal(await evaluate(`document.querySelector('.app-project').classList.contains('required')`),true);
- assert.deepEqual(errors,[]);console.log('アプリ起動: 6アイコン・ミニ384×248・未選択時の赤字と不活性・選択後の起動/排他・定時監視なし・390/1280px OK');
+ assert.deepEqual(errors,[]);console.log('アプリ起動: 6アイコン・ミニ幅384px/内容高・電光掲示板のクリック/Enter/Space・未選択時の赤字と不活性・選択後の起動/排他・定時監視なし・390/1280px OK');
 }finally{
  ws?.close();browser.kill();await manager.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
  const safeBase=resolve(tmpdir())+sep;for(const path of [root,profile]){assert.ok(resolve(path).startsWith(safeBase));for(let i=0;i<20;i++){try{rmSync(path,{recursive:true,force:true});break;}catch{await sleep(100);}}}
