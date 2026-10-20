@@ -128,7 +128,7 @@ app.on('browser-window-created',(_,owner)=>{
    const routesChild=children.find(w=>w.webContents.getTitle().includes('/ 軌跡'));
    const checkBarClose=async visible=>{
     await until(()=>evaluate(explorerChild,`document.querySelector('[aria-label="終了"]')?.disabled===${!visible}&&!!document.querySelector('[aria-label="エクスプローラーを閉じる"]')===${visible}`),'Explorerの閉じる操作');
-    await until(()=>evaluate(routesChild,`document.querySelector('.route-window-actions .window-close')?.disabled===${!visible}&&!!document.querySelector('[aria-label="軌跡バーを閉じる"]')===${visible}`),'軌跡の閉じる操作');
+    await until(()=>evaluate(routesChild,`!document.querySelector('.route-window-actions .window-close')&&!!document.querySelector('.route-window-actions .panel-return')===${visible}&&!!document.querySelector('[aria-label="軌跡バーを閉じる"]')===${visible}`),'軌跡の閉じる操作');
    };
    await checkBarClose(false);
    const checkBarsClosed=async()=>{

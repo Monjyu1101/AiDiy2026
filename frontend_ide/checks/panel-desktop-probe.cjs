@@ -79,8 +79,8 @@ app.on('browser-window-created',(_,owner)=>{
     if(zoom===1){
      await dragPanel(child,await probeBackground(child.webContents),'Explorer背景');
      results.push(await checkNativeControls(child,child.webContents,'Explorer'));
-     results.push(await holdUnmoved(child,child.webContents,'[data-path="sample.txt"] .file-name','Explorerファイル項目'));
      await evaluate(child,`document.querySelector('#move-probe-background').remove()`);
+     await dragPanel(child,'[data-path="sample.txt"] .file-name','Explorerファイル項目');
     }
     if(zoom===1)writeFileSync(join(output,'electron-explorer-title.png'),(await child.webContents.capturePage()).toPNG());
     await evaluate(child,`document.querySelector('input[value="grep"]').click()`);
@@ -151,13 +151,13 @@ app.on('browser-window-created',(_,owner)=>{
    // 非表示の重複操作を除き、高さが異なるボタンは縦中心で同じ行に整列する。
    const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')].filter(button=>button.getBoundingClientRect().width>0);return{rows:new Set(buttons.map(b=>{const r=b.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
    assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40.01,JSON.stringify(row));
-   assert.equal(await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls').getBoundingClientRect(),buttons=[...document.querySelectorAll('.route-window-actions button')];return buttons.length===4&&buttons.every(button=>{const r=button.getBoundingClientRect();return r.left>=bar.left&&r.right<=bar.right;});})()`),true,'軌跡操作が横に長くても窓操作4個を表示する');
+   assert.equal(await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls').getBoundingClientRect(),buttons=[...document.querySelectorAll('.route-window-actions button')];return buttons.length===2&&buttons.every(button=>{const r=button.getBoundingClientRect();return r.left>=bar.left&&r.right<=bar.right;});})()`),true,'軌跡のピン・本体復帰だけを表示する');
    results.push(await holdUnmoved(routes,routes.webContents,'.route-choice','軌跡ボタン'));
    await evaluate(routes,`document.querySelector('.route-choice[aria-expanded="true"]')?.click()`);
    await dragPanel(routes,await probeBackground(routes.webContents),'軌跡背景');
    await evaluate(routes,`document.querySelector('#move-probe-background').remove()`);
    writeFileSync(join(output,'electron-routes-single-row.png'),(await routes.webContents.capturePage()).toPNG());
-   await evaluate(routes,`document.querySelector('.route-window-actions .window-close').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
+   await evaluate(routes,`document.querySelector('.route-burger').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
    await evaluate(owner,`document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'終了前pin');
    const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await evaluate(owner,`Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent==='終了').click()`);

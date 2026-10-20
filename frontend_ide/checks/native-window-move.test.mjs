@@ -11,14 +11,23 @@ import nativeMove from '../デスクトップ/長押し窓移動.cjs';
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
 function fixture(kind='viewer',target=()=>Promise.resolve(1),arm=()=>Promise.resolve(true)){
  const contents=new EventEmitter(),window=new EventEmitter(),timers=new Map(),ticks=new Map(),inputs=[],calls=[],sent=[],queries=[];
- let cursor={x:100,y:100},serial=0;
+ let cursor={x:100,y:100},serial=0,time=0;
  const emit=(type,extra={})=>{const event={preventDefault(){this.prevented=true;}},mouse={type,x:20,y:30,button:'left',clickCount:1,...extra};contents.emit('before-mouse-event',event,mouse);if(!event.prevented)inputs.push(mouse);return event;};
  Object.assign(contents,{isDestroyed:()=>false,getZoomFactor:()=>1,executeJavaScript:async()=>{},executeJavaScriptInIsolatedWorld:(world,scripts)=>{const action=scripts[0].code.match(/\)\("(install|query|arm|disarm|dispose)",/)[1];queries.push({world,scripts,action});return action==='query'?target():action==='arm'?arm():Promise.resolve(true);},sendInputEvent:input=>{sent.push(input);return emit(input.type,input);},insertCSS:async()=> 'move-css',removeInsertedCSS:async key=>calls.push(['css-remove',key])});
  Object.assign(window,{webContents:contents,isDestroyed:()=>false,isMaximized:()=>false,isFullScreen:()=>false});
  const record={kind,window};
- const dispose=nativeMove.installNativeWindowMove({record,screen:{getCursorScreenPoint:()=>({...cursor})},drag:{forRecord:r=>{assert.equal(r,record);return{begin:()=>{calls.push(['begin']);return'token';},move:()=>{calls.push(['move']);return true;},end:()=>calls.push(['end'])};}},setTimer:(fn,delay)=>{assert.equal(delay,500);timers.set(++serial,fn);return serial;},clearTimer:id=>timers.delete(id),setTick:fn=>{ticks.set(++serial,fn);return serial;},clearTick:id=>ticks.delete(id)});
- return{emit,contents,window,timers,ticks,inputs,calls,sent,queries,dispose,advance:async()=>{for(const fn of [...timers.values()])fn();for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
+ const dispose=nativeMove.installNativeWindowMove({record,screen:{getCursorScreenPoint:()=>({...cursor})},drag:{forRecord:r=>{assert.equal(r,record);return{begin:()=>{calls.push(['begin']);return'token';},move:()=>{calls.push(['move']);return true;},end:()=>calls.push(['end'])};}},setTimer:(fn,delay)=>{assert.equal(delay,500);timers.set(++serial,{fn,at:time+delay});return serial;},clearTimer:id=>timers.delete(id),setTick:fn=>{ticks.set(++serial,fn);return serial;},clearTick:id=>ticks.delete(id)});
+ return{emit,contents,window,timers,ticks,inputs,calls,sent,queries,dispose,advance:async(ms=500)=>{time+=ms;for(const [id,timer]of [...timers])if(timer.at<=time){timers.delete(id);timer.fn();}for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
 }
+test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止gestureだけを移動',async()=>{
+ for(const kind of ['explorer','panel-routes']){
+  const f=fixture(kind);const down=f.emit('mouseDown');await f.advance(499);
+  assert.notEqual(down.prevented,true);assert.deepEqual(f.calls,[]);assert.deepEqual(f.queries.map(q=>q.action),['install']);
+  await f.advance(1);assert.deepEqual(f.calls,[['begin']]);assert.deepEqual(f.queries.map(q=>q.action),['install','query','arm']);
+  f.cursor({x:120,y:130});assert.equal(f.emit('mouseMove').prevented,true);assert.ok(f.calls.some(call=>call[0]==='move'));
+  assert.notEqual(f.emit('mouseUp').prevented,true);assert.ok(f.calls.some(call=>call[0]==='end'));assert.equal(f.ticks.size,0);f.dispose();
+ }
+});
 test('全パネル: nativeのdown/upを直ちに一度だけ渡し、短押しを再送しない',async()=>{
  for(const kind of ['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']){
   const f=fixture(kind);assert.notEqual(f.emit('mouseDown').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown']);assert.equal(f.calls.length,0);
@@ -105,6 +114,41 @@ test('native操作部品・ラベル・編集欄・iframe・shadow内の部品�
  assert.equal(allowed(element('div'),{querySelectorAll:()=>[{getClientRects:()=>[]}]}),true,'非表示popupは背景を妨げない');
  assert.equal(allowed(element('div'),{querySelectorAll:()=>[{getClientRects:()=>[{}],visibility:'hidden'}]}),true,'visibility hiddenのpopupは背景を妨げない');
  assert.ok(selectors.length>0);
+});
+test('専用移動面は閉じたselectの残存focusだけを許可し、部品・開いたpopupの保護は維持',()=>{
+ const element=(selectors,parent=null,extra={})=>({parentElement:parent,isContentEditable:false,matches:query=>query.split(',').some(selector=>selectors.includes(selector)),getRootNode:()=>({}),...extra});
+ const marked=parent=>element(['[data-aidiy-window-move-handle]'],parent);
+ const focused=element(['select','input[list]','[role="combobox"]']);
+ const allowed=(node,extra={})=>vm.runInNewContext(`(${nativeMove.backgroundMoveTarget.toString()})(10,20)`,{document:{elementFromPoint:()=>node,querySelector:()=>null,querySelectorAll:()=>[],activeElement:focused,...extra},getComputedStyle:node=>({visibility:node.visibility||'visible'})});
+ assert.equal(allowed(element(['header'])),false,'一般背景では従来のfocus保護を維持');
+ for(const name of ['.route-controls','.route-drag-handle']){
+  const handle=marked(),surface=element([name],handle);
+  assert.equal(allowed(surface),true,name+'は閉じた選択欄の後でも初回から移動可能');
+  for(const control of ['button','select','input','label','[role="combobox"]','[role="button"]','[tabindex]:not([tabindex="-1"])','[data-aidiy-no-window-move]']){
+   assert.equal(allowed(element(['span'],element([control],handle))),false,name+'内の'+control);
+   assert.equal(allowed(element(['span'],marked(element([control])))),false,control+'内のmarkerも権限を広げない');
+  }
+  assert.equal(allowed(surface,{querySelector:()=>element(['select'])}),false,'open select/input/dialogはmarkerでも移動禁止');
+  assert.equal(allowed(surface,{querySelectorAll:()=>[{getClientRects:()=>[{}]}]}),false,'表示中のdialog/listboxも移動禁止');
+  assert.equal(allowed(surface,{querySelectorAll:()=>[{getClientRects:()=>[]}]}),true,'閉じたpopupは移動を妨げない');
+ }
+});
+test('別窓Explorer一覧: 行と余白だけ許可し、未指定tree・操作部品・スクロールバーは除外',()=>{
+ const element=(selectors,parent=null,extra={})=>({parentElement:parent,isContentEditable:false,matches:query=>query.split(',').some(selector=>selectors.includes(selector)),getRootNode:()=>({}),getBoundingClientRect:()=>({left:0,top:0}),...extra});
+ const marked=()=>element(['ul[role="tree"][data-aidiy-window-move-list]','[tabindex]:not([tabindex="-1"])']);
+ const allowed=(node,extra={},x=10,y=20)=>vm.runInNewContext(`(${nativeMove.backgroundMoveTarget.toString()})(${x},${y})`,{document:{elementFromPoint:()=>node,querySelector:()=>null,querySelectorAll:()=>[],...extra},getComputedStyle:()=>({visibility:'visible'})});
+ const tree=marked(),row=element(['li'],tree),text=element(['span'],row);
+ assert.equal(allowed(tree),true,'一覧の余白');assert.equal(allowed(row),true,'ファイル行');assert.equal(allowed(text),true,'ファイル名');
+ assert.equal(allowed(text,{activeElement:element(['select'])}),true,'閉じた選択欄の直後も一覧を長押し可能');
+ assert.equal(allowed(element(['span'],element(['[tabindex]:not([tabindex="-1"])']))),false,'埋込IDEなど未指定のtreeは従来どおり');
+ for(const control of ['input','button','label','[role="button"]','[tabindex]:not([tabindex="-1"])','[data-aidiy-no-window-move]']){
+  assert.equal(allowed(element(['span'],element([control],tree))),false,'一覧内の'+control);
+  const underControl=marked();underControl.parentElement=element([control]);assert.equal(allowed(element(['span'],underControl)),false,'一覧外側の'+control);
+ }
+ assert.equal(allowed(text,{querySelector:()=>element(['dialog'])}),false);
+ assert.equal(allowed(text,{querySelectorAll:()=>[{getClientRects:()=>[{}]}]}),false,'context menu表示中は一覧も動かさない');
+ Object.assign(tree,{clientWidth:100,offsetWidth:115,clientLeft:0,clientHeight:80,offsetHeight:95,clientTop:0});
+ assert.equal(allowed(tree,{},105,20),false,'縦scrollbar');assert.equal(allowed(tree,{},10,85),false,'横scrollbar');assert.equal(allowed(text,{},10,20),true);
 });
 
 function rendererFixture(){

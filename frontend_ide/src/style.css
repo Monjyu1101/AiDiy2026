@@ -231,16 +231,16 @@
 .route-window-document,.route-window-document body,.development-app.routes-window{background:transparent!important;overflow:hidden}
 .development-app.routes-window{height:100vh}
 .routes-window .explorer-routes,.routes-window .explorer-routes.explorer-collapsed{position:relative;inset:auto;width:100%;min-width:0;max-width:none;height:auto;box-sizing:border-box;background:#080c1a;box-shadow:none}
-.native-route-window .route-controls{-webkit-app-region:drag;background:#080c1a}
+.native-route-window .route-controls{-webkit-app-region:no-drag;background:#080c1a;cursor:move}
 .native-route-window .route-drag-handle{display:block;flex:none;width:8px;height:18px;cursor:move;border-left:2px solid #9aa7b8;border-right:2px solid #9aa7b8}
 .native-route-window .route-controls button{-webkit-app-region:no-drag}
-.route-window-actions{flex:none;position:sticky;left:-5px;z-index:1;background:#080c1a}
+.route-window-actions{flex:none;background:#080c1a}
+.route-pin-tools{display:flex;align-items:center;gap:0}
+.route-pin-tools>.panel-return{width:20px;height:26px;padding:0;font-size:12px}
+.panel-return{-webkit-app-region:no-drag;cursor:pointer}
 .route-window-actions .window-actions{gap:1px}
 .route-window-actions .window-actions button{width:23px;height:26px}
-.native-route-window .route-controls .route-choice{flex:1 1 0;min-width:20px;overflow:hidden;text-overflow:ellipsis}
-/* 別窓は共通の×で閉じ、行背景で移動できる。重複操作の幅を軌跡名に譲る。 */
-.native-route-window .route-controls>.route-burger,.native-route-window .route-controls>.route-drag-handle{display:none}
-.native-route-window .route-choice:before{display:none}
+/* 軌跡は従来のバーガーで閉じる。分類ラベルと0.5秒長押し用ハンドルは省略しない。 */
 .routes-window .route-tree{min-width:0}
 
 
@@ -287,6 +287,11 @@
 /* 開いた軌跡バーの先頭の縦三本は、閉じている時の正方形ボタンと同じ位置・大きさの枠（右端は区切り線）にする。 */
 .explorer-routes .route-controls>.route-burger{width:39px;min-width:39px;height:38px;margin:-5px 5px -5px -5px;border:0;border-right:1px solid #343943;background:transparent}
 .explorer-routes .route-controls>.route-burger:hover{background:#202737}
+/* 360pxの別窓では空隙だけを詰め、分類名・開閉マーク・移動ハンドルを残す。 */
+.native-route-window .route-controls{gap:0;padding-inline:3px}
+.native-route-window .route-controls>.route-burger{width:26px;min-width:26px;margin-inline:-3px 3px}
+.native-route-window .route-controls>.route-choice{padding-inline:1px}
+.native-route-window .route-choice:before{margin-right:2px}
 
 /* 閉じる印は本文の文字サイズ・フォントに依存させず、各パネルで同じ2pxの線にする。 */
 .close-icon{position:relative;display:inline-block;width:14px;height:14px;flex:none;vertical-align:-2px;pointer-events:none}

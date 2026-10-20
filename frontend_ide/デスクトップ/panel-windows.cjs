@@ -105,8 +105,8 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   if(value==='pin-state')return windowPins?.state(target)||{pinned:false,locked:false};
   if(value==='toggle-pin')return windowPins?.toggle(target)||{pinned:false,locked:false};
   if(value==='close'){target.close();return true;}
+  if(child.kind==='panel-routes')return false; // 軌跡バーには最小化・最大化を提供せず寸法を維持する。
   if(value==='minimize')target.minimize();
-  if(child.kind==='panel-routes')return false; // コンパクトな軌跡バーは最大化せず寸法を維持する。
   if(value==='maximize'){if(target.isMaximized())target.unmaximize();else target.maximize();}
   return target.isMaximized();
  }

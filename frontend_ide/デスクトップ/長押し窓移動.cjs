@@ -15,13 +15,27 @@ function backgroundMoveTarget(x,y){
  for(const popup of document.querySelectorAll('[aria-modal="true"],[role="dialog"],[role="combobox"][aria-expanded="true"],[role="listbox"],.config-panel-overlay,.modal-overlay,.dialog-overlay,.selection-popup')){
   if(popup.getClientRects().length&&getComputedStyle(popup).visibility!=='hidden')return false;
  }
- let focused=document.activeElement;while(focused?.shadowRoot?.activeElement)focused=focused.shadowRoot.activeElement;
- if(focused?.matches('select,input[list],[role="combobox"]'))return false;
  let node=document.elementFromPoint(x,y);
  if(!node)return false;
  while(node.shadowRoot){const inner=node.shadowRoot.elementFromPoint(x,y);if(!inner||inner===node)break;node=inner;}
- const controls='input,textarea,select,option,optgroup,datalist,button,a[href],label,summary,iframe,object,embed,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[role="button"],[role="link"],[role="combobox"],[role="listbox"],[role="option"],[role="textbox"],[role="slider"],[role="spinbutton"],[role="checkbox"],[role="radio"],[role="switch"],[role="menuitem"],[tabindex]:not([tabindex="-1"]),[draggable="true"],.scrollbar,.slider,.monaco-editor,.xterm,[data-aidiy-no-window-move]';
- for(;node;node=node.parentElement||node.getRootNode?.().host){if(node.isContentEditable||node.matches?.(controls))return false;}
+ const controls='input,textarea,select,option,optgroup,datalist,button,a[href],label,summary,iframe,object,embed,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[role="button"],[role="link"],[role="combobox"],[role="listbox"],[role="option"],[role="textbox"],[role="slider"],[role="spinbutton"],[role="checkbox"],[role="radio"],[role="switch"],[role="menuitem"],[draggable="true"],.scrollbar,.slider,.monaco-editor,.xterm,[data-aidiy-no-window-move]';
+ let handle=false;
+ for(;node;node=node.parentElement||node.getRootNode?.().host){
+  if(node.isContentEditable||node.matches?.(controls))return false;
+  // 別窓Explorerの一覧はキーボード操作用のtabindexを持つ。例外はこのUL自身だけ。
+  const list=node.matches?.('ul[role="tree"][data-aidiy-window-move-list]');
+  if(!list&&node.matches?.('[tabindex]:not([tabindex="-1"])'))return false;
+  if(list){
+   const rect=node.getBoundingClientRect();
+   if(node.clientWidth>0&&node.offsetWidth>node.clientWidth+2&&(x>=rect.left+node.clientLeft+node.clientWidth||x<rect.left+node.clientLeft))return false;
+   if(node.clientHeight>0&&node.offsetHeight>node.clientHeight+2&&y>=rect.top+node.clientTop+node.clientHeight)return false;
+  }
+  if(list||node.matches?.('[data-aidiy-window-move-handle]'))handle=true;
+ }
+ // mousedown捕捉時は既に閉じたselectにもfocusが残る。専用の移動面だけ初回から扱う。
+ // 展開中popupと移動面内の操作部品は上で除外済み。一般背景の保護は変えない。
+ let focused=document.activeElement;while(focused?.shadowRoot?.activeElement)focused=focused.shadowRoot.activeElement;
+ if(!handle&&focused?.matches('select,input[list],[role="combobox"]'))return false;
  return true;
 }
 // 隔離world内の受動的な観測。通常のdown/upは一切止めない。

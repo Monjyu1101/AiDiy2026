@@ -157,12 +157,12 @@ test('別窓ピン: Explorer・比較Viewer・軌跡はIDE由来ON、OFF後の�
  }
 });
 
-test('VR中に作成する全別窓はON固定、軌跡の最小化は許可し最大化は拒否する',async()=>{
+test('VR中に作成する全別窓はON固定、軌跡の最小化・最大化は拒否する',async()=>{
  for(const kind of ['explorer','panel-viewer','panel-routes']){
   const f=fixture({all:true}),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
   f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
   assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:true,locked:true});assert.equal(child.top,true);
-  f.controller.action(f.event,request.name,'minimize');assert.equal(child.minimized,true);
+  f.controller.action(f.event,request.name,'minimize');assert.equal(!!child.minimized,kind!=='panel-routes');
   f.controller.action(f.event,request.name,'maximize');assert.equal(!!child.maximized,kind!=='panel-routes');
   child.destroy();
  }

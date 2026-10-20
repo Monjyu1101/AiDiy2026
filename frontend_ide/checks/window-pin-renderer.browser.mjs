@@ -48,16 +48,16 @@ window.aidiyWindow={
  onPinChanged:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},
  panelAction:async(name,action)=>{panelCalls.push([name,action]);if(action==='isMaximized')return false;if(action==='toggle-pin'&&!panels[name].locked)panels[name].pinned=!panels[name].pinned;return {...panels[name]};}
 };
-const unmount=[];
+const unmount=[],restores=[];
 for(const name of ['explorer','comparison']){
  const host=document.createElement('section');host.dataset.kind=name;document.body.append(host);
  const child={name,document,addEventListener:window.addEventListener.bind(window),removeEventListener:window.removeEventListener.bind(window)};
  unmount.push(mountPanelTitle(host,child,window,name==='explorer'?'Explorer':'ソース比較',name==='explorer'?'explorer':'panel-viewer'));
 }
-const route=document.createElement('section');route.dataset.kind='routes';route.className='routes-window native-route-window';route.innerHTML='<div class="explorer-routes"><div class="route-controls"><button class="burger-button route-burger" aria-label="軌跡バーを閉じる"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button><span class="route-drag-handle" aria-hidden="true"></span><button class="route-choice" title="閲覧軌跡">閲覧軌跡</button><button class="route-choice" title="検索軌跡">検索軌跡</button><button class="route-choice" title="AiDiy検索軌跡">AiDiy検索軌跡</button><button>ルート</button><button>&lt;</button><button>&gt;</button><button>↙</button></div></div>';document.body.append(route);
+const route=document.createElement('section');route.dataset.kind='routes';route.className='routes-window native-route-window';route.innerHTML='<div class="explorer-routes"><div class="route-controls"><button class="burger-button route-burger" aria-label="軌跡バーを閉じる"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button><span class="route-drag-handle" aria-hidden="true"></span><button class="route-choice" title="閲覧軌跡">閲覧軌跡</button><button class="route-choice" title="検索軌跡">検索軌跡</button><button class="route-choice" title="AiDiy検索軌跡">AiDiy検索軌跡</button><button>ルート</button><button>&lt;</button><button>&gt;</button></div></div>';document.body.append(route);
 const bar=route.querySelector('.route-controls'),beforeHeight=bar.getBoundingClientRect().height;
-unmount.push(mountPanelTitle(bar,{name:'routes',document,addEventListener:window.addEventListener.bind(window),removeEventListener:window.removeEventListener.bind(window)},window,'軌跡','panel-routes'));
-window.fixture={apis,panels,panelCalls,beforeHeight,setAllDisplays:value=>ownerState.classList.toggle('all-displays',value),emitPanel:(name,value)=>{panels[name]=value;for(const fn of listeners)fn({panelName:name,...value});},cleanup:()=>unmount.forEach(fn=>fn()),listenerCount:()=>listeners.size};
+unmount.push(mountPanelTitle(bar,{name:'routes',document,addEventListener:window.addEventListener.bind(window),removeEventListener:window.removeEventListener.bind(window)},window,'軌跡','panel-routes',{restore:()=>restores.push('routes')}));
+window.fixture={apis,panels,panelCalls,restores,beforeHeight,setAllDisplays:value=>ownerState.classList.toggle('all-displays',value),emitPanel:(name,value)=>{panels[name]=value;for(const fn of listeners)fn({panelName:name,...value});},cleanup:()=>unmount.forEach(fn=>fn()),listenerCount:()=>listeners.size};
 `;
 const server = await createServer({
   root, configFile: false, plugins: [vue(), {
@@ -117,22 +117,25 @@ try {
   await evaluate(`document.querySelector('[data-kind=explorer] .window-pin').click()`);
   await until(`document.querySelector('[data-kind=explorer] .window-pin').getAttribute('aria-pressed')==='false'`);
   assert.equal(await evaluate(`fixture.panelCalls.some(([name,action])=>name==='explorer'&&action==='toggle-pin')`), true);
+  await evaluate(`document.querySelector('[data-kind=routes] .panel-return').click()`);
+  assert.deepEqual(await evaluate('fixture.restores'), ['routes']);
   await evaluate('fixture.setAllDisplays(true)');
   await until(`document.querySelector('[data-kind=explorer] .window-close').disabled`);
-  await until(`document.querySelector('[data-kind=routes] .window-close').disabled`);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] .panel-return')`), null);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] .window-close')`), null);
   assert.equal(await evaluate(`document.querySelectorAll('[data-kind=explorer] .window-actions button').length`), 4);
   assert.equal(await evaluate(`document.querySelector('[data-kind=comparison] .window-close').disabled`), false);
   await evaluate('fixture.setAllDisplays(false)');
   await until(`!document.querySelector('[data-kind=explorer] .window-close').disabled`);
-  await until(`!document.querySelector('[data-kind=routes] .window-close').disabled`);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] .window-close')`), null);
   assert.equal(await evaluate(`document.querySelector('[data-kind=routes] .route-controls').getBoundingClientRect().height`), await evaluate('fixture.beforeHeight'));
   assert.equal(await evaluate(`document.querySelector('[data-kind=routes]').getBoundingClientRect().width`), 360);
-  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] [aria-label="最大化"]').disabled`), true);
-  assert.match(await evaluate(`document.querySelector('[data-kind=routes] [aria-label="最大化"]').title`), /軌跡バーは最大化できません/);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] [aria-label="最大化"]')`), null);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] [aria-label="最小化"]')`), null);
   await evaluate(`fixture.apis.IDE.emit({pinned:false,locked:false});fixture.apis.Live.emit({pinned:true,locked:true})`);
   await until(`document.querySelector('[data-kind=IDE] .window-pin').getAttribute('aria-pressed')==='false'`);
   await evaluate(`fixture.setAllDisplays(true);fixture.emitPanel('explorer',{pinned:true,locked:true});fixture.emitPanel('comparison',{pinned:true,locked:true})`);
-  await until(`document.querySelector('[data-kind=routes] .window-close').disabled`);
+  assert.equal(await evaluate(`document.querySelector('[data-kind=routes] .window-close')`), null);
   const shot = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(output, Buffer.from(shot.result.data, 'base64'));
   await evaluate('fixture.cleanup()'); assert.equal(await evaluate('fixture.listenerCount()'), 0);
   assert.deepEqual(errors, []);

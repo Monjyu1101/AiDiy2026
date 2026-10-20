@@ -9,10 +9,11 @@ import WindowActions from '../共通表示/窓操作.vue';
 import { createPanelWindowApi } from '../共通表示/窓操作.js';
 
 // 既存Viewerと同じ状態バーを使用。窓操作は所有元IDE経由で対象の別窓だけへ送る。
-export function mountPanelTitle(host, child, owner, title, kind) {
+export function mountPanelTitle(host, child, owner, title, kind, { restore } = {}) {
   const container = child.document.createElement('div');
   container.className = kind === 'panel-routes' ? 'route-window-actions' : 'panel-window-title';
-  host.prepend(container);
+  if (kind === 'panel-routes') host.insertBefore(container, host.querySelector('.route-choice'));
+  else host.prepend(container);
   const state = reactive({ connected: false, mode: '', hideClose: false });
   const preserveDuringVR = kind === 'explorer' || kind === 'panel-routes';
   const ide = owner.document.querySelector('.development-app.ide');
@@ -27,8 +28,9 @@ export function mountPanelTitle(host, child, owner, title, kind) {
   if (source) observer.observe(source, { attributes: true, attributeFilter: ['class'] });
   if (preserveDuringVR && ide) observer.observe(ide, { attributes: true, attributeFilter: ['class'] });
   const windowApi = createPanelWindowApi(owner.aidiyWindow, child.name);
+  const returnButton = () => restore && !state.hideClose ? h('button', { type: 'button', class: 'panel-return', title: '本体へ戻す', 'aria-label': title + 'を本体へ戻す', onClick: restore }, '↙') : null;
   const app = createApp({ render: () => kind === 'panel-routes'
-    ? h(WindowActions, { windowApi, windowContext: child, hideClose: state.hideClose, maximizeDisabled: true, maximizeTitle: '軌跡バーは最大化できません' })
+    ? h('span', { class: 'route-pin-tools' }, [h(WindowActions, { windowApi, windowContext: child, pinOnly: true }), returnButton()])
     : h(StatusBar, { title, status: '別ウィンドウ', ...state, desktop: true, windowApi, windowContext: child }) });
   app.mount(container);
   return () => { observer.disconnect(); app.unmount(); container.remove(); };

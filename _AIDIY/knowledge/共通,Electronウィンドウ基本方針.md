@@ -16,14 +16,14 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 
 ## タイトル操作と最前面ピン
 
-- 操作の並びは **ー □ 📌 Ｘ**。既存のタイトル位置・高さ・窓寸法は維持する。最小化・最大化できない表示では、該当ボタンを理由付きで無効化する（例: Diagのミニ表示、固定寸法の軌跡バー）。
+- 操作の並びは **ー □ 📌 Ｘ**。既存のタイトル位置・高さ・窓寸法は維持する。Diagのミニ表示では最大化を理由付きで無効化する。軌跡バーは通常タイトルバーを持たない例外で、最小化・最大化を追加せず、元のバーガー・ドラッグハンドル・分類ラベルを保持する。
 - 最前面の管理は `frontend_ide/デスクトップ/最前面ピン.cjs` の `createWindowPins` を全アプリで共用する。通常起動はOFF、沈んだ表示。再起動を越えてON状態を保存しない。Diagのミニ表示への切替・復帰も、その時点のユーザー選択を維持する。
 - IDEから開くTerm / Code / Live / Viewer / Browser / Explorer / 比較 / 軌跡だけはONで生成する。現在これらはIDEと同じElectronプロセスで、main側の `record.owner` が起動元の根拠となる。CLIの `--linked`、URL、rendererからの任意フラグを根拠にしない。
 - Diagからのアプリ起動、単独Avatar（設定・タスク・チームを含む）、単独DiscordはIDE由来ではないためOFF。現行IDEにこれらの別プロセス起動経路はない。今後IDEから外部Electronを起動する場合は、mainが管理する起動元とVR状態の通知・切断処理を加え、単に別プロセスだからOFFと判断しない。
 - ONは全OS・全アプリで同じ `floating` 層。選択されたON窓だけ `focus` 時に `moveTop` する。`focus()` の奪い返し、タイマー再固定、IDE選択時の子窓一括持上げ、`pop-up-menu` 等の上位層は使わない。これにより別プロセスのON窓同士も通常のOS選択順に従う。OFF窓の選択では持上げ処理をしない。
 - IDEのVR中は、本体と所属する既存・新規子窓をONにロックする。UIは `aria-pressed` と理由付きdisabledで表示し、mainでもOFF要求を拒否する。F11・VR再押下・最大化によるVR終了後は、各窓のVR直前のユーザー選択へ戻す。VR中にIDEから新規生成した窓はONへ戻り、その後OFFにできる。
 - IDEの子窓の寿命・セッションは `record.owner` で管理する。OSの `parent` / `setParentWindow(owner)` は、OFFでも親より常に手前になるため設定しない。元のDOMを移す別窓は `setParentWindow(null)` で外し、終了時の回収は従来の所有記録で行う。
-- 独立ビューアへ開く旧「ピン留め」は **↗ 別ウィンドウ** と表示し、📌の最前面切替と区別する。別窓API・セッション・元DOMの復元は変えない。
+- ページ内のExplorer・軌跡・Viewer・比較は従来の **📌** で別ウィンドウを開く。Explorer・軌跡の切離し📌は右端に置く。Explorer別窓のタイトル操作と本文の↙本体復帰は既存位置のまま維持する。軌跡別窓だけは右端の切離し操作を重複させず、最前面📌と↙本体復帰を元のドラッグハンドル付近にまとめる。Web popupの復帰、別窓API・セッション・元DOMの保持は変えない。
 - rendererは自分の状態取得・切替・状態変更購読だけをpreload経由で使用する。DOM別窓は親IDEの限定 `panelAction` と、所属する `panelName` の通知を使う。他窓IDや任意IPCを公開せず、mainで所有者・フレーム・セッション世代を照合する。
 
 再検証:
@@ -36,7 +36,8 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 
 - `frontend_ide/デスクトップ/長押し窓移動.cjs` と `code-drag.cjs` を共用する。500msの静止判定をアプリごとに複製しない。
 - 通常の押下・解放は元のnativeイベントを直ちに通し、保留して再送しない。`select` / `option` / `datalist` / 入力欄・ラベル・ボタン・リンク・編集領域・iframe・ARIA操作部品は窓移動の対象外とする。Shadow DOMの内側と祖先も確認する。通常画面の背景だけを長押し候補にし、判定前に位置が動いたら文字選択・通常ドラッグを優先する。
-- モデル選択などの`dialog[open]`、可視のモーダル・一覧・展開中コンボボックスでは、背景も含めて長押し窓移動を開始しない。nativeのselect/datalistにフォーカスがある間も選択操作を優先する。ポップアップ中に窓をドラッグできなくても、モデル選択を妨げないことを優先する。
+- モデル選択などの`dialog[open]`、可視のモーダル・一覧・展開中コンボボックスでは、背景も含めて長押し窓移動を開始しない。nativeのselect/datalistにフォーカスがある間も選択操作を優先する。ただし、閉じた選択欄にフォーカスが残った場合でも、明示した `data-aidiy-window-move-handle` の非操作部分だけは次の長押しを受け付ける。開いた選択ポップアップ・モーダルやハンドル内のボタン・入力欄は例外にしない。ポップアップ中に窓をドラッグできなくても、モデル選択を妨げないことを優先する。
+- 軌跡のバー・ハンドルは `-webkit-app-region:no-drag` とし、OSの即時dragではなく共通の500ms判定を通す。Explorer別窓のファイル一覧は `data-aidiy-window-move-list` を付けたtree要素のtabindexだけを例外にし、通常行・余白の静止した500ms長押しを受け付ける。展開ボタン・rename入力・メニュー・選択前のドラッグは保護する。Explorerのタイトル操作や他画面の入力判定は変更しない。
 - DOMの対象と押下中のgestureは隔離worldで確認し、新しいpreload・IPC権限を追加しない。受動的な入力監視を使い、非同期の確認で元の入力の通過を待たせない。500ms後に同じgesture IDがまだ押下中の場合だけ移動を許可する。確認失敗時は移動を開始せず、解放・移動・フォーカス喪失・遷移・破棄・次の押下後に届いた結果を無視する。
 - 背景の移動成立時だけ、元の対象へ`pointercancel`を送り、pointer captureとCanvasなどの操作状態を後始末する。実際の`pointerup` / `mouseup`は成立後もそのまま通し、同じgestureから生じる`click`だけを抑止する。次の押下・キー操作のクリックを抑止しない。選択欄やポップアップにはこの取消も送らない。
 - 成立後は移動カーソルと静止した四方向マーカーを表示し、解放をクリックとして渡さない。解放・Esc・フォーカス喪失・遷移・破棄で解除する。最大化・全画面では窓移動を開始しない。IDEのVR時は既存の中心点移動へ分岐する。
@@ -76,6 +77,8 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 リポジトリルートで実行する。画面検証は隔離プロファイル・合成データを使い、ユーザーのアプリやサーバーを停止しない。
 
 - `node --test frontend_ide/checks/native-window-move.test.mjs frontend_ide/checks/code-drag.test.mjs frontend_ide/checks/panel-windows.test.mjs`：500ms、通常入力を遮断・再送しないこと、操作部品・ポップアップ除外、遅いDOM確認の取消、解除、DPI、所有元・表示境界。
+- `node frontend_ide/scripts/check-panel-controls.mjs`：実Vue部品を隔離データで描画し、ページ内の📌、Explorerの既存タイトルと復帰、軌跡の一行表示、繰返し切離し、入力保持、VRロックを確認する。外部通信は行わず、結果と描画画像を一時フォルダへ保存する。
+- `frontend_ide/host/node_modules/.bin/electron frontend_ide/checks/panel-hold-drag-desktop.cjs --ozone-platform=headless`：合成パネルへのtrusted入力で、一覧の行・余白、軌跡ハンドルの500ms長押しと、通常選択・rename・部品・ポップアップの保護を確認する。headlessの結果をWindows実機の位置・重なり確認とは扱わない。
 - `node --test frontend_avatar/checks/window-opening.test.cjs frontend_channels/checks/desktop.test.ts backend_diag/checks/desktop.check.mjs`：全17種類の表示経路、連打・取消、Discordへの取り付け、aidiy_diagの初期表示・終了処理。
 - 隔離した実Electron入力: `frontend_avatar/node_modules/.bin/electron frontend_ide/checks/native-input-desktop.cjs`。sandboxを維持した合成画面で、元のtrusted down/up、背景のpointercancelとclick抑止、取消・次の通常クリック、native selectのキー選択、2行listboxのマウス選択、dialog内の背景移動禁止を確認する。Linuxの画面なし環境では`--ozone-platform=headless`を指定できるが、OS固有dropdown popupの実機確認は別途必要。結果はOSの一時フォルダへ出力し、画面を取得できた場合だけPNGも残す。
 - Avatarのmain変更後は `frontend_avatar` の `npm run build:electron` で `dist-electron` を同期する。`node frontend_avatar/checks/window-move-desktop.mjs` は全17種類の実生成関数と共通ズーム・長押しを検査する。本文だけを無害な合成画面へ置き換える。

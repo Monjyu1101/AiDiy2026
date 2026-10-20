@@ -133,6 +133,16 @@ test('通常ドラッグ・入力・ボタン・scrollbarは長押し移動に�
  Object.assign(f.target,{offsetWidth:500,clientWidth:485,clientLeft:0,offsetHeight:500,clientHeight:500,clientTop:0});assert.equal(windowMoveTarget(f.target,490,50,f.win),false);assert.equal(windowMoveTarget(f.target,100,50,f.win),true);f.dispose();
  Object.assign(f.target,{offsetWidth:150,clientWidth:0,offsetHeight:20,clientHeight:0});assert.equal(windowMoveTarget(f.target,100,10,f.win),true,'MonacoやTermの文字spanをスクロールバー扱いしない');
 });
+test('Explorer一覧・軌跡のno-drag面はfallbackでも500ms待ち、操作部品やnative二重導入を除外',async()=>{
+ for(const kind of ['explorer','panel-routes']){
+  const f=browser({kind});
+  f.win.getComputedStyle=()=>({webkitAppRegion:'drag'});f.emit('pointerdown');await f.advance(500);assert.equal(f.calls.length,0,'OSの即時drag面はfallback対象外');
+  f.win.getComputedStyle=()=>({webkitAppRegion:'no-drag'});f.emit('pointerdown');await f.advance(499);assert.equal(f.calls.length,0);
+  await f.advance(1);assert.deepEqual(f.calls,['begin']);f.emit('pointerup');
+  f.target.excluded=true;f.emit('pointerdown');await f.advance(500);assert.equal(f.calls.filter(call=>call==='begin').length,1,'面内のボタン・入力は除外');f.dispose();
+  const nativeOnly=browser({kind,api:{nativeWindowMove:true}});nativeOnly.emit('pointerdown');await nativeOnly.advance(500);assert.equal(nativeOnly.calls.length,0);assert.equal(nativeOnly.doc.listeners.size,0);nativeOnly.dispose();
+ }
+});
 test('プレビューiframeの追加・再読込・除去で長押し購読と移動tokenを片付ける',async()=>{
  const root=browser({api:null}),first=browser({api:null}),second=browser({api:null}),calls=[];
  for(const f of [root,first,second])f.doc.head=new Surface();
