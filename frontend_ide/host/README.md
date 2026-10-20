@@ -67,7 +67,7 @@ VS Code 拡張として試す場合は、次の手順を使います。
 - **選択コード**: エディターで選択したコードを右クリックメニューから添付します。
 - **コードAI／モデル**: 「モデル」から `aidiy_hermes`、`copilot_cli`、`codex_cli` 等を選び、各コードAIのモデルを選択します。モデル情報APIは `_AIDIY/aidiy_diag/code_models_info.json` を優先して読み、診断で保存した表示名・順序を使います。Hermes は `openai_oauth/gpt-6.1-sol`、Copilot は `claude-haiku-5.5` などを選択します。「自動」はAIコアの既定設定です。接続中の変更はセッションの設定だけに反映し、共通設定は保存しません。
 
-オフラインのHermes候補も合成ファイルの `aidiy_hermes.models` を使い、`same` を追加します。合成ファイルがない場合は `same` だけを表示します。`claude_cli/same` / `codex_cli/same` / `copilot_cli/same` は各CLIのモデルを維持して呼び出します。
+オフラインのHermes候補も合成ファイルの `aidiy_hermes.models` を使い、`same` を追加します。合成ファイルがない場合は `same` だけを表示します。診断でファイルを生成・更新した後は、モデル選択を開き直すと再起動なしで反映されます。選択を確定するときも最新の候補を確認します。`claude_cli/same` / `codex_cli/same` / `copilot_cli/same` は各CLIのモデルを維持して呼び出します。
 - **接続状態**: 単独版はタイトル左側に `未接続` / `接続中` / `接続済み` を表示します。接続済みはモデル設定と入力・コード出力の初期化完了を示します。拡張・単独版とも、自動接続ONでは通信切断・接続失敗時も10秒ごとに再接続を試みます。未接続中はHermesで送信できます。接続復帰時のHermes実行は完了まで維持し、次の送信からAIコアを使います。単独版の `--offline` は自動接続OFFで起動します。この場合、ONへの切り替えは新しいオンライン会話を開始します。
 
 未接続時のコードAIは `aidiy_hermes` 固定です。モデルは診断の候補と `same` を使い、`~/.aidiy/aidiy_code_model_offline.json` に保存します。次回起動時もこの保存値を復元し、未保存なら `AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL`（候補外なら `same`）を使います。オンライン用の保存値は変更しません。表示形式は両方とも `NAME - MODEL` です。

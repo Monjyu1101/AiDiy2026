@@ -143,6 +143,8 @@ async function openModels() {
   if (blocked.value || modelLoading.value || picker.value) return;
   const run = generation;
   picker.value = true; modelLoading.value = true; error.value = '';
+  // 再取得が失敗しても、前回キャンセルした選択や古い候補を適用させない。
+  models.value = {}; voices.value = {}; provider.value = ''; model.value = ''; voice.value = '';
   try { await loadModels(connection.session); if (run !== generation || disposed) return; provider.value = choice(models.value, settings.value.LIVE_AI_NAME); changeProvider(); }
   catch (e) { if (run === generation && !disposed) error.value = e.message; }
   finally { if (run === generation && !disposed) modelLoading.value = false; }

@@ -475,7 +475,7 @@ watch(
   (newValue) => {
     const models = availableModels.value?.chat_models?.[newValue] || {};
     const key = CHAT_MODEL_KEYS[newValue];
-    selections.chatModel = (key && currentSettings.value[key]) || Object.keys(models)[0] || '';
+    selections.chatModel = chooseAvailable(key && currentSettings.value[key], Object.keys(models));
   }
 );
 
@@ -486,8 +486,8 @@ watch(
     const voices = availableModels.value?.live_voices?.[newValue] || {};
     const modelKey = LIVE_MODEL_KEYS[newValue];
     const voiceKey = LIVE_VOICE_KEYS[newValue];
-    selections.liveModel = (modelKey && currentSettings.value[modelKey]) || Object.keys(models)[0] || '';
-    selections.liveVoice = (voiceKey && currentSettings.value[voiceKey]) || Object.keys(voices)[0] || '';
+    selections.liveModel = chooseAvailable(modelKey && currentSettings.value[modelKey], Object.keys(models));
+    selections.liveVoice = chooseAvailable(voiceKey && currentSettings.value[voiceKey], Object.keys(voices));
   }
 );
 

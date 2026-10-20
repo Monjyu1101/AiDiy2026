@@ -36,8 +36,9 @@ export async function 単独起動(project: string, backend?: string, initialMod
   const offlineSaved = コードモデル読込(offlineFile);
   // 最後に選んだオンラインの検証回数を次回も使う（未保存なら0回）。
   const optionsFile = コード設定保存先(modelFile);
-  const offlineModels = オフラインモデル候補(root, folder);
-  const offlineModelAllowed = (model: string) => offlineModels.some(item => item.id === model);
+  // 診断で保存し直した候補を、再起動せず一覧表示と選択検証の両方へ反映する。
+  const offlineModels = () => オフラインモデル候補(root, folder);
+  const offlineModelAllowed = (model: string) => offlineModels().some(item => item.id === model);
   const modeModels = {
     online: コード選択(initialModel.offline ? savedModel ?? {provider:'',model:''}
       : remembered ?? (!requestedProvider && !requestedModel ? {provider:'',model:''}
@@ -215,7 +216,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         if (provider.length > 200) { reply(400, {error:'Provider too long'}); return; }
         if (オフライン使用() && provider && provider !== 'aidiy_hermes') { reply(400, {error:'オフラインでは aidiy_hermes だけを使用できます。'}); return; }
         const items = オフライン使用()
-          ? provider ? offlineModels : [{ id:'aidiy_hermes', label:'aidiy_hermes' }]
+          ? provider ? offlineModels() : [{ id:'aidiy_hermes', label:'aidiy_hermes' }]
           : await connection.catalog(provider);
         reply(200, provider ? { models: items } : { providers: items }); return;
       }

@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict');
 const {writeFileSync}=require('node:fs');
 const {app,BrowserWindow,screen}=require('electron');
-const {holdMove}=require('../../frontend_ide/checks/window-move-probe.cjs');
+const {holdMove,checkNativeControls,probeBackground}=require('../../frontend_ide/checks/window-move-probe.cjs');
 app.setPath('appData',process.env.DIAG_TEST_PROFILE);
 app.setPath('userData',process.env.DIAG_TEST_PROFILE);
 app.setPath('sessionData',process.env.DIAG_TEST_PROFILE);
@@ -47,14 +47,18 @@ app.on('browser-window-created',(_event,window)=>{
    window.webContents.invalidate();
    writeFileSync(process.env.DIAG_TEST_SHOT,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
    openingMeasurement=await openingCheck;assert.ok(openingMeasurement);
-   const miniMove=await holdMove(window,window.webContents,'.mini-service','Diagミニ');
+   const miniControls=await checkNativeControls(window,window.webContents,'Diagミニ');
+   const miniBackground=await probeBackground(window.webContents);
+   const miniMove=await holdMove(window,window.webContents,miniBackground,'Diagミニ背景');
+   await window.webContents.executeJavaScript(`document.querySelector('#move-probe-background').remove()`);
    assert.equal(await window.webContents.executeJavaScript("!!document.querySelector('.start-mini')"),true);
    await window.webContents.executeJavaScript("document.querySelector('.mini-restore').click()");
    try{await until(()=>Math.abs(window.getBounds().width-original.width)<=2&&window.webContents.executeJavaScript("!document.querySelector('.start-mini')"));}
    catch(error){throw Error(JSON.stringify({bounds:window.getBounds(),original,ui:await window.webContents.executeJavaScript("({mini:!!document.querySelector('.start-mini'),message:document.querySelector('#message')?.textContent})")}),{cause:error});}
    assert.equal(window.isAlwaysOnTop(),false);near(window.getNormalBounds(),original);
-   const normalMove=await holdMove(window,window.webContents,'.start-targets button','Diag通常','escape');
-   process.send({testPassed:true,bounds,expectedHeight,alwaysOnTop:true,restored:true,openingMeasurement,miniMove,normalMove,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
+   const normalControls=await checkNativeControls(window,window.webContents,'Diag通常');
+   const normalMove=await holdMove(window,window.webContents,await probeBackground(window.webContents),'Diag通常背景','escape');
+   process.send({testPassed:true,bounds,expectedHeight,alwaysOnTop:true,restored:true,openingMeasurement,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
   }catch(error){console.error(error);app.exit(1);}
  });
 });

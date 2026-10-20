@@ -10,14 +10,17 @@
 
 ## 共通の基本動作
 
-AiDiy が所有する Electron の操作画面は、**同じ位置で左ボタンを0.5秒長押しした後のドラッグ移動**と、**表示開始時のズーム**を基本とする。新規のアプリ・別窓にも最初から組み込む。光沢・影が走る追加の登場演出は入れない。
+AiDiy が所有する Electron の操作画面は、**通常画面の背景を同じ位置で左ボタンで0.5秒長押しした後のドラッグ移動**と、**表示開始時のズーム**を基本とする。選択欄・入力欄などの操作と、ポップアップ中のモデル選択を窓移動より優先する。新規のアプリ・別窓にも最初から組み込む。光沢・影が走る追加の登場演出は入れない。
 
 対象は aidiy_diag、Avatar、Term、Code、Live、IDE、Discord と、その機能別ウィンドウ。IDE の Explorer、Viewer、ソース比較、軌跡バー、Browser 本文、Avatar の設定・タスク・チームも含む。Webブラウザ版・VS Code拡張の埋め込み画面にはOS窓移動を導入しない。演出用の短命な透明キャンバスは操作画面ではないため、長押しを取り付けない。
 
 ## 0.5秒長押しドラッグ
 
 - `frontend_ide/デスクトップ/長押し窓移動.cjs` と `code-drag.cjs` を共用する。500msの静止判定をアプリごとに複製しない。
-- 本文・入力欄・ボタン・リンクで同じ判定を使う。短押しは解放時に元のクリックを渡す。判定前に位置が動いたら通常の文字選択・ドラッグへ戻す。コピー操作を停止操作へ置き換えない。
+- 通常の押下・解放は元のnativeイベントを直ちに通し、保留して再送しない。`select` / `option` / `datalist` / 入力欄・ラベル・ボタン・リンク・編集領域・iframe・ARIA操作部品は窓移動の対象外とする。Shadow DOMの内側と祖先も確認する。通常画面の背景だけを長押し候補にし、判定前に位置が動いたら文字選択・通常ドラッグを優先する。
+- モデル選択などの`dialog[open]`、可視のモーダル・一覧・展開中コンボボックスでは、背景も含めて長押し窓移動を開始しない。nativeのselect/datalistにフォーカスがある間も選択操作を優先する。ポップアップ中に窓をドラッグできなくても、モデル選択を妨げないことを優先する。
+- DOMの対象と押下中のgestureは隔離worldで確認し、新しいpreload・IPC権限を追加しない。受動的な入力監視を使い、非同期の確認で元の入力の通過を待たせない。500ms後に同じgesture IDがまだ押下中の場合だけ移動を許可する。確認失敗時は移動を開始せず、解放・移動・フォーカス喪失・遷移・破棄・次の押下後に届いた結果を無視する。
+- 背景の移動成立時だけ、元の対象へ`pointercancel`を送り、pointer captureとCanvasなどの操作状態を後始末する。実際の`pointerup` / `mouseup`は成立後もそのまま通し、同じgestureから生じる`click`だけを抑止する。次の押下・キー操作のクリックを抑止しない。選択欄やポップアップにはこの取消も送らない。
 - 成立後は移動カーソルと静止した四方向マーカーを表示し、解放をクリックとして渡さない。解放・Esc・フォーカス喪失・遷移・破棄で解除する。最大化・全画面では窓移動を開始しない。IDEのVR時は既存の中心点移動へ分岐する。
 - 他アプリは、mainが生成して所有する窓に `attachNativeWindowMove(window, screen, kind)` を一度だけ取り付ける。現在の外部アプリ種別は `diag` / `avatar` / `discord`。新種別を足す場合は両共通ファイルの許可リストを揃える。
 - rendererから任意の窓ID・座標を受け取るIPCを追加しない。Electronのカーソルと窓位置を同じDIP座標で扱い、既存の端数DPI補正・サイズ維持・購読解除を使う。
@@ -54,15 +57,18 @@ AiDiy が所有する Electron の操作画面は、**同じ位置で左ボタ�
 
 リポジトリルートで実行する。画面検証は隔離プロファイル・合成データを使い、ユーザーのアプリやサーバーを停止しない。
 
-- `node --test frontend_ide/checks/native-window-move.test.mjs frontend_ide/checks/code-drag.test.mjs frontend_ide/checks/panel-windows.test.mjs`：500ms、通常入力、解除、DPI、所有元・表示境界。
+- `node --test frontend_ide/checks/native-window-move.test.mjs frontend_ide/checks/code-drag.test.mjs frontend_ide/checks/panel-windows.test.mjs`：500ms、通常入力を遮断・再送しないこと、操作部品・ポップアップ除外、遅いDOM確認の取消、解除、DPI、所有元・表示境界。
 - `node --test frontend_avatar/checks/window-opening.test.cjs frontend_channels/checks/desktop.test.ts backend_diag/checks/desktop.check.mjs`：全17種類の表示経路、連打・取消、Discordへの取り付け、aidiy_diagの初期表示・終了処理。
+- 隔離した実Electron入力: `frontend_avatar/node_modules/.bin/electron frontend_ide/checks/native-input-desktop.cjs`。sandboxを維持した合成画面で、元のtrusted down/up、背景のpointercancelとclick抑止、取消・次の通常クリック、native selectのキー選択、2行listboxのマウス選択、dialog内の背景移動禁止を確認する。Linuxの画面なし環境では`--ozone-platform=headless`を指定できるが、OS固有dropdown popupの実機確認は別途必要。結果はOSの一時フォルダへ出力し、画面を取得できた場合だけPNGも残す。
 - Avatarのmain変更後は `frontend_avatar` の `npm run build:electron` で `dist-electron` を同期する。`node frontend_avatar/checks/window-move-desktop.mjs` は全17種類の実生成関数と共通ズーム・長押しを検査する。本文だけを無害な合成画面へ置き換える。
 - `node backend_diag/checks/initial-mini-desktop.mjs`：実Vueの通常・ミニ表示、長押し、位置・サイズ・最前面・復元。
-- `node frontend_channels/checks/window-behavior-desktop.mjs`：Discordの本番Vue・preload・ズーム・本文と入力欄の長押し・短押し。Bot workerだけを合成し、接続・保存・外部送信をしない。
+- `node frontend_channels/checks/window-behavior-desktop.mjs`：Discordの本番Vue・preload・ズーム・背景の長押し・選択欄と入力欄のnative操作。Bot workerだけを合成し、接続・保存・外部送信をしない。
 - `node frontend_ide/scripts/check-module-move.mjs`：Code / Live / Termの単独・IDE連携、独立Viewer。`node frontend_ide/scripts/check-panel-desktop.mjs`：Explorer、Viewer、比較、iframe、軌跡。Monacoを含む既定の依存物を先にセットアップする。導入済みElectronの指定は各スクリプトの実装を確認する。
 - ズームの画像確認では、キャンバスの透明領域と内側の拡大、実画面のサイズ維持、終了後のキャンバス回収を区別する。光沢の掃引を追加しない。
 
 実Electronの入力とOSの窓位置・寸法を使う検証でも、無操作のためカーソル位置・フォーカス判定だけを模擬する場合がある。Windowsでの結果をMac / Linuxの実機確認として扱わない。異なるDPIの画面間移動やMac / Linuxの描画は各実機でも確認する。
+
+nativeのモデル選択ポップアップはWindows実機で、クリックで開く→別候補を選ぶ→閉じて選択値を確認するところまで検証する。通常窓・最大化、マウス・キーボードの両方を確認し、Code / Live / Discord / Diag / Avatarのモデル・音声選択を含める。headless環境でnative popup自体が表示されない場合、イベント通過やVueの選択テストの合格をWindowsのpopup実機合格として扱わない。
 
 ## アプリごとの保存先と排他
 

@@ -7,7 +7,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const electron=require('electron');
 const {app,BrowserWindow}=electron;
-const {holdMove,shortClick,until}=require('../../frontend_ide/checks/window-move-probe.cjs');
+const {holdMove,checkNativeControls,probeBackground,until}=require('../../frontend_ide/checks/window-move-probe.cjs');
 app.setPath('userData',process.env.AVATAR_MOVE_PROFILE);
 app.setPath('sessionData',process.env.AVATAR_MOVE_PROFILE);
 app.disableHardwareAcceleration();
@@ -47,9 +47,12 @@ app.whenReady().then(async()=>{
    assert.equal(await f.ウィンドウ表示(window),true);
    assert.equal(openings.filter(item=>item===window).length,1,role+'表示開始の実ズーム');
    await f.ウィンドウ表示(window);assert.equal(openings.filter(item=>item===window).length,1,role+'表示中はズームを重ねない');
-   results.push(await holdMove(window,contents,'#action','Avatar_'+role,role==='settings'?'blur':'release'));
+   const background=await probeBackground(contents);
+   results.push(await holdMove(window,contents,background,'Avatar_'+role,role==='settings'?'blur':'release'));
+   const controls=await checkNativeControls(window,contents,'Avatar_'+role);
+   results.at(-1).controls=controls;
    assert.equal(await contents.executeJavaScript('window.clicks||0'),0);
-   await shortClick(contents,'#action');assert.equal(await contents.executeJavaScript('window.clicks'),1);
+   assert.equal(await contents.executeJavaScript(`document.querySelector('#text').value`),'文字選択の確認','既存入力を変更しない');
    if(role==='team'){await f.openTeamWindow();assert.equal(created.length,count+1);}
    if(role==='settings'){f.openSettingsWindow('probe-session-2');assert.equal(created.length,count+1);}
    window.destroy();assert.equal(contents.listenerCount('before-mouse-event'),0);

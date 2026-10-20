@@ -67,7 +67,11 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private readonly 設定保存先 = コード設定保存先(モデル保存先('code'));
   /** 最後に選んだオンラインの検証回数。未保存なら0回。 */
   private 検証回数 = 0;
-  private readonly オフライン候補: { id: string; label: string }[];
+  // 起動時の候補を固定せず、現在の会話のフォルダから診断結果を読み直す。
+  private get オフライン候補(): { id: string; label: string }[] {
+    const folder = this.会話 ? this.現在フォルダ() : this.選択フォルダ();
+    return オフラインモデル候補(this.context.extensionPath, folder?.uri.fsPath ?? this.context.extensionPath);
+  }
   private オフラインジョブ?: ReturnType<typeof オフライン実行>;
   private 最終作業URI?: vscode.Uri;
   private connection?: CodeConnection;
@@ -77,11 +81,11 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('aidiyHermes');
-    this.オフライン候補 = オフラインモデル候補(context.extensionPath, this.選択フォルダ()?.uri.fsPath ?? context.extensionPath);
+    const offlineModels = this.オフライン候補;
     const defaultModel = Hermes既定モデル(context.extensionPath, this.選択フォルダ()?.uri.fsPath ?? context.extensionPath);
     const offlineSaved = コードモデル読込(this.オフライン保存先);
-    const offlineModel = offlineSaved?.provider === 'aidiy_hermes' && this.オフライン候補.some(item => item.id === offlineSaved.model)
-      ? offlineSaved.model : this.オフライン候補.some(item => item.id === defaultModel) ? defaultModel : 'same';
+    const offlineModel = offlineSaved?.provider === 'aidiy_hermes' && offlineModels.some(item => item.id === offlineSaved.model)
+      ? offlineSaved.model : offlineModels.some(item => item.id === defaultModel) ? defaultModel : 'same';
     this.オフラインモデル = { provider: 'aidiy_hermes', model: offlineModel };
     this.検証回数 = 検証回数読込(this.設定保存先) ?? 0;
     const old = context.workspaceState.get<会話>('会話');

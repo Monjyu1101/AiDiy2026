@@ -180,3 +180,101 @@ test('ブラウザの戻る/進む復元では再マウントし、購読を重�
     assert.ok([...f.listeners.values()].every(set => set.size === 1));
   } finally { await f.dispose(); }
 });
+
+
+test('Live の候補が欠落していても Code の AI・モデルを保存でき、接続時は Live を検証する', async () => {
+  let saved = { provider: 'openai_oauth', model: 'code-a' }, starts = 0;
+  const f = fixture({
+    initial: async () => ({ ...initial(), settings: { ...initial().settings, LIVE_FREEAI_MODEL: 'removed-live' }, code: saved }),
+    catalogCode: async (provider: string) => provider ? { models: [{ id: 'code-b', label: 'Code B' }] }
+      : { providers: [{ id: 'openai_oauth', label: 'OpenAI OAuth' }, { id: 'freeai', label: 'FreeAI' }] },
+    selectCode: async (value: typeof saved) => { saved = { ...value }; return saved; },
+    start: async () => { starts++; },
+  });
+  try {
+    await flush();
+    assert.equal(f.get('model').value, '');
+    assert.equal(f.get('code-provider').disabled, false);
+    await f.change('code-provider', 'freeai');
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), { provider: 'freeai', model: '' });
+    f.get('code-model').value = 'code-b';
+    f.get('code-model').dispatchEvent(new f.window.Event('input', { bubbles: true }));
+    await f.change('code-model', 'code-b');
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), { provider: 'freeai', model: 'code-b' });
+    assert.ok(!f.calls.some(([action]) => ['select', 'selectFeatures'].includes(action)), 'Code の変更で Live 設定を保存しない');
+    assert.equal(f.get('toggle').disabled, true);
+    await f.click('toggle'); assert.equal(starts, 0, 'Live 未選択のまま接続しない');
+    await f.change('model', 'live-a');
+    await f.click('toggle'); assert.equal(starts, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), { provider: 'freeai', model: 'code-b' });
+  } finally { await f.dispose(); }
+});
+
+
+test('自動選択では無視される Code モデルを編集させず、AI を指定すれば再び入力できる', async () => {
+  const f = fixture();
+  try {
+    await flush();
+    await f.change('code-provider', '');
+    assert.equal(f.get('code-model').value, '');
+    assert.equal(f.get('code-model').disabled, true);
+    assert.match(f.get('code-model').placeholder, /コード AI を選択/);
+    const saved = f.calls.filter(([action]) => action === 'selectCode').at(-1)?.[1];
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), { provider: '', model: '' });
+    await f.change('code-provider', 'codex_cli');
+    assert.equal(f.get('code-model').disabled, false);
+  } finally { await f.dispose(); }
+});
+
+test('モデルまたは音声候補のない Live AI は候補なしと表示して選択を無効にする', async () => {
+  const f = fixture({ initial: async () => ({ ...initial(),
+    models: { ...initial().models, gemini_live: { 'gemini-a': 'Gemini A' } },
+    voices: { ...initial().voices, openai_live: {} },
+  }) });
+  try {
+    await flush();
+    const options = Object.fromEntries([...f.get('provider').options].map((item: any) => [item.value, item]));
+    assert.equal(options.freeai_live.disabled, false);
+    for (const id of ['gemini_live', 'openai_live']) {
+      assert.equal(options[id].disabled, true);
+      assert.match(options[id].textContent, /候補なし/);
+    }
+    assert.equal(f.get('model').disabled, false);
+    assert.equal(f.get('toggle').disabled, false);
+  } finally { await f.dispose(); }
+});
+
+
+test('Code AI を変更した後に古い候補が届いても新しい AI・モデルを上書きしない', async () => {
+  const previous = deferred();
+  const f = fixture({ catalogCode: async (provider: string) => provider === 'aidiy_hermes' ? previous.promise
+    : provider ? { models: [{ id: 'new-code', label: 'New Code' }] }
+      : { providers: [{ id: 'aidiy_hermes', label: 'Hermes' }, { id: 'codex_cli', label: 'Codex' }] },
+  });
+  try {
+    await flush();
+    await f.change('code-provider', 'codex_cli');
+    assert.equal(f.get('code-models').options[0].value, 'new-code');
+    previous.resolve({ models: [{ id: 'old-code', label: 'Old Code' }] }); await flush();
+    assert.equal(f.get('code-provider').value, 'codex_cli');
+    assert.equal(f.get('code-models').options[0].value, 'new-code');
+    assert.equal(f.get('code-model').value, '');
+  } finally { previous.resolve({ models: [] }); await f.dispose(); }
+});
+
+test('保存済み Live AI の候補が消えても無断で切り替えず、候補のある AI へ変更できる', async () => {
+  const f = fixture({ initial: async () => ({ ...initial(),
+    settings: { ...initial().settings, LIVE_AI_NAME: 'openai_live' },
+    models: { freeai_live: initial().models.freeai_live },
+  }) });
+  try {
+    await flush();
+    assert.equal(f.get('provider').value, 'openai_live');
+    assert.equal(f.get('provider').selectedOptions[0].disabled, true);
+    assert.equal(f.get('model').value, ''); assert.equal(f.get('toggle').disabled, true);
+    assert.equal(f.calls.length, 0, '初期表示だけで保存済み設定を変更しない');
+    await f.change('provider', 'freeai_live');
+    assert.equal(f.get('model').value, 'live-a'); assert.equal(f.get('toggle').disabled, false);
+    assert.ok(f.calls.some(([name, value]) => name === 'select' && value.LIVE_AI_NAME === 'freeai_live'));
+  } finally { await f.dispose(); }
+});

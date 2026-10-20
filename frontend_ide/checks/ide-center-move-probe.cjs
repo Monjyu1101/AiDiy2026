@@ -17,9 +17,10 @@ async function checkIdeCenter(owner,{evaluate,until,output,stamp,near}){
   console.log('中心移動確認: 開始', {vr,dx,dy,ending});
   const zoom=contents.getZoomFactor(),point={x:Math.round(240*zoom),y:Math.round(240*zoom)};
   const bounds=owner.getBounds(),before=await snapshot();cursor={x:400,y:400};
-  await evaluate(owner,`window.centerMoveInputs=[];window.centerMoveListener=e=>centerMoveInputs.push(e.type);for(const name of ['pointerdown','pointerup','mousedown','mouseup','click'])document.addEventListener(name,centerMoveListener,true)`);
+  await evaluate(owner,`window.centerMoveInputs=[];window.centerMoveListener=e=>centerMoveInputs.push(e.type);for(const name of ['pointerdown','mousedown','pointercancel','pointerup','mouseup','click'])document.addEventListener(name,centerMoveListener,true)`);
   contents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});
   await sleep(400);assert.deepEqual(owner.getBounds(),bounds);assert.equal((await snapshot()).marker,undefined);
+  assert.deepEqual(await evaluate(owner,'centerMoveInputs'),['pointerdown','mousedown'],'背景への押下を遅延・再送しない');
   await until(async()=>!!(await snapshot()).marker,'長押しの共通マーカー');
   const marker=(await snapshot()).marker;assert.ok(Math.abs(marker.width-28)<.01);assert.ok(Math.abs(marker.height-28)<.01);
   cursor={x:400+dx,y:400+dy};contents.sendInputEvent({type:'mouseMove',x:point.x+dx,y:point.y+dy,modifiers:['leftButtonDown']});
@@ -38,8 +39,9 @@ async function checkIdeCenter(owner,{evaluate,until,output,stamp,near}){
   if(ending==='blur')owner.emit('blur');
   contents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,x:point.x+dx,y:point.y+dy});
   await until(async()=>!(await snapshot()).marker,'マーカー解除');
-  assert.deepEqual(await evaluate(owner,`centerMoveInputs`),[],'長押し後のクリック・選択を発生させない');
-  await evaluate(owner,`for(const name of ['pointerdown','pointerup','mousedown','mouseup','click'])document.removeEventListener(name,centerMoveListener,true)`);
+  await until(async()=> (await evaluate(owner,'centerMoveInputs')).includes('mouseup'),'元の解放を配信');
+  assert.deepEqual(await evaluate(owner,`centerMoveInputs`),['pointerdown','mousedown','pointercancel','pointerup','mouseup'],'元のpointer操作を取消し、解放は渡してclickだけを抑止する');
+  await evaluate(owner,`for(const name of ['pointerdown','mousedown','pointercancel','pointerup','mouseup','click'])document.removeEventListener(name,centerMoveListener,true)`);
   results.push({vr,zoom,dx,dy,ending,before:before.center,after:after.center,bounds:owner.getBounds()});
  }
  try{

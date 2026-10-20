@@ -42,8 +42,9 @@ export function パネル状態作成(api) {
     モデル候補: computed(() => モデル一覧[画面.ライブAI] || {}), 音声候補: computed(() => 音声一覧[画面.ライブAI] || {}),
     保存, 接続切替, 開始, 終了, モニター切替,
     ライブ切替() { if (!画面.編集可能 || 画面.保存中 || 画面.操作中) return; 画面.機能.live = !画面.機能.live; void 保存(); },
+    ライブAI利用可能(id) { return Object.keys(モデル一覧[id] || {}).length > 0 && Object.keys(音声一覧[id] || {}).length > 0; },
     ライブAI変更() { モデル反映(); void 保存(); },
-    コードAI変更() { 画面.コードモデル = ''; void 保存(); void コード候補取得(); },
+    コードAI変更() { 画面.コードモデル = ''; void 保存('code'); void コード候補取得(); },
     async ウィンドウ操作(action) { try { if (action === 'close') await 保存待ち; await api.window(action); } catch { 案内表示('ウィンドウを操作できませんでした。', true); } },
   });
   const 監視解除 = watchEffect(() => {
@@ -58,10 +59,13 @@ export function パネル状態作成(api) {
     画面.ライブモデル = 選択(モデル一覧[画面.ライブAI] || {}, 設定[modelKey]);
     画面.音声 = 選択(音声一覧[画面.ライブAI] || {}, 設定[voiceKey]);
   }
-  function 保存() {
+  function 保存(対象) {
     if (終了済み) return Promise.resolve(false);
+    // Code 単独の変更を、無関係な Live の候補欠落や保存失敗で拒否しない。
+    // 接続時は引き続き全項目を検証・保存する。
+    const コードのみ = 対象 === 'code';
     const [modelKey, voiceKey] = ライブ設定キー[画面.ライブAI] || [];
-    if (画面.機能.live && (!modelKey || !画面.ライブモデル || !画面.音声)) {
+    if (!コードのみ && 画面.機能.live && (!modelKey || !画面.ライブモデル || !画面.音声)) {
       案内表示('モデルと音声を候補から選択してください。', true); return Promise.resolve(false);
     }
     // 保存中の別イベントが待ち行列の内容を書き換えないよう、要求時点の値を固定する。
@@ -72,10 +76,12 @@ export function パネル状態作成(api) {
     const job = 保存待ち.then(async () => {
       if (終了済み) return false;
       try {
-        await api.selectFeatures(機能);
-        if (機能.live) Object.assign(設定, await api.select(ライブ));
+        if (!コードのみ) {
+          await api.selectFeatures(機能);
+          if (機能.live) Object.assign(設定, await api.select(ライブ));
+        }
         await api.selectCode(コード);
-        案内表示(機能.live ? '選択を保存しました。次回もこのモデル・音声を使用します。' : '選択を保存しました。Live は OFF で接続します。');
+        案内表示(コードのみ ? 'コード AI・モデルの選択を保存しました。' : 機能.live ? '選択を保存しました。次回もこのモデル・音声を使用します。' : '選択を保存しました。Live は OFF で接続します。');
         return true;
       } catch (error) { 案内表示(error?.message || '選択を保存できませんでした。保存先を確認して再試行してください。', true); return false; }
     });

@@ -10,7 +10,7 @@ const {readFileSync,mkdirSync,writeFileSync}=require('node:fs');
 const {join}=require('node:path');
 const Module=require('node:module');
 const assert=require('node:assert/strict');
-const {holdMove,shortClick,until,sleep}=require('./window-move-probe.cjs');
+const {holdMove,holdUnmoved,checkNativeControls,checkMaximizedInput,probeBackground,shortClick,until,sleep}=require('./window-move-probe.cjs');
 app.setPath('appData',process.env.AIDIY_TEST_PROFILE);app.disableHardwareAcceleration();
 const nativeShow=BrowserWindow.prototype.showInactive;
 BrowserWindow.prototype.show=BrowserWindow.prototype.showInactive=function(){if(!this.isAiDiyOpeningCanvas){this.setIgnoreMouseEvents(true);this.setSkipTaskbar(true);}nativeShow.call(this);};BrowserWindow.prototype.focus=function(){};
@@ -51,9 +51,13 @@ app.on('browser-window-created',(_,owner)=>{
      const selector=kind==='code'?'.message.assistant p':kind==='live'?'.live-conversation':'.xterm-screen';
      await until(()=>evaluate(window,`!!document.querySelector(${JSON.stringify(selector)})&&!document.documentElement.classList.contains('desktop-opening')`),kind+'描画');
      const label=kind+(linked?' IDE起動':' 単独起動');
-     results.push(await holdMove(window,window.webContents,selector,label+'本文'));
+     const background=kind==='term'?await probeBackground(window.webContents):selector;
+     results.push(await holdMove(window,window.webContents,background,label+'背景'));
+     results.push(await checkNativeControls(window,window.webContents,label));
+     if(kind==='term')results.push(await holdUnmoved(window,window.webContents,'.xterm-screen',label+'端末入力'));
+     if(kind==='code'&&!linked)results.push(await checkMaximizedInput(window,window.webContents,label));
      if(kind!=='term'){
-      results.push(await holdMove(window,window.webContents,'textarea',label+'入力欄'));
+      results.push(await holdUnmoved(window,window.webContents,'textarea',label+'入力欄'));
       await shortClick(window.webContents,'textarea');assert.equal(await evaluate(window,`document.activeElement.tagName`),'TEXTAREA');
       window.webContents.insertText('入力は維持');assert.equal(await evaluate(window,`document.querySelector('textarea').value`),'入力は維持');
      }
@@ -70,8 +74,10 @@ app.on('browser-window-created',(_,owner)=>{
    }
    const viewer=await globalThis.moveDesktop.createWindow('viewer',parent.url+'#viewer=sample.txt',undefined,parent,key);
    await until(()=>evaluate(viewer,`!!document.querySelector('.viewer-code .view-line')&&!document.documentElement.classList.contains('desktop-opening')`),'独立ビューア');
-   results.push(await holdMove(viewer,viewer.webContents,'.viewer-code .view-line','独立ファイルビューア本文'));
-   for(const ending of ['escape','blur'])results.push(await holdMove(viewer,viewer.webContents,'.viewer-code .view-line','独立Viewer取消_'+ending,ending));viewer.destroy();
+   results.push(await holdUnmoved(viewer,viewer.webContents,'.viewer-code .view-line','独立ファイルビューアeditor'));
+   const viewerBackground=await probeBackground(viewer.webContents);
+   results.push(await holdMove(viewer,viewer.webContents,viewerBackground,'独立ファイルビューア背景'));
+   for(const ending of ['escape','blur'])results.push(await holdMove(viewer,viewer.webContents,viewerBackground,'独立Viewer取消_'+ending,ending));viewer.destroy();
    const result={testPassed:true,scope:'Code / Live / Term の単独・IDE起動、独立ファイルビューア',input:'Electron実入力。カーソル位置とフォーカスだけfixture、OS窓サイズは実測。',results,shots};writeFileSync(join(output,'modules-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);
   }catch(error){console.error(error);app.exit(1);}
  });

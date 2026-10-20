@@ -33,13 +33,62 @@ function load(project, filename, data) {
   const js = ts.transpileModule(script, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
   const calls = [], scope = vue.effectScope();
   const dependencies = {...vue, onMounted: () => {}, defineProps: () => ({isOpen: false, sessionId: 'fixture'}), defineEmits: () => () => {},
-    apiClient: {post: async (url, body) => {calls.push({url, body});return {data: {status: 'OK', data: {available_models: {code_models: data.code_models}, モデル設定: structuredClone(data.settings)}}};}},
+    apiClient: {post: async (url, body) => {calls.push({url, body});return {data: {status: 'OK', data: {available_models: {code_models: data.code_models, ...data.available_models}, モデル設定: structuredClone(data.settings)}}};}},
     qAlert: async () => {}, qMessage: async () => {}, qConfirm: async () => true};
   const api = scope.run(() => new Function(...Object.keys(dependencies), js + '\nreturn {selections, errorMessage, loadConfig, buildNextSettings, handleCodeAiChange, copyCode1Settings, copyCode4Settings, handleTaskAiChange, handleTeamAiChange, handleSaveOnly};')(...Object.values(dependencies)));
   return {...api, calls, nextTick: vue.nextTick, close: () => scope.stop(), template: descriptor.template.content};
 }
 
 for (const [project, filename] of [['frontend_web', 'frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue'], ['frontend_avatar', 'frontend_avatar/src/dialog/AI設定再起動.vue']]) {
+  test(`${project}: Chat/Live watchers select available values without replacing untouched saved settings`, async () => {
+    const data = fixture();
+    Object.assign(data.settings, {
+      CHAT_AI_NAME: 'openai_chat', CHAT_OPENAI_MODEL: 'retired-chat', CHAT_GEMINI_MODEL: 'retired-gemini',
+      LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'retired-live', LIVE_FREEAI_VOICE: 'retired-voice',
+      LIVE_GEMINI_MODEL: 'retired-gemini-live', LIVE_GEMINI_VOICE: 'retired-gemini-voice',
+      LIVE_OPENAI_MODEL: 'saved-openai-live', LIVE_OPENAI_VOICE: 'saved-openai-voice',
+    });
+    data.available_models = {
+      chat_models: {openai_chat: {'available-chat': 'Chat'}, gemini_chat: {'available-gemini': 'Gemini'}},
+      live_models: {freeai_live: {'available-live': 'Live'}, gemini_live: {'available-gemini-live': 'Gemini'}, openai_live: {first: 'First', 'saved-openai-live': 'Saved'}},
+      live_voices: {freeai_live: {'available-voice': 'Voice'}, gemini_live: {'available-gemini-voice': 'Gemini'}, openai_live: {first: 'First', 'saved-openai-voice': 'Saved'}},
+    };
+    const app = load(project, filename, data);
+    try {
+      await app.loadConfig(); await app.nextTick();
+      assert.equal(app.errorMessage.value, '');
+      assert.equal(app.selections.chatModel, 'available-chat');
+      assert.equal(app.selections.liveModel, 'available-live');
+      assert.equal(app.selections.liveVoice, 'available-voice');
+      // 候補の代替表示だけでは、未編集の保存値を書き換えない。
+      for (const key of ['CHAT_OPENAI_MODEL', 'LIVE_FREEAI_MODEL', 'LIVE_FREEAI_VOICE']) assert.equal(app.buildNextSettings()[key], data.settings[key]);
+      app.selections.chatAi = 'gemini_chat'; app.selections.liveAi = 'gemini_live'; await app.nextTick();
+      assert.equal(app.selections.chatModel, 'available-gemini');
+      assert.equal(app.selections.liveModel, 'available-gemini-live');
+      assert.equal(app.selections.liveVoice, 'available-gemini-voice');
+      await app.handleSaveOnly();
+      const sent = app.calls.at(-1).body.モデル設定;
+      assert.equal(sent.CHAT_GEMINI_MODEL, 'available-gemini');
+      assert.equal(sent.LIVE_GEMINI_MODEL, 'available-gemini-live');
+      assert.equal(sent.LIVE_GEMINI_VOICE, 'available-gemini-voice');
+      app.selections.liveAi = 'openai_live'; await app.nextTick();
+      assert.equal(app.selections.liveModel, 'saved-openai-live');
+      assert.equal(app.selections.liveVoice, 'saved-openai-voice');
+    } finally {app.close();}
+  });
+
+  test(`${project}: empty Chat/Live catalogs leave no invisible selection and preserve untouched settings`, async () => {
+    const data = fixture();
+    Object.assign(data.settings, {CHAT_AI_NAME: 'openai_chat', CHAT_OPENAI_MODEL: 'saved-chat', LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'saved-live', LIVE_FREEAI_VOICE: 'saved-voice'});
+    data.available_models = {chat_models: {openai_chat: {}}, live_models: {freeai_live: {}}, live_voices: {freeai_live: {}}};
+    const app = load(project, filename, data);
+    try {
+      await app.loadConfig(); await app.nextTick();
+      for (const field of ['chatModel', 'liveModel', 'liveVoice']) assert.equal(app.selections[field], '');
+      for (const key of ['CHAT_OPENAI_MODEL', 'LIVE_FREEAI_MODEL', 'LIVE_FREEAI_VOICE']) assert.equal(app.buildNextSettings()[key], data.settings[key]);
+    } finally {app.close();}
+  });
+
   test(`${project}: saved values survive loading and every Code slot uses the provider default on manual change`, async () => {
     const data = fixture(), app = load(project, filename, data);
     try {

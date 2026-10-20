@@ -191,7 +191,10 @@ watch(入力TEAM_AI_NAME, (value) => {
 
 TEAMモデル入力.forEach((モデル, 位置) => {
   watch(モデル, (value) => {
-    if (!フォーム初期化中.value) TASKモデル入力[位置]!.value = value;
+    // TASK の AI を別に選び直した後は、別 AI のモデルを流し込まない。
+    if (!フォーム初期化中.value && 入力TEAM_AI_NAME.value === 入力TASK_AI_NAME.value) {
+      TASKモデル入力[位置]!.value = value;
+    }
   }, { flush: 'sync' });
 });
 
