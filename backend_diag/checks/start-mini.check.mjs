@@ -13,7 +13,7 @@ function fakeWindow(maximized=false){
 }
 test('mini window has fixed dimensions and restores original bounds and minimum',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window),original=structuredClone(window.bounds);
- assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:240,height:130});assert.deepEqual(window.minimum,[220,130]);assert.equal(window.maximizable,false);
+ assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:384,height:248});assert.deepEqual(window.minimum,[384,248]);assert.equal(window.maximizable,false);
  controller.set(true);controller.set(false);assert.deepEqual(window.bounds,original);assert.deepEqual(window.minimum,[420,320]);assert.equal(window.maximizable,true);assert.equal(controller.active,false);
 });
 test('maximized windows restore their normal bounds and maximized state',()=>{
@@ -23,7 +23,7 @@ test('maximized windows restore their normal bounds and maximized state',()=>{
 test('startup mini uses primary work-area origin and restores original topmost, location and size',()=>{
  for(const top of [true,false]){
   const window=fakeWindow();window.top=top;const original=structuredClone(window.bounds),controller=miniWindow.ミニ表示を作成(window,{screen:{getPrimaryDisplay:()=>({workArea:{x:-1920,y:32}})}});
-  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:240,height:130});assert.equal(window.top,true);
+  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:384,height:248});assert.equal(window.top,true);
   controller.set(false);assert.deepEqual(window.bounds,original);assert.equal(window.top,top);
  }
 });
@@ -35,12 +35,12 @@ test('initial mini renders immediately even before connection and can restore wi
 test('invalid requests and destroyed windows cannot change bounds',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window);assert.equal(controller.set({width:999}),false);assert.equal(window.bounds.width,1160);window.destroyed=true;assert.equal(controller.set(true),false);
 });
-test('mini view can be entered only from the connected startup screen',async()=>{
+test('mini view requires a connection but has no tab restriction',async()=>{
  const calls=[];let allowed=false;const state=起動ミニ表示を作成({利用可能:()=>allowed,切替:async value=>{calls.push(value);return true;}});
  await state.変更(true);assert.equal(state.表示中.value,false);assert.deepEqual(calls,[]);
  allowed=true;await state.変更(true);assert.equal(state.表示中.value,true);await state.変更(false);assert.equal(state.表示中.value,false);assert.deepEqual(calls,[true,false]);
 });
-test('leaving startup during a pending native resize restores the full window',async()=>{
+test('disconnecting during a pending native resize restores the full window',async()=>{
  let release,allowed=true;const calls=[];const state=起動ミニ表示を作成({利用可能:()=>allowed,切替:value=>{calls.push(value);return value?new Promise(resolve=>release=resolve):Promise.resolve(true);}});
  const pending=state.変更(true);allowed=false;await state.変更(false);release(true);await pending;assert.equal(state.表示中.value,false);assert.equal(state.切替中.value,false);assert.deepEqual(calls,[true,false]);
 });

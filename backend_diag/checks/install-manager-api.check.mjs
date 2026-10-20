@@ -108,6 +108,16 @@ test('個別診断・一括診断・書込から導入への逆方向排他も�
   assert.equal(commands.length,0);
 });
 
+test('API の npm 再導入は固定 install 1回だけで更新し、個別確認結果を一覧へ反映する',async t=>{
+  const {handler,manager,commands,probes,writes}=fixture(t);
+  await request(handler,'api/診断');
+  assert.equal((await request(handler,'api/導入管理/codex/再導入')).status,200);
+  const job=await settled(manager);assert.equal(job.状態,'完了');assert.equal(job.確認済み,true);
+  assert.deepEqual(commands.map(command=>[command.args[1],command.args.at(-1)]),[['install','@openai/codex']]);assert.deepEqual(probes,['codex']);assert.doesNotMatch(job.ログ,/uninstall/);assert.equal(writes.length,0);
+  const list=(await request(handler,'api/一覧',{method:'GET'})).body;
+  assert.deepEqual(list.結果.map(row=>[row.id,row.バージョン]),[['codex','new'],['claude','bulk'],['python','bulk']]);
+});
+
 test('API の削除は固定 npm uninstall の後に存在を確認する',async t=>{
   const {handler,manager,commands}=fixture(t,{probeFn:async entry=>({id:entry.id,状態:'未検出',パス:null})});
   assert.equal((await request(handler,'api/導入管理/claude/削除')).status,200);const job=await settled(manager);assert.equal(job.状態,'完了');assert.equal(job.結果.状態,'未検出');assert.equal(commands.length,1);assert.equal(commands[0].args[1],'uninstall');assert.equal(commands[0].args.at(-1),'@anthropic-ai/claude-code');

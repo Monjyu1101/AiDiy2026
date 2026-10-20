@@ -13,11 +13,14 @@ import { fileURLToPath } from 'node:url';
 import { createAISearch } from './ファイル機能/ai-search.mjs';
 import { createFileAnalysis } from './ファイル機能/file-analysis.mjs';
 import { startTerminal } from './aidiy_term/terminal.mjs';
+import { validateCliOptions, resolveCliLaunch } from './aidiy_term/cli-launch.mjs';
 import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
-export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){
+export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){
  if(!['code','live','ide','term'].includes(kind))throw Error('アプリはcode / live / ide / termから指定してください。');
+ validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
+ if(cli)await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env});
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
  connection??=kind==='ide'?createCoreConnection(project):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
@@ -41,7 +44,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
   },
   panelsFactory:(project,state)=>createPanels(project,state,async(type,folder,snapshot)=>{
    if(kind!=='ide'&&type!==kind)throw Error('このアプリでは利用できません。');
-   if(type==='term')return startTerminal(folder);
+   if(type==='term')return startTerminal(folder,{env,cli,cliAutoApprove,onCliStarted,onCliAbandoned});
    const bundle=require(join(vscodeRoot,'dist',`aidiy_${type}`,'server.cjs'));
    if(type==='code')return bundle.単独起動(folder,backend,{offline:snapshot.mode==='offline',lockedMode:kind==='ide'||linked,keepAlive:true,provider,model});
    const vendor=provider==='openai_live'?'OPENAI':provider==='freeai_live'?'FREEAI':'GEMINI';

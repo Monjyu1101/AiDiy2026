@@ -52,7 +52,7 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
   }
   function 確認文(id, action, name) {
     const capability = 能力(id);
-    const change = action === '削除' ? '対象パッケージを削除します。このプログラムは利用できなくなります。' : action === '再導入' ? '対象パッケージを削除してから、再度インストールします。再導入に失敗すると、このプログラムが利用できなくなる場合があります。' : '診断サーバーの環境へパッケージを導入します。';
+    const change = action === '削除' ? '対象パッケージを削除します。このプログラムは利用できなくなります。' : action === '再導入' ? (capability?.再導入説明 || '対象パッケージを削除してから、再度インストールします。再導入に失敗すると、このプログラムが利用できなくなる場合があります。') : '診断サーバーの環境へパッケージを導入します。';
     return `${name || id} を${action}しますか？\n対象パッケージ: ${capability?.パッケージ || id}\n\n${change}\n認証情報・利用者設定・会話履歴は削除しません。\n${[capability?.説明, capability?.確認説明].filter(Boolean).join('\n')}\n${capability?.関連項目?.length > 1 ? `一式の対象: ${capability.関連項目.join(' / ')}\n` : ''}${capability?.規約URL ? `提供元の案内・規約: ${capability.規約URL}\n` : ''}${action === '削除' ? 'パッケージ管理コマンドを実行します。' : 'ネットワークからパッケージを取得し、インストール処理を実行します。'}\n終了後に対象の各項目で「確認」ボタンと同じ処理を自動実行します。`;
   }
   async function 開始(id, action, name) {

@@ -26,7 +26,7 @@ const openPorts=new Set(portCatalog.map(item=>item.id));const portSamples=[];
 const portStatusFn=async()=>{portSamples.push(Date.now());return {対象:portCatalog.map(({id,名前,ポート})=>({id,名前,ポート,開放:openPorts.has(id)}))};};
 const browserCalls=[];
 const webBrowserOpenFn=createWebBrowserOpener({portStatusFn,fetchFn:async(url,options)=>{browserCalls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({id:'fixture-page'})};}});
-const server=createServer({token:'start-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,
+const server=createServer({cliLauncher:{catalog:async()=>({対象:[]}),launch(){throw Error('CLI execution is forbidden in this fixture');}},token:'start-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,
  webBrowserOpenFn,
  entries:[{id:'node',name:'Node.js',menuGroup:'ベース',commands:['node']}],
  toolsStatusFn:async()=>({online:false}),previousResults:{snapshot:async()=>({})},
@@ -115,7 +115,7 @@ try{
  const desktop=await evaluate(`(()=>{const consoleView=document.querySelector('.start-console');return {page:document.documentElement.scrollHeight>innerHeight,height:consoleView.clientHeight,overflow:getComputedStyle(consoleView).overflowY}})()`);
  assert.equal(desktop.page,false);assert.ok(desktop.height>200,JSON.stringify(desktop));assert.equal(desktop.overflow,'auto');
  await click('ミニ表示');await until(`document.querySelector('.start-mini')`);
- await send('Emulation.setDeviceMetricsOverride',{width:240,height:130,deviceScaleFactor:1,mobile:false});await sleep(100);await capture('start-mini');
+ await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});await sleep(100);await capture('start-mini');
  assert.equal(await evaluate(`document.querySelectorAll('.mini-service').length`),6);
  assert.equal(await evaluate(`document.querySelector('nav.tabs').getClientRects().length`),0);
  assert.equal(await evaluate(`document.querySelector('footer').getClientRects().length`),0);
@@ -178,7 +178,7 @@ try{
  await click('強制停止');await until(`document.querySelector('#run').textContent==='設定起動'&&!document.querySelector('#run').disabled`);
  assert.deepEqual(stopCalls,['web','taskteam','apps','core','tools','local']);assert.ok(children.every(child=>child.closed));
  assert.equal(openPorts.size,0);await capture('start-all-stopped');
- assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・240/390/1280px表示 OK');
+ assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・384/390/1280px表示 OK');
 }finally{
  ws?.close();browser.kill();await manager.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
  const safeBase=resolve(tmpdir())+sep;for(const path of [root,profile]){assert.ok(resolve(path).startsWith(safeBase));for(let i=0;i<20;i++){try{rmSync(path,{recursive:true,force:true});break;}catch{await sleep(100);}}}

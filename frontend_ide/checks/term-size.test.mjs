@@ -26,7 +26,7 @@ async function fixture(t){
   cols=80;rows=24;options={scrollback:5000};listeners={};buffer={active:{}};
   _core={_renderService:{dimensions:{css:{cell:{width:8,height:17}}},clear(){}}};
   constructor(){terminal=this;resources.terminals++;}
-  open(parent){this.element={parentElement:parent};} loadAddon(addon){addon.activate(this);} attachCustomKeyEventHandler(){} reset(){} clear(){} focus(){} dispose(){resources.disposed++;}
+  open(parent){this.element={parentElement:parent};} loadAddon(addon){addon.activate(this);} attachCustomKeyEventHandler(){} reset(){} clear(){} focus(){} writeln(){} dispose(){resources.disposed++;}
   resize(cols,rows){this.cols=cols;this.rows=rows;this.listeners.Resize?.({cols,rows});}
  }
  for(const event of ['Data','Key','Resize','CursorMove','Scroll','Render'])Terminal.prototype['on'+event]=function(callback){this.listeners[event]=callback;return{dispose:()=>delete this.listeners[event]};};
@@ -103,4 +103,16 @@ test('Term CSS: 高さ240以下だけ案内を畳み、余白なしの内側へf
  assert.match(descriptor.template.content,/<div class="term-screen"[^>]*><div ref="container" class="term-viewport">/);
  assert.match(css,/\.term-error\{flex:none;max-height:1\.65em;overflow:auto/);
  assert.match(css,/\.term-meta>span:first-child\{[^}]*white-space:nowrap/);
+});
+
+
+test('CLI Term: 開始時から全体表示、モード保持、クリア・再接続・起動エラー',async t=>{
+ const f=await fixture(t),cli={id:'copilot',name:'GitHub Copilot CLI',mode:'YOLO',autoApprove:true};
+ f.sockets[0].receive({type:'ready',project:'/fixture 日本語',shell:cli.name,cli,state:'running',completion:false});
+ await vue.nextTick();assert.equal(f.state.inputStarted.value,true);assert.equal(f.state.connected.value,true);assert.equal(f.state.cli.value.mode,'YOLO');
+ await f.state.clearDisplay();assert.equal(f.state.inputStarted.value,true,'CLI画面を小さな初期表示へ戻さない');
+ f.state.connect();f.sockets.at(-1).onopen();f.sockets.at(-1).receive({type:'ready',project:'/fixture 日本語',shell:cli.name,cli,state:'exited',completion:false});
+ assert.equal(f.state.connected.value,false);assert.equal(f.state.inputStarted.value,true);assert.equal(f.state.status.value,'終了');
+ f.sockets.at(-1).receive({type:'error',message:'起動失敗fixture'});assert.equal(f.state.error.value,'起動失敗fixture');assert.equal(f.state.status.value,'エラー');
+ assert.match(descriptor.template.content,/モデル指定なし/);assert.match(descriptor.template.content,/再接続/);
 });

@@ -25,7 +25,7 @@ let taskChecks=0;const appCalls=[],appLauncher=createAppLauncher({root,pythonCom
 const portCatalog=JSON.parse(readFileSync(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(item=>item.起動管理!==false);
 const openPorts=new Set(['core']);const portSamples=[];
 const portStatusFn=async()=>{portSamples.push(Date.now());return {対象:portCatalog.map(({id,名前,ポート})=>({id,名前,ポート,開放:openPorts.has(id)}))};};
-const server=createServer({token:'app-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,appLauncher,
+const server=createServer({cliLauncher:{catalog:async()=>({対象:[]}),launch(){throw Error('CLI execution is forbidden in this fixture');}},token:'app-browser-fixture',prefix:'/proxy/8097/',startManager:manager,portStatusFn,appLauncher,
  entries:[{id:'node',name:'Node.js',menuGroup:'ベース',commands:['node']}],
  toolsStatusFn:async()=>({online:false}),previousResults:{snapshot:async()=>({})},
  publicCache:{snapshot:()=>({状態:'未取得'}),input:()=>({})},modelTrials:{close(){}},
@@ -55,7 +55,7 @@ try{
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);
  assert.equal(await evaluate(`document.querySelector('nav.tabs button.active').textContent`),'システム起動');
  await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
- await send('Emulation.setDeviceMetricsOverride',{width:240,height:130,deviceScaleFactor:1,mobile:false});
+ await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});
  await until(`[...document.querySelectorAll('.mini-app-button img')].every(img=>img.complete&&img.naturalWidth>0)`);
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.disabled)`),true);
  assert.equal(await evaluate(`document.querySelector('.mini-app-message .mini-app-marquee').textContent`),'SELECT YOUR PROJECT  ▸▸  READY FOR LAUNCH');
@@ -65,7 +65,7 @@ try{
  assert.equal(await evaluate(`!!document.querySelector('header.panel-brand .mini-restore')`),true);
  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.mini-app-message')).color`),'rgb(255, 107, 130)');
  assert.equal(await evaluate(`(()=>{const view=document.querySelector('.start-mini');return view.scrollHeight<=view.clientHeight&&document.documentElement.scrollWidth<=innerWidth;})()`),true);
- assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.textContent.trim()===''&&!!button.getAttribute('aria-label'))`),true);
+ assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.querySelector('.mini-icon-caption')?.textContent.trim()===button.getAttribute('aria-label').replace(' を起動',''))`),true);
  await until(`[...document.querySelectorAll('.mini-service')].some(button=>button.textContent==='Core'&&button.dataset.tone==='running'&&button.title.includes('8091'))`);
  assert.equal(await evaluate(`(()=>{const items=[...document.querySelectorAll('.mini-service[data-tone=running]')].map(element=>getComputedStyle(element));return items.length>0&&items.every(style=>style.animationName==='mini-blink')&&document.querySelectorAll('.mini-indicator').length===0;})()`),true);
  assert.equal(await evaluate(`new Set([...document.querySelectorAll('.mini-service')].map(element=>element.style.getPropertyValue('--mini-blink'))).size`),6);
@@ -104,7 +104,7 @@ try{
  await evaluate(`[...document.querySelectorAll('.mini-service')].find(button=>button.textContent==='Core').click()`);
  await until(`document.querySelector('nav.tabs button.active').textContent==='システム起動'&&!document.querySelector('.start-mini')`);
  await click('システム起動');await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
- await send('Emulation.setDeviceMetricsOverride',{width:240,height:130,deviceScaleFactor:1,mobile:false});
+ await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>!button.disabled)`),true);
  await evaluate(`document.querySelector('.mini-app-button[data-app="live"]').click()`);
  await until(`document.querySelector('.mini-app-message').textContent==='Live は起動済みです。'`);
@@ -124,7 +124,7 @@ try{
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);await click('アプリ起動');
  assert.equal(await evaluate(`document.querySelector('#app-project-folder').value`),'','再起動・再読込では毎回フォルダ未選択');
  assert.equal(await evaluate(`document.querySelector('.app-project').classList.contains('required')`),true);
- assert.deepEqual(errors,[]);console.log('アプリ起動: 6アイコン・ミニ240×130・未選択時の赤字と不活性・選択後の起動/排他・定時監視なし・390/1280px OK');
+ assert.deepEqual(errors,[]);console.log('アプリ起動: 6アイコン・ミニ384×248・未選択時の赤字と不活性・選択後の起動/排他・定時監視なし・390/1280px OK');
 }finally{
  ws?.close();browser.kill();await manager.close();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
  const safeBase=resolve(tmpdir())+sep;for(const path of [root,profile]){assert.ok(resolve(path).startsWith(safeBase));for(let i=0;i<20;i++){try{rmSync(path,{recursive:true,force:true});break;}catch{await sleep(100);}}}

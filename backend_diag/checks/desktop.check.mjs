@@ -65,7 +65,7 @@ test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',as
 test('Tools 8095 open starts mini at primary work-area top-left before show, while closed/unknown use normal',async()=>{
  for(const toolsOpen of [true,false,null]){
   const f=await mainFixture({toolsOpen,opening:window=>{
-   if(toolsOpen===true){assert.equal(window.bounds.width,240);assert.equal(window.bounds.height,130);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
+   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,248);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
    else assert.equal(window.bounds,undefined);
    window.show();return true;
   }});

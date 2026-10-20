@@ -11,10 +11,10 @@ function ミニ表示を作成(window,{screen}={}){
    if(enabled){
     original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable(),alwaysOnTop:window.isAlwaysOnTop()};
     if(original.maximized)window.unmaximize();
-    window.setMinimumSize(220,130);
+    window.setMinimumSize(384,248);
     window.setMaximizable(false);
     const area=topLeft?screen.getPrimaryDisplay().workArea:null;
-    window.setBounds({...original.bounds,...(area?{x:area.x,y:area.y}:{}),width:240,height:130});
+    window.setBounds({...original.bounds,...(area?{x:area.x,y:area.y}:{}),width:384,height:248});
     window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
    }else{
     const saved=original;original=undefined;

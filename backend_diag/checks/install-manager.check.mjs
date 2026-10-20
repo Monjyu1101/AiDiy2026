@@ -37,11 +37,12 @@ function windowsShim(extension,target){
 test('固定4パッケージ・3操作だけを固定 argv と公式 registry で実行する',()=>{
   assert.deepEqual(NPM_PACKAGES,{claude:'@anthropic-ai/claude-code',codex:'@openai/codex',copilot:'@github/copilot',opencode:'opencode-ai'});
   assert.equal(Object.isFrozen(NPM_PACKAGES),true);
-  for(const [id,pkg] of Object.entries(NPM_PACKAGES))for(const [action,steps] of [['導入',['install']],['削除',['uninstall']],['再導入',['uninstall','install']]]){
+  for(const [id,pkg] of Object.entries(NPM_PACKAGES))for(const [action,steps] of [['導入',['install']],['削除',['uninstall']],['再導入',['install']]]){
     const commands=npmCommands(npm,id,action,'/fixture/private config/npmrc');
     assert.deepEqual(commands.map(command=>command.args[1]),steps);
     for(const command of commands){
       assert.equal(command.executable,npm.executable);
+      assert.equal(command.表示,`npm ${command.args[1]} --global ${pkg}`);
       assert.deepEqual(command.args,[npm.cli,command.args[1],'--global',`--prefix=${npm.prefix}`,'--registry=https://registry.npmjs.org/','--userconfig=/fixture/private config/npmrc','--globalconfig=/fixture/private config/npmrc.global','--no-audit','--no-fund','--no-update-notifier','--foreground-scripts',pkg]);
       assert.ok(command.args.every(value=>typeof value==='string'));
     }
@@ -264,15 +265,18 @@ test('導入は空の一時 npmrc と隔離環境で実行し、確認結果を�
   await assert.rejects(()=>stat(command.cwd),{code:'ENOENT'});
 });
 
-test('再導入は削除終了後に導入、最後に1回だけ確認する',async t=>{
-  const sequence=[];const {manager}=fixture(t,{run:async command=>{sequence.push(command.args[1]);return success;},probeFn:async entry=>{sequence.push('probe');return {id:entry.id,状態:'OK'};}});
-  await manager.start('claude','再導入');assert.equal((await settled(manager)).状態,'完了');assert.deepEqual(sequence,['uninstall','install','probe']);
+test('npm 再導入は install 1回だけで更新し、最後に1回だけ確認する',async t=>{
+  for(const [id,pkg] of Object.entries(NPM_PACKAGES)){
+    const sequence=[];const {manager,results}=fixture(t,{run:async command=>{sequence.push(command.args[1]);assert.equal(command.args.at(-1),pkg);return success;},probeFn:async entry=>{sequence.push('probe');return {id:entry.id,状態:'OK'};}});
+    await manager.start(id,'再導入');const job=await settled(manager);assert.equal(job.状態,'完了');assert.deepEqual(sequence,['install','probe']);assert.equal(results.length,1);
+    assert.ok(job.ログ.includes(`$ npm install --global ${pkg}`));assert.doesNotMatch(job.ログ,/uninstall/);
+  }
 });
 
-test('失敗・期限超過・出力上限・例外でも後続導入を止め、対象を再確認する',async t=>{
+test('npm 再導入の失敗・期限超過・出力上限・例外でも削除や再試行をせず、対象を再確認する',async t=>{
   for(const failure of [{code:7},{error:true,code:null},{timedOut:true},{overflow:true},'throw']){
     const sequence=[];const {manager}=fixture(t,{run:async command=>{sequence.push(command.args[1]);if(failure==='throw')throw Error('synthetic-private-secret');return {...success,...failure};},probeFn:async entry=>{sequence.push('probe');return {id:entry.id,状態:'未検出'};}});
-    await manager.start('codex','再導入');const job=await settled(manager);assert.equal(job.状態,'失敗');assert.deepEqual(sequence,['uninstall','probe']);assert.doesNotMatch(job.ログ,/synthetic-private-secret/);
+    await manager.start('codex','再導入');const job=await settled(manager);assert.equal(job.状態,'失敗');assert.deepEqual(sequence,['install','probe']);assert.doesNotMatch(job.ログ,/synthetic-private-secret|uninstall/);
   }
 });
 
@@ -283,15 +287,15 @@ test('表示後の所有元変更を開始直前に再確認し、実行せず�
 });
 
 test('連打・別行操作は排他され、中止後も停止と再確認完了まで解除しない',async t=>{
-  const gate=defer(),checked=defer();let running,checking=false;t.after(()=>{gate.resolve();checked.resolve();});
-  const {manager}=fixture(t,{run:async command=>{running=command;await gate.promise;return {...success,code:null,cancelled:command.signal.aborted};},probeFn:async entry=>{checking=true;await checked.promise;return {id:entry.id,状態:'未検出'};}});
+  const gate=defer(),checked=defer(),sequence=[];let running,checking=false;t.after(()=>{gate.resolve();checked.resolve();});
+  const {manager}=fixture(t,{run:async command=>{running=command;sequence.push(command.args[1]);await gate.promise;return {...success,code:null,cancelled:command.signal.aborted};},probeFn:async entry=>{checking=true;sequence.push('probe');await checked.promise;return {id:entry.id,状態:'未検出'};}});
   const start=await manager.start('codex','再導入');await until(()=>running);
   for(const id of ['codex','claude'])await assert.rejects(()=>manager.start(id,'導入'),{status:409});
   await assert.rejects(()=>manager.cancel('unknown'),{status:404});assert.equal(running.signal.aborted,false);
   await manager.cancel(start.実行.実行ID);assert.equal(running.signal.aborted,true);assert.equal(manager.busy(),true);
   running.onUncertain();assert.equal((await manager.snapshot()).実行.状態,'停止未確認');await assert.rejects(()=>manager.start('claude','導入'),{status:409});
   gate.resolve();await until(()=>checking);assert.equal((await manager.snapshot()).実行.状態,'確認中');assert.equal(manager.busy(),true);
-  checked.resolve();const job=await settled(manager);assert.equal(job.状態,'中止');assert.match(job.ログ,/中止を要求/);
+  checked.resolve();const job=await settled(manager);assert.equal(job.状態,'中止');assert.match(job.ログ,/中止を要求/);assert.deepEqual(sequence,['install','probe']);assert.doesNotMatch(job.ログ,/uninstall/);
 });
 
 test('事前確認中の中止は npm 操作を開始せず、その後の確認は行う',async t=>{

@@ -14,7 +14,7 @@ import { terminalCompletion, cliCompletions } from '../ターミナル/コマン
 const props = defineProps({ base: String, icon: String, desktop: Boolean, linked: Boolean, visible: { type: Boolean, default: true } });
 const windowTitle = ref('');
 const container = ref(null), connected = ref(false), status = ref('起動中'), project = ref(''), shell = ref(''), error = ref('');
-const completion = ref(''), toolsOnline = ref(false);
+const completion = ref(''), toolsOnline = ref(false), cli = ref(null);
 const toolsEnabled = ref(true), toolsChanging = ref(false), socketReady = ref(false);
 const ghostRows = ref([]);
 const inputStarted = ref(false);
@@ -28,7 +28,7 @@ function startInput() {
 }
 async function clearDisplay() {
   terminal.clear();
-  inputStarted.value = false;
+  inputStarted.value = !!cli.value;
   await nextTick();
   if (disposed) return;
   fitTerminal(); updateCompletion(); terminal.focus();
@@ -76,14 +76,14 @@ function connect() {
   current.onmessage = event => {
     if (current !== socket || disposed) return;
     const message = JSON.parse(event.data);
-    if (message.type === 'ready') { connected.value = true; socketReady.value = true; toolsOnline.value = !!message.toolsOnline; toolsEnabled.value = !!message.toolsEnabled; completionEnabled = !!message.completion; status.value = '実行中'; project.value = message.project; shell.value = message.shell; terminal.focus(); }
+    if (message.type === 'ready') { cli.value = message.cli || null; connected.value = !cli.value || message.state === 'running'; if (cli.value) { inputStarted.value = true; nextTick(fitTerminal); } socketReady.value = true; toolsOnline.value = !!message.toolsOnline; toolsEnabled.value = !!message.toolsEnabled; completionEnabled = !!message.completion; status.value = connected.value ? '実行中' : message.state === 'error' ? 'エラー' : '終了'; project.value = message.project; shell.value = message.shell; terminal.focus(); }
     if (message.type === 'tools') { toolsOnline.value = !!message.online; toolsEnabled.value = !!message.enabled; toolsChanging.value = false; }
     if (message.type === 'data') terminal.write(message.data, () => { if (current === socket && current.readyState === WebSocket.OPEN) { current.send(JSON.stringify({ type: 'ack', length: message.data.length })); updateCompletion(); } });
-    if (message.type === 'exit') { connected.value = false; completion.value = ''; status.value = `終了 (${message.exitCode})`; terminal.writeln(`\r\n[シェルが終了しました: ${message.exitCode}]`); }
-    if (message.type === 'error') { error.value = message.message; status.value = 'エラー'; }
+    if (message.type === 'exit') { connected.value = false; completion.value = ''; status.value = `終了 (${message.exitCode})`; terminal.writeln(`\r\n[${cli.value?.name || 'シェル'}が終了しました: ${message.exitCode}]`); }
+    if (message.type === 'error') { if (cli.value) connected.value = false; error.value = message.message; status.value = 'エラー'; }
   };
   current.onclose = () => { if (current !== socket || disposed) return; socketReady.value = false; toolsChanging.value = false; connected.value = false; toolsOnline.value = false; completion.value = ''; if (status.value === '実行中' || status.value === '起動中') status.value = '切断'; };
-  current.onerror = () => { if (current === socket && !disposed) error.value = '端末に接続できません。「再起動」で接続し直してください。'; };
+  current.onerror = () => { if (current === socket && !disposed) error.value = '端末に接続できません。接続し直してください。'; };
 }
 watch(() => props.visible, async visible => { if (visible) { await nextTick(); fitTerminal(); terminal?.focus(); } });
 onMounted(() => {
@@ -114,10 +114,10 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
 <template>
   <section class="term-component" :class="{ 'desktop-window': desktop, 'term-waiting': !inputStarted }">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Term' : 'AiDiy Term')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
-    <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">再起動</button></nav></div>
+    <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">{{ cli ? '再接続' : '再起動' }}</button></nav></div>
     <div v-if="!inputStarted" class="term-welcome"><TerminalWelcome kind="term" :icon="icon || '/development/AiDiy.png'" /></div>
     <div class="term-screen" aria-label="ターミナル"><div ref="container" class="term-viewport"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
-    <div class="term-meta"><span :title="completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell} · ${status}` }}</span><span :title="'toolsサーバーの稼働状態'">tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>
+    <div class="term-meta"><span :title="cli ? `${cli.name} · ${cli.mode} · モデル指定なし` : completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell}${cli ? ` · ${cli.mode} · モデル指定なし` : ''} · ${status}` }}</span><span :title="'toolsサーバーの稼働状態'">tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>
     <p v-if="error" class="term-error" role="alert">{{ error }}</p>
   </section>
 </template>

@@ -10,10 +10,15 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { cliCompletions } from '../src/ターミナル/コマンド補完.js';
 import { toolsTarget } from '../ファイル機能/ai-search.mjs';
+import { resolveCliLaunch, validateCliOptions } from './cli-launch.mjs';
+import { createCliSession } from './cli-session.mjs';
 
 // IDEのパネル中継だけが接続する、ランダムパス付きのローカル端末。
 // シェル・開始フォルダはサーバー側で決め、ブラウザから指定させない。
-export async function startTerminal(project, { spawnTerminal, env = process.env, checkTools, toolsPollInterval = 10000 } = {}) {
+export async function startTerminal(project, { spawnTerminal, env = process.env, cli, cliAutoApprove = false, cliReconnectGrace = 30000, onCliStarted, onCliAbandoned, checkTools, toolsPollInterval = 10000 } = {}) {
+  validateCliOptions('term', { cli, cliAutoApprove });
+  if (!Number.isFinite(cliReconnectGrace) || cliReconnectGrace < 0) throw Error('CLI再接続の猶予時間が不正です。');
+  const cliLaunch = cli ? await resolveCliLaunch(cli, { autoApprove: cliAutoApprove, env }) : undefined;
   checkTools ??= async () => {
     const response = await fetch((await toolsTarget(project)) + 'ping', { signal: AbortSignal.timeout(1500) });
     if (!response.ok) return false;
@@ -21,6 +26,8 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
     return result.status === 'ok' && result.name === 'aidiy_code_agents';
   };
   spawnTerminal ??= (await import('./terminal-process.mjs')).spawnTerminal;
+  const cliSession = cliLaunch ? createCliSession(cliLaunch, project, spawnTerminal) : undefined;
+  const cliInfo = cliLaunch ? { id: cliLaunch.id, name: cliLaunch.name, mode: cliLaunch.mode, autoApprove: cliLaunch.autoApprove } : undefined;
   const shell = process.platform === 'win32'
     ? join(env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe')
     : env.SHELL || '/bin/sh';
@@ -29,7 +36,8 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
   const args = process.platform === 'win32'
     ? ['-NoLogo', '-NoExit', '-Command', `. '${completionScript}' -CliOptionsJson '${cliOptionsJson}'`] : [];
   const prefix = `/${randomBytes(24).toString('hex')}/`;
-  const sessions = new Set(), stopping = new Set();
+  const sessions = new Set(), stopping = new Set(), cliClients = new Set();
+  let cliDisconnectTimer, cliActivated = false, cliAbandoned = false;
   let origin, closed = false, toolsOnline = false, checkingTools = false, toolsEnabled = true, toolsRevision = 0;
   const allowed = req => req.headers.host === new URL(origin).host
     && (!req.headers.origin || req.headers.origin === origin)
@@ -39,7 +47,7 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
     if (req.url !== prefix + 'config') return res.writeHead(404).end();
     if (req.method !== 'GET') return res.writeHead(405).end();
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ project, shell: basename(shell) }));
+    res.end(JSON.stringify({ project, shell: cliLaunch?.name || basename(shell), cli: cliInfo }));
   });
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 65536, perMessageDeflate: false });
   function sendTools() {
@@ -66,17 +74,32 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
     sockets.handleUpgrade(req, socket, head, ws => sockets.emit('connection', ws));
   });
   sockets.on('connection', ws => {
-    let terminal, output, exit, failure, unacknowledged = 0, dead = false;
+    let terminal, output, exit, failure, cliOutput, started = false, unacknowledged = 0, dead = false;
     const send = value => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(value)); };
     const stop = () => {
       if (dead) return; dead = true;
       clearTimeout(initializing); clearInterval(heartbeat);
-      output?.dispose(); exit?.dispose(); failure?.dispose();
+      output?.dispose(); exit?.dispose(); failure?.dispose(); cliOutput?.dispose();
       if (terminal) {
         const pending = Promise.resolve(terminal.kill());
         stopping.add(pending); void pending.finally(() => stopping.delete(pending));
       }
       sessions.delete(stop); ws.terminate();
+      if (cliSession && started) {
+        cliClients.delete(ws);
+        if (!closed && !cliAbandoned && !cliClients.size && !cliDisconnectTimer) {
+          cliDisconnectTimer = setTimeout(() => {
+            cliDisconnectTimer = undefined;
+            if (closed || cliClients.size) return;
+            cliAbandoned = true;
+            const pending = cliSession.terminate('再接続の猶予時間を過ぎたためCLIを終了しました。再実行するには新しいTerm窓を開いてください。');
+            stopping.add(pending);
+            const abandoned = () => { stopping.delete(pending); void Promise.resolve().then(() => onCliAbandoned?.()).catch(() => {}); };
+            void pending.then(abandoned, abandoned);
+          }, cliReconnectGrace);
+          cliDisconnectTimer.unref();
+        }
+      }
     };
     sessions.add(stop);
     // 消えたブラウザのシェルを残さない。表示中のタブ切替では接続を維持する。
@@ -93,7 +116,29 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
           if (!Number.isInteger(message.cols) || message.cols < 2 || message.cols > 500
             || !Number.isInteger(message.rows) || message.rows < 1 || message.rows > 300) throw Error('端末サイズが不正です。');
         };
-        if (message.type === 'start' && !terminal) {
+        if (message.type === 'start' && cliSession) {
+          size(); clearTimeout(initializing);
+          if (started) return;
+          started = true;
+          cliClients.add(ws); clearTimeout(cliDisconnectTimer); cliDisconnectTimer = undefined;
+          cliSession.start(message.cols, message.rows);
+          if (!cliActivated) { cliActivated = true; onCliStarted?.(); }
+          const snapshot = cliSession.snapshot();
+          const sendCli = value => {
+            if (value.type === 'data') {
+              unacknowledged += value.data.length;
+              // 切断した画面がCLIを止めない。遅い接続だけ切り、再接続時は保持した末尾を表示。
+              if (unacknowledged > 2 * 1024 * 1024 || ws.bufferedAmount > 2 * 1024 * 1024) return stop();
+            }
+            send(value);
+          };
+          send({ type: 'ready', shell: cliLaunch.name, project, cli: cliInfo, completion: false, toolsOnline, toolsEnabled, state: snapshot.state });
+          if (snapshot.output) sendCli({ type: 'data', data: snapshot.output });
+          if (snapshot.error) send({ type: 'error', message: snapshot.error });
+          if (snapshot.exitCode !== undefined) send({ type: 'exit', exitCode: snapshot.exitCode });
+          cliOutput = cliSession.subscribe(sendCli);
+          cliSession.resize(message.cols, message.rows);
+        } else if (message.type === 'start' && !terminal) {
           size(); clearTimeout(initializing);
           terminal = spawnTerminal(shell, args, { name: 'xterm-256color', cols: message.cols, rows: message.rows,
             cwd: project, env: { ...env, TERM: 'xterm-256color' } });
@@ -113,6 +158,10 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
         } else if (message.type === 'tools-check' && typeof message.enabled === 'boolean') {
           toolsEnabled = message.enabled; toolsRevision++; toolsOnline = false;
           sendTools(); if (toolsEnabled) void updateTools();
+        } else if (message.type === 'input' && cliSession && started && typeof message.data === 'string' && message.data.length <= 32768) {
+          cliSession.write(message.data);
+        } else if (message.type === 'resize' && cliSession && started) {
+          size(); cliSession.resize(message.cols, message.rows);
         } else if (message.type === 'input' && terminal && typeof message.data === 'string' && message.data.length <= 32768) {
           terminal.write(message.data);
         } else if (message.type === 'resize' && terminal) {
@@ -128,9 +177,9 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
   origin = `http://127.0.0.1:${server.address().port}`;
   return { url: origin + prefix, async close() {
     if (closed) return; closed = true;
-    clearInterval(toolsTimer);
+    clearInterval(toolsTimer); clearTimeout(cliDisconnectTimer);
     for (const stop of [...sessions]) stop();
-    await Promise.allSettled([...stopping]);
+    await Promise.allSettled([...stopping, ...(cliSession ? [cliSession.close()] : [])]);
     sockets.close(); server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   } };

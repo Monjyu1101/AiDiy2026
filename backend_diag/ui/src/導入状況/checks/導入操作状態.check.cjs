@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 const { ref } = createRequire(path.join(__dirname, '../../../package.json'))('vue');
-const capabilities = [{ id: 'claude', 操作: ['導入'], パッケージ: '@anthropic-ai/claude-code', 説明: 'npm 管理' }, { id: 'codex', 操作: ['再導入', '削除'], パッケージ: '@openai/codex' }, { id: 'node', 操作: [], 理由: '対象外' }];
+const capabilities = [{ id: 'claude', 操作: ['導入'], パッケージ: '@anthropic-ai/claude-code', 説明: 'npm 管理' }, { id: 'codex', 操作: ['再導入', '削除'], パッケージ: '@openai/codex', 再導入説明: 'npm install --global @openai/codex を1回実行して更新・再導入します。事前のアンインストールは行いません。' }, { id: 'node', 操作: [], 理由: '対象外' }];
 const running = (extra = {}) => ({ 実行ID: 'job/1', 対象: 'claude', 操作: '導入', 状態: '実行中', 実行中: true, ログ: 'installing\n', ...extra });
 const completed = (extra = {}) => running({ 状態: '完了', 実行中: false, ログ: 'installing\nchecked\n', 結果: { id: 'claude', 状態: 'OK', バージョン: '2.0' }, 確認済み: true, 前回実行日時: '2026-10-19T22:00:00Z', ...extra });
 const snapshot = run => ({ 項目: capabilities, 実行: run });
@@ -40,8 +40,28 @@ test('導入・再導入・削除は対象と影響を確認し、取り消し�
     assert.match(prompts[0], /対象パッケージ:/); assert.match(prompts[0], /パッケージ/); assert.match(prompts[0], /認証情報・利用者設定・会話履歴は削除しません/);
     assert.match(prompts[0], /終了後に対象の各項目で「確認」ボタンと同じ処理を自動実行/);
     assert.match(prompts[0], action === '削除' ? /利用できなくなります/ : /ネットワーク.*取得.*実行/);
-    if (action === '再導入') { assert.match(prompts[0], /削除してから、再度インストール/); assert.match(prompts[0], /再導入に失敗すると.*利用できなくなる/); }
+    if (action === '再導入') { assert.match(prompts[0], /npm install --global @openai\/codex を1回実行/); assert.match(prompts[0], /事前のアンインストールは行いません/); assert.doesNotMatch(prompts[0], /削除してから|削除後|npm uninstall/); }
+    if (action === '削除') { assert.match(prompts[0], /対象パッケージを削除します/); assert.doesNotMatch(prompts[0], /npm install|更新・再導入/); }
     f.state.終了();
+  }
+});
+
+test('npm 全4パッケージの実際の能力情報を使い、確認は install 1回だけと表示する', async t => {
+  const { mkdtemp, mkdir, writeFile, rm } = require('node:fs/promises');
+  const { tmpdir } = require('node:os');
+  const { NPM_PACKAGES, npmCapability } = await import('../../../../導入管理/導入管理.mjs');
+  const prefix = await mkdtemp(path.join(tmpdir(), 'diag-npm-confirm-')), root = path.join(prefix, 'lib', 'node_modules');
+  t.after(() => rm(prefix, { recursive: true, force: true }));
+  for (const [id, pkg] of Object.entries(NPM_PACKAGES)) {
+    const directory = path.join(root, ...pkg.split('/'));
+    await mkdir(directory, { recursive: true }); await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: pkg }));
+    const capability = await npmCapability({ id }, { prefix, root }, { platform: 'linux', resolve: async () => null });
+    assert.deepEqual(capability.操作, ['再導入', '削除']);
+    const f = await fixture(); f.setData({ 項目: [capability], 実行: null }); await f.state.接続(true);
+    assert.equal(await f.state.開始(id, '再導入', id), true); assert.equal(f.approvals.length, 1);
+    assert.ok(f.approvals[0].includes(`npm install --global ${pkg} を1回実行`));
+    assert.match(f.approvals[0], /事前のアンインストールは行いません/); assert.doesNotMatch(f.approvals[0], /削除してから|削除後|npm uninstall/);
+    assert.equal(f.calls.filter(([, method]) => method === 'POST').length, 1); f.state.終了();
   }
 });
 
@@ -208,6 +228,7 @@ test('追加パッケージの確認は一式の対象・導入方式・案内�
   await f.state.開始('ffprobe', '再導入', 'ffprobe');
   assert.match(f.approvals[0], /Gyan\.FFmpeg/); assert.match(f.approvals[0], /ffmpeg \/ ffprobe \/ ffplay/);
   assert.match(f.approvals[0], /WinGet の一式/); assert.match(f.approvals[0], /https:\/\/www\.gyan\.dev/);
+  assert.match(f.approvals[0], /削除してから、再度インストール/); assert.doesNotMatch(f.approvals[0], /npm install/);
   assert.match(f.approvals[0], /対象の各項目で「確認」ボタンと同じ処理/);
   assert.deepEqual(f.state.可能操作('ollama'), []);
   f.state.終了();

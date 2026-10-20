@@ -108,7 +108,7 @@ export async function findNpm({env=process.env,platform=process.platform,resolve
 export async function npmCapability(entry,npm,{env=process.env,platform=process.platform,resolve=resolveProgram}={}) {
   const pkg=packageFor(entry.id);
   if(!pkg)return {id:entry.id,操作:[],理由:'安全な導入・削除コマンドが登録されていません。'};
-  const base={id:entry.id,パッケージ:pkg,説明:'npm のグローバルパッケージだけを操作します。認証・設定・履歴は削除しません。'};
+  const base={id:entry.id,パッケージ:pkg,説明:'npm のグローバルパッケージだけを操作します。認証・設定・履歴は削除しません。',再導入説明:`npm install --global ${pkg} を1回実行して更新・再導入します。事前のアンインストールは行いません。`};
   const executable=await resolve(entry,{env,platform});
   const directory=path.join(npm.root,...pkg.split('/'));
   let manifest;
@@ -150,8 +150,9 @@ export async function npmCapability(entry,npm,{env=process.env,platform=process.
 export function npmCommands(npm,id,action,configFile) {
   const pkg=packageFor(id);if(!pkg||!ACTIONS.includes(action))throw failure('未対応の導入操作です。');
   const options=['--global',`--prefix=${npm.prefix}`,'--registry=https://registry.npmjs.org/',`--userconfig=${configFile}`,`--globalconfig=${configFile}.global`,'--no-audit','--no-fund','--no-update-notifier','--foreground-scripts'];
-  const steps=action==='再導入'?['uninstall','install']:[action==='削除'?'uninstall':'install'];
-  return steps.map(step=>({executable:npm.executable,args:[npm.cli,step,...options,pkg],表示:`npm ${step} --global ${pkg}`}));
+  // npm install は既存パッケージも更新する。再導入の前に削除しない。
+  const step=action==='削除'?'uninstall':'install';
+  return [{executable:npm.executable,args:[npm.cli,step,...options,pkg],表示:`npm ${step} --global ${pkg}`}];
 }
 
 export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),env=process.env,platform=process.platform,findNpmFn=findNpm,capabilityFn=npmCapability,inspectWingetFn=inspectWinget,executeWingetFn=executeWinget,inspectAntigravityFn=inspectAntigravity,executeAntigravityFn=executeAntigravity,run=runInstallCommand,timeout=300000,acquireLock=acquireInstallLock}={}) {

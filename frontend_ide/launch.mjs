@@ -9,6 +9,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { startDevelopment } from './server.mjs';
+import { validateCliOptions, resolveCliLaunch } from './aidiy_term/cli-launch.mjs';
+import { createCliOwnerLifetime } from './aidiy_term/cli-session.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
 import { spawnDesktop } from './デスクトップ/desktop-process.mjs';
@@ -33,10 +35,12 @@ async function launchDetached(defaultKind,args){
  }catch(error){if(child.connected)child.disconnect();child.kill();throw error;}
 }
 export async function launch(defaultKind='ide',args=process.argv.slice(2)){
- const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
+ const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},cli:{type:'string'},'cli-auto-approve':{type:'boolean'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
  const kind=values.app||defaultKind;
  if(!['code','live','ide','term'].includes(kind))throw Error('--app はcode / live / ide / termから指定してください。');
- if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port] [--provider 名前] [--model モデル]${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
+ if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port] [--provider 名前] [--model モデル]${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='term'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
+ validateCliOptions(kind,{cli:values.cli,cliAutoApprove:values['cli-auto-approve'],provider:values.provider,model:values.model});
+ if(values.cli)await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']});
  const requestedProject=projectFolder(positionals,values.project);
  const project=kind==='ide'?projectIdentity(requestedProject).path:requestedProject,port=values.port===undefined?0:Number(values.port);
  if(!Number.isInteger(port)||port<0||port>65535)throw Error('--port は0〜65535で指定してください。');
@@ -50,9 +54,10 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  }
  if(!existsSync(fileURLToPath(new URL('./dist/app.js',import.meta.url))))throw Error('Vue画面を準備してください: python frontend_ide/_setup.py');
  if(!values.foreground&&!values.wait&&!values.serve&&!values['no-open']&&!values.browser&&!useBrowser())return launchDetached(kind,args);
- const app=await startDevelopment(project,{kind,port,strict:values['strict-port'],offline:values.offline,provider,model,autoConnect:values.connect});
- let desktop,stopping=false;
- const stop=async()=>{if(stopping)return;stopping=true;if(desktop?.connected)desktop.disconnect();await app.close();};
+ let app,desktop,lifetime,stopping=false;
+ const stop=async()=>{if(stopping)return;stopping=true;lifetime?.dispose();if(desktop?.connected)desktop.disconnect();await app?.close();};
+ if(values.cli)lifetime=createCliOwnerLifetime(stop);
+ app=await startDevelopment(project,{kind,port,strict:values['strict-port'],offline:values.offline,provider,model,cli:values.cli,cliAutoApprove:values['cli-auto-approve'],autoConnect:values.connect,onCliStarted:()=>lifetime?.started(),onCliAbandoned:stop});
  const launcherChild=process.env.AIDIY_LAUNCHER_CHILD==='1'&&!!process.send;
  if(launcherChild)process.once('disconnect',stop);
  const notifyReady=message=>{if(launcherChild){process.removeListener('disconnect',stop);process.send?.({launchReady:true,...message});}};
@@ -75,7 +80,11 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
   }catch(error){if(launcherChild){await stop();throw error;}console.warn(error.message+' Web版へ切り替えます。');if(desktop?.connected)desktop.disconnect();desktop?.kill();desktop=undefined;browser=true;}
  }
  await publishReady();
- if(browser)await ブラウザで開く(app.publicUrl,{ローカルURL:app.url});
+ if(browser){
+  const opened=await ブラウザで開く(app.publicUrl,{ローカルURL:app.url});
+  if(values.cli&&!opened){await stop();throw Error('CLI用のTerm画面をブラウザで開けませんでした。既定ブラウザまたはElectronのセットアップを確認して、もう一度起動してください。');}
+ }
+ lifetime?.arm();
  notifyReady(ready);
  return app;
 }

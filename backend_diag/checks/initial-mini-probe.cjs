@@ -33,7 +33,7 @@ app.on('browser-window-created',(_event,window)=>{
   try{
    await until(()=>window.isVisible()&&window.webContents.executeJavaScript("!!document.querySelector('.start-mini .mini-app-button')&&!document.documentElement.classList.contains('desktop-opening')"));
    assert.equal(checks,1);const area=screen.getPrimaryDisplay().workArea,bounds=window.getBounds();
-   near(bounds,{x:area.x,y:area.y,width:240,height:130});assert.equal(window.isAlwaysOnTop(),true);
+   near(bounds,{x:area.x,y:area.y,width:384,height:248});assert.equal(window.isAlwaysOnTop(),true);
    assert.equal(await window.webContents.executeJavaScript('window.aidiyWindow.initialMini'),true);
    assert.equal(await window.webContents.executeJavaScript("document.querySelector('#app-project-folder').value"),'');
    await sleep(650);window.webContents.invalidate();

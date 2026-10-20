@@ -5,12 +5,12 @@ import path from 'node:path';
 const root=fileURLToPath(new URL('.',import.meta.url));
 async function files(directory){const result=[];for(const entry of await readdir(directory,{withFileTypes:true})){const filename=path.join(directory,entry.name);if(entry.name==='checks' && entry.isDirectory())continue;if(entry.isDirectory())result.push(...await files(filename));else result.push(filename);}return result;}
 export async function manifest(directory=root){
-  const names=[path.join(directory,'../../frontend_ide/src/共通表示/シアンバー.css'),...await files(path.join(directory,'src')),...await files(path.join(directory,'../runtime')),path.join(directory,'../モデル試行/defaults.mjs'),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),path.join(directory,'tsconfig.runtime.json'),...['app.js','style.css','index.html','AiDiy_diag.png',...['avatar','ide','term','code','live','discord'].map(id=>`AiDiy_${id}.png`)].map(name=>path.join(directory,'../static',name))];
+  const names=[path.join(directory,'../../frontend_ide/src/共通表示/シアンバー.css'),...await files(path.join(directory,'src')),...await files(path.join(directory,'../runtime')),path.join(directory,'../モデル試行/defaults.mjs'),path.join(directory,'build.mjs'),path.join(directory,'package.json'),path.join(directory,'package-lock.json'),path.join(directory,'tsconfig.runtime.json'),...['app.js','style.css','index.html','AiDiy_diag.png','LICENSE-Octicons.txt','LICENSE-LobeHub.txt','LICENSE-OpenCode.txt','LICENSE_ICONS.md',...['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'].map(id=>`CLI_${id}.png`),...['avatar','ide','term','code','live','discord'].map(id=>`AiDiy_${id}.png`)].map(name=>path.join(directory,'../static',name))];
   // Git の Windows checkout による CRLF だけを正規化。将来の画像等は生バイトで比較する。
   const entries=await Promise.all(names.map(async name=>{
     const relative=path.relative(directory,name).replaceAll('\\','/');
     const bytes=await readFile(name);
-    const content=/\.(?:vue|ts|[cm]?js|css|html|json)$/.test(relative)?Buffer.from(bytes.toString('utf8').replace(/\r\n/g,'\n')):bytes;
+    const content=/\.(?:vue|ts|[cm]?js|css|html|json|md|txt|svg|py)$/.test(relative)?Buffer.from(bytes.toString('utf8').replace(/\r\n/g,'\n')):bytes;
     return [relative,createHash('sha256').update(content).digest('hex')];
   }));
   return Object.fromEntries(entries.sort(([a],[b])=>a<b?-1:a>b?1:0));

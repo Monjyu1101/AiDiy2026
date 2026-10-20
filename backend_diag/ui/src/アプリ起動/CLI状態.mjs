@@ -1,0 +1,25 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+import {ref} from 'vue';
+export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=message=>globalThis.confirm(message)}){
+ const 項目=ref([]),読込中=ref(false),処理中=ref(''),通知=ref(''),失敗=ref(false);let revision=0;
+ async function 読込(){
+  if(読込中.value||!接続可能())return;const version=++revision;読込中.value=true;
+  try{const data=await api('api/CLI起動');if(version===revision){項目.value=data.対象.filter(item=>item.利用可能===true);if(失敗.value){失敗.value=false;通知.value='';}}}
+  catch(error){if(version===revision){項目.value=[];通知.value=error.message;失敗.value=true;}}
+  finally{if(version===revision)読込中.value=false;}
+ }
+ async function 起動(id){
+  if(!接続可能()||処理中.value||アプリ.処理中.value||アプリ.選択中.value||!アプリ.フォルダ.value)return;
+  const item=項目.value.find(value=>value.id===id);if(!item)return;
+  const project=アプリ.フォルダ.value;処理中.value=id;アプリ.処理中.value='cli:'+id;通知.value='';失敗.value=false;
+  try{
+   const accepted=await 確認(`${item.名前} を aidiy_term で開始しますか？\n\nプロジェクト: ${project}\nモード: ${item.モード}\nモデル: 指定なし（CLI の既定設定）\n\nファイルの変更やコマンド実行が自動承認されます。CLIによってはサンドボックスも解除されます。信頼できるプロジェクトだけで使用してください。CLIの契約や設定によって利用料金が発生する場合があります。ログイン・組織の制限・初回の信頼確認はCLI側に残る場合があります。`);
+   if(accepted!==true||!接続可能()||project!==アプリ.フォルダ.value)return;
+   const data=await api('api/CLI起動/開始','POST',undefined,'json',{対象:id,フォルダ:project,自動承認確認:true});通知.value=data.通知;
+  }catch(error){通知.value=error.message;失敗.value=true;}
+  finally{処理中.value='';アプリ.処理中.value='';}
+ }
+ function 切断(){revision++;項目.value=[];読込中.value=false;}
+ return {項目,読込中,処理中,通知,失敗,読込,起動,切断};
+}

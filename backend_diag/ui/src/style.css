@@ -47,3 +47,6 @@ html,body{height:100%;overflow:hidden}#app{height:100vh;height:100dvh;display:fl
 .panel-actions button.write-next:hover:not(:disabled){background:#1d4ed8}
 
 .tabs #run.run-all.force-stop{background:#ff4d6d;border-color:#ff8a9c;color:#30050d}.tabs #run.run-all.force-stop:hover:not(:disabled){background:#ff718b;border-color:#ffb0be}
+
+/* タイトル欄から、表示中のタブを変えずにミニへ移行する。 */
+.window-actions .title-mini-switch{width:auto;min-width:62px;padding:0 7px;font-size:11px;white-space:nowrap}.window-actions .title-mini-switch:disabled{opacity:.4;cursor:not-allowed}.window-actions .title-mini-switch:hover:not(:disabled){color:#d8fff4;background:#20474d}@media(max-width:480px){.panel-brand:not(.compact){grid-template-columns:minmax(0,1fr) auto minmax(152px,1fr)}}
