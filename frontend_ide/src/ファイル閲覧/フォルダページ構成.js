@@ -66,12 +66,13 @@ export function createFolderPageMemory() {
   return {
     save(path, state) {
       const previous = pages.get(path) || { scrollTop: 0, cursor: '' };
-      pages.set(path, { ...previous, ...state, scrollTop: Math.max(0, Number(state.scrollTop ?? previous.scrollTop) || 0) });
+      pages.set(path, { ...previous, ...state, scrollTop: Math.max(0, Number(state.scrollTop ?? previous.scrollTop) || 0),
+        ...('scrollLeft' in state || 'scrollLeft' in previous ? { scrollLeft: Math.max(0, Number(state.scrollLeft ?? previous.scrollLeft) || 0) } : {}) });
     },
     restore(path, entries, selected = '') {
       const state = pages.get(path) || { scrollTop: 0, cursor: '' };
       const paths = new Set(entries.map(entry => entry.path));
-      return { scrollTop: state.scrollTop, cursor: paths.has(selected) ? selected : paths.has(state.cursor) ? state.cursor : entries[0]?.path || '' };
+      return { scrollTop: state.scrollTop, ...('scrollLeft' in state ? { scrollLeft: state.scrollLeft } : {}), cursor: paths.has(selected) ? selected : paths.has(state.cursor) ? state.cursor : entries[0]?.path || '' };
     },
     clear() { pages.clear(); },
   };

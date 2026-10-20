@@ -76,6 +76,13 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
     })();
     return pending;
   }
+  async function 操作結果反映(data, seq, revision) {
+    反映(data, seq);
+    // 送信順はサーバーの処理順とは限らない。既存GETは操作受付前の状態かもしれないため、
+    // その完了を待ってから新しいGETで照合し、実行一覧・中止操作・ポーリングを維持する。
+    if (pending) await pending;
+    if (有効(revision)) await 読込();
+  }
   function 確認文(id, action, name) {
     const capability = 能力(id);
     const change = action === '削除' ? '対象パッケージを削除します。このプログラムは利用できなくなります。' : action === '再導入' ? (capability?.再導入説明 || '対象パッケージを削除してから、再度インストールします。再導入に失敗すると、このプログラムが利用できなくなる場合があります。') : '診断サーバーの環境へパッケージを導入します。';
@@ -98,7 +105,7 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
     try {
       const { data, seq } = await 送信(`api/導入管理/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, 'POST');
       if (!有効(revision)) return false;
-      反映(data, seq); return true;
+      await 操作結果反映(data, seq, revision); return true;
     } catch (error) {
       if (有効(revision)) { エラー.value = `${error.message} 実行の有無を確認しています。`; startFailures.set(id, { action, previous, message: error.message }); uncertain = true; }
       // 受付結果が不明でも POST は再送せず、GET で既存実行を照合する。
@@ -116,7 +123,7 @@ export function 導入操作状態を作成({ api, 接続済み, 操作中 = ref
     // 中止の応答を待つ間はポーリングを止め、応答後に再開する。
     clearTimer(timer); timer = undefined;
     const revision = version; 取消.value = { ...取消.value, [runId]: '要求中' }; エラー.value = ''; 状態更新();
-    try { const { data, seq } = await 送信(`api/導入管理/${encodeURIComponent(runId)}`, 'DELETE'); if (!有効(revision)) return false; 取消.value = { ...取消.value, [runId]: '要求済み' }; 反映(data, seq); return true; }
+    try { const { data, seq } = await 送信(`api/導入管理/${encodeURIComponent(runId)}`, 'DELETE'); if (!有効(revision)) return false; 取消.value = { ...取消.value, [runId]: '要求済み' }; await 操作結果反映(data, seq, revision); return true; }
     catch (error) { if (有効(revision)) { 取消.value = { ...取消.value, [runId]: '要求済み' }; エラー.value = `${error.message} 中止結果を確認しています。`; cancelFailures.set(runId, error.message); uncertain = true; } return false; }
     finally { if (有効(revision)) { 状態更新(); 予約(); } }
   }

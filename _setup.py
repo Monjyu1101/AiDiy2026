@@ -499,7 +499,8 @@ def print_ai_cli_manual_setup():
         print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
         print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
         print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
-        print_info(f"    OpenCode   : {cmd} install -g @opencode/cli")
+        print_info(f'    OpenCode   : node "{BASE_DIR / "scripts" / "cli_bat" / "install_opencode.mjs"}"')
+        print_info("      所有確認した旧 opencode-ai だけを削除して V2 へ移行します。導入失敗時は利用できなくなる場合があります。")
     else:
         print_info("    npm 系 CLI : Node.js / npm を導入後に個別セットアップしてください")
         print_info("      https://nodejs.org/")
@@ -519,9 +520,12 @@ def start_global_cli_tools_install():
     targets = []
     if check_npm_installed():
         cmd = npm_command()
-        for package in ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "@opencode/cli"]:
+        for package in ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex"]:
             command = [cmd, "install", "-g", package]
             targets.append((package, command, " ".join(command), None))
+        command = [shutil.which("node") or "node", str(BASE_DIR / "scripts" / "cli_bat" / "install_opencode.mjs")]
+        print_info("OpenCode: 所有確認した旧 opencode-ai がある場合だけ削除して V2 へ移行します。導入失敗時は利用できなくなる場合があります。")
+        targets.append(("@opencode/cli", command, " ".join(command), None))
     else:
         print_warning("共通: npm がインストールされていないため、npm 系 CLI はスキップします。")
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
@@ -568,7 +572,9 @@ def wait_global_cli_tools_install() -> list[str]:
     failed_packages = []
     for i, (package, process, temp_path) in enumerate(GLOBAL_CLI_INSTALL_PROCESSES, 1):
         try:
-            stdout, stderr = process.communicate(timeout=300)
+            # OpenCode は専用入口が各段階の期限と子プロセスの停止確認を管理する。
+            # 親から強制終了すると npm の子と排他を残すため、停止確認まで待つ。
+            stdout, stderr = process.communicate(timeout=None if package == "@opencode/cli" else 300)
             if process.returncode == 0:
                 print_success(f"  [{i}/{len(GLOBAL_CLI_INSTALL_PROCESSES)}] {package}: 導入完了")
             else:

@@ -6,6 +6,7 @@
 import { access, readFile, realpath, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
+import { inspectOpenCodeNpm } from '../../scripts/opencode-npm.mjs';
 
 // 診断メニューとTermが共有する固定許可リスト。モデル・プロンプト・任意コマンドは渡さない。
 // 各オプションはCLIのツール承認用。ログイン・信頼確認や組織の禁止設定は解除しない。
@@ -37,10 +38,17 @@ async function usable(file, platform) {
 // .cmdはシェルで解釈しない。許可済みnpmパッケージの宣言済みbinだけをNodeへargvで渡す。
 // PATHやプロジェクトに空白、日本語、引用符、&、%、$等が含まれてもコマンド文字列を生成しない。
 async function npmInvocation(id, shim) {
-  const packageName = npmPackages[id];
+  let packageName = npmPackages[id];
   if (!packageName) throw Error(`${byId[id].name}: このコマンド形式には対応していません。`);
-  const root = path.join(path.dirname(shim), 'node_modules', packageName);
   try {
+    if (id === 'opencode') {
+      const prefix = path.dirname(shim), root = path.join(prefix, 'node_modules');
+      // V2 未移行時も、実際の shim が所有する公式 V1 の宣言済み bin を起動する。
+      const { owner } = await inspectOpenCodeNpm({ prefix, root }, { platform: 'win32', executable: shim });
+      if (!owner) throw Error('shim owner');
+      packageName = owner.name;
+    }
+    const root = path.join(path.dirname(shim), 'node_modules', packageName);
     const metadata = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
     const declaredBin = typeof metadata.bin === 'string' ? metadata.bin : metadata.bin && Object.hasOwn(metadata.bin, id) ? metadata.bin[id] : undefined;
     const bin = typeof declaredBin === 'string' ? declaredBin.replace(/^\.\//, '') : undefined;

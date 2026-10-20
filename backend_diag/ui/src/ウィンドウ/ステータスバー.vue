@@ -20,8 +20,13 @@ onBeforeUnmount(()=>{disposed=true;unsubscribePin?.();window.removeEventListener
 <template>
 <header class="panel-brand" :class="{desktop,compact}">
  <span class="connection-label" role="status"><i :class="{online:online&&enabled&&connected}" aria-hidden="true"></i>{{!connected?'診断 未接続':!enabled?'Tools 確認OFF':checking?'Tools 確認中':online?'Tools 接続中':'Tools 未接続'}}</span>
- <strong>{{compact?'AiDiy 起動':'AiDiy Diag'}}</strong>
- <span class="window-actions" :class="{'window-maximized':maximized}"><button v-if="!compact" class="title-mini-switch" :disabled="!connected||switching" @click="$emit('mini')" title="ミニ表示" aria-label="ミニ表示">ミニ表示</button><button v-else class="mini-restore" :disabled="switching" @click="$emit('restore')" title="通常表示" aria-label="通常表示">↗</button><template v-if="desktop"><button @click="action('minimize')" title="最小化" aria-label="最小化"><span class="window-minimize"></span></button><button :disabled="compact" @click="action('maximize')" :title="compact?'ミニ表示中は最大化できません':maximized?'元のサイズに戻す':'最大化'" :aria-label="maximized?'元のサイズに戻す':'最大化'"><span class="window-maximize"></span></button><button class="window-pin" :class="{pinned:pin.pinned}" :aria-pressed="pin.pinned" :disabled="pin.locked||pinBusy" :title="pinTitle" :aria-label="pinTitle" @click="togglePin"><span aria-hidden="true">📌</span></button><button @click="action('close')" title="閉じる" aria-label="終了">×</button></template></span>
+ <strong>{{compact?'AiDiy 起動メニュー':'AiDiy Diag'}}</strong>
+ <span class="window-actions" :class="{'window-maximized':maximized}">
+  <button v-if="!compact" class="title-mini-switch" :disabled="!connected||switching" @click="$emit('mini')" title="起動メニュー" aria-label="起動メニュー">起動メニュー</button>
+  <button v-if="desktop" @click="action('minimize')" title="最小化" aria-label="最小化"><span class="window-minimize"></span></button>
+  <button v-if="desktop||compact" :class="{'mini-restore':compact}" :disabled="switching" @click="compact?$emit('restore'):action('maximize')" :title="compact||maximized?'元のサイズに戻す':'最大化'" :aria-label="compact||maximized?'元のサイズに戻す':'最大化'"><span class="window-maximize"></span></button>
+  <template v-if="desktop"><button class="window-pin" :class="{pinned:pin.pinned}" :aria-pressed="pin.pinned" :disabled="pin.locked||pinBusy" :title="pinTitle" :aria-label="pinTitle" @click="togglePin"><span aria-hidden="true">📌</span></button><button @click="action('close')" title="閉じる" aria-label="終了">×</button></template>
+ </span>
 </header>
 <div class="connection-bar" :class="{online:online&&enabled&&connected,offline:!enabled}" aria-hidden="true"></div>
 </template>

@@ -21,7 +21,8 @@ function 画面サイズ演出を作成(BrowserWindow,window){
  }
  async function 準備(target){
   if(current)return false;
-  if(window.isDestroyed()||!window.isVisible()||window.isMinimized())return true;
+  if(window.isDestroyed())return false;
+  if(!window.isVisible()||window.isMinimized())return true;
   const state={opacity:window.getOpacity()};current=state;
   // rendererが切替完了を通知できなくても、実窓を透明なまま残さない。
   state.timer=setTimeout(終了,2500);state.timer.unref?.();
@@ -38,8 +39,9 @@ function 画面サイズ演出を作成(BrowserWindow,window){
    await canvas.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
    if(current!==state||window.isDestroyed()){if(!canvas.isDestroyed())canvas.destroy();return false;}
    canvas.showInactive();await 描画待ち(canvas.webContents);
-   if(current===state&&!window.isDestroyed())window.setOpacity(0);
-  }catch{if(current!==state)return false;終了();}
+   if(current!==state||window.isDestroyed()){if(current===state)終了();return false;}
+   window.setOpacity(0);
+  }catch{if(current!==state)return false;終了();if(window.isDestroyed())return false;}
   return true;
  }
  async function 完了(){

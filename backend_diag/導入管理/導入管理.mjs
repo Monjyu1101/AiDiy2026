@@ -10,6 +10,7 @@ import {resolveProgram,probe} from '../診断/probes.mjs';
 import {WINGET_PACKAGES,inspectWinget,executeWinget} from './winget.mjs';
 import {inspectAntigravity,executeAntigravity} from './antigravity.mjs';
 import {inspectGrok,executeGrok} from './grok.mjs';
+import {OPENCODE_LEGACY_PACKAGE,inspectOpenCodeNpm} from '../../scripts/opencode-npm.mjs';
 
 // _setup.py の共通セットアップと同じ4パッケージ。クライアントから名前・コマンドを受け取らない。
 // OpenCode は 2.x から公式パッケージ名が opencode-ai から @opencode/cli へ変わった。
@@ -116,6 +117,16 @@ export async function npmCapability(entry,npm,{env=process.env,platform=process.
   if(!pkg)return {id:entry.id,操作:[],理由:'安全な導入・削除コマンドが登録されていません。'};
   const base={id:entry.id,パッケージ:pkg,説明:'npm のグローバルパッケージだけを操作します。認証・設定・履歴は削除しません。',再導入説明:`npm install --global ${pkg} を1回実行して更新・再導入します。事前のアンインストールは行いません。`};
   const executable=await resolve(entry,{env,platform});
+  if(entry.id==='opencode'){
+    try{
+      const {installed}=await inspectOpenCodeNpm(npm,{platform,executable});
+      const legacy=installed.includes(OPENCODE_LEGACY_PACKAGE);
+      return {...base,導入済みパッケージ:installed,操作:installed.length?['再導入','削除']:['導入'],
+        ...(legacy?{移行元:OPENCODE_LEGACY_PACKAGE,
+          説明:`${base.説明} 導入済み: ${installed.join(' / ')}。削除は導入済みパッケージだけを対象にします。`,
+          再導入説明:`所有を確認した ${OPENCODE_LEGACY_PACKAGE} を npm uninstall --global で削除してから、npm install --global ${pkg} で V2 へ移行します。導入に失敗すると OpenCode が利用できなくなる場合があります。`}:{}),};
+    }catch{return {...base,操作:[],理由:'OpenCode のパッケージ・実行ファイルの所有元を確認できないため、自動操作しません。元の導入方法と配置を確認してください。'};}
+  }
   const directory=path.join(npm.root,...pkg.split('/'));
   let manifest;
   try{manifest=JSON.parse(await readFile(path.join(directory,'package.json'),'utf8'));}
@@ -154,12 +165,20 @@ export async function npmCapability(entry,npm,{env=process.env,platform=process.
   return {...base,操作:[],理由:'検出された実行ファイルは別の導入元です。元の方法で管理してください。'};
 }
 
-export function npmCommands(npm,id,action,configFile) {
+export function npmCommands(npm,id,action,configFile,capability) {
   const pkg=packageFor(id);if(!pkg||!ACTIONS.includes(action))throw failure('未対応の導入操作です。');
   const options=['--global',`--prefix=${npm.prefix}`,'--registry=https://registry.npmjs.org/',`--userconfig=${configFile}`,`--globalconfig=${configFile}.global`,'--no-audit','--no-fund','--no-update-notifier','--foreground-scripts'];
-  // npm install は既存パッケージも更新する。再導入の前に削除しない。
+  const command=(step,packages)=>({executable:npm.executable,args:[npm.cli,step,...options,...packages],表示:`npm ${step} --global ${packages.join(' ')}`});
+  // 名前変更を伴う OpenCode V1 だけは、直前に所有確認した旧パッケージを先に除く。
+  if(id==='opencode'&&capability?.移行元===OPENCODE_LEGACY_PACKAGE){
+    const installed=capability.導入済みパッケージ;
+    if(!Array.isArray(installed)||!installed.includes(OPENCODE_LEGACY_PACKAGE)||installed.some(name=>![pkg,OPENCODE_LEGACY_PACKAGE].includes(name)))throw failure('OpenCode の移行元を確認できません。',409);
+    if(action==='削除')return [command('uninstall',installed)];
+    return [command('uninstall',[OPENCODE_LEGACY_PACKAGE]),command('install',[pkg])];
+  }
+  // 通常の npm 再導入は既存パッケージを削除せず、install だけで更新する。
   const step=action==='削除'?'uninstall':'install';
-  return [{executable:npm.executable,args:[npm.cli,step,...options,pkg],表示:`npm ${step} --global ${pkg}`}];
+  return [command(step,[pkg])];
 }
 
 export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),env=process.env,platform=process.platform,findNpmFn=findNpm,capabilityFn=npmCapability,inspectWingetFn=inspectWinget,executeWingetFn=executeWinget,inspectAntigravityFn=inspectAntigravity,executeAntigravityFn=executeAntigravity,inspectGrokFn=inspectGrok,executeGrokFn=executeGrok,run=runInstallCommand,timeout=300000,acquireLock=acquireInstallLock}={}) {
@@ -207,8 +226,8 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
   const ensureAllowed=(state,entry,action)=>{
     if(!state.items.find(item=>item.id===entry.id)?.操作?.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
   };
-  async function execute(job,entry,action){
-    let directory,releaseLock,status='完了',message='操作が完了しました。';
+  async function execute(job,entry,action,expectedCapability){
+    let directory,releaseLock,lockedCapability,status='完了',message='操作が完了しました。';
     const provider=providerFor(entry.id),controller=job.controller,log=text=>append(job,text);
     const onUncertain=()=>{job.状態='停止未確認';job.説明='停止の完了を確認できません。実行中の処理が終了するまで、この項目の新しい操作はできません。';};
     const operationRun=async command=>{
@@ -235,8 +254,12 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
       releaseLock=await acquireLock(lockKey,{platform,scope:lockScopeFor(entry.id)});
       // ロック取得を待つ間に別の操作が完了していても、古い所有判定では実行しない。
       if(provider==='npm'){
-        const lockedCapability=await capabilityFn(entry,fresh.npm,{env,platform});
+        lockedCapability=await capabilityFn(entry,fresh.npm,{env,platform});
         if(!lockedCapability.操作?.includes(action))throw failure('導入状況または所有元が変わりました。操作せず再確認します。',409);
+        if(entry.id==='opencode'&&(lockedCapability.移行元||expectedCapability?.移行元)
+          &&JSON.stringify(lockedCapability.導入済みパッケージ)!==JSON.stringify(expectedCapability?.導入済みパッケージ)){
+          throw failure('OpenCode の移行対象が確認時から変わりました。移行説明を再確認してから操作してください。',409);
+        }
       }else{
         fresh=await inspect();cache=fresh;ensureAllowed(fresh,entry,action);
         const lockedKey=fresh[provider]?.lockKey||fresh[provider]?.prefix;
@@ -246,7 +269,15 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
       directory=await mkdtemp(path.join(os.tmpdir(),'aidiy-install-'));
       if(provider==='npm'){
         const configFile=path.join(directory,'npmrc');await writeFile(configFile,'',{mode:0o600});await writeFile(configFile+'.global','',{mode:0o600});
-        for(const command of npmCommands(fresh.npm,entry.id,action,configFile))await checkedRun(command);
+        const commands=npmCommands(fresh.npm,entry.id,action,configFile,lockedCapability);
+        for(const [index,command] of commands.entries()){
+          if(index>0){
+            // V1 削除後に未知の shim が残った・所有元が変わった場合は V2 を上書きしない。
+            const next=await capabilityFn(entry,fresh.npm,{env,platform});
+            if(next.移行元||!next.操作?.some(value=>['導入','再導入'].includes(value)))throw failure('OpenCode V1 の削除後の所有元を確認できません。V2 の導入は行いません。',409);
+          }
+          await checkedRun(command);
+        }
       }else{
         const executeProvider=provider==='winget'?executeWingetFn:provider==='grok'?executeGrokFn:executeAntigravityFn;
         // 実コマンドは共通の期限・中止・終了確認を通す。プロバイダー内の照会も実行中として排他する。
@@ -291,7 +322,7 @@ export function createInstallManager({entries,probeFn=probe,onResult=()=>({}),en
     if(jobs.some(job=>active(job)&&overlaps(job.対象,id)))throw failure('この項目の導入操作を実行中です。完了後に再試行してください。',409);
     const job={実行ID:randomUUID(),対象:id,関連項目:affectedIds(id),操作:action,状態:'実行中',実行中:true,開始日時:new Date().toISOString(),終了日時:null,raw:`${entry.name||id}: ${action}\n導入元を確認しています。\n`,controller:new AbortController()};
     jobs.push(job);prune();
-    const task=execute(job,entry,action).finally(()=>tasks.delete(task));tasks.add(task);
+    const task=execute(job,entry,action,cache?.items.find(item=>item.id===id)).finally(()=>tasks.delete(task));tasks.add(task);
     const state=await snapshot();
     return {...state,実行:publicJob(job)};
   }

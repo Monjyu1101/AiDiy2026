@@ -18,7 +18,7 @@
 .ide-project-actions{display:flex;align-items:center;gap:8px;flex:1;min-width:0}.ide-project-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ai-launchers{display:flex;gap:4px;flex:none}
 .ide-toolbar-right{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}.ide-view-modes{display:flex;gap:0;flex:none}.ide-view-modes button{min-width:32px}.ide-view-modes button+button{margin-left:-1px}.ide-view-modes button[aria-pressed=true]{position:relative;background:#113039;border-color:#6bcbcc;color:#a7f6ff}.ide-heading .ai-launchers button[aria-pressed=true]{border-color:#8cecff;color:#a7f6ff}
 /* AiDiyの既存メニュー共通色（frontend_web/src/assets/menu-common.css）を2Dだけへ適用する。 */
-.space-view.mode-2d{--aidiy-cream-light:#faf7f2;--aidiy-cream-base:#f5f1e8;--aidiy-cream-shade:#f0ebe0;--aidiy-cream-ink:#5a4a3a;--aidiy-cream-border:#d8d0c4;background:linear-gradient(135deg,var(--aidiy-cream-light),var(--aidiy-cream-base) 50%,var(--aidiy-cream-shade))}
+.space-view.mode-2d{--aidiy-cream-light:#faf7f2;--aidiy-cream-base:#f5f1e8;--aidiy-cream-shade:#f0ebe0;--aidiy-cream-ink:#5a4a3a;--aidiy-cream-border:#d8d0c4;background:var(--aidiy-cream-light)}
 .mode-2d .folder-pages,.mode-2d .folder-page-body,.mode-2d .space-loading{background:var(--aidiy-cream-light);color:var(--aidiy-cream-ink);color-scheme:light;border-color:var(--aidiy-cream-border)}
 .mode-2d .folder-page-heading{background:var(--aidiy-cream-base);border-color:var(--aidiy-cream-border)}.mode-2d .folder-page-heading button{color:var(--aidiy-cream-ink);background:var(--aidiy-cream-light);border-color:var(--aidiy-cream-border)}.mode-2d .folder-page-heading button:hover{background:#e6d5b7}.mode-2d .folder-page-heading nav button[aria-current=location]{color:#4a3a2a;font-weight:bold}
 .mode-2d .folder-page-summary,.mode-2d .folder-pages footer{color:#76644e;border-color:var(--aidiy-cream-border)}.mode-2d .folder-page-summary span,.mode-2d .folder-page-meta,.mode-2d .folder-page-empty{color:#796952}.mode-2d .folder-page-meta{color:#675640}.mode-2d .folder-page-entry{border-color:#e5ded2}.mode-2d .folder-page-entry.folder{background:#f3edde;border-color:#d8d0c4}.mode-2d .folder-page-entry.striped{background:var(--aidiy-cream-base)}.mode-2d .folder-page-entry:hover{background:#eee6d8}.mode-2d .folder-page-entry[data-cursor=true]{background:#e6d5b7;box-shadow:inset 3px 0 #856848}.mode-2d .folder-page-entry.selected{background:#ddcfb5}.mode-2d .folder-page-entry.marked,.mode-2d .folder-page-mark{color:#7a4908}.mode-2d .folder-page-icon{filter:brightness(.5) saturate(.9)}.mode-2d .folder-page-body:focus-visible,.mode-2d .folder-page-heading button:focus-visible{outline:2px solid #856848;outline-offset:-2px}.folder-page-reference-note{flex:none;margin:0;padding:8px 12px;background:#f5e8c9;color:#74521f;border-bottom:1px solid #d8c398;font-size:16px;line-height:1.5;overflow-wrap:anywhere;max-height:30%;overflow:auto}.mode-2d .folder-page-turn-status{max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -27,14 +27,25 @@
 .mode-2d.explorer-open .folder-pages{left:calc(var(--explorer-width) + 24px)}.mode-2d.viewing .folder-pages{right:calc(33vw + 24px)}
 .folder-page-heading{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #29334c;flex:none}.folder-page-heading button{min-height:36px}.folder-page-heading>button{flex:none;white-space:nowrap}.folder-page-heading nav{flex:1;min-width:0;align-items:center;gap:3px;flex-wrap:wrap;max-height:6em;overflow:auto}.folder-page-heading nav button{border:0;background:transparent;overflow-wrap:anywhere;text-align:left;max-width:100%}.folder-page-heading nav button[aria-current=location]{color:#a7f6ff}.folder-page-refresh{margin-left:auto}
 .folder-page-summary{display:flex;flex-wrap:wrap;gap:8px;padding:8px 12px;color:#9aa9bd;border-bottom:1px solid #1b2537;font-size:16px;flex:none}.folder-page-summary span{margin-left:auto;color:#6c809c}.folder-page-stack{--page-turn-slant:min(20%,160px);--page-turn-curve:cubic-bezier(.42,0,1,1);position:relative;flex:1;min-height:96px;overflow:hidden;isolation:isolate}.folder-page-body{position:absolute;inset:0;min-height:96px;overflow:auto;overflow-anchor:none;outline-offset:-2px;background:#080c16}.folder-page-sheet{pointer-events:none;z-index:2}.folder-page-underlay{z-index:1}.folder-page-sheet.page-turn-forward{animation:folder-page-forward var(--page-turn-duration,800ms) var(--page-turn-curve) both}.folder-page-sheet.page-turn-back{animation:folder-page-back var(--page-turn-duration,800ms) var(--page-turn-curve) both}.folder-page-turn-edge{position:absolute;top:0;bottom:0;width:var(--page-turn-slant);height:100%;z-index:3;pointer-events:none;overflow:visible;fill:none;stroke:var(--aidiy-cream-ink,#a7c8e9);stroke-width:2px;filter:drop-shadow(0 0 6px #5a4a3a55)}.folder-page-turn-edge.page-turn-forward{animation:folder-page-edge-forward var(--page-turn-duration,800ms) var(--page-turn-curve) both}.folder-page-turn-edge.page-turn-back{animation:folder-page-edge-back var(--page-turn-duration,800ms) var(--page-turn-curve) both}.folder-page-entry{display:grid;grid-template-columns:32px minmax(0,1fr) max-content;align-items:center;gap:10px;min-height:48px;padding:5px 12px;border-bottom:1px solid #172135;cursor:pointer}.folder-page-entry:hover{background:#122039}.folder-page-entry[data-cursor=true]{background:#172c43;box-shadow:inset 2px 0 #7cbdde}.folder-page-entry.selected{background:#14333c}.folder-page-entry.marked{color:#ffe28a}.folder-page-icon{--file-type-icon-size:24px;width:32px;display:grid;place-items:center}.folder-page-name{min-width:0;overflow-wrap:anywhere}.folder-page-meta{min-width:0;color:#8898b2;font-size:16px;line-height:1.125;text-align:right;overflow-wrap:anywhere}.folder-page-meta time{display:block;margin-top:0;font-size:inherit}.folder-page-mark{color:#e7d28c}.folder-page-empty{padding:20px;color:#91a0b8;line-height:1.8}.folder-pages footer{padding:8px 12px;color:#7b8da8;border-top:1px solid #29334c;font-size:16px;flex:none;max-height:calc(3em + 16px);overflow:auto;overflow-wrap:anywhere}
-/* フォルダ先の既存DOM順を使い、上部だけをAiDiyメニュー風カードにする。ファイル行は全幅のまま。 */
-.folder-page-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,236px),1fr));align-items:stretch}
-.folder-page-entry:not(.folder),.folder-page-empty{grid-column:1/-1}
-.folder-page-entry.folder{grid-template-columns:32px minmax(0,1fr);grid-template-rows:1fr auto;align-items:start;gap:8px 10px;min-height:111px;min-width:0;margin:8px 6px 12px;padding:14px;border:1px solid #d8d0c4;border-radius:0;box-shadow:inset 0 0 22px 4px #8d744b55,0 4px 6px #0000001a;transition:transform .2s ease,box-shadow .2s ease}
+/* フォルダだけ横へ送る単色のスクエアカード。ファイル行は下の全幅リストを維持する。 */
+.folder-page-items{min-width:0}
+.folder-page-folder-strip,.folder-page-files{min-width:0;touch-action:pan-y pinch-zoom;user-select:none;cursor:grab;-webkit-app-region:no-drag}
+.folder-page-folder-strip{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;scroll-behavior:auto}
+.folder-page-folder-strip{padding:12px}
+.folder-page-cards{display:flex;align-items:stretch;gap:12px}
+.folder-page-folder-strip .folder-page-entry,.folder-page-files .folder-page-entry{cursor:grab}
+.slide-dragging,.slide-dragging .folder-page-entry{cursor:grabbing}
+.folder-page-entry.folder{flex:0 0 min(176px,100%);width:176px;aspect-ratio:1;grid-template-columns:32px minmax(0,1fr);grid-template-rows:1fr auto;align-items:start;gap:8px 10px;min-height:176px;min-width:0;margin:0;padding:14px;border:1px solid #b9a98d;border-radius:0;box-shadow:none}
+.folder-page-summary:has(.folder-page-slide-controls){align-items:center;max-height:none}
+.folder-page-slide-controls{display:flex;align-items:center;gap:4px;flex:none;margin-left:auto}
+.folder-page-slide-controls button{min-width:36px;min-height:32px;line-height:1}
+.mode-2d .folder-page-slide-controls button{color:var(--aidiy-cream-ink);background:var(--aidiy-cream-base);border-color:#b9a98d}
+.mode-2d .folder-page-slide-controls button:hover:not(:disabled){background:#e6d5b7}
+.mode-2d .folder-page-slide-controls button:focus-visible{outline:2px solid #856848;outline-offset:1px}
 .folder-page-entry.folder .folder-page-name{font-weight:bold}
 .folder-page-entry.folder .folder-page-meta{grid-column:2;text-align:left;line-height:1.4}
 .mode-2d .folder-page-entry.folder .folder-page-meta{color:#5a4a3a}
-.mode-2d .folder-page-entry.folder:hover{transform:translateY(-3px);box-shadow:inset 0 0 22px 4px #8d744b66,0 8px 20px #00000026}
+.mode-2d .folder-page-entry.folder:hover{background:#eee6d8}
 .mode-2d .folder-page-entry.folder[data-cursor=true]{outline:2px solid #856848;outline-offset:-2px}
 
 /* 右へ傾いた斜線と切り抜きの上下端を揃え、ゆっくり始めて加速する。傾き分だけ外まで動かして四隅も覆う。 */
@@ -46,7 +57,7 @@
 @media(orientation:portrait){.mode-2d.viewing .folder-pages{right:16px;bottom:calc(50dvh + 8px)}}
 @media(max-width:600px){.ide-project-actions{gap:4px}.ide-toolbar-right{gap:4px}.ide-view-modes button{min-width:27px;padding-inline:4px}.ide-heading .ai-launchers button{padding-inline:5px}.folder-page-heading{gap:3px;padding:5px}.folder-page-entry{padding:5px 7px;gap:5px}}
 /* 16pxの補足2行も通常48pxの行内に収める。狭いページでは名前の下へ送り、サイズと日時を横並びから折り返す。 */
-@container folder-page (max-width:520px){.folder-page-entry{grid-template-columns:32px minmax(0,1fr);row-gap:0}.folder-page-meta{grid-column:2;text-align:left;display:flex;flex-wrap:wrap;column-gap:12px}}
+@container folder-page (max-width:520px){.folder-page-summary>span:not(.folder-page-turn-status){display:none}.folder-page-entry{grid-template-columns:32px minmax(0,1fr);row-gap:0}.folder-page-meta{grid-column:2;text-align:left;display:flex;flex-wrap:wrap;column-gap:12px}}
 /* 縦表示のプレビュー中も一覧を残す。補足は文字を縮めず各欄でスクロールする。 */
 @container folder-page (max-height:360px){.folder-page-heading{padding-block:4px}.folder-page-heading nav{max-height:36px}.folder-page-summary,.folder-page-reference-note,.folder-pages footer{padding-block:4px;max-height:30px;overflow:auto}}
 .ide-heading .ai-launchers button{white-space:nowrap;min-height:25px;padding:3px 8px;font-weight:600;color:#f5f8ff;background:linear-gradient(#3b495c,#263246);border-color:#889db7;box-shadow:inset 0 1px 0 #ffffff26,0 1px 2px #0008}
@@ -179,11 +190,10 @@
 
 .mode-2d .folder-page-meta time.is-today{color:#b42318;font-weight:600}
 
-.mode-2d .folder-page-entry.folder:hover{background:#fff7e7}
 .mode-2d .folder-page-entry.folder.selected{background:#ead9b5;color:#302719}
 .mode-2d .folder-page-entry.folder.selected .folder-page-meta{color:#302719}
 
-.mode-2d .folder-page-entry.folder[data-cursor=true]{box-shadow:inset 0 0 22px 4px #8d744b66,0 4px 6px #0000001a}
+.mode-2d .folder-page-entry.folder[data-cursor=true]{box-shadow:none}
 
 .route-file-list .route-list-heading{display:flex;align-items:center;gap:8px}.route-list-heading span{min-width:0}.route-file-list .route-list-clear{width:auto;flex:none;margin-left:auto;white-space:nowrap;text-align:center}
 
