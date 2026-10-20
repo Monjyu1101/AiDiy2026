@@ -351,7 +351,7 @@ def start_global_npm_tools_install():
         "@anthropic-ai/claude-code",
         "@github/copilot",
         "@openai/codex",
-        "opencode-ai",
+        "@opencode/cli",
     ]
 
     GLOBAL_NPM_INSTALL_PROCESSES.clear()

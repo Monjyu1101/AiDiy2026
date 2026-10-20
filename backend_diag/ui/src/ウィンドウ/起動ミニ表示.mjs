@@ -1,6 +1,6 @@
-import {ref} from 'vue';
+import {ref,nextTick} from 'vue';
 
-export function 起動ミニ表示を作成({利用可能,初期表示=false,切替=enabled=>globalThis.window?.aidiyWindow?.startMini?.(enabled)??true}){
+export function 起動ミニ表示を作成({利用可能,初期表示=false,切替=enabled=>globalThis.window?.aidiyWindow?.startMini?.(enabled)??true,反映=()=>globalThis.window?.aidiyWindow?.finishMini?.()??true}){
  const 表示中=ref(初期表示===true),切替中=ref(false),エラー=ref('');let desired=表示中.value;
  async function 変更(enabled){
   desired=enabled===true&&利用可能();
@@ -12,6 +12,7 @@ export function 起動ミニ表示を作成({利用可能,初期表示=false,切
     const next=desired;
     if(await 切替(next)!==true)throw Error('ウィンドウの表示を切り替えられませんでした。');
     表示中.value=next;
+    await nextTick();await 反映();
    }
    return true;
   }catch(error){desired=表示中.value;エラー.value=error.message;return false;}

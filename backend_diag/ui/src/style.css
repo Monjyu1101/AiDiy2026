@@ -40,6 +40,35 @@ html,body{height:100%;overflow:hidden}#app{height:100vh;height:100dvh;display:fl
 
 .previous-run{align-self:center;color:#9aa7b8;font-size:11px;white-space:nowrap}
 
+/* 通常画面の全ページを一回り小さくする。タイトルバーとミニ画面は元の寸法を保つ。 */
+#app>.tabs,#app>.login,#app>#message,#app>.panel:not(.start-mini),#app>footer{zoom:.85}
+
+/* 明細は文字サイズより上下余白を詰め、800×600でも項目を一覧しやすくする。 */
+#app>.panel:not(.start-mini)>main>article{padding:18px 22px}
+#app>.panel:not(.start-mini) article h2{font-size:25px;margin:8px 0 12px}
+#app>.panel:not(.start-mini) article h3{margin:16px 0 8px}
+#app>.panel:not(.start-mini) article p{margin:6px 0;line-height:1.45}
+#app>.panel:not(.start-mini) dl{margin:12px 0;grid-template-columns:110px minmax(0,1fr)}
+#app>.panel:not(.start-mini) dt,#app>.panel:not(.start-mini) dd{padding:6px 0;line-height:1.4}
+#app>.panel:not(.start-mini) article ul{margin:6px 0;line-height:1.45}
+#app>.panel:not(.start-mini) .models li{margin-bottom:6px}
+#app>.panel:not(.start-mini) .item{padding:7px 8px}
+#app>.panel:not(.start-mini) .key-row,#app>.panel:not(.start-mini) .integration-row{padding:6px 4px;gap:8px}
+#app>.panel:not(.start-mini) .trial-select{padding:6px 8px}
+#app>.panel:not(.start-mini) .trial-test{padding:5px;gap:4px}
+#app>.panel:not(.start-mini) .ai-config-row{margin:7px 0;grid-template-columns:100px minmax(0,1fr)}
+#app>footer{padding:6px 16px;line-height:1.35}
+#app>footer p{margin:3px 0}
+
+/* 800px幅では一覧と明細を左右に置き、狭い画面だけ上下表示へ切り替える。 */
+@media(min-width:701px) and (max-width:1000px){
+ #app>.install-panel>main,#app>.panel>main.key-layout,#app>.panel>main.trial-layout{grid-template-columns:minmax(280px,34%) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+ #app>.panel>main>aside{border-right:1px solid #304253;border-bottom:0;max-height:none;padding:12px 10px}
+ #app>.ai-model-panel>.ai-model-scroll{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ #app>.ai-model-panel .ai-model-form{border-right:1px solid #304253;border-bottom:0}
+}
+@media(max-width:480px){#app>.panel:not(.start-mini) .ai-config-row{grid-template-columns:minmax(0,1fr)}}
+
 /* 次の操作: 確認前は水色、確認後の未保存結果は青で書込を案内する。 */
 .panel-actions button.check-next,.trial-test button.check-next{background:#38bdf8;border-color:#7dd3fc;color:#082f49}
 .panel-actions button.check-next:hover:not(:disabled),.trial-test button.check-next:hover:not(:disabled){background:#7dd3fc}

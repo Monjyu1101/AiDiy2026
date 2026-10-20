@@ -42,13 +42,14 @@ test('通常タイトルのミニ表示ボタンは高コントラスト・枠�
  assert.ok(declarations(mini,'.start-mini .mini-project-link:focus-visible').outline);
 });
 
-test('ミニの内容を自然な高さで計測し、2段アイコン・案内・エラーを上限360px内に収める',()=>{
+test('ミニの内容を自然な高さで計測し、2段アイコン・案内を上限360px内に収め、CLI通知行を持たない',()=>{
  const d=selector=>declarations(mini,selector);
  const chrome=px(declarations(normal,'.panel-brand').height)+px(declarations(normal,'.connection-bar').height);
  const app=d('.mini-app-launch'),appMessage=d('.mini-app-message.required');
  const appHeight=verticalPadding(app.padding)+border(app['border-bottom'])+px(d('.mini-app-buttons .mini-app-button').height)+px(appMessage['margin-top'])+px(appMessage.height);
- const cli=d('.mini-cli-launch'),cliMessage=d('.mini-cli-message');
- const cliHeight=verticalPadding(cli.padding)+border(cli['border-bottom'])+px(d('.mini-cli-buttons .mini-cli-button').height)+px(cliMessage.margin.split(' ')[0])+px(cliMessage['line-height']);
+ const cli=d('.mini-cli-launch');
+ const cliHeight=verticalPadding(cli.padding)+border(cli['border-bottom'])+px(d('.mini-cli-buttons .mini-cli-button').height);
+ assert.deepEqual(d('.mini-cli-message'),{});
  const statuses=verticalPadding(d('.mini-services').padding)+px(d('.mini-services .mini-service').height);
  assert.equal(chrome,34);assert.ok(chrome+appHeight+cliHeight+statuses<=360);
  assert.equal(d('#app>.panel.start-mini')['max-width'],'384px');assert.equal(d('#app>.panel.start-mini').overflow,'auto');

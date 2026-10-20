@@ -115,7 +115,7 @@ test('native操作部品・ラベル・編集欄・iframe・shadow内の部品�
  assert.equal(allowed(element('div'),{querySelectorAll:()=>[{getClientRects:()=>[{}],visibility:'hidden'}]}),true,'visibility hiddenのpopupは背景を妨げない');
  assert.ok(selectors.length>0);
 });
-test('専用移動面は閉じたselectの残存focusだけを許可し、部品・開いたpopupの保護は維持',()=>{
+test('専用移動面は閉じたselectの残存focusだけを許可し、一般部品・開いたpopupの保護は維持',()=>{
  const element=(selectors,parent=null,extra={})=>({parentElement:parent,isContentEditable:false,matches:query=>query.split(',').some(selector=>selectors.includes(selector)),getRootNode:()=>({}),...extra});
  const marked=parent=>element(['[data-aidiy-window-move-handle]'],parent);
  const focused=element(['select','input[list]','[role="combobox"]']);
@@ -132,6 +132,17 @@ test('専用移動面は閉じたselectの残存focusだけを許可し、部品
   assert.equal(allowed(surface,{querySelectorAll:()=>[{getClientRects:()=>[{}]}]}),false,'表示中のdialog/listboxも移動禁止');
   assert.equal(allowed(surface,{querySelectorAll:()=>[{getClientRects:()=>[]}]}),true,'閉じたpopupは移動を妨げない');
  }
+});
+test('独立軌跡バーのボタンと内側の印だけ静止長押しを許可し、埋込バーと明示除外は保護する',()=>{
+ const element=(selectors,parent=null)=>({parentElement:parent,isContentEditable:false,matches:query=>query.split(',').some(selector=>selectors.includes(selector)),getRootNode:()=>({})});
+ const bar=element(['[data-aidiy-window-move-handle]']),button=element(['button','[tabindex]:not([tabindex="-1"])'],bar),icon=element(['span'],button);
+ for(const node of [button,icon])node.closest=selector=>selector==='.native-route-window .route-controls button'?button:null;
+ const allowed=(node,extra={})=>vm.runInNewContext(`(${nativeMove.backgroundMoveTarget.toString()})(10,20)`,{document:{elementFromPoint:()=>node,querySelector:()=>null,querySelectorAll:()=>[],activeElement:element(['select']),...extra},getComputedStyle:()=>({visibility:'visible'})});
+ assert.equal(allowed(button),true);assert.equal(allowed(icon),true);
+ assert.equal(allowed(icon,{querySelector:()=>({})}),false,'開いた選択欄やdialogは優先する');
+ assert.equal(allowed(icon,{querySelectorAll:()=>[{getClientRects:()=>[{}]}]}),false,'モーダル表示中は移動しない');
+ button.closest=icon.closest=()=>null;assert.equal(allowed(button),false,'本体内の通常ボタンには広げない');
+ const excluded=element(['button','[data-aidiy-no-window-move]'],bar);excluded.closest=()=>excluded;assert.equal(allowed(excluded),false,'明示的な移動禁止を尊重する');
 });
 test('別窓Explorer一覧: 行と余白だけ許可し、未指定tree・操作部品・スクロールバーは除外',()=>{
  const element=(selectors,parent=null,extra={})=>({parentElement:parent,isContentEditable:false,matches:query=>query.split(',').some(selector=>selectors.includes(selector)),getRootNode:()=>({}),getBoundingClientRect:()=>({left:0,top:0}),...extra});

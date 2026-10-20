@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld('aidiyWindow',Object.freeze({
  close:()=>ipcRenderer.invoke('diag:window','close'),
  selectProject:()=>ipcRenderer.invoke('diag:window','selectProject'),
  startMini:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMini',enabled):Promise.resolve(false),
+ finishMini:()=>ipcRenderer.invoke('diag:window','finishMini'),
  resizeMini:height=>Number.isInteger(height)&&height>=80&&height<=360?ipcRenderer.invoke('diag:window','resizeMini',height):Promise.resolve(false),
 }));

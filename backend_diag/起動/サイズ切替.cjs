@@ -1,0 +1,70 @@
+'use strict';
+
+// 登場ズームと同様、透明な窓で画面画像を動かす。実窓の連続リサイズによる白い縁を避ける。
+const 演出時間=380;
+const 待機=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const 描画待ち=contents=>Promise.race([
+ contents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))').catch(()=>{}),
+ 待機(300),
+]);
+function 囲む(a,b){
+ const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);
+ return {x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};
+}
+function 画面サイズ演出を作成(BrowserWindow,window){
+ let current;
+ function 終了(){
+  const state=current;current=undefined;if(!state)return;
+  clearTimeout(state.timer);
+  if(!window.isDestroyed())window.setOpacity(state.opacity);
+  if(state.canvas&&!state.canvas.isDestroyed())state.canvas.destroy();
+ }
+ async function 準備(target){
+  if(current)return false;
+  if(window.isDestroyed()||!window.isVisible()||window.isMinimized())return true;
+  const state={opacity:window.getOpacity()};current=state;
+  // rendererが切替完了を通知できなくても、実窓を透明なまま残さない。
+  state.timer=setTimeout(終了,2500);state.timer.unref?.();
+  try{
+   const from=window.getContentBounds(),area=囲む(from,target);
+   const snapshot=await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
+   if(snapshot.isEmpty())throw Error('画像なし');
+   if(current!==state||window.isDestroyed())return false;
+   state.from=from;state.area=area;
+   const canvas=new BrowserWindow({title:'AiDiy サイズ切替',...area,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,skipTaskbar:true,show:false,alwaysOnTop:window.isAlwaysOnTop(),webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+   canvas.isAiDiyOpeningCanvas=true;canvas.isAiDiyResizeCanvas=true;state.canvas=canvas;
+   canvas.setBounds(area);
+   const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:transparent}#image{position:absolute;left:0;top:0;width:${from.width}px;height:${from.height}px;transform-origin:0 0;transform:translate(${from.x-area.x}px,${from.y-area.y}px)}img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}#next{opacity:0}</style></head><body><div id="image"><img id="old" alt="" src="${snapshot.toDataURL()}"><img id="next" alt=""></div></body></html>`;
+   await canvas.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+   if(current!==state||window.isDestroyed()){if(!canvas.isDestroyed())canvas.destroy();return false;}
+   canvas.showInactive();await 描画待ち(canvas.webContents);
+   if(current===state&&!window.isDestroyed())window.setOpacity(0);
+  }catch{if(current!==state)return false;終了();}
+  return true;
+ }
+ async function 完了(){
+  const state=current;if(!state)return true;
+  try{
+   await 描画待ち(window.webContents);
+   // Vueの描画後に届くResizeObserverの高さ通知まで待ち、完成した寸法へ一度だけ変形する。
+   await 待機(60);
+   if(current!==state||window.isDestroyed())return true;
+   const to=window.getContentBounds(),snapshot=await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
+   if(snapshot.isEmpty())throw Error('画像なし');
+   if(current!==state||window.isDestroyed()||!state.canvas||state.canvas.isDestroyed())return true;
+   const {from,area}=state,canvas=state.canvas;
+   const start=`translate(${from.x-area.x}px,${from.y-area.y}px) scale(1,1)`,end=`translate(${to.x-area.x}px,${to.y-area.y}px) scale(${to.width/from.width},${to.height/from.height})`;
+   await Promise.race([
+    canvas.webContents.executeJavaScript(`(async()=>{const image=document.querySelector('#image'),next=document.querySelector('#next'),old=document.querySelector('#old');next.src=${JSON.stringify(snapshot.toDataURL())};await next.decode();const options={duration:${演出時間},easing:'cubic-bezier(.33,1,.68,1)',fill:'forwards'};const motion=image.animate([{transform:${JSON.stringify(start)}},{transform:${JSON.stringify(end)}}],options);next.animate([{opacity:0},{opacity:0,offset:.2},{opacity:1}],options);old.animate([{opacity:1},{opacity:0}],options);await motion.finished.catch(()=>{});})()`),
+    待機(演出時間+500),
+   ]);
+   if(current===state&&!window.isDestroyed()){
+    window.setOpacity(state.opacity);await 描画待ち(window.webContents);
+   }
+  }catch{ /* 撮影やアニメーションに失敗しても、実窓の表示を復元する。 */ }
+  finally{if(current===state)終了();}
+  return true;
+ }
+ return {準備,完了,中止:終了,get active(){return !!current;}};
+}
+module.exports={画面サイズ演出を作成,演出時間};

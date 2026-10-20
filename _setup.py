@@ -499,7 +499,7 @@ def print_ai_cli_manual_setup():
         print_info(f"    Claude Code : {cmd} install -g @anthropic-ai/claude-code")
         print_info(f"    GitHub Copilot: {cmd} install -g @github/copilot")
         print_info(f"    OpenAI Codex : {cmd} install -g @openai/codex")
-        print_info(f"    OpenCode   : {cmd} install -g opencode-ai")
+        print_info(f"    OpenCode   : {cmd} install -g @opencode/cli")
     else:
         print_info("    npm 系 CLI : Node.js / npm を導入後に個別セットアップしてください")
         print_info("      https://nodejs.org/")
@@ -519,7 +519,7 @@ def start_global_cli_tools_install():
     targets = []
     if check_npm_installed():
         cmd = npm_command()
-        for package in ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "opencode-ai"]:
+        for package in ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "@opencode/cli"]:
             command = [cmd, "install", "-g", package]
             targets.append((package, command, " ".join(command), None))
     else:

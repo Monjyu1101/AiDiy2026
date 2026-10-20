@@ -102,18 +102,20 @@ test('ページ内Explorer: 別ウィンドウ操作はヘッダーの右端、�
   assert.ok(header.indexOf('title="選択位置を表示"') < header.indexOf('title="すべて閉じる"'));
   assert.ok(header.indexOf('title="すべて閉じる"') < header.indexOf('pinExplorer()'));
   assert.match(header, /@click="detached\?panelWindow\.restore\(\):pinExplorer\(\)">\{\{ detached\?'↙':'📌' \}\}<\/button><\/header>$/);
-  assert.match(header, /v-if="!allDisplays\|\|!detached"/);
+  assert.ok(header.includes('v-if="(!detached||!nativePanels)&&(!allDisplays||!detached)"'));
   assert.doesNotMatch(header, /togglePin|window-pin|↗/);
   assert.match(header, /class="explorer-detach"/);
   assert.match(readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'), /\.explorer-panel header \.explorer-detach\{margin-left:auto\}/);
 });
 
-test('軌跡バー: 元のバーガー・ドラッグハンドル・分類を保ち、native切離し操作は重複しない', () => {
+test('軌跡バー: バーガーは即時ドラッグ、余分な縦線はなく、native切離し操作は重複しない', () => {
   const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
   assert.match(source, /class="route-detach"/);
   assert.match(source, /v-if="\(!routeDetached\|\|!nativePanels\)\&\&\(!allDisplays\|\|!routeDetached\)"/);
   assert.match(source, /routeDetached\?'↙':'📌'/);
   const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
   assert.match(css, /\.native-route-window \.route-controls\{-webkit-app-region:no-drag/);
-  assert.doesNotMatch(css, /route-controls>\.route-burger[^}]*display:none|route-controls>\.route-drag-handle[^}]*display:none|native-route-window \.route-choice:before\{display:none/);
+  assert.match(css, /\.native-route-window \.route-controls>\.route-burger\{[^}]*-webkit-app-region:drag/);
+  assert.doesNotMatch(source, /route-drag-handle/);
+  assert.doesNotMatch(css, /route-drag-handle|route-controls>\.route-burger[^}]*display:none|native-route-window \.route-choice:before\{display:none/);
 });

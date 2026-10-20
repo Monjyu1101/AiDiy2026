@@ -40,7 +40,7 @@ const windowPins=createWindowPins({onChanged(window,state){
  if(receiver&&!receiver.window.isDestroyed()&&!receiver.window.webContents.isDestroyed?.())receiver.window.webContents.send('development:pin-changed',{...state,...(record.name?{panelName:record.name}:{})});
 }});
 function registerWindowPin(record){
- windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner)});
+ windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner),owner:record.owner?.window});
 }
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
 const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
@@ -161,7 +161,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
  const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,revision:0,pending:new Map()};windows.set(contents,record);
- // 寿命はrecord.ownerで管理する。OS親子窓の常時前面関係は作らず、OFF時はIDEも手前にできる。
+ // 寿命はrecord.ownerで管理し、ピンON中だけOS親子窓にしてIDEより手前に保つ。
  registerWindowPin(record);
  attachWindowMove(record);
  if(kind==='ide')allDisplays.register(record);

@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 
 // 全Electronアプリで同じ最前面層を使う。別プロセスの窓同士もOSの選択順に従う。
-// フォーカスの奪い返し・親IDE選択時の子窓一括持上げ・定期的な再固定はしない。
+// IDE由来のON窓だけOSの親子関係でIDEより手前に保つ。フォーカス奪取や定期再固定はしない。
 function createWindowPins({onChanged=()=>{}}={}) {
  const entries=new WeakMap();
  const alive=window=>window&&!window.isDestroyed();
@@ -23,6 +23,10 @@ function createWindowPins({onChanged=()=>{}}={}) {
   const entry=entries.get(window);
   if(!alive(window)||!entry)return state(window);
   const value=state(window);
+  if(entry.owner){
+   const parent=value.pinned&&alive(entry.owner)?entry.owner:null;
+   if(entry.parent!==parent){window.setParentWindow?.(parent);entry.parent=parent;}
+  }
   if(entry.applied!==value.pinned){
    // pop-up-menu / screen-saver 等の上位層を使わず、全アプリを floating に揃える。
    if(value.pinned)window.setAlwaysOnTop(true,'floating');
@@ -36,12 +40,13 @@ function createWindowPins({onChanged=()=>{}}={}) {
   const entry=entries.get(window);if(!entry)return;
   window.removeListener('focus',entry.focus);
   window.removeListener('closed',entry.closed);
+  if(alive(window)&&entry.parent)window.setParentWindow?.(null);
   entries.delete(window);
  }
- function register(window,{pinned=false,locked=false}={}) {
+ function register(window,{pinned=false,locked=false,owner=null}={}) {
   if(!alive(window))return state(window);
   if(entries.has(window))return state(window);
-  const entry={requested:pinned===true,locked:locked===true,applied:undefined,raising:false,
+  const entry={requested:pinned===true,locked:locked===true,owner:alive(owner)&&owner!==window?owner:null,parent:undefined,applied:undefined,raising:false,
    focus:()=>raiseSelected(window),closed:()=>unregister(window)};
   entries.set(window,entry);
   window.on('focus',entry.focus);window.once('closed',entry.closed);

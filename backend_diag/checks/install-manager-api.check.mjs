@@ -40,7 +40,7 @@ test('導入 API は認証・本文・クエリ・固定 ID/操作/経路を検�
     assert.equal((await request(handler,'api/導入管理/unknown',{method:'DELETE',headers})).status,400);
   }
   for(const route of ['api/導入管理?command=bad','api/導入管理/codex/導入?args=bad','api/導入管理/codex/導入?registry=https://invalid.example'])assert.equal((await request(handler,route,{method:route==='api/導入管理?command=bad'?'GET':'POST'})).status,400);
-  for(const route of ['api/導入管理/python/導入','api/導入管理/npm/導入','api/導入管理/constructor/導入','api/導入管理/toString/導入','api/導入管理/codex/install','api/導入管理/codex/導入/extra','api/導入管理/codex%2Fextra/導入','api/導入管理/codex','api/導入管理//導入','api/導入管理/codex/','api/導入管理/codex%00/導入'])assert.equal((await request(handler,route)).status,404,route);
+  for(const route of ['api/導入管理/node/導入','api/導入管理/npm/導入','api/導入管理/constructor/導入','api/導入管理/toString/導入','api/導入管理/codex/install','api/導入管理/codex/導入/extra','api/導入管理/codex%2Fextra/導入','api/導入管理/codex','api/導入管理//導入','api/導入管理/codex/','api/導入管理/codex%00/導入'])assert.equal((await request(handler,route)).status,404,route);
   for(const method of ['GET','PUT','PATCH'])assert.equal((await request(handler,'api/導入管理/codex/導入',{method})).status,404);
   assert.equal((await request(handler,'api/導入管理/codex/導入',{method:'DELETE'})).status,404);
   assert.equal((await request(handler,'api/導入管理/unknown',{method:'DELETE'})).status,404);
@@ -77,11 +77,11 @@ test('導入失敗後も確認結果を一覧へ反映し、エラーの秘密�
   }
 });
 
-test('導入実行中・中止待機・確認中は連打、別行、個別/一括診断、書込を拒否する',async t=>{
+test('導入実行中・中止待機・確認中は同じ項目の連打、個別/一括診断、書込を拒否する',async t=>{
   const commandGate=defer(),probeGate=defer();let command,checking=false;t.after(()=>{commandGate.resolve();probeGate.resolve();});
   const {handler,manager}=fixture(t,{managerOptions:{run:async value=>{command=value;await commandGate.promise;return {...success,cancelled:value.signal.aborted};}},probeFn:async entry=>{checking=true;await probeGate.promise;return {id:entry.id,状態:'未検出'};}});
   const started=await request(handler,'api/導入管理/codex/導入');await until(()=>command);
-  const blocked=['api/導入管理/codex/導入','api/導入管理/claude/再導入','api/診断/codex','api/診断/claude','api/診断','api/書込'];
+  const blocked=['api/導入管理/codex/導入','api/診断/codex','api/診断/claude','api/診断','api/書込'];
   for(const route of blocked)assert.equal((await request(handler,route)).status,409,route);
   const id=started.body.実行.実行ID;
   assert.equal((await request(handler,'api/導入管理/not-the-owned-job',{method:'DELETE'})).status,404);assert.equal(command.signal.aborted,false);

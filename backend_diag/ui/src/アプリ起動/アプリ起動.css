@@ -4,3 +4,20 @@
 /* プロジェクト未選択時は欄とフォルダ選択ボタンを赤くし、枠の光をゆっくり脈打たせて選択を促す。 */
 .app-project.required label{color:#ff8a9c}.app-project.required .app-project-row input{border-color:#ff4d6d;color:#ffd5dc;animation:app-project-alert 2.2s ease-in-out infinite}.app-project.required .app-project-row input::placeholder{color:#ff8a9c;opacity:1}.app-project.required .app-project-select:not(:disabled){border-color:#ff4d6d;background:#5a1424;color:#fff}.app-project.required .app-project-select:not(:disabled):hover{background:#7a1a30}
 @keyframes app-project-alert{0%,100%{box-shadow:0 0 0 1px rgba(255,77,109,.35),0 0 4px rgba(255,77,109,.25)}50%{box-shadow:0 0 0 1px rgba(255,77,109,.9),0 0 12px rgba(255,77,109,.55)}}
+
+/* アプリと全CLIを同じ小型タイルで並べ、アイコンを主役にする。 */
+.app-launch-panel .app-project{padding:10px 16px}.app-launch-panel .app-project p{margin:6px 0 0;font-size:11px}
+.app-launch-panel .app-launch-list{grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:10px 14px}
+.app-launch-panel .app-launch-card{padding:0;border:0;border-radius:5px;background:transparent}
+.app-launch-panel .app-launch-button{position:relative;display:grid;place-items:center;min-height:100px;padding:5px;border:1px solid #2f4a5b;border-radius:5px;background:#101f2c;color:#e7f6fa}
+.app-launch-panel .app-launch-button:hover:not(:disabled){border-color:#35e0d2;background:#173b46}
+.app-launch-panel .app-launch-button:disabled{opacity:.65;cursor:not-allowed}
+.app-launch-panel .app-launch-icon{width:72px;height:72px;object-fit:contain}
+.app-launch-state{position:absolute;bottom:1px;left:2px;right:2px;pointer-events:none;font-size:10px;line-height:12.5px;color:#92c3ce}
+.app-launch-panel .app-single{position:absolute;top:4px;right:4px;padding:0 3px;font-size:8px;background:#101f2c}
+.app-launch-panel .app-launch-result{min-height:0;margin:4px 0!important;font-size:11px}
+.app-launch-panel .unavailable .app-launch-icon{filter:grayscale(1);opacity:.6}
+.app-launch-panel .unavailable .app-launch-state{color:#facc15}
+.app-launch-message.error{color:#ff94a7}
+@media(max-width:700px){.app-launch-panel .app-launch-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:480px){.app-launch-panel .app-launch-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px}.app-launch-panel .app-project{padding:10px}}

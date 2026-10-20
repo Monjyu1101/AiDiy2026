@@ -5,6 +5,26 @@ const {source,render,component}=require('./ui-components.cjs');
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await vue.nextTick();};
 const descendants=node=>[node,...node.children.flatMap(descendants)];
 const text=node=>node.text+node.children.map(text).join('');
+
+test('通常のCLIアイコンは確認なしで起動し、未導入は表示して起動要求を送らない',async()=>{
+ const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){}};
+ let prompts=0;const launches=[];
+ const cliState=CLI状態を作成({アプリ:state,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>{
+  if(route==='api/CLI起動')return {対象:[{id:'codex',名前:'Codex CLI',利用可能:true},{id:'grok',名前:'Grok Build',利用可能:false}]};
+  launches.push(body);return {通知:'fixture launch'};
+ }});
+ const ui=mount(compile('アプリ起動/アプリ起動パネル.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
+ try{
+  await flush();const missing=ui.button('Grok Build をTermで起動');assert.equal(missing.props.disabled,true);assert.match(text(missing),/未導入/);
+  missing.props.onClick();await flush();assert.equal(launches.length,0);assert.equal(prompts,0);
+  ui.button('Codex CLI をTermで起動').props.onClick();await flush();
+  assert.equal(prompts,0);assert.deepEqual(launches,[{対象:'codex',フォルダ:'/fixture/project',自動承認確認:true}]);
+  assert.doesNotMatch(text(ui.root),/fixture launch/);
+  cliState.失敗.value=true;cliState.通知.value='fixture CLI failure';await flush();assert.match(text(ui.root),/fixture CLI failure/);
+ }finally{ui.app.unmount();}
+});
 function compile(name,{globals={},modules={},inline=true}={}){
  const {descriptor}=parse(source(name),{filename:name});const compiled=compileScript(descriptor,{id:name,inlineTemplate:inline,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,URLSearchParams,AbortController,...globals,require:id=>id==='vue'?vue:modules[id]||{}});return module.exports;
@@ -62,7 +82,7 @@ test('電光掲示板はネイティブbuttonで、全7タブのミニからア�
  }finally{ui.app.unmount();scope.stop();}
  assert.match(source('App.vue'),/@open-apps="アプリ起動へ戻る"/);
 });
-test('実Vue CLI行: 確認なしでクリックごとに並行起動し、成功通知を隠して失敗を表示する',async()=>{
+test('実Vue CLI行: 確認なしで並行起動し、処理中・成功・失敗でも通知行を増やさない',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const アプリ={フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false)};
  const launches=[],pending=[];let prompts=0;
  const state=CLI状態を作成({アプリ,確認:()=>{prompts++;return false;},api:async(route,method,_signal,format,body)=>{
@@ -77,16 +97,16 @@ test('実Vue CLI行: 確認なしでクリックごとに並行起動し、成�
   cli().props.onClick();cli().props.onClick();assert.equal(prompts,0);assert.equal(launches.length,2);
   assert.deepEqual(launches[0],{method:'POST',format:'json',body:{対象:'copilot',フォルダ:'/日本語 path & ;',自動承認確認:true}});
   assert.deepEqual(launches[0],launches[1]);assert.match(cli().props.title,/複数起動可/);
-  await flush();assert.equal(cli().props.disabled,false);assert.equal(state.処理中.value,'copilot');assert.equal(アプリ.処理中.value,'cli:copilot');assert.ok(message());assert.match(text(message()),/起動中/);
-  pending[1].resolve({通知:'Term 起動受付'});await flush();assert.match(text(message()),/起動中/);
-  pending[0].resolve({通知:'古い起動受付'});await flush();assert.equal(cli().props.disabled,false);assert.equal(state.通知.value,'Term 起動受付');assert.doesNotMatch(text(ui.root),/Term 起動受付/);assert.equal(message(),undefined);
-  cli().props.onClick();pending[2].reject(Error('Term を開始できません'));await flush();assert.equal(launches.length,3);assert.equal(prompts,0);assert.equal(cli().props.disabled,false);assert.match(text(message()),/Term を開始できません/);assert.match(message().props.class,/error/);
+  await flush();assert.equal(cli().props.disabled,false);assert.equal(state.処理中.value,'copilot');assert.equal(アプリ.処理中.value,'cli:copilot');assert.equal(message(),undefined);
+  pending[1].resolve({通知:'Term 起動受付'});await flush();assert.equal(message(),undefined);
+  pending[0].resolve({通知:'古い起動受付'});await flush();assert.equal(cli().props.disabled,false);assert.equal(state.通知.value,'');assert.doesNotMatch(text(ui.root),/Term 起動受付/);assert.equal(message(),undefined);
+  cli().props.onClick();pending[2].reject(Error('Term を開始できません'));await flush();assert.equal(launches.length,3);assert.equal(prompts,0);assert.equal(cli().props.disabled,false);assert.equal(message(),undefined);assert.equal(state.通知.value,'Term を開始できません');assert.doesNotMatch(text(ui.root),/Term を開始できません/);
   cli().props.onClick();await flush();assert.equal(cli().props.disabled,false);assert.doesNotMatch(text(ui.root),/Term を開始できません/);pending[3].resolve({通知:'再試行の起動受付'});await flush();assert.equal(message(),undefined);assert.doesNotMatch(text(ui.root),/再試行の起動受付/);
   アプリ.選択中.value=true;await flush();assert.equal(cli().props.disabled,true);アプリ.選択中.value=false;アプリ.処理中.value='code';await flush();assert.equal(cli().props.disabled,true);
  }finally{ui.app.unmount();}
  const panel=source('起動/起動ミニパネル.vue');assert.ok(panel.indexOf(':is="ミニアプリ起動"')<panel.indexOf(':is="ミニCLI起動"'));assert.ok(panel.indexOf(':is="ミニCLI起動"')<panel.indexOf('class="mini-services"'));
 });
-test('実Vue AiDiy行: 6アプリは確認なしで起動し、成功説明を隠してフォルダ・処理中・失敗を残す',async()=>{
+test('実Vue AiDiy行: 6アプリは確認なしで起動し、処理中・成功・失敗でもプロジェクト表示を保つ',async()=>{
  const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs'),icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
  const ids=['avatar','ide','term','code','live','discord'],launches=[];let release,prompts=0;
  const state=アプリ状態を作成({api:async(route,method,_signal,format,body)=>{
@@ -101,18 +121,18 @@ test('実Vue AiDiy行: 6アプリは確認なしで起動し、成功説明を�
   for(const [index,id] of ids.entries()){
    button(id).props.onClick();button(id).props.onClick();assert.equal(launches.length,index+1);assert.equal(prompts,0);
    assert.deepEqual(launches.at(-1),{method:'POST',format:'json',body:{対象:id,フォルダ:'/日本語 project & ;'}});
-   await flush();assert.ok(buttons().every(n=>n.props.disabled));assert.match(text(message()),/起動中/);
+   await flush();assert.ok(buttons().every(n=>n.props.disabled));assert.equal(text(message()),state.フォルダ.value);
    const notification=id+' の起動結果の説明';release.resolve({通知:notification,起動済み:index%2===1});await flush();
    assert.equal(state.結果.value[id].通知,notification);assert.equal(text(message()),state.フォルダ.value);assert.equal(message().props.title,state.フォルダ.value);assert.doesNotMatch(text(ui.root),/起動結果の説明/);assert.ok(buttons().every(n=>!n.props.disabled));
   }
-  button('code').props.onClick();release.reject(Error('Code を開始できません'));await flush();assert.equal(text(message()),'Code を開始できません');assert.match(message().props.class,/error/);assert.ok(buttons().every(n=>!n.props.disabled));
-  button('code').props.onClick();await flush();assert.match(text(message()),/起動中/);assert.doesNotMatch(text(ui.root),/Code を開始できません/);release.resolve({通知:'Code の再試行を受け付けました'});await flush();assert.equal(text(message()),state.フォルダ.value);assert.doesNotMatch(message().props.class,/error/);
+  button('code').props.onClick();release.reject(Error('Code を開始できません'));await flush();assert.equal(text(message()),state.フォルダ.value);assert.equal(state.結果.value.code.通知,'Code を開始できません');assert.doesNotMatch(text(ui.root),/Code を開始できません/);assert.ok(buttons().every(n=>!n.props.disabled));
+  button('code').props.onClick();await flush();assert.equal(text(message()),state.フォルダ.value);assert.doesNotMatch(text(ui.root),/Code を開始できません/);release.resolve({通知:'Code の再試行を受け付けました'});await flush();assert.equal(text(message()),state.フォルダ.value);assert.doesNotMatch(message().props.class,/error/);
   state.フォルダ.value='';await flush();assert.match(text(message()),/SELECT YOUR PROJECT/);assert.ok(buttons().every(n=>n.props.disabled));assert.equal(prompts,0);
  }finally{ui.app.unmount();}
 });
-test('CLIの名前やエラーは安全なテキストとして表示する',async()=>{
+test('CLIの名前は安全なテキスト、エラーはミニに表示しない',async()=>{
  const state={項目:vue.ref([{id:'copilot',名前:'<script>bad</script>',モード:'YOLO'}]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref('<script>error</script>'),失敗:vue.ref(true),読込(){},切断(){}};
- const html=await render('アプリ起動/ミニCLI起動.vue',{state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true});assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;error/);assert.match(html,/class="mini-cli-message error"/);
+ const html=await render('アプリ起動/ミニCLI起動.vue',{state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true});assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;bad/);assert.doesNotMatch(html,/&lt;script&gt;error|mini-cli-message/);
 });
 
 test('ミニのCLI更新ボタンと空見出しをなくし、表示・再接続時の自動読込は維持する',async()=>{
@@ -143,7 +163,7 @@ test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermes�
   }
   state.失敗.value=true;state.通知.value='CLI一覧を取得できません';await flush();
   assert.equal(ui.nodes().filter(n=>n.props.class==='mini-cli-launch').length,0);
-  assert.match(text(ui.root),/CLI一覧を取得できません/);
+  assert.doesNotMatch(text(ui.root),/CLI一覧を取得できません/);assert.ok(!ui.nodes().some(n=>n.props.class?.includes('mini-cli-message')));
   state.失敗.value=false;state.通知.value='';await flush();assert.ok(!ui.nodes().some(n=>n.props.class?.includes('mini-cli-message')));
  }finally{ui.app.unmount();}
 });
@@ -171,7 +191,7 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとC
   pending[1].resolve({通知:'Hermes Term 起動受付'});await flush();assert.equal(state.処理中.value,'claude');
   pending[2].resolve({通知:'Claude Term 起動受付'});await flush();assert.equal(state.処理中.value,'aidiy_hermes');
   pending[0].resolve({通知:'古いHermes受付'});await flush();assert.equal(hermes().props.disabled,false);assert.doesNotMatch(text(upper.root)+text(lower.root),/Hermes Term 起動受付|Claude Term 起動受付|古いHermes受付/);assert.equal(lower.nodes().find(n=>n.props.class?.includes('mini-cli-message')),undefined);
-  hermes().props.onClick();pending[3].reject(Error('Hermes の起動に失敗しました'));await flush();assert.equal(prompts,0);assert.equal(launches.length,4);assert.match(text(lower.root),/Hermes の起動に失敗しました/);assert.equal(hermes().props.disabled,false);
+  hermes().props.onClick();pending[3].reject(Error('Hermes の起動に失敗しました'));await flush();assert.equal(prompts,0);assert.equal(launches.length,4);assert.doesNotMatch(text(upper.root)+text(lower.root),/Hermes の起動に失敗しました/);assert.equal(state.通知.value,'Hermes の起動に失敗しました');assert.equal(hermes().props.disabled,false);
   state.項目.value=state.項目.value.filter(item=>item.id!=='aidiy_hermes');await flush();assert.equal(upperButtons().length,6);assert.equal(lowerButtons().length,6);assert.equal(hermes(),undefined);
  }finally{upper.app.unmount();lower.app.unmount();}
  const css=source('起動/起動ミニ.css');assert.match(css,/\.mini-app-buttons\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-cli-buttons\{display:flex;justify-content:center;gap:2px\}/);assert.match(css,/\.mini-cli-buttons \.mini-cli-button\{flex:0 0 calc\(\(100% - 12px\)\/7\)/);assert.match(css,/\.mini-services\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-icon-frame\{[^}]*width:40px;height:40px/);assert.match(css,/\.mini-icon-frame img\{[^}]*width:40px;height:40px;object-fit:contain/);

@@ -113,7 +113,7 @@ async function toggle(record, expected) {
 }
 async function restore(record) {
   const transitions = record.kind === 'explorer' ? await evaluate(owner, 'fixture.log.detachedEvents.length') : null;
-  await click(record.window, record.kind === 'explorer' ? '.explorer-detach' : '.panel-return');
+  await click(record.window, record.kind === 'explorer' ? '.panel-window-title .window-close' : '.panel-return');
   await until(owner, `fixture.saved.${record.kind === 'explorer' ? 'explorer' : 'routes'}.ownerDocument===document`);
   assert.ok(record.window.isDestroyed(), 'Return closes the detached BrowserWindow');
   if (transitions !== null) assert.equal(await evaluate(owner, 'fixture.log.detachedEvents.length'), transitions + 1, 'One existing Explorer return click emits exactly one restore transition');
@@ -147,23 +147,26 @@ async function run() {
   await click(owner, '.route-restore-toggle');
   assert.deepEqual(await evaluate(owner, `['.explorer-panel>header','.route-controls'].map(selector=>{const n=document.querySelector(selector);return{last:n.lastElementChild.textContent,disabled:n.lastElementChild.disabled,pins:n.querySelectorAll('.explorer-detach,.route-detach').length};})`), [{ last: '📌', disabled: false, pins: 1 }, { last: '📌', disabled: false, pins: 1 }]);
   await capture(owner, '01-embedded-detach-buttons');
+  const routeMetrics=`(()=>{const n=document.querySelector('.explorer-routes'),bar=n.querySelector('.route-controls');return{width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height,gap:getComputedStyle(bar).gap,buttons:[...n.querySelectorAll('.route-burger,.route-choice')].map(b=>{const r=b.getBoundingClientRect(),s=getComputedStyle(b);return{width:r.width,height:r.height,fontSize:s.fontSize,padding:s.padding}})}})()`;
+  const embeddedMetrics=await evaluate(owner,routeMetrics);
   result.checks.push('Embedded Explorer and route bar retain exactly one active right-edge detach pin; real Vue grep input is populated without submitting a search');
 
   await click(owner, '.explorer-detach');
   let explorer = await detached('explorer'); await pinState(explorer, true);
   assert.equal(await evaluate(explorer.window, `document.querySelector('.explorer-panel>ul[role=tree]').hasAttribute('data-aidiy-window-move-list')`), true);
   assert.equal(await evaluate(owner, 'fixture.saved.explorer.ownerDocument!==document'), true);
-  assert.equal(await evaluate(explorer.window, `document.querySelectorAll('.explorer-panel>header .explorer-detach').length`), 1);
+  assert.equal(await evaluate(owner, `!!document.querySelector('.explorer-toggle')`),false,'Detached Explorer leaves no burger in owner');
+  assert.equal(await evaluate(explorer.window, `document.querySelectorAll('.explorer-panel>header .explorer-detach').length`), 0);
   assert.deepEqual(await evaluate(explorer.window, `[...document.querySelectorAll('.panel-window-title .window-actions button')].map(n=>n.classList.contains('window-pin')?'pin':n.getAttribute('aria-label'))`), ['最小化', '最大化', 'pin', '終了']);
   assert.equal(await evaluate(explorer.window, `!!document.querySelector('.panel-window-title .panel-return')`), false);
-  assert.equal(await evaluate(explorer.window, `document.querySelector('.explorer-panel>header .explorer-detach').textContent`), '↙');
+  assert.equal(await evaluate(explorer.window, `document.querySelector('.panel-window-title .window-close .close-icon')!==null`), true);
   assert.equal(await evaluate(explorer.window, `document.querySelector('.grep-query input').value`), '未送信の検索入力');
   await capture(explorer.window, '02-native-explorer-pin-on');
   await toggle(explorer, false); await capture(explorer.window, '03-native-explorer-pin-off'); await toggle(explorer, true);
   await restore(explorer);
   assert.equal(await evaluate(owner, `document.querySelector('.explorer-panel>ul[role=tree]').hasAttribute('data-aidiy-window-move-list')`), false);
   assert.equal(await evaluate(owner, `fixture.saved.input===document.querySelector('.grep-query input') && fixture.saved.input.value==='未送信の検索入力'`), true);
-  result.checks.push('Actual Explorer DOM moves into BrowserWindow; native title keeps minimize/maximize/pin/close in order, existing body-header return is retained without a new title return; ON→OFF→ON pin then return preserve the same unsubmitted input node/value');
+  result.checks.push('Actual Explorer DOM moves into BrowserWindow; native title keeps minimize/maximize/pin/close in order, body-header return is removed and title close restores the embedded panel; ON→OFF→ON pin then close preserve the same unsubmitted input node/value');
 
   for (let n = 0; n < 2; n++) {
     await click(owner, '.explorer-detach'); explorer = await detached('explorer');
@@ -181,10 +184,12 @@ async function run() {
 
   await click(owner, '.route-detach');
   let routes = await detached('panel-routes'); await pinState(routes, true);
+  assert.equal(await evaluate(owner, `!!document.querySelector('.route-restore-toggle')`),false,'Detached routes leave no burger in owner');
+  assert.deepEqual(await evaluate(routes.window,routeMetrics),embeddedMetrics,'Embedded and independent bars share compact dimensions, font and spacing');
   assert.equal(await evaluate(routes.window, `document.querySelectorAll('.panel-window-title,.route-detach,.window-minimize,.window-maximize,.window-close').length`), 0);
   assert.equal(await evaluate(routes.window, `document.querySelectorAll('.route-controls .window-pin').length`), 1);
-  assert.equal(await evaluate(routes.window, `!!document.querySelector('.route-burger') && getComputedStyle(document.querySelector('.route-drag-handle')).display!=='none'`), true);
-  assert.equal(await evaluate(routes.window, `document.querySelector('.route-window-actions').nextElementSibling.classList.contains('route-choice')`), true);
+  assert.equal(await evaluate(routes.window, `getComputedStyle(document.querySelector('.route-burger')).webkitAppRegion==='drag' && !document.querySelector('.route-drag-handle')`), true);
+  assert.equal(await evaluate(routes.window, `document.querySelector('.route-window-actions')===document.querySelector('.route-controls').lastElementChild`), true);
   assert.deepEqual(await evaluate(routes.window, `[...document.querySelectorAll('.route-choice')].map(n=>n.textContent)`), ['閲覧軌跡', '検索軌跡', 'AiDiy検索軌跡']);
   result.routeGeometry = await evaluate(routes.window, `(()=>{const n=document.querySelector('.route-controls'),r=n.getBoundingClientRect();return{width:r.width,height:r.height,scrollWidth:n.scrollWidth,clientWidth:n.clientWidth,buttons:[...n.querySelectorAll('button')].map(b=>({text:b.textContent,left:b.getBoundingClientRect().left,width:b.getBoundingClientRect().width,top:b.getBoundingClientRect().top,bottom:b.getBoundingClientRect().bottom}))};})()`);
   assert.ok(result.routeGeometry.scrollWidth <= result.routeGeometry.clientWidth, 'Native route bar fits 360px without horizontal scrolling');
@@ -204,16 +209,19 @@ async function run() {
   await until(routes.window, `document.querySelector('.route-reveal')?.dataset.phase==='open'`);
   await restore(routes);
   assert.equal(await evaluate(owner, `fixture.saved.routes===document.querySelector('.explorer-routes') && !!document.querySelector('.route-tree [data-route-path="keep.txt"]')`), true);
-  result.checks.push('Native routes keep a single compact 360px row with burger close, visible drag handle, pin-only WindowActions and return near left; pin toggles independently; clicking the actual route choice expands the preserved tree and returns the same DOM');
+  result.checks.push('Native routes keep a compact 360px row with immediate-drag burger, no extra vertical handle, pin and close at right; classification and preserved DOM still work');
 
   await click(owner, '.route-detach'); routes = await detached('panel-routes');
   assert.equal(await evaluate(routes.window, `document.querySelectorAll('.route-window-actions').length`), 1);
   await click(routes.window, '.route-burger');
+  assert.equal(routes.window.isDestroyed(), false, 'Native title drag surface does not close on click');
+  await restore(routes);
+  await click(owner, '.route-burger');
   await until(owner, `fixture.saved.routes.ownerDocument===document && !!document.querySelector('.route-restore-toggle')`);
   assert.ok(routes.window.isDestroyed());
   assert.equal(await evaluate(owner, `getComputedStyle(fixture.saved.routes).display`), 'none');
   await click(owner, '.route-restore-toggle');
-  result.checks.push('Repeated route detachment has one controls mount; the original burger closes native routes and preserves the embedded reopen entry');
+  result.checks.push('Repeated route detachment has one controls mount; native burger stays a title drag surface; embedded burger still closes the bar and preserves its reopen entry');
 
   await click(owner, '.explorer-detach'); explorer = await detached('explorer');
   await click(owner, '.route-detach'); routes = await detached('panel-routes');

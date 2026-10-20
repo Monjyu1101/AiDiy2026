@@ -45,7 +45,7 @@ function fixture({all=false,area={x:0,y:0,width:1920,height:1040}}={}){
  }
  const owner={window:new Window(),kind:'ide',revision:0},event={owner},key=state=>state.active?`${state.mode}:${state.startedAt}`:'';
  const windowPins=pinModule.createWindowPins();
- const controller=createPanelWindows({windowPins,registerWindowPin:record=>windowPins.register(record.window,{pinned:true,locked:all}),windows,trustedEvent:e=>e.owner,readState:async()=>state,sessionKey:key,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:area.x+100,y:area.y+100})},BrowserWindow:Window,拡大表示:async()=>{animations++;},isQuitting:()=>quitting,isAllDisplays:()=>all});
+ const controller=createPanelWindows({windowPins,registerWindowPin:record=>windowPins.register(record.window,{pinned:true,locked:all,owner:record.owner?.window}),windows,trustedEvent:e=>e.owner,readState:async()=>state,sessionKey:key,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:area.x+100,y:area.y+100})},BrowserWindow:Window,拡大表示:async()=>{animations++;},isQuitting:()=>quitting,isAllDisplays:()=>all});
  return{windows,Window,owner,event,controller,rect:{left:16,top:78,width:380,height:650},state:next=>{state=next;},animations:()=>animations,quit:()=>{quitting=true;}};
 }
 test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、元画面のキャプチャを要求しない',async()=>{
@@ -54,7 +54,7 @@ test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、�
   const request=await f.controller.prepare(f.event,{left:9000,top:-9000,width:8000,height:4000},kind,{left:9000,top:-9000,width:8000,height:4000});assert.equal(request.ok,true);assert.equal(request.preview,undefined);
   const details={url:'about:blank',frameName:request.name},bounds=f.controller.open(f.owner,details).overrideBrowserWindowOptions;
   assert.ok(bounds.x>=area.x&&bounds.y>=area.y&&bounds.x+bounds.width<=area.x+area.width&&bounds.y+bounds.height<=area.y+area.height);assert.ok(bounds.width<=680);
-  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,null);child.destroy();
+  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,f.owner.window);child.destroy();
  }
 });
 
@@ -66,7 +66,7 @@ test('Explorer: 承認済みabout:blankを一回だけ許可し、同じ親の�
  assert.equal(f.controller.open(f.owner,details),null);
  const child=new f.Window();f.controller.created(f.owner,child,details);
  assert.equal(f.controller.dragTarget(f.owner,request.name),null,'表示前は移動対象にしない');
- assert.equal(child.parent,null);
+ assert.equal(child.parent,f.owner.window);
  assert.equal(f.windows.get(child.webContents).owner,f.owner);assert.equal(f.windows.get(child.webContents).linkKey,'offline:1');
  assert.equal((await f.controller.show(f.event,request.name,false)).ok,true);assert.equal(f.animations(),1);
  assert.equal(f.controller.dragTarget(f.owner,request.name),f.windows.get(child.webContents));

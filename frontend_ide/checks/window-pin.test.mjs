@@ -15,6 +15,7 @@ function windowFixture(name='window',order=[]){
   isDestroyed:()=>!!window.destroyed,isFocused:()=>!!window.focused,
   setAlwaysOnTop(value,level){this.top=value;this.level=level;this.calls.push([value,level]);},
   moveTop(){order.push(name);},calls:[],
+  setParentWindow(value){this.parent?.children.delete(this);this.parent=value;value?.children.add(this);},getParentWindow(){return this.parent||null;},isAlwaysOnTop(){return !!this.top;},children:new Set(),
   focus(){this.focused=true;this.emit('focus');},
   destroy(){this.destroyed=true;this.emit('closed');},
  });
@@ -40,6 +41,18 @@ test('VRはユーザー選択を変更せず強制ON、ロック中の連打を�
  }
  const pins=createWindowPins(),during=windowFixture();pins.register(during,{pinned:true,locked:true});
  assert.deepEqual(pins.setLocked(during,false),{pinned:true,locked:false},'VR中にIDEから起動した窓は通常のIDE由来ONへ戻る');
+});
+test('IDE由来の全モジュールはON中だけIDEのOS子窓となり、OFF・VR復帰・購読解除で外れる',()=>{
+ for(const kind of ['term','code','live','viewer','browser','explorer','compare','routes']){
+  const pins=createWindowPins(),ide=windowFixture('ide'),child=windowFixture(kind);
+  pins.register(ide);pins.register(child,{owner:ide,pinned:true});assert.equal(child.getParentWindow(),ide,kind);
+  ide.focus();assert.equal(child.getParentWindow(),ide,'IDE選択でも所属が外れない');
+  pins.toggle(ide);pins.toggle(ide);assert.equal(pins.state(child).pinned,true);assert.equal(child.getParentWindow(),ide,'本体のON/OFFでもIDEより手前の関係を維持する');
+  pins.toggle(child);assert.equal(child.getParentWindow(),null);assert.equal(child.top,false);
+  pins.setLocked(child,true);assert.equal(child.getParentWindow(),ide);assert.equal(child.top,true);
+  pins.setLocked(child,false);assert.equal(child.getParentWindow(),null);assert.equal(child.top,false);
+  pins.toggle(child);assert.equal(child.getParentWindow(),ide);pins.unregister(child);assert.equal(child.getParentWindow(),null);
+ }
 });
 test('別アプリ相当の管理器でも同じ層、選択されたON窓だけ持上げ、OFF・blurは何もしない',()=>{
  const order=[],a=createWindowPins(),b=createWindowPins(),one=windowFixture('one',order),two=windowFixture('two',order),off=windowFixture('off',order);

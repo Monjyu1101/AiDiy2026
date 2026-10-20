@@ -47,7 +47,7 @@ test('名称の下の2行目左側に能力由来の導入・再導入・削除�
   assert.ok(html.indexOf('data-install-check="claude"') < html.indexOf('data-install-id="claude"'), 'キーボード順序も1行目の確認から2行目の導入操作へ進む');
 });
 
-test('実Vueクリックで確認を取り消せる。承認後は一度だけ実行し、全確認・書込を無効化する', async () => {
+test('実Vueクリックで確認を取り消せる。承認後は一度だけ実行し、その項目の操作と全確認・書込を無効化する', async () => {
   const f = await fixture();
   try {
     f.action('claude', '導入').props.onClick(); await flush();
@@ -55,7 +55,10 @@ test('実Vueクリックで確認を取り消せる。承認後は一度だけ�
     f.approve(true); f.action('claude', '導入').props.onClick(); f.action('claude', '導入').props.onClick(); await flush();
     assert.equal(f.prompts.length, 2); assert.equal(f.calls.filter(([, method]) => method === 'POST').length, 1);
     assert.equal(f.select('claude').props['aria-pressed'], true);
-    assert.ok(f.nodes().filter(node => node.props['data-install-action'] || node.props['data-install-check']).every(node => node.props.disabled));
+    // 実行中の項目の導入操作と、全項目の確認は無効。別項目の導入操作は並行して押せる。
+    assert.equal(f.action('claude', '導入').props.disabled, true);
+    assert.ok(f.nodes().filter(node => node.props['data-install-check']).every(node => node.props.disabled));
+    assert.equal(f.action('codex', '再導入').props.disabled, false); assert.equal(f.action('codex', '削除').props.disabled, false);
     assert.equal(f.byId('install-run').props.disabled, true); assert.equal(f.byId('install-write').props.disabled, true);
     const console = f.nodes().find(node => node.tag === 'pre'); assert.match(text(console), /<script>alert\(1\)<\/script>/); assert.ok(!f.nodes().some(node => node.tag === 'script'));
     f.finish(); await f.tick();

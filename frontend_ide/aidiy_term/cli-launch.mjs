@@ -19,7 +19,7 @@ export const CLI_LAUNCHERS = Object.freeze([
   ['aidiy_hermes', 'AiDiy Hermes', '--yolo', 'YOLO'],
 ].map(([id, name, flag, mode]) => Object.freeze({ id, name, args: Object.freeze([flag]), mode, autoApproveSupported: true })));
 const byId = Object.freeze(Object.fromEntries(CLI_LAUNCHERS.map(item => [item.id, item])));
-const npmPackages = Object.freeze({ claude: '@anthropic-ai/claude-code', codex: '@openai/codex', copilot: '@github/copilot', opencode: 'opencode-ai' });
+const npmPackages = Object.freeze({ claude: '@anthropic-ai/claude-code', codex: '@openai/codex', copilot: '@github/copilot', opencode: '@opencode/cli' });
 const validPath = value => typeof value === 'string' && value.length > 0 && !/[\0\r\n]/.test(value);
 const envValue = (env, key, platform) => env[key] || (platform === 'win32' ? Object.entries(env).find(([name]) => name.toUpperCase() === key.toUpperCase())?.[1] : undefined);
 

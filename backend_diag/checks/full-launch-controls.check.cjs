@@ -48,6 +48,35 @@ test('通常のアプリ起動は未接続・未選択・処理中でもペー�
  assert.doesNotMatch(source('アプリ起動/アプリ起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
 });
 
+test('通常画面は6アプリとHermesを含む全7CLIを並べ、未導入CLIを無効にする',async()=>{
+ const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'];
+ const entries=ids.map(id=>({id,名前:id,モード:'fixture',利用可能:!['grok','opencode'].includes(id)}));
+ const cliState={全項目:value(entries),処理中:value(''),通知:value(''),失敗:value(false),読込:async()=>{}};
+ for(const online of [true,false])for(const folder of ['/fixture/project','']){
+  const state=appState({folder});state.項目=value(['avatar','ide','term','code','live','discord'].map(id=>({id,名前:id})));
+  const html=await render('アプリ起動/アプリ起動パネル.vue',{state,cliState,online,visible:true});
+  assert.equal((html.match(/class="app-launch-button"/g)||[]).length,13);
+  assert.equal((html.match(/width="72" height="72"/g)||[]).length,13);
+  assert.doesNotMatch(html,/app-launch-name/);
+  assert.ok(html.indexOf('data-cli="aidiy_hermes"')<html.indexOf('data-cli="claude"'));
+  for(const item of entries){
+   const card=html.match(new RegExp(`<article[^>]*data-cli="${item.id}"[^>]*>([\\s\\S]*?)</article>`))[1];
+   const button=card.match(/<button[^>]*>/)[0];
+   assert.equal(/ disabled(?:[ >])/.test(button),!online||!folder||!item.利用可能,item.id);
+   assert.equal(card.includes('未導入'),!item.利用可能,item.id);
+  }
+ }
+});
+
+test('通常のアプリ起動は受付・起動済み通知を隠し、エラーだけ表示する',async()=>{
+ const state=appState({folder:'/fixture/project'});
+ for(const 種別 of ['accepted','existing','error']){
+  state.結果=value({code:{種別,通知:'fixture launch notice',ログ:'/fixture/log'}});
+  const html=await render('アプリ起動/アプリ起動パネル.vue',{state,online:true,visible:true});
+  assert.equal(html.includes('fixture launch notice'),種別==='error');assert.doesNotMatch(html,/起動ログの保存先/);
+ }
+});
+
 test('ミニ切替の配線はタイトルバーだけに残し、通常ページの表示条件を維持する',async()=>{
  const app=source('App.vue');
  assert.equal((app.match(/@mini=/g)||[]).length,1);

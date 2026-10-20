@@ -18,19 +18,22 @@ function backgroundMoveTarget(x,y){
  let node=document.elementFromPoint(x,y);
  if(!node)return false;
  while(node.shadowRoot){const inner=node.shadowRoot.elementFromPoint(x,y);if(!inner||inner===node)break;node=inner;}
+ // 小さな軌跡窓はほぼ全幅がボタン。短押しを維持し、同じボタンの静止長押しだけ移動面にする。
+ const routeButton=node.closest?.('.native-route-window .route-controls button');
  const controls='input,textarea,select,option,optgroup,datalist,button,a[href],label,summary,iframe,object,embed,audio[controls],video[controls],[contenteditable]:not([contenteditable="false"]),[role="button"],[role="link"],[role="combobox"],[role="listbox"],[role="option"],[role="textbox"],[role="slider"],[role="spinbutton"],[role="checkbox"],[role="radio"],[role="switch"],[role="menuitem"],[draggable="true"],.scrollbar,.slider,.monaco-editor,.xterm,[data-aidiy-no-window-move]';
  let handle=false;
  for(;node;node=node.parentElement||node.getRootNode?.().host){
-  if(node.isContentEditable||node.matches?.(controls))return false;
+  const routeHandle=node===routeButton&&!node.matches?.('[data-aidiy-no-window-move],[draggable="true"]');
+  if(node.isContentEditable||!routeHandle&&node.matches?.(controls))return false;
   // 別窓Explorerの一覧はキーボード操作用のtabindexを持つ。例外はこのUL自身だけ。
   const list=node.matches?.('ul[role="tree"][data-aidiy-window-move-list]');
-  if(!list&&node.matches?.('[tabindex]:not([tabindex="-1"])'))return false;
+  if(!list&&!routeHandle&&node.matches?.('[tabindex]:not([tabindex="-1"])'))return false;
   if(list){
    const rect=node.getBoundingClientRect();
    if(node.clientWidth>0&&node.offsetWidth>node.clientWidth+2&&(x>=rect.left+node.clientLeft+node.clientWidth||x<rect.left+node.clientLeft))return false;
    if(node.clientHeight>0&&node.offsetHeight>node.clientHeight+2&&y>=rect.top+node.clientTop+node.clientHeight)return false;
   }
-  if(list||node.matches?.('[data-aidiy-window-move-handle]'))handle=true;
+  if(routeHandle||list||node.matches?.('[data-aidiy-window-move-handle]'))handle=true;
  }
  // mousedown捕捉時は既に閉じたselectにもfocusが残る。専用の移動面だけ初回から扱う。
  // 展開中popupと移動面内の操作部品は上で除外済み。一般背景の保護は変えない。

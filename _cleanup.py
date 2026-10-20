@@ -87,7 +87,8 @@ NPM_PACKAGES = [
     "@anthropic-ai/claude-code",
     "@github/copilot",
     "@openai/codex",
-    "opencode-ai",
+    "@opencode/cli",
+    "opencode-ai",  # 旧パッケージ名（OpenCode 1.x）
 ]
 
 

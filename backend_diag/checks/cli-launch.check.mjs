@@ -23,7 +23,7 @@ test('CLI catalog is fixed; availability uses resolver only, no process executio
 });
 test('all CLI launches pass only fixed id, approval, and exact cwd; omit models and shell strings',async t=>{
  const f=await fixture(t);
- for(const id of ids){const result=await f.manager.launch(id,f.project,true);assert.equal(result.受付,true);const c=f.calls.at(-1);assert.equal(c.opts.cwd,f.project);assert.equal(c.opts.shell,false);assert.equal(c.opts.detached,true);assert.equal(c.opts.env.AIDIY_LAUNCHER_CHILD,'1');assert.deepEqual(c.args,[join(f.root,'frontend_ide','launch.mjs'),'--app','term','--project',f.project,'--new-window','--cli',id,'--cli-auto-approve','--foreground']);assert.equal(c.opts.stdio.at(-1),'ipc');assert.equal(c.child.connected,false);assert.doesNotMatch(c.args.join(' '),/--model|--provider|--prompt/);}
+ for(const id of ids){const result=await f.manager.launch(id,f.project,true);assert.equal(result.受付,true);assert.equal(result.通知,'');const c=f.calls.at(-1);assert.equal(c.opts.cwd,f.project);assert.equal(c.opts.shell,false);assert.equal(c.opts.detached,true);assert.equal(c.opts.env.AIDIY_LAUNCHER_CHILD,'1');assert.deepEqual(c.args,[join(f.root,'frontend_ide','launch.mjs'),'--app','term','--project',f.project,'--new-window','--cli',id,'--cli-auto-approve','--foreground']);assert.equal(c.opts.stdio.at(-1),'ipc');assert.equal(c.child.connected,false);assert.doesNotMatch(c.args.join(' '),/--model|--provider|--prompt/);}
 });
 test('invalid ids, unconfirmed mode, missing project and missing executable never spawn',async t=>{
  const f=await fixture(t,{missing:'grok'});

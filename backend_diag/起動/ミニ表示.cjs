@@ -7,6 +7,11 @@ function ミニ表示を作成(window,{screen}={}){
  let original;
  return {
   get active(){return !!original;},
+  演出範囲(enabled){
+   if(enabled){const bounds=window.getNormalBounds();return {...bounds,width:ミニ幅,height:最大ミニ高さ};}
+   if(original?.maximized)return screen.getDisplayMatching(original.bounds).workArea;
+   return original?.bounds||window.getBounds();
+  },
   set(enabled,{topLeft=false}={}){
    if(typeof enabled!=='boolean'||!window||window.isDestroyed())return false;
    if(enabled===!!original)return true;

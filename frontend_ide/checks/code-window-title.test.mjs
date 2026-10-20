@@ -28,6 +28,8 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   setBounds(bounds){this.bounds=bounds;}
   setAlwaysOnTop(value,level){this.top=value;this.topLevel=level;this.topCalls=(this.topCalls||0)+1;}
   isAlwaysOnTop(){return !!this.top;}
+  setParentWindow(value){this.parent=value;}
+  getParentWindow(){return this.parent||null;}
   setTitle(title){this.title=title;}
   getTitle(){return this.title;}
   async loadURL(url){this.webContents.mainFrame.url=url.split('#')[0];}
@@ -99,13 +101,13 @@ test('IDE再フォーカスは子パネルのOFFを上書きせず、選択さ�
  const f=await desktopFixture(),child=await f.code(),other=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
  const action=(record,command)=>f.handlers.get('development:window')(f.event(record),command);
  assert.equal(child.window.top,true);assert.equal(other.window.top,true);assert.equal(standalone.top,false);assert.equal(f.owner.window.top,false);
- assert.equal(child.window.topLevel,'floating');assert.equal(child.window.options.parent,undefined,'OSの親子関係でOFFを無効化しない');
- const bounds=child.window.getBounds();action(child,'toggle-pin');assert.equal(child.window.top,false);
+ assert.equal(child.window.topLevel,'floating');assert.equal(child.window.getParentWindow(),f.owner.window,'ピンONはIDEより手前に保つ');
+ const bounds=child.window.getBounds();action(child,'toggle-pin');assert.equal(child.window.top,false);assert.equal(child.window.getParentWindow(),null);
  const raises=other.window.raises;f.owner.window.focus();child.window.focus();
  assert.equal(child.window.top,false);assert.equal(other.window.raises,raises);assert.equal(child.window.getBounds(),bounds);
  other.window.focus();assert.equal(other.window.raises,raises+1);
  assert.equal(action(child,'pin-state').pinned,false);
- assert.equal(action(child,'toggle-pin').pinned,true);child.window.focus();assert.ok(child.window.raises>0);
+ assert.equal(action(child,'toggle-pin').pinned,true);assert.equal(child.window.getParentWindow(),f.owner.window);child.window.focus();assert.ok(child.window.raises>0);
  assert.equal(f.handlers.get('development:window')({sender:{},senderFrame:{}},'toggle-pin'),undefined);
  assert.equal(f.handlers.get('development:window')({...f.event(child),senderFrame:{url:child.url}},'toggle-pin'),undefined);
 });

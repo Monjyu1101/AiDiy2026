@@ -35,7 +35,7 @@ function windowsShim(extension,target){
 }
 
 test('固定4パッケージ・3操作だけを固定 argv と公式 registry で実行する',()=>{
-  assert.deepEqual(NPM_PACKAGES,{claude:'@anthropic-ai/claude-code',codex:'@openai/codex',copilot:'@github/copilot',opencode:'opencode-ai'});
+  assert.deepEqual(NPM_PACKAGES,{claude:'@anthropic-ai/claude-code',codex:'@openai/codex',copilot:'@github/copilot',opencode:'@opencode/cli'});
   assert.equal(Object.isFrozen(NPM_PACKAGES),true);
   for(const [id,pkg] of Object.entries(NPM_PACKAGES))for(const [action,steps] of [['導入',['install']],['削除',['uninstall']],['再導入',['install']]]){
     const commands=npmCommands(npm,id,action,'/fixture/private config/npmrc');
@@ -286,14 +286,14 @@ test('表示後の所有元変更を開始直前に再確認し、実行せず�
   await manager.start('claude','導入');const job=await settled(manager);assert.equal(job.状態,'失敗');assert.match(job.説明,/所有元が変わりました/);assert.equal(calls.length,0);assert.deepEqual(probes,['claude']);
 });
 
-test('連打・別行操作は排他され、中止後も停止と再確認完了まで解除しない',async t=>{
+test('同じ項目の連打は排他され、中止後も停止と再確認完了まで解除しない',async t=>{
   const gate=defer(),checked=defer(),sequence=[];let running,checking=false;t.after(()=>{gate.resolve();checked.resolve();});
   const {manager}=fixture(t,{run:async command=>{running=command;sequence.push(command.args[1]);await gate.promise;return {...success,code:null,cancelled:command.signal.aborted};},probeFn:async entry=>{checking=true;sequence.push('probe');await checked.promise;return {id:entry.id,状態:'未検出'};}});
   const start=await manager.start('codex','再導入');await until(()=>running);
-  for(const id of ['codex','claude'])await assert.rejects(()=>manager.start(id,'導入'),{status:409});
+  await assert.rejects(()=>manager.start('codex','導入'),{status:409});
   await assert.rejects(()=>manager.cancel('unknown'),{status:404});assert.equal(running.signal.aborted,false);
   await manager.cancel(start.実行.実行ID);assert.equal(running.signal.aborted,true);assert.equal(manager.busy(),true);
-  running.onUncertain();assert.equal((await manager.snapshot()).実行.状態,'停止未確認');await assert.rejects(()=>manager.start('claude','導入'),{status:409});
+  running.onUncertain();assert.equal((await manager.snapshot()).実行.状態,'停止未確認');await assert.rejects(()=>manager.start('codex','導入'),{status:409});
   gate.resolve();await until(()=>checking);assert.equal((await manager.snapshot()).実行.状態,'確認中');assert.equal(manager.busy(),true);
   checked.resolve();const job=await settled(manager);assert.equal(job.状態,'中止');assert.match(job.ログ,/中止を要求/);assert.deepEqual(sequence,['install','probe']);assert.doesNotMatch(job.ログ,/uninstall/);
 });
@@ -328,7 +328,7 @@ test('終了は所有操作を中止して確認完了を待ち、以後の操�
 
 test('manager 自体も固定4 ID と固定操作以外を拒否する',async t=>{
   const {manager,calls,probes}=fixture(t,{entries:[...entries,{id:'constructor'},{id:'toString'}]});
-  for(const id of ['python','constructor','toString','__proto__','codex/extra'])await assert.rejects(()=>manager.start(id,'導入'),{status:404});
+  for(const id of ['node','constructor','toString','__proto__','codex/extra'])await assert.rejects(()=>manager.start(id,'導入'),{status:404});
   await assert.rejects(()=>manager.start('codex','任意コマンド'),{status:404});assert.equal(calls.length,0);assert.equal(probes.length,0);
 });
 
@@ -387,7 +387,7 @@ test('管理処理は親 close 後も子孫停止まで prefix ロックを保�
   t.after(()=>{alive=false;child.emit('close',null);});
   const {manager}=fixture(t,{acquireLock:async()=>async()=>{released++;},run:command=>{active=command;return runInstallCommand({...command,spawnFn:()=>child,isTreeRunning:()=>alive,killTree:()=>true});},probeFn:async entry=>{checks++;return {id:entry.id,状態:'未検出'};}});
   const start=await manager.start('codex','導入');await until(()=>active);await manager.cancel(start.実行.実行ID);child.emit('close',null);
-  await new Promise(resolve=>setTimeout(resolve,20));assert.equal(released,0);assert.equal(checks,0);assert.equal(manager.busy(),true);await assert.rejects(()=>manager.start('claude','導入'),{status:409});
+  await new Promise(resolve=>setTimeout(resolve,20));assert.equal(released,0);assert.equal(checks,0);assert.equal(manager.busy(),true);await assert.rejects(()=>manager.start('codex','導入'),{status:409});
   alive=false;assert.equal((await settled(manager)).状態,'中止');assert.equal(released,1);assert.equal(checks,1);
 });
 
@@ -397,4 +397,26 @@ test('固定 CMD だけは既に組み立てた引用符を Windows へ保持し
   const args=['/d','/v:off','/s','/c','""C:\\fixture (space)\\install.cmd" --skip-path --skip-aliases"'];
   const pending=runInstallCommand({platform:'win32',executable:'C:\\Windows\\System32\\cmd.exe',args,windowsVerbatimArguments:true,spawnFn:(_executable,actualArgs,options)=>{captured={actualArgs,options};return child;}});
   child.emit('close',0);assert.equal((await pending).code,0);assert.deepEqual(captured.actualArgs,args);assert.equal(captured.options.windowsVerbatimArguments,true);assert.equal(captured.options.shell,false);
+});
+
+test('別項目は同じ npm 導入先でも並行して実行し、排他ロックはパッケージ単位で取る',async t=>{
+  const gate=defer(),running=[],scopes=[];t.after(()=>gate.resolve());
+  const {manager,probes}=fixture(t,{acquireLock:async(prefix,options)=>{assert.equal(prefix,npm.prefix);scopes.push(options.scope);return async()=>{};},run:async command=>{running.push(command.args.at(-1));await gate.promise;return success;}});
+  await manager.start('codex','導入');await manager.start('claude','導入');
+  await until(()=>running.length===2);
+  assert.deepEqual([...running].sort(),['@anthropic-ai/claude-code','@openai/codex']);assert.deepEqual([...scopes].sort(),['@anthropic-ai/claude-code','@openai/codex']);
+  assert.equal((await manager.snapshot()).実行一覧.filter(job=>job.実行中).length,2);
+  await assert.rejects(()=>manager.start('codex','削除'),{status:409});
+  gate.resolve();await settled(manager);
+  const jobs=(await manager.snapshot()).実行一覧;
+  assert.deepEqual(jobs.map(job=>[job.対象,job.状態]),[['codex','完了'],['claude','完了']]);assert.deepEqual([...probes].sort(),['claude','codex']);
+});
+
+test('同じ導入先でも、ロックの範囲が違えば並行取得でき、同じ範囲は拒否する',async t=>{
+  const directory=await temp(t),prefix=path.join(directory,'prefix');await mkdir(prefix);
+  const first=await acquireInstallLock(prefix,{directory,scope:'@openai/codex'});
+  const second=await acquireInstallLock(prefix,{directory,scope:'@anthropic-ai/claude-code'});
+  await assert.rejects(()=>acquireInstallLock(prefix,{directory,scope:'@openai/codex'}),{status:409});
+  await first();await second();
+  await (await acquireInstallLock(prefix,{directory,scope:'@openai/codex'}))();
 });

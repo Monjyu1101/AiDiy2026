@@ -26,11 +26,11 @@
 
 ## Antigravity CLI / agy
 
-- 対象: `agy.svg`、`agy.png`、保存原本 `upstream/agy-aidiy.svg`。
-- 出典: AiDiy 向けに作成されたこのフォルダ既存の独自ピクトグラム（浮遊ロケット）。外部の公式ロゴや公式キャラクターの引用ではありません。
-- 生成元: 既存 `agy.svg` を無改変で保存した `upstream/agy-aidiy.svg`。原本 SHA-256: `a5b63771f310b55952380ba50f9d5533ab0d0ba69fa7e2fb8538dbbd5b6f3dde`。96単位の viewBox・図形・色はそのまま入れ子 SVG 内に保持し、共通枠の外側の白帯に黒字の Agy を追加。PNG は合成 SVG から120×120pxで生成します。
-- ライセンス: リポジトリと同じ [AiDiy 公開利用ライセンス v1.1](../../../../../LICENSE)。`Copyright (c) 2014-2026 Mitsuo KONDOU and contributors`。再配布時はライセンス全文・著作権表示を含めてください。
-- Antigravity の商標権その他の第三者権利を許諾するものではありません。
+- 対象: `agy.svg`、`agy.png`。無改変原本: `upstream/antigravity-logo-mark.svg`。
+- 引用元: [Google Antigravity 公式サイト](https://antigravity.google/) のヘッダーに埋め込まれた虹色の山形マーク（背景なし、180単位の viewBox）。取得日: 2026-10-20 UTC。ページ内の SVG 要素をそのまま保存し、末尾に改行1つを付けています。番号つきリリースはなく、取得時のハッシュで固定しています。
+- 原本 SHA-256: `db3b1dd11fddd2680cc2b5785dbd79f03e1fb305c871b466c3485b4383fd957a`。
+- 形状・色: viewBox、パス、マスク、ぼかしフィルター、色は入れ子 SVG 内にそのまま保持します。トリミングはしていません。表示用 SVG は共通枠に等比配置し、図形の外の白帯に黒字の Agy を追加。PNG は合成 SVG をブラウザで描画した120×120pxの透過出力で、公式配布ファイルそのものではありません。
+- 利用条件: Google の製品ロゴであり、MIT 等のオープンライセンスは付いていません。商標その他の権利は Google に帰属します。Antigravity CLI の起動先の識別だけに使い、AiDiy 自身のマークとしては使いません。公式な提携・承認を示すものではなく、AiDiy のソフトウェアライセンスによって再許諾しません。この記録は、全配布・宣伝用途への許諾を保証するものではありません。
 
 ## Claude Code / Codex
 
@@ -78,9 +78,9 @@
 - ライセンス: [MIT License](https://github.com/anomalyco/opencode/blob/6e9c85390bc232866f83ca19dfb46bd9d39b7aa1/LICENSE)、`Copyright (c) 2025 opencode`。全文を [LICENSE-OpenCode.txt](./LICENSE-OpenCode.txt) と本メモ末尾に保持します。原文 SHA-256: `625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b`。
 - 確認したアイコンと親ディレクトリに別ライセンスの表記はありません。MIT は著作権上の利用条件であり、商標権・公式提携の許諾を意味しません。AiDiy は OpenCode チームが制作したものではなく、公式な提携・承認を示すものでもありません。
 
-## 生成スクリプト
+## 生成方法
 
-`PNG生成.py` の独自実装はリポジトリと同じ [AiDiy 公開利用ライセンス v1.1](../../../../../LICENSE) の対象です。実行方法・保存原本・生成物の関係は [README.md](./README.md) を参照してください。
+生成スクリプトは同梱していません。合成の仕様・保存原本・生成物の関係は [README.md](./README.md) を参照してください。
 
 
 ## 再配布用の MIT 表示全文

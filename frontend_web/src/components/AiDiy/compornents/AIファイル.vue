@@ -1142,7 +1142,7 @@ onBeforeUnmount(() => {
 
 .close-btn {
   position: absolute;
-  left: 10px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
@@ -1165,7 +1165,7 @@ onBeforeUnmount(() => {
 
 .status-group {
   position: absolute;
-  right: 40px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -1190,7 +1190,7 @@ onBeforeUnmount(() => {
 
 .reload-btn {
   position: absolute;
-  right: 10px;
+  right: 40px;
   top: 50%;
   transform: translateY(-50%);
   background: #22c55e;

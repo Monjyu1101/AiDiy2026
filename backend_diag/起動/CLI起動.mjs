@@ -51,7 +51,7 @@ export function createCliLauncher({root=ROOT,node=process.execPath,spawnFn=spawn
    if(child.connected)child.disconnect();child.unref();
   }catch(error){if(child?.connected)child.disconnect();child?.kill();throw error.status?error:fail('Term の起動に失敗しました。セットアップを確認してください。',503);}
   finally{await output.close();}
-  return {受付:true,通知:`${item.name} 用の Term を開きました（${item.mode}・モデル指定なし）。CLI の起動結果は端末を確認してください。`,ログ:logPath};
+  return {受付:true,通知:'',ログ:logPath};
  }
  return {catalog,launch};
 }

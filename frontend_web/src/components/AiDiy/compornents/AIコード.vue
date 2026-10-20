@@ -1082,7 +1082,7 @@ const 状態表示テキスト = () => {
 
 .close-btn {
   position: absolute;
-  left: 10px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
@@ -1106,7 +1106,7 @@ const 状態表示テキスト = () => {
 .agent-status {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
   gap: 8px;

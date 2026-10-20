@@ -1,6 +1,5 @@
 // Windows の固定 WinGet パッケージ。list の掲載だけを所有元の証明にしません。
 // 所有登録: microsoft/winget-cli src/AppInstallerCLICore/PortableInstaller.cpp, AppInstallerCommonCore/PortableARPEntry.cpp
-// 設定保持: https://github.com/microsoft/vscode-docs/blob/main/docs/setup/uninstall.md
 // OBS は https://github.com/obsproject/bouf/blob/master/extra/nsis/mp-installer.nsi の通常 /S（任意の設定削除を選択しない）。
 import * as filesystem from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -8,7 +7,7 @@ import path from 'node:path';
 import {stripVTControlCharacters} from 'node:util';
 import {resolveProgram} from '../診断/probes.mjs';
 
-export const WINGET_PACKAGES=Object.freeze({ffmpeg:'Gyan.FFmpeg',ffprobe:'Gyan.FFmpeg',ffplay:'Gyan.FFmpeg',uv:'astral-sh.uv',ollama:'Ollama.Ollama',obs:'OBSProject.OBSStudio',code:'Microsoft.VisualStudioCode'});
+export const WINGET_PACKAGES=Object.freeze({ffmpeg:'Gyan.FFmpeg',ffprobe:'Gyan.FFmpeg',ffplay:'Gyan.FFmpeg',ollama:'Ollama.Ollama',obs:'OBSProject.OBSStudio',chrome:'Google.Chrome'});
 const SOURCE='Microsoft.Winget.Source_8wekyb3d8bbwe',SOURCE_URL='https://cdn.winget.microsoft.com/cache';
 const ACTIONS=['導入','再導入','削除'],contexts=new WeakMap(),win=path.win32;
 const failure=message=>Object.assign(Error(message),{status:409});
@@ -18,11 +17,13 @@ const normal=value=>typeof value==='string'?win.normalize(value).replace(/\\+$/,
 const same=(a,b)=>Boolean(a&&b)&&normal(a)===normal(b);
 const absolute=value=>typeof value==='string'&&/^[a-z]:[\\/]/i.test(value)&&!/[\x00-\x1f<>|?*]/.test(value)&&!value.slice(2).includes(':');
 const join=(root,...parts)=>absolute(root)?win.join(root,...parts):null;
-const groups=Object.freeze({ffmpeg:['ffmpeg','ffprobe','ffplay'],uv:['uv'],ollama:['ollama'],obs:['obs'],code:['code']});
+const groups=Object.freeze({ffmpeg:['ffmpeg','ffprobe','ffplay'],ollama:['ollama'],obs:['obs'],chrome:['chrome']});
+// 利用者データ（モデル・ブラウザープロファイル）を抱えるため、未導入時の新規導入だけを行う。
+const INSTALL_ONLY=new Set(['ollama','chrome']);
 const groupFor=id=>['ffmpeg','ffprobe','ffplay'].includes(id)?'ffmpeg':id;
-const processNames=Object.freeze({ffmpeg:['ffmpeg.exe','ffprobe.exe','ffplay.exe'],uv:['uv.exe','uvx.exe'],ollama:['ollama.exe','ollama app.exe'],obs:['obs64.exe','obs32.exe','obs-browser-page.exe'],code:['code.exe','code - insiders.exe']});
-const descriptions={ffmpeg:'FFmpeg 一式（ffmpeg / ffprobe / ffplay）をまとめて操作します。',uv:'uv / uvx 本体だけを操作し、仮想環境・Python・キャッシュは削除しません。',ollama:'モデル保持を保証できないため、Ollama は新規導入だけに対応します。',obs:'OBS 本体だけを操作し、設定・プロファイル・シーン・録画は削除しません。アプリ内に追加したプラグインは再導入が必要になる場合があります。',code:'VS Code 本体だけを操作し、設定・拡張機能・認証・作業ファイルは削除しません。'};
-const terms={ffmpeg:'https://ffmpeg.org/legal.html',uv:'https://github.com/astral-sh/uv/blob/main/LICENSE-MIT',ollama:'https://github.com/ollama/ollama/blob/main/LICENSE',obs:'https://github.com/obsproject/obs-studio/blob/master/COPYING',code:'https://code.visualstudio.com/license'};
+const processNames=Object.freeze({ffmpeg:['ffmpeg.exe','ffprobe.exe','ffplay.exe'],ollama:['ollama.exe','ollama app.exe'],obs:['obs64.exe','obs32.exe','obs-browser-page.exe'],chrome:['chrome.exe']});
+const descriptions={ffmpeg:'FFmpeg 一式（ffmpeg / ffprobe / ffplay）をまとめて操作します。',ollama:'モデル保持を保証できないため、Ollama は新規導入だけに対応します。',obs:'OBS 本体だけを操作し、設定・プロファイル・シーン・録画は削除しません。アプリ内に追加したプラグインは再導入が必要になる場合があります。',chrome:'Google Chrome の新規導入だけに対応します。プロファイル・拡張機能・同期データを守るため、再導入・削除は自動実行しません。'};
+const terms={ffmpeg:'https://ffmpeg.org/legal.html',ollama:'https://github.com/ollama/ollama/blob/main/LICENSE',obs:'https://github.com/obsproject/obs-studio/blob/master/COPYING',chrome:'https://www.google.com/chrome/terms/'};
 const baseFor=id=>({id,パッケージ:packageFor(id),説明:descriptions[groupFor(id)],関連項目:groups[groupFor(id)],規約URL:terms[groupFor(id)],確認説明:'公式の winget 配布元を使用します。導入先・PATH が標準インストーラーにより変更され、管理者の承認画面が出る場合があります。利用規約の追加承諾や昇格が必要な場合は自動回避せず停止します。再導入は削除後に導入するため、途中で失敗すると本体が未導入になります。'});
 
 // 固定の読み取りだけ。入力値の連結、コマンドラインの取得、ExecutionPolicy 変更はしない。
@@ -44,14 +45,14 @@ foreach ($spec in $specs) {
         $item = $root.OpenSubKey($key,$false)
         if ($null -eq $item) { throw 'Registry entry changed' }
         $name = [string]$item.GetValue('DisplayName',''); $pkg = [string]$item.GetValue('WinGetPackageIdentifier','')
-        if ($name -notmatch '(?i)ffmpeg|^uv(?:\s|$)|ollama|obs studio|visual studio code' -and $pkg -notin @('Gyan.FFmpeg','astral-sh.uv','Ollama.Ollama','OBSProject.OBSStudio','Microsoft.VisualStudioCode')) { continue }
+        if ($name -notmatch '(?i)ffmpeg|ollama|obs studio|^google chrome$' -and $pkg -notin @('Gyan.FFmpeg','Ollama.Ollama','OBSProject.OBSStudio','Google.Chrome')) { continue }
         $rows += [pscustomobject]@{scope=$spec[2];view=$spec[1];key=$key;name=$name;publisher=[string]$item.GetValue('Publisher','');version=[string]$item.GetValue('DisplayVersion','');installLocation=[string]$item.GetValue('InstallLocation','');uninstallString=[string]$item.GetValue('UninstallString','');quietUninstallString=[string]$item.GetValue('QuietUninstallString','');packageIdentifier=$pkg;sourceIdentifier=[string]$item.GetValue('WinGetSourceIdentifier','');installerType=[string]$item.GetValue('WinGetInstallerType','')}
       } finally { if ($null -ne $item) { $item.Dispose() } }
     }
   } catch { $registryKnown = $false } finally { if ($null -ne $root) { $root.Dispose() }; if ($null -ne $base) { $base.Dispose() } }
 }
 try {
-  $names = @(Get-CimInstance Win32_Process -Filter "Name='ffmpeg.exe' OR Name='ffprobe.exe' OR Name='ffplay.exe' OR Name='uv.exe' OR Name='uvx.exe' OR Name='ollama.exe' OR Name='ollama app.exe' OR Name='obs64.exe' OR Name='obs32.exe' OR Name='obs-browser-page.exe' OR Name='Code.exe' OR Name='Code - Insiders.exe'" | ForEach-Object { [string]$_.Name })
+  $names = @(Get-CimInstance Win32_Process -Filter "Name='ffmpeg.exe' OR Name='ffprobe.exe' OR Name='ffplay.exe' OR Name='ollama.exe' OR Name='ollama app.exe' OR Name='obs64.exe' OR Name='obs32.exe' OR Name='obs-browser-page.exe' OR Name='chrome.exe'" | ForEach-Object { [string]$_.Name })
 } catch { $processKnown = $false }
 [pscustomobject]@{schema=1;registryKnown=$registryKnown;processKnown=$processKnown;registrations=@($rows);processes=@($names)} | ConvertTo-Json -Depth 5 -Compress
 `;
@@ -69,14 +70,14 @@ async function readCommand(run,executable,args,env){
 }
 function registryMatches(row,group){
   if(row.packageIdentifier===WINGET_PACKAGES[groups[group][0]])return true;
-  const names={ffmpeg:/ffmpeg/i,uv:/^uv(?:\s|$)/i,ollama:/ollama/i,obs:/obs studio/i,code:/visual studio code/i};
+  const names={ffmpeg:/ffmpeg/i,ollama:/ollama/i,obs:/obs studio/i,chrome:/^google chrome$/i};
   return names[group].test(row.name||'');
 }
 function rootsFor(group,env,scope){
   const local=environment(env,'LOCALAPPDATA'),program=environment(env,'PROGRAMFILES'),program86=environment(env,'PROGRAMFILES(X86)');
-  if(['ffmpeg','uv'].includes(group))return (scope==='user'?[join(local,'Microsoft','WinGet','Packages')]:[join(program,'WinGet','Packages'),join(program86,'WinGet','Packages')]).filter(Boolean).map(root=>join(root,`${WINGET_PACKAGES[groups[group][0]]}_${SOURCE}`));
-  if(group==='code')return scope==='user'?[join(local,'Programs','Microsoft VS Code')].filter(Boolean):[join(program,'Microsoft VS Code')].filter(Boolean);
+  if(group==='ffmpeg')return (scope==='user'?[join(local,'Microsoft','WinGet','Packages')]:[join(program,'WinGet','Packages'),join(program86,'WinGet','Packages')]).filter(Boolean).map(root=>join(root,`${WINGET_PACKAGES[groups[group][0]]}_${SOURCE}`));
   if(group==='obs')return scope==='machine'?[join(program,'obs-studio')].filter(Boolean):[];
+  if(group==='chrome')return (scope==='user'?[join(local,'Google','Chrome','Application')]:[join(program,'Google','Chrome','Application'),join(program86,'Google','Chrome','Application')]).filter(Boolean);
   return [join(local,'Programs','Ollama')].filter(Boolean);
 }
 async function plainDirectory(directory,io,{create=false,allowMissing=false}={}){
@@ -95,44 +96,38 @@ async function fileIdentity(filename,io,{hash=true}={}){
   return hash?{path:normal(filename),sha256:createHash('sha256').update(await io.readFile(filename)).digest('hex')}:{path:normal(filename),size:info.size};
 }
 function nativeIdentity(row,group){
-  if(group==='code'){
-    const keys=row.scope==='user'?['{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1','{D9E514E7-1A56-452D-9337-2990C0DC4310}_is1']:['{EA457B21-F73E-494C-ACAB-524FDE069978}_is1','{A5270FC5-65AD-483E-AC30-2C276B63D0AC}_is1'];
-    return row.publisher==='Microsoft Corporation'&&/^Microsoft Visual Studio Code(?: \(User\))?$/.test(row.name)&&keys.includes(row.key);
-  }
   return group==='obs'&&row.scope==='machine'&&row.key==='OBS Studio'&&row.publisher==='OBS Project'&&/^OBS Studio(?: \([^)]+\))?$/.test(row.name);
 }
 function uninstallPath(value){const match=typeof value==='string'&&value.match(/^"([^"\r\n]+\.exe)"(?:\s+(?:\/SILENT|\/VERYSILENT|\/SUPPRESSMSGBOXES|\/NORESTART|\/S))*\s*$/i);return match?.[1]||null;}
 async function candidateProof(group,row,resolved,env,io){
-  const declaredRoot=row.installLocation||(['obs','code'].includes(group)?win.dirname(uninstallPath(row.uninstallString)||''):null);
+  const declaredRoot=row.installLocation||(group==='obs'?win.dirname(uninstallPath(row.uninstallString)||''):null);
   if(!['user','machine'].includes(row.scope)||!['Registry32','Registry64'].includes(row.view)||!rootsFor(group,env,row.scope).some(root=>same(root,declaredRoot)))return null;
   const root=win.normalize(declaredRoot);await plainDirectory(root,io);
   const files=[];let portable=false;
-  if(['ffmpeg','uv'].includes(group)){
+  if(group==='ffmpeg'){
     portable=true;
     if(row.packageIdentifier!==WINGET_PACKAGES[groups[group][0]]||row.sourceIdentifier!==SOURCE||row.installerType!=='portable'||row.key!==`${row.packageIdentifier}_${SOURCE}`||row.uninstallString!==`winget uninstall --product-code ${row.key}`)return null;
     let parent;
     for(const id of groups[group]){
       if(!resolved[id])return null;
       const target=await io.realpath(resolved[id]),relative=win.relative(root,target);
-      if(group==='uv'?!/^uv\.exe$/i.test(relative):!/^ffmpeg-[\w.+-]+-full_build\\bin\\(?:ffmpeg|ffprobe|ffplay)\.exe$/i.test(relative))return null;
+      if(!/^ffmpeg-[\w.+-]+-full_build\\bin\\(?:ffmpeg|ffprobe|ffplay)\.exe$/i.test(relative))return null;
       if(win.basename(target).toLowerCase()!==`${id}.exe`)return null;
       if(parent&&!same(parent,win.dirname(target)))return null;parent=win.dirname(target);files.push(await fileIdentity(target,io,{hash:false}));
     }
-    if(group==='uv')files.push(await fileIdentity(win.join(root,'uvx.exe'),io,{hash:false}));
   }else{
     if(!nativeIdentity(row,group)||!resolved[group])return null;
     // 後から portable 化した配置は本体内に設定を持つため、通常の削除保証を適用しない。
-    for(const marker of group==='code'?['data']:['portable_mode','portable_mode.txt','config']){
+    for(const marker of ['portable_mode','portable_mode.txt','config']){
       try{await io.lstat(win.join(root,marker));return null;}catch(error){if(error.code!=='ENOENT')throw error;}
     }
-    const cli=win.join(root,group==='code'?'bin\\code.cmd':'bin\\64bit\\obs64.exe');
+    const cli=win.join(root,'bin\\64bit\\obs64.exe');
     if(!same(await io.realpath(resolved[group]),cli))return null;
     const uninstaller=uninstallPath(row.uninstallString);
-    if(!uninstaller||!same(win.dirname(uninstaller),root)||(group==='code'?!/^unins\d{3}\.exe$/i.test(win.basename(uninstaller)):win.basename(uninstaller).toLowerCase()!=='uninstall.exe'))return null;
+    if(!uninstaller||!same(win.dirname(uninstaller),root)||win.basename(uninstaller).toLowerCase()!=='uninstall.exe')return null;
     if(!same(uninstallPath(row.uninstallString),uninstaller))return null;
     if(row.quietUninstallString&&!same(uninstallPath(row.quietUninstallString),uninstaller))return null;
     files.push(await fileIdentity(cli,io));
-    if(group==='code')files.push(await fileIdentity(win.join(root,'Code.exe'),io));
     files.push(await fileIdentity(uninstaller,io));
   }
   return {schema:1,package:WINGET_PACKAGES[groups[group][0]],source:SOURCE,scope:row.scope,view:row.view,key:row.key,name:row.name,publisher:row.publisher,version:row.version,root:normal(root),uninstallString:row.uninstallString,quietUninstallString:row.quietUninstallString||'',portable,files};
@@ -161,8 +156,10 @@ export async function inspectWinget({entries=[],env=process.env,platform=process
   if(platform!=='win32')return disabled('winget による操作は Windows 専用です。');
   if(typeof run!=='function')return disabled('winget の実行環境を確認できません。');
   try{
-    const executable=await resolve({id:'winget',commands:['winget.exe'],paths:{win32:['$LOCALAPPDATA/Microsoft/WindowsApps/winget.exe']}},{env,platform});
+    let executable=await resolve({id:'winget',commands:['winget.exe'],paths:{win32:['$LOCALAPPDATA/Microsoft/WindowsApps/winget.exe']}},{env,platform});
     const alias=join(environment(env,'LOCALAPPDATA'),'Microsoft','WindowsApps','winget.exe');
+    // App Installer の実行エイリアスは stat が EACCES になり探索で見つからない。標準位置だけ lstat で存在を確認して使う。
+    if(!executable&&alias){try{const info=await io.lstat(alias);if(info.isFile()||info.isSymbolicLink())executable=alias;}catch{}}
     if(!executable||!same(executable,alias))return disabled('標準の winget が見つかりません。Windows の App Installer を確認してください。');
     const sourceRead=await readCommand(run,executable,['source','export','--name','winget','--disable-interactivity'],env);
     if(!commandOK(sourceRead.result))return disabled('winget の配布元を確認できません。利用規約や権限を確認してください。');
@@ -179,7 +176,7 @@ export async function inspectWinget({entries=[],env=process.env,platform=process
     const resolved={};
     // FFmpeg は1行だけの要求でも全3本の別導入元・実行状態を検査する。
     for(const id of Object.keys(WINGET_PACKAGES)){
-      const entry=entries.find(item=>item.id===id)||{id,commands:[id==='obs'?'obs64.exe':id==='code'?'code.cmd':`${id}.exe`]};
+      const entry=entries.find(item=>item.id===id)||{id,commands:[id==='obs'?'obs64.exe':`${id}.exe`]};
       resolved[id]=await resolve(entry,{env,platform});
     }
     const evidence={},items=[];
@@ -195,7 +192,7 @@ export async function inspectWinget({entries=[],env=process.env,platform=process
         for(const scope of ['user','machine'])for(const root of rootsFor(group,env,scope))try{await plainDirectory(root,io,{allowMissing:true});await io.lstat(root);residual=true;}catch(error){if(error.code!=='ENOENT')residual=true;}
         if(residual||await receiptExists(group,env,io))reason='標準導入先または導入記録が残っています。状態を確認してから操作してください。';
         else actions=['導入'];
-      }else if(group==='ollama')reason='モデル・設定の保持を保証できないため、Ollama の再導入・削除は自動実行しません。';
+      }else if(INSTALL_ONLY.has(group))reason={ollama:'モデル・設定の保持を保証できないため、Ollama の再導入・削除は自動実行しません。',chrome:'プロファイル・拡張機能を保護するため、Chrome の再導入・削除は自動実行しません。'}[group];
       else if(rows.length!==1||listed!==1)reason='複数の導入先、手動導入、または一致しない登録があるため、自動操作しません。';
       else{
         try{proof=await candidateProof(group,rows[0],resolved,env,io);}catch{}
@@ -208,7 +205,7 @@ export async function inspectWinget({entries=[],env=process.env,platform=process
       }
       if(actions.length&&metadata.processKnown!==true){actions=[];reason='実行中プロセスを確認できないため、自動操作しません。';}
       if(actions.length&&running){actions=[];reason='対象アプリまたは関連プロセスが実行中です。終了後に再確認してください。';}
-      evidence[group]={proof,owned,absent:!rows.length&&!listed&&!ids.some(id=>resolved[id]),scope:proof?.scope||(group==='obs'?'machine':'user'),actions};
+      evidence[group]={proof,owned,absent:!rows.length&&!listed&&!ids.some(id=>resolved[id]),scope:proof?.scope||(['obs','chrome'].includes(group)?'machine':'user'),actions};
       for(const id of ids)if(supported.some(entry=>entry.id===id))items.push({...baseFor(id),操作:actions,...reason?{理由:reason}:{}});
     }
     const context=Object.freeze({executable,lockKey:win.join(system,'AiDiy-winget-package-management'),evidence});
@@ -238,9 +235,9 @@ export async function executeWinget(entry,action,context,{env,platform=process.p
     if(step==='uninstall'){
       if(!post?.absent)throw failure('削除後の登録または実行ファイルが残っています。再導入を続行しません。');
       if(!current.proof.portable)await removeReceipt(group,current.proof,privateContext.env,privateContext.io);
-    }else if(['ffmpeg','uv'].includes(group)){
+    }else if(group==='ffmpeg'){
       if(!post?.proof||!post.owned||post.proof.scope!==initial.scope)throw failure('導入は終了しましたが、標準の winget 所有情報を確認できませんでした。');
-    }else if(['obs','code'].includes(group)){
+    }else if(group==='obs'){
       if(!post?.proof||post.proof.scope!==initial.scope)throw failure('導入は終了しましたが、標準の導入元を確認できず管理記録を保存できませんでした。');
       try{await saveReceipt(group,post.proof,privateContext.env,privateContext.io);}catch(error){if(error.status)throw error;throw failure('導入は終了しましたが、安全な管理記録を保存できませんでした。');}
     }

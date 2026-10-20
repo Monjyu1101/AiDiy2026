@@ -17,14 +17,18 @@ BrowserWindow.prototype.focus=function(){};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function until(check){for(let i=0;i<150;i++){if(await check())return;await sleep(50);}throw Error('initial mini timeout');}
 const near=(actual,expected)=>{for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=2,`${key}: ${actual[key]} / ${expected[key]}`);};
-let owner,openingMeasurement,openingCheck;
+let owner,openingMeasurement,openingCheck;const resizeChecks=[];
 app.on('browser-window-created',(_event,window)=>{
  if(owner){
   openingCheck=(async()=>{
+   await sleep(0);
+   const resize=window.isAiDiyResizeCanvas===true;
+   if(resize)resizeChecks.push(openingCheck);
    await until(()=>window.webContents.executeJavaScript("!!document.getAnimations().length"));
    const before=window.getBounds();
-   const timing=await window.webContents.executeJavaScript(`(async()=>{const a=document.getAnimations()[0],start=performance.now(),current=a.currentTime,duration=a.effect.getTiming().duration;await a.finished;return{duration,elapsedEstimateMs:current+performance.now()-start};})()`);
-   assert.equal(timing.duration,750);assert.ok(Math.abs(timing.elapsedEstimateMs-750)<150,JSON.stringify(timing));
+   const timing=await window.webContents.executeJavaScript(`(async()=>{const a=document.getAnimations()[0],start=performance.now(),current=a.currentTime,duration=a.effect.getTiming().duration,node=document.querySelector('#image')||document.querySelector('div'),samples=[];while(a.playState==='running'){const r=node.getBoundingClientRect();samples.push({width:r.width,height:r.height});await new Promise(requestAnimationFrame);}return{duration,elapsedEstimateMs:current+performance.now()-start,samples};})()`);
+   assert.equal(timing.duration,resize?380:750);assert.ok(Math.abs(timing.elapsedEstimateMs-timing.duration)<150,JSON.stringify(timing));
+   if(resize){assert.ok(timing.samples.length>=3);assert.ok(Math.abs(timing.samples[0].width-timing.samples.at(-1).width)>10);}
    assert.deepEqual(window.getBounds(),before);return{...timing,bounds:before,boundsStable:true};
   })();openingCheck.catch(()=>{});return;
  }
@@ -63,9 +67,20 @@ app.on('browser-window-created',(_event,window)=>{
    await until(()=>!window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='false'"));
    const normalControls=await checkNativeControls(window,window.webContents,'Diag通常');
    const normalMove=await holdMove(window,window.webContents,await probeBackground(window.webContents),'Diag通常背景','escape');
-   process.send({testPassed:true,bounds,expectedHeight,initialPin:false,pinRoundTrip:true,restored:true,openingMeasurement,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
+   const movedNormal=window.getNormalBounds();
+   await window.webContents.executeJavaScript("document.querySelector('#move-probe-background')?.remove();document.querySelector('.title-mini-switch').click()");
+   await until(()=>window.webContents.executeJavaScript("!!document.querySelector('.start-mini')&&!document.querySelector('.mini-restore').disabled"));
+   assert.ok(Math.abs(window.getBounds().width-384)<=2);
+   await window.webContents.executeJavaScript("document.querySelector('.mini-restore').click()");
+   await until(()=>window.webContents.executeJavaScript("!document.querySelector('.start-mini')&&!document.querySelector('.title-mini-switch').disabled"));
+   near(window.getNormalBounds(),movedNormal);
+   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(window.isMaximized(),true);
+   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(window.isMaximized(),false);
+   const resizeMeasurements=await Promise.all(resizeChecks);assert.equal(resizeMeasurements.length,5);
+   assert.ok(BrowserWindow.getAllWindows().every(candidate=>!candidate.isAiDiyResizeCanvas));
+   process.send({testPassed:true,bounds,expectedHeight,initialPin:false,pinRoundTrip:true,restored:true,openingMeasurement,resizeMeasurements,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
   }catch(error){console.error(error);app.exit(1);}
  });
 });
-setTimeout(()=>app.exit(1),20000).unref();
+setTimeout(()=>app.exit(1),30000).unref();
 require('../起動/electron-main.cjs');

@@ -13,8 +13,9 @@ function fixture(t,overrides={}){
   const probes=[],results=[],calls=[],locks=[];
   const inspectWingetFn=async({entries})=>({items:entries.map(entry=>({id:entry.id,操作:entry.id==='ollama'?['導入']:['導入','再導入','削除']})),context:{lockKey:'C:\\Windows\\aidiy-winget'}});
   const inspectAntigravityFn=async()=>({item:{id:'agy',操作:['導入','再導入','削除']},context:{prefix:'C:\\fixture\\agy\\bin'}});
+  const inspectGrokFn=async()=>({item:{id:'grok',操作:['導入','再導入','削除']},context:{prefix:'C:\\fixture\\.grok\\bin',lockKey:'C:\\fixture\\.grok\\bin'}});
   const execute=async(entry,action,context,options)=>{calls.push({id:entry.id,action,context,options});options.onData('固定プロバイダーの合成ログ\n');return success;};
-  const manager=createInstallManager({entries,env:{PATH:'C:\\fixture',OPENAI_API_KEY:'fixture-private-key'},platform:'win32',findNpmFn:()=>assert.fail('npm 非対象'),inspectWingetFn,inspectAntigravityFn,executeWingetFn:execute,executeAntigravityFn:execute,acquireLock:async key=>{locks.push(key);return async()=>{};},run:()=>assert.fail('実コマンド禁止'),probeFn:async entry=>{probes.push(entry.id);return {id:entry.id,状態:'OK',説明:'共通 probe の合成結果',確認日時:'2026-10-19T23:00:00Z'};},onResult:result=>{results.push(result.id);return {確認済み:results.length===3};},...overrides});
+  const manager=createInstallManager({entries,env:{PATH:'C:\\fixture',OPENAI_API_KEY:'fixture-private-key'},platform:'win32',findNpmFn:()=>assert.fail('npm 非対象'),inspectWingetFn,inspectAntigravityFn,inspectGrokFn,executeWingetFn:execute,executeAntigravityFn:execute,executeGrokFn:execute,acquireLock:async key=>{locks.push(key);return async()=>{};},run:()=>assert.fail('実コマンド禁止'),probeFn:async entry=>{probes.push(entry.id);return {id:entry.id,状態:'OK',説明:'共通 probe の合成結果',確認日時:'2026-10-19T23:00:00Z'};},onResult:result=>{results.push(result.id);return {確認済み:results.length===3};},...overrides});
   t.after(()=>manager.close());return {manager,probes,results,calls,locks};
 }
 test('FFmpeg は各行から単一パッケージ操作を行い、終了後3行を共通 probe / 結果反映へ1回ずつ渡す',async t=>{
@@ -38,27 +39,30 @@ test('FFmpeg の削除失敗・中止でも3項目を確認し、1項目の prob
   }
 });
 test('追加対象は同じコンソール・排他を使い、未承認対象と Ollama 削除は実行しない',async t=>{
-  for(const id of ['uv','ollama','obs','code','agy']){
+  for(const id of ['ollama','obs','agy','grok','chrome']){
     const f=fixture(t);await f.manager.start(id,'導入');const job=await settled(f.manager);
     assert.equal(job.状態,'完了');assert.deepEqual(f.probes,[id]);assert.equal(f.calls.length,1);assert.match(job.ログ,/固定プロバイダー/);
   }
   const f=fixture(t);
-  for(const id of ['node','grok','chrome','python','electron','constructor','toString','__proto__'])await assert.rejects(()=>f.manager.start(id,'導入'),{status:404});
+  for(const id of ['node','python','uv','code','electron','constructor','toString','__proto__'])await assert.rejects(()=>f.manager.start(id,'導入'),{status:404});
   await f.manager.start('ollama','削除');assert.equal((await settled(f.manager)).状態,'失敗');assert.equal(f.calls.length,0);
 });
 test('WinGet 所有元とロックキーをロック下で再照合し、変更時は操作しない',async t=>{
   for(const change of ['ownership','lock']){
     let locked=false,released=false;const f=fixture(t,{acquireLock:async()=>{locked=true;return async()=>{released=true;};},inspectWingetFn:async({entries})=>({items:entries.map(entry=>({id:entry.id,操作:locked&&change==='ownership'?[]:['導入']})),context:{lockKey:locked&&change==='lock'?'changed':'original'}})});
-    await f.manager.start('uv','導入');assert.equal((await settled(f.manager)).状態,'失敗');assert.equal(f.calls.length,0);assert.equal(released,true);
+    await f.manager.start('obs','導入');assert.equal((await settled(f.manager)).状態,'失敗');assert.equal(f.calls.length,0);assert.equal(released,true);
   }
 });
-test('追加プロバイダーの停止未確認は同一・別項目の操作を拒否し、最終確認までロックを保持する',async t=>{
-  const gate=defer();let options,released=false;
-  const f=fixture(t,{acquireLock:async()=>async()=>{released=true;},executeAntigravityFn:async(_e,_a,_c,value)=>{options=value;await gate.promise;throw Object.assign(Error('操作を中止しました。'),{status:409});}});
+test('追加プロバイダーの停止未確認は同一項目だけ拒否し、別項目は並行でき、最終確認までロックを保持する',async t=>{
+  const gate=defer(),releases=[];let options;
+  const f=fixture(t,{acquireLock:async(_key,lock)=>async()=>{releases.push(lock.scope);},executeAntigravityFn:async(_e,_a,_c,value)=>{options=value;await gate.promise;throw Object.assign(Error('操作を中止しました。'),{status:409});}});
   t.after(()=>gate.resolve());const initial=await f.manager.start('agy','再導入');await until(()=>options);await f.manager.cancel(initial.実行.実行ID);options.onUncertain();
-  assert.equal((await f.manager.snapshot()).実行.状態,'停止未確認');assert.equal(released,false);assert.equal(f.probes.length,0);
-  for(const id of ['agy','uv','ffplay'])await assert.rejects(()=>f.manager.start(id,'導入'),{status:409});
-  gate.resolve();assert.equal((await settled(f.manager)).状態,'中止');assert.equal(released,true);assert.deepEqual(f.probes,['agy']);
+  assert.equal((await f.manager.snapshot()).実行.状態,'停止未確認');assert.deepEqual(releases,[]);assert.equal(f.probes.length,0);
+  await assert.rejects(()=>f.manager.start('agy','導入'),{status:409});
+  // 別項目は停止未確認の項目を待たずに実行できる。
+  await f.manager.start('obs','導入');await until(()=>releases.includes('obs'));assert.deepEqual(releases,['obs'],'停止未確認の agy のロックは保持する');
+  gate.resolve();await settled(f.manager);const jobs=(await f.manager.snapshot()).実行一覧;
+  assert.equal(jobs.find(job=>job.対象==='agy').状態,'中止');assert.equal(jobs.find(job=>job.対象==='obs').状態,'完了');assert.deepEqual(releases,['obs','agy']);assert.deepEqual(f.probes,['obs','agy']);
 });
 test('WinGet 既定配置を共通カタログに登録し、操作直後と手動確認で同じ探索先を使う',async()=>{
   const all=await catalog();
@@ -74,5 +78,5 @@ test('実操作成功後の未導入照会コードを、操作の終了コー�
     const result=await options.run({executable:'fixture-winget',args:['uninstall'],表示:'固定の削除',onData:options.onData});
     await options.run({executable:'fixture-winget',args:['list'],onData:()=>{}});return result;
   },probeFn:async entry=>({id:entry.id,状態:'未検出',パス:null})});
-  await f.manager.start('uv','削除');const job=await settled(f.manager);assert.equal(job.状態,'完了');assert.equal(job.終了コード,0);
+  await f.manager.start('obs','削除');const job=await settled(f.manager);assert.equal(job.状態,'完了');assert.equal(job.終了コード,0);
 });

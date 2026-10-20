@@ -105,7 +105,8 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         try{
           if(req.method==='DELETE'&&parts.length===1)return reply(200,await management.cancel(parts[0]));
           if(req.method!=='POST'||parts.length!==2)return reply(404,{エラー:'見つかりません。'});
-          if(busy||writing||management.busy())return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
+          // 別項目の導入操作とは並行できる。同じ項目の重複は management.start が拒否する。
+          if(busy||writing)return reply(409,{エラー:'診断・書込の実行中です。完了後に再試行してください。'});
           return reply(200,await management.start(parts[0],parts[1]));
         }catch(error){return reply(error.status||500,{エラー:error.status?error.message:'導入操作でエラーが発生しました。'});}
       }

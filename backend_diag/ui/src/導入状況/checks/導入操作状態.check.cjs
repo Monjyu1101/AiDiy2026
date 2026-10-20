@@ -71,7 +71,9 @@ test('開始連打は一度だけ送信し、POST本文なし。進行ログ・�
   // 個別応答を変えられる API に差し替える代わりに、この fixture の後半は可変 snapshot を使用する。
   await f.state.接続(true);
   const start = f.state.開始('claude', '導入', 'Claude Code'); await flush();
-  assert.equal(f.操作中.value, true); assert.equal(await f.state.開始('codex', '削除'), false);
+  // 同じ項目の連打だけを拒否し、別項目のボタンは押せるまま（並行実行）。
+  assert.equal(f.操作中.value, true); assert.equal(await f.state.開始('claude', '導入'), false);
+  assert.equal(f.state.項目操作中('claude'), true); assert.equal(f.state.項目操作中('codex'), false);
   assert.equal(f.approvals.length, 1);
   const sent = f.calls.find(([, method]) => method === 'POST');
   assert.equal(sent[0], `api/導入管理/claude/${encodeURIComponent('導入')}`); assert.equal(sent.length, 3);

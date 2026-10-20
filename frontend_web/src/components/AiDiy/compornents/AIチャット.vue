@@ -1064,7 +1064,7 @@ const 接続状態表示 = computed(() => {
 
 .close-btn {
   position: absolute;
-  left: 10px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
@@ -1088,7 +1088,7 @@ const 接続状態表示 = computed(() => {
 .status {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
   gap: 8px;

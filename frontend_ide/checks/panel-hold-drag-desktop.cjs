@@ -23,7 +23,7 @@ function markup(kind){
  <aside class="explorer-panel"><header><button>≡</button><span>エクスプローラー</span><button id="header-control">◎</button></header>
  <section class="explorer-search"><select id="select"><option value="one">One</option><option value="two">Two</option></select><input id="input" value="editable text"><p id="text">Normal text selection stays available before the long hold threshold.</p></section>
  <ul id="tree" role="tree" tabindex="0" data-aidiy-window-move-list><li id="file-row" role="treeitem"><span id="file-name">sample.txt</span></li><li role="treeitem"><button id="chevron">▸</button><span>folder</span></li><li role="treeitem"><input id="rename" class="explorer-rename" value="new-name.txt"></li></ul><div id="menu" class="selection-popup" data-aidiy-no-window-move style="display:none;position:fixed;left:400px;top:100px;width:180px;height:60px;background:#203040;z-index:90"><button id="menu-button">ファイル操作</button></div></aside></main>`;
- const routes=`<main class="development-app routes-window"><div class="explorer-routes"><div class="route-controls" data-aidiy-window-move-handle><div class="route-window-actions"><nav class="window-actions"><button id="route-pin">📌</button></nav></div><span class="route-drag-handle" aria-hidden="true"></span><button class="route-choice">軌跡 1</button><button>＋</button><button>×</button></div></div></main>`;
+ const routes=`<main class="development-app routes-window"><div class="explorer-routes"><div class="route-controls" data-aidiy-window-move-handle><div class="route-window-actions"><nav class="window-actions"><button id="route-pin">📌</button></nav></div><button class="burger-button route-burger" title="ドラッグして移動"><span class="burger burger-v"><i></i><i></i><i></i></span></button><button class="route-choice">軌跡 1</button><button>＋</button><button>×</button></div></div></main>`;
  return `<!doctype html><html class="${kind==='panel-routes'?'route-window-document native-route-window':''}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"><style>${css}</style></head><body>${kind==='explorer'?explorer:routes}
  <script>window.events=[];for(const type of ['pointerdown','mousedown','pointercancel','pointerup','mouseup','click','dblclick','contextmenu'])document.addEventListener(type,event=>events.push({type,target:event.target.id||event.target.className,trusted:event.isTrusted}),true);window.fileClicks=0;window.fileDoubleClicks=0;window.fileMenus=0;const row=document.querySelector('#file-row');if(row){row.onclick=()=>fileClicks++;row.ondblclick=()=>fileDoubleClicks++;row.oncontextmenu=event=>{event.preventDefault();fileMenus++};}</script></body></html>`;
 }
@@ -83,8 +83,9 @@ app.whenReady().then(async()=>{
    assert.equal(begins,before);assert.ok((await js('getSelection().toString()')).length>0,'file-name text selection is preserved');results.push({kind,fileNameTextSelection:true});
   }else{
    assert.equal(await js(`getComputedStyle(document.querySelector('.route-controls')).webkitAppRegion`),'no-drag');
-   assert.ok(await js(`document.querySelector('.route-drag-handle').getBoundingClientRect().width>=8`),'visible drag handle');
-   await hold('.route-drag-handle',true);await hold('.route-controls',true,{padding:true});await hold('.route-choice',false);await hold('#route-pin',false);
+   assert.equal(await js(`getComputedStyle(document.querySelector('.route-burger')).webkitAppRegion`),'drag');
+   assert.equal(await js(`!!document.querySelector('.route-drag-handle')`),false);
+   await hold('.route-controls',true,{padding:true});await hold('.route-choice',true);await hold('#route-pin',true);
   }
   // 成立した移動の直後にも通常の短いクリックは一度だけ通す。
   const selector=kind==='explorer'?'#title-pin':'#route-pin',p=await point(selector),before=begins;

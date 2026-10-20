@@ -11,7 +11,7 @@
 - `diag_main.mjs` / `aidiy_diag` / `aidiy_diag.cmd`: 外部から使う起動入口。
 - `起動/`: Electron ウィンドウ・preload・起動監視・安全な診断ログ。
 - `診断/`: インストール確認、MCP 状態、headless 実行、カタログと調査範囲。
-- `導入管理/`: 固定 npm / Windows WinGet / Antigravity の明示導入・再導入・削除と、終了後の個別確認。
+- `導入管理/`: 固定 npm / Windows WinGet / Antigravity / Grok Build の明示導入・再導入・削除（項目単位で並行実行）と、終了後の個別確認。
 - `モデル情報/`: キー確認、モデル・音声 JSON の合成、公開モデル一覧。`openrouter_models/` はこの機能専用の同梱キャッシュです。
 - `runtime/`: モデル判定・通信の TypeScript と配布用 `.mjs`。
 - `ui/` / `static/`: Vue ソース・ビルド設定と配布画面。
@@ -58,14 +58,19 @@ aidiy_diag --headless       # 画面を開かず全診断を最速で実行し�
 
 | 対象 | 導入方法・制限 |
 |---|---|
-| Claude Code / Codex / Copilot / OpenCode | 従来と同じ固定 npm グローバルパッケージ。標準 prefix / root と実体・shim を照合します。 |
+| Claude Code / Codex / Copilot / OpenCode | 固定 npm グローバルパッケージ（OpenCode は 2.x の公式名 `@opencode/cli`）。標準 prefix / root と実体・shim を照合します。 |
 | FFmpeg 一式 | Windows の `Gyan.FFmpeg`。ffmpeg / ffprobe / ffplay のどの行からもパッケージ操作は1回だけ。終了後は3行を各1回確認します。 |
-| uv | Windows の `astral-sh.uv`。uv / uvx 本体を管理し、Python・仮想環境・キャッシュは削除しません。pip / standalone 等の別導入元は操作しません。 |
 | Ollama | Windows の `Ollama.Ollama` の新規導入のみ。モデル保持を保証できないため再導入・削除は表示しません。 |
-| OBS / VS Code Stable | Windows の `OBSProject.OBSStudio` / `Microsoft.VisualStudioCode`。標準配置と導入記録を確認できる場合のみ再導入・削除。設定・プロファイル・シーン・拡張機能を保持しますが、OBS 本体内の追加プラグインは再導入が必要になる場合があります。 |
-| Antigravity CLI | Windows の公式 `https://antigravity.google/cli/install.cmd`。標準の `%LOCALAPPDATA%\agy\bin\agy.exe` の署名・製品情報または一致する導入記録を照合します。 |
+| Chrome | Windows の `Google.Chrome` の新規導入のみ。プロファイル・拡張機能を保護するため再導入・削除は表示しません。 |
+| OBS | Windows の `OBSProject.OBSStudio`。標準配置と導入記録を確認できる場合のみ再導入・削除。設定・プロファイル・シーンを保持しますが、OBS 本体内の追加プラグインは再導入が必要になる場合があります。 |
+| Antigravity CLI | Windows の公式 `https://antigravity.google/cli/install.cmd`。標準の `%LOCALAPPDATA%\agy\bin\agy.exe` の Google 署名（製品情報がある版はその一致も）または一致する導入記録を照合します。 |
+| Grok Build | Windows の公式 `https://x.ai/cli/install.ps1`（stable）。`~/.grok/bin` の grok.exe / agent.exe（配布がある版は grove 系も）の X.AI 署名を照合します。 |
 
-WinGet の一覧に出るだけでは所有確認にしません。公式 source、登録されたパッケージ・導入先・実行ファイル・アンインストーラーを照合し、native アプリはこの Diag が導入して記録したものだけを変更します。別の PATH 上の実行ファイル、手動導入、複数 scope、portable / Insiders、リンク・junction・所有不明の場合は再導入・削除を出しません。稼働中の対象・関連プロセスは利用者が終了してから再確認してください。自動でアプリを終了しません。Windows 以外の追加対象は確認だけです。Grok / Chrome / Python / Node.js / npm / Electron の管理範囲は増やしません。
+ベース（Python / uv / Node.js / npm / npx / Electron）と VS Code は手動導入とし、導入ボタンを出しません。一覧での表示・確認・バージョン表記はほかの項目と同じです。
+
+WinGet の一覧に出るだけでは所有確認にしません。公式 source、登録されたパッケージ・導入先・実行ファイル・アンインストーラーを照合し、native アプリはこの Diag が導入して記録したものだけを変更します。App Installer の `winget.exe` は実行エイリアスのため、標準位置（`%LOCALAPPDATA%\Microsoft\WindowsApps`）だけ lstat で存在を確認して使います。別の PATH 上の実行ファイル、手動導入、複数 scope、portable / Insiders、リンク・junction・所有不明の場合は再導入・削除を出しません。稼働中の対象・関連プロセスは利用者が終了してから再確認してください。自動でアプリを終了しません。Windows 以外の追加対象は確認だけです。
+
+Grok Build の公式インストーラーは削除用のサブコマンドを持ちません。再導入では所有確認済みの実行ファイルを退避してから実行し、失敗・中止時は元に戻します。公式インストーラーは `~/.grok/config.toml` の `[cli]` installer 行を更新し、ユーザー PATH に `~/.grok/bin` が無ければ追加します。`GROK_*` の環境変数は渡さず、stable と既定の導入先に固定します。削除は署名を確認した実行ファイルだけを対象とし、認証・設定・セッション・PATH・同梱 git（`%LOCALAPPDATA%\grok`）を残します。レビュー済み installer の SHA256 が変わった場合は安全確認の更新まで停止します。
 
 Antigravity の公式インストーラーは既存バイナリがあると何もしないため、再導入では所有確認済みの `agy.exe` だけを退避してから実行し、公式 SHA512 を確認します。失敗・中止時は旧バイナリを復元し、未確認の出力や復旧が必要な退避ファイルを推測で削除しません。公式の `--skip-path --skip-aliases` を指定し、`.gemini/antigravity-cli`・認証・OS 資格情報を保持します。フォルダ全体の削除、共有 staging の削除、PATH の一括編集はしません。レビュー済み installer の SHA256 が変わった場合は安全確認の更新まで停止します。公式の [導入オプション](https://www.antigravity.google/docs/cli/install/) を参照してください。
 
@@ -73,7 +78,7 @@ Antigravity の公式インストーラーは既存バイナリがあると何�
 
 右パネルは共通の実行コンソールへ切り替わり、完了・失敗・中止後に「確認」ボタンと同じ固定 probe と結果反映を対象ごとに1回実行します。FFmpeg 一式では3行の結果を同じコンソールへ表示します。別項目・タブへ移った場合はその選択を維持し、新しい個別確認結果を古い実行結果で巻き戻しません。自動保存やモデル・認証試験は行いません。
 
-コマンドはサーバーの固定 ID 対応表だけから構築し、本文・クエリ・クライアント指定コマンドは受け付けません。秘密値を継承しない実行環境、1コマンド5分・出力4 MiB、表示ログ120,000文字の上限を使用します。npm は公式 registry と空の一時 npm 設定、WinGet は照合済み公式 source、Antigravity は固定の公式 URL と検証済み installer を使います。同じ Diag の診断・書込、同じ OS 利用者が起動した別 Diag の同一 npm / Antigravity 導入先、WinGet 全体と排他します。別 OS 利用者との競合は WinGet 自身の制御に従い、共用フォルダの権限は変更しません。停止未確認中はロックを解除しません。
+コマンドはサーバーの固定 ID 対応表だけから構築し、本文・クエリ・クライアント指定コマンドは受け付けません。秘密値を継承しない実行環境、1コマンド5分・出力4 MiB、表示ログ120,000文字の上限を使用します。npm は公式 registry と空の一時 npm 設定、WinGet は照合済み公式 source、Antigravity は固定の公式 URL と検証済み installer を使います。導入操作は項目ごとに独立して実行し、別の項目とは並行できます（npm の複数パッケージ導入も `_setup.py` の並列導入と同じ扱いです）。押せなくなるのは、実行中・受付中の項目（FFmpeg は3行一式）のボタンと、診断・書込・全テストだけです。実行中の各項目は導入状況パネル上部に並べて表示し、コンソールは項目ごとに分かれます。同じ Diag の診断・書込と排他し、同じ OS 利用者が起動した別 Diag とは同一導入先の同一パッケージ（項目）単位で排他します。別 OS 利用者との競合は WinGet 自身の制御に従い、共用フォルダの権限は変更しません。停止未確認中はロックを解除しません。
 
 検証は合成プロセス・一時 fixture・Vue イベントで行い、実際のグローバル導入・削除は行いません。実 Windows のインストーラー・UAC・実アプリ・実ブラウザ画面は別途確認が必要です。詳しくは [環境診断運用](../_AIDIY/knowledge/backend_diag,環境診断運用.md#個別確認と導入管理) を参照してください。
 
@@ -431,7 +436,7 @@ Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付
 
 Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリックごとに独立したTerm窓を開きます。起動途中や別窓の稼働中も追加起動でき、既存窓を再利用・前面化しません。各窓は別のサーバーポート・端末セッション・起動ログを持ち、1つを閉じても他の窓は続行します。確認付きの呼出しでは確認ダイアログだけを重ねず、承認後の起動は並行して受け付けます。通信の再接続・重複startはその窓が所有する同じCLIに戻り、終了済みCLIを勝手に再実行しません。Diag終了ではTermは終了せず、Term窓・所有サーバーを閉じるとその窓のCLIだけが停止します。ブラウザタブの一時切断は再接続のため30秒だけプロセスを保持し、戻らなければCLIと所有サーバーを終了します。初回の端末接続が表示後30秒以内に始まらない場合も終了し、次回のクリックで再起動できます。既存CLIの全OS横断検出は行いません。Avatar・Live・Discordの単一起動制限と、その他アプリの起動中の排他は変更しません。
 
-アイコンの出典・ライセンス・引用メモは保存先の `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md` に集約し、配布先にも同名の `static/LICENSE_ICONS.md` を同梱します。CopilotはGitHub Octicons、Grokはx.ai公式ブランド配布、OpenCodeは公式リポジトリ、Codex / Claude CodeはLobeHubのMIT素材です。各素材の形状・色を保持し（Copilotは記録済み単色変更）、外部CLIとHermesは白い帯・黒い名称を含む120×120pxの自己完結SVGとして表示します。PNG派生物も同梱します。Hermesは既存AiDiy画像にHERMESの帯を組み合わせ、Agyは独自ピクトグラムです。AiDiy6アプリは名称入りの既存画像を使い、いずれもHTMLで名前を重ねません。アイコンは上段のAiDiy6アプリ＋Hermesと、下段の外部CLI6種の計2行です。CLIは利用可能なものだけを並べます。全アイコンを名称帯込みの40px枠・40px表示へ揃え、元の縦横比を維持します。稼働インジケーター6件は1行で表示します。再生成方法と原本の場所は同フォルダのREADMEを参照してください。
+アイコンの出典・ライセンス・引用メモは保存先の `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md` に集約し、配布先にも同名の `static/LICENSE_ICONS.md` を同梱します。CopilotはGitHub Octicons、Grokはx.ai公式ブランド配布、OpenCodeは公式リポジトリ、Codex / Claude CodeはLobeHubのMIT素材です。各素材の形状・色を保持し（Copilotは記録済み単色変更）、外部CLIとHermesは白い帯・黒い名称を含む120×120pxの自己完結SVGとして表示します。PNG派生物も同梱します。Hermesは既存AiDiy画像にHERMESの帯を組み合わせ、AgyはAntigravity公式サイトの山形マークです。AiDiy6アプリは名称入りの既存画像を使い、いずれもHTMLで名前を重ねません。アイコンは上段のAiDiy6アプリ＋Hermesと、下段の外部CLI6種の計2行です。CLIは利用可能なものだけを並べます。全アイコンを名称帯込みの40px枠・40px表示へ揃え、元の縦横比を維持します。稼働インジケーター6件は1行で表示します。再生成方法と原本の場所は同フォルダのREADMEを参照してください。
 
 素材の著作権ライセンスとブランド・商標の条件は別です。Codex / Claude Code画像はベンダー公式配布ではなく第三者のLobeHub素材です。AiDiyは各社・各開発チームの提供・承認・提携を示しません。MIT等の全文と素材ごとの制約は `LICENSE_ICONS.md` に保持し、商標利用の包括的な許諾とは記載しません。
 

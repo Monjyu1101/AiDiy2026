@@ -28,9 +28,9 @@ function environment(env,context,temporary) {
     COMSPEC:context.cmd,TEMP:temporary||os.tmpdir(),TMP:temporary||os.tmpdir(),PROCESSOR_ARCHITECTURE:context.architecture,NO_COLOR:'1',CI:'1',DO_NOT_TRACK:'1'};
 }
 
-async function exists(file) {try{return await lstat(file);}catch(error){if(error.code==='ENOENT')return null;throw error;}}
+export async function exists(file) {try{return await lstat(file);}catch(error){if(error.code==='ENOENT')return null;throw error;}}
 // ファイルだけでなく親の junction / symlink / 別実体も拒否する。存在しない末尾だけは許可する。
-async function plainPath(file,{fileOnly=false,allowHardlinks=false}={}) {
+export async function plainPath(file,{fileOnly=false,allowHardlinks=false}={}) {
   const chain=[];let current=path.resolve(file);
   while(true){chain.unshift(current);const parent=path.dirname(current);if(parent===current)break;current=parent;}
   let result=null;
@@ -44,7 +44,7 @@ async function plainPath(file,{fileOnly=false,allowHardlinks=false}={}) {
   return result;
 }
 
-async function digest(file,algorithm='sha512',{signal,executable=false}={}) {
+export async function digest(file,algorithm='sha512',{signal,executable=false}={}) {
   await plainPath(file,{fileOnly:true});const handle=await open(file,'r');
   try{
     const before=await handle.stat();if(!before.isFile()||before.nlink!==1||before.size>512*1024*1024)throw failure('実行ファイルの形式・サイズを確認できません。');
@@ -82,9 +82,12 @@ async function inspectWindows(context,{env,run,signal}) {
   return data.identity;
 }
 
-function officialIdentity(identity) {
-  return identity?.status==='Valid'&&/(?:^|,\s*)CN=Google (?:LLC|Inc\.?)(?:,|$)/.test(identity.subject||'')&&
-    /^Google (?:LLC|Inc\.?)$/.test(identity.company||'')&&/Antigravity/i.test(identity.product||'')&&/^agy\.exe$/i.test(identity.original||'');
+// 公式 agy.exe は製品情報（VersionInfo）を持たない版がある。空の場合は署名だけで判定し、
+// 値がある場合は従来どおり会社名・製品名・元ファイル名の一致も求める。
+export function officialIdentity(identity) {
+  if(identity?.status!=='Valid'||!/(?:^|,\s*)CN=Google (?:LLC|Inc\.?)(?:,|$)/.test(identity.subject||''))return false;
+  if(!identity.company&&!identity.product&&!identity.original)return true;
+  return /^Google (?:LLC|Inc\.?)$/.test(identity.company||'')&&/Antigravity/i.test(identity.product||'')&&/^agy\.exe$/i.test(identity.original||'');
 }
 
 async function receiptFor(context) {

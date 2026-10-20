@@ -167,7 +167,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.0.0",
     "@types/vscode": "1.106.0",
-    "@vscode/vsce": "^3.6.0",
+    "@vscode/vsce": "^4.0.0",
     "electron": "^44.7.0",
     "esbuild": "^0.25.0",
     "markdown-it": "^14.1.0",

@@ -98,12 +98,12 @@ try{
  assert.equal(await evaluate(`[...document.querySelectorAll('.app-launch-button')].every(button=>!button.disabled)`),true);
  await sleep(900);assert.equal(taskChecks,0,'フォルダ選択・表示・待機ではアプリの稼働中確認をしない');
  for(const name of ['Avatar','IDE','Term','Code','Live','Discord']){
-  await click(`${name} を起動`);await until(`![...document.querySelectorAll('.app-launch-button')].some(button=>button.textContent==='起動確認中…')`);
+  await click(`${name} を起動`);await until(`![...document.querySelectorAll('.app-launch-state')].some(state=>state.textContent==='起動確認中…')`);
  }
  assert.deepEqual(appCalls.map(item=>item.args.includes('--project')?item.args[item.args.indexOf('--project')+1]:item.cwd),[root,project,project,project,project]);
  assert.equal(taskChecks,3);assert.equal(appCalls.length,5);
- assert.equal(await evaluate(`document.querySelector('[data-app="live"] .app-launch-result').textContent`),'Live は起動済みです。');
- await click('Code を起動');await until(`document.querySelector('[data-app="code"] .app-launch-button').textContent==='Code を起動'&&!document.querySelector('[data-app="code"] .app-launch-button').disabled`);
+ assert.equal(await evaluate(`document.querySelector('[data-app="live"] .app-launch-result')===null`),true,'起動済みの成功通知も表示しない');
+ await click('Code を起動');await until(`document.querySelector('[data-app="code"] .app-launch-state').textContent===''&&!document.querySelector('[data-app="code"] .app-launch-button').disabled`);
  assert.equal(appCalls.length,6);assert.equal(taskChecks,3);
  await until(`[...document.querySelectorAll('.app-launch-icon')].every(img=>img.complete&&img.naturalWidth>0)`);
  await capture('app-desktop');

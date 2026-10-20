@@ -10,6 +10,7 @@ ECHO uninstall
 ECHO ---------
 start npm uninstall -g @anthropic-ai/claude-code
 start npm uninstall -g @openai/codex
+start npm uninstall -g @opencode/cli
 start npm uninstall -g opencode-ai
 start npm uninstall -g @github/copilot
 

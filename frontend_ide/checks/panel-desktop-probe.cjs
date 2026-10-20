@@ -7,7 +7,7 @@ const assert=require('node:assert/strict');
 const {app,BrowserWindow,screen}=require('electron');
 const {mkdirSync,writeFileSync}=require('node:fs');
 const {join}=require('node:path');
-const {holdUnmoved,checkNativeControls,probeBackground}=require('./window-move-probe.cjs');
+const {holdUnmoved,holdMove,shortClick,checkNativeControls,probeBackground}=require('./window-move-probe.cjs');
 app.setPath('appData',process.env.AIDIY_TEST_PROFILE);
 const showInactive=BrowserWindow.prototype.showInactive;
 // 非表示の専用プロファイルで実ElectronのDOM/IPC/配置/終了を検証する。
@@ -18,6 +18,21 @@ async function until(check,label){for(let i=0;i<150;i++){if(await check())return
 const output=join(__dirname,'../../temp/panel-pin-check');mkdirSync(output,{recursive:true});
 const results=[];let running=false;
 const nearBounds=(actual,expected)=>{for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=2,`${key}: ${actual[key]} / ${expected[key]}`);};
+async function checkExplorerHeading(window,label){
+ const geometry=await evaluate(window,`(()=>{const header=document.querySelector('.explorer-panel>header'),burger=header.querySelector('.explorer-burger').getBoundingClientRect(),title=header.querySelector(':scope>span').getBoundingClientRect(),lines=[...header.querySelectorAll('.burger i')].map(node=>{const r=node.getBoundingClientRect();return{left:r.left,right:r.right}});return{button:{left:burger.left,right:burger.right},title:{left:title.left,right:title.right},lines};})()`);
+ assert.ok(geometry.title.left>=geometry.button.right+3,label+'の見出しはバーガーの右に置く');
+ assert.ok(geometry.lines.every(line=>line.left>=geometry.button.left&&line.right<=geometry.button.right),label+'の三本線はボタンの内側に収まる');
+ results.push({heading:label,...geometry});
+}
+async function capturePanel(window,name){
+ const visible=window.isVisible(),opacity=window.getOpacity();
+ try{
+  // 非表示窓の古い合成フレームを撮らず、ユーザーのフォーカスを奪わずに描画させる。
+  window.setOpacity(.01);window.setIgnoreMouseEvents(true);window.setSkipTaskbar(true);showInactive.call(window);
+  window.webContents.invalidate();await evaluate(window,'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');await sleep(200);
+  writeFileSync(join(output,name),(await window.webContents.capturePage()).toPNG());
+ }finally{if(!visible)window.hide();window.setOpacity(opacity);window.setIgnoreMouseEvents(false);}
+}
 async function dragPanel(window,selector,label,frame=false){
  const originalFocus=window.isFocused,originalCursor=screen.getCursorScreenPoint;
  let cursor=originalCursor();window.isFocused=()=>true;screen.getCursorScreenPoint=()=>cursor;
@@ -61,6 +76,12 @@ app.on('browser-window-created',(_,owner)=>{
    await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);
    await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'Viewer');
    await evaluate(owner,`document.querySelector('.explorer-toggle').click()`);
+   for(const mode of ['since','grep','ai']){
+    await evaluate(owner,`document.querySelector('input[value="${mode}"]').click()`);await sleep(80);
+    await checkExplorerHeading(owner,'本体Explorer '+mode);
+   }
+   await evaluate(owner,`document.querySelector('input[value="since"]').click()`);await sleep(80);
+   await capturePanel(owner,'electron-explorer-heading.png');
    for(const zoom of process.env.AIDIY_PANEL_ROUTES_ONLY==='1'?[]:[1,1.25]){
     console.log('Explorer zoom',zoom);
     owner.webContents.setZoomFactor(zoom);await sleep(150);
@@ -73,6 +94,7 @@ app.on('browser-window-created',(_,owner)=>{
     const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');assert.ok(child);
     await until(()=>evaluate(child,`!!document.querySelector('.explorer-panel')`),'Explorer DOM');
     await until(()=>evaluate(child,`!!document.querySelector('.panel-window-title .window-actions')`),'共通タイトルバー');
+    await checkExplorerHeading(child,'別窓Explorer '+zoom);
     assert.equal(await evaluate(child,`document.querySelector('.panel-window-title .connection-bar').classList.contains('offline')`),true);
     nearBounds(child.getBounds(),expected);
     await until(()=>evaluate(owner,`!document.querySelector('.panel-pin-preview')`),'別窓表示後に元表示を除去');
@@ -152,12 +174,21 @@ app.on('browser-window-created',(_,owner)=>{
    const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')].filter(button=>button.getBoundingClientRect().width>0);return{rows:new Set(buttons.map(b=>{const r=b.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
    assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40.01,JSON.stringify(row));
    assert.equal(await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls').getBoundingClientRect(),buttons=[...document.querySelectorAll('.route-window-actions button')];return buttons.length===2&&buttons.every(button=>{const r=button.getBoundingClientRect();return r.left>=bar.left&&r.right<=bar.right;});})()`),true,'軌跡のピン・本体復帰だけを表示する');
-   results.push(await holdUnmoved(routes,routes.webContents,'.route-choice','軌跡ボタン'));
+   assert.equal(await evaluate(routes,`(()=>{const tools=document.querySelector('.route-window-actions'),pin=tools.querySelector('.window-pin'),close=tools.querySelector('.panel-return');return tools===tools.parentElement.lastElementChild&&tools.getBoundingClientRect().left>[...document.querySelectorAll('.route-choice')].at(-1).getBoundingClientRect().left&&close.getBoundingClientRect().left>=pin.getBoundingClientRect().right&&!!close.querySelector('.close-icon');})()`),true,'右側はピン・×の順に置く');
+   const selectedRoute=await evaluate(routes,`document.querySelector('.route-choice').getAttribute('aria-expanded')`),pinned=await evaluate(routes,`document.querySelector('.window-pin').getAttribute('aria-pressed')`);
+   results.push(await holdMove(routes,routes.webContents,'.route-choice','軌跡ボタン'));
+   results.push(await holdMove(routes,routes.webContents,'.window-pin','軌跡ピン'));
+   assert.equal(await evaluate(routes,`document.querySelector('.route-choice').getAttribute('aria-expanded')`),selectedRoute,'長押し移動で分類を開閉しない');
+   assert.equal(await evaluate(routes,`document.querySelector('.window-pin').getAttribute('aria-pressed')`),pinned,'長押し移動でピンを切り替えない');
    await evaluate(routes,`document.querySelector('.route-choice[aria-expanded="true"]')?.click()`);
+   await shortClick(routes.webContents,'.route-choice');await until(()=>evaluate(routes,`document.querySelector('.route-choice').getAttribute('aria-expanded')==='true'`),'短押しで分類を開く');
+   await shortClick(routes.webContents,'.route-choice');await until(()=>evaluate(routes,`document.querySelector('.route-choice').getAttribute('aria-expanded')==='false'`),'短押しで分類を閉じる');
+   await until(()=>evaluate(routes,`document.querySelector('.route-reveal').dataset.phase==='closed'`),'分類の縮小完了');await sleep(100);
    await dragPanel(routes,await probeBackground(routes.webContents),'軌跡背景');
    await evaluate(routes,`document.querySelector('#move-probe-background').remove()`);
-   writeFileSync(join(output,'electron-routes-single-row.png'),(await routes.webContents.capturePage()).toPNG());
-   await evaluate(routes,`document.querySelector('.route-burger').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
+   await capturePanel(routes,'electron-routes-single-row.png');
+   await shortClick(routes.webContents,'.panel-return');await until(()=>routes.isDestroyed(),'軌跡×で別窓終了');
+   await until(()=>evaluate(owner,`!!document.querySelector('.explorer-routes')&&document.querySelector('.explorer-routes').getBoundingClientRect().height>0&&!document.querySelector('.route-window-actions')`),'軌跡×で本体へ復帰');results.push({kind:'routes',...row,closedToEmbedded:true});
    await evaluate(owner,`document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'終了前pin');
    const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await evaluate(owner,`Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent==='終了').click()`);
