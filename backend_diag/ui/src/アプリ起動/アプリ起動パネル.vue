@@ -3,7 +3,6 @@ import {watch,ref,nextTick} from 'vue';
 import './アプリ起動.css';
 import {アプリアイコン} from './アプリアイコン.mjs';
 const props=defineProps({state:Object,online:Boolean,visible:Boolean});
-defineEmits(['mini']);
 const folderInput=ref();
 watch(()=>!!props.state.一覧.value,async value=>{if(value){await nextTick();folderInput.value?.focus();}});
 watch(()=>props.online&&props.visible,value=>{if(value)void props.state.読込();},{immediate:true});
@@ -11,7 +10,7 @@ const descriptions={avatar:'AIコアのアバター画面を開きます。',ide
 </script>
 <template>
 <section class="panel app-launch-panel" v-show="visible" aria-label="アプリ起動">
- <div class="panel-heading"><h2>アプリ起動</h2><button :disabled="!online" @click="$emit('mini')">ミニ表示</button></div>
+ <div class="panel-heading"><h2>アプリ起動</h2></div>
  <div class="app-project" :class="{required:!state.フォルダ.value}"><label for="app-project-folder">プロジェクトフォルダ</label><div class="app-project-row"><input id="app-project-folder" :value="state.フォルダ.value" readonly placeholder="プロジェクト選択してね"><button class="app-project-select" :disabled="!online||!!state.処理中.value||state.選択中.value" @click="state.選択()">フォルダ選択</button><button v-if="state.フォルダ.value" :disabled="!!state.処理中.value||state.選択中.value" @click="state.解除()">解除</button></div><p>Avatar 以外は、このフォルダを作業パスにして開きます。起動したアプリは Diag を閉じても動作を続けます。</p></div>
  <p v-if="state.通知.value" class="app-launch-message" role="status">{{state.通知.value}}</p>
  <div class="app-launch-list">

@@ -3,7 +3,6 @@ import {ref,watch,nextTick} from 'vue';
 import './起動.css';
 import {明滅値} from './明滅.mjs';
 const props=defineProps({state:Object,online:Boolean,visible:Boolean});
-defineEmits(['mini']);
 const consoleView=ref(),targetTabs=ref();
 watch([()=>props.state.コンソール.value,()=>props.visible,()=>props.state.選択.value],async()=>{await nextTick();if(props.visible&&consoleView.value)consoleView.value.scrollTop=consoleView.value.scrollHeight;});
 watch(()=>props.state.選択.value,async()=>{await nextTick();if(props.visible)targetTabs.value?.querySelector('.active')?.scrollIntoView({block:'nearest',inline:'nearest'});});
@@ -17,7 +16,7 @@ function 表示色(item){
 </script>
 <template>
 <section class="panel start-panel" v-show="visible" aria-label="システム起動管理">
- <div class="panel-heading"><div><h2>システム起動</h2><p>すべて未起動なら「設定起動」、稼働中の機能があれば「強制停止」でタブの逆順に停止します。</p></div><div class="start-view-actions"><span class="start-save" role="status">{{state.保存表示.value}}</span><button class="start-mini-switch" :disabled="!online||!state.項目.value.length" @click="$emit('mini')">ミニ表示</button></div></div>
+ <div class="panel-heading"><div><h2>システム起動</h2><p>すべて未起動なら「設定起動」、稼働中の機能があれば「強制停止」でタブの逆順に停止します。</p></div><div class="start-view-actions"><span class="start-save" role="status">{{state.保存表示.value}}</span></div></div>
  <nav ref="targetTabs" class="start-targets" aria-label="起動する機能">
   <button v-for="(item,index) in state.項目.value" :key="item.id" :class="{active:state.選択.value===item.id}" :data-tone="表示色(item)" :title="state.停止警告対象.value.has(item.id)?'起動対象ですが、現在ポートが閉じています':''" :style="明滅値(index,'start')" :aria-pressed="state.選択.value===item.id" @click="state.選択.value=item.id"><span class="start-dot" :data-tone="表示色(item)"></span>{{item.名前}}<span v-if="item.設定.起動対象" class="start-enabled" title="設定起動の対象">✓</span></button>
  </nav>

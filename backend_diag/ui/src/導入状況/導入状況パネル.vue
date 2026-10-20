@@ -50,7 +50,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
         </template>
         <template v-else><component :is="状態バッジ" class="status" :state="状態(選択項目.id)"/><p>{{選択項目.description}}</p><p v-if="能力(選択項目.id)?.理由" class="install-capability-note">{{能力(選択項目.id).理由}}</p><dl><template v-for="[label,value] in 詳細項目" :key="label"><dt>{{label}}</dt><dd>{{value}}</dd></template></dl><h3>ソースの参照箇所</h3><ul><li v-for="source in 参照箇所" :key="source">{{source}}</li></ul></template>
       </template>
-      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、名称の下の2行目に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
+      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>名称の右側に「確認」と状態を表示します。各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、2行目の左側に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
     </article>
   </main>
 </section>

@@ -9,14 +9,14 @@
 #list > details > details{margin-left:10px}
 .install-item{border-radius:5px;margin-bottom:5px}
 .install-item.selected{background:#25403d}
-.install-check{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 10px 10px}
+.install-check{display:flex;align-items:center;justify-content:flex-end;flex-wrap:nowrap;gap:8px;padding:0 10px 0 0}
 .install-check button{padding:3px 10px;font-size:11px;white-space:nowrap}
 .install-check>.badge{min-width:60px}
-/* 1行目は名称、2行目は確認・状態と導入操作。長い名称でも操作は独立した行に置く。 */
-.install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name name" "check manage";align-items:start;gap:0 4px}
+/* 1行目は左に名称、右に確認・状態。2行目の導入操作は左寄せし、長い名称と重ねない。 */
+.install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name check" "manage manage";align-items:center;gap:0 4px}
 .install-item>.item{grid-area:name;min-width:0;overflow-wrap:anywhere;justify-content:flex-start}
 .install-item>.item>span{min-width:0}
-.install-manage{grid-area:manage;display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 10px 0}
+.install-manage{grid-area:manage;display:flex;justify-content:flex-start;flex-wrap:wrap;gap:4px;padding:0 10px 10px}
 .install-manage button{padding:3px 7px;font-size:11px;white-space:nowrap}
 .install-manage .install-delete{border-color:#925064;color:#ffbdc8}
 .install-check{grid-area:check;min-width:0}

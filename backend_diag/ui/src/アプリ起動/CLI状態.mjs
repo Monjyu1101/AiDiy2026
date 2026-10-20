@@ -9,12 +9,13 @@ export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=m
   catch(error){if(version===revision){項目.value=[];通知.value=error.message;失敗.value=true;}}
   finally{if(version===revision)読込中.value=false;}
  }
- async function 起動(id){
+ async function 起動(id,{確認省略=false}={}){
   if(!接続可能()||処理中.value||アプリ.処理中.value||アプリ.選択中.value||!アプリ.フォルダ.value)return;
   const item=項目.value.find(value=>value.id===id);if(!item)return;
   const project=アプリ.フォルダ.value;処理中.value=id;アプリ.処理中.value='cli:'+id;通知.value='';失敗.value=false;
   try{
-   const accepted=await 確認(`${item.名前} を aidiy_term で開始しますか？\n\nプロジェクト: ${project}\nモード: ${item.モード}\nモデル: 指定なし（CLI の既定設定）\n\nファイルの変更やコマンド実行が自動承認されます。CLIによってはサンドボックスも解除されます。信頼できるプロジェクトだけで使用してください。CLIの契約や設定によって利用料金が発生する場合があります。ログイン・組織の制限・初回の信頼確認はCLI側に残る場合があります。`);
+   // ミニの明示クリックだけは確認ダイアログを省き、固定の起動条件と排他は共用する。
+   const accepted=確認省略===true?true:await 確認(`${item.名前} を aidiy_term で開始しますか？\n\nプロジェクト: ${project}\nモード: ${item.モード}\nモデル: 指定なし（CLI の既定設定）\n\nファイルの変更やコマンド実行が自動承認されます。CLIによってはサンドボックスも解除されます。信頼できるプロジェクトだけで使用してください。CLIの契約や設定によって利用料金が発生する場合があります。ログイン・組織の制限・初回の信頼確認はCLI側に残る場合があります。`);
    if(accepted!==true||!接続可能()||project!==アプリ.フォルダ.value)return;
    const data=await api('api/CLI起動/開始','POST',undefined,'json',{対象:id,フォルダ:project,自動承認確認:true});通知.value=data.通知;
   }catch(error){通知.value=error.message;失敗.value=true;}

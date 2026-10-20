@@ -58,7 +58,8 @@ try{
  await until(`document.querySelector('nav.tabs button.active')?.textContent==='システム起動'&&document.querySelectorAll('.start-targets button').length===6`);
  assert.deepEqual(calls,[],'初期表示ではサービスを起動しない');
  await click('導入状況');
- assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0,'ミニ切替は起動画面だけ');
+ assert.equal(await evaluate(`document.querySelectorAll('.start-mini-switch').length`),0,'ページ内のミニ切替は置かない');
+ assert.equal(await evaluate(`document.querySelectorAll('header.panel-brand .title-mini-switch:not(:disabled)').length`),1,'ミニ切替は全タブ共通のタイトルバーに置く');
  assert.deepEqual(calls,[]);await click('システム起動');await until(`document.querySelectorAll('.start-targets button').length===6`);
  await until(`document.querySelector('#run').textContent==='強制停止'&&!document.querySelector('#run').disabled`);
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);
@@ -135,7 +136,7 @@ try{
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  assert.deepEqual(calls,['local','tools','core','apps','taskteam','web'],'表示切替は起動・停止しない');assert.ok(children.every(child=>!child.closed));
  await click('ミニ表示');await until(`document.querySelector('.start-mini')`);await click('通常表示');await until(`!document.querySelector('.start-mini')`);
- await click('導入状況');assert.equal(await evaluate(`document.querySelector('.start-mini-switch').getClientRects().length`),0);await click('システム起動');
+ await click('導入状況');assert.equal(await evaluate(`document.querySelectorAll('.start-mini-switch').length`),0);await click('システム起動');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);
  await until(`document.querySelector('.start-console-heading strong').textContent==='Local コンソール'`);
  await until(`document.querySelector('.start-console').textContent.includes('合成コンソール')`);

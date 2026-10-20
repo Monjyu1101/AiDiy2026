@@ -65,7 +65,8 @@ try{
  assert.equal(await evaluate(`!!document.querySelector('header.panel-brand .mini-restore')`),true);
  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.mini-app-message')).color`),'rgb(255, 107, 130)');
  assert.equal(await evaluate(`(()=>{const view=document.querySelector('.start-mini');return view.scrollHeight<=view.clientHeight&&document.documentElement.scrollWidth<=innerWidth;})()`),true);
- assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.querySelector('.mini-icon-caption')?.textContent.trim()===button.getAttribute('aria-label').replace(' を起動',''))`),true);
+ assert.equal(await evaluate(`document.querySelectorAll('.mini-icon-caption').length`),0);
+ assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.getAttribute('aria-label')?.endsWith(' を起動')&&button.querySelector('img')?.getAttribute('width')==='40')`),true);
  await until(`[...document.querySelectorAll('.mini-service')].some(button=>button.textContent==='Core'&&button.dataset.tone==='running'&&button.title.includes('8091'))`);
  assert.equal(await evaluate(`(()=>{const items=[...document.querySelectorAll('.mini-service[data-tone=running]')].map(element=>getComputedStyle(element));return items.length>0&&items.every(style=>style.animationName==='mini-blink')&&document.querySelectorAll('.mini-indicator').length===0;})()`),true);
  assert.equal(await evaluate(`new Set([...document.querySelectorAll('.mini-service')].map(element=>element.style.getPropertyValue('--mini-blink'))).size`),6);
@@ -107,11 +108,13 @@ try{
  await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>!button.disabled)`),true);
  await evaluate(`document.querySelector('.mini-app-button[data-app="live"]').click()`);
- await until(`document.querySelector('.mini-app-message').textContent==='Live は起動済みです。'`);
+ await until(`!document.querySelector('.mini-app-button[data-app="live"]').disabled&&document.querySelector('.mini-app-message').textContent===${JSON.stringify(project)}`);
+ assert.equal(await evaluate(`document.querySelector('.mini-app-message').textContent.includes('起動済み')`),false);
  assert.equal(taskChecks,4);assert.equal(appCalls.length,6);
  assert.equal(await evaluate(`document.querySelector('.mini-app-button[data-app="live"]').disabled`),false,'起動済みの結果を理由にボタンを無効化せず、次回押下時も再確認する');
  await evaluate(`document.querySelector('.mini-app-button[data-app="code"]').click()`);
- await until(`document.querySelector('.mini-app-message').textContent==='Code の起動を要求しました。'`);
+ await until(`!document.querySelector('.mini-app-button[data-app="code"]').disabled&&document.querySelector('.mini-app-message').textContent===${JSON.stringify(project)}`);
+ assert.equal(await evaluate(`document.querySelector('.mini-app-message').textContent.includes('起動を要求')`),false);
  assert.equal(appCalls.length,7);assert.equal(appCalls.at(-1).cwd,project);assert.equal(taskChecks,4);
  assert.equal(await evaluate(`(()=>{const view=document.querySelector('.start-mini');return view.scrollHeight<=view.clientHeight&&document.documentElement.scrollWidth<=innerWidth;})()`),true);
  await capture('app-mini-project');
