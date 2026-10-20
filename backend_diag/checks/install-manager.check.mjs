@@ -162,15 +162,17 @@ test('npm 探索は固定 CLI 本体と標準 prefix/root のみを採用する'
 });
 
 test('npm 不在・別 CLI・異なる所有者・不正導入先・探索失敗では操作しない',async t=>{
+  // POSIX 配置の fixture は、実行OSにかかわらず同じ探索条件で検証する。
+  const findFixtureNpm=options=>findNpm({...options,platform:'linux'});
   const tree=await npmTree(t);
-  await assert.rejects(()=>findNpm({resolve:async()=>null,run:()=>assert.fail('実行しない')}),{status:409});
+  await assert.rejects(()=>findFixtureNpm({resolve:async()=>null,run:()=>assert.fail('実行しない')}),{status:409});
   const other=path.join(tree.directory,'not-npm.js');await writeFile(other,'// 合成');
-  await assert.rejects(()=>findNpm({resolve:async()=>other,run:()=>assert.fail('実行しない')}),{status:409});
-  for(const answer of ['relative/path',`${tree.prefix}\n${tree.prefix}`,`${tree.prefix}\r${tree.prefix}`])await assert.rejects(()=>findNpm({resolve:async()=>tree.cli,run:async command=>{command.onData(answer);return success;}}),{status:409});
-  await assert.rejects(()=>findNpm({resolve:async()=>tree.cli,run:async command=>{command.onData(command.args[1]==='prefix'?tree.prefix:path.join(tree.directory,'foreign'));return success;}}),{status:409});
-  for(const patch of [{code:1},{error:true},{timedOut:true},{overflow:true}])await assert.rejects(()=>findNpm({resolve:async()=>tree.cli,run:async()=>({...success,...patch})}),{status:409});
+  await assert.rejects(()=>findFixtureNpm({resolve:async()=>other,run:()=>assert.fail('実行しない')}),{status:409});
+  for(const answer of ['relative/path',`${tree.prefix}\n${tree.prefix}`,`${tree.prefix}\r${tree.prefix}`])await assert.rejects(()=>findFixtureNpm({resolve:async()=>tree.cli,run:async command=>{command.onData(answer);return success;}}),{status:409});
+  await assert.rejects(()=>findFixtureNpm({resolve:async()=>tree.cli,run:async command=>{command.onData(command.args[1]==='prefix'?tree.prefix:path.join(tree.directory,'foreign'));return success;}}),{status:409});
+  for(const patch of [{code:1},{error:true},{timedOut:true},{overflow:true}])await assert.rejects(()=>findFixtureNpm({resolve:async()=>tree.cli,run:async()=>({...success,...patch})}),{status:409});
   await writeFile(path.join(tree.root,'npm','package.json'),JSON.stringify({name:'not-npm'}));
-  await assert.rejects(()=>findNpm({resolve:async()=>tree.cli,run:()=>assert.fail('実行しない')}),{status:409});
+  await assert.rejects(()=>findFixtureNpm({resolve:async()=>tree.cli,run:()=>assert.fail('実行しない')}),{status:409});
 });
 
 async function packageTree(t,{id='codex',platform='linux',manifest={name:NPM_PACKAGES[id],bin:{[id]:'bin/cli.js'}}}={}){

@@ -47,6 +47,7 @@ class Live:
         self.live_session = None
 
     async def 開始(self, **kwargs):
+        # Python のキーワード識別子は NFKC 正規化され、全角Ｑも ASCII Q になる。
         self.queue = kwargs["テキスト受信処理Q"]
         assert self.queue is kwargs["音声受信処理Q"]
         self.live_session = object()
@@ -64,7 +65,7 @@ class Live:
 
 
 async def skip_sleep(seconds):
-    assert seconds == 10
+    assert seconds == 15
 
 
 async def main():

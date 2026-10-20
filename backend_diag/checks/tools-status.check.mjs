@@ -46,12 +46,20 @@ test('invalid config/ports never cause a request, and config BOM is supported', 
 });
 
 test('timeout bounds stalled response and config read', async t => {
-  assert.equal(TOOLS_TIMEOUT_MS,1500);
+  assert.equal(TOOLS_TIMEOUT_MS,5000);
   const port = await server(t, (_req,res) => {res.writeHead(200);res.write('{');});
   for (const check of [checker(port,{timeoutMs:30}), createToolsStatusChecker({timeoutMs:30, reader:() => new Promise(() => {})})]) {
     const start = Date.now(); assert.deepEqual(await check(),{online:false});
     assert.ok(Date.now()-start < 1000);
   }
+});
+
+test('brief startup latency does not disconnect a healthy Tools service', async t => {
+  const port = await server(t, (_req,res) => {
+    const timer=setTimeout(()=>res.end(good),2000);
+    res.once('close',()=>clearTimeout(timer));
+  });
+  assert.deepEqual(await checker(port)(),{online:true});
 });
 
 test('concurrent polls share one request; one disconnected waiter does not cancel others', async t => {

@@ -203,7 +203,8 @@ class LiveModelCheck:
             backend = str(self.root / 'backend_server')
             if backend not in sys.path:
                 sys.path.append(backend)
-            factory = self.factory or getattr(importlib.import_module(module), 'LiveAI')
+            # 初回SDK import中もToolsのpingを止めず、試行の切断誤判定を防ぐ。
+            factory = self.factory or await asyncio.to_thread(lambda: getattr(importlib.import_module(module), 'LiveAI'))
             adapter = factory(セッションID='diag-'+uuid.uuid4().hex, parent_manager=None,
                               live_ai=prefix.lower(), live_model=model, live_voice=voice,
                               api_key=key, system_instruction='入力に日本語で簡潔に返答してください。' if manual else '挨拶に日本語で短く一文だけ返答してください。', diagnostic=True)

@@ -119,7 +119,10 @@ def setup_logging(instance_name: str = "mcp_main"):
     logging.getLogger('asyncio').setLevel(logging.CRITICAL)
     logging.getLogger('websockets').setLevel(logging.WARNING)
     logging.getLogger('uvicorn').setLevel(logging.WARNING)
-    logging.getLogger('uvicorn.error').setLevel(logging.WARNING)
+    # Diag の専用コンソールでは起動・終了も表示し、待受終了と監視状態を照合できるようにする。
+    logging.getLogger('uvicorn.error').setLevel(
+        logging.INFO if os.environ.get('AIDIY_DIAG_CONSOLE') == '1' else logging.WARNING
+    )
     logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
     # MCP の "Processing request of type ..." ログ（ListTools/ListResources等）を抑制
     logging.getLogger('mcp.server.lowlevel.server').setLevel(logging.WARNING)

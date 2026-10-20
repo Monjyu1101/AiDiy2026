@@ -7,13 +7,14 @@ import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
 import {callMcp,createModelTrials,localRequest} from '../モデル試行/trials.mjs';
 
-test('actual MCP SDK and production Chat/Code/Decision registrations return valid results', {skip:!process.env.DIAG_TEST_PYTHON,timeout:20000},async()=>{
+// Windows 初回 import と並行回帰の負荷を考慮。AI応答は従来どおり合成の短文だけ。
+test('actual MCP SDK and production Chat/Code/Decision registrations return valid results', {skip:!process.env.DIAG_TEST_PYTHON,timeout:90000},async()=>{
  const child=spawn(process.env.DIAG_TEST_PYTHON,[fileURLToPath(new URL('./fixtures/model_trials_tools.py',import.meta.url))],{stdio:['ignore','pipe','pipe'],windowsHide:true});
  let errors='';child.stderr.on('data',chunk=>errors+=chunk);
  const lines=createInterface({input:child.stdout});
  try{
   const port=await new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>reject(new Error(`fixture startup: ${errors}`)),10000);
+   const timer=setTimeout(()=>reject(new Error(`fixture startup: ${errors}`)),60000);
    lines.once('line',line=>{clearTimeout(timer);resolve(JSON.parse(line).port);});
    child.once('error',error=>{clearTimeout(timer);reject(error);});
    child.once('exit',()=>{clearTimeout(timer);reject(new Error(`fixture exit: ${errors}`));});

@@ -23,6 +23,7 @@ MCP ツールの description で通知する。
 (/aidiy_chat_completions) からも本ラッパーを利用する。
 """
 
+import asyncio
 import importlib
 import inspect
 import json
@@ -321,7 +322,8 @@ Args:
         api_key = self._api_key_for(ai_name, key)
         parent = _ParentShim(key)
 
-        ChatAI = self._select_chat_class(ai_name)
+        # SDK の初回 import は時間がかかる。Tools の ping・中止処理を止めない。
+        ChatAI = await asyncio.to_thread(self._select_chat_class, ai_name)
         instance = ChatAI(
             親=parent,
             セッションID="mcp_session",

@@ -1,9 +1,0 @@
-{
-  "supervisorPid": 8256,
-  "httpReady": true,
-  "launch": "frontend_avatar/_start.py → node electron/dev-start.cjs",
-  "oldSupervisorPid": 30348,
-  "status": "✅ OK",
-  "nativeWindowCheck": "✅ OK：Computer Useで実Electronの認証画面を確認。ログイン操作は未実施。",
-  "windowId": 59706646
-}

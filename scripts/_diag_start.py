@@ -86,9 +86,12 @@ def service_lock(path, stopped):
 
 def pipe_output(process, console):
     decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+    # BufferedReader.read(size) は size 分たまるまで待つ。短い進捗・停止理由も
+    # 子プロセスの終了を待たずに表示する。
+    read = getattr(process.stdout, 'read1', process.stdout.read)
     try:
         while True:
-            chunk = process.stdout.read(4096)
+            chunk = read(4096)
             if not chunk:
                 break
             console.write(decoder.decode(chunk))
@@ -317,7 +320,9 @@ def run(module, kind, settings, *, run_id=None, console=None, stopped=None):
                 if process.stdout is not None:
                     output = threading.Thread(target=pipe_output, args=(process, console), daemon=True)
                     output.start()
-                deadline = time.monotonic() + 90
+                # Tools は Windows 初回の COM キャッシュ生成と全 MCP 登録を含む。
+                # 冷起動でも初期化途中に打ち切らない。停止要求は待機中も監視する。
+                deadline = time.monotonic() + (180 if kind == 'tools' else 90)
                 while not stopped.is_set() and process.poll() is None:
                     if not target.get('ポート'):
                         if stopped.wait(1):

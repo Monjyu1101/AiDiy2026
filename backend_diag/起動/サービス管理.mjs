@@ -13,7 +13,7 @@ export function validateSettings(target,value){
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||keys.some(key=>typeof value[key]!=='boolean'))throw failure('起動設定は指定の項目を真偽値で設定してください。');
  return Object.fromEntries(keys.map(key=>[key,value[key]]));
 }
-export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=180000,stopTimeout=30000,portStatusFn,forceStopFn}={}){
+export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=300000,stopTimeout=30000,portStatusFn,forceStopFn}={}){
  let targets,settings,loading,writing=Promise.resolve(),busy=false,stopping=false,closed=false,operation='',work=Promise.resolve(),focus=null,portChecker;
  const sessions=new Map(),cancelled=new Set(),logs=new Map();
  const settingsFile=join(root,'_config','AiDiy_diag_start.json'),runtime=join(root,'_AIDIY','aidiy_diag','起動');

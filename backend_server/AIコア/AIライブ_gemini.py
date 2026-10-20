@@ -169,7 +169,7 @@ class LiveAI:
 
         # Gemini Client初期化
         self.client = None
-        if self.api_key:
+        if self.api_key and not diagnostic:
             try:
                 # genai.Clientの初期化（asyncioループが不要な同期初期化）
                 self.client = genai.Client(
@@ -287,7 +287,8 @@ class LiveAI:
                 # logger.info("開始:GeminiClient初期化開始")
                 pass
                 try:
-                    self.client = genai.Client(
+                    self.client = await asyncio.to_thread(
+                        genai.Client,
                         api_key=self.api_key,
                         http_options={'api_version': 'v1alpha'}
                     )

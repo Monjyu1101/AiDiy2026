@@ -27,6 +27,27 @@ def load(path):
 
 
 class StartTests(unittest.TestCase):
+    def test_short_progress_is_forwarded_before_child_exit(self):
+        module = load(ROOT / 'scripts/_diag_start.py')
+        output = queue.Queue()
+        child = subprocess.Popen(
+            [sys.executable, '-u', '-c', "import sys;print('準備完了',flush=True);sys.stdin.read()"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
+            **({'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}),
+        )
+        reader = threading.Thread(target=module.pipe_output,
+                                  args=(child, SimpleNamespace(write=output.put)), daemon=True)
+        reader.start()
+        try:
+            self.assertIn('準備完了', output.get(timeout=10))
+            self.assertIsNone(child.poll(), '終了前の進捗を確認する')
+        finally:
+            child.stdin.close()
+            child.wait(timeout=5)
+            reader.join(timeout=5)
+            child.stdout.close()
+
     @unittest.skipUnless(os.name == 'nt', 'Windows の補助コマンド非表示')
     def test_auxiliary_commands_are_hidden_and_module_api_is_restored(self):
         module = load(ROOT / 'scripts/_diag_start.py')

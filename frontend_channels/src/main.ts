@@ -11,7 +11,7 @@
  */
 
 import { 設定読込 } from './接続/接続設定';
-import { DiscordBot } from './接続/Bot接続';
+import type { DiscordBot } from './接続/Bot接続';
 import { 起動解決 } from './共通連携/IDE連携';
 import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from './接続/接続エラー';
 
@@ -27,6 +27,8 @@ try {
     起動解決(config.cli, config.python, config.folder);
     console.log('Discord 設定・Hermes 起動パス: OK（外部接続は行っていません）');
   } else {
+    // 設定確認だけでは Discord SDK・音声処理を読み込まない。
+    const { DiscordBot } = await import('./接続/Bot接続');
     stage = 'Bot作成';
     bot = new DiscordBot(config);
     const shutdown = () => { void bot?.終了().catch(() => { process.exitCode = 1; }); };

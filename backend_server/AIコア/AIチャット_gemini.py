@@ -139,7 +139,8 @@ class ChatAI:
                 return False
 
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                # SSL・HTTPクライアントの初期化中も ping・中止を処理できるようにする。
+                self.client = await asyncio.to_thread(genai.Client, api_key=self.api_key)
                 self.is_alive = True
                 # logger.info("ChatAI: apiクライアント初期化完了")
                 pass

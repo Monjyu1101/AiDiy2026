@@ -2,7 +2,9 @@
 import http from 'node:http';
 import {readConfig} from '../runtime/model_probe.mjs';
 
-export const TOOLS_TIMEOUT_MS = 1500;
+// AI/CLI の初期化時に生じる短い応答遅延を接続断と誤判定しない。
+// 接続拒否などの確定した通信失敗は、期限を待たずに従来どおり返す。
+export const TOOLS_TIMEOUT_MS = 5000;
 export const TOOLS_RESPONSE_LIMIT = 16 * 1024;
 
 function checkTools({reader, timeoutMs, signal}) {
