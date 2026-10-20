@@ -1,4 +1,6 @@
 /* インストール一覧・詳細専用。共通レイアウトと状態バッジは ../style.css。 */
+.install-panel>main{grid-template-columns:clamp(400px,34vw,480px) minmax(0,1fr)}
+.install-panel>main>aside,.install-panel>main>article{min-width:0}
 .item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:none;text-align:left;border-radius:5px;padding:11px 10px}
 .item.selected{background:#25403d;color:#b0eee2}
 .welcome{padding-top:45px;max-width:650px}
@@ -7,16 +9,17 @@
 #list > details > details{margin-left:10px}
 .install-item{border-radius:5px;margin-bottom:5px}
 .install-item.selected{background:#25403d}
-.install-check{display:flex;align-items:center;gap:8px;padding:0 10px 10px}
+.install-check{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 10px 10px}
 .install-check button{padding:3px 10px;font-size:11px;white-space:nowrap}
 .install-check>.badge{min-width:60px}
-/* 名称の直後にサーバーが許可した操作だけを並べる。選択ボタンとは分離する。 */
-.install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 4px}
-.install-item>.item{min-width:0;overflow-wrap:anywhere;justify-content:flex-start}
-.install-manage{display:flex;flex-wrap:wrap;gap:4px;padding-right:8px}
+/* 1行目は名称、2行目は確認・状態と導入操作。長い名称でも操作は独立した行に置く。 */
+.install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name name" "check manage";align-items:start;gap:0 4px}
+.install-item>.item{grid-area:name;min-width:0;overflow-wrap:anywhere;justify-content:flex-start}
+.install-item>.item>span{min-width:0}
+.install-manage{grid-area:manage;display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 10px 0}
 .install-manage button{padding:3px 7px;font-size:11px;white-space:nowrap}
 .install-manage .install-delete{border-color:#925064;color:#ffbdc8}
-.install-check{grid-column:1/-1}
+.install-check{grid-area:check;min-width:0}
 .install-progress{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .install-progress button,.install-detail-tabs button,.install-console-heading button{padding:4px 10px;font-size:12px}
 .install-detail-tabs{display:flex;gap:6px;margin-bottom:18px}
@@ -27,4 +30,6 @@
 .install-recheck{margin-top:18px;border-top:1px solid #304253;padding-top:15px}
 .install-recheck>strong{margin-right:10px}
 .install-recheck p,.install-capability-note{font-size:12px}
-@media(max-width:380px){.install-manage{gap:3px;padding-right:4px}.install-manage button{padding:3px 5px}}
+/* 詳細・コンソールを圧迫する幅では上下に分け、各領域の内部スクロールを保つ。 */
+@media(max-width:900px){.install-panel>main{grid-template-columns:minmax(0,1fr)}#app>.install-panel>main{grid-template-rows:minmax(0,45%) minmax(0,1fr)}.install-panel>main>aside{border-right:0;border-bottom:1px solid #304253;max-height:none}.install-panel>main>article{padding:26px 20px}}
+@media(max-width:380px){.install-check{gap:4px;padding-right:4px}.install-manage{gap:3px;padding-right:8px}.install-manage button{padding:3px 5px}}

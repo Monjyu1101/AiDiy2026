@@ -12,6 +12,20 @@ test('install list keeps categories and badges without search, legend or state f
   assert.match(html, /ベース/);
   assert.doesNotMatch(html, /class="legend"|<select|状態で絞り込む|<input|プログラムを検索/);
   assert.equal((html.match(/data-state="OK"/g) || []).length, 1);
+  assert.match(html, /class="panel install-panel"/);
+});
+
+test('導入だけ一覧を広げ、1行目の名称と2行目の確認・導入操作を分離する', () => {
+  const css = source('導入状況/導入状況.css');
+  assert.match(css, /\.install-panel>main\{grid-template-columns:clamp\(400px,34vw,480px\) minmax\(0,1fr\)/);
+  assert.match(css, /grid-template-areas:"name name" "check manage";align-items:start/);
+  assert.match(css, /\.install-item>\.item\{grid-area:name;min-width:0;overflow-wrap:anywhere/);
+  assert.match(css, /\.install-manage\{grid-area:manage;/);
+  assert.match(css, /\.install-check\{grid-area:check;min-width:0\}/);
+  assert.match(css, /@media\(max-width:900px\)\{\.install-panel>main\{grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(css, /#app>\.install-panel>main\{grid-template-rows:minmax\(0,45%\) minmax\(0,1fr\)/);
+  assert.equal((css.match(/grid-template-areas:/g) || []).length, 1, '狭幅でも導入操作は2行目を保つ');
+  assert.match(source('style.css'), /main\{display:grid;grid-template-columns:310px minmax\(0,1fr\)/, '他画面の既定幅は変更しない');
 });
 
 test('write button is enabled only after a completed check', async () => {

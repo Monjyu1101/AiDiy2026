@@ -30,7 +30,7 @@ async function fixture() {
   return { ...ui, operation, install, calls, prompts, approve: value => { approved = value; }, finish: extra => { run = { ...run, 状態: '完了', 実行中: false, 結果: { id: run.対象, 状態: 'OK', 説明: '確認できました。' }, 確認済み: true, ログ: 'finished\n', ...extra }; }, async tick() { const [id, callback] = timers.entries().next().value; timers.delete(id); callback(); await flush(); }, close() { operation.終了(); ui.app.unmount(); } };
 }
 
-test('名称の右に能力由来の導入・再導入・削除だけを表示し、導入済みでも非対応の操作を作らない', async () => {
+test('名称の下の2行目に能力由来の導入・再導入・削除だけを表示し、導入済みでも非対応の操作を作らない', async () => {
   const operation = { 可能操作: id => capabilities.find(row => row.id === id)?.操作 || [], 能力: id => capabilities.find(row => row.id === id) };
   const html = await render('導入状況/導入状況パネル.vue', { 項目: items, 結果: items.map(item => ({ id: item.id, 状態: 'OK' })), 接続済み: true, 操作: operation });
   assert.equal((html.match(/data-install-action=/g) || []).length, 3);
@@ -41,7 +41,8 @@ test('名称の右に能力由来の導入・再導入・削除だけを表示�
   assert.doesNotMatch(html, /<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);
   const noCapabilities = await render('導入状況/導入状況パネル.vue', { 項目: items, 結果: [], 接続済み: true });
   assert.doesNotMatch(noCapabilities, /data-install-action=/);
-  const css = source('導入状況/導入状況.css'); assert.match(css, /grid-template-columns:minmax\(0,1fr\) auto/);
+  const css = source('導入状況/導入状況.css'); assert.match(css, /grid-template-areas:"name name" "check manage"/);
+  assert.ok(html.indexOf('data-install-check="claude"') < html.indexOf('data-install-id="claude"'), 'キーボード順序も2行目の確認から導入操作へ進む');
 });
 
 test('実Vueクリックで確認を取り消せる。承認後は一度だけ実行し、全確認・書込を無効化する', async () => {

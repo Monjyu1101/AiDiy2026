@@ -26,7 +26,7 @@ watch(()=>props.表示中,async id=>{if(!id)return;詳細表示.value=true;await
 watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value)));
 </script>
 <template>
-<section ref="パネル" class="panel" aria-label="導入状況">
+<section ref="パネル" class="panel install-panel" aria-label="導入状況">
   <div class="panel-heading"><h2>導入状況</h2><div class="panel-actions"><component :is="前回実行日時" :value="lastRun"/><button id="install-run" :class="{'check-next': !確認済み}" :disabled="操作禁止" @click="$emit('確認')">{{確認中?'確認中…':'状況確認'}}</button><button id="install-write" :class="{'write-next': 確認済み && !書込済み}" :disabled="操作禁止 || !確認済み" title="直前の確認結果を _AIDIY/aidiy_diag/install_info.json に保存します" @click="$emit('書込')">{{書込中?'書込中…':書込済み?'書込済':'書込'}}</button></div></div>
   <p v-if="操作 && unref(操作.エラー)" class="panel-note warning" role="status">{{unref(操作.エラー)}}</p>
   <p v-if="実行 && 操作中" class="panel-note install-progress" role="status">{{項目.find(item=>item.id===実行.対象)?.name || 実行.対象}} · {{実行.操作}} · {{実行.状態}}<button type="button" @click="選択ID=実行.対象;詳細表示=false">実行コンソールを表示</button></p>
@@ -34,8 +34,8 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
     <aside aria-label="診断項目"><nav id="list"><details open><summary>導入状況</summary><template v-for="group in 分類" :key="group"><details :open="!折り畳み.has(group)" @toggle="開閉(group,$event)"><summary>{{group}} · {{項目.filter(e=>(e.menuGroup || 'その他拡張')===group).length}}</summary>
       <div v-for="item in 項目.filter(e=>(e.menuGroup || 'その他拡張')===group)" :key="item.id" class="install-item" :class="{selected:選択ID===item.id}">
         <button class="item" :class="{selected:選択ID===item.id}" :aria-pressed="選択ID===item.id" @click="選択ID=item.id;詳細表示=true"><span>{{item.name}}</span></button>
-        <div v-if="可能操作(item.id).length" class="install-manage"><button v-for="action in 可能操作(item.id)" :key="action" type="button" :data-install-action="action" :data-install-id="item.id" :aria-label="`${item.name} を${action}`" :class="{'install-delete':action==='削除'}" :disabled="操作禁止 || 全診断中 || unref(操作?.読込中)" :title="能力(item.id)?.説明" @click="実行開始(item,action)">{{action}}</button></div>
         <div class="install-check"><button :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="操作禁止" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{個別確認中===item.id?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
+        <div v-if="可能操作(item.id).length" class="install-manage"><button v-for="action in 可能操作(item.id)" :key="action" type="button" :data-install-action="action" :data-install-id="item.id" :aria-label="`${item.name} を${action}`" :class="{'install-delete':action==='削除'}" :disabled="操作禁止 || 全診断中 || unref(操作?.読込中)" :title="能力(item.id)?.説明" @click="実行開始(item,action)">{{action}}</button></div>
       </div>
     </details></template></details></nav></aside>
     <article id="detail" aria-live="polite">
@@ -50,7 +50,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
         </template>
         <template v-else><component :is="状態バッジ" class="status" :state="状態(選択項目.id)"/><p>{{選択項目.description}}</p><p v-if="能力(選択項目.id)?.理由" class="install-capability-note">{{能力(選択項目.id).理由}}</p><dl><template v-for="[label,value] in 詳細項目" :key="label"><dt>{{label}}</dt><dd>{{value}}</dd></template></dl><h3>ソースの参照箇所</h3><ul><li v-for="source in 参照箇所" :key="source">{{source}}</li></ul></template>
       </template>
-      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、名称の右に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
+      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、名称の下の2行目に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
     </article>
   </main>
 </section>
