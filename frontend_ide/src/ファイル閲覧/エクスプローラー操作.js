@@ -17,8 +17,9 @@ export function explorerNameError(name) {
 }
 
 // OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
-export function createExplorerActions({ root, document: ownerDocument, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
+export function createExplorerActions({ root, document: ownerDocument, openFile = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
   const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, error: '', notice: '' });
+  const canOpenFile = typeof openFile === 'function';
   let cleanup = () => {}, disposed = false, epoch = 0;
   const doc = () => ownerDocument() || globalThis.document;
   const activeRow = row => row || { type: 'dir', path: '', name: root().split(/[\\/]/).filter(Boolean).at(-1) || 'ルート' };
@@ -92,7 +93,20 @@ export function createExplorerActions({ root, document: ownerDocument, changed =
     const run = epoch, current = () => !disposed && run === epoch;
     row = { ...activeRow(row) }; closeMenu(); clearMessage();
     const path = row.path, destination = directory(row);
-    if (action === 'copy-path' || action === 'copy-relative') {
+    if (action === 'open-app') {
+      if (row.type !== 'file' || !path) { state.error = 'アプリで開くファイルを選択してください。'; return; }
+      if (!canOpenFile) { state.error = '「アプリで開く」はデスクトップ版で利用できます。'; return; }
+      state.busy = true;
+      try {
+        const result = await openFile(path);
+        if (!current()) return;
+        if (result?.cancelled) return;
+        if (!result?.ok) throw Error(result?.error || '関連付けられたアプリで開けませんでした。');
+        state.notice = `「${row.name || path}」を既定のアプリで開きました。`;
+      } catch (error) { if (current()) state.error = error.message || '関連付けられたアプリで開けませんでした。'; }
+      finally { if (current()) { state.busy = false; focus(); } }
+      return;
+    } else if (action === 'copy-path' || action === 'copy-relative') {
       const text = action === 'copy-path' ? (path ? fullFilePath(root(), path) : root()) : path || '.';
       try { const document = doc(); await copyBrowserText(text, { document, clipboard: document?.defaultView?.navigator?.clipboard, isCurrent: current }); if(current()) state.notice = 'パスをコピーしました。'; }
       catch { if(current()) await showDialog({ action: 'manual-copy', value: text }); }
@@ -123,5 +137,5 @@ export function createExplorerActions({ root, document: ownerDocument, changed =
   }
   function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = false; clearMessage(); }
   function dispose() { disposed = true; reset(); }
-  return { state, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
+  return { state, canOpenFile, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
 }

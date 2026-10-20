@@ -12,6 +12,8 @@ const menuItems = computed(() => {
   const menu = state.menu, item = !!menu?.target.path;
   const paste = !!state.clipboard && !(state.clipboard.type === 'dir' && containsPath(state.clipboard.path, menu?.directory || ''));
   return [
+    ['open-app','アプリで開く','',item && menu.target.type === 'file' && props.actions.canOpenFile,
+      !props.actions.canOpenFile ? 'デスクトップ版で利用できます。' : menu?.target.type !== 'file' ? 'ファイルを選択してください。' : 'OSに関連付けられた既定のアプリで開きます。'],
     ['copy-path','パスのコピー','Ctrl+Shift+C',true],['copy-relative','相対パスのコピー','',true],
     ['copy','コピー（IDE内）','Ctrl+C',item],['paste','ペースト','Ctrl+V',paste],['duplicate','複製','',item],
     ['rename','名前の変更','F2',item],['trash','削除（ゴミ箱へ）','Delete',item],
@@ -37,8 +39,9 @@ function dialogKey(event) {
 <template>
   <div v-if="state.menu" class="explorer-context-menu selection-popup" role="menu" aria-label="ファイル操作" data-aidiy-no-window-move :style="{left:state.menu.x+'px',top:state.menu.y+'px'}" @contextmenu.prevent.stop @keydown.stop="menuKey" @click.stop>
     <p class="menu-target" :title="state.menu.target.path">{{ state.menu.target.name || 'ルートフォルダ' }}</p>
-    <button v-for="[action,label,shortcut,enabled] in menuItems" :key="action" role="menuitem" :data-action="action" :disabled="!enabled||state.busy" @click="actions.action(action)"><span>{{ label }}</span><small>{{ shortcut }}</small></button>
+    <button v-for="[action,label,shortcut,enabled,title] in menuItems" :key="action" role="menuitem" :data-action="action" :title="title" :disabled="!enabled||state.busy" @click="actions.action(action)"><span>{{ label }}</span><small>{{ shortcut }}</small></button>
     <p class="menu-help">貼り付け・新規作成先: {{ state.menu.directory || 'ルート' }}<br>同名コピーは別名で作成します。</p>
+    <p v-if="!actions.canOpenFile" class="menu-help">アプリで開く: デスクトップ版で利用できます。</p>
   </div>
   <div v-if="state.dialog" class="explorer-dialog-overlay" data-aidiy-no-window-move @contextmenu.stop @click.stop @keydown.stop="dialogKey">
     <form class="explorer-action-dialog" role="dialog" aria-modal="true" :aria-label="state.dialog.action==='trash'?'削除の確認':state.dialog.action==='manual-copy'?'パスの手動コピー':'名前の入力'" @submit.prevent="actions.submitName">

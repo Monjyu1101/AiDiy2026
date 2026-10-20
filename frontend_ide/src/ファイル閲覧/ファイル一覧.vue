@@ -285,6 +285,8 @@ async function grep() {
 let fileNavigationVersion=0;
 // 右クリックは閲覧位置を動かさず、操作対象だけをカーソルへ合わせる。
 const fileActions=createExplorerActions({root:()=>props.root||'',document:()=>panel.value?.ownerDocument,
+  // 別窓へDOMを移しても、元のIDEの限定IPCとセッション検証を通す。
+  openFile:typeof window.aidiyWindow?.openFile==='function'?path=>window.aidiyWindow.openFile(path):null,
   focus:()=>treeElement.value?.focus(),edit:row=>{cursor.value=row.path;reveal(row.path);},
   refresh:async()=>{if(props.reload)await props.reload();},
   changed:async(result,isCurrent)=>{
