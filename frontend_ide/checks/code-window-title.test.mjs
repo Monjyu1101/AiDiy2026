@@ -13,7 +13,7 @@ import panelModule from '../デスクトップ/panel-windows.cjs';
 import codeDragModule from '../デスクトップ/code-drag.cjs';
 import browserModule from '../デスクトップ/ブラウザ.cjs';
 import nativeMoveModule from '../デスクトップ/長押し窓移動.cjs';
-import frontModule from '../デスクトップ/前面維持.cjs';
+import pinModule from '../デスクトップ/最前面ピン.cjs';
 import placementModule from '../デスクトップ/VRパネル配置.cjs';
 import macMenuModule from '../host/scripts/MacOS-Menu.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -22,7 +22,7 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
  const reserved=new Set();
  const handlers=new Map(),state={active,mode:'online',startedAt:10,project:{path:'/project'}},created=[],dialogs=[];
  class Window extends EventEmitter{
-  constructor(options){super();created.push(this);this.options=options;this.title=options.title;this.bounds=options;this.webContents=new EventEmitter();this.webContents.mainFrame={url:''};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};}
+  constructor(options){super();created.push(this);this.options=options;this.title=options.title;this.bounds=options;this.webContents=new EventEmitter();this.webContents.mainFrame={url:''};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};this.messages=[];this.webContents.send=(...args)=>this.messages.push(args);}
   isDestroyed(){return !!this.destroyed;}
   getBounds(){return this.bounds;}
   setBounds(bounds){this.bounds=bounds;}
@@ -36,6 +36,7 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   isMinimized(){return false;}
   show(){}
   focus(){this.emit('focus');}
+  moveTop(){this.raises=(this.raises||0)+1;}
  }
  const app=new EventEmitter();Object.assign(app,{setName(name){this.name=name;},getPath:()=>'/tmp',setPath(){},requestSingleInstanceLock:()=>true,whenReady:()=>Promise.resolve(),quit(){const event={preventDefault(){this.prevented=true;}};app.emit('before-quit',event);if(!event.prevented)app.quitComplete=true;},dock:{setMenu(value){this.menu=value;},setIcon(value){this.icon=value;}}});
  const Menu={buildFromTemplate:items=>items,setApplicationMenu(value){app.menu=value;}};
@@ -50,9 +51,9 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
   './デスクトップ/ブラウザ.cjs':browserModule,
   './デスクトップ/長押し窓移動.cjs':nativeMoveModule,
-  './デスクトップ/前面維持.cjs':frontModule,
+  './デスクトップ/最前面ピン.cjs':pinModule,
   './デスクトップ/VRパネル配置.cjs':placementModule,
-  './デスクトップ/全画面横断.cjs':{createAllDisplays:()=>({register(){},attachExitKey:()=>()=>{},leave:()=>false,handle:()=>({ok:true,active:false})})},
+  './デスクトップ/全画面横断.cjs':{createAllDisplays:({syncChildren})=>{let active=false;return{register(){},attachExitKey:()=>()=>{},leave:()=>false,isActive:()=>active,handle(event,action){if(action==='toggle')active=!active;const owner=[...api.windows.values()].find(record=>record.window.webContents===event.sender);syncChildren(owner);return{ok:true,active};}};}},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const proc=new EventEmitter();Object.assign(proc,{platform,env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:kind},cwd:()=>'/project'});
@@ -94,12 +95,32 @@ test('IDE Code番号: 実createWindowのslotをタイトル・限定IPC・連携
  const standalone=await f.createWindow('code','http://127.0.0.1:6789/');assert.equal(standalone.getTitle(),'AiDiy Code');
 });
 
-test('IDE再フォーカスは自分の子パネルだけを手前に戻し、位置と単独窓を変えない',async()=>{
- const f=await desktopFixture(),child=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
- const bounds=child.window.getBounds();child.window.top=false;standalone.top=false;
- f.owner.window.focus();assert.equal(child.window.top,true);assert.equal(standalone.top,false);assert.equal(child.window.getBounds(),bounds);assert.equal(child.window.options.parent,f.owner.window);
- assert.equal(child.window.topLevel,process.platform==='win32'?'pop-up-menu':'floating');
- const count=child.window.topCalls;f.owner.window.focus();assert.equal(child.window.topCalls,count,'既に手前の子窓には最前面設定を繰り返さない');
+test('IDE再フォーカスは子パネルのOFFを上書きせず、選択されたON窓だけが同じ層の手前へ移る',async()=>{
+ const f=await desktopFixture(),child=await f.code(),other=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
+ const action=(record,command)=>f.handlers.get('development:window')(f.event(record),command);
+ assert.equal(child.window.top,true);assert.equal(other.window.top,true);assert.equal(standalone.top,false);assert.equal(f.owner.window.top,false);
+ assert.equal(child.window.topLevel,'floating');assert.equal(child.window.options.parent,undefined,'OSの親子関係でOFFを無効化しない');
+ const bounds=child.window.getBounds();action(child,'toggle-pin');assert.equal(child.window.top,false);
+ const raises=other.window.raises;f.owner.window.focus();child.window.focus();
+ assert.equal(child.window.top,false);assert.equal(other.window.raises,raises);assert.equal(child.window.getBounds(),bounds);
+ other.window.focus();assert.equal(other.window.raises,raises+1);
+ assert.equal(action(child,'pin-state').pinned,false);
+ assert.equal(action(child,'toggle-pin').pinned,true);child.window.focus();assert.ok(child.window.raises>0);
+ assert.equal(f.handlers.get('development:window')({sender:{},senderFrame:{}},'toggle-pin'),undefined);
+ assert.equal(f.handlers.get('development:window')({...f.event(child),senderFrame:{url:child.url}},'toggle-pin'),undefined);
+});
+
+test('VRは本体と既存・新規子窓のピンをロックし、終了後は各窓の元選択へ戻す',async()=>{
+ const f=await desktopFixture(),off=await f.code(),on=await f.code();
+ const action=(record,command)=>f.handlers.get('development:window')(f.event(record),command);
+ action(off,'toggle-pin');f.handlers.get('development:all-displays')(f.event(f.owner),'toggle');
+ for(const record of [f.owner,off,on]){assert.equal(action(record,'pin-state').locked,true);assert.equal(action(record,'toggle-pin').pinned,true);assert.equal(record.window.top,true);}
+ const during=await f.code();assert.equal(action(during,'pin-state').locked,true);
+ f.handlers.get('development:all-displays')(f.event(f.owner),'toggle');
+ for(const record of [f.owner,off])assert.equal(action(record,'pin-state').pinned,false);
+ for(const record of [on,during])assert.equal(action(record,'pin-state').pinned,true);
+ for(const record of [f.owner,off,on,during])assert.equal(action(record,'pin-state').locked,false);
+ assert.equal(action(on,'toggle-pin').pinned,false);
 });
 
 test('preloadタイトル: 任意IPCを公開せずホストの同一ウィンドウタイトルだけを取得する',async()=>{

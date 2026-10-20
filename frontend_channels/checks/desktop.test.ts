@@ -43,15 +43,17 @@ async function desktop(platform = 'win32', owned = true) {
     },
   });
   class Window extends EventEmitter {
-    destroyed = false;
+    destroyed = false; top = false; maximized = false; minimized = false; raised = 0;
     webContents = Object.assign(new EventEmitter(), {
       mainFrame: { url: url.pathToFileURL(path.join(dirname(file), 'index.html')).href },
-      send(_name: string, state: any) { states.push(state); },
+      send(_name: string, state: any) { states.push(state); }, isDestroyed: () => false,
       session: { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} }, setWindowOpenHandler() {},
       async insertCSS() { return 'css'; }, async removeInsertedCSS() {}, async executeJavaScript() {},
     });
     constructor(options: any) { super(); if (!options.transparent) window = this; }
-    setMenu() {} setPosition() {} setBounds() {} setMinimumSize() {} show() {} focus() {} restore() {} minimize() {}
+    setMenu() {} setPosition() {} setBounds() {} setMinimumSize() {} show() {} focus() {} restore() {} minimize() { this.minimized = true; }
+    isMaximized() { return this.maximized; } maximize() { this.maximized = true; } unmaximize() { this.maximized = false; }
+    setAlwaysOnTop(value: boolean) { this.top = value; } moveTop() { this.raised++; }
     // 初回演出（frontend_ide/host/scripts/window-opening.cjs）の透明キャンバスと透明度。
     showInactive() {} setOpacity() {} destroy() { this.destroyed = true; }
     getBounds() { return { x: 722, y: 8, width: 476, height: 414 }; }
@@ -71,6 +73,7 @@ async function desktop(platform = 'win32', owned = true) {
     require(name: string) {
       if (name === 'node:path') return path;
       if (name === '../../frontend_ide/デスクトップ/長押し窓移動.cjs') return {attachNativeWindowMove: (window: any, screen: any, kind: string) => moves.push({window, screen, kind})};
+      if (name === '../../frontend_ide/デスクトップ/最前面ピン.cjs') return createRequire(import.meta.url)(name);
       if (name === '../../frontend_ide/host/scripts/single-instance.cjs') return { 起動ロック: async () => owned ? { close: async () => {} } : null };
       // 3本共通のウィンドウ大きさ・初回演出は実物を使う。
       if (name.startsWith('../../frontend_ide/host/scripts/')) return createRequire(import.meta.url)(name);
@@ -90,7 +93,7 @@ async function desktop(platform = 'win32', owned = true) {
   for (let entry; (entry = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0]) && entry[1].at <= 1000;) {
     clock = entry[1].at; timers.delete(entry[0]); entry[1].callback(); await flush();
   }
-  return { app, worker, window, files, requests, kills, states, timers, flush, moves,
+  return { app, worker, window, files, requests, kills, states, timers, flush, moves, handlers,
     exited: () => exited, locked: () => locked,
     exitWorker(code: number | null, signal: string | null = null) {
       worker.exitCode = code; worker.signalCode = signal; worker.connected = false; worker.emit('exit', code, signal);
@@ -159,4 +162,35 @@ test('workerが応答しない場合は対象だけを強制終了し、exit通�
     await f.advance(3000);
     assert.equal(f.exited(), true); assert.equal(f.locked(), false);
   }
+});
+
+test('Discord の4操作は主frame専用で、ピンは OFF から切り替え・選択時だけ前面化する', async () => {
+  const f = await desktop(), control = f.handlers.get('discord:window')!;
+  const event = { sender: f.window.webContents, senderFrame: f.window.webContents.mainFrame };
+  assert.deepEqual(control(event, 'getPinState'), { pinned: false, locked: false }); assert.equal(f.window.top, false);
+  for (const denied of [{ ...event, senderFrame: {} }, { ...event, sender: {} }, { ...event, senderFrame: { url: event.senderFrame.url } }]) {
+    for (const action of ['togglePin', 'getPinState', 'maximize', 'minimize', 'close']) assert.equal(control(denied, action), false);
+  }
+  assert.equal(f.window.top, false); assert.equal(f.window.maximized, false); assert.equal(f.window.minimized, false);
+  assert.deepEqual(control(event, 'togglePin'), { pinned: true, locked: false }); assert.equal(f.window.top, true);
+  f.window.emit('focus'); assert.equal(f.window.raised, 1);
+  control(event, 'maximize'); assert.equal(control(event, 'isMaximized'), true); control(event, 'maximize'); assert.equal(control(event, 'isMaximized'), false);
+  control(event, 'minimize'); assert.equal(f.window.minimized, true);
+  control(event, 'togglePin'); f.window.emit('focus'); assert.equal(f.window.raised, 1); assert.equal(f.window.top, false);
+  control(event, 'setLocked'); assert.equal(control(event, 'getPinState').locked, false);
+  f.window.destroyed = true; assert.equal(control(event, 'togglePin'), false);
+});
+
+test('Discord preload は固定の窓操作と検証済みピン通知のみを公開する', async () => {
+  const ipc = Object.assign(new EventEmitter(), { invoke: (...args: any[]) => args });
+  let api: any;
+  runInNewContext(readFileSync(new URL('../panel/preload.cjs', import.meta.url), 'utf8'), { require: () => ({ contextBridge: { exposeInMainWorld(_name: string, value: any) { api = value; } }, ipcRenderer: ipc }) });
+  for (const action of ['minimize', 'maximize', 'close']) assert.deepEqual(Array.from(api.window(action)), ['discord:window', action]);
+  assert.equal(await api.window('setLocked'), false); assert.equal(await api.window({ action: 'close' }), false);
+  assert.deepEqual(Array.from(api.getPinState()), ['discord:window', 'getPinState']); assert.deepEqual(Array.from(api.togglePin()), ['discord:window', 'togglePin']);
+  const values: any[] = [], cancel = api.onPinState((value: any) => values.push(value));
+  for (const value of [null, {}, { pinned: 1, locked: false }, { pinned: true }]) ipc.emit('discord:pin-state', {}, value);
+  assert.equal(values.length, 0); ipc.emit('discord:pin-state', {}, { pinned: true, locked: false, extra: 'ignored' });
+  assert.equal(JSON.stringify(values), JSON.stringify([{ pinned: true, locked: false }])); cancel(); assert.equal(ipc.listenerCount('discord:pin-state'), 0);
+  api.onPinState(null)();
 });

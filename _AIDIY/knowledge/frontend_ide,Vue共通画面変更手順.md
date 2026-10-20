@@ -156,7 +156,7 @@ IDEのプロジェクト識別は `デスクトップ/project-profile.cjs` に�
 
 WindowsでElectronのGUI本体をspawnするときは `windowsHide: false` にします。`true` では初回の画面表示が隠され、URLだけ出て再実行するまで窓が見えない場合があります。バックグラウンドの補助プロセスとは区別し、初回起動時の可視状態を `scripts/check-single-instance.mjs` でも確認します。
 
-IDEの子窓の前面維持は `デスクトップ/前面維持.cjs` を共用します。Windowsでは標準の `floating` 指定で前面状態が成立しない環境があるため、`pop-up-menu` を明示します。所有するIDEとの親子関係を維持し、既に前面の窓へ設定を繰り返しません。`node frontend_ide/scripts/check-all-displays.mjs` で、実Electronの `isAlwaysOnTop()`、VR往復、軌跡のリサイズ、新規ビューアと比較表示を確認してください。
+最前面ピンは全Electron共通の `デスクトップ/最前面ピン.cjs` で管理します。単独起動はOFF、IDEから作る子窓だけONです。操作は「ー □ 📌 Ｘ」で、VR中は本体と所属子窓をON固定し、解除後は各窓の直前の選択へ戻します。OFFでも親より手前に残るOS親子関係は作らず、寿命は `record.owner` で管理します。全アプリを同じ `floating` 層に揃え、選択されたON窓だけを手前にします。詳細とWindows実機でのZ順確認手順は [共通の基本方針](./共通,Electronウィンドウ基本方針.md#タイトル操作と最前面ピン) を参照してください。以前の所有関係・上位レベルによる回避策を戻さず、Windowsで異常が出る場合はOFF/ON・別アプリ間の選択順を実窓で再検証してください。
 
 ## BrowserパネルとMCP接続
 

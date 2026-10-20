@@ -144,8 +144,8 @@ defineExpose({moved:bindActivityWindow});
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
-      <!-- 右端は ⟳ 📌 × の順。右端へ寄せる役目は先頭の ⟳ が持つ -->
-      <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" :disabled="pinBusy" title="ピン留め（別ウィンドウで開く）" aria-label="ピン留め" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')"><span class="close-icon" aria-hidden="true"></span></button></header>
+      <!-- 右端は ⟳ ↗ × の順。別窓化の ↗ と最前面ピン留めの 📌 を区別する -->
+      <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" :disabled="pinBusy" title="別ウィンドウで開く" aria-label="ファイルを別ウィンドウで開く" @click="emit('pin',file)">↗</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')"><span class="close-icon" aria-hidden="true"></span></button></header>
     <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><div class="viewer-path-actions"><button class="viewer-copy" :disabled="!!actionBusy" aria-live="polite" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button><button v-if="canOpenFile" class="viewer-open-app" :disabled="!!actionBusy" @click="openFile">{{ actionBusy==='open'?'開いています…':'アプリで開く' }}</button></div></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
     <p v-if="actionError" class="error viewer-action-error" role="status">{{ actionError }}</p>
     <p v-if="file.unlisted" class="input-hint">現在の一覧に含まれない検索結果を直接表示しています。</p>

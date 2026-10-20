@@ -33,6 +33,14 @@ test('ズーム待ちの表示取消では実窓を表示せず、透明パネ�
  assert.equal(f.canvases[0].dead,true);assert.deepEqual(f.realCalls,[]);
 });
 
+test('短命な演出キャンバスは実窓のピン層だけを継承し、OFF窓を最前面にしない',async()=>{
+ for(const pinned of [false,true]){
+  const f=fixture();f.main.isAlwaysOnTop=()=>pinned;
+  assert.equal(await f.拡大表示(f.Canvas,f.main),true);
+  assert.equal(f.canvases[0].options.alwaysOnTop,pinned);assert.equal(f.canvases[0].dead,true);
+ }
+});
+
 test('実画面を取得できない時は代用の白い面を出さず、一時スタイルを回収して本画面を表示する',async()=>{
  const f=fixture(),scripts=[];
  f.main.webContents.executeJavaScript=async script=>scripts.push(script);

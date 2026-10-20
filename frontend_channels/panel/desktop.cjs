@@ -18,6 +18,7 @@ const { writeFileSync } = require('node:fs');
 const size = require('../../frontend_ide/host/scripts/window-size.cjs');
 const { 拡大表示 } = require('../../frontend_ide/host/scripts/window-opening.cjs');
 const { attachNativeWindowMove } = require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
+const { createWindowPins } = require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
 const { 起動ロック } = require('../../frontend_ide/host/scripts/single-instance.cjs');
 
 const root = join(__dirname, '..');
@@ -26,6 +27,9 @@ app.setName(process.platform === 'darwin' ? 'AiDiy Discord' : 'aidiy_discord');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_discord'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_discord');
 let window, worker, quitting = false, shutdownComplete = false, shutdown;
+const pins = createWindowPins({ onChanged: (target, state) => {
+  if (!target.isDestroyed() && !target.webContents.isDestroyed()) target.webContents.send('discord:pin-state', state);
+} });
 let sequence = 0;
 const pending = new Map();
 const readyFile = process.env.AIDIY_DISCORD_READY;
@@ -144,6 +148,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true },
     });
     window.setMenu(null);
+    pins.register(window);
     attachNativeWindowMove(window, screen, 'discord');
     window.on('close', event => {
       if (shutdownComplete) return;
@@ -152,15 +157,20 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     if (process.platform === 'darwin') require('../../frontend_ide/host/scripts/MacOS-Menu.cjs').Macメニューを設定({ app, Menu, 名前: 'AiDiy Discord', 閉じる: () => window.close(), icon: join(__dirname, 'AiDiy_discord.png'), platform: process.platform });
     window.webContents.session.setPermissionCheckHandler(() => false);
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    const trusted = event => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === page;
+    const trusted = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === page;
     ipcMain.handle('discord:request', (event, action, value) => {
       if (!trusted(event) || !['initial', 'select', 'select-features', 'select-code', 'catalog-code', 'start', 'stop', 'monitor'].includes(action)) throw new Error('許可されていない操作です。');
       return request(action, value);
     });
     ipcMain.handle('discord:window', (event, action) => {
-      if (!trusted(event)) return;
+      if (!trusted(event)) return false;
+      if (action === 'getPinState') return pins.state(window);
+      if (action === 'togglePin') return pins.toggle(window);
+      if (action === 'isMaximized') return window.isMaximized();
       if (action === 'minimize') window.minimize();
+      else if (action === 'maximize') { if (window.isMaximized()) window.unmaximize(); else window.maximize(); }
       else if (action === 'close') window.close();
+      return false;
     });
     window.webContents.on('will-navigate', event => event.preventDefault());
     window.webContents.on('will-redirect', event => event.preventDefault());

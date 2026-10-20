@@ -14,11 +14,11 @@ function mount(component,props){
  const renderer=vue.createRenderer({createElement:tag=>make(tag),createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(node,value)=>node.text=value,setElementText:(node,value)=>{node.text=value;node.children=[];},parentNode:node=>node.parent,nextSibling:node=>node.parent?.children[node.parent.children.indexOf(node)+1]||null,patchProp:(node,key,_old,value)=>node.props[key]=value,insert(node,parent,anchor){if(node.parent)node.parent.children.splice(node.parent.children.indexOf(node),1);node.parent=parent;const index=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(index<0?parent.children.length:index,0,node);},remove(node){node.parent?.children.splice(node.parent.children.indexOf(node),1);}});
  const root=make('root'),app=renderer.createApp({render:()=>vue.h(component,props())});app.mount(root);return {root,app,nodes:()=>descendants(root),button:label=>descendants(root).find(n=>n.tag==='button'&&(n.props['aria-label']===label||text(n)===label))};
 }
-test('実Vueタイトル欄: ミニ→最小化→最大化→終了の順、クリックと復帰は独立する',async()=>{
+test('実Vueタイトル欄: ミニ→最小化→最大化→ピン→終了の順、クリックと復帰は独立する',async()=>{
  const calls=[],window=new EventTarget();window.aidiyWindow={isMaximized:async()=>false,minimize:async()=>calls.push('minimize'),maximize:async()=>calls.push('maximize'),close:async()=>calls.push('close')};
  const props=vue.reactive({connected:true,compact:false,switching:false,onMini:()=>calls.push('mini'),onRestore:()=>calls.push('restore')});
  const ui=mount(compile('ウィンドウ/ステータスバー.vue',{globals:{window}}),()=>props);
- try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ミニ表示','最小化','最大化','終了']);ui.button('ミニ表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['通常表示','最小化','終了']);ui.button('通常表示').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ミニ表示').props.disabled,true);}finally{ui.app.unmount();}
+ try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ミニ表示','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ミニ表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['通常表示','最小化','最大化','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('最大化').props.disabled,true);ui.button('通常表示').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ミニ表示').props.disabled,true);}finally{ui.app.unmount();}
  const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{-webkit-app-region:drag\}/);assert.match(css,/\.panel-brand button,\.window-actions\{-webkit-app-region:no-drag\}/);
 });
 async function appState(switchMini=async()=>true){
@@ -62,24 +62,26 @@ test('電光掲示板はネイティブbuttonで、全7タブのミニからア�
  }finally{ui.app.unmount();scope.stop();}
  assert.match(source('App.vue'),/@open-apps="アプリ起動へ戻る"/);
 });
-test('実Vue CLI行: 確認なしで即時起動し、連打・処理中を排他、成功通知を隠して失敗を表示する',async()=>{
+test('実Vue CLI行: 確認なしでクリックごとに並行起動し、成功通知を隠して失敗を表示する',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const アプリ={フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false)};
- const launches=[];let prompts=0,release;
+ const launches=[],pending=[];let prompts=0;
  const state=CLI状態を作成({アプリ,確認:()=>{prompts++;return false;},api:async(route,method,_signal,format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'copilot',名前:'GitHub Copilot CLI',モード:'YOLO',利用可能:true}]};
-  assert.equal(route,'api/CLI起動/開始');launches.push({method,format,body});return new Promise((resolve,reject)=>release={resolve,reject});
+  assert.equal(route,'api/CLI起動/開始');launches.push({method,format,body});return new Promise((resolve,reject)=>pending.push({resolve,reject}));
  }});
  const ui=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:アプリ,online:true}));
  const cli=()=>ui.nodes().find(n=>n.props['data-cli']==='copilot'),message=()=>ui.nodes().find(n=>n.props.class?.includes('mini-cli-message'));
  try{
   await flush();assert.equal(cli().props.disabled,true);assert.equal(text(cli()),'');assert.equal(cli().props['aria-label'],'GitHub Copilot CLI をTermで起動（YOLO）');assert.equal(descendants(cli()).find(n=>n.tag==='img').props.src,'CLI_copilot.svg');assert.match(cli().props.title,/YOLO.*モデル指定なし/);
   アプリ.フォルダ.value='/日本語 path & ;';await flush();assert.equal(cli().props.disabled,false);
-  cli().props.onClick();cli().props.onClick();assert.equal(prompts,0);assert.equal(launches.length,1);
+  cli().props.onClick();cli().props.onClick();assert.equal(prompts,0);assert.equal(launches.length,2);
   assert.deepEqual(launches[0],{method:'POST',format:'json',body:{対象:'copilot',フォルダ:'/日本語 path & ;',自動承認確認:true}});
-  await flush();assert.equal(cli().props.disabled,true);assert.equal(state.処理中.value,'copilot');assert.equal(アプリ.処理中.value,'cli:copilot');assert.ok(message());assert.match(text(message()),/起動中/);
-  release.resolve({通知:'Term 起動受付'});await flush();assert.equal(cli().props.disabled,false);assert.equal(state.通知.value,'Term 起動受付');assert.doesNotMatch(text(ui.root),/Term 起動受付/);assert.equal(message(),undefined);
-  cli().props.onClick();release.reject(Error('Term を開始できません'));await flush();assert.equal(launches.length,2);assert.equal(prompts,0);assert.equal(cli().props.disabled,false);assert.match(text(message()),/Term を開始できません/);assert.match(message().props.class,/error/);
-  cli().props.onClick();await flush();assert.equal(cli().props.disabled,true);assert.doesNotMatch(text(ui.root),/Term を開始できません/);release.resolve({通知:'再試行の起動受付'});await flush();assert.equal(message(),undefined);assert.doesNotMatch(text(ui.root),/再試行の起動受付/);
+  assert.deepEqual(launches[0],launches[1]);assert.match(cli().props.title,/複数起動可/);
+  await flush();assert.equal(cli().props.disabled,false);assert.equal(state.処理中.value,'copilot');assert.equal(アプリ.処理中.value,'cli:copilot');assert.ok(message());assert.match(text(message()),/起動中/);
+  pending[1].resolve({通知:'Term 起動受付'});await flush();assert.match(text(message()),/起動中/);
+  pending[0].resolve({通知:'古い起動受付'});await flush();assert.equal(cli().props.disabled,false);assert.equal(state.通知.value,'Term 起動受付');assert.doesNotMatch(text(ui.root),/Term 起動受付/);assert.equal(message(),undefined);
+  cli().props.onClick();pending[2].reject(Error('Term を開始できません'));await flush();assert.equal(launches.length,3);assert.equal(prompts,0);assert.equal(cli().props.disabled,false);assert.match(text(message()),/Term を開始できません/);assert.match(message().props.class,/error/);
+  cli().props.onClick();await flush();assert.equal(cli().props.disabled,false);assert.doesNotMatch(text(ui.root),/Term を開始できません/);pending[3].resolve({通知:'再試行の起動受付'});await flush();assert.equal(message(),undefined);assert.doesNotMatch(text(ui.root),/再試行の起動受付/);
   アプリ.選択中.value=true;await flush();assert.equal(cli().props.disabled,true);アプリ.選択中.value=false;アプリ.処理中.value='code';await flush();assert.equal(cli().props.disabled,true);
  }finally{ui.app.unmount();}
  const panel=source('起動/起動ミニパネル.vue');assert.ok(panel.indexOf(':is="ミニアプリ起動"')<panel.indexOf(':is="ミニCLI起動"'));assert.ok(panel.indexOf(':is="ミニCLI起動"')<panel.indexOf('class="mini-services"'));
@@ -146,11 +148,11 @@ test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermes�
  }finally{ui.app.unmount();}
 });
 
-test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。Hermesも確認なし・排他・成功非表示',async()=>{
+test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとCLIは並行起動・成功非表示',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
- const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'],apps=['avatar','ide','term','code','live','discord'];let prompts=0,release;const launches=[],appLaunches=[];
+ const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'],apps=['avatar','ide','term','code','live','discord'];let prompts=0;const launches=[],appLaunches=[],pending=[];
  const app={項目:vue.ref(apps.map((id,i)=>({id,名前:['Avatar','IDE','Term','Code','Live','Discord'][i]}))),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},起動:id=>appLaunches.push(id)};
- const state=CLI状態を作成({アプリ:app,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>route==='api/CLI起動'?{対象:ids.map(id=>({id,名前:id,モード:'YOLO',利用可能:true}))}:(launches.push(body),new Promise((resolve,reject)=>release={resolve,reject}))});
+ const state=CLI状態を作成({アプリ:app,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>route==='api/CLI起動'?{対象:ids.map(id=>({id,名前:id,モード:'YOLO',利用可能:true}))}:(launches.push(body),new Promise((resolve,reject)=>pending.push({resolve,reject})))});
  const upper=mount(compile('アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state:app,cliState:state,online:true}));
  const lower=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:app,online:true}));
  const upperButtons=()=>upper.nodes().filter(n=>n.props['data-app']||n.props['data-cli']),lowerButtons=()=>lower.nodes().filter(n=>n.props['data-cli']),hermes=()=>upper.nodes().find(n=>n.props['data-cli']==='aidiy_hermes');
@@ -164,10 +166,12 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。Hermesも�
    assert.equal(img.props.src,appId?icons.アプリアイコン[appId]:cliId==='aidiy_hermes'?'CLI_aidiy_hermes.svg':'CLI_'+cliId+'.svg');
   }
   app.フォルダ.value='/project';await flush();assert.equal(hermes().props.disabled,false);
-  hermes().props.onClick();hermes().props.onClick();lowerButtons()[0].props.onClick();assert.equal(prompts,0);assert.equal(launches.length,1);assert.deepEqual(launches[0],{対象:'aidiy_hermes',フォルダ:'/project',自動承認確認:true});
-  await flush();assert.ok([...upperButtons(),...lowerButtons()].every(n=>n.props.disabled));assert.equal(appLaunches.length,0);
-  release.resolve({通知:'Hermes Term 起動受付'});await flush();assert.equal(hermes().props.disabled,false);assert.doesNotMatch(text(upper.root)+text(lower.root),/Hermes Term 起動受付/);assert.equal(lower.nodes().find(n=>n.props.class?.includes('mini-cli-message')),undefined);
-  hermes().props.onClick();release.reject(Error('Hermes の起動に失敗しました'));await flush();assert.equal(prompts,0);assert.equal(launches.length,2);assert.match(text(lower.root),/Hermes の起動に失敗しました/);assert.equal(hermes().props.disabled,false);
+  hermes().props.onClick();hermes().props.onClick();lowerButtons()[0].props.onClick();assert.equal(prompts,0);assert.equal(launches.length,3);assert.deepEqual(launches[0],{対象:'aidiy_hermes',フォルダ:'/project',自動承認確認:true});assert.deepEqual(launches[1],launches[0]);assert.equal(launches[2].対象,'claude');
+  await flush();assert.ok(upperButtons().filter(n=>n.props['data-app']).every(n=>n.props.disabled));assert.ok([hermes(),...lowerButtons()].every(n=>!n.props.disabled));assert.equal(appLaunches.length,0);
+  pending[1].resolve({通知:'Hermes Term 起動受付'});await flush();assert.equal(state.処理中.value,'claude');
+  pending[2].resolve({通知:'Claude Term 起動受付'});await flush();assert.equal(state.処理中.value,'aidiy_hermes');
+  pending[0].resolve({通知:'古いHermes受付'});await flush();assert.equal(hermes().props.disabled,false);assert.doesNotMatch(text(upper.root)+text(lower.root),/Hermes Term 起動受付|Claude Term 起動受付|古いHermes受付/);assert.equal(lower.nodes().find(n=>n.props.class?.includes('mini-cli-message')),undefined);
+  hermes().props.onClick();pending[3].reject(Error('Hermes の起動に失敗しました'));await flush();assert.equal(prompts,0);assert.equal(launches.length,4);assert.match(text(lower.root),/Hermes の起動に失敗しました/);assert.equal(hermes().props.disabled,false);
   state.項目.value=state.項目.value.filter(item=>item.id!=='aidiy_hermes');await flush();assert.equal(upperButtons().length,6);assert.equal(lowerButtons().length,6);assert.equal(hermes(),undefined);
  }finally{upper.app.unmount();lower.app.unmount();}
  const css=source('起動/起動ミニ.css');assert.match(css,/\.mini-app-buttons\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-cli-buttons\{display:flex;justify-content:center;gap:2px\}/);assert.match(css,/\.mini-cli-buttons \.mini-cli-button\{flex:0 0 calc\(\(100% - 12px\)\/7\)/);assert.match(css,/\.mini-services\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-icon-frame\{[^}]*width:40px;height:40px/);assert.match(css,/\.mini-icon-frame img\{[^}]*width:40px;height:40px;object-fit:contain/);

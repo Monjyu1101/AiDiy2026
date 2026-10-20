@@ -75,11 +75,11 @@ try{
  const reverse=await trace(main,`const button=document.querySelector('.route-choice');button.click();setTimeout(()=>button.click(),80);setTimeout(()=>button.click(),140);setTimeout(()=>document.querySelectorAll('.route-choice')[1].click(),180)`);
  assert.equal(reverse.at(-1).phase,'open');assert.equal(await main.evaluate(`document.querySelector('.route-choice[aria-pressed=true]').textContent`),'検索軌跡');
  await main.evaluate(`document.querySelectorAll('.route-choice')[1].click()`);await sleep(350);
- await main.evaluate(`aidiyIDE.clear();document.querySelector('.route-choice').click();window.routeNode=document.querySelector('.explorer-routes');window.nativeOpen=window.open;window.open=()=>null;document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);
+ await main.evaluate(`aidiyIDE.clear();document.querySelector('.route-choice').click();window.routeNode=document.querySelector('.explorer-routes');window.nativeOpen=window.open;window.open=()=>null;document.querySelector('[aria-label="軌跡バーを別ウィンドウで開く"]').click()`);
  await main.until(`document.body.textContent.includes('ポップアップがブロックされました')`);
  assert.equal(await main.evaluate(`document.querySelectorAll('.route-choice').length`),3);
  const initialRows=await main.evaluate(`Array.from(document.querySelectorAll('[data-route-point]'),el=>el.dataset.routePoint)`);assert.ok(initialRows.length>=3);await trace(main,`document.querySelector('.route-choice').click()`);
- await main.evaluate(`window.open=function(...args){window.popupArgs=args;return nativeOpen.apply(window,args)};const pin=document.querySelector('[aria-label="軌跡バーをピン留め"]');pin.click();pin.click()`);
+ await main.evaluate(`window.open=function(...args){window.popupArgs=args;return nativeOpen.apply(window,args)};const pin=document.querySelector('[aria-label="軌跡バーを別ウィンドウで開く"]');pin.click();pin.click()`);
  await main.until(`!document.querySelector('.explorer-routes')`);
  let target=(await targets()).find(t=>t.title==='AiDiy IDE / 軌跡');assert.ok(target);let child=await connect(target);await child.until(`!!document.querySelector('.route-controls')`);await child.until(`document.querySelector('.route-reveal').dataset.phase==='closed'`);assert.ok(await child.evaluate(`document.querySelector('.explorer-routes').getBoundingClientRect().height<100`));await child.capture('popup-small-bar');await child.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});const popupOpen=await trace(child,`document.querySelector('.route-choice').click()`);assert.ok(popupOpen.some(r=>r.height>2&&r.height<290));assert.ok(popupOpen.filter(r=>r.height<299).every(r=>!r.visible));
  assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / 軌跡').length,1);
@@ -105,14 +105,14 @@ try{
  await child.capture('ai-route-tree');assert.equal(await main.evaluate('aiPosts'),0);
  // 戻す/再pinは同じDOM。X後は閉じたバー、記録を保って再表示する。
  await child.evaluate(`document.querySelector('[aria-label="軌跡バーを本体へ戻す"]').click()`);await main.until(`document.querySelector('.explorer-routes')===routeNode`);
- await main.evaluate(`document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);await main.until(`!document.querySelector('.explorer-routes')`);
+ await main.evaluate(`document.querySelector('[aria-label="軌跡バーを別ウィンドウで開く"]').click()`);await main.until(`!document.querySelector('.explorer-routes')`);
  target=(await targets()).find(t=>t.title==='AiDiy IDE / 軌跡');child=await connect(target);await child.until(`!!document.querySelector('.route-tree')`);
  await child.send('Page.close');await main.until(`getComputedStyle(routeNode).display==='none'&&!!document.querySelector('[aria-label="軌跡バーを開く"]')`);
  await main.evaluate(`document.querySelector('[aria-label="軌跡バーを開く"]').click();Array.from(document.querySelectorAll('.route-choice')).find(b=>b.textContent==='AiDiy検索軌跡').click()`);
  await main.until(`!!document.querySelector('[data-route-path="src/sample.txt"]')`);
  await main.evaluate(`Array.from(document.querySelectorAll('.route-choice')).find(b=>b.textContent==='閲覧軌跡').click()`);await main.until(`!!document.querySelector('[aria-label="閲覧軌跡をクリア"]')`);
  assert.ok(await main.evaluate(`document.querySelectorAll('[data-route-point]').length>=3`));
- await main.evaluate(`document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);await main.until(`!document.querySelector('.explorer-routes')`);
+ await main.evaluate(`document.querySelector('[aria-label="軌跡バーを別ウィンドウで開く"]').click()`);await main.until(`!document.querySelector('.explorer-routes')`);
  child=await connect((await targets()).find(t=>t.title==='AiDiy IDE / 軌跡'));await child.until(`!!document.querySelector('[aria-label="閲覧軌跡をクリア"]')`);
  await child.evaluate(`document.querySelector('[aria-label="閲覧軌跡をクリア"]').click()`);await child.until(`document.querySelector('[aria-label="閲覧軌跡をクリア"]').disabled`);
  await child.evaluate(`Array.from(document.querySelectorAll('.route-choice')).find(b=>b.textContent==='AiDiy検索軌跡').click()`);await child.until(`!!document.querySelector('[data-route-path="README.txt"]')`);

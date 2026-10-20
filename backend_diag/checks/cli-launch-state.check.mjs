@@ -12,17 +12,20 @@ test('explicit risk confirmation includes chosen project/mode/model default; pay
  const f=fixture();await f.state.読込();await f.state.起動('copilot');assert.equal(f.confirmations.length,1);for(const value of ['YOLO','指定なし','ファイルの変更','コマンド実行','サンドボックス','/日本語 path & ;'])assert.ok(f.confirmations[0].includes(value));
  assert.deepEqual(f.requests.at(-1).body,{対象:'copilot',フォルダ:f.アプリ.フォルダ.value,自動承認確認:true});assert.equal(f.state.通知.value,'Term を開きました');assert.equal(f.アプリ.処理中.value,'');
 });
-test('mini launch skips confirmation and immediately sends the exact project once for CLI and Hermes',async()=>{
+test('mini launch skips confirmation and sends an independent request per click for CLI and Hermes',async()=>{
  for(const id of ['copilot','aidiy_hermes']){
-  const requests=[],confirmations=[];let release;
+  const requests=[],confirmations=[],pending=[];
   const f=fixture({確認:()=>{confirmations.push('unexpected confirmation');return false;},api:(route,method,_signal,format,body)=>{
-   requests.push({route,method,format,body});return new Promise((resolve,reject)=>release={resolve,reject});
+   requests.push({route,method,format,body});return new Promise((resolve,reject)=>pending.push({resolve,reject}));
   }});
   f.state.項目.value=[{id,名前:id,モード:'YOLO',利用可能:true}];
   const first=f.state.起動(id,{確認省略:true});
   assert.equal(confirmations.length,0);assert.deepEqual(requests,[{route:'api/CLI起動/開始',method:'POST',format:'json',body:{対象:id,フォルダ:'/日本語 path & ;',自動承認確認:true}}]);
-  assert.equal(f.state.処理中.value,id);assert.equal(f.アプリ.処理中.value,'cli:'+id);await f.state.起動(id,{確認省略:true});assert.equal(requests.length,1);
-  release.resolve({通知:'Term を開きました'});await first;assert.equal(f.state.処理中.value,'');assert.equal(f.アプリ.処理中.value,'');assert.equal(f.state.失敗.value,false);
+  assert.equal(f.state.処理中.value,id);assert.equal(f.アプリ.処理中.value,'cli:'+id);
+  const second=f.state.起動(id,{確認省略:true});assert.equal(requests.length,2);assert.deepEqual(requests[0],requests[1]);
+  pending[1].resolve({通知:'Term を開きました'});await second;
+  assert.equal(f.state.処理中.value,id);assert.equal(f.アプリ.処理中.value,'cli:'+id,'one completion must not clear another pending launch');
+  pending[0].resolve({通知:'古い結果'});await first;assert.equal(f.state.処理中.value,'');assert.equal(f.アプリ.処理中.value,'');assert.equal(f.state.失敗.value,false);
   assert.equal(f.state.通知.value,'Term を開きました');assert.equal(confirmations.length,0);
  }
 });
@@ -31,7 +34,7 @@ test('mini confirmation bypass preserves project, connectivity, target and busy 
  const f=fixture({確認:()=>{assert.fail('mini launch must not ask for confirmation');}});await f.state.読込();
  await f.state.起動('unknown',options);f.アプリ.フォルダ.value='';await f.state.起動('copilot',options);
  f.アプリ.フォルダ.value='/project';f.アプリ.選択中.value=true;await f.state.起動('copilot',options);f.アプリ.選択中.value=false;
- f.アプリ.処理中.value='code';await f.state.起動('copilot',options);f.アプリ.処理中.value='';f.state.処理中.value='aidiy_hermes';await f.state.起動('copilot',options);
+ f.アプリ.処理中.value='code';await f.state.起動('copilot',options);f.アプリ.処理中.value='';
  assert.equal(f.requests.length,1);
  const offline=fixture({接続可能:()=>false,確認:()=>{assert.fail('offline must not ask for confirmation');}});offline.state.項目.value=[{id:'copilot',名前:'Copilot'}];await offline.state.起動('copilot',options);assert.equal(offline.requests.length,0);
 });
@@ -52,6 +55,27 @@ test('cancel/no project/offline/unknown/picker busy do not launch',async()=>{
 });
 test('repeated clicks lock while confirmation pending; changed project invalidates approval',async()=>{
  let release;const f=fixture({確認:()=>new Promise(resolve=>release=resolve)});await f.state.読込();const one=f.state.起動('copilot');await f.state.起動('copilot');assert.equal(f.アプリ.処理中.value,'cli:copilot');f.アプリ.フォルダ.value='/changed';release(true);await one;assert.equal(f.requests.length,1);assert.equal(f.アプリ.処理中.value,'');
+});
+test('normal confirmed launch permits another instance while startup is pending and preserves latest result',async()=>{
+ const pending=[],confirmations=[];
+ const f=fixture({確認:async value=>{confirmations.push(value);return true;},api:()=>new Promise((resolve,reject)=>pending.push({resolve,reject}))});
+ f.state.項目.value=[{id:'copilot',名前:'Copilot',モード:'YOLO'},{id:'aidiy_hermes',名前:'Hermes',モード:'YOLO'}];
+ const first=f.state.起動('copilot');await Promise.resolve();
+ const second=f.state.起動('aidiy_hermes');await Promise.resolve();
+ assert.equal(pending.length,2);assert.equal(confirmations.length,2);assert.equal(f.state.処理中.value,'aidiy_hermes');
+ pending[1].reject(Error('最新の失敗'));await second;
+ assert.equal(f.state.処理中.value,'copilot');assert.equal(f.アプリ.処理中.value,'cli:copilot');assert.equal(f.state.失敗.value,true);
+ pending[0].resolve({通知:'古い成功'});await first;
+ assert.equal(f.state.通知.value,'最新の失敗');assert.equal(f.state.失敗.value,true);assert.equal(f.アプリ.処理中.value,'');
+});
+test('disconnect invalidates pending confirmation and late launch results without losing pending accounting',async()=>{
+ let release;const f=fixture({確認:()=>new Promise(resolve=>release=resolve)});await f.state.読込();
+ const confirmed=f.state.起動('copilot');f.state.切断();release(true);await confirmed;assert.equal(f.requests.length,1);assert.equal(f.アプリ.処理中.value,'');
+ const pending=[];const launch=fixture({api:()=>new Promise((resolve,reject)=>pending.push({resolve,reject}))});
+ launch.state.項目.value=[{id:'copilot',名前:'Copilot',モード:'YOLO'}];
+ const one=launch.state.起動('copilot',{確認省略:true});launch.state.切断();
+ pending[0].reject(Error('古い接続の失敗'));await one;
+ assert.equal(launch.state.通知.value,'');assert.equal(launch.state.失敗.value,false);assert.equal(launch.state.処理中.value,'');assert.equal(launch.アプリ.処理中.value,'');
 });
 test('failed launch is visible and retry remains possible; disconnect discards late catalog',async()=>{
  let calls=0;const f=fixture({api:async()=>{calls++;throw Error('実行ファイルなし');}});f.state.項目.value=[{id:'copilot',名前:'Copilot',モード:'YOLO'}];await f.state.起動('copilot');assert.equal(f.state.失敗.value,true);assert.equal(f.state.通知.value,'実行ファイルなし');await f.state.起動('copilot');assert.equal(calls,2);

@@ -32,6 +32,16 @@ if(!independent&&!app.requestSingleInstanceLock()){
  return;
 }
 const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
+const {createWindowPins}=require('./デスクトップ/最前面ピン.cjs');
+const windowPins=createWindowPins({onChanged(window,state){
+ const record=windows.get(window.webContents);if(!record)return;
+ // DOMを親から移した別窓の操作も、所有するIDEのpreloadだけを通す。
+ const receiver=record.name?record.owner:record;
+ if(receiver&&!receiver.window.isDestroyed()&&!receiver.window.webContents.isDestroyed?.())receiver.window.webContents.send('development:pin-changed',{...state,...(record.name?{panelName:record.name}:{})});
+}});
+function registerWindowPin(record){
+ windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner)});
+}
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
 const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
 const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
@@ -43,7 +53,7 @@ function closeApplication(){
  if(main)main.close();else app.quit();
 }
 const {panelBounds,createPanelWindows}=require('./デスクトップ/panel-windows.cjs');
-const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting,isAllDisplays:record=>allDisplays.state(record).active,attachWindowMove});
+const panelWindows=createPanelWindows({windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),screen,BrowserWindow,拡大表示,isQuitting:()=>quitting,isAllDisplays:record=>allDisplays.state(record).active,attachWindowMove,registerWindowPin,windowPins});
 const {createCodeDrag}=require('./デスクトップ/code-drag.cjs');
 const codeDrag=createCodeDrag({trustedEvent,screen,resolvePanel:panelWindows.dragTarget,isCenterMove:record=>allDisplays.isActive(record)});
 const {installNativeWindowMove}=require('./デスクトップ/長押し窓移動.cjs');
@@ -53,10 +63,12 @@ function attachWindowMove(record,contents){
  return()=>{stopExit();stopMove();};
 }
 const {createAllDisplays}=require('./デスクトップ/全画面横断.cjs');
-const {keepInFront}=require('./デスクトップ/前面維持.cjs');
 const {createVRPanelPlacement}=require('./デスクトップ/VRパネル配置.cjs');
 const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
-const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{for(const child of windows.values())if(child.owner===owner)keepInFront(child.window);}});
+const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{
+ const locked=allDisplays.isActive(owner);
+ for(const record of windows.values())if(record===owner||record.owner===owner)windowPins.setLocked(record.window,locked);
+}});
 const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デスクトップ/ブラウザ.cjs');
 const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
 let browserViews;
@@ -140,24 +152,20 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  }catch(error){placement?.close();throw error;}
  const title=kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),...(owner?{parent:owner.window}:{}),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
  window.setBounds(bounds);
- // IDEから開いたCode / Liveは、IDEや他アプリを操作中も手前に保つ。
- if(owner)keepInFront(window);
  const contents=window.webContents;
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
  const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,revision:0,pending:new Map()};windows.set(contents,record);
+ // 寿命はrecord.ownerで管理する。OS親子窓の常時前面関係は作らず、OFF時はIDEも手前にできる。
+ registerWindowPin(record);
  attachWindowMove(record);
  if(kind==='ide')allDisplays.register(record);
- window.on('focus',()=>{
-  draftRouter.focused(record);
-  // ALLの拡張・復帰やWindowsの透明窓の再配置後も、IDEへのクリックでパネルを隠さない。
-  if(kind==='ide')for(const child of windows.values())if(child.owner===record)keepInFront(child.window);
- });
+ window.on('focus',()=>{draftRouter.focused(record);});
  // IDEの×・Alt+F4は、利用中（接続利用・オフライン利用の開始後）だけ確認してから全体を閉じる。
  // 初期画面と「終了」で起動画面へ戻った後は、守る作業がないので確認しない（状態が不明な時は作業を守るため確認する）。利用終了は子窓だけを閉じる。
  if(kind==='ide'){
@@ -226,6 +234,8 @@ app.whenReady().then(async()=>{
   if(action==='minimize')record.window.minimize();else if(action==='close')record.window.close();
   else if(action==='maximize'){if(!allDisplays.leave(record,{maximize:true})){if(record.window.isMaximized())record.window.unmaximize();else record.window.maximize();}}
   if(action==='title')return record.window.getTitle();
+  if(action==='pin-state')return windowPins.state(record.window);
+  if(action==='toggle-pin')return windowPins.toggle(record.window);
   if(action==='maximize'||action==='isMaximized')return record.window.isMaximized();
  });
  ipcMain.handle('development:all-displays',(event,action)=>allDisplays.handle(event,action));

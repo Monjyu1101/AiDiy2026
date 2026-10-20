@@ -65,6 +65,8 @@ async function 拡大表示(BrowserWindow, window, { canShow = () => true } = {}
       title: 'AiDiy 表示準備',
       ...bounds, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
       resizable: false, skipTaskbar: true, show: false,
+      // VR中のIDEにも隠れないよう、短命な画像だけ実窓と同じ層に置く。OFF窓は通常層のまま。
+      alwaysOnTop: window.isAlwaysOnTop?.() === true,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
     canvas.isAiDiyOpeningCanvas = true;

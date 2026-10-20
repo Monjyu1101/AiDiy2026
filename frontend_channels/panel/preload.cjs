@@ -12,6 +12,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 const 購読 = (channel, callback) => {
+  if (typeof callback !== 'function') return () => {};
   const listener = (_event, value) => callback(value);
   ipcRenderer.on(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
@@ -25,7 +26,13 @@ contextBridge.exposeInMainWorld('discordPanel', {
   start: () => ipcRenderer.invoke('discord:request', 'start'),
   stop: () => ipcRenderer.invoke('discord:request', 'stop'),
   monitor: on => ipcRenderer.invoke('discord:request', 'monitor', on),
-  window: action => ipcRenderer.invoke('discord:window', action),
+  window: action => ['minimize', 'maximize', 'close'].includes(action) ? ipcRenderer.invoke('discord:window', action) : Promise.resolve(false),
+  isMaximized: () => ipcRenderer.invoke('discord:window', 'isMaximized'),
+  getPinState: () => ipcRenderer.invoke('discord:window', 'getPinState'),
+  togglePin: () => ipcRenderer.invoke('discord:window', 'togglePin'),
+  onPinState: callback => typeof callback === 'function' ? 購読('discord:pin-state', value => {
+    if (value && typeof value.pinned === 'boolean' && typeof value.locked === 'boolean') callback({ pinned: value.pinned, locked: value.locked });
+  }) : () => {},
   onState: callback => 購読('discord:state', callback),
   onAudio: callback => 購読('discord:audio', callback),
   onMeter: callback => 購読('discord:meter', callback),

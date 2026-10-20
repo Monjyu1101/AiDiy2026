@@ -1710,11 +1710,13 @@ onBeforeUnmount(() => {
 
     <!-- Electron AIチーム専用ウィンドウ -->
     <div v-else-if="チームウィンドウ && 認証済み && isElectron" class="team-window-root">
-      <component
-        :is="AIチームビュー"
-        :利用者ID="String(利用者?.利用者ID || '')"
-        :利用者名="String(利用者?.利用者名 || 利用者?.利用者ID || '')"
-      />
+      <WindowShell title="AiDiy AI Team" theme="purple">
+        <component
+          :is="AIチームビュー"
+          :利用者ID="String(利用者?.利用者ID || '')"
+          :利用者名="String(利用者?.利用者名 || 利用者?.利用者ID || '')"
+        />
+      </WindowShell>
     </div>
 
     <div v-else-if="設定ウィンドウ" class="settings-window-root">

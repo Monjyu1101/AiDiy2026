@@ -11,18 +11,17 @@ function ミニ表示を作成(window,{screen}={}){
    if(typeof enabled!=='boolean'||!window||window.isDestroyed())return false;
    if(enabled===!!original)return true;
    if(enabled){
-    original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable(),alwaysOnTop:window.isAlwaysOnTop()};
+    original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable()};
     if(original.maximized)window.unmaximize();
     window.setMinimumSize(ミニ幅,初期ミニ高さ);
     window.setMaximizable(false);
     const area=topLeft?screen.getPrimaryDisplay().workArea:null;
     window.setBounds({...original.bounds,...(area?{x:area.x,y:area.y}:{}),width:ミニ幅,height:初期ミニ高さ});
-    window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
    }else{
     const saved=original;original=undefined;
     window.setMinimumSize(...saved.minimum);
     window.setMaximizable(saved.maximizable);
-    window.setAlwaysOnTop(saved.alwaysOnTop);
+    // 最前面は共通ピンの所有。ミニ中の変更を通常表示へ戻しても保持する。
     window.setBounds(saved.bounds);
     if(saved.maximized)window.maximize();
    }

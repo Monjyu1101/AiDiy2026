@@ -44,7 +44,7 @@ app.on('browser-window-created',(_,owner)=>{
    await until(()=>googlePage.getURL().startsWith('https://www.google.')&&!googlePage.isLoading(),'Google読み込み');
    const googleTitle=googlePage.getTitle();assert.match(googleTitle,/Google/i);
    assert.equal(await googlePage.executeJavaScript(`typeof window.aidiyWindow+':'+typeof process+':'+typeof require`),'undefined:undefined:undefined');
-   assert.equal(google.getParentWindow(),owner);assert.equal(google.isAlwaysOnTop(),true);
+   assert.equal(google.getParentWindow(),null);assert.equal(google.isAlwaysOnTop(),true);
    await capture(google,'google');
    const blocked=await evaluate(google,`aidiyWindow.browserAction('navigate',${JSON.stringify(process.env.AIDIY_DEVELOPMENT_URL)})`);assert.equal(blocked.ok,false);
    assert.equal((await evaluate(owner,`aidiyWindow.openBrowser('../index.html')`)).ok,false);

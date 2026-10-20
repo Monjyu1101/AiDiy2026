@@ -12,8 +12,9 @@ const filename=path.join(__dirname,'../dist-electron/main.js'),load=createRequir
 function fixture(){
  const windows=[],openings=[];let gate=Promise.resolve();
  class Window extends EventEmitter{
-  constructor(options){super();this.bounds={x:0,y:0,...options};this.visible=options.show;windows.push(this);this.id=windows.length;this.webContents=Object.assign(new EventEmitter(),{isLoading:()=>false,send(){}});}
+  constructor(options){super();this.bounds={x:0,y:0,...options};this.visible=options.show;windows.push(this);this.id=windows.length;this.webContents=Object.assign(new EventEmitter(),{isLoading:()=>false,isDestroyed:()=>false,send(){}});}
   async loadURL(url){this.role=new URL(url).searchParams.get('role');queueMicrotask(()=>{this.emit('ready-to-show');this.webContents.emit('did-finish-load');});}
+  setAlwaysOnTop(value,level){this.alwaysOnTop=value;this.topLevel=level;}
   setMinimumSize(){}setResizable(){}setPosition(x,y){Object.assign(this.bounds,{x,y});}setBounds(bounds){Object.assign(this.bounds,bounds);}center(){}focus(){}
   show(){this.visible=true;}hide(){this.visible=false;}isVisible(){return this.visible;}isDestroyed(){return !!this.dead;}isMinimized(){return false;}
   destroy(){this.dead=true;this.visible=false;this.emit('closed');}close(){this.destroy();}

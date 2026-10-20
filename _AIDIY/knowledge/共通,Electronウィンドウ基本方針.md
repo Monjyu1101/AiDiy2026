@@ -14,6 +14,24 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 
 対象は aidiy_diag、Avatar、Term、Code、Live、IDE、Discord と、その機能別ウィンドウ。IDE の Explorer、Viewer、ソース比較、軌跡バー、Browser 本文、Avatar の設定・タスク・チームも含む。Webブラウザ版・VS Code拡張の埋め込み画面にはOS窓移動を導入しない。演出用の短命な透明キャンバスは操作画面ではないため、長押しを取り付けない。
 
+## タイトル操作と最前面ピン
+
+- 操作の並びは **ー □ 📌 Ｘ**。既存のタイトル位置・高さ・窓寸法は維持する。最小化・最大化できない表示では、該当ボタンを理由付きで無効化する（例: Diagのミニ表示、固定寸法の軌跡バー）。
+- 最前面の管理は `frontend_ide/デスクトップ/最前面ピン.cjs` の `createWindowPins` を全アプリで共用する。通常起動はOFF、沈んだ表示。再起動を越えてON状態を保存しない。Diagのミニ表示への切替・復帰も、その時点のユーザー選択を維持する。
+- IDEから開くTerm / Code / Live / Viewer / Browser / Explorer / 比較 / 軌跡だけはONで生成する。現在これらはIDEと同じElectronプロセスで、main側の `record.owner` が起動元の根拠となる。CLIの `--linked`、URL、rendererからの任意フラグを根拠にしない。
+- Diagからのアプリ起動、単独Avatar（設定・タスク・チームを含む）、単独DiscordはIDE由来ではないためOFF。現行IDEにこれらの別プロセス起動経路はない。今後IDEから外部Electronを起動する場合は、mainが管理する起動元とVR状態の通知・切断処理を加え、単に別プロセスだからOFFと判断しない。
+- ONは全OS・全アプリで同じ `floating` 層。選択されたON窓だけ `focus` 時に `moveTop` する。`focus()` の奪い返し、タイマー再固定、IDE選択時の子窓一括持上げ、`pop-up-menu` 等の上位層は使わない。これにより別プロセスのON窓同士も通常のOS選択順に従う。OFF窓の選択では持上げ処理をしない。
+- IDEのVR中は、本体と所属する既存・新規子窓をONにロックする。UIは `aria-pressed` と理由付きdisabledで表示し、mainでもOFF要求を拒否する。F11・VR再押下・最大化によるVR終了後は、各窓のVR直前のユーザー選択へ戻す。VR中にIDEから新規生成した窓はONへ戻り、その後OFFにできる。
+- IDEの子窓の寿命・セッションは `record.owner` で管理する。OSの `parent` / `setParentWindow(owner)` は、OFFでも親より常に手前になるため設定しない。元のDOMを移す別窓は `setParentWindow(null)` で外し、終了時の回収は従来の所有記録で行う。
+- 独立ビューアへ開く旧「ピン留め」は **↗ 別ウィンドウ** と表示し、📌の最前面切替と区別する。別窓API・セッション・元DOMの復元は変えない。
+- rendererは自分の状態取得・切替・状態変更購読だけをpreload経由で使用する。DOM別窓は親IDEの限定 `panelAction` と、所属する `panelName` の通知を使う。他窓IDや任意IPCを公開せず、mainで所有者・フレーム・セッション世代を照合する。
+
+再検証:
+
+- `node --test frontend_ide/checks/window-pin.test.mjs frontend_ide/checks/window-pin-renderer.test.mjs frontend_ide/checks/code-window-title.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/all-displays.test.mjs`。OFF/ON初期値、選択順、VR入出、F11、連打・古い通知・閉鎖時の回収、他窓操作拒否を確認する。
+- `frontend_avatar/node_modules/.bin/electron frontend_ide/checks/window-pin-desktop.cjs --ozone-platform=headless` は隔離した合成画面だけを使う。Linux headlessでは `setAlwaysOnTop` を受け付けても `isAlwaysOnTop()` がfalseのままの環境がある。コントローラーの状態・API呼出検査と、OS最前面の実測を区別する。
+- Windows実機では、別アプリを含むON窓A/Bの交互選択、OFFへ変更したIDE子窓とIDE本体の前後入替、他アプリ選択、VR中の解除拒否、VR終了後の復元を実窓で確認する。headless・モックの成功を実デスクトップのZ順検証として扱わない。
+
 ## 0.5秒長押しドラッグ
 
 - `frontend_ide/デスクトップ/長押し窓移動.cjs` と `code-drag.cjs` を共用する。500msの静止判定をアプリごとに複製しない。
@@ -33,7 +51,7 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 2. `frontend_ide/host/scripts/window-opening.cjs` の `拡大表示` を使う。実画面の `getContentBounds()` と同じ領域へ、透明なキャンバス窓を作る。`transparent: true`、背景 `#00000000`、枠・影なし、タスクバー非表示を維持する。キャンバスの外枠は確定した領域のまま動かさない。
 3. 非表示の実画面を `capturePage`（`stayHidden` / `stayAwake`）で取り込む。登場待ちで隠している不透明度だけを一時解除し、取得後に必ず戻す。HTML / body と画像の外側は透明とし、実画面の画像だけを中央から55%→100%へ750msで拡大する。白や背景色だけの代用面は出さない。倍率と時間の同期元は同ファイルの `開始倍率` / `演出時間`。実画面の位置・サイズを連続変更しない。
 4. 実画面を透明度0で表示し、描画を待って透明度1へ戻す。実画面が見えてからキャンバスを破棄する。Windowsの白い縁や未描画フレームを露出させない。
-5. キャンバスは `showInactive()` を使う。Windowsで透明部分が白くなる組合せを避けるため、本番の演出用キャンバスへ `focusable: false` や `setIgnoreMouseEvents` を追加しない。
+5. キャンバスは `showInactive()` を使う。VR中のIDEなどに演出が隠れないよう、短命な画像だけは実窓の `isAlwaysOnTop()` と同じ層で作る。OFF窓の演出を最前面にしない。Windowsで透明部分が白くなる組合せを避けるため、本番の演出用キャンバスへ `focusable: false` や `setIgnoreMouseEvents` を追加しない。
 
 非表示窓の初回取得はWindowsの描画待ちで失敗する場合があるため、再描画して最大3回取得する。拡大の終了は描画側のanimation.finishedで待つ。
 

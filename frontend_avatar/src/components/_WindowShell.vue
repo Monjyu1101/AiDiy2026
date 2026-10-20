@@ -12,6 +12,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
+import WindowControls from './_WindowControls.vue'
 
 type ResizeDirection =
   | 'n'
@@ -42,6 +43,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const isElectron = Boolean(window.desktopApi)
 const actionButtonLabel = computed(() => (props.closeMode === 'minimize' ? '−' : '×'))
 const actionButtonTitle = computed(() => (props.closeMode === 'minimize' ? '最小化' : '閉じる'))
 
@@ -162,8 +164,9 @@ onBeforeUnmount(() => {
       </div>
       <div class="title-right">
         <slot name="title-right"></slot>
+        <WindowControls v-if="isElectron" :closable="closable" @close="closeWindow" />
         <button
-          v-if="closable"
+          v-else-if="closable"
           class="close-button"
           type="button"
           :title="actionButtonTitle"

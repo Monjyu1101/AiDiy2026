@@ -70,7 +70,7 @@ function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',a
  process.env={AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_URL:url,AIDIY_DEVELOPMENT_NEW_WINDOW:newWindow?'1':'0',...(project?{AIDIY_DEVELOPMENT_PROJECT:project}:{})};
  process.cwd=()=>cwd;process.send=(message,callback)=>{messages.push(message);callback?.();};
  class Window extends EventEmitter{
-  constructor(options){super();this.options=options;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};windows.push(this);}
+  constructor(options){super();this.options=options;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=()=>{};this.webContents.executeJavaScript=async()=>{};this.webContents.send=()=>{};windows.push(this);}
   setBounds(bounds){this.bounds=bounds;}getBounds(){return this.bounds;}
   isDestroyed(){return !!this.destroyed;}isMinimized(){return !!this.minimized;}
   minimize(){this.minimized=true;}restore(){this.minimized=false;this.restored=true;}

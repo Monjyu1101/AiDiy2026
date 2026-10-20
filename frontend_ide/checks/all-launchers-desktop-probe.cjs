@@ -68,7 +68,7 @@ app.on('browser-window-created',(_,owner)=>{
      await until(()=>{child=BrowserWindow.getAllWindows().find(w=>!before.has(w.id)&&w.getTitle().includes(kind==='code'?'Code':kind==='live'?'Live':'Term'));return child?.isVisible();},kind+'別窓');
      await until(()=>evaluate(owner,`[...document.querySelectorAll('${selector(display)} button')].every(b=>!b.disabled)`),'起動完了');
      near(child.getBounds(),allWindowBounds(kind,display.workArea));
-     assert.equal(child.getParentWindow(),owner);assert.equal(child.isAlwaysOnTop(),true);
+     assert.equal(child.getParentWindow(),null);assert.equal(child.isAlwaysOnTop(),true);
      opened.push({displayId:display.id,kind,bounds:child.getBounds()});
      if(kind==='live'){
       assert.equal(await evaluate(owner,`[...document.querySelectorAll('.all-launchers button')].some(b=>b.textContent.includes('Live'))`),false,'Live起動後は全画面でボタンを隠す');

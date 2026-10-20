@@ -81,7 +81,7 @@ try{
  await main.evaluate(`document.querySelector('.explorer-toggle').click();Array.from(document.querySelectorAll('.route-choice')).find(b=>b.textContent==='閲覧軌跡').click()`);
  const glass3d=await main.evaluate(styles);for(const name of ['explorer','bar','list','viewer'])assert.equal(glass3d[name].blur,'blur(4px)');await main.capture('embedded-3d');
  // 実際のピン留めボタンで別ターゲットを起動し、元画面のプレビューが閉じることも確認。
- await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);
+ await main.evaluate(`document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]').click()`);
  let popup;for(let i=0;i<100&&!popup;i++){popup=(await targets()).find(t=>t.type==='page'&&t.url.includes('#viewer='));if(!popup)await sleep(50);}
  assert.ok(popup,'ピン留めの別ウィンドウ');const pinned=await connect(popup);
  await pinned.send('Emulation.setDeviceMetricsOverride',{width:680,height:780,deviceScaleFactor:1,mobile:false});

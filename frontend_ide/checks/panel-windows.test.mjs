@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import native from '../デスクトップ/panel-windows.cjs';
+import pinModule from '../デスクトップ/最前面ピン.cjs';
 import {popupFeatures,fadePanel} from '../src/ファイル閲覧/パネル別窓.js';
 const {panelBounds,createPanelWindows}=native;
 test('表示開始フェード: opacityだけ260ms、再実行で古い演出解除、OS設定にかかわらず表示',()=>{
@@ -39,11 +40,12 @@ function fixture({all=false,area={x:0,y:0,width:1920,height:1040}}={}){
  class Window extends EventEmitter{
   constructor(){super();this.webContents=new EventEmitter();Object.assign(this.webContents,{executeJavaScript:async()=>{},getZoomFactor:()=>1,setWindowOpenHandler:fn=>{this.handler=fn;}});}
   setParentWindow(value){this.parent=value;}
-  isAlwaysOnTop(){return false;}
-  isDestroyed(){return !!this.dead;}destroy(){this.dead=true;this.emit('closed');}close(){this.destroy();}minimize(){this.minimized=true;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}isMaximized(){return !!this.maximized;}setBounds(value){this.bounds=value;}setAlwaysOnTop(){}getContentBounds(){return this.bounds||{x:100,y:100,width:420,height:360};}getBounds(){return this.getContentBounds();}show(){this.shown=true;}focus(){}
+  isAlwaysOnTop(){return !!this.top;}
+  isDestroyed(){return !!this.dead;}destroy(){this.dead=true;this.emit('closed');}close(){this.destroy();}minimize(){this.minimized=true;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}isMaximized(){return !!this.maximized;}setBounds(value){this.bounds=value;}setAlwaysOnTop(value){this.top=value;}getContentBounds(){return this.bounds||{x:100,y:100,width:420,height:360};}getBounds(){return this.getContentBounds();}show(){this.shown=true;}focus(){}
  }
  const owner={window:new Window(),kind:'ide',revision:0},event={owner},key=state=>state.active?`${state.mode}:${state.startedAt}`:'';
- const controller=createPanelWindows({windows,trustedEvent:e=>e.owner,readState:async()=>state,sessionKey:key,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:area.x+100,y:area.y+100})},BrowserWindow:Window,拡大表示:async()=>{animations++;},isQuitting:()=>quitting,isAllDisplays:()=>all});
+ const windowPins=pinModule.createWindowPins();
+ const controller=createPanelWindows({windowPins,registerWindowPin:record=>windowPins.register(record.window,{pinned:true,locked:all}),windows,trustedEvent:e=>e.owner,readState:async()=>state,sessionKey:key,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:area.x+100,y:area.y+100})},BrowserWindow:Window,拡大表示:async()=>{animations++;},isQuitting:()=>quitting,isAllDisplays:()=>all});
  return{windows,Window,owner,event,controller,rect:{left:16,top:78,width:380,height:650},state:next=>{state=next;},animations:()=>animations,quit:()=>{quitting=true;}};
 }
 test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、元画面のキャプチャを要求しない',async()=>{
@@ -52,7 +54,7 @@ test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、�
   const request=await f.controller.prepare(f.event,{left:9000,top:-9000,width:8000,height:4000},kind,{left:9000,top:-9000,width:8000,height:4000});assert.equal(request.ok,true);assert.equal(request.preview,undefined);
   const details={url:'about:blank',frameName:request.name},bounds=f.controller.open(f.owner,details).overrideBrowserWindowOptions;
   assert.ok(bounds.x>=area.x&&bounds.y>=area.y&&bounds.x+bounds.width<=area.x+area.width&&bounds.y+bounds.height<=area.y+area.height);assert.ok(bounds.width<=680);
-  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,f.owner.window);child.destroy();
+  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,null);child.destroy();
  }
 });
 
@@ -64,7 +66,7 @@ test('Explorer: 承認済みabout:blankを一回だけ許可し、同じ親の�
  assert.equal(f.controller.open(f.owner,details),null);
  const child=new f.Window();f.controller.created(f.owner,child,details);
  assert.equal(f.controller.dragTarget(f.owner,request.name),null,'表示前は移動対象にしない');
- assert.equal(child.parent,f.owner.window);
+ assert.equal(child.parent,null);
  assert.equal(f.windows.get(child.webContents).owner,f.owner);assert.equal(f.windows.get(child.webContents).linkKey,'offline:1');
  assert.equal((await f.controller.show(f.event,request.name,false)).ok,true);assert.equal(f.animations(),1);
  assert.equal(f.controller.dragTarget(f.owner,request.name),f.windows.get(child.webContents));
@@ -138,6 +140,32 @@ test('共通タイトルバー: 所有する別窓だけ操作し、別親・古
  assert.equal(f.controller.action(f.event,request.name,'destroy'),false);
  f.owner.revision++;assert.equal(f.controller.action(f.event,request.name,'close'),false);assert.equal(child.isDestroyed(),false);
  f.owner.revision--;f.controller.action(f.event,request.name,'close');assert.equal(child.isDestroyed(),true);assert.equal(f.windows.size,0);
+});
+
+test('別窓ピン: Explorer・比較Viewer・軌跡はIDE由来ON、OFF後の再表示・高さ変更で再固定しない',async()=>{
+ for(const kind of ['explorer','panel-viewer','panel-routes']){
+  const f=fixture(),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
+  f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
+  assert.deepEqual(f.controller.action(f.event,request.name,'pin-state'),{pinned:true,locked:false});
+  assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:false,locked:false});
+  await f.controller.show(f.event,request.name);await f.controller.show(f.event,request.name);
+  if(kind==='panel-routes')f.controller.resizeRoutes(f.event,request.name,200);
+  assert.equal(child.top,false);assert.equal(child.parent,null);
+  assert.equal(f.controller.action({owner:{kind:'ide'}},request.name,'toggle-pin'),false);
+  f.owner.revision++;assert.equal(f.controller.action(f.event,request.name,'toggle-pin'),false);assert.equal(child.top,false);
+  child.destroy();
+ }
+});
+
+test('VR中に作成する全別窓はON固定、軌跡の最小化は許可し最大化は拒否する',async()=>{
+ for(const kind of ['explorer','panel-viewer','panel-routes']){
+  const f=fixture({all:true}),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
+  f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
+  assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:true,locked:true});assert.equal(child.top,true);
+  f.controller.action(f.event,request.name,'minimize');assert.equal(child.minimized,true);
+  f.controller.action(f.event,request.name,'maximize');assert.equal(!!child.maximized,kind!=='panel-routes');
+  child.destroy();
+ }
 });
 
 test('小さな軌跡パネル: 負座標の実画面内へ収め、DPI倍率を二重適用しない',()=>{

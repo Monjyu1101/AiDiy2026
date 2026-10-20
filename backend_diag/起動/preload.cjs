@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld('aidiyWindow',Object.freeze({
  minimize:()=>ipcRenderer.invoke('diag:window','minimize'),
  maximize:()=>ipcRenderer.invoke('diag:window','maximize'),
  isMaximized:()=>ipcRenderer.invoke('diag:window','isMaximized'),
+ getPinState:()=>ipcRenderer.invoke('diag:window','getPinState'),
+ togglePin:()=>ipcRenderer.invoke('diag:window','togglePin'),
+ onPinState:callback=>{
+  if(typeof callback!=='function')return ()=>{};
+  const listener=(_event,state)=>{if(state&&typeof state.pinned==='boolean'&&typeof state.locked==='boolean')callback({pinned:state.pinned,locked:state.locked});};
+  ipcRenderer.on('diag:pin-state',listener);
+  return ()=>ipcRenderer.removeListener('diag:pin-state',listener);
+ },
  close:()=>ipcRenderer.invoke('diag:window','close'),
  selectProject:()=>ipcRenderer.invoke('diag:window','selectProject'),
  startMini:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMini',enabled):Promise.resolve(false),

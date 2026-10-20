@@ -12,3 +12,33 @@ test('mini restore lives in the titlebar in browser mode too',async()=>{
  const normal=await render('ウィンドウ/ステータスバー.vue',{connected:true,enabled:true});
  assert.ok(!normal.includes('aria-label="通常表示"'));
 });
+
+// 本番 SFC の setup を実行し、DOM のない場所でも購読・状態遷移・解除を検証する。
+async function desktopFixture(overrides={}){
+ const path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module');
+ const req=createRequire(path.join(__dirname,'../ui/package.json')),{parse,compileScript}=req('@vue/compiler-sfc'),{transformSync}=req('esbuild'),vue=req('vue');
+ const callbacks={},events=new Map(),calls=[],listeners=new Set();let pinned=false,maximized=false;
+ const api={getPinState:async()=>({pinned,locked:false}),togglePin:async()=>{calls.push('pin');pinned=!pinned;return{pinned,locked:false};},isMaximized:async()=>maximized,maximize:async()=>{maximized=!maximized;},minimize:async()=>calls.push('minimize'),close:async()=>calls.push('close'),onPinState:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},...overrides};
+ const module={exports:{}},{descriptor}=parse(source('ウィンドウ/ステータスバー.vue'));
+ const code=transformSync(compileScript(descriptor,{id:'statusbar-pin',inlineTemplate:false}).content,{format:'cjs'}).code;
+ vm.runInNewContext(code,{module,exports:module.exports,window:{aidiyWindow:api,addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type)},require:()=>({...vue,onMounted:fn=>callbacks.mount=fn,onBeforeUnmount:fn=>callbacks.unmount=fn})});
+ const state=module.exports.default.setup({},{expose(){}});callbacks.mount();
+ const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};await flush();
+ return{state,calls,events,listeners,flush,unmount:()=>callbacks.unmount(),emit:value=>{for(const fn of listeners)fn(value);}};
+}
+test('Diag の4操作の並びとピン OFF/ON/ロック、最大化、購読解除を保つ',async()=>{
+ const f=await desktopFixture(),s=f.state;
+ assert.equal(s.desktop.value,true);assert.equal(s.pin.value.pinned,false);assert.match(s.pinTitle.value,/ON/);
+ await s.togglePin();assert.equal(s.pin.value.pinned,true);assert.match(s.pinTitle.value,/OFF/);
+ await s.togglePin();assert.equal(s.pin.value.pinned,false);
+ f.emit({pinned:true,locked:true});await s.togglePin();assert.equal(f.calls.filter(v=>v==='pin').length,2);assert.equal(s.pin.value.pinned,true);assert.match(s.pinTitle.value,/VR/);
+ f.emit({pinned:false,locked:false});assert.equal(s.pin.value.pinned,false);await s.action('maximize');assert.equal(s.maximized.value,true);await s.action('maximize');assert.equal(s.maximized.value,false);
+ const template=source('ウィンドウ/ステータスバー.vue');assert.match(template,/action\('minimize'\)[\s\S]*action\('maximize'\)[\s\S]*class="window-pin"[\s\S]*action\('close'\)/);assert.match(template,/:aria-pressed="pin.pinned"/);assert.match(template,/:disabled="compact"/);
+ f.unmount();assert.equal(f.listeners.size,0);assert.equal(f.events.size,0);
+});
+test('Diag の新しいピン通知を遅い初期応答で戻さず、切替連打と終了後の反映を防ぐ',async()=>{
+ let initial,toggle;const f=await desktopFixture({getPinState:()=>new Promise(resolve=>initial=resolve),togglePin:()=>new Promise(resolve=>toggle=resolve)}),s=f.state;
+ f.emit({pinned:true,locked:true});initial({pinned:false,locked:false});await f.flush();assert.equal(s.pin.value.locked,true);
+ f.emit({pinned:false,locked:false});const pending=s.togglePin();assert.equal(s.pinBusy.value,true);await s.togglePin();f.unmount();toggle({pinned:true,locked:false});await pending;
+ assert.equal(s.pin.value.pinned,false);assert.equal(s.pinBusy.value,false);
+});

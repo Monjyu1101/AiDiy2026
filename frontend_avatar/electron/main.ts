@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session, Menu } from 'electron'
+import { app, BrowserWindow, desktopCapturer, ipcMain, screen, session, Menu, type IpcMainInvokeEvent } from 'electron'
 import { readdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -16,6 +16,23 @@ const { 拡大表示 } = require(path.join(__dirname, '../../frontend_ide/host/s
 const { attachNativeWindowMove } = require(path.join(__dirname, '../../frontend_ide/デスクトップ/長押し窓移動.cjs')) as {
   attachNativeWindowMove: (window: BrowserWindow, screen: typeof import('electron').screen, kind: 'avatar') => () => void
 }
+
+type WindowPinState = { pinned: boolean; locked: boolean }
+const { createWindowPins } = require(path.join(__dirname, '../../frontend_ide/デスクトップ/最前面ピン.cjs')) as {
+  createWindowPins: (options: { onChanged: (window: BrowserWindow, state: WindowPinState) => void }) => {
+    register: (window: BrowserWindow, options?: Partial<WindowPinState>) => WindowPinState
+    state: (window: BrowserWindow) => WindowPinState
+    toggle: (window: BrowserWindow) => WindowPinState
+    unregister: (window: BrowserWindow) => void
+  }
+}
+const windowPins = createWindowPins({
+  onChanged: (window, state) => {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send('window:pin-changed', state)
+    }
+  },
+})
 
 type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
@@ -273,6 +290,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
   })
 
   windowRoles.set(window.id, role)
+  windowPins.register(window)
   attachNativeWindowMove(window, screen, 'avatar')
 
   // min サイズを独自管理し、ロード後に再適用（Electron Windowsバグ対策）
@@ -283,6 +301,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
     }
   })
   window.on('closed', () => {
+    windowPins.unregister(window)
     windowMinSizes.delete(window.id)
   })
 
@@ -553,9 +572,9 @@ async function openTeamWindow(): Promise<boolean> {
       minHeight: TEAM_BOUNDS.minHeight,
       show: false,
       backgroundColor: '#07111f',
-      frame: true,
+      frame: false,
       resizable: true,
-      minimizable: false,
+      minimizable: true,
       autoHideMenuBar: true,
       title: 'AiDiy AI Team',
       icon: iconPath,
@@ -569,6 +588,7 @@ async function openTeamWindow(): Promise<boolean> {
       },
     })
     windowRoles.set(teamWindow.id, 'team')
+    windowPins.register(teamWindow)
     attachNativeWindowMove(teamWindow, screen, 'avatar')
     windowMinSizes.set(teamWindow.id, {
       minWidth: TEAM_BOUNDS.minWidth,
@@ -581,6 +601,7 @@ async function openTeamWindow(): Promise<boolean> {
     }, false)
     const createdTeamWindow = teamWindow
     createdTeamWindow.on('closed', () => {
+      windowPins.unregister(createdTeamWindow)
       windowRoles.delete(createdTeamWindow.id)
       windowMinSizes.delete(createdTeamWindow.id)
       if (teamWindow === createdTeamWindow) teamWindow = null
@@ -782,6 +803,7 @@ function openSettingsWindow(sessionId: string) {
   })
 
   windowRoles.set(settingsWindow.id, 'settings')
+  windowPins.register(settingsWindow)
   attachNativeWindowMove(settingsWindow, screen, 'avatar')
   windowMinSizes.set(settingsWindow.id, { minWidth: SETTINGS_BOUNDS.minWidth, minHeight: SETTINGS_BOUNDS.minHeight })
 
@@ -796,6 +818,7 @@ function openSettingsWindow(sessionId: string) {
   })
 
   settingsWindow.on('closed', () => {
+    windowPins.unregister(createdSettingsWindow)
     if (settingsWindow) {
       windowRoles.delete(settingsWindow.id)
       windowMinSizes.delete(settingsWindow.id)
@@ -809,6 +832,14 @@ function openSettingsWindow(sessionId: string) {
   const url = new URL(baseUrl)
   url.searchParams.set('role', 'settings')
   void settingsWindow.loadURL(url.toString())
+}
+
+// 任意のroleやIDを受け取らず、登録済みの現在ウィンドウのmain frameだけを操作する。
+function currentControlWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (!window || window.isDestroyed() || !windowRoles.has(window.id)) return null
+  if (window.webContents !== event.sender || event.senderFrame !== window.webContents.mainFrame) return null
+  return window
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -856,6 +887,24 @@ app.whenReady().then(() => {
     { useSystemPicker: false },
   )
 
+  ipcMain.handle('window:get-pin', (event) => {
+    const window = currentControlWindow(event)
+    return window ? windowPins.state(window) : null
+  })
+
+  ipcMain.handle('window:toggle-pin', (event) => {
+    const window = currentControlWindow(event)
+    return window ? windowPins.toggle(window) : null
+  })
+
+  ipcMain.handle('window:toggle-maximize', (event) => {
+    const window = currentControlWindow(event)
+    if (!window) return false
+    if (window.isMaximized()) window.unmaximize()
+    else if (window.isMaximizable()) window.maximize()
+    return window.isMaximized()
+  })
+
   ipcMain.handle('window:get-role', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return 'login'
@@ -883,7 +932,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('window:close-self', (event) => {
-    const window = BrowserWindow.fromWebContents(event.sender)
+    const window = currentControlWindow(event)
     if (!window) return
     const role = windowRoles.get(window.id)
     if (role && TASK_KEYS.includes(role as TaskKey)) {
@@ -906,7 +955,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('window:minimize-self', (event) => {
-    const window = BrowserWindow.fromWebContents(event.sender)
+    const window = currentControlWindow(event)
     if (!window) return
     window.minimize()
   })

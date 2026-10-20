@@ -20,10 +20,10 @@ test('maximized windows restore their normal bounds and maximized state',()=>{
  const window=fakeWindow(true),controller=miniWindow.ミニ表示を作成(window);controller.set(true);assert.equal(window.maximized,false);controller.set(false);assert.equal(window.maximized,true);assert.equal(window.bounds.width,1160);
 });
 
-test('startup mini uses primary work-area origin and restores original topmost, location and size',()=>{
+test('startup mini uses primary work-area origin without changing the current pin, restoring location and size',()=>{
  for(const top of [true,false]){
   const window=fakeWindow();window.top=top;const original=structuredClone(window.bounds),controller=miniWindow.ミニ表示を作成(window,{screen:{getPrimaryDisplay:()=>({workArea:{x:-1920,y:32}})}});
-  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:384,height:134});assert.equal(window.top,true);
+  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1920,y:32,width:384,height:134});assert.equal(window.top,top);
   controller.set(false);assert.deepEqual(window.bounds,original);assert.equal(window.top,top);
  }
 });
@@ -85,4 +85,12 @@ test('mini polling refreshes statuses without reading logs or mutating services'
  const timer=scheduled.at(-1);state.表示(false);assert.ok(cleared.includes(timer));const portCalls=calls.filter(route=>route==='api/起動/ポート').length;
  state.表示(true,true);await delay(30);state.表示(false);assert.ok(calls.includes('api/起動/ログ'));assert.ok(!calls.some(route=>/設定|再起動|停止/.test(route)));
  assert.ok(calls.filter(route=>route==='api/起動/ポート').length>portCalls,'通常画面でも一括起動・停止の判定にポートを確認する');
+});
+
+test('mini restore keeps pin changes made while compact instead of restoring a stale topmost value',()=>{
+ for(const top of [false,true]){
+  const window=fakeWindow();window.top=top;const controller=miniWindow.ミニ表示を作成(window);
+  controller.set(true);assert.equal(window.top,top);window.setAlwaysOnTop(!top);
+  controller.set(false);assert.equal(window.top,!top);
+ }
 });

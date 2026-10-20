@@ -43,7 +43,10 @@ app.on('browser-window-created',(_event,window)=>{
     const current=window.getBounds();if(height===null||Math.abs(current.height-height)>2)return false;
     bounds=current;expectedHeight=height;return true;
    });
-   near(bounds,{x:area.x,y:area.y,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),true);
+   near(bounds,{x:area.x,y:area.y,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),false);
+   assert.equal(await window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')"),'false');
+   await window.webContents.executeJavaScript("document.querySelector('.window-pin').click()");
+   await until(()=>window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='true'"));
    window.webContents.invalidate();
    writeFileSync(process.env.DIAG_TEST_SHOT,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
    openingMeasurement=await openingCheck;assert.ok(openingMeasurement);
@@ -55,10 +58,12 @@ app.on('browser-window-created',(_event,window)=>{
    await window.webContents.executeJavaScript("document.querySelector('.mini-restore').click()");
    try{await until(()=>Math.abs(window.getBounds().width-original.width)<=2&&window.webContents.executeJavaScript("!document.querySelector('.start-mini')"));}
    catch(error){throw Error(JSON.stringify({bounds:window.getBounds(),original,ui:await window.webContents.executeJavaScript("({mini:!!document.querySelector('.start-mini'),message:document.querySelector('#message')?.textContent})")}),{cause:error});}
-   assert.equal(window.isAlwaysOnTop(),false);near(window.getNormalBounds(),original);
+   assert.equal(window.isAlwaysOnTop(),true);near(window.getNormalBounds(),original);
+   await window.webContents.executeJavaScript("document.querySelector('.window-pin').click()");
+   await until(()=>!window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='false'"));
    const normalControls=await checkNativeControls(window,window.webContents,'Diag通常');
    const normalMove=await holdMove(window,window.webContents,await probeBackground(window.webContents),'Diag通常背景','escape');
-   process.send({testPassed:true,bounds,expectedHeight,alwaysOnTop:true,restored:true,openingMeasurement,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
+   process.send({testPassed:true,bounds,expectedHeight,initialPin:false,pinRoundTrip:true,restored:true,openingMeasurement,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());
   }catch(error){console.error(error);app.exit(1);}
  });
 });

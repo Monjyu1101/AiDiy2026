@@ -5,7 +5,6 @@
 // https://github.com/monjyu1101/AiDiy2026
 const {randomUUID}=require('node:crypto');
 const {windowBounds}=require('./window-layout.cjs');
-const {keepInFront}=require('./前面維持.cjs');
 
 // getContentBounds / screen.workArea はDIP。CSS pxにzoomだけ掛け、OSのDPI倍率は掛けない。
 function panelBounds(rect,owner,screen,kind='explorer'){
@@ -20,7 +19,7 @@ function panelBounds(rect,owner,screen,kind='explorer'){
 
 // Explorerは同じDOMを親から移すため、許可したabout:blankだけwindow.openで作る。
 // 任意URL・別フレーム・別セッションからの要求は許可しない。
-function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,BrowserWindow,拡大表示,isQuitting,isAllDisplays=()=>false,attachWindowMove=()=>{}}){
+function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,BrowserWindow,拡大表示,isQuitting,isAllDisplays=()=>false,attachWindowMove=()=>{},registerWindowPin=()=>{},windowPins}){
  const requests=new WeakMap();
  async function prepare(event,rect,kind='explorer',previewRect){
   if(!['explorer','panel-viewer','panel-routes'].includes(kind))return{ok:false,error:'対応していないパネルです。'};
@@ -67,10 +66,11 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
  function created(owner,window,details){
   const request=requests.get(owner);requests.delete(owner);
   if(!request?.used||request.name!==details.frameName||owner.window.isDestroyed()||owner.revision!==request.revision||isQuitting()){window.destroy();return;}
-  // ネイティブの所有関係でもIDEより手前を保証する。フォーカスやALL解除で子窓を動かさない。
-  window.setParentWindow(owner.window);window.setBounds(request.bounds);keepInFront(window);
+  // 寿命はownerで管理する。OSの親子関係による常時前面を避け、ピンOFFを実効にする。
+  window.setParentWindow(null);window.setBounds(request.bounds);
   const contents=window.webContents;
   const record={window,owner,kind:request.kind,url:'about:blank',linkKey:request.key,revision:0,ownerRevision:request.revision,barHeight:request.bounds.height,pending:new Map(),name:request.name};windows.set(contents,record);
+  registerWindowPin(record);
   attachWindowMove(record);
   contents.setWindowOpenHandler(()=>({action:'deny'}));
   contents.on('will-navigate',(event,url)=>{if(url!=='about:blank')event.preventDefault();});
@@ -84,7 +84,6 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   try{if(child.linkKey!==sessionKey(await readState(owner))||owner.window.isDestroyed()||child.window.isDestroyed())return{ok:false,error:'IDEの利用状態が変わりました。'};}catch{return{ok:false,error:'IDEの利用状態を確認できません。'};}
   // 旧IPCの第3引数が届いても、全パネルで共通の表示開始演出を使う。
   if(!child.shown){child.shown=true;clearTimeout(child.timeout);await 拡大表示(BrowserWindow,child.window,{background:'#080c1a'});}
-  keepInFront(child.window);
   return{ok:!child.window.isDestroyed()};
  }
  function resizeRoutes(event,name,height){
@@ -96,16 +95,18 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   if(height<160)child.barHeight=Math.max(40,Math.ceil(height*zoom));
   const y=Math.max(area.y+margin,Math.min(current.y,area.y+area.height-margin-child.barHeight));
   const next={...current,y,height:Math.max(1,Math.min(Math.ceil(height*zoom),area.y+area.height-margin-y))};
-  if(next.height!==current.height||next.y!==current.y){win.setBounds(next);keepInFront(win);}
+  if(next.height!==current.height||next.y!==current.y)win.setBounds(next);
   return{ok:true,height:win.getContentBounds().height/zoom};
  }
  function action(event,name,value){
   const owner=trustedEvent(event),child=[...windows.values()].find(item=>item.owner===owner&&item.name===name&&['explorer','panel-viewer','panel-routes'].includes(item.kind)&&!item.window.isDestroyed());
-  if(!owner||owner.kind!=='ide'||!child||owner.revision!==child.ownerRevision||isQuitting()||!['minimize','maximize','isMaximized','close'].includes(value))return false;
+  if(!owner||owner.kind!=='ide'||!child||owner.revision!==child.ownerRevision||isQuitting()||!['minimize','maximize','isMaximized','close','pin-state','toggle-pin'].includes(value))return false;
   const target=child.window;
+  if(value==='pin-state')return windowPins?.state(target)||{pinned:false,locked:false};
+  if(value==='toggle-pin')return windowPins?.toggle(target)||{pinned:false,locked:false};
   if(value==='close'){target.close();return true;}
-  if(child.kind==='panel-routes')return false;
   if(value==='minimize')target.minimize();
+  if(child.kind==='panel-routes')return false; // コンパクトな軌跡バーは最大化せず寸法を維持する。
   if(value==='maximize'){if(target.isMaximized())target.unmaximize();else target.maximize();}
   return target.isMaximized();
  }

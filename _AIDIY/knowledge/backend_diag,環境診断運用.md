@@ -6,11 +6,11 @@
 
 Electronの長押し操作と表示開始ズームは [共通の基本方針](./共通,Electronウィンドウ基本方針.md) に従う。初期ミニ表示でも最終位置・寸法を先に確定し、透明パネル内でズームする。表示中の通常・ミニ切替には登場ズームを再実行しない。
 
-タイトル欄の「ミニ表示」を最小化・最大化・終了の左に置き、接続中はどのタブからでも切り替える。既存の「システム起動」と「アプリ起動」のボタンも維持する。通常表示への復帰は元のタブへ戻り、ミニ内のサービス名を押した場合は「システム起動」の該当ログへ移る。アプリ起動側からミニにした場合もポート状態の更新を続ける。アプリはdetachedで独立起動し、Diag終了時のサービス停止対象には登録しない。終了確認には、停止する管理サービスと継続するアプリの違いを明記する。
+タイトル欄の「ミニ表示」を最小化・最大化・ピン・終了の左に置き、接続中はどのタブからでも切り替える。既存の「システム起動」と「アプリ起動」のボタンも維持する。通常表示への復帰は元のタブへ戻り、ミニ内のサービス名を押した場合は「システム起動」の該当ログへ移る。アプリ起動側からミニにした場合もポート状態の更新を続ける。アプリはdetachedで独立起動し、Diag終了時のサービス停止対象には登録しない。終了確認には、停止する管理サービスと継続するアプリの違いを明記する。
 
 総合テストでは、キー未登録・機器未接続・任意サービス未起動を `PASS (別途環境調整必要)` として報告する。診断画面が実際に検出したNGの記録は保持し、環境条件と製品不具合を区別する。総合評価は `✅ OK (PASS n件含む)` とし、nの内訳を併記する。
 
-専用Electron窓は通常・ミニ表示とも左ボタンを同じ位置で0.5秒押すとドラッグ移動できる。`起動/electron-main.cjs` が窓の生成時に `frontend_ide/デスクトップ/長押し窓移動.cjs` の `attachNativeWindowMove(window,screen,'diag')` を一度取り付ける。短押しはクリック、0.5秒前の移動は通常のログ選択・ドラッグとして扱い、移動後の解放でボタンを押さない。解放・Esc・フォーカス喪失・破棄で解除し、最大化・全画面では開始しない。ミニ状態の位置・最前面指定や通常表示への復元処理は既存の `ミニ表示.cjs` が保持する。Web / headlessには適用しない。`node backend_diag/checks/initial-mini-desktop.mjs` は合成Tools状態と隔離プロファイルで初期ミニ表示・通常復元に加え、実Electron入力による両表示の長押し移動とサイズ維持・誤クリック防止・Esc解除を確認する。
+専用Electron窓は通常・ミニ表示とも左ボタンを同じ位置で0.5秒押すとドラッグ移動できる。`起動/electron-main.cjs` が窓の生成時に `frontend_ide/デスクトップ/長押し窓移動.cjs` の `attachNativeWindowMove(window,screen,'diag')` を一度取り付ける。短押しはクリック、0.5秒前の移動は通常のログ選択・ドラッグとして扱い、移動後の解放でボタンを押さない。解放・Esc・フォーカス喪失・破棄で解除し、最大化・全画面では開始しない。ミニ状態の位置と通常表示への復元は `ミニ表示.cjs`、最前面ピンは共通の `最前面ピン.cjs` が管理する。通常・ミニとも起動時はOFFで、切替中もユーザーのON/OFF選択を維持する。Web / headlessには適用しない。`node backend_diag/checks/initial-mini-desktop.mjs` は合成Tools状態と隔離プロファイルで初期ミニ表示・通常復元に加え、実Electron入力による両表示の長押し移動とサイズ維持・誤クリック防止・Esc解除を確認する。
 
 - セットアップとクリーンアップでは最初の選択項目に置き、既定 `[y]/n`、全体の a=auto でも対象にします。
 - 通常は `aidiy_diag` で Electron 起動、`aidiy_diag --browser` で Web 起動します。Codespaces / GUI なしでは Web です。Electron は既存 `scripts/_setup_electron.py` の共有 ZIP / 同版 dist を使ってセットアップします。Node.js 自体が無い場合はランチャーが理由と公式導入先を表示します。Python は診断アプリ起動には不要です。
@@ -33,9 +33,9 @@ Electronの長押し操作と表示開始ズームは [共通の基本方針](./
 
 Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools / MCPとWebの両TCPポートが開放されているときだけ有効とし、通常表示でも全6機能のポート確認を使う。チェック欄のON/OFFと独立した一時操作で、サービスや設定は変更しない。一括起動の自動ブラウザ表示にもTools / MCPが必要。手動操作の認証付き `POST /api/起動/ブラウザ` は空JSONだけを受け付け、押下時に両ポートを再確認してから `起動/Webブラウザ.mjs` が既存の `POST /aidiy_chrome_devtools/new_page` を呼び、固定の `http://localhost:8090/` とページIDを確認する。URL・コマンド・起動対象は受け付けず、連打は抑止する。検証は `checks/web-browser.check.mjs` と `checks/start-browser.mjs`。
 
-- 専用窓の初期表示は `起動/electron-main.cjs` が一度だけ127.0.0.1:8095へTCP接続して判定する。開放時は非表示の窓をミニへ整え、主ディスプレイのworkArea左上・最前面で初表示する。未開放・確認不可は通常のシステム起動画面。TCP接続は `起動/ポート接続.cjs` を周期的なサーバー確認と共用し、500msで打ち切る。
-- 初期ミニの真偽だけを固定のadditionalArgumentsからsandbox preloadへ渡し、`aidiyWindow.initialMini` として公開する。Vueは最初の描画から同じモードを使う。認証失敗時は通常表示へ戻す。画面再読込は通常表示へ戻し、初期ポート判定を繰り返さない。ミニ中は最前面とし、通常へ戻す時に元の位置・寸法・最大化・最前面設定を復元する。任意座標や最前面レベルのIPCは追加しない。
-- headlessはElectron経路へ入らず、起動時の8095確認・UI・HTTP待受も実行しない。`checks/node-only-startup.check.mjs` は実headlessのポート確認とlistenを禁止して、診断・書込が従来どおり完了することを確認する。`checks/desktop.check.mjs` / `checks/start-mini.check.mjs` は開放・未開放・確認不可の分岐と位置・最前面の復元を検証する。`node backend_diag/checks/initial-mini-desktop.mjs` は合成Tools稼働・実Electronの初期描画、左上座標、最前面、通常復元を確認する。実サービスには接続せず、テスト窓はフォーカスとマウスを奪わない。
+- 専用窓の初期表示は `起動/electron-main.cjs` が一度だけ127.0.0.1:8095へTCP接続して判定する。開放時は非表示の窓をミニへ整え、主ディスプレイのworkArea左上へ、最前面ピンOFFで初表示する。未開放・確認不可は通常のシステム起動画面。TCP接続は `起動/ポート接続.cjs` を周期的なサーバー確認と共用し、500msで打ち切る。
+- 初期ミニの真偽だけを固定のadditionalArgumentsからsandbox preloadへ渡し、`aidiyWindow.initialMini` として公開する。Vueは最初の描画から同じモードを使う。認証失敗時は通常表示へ戻す。画面再読込は通常表示へ戻し、初期ポート判定を繰り返さない。ミニ中もピンをON/OFFできる。通常へ戻す時は元の位置・寸法・最大化を復元し、最前面ピンは最新のユーザー選択を保持する。任意座標や最前面レベルのIPCは追加しない。
+- headlessはElectron経路へ入らず、起動時の8095確認・UI・HTTP待受も実行しない。`checks/node-only-startup.check.mjs` は実headlessのポート確認とlistenを禁止して、診断・書込が従来どおり完了することを確認する。`checks/desktop.check.mjs` / `checks/start-mini.check.mjs` は開放・未開放・確認不可の分岐と位置の復元、最前面ピンの保持を検証する。`node backend_diag/checks/initial-mini-desktop.mjs` は合成Tools稼働・実Electronの初期描画、左上座標、最前面、通常復元を確認する。実サービスには接続せず、テスト窓はフォーカスとマウスを奪わない。
 - 画面は `backend_diag/ui/src/起動/`、認証付き API は `diag_main.mjs` の `/api/起動*`、管理は `起動/サービス管理.mjs`。プロセス起動は Node の `spawn` で固定の `python -u -X utf8 <各フォルダ>/_start.py --diag-start <ID>` を実行する。HTTP でコマンド・引数・作業フォルダは指定させない。
 - `scripts/起動対象.json` は順番、フォルダ、既定値の共通元。ルート `_start.py` の auto と aidiy_diag の初期値を両方確認する。aidiy_diag の対象は local / tools / core / apps / taskteam / web の6機能。`起動管理: false` の Avatar 以降はルート起動の既定値だけを残し、システム起動の表示・起動 API・専用経路から除外する（アプリ起動は別機能）。aidiy_diag 自身と on-demand の Hermes も対象に含めない。
 - 設定は `_config/AiDiy_diag_start.json` に原子的に保存する。機能ごとに既知の真偽値だけを受け付ける。起動時に設定のコピーを固定し、処理中に変更した設定は次回へ適用する。ページ再読込・別タブへの移動ではプロセスを停止しない。
@@ -200,8 +200,8 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 
 ## ミニCLI起動を変更するとき
 
-- `ui/src/アプリ起動/CLI状態.mjs` と `ミニCLI起動.vue` が確認・利用可能項目・名称帯を管理する。プロジェクトは既存アプリ状態を共有し、処理中ロックも共用する。ミニ表示時と再接続時は存在確認だけで、CLI・ログイン・導入を実行しない。
-- `起動/CLI起動.mjs` は固定ID・絶対プロジェクト・自動承認指定だけを受け付け、固定 `frontend_ide/launch.mjs --app term --cli <ID> --cli-auto-approve` へ渡す。ミニの明示クリックは確認ダイアログなしで従来の起動指定を送り、成功後の説明を表示しない。エラー・処理中表示・重複起動防止は保持する。モデル・コマンド文字列を受け付けず、実行ファイルの探索と引数は `frontend_ide/aidiy_term/cli-launch.mjs` を共有する。公式フラグ・出典・古いCLIでの失敗時の扱いは backend_diag/README.md の「ミニ表示からCLIを開く」を参照する。
-- 起動通知はIPCでTerm窓の準備完了を待つ。CLI自身の起動結果はTermに表示する。同じDiagで同じCLI・正規化済みプロジェクトを起動中／起動済みなら二重起動しない。Term終了を受けて再び起動可能になる。ブラウザの最後の有効な端末接続が切れて30秒戻らない場合と、表示後30秒以内に初回端末接続が始まらない場合はCLIと所有サーバーを終了し、ロックを解放する。Diag終了とTerm終了は連動させない。
+- `ui/src/アプリ起動/CLI状態.mjs` と `ミニCLI起動.vue` が確認・利用可能項目・名称帯を管理する。プロジェクトは既存アプリ状態を共有する。Hermes・外部CLIは起動中も追加起動でき、要求ごとの処理中状態を管理する。確認ダイアログ・他アプリの起動・フォルダ選択は重ねない。ミニ表示時と再接続時は存在確認だけで、CLI・ログイン・導入を実行しない。
+- `起動/CLI起動.mjs` は固定ID・絶対プロジェクト・自動承認指定だけを受け付け、固定 `frontend_ide/launch.mjs --app term --cli <ID> --cli-auto-approve` へ渡す。ミニの明示クリックは確認ダイアログなしで従来の起動指定を送り、成功後の説明を表示しない。エラー・処理中表示は保持し、同じCLI・プロジェクトでもクリックごとに別のTerm窓を開く。モデル・コマンド文字列を受け付けず、実行ファイルの探索と引数は `frontend_ide/aidiy_term/cli-launch.mjs` を共有する。公式フラグ・出典・古いCLIでの失敗時の扱いは backend_diag/README.md の「ミニ表示からCLIを開く」を参照する。
+- 起動通知はIPCでTerm窓の準備完了を待つ。CLI自身の起動結果はTermに表示する。同じDiagで同じCLI・正規化済みプロジェクトでも並行起動し、既存窓へ戻らない。Termごとに動的ポート・端末セッション・起動ログを分ける。1つの窓の起動失敗・終了では他の窓のCLIやサーバーを止めない。ブラウザの最後の有効な端末接続が切れて30秒戻らない場合と、表示後30秒以内に初回端末接続が始まらない場合はその窓のCLIと所有サーバーだけを終了する。Diag終了とTerm終了は連動させない。Avatar・Live・Discordの単一起動制限は維持する。
 - タイトル欄はdrag、ボタンはno-dragを維持する。ミニは幅384pxで高さは表示内容に追従する。アイコンは原本SVG・透過PNG・出典・ライセンスを `ui/src/アプリ起動/CLIアイコン/` に保持する。CopilotはGitHub Octicons、Codex / Claude CodeはLobeHub、Grok / OpenCodeは公式配布元の実素材。Hermesは既存AiDiy画像、Agyは独自図案。白帯・黒文字を内包する120×120pxの固定7SVGとPNG派生物、出典・ライセンス全文 `LICENSE_ICONS.md` をstaticへ配布する。ミニはSVGを直接表示し、Hermesは既存AiDiy画像とHERMESの帯を内包する。AiDiy6アプリも画像内の名称を使い、HTMLの名前は重ねない。上段はAiDiy6アプリ＋Hermes、下段は存在する外部CLIだけを同じ幅で中央寄せする。外部CLI0件なら下段と余白を出さず、更新ボタンも置かない。全画像は名称帯込みの40px枠・40px表示（縦横比維持）、稼働インジケーター6件は1行。変更後はUIビルドとmanifest照合を行う。
-- 回帰確認: `node --test backend_diag/checks/{cli-launch,cli-launch-state,mini-cli-ui,start-mini}.check.*` と frontend_ide のCLI/端末テスト。全タブ復帰・ミニの確認なし起動と成功説明の非表示・連打・切断・起動失敗・日本語と記号付きパス・モデル引数なし・再接続での再実行なしをfixtureで確認する。実CLI自動作業や有料APIを回帰テストに使わない。
+- 回帰確認: `node --test backend_diag/checks/{cli-launch,cli-launch-state,mini-cli-ui,start-mini}.check.*` と frontend_ide のCLI/端末テスト（`cli-parallel-lifecycle.test.mjs`を含む）。全タブ復帰・ミニの確認なし起動と成功説明の非表示・連続／同時起動・個別終了・切断・起動失敗・日本語と記号付きパス・モデル引数なし・再接続での再実行なしをfixtureで確認する。実CLI自動作業や有料APIを回帰テストに使わない。

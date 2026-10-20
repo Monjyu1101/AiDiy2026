@@ -5,6 +5,7 @@ const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs
 const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
+const {createWindowPins}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
 const {起動状態を読む,終了確認を作成}=require('./終了確認.cjs');
 const {アプリ名,Macメニューを設定}=require('./MacOS-Menu.cjs');
 if(process.platform==='darwin')app.setName(アプリ名);
@@ -12,6 +13,9 @@ if(process.platform==='darwin')app.setName(アプリ名);
 // 相互に別インスタンスと誤認する。排他ロック・キャッシュを Diag 専用にする。
 app.setPath('userData',path.join(app.getPath('appData'),'aidiy_diag'));
 let window, failed=false,終了確認;
+const pins=createWindowPins({onChanged:(target,state)=>{
+  if(!target.isDestroyed()&&!target.webContents.isDestroyed())target.webContents.send('diag:pin-state',state);
+}});
 function fail(code) {
   if(failed)return;failed=true;
   // 例外本文や loadURL の URL は返さず、固定の原因コードだけを IPC へ送る。
@@ -39,6 +43,7 @@ async function start(value) {
   });
   window=new BrowserWindow({width:1160,height:820,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),additionalArguments:initialMini?['--aidiy-diag-initial-mini']:[],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
+  pins.register(window);
   attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
@@ -66,6 +71,8 @@ async function start(value) {
       return mini.resize(value);
     }
     if(action==='isMaximized')return window.isMaximized();
+    if(action==='getPinState')return pins.state(window);
+    if(action==='togglePin')return pins.toggle(window);
     if(action==='minimize')window.minimize();
     else if(action==='maximize'&&!mini.active){if(window.isMaximized())window.unmaximize();else window.maximize();}
     else if(action==='close')window.close();

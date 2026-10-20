@@ -45,8 +45,13 @@ function fixture(overrides: Record<string, any> = {}) {
   const api: any = {};
   for (const action of ['select', 'selectFeatures', 'selectCode', 'start', 'stop', 'monitor', 'window']) api[action] = async (value: any) => { calls.push([action, value]); return value; };
   api.initial = async () => initial();
+  let pinned = false, maximized = false;
+  api.getPinState = async () => ({ pinned, locked: false });
+  api.togglePin = async () => { calls.push(['togglePin']); pinned = !pinned; return { pinned, locked: false }; };
+  api.isMaximized = async () => maximized;
+  api.window = async (value: string) => { calls.push(['window', value]); if (value === 'maximize') maximized = !maximized; };
   api.catalogCode = async (provider: string) => provider ? { models: [{ id: 'code-a', label: 'Code A' }] } : { providers: [{ id: 'aidiy_hermes', label: 'Hermes' }, { id: 'codex_cli', label: 'Codex' }] };
-  for (const type of ['State', 'Activity', 'Meter', 'Audio']) api[`on${type}`] = (callback: Function) => { const set = listeners.get(type) || new Set(); set.add(callback); listeners.set(type, set); return () => set.delete(callback); };
+  for (const type of ['State', 'Activity', 'Meter', 'Audio', 'PinState']) api[`on${type}`] = (callback: Function) => { const set = listeners.get(type) || new Set(); set.add(callback); listeners.set(type, set); return () => set.delete(callback); };
   Object.assign(api, overrides); window.discordPanel = api;
   window.document.body.innerHTML = '<div id="app"></div>';
   window.eval(bundle);
@@ -277,4 +282,31 @@ test('保存済み Live AI の候補が消えても無断で切り替えず、�
     assert.equal(f.get('model').value, 'live-a'); assert.equal(f.get('toggle').disabled, false);
     assert.ok(f.calls.some(([name, value]) => name === 'select' && value.LIVE_AI_NAME === 'freeai_live'));
   } finally { await f.dispose(); }
+});
+
+test('Discord のタイトル操作は最小化・最大化・ピン・閉じる順で、OFF/ON/ロックを同期する', async () => {
+  const f = fixture();
+  try {
+    await flush();
+    assert.deepEqual([...f.window.document.querySelectorAll('.window-actions button')].map((button: any) => button.id), ['minimize', 'maximize', 'pin', 'close']);
+    assert.equal(f.get('pin').getAttribute('aria-pressed'), 'false'); assert.equal(f.get('pin').classList.contains('pinned'), false);
+    await f.click('pin'); assert.equal(f.get('pin').getAttribute('aria-pressed'), 'true'); assert.equal(f.get('pin').classList.contains('pinned'), true);
+    await f.click('pin'); assert.equal(f.get('pin').getAttribute('aria-pressed'), 'false');
+    await f.emit('PinState', { pinned: true, locked: true }); assert.equal(f.get('pin').disabled, true); assert.match(f.get('pin').title, /VR/);
+    const count = f.calls.filter(([action]) => action === 'togglePin').length;
+    await f.click('pin'); assert.equal(f.calls.filter(([action]) => action === 'togglePin').length, count);
+    await f.emit('PinState', { pinned: false, locked: false }); assert.equal(f.get('pin').disabled, false); assert.equal(f.get('pin').getAttribute('aria-pressed'), 'false');
+    await f.click('maximize'); assert.equal(f.get('maximize').title, '元のサイズに戻す');
+    await f.click('maximize'); assert.equal(f.get('maximize').title, '最大化');
+    await f.dispose(); assert.equal(f.listeners.get('PinState')?.size, 0);
+  } finally { await f.dispose(); }
+});
+
+test('Discord の遅いピン初期読込は新しい通知を上書きしない', async () => {
+  const gate = deferred(), f = fixture({ getPinState: () => gate.promise });
+  try {
+    await f.emit('PinState', { pinned: true, locked: true });
+    gate.resolve({ pinned: false, locked: false }); await flush();
+    assert.equal(f.get('pin').getAttribute('aria-pressed'), 'true'); assert.equal(f.get('pin').disabled, true);
+  } finally { gate.resolve({ pinned: false, locked: false }); await f.dispose(); }
 });

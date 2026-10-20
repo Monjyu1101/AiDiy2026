@@ -12,6 +12,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import WindowControls from './_WindowControls.vue'
 
 defineProps<{
   loading: boolean;
@@ -29,13 +30,14 @@ const emit = defineEmits<{
 
 const 利用者ID = ref(localStorage.getItem('avatar_last_user') || 'admin')
 const パスワード = ref('********')
+const isElectron = Boolean(window.desktopApi)
 
 function submit() {
   emit('submit', { 利用者ID: 利用者ID.value, パスワード: パスワード.value })
 }
 
-function minimizeWindow() {
-  void window.desktopApi?.minimizeCurrentWindow?.()
+function closeWindow() {
+  void window.desktopApi?.closeCurrentWindow?.()
 }
 </script>
 
@@ -46,8 +48,8 @@ function minimizeWindow() {
         <div class="title-left">
           <strong>AiDiy Avatar</strong>
         </div>
-        <div class="title-right">
-          <button class="close-button" type="button" title="最小化" @click="minimizeWindow">−</button>
+        <div v-if="isElectron" class="title-right">
+          <WindowControls @close="closeWindow" />
         </div>
       </div>
 
@@ -136,21 +138,6 @@ function minimizeWindow() {
 
 .title-right {
   -webkit-app-region: no-drag;
-}
-
-.close-button {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: rgba(0, 0, 0, 0.72);
-  color: #fff;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-  padding: 0;
 }
 
 .card-eyebrow {

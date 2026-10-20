@@ -6,6 +6,9 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
  nativeWindowMove:true,
+ pinState:()=>ipcRenderer.invoke('development:window','pin-state'),
+ togglePin:()=>ipcRenderer.invoke('development:window','toggle-pin'),
+ onPinChanged:callback=>{if(typeof callback!=='function')return()=>{};const listener=(_event,state)=>callback(state);ipcRenderer.on('development:pin-changed',listener);return()=>ipcRenderer.removeListener('development:pin-changed',listener);},
  onSpaceCenterMove:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('development:space-center-move',listener);return()=>ipcRenderer.removeListener('development:space-center-move',listener);},
  openBrowser:(path,displayId)=>ipcRenderer.invoke('development:open-browser',path,displayId),
  browserAction:(action,value)=>ipcRenderer.invoke('development:browser-action',action,value),

@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import layout from '../デスクトップ/window-layout.cjs';
-import frontModule from '../デスクトップ/前面維持.cjs';
 const {windowBounds,windowMinimumSize,allWindowBounds}=layout;
 test('ALL選択画面: 負座標・縦画面・狭い画面でもTerm下部、Code右上、Live左上',()=>{
  for(const area of [{x:-1920,y:-1080,width:1920,height:1040},{x:0,y:90,width:1080,height:1880},{x:0,y:0,width:320,height:240}]){
@@ -77,7 +76,7 @@ test('Electron生成: 単独Term・IDE子Termの双方へ最小寸法を渡し�
   once(){} on(){} setBounds(bounds){this.bounds=bounds;} getBounds(){return this.bounds;} setAlwaysOnTop(){} isDestroyed(){return false;} async loadURL(){}
  }
  const context={allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:0,y:0})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}})};
- Window.prototype.isAlwaysOnTop=()=>false;context.keepInFront=frontModule.keepInFront;
+ context.registerWindowPin=()=>{};context.attachWindowMove=()=>{};
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>windowBounds('ide',area),isDestroyed:()=>false},revision:0};
  for(const parent of [undefined,owner])for(const kind of ['term','code','live','ide','viewer']){
@@ -127,18 +126,18 @@ test('Electron生成: 親IDE側の画面を選び、Code番号・閉鎖後のslo
   destroy(){this.destroyed=true;for(const fn of this.closed)fn();} isMinimized(){return true;} restore(){} show(){} focus(){}
  }
  const context={allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:bounds=>{matched.push(bounds);return{workArea:secondary};},getDisplayNearestPoint:()=>({workArea:primary}),getCursorScreenPoint:()=>({x:100,y:100})},reserveTermSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}}),clearInterval(){},draftRouter:{invalidate(){}},nativePreviewActions:{invalidate(){}},closeChildren(){},closeServer(){}};
- Window.prototype.isAlwaysOnTop=()=>false;context.keepInFront=frontModule.keepInFront;
+ context.registerWindowPin=()=>{};context.attachWindowMove=()=>{};
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>({x:-900,y:150,width:700,height:800}),isDestroyed:()=>false},revision:0};
  const create=kind=>context.create(kind,'http://127.0.0.1:1234/',undefined,owner,'offline:1');
  const first=await create('code'),second=await create('code'),third=await create('code');
- assert.equal(first.options.parent,owner.window);
+ assert.equal(first.options.parent,undefined);
  assert.deepEqual([first,second,third].map(w=>w.options.title),['AiDiy IDE / Code 1','AiDiy IDE / Code 2','AiDiy IDE / Code 3']);
  assert.deepEqual(first.bounds,windowBounds('code',secondary));
  assert.equal(second.bounds.x,first.bounds.x+24);assert.equal(second.bounds.y,first.bounds.y+24);
  second.destroy();const reopened=await create('code');assert.deepEqual(reopened.bounds,second.bounds);assert.equal(reopened.options.title,second.options.title);
  const live=await create('live'),term=await create('term');
- assert.equal(live.options.parent,owner.window);assert.equal(term.options.parent,owner.window);
+ assert.equal(live.options.parent,undefined);assert.equal(term.options.parent,undefined);
  assert.deepEqual(live.bounds,windowBounds('live',secondary));assert.equal(term.bounds.height,470);
  assert.ok(matched.length>=6);assert.deepEqual(matched[0],owner.window.getBounds());
  const standalone=await context.create('code','http://127.0.0.1:1234/');assert.deepEqual(standalone.bounds,windowBounds('code',primary));

@@ -64,10 +64,10 @@ try{
  // Monacoの実エディターを記録し、pin/reloadで同じmodelとscrollを使うことを確認する。
  await main.evaluate(`window.diffEditors=[];window.makeDiff=monaco.editor.createDiffEditor;monaco.editor.createDiffEditor=function(...args){const value=makeDiff.apply(this,args);diffEditors.push(value);return value;};document.querySelector('.viewer-history').click()`);
  await main.until(`!!document.querySelector('.file-history-changes')&&!document.querySelector('.file-history-changes').textContent.includes('計算中')`);
- await main.evaluate(`window.originalCompare=document.querySelector('.file-history-editor');window.initialDiff=diffEditors.at(-1);initialDiff.getOriginalEditor().setScrollTop(700);initialDiff.getModifiedEditor().setScrollTop(700);window.initialModel=initialDiff.getModel();window.nativeOpen=window.open;window.open=()=>null;document.querySelector('[aria-label="ソース比較をピン留め"]').click()`);
+ await main.evaluate(`window.originalCompare=document.querySelector('.file-history-editor');window.initialDiff=diffEditors.at(-1);initialDiff.getOriginalEditor().setScrollTop(700);initialDiff.getModifiedEditor().setScrollTop(700);window.initialModel=initialDiff.getModel();window.nativeOpen=window.open;window.open=()=>null;document.querySelector('[aria-label="ソース比較を別ウィンドウで開く"]').click()`);
  await main.until(`document.body.textContent.includes('ポップアップがブロックされました')`);
  assert.equal(await main.evaluate('diffEditors.length'),1);
- await main.evaluate(`window.open=function(...args){window.popupArgs=args;return nativeOpen.apply(window,args)};const button=document.querySelector('[aria-label="ソース比較をピン留め"]');button.click();button.click()`);
+ await main.evaluate(`window.open=function(...args){window.popupArgs=args;return nativeOpen.apply(window,args)};const button=document.querySelector('[aria-label="ソース比較を別ウィンドウで開く"]');button.click();button.click()`);
  await main.until(`!document.querySelector('.viewer-session')`);
  let childTarget=(await targets()).find(t=>t.title.startsWith('AiDiy IDE / Viewer'));assert.ok(childTarget);
  const child=await connect(childTarget);await child.until(`!!document.querySelector('.history-embedded')`);
@@ -99,12 +99,12 @@ try{
  assert.equal(await main.evaluate(`!!document.querySelector('.viewer-session')`),false);
  // 通常viewerのpin経路も、比較を同じ窓に開く。Xは復元しない。
  await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/sample.txt'})`);await main.until(`!!document.querySelector('.viewer-history')`);
- await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);await main.until(`!document.querySelector('.viewer-session')`);
+ await main.evaluate(`document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]').click()`);await main.until(`!document.querySelector('.viewer-session')`);
  childTarget=(await targets()).find(t=>t.title.startsWith('AiDiy IDE / Viewer'));const again=await connect(childTarget);
  await again.until(`!!document.querySelector('.viewer-history')`);await again.evaluate(`document.querySelector('.viewer-history').click()`);await again.until(`!!document.querySelector('.file-history-changes')`);
  // Explorer Xは折畳み。バーガーで再表示しても入力は保持する。
  await main.evaluate(`document.querySelector('.explorer-toggle').click();window.explorerNode=document.querySelector('.explorer-panel');document.querySelector('input[value="grep"]').click()`);
- await main.evaluate(`const input=document.querySelector('.explorer-panel input[type=search]');input.value='保持する検索';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);
+ await main.evaluate(`const input=document.querySelector('.explorer-panel input[type=search]');input.value='保持する検索';input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);
  await main.until(`!document.querySelector('.explorer-panel')`);const explorer=await connect((await targets()).find(t=>t.title==='AiDiy IDE / Explorer'));
  await explorer.until(`!!document.querySelector('.explorer-panel')`);await explorer.send('Page.close');await main.until(`!!document.querySelector('.explorer-toggle')&&getComputedStyle(explorerNode).display==='none'`);
  await main.evaluate(`document.querySelector('.explorer-toggle').click()`);await main.until(`getComputedStyle(explorerNode).display!=='none'`);

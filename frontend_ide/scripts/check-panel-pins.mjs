@@ -58,7 +58,7 @@ try{
  await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/sample.txt'})`);
  await main.until(`!!document.querySelector('.viewer-popup .viewer-meta')`);
  await main.evaluate(`document.querySelector('.explorer-toggle').click();window.savedOpen=window.open;window.open=()=>null`);
- await main.evaluate(`document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);
+ await main.evaluate(`document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);
  await main.until(`document.body.textContent.includes('ポップアップがブロックされました')`);
  assert.equal(await main.evaluate(`!!document.querySelector('.explorer-panel')`),true);
  await main.until(`!document.querySelector('.explorer-branch-enter-active')`);
@@ -75,7 +75,7 @@ try{
  await main.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
  await main.evaluate(`window.open=function(...args){window.pinFeatures=args[2];return savedOpen.apply(window,args)};window.explorerNode=document.querySelector('.explorer-panel');window.treeNode=explorerNode.querySelector('[role=tree]');treeNode.scrollTop=250;window.treeTop=treeNode.scrollTop`);
  const before=await main.evaluate(`({scroll:treeTop,html:explorerNode.querySelector('[role=tree]').innerHTML,rect:(()=>{const r=explorerNode.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()})`);
- await main.evaluate(`const pin=document.querySelector('[aria-label="エクスプローラーをピン留め"]');pin.click();pin.click()`);
+ await main.evaluate(`const pin=document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]');pin.click();pin.click()`);
  await main.until(`!document.querySelector('.explorer-panel')`);
  let explorerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Explorer');assert.ok(explorerTarget);
  const explorer=await connect(explorerTarget);
@@ -100,7 +100,7 @@ try{
  assert.equal(await main.evaluate(`explorerNode===document.querySelector('.explorer-panel')&&treeNode===document.querySelector('[role=tree]')`),true);
  assert.equal(await main.evaluate(`getComputedStyle(explorerNode).backdropFilter`),'blur(4px)');
  await main.capture('explorer-restored');
- await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click();document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);
+ await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click();document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);
  await main.until(`!document.querySelector('.explorer-panel')`);
  explorerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Explorer');const again=await connect(explorerTarget);
  await again.until(`!!document.querySelector('.grep-results')`);
@@ -112,7 +112,7 @@ try{
  await again.evaluate(`document.querySelector('[aria-label="本体へ戻す"]').click()`);await main.until(`!!document.querySelector('.explorer-panel')`);
  assert.equal(await main.evaluate(`document.querySelector('.ai-search-panel textarea').value`),'未送信の調査内容');
  // Viewerも同じ位置指定で起動し、閉鎖後は閲覧を破棄し、明示的に再open/pinできる。
- await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);
+ await main.evaluate(`document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]').click()`);
  await main.until(`!document.querySelector('.viewer-popup')`);
  let viewerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Viewer');assert.ok(viewerTarget);const viewer=await connect(viewerTarget);
  await viewer.until(`!!document.querySelector('.viewer-pinned .viewer-meta')`);
@@ -122,9 +122,9 @@ try{
  assert.equal(await viewer.evaluate(`getComputedStyle(document.querySelector('.viewer-window')).animationDuration`),'0.26s');
  await viewer.capture('viewer-pinned');await viewer.send('Page.close');
  await main.until(`!document.querySelector('.viewer-session')`);
- await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/file-01.txt'})`);await main.until(`!!document.querySelector('[aria-label="ピン留め"]')`);
- await main.evaluate(`document.querySelector('[aria-label="ピン留め"]').click()`);await main.until(`!document.querySelector('.viewer-popup')`);
- await main.evaluate(`document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);await main.until(`!document.querySelector('.explorer-panel')`);
+ await main.evaluate(`aidiyIDE.goTo({type:'file',path:'src/file-01.txt'})`);await main.until(`!!document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]')`);
+ await main.evaluate(`document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]').click()`);await main.until(`!document.querySelector('.viewer-popup')`);
+ await main.evaluate(`document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);await main.until(`!document.querySelector('.explorer-panel')`);
  await main.send('Page.close');await sleep(700);
  assert.equal((await targets()).filter(t=>t.title==='AiDiy IDE / Explorer'||t.title==='AiDiy IDE / Viewer').length,0);
  assert.deepEqual(errors,[]);

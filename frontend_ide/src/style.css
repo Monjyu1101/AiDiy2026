@@ -100,6 +100,7 @@
 .space-view .explorer-panel :is(button,input,textarea,select,li,small,.explorer-search),.space-view .explorer-routes :is(button,p,small),:is(.viewer-popup,.viewer-pinned) :is(header span,button,.viewer-path,.viewer-meta,.viewer-preview-note,.viewer-route,.viewer-content pre){font-size:var(--file-font-size)}
 .space-view .explorer-panel header{gap:4px;padding:5px;flex-wrap:wrap}
 .space-view .explorer-panel header span{min-width:50px}
+.explorer-panel header .explorer-detach{margin-left:auto}
 .space-view .explorer-search{padding:8px}
 .space-view .explorer-search fieldset,.space-view .since-presets{flex-wrap:wrap;gap:4px}
 .space-view .explorer-search input[type=datetime-local]{max-width:100%;min-width:0}
@@ -233,6 +234,13 @@
 .native-route-window .route-controls{-webkit-app-region:drag;background:#080c1a}
 .native-route-window .route-drag-handle{display:block;flex:none;width:8px;height:18px;cursor:move;border-left:2px solid #9aa7b8;border-right:2px solid #9aa7b8}
 .native-route-window .route-controls button{-webkit-app-region:no-drag}
+.route-window-actions{flex:none;position:sticky;left:-5px;z-index:1;background:#080c1a}
+.route-window-actions .window-actions{gap:1px}
+.route-window-actions .window-actions button{width:23px;height:26px}
+.native-route-window .route-controls .route-choice{flex:1 1 0;min-width:20px;overflow:hidden;text-overflow:ellipsis}
+/* 別窓は共通の×で閉じ、行背景で移動できる。重複操作の幅を軌跡名に譲る。 */
+.native-route-window .route-controls>.route-burger,.native-route-window .route-controls>.route-drag-handle{display:none}
+.native-route-window .route-choice:before{display:none}
 .routes-window .route-tree{min-width:0}
 
 

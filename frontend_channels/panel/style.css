@@ -125,3 +125,6 @@ body.live-view #features{display:flex}
 body.live-off #audio-cloud,body.live-off #monitor{display:none!important}
 
 #app{display:contents}
+
+/* 最前面ピンだけを沈んだ OFF / 明るい ON で区別し、28px の操作寸法を保つ。 */
+.window-actions .window-pin{background:#070a0f;box-shadow:inset 0 1px 3px #000;color:#778394;font-size:14px}.window-pin>span{display:inline-block;filter:grayscale(1);opacity:.65;transform:translateY(1px)}.window-actions .window-pin.pinned{background:#263b49;box-shadow:inset 0 0 0 1px #6bbed0;color:#c3f7ff}.window-pin.pinned>span{filter:none;opacity:1;transform:none}.window-actions .window-pin:focus-visible{outline:2px solid #8d9fff;outline-offset:-2px}.window-actions .window-pin:disabled{cursor:not-allowed;opacity:.75}.window-maximize{display:inline-block;width:10px;height:10px;border:1px solid currentColor}.maximized .window-maximize{box-shadow:2px -2px 0 -1px #101217,2px -2px 0 0 currentColor}

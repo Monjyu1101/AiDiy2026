@@ -66,7 +66,7 @@ app.on('browser-window-created',(_,owner)=>{
    const buttonsOnly=process.env.AIDIY_ALL_BUTTONS_ONLY==='1';
    if(buttonsOnly||viewerOnly||process.env.AIDIY_ALL_PANEL_POSITION_ONLY==='1'){nativeOpacity.call(owner,1);await sleep(500);}
    const buttons=await evaluate(owner,`[...document.querySelectorAll('.ide-heading .window-actions button')].map(button=>button.getAttribute('aria-label')||button.textContent.trim())`);
-   assert.deepEqual(buttons,['最小化','最大化','終了']);
+   assert.deepEqual(buttons,['最小化','最大化','ピン留め（最前面を維持）','終了']);
    if(buttonsOnly)await headingShot('startup-no-all');
    await evaluate(owner,`[...document.querySelectorAll('button')].find(b=>b.textContent==='オフライン利用').click()`);
    await until(()=>evaluate(owner,'!!window.aidiyIDE'),'宇宙表示');
@@ -97,7 +97,7 @@ app.on('browser-window-created',(_,owner)=>{
     await until(()=>evaluate(owner,`!!document.querySelector('.viewer-popup .viewer-meta')`),'ビューア表示');
     const shots=[],capture=async(window,name)=>{const shot=join(output,`${stamp}_opening-clean-${name}.png`);writeFileSync(shot,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());shots.push(shot);};
     await sleep(850);assert.equal(await evaluate(owner,`document.querySelectorAll('.opening-shine,.opening-shine-band').length`),0);await capture(owner,'inline');
-    for(const [label,title] of [['エクスプローラーをピン留め','Explorer']]){
+    for(const [label,title] of [['エクスプローラーを別ウィンドウで開く','Explorer']]){
      const before=new Set(BrowserWindow.getAllWindows().map(window=>window.id));
      await evaluate(owner,`document.querySelector('[aria-label="${label}"]').click()`);
      let child;await until(()=>{child=BrowserWindow.getAllWindows().find(w=>!before.has(w.id)&&w.webContents.getURL()==='about:blank');return child&&shownWindows.includes(child.id);},title+'表示');
@@ -127,15 +127,15 @@ app.on('browser-window-created',(_,owner)=>{
    const explorerChild=children.find(w=>w.webContents.getTitle().includes('/ Explorer'));
    const routesChild=children.find(w=>w.webContents.getTitle().includes('/ 軌跡'));
    const checkBarClose=async visible=>{
-    await until(()=>evaluate(explorerChild,`!!document.querySelector('[aria-label="終了"]')===${visible}&&!!document.querySelector('[aria-label="エクスプローラーを閉じる"]')===${visible}`),'Explorerの閉じる操作');
-    await until(()=>evaluate(routesChild,`!!document.querySelector('[aria-label="軌跡バーを閉じる"]')===${visible}`),'軌跡の閉じる操作');
+    await until(()=>evaluate(explorerChild,`document.querySelector('[aria-label="終了"]')?.disabled===${!visible}&&!!document.querySelector('[aria-label="エクスプローラーを閉じる"]')===${visible}`),'Explorerの閉じる操作');
+    await until(()=>evaluate(routesChild,`document.querySelector('.route-window-actions .window-close')?.disabled===${!visible}&&!!document.querySelector('[aria-label="軌跡バーを閉じる"]')===${visible}`),'軌跡の閉じる操作');
    };
    await checkBarClose(false);
    const checkBarsClosed=async()=>{
     await until(()=>BrowserWindow.getAllWindows().every(w=>w===owner||!['AiDiy IDE / Explorer','AiDiy IDE / 軌跡'].includes(w.webContents.getTitle())),'ALL解除でExplorer・軌跡の別窓を終了');
     await until(()=>evaluate(owner,`originalExplorer.ownerDocument===document&&originalRoutes.ownerDocument===document&&getComputedStyle(originalExplorer).display==='none'&&getComputedStyle(originalRoutes).display==='none'&&!!document.querySelector('.explorer-toggle')&&!!document.querySelector('.route-restore-toggle')`),'本体へDOMを回収して閉じる');
    };
-   for(const child of children){assert.equal(child.getParentWindow(),owner);assert.equal(child.isAlwaysOnTop(),true,`${child.webContents.getTitle()} の前面維持`);}
+   for(const child of children){assert.equal(child.getParentWindow(),null);assert.equal(child.isAlwaysOnTop(),true,`${child.webContents.getTitle()} の前面維持`);}
    for(const child of children){
     assert.equal(await evaluate(child,'window.openingShines'),0,`${child.webContents.getTitle()} に登場後の光沢を出さない`);
    }
@@ -225,11 +225,11 @@ app.on('browser-window-created',(_,owner)=>{
     await evaluate(owner,`document.querySelector('.viewer-history').click()`);
     await until(()=>evaluate(owner,`!!document.querySelector('.file-history-changes')&&!document.querySelector('.file-history-changes').textContent.includes('計算中')`),'ALL中の比較も同じIDE内パネル');
     await checkInline('.history-embedded');assert.equal(count(),2);
-    await evaluate(owner,`document.querySelector('[aria-label="ソース比較をピン留め"]').click()`);
+    await evaluate(owner,`document.querySelector('[aria-label="ソース比較を別ウィンドウで開く"]').click()`);
     let pinned;
     await until(async()=>{pinned=BrowserWindow.getAllWindows().find(w=>w.webContents.getTitle().includes('Viewer - second.txt'));return pinned&&await evaluate(pinned,`!!document.querySelector('.history-embedded')`);},'明示的なピン留めだけ別窓にする');
     await until(()=>evaluate(owner,`!document.querySelector('.viewer-session')`),'ピン留め後はIDE内から移す');
-    assert.equal(count(),3);assert.equal(pinned.getParentWindow(),owner);
+    assert.equal(count(),3);assert.equal(pinned.getParentWindow(),null);
     await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'sample.txt'})`);
     await until(()=>evaluate(owner,`!!document.querySelector('[data-viewer-path="sample.txt"] .viewer-meta')`),'次のファイルは再びIDE内に表示');
     await checkInline('.viewer-popup');assert.equal(count(),3);
@@ -312,7 +312,7 @@ app.on('browser-window-created',(_,owner)=>{
    const {shots:inlineShots,pinned:newViewer}=await checkInlineViewer();
    const viewerBounds=newViewer.getBounds(),newPanelShot=inlineShots.at(-1);
    await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'最終復帰');near(owner.getBounds(),original);
-   near(newViewer.getBounds(),viewerBounds);assert.equal(newViewer.getParentWindow(),owner);
+   near(newViewer.getBounds(),viewerBounds);assert.equal(newViewer.getParentWindow(),null);
    // preloadのない通常Web環境でも同じ実画面を読み、--browserの表示条件を確認する。
    await checkWeb();
    const result={testPassed:true,displays:displays.map(d=>({bounds:d.bounds,scaleFactor:d.scaleFactor})),all:expected,restored:original,autoPinned:['explorer','routes'],pinOrder:['explorer','routes'],closedPanelsPinned:true,barsClosedOnExit:true,newViewerAndComparison:true,nativeOwnedPanels:true,zone,shot,hoverShot,newPanelShot};

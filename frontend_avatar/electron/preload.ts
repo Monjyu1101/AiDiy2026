@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 type TaskKey = 'task1' | 'task2' | 'task3'
+type WindowPinState = { pinned: boolean; locked: boolean }
 type WindowMode = 'login' | 'core'
 type WindowRole = WindowMode | PanelKey | TaskKey | 'settings' | 'taskDialog' | 'team'
 type WindowBounds = { x: number; y: number; width: number; height: number }
@@ -36,6 +37,14 @@ const api = {
   openLoginWindow: () => ipcRenderer.invoke('window:open-login') as Promise<WindowMode>,
   closeCurrentWindow: () => ipcRenderer.invoke('window:close-self'),
   minimizeCurrentWindow: () => ipcRenderer.invoke('window:minimize-self'),
+  toggleMaximizeCurrentWindow: () => ipcRenderer.invoke('window:toggle-maximize') as Promise<boolean>,
+  getWindowPinState: () => ipcRenderer.invoke('window:get-pin') as Promise<WindowPinState | null>,
+  toggleWindowPin: () => ipcRenderer.invoke('window:toggle-pin') as Promise<WindowPinState | null>,
+  onWindowPinChanged: (callback: (state: WindowPinState) => void) => {
+    const handler = (_event: unknown, state: WindowPinState) => callback(state)
+    ipcRenderer.on('window:pin-changed', handler)
+    return () => ipcRenderer.removeListener('window:pin-changed', handler)
+  },
   togglePanel: (panel: PanelKey) => ipcRenderer.invoke('panel:toggle', panel),
   toggleTaskWindows: () => ipcRenderer.invoke('task:toggle-all') as Promise<boolean>,
   toggleTeamWindow: () => ipcRenderer.invoke('team:toggle-window') as Promise<boolean>,

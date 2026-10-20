@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
-import {mkdtemp,mkdir,rm,readFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {mkdtemp,mkdir,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createCliLauncher} from '../起動/CLI起動.mjs';
@@ -29,11 +30,81 @@ test('invalid ids, unconfirmed mode, missing project and missing executable neve
  for(const [id,path,approved,status] of [['injected;sh',f.project,true,400],['copilot',f.project,false,400],['copilot',f.project,'true',400],['copilot','',true,400],['copilot','relative',true,400],['copilot',join(f.root,'missing'),true,400],['copilot',f.project+'\n',true,400],['grok',f.project,true,503]])await assert.rejects(f.manager.launch(id,path,approved),{status});
  assert.equal(f.calls.length,0);
 });
-test('pending and already-open CLI duplicates are rejected or reported; closing permits a new window',async t=>{
- const f=await fixture(t,{pending:true});const first=f.manager.launch('copilot',f.project,true);while(!f.calls.length)await new Promise(resolve=>setImmediate(resolve));
- await assert.rejects(f.manager.launch('copilot',f.project,true),{status:409});f.calls[0].child.emit('message',{launchReady:true});await first;
- assert.equal((await f.manager.launch('copilot',f.project,true)).起動済み,true);assert.equal(f.calls.length,1);
- f.calls[0].child.emit('exit',0);const second=f.manager.launch('copilot',f.project,true);while(f.calls.length<2)await new Promise(resolve=>setImmediate(resolve));f.calls[1].child.emit('message',{launchReady:true});await second;assert.equal(f.calls.length,2);
+test('every CLI including Hermes opens independent windows for repeated and concurrent same-project requests',async t=>{
+ for(const id of ids){
+  const f=await fixture(t,{pending:true});
+  const first=f.manager.launch(id,f.project,true),second=f.manager.launch(id,f.project,true);
+  while(f.calls.length<2)await new Promise(resolve=>setImmediate(resolve));
+  assert.notEqual(f.calls[0].child,f.calls[1].child);
+  f.calls[1].child.emit('message',{launchReady:true});f.calls[0].child.emit('message',{launchReady:true});
+  const results=await Promise.all([first,second]);
+  const third=f.manager.launch(id,f.project,true);
+  while(f.calls.length<3)await new Promise(resolve=>setImmediate(resolve));
+  f.calls[2].child.emit('message',{launchReady:true});results.push(await third);
+  assert.ok(results.every(result=>result.受付===true&&!result.起動済み));
+  assert.equal(new Set(results.map(result=>result.ログ)).size,3);
+  assert.ok(f.calls.every(call=>call.args.includes('--new-window')&&!call.child.killed));
+  f.calls[0].child.emit('exit',0);
+  assert.ok(f.calls.slice(1).every(call=>!call.child.killed));
+  assert.ok(f.calls.every(call=>call.child.listenerCount('exit')===0&&call.child.listenerCount('message')===0),'successful windows are owned by Term, not tracked by CLI/project');
+ }
+});
+test('one concurrent startup failure kills only its own unfinished child and leaves the other launch usable',async t=>{
+ const f=await fixture(t,{pending:true});
+ const first=f.manager.launch('aidiy_hermes',f.project,true);
+ const failed=assert.rejects(first,{status:503});
+ while(!f.calls.length)await new Promise(resolve=>setImmediate(resolve));
+ const second=f.manager.launch('aidiy_hermes',f.project,true);
+ while(f.calls.length<2)await new Promise(resolve=>setImmediate(resolve));
+ f.calls[0].child.emit('message',{launchError:'fixture error'});
+ f.calls[1].child.emit('message',{launchReady:true});
+ await failed;assert.equal((await second).受付,true);
+ assert.equal(f.calls[0].child.killed,true);assert.equal(f.calls[1].child.killed,undefined);
+});
+test('real IPC launchers keep separate processes and ports; closing one owner or Diag does not stop the other', {timeout:10000},async t=>{
+ const root=await mkdtemp(join(tmpdir(),'diag-cli-process-')),project=join(root,'日本語 project &'),children=[];
+ await mkdir(project);await mkdir(join(root,'frontend_ide'));
+ await writeFile(join(root,'frontend_ide','launch.mjs'),`
+  import {createServer} from 'node:http';
+  const server=createServer((req,res)=>{
+   res.setHeader('Content-Type','application/json');
+   res.end(JSON.stringify({pid:process.pid,cwd:process.cwd(),args:process.argv.slice(2)}));
+   if(req.url==='/close')server.close(()=>process.exit(0));
+  });
+  process.on('disconnect',()=>{}); // 表示完了後はTerm自身がサーバーを所有する。
+  process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
+  server.listen(0,'127.0.0.1',()=>process.send({launchReady:true,url:'http://127.0.0.1:'+server.address().port}));
+ `,'utf8');
+ t.after(async()=>{
+  await Promise.all(children.map(async record=>{
+   if(record.child.exitCode!==null||record.child.signalCode)return;
+   const exit=new Promise(resolve=>record.child.once('exit',resolve));record.child.kill();await exit;
+  }));
+  await rm(root,{recursive:true,force:true,maxRetries:5});
+ });
+ const manager=createCliLauncher({root,resolveCli:async()=>({}),timeout:5000,spawnFn(...args){
+  const child=spawn(...args),record={child};children.push(record);
+  child.on('message',message=>{if(message.launchReady)record.url=message.url;});
+  return child;
+ }});
+ const server=createServer({token:'fixture',cliLauncher:manager,modelTrials:{close(){}},startManager:{close(){}}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+ const base=`http://127.0.0.1:${server.address().port}`;
+ const launch=()=>fetch(base+'/api/CLI起動/開始',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:JSON.stringify({対象:'aidiy_hermes',フォルダ:project,自動承認確認:true})});
+ const responses=await Promise.all([launch(),launch()]);assert.ok(responses.every(response=>response.status===202));
+ assert.equal(children.length,2);assert.notEqual(children[0].child.pid,children[1].child.pid);assert.notEqual(children[0].url,children[1].url);
+ const inspect=record=>fetch(record.url,{signal:AbortSignal.timeout(1000)}).then(response=>response.json());
+ for(const record of children){const info=await inspect(record);assert.equal(info.cwd,project);assert.ok(info.args.includes('--new-window'));assert.equal(record.child.connected,false);}
+ // DiagのHTTP待受と終了処理は、完了済みのCLI起動の所有者ではない。
+ await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
+ for(const record of children)assert.equal((await inspect(record)).pid,record.child.pid);
+ const firstExit=new Promise(resolve=>children[0].child.once('exit',resolve));
+ await fetch(children[0].url+'/close');await firstExit;
+ await assert.rejects(inspect(children[0]));assert.equal((await inspect(children[1])).pid,children[1].child.pid);
+ const secondExit=new Promise(resolve=>children[1].child.once('exit',resolve));
+ await fetch(children[1].url+'/close');await secondExit;
+ await assert.rejects(inspect(children[1]));
 });
 test('startup errors and timeout fail closed, kill unfinished child and permit retry',async t=>{
  for(const options of [{error:true},{pending:true,timeout:5}]){
@@ -54,6 +125,8 @@ test('authenticated CLI API limits body fields, confirmation, asset names and me
  for(const [body,status] of [[{対象:'copilot',フォルダ:f.project},400],[{対象:'copilot',フォルダ:f.project,自動承認確認:true,model:'bad'},400],[{対象:'copilot',フォルダ:'x'.repeat(9000),自動承認確認:true},413]])assert.equal((await fetch(base+'api/CLI起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,status);
  assert.equal((await fetch(base+'api/CLI起動/開始',{headers})).status,404);assert.equal(f.calls.length,0);
  assert.equal((await fetch(base+'api/CLI起動/開始',{method:'POST',headers,body:JSON.stringify({対象:'copilot',フォルダ:f.project,自動承認確認:true})})).status,202);assert.equal(f.calls.length,1);
+ const repeated=await Promise.all(Array.from({length:3},()=>fetch(base+'api/CLI起動/開始',{method:'POST',headers,body:JSON.stringify({対象:'copilot',フォルダ:f.project,自動承認確認:true})})));
+ assert.ok(repeated.every(response=>response.status===202));assert.equal(f.calls.length,4);
 });
 
 test('missing optional Term files do not prevent Diag construction and fail only on CLI use',async()=>{

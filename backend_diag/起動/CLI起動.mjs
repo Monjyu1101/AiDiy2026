@@ -11,7 +11,6 @@ const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 // 任意コマンド・モデル・引数・実行ファイルはAPIから受け取らない。
 // 存在確認はファイル探索のみ。CLIの起動・認証・バージョン確認は行わない。
 export function createCliLauncher({root=ROOT,node=process.execPath,spawnFn=spawn,resolveCli,loadDefinitions=()=>import('../../frontend_ide/aidiy_term/cli-launch.mjs'),timeout=30000,env=process.env}={}){
- const pending=new Set(),active=new Map();
  async function definitions(){
   try{const shared=await loadDefinitions();return {items:shared.CLI_LAUNCHERS,resolve:resolveCli||shared.resolveCliLaunch};}
   catch{throw fail('Term のCLI起動ファイルが不足しています。同じ版の frontend_ide を準備してください。',503);}
@@ -31,33 +30,28 @@ export function createCliLauncher({root=ROOT,node=process.execPath,spawnFn=spawn
   if(approved!==true)throw fail('自動承認モードの注意事項を確認してください。');
   if(typeof project!=='string'||!project.trim()||project.length>4096||/[\0\r\n]/.test(project)||!isAbsolute(project))throw fail('プロジェクトフォルダを選択してください。');
   let cwd;try{cwd=await realpath(project);if(!(await stat(cwd)).isDirectory())throw Error();}catch{throw fail('フォルダが見つからないか、アクセスできません。');}
-  const key=JSON.stringify([id,cwd]);
-  if(pending.has(key))throw fail('このCLIの起動処理中です。',409);
-  if(active.has(key))return {起動済み:true,通知:`${item.name} はこのプロジェクトで起動済みです。Term のウィンドウを確認してください。`};
-  pending.add(key);
+  // 同じCLI・プロジェクトでも要求ごとに独立したTermを開く。
+  // 起動完了後のCLI・サーバー・窓の所有権と終了処理は、そのTermだけが持つ。
+  try{await resolve(id,{autoApprove:true,env});}catch{throw fail(`${item.name} の実行ファイルが見つからないか、利用できません。導入状況を確認してください。`,503);}
+  const args=[join(root,'frontend_ide','launch.mjs'),'--app','term','--project',cwd,'--new-window','--cli',id,'--cli-auto-approve','--foreground'];
+  const childEnv={...env,AIDIY_LAUNCHER_CHILD:'1'};
+  for(const name of Object.keys(childEnv))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(name))delete childEnv[name];
+  const logs=join(root,'_AIDIY','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
+  const logPath=join(logs,`cli-${id}-${randomUUID()}.log`),output=await open(logPath,'a',0o600);let child;
   try{
-   try{await resolve(id,{autoApprove:true,env});}catch{throw fail(`${item.name} の実行ファイルが見つからないか、利用できません。導入状況を確認してください。`,503);}
-   const args=[join(root,'frontend_ide','launch.mjs'),'--app','term','--project',cwd,'--new-window','--cli',id,'--cli-auto-approve','--foreground'];
-   const childEnv={...env,AIDIY_LAUNCHER_CHILD:'1'};
-   for(const name of Object.keys(childEnv))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(name))delete childEnv[name];
-   const logs=join(root,'_AIDIY','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
-   const logPath=join(logs,`cli-${id}-${randomUUID()}.log`),output=await open(logPath,'a',0o600);let child;
-   try{
-    child=spawnFn(node,args,{cwd,env:childEnv,detached:true,windowsHide:true,shell:false,stdio:['ignore',output.fd,output.fd,'ipc']});
-    await new Promise((resolve,reject)=>{
-     let finished=false;const finish=(error)=>{if(finished)return;finished=true;clearTimeout(timer);child.off('message',message);child.off('error',failed);child.off('exit',exited);error?reject(error):resolve();};
-     const message=value=>{if(value?.launchReady===true)finish();else if(value?.launchError)finish(fail(`${item.name} を開始できませんでした。Term のセットアップと起動ログを確認してください。`,503));};
-     const failed=()=>finish(fail('Term の起動に失敗しました。セットアップを確認してください。',503));
-     const exited=()=>finish(fail('Term が起動完了前に終了しました。起動ログを確認してください。',503));
-     const timer=setTimeout(()=>finish(fail('Term の起動がタイムアウトしました。起動ログを確認してください。',504)),timeout);
-     child.on('message',message);child.once('error',failed);child.once('exit',exited);
-    });
-    active.set(key,child);child.once('exit',()=>{if(active.get(key)===child)active.delete(key);});
-    if(child.connected)child.disconnect();child.unref();
-   }catch(error){if(child?.connected)child.disconnect();child?.kill();throw error.status?error:fail('Term の起動に失敗しました。セットアップを確認してください。',503);}
-   finally{await output.close();}
-   return {受付:true,通知:`${item.name} 用の Term を開きました（${item.mode}・モデル指定なし）。CLI の起動結果は端末を確認してください。`,ログ:logPath};
-  }finally{pending.delete(key);}
+   child=spawnFn(node,args,{cwd,env:childEnv,detached:true,windowsHide:true,shell:false,stdio:['ignore',output.fd,output.fd,'ipc']});
+   await new Promise((resolve,reject)=>{
+    let finished=false;const finish=(error)=>{if(finished)return;finished=true;clearTimeout(timer);child.off('message',message);child.off('error',failed);child.off('exit',exited);error?reject(error):resolve();};
+    const message=value=>{if(value?.launchReady===true)finish();else if(value?.launchError)finish(fail(`${item.name} を開始できませんでした。Term のセットアップと起動ログを確認してください。`,503));};
+    const failed=()=>finish(fail('Term の起動に失敗しました。セットアップを確認してください。',503));
+    const exited=()=>finish(fail('Term が起動完了前に終了しました。起動ログを確認してください。',503));
+    const timer=setTimeout(()=>finish(fail('Term の起動がタイムアウトしました。起動ログを確認してください。',504)),timeout);
+    child.on('message',message);child.once('error',failed);child.once('exit',exited);
+   });
+   if(child.connected)child.disconnect();child.unref();
+  }catch(error){if(child?.connected)child.disconnect();child?.kill();throw error.status?error:fail('Term の起動に失敗しました。セットアップを確認してください。',503);}
+  finally{await output.close();}
+  return {受付:true,通知:`${item.name} 用の Term を開きました（${item.mode}・モデル指定なし）。CLI の起動結果は端末を確認してください。`,ログ:logPath};
  }
  return {catalog,launch};
 }

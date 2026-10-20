@@ -19,6 +19,7 @@ interface ImportMetaEnv {
 declare global {
   type AvatarPanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
   type AvatarTaskKey = 'task1' | 'task2' | 'task3'
+  type AvatarWindowPinState = { pinned: boolean; locked: boolean }
   type AvatarWindowMode = 'login' | 'core'
   type AvatarWindowRole = AvatarWindowMode | AvatarPanelKey | AvatarTaskKey | 'settings' | 'taskDialog' | 'team'
   type AvatarWindowBounds = { x: number; y: number; width: number; height: number }
@@ -54,6 +55,10 @@ declare global {
       openLoginWindow?: () => Promise<AvatarWindowMode>
       closeCurrentWindow?: () => Promise<void>
       minimizeCurrentWindow?: () => Promise<void>
+      toggleMaximizeCurrentWindow?: () => Promise<boolean>
+      getWindowPinState?: () => Promise<AvatarWindowPinState | null>
+      toggleWindowPin?: () => Promise<AvatarWindowPinState | null>
+      onWindowPinChanged?: (callback: (state: AvatarWindowPinState) => void) => () => void
       togglePanel?: (panel: AvatarPanelKey) => Promise<Record<AvatarPanelKey, boolean>>
       toggleTaskWindows?: () => Promise<boolean>
       toggleTeamWindow?: () => Promise<boolean>

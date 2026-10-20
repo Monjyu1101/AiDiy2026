@@ -79,11 +79,12 @@ export function createPanelWindow({ element, changed, report, closed = () => {},
       const host = doc.createElement('main'); host.className = 'development-app ' + className;
       doc.body.replaceChildren(host);
       let removeTitle = () => {};
-      if (win.aidiyWindow?.panelAction && kind !== 'panel-routes') {
+      if (win.aidiyWindow?.panelAction) {
         const { mountPanelTitle } = await import('./別窓タイトル.js');
         if (disposed || child !== target || target.closed || target.document !== doc) return;
-        host.classList.add('native-panel-window');
-        removeTitle = mountPanelTitle(host, target, win, title, kind);
+        if (kind !== 'panel-routes') host.classList.add('native-panel-window');
+        // 軌跡バーは既存の一行に操作を置き、窓の高さ・展開位置を変えない。
+        removeTitle = mountPanelTitle(kind === 'panel-routes' ? element().querySelector('.route-controls') : host, target, win, title, kind);
       }
       if(kind==='panel-routes'){doc.documentElement.classList.add('route-window-document');if(win.aidiyWindow?.resizeRoutes)doc.documentElement.classList.add('native-route-window');}
       // 元Documentのタイムラインを別窓へ持ち込まない（裏のIDEでは停止し得る）。

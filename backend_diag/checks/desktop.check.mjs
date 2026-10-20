@@ -11,6 +11,7 @@ import {browserMode,desktopBinary,openDesktop,closeDesktop} from '../起動/desk
 import miniWindow from '../起動/ミニ表示.cjs';
 import closeWindow from '../起動/終了確認.cjs';
 import macMenu from '../起動/MacOS-Menu.cjs';
+import windowPins from '../../frontend_ide/デスクトップ/最前面ピン.cjs';
 const url='http://127.0.0.1:1234/#token='+'a'.repeat(43);
 function childFixture(){const child=new EventEmitter();child.stderr=new EventEmitter();child.send=()=>{};child.kill=()=>{};return child;}
 async function mainFixture({opening,load,toolsOpen=false,primary=true,platform='win32',startStatus={終了時停止あり:false},confirmClose=async()=>({response:1}),selectFolder=async()=>({canceled:true,filePaths:[]})}={}){
@@ -26,8 +27,8 @@ async function mainFixture({opening,load,toolsOpen=false,primary=true,platform='
  app.setName=name=>{app.name=name;};app.dock={setMenu(menu){app.dock.menu=menu;},setIcon(icon){app.dock.icon=icon;}};
  const Menu={buildFromTemplate:items=>items,setApplicationMenu(menu){app.menu=menu;}};
  const session={fromPartition(name){assert.ok(!name.startsWith('persist:'));return {setPermissionRequestHandler(fn){policy.permission=fn;},setPermissionCheckHandler(fn){policy.check=fn;},webRequest:{onBeforeRequest(fn){policy.request=fn;}}};}};
- class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}getBounds(){return {...this.getNormalBounds()};}getNormalBounds(){return this.bounds||{x:150,y:100,width:1160,height:820};}getMinimumSize(){return this.minimum||[420,320];}isMaximizable(){return true;}setMinimumSize(...value){this.minimum=value;}setMaximizable(value){this.maximizable=value;}setBounds(value){this.bounds=value;}isAlwaysOnTop(){return !!this.top;}setAlwaysOnTop(value){this.top=value;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;this.webContents.emit('did-start-loading');await load?.();}}
- vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./MacOS-Menu.cjs'?{...macMenu,Macメニューを設定:options=>macMenu.Macメニューを設定({...options,platform})}:id==='../../frontend_ide/デスクトップ/長押し窓移動.cjs'?{attachNativeWindowMove:(window,screen,kind)=>moves.push({window,screen,kind})}:id==='./ポート接続.cjs'?{checkPort:async port=>{assert.equal(port,8095);return toolsOpen;}}:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,Menu,screen:{getPrimaryDisplay:()=>({workArea:{x:0,y:28,width:1920,height:1052}})},dialog:{showOpenDialog:selectFolder,showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
+ class Window extends EventEmitter {constructor(value){super();options=value;win=this;this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.isDestroyed=()=>false;this.webContents.send=(channel,state)=>{this.pinMessage={channel,state};};this.webContents.executeJavaScript=async script=>{scripts.push(script);};this.webContents.setWindowOpenHandler=fn=>{policy.window=fn;};}isDestroyed(){return !!this.destroyed;}isMaximized(){return !!this.maximized;}maximize(){this.maximized=true;}unmaximize(){this.maximized=false;}minimize(){this.minimized=true;}close(){const event={preventDefault(){this.prevented=true;}};this.emit('close',event);if(!event.prevented)this.closed=true;}getBounds(){return {...this.getNormalBounds()};}getNormalBounds(){return this.bounds||{x:150,y:100,width:1160,height:820};}getMinimumSize(){return this.minimum||[420,320];}isMaximizable(){return true;}setMinimumSize(...value){this.minimum=value;}setMaximizable(value){this.maximizable=value;}setBounds(value){this.bounds=value;}isAlwaysOnTop(){return !!this.top;}setAlwaysOnTop(value){this.top=value;}setMenuBarVisibility(){}show(){this.shown=true;}async loadURL(value){loaded=value;this.webContents.emit('did-start-loading');await load?.();}}
+ vm.runInNewContext(source,{__dirname:'/fixture',require:id=>id==='node:path'?path:id==='./MacOS-Menu.cjs'?{...macMenu,Macメニューを設定:options=>macMenu.Macメニューを設定({...options,platform})}:id==='../../frontend_ide/デスクトップ/長押し窓移動.cjs'?{attachNativeWindowMove:(window,screen,kind)=>moves.push({window,screen,kind})}:id==='../../frontend_ide/デスクトップ/最前面ピン.cjs'?windowPins:id==='./ポート接続.cjs'?{checkPort:async port=>{assert.equal(port,8095);return toolsOpen;}}:id==='./ミニ表示.cjs'?miniWindow:id==='./終了確認.cjs'?{...closeWindow,起動状態を読む:async()=>structuredClone(startStatus)}:id==='../../frontend_ide/host/scripts/window-opening.cjs'?{拡大表示:async(Constructor,window,options)=>{openings.push({Constructor,window,options});if(opening)return opening(window);window.show();return true;}}:({app,BrowserWindow:Window,session,Menu,screen:{getPrimaryDisplay:()=>({workArea:{x:0,y:28,width:1920,height:1052}})},dialog:{showOpenDialog:selectFolder,showMessageBox:(parent,options)=>{dialogs.push({parent,options});return confirmClose();}},ipcMain:{handle:(name,fn)=>handlers[name]=fn}}),process:proc,URL,setTimeout:()=>({unref(){}}),clearTimeout(){}});
  return {stdin,proc,app,policy,sent,exits,handlers,scripts,openings,dialogs,moves,get options(){return options;},get win(){return win;},get loaded(){return loaded;}};
 }
 test('desktop default; explicit browser, Codespaces, headless remain Node-only',()=>{
@@ -65,7 +66,7 @@ test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',as
 test('Tools 8095 open starts mini at primary work-area top-left before show, while closed/unknown use normal',async()=>{
  for(const toolsOpen of [true,false,null]){
   const f=await mainFixture({toolsOpen,opening:window=>{
-   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,134);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,true);}
+   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,134);assert.equal(window.bounds.x,0);assert.equal(window.bounds.y,28);assert.equal(window.top,false);}
    else assert.equal(window.bounds,undefined);
    window.show();return true;
   }});
@@ -213,7 +214,7 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  control(event,'openFile');assert.equal(f.win.closed,undefined);
  control(event,'minimize');assert.equal(f.win.minimized,true);control(event,'maximize');assert.equal(control(event,'isMaximized'),true);control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,0);
  const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{process:{argv:[]},require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
- assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','initialMini','isMaximized','maximize','minimize','resizeMini','selectProject','startMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['close','getPinState','initialMini','isMaximized','maximize','minimize','onPinState','resizeMini','selectProject','startMini','togglePin']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
  assert.equal(exposed.aidiyWindow.initialMini,false);
  assert.deepEqual(Array.from(exposed.aidiyWindow.selectProject()),['diag:window','selectProject']);
  assert.deepEqual(Array.from(exposed.aidiyWindow.startMini(true)),['diag:window','startMini',true]);assert.equal(await exposed.aidiyWindow.startMini({width:100}),false);
@@ -275,4 +276,30 @@ test('load failure skips expansion and content fade is desktop-only without an O
  assert.match(css,/\.desktop-window #app\{animation:startup-fade-in \.45s ease-out both\}/);
  assert.match(css,/\.desktop-opening #app\{opacity:0;animation:none\}/);
  assert.doesNotMatch(css,/prefers-reduced-motion/);
+});
+
+test('Diag pin is default OFF, main-frame-only and survives normal/mini transitions',async()=>{
+ const f=await mainFixture();f.proc.emit('message',{type:'diag-start',url});await flush();
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ assert.deepEqual(control(event,'getPinState'),{pinned:false,locked:false});assert.equal(f.win.top,false);
+ for(const denied of [{...event,senderFrame:{}},{...event,sender:{}}]){
+  assert.equal(control(denied,'togglePin'),false);assert.equal(control(denied,'getPinState'),false);
+ }
+ assert.equal(f.win.top,false);assert.deepEqual(control(event,'togglePin'),{pinned:true,locked:false});assert.equal(f.win.top,true);
+ assert.equal(f.win.pinMessage.channel,'diag:pin-state');assert.deepEqual(f.win.pinMessage.state,{pinned:true,locked:false});
+ control(event,'startMini',true);assert.equal(f.win.top,true);control(event,'togglePin');assert.equal(f.win.top,false);
+ control(event,'startMini',false);assert.equal(f.win.top,false);
+ control(event,'startMini',true);control(event,'togglePin');control(event,'startMini',false);assert.equal(f.win.top,true);
+ f.win.destroyed=true;assert.equal(control(event,'togglePin'),false);
+});
+
+test('Diag preload pin subscriptions validate payloads and return an exact unsubscriber',async()=>{
+ const ipc=new EventEmitter(),exposed={},calls=[];ipc.invoke=(...args)=>{calls.push(args);return Promise.resolve({pinned:false,locked:false});};
+ vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{process:{argv:[]},require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:ipc})});
+ const received=[],api=exposed.aidiyWindow,cancel=api.onPinState(value=>received.push(value));
+ for(const value of [null,{},true,{pinned:'true',locked:false},{pinned:true}])ipc.emit('diag:pin-state',{},value);
+ assert.equal(received.length,0);ipc.emit('diag:pin-state',{}, {pinned:true,locked:false,extra:'ignored'});
+ assert.equal(JSON.stringify(received),JSON.stringify([{pinned:true,locked:false}]));cancel();assert.equal(ipc.listenerCount('diag:pin-state'),0);
+ api.onPinState(null)();await api.getPinState();await api.togglePin();
+ assert.deepEqual(calls,[['diag:window','getPinState'],['diag:window','togglePin']]);
 });

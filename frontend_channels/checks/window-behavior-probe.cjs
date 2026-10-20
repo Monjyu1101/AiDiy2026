@@ -25,10 +25,16 @@ async function inspect(window){
  try{
   assert.equal(openings,1);await until(()=>window.webContents.executeJavaScript("!!document.querySelector('#code-model:not(:disabled)')"),'Discord読込');
   assert.equal(BrowserWindow.getAllWindows().length,1,'演出用の透明パネルを回収');
+  assert.equal(window.isAlwaysOnTop(),false);
+  assert.equal(await window.webContents.executeJavaScript("document.querySelector('#pin').getAttribute('aria-pressed')"),'false');
+  await window.webContents.executeJavaScript("document.querySelector('#pin').click()");
+  await until(()=>window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('#pin').getAttribute('aria-pressed')==='true'"),'Discordピン ON');
+  await window.webContents.executeJavaScript("document.querySelector('#pin').click()");
+  await until(()=>!window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('#pin').getAttribute('aria-pressed')==='false'"),'Discordピン OFF');
   const results=[await holdMove(window,window.webContents,'.hint','Discord_背景'),await holdUnmoved(window,window.webContents,'#code-model','Discord_モデル入力'),await checkNativeControls(window,window.webContents,'Discord')];
   assert.equal(await window.webContents.executeJavaScript(`document.querySelector('#code-model').value`),'fixture-model','保持・入力確認で保存済みモデルを変えない');
   assert.ok(requests.every(action=>['initial','catalog-code'].includes(action)),'Botの起動・接続・設定変更をしない');
-  process.send({testPassed:true,openingCount:openings,results},()=>app.exit(0));
+  process.send({testPassed:true,openingCount:openings,initialPin:false,pinRoundTrip:true,results},()=>app.exit(0));
  }catch(error){console.error(error);app.exit(1);}
 }
 const filename=path.resolve(__dirname,'../panel/desktop.cjs'),load=createRequire(filename);

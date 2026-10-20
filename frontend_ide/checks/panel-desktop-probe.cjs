@@ -66,7 +66,7 @@ app.on('browser-window-created',(_,owner)=>{
     owner.webContents.setZoomFactor(zoom);await sleep(150);
     const rect=await evaluate(owner,`(()=>{const r=document.querySelector('.explorer-panel').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`);
     const expected=require('../デスクトップ/panel-windows.cjs').panelBounds(rect,{window:owner},screen);
-    await evaluate(owner,`(()=>{window.originalExplorer=document.querySelector('.explorer-panel');window.pinPreviewObserved=false;const observer=new MutationObserver(()=>{if(!document.querySelector('.explorer-panel')){window.pinPreviewObserved=!!document.querySelector('.panel-pin-preview');observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});const pin=document.querySelector('[aria-label="エクスプローラーをピン留め"]');pin.click();pin.click()})()`);
+    await evaluate(owner,`(()=>{window.originalExplorer=document.querySelector('.explorer-panel');window.pinPreviewObserved=false;const observer=new MutationObserver(()=>{if(!document.querySelector('.explorer-panel')){window.pinPreviewObserved=!!document.querySelector('.panel-pin-preview');observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});const pin=document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]');pin.click();pin.click()})()`);
     await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'Explorer移動');
     assert.equal(await evaluate(owner,`pinPreviewObserved`),true,'別窓へDOMを移す時点では元位置の表示を残す');
     if(zoom===1)writeFileSync(join(output,'electron-pin-before-show.png'),(await owner.webContents.capturePage()).toPNG());
@@ -105,7 +105,7 @@ app.on('browser-window-created',(_,owner)=>{
     owner.webContents.setZoomFactor(zoom);await sleep(150);
     const rect=await evaluate(owner,`(()=>{const r=document.querySelector('.viewer-popup').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height}})()`);
     const expected=require('../デスクトップ/panel-windows.cjs').panelBounds(rect,{window:owner},screen);
-    await evaluate(owner,`document.querySelector('[aria-label="ピン留め"]').click()`);
+    await evaluate(owner,`document.querySelector('[aria-label="ファイルを別ウィンドウで開く"]').click()`);
     await until(()=>evaluate(owner,`!document.querySelector('.viewer-popup')`),'Viewer移動');
     const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');assert.ok(child);
     nearBounds(child.getBounds(),expected);await until(()=>evaluate(child,`!!document.querySelector('.viewer-pinned .viewer-meta')`),'Viewer表示');
@@ -142,22 +142,23 @@ app.on('browser-window-created',(_,owner)=>{
    // 閉じたバーの非表示ボタンを直接押さず、利用者と同じ順で展開してからpinする。
    await evaluate(owner,`document.querySelector('[aria-label="軌跡バーを開く"]')?.click()`);
    await until(()=>evaluate(owner,`document.querySelector('.explorer-routes').getBoundingClientRect().height>0`),'軌跡展開');
-   await evaluate(owner,`document.querySelector('[aria-label="軌跡バーをピン留め"]').click()`);
+   await evaluate(owner,`document.querySelector('[aria-label="軌跡バーを別ウィンドウで開く"]').click()`);
    await until(()=>evaluate(owner,`!document.querySelector('.explorer-routes')`),'軌跡pin');
    const routes=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await until(()=>evaluate(routes,`!!document.querySelector('.route-controls')`),'軌跡表示');
    await until(()=>evaluate(owner,`!document.querySelector('.panel-pin-preview')`),'軌跡ズーム完了');
    await sleep(350);
-   // 大きいバーガーボタンも同じ行。高さが異なるボタンは上端でなく縦中心で整列を検査する。
-   const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')];return{rows:new Set(buttons.map(b=>{const r=b.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
+   // 非表示の重複操作を除き、高さが異なるボタンは縦中心で同じ行に整列する。
+   const row=await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls'),buttons=[...bar.querySelectorAll('button')].filter(button=>button.getBoundingClientRect().width>0);return{rows:new Set(buttons.map(b=>{const r=b.getBoundingClientRect();return Math.round(r.top+r.height/2)})).size,height:document.querySelector('.explorer-routes').getBoundingClientRect().height,overflow:bar.scrollWidth>bar.clientWidth}})()`);
    assert.equal(row.rows,1);assert.equal(row.overflow,false);assert.ok(row.height<=40.01,JSON.stringify(row));
+   assert.equal(await evaluate(routes,`(()=>{const bar=document.querySelector('.route-controls').getBoundingClientRect(),buttons=[...document.querySelectorAll('.route-window-actions button')];return buttons.length===4&&buttons.every(button=>{const r=button.getBoundingClientRect();return r.left>=bar.left&&r.right<=bar.right;});})()`),true,'軌跡操作が横に長くても窓操作4個を表示する');
    results.push(await holdUnmoved(routes,routes.webContents,'.route-choice','軌跡ボタン'));
    await evaluate(routes,`document.querySelector('.route-choice[aria-expanded="true"]')?.click()`);
    await dragPanel(routes,await probeBackground(routes.webContents),'軌跡背景');
    await evaluate(routes,`document.querySelector('#move-probe-background').remove()`);
    writeFileSync(join(output,'electron-routes-single-row.png'),(await routes.webContents.capturePage()).toPNG());
-   await evaluate(routes,`document.querySelector('[aria-label="軌跡バーを閉じる"]').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
-   await evaluate(owner,`document.querySelector('[aria-label="エクスプローラーをピン留め"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'終了前pin');
+   await evaluate(routes,`document.querySelector('.route-window-actions .window-close').click()`);await until(()=>routes.isDestroyed(),'軌跡終了');results.push({kind:'routes',...row});
+   await evaluate(owner,`document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);await until(()=>evaluate(owner,`!document.querySelector('.explorer-panel')`),'終了前pin');
    const child=BrowserWindow.getAllWindows().find(w=>w!==owner&&w.webContents.getURL()==='about:blank');
    await evaluate(owner,`Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent==='終了').click()`);
    await until(()=>child.isDestroyed(),'利用終了');
