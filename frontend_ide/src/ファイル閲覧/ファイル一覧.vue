@@ -9,12 +9,14 @@ import { createRouteExpansion } from '../ファイル閲覧/軌跡パネル展�
 import { createPanelWindow, fadePanel } from '../ファイル閲覧/パネル別窓.js';
 import AISearchPanel from '../ファイル検索/AI検索パネル.vue';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
+import ExplorerActionView from '../ファイル閲覧/エクスプローラー操作表示.vue';
+import { createExplorerActions, containsPath, renamedPath } from './エクスプローラー操作.js';
 import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新ファイル.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
-const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, allDisplays: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, color: { type: Function, default: () => '#bac7da' } });
-const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached']);
+const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, allDisplays: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, applyFileChange: Function, reload: Function, color: { type: Function, default: () => '#bac7da' } });
+const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached', 'activity']);
 const panel=ref(),detached=ref(false),pinError=ref('');
 let panelWindow,routeWindow;
 // 軌跡バーはエクスプローラーと同じく、最初は閉じて縦三本の正方形ボタンだけを出す。
@@ -30,10 +32,11 @@ function pinRoutes(){
 function openRoutes(){if(!routeWindow?.focus())routeClosed.value=false;}
 function closeRoutes(){if(routeDetached.value)routeWindow.dismiss();else{routeClosed.value=true;routeListOpen.value=false;}}
 function pinExplorer(){
+  fileActions.closeMenu();
   panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},closed:()=>emit('update:open',false),report:message=>{pinError.value=message;}});
   return panelWindow.pin();
 }
-function closeExplorer(){if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
+function closeExplorer(){fileActions.closeMenu();if(!fileActionState.busy)fileActions.cancel();if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
 watch(()=>props.allDisplays,(active,previous)=>{
   if(previous&&!active){
     // DOM・履歴を本体へ回収してから別窓を閉じ、通常画面では閉じた状態へ戻す。
@@ -216,7 +219,7 @@ const rows = computed(() => {
   if (tree.value && rootExpanded.value) walk(tree.value,'',0); return result;
 });
 function save() { if (props.root) try { localStorage.setItem(`aidiy_ide:explorer:${props.root}`,JSON.stringify({expanded:[...expanded.value]})); } catch {} }
-function toggle(row) { cancelSinceExpansion();const next=new Set(expanded.value); next.has(row.path)?next.delete(row.path):next.add(row.path); expanded.value=next; save(); }
+function toggle(row) { if(fileActionState.rename||fileActionState.busy)return;cancelSinceExpansion();const next=new Set(expanded.value); next.has(row.path)?next.delete(row.path):next.add(row.path); expanded.value=next; save(); }
 function reveal(path = props.selected || props.current) {
   if (!path || searching.value || pendingSince) return;
   rootExpanded.value=true;
@@ -226,7 +229,7 @@ function reveal(path = props.selected || props.current) {
   nextTick(()=>treeElement.value?.querySelector(`[data-path="${CSS.escape(path)}"]`)?.scrollIntoView({block:'nearest'}));
 }
 function select(row, toggleSelection=false) {
-  cancelSinceExpansion();
+  fileNavigationVersion++;cancelSinceExpansion();
   if(toggleSelection&&!props.navigating&&row.type==='file'&&props.selected===row.path){cursor.value='';emit('clear');return;}
   cursor.value=row.path;
   if(row.type==='dir'){if(row.path==='')rootExpanded.value=true;else expanded.value=new Set([...expanded.value,row.path]);save();}
@@ -278,8 +281,41 @@ async function grep() {
   }catch(e){if(run===generation)status.value=`検索できません: ${e.message}`;}
   finally{if(run===generation){searching.value=false;rootExpanded.value=true;nextTick(scrollToTop);}}
 }
+let fileNavigationVersion=0;
+// 右クリックは閲覧位置を動かさず、操作対象だけをカーソルへ合わせる。
+const fileActions=createExplorerActions({root:()=>props.root||'',document:()=>panel.value?.ownerDocument,
+  focus:()=>treeElement.value?.focus(),edit:row=>{cursor.value=row.path;reveal(row.path);},
+  refresh:async()=>{if(props.reload)await props.reload();},
+  changed:async(result,isCurrent)=>{
+    const navigation=fileNavigationVersion;
+    const previous=result.previousPath||result.path;
+    if(result.action==='rename'){
+      expanded.value=new Set([...expanded.value].map(path=>renamedPath(path,previous,result.path)));
+      cursor.value=renamedPath(cursor.value,previous,result.path);
+    }else if(result.action==='trash'){
+      expanded.value=new Set([...expanded.value].filter(path=>!containsPath(previous,path)));
+      if(containsPath(previous,cursor.value))cursor.value='';
+    }
+    clearSearch();recentUpdates.value=recentUpdates.value.filter(file=>!containsPath(previous,file.path));save();
+    if(props.applyFileChange)await props.applyFileChange(result);
+    if(isCurrent()&&navigation===fileNavigationVersion&&result.action!=='trash'){cursor.value=result.path;reveal(result.path);}
+  }});
+const fileActionState=fileActions.state;
+function contextMenu(event,row){if(fileActionState.busy)return;fileNavigationVersion++;if(row)cursor.value=row.path;void fileActions.showMenu(event,row,panel.value);}
+function renameKey(event){
+  if(event.isComposing||event.keyCode===229)return;
+  if(event.key==='Escape'){event.preventDefault();fileActions.cancel();}
+  else if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();void fileActions.submitName();}
+}
+watch(()=>[props.root,props.startedAt],()=>fileActions.reset());
+watch(()=>props.open,value=>{if(!value)fileActions.closeMenu();});
+watch(mode,()=>{fileActions.closeMenu();if(!fileActionState.busy)fileActions.cancel();});
+function rowKey(event,row){const command=fileActions.keyboard(event,row);if(command==='menu'){contextMenu(event,row);return true;}return command;}
 function key(event) {
+  if(event.target?.closest?.('input,textarea,[contenteditable="true"]'))return;
   const index=rows.value.findIndex(row=>row.path===cursor.value), row=rows.value[index];let next=index;
+  const command=rowKey(event,row);
+  if(command||fileActionState.rename||fileActionState.dialog||fileActionState.busy)return;
   if(event.key==='ArrowDown')next=Math.min(rows.value.length-1,index+1);
   else if(event.key==='ArrowUp')next=Math.max(0,index-1);
   else if(event.key==='Home')next=0;
@@ -302,7 +338,7 @@ watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();in
 watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,matches,aiResult],emitMarks,{immediate:true});
-onBeforeUnmount(()=>{routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
+onBeforeUnmount(()=>{fileActions.dispose();routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
 defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 </script>
 <template>
@@ -327,8 +363,8 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
       </section>
       </div>
     </div>
-    <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー">
-      <header><button v-if="!allDisplays" class="burger-button explorer-burger" aria-label="エクスプローラーを閉じる" title="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button><span>エクスプローラー</span><button v-if="!allDisplays||!detached" :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
+    <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー" @contextmenu.self.prevent="contextMenu($event)" @pointerdown.capture="emit('activity')">
+      <header><button v-if="!allDisplays" class="burger-button explorer-burger" aria-label="エクスプローラーを閉じる" title="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button><span>エクスプローラー</span><button v-if="!allDisplays||!detached" :aria-label="detached?'本体へ戻す':'エクスプローラーをピン留め'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" :disabled="fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button></header>
       <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">起点検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>
@@ -343,28 +379,30 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
         <AISearchPanel :key="root" :root="root" v-show="mode==='ai'" @search="beginSearch('ai')" @result="acceptAI" />
         <div v-if="mode==='ai'&&aiResult" class="ai-route-results"><p v-if="hiddenAI">{{ hiddenAI }}件は現在の一覧にありません。フィルターをOFFにするか一覧を更新してください。</p><p :title="aiResult.query">{{ aiResult.title || aiResult.query }} · {{ aiRoute.length }}件</p><ol><li v-for="path in aiRoute" :key="path"><button :title="aiFiles.get(path)" @click="select({type:'file',path})">{{ path }}</button><small>{{ aiFiles.get(path) }}</small></li></ol></div>
       </section>
-      <div class="explorer-root" :title="root">
-        <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
+      <div class="explorer-root" :title="root" @contextmenu.prevent.stop="contextMenu($event,{type:'dir',path:'',name:tree?.n})" @keydown="rowKey($event,{type:'dir',path:'',name:tree?.n})">
+        <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching||fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
         <button class="explorer-root-name" :disabled="searching" @click="select({type:'dir',path:''})"><FileTypeIcon :name="tree?.n" directory :open="rootExpanded" /><span class="file-name">{{ tree?.n }}</span></button>
       </div>
-      <ul ref="treeElement" role="tree" tabindex="0" @keydown="key"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :data-entry-type="row.type" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,'plain-folder':row.type==='dir'&&mode!=='ai',selected:selected===row.path,cursor:cursor===row.path}" @click="select(row,true)">
-        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><span class="file-name">{{ row.name }}</span><span class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh" class="file-mark">●</span>
+      <ul ref="treeElement" role="tree" tabindex="0" @keydown="key" @contextmenu.prevent.stop="contextMenu($event)"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :data-entry-type="row.type" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,'plain-folder':row.type==='dir'&&mode!=='ai',selected:selected===row.path,cursor:cursor===row.path}" @click="!fileActionState.rename&&!fileActionState.busy&&select(row,true)" @contextmenu.prevent.stop="contextMenu($event,row)">
+        <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><input v-if="fileActionState.rename?.path===row.path" v-model="fileActionState.rename.value" class="explorer-rename" aria-label="新しい名前" :disabled="fileActionState.busy" maxlength="255" autocomplete="off" spellcheck="false" @click.stop @contextmenu.stop @keydown.stop="renameKey" @blur="!fileActionState.busy&&fileActions.cancel()"><span v-else class="file-name">{{ row.name }}</span><span v-if="fileActionState.rename?.path!==row.path" class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh" class="file-mark">●</span>
       </li></TransitionGroup></ul>
       <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
       <footer class="explorer-footer">
         <p v-if="latestWarning" class="scan-warning" role="status">{{ latestWarning }}</p>
         <small v-if="recentUpdates.length">最終更新 · {{ recentUpdates.length }}件</small>
         <div v-if="recentUpdates.length" class="explorer-latest-list" aria-label="最終更新ファイル一覧">
-          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path,mtime:file.mtime,source:'latest'})"><FileTypeIcon :name="file.name" /><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
+          <button v-for="file in recentUpdates" :key="file.path" class="explorer-latest" :data-latest-path="file.path" :title="`${file.path} · ${new Date(file.mtime).toLocaleString('ja-JP')}`" @click="select({type:'file',path:file.path,mtime:file.mtime,source:'latest'})" @contextmenu.prevent.stop="contextMenu($event,{...file,type:'file'})" @keydown="rowKey($event,{...file,type:'file'})"><FileTypeIcon :name="file.name" /><span class="file-name">{{ file.name }}</span><span class="file-meta">{{ latestTime(file) }}</span></button>
         </div>
       </footer>
-
+      <ExplorerActionView :actions="fileActions" />
     </aside>
     <p v-if="pinError" class="app-error" role="alert">{{ pinError }}</p>
   </div>
 </template>
 
 <style scoped>
+.explorer-rename{flex:1;min-width:0;width:0;height:23px;box-sizing:border-box;background:#0c1424;color:#fff;border:1px solid #8de6eb;padding:1px 4px;font:inherit}.explorer-rename:focus{outline:1px solid #8de6eb}
+
 .scan-warning{margin:0;padding:6px 8px;color:#ffe28a;font-size:var(--file-font-size,10px);overflow-wrap:anywhere;flex-shrink:0}
 .grep-results{list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto}
 .explorer-panel .grep-results li{display:block;height:auto;padding:0;margin:4px 0}

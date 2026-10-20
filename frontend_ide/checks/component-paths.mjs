@@ -13,6 +13,7 @@ export const componentPaths = {
   "SpaceView": "開発スペース/開発スペース.vue",
   "SpaceCanvas": "開発スペース/宇宙キャンバス.vue",
   "FileExplorer": "ファイル閲覧/ファイル一覧.vue",
+  "ExplorerActionView": "ファイル閲覧/エクスプローラー操作表示.vue",
   "FileTypeIcon": "ファイル閲覧/ファイル種別アイコン.vue",
   "ViewerWindow": "ファイル閲覧/閲覧ウィンドウ.vue",
   "BrowserPanel": "ブラウザ/ブラウザパネル.vue",

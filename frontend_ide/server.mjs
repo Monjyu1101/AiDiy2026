@@ -17,7 +17,7 @@ import { validateCliOptions, resolveCliLaunch } from './aidiy_term/cli-launch.mj
 import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
-export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions}={}){
+export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
  if(!['code','live','ide','term'].includes(kind))throw Error('アプリはcode / live / ide / termから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  if(cli)await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env});
@@ -28,7 +28,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
  const aiSearch=createAISearch(project,{...aiSearchOptions,state:connection.state});
  const fileAnalysis=createFileAnalysis(project,{...fileAnalysisOptions,state:connection.state});
  const fileHistory=createFileHistory(project,{state:connection.state});
- const app=await startServer(project,port,{strict,env,connection,
+ const app=await startServer(project,port,{strict,env,connection,explorerOptions,
   requestHandler:async(req,res,url)=>{
    if(kind==='ide'&&await aiSearch.handle(req,res,url))return true;
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;

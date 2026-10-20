@@ -23,6 +23,7 @@ import { publicMediaURL } from './登録HTMLルート.mjs';
 import { MEDIA_PATTERN } from './media-types.mjs';
 import { latestFile, latestFiles } from '../src/ファイル閲覧/最新ファイル.js';
 import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
+import { createExplorerFiles } from '../ファイル機能/explorer-files.mjs';
 export { scanTree, createScanPool } from './file-scan.mjs';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
@@ -221,14 +222,15 @@ export async function grepFiles(root, query, { caseSensitive = false, signal, po
 }
 
 /** 既定は OS による空きポート割り当て。明示ポートが使用中なら再割り当て（strict なら失敗）。 */
-export async function startServer(root, port = 0, { strict = false, env = process.env, connection = createCoreConnection(root), requestHandler, panelsFactory = createPanels, scanPoolOptions } = {}) {
+export async function startServer(root, port = 0, { strict = false, env = process.env, connection = createCoreConnection(root), requestHandler, panelsFactory = createPanels, scanPoolOptions, explorerOptions } = {}) {
   let allowedHosts = new Set();
   let allowedOrigins = new Set();
   const panels = panelsFactory(root, connection.state);
   const scans = createScanPool(root, scanPoolOptions);
+  const explorer = createExplorerFiles(root, { ...explorerOptions, state: connection.state, onChange: () => scans.invalidate() });
   const reads = new Set();
   const cancelReads = () => { for (const controller of reads) controller.abort(); };
-  const closeScans = () => { cancelReads(); scans.close(); };
+  const closeScans = () => { cancelReads(); scans.close(); explorer.close(); };
   // HTML プレビュー用の別オリジン静的サーバー。最初のプレビュー要求で起動し、このサーバーを閉じる時に止める。
   const preview = createPreview(root, () => connection.state().active, { env });
   const server = createServer(async (req, res) => {
@@ -267,11 +269,12 @@ export async function startServer(root, port = 0, { strict = false, env = proces
       if (['/api/connection/connect', '/api/connection/disconnect', '/api/connection/offline'].includes(url.pathname)) {
         if (req.method !== 'POST') return fail(405, 'POST required');
         req.resume();
-        if (!url.pathname.endsWith('/connect') || connection.state().mode !== 'online') { cancelReads(); scans.invalidate(); }
+        if (!url.pathname.endsWith('/connect') || connection.state().mode !== 'online') { cancelReads(); scans.invalidate(); explorer.invalidate(); }
         return json(url.pathname.endsWith('/disconnect') ? connection.disconnect() : url.pathname.endsWith('/offline') ? connection.offline() : await connection.connect());
       }
       // 画面を隠すだけでなく、未接続時はファイル取得も停止する。
       if (url.pathname.startsWith('/api/') && !connection.state().active) return fail(503, 'AiDiy接続利用またはオフライン利用を選択してください。');
+      if (await explorer.handle(req, res, url)) return;
       if (url.pathname === '/api/panels/code' || url.pathname === '/api/panels/live' || url.pathname === '/api/panels/term') {
         if (req.method !== 'POST') return fail(405, 'POST required');
         if (url.pathname.endsWith('/live') && connection.state().mode !== 'online') return fail(403, 'LiveはAiDiy接続利用で開けます。');

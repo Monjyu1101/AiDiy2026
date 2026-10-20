@@ -12,6 +12,7 @@ import vm from 'node:vm';
 import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
 import * as fileReference from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import * as explorerActions from '../src/ファイル閲覧/エクスプローラー操作.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
@@ -24,7 +25,7 @@ function component(name,{props={},modules={},globals={},provided={}}={}){
     module,window,AbortController,AbortSignal,URLSearchParams,Response,Date,
     localStorage:{getItem:()=>null,setItem(){}},getComputedStyle:()=>({getPropertyValue:()=>10}),
     setTimeout:()=>0,clearTimeout(){},
-    require:id=>id==='../ファイル閲覧/閲覧待機.js'?viewerIdle:id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../ファイル閲覧/ファイル操作.js'?fileActions:modules[id]||{},
+    require:id=>id==='../ファイル閲覧/閲覧待機.js'?viewerIdle:id==='vue'?{...vue,inject:(key,fallback)=>provided[key]??fallback,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id==='../ファイル閲覧/ファイル操作.js'?fileActions:id==='../ファイル閲覧/エクスプローラー操作.js'?explorerActions:modules[id]||{},
     ...globals,
   });
   const scope=vue.effectScope(),reactive=vue.reactive(props);
@@ -133,4 +134,29 @@ test('連携先: ゼロ件の起動は明示操作のみ、閉じた対象の失
   try{await fixture.mount();assert.deepEqual(fixture.launched,[]);await fixture.state.launch('code');assert.deepEqual(fixture.launched,['code']);assert.deepEqual(fixture.inserted,[]);
     fixture.setTargets([target('closed')]);await fixture.state.refresh();fixture.setResult({ok:false,error:'連携先が閉じられました'});await fixture.state.insert();assert.match(fixture.state.error.value,/閉じられ/);assert.equal(fixture.emitted.length,0);
   }finally{fixture.dispose();}
+});
+
+test('Explorer変更: 配下の別窓を閉じ、選択中ファイルを名前変更後のパスで開き直す',async()=>{
+ const f=component('SpaceView',{props:{startedAt:1,viewMode:'3d'},globals:{document:new EventTarget()}}),calls=[];
+ try{
+  f.state.scan.value={root:'/project'};
+  f.state.ready({marks(){},route(){},refresh:async()=>true,clear(){f.state.selected.value=null;},goTo:async file=>calls.push(file)});
+  f.state.selected.value={path:'docs/one.txt',name:'one.txt'};await flush();
+  f.state.viewerSessions.value.push({file:{path:'docs/two.txt'},detached:true},{file:{path:'other.txt'},detached:true});
+  await f.state.applyFileChange({action:'rename',previousPath:'docs',path:'renamed',name:'renamed',type:'directory'});
+  assert.deepEqual(calls.map(file=>file.path),['renamed/one.txt']);assert.equal(f.state.viewerSessions.value.length,1);assert.equal(f.state.viewerSessions.value[0].file.path,'other.txt');
+ }finally{f.dispose();}
+});
+test('Explorer変更: 更新中の新しい操作・利用セッション切替後に古い選択へ戻さない',async()=>{
+ for(const change of ['navigation','session']){
+  const f=component('SpaceView',{props:{startedAt:1,viewMode:'3d'},globals:{document:new EventTarget()}}),calls=[];let finish,wait=false;
+  try{
+   f.state.scan.value={root:'/project'};
+   f.state.ready({marks(){},route(){},refresh:()=>wait?new Promise(done=>{finish=done;}):Promise.resolve(true),clear(){f.state.selected.value=null;},goTo:async file=>calls.push(file)});
+   f.state.selected.value={path:'docs/one.txt',name:'one.txt'};await flush();wait=true;
+   const result=f.state.applyFileChange({action:'rename',previousPath:'docs',path:'renamed',name:'renamed',type:'directory'});
+   if(change==='navigation')f.state.navigationActivity();else f.props.startedAt=2;
+   wait=false;finish(true);await result;await flush();assert.deepEqual(calls,[]);
+  }finally{f.dispose();}
+ }
 });

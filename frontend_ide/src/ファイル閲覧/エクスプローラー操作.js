@@ -1,0 +1,127 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
+import { reactive, nextTick } from 'vue';
+import { fullFilePath, copyBrowserText } from './ファイル操作.js';
+
+export const parentPath = path => path.split('/').slice(0, -1).join('/');
+export const containsPath = (base, path) => path === base || path.startsWith(base + '/');
+export const renamedPath = (path, before, after) => containsPath(before, path) ? after + path.slice(before.length) : path;
+export function explorerNameError(name) {
+  if (typeof name !== 'string' || !name.trim()) return '名前を入力してください。';
+  if (new TextEncoder().encode(name).length > 255 || /[\\/:*?"<>|\x00-\x1f\x7f]/.test(name) || name === '.' || name === '..' || /[.\s]$/u.test(name)) return '区切り文字・記号・末尾の空白やピリオドは使えません。';
+  if (/^(con|prn|aux|nul|clock\$|conin\$|conout\$|com[0-9¹²³]|lpt[0-9¹²³])(?:\.|$)/iu.test(name)) return 'この名前はOSで予約されています。';
+  return '';
+}
+
+// OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
+export function createExplorerActions({ root, document: ownerDocument, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
+  const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, error: '', notice: '' });
+  let cleanup = () => {}, disposed = false, epoch = 0;
+  const doc = () => ownerDocument() || globalThis.document;
+  const activeRow = row => row || { type: 'dir', path: '', name: root().split(/[\\/]/).filter(Boolean).at(-1) || 'ルート' };
+  const directory = row => row.type === 'dir' ? row.path : parentPath(row.path);
+  function closeMenu(restore = false) { cleanup(); cleanup = () => {}; state.menu = null; if (restore) focus(); }
+  function clearMessage() { state.error = ''; state.notice = ''; }
+  function cancel() { if (state.busy) return; state.rename = null; state.dialog = null; closeMenu(); focus(); }
+  async function showMenu(event, row, panel) {
+    event?.preventDefault(); event?.stopPropagation();
+    if (state.busy || state.dialog || state.rename) return;
+    closeMenu(); clearMessage();
+    const run = epoch, target = { ...activeRow(row) }, rectangle = panel.getBoundingClientRect();
+    const x = (event?.clientX || rectangle.left + 18) - rectangle.left;
+    const y = (event?.clientY || rectangle.top + 50) - rectangle.top;
+    state.menu = { target, directory: directory(target), x: Math.max(6, Math.min(x, rectangle.width - 250)), y: Math.max(6, y) };
+    const document = panel.ownerDocument, view = document.defaultView;
+    const outside = event => { if (!event.target.closest?.('.explorer-context-menu')) closeMenu(); };
+    const escape = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closeMenu(true); } };
+    const resize = () => closeMenu();
+    const scroll = event => { if (!event.target.closest?.('.explorer-context-menu')) closeMenu(); };
+    document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', escape, true); document.addEventListener('scroll', scroll, true);
+    view?.addEventListener('blur', resize); view?.addEventListener('resize', resize);
+    cleanup = () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape, true); document.removeEventListener('scroll', scroll, true); view?.removeEventListener('blur', resize); view?.removeEventListener('resize', resize); };
+    await nextTick();
+    const menu = panel.querySelector('.explorer-context-menu');
+    if (!disposed && run === epoch && menu && state.menu) { state.menu.y = Math.max(6, Math.min(y, rectangle.height - menu.offsetHeight - 6)); menu.querySelector('button:not(:disabled)')?.focus(); }
+  }
+  async function beginRename(row) {
+    if (!row?.path || state.busy) return;
+    closeMenu(); clearMessage(); const run = epoch; state.rename = { ...row, value: row.name || row.path.split('/').at(-1) };
+    const target = state.rename; edit(row); await nextTick();
+    if (disposed || run !== epoch || state.rename !== target) return;
+    const input = doc()?.querySelector('.explorer-rename'); input?.focus();
+    const end = row.type === 'file' && state.rename.value.lastIndexOf('.') > 0 ? state.rename.value.lastIndexOf('.') : state.rename.value.length;
+    input?.setSelectionRange(0, end);
+  }
+  async function showDialog(value) { const run = epoch; state.dialog = value; const target = state.dialog; await nextTick(); if (disposed || run !== epoch || state.dialog !== target) return; const element = doc()?.querySelector('.explorer-action-dialog'); (element?.querySelector('[data-initial-focus]') || element?.querySelector('input,button'))?.focus(); }
+  async function perform(payload) {
+    if (state.busy || disposed) return;
+    state.busy = true; clearMessage(); const run = epoch;
+    try {
+      const response = await request('/api/explorer/actions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AiDiy-Explorer': '1' }, body: JSON.stringify(payload) });
+      const text = await response.text(); let result;
+      try { result = JSON.parse(text); } catch { throw Error(text || 'ファイル操作の応答を読み取れません。'); }
+      if (!response.ok) {
+        if(result.partialPath&&!disposed&&run===epoch)try{await refresh();}catch{}
+        throw Error(result.message || result.error || 'ファイルを操作できません。');
+      }
+      if (disposed || run !== epoch) return;
+      if (result.action === 'rename' && state.clipboard) state.clipboard.path = renamedPath(state.clipboard.path, result.previousPath, result.path);
+      if (result.action === 'trash' && state.clipboard && containsPath(result.path, state.clipboard.path)) state.clipboard = null;
+      state.rename = null; state.dialog = null;
+      state.notice = result.action === 'trash' ? `「${result.name}」をゴミ箱へ移動しました。復元はOSのゴミ箱から行えます。` : `「${result.name}」${result.action === 'rename' ? 'に名前を変更しました。' : result.action === 'copy' ? 'をコピーしました。' : 'を作成しました。'}`;
+      try { await changed(result, () => !disposed && run === epoch); } catch (error) { if (!disposed && run === epoch) state.error = `操作は完了しましたが、一覧を更新できません。再読み込みしてください。${error.message || ''}`; }
+      return result;
+    } catch (error) { if (!disposed && run === epoch) state.error = error.message || 'ファイルを操作できません。'; }
+    finally { if (!disposed && run === epoch) { state.busy = false; if(!state.rename&&!state.dialog)focus(); } }
+  }
+  async function submitName() {
+    const target = state.rename || state.dialog;
+    if (!target || state.busy) return;
+    const error = explorerNameError(target.value); if (error) { state.error = error; return; }
+    if (state.rename) {
+      if (target.value === target.name) { cancel(); return; }
+      return perform({ action: 'rename', path: target.path, name: target.value });
+    }
+    return perform({ action: target.action, directory: target.directory, name: target.value });
+  }
+  async function action(action, row = state.menu?.target) {
+    if (state.busy || disposed) return;
+    const run = epoch, current = () => !disposed && run === epoch;
+    row = { ...activeRow(row) }; closeMenu(); clearMessage();
+    const path = row.path, destination = directory(row);
+    if (action === 'copy-path' || action === 'copy-relative') {
+      const text = action === 'copy-path' ? (path ? fullFilePath(root(), path) : root()) : path || '.';
+      try { const document = doc(); await copyBrowserText(text, { document, clipboard: document?.defaultView?.navigator?.clipboard, isCurrent: current }); if(current()) state.notice = 'パスをコピーしました。'; }
+      catch { if(current()) await showDialog({ action: 'manual-copy', value: text }); }
+    } else if (action === 'copy' && path) { state.clipboard = { path, type: row.type, root: root() }; state.notice = `「${row.name || path}」をコピーしました。IDE内の貼り付け先を右クリックしてください。`; }
+    else if (action === 'paste' && state.clipboard?.root === root()) {
+      if (state.clipboard.type === 'dir' && containsPath(state.clipboard.path, destination)) { state.error = 'フォルダ自身やその配下には貼り付けできません。'; return; }
+      await perform({ action: 'copy', path: state.clipboard.path, directory: destination });
+    } else if (action === 'duplicate' && path) await perform({ action: 'copy', path, directory: parentPath(path) });
+    else if (action === 'rename') await beginRename(row);
+    else if (action === 'trash' && path) await showDialog({ action: 'trash', ...row });
+    else if (action === 'create-file' || action === 'create-folder') await showDialog({ action, directory: destination, value: '' });
+    else if (action === 'refresh') { state.busy = true; try { await refresh(); if(current()) state.notice = '一覧を再読み込みしました。'; } catch (error) { if(current()) state.error = error.message; } finally { if(current()) state.busy = false; } }
+    if(current()&&!state.dialog&&!state.rename&&!state.busy)focus();
+  }
+  function keyboard(event, row) {
+    if (event.target?.closest?.('input,textarea,[contenteditable="true"]')) return false;
+    if (state.busy || state.dialog || state.rename || state.menu) return false;
+    let command;
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) return 'menu';
+    if (event.key === 'F2' && row?.path) command = 'rename';
+    else if (event.key === 'Delete' && !event.shiftKey && row?.path) command = 'trash';
+    else if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+      if (event.key.toLowerCase() === 'c') command = event.shiftKey ? 'copy-path' : 'copy';
+      if (event.key.toLowerCase() === 'v' && !event.shiftKey) command = 'paste';
+    }
+    if (!command) return false;
+    event.preventDefault(); event.stopPropagation(); void action(command, row); return true;
+  }
+  function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = false; clearMessage(); }
+  function dispose() { disposed = true; reset(); }
+  return { state, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
+}
