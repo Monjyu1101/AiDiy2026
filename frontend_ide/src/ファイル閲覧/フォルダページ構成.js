@@ -4,6 +4,8 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 
+import { inTimeRange } from './ファイル日時.js';
+
 const join = (parent, name) => parent ? `${parent}/${name}` : name;
 const byName = (left, right) => left.name.localeCompare(right.name, 'ja', { numeric: true });
 
@@ -37,7 +39,7 @@ export function folderPageTurnPlan(previous, next, limit = 5) {
 export function indexFolderPages(tree, marks = {}) {
   const pages = new Map(), matches = new Set(marks.paths || []);
   const marked = (path, mtime) => ['grep', 'ai'].includes(marks.mode)
-    ? matches.has(path) : marks.since != null && mtime >= marks.since;
+    ? matches.has(path) : inTimeRange(mtime, marks.since, marks.until);
   function visit(node, path) {
     const folders = (node.d || []).map(child => {
       const childPath = join(path, child.n), totals = visit(child, childPath);

@@ -19,7 +19,7 @@ export function explorerNameError(name) {
 
 // OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
 export function createExplorerActions({ root, document: ownerDocument, openFile = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
-  const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, error: '', notice: '' });
+  const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, refreshing: false, error: '', notice: '' });
   const canOpenFile = typeof openFile === 'function';
   const canOpenDraft = () => typeof openDraft === 'function' && !!root();
   let cleanup = () => {}, disposed = false, epoch = 0;
@@ -128,7 +128,12 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     else if (action === 'rename') await beginRename(row);
     else if (action === 'trash' && path) await showDialog({ action: 'trash', ...row });
     else if (action === 'create-file' || action === 'create-folder') await showDialog({ action, directory: destination, value: '' });
-    else if (action === 'refresh') { state.busy = true; try { await refresh(); if(current()) state.notice = '一覧を再読み込みしました。'; } catch (error) { if(current()) state.error = error.message; } finally { if(current()) state.busy = false; } }
+    else if (action === 'refresh') {
+      state.busy = state.refreshing = true;
+      try { await refresh(); if(current()) state.notice = '一覧を再読み込みしました。'; }
+      catch (error) { if(current()) state.error = error?.message || '一覧を再読み込みできません。'; }
+      finally { if(current()) state.busy = state.refreshing = false; }
+    }
     if(current()&&!state.dialog&&!state.rename&&!state.busy)focus();
   }
   function keyboard(event, row) {
@@ -145,7 +150,7 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     if (!command) return false;
     event.preventDefault(); event.stopPropagation(); void action(command, row); return true;
   }
-  function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = false; clearMessage(); }
+  function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = state.refreshing = false; clearMessage(); }
   function dispose() { disposed = true; reset(); }
   return { state, canOpenFile, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
 }

@@ -16,3 +16,35 @@ export function fileDateInfo(mtime, now = Date.now()) {
 export function nextLocalMidnight(now = Date.now()) {
   const next = new Date(now); next.setHours(24, 0, 0, 0); return next.getTime();
 }
+
+// datetime-localはUTCへ読み替えず、閲覧端末の日時として扱う。
+export function localDateTimeInput(value) {
+  if (!Number.isFinite(value)) return '';
+  const date = new Date(value), pad = number => String(number).padStart(2, '0');
+  if (!Number.isFinite(date.getTime())) return '';
+  return `${String(date.getFullYear()).padStart(4, '0')}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+export function parseLocalDateTime(value, { end = false, invalid = false } = {}) {
+  if (invalid) return NaN;
+  if (!value) return null;
+  const match = /^(\d{4,})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (!match) return NaN;
+  const canonical = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] || '00'}`;
+  const at = new Date(canonical).getTime();
+  // 月末の繰り上がり・存在しないローカル日時を黙って別の日時にしない。
+  if (localDateTimeInput(at) !== canonical) return NaN;
+  // 秒までの入力なので、次秒未満を上限にしてミリ秒未満のmtimeも含める。
+  return end ? at + 1000 : at;
+}
+export function timeRangeError(since, until) {
+  if (since != null && !Number.isFinite(since)) return '開始日時を正しく入力してください。';
+  if (until != null && !Number.isFinite(until)) return '終了日時を正しく入力してください。';
+  if (since == null && until != null) return '開始日時を入力してください。';
+  if (since != null && until != null && since >= until) return '終了日時は開始日時以降にしてください。';
+  return '';
+}
+export function inTimeRange(mtime, since, until = null) {
+  return Number.isFinite(mtime) && Number.isFinite(since)
+    && (until == null || Number.isFinite(until) && since < until)
+    && mtime >= since && (until == null || mtime < until);
+}

@@ -20,7 +20,7 @@ import { turnToTarget, cameraPosition, orbitAround, interpolateOrbit, interpolat
 import { aiRouteRecords, aiRouteTargets } from '../開発スペース/検索経路.js';
 import { restoreRoute, visitPoint, searchRouteRecords } from '../開発スペース/経路記録.js';
 import { createUpdateMarks, updateFlash, UPDATE_FLASH_MS } from '../ファイル閲覧/更新の目印.js';
-import { nextLocalMidnight } from '../ファイル閲覧/ファイル日時.js';
+import { nextLocalMidnight, inTimeRange } from '../ファイル閲覧/ファイル日時.js';
 import { createTextWidthCache } from '../開発スペース/文字幅キャッシュ.js';
 
 export const ORBIT_PATH_SCALE = .9;
@@ -178,9 +178,9 @@ let knownPaths = null;      // 前回観測した全パス（新しく生まれ�
 const galaxyRadius = 160;
 const GATE_RING_STROKE = 0.07;
 
-// 起点日時以降に更新したファイル（AI が触ったファイルを見つける目印）
+// 指定期間に更新したファイル（AI が触ったファイルを見つける目印）
 let markMode = 'since', grepMatches = new Set(), grepController, grepRevision = 0;
-const isFresh = file => markMode === 'grep' || markMode === 'ai' ? grepMatches.has(file.path) : since !== null && file.mtime >= since;
+const isFresh = file => markMode === 'grep' || markMode === 'ai' ? grepMatches.has(file.path) : inTimeRange(file.mtime, since, until);
 const fastBlink = t => 0.5 + 0.5 * Math.sin(t * 1.8);          // ファイル: 約3.5秒周期で穏やかに明滅
 const slowBlink = t => 0.5 + 0.5 * Math.sin(t * 1.4 - 1.2);    // フォルダ: 約4.5秒周期
 function recountFresh() {
@@ -368,7 +368,7 @@ let manualOrbit = false;     // ドラッグだけは注視点を軸とした回
 let orbitPivot = {x:0,y:0,z:0};
 let hoveredGate = false;
 let gateHit = null;          // 帰還ゲートの画面上の [x, y, 半径]
-let since = null;            // 起点日時（ms）。これ以降に更新したファイルを明滅させる。null なら明滅なし
+let since = null, until = null; // 開始・終了の次秒（ms、上限は未満）。開始nullは明滅なし、終了nullは上限なし。
 let voyages = {};            // 階層ごとの航路 { 階層パス: [{ from, to }, ...] }
 let voyageCurrent = {};       // 再訪は明細を増やさず、この現在点だけを更新する
 let journal = [];            // 航海日誌（新しい順） [{ type, path, at }]
@@ -582,7 +582,7 @@ function drawGalaxies(t, now) {
       const light = depthLight(depth) * nearFade(depth);
       galaxyHits.push([g, gx, gy, g.R * gk]);
 
-      // 円盤の光（見かけの傾きに合わせて楕円にする）。起点以降に更新したファイルを含む銀河はゆっくり明滅する。
+      // 円盤の光（見かけの傾きに合わせて楕円にする）。指定期間に更新したファイルを含む銀河はゆっくり明滅する。
       const [nx, ny, nz] = turn(...g.normal);
       const size = g.R * 2.6 * gk;
       const pulse = g.fresh ? slowBlink(t) : 0;
@@ -795,7 +795,7 @@ function drawLabels(t) {
     const hover = g === hoveredGalaxy;
     let alpha = Math.min(1, Math.max(0, intro - 1.0)) * (dimmed(g) ? 0.45 : 1);
     if (alpha <= 0.02) continue;
-    // 「名前 (ファイル数)」の1行だけ。起点以降の更新があるフォルダは金色でゆっくり明滅させる。
+    // 「名前 (ファイル数)」の1行だけ。指定期間の更新があるフォルダは金色でゆっくり明滅させる。
     const name = `${g.name} (${g.files.length.toLocaleString()})`;
     ctx.font = `600 13px ${font}`;
     const w = textWidths.measure(name) + 12;
@@ -1671,7 +1671,7 @@ function refresh(startedAt, {fresh=true}={}) {
       invalidateNavigation(); clearFollowRequests(); cancelRefresh();
       selected=null;tracking=null;focus=null;knownPaths=null;folderViews.clear();
     }
-    sessionStartedAt=startedAt;since=startedAt;
+    sessionStartedAt=startedAt;since=startedAt;until=null;
   }
   // 同じ条件の読み込みを重ねず、手動選択と更新通知は同じ結果を待つ。
   if(refreshPending?.filter===fileFilter)return refreshPending.promise;
@@ -1763,7 +1763,7 @@ return {
   },
   get searchRouteRecords() { return routeMode==='search'?searchPaths.map(path=>({from:null,to:`f:${path}`})):aiRecords.map(record=>({...record})); },
   get routeState() { return {mode:routeMode,paths:[...(routeMode==='search'?searchPaths:aiRoute)]}; },
-  marks(value) { markMode = value.mode; since = value.since; grepMatches = new Set(value.paths || []); recountFresh(); },
+  marks(value) { markMode = value.mode; since = value.since; until = value.until ?? null; grepMatches = new Set(value.paths || []); recountFresh(); },
   dispose() { disposed = true; clearTimeout(updateTimer); updateTracker.clear(); cancelRefresh(); invalidateNavigation(); listeners.abort(); window.cancelAnimationFrame(frameId); frameId = 0; folderViews.clear(); },
 };
 }
