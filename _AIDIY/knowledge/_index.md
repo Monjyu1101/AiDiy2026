@@ -131,6 +131,7 @@
 | upstream hermes-agent の新版を command_hermes へ取り込む、移植後に起動しない | [`command_hermes,upstream移植手順.md`](./command_hermes,upstream移植手順.md) |
 | Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 | hermes を MCP サーバーとして Code CLI から使う | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
+| プロジェクト別に Chat / Code の会話履歴を分析する | [`backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md`](./backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md)、[`command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
@@ -159,7 +160,7 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| SQLite スキーマ差分を既存 DB へ反映する | [`backend_server,スキーマ変更手順.md`](./backend_server,スキーマ変更手順.md) |
+| SQLite スキーマ変更と手動 DB 再作成の前提を確認する | [`backend_server,スキーマ変更手順.md`](./backend_server,スキーマ変更手順.md) |
 | C採番と監査フィールドを使う | [`backend_server,C採番と監査フィールド.md`](./backend_server,C採番と監査フィールド.md) |
 | backend の Model / Schema / CRUD / Router パターンを確認する | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
 

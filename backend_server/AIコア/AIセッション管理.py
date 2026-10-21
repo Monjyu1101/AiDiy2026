@@ -66,6 +66,9 @@ def 初期モデル設定生成(app_conf) -> dict:
         "LIVE_FREEAI_VOICE": app_conf.json.get("LIVE_FREEAI_VOICE", "Zephyr"),
         "LIVE_OPENAI_MODEL": app_conf.json.get("LIVE_OPENAI_MODEL", "gpt-realtime-2.1-mini"),
         "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
+        # PredictionAI設定
+        "PREDICTION_AI_NAME": app_conf.json.get("PREDICTION_AI_NAME", "auto"),
+        "PREDICTION_AI_MODEL": app_conf.json.get("PREDICTION_AI_MODEL", "auto"),
         # DecisionAI設定
         "DECISION_AI_NAME": app_conf.json.get("DECISION_AI_NAME", "auto"),
         "DECISION_OPENAI_MODEL": app_conf.json.get("DECISION_OPENAI_MODEL", app_conf.json.get("DECISION_AI_MODEL", "auto")),

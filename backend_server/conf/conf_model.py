@@ -55,7 +55,7 @@ class conf_models:
 
     def fetch_all_models(self):
         """互換入口。外部API・CLIは呼ばず、合成ファイルの読込だけを確認する。"""
-        for kind in ("chat", "live", "decisions", "code"):
+        for kind in ("chat", "live", "prediction", "decisions", "code"):
             self._get_diag_models(kind)
         self.get_live_voices()
 
@@ -68,6 +68,11 @@ class conf_models:
     def get_live_models(self) -> Dict[str, Dict[str, str]]:
         """live合成ファイルの候補を取得する。"""
         return self._get_diag_models("live") or {}
+
+
+    def get_prediction_models(self) -> Dict[str, Dict[str, str]]:
+        """予測実行と同じChat方式・有効なモデルIDだけを画面へ渡す。"""
+        return self._get_diag_models("prediction") or {}
 
 
     def get_decisions_models(self) -> Dict[str, Dict[str, str]]:
@@ -92,8 +97,21 @@ class conf_models:
             if not isinstance(payload, dict):
                 raise ValueError("モデル情報のルートはobjectで指定してください")
             result = {}
-            for provider, entry in payload.items():
+            entries = payload.items()
+            if kind == "prediction":
+                entries = ((name, payload.get(name)) for name in ("openai_oauth", "freeai_chat", "openai_chat", "gemini_chat"))
+            for provider, entry in entries:
                 models = entry.get(field) if isinstance(entry, dict) else None
+                if kind == "prediction":
+                    # PredictionLLM._catalogと同じ条件。空・不正の区分は補完しない。
+                    if isinstance(models, dict):
+                        valid = {model: label for model, label in models.items()
+                                 if isinstance(model, str) and 0 < len(model) <= 200 and model.strip() == model
+                                 and not any(ord(c) < 32 or ord(c) == 127 for c in model) and model not in ("auto", "same")
+                                 and isinstance(label, str)}
+                        if valid:
+                            result[provider] = valid
+                    continue
                 if not isinstance(models, dict) or any(not isinstance(label, str) for label in models.values()):
                     raise ValueError(f"{field}は表示名のobjectで指定してください")
                 result[provider] = dict(models)

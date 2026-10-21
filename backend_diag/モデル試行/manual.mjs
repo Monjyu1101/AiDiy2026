@@ -6,7 +6,7 @@ const string=(value,max=16000)=>typeof value==='string'&&value.trim().length>0&&
 export function manualInput(value,supported,label){
  if(!object(value)||Object.keys(value).some(key=>!['family','provider','model','voice','prompt','questions'].includes(key)))fail('試行入力が不正です。');
  const {family,provider,model,voice='',prompt,questions}=value;
- if(!supported(family,provider)||!label(provider)||!label(model)||!string(prompt))fail('プロバイダ・モデル・入力を確認してください。');
+ if(!supported(family,provider)||!label(provider)||!label(model)||(family==='PREDICTION'?prompt!==undefined:!string(prompt)))fail('プロバイダ・モデル・入力を確認してください。');
  if(family==='LIVE'&&!label(voice))fail('音声を選択してください。');
  const result={family,provider,model,voice,prompt};
  if(family==='DECISION'){

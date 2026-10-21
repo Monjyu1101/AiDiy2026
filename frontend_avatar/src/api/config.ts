@@ -91,6 +91,8 @@ export function defaultModelSettings(): ModelSettings {
     LIVE_FREEAI_VOICE: 'Zephyr',
     LIVE_OPENAI_MODEL: 'gpt-realtime-2.1-mini',
     LIVE_OPENAI_VOICE: 'marin',
+    PREDICTION_AI_NAME: 'auto',
+    PREDICTION_AI_MODEL: 'auto',
     DECISION_AI_NAME: 'auto',
     DECISION_OPENAI_MODEL: 'auto',
     DECISION_OAUTH_MODEL: 'auto',

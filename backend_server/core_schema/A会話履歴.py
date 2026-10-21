@@ -8,12 +8,22 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from 会話履歴パス import normalize_project_path
 from typing import Optional
 
 # --- A会話履歴 ---
 
-class A会話履歴Base(BaseModel):
+class _プロジェクトパスSchema(BaseModel):
+    プロジェクトパス: Optional[str] = None
+
+    @field_validator("プロジェクトパス")
+    @classmethod
+    def validate_project_path(cls, value: Optional[str]) -> Optional[str]:
+        return normalize_project_path(value)
+
+
+class A会話履歴Base(_プロジェクトパスSchema):
     セッションID: str
     シーケンス: int
     チャンネル: str
@@ -27,7 +37,7 @@ class A会話履歴Create(A会話履歴Base):
     pass
 
 
-class A会話履歴Update(BaseModel):
+class A会話履歴Update(_プロジェクトパスSchema):
     セッションID: str
     シーケンス: int
     メッセージ内容: Optional[str] = None
@@ -45,7 +55,7 @@ class A会話履歴Get(BaseModel):
     シーケンス: int
 
 
-class A会話履歴ListRequest(BaseModel):
+class A会話履歴ListRequest(_プロジェクトパスSchema):
     セッションID: Optional[str] = None
     チャンネル: Optional[str] = None
     件数: Optional[int] = None

@@ -20,6 +20,7 @@ import os
 from typing import Optional
 
 from AIコア.AI応答 import 応答正規化, エラー応答
+from AIコア.AI履歴コンテキスト import 履歴要求コピー, 履歴要求コンテキスト, セッション履歴パス
 from log_config import get_logger
 
 logger = get_logger(__name__)
@@ -284,7 +285,7 @@ class Chat:
                     "メッセージ内容": "! ChatAIが停止状態です。APIキーの設定を確認、再起動してください。"
                 })
             return
-        await self.チャット処理Ｑ.put(受信データ)
+        await self.チャット処理Ｑ.put(履歴要求コピー(self.接続, 受信データ))
 
     async def _チャット処理ワーカー(self):
         """チャット処理ワーカー（キューから取り出して処理）"""
@@ -299,15 +300,29 @@ class Chat:
                 if not isinstance(受信データ, dict):
                     continue
                     
-                メッセージ識別 = 受信データ.get("メッセージ識別", "")
+                with 履歴要求コンテキスト(self.セッションID, 受信データ.get("プロジェクトパス")):
+                    self.履歴処理中 = True
+                    try:
+                        if 受信データ.get("プロジェクトパス") != セッション履歴パス(self.接続):
+                            text = "プロジェクトが変更されたため要求を実行しませんでした。再送してください。"
+                            await self.接続.send_to_channel(self.チャンネル, {
+                                "セッションID": self.セッションID, "メッセージ識別": "output_text", "メッセージ内容": text, "実行中": False,
+                            })
+                            if self.保存関数:
+                                self.保存関数(セッションID=self.セッションID, チャンネル=self.チャンネル,
+                                          メッセージ識別="output_text", メッセージ内容=text)
+                        else:
+                            メッセージ識別 = 受信データ.get("メッセージ識別", "")
                 
-                if メッセージ識別 == "input_text":
-                    # テキスト処理: AI実行 → output_text送信（エコーバックは既に実施済み）
-                    await self._処理_input_text(受信データ)
-                elif メッセージ識別 == "input_file":
-                    # ファイル処理: temp/outputコピー → output_file送信 → 会話履歴保存
-                    await self._処理_input_file(受信データ)
-                
+                            if メッセージ識別 == "input_text":
+                                # テキスト処理: AI実行 → output_text送信（エコーバックは既に実施済み）
+                                await self._処理_input_text(受信データ)
+                            elif メッセージ識別 == "input_file":
+                                # ファイル処理: temp/outputコピー → output_file送信 → 会話履歴保存
+                                await self._処理_input_file(受信データ)
+                    finally:
+                        self.履歴処理中 = False
+
                 self.チャット処理Ｑ.task_done()
             except asyncio.CancelledError:
                 break

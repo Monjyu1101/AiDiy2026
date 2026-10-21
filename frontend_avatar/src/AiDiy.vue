@@ -837,8 +837,11 @@ async function コア初期化(preferredSessionId = '') {
     WebURL同期(nextSessionId)
     コアソケット.value = nextCoreSocket
 
-    // inputチャンネルを接続（送信専用・ハンドラなし）
-    const nextInputSocket = new AIWebSocket(wsUrl, nextSessionId, 'input')
+    // core で確認したプロジェクトを input に引き継ぐ。入力拒否は画面へ通知する。
+    const nextInputSocket = new AIWebSocket(wsUrl, nextSessionId, 'input', モデル設定.value.CODE_BASE_PATH)
+    nextInputSocket.on('error', (message) => {
+      コアエラー.value = String(message.メッセージ内容 || message.error || 'AIコア入力エラー')
+    })
     nextInputSocket.onStateChange((connected) => {
       if (connected) void 操作状態同期()
     })
@@ -1108,6 +1111,10 @@ function ウィンドウからメッセージ送信(text: string) {
 }
 
 function ウィンドウから入力ペイロード送信(message: Record<string, unknown>) {
+  // BroadcastChannel の中継前に、送信元が表示しているプロジェクトを固定する。
+  if (['input_text', 'input_request', 'input_file', 'input_image'].includes(String(message.メッセージ識別 || message.type || ''))) {
+    message = { ...message, プロジェクトパス: message.プロジェクトパス ?? (表示モデル設定.value.CODE_BASE_PATH || null) }
+  }
   if (コアウィンドウ.value) {
     入力ペイロード送信(message)
     return

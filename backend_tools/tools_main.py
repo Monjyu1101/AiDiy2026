@@ -430,6 +430,8 @@ app = FastAPI(
 )
 from tools_proc.live_model_check import register_live_model_check
 register_live_model_check(app)
+from tools_proc.tools_prediction import register_prediction_llms
+register_prediction_llms(app)
 
 app.add_middleware(
     CORSMiddleware,

@@ -186,11 +186,12 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const controller=new AbortController();
         const abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
         try {
+          if(req.method==='DELETE' && parts.length===1 && parts[0]==='チャット成功'){modelTrials.invalidateChat?.();return reply(200,{状態:'未実施'});}
           if(req.method==='POST' && parts.length===1 && parts[0]==='開始')return reply(200,await modelTrials.start({signal:controller.signal}));
-          if(req.method==='POST' && parts.length===2 && parts[0]==='開始' && /^(CHAT|LIVE|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.start({signal:controller.signal,rowId:parts[1]}));
+          if(req.method==='POST' && parts.length===2 && parts[0]==='開始' && /^(CHAT|LIVE|PREDICTION|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.start({signal:controller.signal,rowId:parts[1]}));
           if(!/^[a-f0-9]{32}$/.test(parts[0]))return reply(404,{エラー:'試行が見つかりません。'});
           if(req.method==='DELETE' && parts.length===1)return reply(200,modelTrials.cancel(parts[0]));
-          if(req.method==='POST' && parts.length===2 && /^(CHAT|LIVE|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.next(parts[0],parts[1],{signal:controller.signal}));
+          if(req.method==='POST' && parts.length===2 && /^(CHAT|LIVE|PREDICTION|DECISION|CODE[1-6]|(?:TASK|TEAM)_(?:plan|do|check))$/.test(parts[1]))return reply(200,await modelTrials.next(parts[0],parts[1],{signal:controller.signal}));
           return reply(404,{エラー:'試行が見つかりません。'});
         } catch(error) {return reply(error?.status || 500,{エラー:error?.status ? error.message : 'モデル試行に失敗しました。'});}
         finally {res.removeListener('close',abort);}
@@ -209,21 +210,21 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       }
       // 明示的に読み直す側だけ破棄し、別タブの確認結果は書込まで保持する。
       if (req.method === 'GET' && ['api/キー設定','api/キー設定/モデル一覧','api/キー設定/外部連携'].includes(route)) {
-        if(route!=='api/キー設定/外部連携'&&!modelWriting)modelResults={};
+        if(route!=='api/キー設定/外部連携'&&!modelWriting){modelResults={};modelTrials.invalidateChat?.();}
         if(route!=='api/キー設定/モデル一覧'&&!integrationWriting)integrationResults={};
         return reply(200,{...await keyStatusFn(),前回結果:await previousResults?.snapshot(),公開モデル:publicCache.snapshot()});
       }
       if (req.method === 'GET' && route === 'api/公開モデル') return reply(200,publicCache.snapshot());
       if (req.method === 'POST' && route === 'api/公開モデル/再取得') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
-        return reply(200,await publicCache.refresh());
+        modelTrials.invalidateChat?.();return reply(200,await publicCache.refresh());
       }
       if (req.method === 'POST' && route?.startsWith('api/キーテスト/')) {
         const id=route.slice('api/キーテスト/'.length);
         if (!KEY_PROVIDERS.some(provider=>provider.id===id)) return reply(404,{エラー:'未対応の項目です。'});
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
         if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
-        keyBusy=true;
+        modelTrials.invalidateChat?.();keyBusy=true;
         // 外部連携（Hugging Face / Discord）の認証確認はモデル情報の保存対象にしない。
         const integration=INTEGRATION_PROBES.includes(KEY_PROVIDERS.find(provider=>provider.id===id)?.probe);
         try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {keyBusy=false;}
@@ -258,7 +259,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
         if (keyBusy || modelWriting) return reply(409,{エラー:'モデル取得または書込の実行中です。完了後に再試行してください。'});
         if (!Object.keys(modelResults).length) return reply(409,{エラー:'先に最新モデル取得を実行してください。'});
-        modelWriting=true;
+        modelTrials.invalidateChat?.();modelWriting=true;
         try { const status=await keyStatusFn();const saved=await modelsWriteFn(status.項目,modelResults); reply(200,{保存先:saved.map(file=>'_AIDIY/aidiy_diag/'+file),件数:saved.length}); }
         catch { reply(500,{エラー:'モデル情報の書き込みに失敗しました。書き込めなかったファイルは以前の内容のままです。'}); }
         finally { modelWriting=false; }

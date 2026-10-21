@@ -44,6 +44,7 @@
 - `backend_tools/tools_proc/notification_sounds.py`
 - `backend_tools/tools_proc/code_agents.py`
 - `backend_tools/tools_proc/chat_llm.py`（`tools_proc/tools_chat.py` が MCP 登録と OpenAI 互換 HTTP ルートを持つ）
+- `backend_tools/tools_proc/prediction_llm.py` / `backend_tools/tools_proc/tools_prediction.py`（プロジェクト別の次入力予測、履歴・セッション非保存）
 - `backend_tools/tools_proc/decisions_check.py` / `backend_tools/tools_proc/tools_decisions.py`（判断ロジックは `backend_server/AIコア/AI判断*.py`）
 - `backend_tools/tools_proc/task_agents.py`
 - `backend_tools/tools_proc/team_agents.py`
@@ -107,6 +108,42 @@ print(res.json())  # {"save_path": "..."}
 | `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
 Linux / macOS では `aidiy_windows_control` の import、MCP 登録、REST ルート、SSE マウントを行わない。`GET /` の `mcps` は 19 件で、Windows 操作の URL は 404 を返す。`uiautomation` も Windows だけにインストールする。`_config/AiDiy_mcp.json` はローカル生成設定であり、Windows で `_setup.py` の MCP 設定を実行すると Windows 操作 MCP を追加する。非 Windows で設定を実行すると、以前登録した Windows 操作 MCP をプロジェクト設定と各 CLI 設定から削除する。画面のない Linux 環境では `pyautogui` の初期化失敗を `desktop_capture.py` が保持し、キャプチャ呼び出し時にエラーを返す。
+
+## 次のユーザー入力予測
+
+`aidiy_prediction_llms` はMCPに公開しない内部サービスで、`POST /internal/prediction_llms` だけを提供する。Live試行の `/internal/live_model_check` と同じ境界を使い、OpenAPIには掲載しない。公開 `/aidiy_prediction_llms/*`、config/docs経路、SSE/Streamable HTTP/stdio、MCP一覧・各CLIへの登録は追加しない。
+
+- 接続元はloopback IPに限定し、HostはDNS解決せず `127.0.0.1` / `[::1]`（任意ポート）だけを許可する。Hostと `X-AiDiy-Diag` は各1つ、ヘッダー値は `X-AiDiy-Diag: model-trial` が必要。
+- `Origin`、`Forwarded`、`X-Forwarded-*`、`X-Real-IP`、`X-Original-Host`、`X-Original-URL`、`X-Rewrite-URL`、クエリ文字列は拒否する。`Content-Type: application/json` と64KiB以下のJSON本文が必要で、受信は3秒まで。
+- 呼び出し元の切断時は予測タスクと監視タスクをキャンセルして回収する。これはアプリ側の処理制御であり、外部プロバイダ側の通信終了やデータ保持を保証するものではない。
+
+- JSON本文は `project_path` 必須。任意引数は `ai_name="auto"`、`ai_model="auto"`、`timeout_sec=120`（整数1〜600秒）のみ。空パスや未知の引数は拒否する。
+- 正規化したプロジェクト絶対パスが完全一致する、呼び出し時点から直近2時間以内のテキスト会話だけを参照する。DBの保存時刻と同じサーバーローカル時刻・秒精度で一度だけ範囲を確定し、2時間前と呼び出し時刻の両端を含め、未来の行は除外する。2時間より前の古い会話で補充しない。
+- 1ターンは同一セッション・チャンネルのユーザー入力と、次の入力までの返答群。明確なCode/ch0ミラーを整理してから、ユーザー入力が新しい順に最大5ターンを選ぶ。最新の未返信入力も含め、期間外入力に対する返答だけではターンを作らない。期間内の別セッション・チャンネルの返答は混ぜない。
+- 推論へは選んだ入出力を古い順で渡し、一時的な `turn_id` で対応関係を示す。DBのセッションIDはモデルに渡さない。本文合計24,000文字・1件4,000文字の安全上限は維持し、超えるときは最新ターンの入力を残して新しい返答から優先する。文字数上限により5ターン未満になることはある。
+- 他プロジェクト・所属不明・2時間より古い履歴へフォールバックしない。対象のユーザー入力がなければ `status: "NG"` を返し、モデルは呼ばない。`history_count` は採用したメッセージ数で、ターン数ではない（5ターンが10件以上のメッセージになる場合もある）。
+- 通常の Chat 設定ではなく `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL`（初期値 `auto` / `auto`）を使う。明示引数を優先し、引数がautoのときだけ設定値を使う。方式設定もautoなら、Diagの `prediction_models_info.json` に候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` の順で選ぶ。`openai_chat` は明示指定時のみ使用する。モデルもautoなら選んだ方式の先頭候補を使い、候補外モデルには切り替えない。
+- Diagは判断用と同じ認証済み低コスト候補から生成し、OpenAI API区分だけ `openai_decisions` から `openai_chat` に置き換える。予測JSONに `openai_decisions` は含めない。判断側の候補区分・選択順・実行処理は変更しない。
+- 起動時のモデル実行チェックは行わず、実行時に設定・認証を確認する。DBは読み取り専用で、会話本文・予測文をDB・ログ・セッションへ保存せず、ファイル生成やツール実行も行わない。MCPツールとしては登録しない。設定はWeb / AvatarのAI設定画面で変更し、Diagの明示試行と、利用者がONにしたCode画面の自動提案から内部RESTを呼び出す。
+- 戻り値は `status`、`result`（予測文または安全な説明）、`ai_name`、`ai_model`、`project_path`、`history_count`。ラッパー内部の予期しない失敗は `status` / `result` の安全な説明のみを返す。
+- 次の入力を合理的に予測できない場合、プロンプトは半角 `!` の直後に短い理由を返すよう指示する。実生成に成功した `!説明`（全角 `！説明` も許容）は `status: "OK"` のまま `result` に保持する。呼び出し側は先頭1文字を除いて説明ダイアログに表示し、下書きへ入れず自動送信もしない。実生成に成功したマーカー単独も非空応答として `OK` にし、Diagの疎通試験は通過できる。ただし呼び出し側は空の説明ダイアログや下書きを表示しない。通信・認証・タイムアウト・ラッパー例外は正常な応答へ昇格せず `NG` とする。通常Chatの `!` エラー規約は変更しない。
+- 入力エラーは値を含めない安全な400応答にし、予測本文・履歴・モデル出力・例外詳細をログへ追加しない。内部処理の安全な状態メッセージだけを記録する。
+- 検証時は実DBや外部モデルへ接続せず、予測エンジンをmockに置換して、loopback/Host/必須ヘッダー/プロキシ拒否、JSON制限・必須項目、安全なエラー応答、切断時の回収、公開経路・MCP一覧への非掲載を確認する。履歴は固定時計と一時DBで、2時間境界・未来除外・5ターンとメッセージ数の違い・セッション/チャンネル分離・未返信入力・文字数上限・DB不変を確認する。
+
+内部処理からの呼び出し例:
+
+```python
+import requests
+response = requests.post(
+    "http://127.0.0.1:8095/internal/prediction_llms",
+    headers={"X-AiDiy-Diag": "model-trial"},
+    json={"project_path": "/path/to/project"},
+    timeout=130,
+)
+result = response.json()
+```
+
+`result` の `status` が `OK` のとき、同名の `result` フィールドが次のユーザー入力の予測文になる。
 
 ## 新規 MCP サーバー追加手順
 

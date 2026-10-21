@@ -96,6 +96,8 @@ Electron版IDEをtoolsへ接続し、「＋ Browser」を開いてから、`aidi
 | AIチームの要員へ依頼を投入して非同期実行させる | `aidiy_team_agents` |
 | マウス/キーボード操作、ウィンドウ制御、プロセス管理 | `aidiy_windows_control` |
 
+次のユーザー入力予測 `aidiy_prediction_llms` はMCP非公開で、各CLIのMCP設定には追加しない。内部処理から `POST /internal/prediction_llms` を使う。必須引数・接続制限は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
+
 SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まずアプリ API や既存初期化処理で再現できないか確認する。
 
 `aidiy_task_agents.submit`の`task_id`は通常は指定不要で、省略時はbackend_taskteamが`TASK.mmdd.hhmmss`形式で自動採番する。呼出元のIDをAタスク要求まで引き継ぐ必要がある場合だけ指定する。

@@ -15,9 +15,9 @@ const change=(key,event)=>s.変更(key,event.target.value);
 </script>
 <template>
 <section class="panel ai-model-panel" aria-label="AIモデル">
- <div class="panel-heading ai-model-heading"><div class="heading-title"><h2>AIモデルを試す</h2><button class="ai-model-reload refresh-button" title="AIモデルの候補を再読込します" :aria-busy="s.読込中.value" :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込"><span class="refresh-glyph" aria-hidden="true">↺</span><span>候補を再読込</span></button></div><div class="panel-actions"><button id="ai-model-start" :class="{'check-next': !s.結果.value}" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value" title="CHAT → LIVE → DECISION → CODE を順に確認します" @click="s.開始(true)">{{s.実行中.value?'実行中…':'動作確認'}}</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div></div>
- <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family}}</button></nav>
- <p class="panel-note">各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。</p>
+ <div class="panel-heading ai-model-heading"><div class="heading-title"><h2>AIモデルを試す</h2><button class="ai-model-reload refresh-button" title="AIモデルの候補を再読込します" :aria-busy="s.読込中.value" :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込"><span class="refresh-glyph" aria-hidden="true">↺</span><span>候補を再読込</span></button></div><div class="panel-actions"><button id="ai-model-start" :class="{'check-next': !s.結果.value}" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value" title="CHAT → LIVE → PREDICTION → DECISION → CODE を順に確認します" @click="s.開始(true)">{{s.実行中.value?'実行中…':'動作確認'}}</button><button id="ai-model-test" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value || (s.区分.value==='PREDICTION' && !s.予測条件.value.テスト可能)" :title="s.区分.value==='PREDICTION'?s.予測条件.value.説明:'現在の種類だけをテストします'" @click="s.開始()">テスト</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div></div>
+ <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','PREDICTION','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family}}</button></nav>
+ <p class="panel-note">各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → PREDICTION → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。</p>
  <div class="ai-model-scroll">
   <div class="ai-model-form">
    <h3>{{s.区分.value}} / 入力</h3>
@@ -26,7 +26,7 @@ const change=(key,event)=>s.変更(key,event.target.value);
    <label class="ai-config-row"><span>{{s.区分.value}}_AI:</span><select aria-label="プロバイダ" :value="s.入力.provider" :disabled="s.読込中.value" @change="change('provider',$event)"><option v-if="!s.プロバイダ.value.length" value="">候補なし</option><option v-for="p in s.プロバイダ.value" :key="p.id" :value="p.id">{{p.id}}</option></select></label>
    <label class="ai-config-row"><span>{{s.区分.value}}_MODEL:</span><select aria-label="モデル" :value="s.入力.model" :disabled="s.読込中.value" @change="change('model',$event)"><option v-if="!s.モデル.value.length" value="">候補なし</option><option v-for="m in s.モデル.value" :key="m.id" :value="m.id">{{m.名前}}</option></select></label>
    <label v-if="s.区分.value==='LIVE'" class="ai-config-row"><span>LIVE_VOICE:</span><select aria-label="音声" :value="s.入力.voice" @change="change('voice',$event)"><option v-if="!s.音声候補.value.length" value="">候補なし</option><option v-for="v in s.音声候補.value" :key="v.id" :value="v.id">{{v.名前}}</option></select></label>
-   <label class="ai-input-label">{{s.区分.value==='DECISION'?'判断対象の入力':'自由プロンプト'}}<textarea aria-label="自由プロンプト" :value="s.入力.prompt" maxlength="16000" rows="5" @input="change('prompt',$event)"></textarea></label>
+   <label v-if="s.区分.value!=='PREDICTION'" class="ai-input-label">{{s.区分.value==='DECISION'?'判断対象の入力':'自由プロンプト'}}<textarea aria-label="自由プロンプト" :value="s.入力.prompt" maxlength="16000" rows="5" @input="change('prompt',$event)"></textarea></label>
    <fieldset v-if="s.区分.value==='DECISION'"><legend>質問</legend>
     <label class="ai-config-row"><span>形式</span><select aria-label="質問形式" :value="s.入力.type" @change="change('type',$event)"><option value="choice">選択（choice）</option><option value="predicate">判定（predicate）</option><option value="score">スコア（score）</option></select></label>
     <label class="ai-config-row"><span>質問名</span><input aria-label="質問名" :value="s.入力.name" maxlength="100" @input="change('name',$event)"></label>
@@ -35,6 +35,7 @@ const change=(key,event)=>s.変更(key,event.target.value);
    </fieldset>
    <p v-if="s.区分.value==='LIVE'" class="ai-help">接続後15秒待機して送信し、応答を最大60秒待ちます。1秒以上の応答音声を一時保存し、ここで再生できます。</p>
 
+   <template v-if="s.区分.value==='PREDICTION'"><p class="ai-help">同じプロバイダ・モデルのChat応答と履歴保存を確認後に試行します。Chat試験の1往復を含む、CODE_BASE_PATHの同一プロジェクトの直近2時間・最大5ターンが対象です。予測結果は履歴に保存しません。</p><p class="ai-help">対象: {{s.一覧.value?.予測条件?.プロジェクト || '未設定'}}<br>予測モデル: {{s.予測条件.value.プロバイダ || '未取得'}} / {{s.予測条件.value.モデル || '未取得'}}</p><p v-if="!s.予測条件.value.テスト可能" class="warning">{{s.予測条件.value.説明}}</p><p class="ai-help">正常な非空応答は!・！を含む説明もOKです。履歴なし・空応答・エラー・タイムアウトは成功扱いにしません。</p></template>
    <p class="ai-help">試行時に選択したAIへ送信します。料金が発生する場合があります。</p>
   </div>
   <section class="ai-model-output" aria-label="試行結果" aria-live="polite"><h3>出力</h3><component :is="状態バッジ" :state="s.実行中.value?'実行中':s.結果.value?.状態||'未実施'"/><p role="status">{{s.通知.value || '入力して「動作確認」を押してください。'}}</p>

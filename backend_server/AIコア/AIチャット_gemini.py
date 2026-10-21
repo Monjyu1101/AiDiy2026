@@ -263,6 +263,8 @@ class ChatAI:
                                tools を含む場合は Gemini function calling に変換して実行する。
                                空 or None のときは従来のテキスト生成（挙動は不変）。
         """
+        self.last_completion_succeeded = False
+        completion_succeeded = False
         try:
             # 生存状態チェック
             if not self.is_alive:
@@ -404,7 +406,7 @@ class ChatAI:
                         # インラインデータ（画像など）
                         else:
                             inline_data = response.candidates[0].content.parts[p].inline_data
-                            if inline_data is not None:
+                            if inline_data is not None and getattr(self, "出力ファイル保存", True):
                                 data_bytes = inline_data.data
                                 mime_type = inline_data.mime_type
                                 try:
@@ -463,19 +465,19 @@ class ChatAI:
                 monitor_task = asyncio.create_task(_timeout_monitor())
                 execution_task = asyncio.create_task(_chat_execution())
 
-                done, pending = await asyncio.wait([execution_task, monitor_task], return_when=asyncio.FIRST_COMPLETED)
-
-                for task in pending:
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-
-                if execution_task in done:
-                    execution_task.result()
-                else:
-                    raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
+                try:
+                    done, _ = await asyncio.wait([execution_task, monitor_task], return_when=asyncio.FIRST_COMPLETED)
+                    if execution_task in done:
+                        execution_task.result()
+                        completion_succeeded = True
+                    else:
+                        raise asyncio.TimeoutError(f"タイムアウト({タイムアウト秒数}秒)")
+                finally:
+                    # 外側のキャンセル時も子タスクを残さず、例外を呼出し元のログ文脈内で回収する。
+                    for task in (execution_task, monitor_task):
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(execution_task, monitor_task, return_exceptions=True)
 
             except asyncio.TimeoutError:
                 logger.warning(f"api タイムアウト ({タイムアウト秒数}秒)")
@@ -511,6 +513,7 @@ class ChatAI:
                 for output_file in output_files:
                     logger.info(f"  - {output_file}")
 
+            self.last_completion_succeeded = completion_succeeded and bool(result_text.strip()) and (final_result != "!" or result_text.strip() == "!")
             return final_result
 
         except Exception as e:

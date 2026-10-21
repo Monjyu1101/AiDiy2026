@@ -186,6 +186,7 @@ def _最大更新日時文字列(ファイルリスト: list[dict]) -> str:
 
 
 try:
+    from AIコア.AI履歴コンテキスト import (現在履歴パス, 要求履歴パス確定, セッション履歴パス, 履歴パス解決, 履歴要求処理中)
     from AIコア.AIセッション管理 import AIセッション管理, SessionConnection, 初期モデル設定生成
     from AIコア.AIストリーミング処理 import StreamingProcessor
     from AIコア.AI音声認識 import Recognition
@@ -205,15 +206,19 @@ router = APIRouter()
 セッション情報: Dict[str, dict] = {}
 
 
+_履歴パス未指定 = object()
+
+
 def 保存_会話履歴(
     セッションID: str,
     チャンネル: str,
     メッセージ識別: str,
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
-    サムネイル画像: Optional[str] = None
+    サムネイル画像: Optional[str] = None,
+    プロジェクトパス=_履歴パス未指定
 ):
-    """会話履歴を保存（AIコア用）"""
+    """会話履歴を保存（AIコア用）。応答は受付時の要求コンテキストを使う。"""
     db = database.SessionLocal()
     try:
         シーケンス = crud.get_next_sequence(db, セッションID)
@@ -226,6 +231,7 @@ def 保存_会話履歴(
             メッセージ内容=メッセージ内容,
             ファイル名=ファイル名,
             サムネイル画像=サムネイル画像,
+            プロジェクトパス=(現在履歴パス(セッションID) if プロジェクトパス is _履歴パス未指定 else プロジェクトパス),
             認証情報={"利用者ID": "AIコア", "利用者名": "AIコア"}
         )
     finally:
@@ -393,7 +399,8 @@ async def 送信_会話履歴(
             "メッセージ識別": item.メッセージ識別,
             "メッセージ内容": item.メッセージ内容,
             "ファイル名": item.ファイル名,
-            "サムネイル画像": item.サムネイル画像
+            "サムネイル画像": item.サムネイル画像,
+            "プロジェクトパス": item.プロジェクトパス
         }
         await 接続.send_json(payload)
     logger.info(f"チャンネル={チャンネル}, 会話履歴送信, 件数={len(履歴一覧)}")
@@ -550,6 +557,7 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
                 "live_models": モデル一覧.get_live_models(),
                 "live_voices": モデル一覧.get_live_voices(),
                 "code_models": モデル一覧.get_code_models(),
+                "prediction_models": モデル一覧.get_prediction_models(),
                 "decision_models": モデル一覧.get_decisions_models(),
             }
             if not _backend_local稼働中(http_request.app.conf):
@@ -557,9 +565,12 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
 
         # ソケットのモデル設定を取得
         現在設定 = dict(接続.モデル設定) if 接続 else 初期モデル設定生成(getattr(http_request.app, "conf", None))
-        # 判断はToolsが共通JSONを読むため、保存後の再取得でもセッションの古い値を返さない。
+        # 予測・判断はToolsが共通JSONを読むため、保存後の再取得でもセッションの古い値を返さない。
         from AIコア.AI判断 import Decision
         共通設定 = getattr(getattr(http_request.app, "conf", None), "json", None)
+        予測設定 = 共通設定 if 共通設定 is not None else 現在設定
+        for key in ("PREDICTION_AI_NAME", "PREDICTION_AI_MODEL"):
+            現在設定[key] = 予測設定.get(key, "auto") or "auto"
         判断設定 = 共通設定 if 共通設定 is not None else 現在設定
         現在設定["DECISION_AI_NAME"] = 判断設定.get("DECISION_AI_NAME", "auto") or "auto"
         for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"):
@@ -709,6 +720,8 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "LIVE_AI_NAME", "LIVE_GEMINI_MODEL", "LIVE_GEMINI_VOICE",
             "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE",
             "LIVE_OPENAI_MODEL", "LIVE_OPENAI_VOICE",
+            # PredictionAI設定
+            "PREDICTION_AI_NAME", "PREDICTION_AI_MODEL",
             # DecisionAI設定
             "DECISION_AI_NAME", "DECISION_AI_MODEL",
             "DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL",
@@ -764,6 +777,12 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             and 接続.モデル設定.get(key) != value
             for key, value in 許可設定.items()
         )
+
+        # 実行中の要求を別プロジェクトへ移さない。保存のみの場合は現セッションを変えない。
+        保存のみ = save and not リセット and not 再起動要求あり
+        if "CODE_BASE_PATH" in 許可設定 and not 保存のみ:
+            if 履歴パス解決(許可設定["CODE_BASE_PATH"]) != セッション履歴パス(接続) and 履歴要求処理中(接続):
+                return {"status": "NG", "message": "会話の処理中はプロジェクトを変更できません。完了後に変更してください。"}
 
         # save=True またはリセットの場合は AiDiy_key.json へ書き込む
         設定保存済み = False
@@ -1458,6 +1477,29 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 if ソケット番号 not in ("input", "audio"):
                     continue
 
+                # awaitやキュー投入より前に固定。添付・最終応答も同じルートで分析できる。
+                if メッセージ識別 in ("input_text", "input_request", "input_file"):
+                    try:
+                        受信データ["プロジェクトパス"] = 要求履歴パス確定(セッション, 受信データ)
+                    except ValueError as e:
+                        await WebSocket接続.send_json({
+                            "セッションID": セッションID, "チャンネル": 受信データ.get("チャンネル", "0"),
+                            "メッセージ識別": "error", "メッセージ内容": str(e),
+                            "エラーコード": "PROJECT_CONTEXT_MISMATCH",
+                        })
+                        # 拒否でも送信待ち状態を解除する。Code拡張には本文を重複表示しない。
+                        通知チャンネル = str(受信データ.get("チャンネル", "0"))
+                        if 通知チャンネル not in 数値チャンネル一覧:
+                            通知チャンネル = "0"
+                        実行状態通知 = 受信データ.get("実行状態通知") is True
+                        await セッション.send_to_channel(通知チャンネル, {
+                            "セッションID": セッションID,
+                            "メッセージ識別": "output_end" if 実行状態通知 else "output_text",
+                            "メッセージ内容": "" if 実行状態通知 else f"! {e}",
+                            "実行中": False,
+                        })
+                        continue
+
                 if メッセージ識別 == "operations":
                     if ソケット番号 != "input":
                         continue
@@ -1565,6 +1607,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                     "サムネイル画像": None
                                 })
                                 保存_会話履歴(
+                                    プロジェクトパス=受信データ.get("プロジェクトパス"),
                                     セッションID=セッションID,
                                     チャンネル=フィードバック表示チャンネル,
                                     メッセージ識別="input_request",
@@ -1582,6 +1625,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                                     "サムネイル画像": None
                                 })
                                 保存_会話履歴(
+                                    プロジェクトパス=受信データ.get("プロジェクトパス"),
                                     セッションID=セッションID,
                                     チャンネル=フィードバック表示チャンネル,
                                     メッセージ識別="input_text",
@@ -1663,6 +1707,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
 
                     # 会話履歴保存
                     保存_会話履歴(
+                        プロジェクトパス=受信データ.get("プロジェクトパス"),
                         セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_request",
@@ -1745,6 +1790,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                     })
 
                     保存_会話履歴(
+                        プロジェクトパス=受信データ.get("プロジェクトパス"),
                         セッションID=セッションID,
                         チャンネル=出力先チャンネル,
                         メッセージ識別="input_file",

@@ -199,7 +199,7 @@ export class CodeConnection {
     if (!this.connected || this.modelChanging || socket?.readyState !== 1 || socket.bufferedAmount > 128000) return false;
     try {
       const request = packet.メッセージ識別 === 'input_text' || packet.メッセージ識別 === 'input_request';
-      socket.send(JSON.stringify({ ...packet, ...(request ? { 実行状態通知: true } : {}), セッションID: this.session, チャンネル: '1' }));
+      socket.send(JSON.stringify({ ...packet, ...(request ? { 実行状態通知: true, プロジェクトパス: this.project || null } : {}), セッションID: this.session, チャンネル: '1' }));
       if (request) { this.replay.clear(); this.実行継続中 = true; }
       return true;
     }

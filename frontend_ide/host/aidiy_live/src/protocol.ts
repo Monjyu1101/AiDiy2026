@@ -11,7 +11,7 @@
  */
 
 export type Packet = {
-  メッセージ識別?: string; セッションID?: string; チャンネル?: string;
+  メッセージ識別?: string; セッションID?: string; チャンネル?: string; プロジェクトパス?: string | null;
   メッセージ内容?: unknown; ファイル名?: string; [key: string]: unknown;
 };
 export interface LiveSocket {

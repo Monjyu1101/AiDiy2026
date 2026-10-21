@@ -170,7 +170,8 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 - SQLite を使う。
 - DB ファイルは `_data/AiDiy/database.db`。
 - Alembic は使わない。
-- 既存DBが残る場合、モデル変更だけではスキーマ差分は反映されない。
+- DB は現行スキーマでの新規作成を前提とし、旧テーブル・旧カラムの自動移行や互換フォールバックは行わない。
+- スキーマ変更時の DB 再作成は利用者が手動で行う。アプリ起動やコード検証で既存 DB を削除・再構築しない。
 - カスタムID生成は `C採番` で管理し、AUTOINCREMENT を前提にしない。
 - 全テーブルは登録 / 更新の監査フィールドを持つ。
 
@@ -251,6 +252,7 @@ AIコアは、テキスト、音声、画像、ファイル、コード支援を
 |------|------|
 | `CHAT_AI_NAME` | テキストチャット |
 | `LIVE_AI_NAME` | 音声リアルタイム対話 |
+| `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` | 内部RESTでプロジェクト履歴から次のユーザー入力を予測（初期値 auto / auto、履歴非保存） |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | code1〜code6 のコード支援 |
 | `TASK_AI_NAME` / `TASK_AI_MODEL_plan` / `_do` / `_check` | backend_taskteam の AIタスク自動実行 |
 | `TEAM_AI_NAME` / `TEAM_AI_MODEL_plan` / `_do` / `_check` | backend_taskteam の AIチーム依頼実行 |
@@ -353,6 +355,8 @@ AiDiy IDE の中心となる画面は `frontend_ide/src/開発スペース/` が
 | `aidiy_windows_control` | Windows でのみ公開するデスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation 要素操作） |
 
 各 MCP は **SSE Transport**、**Streamable HTTP Transport**、**stdio gateway（`mcp_stdio.py`）** の 3 トランスポートを同一ポートで提供します。Python の `requests` でそのまま呼び出せるため、自動化スクリプトやバックエンドルーターからも利用できます。加えて OpenAI / Ollama 互換の標準チャットインターフェース `POST http://127.0.0.1:8095/aidiy_chat_completions/v1/chat/completions`（HTTP のみ）を提供します。
+
+次のユーザー入力予測 `aidiy_prediction_llms` は MCP に公開せず、Live 試行と同様に内部REST `POST /internal/prediction_llms` のみで提供します。
 
 MCP の使い分けと設定は `_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md` を参照してください。
 

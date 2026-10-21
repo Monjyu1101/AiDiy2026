@@ -1,8 +1,10 @@
 // 手動の config モデル試行専用。起動・全診断・headless からは呼ばない。
 import http from 'node:http';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {manualInput,manualDecisionAnswer,readManualCatalog} from './manual.mjs';
 import {createHmac, randomBytes} from 'node:crypto';
-import {readConfig} from '../runtime/model_probe.mjs';
+import {readConfig,readOAuth} from '../runtime/model_probe.mjs';
 import {getToolsStatus} from '../診断/tools_status.mjs';
 import {createAudioStore,validateAudio} from './audio_store.mjs';
 
@@ -14,27 +16,36 @@ export const TRIAL_RUN_TTL_MS=45*60*1000;
 const CHAT = {gemini_chat:'GEMINI',freeai_chat:'FREEAI',openrt_chat:'OPENRT',openai_chat:'OPENAI',openai_oauth:'OPENAI',ollama_chat:'OLLAMA',local_chat:'LOCAL'};
 const LIVE = {gemini_live:'GEMINI',freeai_live:'FREEAI',openai_live:'OPENAI'};
 const DECISION = new Set(['auto','openai_oauth','openai_jsonchat','freeai_chat','openai_decisions','gemini_chat']);
-import {TRIAL_PROMPT,DECISION_CHOICES,decisionQuestions} from './defaults.mjs';
+import {TRIAL_PROMPT,DECISION_CHOICES,decisionQuestions,TRIAL_FAMILIES,PREDICTION_PROVIDERS,PREDICTION_AUTO_PROVIDERS,predictionChatPassed} from './defaults.mjs';
 export {DECISION_CHOICES} from './defaults.mjs';
 const CODE = new Set(['auto','same','claude_sdk','claude_cli','claude_ollama','copilot_cli','codex_cli','codex_ollama','antigravity_cli','grok_cli','opencode_cli','aidiy_hermes']);
 const text = value => typeof value === 'string' ? value.trim() : '';
 const label = value => /^[\w./:@+-]{1,180}$/.test(text(value)) && !/^(?:sk-|AIza|Bearer )/i.test(text(value)) ? text(value) : '';
 const failure = (message, status=409) => Object.assign(new Error(message),{status,trialFailure:true});
-const sharedKey = row => JSON.stringify([row.区分==='CHAT'?'chat':row.区分==='LIVE'?'live':row.区分==='DECISION'?'decision':'code',row.プロバイダ,row.モデル,row.音声]);
+const sharedKey = row => JSON.stringify([row.区分==='CHAT'?'chat':row.区分==='LIVE'?'live':row.区分==='PREDICTION'?'prediction':row.区分==='DECISION'?'decision':'code',row.プロバイダ,row.モデル,row.音声]);
 function portOf(config) {const value=config.PORT_TOOLS ?? 8095;const port=Number(value);return /^(?:[1-9]\d*)$/.test(String(value)) && Number.isInteger(port) && port<=65535 ? port : 0;}
+export function trialProjectPath(config) {
+  const configured=text(config.CODE_BASE_PATH).replaceAll('\\','/');
+  if(!configured||configured.length>4096||/[\u0000-\u001f\u007f]/.test(configured))return '';
+  // AIコアの履歴と同じbackend_server基準。ドライブ相対パスや未設定は補完しない。
+  if(/^[a-z]:/i.test(configured)&&!(/^[a-z]:\//i.test(configured)))return '';
+  if(/^[a-z]:\//i.test(configured)||(configured.startsWith('//')&&!configured.startsWith('///')))return path.win32.normalize(configured);
+  return path.resolve(fileURLToPath(new URL('../../backend_server/',import.meta.url)),configured);
+}
 export function configRows(config) {
   const rows=[];
   const secrets=new Set(Object.entries(config).filter(([key,value])=>/key|token|secret|password/i.test(key) && typeof value==='string' && value.length>=4).map(([,value])=>value));
   function add(id, family, role, provider, model, voice='', inherited='') {
     const safe=value=>[...secrets].some(secret=>text(value).includes(secret))?'':label(value);
     provider=safe(provider);model=safe(model);voice=safe(voice);
-    const supported=family==='CHAT' ? Object.hasOwn(CHAT,provider) : family==='LIVE' ? Object.hasOwn(LIVE,provider) : family==='DECISION' ? DECISION.has(provider) : CODE.has(provider);
+    const supported=family==='CHAT' ? Object.hasOwn(CHAT,provider) : family==='LIVE' ? Object.hasOwn(LIVE,provider) : family==='PREDICTION' ? ['auto',...PREDICTION_PROVIDERS].includes(provider) : family==='DECISION' ? DECISION.has(provider) : CODE.has(provider);
     const state=provider && !supported ? '未対応' : !provider || !model || (family==='LIVE' && !voice) ? '未設定' : '未実行';
     rows.push({id,区分:family,役割:role,プロバイダ:provider,モデル:model,音声:voice,継承元:inherited,状態:state,説明:state==='未設定'?'設定値が不足または不正です。':state==='未対応'?'このプロバイダは試行に対応していません。':''});
   }
   const chat=text(config.CHAT_AI_NAME),live=text(config.LIVE_AI_NAME);
   add('CHAT','CHAT','会話',chat,config[`CHAT_${CHAT[chat]}_MODEL`]);
   add('LIVE','LIVE','音声会話',live,config[`LIVE_${LIVE[live]}_MODEL`],config[`LIVE_${LIVE[live]}_VOICE`]);
+  add('PREDICTION','PREDICTION','次のユーザー入力',text(config.PREDICTION_AI_NAME)||'auto',text(config.PREDICTION_AI_MODEL)||'auto');
   const decision=text(config.DECISION_AI_NAME)||'auto';
   const decisionKey={openai_decisions:'DECISION_OPENAI_MODEL',openai_oauth:'DECISION_OAUTH_MODEL',openai_jsonchat:'DECISION_OAUTH_MODEL',gemini_chat:'DECISION_GEMINI_MODEL',freeai_chat:'DECISION_FREEAI_MODEL'}[decision];
   // auto方式はToolsで方式とそのモデルを解決。明示方式では新キーを優先し、旧ファイルだけ共通値を使う。
@@ -89,6 +100,8 @@ export function localRequest({port,path,method='POST',body,headers={},signal,id,
 }
 export async function callMcp(row, config, {signal,request=localRequest,manual}={}) {
   const chat=row.区分==='CHAT',decision=row.区分==='DECISION',path=decision?'/aidiy_decisions_check/mcp':chat?'/aidiy_chat_llms/mcp':'/aidiy_code_agents/mcp',port=portOf(config);
+  const project=decision?'':trialProjectPath(config);
+  if(!decision&&!project)throw failure('CODE_BASE_PATHに会話履歴の対象プロジェクトを設定してください。');
   let session,protocol='2024-11-05';
   const headers=()=>({'MCP-Protocol-Version':protocol,...(session?{'Mcp-Session-Id':session}:{})});
   const rpc=async(id,method,params)=>{const response=await request({port,path,signal,id,headers:headers(),body:{jsonrpc:'2.0',...(id===undefined?{}:{id}),method,params}});session=response.session || session;if(id!==undefined && response.body?.jsonrpc!=='2.0')throw failure('MCP 応答が不正です。');if(response.body?.error)throw failure('MCP ツールの実行に失敗しました。');return response.body?.result;};
@@ -98,7 +111,7 @@ export async function callMcp(row, config, {signal,request=localRequest,manual}=
     await rpc(undefined,'notifications/initialized',{});
     // 既存 MCP の通常契約だけを使う。診断専用 provider / CLI / 認証経路は作らない。
     const option=(key,allowed,fallback='auto')=>allowed.includes(config[key])?config[key]:fallback;
-    const args=decision?{input:manual?.prompt??TRIAL_PROMPT,questions:manual?.questions??decisionQuestions(),ai_name:row.プロバイダ,ai_model:row.モデル,timeout_sec:60}:{prompt:manual?.prompt??TRIAL_PROMPT,ai_name:row.プロバイダ,ai_model:row.モデル,resume:false,timeout_sec:60,...(chat?{use_tools:false,session_id:`diag_${randomBytes(12).toString('hex')}`}:{code_permissions:option('CODE_PERMISSIONS',['auto','full','none']),self_check_loop:0})};
+    const args=decision?{input:manual?.prompt??TRIAL_PROMPT,questions:manual?.questions??decisionQuestions(),ai_name:row.プロバイダ,ai_model:row.モデル,timeout_sec:60}:{prompt:manual?.prompt??TRIAL_PROMPT,project_path:project,ai_name:row.プロバイダ,ai_model:row.モデル,resume:false,timeout_sec:60,...(chat?{use_tools:false,session_id:`diag_${randomBytes(12).toString('hex')}`}:{code_permissions:option('CODE_PERMISSIONS',['auto','full','none']),self_check_loop:0})};
     const result=await rpc(2,'tools/call',{name:decision?'decisions_check':chat?'chat_llms_run':'code_agents_run',arguments:args});
     if(result?.isError)throw failure('MCP ツールがエラーを返しました。');
     try{return toolPayload(result);}catch(error){
@@ -126,17 +139,42 @@ function redact(value,config,limit=1500) {
   for(const [key,secret] of Object.entries(config))if(/key|token|secret|password/i.test(key) && typeof secret==='string' && secret.length>=4)result=result.split(secret).join('[非表示]');
   return result.replace(/\b(?:sk-[\w-]{8,}|AIza[\w-]{15,}|Bearer\s+\S+)\b/gi,'[非表示]').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').slice(0,limit);
 }
-export function createModelTrials({reader,statusFn=getToolsStatus,request=localRequest,timeoutMs=TRIAL_ROW_TIMEOUT_MS,catalogReader=readManualCatalog,audioStore=createAudioStore()}={}) {
-  const salt=randomBytes(32);let run;
-  const snapshot=async()=>{const [state,config]=await readConfig(reader);const version=createHmac('sha256',salt).update(JSON.stringify(config)).digest('hex');return {state,config,version,rows:configRows(config)};};
-  const supported=(family,provider)=>family==='CHAT'?Object.hasOwn(CHAT,provider):family==='LIVE'?Object.hasOwn(LIVE,provider):family==='DECISION'?DECISION.has(provider):family==='CODE'?CODE.has(provider):false;
-  const publicSnapshot=s=>({版:s.version,項目:s.rows});
+export function createModelTrials({reader,statusFn=getToolsStatus,request=localRequest,timeoutMs=TRIAL_ROW_TIMEOUT_MS,catalogReader=readManualCatalog,credentialReader=()=>readOAuth('codex'),audioStore=createAudioStore()}={}) {
+  const salt=randomBytes(32);let run,contextVersion='',generation=0;
+  const chats=new Map();
+  const clearChat=()=>{chats.clear();generation++;};
+  const successList=()=>[...chats.values()];
+  const readCatalog=async name=>{try{const value=await catalogReader(name);return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}};
+  const snapshot=async()=>{
+    const [state,config]=await readConfig(reader);
+    const [predictionCatalog,chatCatalog,credentials]=await Promise.all([readCatalog('prediction_models'),readCatalog('chat_models'),Promise.resolve().then(()=>credentialReader()).catch(()=>null)]);
+    const version=createHmac('sha256',salt).update(JSON.stringify([config,predictionCatalog,chatCatalog,credentials,generation])).digest('hex');
+    if(contextVersion!==version){chats.clear();contextVersion=version;}
+    return {state,config,version,predictionCatalog,rows:configRows(config)};
+  };
+  function predictionTarget(s,provider,model){
+    let name=provider==='auto'?text(s.config.PREDICTION_AI_NAME)||'auto':provider;
+    if(name==='auto')name=PREDICTION_AUTO_PROVIDERS.find(name=>Object.keys(s.predictionCatalog[name]?.models||{}).some(id=>label(id)&&!['auto','same'].includes(id)));
+    let selected=model==='auto'?text(s.config.PREDICTION_AI_MODEL)||'auto':model;
+    const models=s.predictionCatalog[name]?.models;
+    if(selected==='auto')selected=Object.keys(models||{}).find(id=>label(id)&&!['auto','same'].includes(id));
+    let reason='';
+    if(!PREDICTION_PROVIDERS.includes(name)||!label(selected)||redact(selected,s.config)!==selected||!models||!Object.hasOwn(models,selected))reason='予測モデル候補がありません。モデル一覧を再取得・書込してください。';
+    const project=trialProjectPath(s.config);
+    if(!project)reason='CODE_BASE_PATHに予測対象のプロジェクトを設定してください。';
+    const passed=predictionChatPassed(successList(),name,selected);
+    return {provider:label(redact(name,s.config)),model:label(redact(selected,s.config)),project,available:!reason,ready:!reason&&passed,reason:reason||(!passed?'同じプロバイダ・モデルのChatテストを先に成功させてください。':'')};
+  }
+  const trialContext=s=>{const row=s.rows.find(row=>row.id==='PREDICTION');const target=predictionTarget(s,row.プロバイダ,row.モデル);return {チャット成功:successList(),予測条件:{プロバイダ:target.provider,モデル:target.model,プロジェクト:redact(target.project,s.config),利用可能:target.available,テスト可能:target.ready,説明:target.reason}};};
+  const supported=(family,provider)=>family==='CHAT'?Object.hasOwn(CHAT,provider):family==='LIVE'?Object.hasOwn(LIVE,provider):family==='PREDICTION'?['auto',...PREDICTION_PROVIDERS].includes(provider):family==='DECISION'?DECISION.has(provider):family==='CODE'?CODE.has(provider):false;
+  const publicSnapshot=s=>({版:s.version,項目:s.rows,...trialContext(s)});
   function cancel(preserveAudio=false){if(run){const id=run.id;run.controller.abort();clearTimeout(run.timer);run=null;if(!preserveAudio)void audioStore.clear(id).catch(()=>{});}}
-  return {
-    async snapshot(){return publicSnapshot(await snapshot());},
+  const service={
+    async snapshot(){clearChat();return publicSnapshot(await snapshot());},
+    invalidateChat(){clearChat();},
     async catalogs(){
-      const s=await snapshot(),families={};
-      for(const [family,file] of Object.entries({CHAT:'chat_models',LIVE:'live_models',DECISION:'decisions_models',CODE:'code_models'})){
+      clearChat();const s=await snapshot(),families={};
+      for(const [family,file] of Object.entries({CHAT:'chat_models',LIVE:'live_models',PREDICTION:'prediction_models',DECISION:'decisions_models',CODE:'code_models'})){
         let source={},state='読込済み';try{source=await catalogReader(file);if(!source||typeof source!=='object'||Array.isArray(source))throw Error();}catch{state='未取得';}
         const providers=[];
         for(const [provider,info] of Object.entries(source)){
@@ -149,6 +187,7 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
           let provider=providers.find(p=>p.id===row.プロバイダ);if(!provider){provider={id:row.プロバイダ,モデル:[]};providers.push(provider);}
           if(!provider.モデル.some(m=>m.id===row.モデル))provider.モデル.push({id:row.モデル,名前:row.モデル+'（設定保持値・一覧外）',保存値:true});
         }
+        if(family==='PREDICTION')providers.unshift({id:'auto',モデル:[{id:'auto',名前:'auto（自動判定）',保存値:false}]});
         if(family==='DECISION')for(const id of ['auto','openai_oauth','freeai_chat','openai_decisions','gemini_chat'])if(!providers.some(p=>p.id===id))providers.push({id,モデル:[]});
         if(family==='CODE'&&!providers.some(p=>p.id==='auto'))providers.unshift({id:'auto',モデル:[]});
         for(const provider of providers){
@@ -162,8 +201,10 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
             {id:'same',名前:'same (変更なし)',保存値:false},
             ...provider.モデル.filter(m=>!['auto','same'].includes(m.id)),
           ];
+          if(family==='PREDICTION'&&!provider.モデル.some(m=>m.id==='auto'))provider.モデル.unshift({id:'auto',名前:'auto（既定モデル）',保存値:false});
           if(family==='DECISION'&&!provider.モデル.some(m=>m.id==='auto'))provider.モデル.unshift({id:'auto',名前:'auto（既定モデル）',保存値:false});
         }
+        if(family==='PREDICTION')for(const provider of providers)for(const model of provider.モデル){const target=predictionTarget(s,provider.id,model.id);Object.assign(model,{解決プロバイダ:target.provider,解決モデル:target.model,利用可能:target.available,説明:target.available?'':target.reason});}
         families[family]={状態:state,プロバイダ:providers};
       }
       let voices={};try{voices=await catalogReader('live_voices');}catch{}
@@ -173,13 +214,13 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         if(saved&&redact(saved,s.config)===saved)provider.現在音声=saved;
         if(saved&&redact(saved,s.config)===saved&&!provider.音声.some(v=>v.id===saved))provider.音声.push({id:saved,名前:saved+'（設定保持値・一覧外）'});
       }
-      const 初期値=Object.fromEntries(s.rows.filter(row=>['CHAT','LIVE','DECISION','CODE1'].includes(row.id)).map(row=>[row.区分,{provider:row.プロバイダ,model:row.モデル,voice:row.音声}]));
-      return {区分:families,版:s.version,初期値};
+      const 初期値=Object.fromEntries(s.rows.filter(row=>['CHAT','LIVE','PREDICTION','DECISION','CODE1'].includes(row.id)).map(row=>[row.区分,{provider:row.プロバイダ,model:row.モデル,voice:row.音声}]));
+      return {区分:families,版:s.version,初期値,...trialContext(s)};
     },
     async start({signal,rowId,manual,manuals}={}) {
       if(run)throw failure('前の試行を終了してから開始してください。');
       if(manuals!==undefined){
-        if(!Array.isArray(manuals)||manuals.length!==4||manuals.some((item,i)=>item?.family!==['CHAT','LIVE','DECISION','CODE'][i]))throw failure('一括試行はCHAT・LIVE・DECISION・CODEの順に指定してください。',400);
+        if(!Array.isArray(manuals)||manuals.length!==TRIAL_FAMILIES.length||manuals.some((item,i)=>item?.family!==TRIAL_FAMILIES[i]))throw failure('一括試行はCHAT・LIVE・PREDICTION・DECISION・CODEの順に指定してください。',400);
         manuals=manuals.map(item=>{try{return manualInput(item,supported,label);}catch(error){return {family:item.family,provider:'',model:'',voice:'',invalid:error.message};}});
       }
       if(manual)manual=manualInput(manual,supported,label);
@@ -187,7 +228,7 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
       // 準備中も占有し、同時の開始を拒否する。
       const current={id:randomBytes(16).toString('hex'),controller:new AbortController(),cache:new Map(),index:0,busy:false};run=current;
       const abort=()=>current.controller.abort();signal?.addEventListener('abort',abort,{once:true});
-      try {await audioStore.clear();if(signal?.aborted)abort();const s=await snapshot();if(s.state!=='読込済み' || !portOf(s.config))throw failure('設定ファイルを読み取れません。');const queue=manualRows.length?manualRows:rowId===undefined?s.rows:s.rows.filter(row=>row.id===rowId);if(!queue.length)throw failure('設定項目が見つかりません。',404);if(!(await statusFn({signal:current.controller.signal})).online || current.controller.signal.aborted)throw failure('Tools に接続してください。');Object.assign(current,s,{queue,manual,manuals});current.timer=setTimeout(cancel,TRIAL_RUN_TTL_MS);current.timer.unref?.();return {実行ID:current.id,実行順:queue.map(row=>row.id),...publicSnapshot(s)};}
+      try {await audioStore.clear();if(signal?.aborted)abort();const s=await snapshot();if(s.state!=='読込済み' || !portOf(s.config))throw failure('設定ファイルを読み取れません。');const queue=manualRows.length?manualRows:rowId===undefined?s.rows:s.rows.filter(row=>row.id===rowId);if(!queue.length)throw failure('設定項目が見つかりません。',404);if(queue.some(row=>row.区分==='CHAT'))chats.clear();if(queue.length===1&&queue[0].区分==='PREDICTION'){const target=predictionTarget(s,queue[0].プロバイダ,queue[0].モデル);if(!target.ready)throw failure(target.reason);}if(!(await statusFn({signal:current.controller.signal})).online || current.controller.signal.aborted)throw failure('Tools に接続してください。');Object.assign(current,s,{queue,manual,manuals});current.timer=setTimeout(cancel,TRIAL_RUN_TTL_MS);current.timer.unref?.();return {実行ID:current.id,実行順:queue.map(row=>row.id),...publicSnapshot(s)};}
       catch(error){if(run===current)cancel();throw error;}finally{signal?.removeEventListener('abort',abort);}
     },
     cancel(id){if(run?.id!==id)throw failure('試行が見つかりません。',404);cancel();return {状態:'中止'};},
@@ -197,6 +238,8 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
       const row=current.queue[current.index];if(row?.id!==rowId)throw failure('モデル試行の順序が一致しません。');
       const manual=current.manuals?.find(item=>item.family===row.区分)||current.manual;
       const key=sharedKey(row);
+      // 再試行の失敗・中止で古いChat成功を使わない。
+      if(row.区分==='CHAT')chats.clear();
       current.busy=true;const started=Date.now(),abort=()=>current.controller.abort();signal?.addEventListener('abort',abort,{once:true});
       let timedOut=false;const timer=setTimeout(()=>{timedOut=true;abort();},timeoutMs);if(signal?.aborted)abort();
       try {
@@ -207,10 +250,20 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         // 同じ設定版・固定オプションでのみ共有。CHAT/LIVE は CODE 系と混ぜない。
         if(current.cache.has(key)){const prior=current.cache.get(key);return {...prior,id:row.id,共有元:prior.id,所要ms:0};}
         let payload;
-        if(row.区分==='LIVE')payload=(await request({port:portOf(current.config),path:'/internal/live_model_check',body:manual?{ai_name:row.プロバイダ,ai_model:row.モデル,voice:row.音声,prompt:manual.prompt}:{},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:LIVE_HTTP_TIMEOUT_MS,responseLimit:3*1024*1024})).body;
+        if(row.区分==='PREDICTION'){
+          const target=predictionTarget(current,row.プロバイダ,row.モデル);
+          if(!target.ready)return {...base,状態:'未実施',説明:target.reason};
+          payload=(await request({port:portOf(current.config),path:'/internal/prediction_llms',body:{project_path:target.project,ai_name:target.provider,ai_model:target.model,timeout_sec:60},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:75000})).body;
+        }
+        else if(row.区分==='LIVE')payload=(await request({port:portOf(current.config),path:'/internal/live_model_check',body:manual?{ai_name:row.プロバイダ,ai_model:row.モデル,voice:row.音声,prompt:manual.prompt}:{},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:LIVE_HTTP_TIMEOUT_MS,responseLimit:3*1024*1024})).body;
         else payload=await callMcp(row,current.config,{signal:current.controller.signal,request,manual});
         if(current.controller.signal.aborted)throw failure('試行を中止しました。');
         if((await snapshot()).version!==current.version){cancel();throw Object.assign(failure('設定が変更されました。読み直して開始してください。'),{configChanged:true});}
+        if(row.区分==='PREDICTION'){
+          const answer=text(payload?.result),ok=payload?.status==='OK'&&Boolean(answer);
+          const result={...base,状態:ok?'OK':'NG',応答:ok?redact(answer,current.config,4000):'',実行プロバイダ:label(redact(payload?.ai_name,current.config)),実行モデル:label(redact(payload?.ai_model,current.config)),所要ms:Date.now()-started,説明:ok?'予測応答を確認しました（!・！を含む説明も応答として扱います）。':`予測応答を確認できませんでした。${answer?`（${redact(answer,current.config).slice(0,300)}）`:''}`};
+          current.cache.set(key,result);return result;
+        }
         if(row.区分==='DECISION'){
           let answer;
           if(manual){try{answer=manualDecisionAnswer(payload,manual.questions);}catch(error){
@@ -226,14 +279,19 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         if(live && payload?.status==='OK')try{validateAudio(payload.audio);audio=await audioStore.put(payload.audio,current.id);}catch{}
         if(current.controller.signal.aborted || run!==current){await audioStore.clear(current.id);throw failure('試行を中止しました。');}
         if((await snapshot()).version!==current.version){cancel();throw Object.assign(failure('設定が変更されました。読み直して開始してください。'),{configChanged:true});}
-        const ok=textOk || (live && !!audio);
+        const historySaved=live||payload?.history_saved===true;
+        const ok=(textOk && historySaved) || (live && !!audio);
+        const historyUnconfirmed=!live && (textOk || payload?.history_error) && !historySaved;
         const actual=row.区分==='LIVE'?payload?.model:row.区分==='CHAT'?payload?.ai_model:payload?.selected_model;
-        const result={...base,状態:ok?'OK':payload?.status==='UNSUPPORTED'?'未対応':'NG',応答:ok && textOk?redact(answer,current.config):'',...(audio?{音声ファイル:audio}:{}),実行プロバイダ:label(redact(payload?.provider||payload?.ai_name||payload?.selected_ai,current.config)),実行モデル:['auto','same'].includes(text(actual))?'':label(redact(actual,current.config)),所要ms:Date.now()-started,説明:ok?(audio?'音声応答を確認しました。':live?'1秒以上の再生可能な音声がありません。':''):live?'有効な会話応答または1秒以上の音声応答を確認できませんでした。':payload?.status==='UNSUPPORTED'?'接続先 MCP はこのプロバイダに対応していません。':`有効な会話応答を確認できませんでした。${answer?`（${redact(answer,current.config).slice(0,300)}）`:''}`};
+        const result={...base,状態:ok?'OK':payload?.status==='UNSUPPORTED'?'未対応':'NG',応答:(ok && textOk)||(historyUnconfirmed && (textOk||payload?.execution_status==='OK'))?redact(answer,current.config):'',...(audio?{音声ファイル:audio}:{}),実行プロバイダ:label(redact(payload?.provider||payload?.ai_name||payload?.selected_ai,current.config)),実行モデル:['auto','same'].includes(text(actual))?'':label(redact(actual,current.config)),所要ms:Date.now()-started,説明:ok?(audio?'音声応答を確認しました。':live?'1秒以上の再生可能な音声がありません。':'会話履歴への保存を確認しました。'):historyUnconfirmed?'会話履歴への保存を確認できませんでした。AIの処理は完了している場合があります。再試行前に実行結果とDB・Toolsの対応を確認してください。':live?'有効な会話応答または1秒以上の音声応答を確認できませんでした。':payload?.status==='UNSUPPORTED'?'接続先 MCP はこのプロバイダに対応していません。':`有効な会話応答を確認できませんでした。${answer?`（${redact(answer,current.config).slice(0,300)}）`:''}`};
+        if(row.区分==='CHAT'&&ok){const provider=label(redact(payload?.ai_name||payload?.provider||row.プロバイダ,current.config)),model=label(redact(payload?.ai_model||payload?.model||row.モデル,current.config));if(PREDICTION_PROVIDERS.includes(provider)&&model&&!['auto','same'].includes(model))chats.set(JSON.stringify([provider,model]),{provider,model});}
         current.cache.set(key,result);return result;
-      }catch(error){if(error?.configChanged)throw error;if(current.controller.signal.aborted){const continuing=!!manual&&timedOut&&run===current&&!signal?.aborted;if(continuing)current.controller=new AbortController();else if(run===current)cancel();const timeout=timedOut&&(!!manual||row.区分==='DECISION');return {id:row.id,状態:timeout?'NG':'中止',...(timeout&&!continuing?{実行終了:true}:{}),応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:timeout?(manual?'試行が制限時間を超えました。':'判断試行が制限時間を超えました。'):'試行を中止しました。'};}if(run!==current)throw error;const result={id:row.id,状態:'NG',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:error?.trialFailure?error.message:row.区分==='DECISION'?'Tools から判断応答を取得できませんでした。':'Tools から会話応答を取得できませんでした。'};current.cache.set(key,result);return result;}
+      }catch(error){if(error?.configChanged)throw error;if(current.controller.signal.aborted){const continuing=!!manual&&timedOut&&run===current&&!signal?.aborted;if(continuing)current.controller=new AbortController();else if(run===current)cancel();const timeout=timedOut&&(!!manual||['DECISION','PREDICTION'].includes(row.区分));return {id:row.id,状態:timeout?'NG':'中止',...(timeout&&!continuing?{実行終了:true}:{}),応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:timeout?(manual?'試行が制限時間を超えました。':`${row.区分==='PREDICTION'?'予測':'判断'}試行が制限時間を超えました。`):'試行を中止しました。'};}if(run!==current)throw error;const result={id:row.id,状態:'NG',応答:'',実行モデル:'',共有元:'',所要ms:Date.now()-started,説明:error?.trialFailure?error.message:row.区分==='DECISION'?'Tools から判断応答を取得できませんでした。':row.区分==='PREDICTION'?'Tools から予測応答を取得できませんでした。':'Tools から会話応答を取得できませんでした。'};current.cache.set(key,result);return result;}
       finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);current.busy=false;current.index++;if(current.index>=current.queue.length && run===current)cancel(true);}
     },
     audio:id=>audioStore.get(id),
     close(){cancel();return audioStore.close().catch(()=>{});},
   };
+  const next=service.next;service.next=async(...args)=>{const result=await next(...args);return {...result,...trialContext(await snapshot())};};
+  return service;
 }

@@ -30,6 +30,9 @@ def list_A会話履歴(
     if request and request.チャンネル is not None:
         query = query.filter(models.A会話履歴.チャンネル == request.チャンネル)
 
+    if request and request.プロジェクトパス is not None:
+        query = query.filter(models.A会話履歴.プロジェクトパス == request.プロジェクトパス)
+
     total = query.count()
 
     limit = MAX_ITEMS
@@ -85,6 +88,7 @@ def create_A会話履歴(
         セッションID=request.セッションID,
         シーケンス=request.シーケンス,
         チャンネル=request.チャンネル,
+        プロジェクトパス=request.プロジェクトパス,
         メッセージ識別=request.メッセージ識別,
         メッセージ内容=request.メッセージ内容,
         ファイル名=request.ファイル名,
@@ -106,6 +110,8 @@ def update_A会話履歴(
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
+    # 旧クライアントや項目省略の変更で、保存済みのプロジェクトを消さない。
+    project_fields = request.model_dump(include={"プロジェクトパス"}, exclude_unset=True)
     item = crud.update_会話履歴(
         db,
         セッションID=request.セッションID,
@@ -113,7 +119,8 @@ def update_A会話履歴(
         メッセージ内容=request.メッセージ内容,
         ファイル名=request.ファイル名,
         サムネイル画像=request.サムネイル画像,
-        認証情報=認証情報
+        認証情報=認証情報,
+        **project_fields
     )
 
     if not item:

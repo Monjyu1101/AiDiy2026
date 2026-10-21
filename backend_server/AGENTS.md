@@ -13,7 +13,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 |------|--------|
 | backend の層構造、Model / Schema / CRUD / Router パターン | [`../_AIDIY/knowledge/backend_server,実装パターン.md`](../_AIDIY/knowledge/backend_server,実装パターン.md) |
 | 開発環境起動、依存関係、DB、Swagger、よくある問題 | [`../_AIDIY/knowledge/共通,開発環境運用手順.md`](../_AIDIY/knowledge/共通,開発環境運用手順.md) |
-| 既存 DB へのスキーマ差分反映 | [`../_AIDIY/knowledge/backend_server,スキーマ変更手順.md`](../_AIDIY/knowledge/backend_server,スキーマ変更手順.md) |
+| スキーマ変更と手動 DB 再作成の前提 | [`../_AIDIY/knowledge/backend_server,スキーマ変更手順.md`](../_AIDIY/knowledge/backend_server,スキーマ変更手順.md) |
 | C採番と監査フィールド | [`../_AIDIY/knowledge/backend_server,C採番と監査フィールド.md`](../_AIDIY/knowledge/backend_server,C採番と監査フィールド.md) |
 | C利用者パスワード運用 | [`../_AIDIY/knowledge/backend_server,C利用者パスワード運用.md`](../_AIDIY/knowledge/backend_server,C利用者パスワード運用.md) |
 | JWT 認証 | [`../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
@@ -57,7 +57,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - レスポンスは `status`、`message`、`data` を持つ統一形式にする。
 - DB VIEW オブジェクトは作らず、V系 Router の生 SQL で JOIN / 集計する。
 - Alembic は使わない。
-- 既存DB向けスキーマ差分は起動時の冪等処理で反映する。
+- 現行スキーマの新規 DB を前提とし、既存 DB の旧テーブル・旧カラムを起動時に自動移行しない。
 - 採番は `C採番` で管理する。
 - 監査フィールドは共通 helper を使う。
 - フロントエンドのポートを変える場合は、`core_main.py` / `apps_main.py` の CORS 許可リストも合わせて確認する。
@@ -111,7 +111,7 @@ Apps:
 DB ファイルは `_data/AiDiy/database.db` です。
 `create_all()` は新規テーブル作成には効きますが、既存テーブルのカラム追加・削除・型変更には効きません。
 
-スキーマ差分、初期データ、DBリセットの判断は `_AIDIY/knowledge` の手順を優先してください。
+スキーマ変更時の DB 再作成は利用者が手動で行います。起動時は新規テーブル作成と初期データ投入に留め、既存 DB の削除・構造変換は行いません。判断と確認方法は `_AIDIY/knowledge` の手順を参照してください。
 
 ## 設定管理
 

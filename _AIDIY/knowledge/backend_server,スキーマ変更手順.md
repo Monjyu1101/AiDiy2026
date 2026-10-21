@@ -1,111 +1,44 @@
 # スキーマ変更手順
 
-> 文書: `backend_server,スキーマ変更手順.md` | 実装: `backend_server/apps_crud/init.py`, `backend_server/core_crud/init.py`
+> 文書: `backend_server,スキーマ変更手順.md` | 実装: `backend_server/core_models/`, `backend_server/apps_models/`, `backend_taskteam/task_proc/tasks_db.py`, `backend_taskteam/team_proc/*_db.py`
 
 ## このメモを使う場面
-- SQLite の既存DBへカラム追加・削除・型変更を適用する
-- 不要テーブルを削除する
-- サーバー起動時に既存DBとのスキーマ差分を補正する
 
-## 関連ファイル
-- `backend_server/apps_crud/init.py`
-- `backend_server/core_crud/init.py`
-- `backend_server/apps_models/`
-- `backend_server/core_models/`
+- テーブル・カラム・主キー・索引の定義を変更する
+- 新規 DB のスキーマと初期データを確認する
+- 起動時や API 実行時のカラム不足・旧テーブル参照を切り分ける
+
+## 基本方針
+
+- アプリは現行スキーマで新規作成した DB を前提とする。
+- 旧テーブル・旧カラムへのフォールバックや、起動時の `ALTER TABLE`、コピー移行、主キー・列順の自動変換を追加しない。
+- スキーマ変更時の DB 再作成は利用者が手動で行う。コード修正・構文確認・テストを理由に、実 DB の削除や再構築を実行しない。
+- `create_all()` と `CREATE TABLE IF NOT EXISTS` は未作成テーブルを作るだけで、既存テーブルの定義を更新しない。
+- 既存 DB の列不足は、旧構造へのフォールバックで隠さず、現行定義との不一致として扱う。
+
+## 関連ファイルと役割
+
+- `backend_server/core_models/`, `backend_server/apps_models/`: Core / Apps の現行モデル定義。
+- `backend_server/core_main.py`, `backend_server/apps_main.py`: 対象モデルのテーブル作成。
+- `backend_server/core_crud/init.py`, `backend_server/apps_crud/init.py`: 現行スキーマへの初期データ投入。
+- `backend_server/core_crud/C採番.py`: 新規 DB 向け採番初期値。
+- `backend_taskteam/task_proc/tasks_db.py`: Task の現行 DDL と初期化。
+- `backend_taskteam/team_proc/*_db.py`: Team の現行 DDL と初期化。
+- `backend_tools/tools_proc/sqlite_query.py`: 読み取り中心のスキーマ診断。診断のための列一覧取得は旧構造互換処理とは区別する。
 
 ## 実装手順
 
-### 1. 差分を確認する
+1. Model または DDL を現行定義へ変更し、Schema / CRUD / Router / 利用側との項目名を揃える。
+2. 新規テーブルは所定の初期化処理へ登録する。既存テーブルを検出して自動変換する処理は追加しない。
+3. 初期データと採番が新規 DB 上で成立することを確認する。旧データの補完は初期データ投入へ混在させない。
+4. 型・主キー・索引・列順を一時 DB で確認する。Task 明細のタイプは登録・更新時に `明細タイプ()` で決め、起動時に旧レコードを補正しない。
+5. スキーマ変更後の利用には利用者による手動再作成が必要なことを伝える。保持が必要なデータの退避と再作成方法は [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) の「DB 管理」を参照する。
 
-既存DBが残る運用では `create_all()` だけでは既存テーブルの列追加・PK変更・列削除は反映されない。変更前に `PRAGMA table_info()` または SQLAlchemy inspector で現行スキーマを確認する。
+## 検証時の安全な切り分け
 
-```python
-result = db.execute(text('PRAGMA table_info("テーブル名")')).fetchall()
-existing_columns = [row[1] for row in result]
-```
-
-```python
-from sqlalchemy import inspect
-
-inspector = inspect(db.bind)
-if inspector.has_table("テーブル名"):
-    columns = [column["name"] for column in inspector.get_columns("テーブル名")]
-```
-
-### 2. カラム追加
-
-```python
-def apply_schema_migrations(db: Session):
-    result = db.execute(text('PRAGMA table_info("テーブル名")')).fetchall()
-    existing = [row[1] for row in result]
-    if "新カラム名" not in existing:
-        db.execute(text('ALTER TABLE "テーブル名" ADD COLUMN "新カラム名" TEXT'))
-        db.execute(text('UPDATE "テーブル名" SET "新カラム名" = :value WHERE "新カラム名" IS NULL'), {"value": "デフォルト値"})
-        db.commit()
-```
-
-- NULL許容カラムは `ALTER TABLE ADD COLUMN` で追加する。
-- NOT NULL相当のカラムは `DEFAULT` 付き追加、または追加直後の `UPDATE` で既存行を埋める。
-- 日本語カラム名はダブルクォートで囲む。
-
-### 3. カラム削除・型変更・PK変更
-
-SQLite の `DROP COLUMN`、型変更、主キー変更は制約が多い。互換性を優先し、原則としてテーブル再作成方式にする。
-
-1. 旧テーブルをリネームする。
-2. Model 定義から新テーブルを作成する。
-3. 必要な列だけを `INSERT INTO ... SELECT ...` で移行する。
-4. 旧テーブルを削除する。
-5. `db.commit()` する。
-
-```python
-db.execute(text('ALTER TABLE "テーブル名" RENAME TO "テーブル名_old"'))
-models.M対象.__table__.create(bind=db.bind, checkfirst=True)
-db.execute(text("""
-    INSERT INTO "テーブル名" ("ID", "名称", "有効")
-    SELECT "ID", "名称", 1
-    FROM "テーブル名_old"
-"""))
-db.execute(text('DROP TABLE IF EXISTS "テーブル名_old"'))
-db.commit()
-```
-
-開発用の空テーブルや再投入可能なサンプルデータなら `DROP TABLE` 後に `models.<Model>.__table__.create(bind=db.bind, checkfirst=True)` で再作成してよい。実データがある場合は、移行SQLを明示してから削除する。
-
-### 4. テーブル削除
-
-```python
-db.execute(text('DROP TABLE IF EXISTS "旧テーブル名"'))
-db.commit()
-```
-
-## 注意点
-
-- `apply_schema_migrations()` は `init_db_data()` の前に呼ぶ。構造が揃っていないと初期データ投入が失敗する。
-- `ALTER TABLE` / `DROP TABLE` / `CREATE TABLE` 後に続けて列確認する場合は、`inspector = inspect(db.bind)` を作り直す。
-- 複合PKを追加する変更（例: `明細SEQ` 追加）は SQLite の `ALTER TABLE ADD PRIMARY KEY` では対応できない。旧テーブルをリネーム、新テーブルを Model から作成、必要なデータを INSERT、旧テーブルを DROP する。
-- 互換救済コードは永続化しすぎない。既存ユーザーDBを壊さない範囲で削除可否を判断する。
-- DBファイルの場所や初期化順は現行実装を確認してから作業する。
-
-## 判断基準
-
-| 変更内容 | 推奨対応 |
-|---------|----------|
-| NULL許容カラム追加 | `ALTER TABLE ADD COLUMN` |
-| NOT NULLカラム追加 | `DEFAULT` 付きで追加し、必要なら既存行を `UPDATE` |
-| 表示用/任意項目追加 | 起動時補正で追加してよい |
-| PK構成変更 | テーブル再作成 |
-| カラム名変更 | テーブル再作成、または新列追加＋データコピー＋旧列は互換残し |
-| 不要テーブル削除 | `DROP TABLE IF EXISTS` |
-
-## 確認方法
-
-```powershell
-sqlite3 _data/AiDiy/database.db ".schema テーブル名"
-```
-
-```powershell
-cd backend_server
-.venv\Scripts\python.exe -m py_compile apps_crud\init.py
-.venv\Scripts\python.exe -c "import apps_main"
-```
+- `ast.parse()` など接続を伴わない構文確認を先に行う。
+- DB を使う検証は `:memory:` または専用の一時ディレクトリへ接続先を固定する。アプリの import や起動だけで実 DB に接続する経路がないか確認する。
+- 新規作成と複数回の初期化を確認する。現行テーブル・索引・初期データが存在し、再初期化で既存行を書き換えないことを検証する。
+- 旧構造の一時 fixture を用いる場合は、初期化が既存テーブルを削除・コピー・変換しないことと、必要列を使う処理が不整合を隠さないことを確認する。
+- 正常なロールバック、接続ロックへの対処、初期化前の別機能テーブル未作成への対処、読み取り専用のスキーマ診断は、旧 DB 互換処理として一括削除しない。
+- 実 DB を使う起動試験・削除・再作成は、一時 DB の検証とは別の作業として扱う。

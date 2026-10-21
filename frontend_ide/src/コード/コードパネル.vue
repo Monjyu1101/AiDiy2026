@@ -7,7 +7,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
 import { codeTransport } from '../コード/コード通信.js';
-import { visibleStreamContent } from '../../host/src/stream-control';
+import { visibleStreamContent, streamControlOf } from '../../host/src/stream-control';
 import StatusBar from '../共通表示/状態バー.vue';
 import TerminalWelcome from '../ターミナル/開始表示.vue';
 import TerminalProgress from '../ターミナル/進捗表示.vue';
@@ -19,6 +19,9 @@ const windowTitle = ref('');
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
+// 下書きやホスト設定から復元しない。画面を開くたびに自動提案はOFFで開始する。
+const autoSuggest = ref(false), predicting = ref(false), predictionNotice = ref('');
+let prediction, predictionReply = false, predictionFailed = false;
 const changingConversation = ref(false);
 let conversationChange;
 const autoPending = ref(false), deleteTarget = ref(null), deleting = ref(false), catalogReady = ref(false);
@@ -42,7 +45,7 @@ const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || p
 const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value && !stream.value?.visible);
 const operable = computed(() => state.信頼済み && state.画面接続済み !== false);
 const allowed = computed(() => state.信頼済み && state.画面接続済み !== false && !!state.作業フォルダ && (offline.value || state.接続済み));
-const canSend = computed(() => allowed.value && !busy.value && prompt.value.trim());
+const canSend = computed(() => allowed.value && !busy.value && !predicting.value && prompt.value.trim());
 const canStop = computed(() => allowed.value && state.実行中 && !state.停止中 && !stopPending.value);
 const modelLabel = computed(() => `${state.provider || '自動'} - ${state.model || (state.provider ? '既定モデル' : 'AIコアの設定')}`);
 const sortedHistory = computed(() => [...state.履歴].sort((a, b) => b.更新日時 - a.更新日時));
@@ -50,6 +53,44 @@ const canApplyModel = computed(() => catalogReady.value && !catalogBusy.value &&
   (model.value === '__custom__' ? !!custom.value.trim() : !offline.value || models.value.some(item => item.id === model.value)));
 const transport = codeTransport(props, receive);
 let disposed = false;
+const predictionScope = () => JSON.stringify([state.作業フォルダ?.パス, state.会話ID, state.セッションID || state.コアセッションID]);
+const predictionAllowed = () => autoSuggest.value && operable.value && state.自動接続 && state.接続済み && !offline.value && !busy.value;
+function cancelPrediction(notify = true) {
+  predictionNotice.value = '';
+  const request = prediction;
+  prediction = undefined; predicting.value = false;
+  if (!request) return;
+  clearTimeout(request.timer);
+  if (notify) void transport.send({ type: 'cancelPrediction', requestId: request.id }).catch(() => {});
+}
+function startPrediction() {
+  // IME変換中はv-modelへ反映前の文字があり得るため、実際の入力欄も確認する。
+  if (!predictionAllowed() || prompt.value.trim() || prediction || input.value?.composing
+      || (typeof input.value?.value === 'string' && input.value.value.trim())) return;
+  const request = { id: crypto.randomUUID(), scope: predictionScope(), draft: prompt.value };
+  prediction = request; predicting.value = true;
+  // ホスト応答・画面通信が失われても入力欄をロックしたままにしない。
+  request.timer = setTimeout(() => { if (prediction === request) cancelPrediction(); }, 125000);
+  void transport.send({ type: 'predictInput', requestId: request.id, conversationId: state.会話ID,
+    sessionId: state.セッションID || state.コアセッションID || '' }).catch(() => { if (prediction === request) cancelPrediction(); });
+}
+function toggleSuggestion() {
+  autoSuggest.value = !autoSuggest.value;
+  if (!autoSuggest.value) cancelPrediction();
+}
+function acceptPrediction(packet) {
+  const request = prediction;
+  if (!request || packet.requestId !== request.id) return;
+  const apply = !disposed && predictionAllowed() && predictionScope() === request.scope && prompt.value === request.draft
+    && typeof packet.text === 'string' && !!packet.text.trim() && packet.text.length <= 200000;
+  cancelPrediction(false);
+  // 提案は編集できる下書きだけ。送信、会話追加、添付変更は行わない。
+  if (apply) {
+    const text = packet.text.trim();
+    if (/^[!！]/.test(text)) predictionNotice.value = text.slice(1).trim();
+    else prompt.value = text;
+  }
+}
 function confirmsConversationChange(packet) {
   const change = conversationChange;
   if (!change || typeof packet.会話ID !== 'string' || !packet.会話ID) return false;
@@ -63,6 +104,13 @@ function receive(packet) {
   if (packet.type === 'state') {
     const first = !state.会話ID;
     const changed = !!state.会話ID && state.会話ID !== packet.会話ID;
+    const scopeChanged = !first && (state.作業フォルダ?.パス !== packet.作業フォルダ?.パス
+      || (state.セッションID || state.コアセッションID) !== (packet.セッションID || packet.コアセッションID));
+    const completedReply = !first && !changed && !scopeChanged && state.実行中 && !packet.実行中 && predictionReply && !predictionFailed && !state.停止中 && !packet.停止中;
+    if (first || changed || scopeChanged || !packet.接続済み || packet.画面接続済み === false || packet.停止中) {
+      predictionReply = false; cancelPrediction();
+    }
+    if (packet.実行中 && !state.実行中) { predictionReply = false; predictionFailed = false; cancelPrediction(); }
     const confirmed = confirmsConversationChange(packet);
     const previous = state.メッセージ.map(item => `${item.種別}:${item.本文}`);
     if (first || changed) { revision++; arrivals.reset(); }
@@ -81,6 +129,11 @@ function receive(packet) {
     progress.value = (packet.進捗 || []).map(line => visibleStreamContent(String(line))).filter(Boolean).join('\n');
     if (packet.実行中 && progress.value.trim()) hasStreamContent.value = true;
     const messages = packet.メッセージ || [];
+    if ((prediction || predictionNotice.value) && (!predictionAllowed() || (prediction && prediction.scope !== predictionScope()))) cancelPrediction();
+    if (completedReply) {
+      predictionReply = false;
+      if (messages.at(-1)?.種別 === 'assistant') startPrediction();
+    }
     void nextTick(() => {
       if (disposed || own !== revision) return;
       stream.value?.sync(progress.value, first || changed);
@@ -91,6 +144,7 @@ function receive(packet) {
       }
       scroll();
     });
+  } else if (packet.type === 'predictionResult') { acceptPrediction(packet);
   } else if (packet.type === 'conversationChangeResult') {
     const change = conversationChange;
     if (!props.host || !change || packet.requestId !== change.requestId) return;
@@ -103,7 +157,7 @@ function receive(packet) {
       else { change.error = `${error.value} 下書きを控えてから画面を再読み込みしてください。`; error.value = change.error; }
     }
   } else if (packet.type === 'showConversation') { history.value = false; nextTick(scroll); }
-  else if (packet.type === 'accepted') { prompt.value = ''; pending.value = false; }
+  else if (packet.type === 'accepted') { cancelPrediction(); predictionReply = false; predictionFailed = false; prompt.value = ''; pending.value = false; }
   else if (packet.type === 'modelCatalog') {
     if (!picker.value || (packet.provider || '') !== catalogProvider) return;
     const items = (packet.items || []).filter(item => typeof item?.id === 'string' && typeof item.label === 'string');
@@ -119,6 +173,7 @@ function receive(packet) {
       catalogBusy.value = false; catalogReady.value = true;
     }
   } else if (['modelCatalogError', 'transportError', 'error'].includes(packet.type)) {
+    cancelPrediction(); predictionReply = false; predictionFailed = true;
     if (packet.type === 'modelCatalogError' && (!picker.value || (packet.provider || '') !== catalogProvider)) return;
     error.value = packet.message || packet.error || '処理に失敗しました。'; pending.value = false; catalogBusy.value = false;
     stopPending.value = false; autoPending.value = false;
@@ -126,7 +181,20 @@ function receive(packet) {
     arrivals.cancelReservation();
     if (packet.type === 'transportError') { revision++; state.画面接続済み = false; arrivals.reset(); stream.value?.reset(); }
   } else if (packet.メッセージ識別 === 'output_stream') {
+    const control = streamControlOf(String(packet.メッセージ内容 || ''));
+    if (control === 'cancel') { predictionReply = false; predictionFailed = true; cancelPrediction(); }
+    else if (control === 'start') cancelPrediction();
     stream.value?.packet(String(packet.メッセージ内容 || ''));
+  } else if (['output_text', 'output'].includes(packet.メッセージ識別)) {
+    cancelPrediction();
+    // AIコア共通のエラー応答は output_text でも先頭が ! になる。中断後の本文でも再開しない。
+    const text = typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容.trim() : '';
+    if (text.startsWith('!')) { predictionReply = false; predictionFailed = true; }
+    const progressOnly = /^【(?:検証|自己改善)(?:開始|完了)】/.test(text);
+    if (state.実行中 && !state.停止中 && !predictionFailed && text && !progressOnly) predictionReply = true;
+  } else if (['error', 'cancel_run'].includes(packet.メッセージ識別)
+      || (packet.メッセージ識別 === 'output_end' && packet.メッセージ内容)) {
+    predictionReply = false; predictionFailed = true; cancelPrediction();
   }
 }
 function finishConversationChange() {
@@ -138,6 +206,7 @@ async function send(type, data = {}) {
   const changesConversation = type === 'new' || type === 'selectHistory' || (type === 'deleteHistory' && data.id === state.会話ID) ||
     (!props.host && type === 'autoConnect' && data.enabled && state.実行モード === 'offline');
   if (changesConversation && changingConversation.value) return false;
+  if (changesConversation || ['autoConnect', 'setModel', 'input_text', 'cancel_run'].includes(type)) { cancelPrediction(); predictionReply = false; }
   if (type === 'selectHistory' && data.id === state.会話ID) return true;
   let change;
   if (changesConversation) {
@@ -195,28 +264,29 @@ async function toggleAuto() { if (busy.value || autoPending.value || !operable.v
 async function deleteHistory() { if (!deleteTarget.value || busy.value || deleting.value || !operable.value) return; deleting.value = true; if (await send('deleteHistory', { id: deleteTarget.value.id })) deleteTarget.value = null; deleting.value = false; }
 function historyDate(value) { const date = new Date(value); if (Number.isNaN(date.getTime())) return ''; const pad = n => String(n).padStart(2, '0'); return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`; }
 function link(event) { const a = event.target.closest('a'); if (a) { event.preventDefault(); transport.link(a.href); } }
-function copyInput(text) { prompt.value = text; nextTick(() => { input.value?.focus(); input.value?.setSelectionRange(text.length, text.length); scroll(); }); }
+function copyInput(text) { cancelPrediction(); prompt.value = text; nextTick(() => { input.value?.focus(); input.value?.setSelectionRange(text.length, text.length); scroll(); }); }
 const draftReceiver = createDraftReceiver({
   kind: 'code', project: () => state.作業フォルダ?.パス, scope: () => state.会話ID,
   ready: () => !disposed && !!state.信頼済み && state.画面接続済み !== false && !pending.value && !changingConversation.value,
-  draft: () => prompt.value, setDraft: value => { prompt.value = value; history.value = false; },
+  draft: () => prompt.value, setDraft: value => { cancelPrediction(); prompt.value = value; history.value = false; },
   label: () => state.履歴.find(item => item.id === state.会話ID)?.題名 || 'Code',
   focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
   api: props.desktop && props.linked ? window.aidiyWindow : undefined,
 });
 defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
 watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, changingConversation.value, state.履歴], () => draftReceiver.publish());
-watch(prompt, text => transport.saveDraft(text));
+watch(prompt, text => { if (prediction && text !== prediction.draft) cancelPrediction(); transport.saveDraft(text); }, { flush: 'sync' });
 watch(offline, () => { picker.value = false; });
 onMounted(() => {
   if (props.desktop && props.linked) void window.aidiyWindow?.title?.().then(title => { if (!disposed && typeof title === 'string') windowTitle.value = title; }).catch(() => {});
   prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
-onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
+onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
 </script>
 <template>
   <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
+      <button class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" :title="`自動提案 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span>自動提案</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>
     </nav></div>
@@ -240,7 +310,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; ar
     <footer v-show="!history" class="composer">
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form :class="{ running: waitingForStream }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" placeholder="AiDiyに依頼する…" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea></div>
+      <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '入力予測推論中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">入力予測推論中、、、</span></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
           <div class="verification-options"><label>検証</label><select :value="offline ? 0 : checks" :disabled="offline" aria-label="検証回数" @change="checks = Number($event.target.value); checksRestored = true; send('setSelfCheckLoop', { count: checks })"><option v-for="n in [0,1,2,3]" :key="n" :value="n">{{ n }}回</option></select><span class="verification-hint">0回:バックアップ・検証無</span></div>
           <button v-if="state.実行中" type="button" class="stop" :disabled="!canStop" aria-label="実行を停止" title="実行を停止" @click="stop"><img class="stop-icon" :src="stopIcon" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button>
@@ -248,6 +318,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; revision++; ar
         </div>
       </form>
     </footer>
+    <ModalDialog v-if="predictionNotice" label="自動提案" @close="predictionNotice = ''"><h3>自動提案</h3><p class="prediction-notice">{{ predictionNotice }}</p><button @click="predictionNotice = ''">閉じる</button></ModalDialog>
     <ModalDialog v-if="picker" label="モデル選択" @close="picker = false"><h3>コードAIとモデル</h3>
       <p>{{ offline ? 'aidiy_hermes を直接実行します。オンラインとは別のモデルを保存します。' : 'AIコアのコードAIを選択します。' }}</p>
       <label>コードAI<select v-model="provider" :disabled="catalogBusy || offline" @change="changeProvider"><option v-if="!offline" value="">自動（AIコアの設定）</option><option v-for="p in providers" :key="p.id" :value="p.id">{{ p.label || p.id }}</option></select></label>

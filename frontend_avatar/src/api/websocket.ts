@@ -44,6 +44,7 @@ function 入力系認証トークン更新(message: WebSocketMessage): void {
 export type WebSocketMessage = {
   type?: string
   セッションID?: string
+  プロジェクトパス?: string | null
   ソケット番号?: string
   チャンネル?: string | null
   出力先チャンネル?: string
@@ -206,8 +207,11 @@ export class AIWebSocket implements IWebSocketClient {
 
     入力系認証トークン更新(message)
 
+    // 別ウィンドウで確定済みの値は保持し、未指定時だけ接続時のプロジェクトを使う。
+    const 入力要求 = 認証延長対象メッセージ識別.has(String(message.メッセージ識別 || message.type || ''))
     const payload: WebSocketMessage = {
       ...message,
+      ...(入力要求 ? { プロジェクトパス: message.プロジェクトパス ?? (this.codeBasePath || null) } : {}),
       セッションID: message.セッションID ?? this.sessionId ?? this.requestedSessionId,
     }
     this.socket.send(JSON.stringify(payload))

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from log_config import get_logger
 from tools_proc.code_agents import CodeAgentsError
+from tools_proc.conversation_history import run_with_history
 from tools_proc.tool_availability import availability_status
 
 logger = get_logger(__name__)
@@ -117,7 +118,8 @@ def register_tools(mcp_ca, code_agents):
         ) -> str:
             """AIコード.py の CodeAgent を実行する（起動時に description が動的更新される）"""
             try:
-                result = await code_agents.run_async(
+                result = await run_with_history(
+                    code_agents.run_async, "code",
                     prompt=prompt,
                     project_path=project_path,
                     ai_name=ai_name,
@@ -137,7 +139,7 @@ def register_tools(mcp_ca, code_agents):
 
     # description 動的生成
     if _ca_available and "code_agents_run" in mcp_ca._tool_manager._tools:
-        mcp_ca._tool_manager._tools["code_agents_run"].description = code_agents.get_description()
+        mcp_ca._tool_manager._tools["code_agents_run"].description = code_agents.get_description() + "\n入力と最終応答を共通DBへ保存します。履歴の所属には絶対project_pathを指定してください。history_saved=trueは正常応答の保存完了です。保存失敗時のexecution_status=OKはAI実行済みを示すため、自動再実行しないでください。"
 
     _ca_skipped = [k for k, v in code_agents.version_info.items() if not v.get("ok")]
     logger.info(f"aidiy_code_agents 利用可能: {_ca_available}")
@@ -189,7 +191,7 @@ def create_router(code_agents) -> APIRouter:
                     "description": "指定プロンプトを AI コードエージェントに渡して実行する。完了まで数分〜数十分かかることがある（timeout_sec で制御）。事前に config でプロジェクトパスと AI の利用可能状態を確認すること。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "エージェントへの指示（日本語可）。実装内容・対象ファイル・制約を具体的に記述する"},
-                        "project_path": {"type": "string", "required": False, "description": "作業ディレクトリの絶対パス。省略時は CODE_BASE_PATH"},
+                        "project_path": {"type": "string", "required": False, "description": "プロジェクト絶対パス。実行先は省略時 CODE_BASE_PATH、DB履歴の所属は未指定ならNULL"},
                         "ai_name": {"type": "string", "required": False, "default": "auto", "values": ["auto", "same", "aidiy_hermes", "claude_sdk", "claude_cli", "copilot_cli", "codex_cli"], "description": "使用する AI エージェント。auto / same は aidiy_hermes を選択"},
                         "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。autoはHermes/Codex/Claude/Copilotで履歴から自動選択。Hermesのsameは前回のprovider/モデルを復元、他CLIのsameは指定省略"},
                         "max_turns": {"type": "integer", "required": False, "default": 999, "description": "エージェントの最大ターン数"},
@@ -207,11 +209,15 @@ def create_router(code_agents) -> APIRouter:
                         "timeout_sec": 1800,
                     },
                     "response_fields": {
-                        "ok": "True=成功",
-                        "output": "エージェントの最終出力テキスト",
-                        "turns": "実行ターン数",
-                        "elapsed_sec": "実行にかかった秒数",
+                        "status": "OK / NG",
+                        "result": "エージェントの最終出力テキスト",
                         "ai_name": "実際に使用した AI エージェント",
+                        "history_saved": "入力と正常な最終応答のDB保存完了。falseでも入力やerror行は保存済みの場合がある",
+                        "history_input_saved": "入力行のDB保存完了",
+                        "history_session_id": "呼出し単位のDBセッションID",
+                        "history_project_path": "履歴へ保存した正規化済みプロジェクト絶対パス、未指定はnull",
+                        "history_error": "履歴保存失敗時のみ。DBパスや例外詳細は含めない",
+                        "execution_status": "保存失敗時のみ。NOT_STARTED=AI未開始、OK/NG=AI自体の結果。OKなら自動再実行しない",
                     },
                 },
             },
@@ -231,7 +237,8 @@ def create_router(code_agents) -> APIRouter:
                 info = {**info, **availability_status("Code Agents", code_agents.version_info)}
                 return info if isinstance(info, dict) else {"result": info}
             elif method_name == "run":
-                result = await code_agents.run_async(
+                result = await run_with_history(
+                    code_agents.run_async, "code",
                     prompt=req.prompt,
                     project_path=req.project_path,
                     ai_name=req.ai_name,

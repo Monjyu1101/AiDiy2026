@@ -61,12 +61,13 @@ class Recognition:
             except asyncio.CancelledError:
                 pass
 
-    async def 音声認識要求(self, message_type: str, audio_bytes: bytes):
+    async def 音声認識要求(self, message_type: str, audio_bytes: bytes, プロジェクトパス=None):
         if not audio_bytes:
             return
         await self.音声認識処理Ｑ.put({
             "audio_bytes": audio_bytes,
-            "message_type": message_type
+            "message_type": message_type,
+            "プロジェクトパス": プロジェクトパス
         })
 
     async def _音声認識ワーカー(self):
@@ -83,7 +84,7 @@ class Recognition:
                 if audio_bytes:
                     text = await self._音声をテキストに変換(audio_bytes)
                     if text:
-                        await self._結果送信(text, message_type)
+                        await self._結果送信(text, message_type, プロジェクトパス=item.get("プロジェクトパス"))
                 self.音声認識処理Ｑ.task_done()
             except asyncio.CancelledError:
                 break
@@ -114,12 +115,13 @@ class Recognition:
             logger.warning(f"音声認識エラー: {e}")
             return ""
 
-    async def _結果送信(self, text: str, message_type: str):
+    async def _結果送信(self, text: str, message_type: str, プロジェクトパス=None):
         if not self.接続 or not text:
             return
         if callable(self.保存関数):
             try:
                 self.保存関数(
+                    プロジェクトパス=プロジェクトパス,
                     セッションID=self.セッションID,
                     チャンネル="0",
                     メッセージ識別=f"recognition_{message_type}",
@@ -130,6 +132,7 @@ class Recognition:
             except Exception:
                 pass
         await self.接続.send_json({
+            "プロジェクトパス": プロジェクトパス,
             "セッションID": self.セッションID,
             "チャンネル": "0",
             "メッセージ識別": f"recognition_{message_type}",

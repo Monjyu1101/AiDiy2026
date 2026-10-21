@@ -84,6 +84,8 @@ export interface ModelSettings {
   CODE_BASE_PATH?: string;
   CHAT_AI_NAME: string;
   LIVE_AI_NAME: string;
+  PREDICTION_AI_NAME?: string;
+  PREDICTION_AI_MODEL?: string;
   DECISION_AI_NAME?: string;
   DECISION_AI_MODEL?: string; // 旧設定の互換読込用
   DECISION_OPENAI_MODEL?: string;

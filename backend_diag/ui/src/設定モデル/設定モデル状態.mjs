@@ -23,6 +23,7 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
  async function 開始(rowId){
   if(!有効()||実行中.value||読込中.value||!設定.value?.項目?.length)return;
   if(rowId!==undefined&&!設定.value.項目.some(row=>row.id===rowId))return;
+  if(rowId==='PREDICTION'&&!設定.value.予測条件?.テスト可能){通知.value=設定.value.予測条件?.説明||'同じプロバイダ・モデルのChatテストを先に成功させてください。';return;}
   中止();const 現在=++世代;制御=new AbortController();実行中.value=true;const 前版=設定.value.版;
   // 次の開始で音声は失効する。個別テストでは他の行のテキスト結果だけを残す。
   結果.value=rowId===undefined?{}:Object.fromEntries(Object.entries(結果.value).map(([id,{音声ファイル,...value}])=>[id,value]));通知.value='設定を確認して試行します…';
@@ -41,6 +42,7 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
     if(!完了.has(item.id))結果.value={...結果.value,...Object.fromEntries(対象.map(id=>[id,{id,状態:'実行中'}]))};
     const result=await api(`api/モデル試行/${encodeURIComponent(id)}/${encodeURIComponent(item.id)}`,'POST',制御.signal);
     if(現在!==世代||!有効())return;
+    設定.value={...設定.value,チャット成功:result.チャット成功||[],予測条件:result.予測条件||設定.value.予測条件};
     const 共有元=result.共有元||item.id;
     結果.value={...結果.value,...Object.fromEntries(対象.map(id=>[id,{...result,id,共有元:id===共有元?'':共有元,所要ms:id===共有元?(結果.value[id]?.所要ms??result.所要ms):0}]))};
     // Live の音声はサーバー側の保存期限（10分）があるため、受け取った時点で取得し、再生ボタンですぐ聴けるようにする。
@@ -50,7 +52,7 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
    }
    通知.value='試行が完了しました。';
   }catch(error){
-   if(現在===世代){通知.value=error.message||'通信に失敗しました。設定を再読込してください。';結果.value=Object.fromEntries(Object.entries(結果.value).map(([id,value])=>[id,value.状態==='実行中'?{id,状態:'ERR',説明:通知.value}:value]));}
+   if(現在===世代){if(設定.value)設定.value={...設定.value,チャット成功:[],予測条件:{...設定.value.予測条件,テスト可能:false}};通知.value=error.message||'通信に失敗しました。設定を再読込してください。';結果.value=Object.fromEntries(Object.entries(結果.value).map(([id,value])=>[id,value.状態==='実行中'?{id,状態:'ERR',説明:通知.value}:value]));}
   }finally{
    // 全行の動作確認が終わったら、1項目目（先頭行）を表示する（個別テスト・中止では選択を維持）。
    if(現在===世代){if(rowId===undefined&&設定.value?.項目?.length)選択.value=設定.value.項目[0].id;実行中.value=false;制御=undefined;実行ID='';await サーバー中止(id);}

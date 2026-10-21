@@ -8,7 +8,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
-from sqlalchemy import Column, Integer, Text
+from sqlalchemy import Column, Index, Integer, Text, desc
 from database import Base
 
 
@@ -18,11 +18,17 @@ class A会話履歴(Base):
     WebSocketセッションの会話履歴を保存
     """
     __tablename__ = "A会話履歴"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        Index("ix_A会話履歴_プロジェクトパス", "プロジェクトパス", "セッションID", desc("シーケンス")),
+        {'extend_existing': True},
+    )
 
     # 複合主キー
     セッションID = Column(Text, primary_key=True)
     シーケンス = Column(Integer, primary_key=True)
+
+    # プロジェクトの絶対パス。特定できない履歴は NULL のまま保持する。
+    プロジェクトパス = Column(Text, nullable=True)
 
     # 会話データ
     チャンネル = Column(Text, nullable=False)

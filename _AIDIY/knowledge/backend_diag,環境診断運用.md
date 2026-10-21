@@ -79,7 +79,7 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 
 ## 拡張予定（未実装）
 
-キー設定・モデル一覧と、Tools 接続中だけ表示する「設定モデル」を分離します。試行は利用者の開始操作で15役割を順番に確認し、同一設定だけ実行内で共有します。Chat / Code は MCP、Live は非公開の固定 loopback アダプターを使用します。Chat / Code は既存 MCP の通常ツールを呼び、診断専用の CLI・認証・provider 経路は作りません。キーの値は表示せず、外部送信・課金があり得る試行を起動・headless・全テストから自動実行しません。詳細な API と mock 検証手順は backend_diag/README.md の「設定モデル」を参照してください。
+キー設定・モデル一覧と、Tools 接続中だけ表示する「設定モデル」を分離します。試行は利用者の開始操作で16役割を順番に確認し、同一設定だけ実行内で共有します。Chat / Code は MCP、Live / Prediction は非公開の固定 loopback アダプターを使用します。Chat / Code は既存 MCP の通常ツールを呼び、診断専用の CLI・認証・provider 経路は作りません。キーの値は表示せず、外部送信・課金があり得る試行を起動・headless・全テストから自動実行しません。詳細な API と mock 検証手順は backend_diag/README.md の「設定モデル」を参照してください。
 
 ## 状態インジケーター
 
@@ -129,9 +129,17 @@ aidiy_diagは認証付きGET一覧に候補配列のIDそのものがある方�
 
 `code_models_info.json` の `opencode_cli.models` はCodex用に合成した候補を共通元とし、OpenCode側のIDと表示名のモデル部分に `openai/` を付ける（例: `openai/gpt-6.1-sol`）。日付・順序は保持し、既存の接頭辞は二重に付けない。Codex候補が0件ならCopilotと同じ `COPILOT_FALLBACK_MODELS` の規定8モデルに同じ `openai/` を付けて補完する。Copilot側の取得候補・規定値は変更しない。OpenCodeの出力条件は自身の導入検出だけで、Codex / Copilotの導入には依存しない。補完はモデル候補の書き出しだけで、認証・実行成功を意味しない。検証は `checks/models-info.check.mjs` で行う。
 
+## 予測モデルの手動試行
+
+設定モデル・AIモデルともLive直後にPredictionを置きます。同一provider・実行modelのChat成功をサーバー側で確認し、auto解決後に一致したときだけ `/internal/prediction_llms` へ進みます。OAuth／APIキー、FreeAI／Geminiを混同しません。設定・モデル候補・OAuth認証の変更、再取得・再読込・手動入力変更、Chat再試行で過去の成功を破棄します。
+
+Chatの `aidiy_chat_llms/chat_llms_run`、Code系の `aidiy_code_agents/code_agents_run`、Predictionに同じCODE_BASE_PATHの絶対 `project_path` を渡します。相対パスはbackend_server基準、未設定は実行不可です。通常のMCP側で実際の入力と成功応答をA会話履歴へ保存し、Diagは `history_saved: true` まで確認して成功とします。Chat成功後の1往復は、Predictionが同一プロジェクトの直近2時間・最新最大5ターンを読む通常経路で参照できます。保存失敗・未確認ではPredictionを解禁せず、診断用交換・合成履歴・専用APIで代替しません。
+
+正常な非空応答は `!`／`！` で始まる説明も合格とし、NG・空応答・通信失敗・タイムアウトは合格にしません。予測結果を履歴に保存せず、ブラウザから履歴本文や成功判定を受け付けません。詳しい確認条件・経路・mock検証方針は [READMEのPrediction手動試行](../../backend_diag/README.md#predictionの手動試行) を参照します。
+
 ## 判断モデルの手動試行
 
-設定モデル動作確認のLIVE直後に `DECISION / 挨拶の丁寧さ` を表示する。個別「テスト」と全体「動作確認」の両方で、既存MCP `/aidiy_decisions_check/mcp` の `decisions_check` を呼ぶ。HTTP `/check` への代替直結は行わない。Tools接続中の明示操作に限定し、headless・起動・全診断では実行しない。
+設定モデル動作確認のPREDICTION直後に `DECISION / 挨拶の丁寧さ` を表示する。個別「テスト」と全体「動作確認」の両方で、既存MCP `/aidiy_decisions_check/mcp` の `decisions_check` を呼ぶ。HTTP `/check` への代替直結は行わない。Tools接続中の明示操作に限定し、headless・起動・全診断では実行しない。
 
 `DECISION_AI_NAME` と方式別 `DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL` が不足時はauto。方式が明示されている試行行は対応する方式別値を使い、キー未存在時だけ旧 `DECISION_AI_MODEL` を参照する。方式autoの行はモデルもautoで送り、Toolsで方式とモデルを解決する。autoの方式順はOAuth → FreeAI → Decisions API → Gemini。結果には実効モデルを表示し、設定ファイルへは書き戻さない。
 
@@ -146,13 +154,13 @@ Chat/Live/Codeと判断結果は共有しない。MCPの初期化・セッショ
 
 Gemini系Live（`freeai_live` 経由を含む）は接続直後の初回送信で失敗する場合があります。診断では接続確立後に15秒待って初回送信し、送信後の応答・音声ターン完了を最大60秒待つ設定です。この条件で実回答を確認したLive試験は通過とし、初回失敗は注意事項・経過の証跡として残します。
 
-「AIモデル」はChat / Live / Decision / Codeの4画面です。初期値はconfigのCHAT・LIVE・DECISION各設定とCODE1を使います。Decisionの方式autoはモデルもautoとしてTools側で解決します。入力の「おはよう」とDecisionのpoliteness / high・medium・lowは `モデル試行/defaults.mjs` を既存設定モデル試行と共用し、手動画面では自由に編集できます。
+「AIモデル」はChat / Live / Prediction / Decision / Codeの5画面です。初期値はconfigのCHAT・LIVE・PREDICTION・DECISION各設定とCODE1を使います。Decisionの方式autoはモデルもautoとしてTools側で解決します。入力の「おはよう」とDecisionのpoliteness / high・medium・lowは `モデル試行/defaults.mjs` を既存設定モデル試行と共用し、手動画面では自由に編集できます。
 
-候補は `_AIDIY/aidiy_diag/{chat,live,decisions,code}_models_info.json` と `live_voices_info.json` の保存済み内容を使います。Codeのモデル候補には、Web / Avatarの「AI設定・再起動」と同じ実行方法 `auto (自動判定)`、`same (変更なし)` をこの順で先頭に補い、重複を除きます。これらはモデル一覧JSONへ書き戻しません。画面初期読込・再読込は認証付きローカルaidiy_diag APIを使い、外部モデル取得は行いません。プロバイダ変更は画面内で候補を連動し、一覧外の設定保持値を未確認として残します。 Code初回表示はCODE1の設定を使い、プロバイダ切替時は `CODE_<プロバイダ大文字>_MODEL`（例: `CODE_GROK_CLI_MODEL`）を優先します。そのキーがない場合だけCODE1〜6の同プロバイダ設定、次に候補の先頭へ戻します。画面内で手動選択した値は再読込まで優先して保持します。候補の存在は認証・モデル利用成功の保証ではありません。選択や入力をconfigへ書き戻しません。
+候補は `_AIDIY/aidiy_diag/{chat,live,prediction,decisions,code}_models_info.json` と `live_voices_info.json` の保存済み内容を使います。Codeのモデル候補には、Web / Avatarの「AI設定・再起動」と同じ実行方法 `auto (自動判定)`、`same (変更なし)` をこの順で先頭に補い、重複を除きます。これらはモデル一覧JSONへ書き戻しません。画面初期読込・再読込は認証付きローカルaidiy_diag APIを使い、外部モデル取得は行いません。プロバイダ変更は画面内で候補を連動し、一覧外の設定保持値を未確認として残します。 Code初回表示はCODE1の設定を使い、プロバイダ切替時は `CODE_<プロバイダ大文字>_MODEL`（例: `CODE_GROK_CLI_MODEL`）を優先します。そのキーがない場合だけCODE1〜6の同プロバイダ設定、次に候補の先頭へ戻します。画面内で手動選択した値は再読込まで優先して保持します。候補の存在は認証・モデル利用成功の保証ではありません。選択や入力をconfigへ書き戻しません。
 
-試行はTools接続中の明示操作だけです。既存 `モデル試行/trials.mjs` のMCP初期化・呼出し・セッション終了、逐次実行ロック、設定変更検知、期限、音声保存を共用します。Chatは `chat_llms_run`、Codeは `code_agents_run`、Decisionは `decisions_check` をHTTP MCPで呼び、Liveだけは既存 `/internal/live_model_check` へ明示した方式・モデル・音声・入力を渡します。設定モデル・AIモデルのLiveは、試行ごとに新規セッションを作り、接続確立後の初回送信前に15秒自動待機してから送信します。同じセッションの毎送信に課す待機ではなく、利用者の追加待機も不要です。長い返答の生成・音声ターン完了に余裕を持たせ、送信後の応答待ちは最大60秒です。接続準備20秒・初回待機15秒・終了処理9秒と通信余裕を含め、内部HTTPは135秒、1試行は150秒、全実行は45分を上限とします。アダプター終了処理も共通です。空JSONの従来Live試行は従来のconfigと固定挨拶を使います。
+試行はTools接続中の明示操作だけです。既存 `モデル試行/trials.mjs` のMCP初期化・呼出し・セッション終了、逐次実行ロック、設定変更検知、期限、音声保存を共用します。Chatは `chat_llms_run`、Codeは `code_agents_run`、Decisionは `decisions_check` をHTTP MCPで呼び、Liveは既存 `/internal/live_model_check` へ明示した方式・モデル・音声・入力を渡します。設定モデル・AIモデルのLiveは、試行ごとに新規セッションを作り、接続確立後の初回送信前に15秒自動待機してから送信します。同じセッションの毎送信に課す待機ではなく、利用者の追加待機も不要です。長い返答の生成・音声ターン完了に余裕を持たせ、送信後の応答待ちは最大60秒です。接続準備20秒・初回待機15秒・終了処理9秒と通信余裕を含め、内部HTTPは135秒、1試行は150秒、全実行は45分を上限とします。アダプター終了処理も共通です。空JSONの従来Live試行は従来のconfigと固定挨拶を使います。
 
-AIモデルタブのタイトルバー「一括試行」は4画面の入力を開始時に固定し、Chat→Live→Decision→Codeを1実行として順に呼びます。NG・行タイムアウトでも次へ進みます。連打は抑止し、入力変更・実行中の画面移動・Tools切断で中止して古い結果を破棄します。全診断・headless・起動ではAI試行しません。設定モデルの15項目試行とAIモデルの4種試行は別の操作です。
+AIモデルタブのタイトルバー「一括試行」は5画面の入力を開始時に固定し、Chat→Live→Prediction→Decision→Codeを1実行として順に呼びます。NG・行タイムアウトでも次へ進みます。連打は抑止し、入力変更・実行中の画面移動・Tools切断で中止して古い結果を破棄します。全診断・headless・起動ではAI試行しません。設定モデルの16項目試行とAIモデルの5種試行は別の操作です。
 
 Decisionは1問ずつpredicate / choice / scoreを選び、質問名・質問文と、必要な選択肢／段階（2〜32件、重複不可）を編集します。戻り値全体はJSONを読めればインデント付き、読めなければ元文字列を安全なテキストとして表示します。表示できることと回答スキーマの成功判定は別です。既知の秘密値は伏せます。
 
@@ -186,6 +194,8 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 完了した冊子のPDFは `node scripts/checks/総合テストPDF.mjs <md名>` で作成できます。元のMarkdownと同じフォルダへ同名で保存し、本文の修正後は再生成します。本文の折りたたみ欄も開いて出力し、説明と画像を同じ図として配置します。生成後はPoppler等で全ページを画像化し、日本語・表・画像・改ページを確認してください。
 
 ## 個別確認と導入管理
+
+モデル一覧の `↺ 一覧再取得` 後の「書込」は、従来の合成JSONに加えて `_AIDIY/aidiy_diag/prediction_models_info.json` も生成する。headless / 全テストも同じ生成処理を使う。Predictionは `decisions_models_info.json` と生成関数を共用し、同じ低コスト候補・現在の認証条件を適用した後、`openai_decisions` 区分を `openai_chat` へ置き換える。予測JSONの方式は `openai_oauth` / `freeai_chat` / `openai_chat` / `gemini_chat` で、`openai_decisions` は含めない。認証済み一覧にない方式は出力せず、全て空なら `{}`。候補を書き出すだけで `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` の設定値を変更せず、予測も実行しない。内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）は方式がautoの場合、候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` から選び、`openai_chat` は明示指定時だけ使う。判断側の挙動は変更しない。内容・候補管理は [READMEの予測用モデル一覧](../../backend_diag/README.md#予測用モデル一覧) を参照する。
 
 - 各行の「確認」は認証付き `POST api/診断/<登録済みID>` を使用し、その項目だけ既存 probe で再確認する。全項目確認と書込は同じ実行排他を使う。今回確認していない前回保存済み結果は表示だけに使い、書込対象へ混ぜない。
 - 導入管理は `GET api/導入管理` で能力と実行状態を取得し、`POST api/導入管理/<登録済みID>/<導入・再導入・削除>` で開始、`DELETE api/導入管理/<実行ID>` で中止する。入力本文・クエリ・任意コマンドは不可。操作後は個別確認と共通の probe と結果反映を各対象に1回呼ぶ。FFmpeg は3行を確認し、`結果一覧` と対象行の `結果` を返す。

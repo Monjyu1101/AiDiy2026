@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict
 
 from log_config import get_logger
 from tools_proc.chat_llm import ChatLLMError
+from tools_proc.conversation_history import run_with_history
 from tools_proc.tool_availability import availability_status
 
 logger = get_logger(__name__)
@@ -122,19 +123,13 @@ def register_tools(mcp_cl, chat_llm):
             use_tools=True のときは自前 MCP 群をツールとして LLM に渡し、tool_calls を
             サーバー側で実行しながら応答が確定するまで最大 max_turns 回ループする。"""
             try:
-                result = await chat_llm.run_async(
-                    prompt,
-                    project_path,
-                    ai_name,
-                    ai_model,
-                    system_instruction,
-                    session_id,
-                    resume,
-                    temperature,
-                    timeout_sec,
-                    file_path,
-                    use_tools,
-                    max_turns,
+                result = await run_with_history(
+                    chat_llm.run_async, "chat",
+                    prompt=prompt, project_path=project_path,
+                    ai_name=ai_name, ai_model=ai_model,
+                    system_instruction=system_instruction, session_id=session_id,
+                    resume=resume, temperature=temperature, timeout_sec=timeout_sec,
+                    file_path=file_path, use_tools=use_tools, max_turns=max_turns,
                 )
             except ChatLLMError as e:
                 raise ValueError(str(e)) from e
@@ -142,7 +137,7 @@ def register_tools(mcp_cl, chat_llm):
 
     # description 動的生成
     if _cl_available and "chat_llms_run" in mcp_cl._tool_manager._tools:
-        mcp_cl._tool_manager._tools["chat_llms_run"].description = chat_llm.get_description()
+        mcp_cl._tool_manager._tools["chat_llms_run"].description = chat_llm.get_description() + "\n入力と最終応答を共通DBへ保存します。履歴の所属には絶対project_pathを指定してください。history_saved=trueは正常応答の保存完了です。保存失敗時のexecution_status=OKはAI実行済みを示すため、自動再実行しないでください。"
 
     _cl_skipped = [k for k, v in chat_llm.version_info.items() if not v.get("ok")]
     logger.info(f"aidiy_chat_llms 利用可能: {_cl_available}")
@@ -188,11 +183,11 @@ def create_router(chat_llm) -> APIRouter:
                     "description": "指定プロンプトを ChatAI に渡してテキスト応答を生成する。use_tools=True のときは自前 MCP 群（aidiy_sqlite / aidiy_logs / aidiy_code_check 等）をツールとして LLM に渡し、LLM が返した tool_calls をサーバー側で self-call 実行し、結果を戻して応答が確定するまで最大 max_turns 回ループする（aidiy_chat_llms / aidiy_code_agents 自身はツールから除外）。tool_calls を返すだけのローレベル動作が必要なら aidiy_chat_completions を使う。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "AI への入力テキスト（日本語可）"},
-                        "project_path": {"type": "string", "required": False, "description": "出力ファイル保存先の絶対パス。省略時は CODE_BASE_PATH"},
+                        "project_path": {"type": "string", "required": False, "description": "プロジェクト絶対パス。実行先は省略時 CODE_BASE_PATH、DB履歴の所属は未指定ならNULL"},
                         "ai_name": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openrt_chat", "gemini_chat", "freeai_chat", "ollama_chat"], "description": "使用する AI。auto で CHAT_AI_NAME を優先選択"},
                         "ai_model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。auto で ai_name の既定モデルを使用"},
                         "system_instruction": {"type": "string", "required": False, "description": "システム指示"},
-                        "session_id": {"type": "string", "required": False, "default": "mcp_default", "description": "会話履歴のキー（resume=True 時に継続）"},
+                        "session_id": {"type": "string", "required": False, "default": "mcp_default", "description": "モデル文脈の継続キー（resume=True）。DBの呼出し単位history_session_idとは別"},
                         "resume": {"type": "boolean", "required": False, "default": True, "description": "True で session_id の会話履歴を継続"},
                         "temperature": {"type": "number", "required": False, "description": "生成温度"},
                         "timeout_sec": {"type": "integer", "required": False, "default": 120, "description": "タイムアウト秒（ツール 1 回あたりにも適用）"},
@@ -213,6 +208,12 @@ def create_router(chat_llm) -> APIRouter:
                         "tool_trace": "実行したツールの履歴 [{mcp, method, arguments, ok}, ...]",
                         "turns": "実行したループのターン数",
                         "tool_stopped": "True=max_turns 到達で打ち切り",
+                        "history_saved": "入力と正常な最終応答のDB保存完了。falseでも入力やerror行は保存済みの場合がある",
+                        "history_input_saved": "入力行のDB保存完了",
+                        "history_session_id": "呼出し単位のDBセッションID",
+                        "history_project_path": "履歴へ保存した正規化済みプロジェクト絶対パス、未指定はnull",
+                        "history_error": "履歴保存失敗時のみ。DBパスや例外詳細は含めない",
+                        "execution_status": "保存失敗時のみ。NOT_STARTED=AI未開始、OK/NG=AI自体の結果。OKなら自動再実行しない",
                     },
                 },
             },
@@ -230,7 +231,8 @@ def create_router(chat_llm) -> APIRouter:
             if method_name == "config":
                 return {**chat_llm.get_config(req.project_path), **availability_status("Chat LLM", chat_llm.version_info)}
             elif method_name == "run":
-                return await chat_llm.run_async(
+                return await run_with_history(
+                    chat_llm.run_async, "chat",
                     prompt=req.prompt,
                     project_path=req.project_path,
                     ai_name=req.ai_name,

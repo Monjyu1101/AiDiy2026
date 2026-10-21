@@ -362,7 +362,10 @@ async function コア初期化(preferredSessionId = ''): Promise<string> {
     セッションID.value = nextSessionId;
     コアソケット.value = nextCoreSocket;
 
-    const nextInputSocket = new AIWebSocket(wsUrl, nextSessionId, 'input');
+    const nextInputSocket = new AIWebSocket(wsUrl, nextSessionId, 'input', モデル設定.value.CODE_BASE_PATH);
+    nextInputSocket.on('error', (message) => {
+      コアエラー.value = String(message.メッセージ内容 || message.error || 'AIコア入力エラー');
+    });
     nextInputSocket.onStateChange((connected) => {
       if (connected) void 操作状態同期();
     });

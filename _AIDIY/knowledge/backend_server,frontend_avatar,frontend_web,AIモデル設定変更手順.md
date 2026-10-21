@@ -3,7 +3,7 @@
 > 文書: `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` | 実装: `_config/AiDiy_key.json`, `backend_server/conf/conf_json.py`, `backend_server/AIコア/AIチャット_openai.py`, `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
 
 ## このメモを使う場面
-- Chat / Live / Decision / Code / Task / Team AI のモデルや API キーを変更する
+- Chat / Live / Prediction / Decision / Code / Task / Team AI のモデルや API キーを変更する
 - `AiDiy_key.json` と設定 UI の整合を確認する
 - 新しい AI 種別や Code CLI を追加した後、設定として選べるようにする
 
@@ -23,6 +23,7 @@
 |------|-----------|----|
 | `CHAT_AI_NAME` | 原則 `_chat`（OAuth は例外） | `gemini_chat`, `openrt_chat`, `openai_chat`, `openai_oauth`, `freeai_chat`, `ollama_chat`, `local_chat` |
 | `LIVE_AI_NAME` | `_live` | `gemini_live`, `freeai_live`, `openai_live` |
+| `PREDICTION_AI_NAME` | 予測用のChat方式 | `auto`, `openai_oauth`, `freeai_chat`, `openai_chat`, `gemini_chat` |
 | `DECISION_AI_NAME` | 判断用の方式 | `auto`, `openai_oauth`, `freeai_chat`, `openai_decisions`, `gemini_chat` |
 | `CODE_AI1_NAME`〜`CODE_AI6_NAME` | 原則 `_sdk` または `_cli`、例外 `aidiy_hermes` | `claude_sdk`, `claude_cli`, `copilot_cli`, `codex_cli`, `antigravity_cli`, `grok_cli`, `opencode_cli`, `aidiy_hermes` |
 | `TASK_AI_NAME` / `TEAM_AI_NAME` | Code AI と同じ候補を使用 | `claude_cli`, `codex_cli`, `aidiy_hermes` |
@@ -102,8 +103,13 @@ Web / AvatarのCode1〜6、Task / Teamでプロバイダを手動変更したと
 {
   "CHAT_AI_NAME": "gemini_chat",
   "LIVE_AI_NAME": "gemini_live",
+  "PREDICTION_AI_NAME": "auto",
+  "PREDICTION_AI_MODEL": "auto",
   "DECISION_AI_NAME": "auto",
-  "DECISION_AI_MODEL": "auto",
+  "DECISION_OPENAI_MODEL": "auto",
+  "DECISION_OAUTH_MODEL": "auto",
+  "DECISION_GEMINI_MODEL": "auto",
+  "DECISION_FREEAI_MODEL": "auto",
   "CODE_PERMISSIONS": "auto",
   "CODE_AI1_NAME": "codex_cli",
   "CODE_AI1_MODEL": "auto",
@@ -140,9 +146,13 @@ Web / AvatarのCode1〜6、Task / Teamでプロバイダを手動変更したと
 
 Web / Avatar とも「保存(json書換)」は `save: true`、再起動要求なし。「設定/再起動」も `save: true` でJSONを保存してから apps / tools の再起動を要求する。
 
-判断用の `DECISION_AI_NAME` と方式別4モデル（`DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL`） は、JSON・両設定画面ともLIVEブロック全体の直後（CHAT → LIVE → DECISION → CODE）に置く。初期値・欠落時は `auto` / `auto`。方式のautoは起動チェック成功のものから OAuth → FreeAI → Decisions API → Gemini の順で選ぶ。
+JSONではLIVEブロックの後に `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` を置き、その直後に判断用の `DECISION_AI_NAME` と方式別4モデル（`DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL`）を置く。Predictionは初期値・欠落時ともに `auto` / `auto` で、内部RESTの `aidiy_prediction_llms` が予測実行に使用する。Web / Avatar両方のAI設定再起動画面も CHAT → LIVE → PREDICTION → DECISION → CODE の順に表示する。判断の初期値・欠落時もすべて `auto` で、方式のautoは起動チェック成功のものから OAuth → FreeAI → Decisions API → Gemini の順で選ぶ。
 
-候補は `conf_models.get_decisions_models()` が毎回読む `_AIDIY/aidiy_diag/decisions_models_info.json` を、取得APIの `available_models.decision_models` へ渡す。方式がautoなら全方式の取得済み候補を合わせる。外部APIへの照会や、実行時の既定モデルを利用可能候補として補う処理はしない。ファイルが未取得・空・不正でもautoと現在設定を保持する。未掲載のモデルは「保持値・Diag一覧外／未確認」と表示し、旧別名 `openai_jsonchat` はOAuthの候補を使いながら保存値を維持する。
+予測は内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）で実行し、`project_path` が必須。方式・モデルは明示引数 → `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` の順で決める。方式設定もautoなら、Diagの `prediction_models_info.json` に候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` の順で選び、`openai_chat` は明示指定時だけ使う。モデルもautoなら選んだ方式の先頭候補を使う。予測JSONではOpenAI API区分を `openai_chat` とし、`openai_decisions` は含めない。履歴の読み取り・非保存仕様は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。判断側の候補・選択順は変更しない。
+
+予測の候補は `conf_models.get_prediction_models()` が毎回読む `_AIDIY/aidiy_diag/prediction_models_info.json` を、取得APIの `available_models.prediction_models` へ渡す。実行側と同じ4方式・有効なモデルIDだけを展開し、外部APIへの照会や候補の補完は行わない。方式がautoの場合は実行時と同じ優先順で最初に候補のある1方式のモデルを表示し、OpenAI APIは明示指定時だけ選べる。方式の手動変更時はモデルをautoへ戻す。ファイルが未取得・空・不正でもautoと保存値を保持し、一覧外の保存値は「保持値・Diag一覧外／未確認」と表示する。未編集の値は他項目だけの保存で上書きしない。PredictionはToolsが共通JSONを読むため、取得APIでは保存済みの値をセッションの古い値より優先し、保存後の次回予測から適用する。
+
+判断の候補は `conf_models.get_decisions_models()` が毎回読む `_AIDIY/aidiy_diag/decisions_models_info.json` を、取得APIの `available_models.decision_models` へ渡す。方式がautoなら全方式の取得済み候補を合わせる。外部APIへの照会や、実行時の既定モデルを利用可能候補として補う処理はしない。ファイルが未取得・空・不正でもautoと現在設定を保持する。未掲載のモデルは「保持値・Diag一覧外／未確認」と表示し、旧別名 `openai_jsonchat` はOAuthの候補を使いながら保存値を維持する。
 
 画面はDiag候補・auto・保持中の現在値からモデルを選べる。候補が1件ならその1件を表示し、方式名に基づくモデルIDのハードコードや選択欄の恒久無効化は行わない。Diag書き出し候補が変われば再取得後に新モデルを選択・保存でき、実行側もその指定を使う。候補掲載は利用可否の保証ではなく、Toolsの判断チェックで確認する。
 
@@ -156,7 +166,7 @@ Electron では settings 専用ウィンドウ、Web では同じコンポーネ
 
 1. frontend が `POST /core/AIコア/モデル情報/取得` を呼ぶ
 2. backend が現在設定と `available_models` を返す
-3. 設定 UI が `chat_models` / `live_models` / `decision_models` / `code_models` から選択肢を作る
+3. 設定 UI が `chat_models` / `live_models` / `prediction_models` / `decision_models` / `code_models` から選択肢を作る
 4. 設定時に `POST /core/AIコア/モデル情報/設定` へ送り、保存する場合は `save: true` を指定する
 5. モデル情報の再取得で設定を確認し、再起動を要求した場合は再接続後も確認する
 
@@ -206,8 +216,8 @@ Code CLI の権限モードは `CODE_PERMISSIONS` で管理する。設定 UI �
 ## 確認方法
 
 - `POST http://127.0.0.1:8091/core/AIコア/モデル情報/取得` に `{"セッションID": "対象セッションID"}` を送り、現在設定と利用可能モデル一覧を確認する。接続前は `{}` を送り、共通設定の既定値と候補を取得できる
-- 設定 UI で Chat / Live / Decision / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
+- 設定 UI で Chat / Live / Prediction / Decision / Code1〜Code6 / Task / Team の選択肢が出ることを確認する（Task / Team は plan / do / check の3行）
 - `node --test scripts/checks/decision-settings.test.cjs` で両実SFCの候補・保存・互換を確認する。任意のブラウザQAは `node scripts/checks/decision-settings-browser.cjs`。既存Chrome/Edgeを一時プロファイルで起動し、合成設定APIだけを使う。`SETTINGS_QA_OUTPUT` でスクリーンショット保存先を指定できる。
 - 「保存(json書換)」で `AiDiy_key.json` が更新され、サーバーが再起動しないことを確認する。再起動を要求した場合は、指定したサーバーの再起動と再接続を確認する
 
-設定の生成・不足補完・画面順は CHAT → LIVE → DECISION → CODE → TASK → TEAM。判断の新規既定値は方式と4モデルとも `auto`。旧 `DECISION_AI_MODEL` は削除せず、不足する方式別キーにだけ引き継ぐ。既存方式別キーの `auto` は旧共通値で上書きしない。設定取得・保存APIは `/core/AIコア/モデル情報/取得` と `/core/AIコア/モデル情報/設定`。
+設定JSONの生成・不足補完の順序は CHAT → LIVE → PREDICTION → DECISION → CODE → TASK → TEAM。Predictionの2キーは新規・欠落時だけ `auto` を補完し、既存値を保持する。両設定画面にPredictionの方式・モデルを表示する。判断の新規既定値は方式と4モデルとも `auto`。旧 `DECISION_AI_MODEL` は削除せず、不足する方式別キーにだけ引き継ぐ。既存方式別キーの `auto` は旧共通値で上書きしない。設定取得・保存APIは `/core/AIコア/モデル情報/取得` と `/core/AIコア/モデル情報/設定`。

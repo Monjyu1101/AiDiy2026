@@ -13,6 +13,10 @@ from sqlalchemy import and_, desc
 from core_models.A会話履歴 import A会話履歴
 from core_crud.utils import create_audit_fields, update_audit_fields
 from typing import Optional, List
+from 会話履歴パス import normalize_project_path
+
+
+_プロジェクトパス未指定 = object()
 
 
 def create_会話履歴(
@@ -24,7 +28,8 @@ def create_会話履歴(
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
     サムネイル画像: Optional[str] = None,
-    認証情報: dict = None
+    認証情報: dict = None,
+    プロジェクトパス: Optional[str] = None
 ) -> A会話履歴:
     """会話履歴を作成"""
     audit_fields = create_audit_fields(認証情報)
@@ -33,6 +38,7 @@ def create_会話履歴(
         セッションID=セッションID,
         シーケンス=シーケンス,
         チャンネル=チャンネル,
+        プロジェクトパス=normalize_project_path(プロジェクトパス),
         メッセージ識別=メッセージ識別,
         メッセージ内容=メッセージ内容,
         ファイル名=ファイル名,
@@ -59,13 +65,18 @@ def get_会話履歴_by_socket(
     db: Session,
     セッションID: str,
     チャンネル: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
+    プロジェクトパス: Optional[str] = None
 ) -> List[A会話履歴]:
-    """セッションIDで会話履歴を取得（チャンネル指定可能）"""
+    """セッションIDで会話履歴を取得（チャンネル・プロジェクト指定可能）"""
     query = db.query(A会話履歴).filter(A会話履歴.セッションID == セッションID)
 
     if チャンネル is not None:
         query = query.filter(A会話履歴.チャンネル == チャンネル)
+
+    project_path = normalize_project_path(プロジェクトパス)
+    if project_path is not None:
+        query = query.filter(A会話履歴.プロジェクトパス == project_path)
 
     return query.order_by(desc(A会話履歴.シーケンス)).limit(limit).all()
 
@@ -86,14 +97,21 @@ def update_会話履歴(
     メッセージ内容: Optional[str] = None,
     ファイル名: Optional[str] = None,
     サムネイル画像: Optional[str] = None,
-    認証情報: dict = None
+    認証情報: dict = None,
+    プロジェクトパス=_プロジェクトパス未指定
 ) -> Optional[A会話履歴]:
-    """会話履歴を更新"""
+    """会話履歴を更新。プロジェクトパスは省略時に保持、明示的な None で解除。"""
+    if プロジェクトパス is not _プロジェクトパス未指定:
+        プロジェクトパス = normalize_project_path(プロジェクトパス)
+
     db_record = get_会話履歴(db, セッションID, シーケンス)
     if not db_record:
         return None
 
     audit_fields = update_audit_fields(認証情報)
+
+    if プロジェクトパス is not _プロジェクトパス未指定:
+        db_record.プロジェクトパス = プロジェクトパス
 
     if メッセージ内容 is not None:
         db_record.メッセージ内容 = メッセージ内容

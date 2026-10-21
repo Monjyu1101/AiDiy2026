@@ -85,6 +85,10 @@ class conf_json:
         'LIVE_OPENAI_MODEL': 'gpt-realtime-2.1-mini',
         'LIVE_OPENAI_VOICE': 'marin',
 
+        # PredictionAI設定（次のユーザー入力予測用）
+        'PREDICTION_AI_NAME': 'auto',
+        'PREDICTION_AI_MODEL': 'auto',
+
         # DecisionAI設定（方式別モデル。autoは各方式の既定値）
         'DECISION_AI_NAME': 'auto',
         'DECISION_OPENAI_MODEL': 'auto',

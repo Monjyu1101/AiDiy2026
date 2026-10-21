@@ -44,9 +44,9 @@
 
 ### 5. 初期データ
 
-- 初期データが必要な場合は `apps_crud/init.py` へ init 関数 import、テーブル作成、初期投入呼び出しを追加する。
+- 初期データが必要な場合は `apps_crud/init.py` へ init 関数 import と初期投入呼び出しを追加する。テーブル作成は `apps_main.py` の `create_all()` へ登録する。
 - 初期データ関数は、既存データが1件でもあれば `return` する形を基本にする。起動のたびに upsert して監査項目を更新しない。
-- 新規テーブルは `create_all()` で作成する。既存DB移行が不要な場合、個別の `DROP TABLE` / `ALTER TABLE` / 手動 `__table__.create()` を入れない。
+- 新規テーブルは `create_all()` で作成する。旧 DB の互換救済を目的とする `DROP TABLE` / `ALTER TABLE` / コピー移行は追加しない。スキーマ変更時は利用者が DB を手動で再作成する。
 
 ## 一覧件数と有効フラグ
 

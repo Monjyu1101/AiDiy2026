@@ -344,21 +344,43 @@ Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環�
 
 ## 設定モデル（手動のみ）
 
-Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の現在の CHAT / LIVE / CODE1〜6 / TASK plan・do・check / TEAM plan・do・check の15行へ、固定の「おはよう」を順番に送ります。設定ファイルは読み取りだけで、既存 conf クラスの初期化・補完保存は行いません。CODE2〜6 の NAME=auto は CODE1 の NAME と MODEL を継承します。モデルや音声だけを表示し、キーや作業パスは返しません。
+Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の現在の CHAT / LIVE / PREDICTION / DECISION / CODE1〜6 / TASK plan・do・check / TEAM plan・do・check の16行を順番に確認します。Chat・Live・Code系の既定入力は「おはよう」です。設定ファイルは読み取りだけで、既存 conf クラスの初期化・補完保存は行いません。CODE2〜6 の NAME=auto は CODE1 の NAME と MODEL を継承します。モデル・音声とPredictionの対象プロジェクトを表示し、APIキーは返しません。
 
 見出し行の「再読込」で一覧を更新し、各項目の「テスト」でその1行だけ、または「動作確認」で全行を確認できます。同一設定の共有対象はサーバーが返し、その全行を同時に「テスト中」・結果へ更新します。個別テストでは設定版が同じ他の行のテキスト結果を残しますが、以前の音声は次の開始時に失効します。
 
 - Chat は `chat_llms_run`、Code と Task / Team の選択モデルは `code_agents_run` を実際の MCP Streamable HTTP で呼びます。Task / Team の業務実行・投入は行いません。既存の通常 MCP 契約を使い、診断専用の CLI・認証・provider モードは追加しません。Code の権限は設定値を渡し、バックアップ検証ループは挨拶試行では実行しません。接続先 MCP の実際の利用可否と応答で結果を判定します。
 - Live は Tools の非公開 `POST /internal/live_model_check` で固定メッセージに対する実際の応答を確認します。接続準備は最大20秒、準備完了後に15秒の安定待ちを挟み、テキストを送信して最大60秒、応答と音声ターン完了を待ちます。設定モデル・AIモデルとも同じ待機を使います。終了処理の余裕を含め HTTP は135秒、1行は150秒、全実行は45分に制限します。音声セッションの接続成功だけを OK にしません。実際に返った PCM16・mono・24kHz の音声が1秒以上ある場合は保存・再生でき、テキストがなくても音声応答として OK にします。通常の有効なテキスト応答も引き続き OK です。音声が1秒未満の場合は保存しません。
 - 返された音声は最大30秒・1,440,044バイトの WAV に限り、`_temp/aidiy-diag-audio-*` の専用一時フォルダへ保存します。フォルダは700、ファイルは600で作成し、外部指定パスを受け付けず、登録した通常ファイルだけを開きます。保存は最大16件・10分です。完了後は再生でき、次の開始・実行中の取消・設定変更・終了時に削除します。音声取得は認証付き同一 origin の GET `/api/モデル試行/音声/{音声ID}` のみで、画面へローカルパスやbase64は渡しません。画面は結果を受け取った時点で音声を取得して再生ボタンを表示し（保存期限後も同じ画面では再生可能）、再生ボタンを押して聴きます。自動再生はしません。
-- 同じ実行内で transport・プロバイダ・モデル・音声と設定版が同じ行だけ結果を共有します。Chat と Live は共有しません。auto は動的選択のまま渡し、実行モデルが返らなければ未確認として表示します。
+- 同じ実行内で transport・プロバイダ・モデル・音声と設定版が同じ行だけ結果を共有します。Chat・Live・Predictionは共有しません。Predictionはautoを候補から解決してChat成功との一致を確認し、具体的な方式・モデルを送ります。他のautoは動的選択のまま渡し、実行モデルが返らなければ未確認として表示します。
 - 空応答・エラー・未設定・未対応は OK にしません。API キーの利用と料金が発生する場合があります。開始は利用者の明示操作だけで、起動・タブ表示・headless・既存「全テスト」から実行しません。
 - 認証付き GET `/api/モデル試行` は表示情報だけ、POST `/api/モデル試行/開始` は一時実行を作成し、POST `/api/モデル試行/{実行ID}/{行ID}` は順序を確認して1行だけ実行します。いずれも利用者指定の本文・URL・プロンプトを受け付けません。DELETE `/api/モデル試行/{実行ID}`、画面切断、タイムアウトで中止し、MCP セッションを破棄します。設定変更時は結果を流用せず再開始します。
-- 個別テストは POST `/api/モデル試行/開始/{行ID}` で1行の実行順を作成します。行IDは上記15役割のみ受け付け、全件と同じ認証・Tools接続・設定版・重複判定・中止処理を使います。
+- 個別テストは POST `/api/モデル試行/開始/{行ID}` で1行の実行順を作成します。行IDは上記16役割のみ受け付け、全件と同じ認証・Tools接続・設定版・重複判定・中止処理を使います。
 - MCP SDK は文字列戻り値を `structuredContent.result` に包むため、その中の JSON を解析して `status` と応答を判定します。オブジェクト形式の `structuredContent` と従来の `content[].text` にも対応します。外側の MCP 成功だけで会話を OK にしません。
-- 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。15行、継承、重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
+- 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。行順・継承・重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
 - 実 SDK 契約確認: Tools と同じ `mcp>=2,<3`・FastAPI・uvicorn を持つ Python を環境変数 `DIAG_TEST_PYTHON` に指定し、`node --test backend_diag/checks/model-trials-sdk.check.mjs` を実行します。実際の Chat / Code ツール登録と MCP SDK の初期化・セッション・SSE・文字列結果、実 Live 内部 HTTP ルートを一時 loopback サーバーで検証します。モデル実行と Live アダプターだけを合成し、キー・有料 API・稼働中の Tools は使いません。環境変数未指定時はこの契約テストをスキップします。
 - 行別ボタンと配色は `node --test backend_diag/checks/status-badge.check.cjs backend_diag/ui/src/設定モデル/checks/設定モデル.check.cjs` で確認します。実ブラウザの任意確認は `node backend_diag/checks/model-trials-browser.mjs`。既存 Chrome / Edge（必要なら `CHROME_PATH`）を使い、合成データで1回だけの実行・共有表示・見出し配置・狭幅を確認し、`temp/diag-trial-browser/`（`DIAG_SCREENSHOT_DIR` で変更可）へ画像と結果を保存します。
+
+## Predictionの手動試行
+
+設定モデルとAIモデルの両方で、Liveの次にPrediction、その次にDecisionを配置します。AIモデルの「動作確認」／「一括試行」は Chat → Live → Prediction → Decision → Code の順で、各タブの「テスト」はその種類だけを実行します。
+
+- 同じプロバイダ・実行モデルのChat試験が現在の条件で成功した場合だけPredictionを実行します。OAuth、FreeAI、Gemini、OpenAI APIは別の方式として扱い、Googleのキー補完があっても成功結果を共有しません。autoは予測候補と設定から先に解決します。
+- 判定はDiagサーバーが保持します。ブラウザからChat成功の申告や履歴本文は受け付けません。設定・候補・OAuth認証の変更、再取得／再読込、手動入力の変更で成功条件を無効化します。Chatの再試行開始時も以前の成功を破棄し、失敗・中止時には流用しません。
+- 固定loopbackの `POST /internal/prediction_llms` へ、`X-AiDiy-Diag: model-trial`、解決済み方式・モデル、CODE_BASE_PATHから解決した絶対project_pathを送ります。相対CODE_BASE_PATHは通常履歴と同じbackend_server基準で、未設定時に別プロジェクトへ補完しません。MCPとして公開しません。
+- Chatは `aidiy_chat_llms` の `chat_llms_run`、Code系は `aidiy_code_agents` の `code_agents_run` を使い、Predictionと同じ絶対 `project_path` を渡します。実際に送信した入力と成功応答は通常のMCP側でA会話履歴へ保存され、Diagは `history_saved: true` まで確認して成功とします。Chat成功後の1往復は、Predictionが同一プロジェクトの直近2時間・最新最大5ターンを読む通常経路で参照できます。保存失敗・未確認ではPredictionを解禁せず、診断用の合成履歴や専用APIは使いません。
+- Predictionは `status: OK` の非空応答なら `!`／`！` や説明文も合格とします。空・NG・通信失敗・タイムアウトは合格にしません。予測本文は履歴へ保存せず、画面へ返す既知の秘密値は伏せます。
+- 検証では実AI・利用者DBを使わず、モックと一時DBで実際のChat入力・応答の保存と通常Prediction参照、4方式の厳密な成功条件、auto解決、失敗後の無効化、認証・本文制限、空／NG／!応答、UIの順序と無効ボタンをmockで確認します。UI変更後は配布物を再生成しmanifest照合を行います。旧fixtureに15行・4種類の固定値がある場合は、新しい16行・5種類へ合わせてから全体回帰を実行してください。
+
+## 予測用モデル一覧
+
+`モデル情報/prediction_info.mjs` が `_AIDIY/aidiy_diag/prediction_models_info.json` を生成する。判断用の生成関数を共用し、低コスト候補・スキーマ・認証条件を `decisions_models_info.json` と揃えたうえで、OpenAI APIの区分だけ実行先に合わせて `openai_decisions` から `openai_chat` へ置き換える。予測JSONに `openai_decisions` は出力しない。
+
+- 出力方式は `openai_oauth` → `freeai_chat` → `openai_chat` → `gemini_chat`。各区分は `{models: {モデルID: 表示名}}`。現在の候補はOpenAI両方式が `gpt-6-luna`、FreeAI/Geminiが `gemini-flash-lite-latest`。共通の `DECISION_MODEL_CANDIDATES` を使い、別の固定候補は持たない。
+- 認証済みの取得一覧に含まれるモデルだけを出力する。表示名は `YYYY/MM/DD - ID`、日付不明時は `yyyy/mm/dd - ID`。候補がない方式は省略し、全方式が空なら `{}` を保存する。公開・固定・旧保存候補からの補完はしない。
+- 既存の緑の `↺ 一覧再取得` → `書込`、または headless / 全テスト内の共通モデル書込で更新する。保存先一覧では `prediction_models_info.json` を `decisions_models_info.json` の直前に含める。独立した取得APIや生成試行は追加しない。
+- `AiDiy_key.json` の `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` は `auto` / `auto` を初期値とする。候補の書込では設定値を変更せず、予測も実行しない。設定はWeb / AvatarのAI設定画面で変更する。
+- 内部RESTの `aidiy_prediction_llms`（`POST /internal/prediction_llms`、MCP非公開）はこのJSONを参照する。方式も `auto` なら、候補が存在する `openai_oauth` → `freeai_chat` → `gemini_chat` の順で1方式を選ぶ。`openai_chat` は設定または呼び出し引数で明示した場合だけ使い、autoでは選ばない。判断側の候補区分・選択順は変更しない。
+- 内部RESTは `project_path` を必須指定し、同じプロジェクトの過去会話から次のユーザー入力を返す。候補取得・書込だけでは予測を実行せず、Diagでは設定モデル／AIモデルの明示試行から呼び出す。Code画面の自動提案も同じ内部RESTを使い、トグルは初期OFFとする。履歴非保存などの仕様は [backend_tools 構成](../_AIDIY/knowledge/backend_tools,構成.md#次のユーザー入力予測) を参照する。
 
 ## 判断用モデル一覧
 

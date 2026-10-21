@@ -56,6 +56,8 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | チャット補完（OpenAI 標準） | `POST /aidiy_chat_completions/v1/chat/completions` |
 | モデル一覧（ai_name 一覧） | `GET /aidiy_chat_completions/v1/models` |
 
+次のユーザー入力予測 `aidiy_prediction_llms` は、同じプロジェクトの直近2時間・最新最大5ターンを参照し、MCP には公開しません。Live 試行と同じ直接loopback限定の内部REST `POST /internal/prediction_llms` だけを提供し、OpenAPI・MCP一覧・各CLI設定には追加しません。
+
 ## ファイル構成
 
 | パス | 役割 |
@@ -88,6 +90,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | `tools_proc/code_agents.py` | CodeAI CLI ラッパー（コードエージェント実行） |
 | `tools_proc/chat_llm.py` | ChatAI ラッパー（チャット LLM 実行 / OpenAI 互換 completions） |
 | `tools_proc/tools_chat.py` | `aidiy_chat_llms` MCP 登録 + HTTP 2 系統ルート（独自 IF / OpenAI 互換 IF） |
+| `tools_proc/prediction_llm.py` / `tools_proc/tools_prediction.py` | 次のユーザー入力予測（履歴の読み取り専用参照）と非公開の内部REST |
 | `tools_proc/decisions_check.py` / `tools_proc/tools_decisions.py` | backend_serverのAI判断への接続、MCP / HTTP公開 |
 | `tools_proc/task_agents.py` / `tools_proc/tools_task_agents.py` | backend_taskteam の `/task` API への AIタスク投入 |
 | `tools_proc/team_agents.py` / `tools_proc/tools_team_agents.py` | backend_taskteam の `/team` API への AIチーム依頼投入 |

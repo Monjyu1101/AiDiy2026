@@ -19,6 +19,7 @@ import { コードモデル読込, コードモデル保存, モデル保存先,
 import { Hermes既定モデル, オフラインモデル候補, オフラインモデル保存先, オフライン実行 } from '../aidiy_code/src/offline';
 import { 起動解決 } from './runner';
 import { CodeConnection, コード選択 } from './code-connection';
+import { InputPrediction } from './input-prediction';
 import { ローカル接続先 } from '../aidiy_live/local-backend.cjs';
 import type { Packet } from '../aidiy_live/src/protocol';
 import { streamControlOf, visibleStreamContent, type コードパケット } from './protocol';
@@ -77,9 +78,15 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private connection?: CodeConnection;
   private 接続フォルダ = '';
   private 自動接続 = true;
+  private prediction: InputPrediction;
   private readonly ログ = vscode.window.createOutputChannel('AiDiy Code');
 
   constructor(private readonly context: vscode.ExtensionContext) {
+    this.prediction = new InputPrediction(context.extensionPath, () => ({
+      projectPath: this.現在フォルダ()?.uri.fsPath || '', conversationId: this.会話ID,
+      sessionId: this.会話.コアセッションID || '', enabled: !this.破棄済み && !!this.view && vscode.workspace.isTrusted
+        && this.自動接続 && !this.オフライン使用() && !this.実行中 && !this.モデル変更中(),
+    }));
     const config = vscode.workspace.getConfiguration('aidiyHermes');
     const offlineModels = this.オフライン候補;
     const defaultModel = Hermes既定モデル(context.extensionPath, this.選択フォルダ()?.uri.fsPath ?? context.extensionPath);
@@ -128,7 +135,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     view.webview.onDidReceiveMessage(message => {
       void this.受信(message).catch(error => this.エラー(error));
     }, undefined, this.context.subscriptions);
-    view.onDidDispose(() => { if (this.view === view) { this.view = undefined; this.オフラインジョブ?.停止(); this.connection?.disconnect(); this.接続フォルダ = ''; } }, undefined, this.context.subscriptions);
+    view.onDidDispose(() => { if (this.view === view) { this.view = undefined; this.prediction.clear(); this.オフラインジョブ?.停止(); this.connection?.disconnect(); this.接続フォルダ = ''; } }, undefined, this.context.subscriptions);
     view.onDidChangeVisibility(() => this.通知(), undefined, this.context.subscriptions);
   }
 
@@ -148,6 +155,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private オフライン使用(): boolean { return !this.connection?.connected || Boolean(this.オフラインジョブ); }
   private 通知(): void {
     if (this.破棄済み) return;
+    this.prediction.sync();
     const folder = this.現在フォルダ();
     void this.view?.webview.postMessage({
       type: 'state', ...this.会話, 会話ID: this.会話ID, 添付: this.添付?.名前, 実行中: this.実行中, 進捗: this.進捗,
@@ -257,6 +265,13 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     const data = message as Record<string, unknown>;
     switch (data.メッセージ識別 ?? data.type) {
       case 'ready': this.接続更新(); this.通知(); break;
+      case 'predictInput': {
+        const view = this.view;
+        const result = await this.prediction.predict(data);
+        if (!this.破棄済み && view && this.view === view) void view.webview.postMessage(result);
+        break;
+      }
+      case 'cancelPrediction': this.prediction.cancel(data.requestId); break;
       case 'autoConnect':
         if (typeof data.enabled !== 'boolean') throw new Error('自動接続の指定が不正です。');
         if (this.実行中 || this.オフラインジョブ || this.モデル変更中()) throw new Error('実行中またはモデル変更中は自動接続を変更できません。');
@@ -485,6 +500,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   dispose(): void {
     this.書込実行();
     this.破棄済み = true;
+    this.prediction.clear();
     if (this.オフラインジョブ) this.オフラインジョブ.停止();
     else if (this.実行中) this.connection?.send({ メッセージ識別: 'cancel_run' });
     this.connection?.dispose(); this.ログ.dispose();

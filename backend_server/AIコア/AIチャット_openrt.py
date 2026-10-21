@@ -154,6 +154,7 @@ class ChatAI:
         Returns:
             生成されたテキスト
         """
+        self.last_completion_succeeded = False
         try:
             if not self.is_alive:
                 logger.warning("ChatAI実行:ChatAIが開始されていません")
@@ -248,15 +249,14 @@ class ChatAI:
                     )
 
                 # 非同期でapi実行
-                応答テキスト = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: self._同期実行(
-                        メッセージ履歴=メッセージ履歴,
-                        テキスト受信処理Ｑ=テキスト受信処理Ｑ,
-                        タイムアウトフラグ=タイムアウトフラグ,
-                        output_files=output_files,
-                        completions_tools=completions_tools
-                    )
+                # 予測など呼出し単位の非保存ログ設定を同期APIスレッドへ引き継ぐ。
+                応答テキスト = await asyncio.to_thread(
+                    self._同期実行,
+                    メッセージ履歴=メッセージ履歴,
+                    テキスト受信処理Ｑ=テキスト受信処理Ｑ,
+                    タイムアウトフラグ=タイムアウトフラグ,
+                    output_files=output_files,
+                    completions_tools=completions_tools,
                 )
 
                 # タイムアウトタスクキャンセル
@@ -284,6 +284,8 @@ class ChatAI:
                     for output_file in output_files:
                         logger.info(f"  - {output_file}")
 
+                # API由来の本文と、アダプターが作った ! エラーを区別する。
+                self.last_completion_succeeded = bool(self._last_sync_completion_succeeded and not タイムアウトフラグ.is_set())
                 return final_result
 
             except asyncio.CancelledError:
@@ -322,6 +324,7 @@ class ChatAI:
         """
         同期api実行（スレッドプールで実行、画像生成対応）
         """
+        self._last_sync_completion_succeeded = False
         try:
             # パラメータ構築
             parm_kwargs = {
@@ -363,7 +366,7 @@ class ChatAI:
 
             def _保存画像データ(image_url: str):
                 """data URL画像を保存してパスを返す"""
-                if not image_url or not image_url.startswith('data:image/'):
+                if not getattr(self, "出力ファイル保存", True) or not image_url or not image_url.startswith('data:image/'):
                     return None
                 try:
                     from pathlib import Path
@@ -430,7 +433,7 @@ class ChatAI:
                             if content_part.type == 'text':
                                 応答テキスト += content_part.text
                             # 画像部分（base64またはURL）- 最初の1つだけ保存
-                            elif content_part.type == 'image_url' and hasattr(content_part, 'image_url') and not 画像保存済み:
+                            elif content_part.type == 'image_url' and hasattr(content_part, 'image_url') and not 画像保存済み and getattr(self, "出力ファイル保存", True):
                                 try:
                                     image_url = content_part.image_url.url
                                     # base64データの場合
@@ -536,6 +539,7 @@ class ChatAI:
                 except:
                     pass
 
+            self._last_sync_completion_succeeded = bool(応答テキスト.strip()) and (応答正規化(応答テキスト) != "!" or 応答テキスト.strip() == "!")
             return 応答テキスト
 
         except Exception as e:

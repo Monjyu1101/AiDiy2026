@@ -8,6 +8,13 @@
 - MCP SSE エンドポイント、stdio bridge、環境変数を確認する。
 - SQLite / PostgreSQL / Logs / Code Check / Backup 系 MCP の使い分けを確認する。
 
+## 利用範囲とパスワード
+
+ローカル環境での実行を基本とする。外部へ公開する場合、公開範囲・認証・接続設定などの判断と運用は利用者自身の責任で行う。
+
+AiDiy のログインパスワードは、管理画面の「C管理 → C利用者」で対象の利用者IDまたは利用者名を選び、パスワード欄に新しい値を入力して「更新」すると変更できる。空欄なら現在のパスワードを維持する。
+これは OBS WebSocket の接続パスワードとは別であり、変更しても backend_tools の公開範囲や認証は変わらない。
+
 ## 関連ファイル
 
 - `backend_tools/tools_main.py`
@@ -127,6 +134,10 @@ print(res.json())
 
 現行実装では通常の起動は `0.0.0.0` で待ち受け、REST API 全体に接続元を localhost へ制限する処理はない。`tools_main.py` が MCP SDK へ渡す `host="127.0.0.1"` は SSE / Streamable HTTP 側の設定であり、REST 全体の接続制限とは異なる。
 
+## 内部RESTの予測処理
+
+`aidiy_prediction_llms` はMCP非公開で、`POST /internal/prediction_llms` のみを提供する。`/aidiy_prediction_llms/*` の公開経路やMCP/CLI登録はない。Live試行と同じく接続元IPとHostがloopbackで、`X-AiDiy-Diag: model-trial` と `Content-Type: application/json` が必要。Origin・プロキシ転送ヘッダー・クエリは拒否する。JSON本文は64KiB以下・受信3秒以内で、`project_path` が必須。詳細と利用例は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
+
 ## 環境変数
 
 | 変数名 | 既定 | 用途 |
@@ -142,7 +153,8 @@ mount path 系の環境変数を使う場合は `tools_main.py` の現行実装�
 ## OBS Studio 接続設定
 
 `aidiy_obs_studio_control` の接続情報は `_config/mcp_obs_studio_control.json` で管理する。
-ファイルが無ければ初回起動時にデフォルト値（`host=localhost`, `port=4455`, `password=aidiy4455`, `timeout=10`）が自動書き込まれる。
+ファイルが無ければ初回起動時にデフォルトの接続設定（`host=localhost`, `port=4455`, `password=********`, `timeout=10`）が自動書き込まれる。
+ここで `********` はパスワードを伏せた表示であり、設定ファイルに書き込まれる値ではない。実際の値はローカルの設定ファイルで確認し、公開資料には記載しない。
 OBS Studio 側の `ツール → WebSocketサーバー設定` と一致させる。
 
 ## ffmpeg / ffprobe / ffplay 実行設定

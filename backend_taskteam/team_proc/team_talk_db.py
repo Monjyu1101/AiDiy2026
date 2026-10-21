@@ -63,60 +63,6 @@ def _テーブル作成(conn: sqlite3.Connection) -> None:
     """)
 
 
-def _現行スキーマか(conn: sqlite3.Connection) -> bool:
-    列一覧 = conn.execute(f'PRAGMA table_info("{会話テーブル}")').fetchall()
-    if not 列一覧:
-        return False
-    主キー = [
-        str(列["name"])
-        for 列 in sorted(列一覧, key=lambda 列: int(列["pk"]))
-        if int(列["pk"]) > 0
-    ]
-    return 主キー == ["プロジェクト", "要員ID"] and all(
-        str(列["name"]) != "会話ID" for 列 in 列一覧
-    )
-
-
-def _旧スキーマ移行(conn: sqlite3.Connection) -> None:
-    """会話ID主キーの履歴型テーブルを、要員ごとの最終発言型へ移行する。"""
-    旧テーブル = f"{会話テーブル}_旧"
-    conn.execute(f'DROP TABLE IF EXISTS "{旧テーブル}"')
-    conn.execute(f'ALTER TABLE "{会話テーブル}" RENAME TO "{旧テーブル}"')
-    _テーブル作成(conn)
-
-    旧列 = {
-        str(列["name"])
-        for 列 in conn.execute(f'PRAGMA table_info("{旧テーブル}")').fetchall()
-    }
-    移行列 = {
-        "プロジェクト", "要員ID", "要求内容", "発言内容",
-        "登録日時", "登録利用者ID", "登録利用者名", "登録端末ID",
-        "更新日時", "更新利用者ID", "更新利用者名", "更新端末ID",
-    }
-    if 移行列.issubset(旧列):
-        conn.execute(f"""
-            INSERT INTO "{会話テーブル}" (
-                プロジェクト, 要員ID, 要求内容, 発言内容,
-                登録日時, 登録利用者ID, 登録利用者名, 登録端末ID,
-                更新日時, 更新利用者ID, 更新利用者名, 更新端末ID
-            )
-            SELECT
-                old.プロジェクト, old.要員ID, old.要求内容, old.発言内容,
-                old.登録日時, old.登録利用者ID, old.登録利用者名, old.登録端末ID,
-                old.更新日時, old.更新利用者ID, old.更新利用者名, old.更新端末ID
-              FROM "{旧テーブル}" old
-             WHERE old.rowid = (
-                SELECT latest.rowid
-                  FROM "{旧テーブル}" latest
-                 WHERE latest.プロジェクト = old.プロジェクト
-                   AND latest.要員ID = old.要員ID
-                 ORDER BY latest.更新日時 DESC, latest.rowid DESC
-                 LIMIT 1
-             )
-        """)
-    conn.execute(f'DROP TABLE "{旧テーブル}"')
-
-
 def _次更新日時(conn: sqlite3.Connection, プロジェクト: str, 要員ID: str) -> str:
     """同じ秒の連続更新でもポーリングが検知できるよう、更新日時を必ず増加させる。"""
     now = datetime.now().replace(microsecond=0)
@@ -138,14 +84,7 @@ def 初期化() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = 接続取得()
     try:
-        テーブルあり = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-            [会話テーブル],
-        ).fetchone()
-        if テーブルあり and not _現行スキーマか(conn):
-            _旧スキーマ移行(conn)
-        else:
-            _テーブル作成(conn)
+        _テーブル作成(conn)
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS "IX_Aチーム会話_プロジェクト"
             ON "{会話テーブル}" (プロジェクト, 更新日時)

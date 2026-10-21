@@ -15,6 +15,7 @@ import { writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
+import { InputPrediction } from '../../src/input-prediction';
 import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
@@ -97,7 +98,9 @@ export async function 単独起動(project: string, backend?: string, initialMod
   const 表示状態 = () => オフライン使用() ? { ...state, 実行モード: 'offline',
     ...(state.実行モード === 'offline' ? {} : modeModels.offline),
     セッションID: state.実行モード === 'offline' ? state.セッションID : state.HermesセッションID } : state;
-  const notify = () => broadcast(表示状態());
+  const prediction = new InputPrediction(root, () => ({ projectPath: folder, conversationId: state.会話ID,
+    sessionId: state.セッションID || '', enabled: !closed && state.自動接続 && !オフライン使用() && !state.実行中 && !state.モデル変更中 }));
+  const notify = () => { prediction.sync(); broadcast(表示状態()); };
   const save = (更新日時を変更 = true) => {
     if (!state.メッセージ.length && !state.セッションID) return;
     const previous = history.find(item => item.id === state.会話ID);
@@ -207,6 +210,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
         const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
         res.on('close', () => {
           clearInterval(heartbeat); clients.delete(res);
+          if (!clients.size) prediction.clear();
           if (!closed && !clients.size && !initialModel.lockedMode && !initialModel.keepAlive) idle = setTimeout(() => { void close(); }, 60_000);
         });
         return;
@@ -231,6 +235,11 @@ export async function 単独起動(project: string, backend?: string, initialMod
         if (initialModel.lockedMode && ['autoConnect', 'executionMode', 'connect', 'disconnect'].includes(type)) {
           reply(409, {error:'接続モードはAiDiy IDEの利用開始画面で変更してください。'}); return;
         }
+        if (type === 'predictInput') {
+          void prediction.predict(data).then(result => { if (!closed) broadcast(result); });
+          reply(200, {ok:true}); return;
+        }
+        if (type === 'cancelPrediction') { prediction.cancel(data.requestId); reply(200, {ok:true}); return; }
         if (type === 'cancel_run') {
           if (!state.実行中 || state.停止中) { reply(200, {ok:true}); return; }
           state.停止中 = true;
@@ -315,6 +324,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
   });
   async function close() {
     if (closed) return; closed = true;
+    prediction.clear();
     書込実行();
     clearTimeout(idle);
     if (offlineJob) { offlineJob.停止(); await offlineJob.完了.catch(() => {}); }

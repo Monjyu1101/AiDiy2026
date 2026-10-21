@@ -9,6 +9,7 @@ import { OUTPUT_DIRECTORY, writeResult } from '../診断/headless.mjs';
 import {catalog, resolveProgram} from '../診断/probes.mjs';
 import {currentOpenRouterProof, readConfig} from '../runtime/model_probe.mjs';
 import {LIVE_VOICES_FILE, liveVoicesInfo} from './voices_info.mjs';
+import {PREDICTION_MODELS_FILE, predictionModelsInfo} from './prediction_info.mjs';
 import {DECISIONS_MODELS_FILE,decisionsModelsInfo} from './decisions_info.mjs';
 import {COPILOT_FALLBACK_MODELS, OAUTH_FALLBACK_SOURCE, oauthModelFallback} from './model_fallbacks.mjs';
 import {antigravityModels} from './antigravity_models.mjs';
@@ -281,7 +282,9 @@ export async function writeModelsInfo(providers, results, {directory = OUTPUT_DI
     saved.push(file);
   }
   saved.push(...await writeMergedModelsInfo(directory, options.installedClis ?? await installedCodeClis(), providers, results, options));
-  // 判断用はディスクの旧一覧を認証証跡にしない。実行中の取得結果と現在の認証で再合成。
+  // 予測・判断用はディスクの旧一覧を認証証跡にしない。実行中の取得結果と現在の認証で再合成。
+  await writeResult(path.join(directory, PREDICTION_MODELS_FILE), await predictionModelsInfo(providers, results, options));
+  saved.push(PREDICTION_MODELS_FILE);
   await writeResult(path.join(directory, DECISIONS_MODELS_FILE), await decisionsModelsInfo(providers, results, options));
   saved.push(DECISIONS_MODELS_FILE);
   await writeResult(path.join(directory, LIVE_VOICES_FILE), liveVoicesInfo());

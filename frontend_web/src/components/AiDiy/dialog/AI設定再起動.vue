@@ -42,6 +42,8 @@ let loadedFormSettings: Record<string, any> = {};
 const selections = reactive({
   chatAi: '',
   chatModel: '',
+  predictionAi: 'auto',
+  predictionModel: 'auto',
   decisionAi: 'auto',
   liveAi: '',
   liveModel: '',
@@ -106,6 +108,43 @@ const CODE_MODEL_KEYS: Record<string, string> = {
 };
 
 const chatAiOptions = computed(() => Object.keys(availableModels.value?.chat_models || {}));
+// 予測候補はDiag取得値だけ。autoは実行側と同じ優先順の1方式に絞る。
+const predictionProviders = ['openai_oauth', 'freeai_chat', 'openai_chat', 'gemini_chat'];
+const predictionAutoProviders = ['openai_oauth', 'freeai_chat', 'gemini_chat'];
+const predictionAiOptions = computed(() => [...new Set(['auto', ...predictionProviders, selections.predictionAi])].filter(Boolean));
+const predictionCatalog = computed<Record<string, Record<string, string>>>(() => {
+  const catalog: Record<string, Record<string, string>> = {};
+  for (const provider of predictionProviders) {
+    const models = availableModels.value?.prediction_models?.[provider];
+    if (!models || typeof models !== 'object' || Array.isArray(models)) continue;
+    catalog[provider] = Object.fromEntries(Object.entries(models).filter(([model, label]) =>
+      model.length > 0 && model.length <= 200 && model.trim() === model &&
+      !/[\x00-\x1f\x7f]/.test(model) && !['auto', 'same'].includes(model) && typeof label === 'string'
+    )) as Record<string, string>;
+  }
+  return catalog;
+});
+const predictionResolvedAi = computed(() => selections.predictionAi === 'auto'
+  ? predictionAutoProviders.find(provider => Object.keys(predictionCatalog.value[provider] || {}).length > 0) || ''
+  : selections.predictionAi);
+const predictionHasCandidates = computed(() => Object.keys(predictionCatalog.value[predictionResolvedAi.value] || {}).length > 0);
+const predictionModelOptions = computed(() => {
+  const choices: Record<string, string> = {
+    auto: 'auto（選択方式の先頭候補）',
+    ...predictionCatalog.value[predictionResolvedAi.value],
+  };
+  const current = selections.predictionModel;
+  if (current && !Object.prototype.hasOwnProperty.call(choices, current)) {
+    choices[current] = current + '（保持値・Diag一覧外／未確認）';
+  }
+  return Object.entries(choices).map(([value, label]) => ({ value, label: label || value }));
+});
+
+function handlePredictionAiChange() {
+  // 別方式のモデルを引き継がない。読込では呼ばず、保存済みの値は保持する。
+  selections.predictionModel = 'auto';
+}
+
 // 判断の候補はDiag取得値だけ。方式・モデルの保存値は一覧外でも失わない。
 const decisionAiOptions = computed(() => [...new Set([
   'auto', 'openai_oauth', 'freeai_chat', 'openai_decisions', 'gemini_chat', selections.decisionAi,
@@ -248,6 +287,8 @@ const loadConfig = async () => {
       const codeModels = availableModels.value.code_models || {};
 
       selections.chatAi = chooseAvailable(currentSettings.value.CHAT_AI_NAME, chatAiOptions.value);
+      selections.predictionAi = String(currentSettings.value.PREDICTION_AI_NAME ?? 'auto') || 'auto';
+      selections.predictionModel = String(currentSettings.value.PREDICTION_AI_MODEL ?? 'auto') || 'auto';
       selections.decisionAi = String(currentSettings.value.DECISION_AI_NAME || 'auto').trim() || 'auto';
       for (const { key } of decisionFields) {
         decisionModels[key] = String(currentSettings.value[key] ?? currentSettings.value.DECISION_AI_MODEL ?? 'auto').trim() || 'auto';
@@ -316,6 +357,8 @@ const handleCancel = () => {
 const buildFormSettings = () => {
     const nextSettings = { ...currentSettings.value };
     nextSettings.CHAT_AI_NAME = selections.chatAi;
+    nextSettings.PREDICTION_AI_NAME = selections.predictionAi || 'auto';
+    nextSettings.PREDICTION_AI_MODEL = selections.predictionModel || 'auto';
     nextSettings.DECISION_AI_NAME = selections.decisionAi || 'auto';
     for (const { key } of decisionFields) nextSettings[key] = decisionModels[key] || 'auto';
     nextSettings.LIVE_AI_NAME = selections.liveAi;
@@ -367,9 +410,10 @@ function buildNextSettings() {
   const next = buildFormSettings();
   for (const key of Object.keys(next)) {
     if (key === 'DECISION_AI_NAME' || decisionFields.some(field => field.key === key)) continue;
+    if (key === 'PREDICTION_AI_MODEL' && next.PREDICTION_AI_NAME !== loadedFormSettings.PREDICTION_AI_NAME) continue;
     if (next[key] === loadedFormSettings[key]) {
       if (Object.prototype.hasOwnProperty.call(currentSettings.value, key)) next[key] = currentSettings.value[key];
-      else delete next[key];
+      else if (!['PREDICTION_AI_NAME', 'PREDICTION_AI_MODEL'].includes(key)) delete next[key];
     }
   }
   return next;
@@ -653,6 +697,31 @@ onMounted(() => {
             </div>
 
             <div class="config-panel-section">
+              <div class="config-panel-section-header">Prediction AI Model（入力予測）</div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-prediction-ai-select">PREDICTION_AI_NAME:</label>
+                <div class="config-panel-control">
+                  <select id="config-prediction-ai-select" v-model="selections.predictionAi" aria-describedby="config-prediction-note" class="config-panel-select" @change="handlePredictionAiChange">
+                    <option v-for="ai in predictionAiOptions" :key="ai" :value="ai">{{ ai === 'auto' || predictionProviders.includes(ai) ? ai : ai + '（保持値・未対応）' }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-panel-field">
+                <label class="config-panel-label" for="config-prediction-model-select">PREDICTION_AI_MODEL:</label>
+                <div class="config-panel-control">
+                  <select id="config-prediction-model-select" v-model="selections.predictionModel" aria-describedby="config-prediction-note" class="config-panel-select">
+                    <option v-for="model in predictionModelOptions" :key="model.value" :value="model.value">{{ model.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div id="config-prediction-note" class="config-model-note" role="note">
+                <p>方式のautoはDiag候補があるOAuth → FreeAI → Geminiの順です。OpenAI API（openai_chat）は明示指定時だけ使用します。</p>
+                <p v-if="!predictionHasCandidates">選択方式のDiag候補はありません。現在設定とautoを保持しています。候補をDiagで取得・書き出してから画面を開き直してください。</p>
+                <p v-else>候補はDiagの取得済み一覧です。autoのモデルは選択方式の先頭候補を使います。候補掲載は現在の利用可否を保証しません。</p>
+              </div>
+            </div>
+
+            <div class="config-panel-section">
               <div class="config-panel-section-header">Decision AI Model（判断）</div>
               <div class="config-panel-field">
                 <label class="config-panel-label" for="config-decision-ai-select">DECISION_AI_NAME:</label>
@@ -932,7 +1001,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.config-model-note,
 .config-decision-note { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; opacity: 0.85; }
+.config-model-note p,
 .config-decision-note p { margin: 6px 0; }
 .config-panel-overlay {
   position: fixed;

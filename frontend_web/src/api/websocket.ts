@@ -32,6 +32,7 @@ function 入力系認証トークン更新(message: WebSocketMessage): void {
 export interface WebSocketMessage {
   type?: string;
   セッションID?: string;
+  プロジェクトパス?: string | null;
   [key: string]: any;
 }
 
@@ -201,8 +202,11 @@ export class AIWebSocket implements IWebSocketClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       入力系認証トークン更新(message);
 
+      // 接続時に確定したプロジェクトを要求単位で渡す。選択ファイルのパスは使わない。
+      const 入力要求 = 認証延長対象メッセージ識別.has(String(message.メッセージ識別 || message.type || ''));
       const payload: WebSocketMessage = {
         ...message,
+        ...(入力要求 ? { プロジェクトパス: message.プロジェクトパス ?? (this.codeBasePath || null) } : {}),
         セッションID: message.セッションID ?? this.セッションID ?? this.要求セッションID,
       };
       this.ws.send(JSON.stringify(payload));

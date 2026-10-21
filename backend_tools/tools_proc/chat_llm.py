@@ -94,8 +94,8 @@ class ChatLLM:
         # 起動時 API キー確認結果（tools_main.py から _check_ai_versions() で設定）
         self.version_info: dict[str, dict] = {}
 
-        # resume 用セッションキャッシュ（session_id -> ChatAI インスタンス）
-        self._sessions: dict[str, Any] = {}
+        # resume 用セッションキャッシュ（セッション・方式・モデル・プロジェクト単位）
+        self._sessions: dict[tuple[str, str, str, str], Any] = {}
 
     # ------------------------------------------------------------------ #
     # sys.path 設定
@@ -421,7 +421,7 @@ Args:
         file_path: Optional[str],
     ) -> dict:
         """従来挙動: ChatAI を 1 回だけ実行して素応答を返す（session_id で履歴継続）。"""
-        cache_key = f"{session_id}::{ai_name}::{ai_model}"
+        cache_key = (session_id, ai_name, ai_model, os.path.normcase(resolved_path))
         instance = self._sessions.get(cache_key) if resume else None
 
         try:
@@ -638,6 +638,10 @@ Args:
         # 具体モデル名が来た場合は ai_model として採用
         return ai_name, model
 
+    def _completion_result(self, instance, content, *, completed=True):
+        """通常チャットの応答規約。専用の派生ラッパーだけ上書きできる。"""
+        return _応答結果(content)
+
     async def complete_async(
         self,
         messages: list,
@@ -759,6 +763,7 @@ Args:
                         temp_image_paths.append(materialized)
                     break
 
+        completed = False
         try:
             # 過去ターンを履歴注入（最後の user を除く）
             for role, text in history:
@@ -774,6 +779,7 @@ Args:
             )
             output_files = list(getattr(instance, "last_output_files", []) or [])
             tool_calls = list(getattr(instance, "last_tool_calls", []) or [])
+            completed = True
         except Exception as e:
             from AIコア.AI応答 import エラー応答
             result_text = エラー応答(e)
@@ -795,7 +801,7 @@ Args:
         # tool_calls のみでテキストが無い場合、ChatAI は "!" を返すため空に正規化する
         if tool_calls and content.strip() in ("", "!"):
             content = ""
-        content, result_status = ("", "OK") if tool_calls and content == "" else _応答結果(content)
+        content, result_status = ("", "OK") if tool_calls and content == "" else self._completion_result(instance, content, completed=completed)
         return {
             "status": result_status,
             "content": content,

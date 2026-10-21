@@ -21,6 +21,7 @@ from typing import Tuple
 
 import numpy as np
 
+from AIコア.AI履歴コンテキスト import セッション履歴パス
 from log_config import get_logger
 
 logger = get_logger(__name__)
@@ -102,6 +103,7 @@ async def 音声入力データ処理(接続, 音声データ: bytes):
     try:
         current_time = time.time()
         data = 接続.audio_data["音声入力データ"]
+        入力プロジェクトパス = セッション履歴パス(接続)
 
         _, is_voice = _音声レベル分析(音声データ, data["音声レベルバッファ"])
         if is_voice:
@@ -126,6 +128,10 @@ async def 音声入力データ処理(接続, 音声データ: bytes):
         ):
             if len(data["音声入力バッファ"]) == 0:
                 data["音声入力開始時刻"] = current_time
+                data["プロジェクトパス"] = 入力プロジェクトパス
+            elif data.get("プロジェクトパス") != 入力プロジェクトパス:
+                # 切替をまたいだ音声を、現在のプロジェクトへ推測で割り当てない。
+                data["プロジェクトパス"] = None
             data["音声入力バッファ"].append(音声データ)
 
     except Exception as e:
@@ -158,6 +164,7 @@ async def 統合音声分離ワーカー(接続):
 
                 if input_buffer_ready or input_buffer_overflow:
                     audio_buffer = input_data["音声入力バッファ"].copy()
+                    プロジェクトパス = input_data.pop("プロジェクトパス", None)
                     input_data["音声入力開始時刻"] = None
                     input_data["音声入力最終時刻"] = None
                     input_data["音声入力バッファ"] = []
@@ -166,7 +173,7 @@ async def 統合音声分離ワーカー(接続):
 
                     combined_audio = b"".join(audio_buffer)
                     if len(combined_audio) >= MIN_AUDIO_BYTES and 接続.recognition_processor:
-                        await 接続.recognition_processor.音声認識要求("input", combined_audio)
+                        await 接続.recognition_processor.音声認識要求("input", combined_audio, プロジェクトパス=プロジェクトパス)
 
                     # 音声入力バッファクリア完了 → 音声出力再開
                     if 接続.output_audio_paused:

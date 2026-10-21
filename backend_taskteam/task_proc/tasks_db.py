@@ -164,7 +164,7 @@ def 明細タイプ(明細SEQ, 指定=None) -> str:
     """明細タイプを決める。開始行(0)=start / 終了行(9999)=end は明細SEQ で確定する。
 
     それ以外は 指定 の do / if / or を採用し、未指定・不正値は do にする。
-    登録・移行のどちらもこの関数を通し、SEQ とタイプが食い違わないようにする。
+    登録・更新はこの関数を通し、SEQ とタイプが食い違わないようにする。
     """
     seq = _正整数(明細SEQ, -1)
     if seq == 開始明細SEQ:
@@ -357,14 +357,6 @@ _明細カラムDDL = f"""
     PRIMARY KEY (タスクID, 明細SEQ)
 """
 
-# 業務項目は必ず監査項目より前に並べる規約。ALTER TABLE ADD COLUMN では末尾（監査項目の後ろ）に
-# 付いてしまうため、列順が規約どおりでない既存 DB はテーブルごと作り直して並べ替える。
-_明細列順 = [
-    "タスクID", "明細SEQ", "タイプ", "タイトル", "要求内容", "先行SEQ",
-    "TASK_AI_NAME", "TASK_AI_MODEL_do", "操作検証", "実行有効", "状態",
-    "PID", "開始日時", "終了日時", "実行回数", "予測分数", "実績分数", "応答内容",
-] + list(_監査項目().keys())
-
 
 def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
     conn.execute(f"""
@@ -372,43 +364,6 @@ def _AIタスク明細テーブル作成(conn: sqlite3.Connection) -> None:
             {_明細カラムDDL}
         )
     """)
-    現在列 = [str(row["name"]) for row in conn.execute(f"PRAGMA table_info({AIタスク明細テーブル})")]
-    if 現在列 != _明細列順:
-        # 列が足りない / 監査項目より後ろに業務項目が付いている旧スキーマを、正しい列順へ作り替える
-        移行テーブル = f"{AIタスク明細テーブル}_移行"
-        引継列 = ", ".join(_識別子(列) for 列 in _明細列順 if 列 in 現在列)
-        conn.execute(f"DROP TABLE IF EXISTS {_識別子(移行テーブル)}")
-        conn.execute(f"CREATE TABLE {_識別子(移行テーブル)} ({_明細カラムDDL})")
-        conn.execute(
-            f"INSERT INTO {_識別子(移行テーブル)} ({引継列}) "
-            f"SELECT {引継列} FROM {AIタスク明細テーブル}"
-        )
-        conn.execute(f"DROP TABLE {AIタスク明細テーブル}")
-        conn.execute(f"ALTER TABLE {_識別子(移行テーブル)} RENAME TO {AIタスク明細テーブル}")
-    _明細タイプ補正(conn)
-
-
-def _明細タイプ補正(conn: sqlite3.Connection) -> None:
-    """タイプ列を 明細SEQ から決まる値へ揃える。
-
-    タイプ列を持たない旧 DB から移行した直後は全行が DDL の既定値 'do' になるため、
-    開始行(0)・終了行(9999) をここで埋め直す。既に正しい行は更新しない。
-    """
-    conn.execute(
-        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'start' WHERE 明細SEQ = ? AND タイプ != 'start'",
-        [開始明細SEQ],
-    )
-    conn.execute(
-        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'end' WHERE 明細SEQ = ? AND タイプ != 'end'",
-        [終了明細SEQ],
-    )
-    # 途中行は do / if / or のいずれか。想定外の値だけ do へ戻す（if・or は保存値を尊重する）
-    placeholders = ", ".join("?" for _ in 明細タイプ指定可能値)
-    conn.execute(
-        f"UPDATE {AIタスク明細テーブル} SET タイプ = 'do' "
-        f"WHERE 明細SEQ NOT IN (?, ?) AND タイプ NOT IN ({placeholders})",
-        [開始明細SEQ, 終了明細SEQ, *明細タイプ指定可能値],
-    )
 
 
 _実行条件カラムDDL = f"""
@@ -438,24 +393,6 @@ def _AIタスク実行条件テーブル作成(conn: sqlite3.Connection) -> None
             {_実行条件カラムDDL}
         )
     """)
-    # 旧版は主キーが（利用者ID, タスクID）の複合だった。CRUDのキーはタスクID単独に統一したため、
-    # 旧スキーマのDBが残っている場合だけタスクID主キーへ作り替える（重複は更新日時が新しい行を残す）。
-    主キー列 = [
-        str(row["name"])
-        for row in conn.execute(f"PRAGMA table_info({AIタスク実行条件テーブル})")
-        if int(row["pk"]) > 0
-    ]
-    if 主キー列 == ["タスクID"]:
-        return
-    移行テーブル = f"{AIタスク実行条件テーブル}_移行"
-    conn.execute(f"DROP TABLE IF EXISTS {移行テーブル}")
-    conn.execute(f"CREATE TABLE {移行テーブル} ({_実行条件カラムDDL})")
-    conn.execute(
-        f"INSERT OR REPLACE INTO {移行テーブル} "
-        f"SELECT * FROM {AIタスク実行条件テーブル} ORDER BY 更新日時"
-    )
-    conn.execute(f"DROP TABLE {AIタスク実行条件テーブル}")
-    conn.execute(f"ALTER TABLE {移行テーブル} RENAME TO {AIタスク実行条件テーブル}")
 
 
 # 手動登録 API 用の標準明細テンプレート（明細SEQ, タイトル, 先行SEQ）
@@ -848,10 +785,9 @@ def _Aチーム作業反映(
             [*項目.values(), now, タスクID],
         )
     except sqlite3.OperationalError as exc:
-        # Aチーム作業 / Aチーム依頼 が未作成、または旧版のまま 状況 列が無いときは
-        # 何もしない（backend_taskteam の初期化時に整う）。
-        メッセージ = str(exc)
-        if "no such table" not in メッセージ and "no such column" not in メッセージ:
+        # Team 処理の初期化前でテーブルが未作成の場合だけ何もしない。
+        # 列不足などのスキーマ不整合は隠さず、呼び出し側へ伝える。
+        if "no such table" not in str(exc):
             raise
 
 

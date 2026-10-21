@@ -9,6 +9,7 @@
 # https://github.com/monjyu1101/AiDiy2026
 # -------------------------------------------------------------------------
 
+from AIコア.AI履歴コンテキスト import 内部要求履歴パス
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -147,8 +148,11 @@ class CodeAgentRequestTool(ToolInterface):
             エージェント = code_agents[チャンネル - 1]
             チャンネルStr = str(チャンネル)  # sockets辞書は文字列キー
             
+            プロジェクトパス = 内部要求履歴パス(self.セッション)
+
             # 1) フロントエンドへ送信（表示用）
             要求データ = {
+                "プロジェクトパス": プロジェクトパス,
                 "セッションID": self.セッション.セッションID,
                 "メッセージ識別": "input_request",
                 "メッセージ内容": 要求内容,
@@ -161,6 +165,7 @@ class CodeAgentRequestTool(ToolInterface):
             # 2) 会話履歴保存
             if hasattr(エージェント, "保存関数") and エージェント.保存関数:
                 エージェント.保存関数(
+                    プロジェクトパス=プロジェクトパス,
                     セッションID=self.セッション.セッションID,
                     チャンネル=チャンネルStr,
                     メッセージ識別="input_request",

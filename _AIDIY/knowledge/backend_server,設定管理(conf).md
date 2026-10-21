@@ -77,10 +77,15 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |
 | ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OPENAI_MODEL`, `CHAT_OLLAMA_MODEL`, `CHAT_LOCAL_MODEL` |
-| DecisionAI | LIVE設定ブロックの直後に `DECISION_AI_NAME`, `DECISION_AI_MODEL`（初期値はともに `auto`）。方式別の予備設定は `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`, `DECISION_FREEAI_MODEL`, `DECISION_GEMINI_MODEL`（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
 | LiveAI | `LIVE_AI_NAME`, `LIVE_GEMINI_MODEL/VOICE`, `LIVE_FREEAI_MODEL/VOICE`, `LIVE_OPENAI_MODEL/VOICE` |
+| PredictionAI | LIVE設定ブロックの後、DecisionAIの直前に `PREDICTION_AI_NAME`, `PREDICTION_AI_MODEL`（初期値はともに `auto`）。内部RESTの `aidiy_prediction_llms` が次のユーザー入力予測に使用する。Web / AvatarのAI設定再起動画面でもLIVEとDECISIONの間に表示する |
+| DecisionAI | `DECISION_AI_NAME`, `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`, `DECISION_GEMINI_MODEL`, `DECISION_FREEAI_MODEL`（初期値はすべて `auto`）。旧 `DECISION_AI_MODEL` は保持する（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
 | CodeAI | `CODE_BASE_PATH`, `CODE_AI1~6_NAME/MODEL`, `CODE_CLAUDE_SDK_MODEL`, `CODE_MAX_TURNS`, `CODE_PLAN`, `CODE_VERIFY` |
 | TaskAI / TeamAI | `TASK_AI_NAME`, `TEAM_AI_NAME`, `TASK_AI_MODEL_plan/do/check`, `TEAM_AI_MODEL_plan/do/check`（各フェーズを別キーで保持） |
+
+`PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` がない既存JSONは通常の不足キー補完で `auto` を追加して保存する。設定済みの値は上書きせず、保存時は上記の順序へ並べる。
+
+予測実行は内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`）へ `project_path` を渡す。Live試行と同じ直接loopback・固定ヘッダーの制限があり、MCPには公開しない。明示引数を優先し、`auto` の引数は予測専用の設定値を使う。方式設定も `auto` なら、Diagの `prediction_models_info.json` に候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` の順で選ぶ。`openai_chat` は明示指定時のみ使用する。モデルも `auto` なら選んだ方式の先頭候補を使い、候補外モデルには切り替えない。通常Chat・Decisionの設定や選択順とは独立する。Web / AvatarのAI設定再起動画面は `available_models.prediction_models` の候補を表示し、方式変更時はモデルを `auto` に戻す。保存済みの一覧外モデルは未確認の保持値として残す。履歴の範囲・非保存仕様は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
 
 ### `:cloud` サフィックスの扱い
 
