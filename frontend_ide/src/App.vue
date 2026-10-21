@@ -25,6 +25,8 @@ const history=ref(null),draftRequest=ref(null),codePanel=ref(),livePanel=ref();
 const draftRegistry=createDraftTargetRegistry(),pinnedViewers=new Map();
 let lastDraftKind='';
 provide('openFileDraft',request=>{draftRequest.value=request;});
+// Explorerの別窓にも、同じ連携先確認・下書き追加処理を提供する。
+provide('fileDraftActions',{loadTargets:loadDraftTargets,insertDraft:insertFileDraft,launchTarget:launchDraftTarget});
 provide('registerPinnedViewer',opened=>{if(opened&&state.value.active)pinnedViewers.set(opened,{sessionKey:session,projectPath:state.value.project?.path});});
 provide('openFileHistory',(file,root)=>{history.value={file:{path:file.path,name:file.name},root};});
 // ビューアの3分消去やファイル切替から独立して、解析対象を保持する。

@@ -4,12 +4,13 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
-import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, shallowRef, computed, inject, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { createRouteExpansion } from '../ファイル閲覧/軌跡パネル展開.js';
 import { createPanelWindow, fadePanel } from '../ファイル閲覧/パネル別窓.js';
 import AISearchPanel from '../ファイル検索/AI検索パネル.vue';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
 import ExplorerActionView from '../ファイル閲覧/エクスプローラー操作表示.vue';
+import DraftHandoffDialog from '../下書き連携/下書き連携ダイアログ.vue';
 import { createExplorerActions, containsPath, renamedPath } from './エクスプローラー操作.js';
 import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新ファイル.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
@@ -18,6 +19,7 @@ import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発�
 const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, allDisplays: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, applyFileChange: Function, reload: Function, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached', 'activity']);
 const panel=ref(),detached=ref(false),pinError=ref('');
+const draftActions=inject('fileDraftActions',null),draftRequest=ref(null);
 const nativePanels=!!window.aidiyWindow?.panelAction;
 let panelWindow,routeWindow;
 // 軌跡バーはエクスプローラーと同じく、最初は閉じて縦三本の正方形ボタンだけを出す。
@@ -33,11 +35,11 @@ function pinRoutes(){
 function openRoutes(){if(!routeWindow?.focus())routeClosed.value=false;}
 function closeRoutes(){if(routeDetached.value)routeWindow.dismiss();else{routeClosed.value=true;routeListOpen.value=false;}}
 function pinExplorer(){
-  fileActions.closeMenu();
-  panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},closed:()=>emit('update:open',false),report:message=>{pinError.value=message;}});
+  fileActions.closeMenu();draftRequest.value=null;
+  panelWindow??=createPanelWindow({element:()=>panel.value,changed:value=>{detached.value=value;emit('detached',value);},closed:()=>emit('update:open',false),moved:()=>{draftRequest.value=null;},report:message=>{pinError.value=message;}});
   return panelWindow.pin();
 }
-function closeExplorer(){fileActions.closeMenu();if(!fileActionState.busy)fileActions.cancel();if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
+function closeExplorer(){draftRequest.value=null;fileActions.closeMenu();if(!fileActionState.busy)fileActions.cancel();if(detached.value)panelWindow.dismiss();else emit('update:open',false);}
 watch(()=>props.allDisplays,(active,previous)=>{
   if(previous&&!active){
     // DOM・履歴を本体へ回収してから別窓を閉じ、通常画面では閉じた状態へ戻す。
@@ -287,6 +289,7 @@ let fileNavigationVersion=0;
 const fileActions=createExplorerActions({root:()=>props.root||'',document:()=>panel.value?.ownerDocument,
   // 別窓へDOMを移しても、元のIDEの限定IPCとセッション検証を通す。
   openFile:typeof window.aidiyWindow?.openFile==='function'?path=>window.aidiyWindow.openFile(path):null,
+  openDraft:draftActions?request=>{draftRequest.value=request;}:null,
   focus:()=>treeElement.value?.focus(),edit:row=>{cursor.value=row.path;reveal(row.path);},
   refresh:async()=>{if(props.reload)await props.reload();},
   changed:async(result,isCurrent)=>{
@@ -310,7 +313,9 @@ function renameKey(event){
   if(event.key==='Escape'){event.preventDefault();fileActions.cancel();}
   else if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();void fileActions.submitName();}
 }
-watch(()=>[props.root,props.startedAt],()=>fileActions.reset());
+watch(()=>[props.root,props.startedAt],()=>{fileActions.reset();draftRequest.value=null;});
+// 閉じる・別窓へ移す途中に古い連携ダイアログを残さない。
+watch([()=>props.open,detached],()=>{draftRequest.value=null;});
 watch(()=>props.open,value=>{if(!value)fileActions.closeMenu();});
 watch(mode,()=>{fileActions.closeMenu();if(!fileActionState.busy)fileActions.cancel();});
 function rowKey(event,row){const command=fileActions.keyboard(event,row);if(command==='menu'){contextMenu(event,row);return true;}return command;}
@@ -398,6 +403,8 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
         </div>
       </footer>
       <ExplorerActionView :actions="fileActions" />
+      <!-- 同じダイアログをExplorer内に置き、ピン留め先のDocumentで操作できるようにする。 -->
+      <DraftHandoffDialog v-if="draftRequest&&draftActions" data-aidiy-no-window-move :request="draftRequest" :load-targets="draftActions.loadTargets" :insert-draft="draftActions.insertDraft" :launch-target="draftActions.launchTarget" @close="draftRequest=null" />
     </aside>
     <p v-if="pinError" class="app-error" role="alert">{{ pinError }}</p>
   </div>

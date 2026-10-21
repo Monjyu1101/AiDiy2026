@@ -14,10 +14,12 @@ const menuItems = computed(() => {
   return [
     ['open-app','アプリで開く','',item && menu.target.type === 'file' && props.actions.canOpenFile,
       !props.actions.canOpenFile ? 'デスクトップ版で利用できます。' : menu?.target.type !== 'file' ? 'ファイルを選択してください。' : 'OSに関連付けられた既定のアプリで開きます。'],
+    ['handoff','Code / Liveへ','',item && menu.target.type === 'file' && props.actions.canOpenDraft(),
+      menu?.target.type !== 'file' ? 'ファイルを選択してください。' : !props.actions.canOpenDraft() ? '下書き連携を利用できません。' : 'このファイルの参照をCode / Liveの下書きへ追加します。AIへの送信はしません。'],
     ['copy-path','パスのコピー','Ctrl+Shift+C',true],['copy-relative','相対パスのコピー','',true],
     ['copy','コピー（IDE内）','Ctrl+C',item],['paste','ペースト','Ctrl+V',paste],['duplicate','複製','',item],
     ['rename','名前の変更','F2',item],['trash','削除（ゴミ箱へ）','Delete',item],
-    ['create-file','新しいファイル…','',true],['create-folder','新しいフォルダ…','',true],['refresh','再読み込み','',true],
+    ['create-file','新しいファイル…','',true],['create-folder','新しいフォルダ…','',true],
   ];
 });
 function menuKey(event) {

@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import { reactive, nextTick } from 'vue';
 import { fullFilePath, copyBrowserText } from './ファイル操作.js';
+import { fileDraftReference } from './ファイル参照.js';
 
 export const parentPath = path => path.split('/').slice(0, -1).join('/');
 export const containsPath = (base, path) => path === base || path.startsWith(base + '/');
@@ -17,9 +18,10 @@ export function explorerNameError(name) {
 }
 
 // OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
-export function createExplorerActions({ root, document: ownerDocument, openFile = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
+export function createExplorerActions({ root, document: ownerDocument, openFile = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
   const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, error: '', notice: '' });
   const canOpenFile = typeof openFile === 'function';
+  const canOpenDraft = () => typeof openDraft === 'function' && !!root();
   let cleanup = () => {}, disposed = false, epoch = 0;
   const doc = () => ownerDocument() || globalThis.document;
   const activeRow = row => row || { type: 'dir', path: '', name: root().split(/[\\/]/).filter(Boolean).at(-1) || 'ルート' };
@@ -93,7 +95,15 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     const run = epoch, current = () => !disposed && run === epoch;
     row = { ...activeRow(row) }; closeMenu(); clearMessage();
     const path = row.path, destination = directory(row);
-    if (action === 'open-app') {
+    if (action === 'handoff') {
+      try {
+        if (row.type !== 'file' || !path) throw Error('Code / Liveへ渡すファイルを選択してください。');
+        if (!canOpenDraft()) throw Error('Code / Liveへの下書き連携を利用できません。');
+        // 閲覧中のファイルや選択本文ではなく、右クリックしたファイルの参照だけを渡す。
+        openDraft({ projectPath: root(), path, name: row.name, text: fileDraftReference(row), selection: false });
+      } catch (error) { if (current()) { state.error = error?.message || '下書き連携を開けませんでした。'; focus(); } }
+      return; // ダイアログの初期フォーカスを一覧へ戻さない。
+    } else if (action === 'open-app') {
       if (row.type !== 'file' || !path) { state.error = 'アプリで開くファイルを選択してください。'; return; }
       if (!canOpenFile) { state.error = '「アプリで開く」はデスクトップ版で利用できます。'; return; }
       state.busy = true;
@@ -137,5 +147,5 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
   }
   function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = false; clearMessage(); }
   function dispose() { disposed = true; reset(); }
-  return { state, canOpenFile, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
+  return { state, canOpenFile, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
 }
