@@ -1,10 +1,34 @@
 """ランチャーのユーザー PATH 登録と、自動追加した登録の解除。"""
+import base64
 import json
 import ntpath
 import os
 import shlex
 import sys
 from pathlib import Path
+
+
+def windows_launcher_command(command):
+    """呼出元のコードページを変えず、UTF-8の配置先と引数を既存ランタイムへ渡す。"""
+    # cmd.exe が読む実行文はASCIIだけにする。Nodeは全Electronアプリの既存の前提。
+    # 日本語パスをUTF-8のままcmdへ埋めたり、chcpで共有コンソールを変更したりしない。
+    payload = base64.b64encode(json.dumps(command, ensure_ascii=False).encode('utf-8')).decode('ascii')
+    script = ("const{spawnSync}=require('node:child_process');"
+              f"const[c,...a]=JSON.parse(Buffer.from('{payload}','base64').toString('utf8'));"
+              "const r=spawnSync(c,[...a,...process.argv.slice(1)],{stdio:'inherit',windowsHide:true,shell:false});"
+              "if(r.error)console.error(r.error.message);process.exitCode=r.status===null?1:r.status;")
+    return f'node.exe -e "{script}" -- %*'
+
+
+def launcher_owner_comment(script):
+    """既存の解除処理が配置先を照合できるコメント。実行文には利用しない。"""
+    return 'rem aidiy-launcher-owner: "' + str(script).replace('%', '%%') + '"'
+
+
+def launcher_owned_by(content, script):
+    """新形式は所有者コメントを完全一致、旧形式は従来の配置先で照合する。"""
+    owners = [line for line in content.splitlines() if line.startswith('rem aidiy-launcher-owner: ')]
+    return launcher_owner_comment(script) in owners if owners else str(script) in content
 
 
 def _normalize(value):

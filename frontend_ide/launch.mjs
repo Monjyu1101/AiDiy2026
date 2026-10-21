@@ -63,11 +63,13 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  const notifyReady=message=>{if(launcherChild){process.removeListener('disconnect',stop);process.send?.({launchReady:true,...message});}};
  process.once('SIGINT',()=>void stop());process.once('SIGTERM',()=>void stop());
  const ready={url:app.url,publicUrl:app.publicUrl,pid:process.pid,kind,project};
- const publishReady=async()=>{
+ const publishReady=async(browser=false)=>{
   try{if(values['ready-file'])writeFileSync(resolve(values['ready-file']),JSON.stringify(ready),'utf8');}catch(error){await stop();throw error;}
-  console.log(`AiDiy ${kind==='ide'?'IDE':kind[0].toUpperCase()+kind.slice(1)}: ${app.publicUrl}`);if(kind!=='code')console.log(`プロジェクト: ${project}`);
+  const label=kind==='ide'?'IDE':kind[0].toUpperCase()+kind.slice(1);
+  console.log(browser?`AiDiy ${label}: ${app.publicUrl}`:`AiDiy ${label}を起動しました。`);
+  if(browser&&kind!=='code')console.log(`プロジェクト: ${project}`);
  };
- if(values['no-open']||values.serve){await publishReady();return app;}
+ if(values['no-open']||values.serve){await publishReady(true);return app;}
  let browser=values.browser||useBrowser();
  if(!browser){
   try{
@@ -79,7 +81,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
    desktop.once('exit',code=>{if(code)process.exitCode=code;void stop();});
   }catch(error){if(launcherChild){await stop();throw error;}console.warn(error.message+' Web版へ切り替えます。');if(desktop?.connected)desktop.disconnect();desktop?.kill();desktop=undefined;browser=true;}
  }
- await publishReady();
+ await publishReady(browser);
  if(browser){
   const opened=await ブラウザで開く(app.publicUrl,{ローカルURL:app.url});
   if(values.cli&&!opened){await stop();throw Error('CLI用のTerm画面をブラウザで開けませんでした。既定ブラウザまたはElectronのセットアップを確認して、もう一度起動してください。');}

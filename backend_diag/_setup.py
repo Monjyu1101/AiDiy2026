@@ -31,11 +31,10 @@ def launcher_content(script, windows=None):
     windows = sys.platform == 'win32' if windows is None else windows
     marker = 'aidiy_diag-owner:' + hashlib.sha256(str(script).encode('utf-8')).hexdigest()
     if windows:
-        script = str(script).replace('%', '%%')
-        return ('@echo off\r\nsetlocal DisableDelayedExpansion\r\n' + f'rem {marker}\r\n' + 'chcp 65001 >nul\r\n'
+        return ('@echo off\r\nsetlocal DisableDelayedExpansion\r\n' + f'rem {marker}\r\n'
                 'where node.exe >nul 2>nul\r\n'
                 'if errorlevel 1 (echo Node.js 18+ is required: https://nodejs.org/ & exit /b 1)\r\n'
-                f'node.exe "{script}" %*\r\nexit /b %ERRORLEVEL%\r\n')
+                + _path_helper.windows_launcher_command(['node.exe', str(script)]) + '\r\nexit /b %ERRORLEVEL%\r\n')
     return ('#!/usr/bin/env sh\n' + f'# {marker}\n'
             'command -v node >/dev/null 2>&1 || { echo "Node.js 18+ is required: https://nodejs.org/" >&2; exit 1; }\n'
             f'exec node {shlex.quote(str(script))} "$@"\n')

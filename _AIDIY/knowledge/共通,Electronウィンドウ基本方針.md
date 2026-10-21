@@ -115,3 +115,9 @@ AvatarのGUI起動は `electron/dev-start.cjs` がVite・TypeScript監視・Elec
 回帰試験は `node scripts/checks/Electron表示統合確認.cjs`。Pythonの実子プロセス、GUIバイナリ、各Electron画面と関連パネルを順に確認し、実施ごとのフォルダへログと結果を保存する。`AIDIY_ELECTRON_AUDIT_DIR` で保存先を指定できる。
 
 試験用のクリック透過や1%不透明度を、共通ズームの `isAiDiyOpeningCanvas` が付いた窓へ適用しない。Windowsでは白い面になる条件がある。`capturePage`の透明な画像だけを根拠にせず、`Electron透明表示目視.cjs` とComputer UseでOS上の表示も確認する。目視用スクリプトへは、起動中IDEのURLを `AIDIY_PREVIEW_URL` で渡す。読み込み表示が消え、出航準備中を抜け、Canvasに星が描画されてから撮影する。撮影対象を前面に出し、別窓の重なりも確認する。ズーム途中を静止する試験なので、750msの時間測定には使わない。
+
+## 起動元コンソールの保持
+
+Term / Code / Live / IDE の Electron 起動完了は1行で案内し、ブラウザ版・`--no-open` / `--serve` のURL、失敗理由、診断ログは維持します。Windows の直接 `.cmd` と PATH ランチャーは起動元で `chcp` / `cls` を実行しません。登録時は `scripts/_setup_path.py` の共通生成を使い、実行ファイル・固定引数をASCIIの実行文から復元して渡すため、日本語の配置先でもコンソールのコードページを変更しません。既存の PATH ランチャーはセットアップで再登録してください。
+
+Avatar の両 Vite 設定は `clearScreen: false` とし、開発サーバー再起動でも過去の出力を消しません。アプリ内のTerm・対話CLIの画面制御や、全体起動の明示的なリブート操作は別機能なので変更しません。Windows実機では、起動前の文字列が残ること、日本語の配置先・作業フォルダ、空白入り引数、失敗時の終了コード、`--wait` / Avatar の Ctrl+C を確認してください。

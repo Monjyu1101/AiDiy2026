@@ -20,6 +20,9 @@ _path_helper = importlib.util.module_from_spec(_path_spec)
 _path_spec.loader.exec_module(_path_helper)
 ensure_launcher_path = _path_helper.ensure_launcher_path
 remove_launcher_path = _path_helper.remove_launcher_path
+windows_launcher_command = _path_helper.windows_launcher_command
+launcher_owner_comment = _path_helper.launcher_owner_comment
+launcher_owned_by = _path_helper.launcher_owned_by
 
 
 def launcher_path() -> Path:
@@ -36,7 +39,9 @@ def install_launcher(root: Path) -> None:
     path = launcher_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if sys.platform == 'win32':
-        content = f'@echo off\nchcp 65001 >nul\nsetlocal EnableExtensions DisableDelayedExpansion\n"{node}" "{script}" %*\nexit /b %errorlevel%\n'
+        content = ('@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n'
+                   + launcher_owner_comment(script) + '\n'
+                   + windows_launcher_command([node, str(script)]) + '\nexit /b %errorlevel%\n')
         path.write_bytes(content.replace('\n', '\r\n').encode('utf-8'))
     else:
         path.write_text(f'#!/bin/sh\nexec {shlex.quote(node)} {shlex.quote(str(script))} "$@"\n', encoding='utf-8')
@@ -49,7 +54,7 @@ def install_launcher(root: Path) -> None:
 def remove_launcher(root: Path) -> bool:
     path = launcher_path()
     try:
-        if path.is_file() and str(root.resolve() / 'panel' / 'launch.mjs') in path.read_text(encoding='utf-8'):
+        if path.is_file() and launcher_owned_by(path.read_text(encoding='utf-8'), root.resolve() / 'panel' / 'launch.mjs'):
             path.unlink()
         return remove_launcher_path(path.parent)
     except OSError:

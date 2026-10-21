@@ -35,7 +35,7 @@ FRONTEND_AVATAR_DIR = THIS_DIR
 FRONTEND_AVATAR_BUILD_DIRS = ["dist", "dist-electron"]
 
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
-from _setup_path import remove_launcher_path
+from _setup_path import remove_launcher_path, launcher_owned_by
 
 AUTO_MODE = False
 
@@ -177,7 +177,7 @@ def remove_standalone_launcher() -> bool:
     try:
         for name in ('aidiy_avatar.cmd', 'aidiy_avatar'):
             launcher = directory / name
-            if launcher.is_file() and script in launcher.read_text(encoding='utf-8'):
+            if launcher.is_file() and launcher_owned_by(launcher.read_text(encoding='utf-8'), script):
                 launcher.unlink()
                 print_success(f'起動ランチャーを解除しました: {launcher}')
         return remove_launcher_path(directory)

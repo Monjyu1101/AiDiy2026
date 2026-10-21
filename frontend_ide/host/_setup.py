@@ -38,7 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
 from _setup_electron import setup_dependencies
-from _setup_path import ensure_launcher_path
+from _setup_path import ensure_launcher_path, windows_launcher_command, launcher_owner_comment
 
 sys.path.insert(0, str(THIS_DIR / "scripts"))
 from vscode_extensions import uninstall_aidiy_extensions
@@ -277,7 +277,10 @@ def install_standalone_launcher() -> bool:
         for name, script_path in scripts.items():
             launcher_path = launcher_dir / (f"{name}.cmd" if sys.platform == "win32" else name)
             if sys.platform == "win32":
-                content = "@echo off\nchcp 65001 >nul\nsetlocal\n" + f'node.exe "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
+                content = ("@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n"
+                           + launcher_owner_comment(script_path) + "\n"
+                           + windows_launcher_command(['node.exe', str(script_path)])
+                           + "\nexit /b %ERRORLEVEL%\n")
             else:
                 content = f'#!/usr/bin/env sh\nexec node {shlex.quote(str(script_path))} "$@"\n'
             launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8") if sys.platform == "win32" else content.encode("utf-8"))

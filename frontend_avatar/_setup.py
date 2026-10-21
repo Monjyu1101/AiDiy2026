@@ -38,7 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
 from _setup_electron import setup_dependencies
-from _setup_path import ensure_launcher_path
+from _setup_path import ensure_launcher_path, windows_launcher_command, launcher_owner_comment
 
 AUTO_MODE = False
 
@@ -162,8 +162,10 @@ def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
         launcher_dir.mkdir(parents=True, exist_ok=True)
         if sys.platform == "win32":
             content = (
-                "@echo off\nchcp 65001 >nul\nsetlocal EnableExtensions DisableDelayedExpansion\n"
-                f'"{sys.executable}" -X utf8 "{script_path}" %*\nexit /b %ERRORLEVEL%\n'
+                "@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n"
+                + launcher_owner_comment(script_path) + "\n"
+                + windows_launcher_command([sys.executable, '-X', 'utf8', str(script_path)])
+                + "\nexit /b %ERRORLEVEL%\n"
             )
             launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
         else:

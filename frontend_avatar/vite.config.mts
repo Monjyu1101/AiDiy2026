@@ -8,6 +8,7 @@ const PORT_TASKTEAM = 8093
 const PORT_APPS = 8098
 
 export default defineConfig({
+  clearScreen: false,
   plugins: [vue()],
   optimizeDeps: {
     include: [
