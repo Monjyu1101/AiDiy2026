@@ -7,6 +7,15 @@
 // 最終更新表示・自動追跡だけに適用する。ツリー表示・バックアップ・Gitの対象は変えない。
 const EXCLUDED_DIRS = new Set(['_AIDIY', '_data', '_datas']);
 
+// 最終更新候補とは別に、現在のフィルターを適用した一覧全体の増減を調べる。
+// 不完全な走査や古い応答の件数では、表示済みの一覧を更新しない。
+export function fileCountChanged(previous, next) {
+  const complete = value => value && !value.truncated && !value.missing
+    && Number.isSafeInteger(value.files) && value.files >= 0 && Number.isFinite(value.scannedAt);
+  return !!(complete(previous) && complete(next)
+    && next.scannedAt >= previous.scannedAt && previous.files !== next.files);
+}
+
 export function latestFile(tree) {
   let latest = null;
   function walk(node, prefix) {

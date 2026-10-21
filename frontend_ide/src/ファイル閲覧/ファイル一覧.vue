@@ -12,7 +12,7 @@ import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.v
 import ExplorerActionView from '../ファイル閲覧/エクスプローラー操作表示.vue';
 import DraftHandoffDialog from '../下書き連携/下書き連携ダイアログ.vue';
 import { createExplorerActions, containsPath, renamedPath } from './エクスプローラー操作.js';
-import { latestFiles, createLatestUpdates } from '../ファイル閲覧/最新ファイル.js';
+import { latestFiles, createLatestUpdates, fileCountChanged } from '../ファイル閲覧/最新ファイル.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
@@ -78,18 +78,20 @@ function acceptUpdates(files) {
 }
 async function pollLatest() {
   if (latestDisposed || (panel.value?.ownerDocument||document).hidden || latestController) return;   // 裏に隠れている間と前回取得中は問い合わせない
-  const run = ++latestRun, forFilter = props.filter, request = new AbortController();
+  const run = ++latestRun, forFilter = props.filter, forRoot = props.root, forSession = props.startedAt, request = new AbortController();
   latestController = request;
   try {
     const params = { ...(forFilter ? { filter: 'backup' } : {}), ...(updates.since === null ? {} : { since: String(updates.since) }) };
     const response = await fetch('/api/latest?' + new URLSearchParams(params), { cache: 'no-store', signal: request.signal });
     if (!response.ok) return;
     const result = await response.json();
-    if (!latestDisposed && run === latestRun && forFilter === props.filter) {
+    if (!latestDisposed && run === latestRun && forFilter === props.filter && forRoot === props.root && forSession === props.startedAt) {
       latestScan.value = result.scan || result;
+      // 前回の応答ではなく表示中の一覧と比較し、再読込が失敗しても次の周期で再試行する。
+      const countChanged = !switchingFilter && fileCountChanged(props.scan, latestScan.value);
       const changed = acceptUpdates(result.files || []); switchingFilter = false;
       // 最新の一覧を取り込むことと、自動で移動することは独立させる。
-      if (changed.length) emit('freshness', { files: changed });
+      if (changed.length || countChanged) emit('freshness', { files: changed });
     }
   } catch { /* 次の周期で再試行 */ }
   finally { if (latestController === request) latestController = null; }
