@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {configRows,createModelTrials,DECISION_CHOICES} from '../モデル試行/trials.mjs';
-const config={DECISION_AI_NAME:'freeai_chat',DECISION_AI_MODEL:'gemini-flash-lite-latest',CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'gemini-flash-lite-latest'};
+const config={DECISION_AI_NAME:'freeai_chat',DECISION_FREEAI_MODEL:'gemini-flash-lite-latest',CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'gemini-flash-lite-latest'};
 const answer=choice=>({status:'OK',data:{model:'freeai_chat/gemini-flash-lite-latest',answers:[{type:'choice',name:'politeness',choice,confidence:.9,probabilities:DECISION_CHOICES.map(value=>({value,probability:value===choice?1:0}))}]}});
 function fixture(payload,{online=true,timeoutMs=1000,requestHook}={}){
  const calls=[];
@@ -23,12 +23,12 @@ function fixture(payload,{online=true,timeoutMs=1000,requestHook}={}){
 }
 test('decision row follows LIVE, uses defaults and never shares Chat or Code results',()=>{
  const rows=configRows(config),row=rows.find(row=>row.id==='DECISION');
- assert.equal(rows.length,15);assert.equal(rows[2].id,'DECISION');
+ assert.equal(rows.length,16);assert.equal(rows[3].id,'DECISION');
  assert.deepEqual(row.共有対象,['DECISION']);assert.equal(row.モデル,'gemini-flash-lite-latest');
- assert.equal(configRows({})[2].プロバイダ,'auto');assert.equal(configRows({})[2].モデル,'auto');
- assert.equal(configRows({...config,DECISION_AI_NAME:'gemini_chat',DECISION_AI_MODEL:'custom'})[2].モデル,'custom');
- for(const provider of ['openai_oauth','openai_decisions','openai_jsonchat'])assert.equal(configRows({...config,DECISION_AI_NAME:provider,DECISION_AI_MODEL:'expensive'})[2].モデル,'expensive');
- assert.equal(configRows({...config,DECISION_AI_NAME:'auto',DECISION_AI_MODEL:'expensive'})[2].モデル,'auto');
+ assert.equal(configRows({}).find(row=>row.id==='DECISION').プロバイダ,'auto');assert.equal(configRows({}).find(row=>row.id==='DECISION').モデル,'auto');
+ assert.equal(configRows({...config,DECISION_AI_NAME:'gemini_chat',DECISION_GEMINI_MODEL:'custom'}).find(row=>row.id==='DECISION').モデル,'custom');
+ for(const [provider,key] of [['openai_oauth','DECISION_OAUTH_MODEL'],['openai_decisions','DECISION_OPENAI_MODEL'],['openai_jsonchat','DECISION_OAUTH_MODEL']])assert.equal(configRows({...config,DECISION_AI_NAME:provider,[key]:'expensive'}).find(row=>row.id==='DECISION').モデル,'expensive');
+ assert.equal(configRows({...config,DECISION_AI_NAME:'auto',DECISION_FREEAI_MODEL:'expensive'}).find(row=>row.id==='DECISION').モデル,'auto');
 });
 test('all three choices are valid JSON results and use MCP lifecycle only',async()=>{
  for(const choice of DECISION_CHOICES){const payload=answer(choice);payload.data.answers[0].probabilities.find(item=>item.value===choice).probability=.99999;const f=fixture(payload);try{
@@ -51,12 +51,11 @@ test('offline refuses start without request; connection failure and timeout cann
  try{const result=await timeout.run();assert.equal(result.状態,'NG');assert.equal(result.実行終了,true);assert.match(result.説明,/制限時間/);}finally{await timeout.trials.close();}
 });
 
-test('decision trial respects four provider settings, legacy fallback and explicit auto',()=>{
+test('decision trial respects four provider settings and explicit auto',()=>{
  const fields={openai_decisions:'DECISION_OPENAI_MODEL',openai_oauth:'DECISION_OAUTH_MODEL',openai_jsonchat:'DECISION_OAUTH_MODEL',gemini_chat:'DECISION_GEMINI_MODEL',freeai_chat:'DECISION_FREEAI_MODEL'};
  for(const [provider,key] of Object.entries(fields)){
-  for(const value of ['selected','auto'])assert.equal(configRows({DECISION_AI_NAME:provider,DECISION_AI_MODEL:'legacy',[key]:value})[2].モデル,value);
-  assert.equal(configRows({DECISION_AI_NAME:provider,DECISION_AI_MODEL:'legacy'})[2].モデル,'legacy');
+  for(const value of ['selected','auto'])assert.equal(configRows({DECISION_AI_NAME:provider,[key]:value}).find(row=>row.id==='DECISION').モデル,value);
  }
- const all={DECISION_AI_NAME:'auto',DECISION_AI_MODEL:'legacy',...Object.fromEntries(Object.values(fields).map(key=>[key,'selected']))};
- assert.equal(configRows(all)[2].モデル,'auto');
+ const all={DECISION_AI_NAME:'auto',...Object.fromEntries(Object.values(fields).map(key=>[key,'selected']))};
+ assert.equal(configRows(all).find(row=>row.id==='DECISION').モデル,'auto');
 });

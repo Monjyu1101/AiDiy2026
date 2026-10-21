@@ -22,7 +22,7 @@ const trials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:
 const server=createServer({token:'synthetic-row-ui',modelTrials:trials,toolsStatusFn:async()=>({online:true}),publicCache:{snapshot:()=>({状態:'取得済',件数:0}),input:()=>({})},
  entries:[{id:'node',name:'Node.js',description:'合成データ',commands:['node'],menuGroup:'ベース'}],
  scanFn:async()=>{scanCalls++;return [{id:'node',状態:'OK',説明:'合成応答'}];},
- keyStatusFn:async()=>({設定状態:'読込済み',項目:[{id:'openai',名前:'OpenAI',キー名:'openai_key_id',設定済み:true,テスト可能:true},{id:'discord',名前:'Discord',キー名:'DISCORD_BOT_TOKEN',設定済み:true,テスト可能:false,理由:'接続テストは未対応です。'}]}),
+ keyStatusFn:async()=>({設定状態:'読込済み',項目:[{id:'openai',名前:'OpenAI',キー名:'openai_key_id',設定済み:true,テスト可能:true},{id:'discord',名前:'Discord',キー名:'discord_bot_token',設定済み:true,テスト可能:false,理由:'接続テストは未対応です。'}]}),
  keyTestFn:async()=>{keyCalls++;return {id:'openai',状態:'OK',モデル:['synthetic-model']};},
 });
 const chromePath=process.env.CHROME_PATH||[

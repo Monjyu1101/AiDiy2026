@@ -29,10 +29,10 @@ export const KEY_PROVIDERS=Object.freeze([
  ['azure','Azure OpenAI','azure_key_id',null],['copilot','GitHub Copilot','copilot_key_id',null],
  ['openrt','OpenRouter','openrt_key_id','openrouter'],['ollama','Ollama（ローカル）','ollama list','ollama-local'],['local','ローカル（backend_local）','固定候補','local-fixed'],
  ['huggingface_read','Hugging Face 読取','huggingface_key_read','huggingface'],['huggingface_write','Hugging Face 書込','huggingface_key_write','huggingface'],
- ['discord','Discord Bot','DISCORD_BOT_TOKEN','discord'],
+ ['discord','Discord Bot','discord_bot_token','discord'],
 ].map(([id,名前,キー名,probe])=>Object.freeze({id:id!,名前:名前!,キー名:キー名!,probe,oauth:probe==='codex'||probe==='grok'?probe as OAuthKind:null})));
 // モデル名に紛れたキー値を伏せる対象（行の追加・変更とは独立）。
-const SECRET_CONFIG_KEYS=Object.freeze(['gemini_key_id','freeai_key_id','claude_key_id','openai_key_id','azure_key_id','copilot_key_id','openrt_key_id','ollama_key_id','huggingface_key_read','huggingface_key_write','DISCORD_BOT_TOKEN','openai_organization']);
+const SECRET_CONFIG_KEYS=Object.freeze(['gemini_key_id','freeai_key_id','claude_key_id','openai_key_id','azure_key_id','copilot_key_id','openrt_key_id','ollama_key_id','huggingface_key_read','huggingface_key_write','discord_bot_token','openai_organization']);
 export type Dictionary=Record<string,unknown>;
 const record=(value:unknown):value is Dictionary=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 export type Reader=(path:string)=>Promise<string|Uint8Array>|string|Uint8Array;

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { catalog, scan, probe, cancelProbes } from './診断/probes.mjs';
 import {getToolsStatus} from './診断/tools_status.mjs';
-import {createModelTrials} from './モデル試行/trials.mjs';
+import {createModelTrials,PREDICTION_ROW_TIMEOUT_MS} from './モデル試行/trials.mjs';
 import {browserMode,desktopBinary,openDesktop,closeDesktop} from './起動/desktop.mjs';
 import {createPublicModelCache} from './モデル情報/public_models.mjs';
 import {getKeyStatus,testKey,KEY_PROVIDERS,INTEGRATION_PROBES,cancelKeyProbes} from './モデル情報/key_status.mjs';
@@ -166,6 +166,9 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const bytes=await modelTrials.audio(id);
         return bytes?reply(200,bytes,'audio/wav'):reply(404,{エラー:'音声の保存期限が切れたか、音声が見つかりません。'});
       }
+      if(req.method==='GET' && /^api\/モデル試行\/[a-f0-9]{32}\/経過$/.test(route||'')){
+        try{return reply(200,modelTrials.progress(route.split('/')[2]));}catch(error){return reply(error?.status||500,{エラー:error?.status?error.message:'経過を取得できませんでした。'});}
+      }
       if(route==='api/AIモデル'&&req.method==='GET')return reply(200,await modelTrials.catalogs());
       if(route==='api/AIモデル/開始'&&req.method==='POST'){
         const controller=new AbortController(),abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
@@ -304,7 +307,8 @@ export function createServer(options) {
   server.once('close',()=>{modelTrials.close();void startManager.close();void handler.close();});
   server.maxConnections=16; server.maxRequestsPerSocket=20; server.keepAliveTimeout=2000;
   // 診断は最大 4 並列 × 登録数分。slow connection は下の期限で切断する。
-  server.setTimeout(Math.max(95000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());
+  // 予測の試行（2ターン＋予測）は1回の要求で最長 PREDICTION_ROW_TIMEOUT_MS かかる。
+  server.setTimeout(Math.max(95000,PREDICTION_ROW_TIMEOUT_MS+5000,Math.ceil((options.entries?.length || 0)/4)*5000+5000),socket=>socket.destroy());
   server.on('clientError',(_err,socket)=>socket.destroy());
   return server;
 }

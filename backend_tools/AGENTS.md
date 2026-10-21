@@ -56,7 +56,7 @@ OpenAI SDK / Ollama クライアントの `base_url` に `http://127.0.0.1:8095/
 | チャット補完（OpenAI 標準） | `POST /aidiy_chat_completions/v1/chat/completions` |
 | モデル一覧（ai_name 一覧） | `GET /aidiy_chat_completions/v1/models` |
 
-次のユーザー入力予測 `aidiy_prediction_llms` は、同じプロジェクトの直近2時間・最新最大5ターンを参照し、MCP には公開しません。Live 試行と同じ直接loopback限定の内部REST `POST /internal/prediction_llms` だけを提供し、OpenAPI・MCP一覧・各CLI設定には追加しません。
+次のユーザー入力予測 `aidiy_prediction_llms` は、同じプロジェクトの直近2時間・最新最大10ターンを参照し、MCP には公開しません。Live 試行と同じ直接loopback限定の内部REST `POST /internal/prediction_llms` だけを提供し、OpenAPI・MCP一覧・各CLI設定には追加しません。
 
 ## ファイル構成
 

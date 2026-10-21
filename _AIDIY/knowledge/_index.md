@@ -132,6 +132,7 @@
 | Windows ネイティブで terminal / file 操作が落ちる、OS 分岐を入れたい | [`command_hermes,Windows対応規則.md`](./command_hermes,Windows対応規則.md) |
 | hermes を MCP サーバーとして Code CLI から使う | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
 | プロジェクト別に Chat / Code の会話履歴を分析する | [`backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md`](./backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md) |
+| AIチャット / AIコードの引数・実行オプション（会話継続・履歴保存・ストリーム送信・出力ファイル保存）を追加・変更する | [`backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md`](./backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md)、[`command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
@@ -268,6 +269,7 @@
 | AIコア WebSocket の接続・パケット形式を確認する | [`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
 | Gemini の thought_signature を tool_calls で中間保持・復元する | [`backend_server,Gemini_thought_signature保持と復元.md`](./backend_server,Gemini_thought_signature保持と復元.md) |
 | AIWebSocket クライアントの実装・再接続ポリシー・両フロントエンドの差分を確認する | [`frontend_web,frontend_avatar,共通WebSocketクライアント.md`](./frontend_web,frontend_avatar,共通WebSocketクライアント.md) |
+| AIチャット / AIコードに共通パラメータを追加する（片方だけに独自引数を足さない） | [`backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md`](./backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md) |
 | AI モデル設定を変更する | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
 | code1〜code6 のコード AI パネルを調整する | [`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
 | backend_server の設定管理（conf_json / conf_model / conf_path）を変更する | [`backend_server,設定管理(conf).md`](<./backend_server,設定管理(conf).md>) |

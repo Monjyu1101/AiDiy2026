@@ -19,7 +19,7 @@ const windowTitle = ref('');
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
-// 下書きやホスト設定から復元しない。画面を開くたびに自動提案はOFFで開始する。
+// 下書きやホスト設定から復元しない。画面を開くたびに予測はOFFで開始する。
 const autoSuggest = ref(false), predicting = ref(false), predictionNotice = ref('');
 let prediction, predictionReply = false, predictionFailed = false;
 const changingConversation = ref(false);
@@ -286,7 +286,6 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
   <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
-      <button class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" :title="`自動提案 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span>自動提案</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
       <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>
     </nav></div>
@@ -310,15 +309,16 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
     <footer v-show="!history" class="composer">
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '入力予測推論中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">入力予測推論中、、、</span></div>
+      <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '予測中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">予測中、、、</span></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
+          <div class="prediction-options"><label class="prediction-caption">予測</label><button type="button" class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" aria-label="予測" :title="`予測 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span><span>{{ autoSuggest ? 'ON' : 'OFF' }}</span></button></div>
           <div class="verification-options"><label>検証</label><select :value="offline ? 0 : checks" :disabled="offline" aria-label="検証回数" @change="checks = Number($event.target.value); checksRestored = true; send('setSelfCheckLoop', { count: checks })"><option v-for="n in [0,1,2,3]" :key="n" :value="n">{{ n }}回</option></select><span class="verification-hint">0回:バックアップ・検証無</span></div>
           <button v-if="state.実行中" type="button" class="stop" :disabled="!canStop" aria-label="実行を停止" title="実行を停止" @click="stop"><img class="stop-icon" :src="stopIcon" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button>
           <button v-else ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !allowed }" :disabled="!canSend" aria-label="送信"><img :src="sendIcon" alt=""></button>
         </div>
       </form>
     </footer>
-    <ModalDialog v-if="predictionNotice" label="自動提案" @close="predictionNotice = ''"><h3>自動提案</h3><p class="prediction-notice">{{ predictionNotice }}</p><button @click="predictionNotice = ''">閉じる</button></ModalDialog>
+    <ModalDialog v-if="predictionNotice" label="予測" @close="predictionNotice = ''"><h3>予測</h3><p class="prediction-notice">{{ predictionNotice }}</p><button @click="predictionNotice = ''">閉じる</button></ModalDialog>
     <ModalDialog v-if="picker" label="モデル選択" @close="picker = false"><h3>コードAIとモデル</h3>
       <p>{{ offline ? 'aidiy_hermes を直接実行します。オンラインとは別のモデルを保存します。' : 'AIコアのコードAIを選択します。' }}</p>
       <label>コードAI<select v-model="provider" :disabled="catalogBusy || offline" @change="changeProvider"><option v-if="!offline" value="">自動（AIコアの設定）</option><option v-for="p in providers" :key="p.id" :value="p.id">{{ p.label || p.id }}</option></select></label>

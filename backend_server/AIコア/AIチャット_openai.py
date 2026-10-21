@@ -174,6 +174,7 @@ class ChatAI(OpenRouterChatAI):
         AI_MODEL: str = "gpt-6.1-sol",
         api_key: str = None,
         system_instruction: str = None,
+        実行オプション=None,
     ):
         self.oauth_mode = AI_NAME == "openai_oauth"
         inherited_api_key = "oauth-managed-by-hermes" if self.oauth_mode else api_key
@@ -186,6 +187,7 @@ class ChatAI(OpenRouterChatAI):
             AI_MODEL=AI_MODEL or "gpt-6.1-sol",
             api_key=inherited_api_key,
             system_instruction=system_instruction,
+            実行オプション=実行オプション,
         )
         if self.oauth_mode:
             self.api_key = None

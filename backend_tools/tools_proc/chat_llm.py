@@ -309,6 +309,10 @@ Args:
     # ChatAI インスタンス生成
     # ------------------------------------------------------------------ #
 
+    def _実行オプション(self):
+        """ChatAI に渡す AI実行オプション。None は従来どおりの既定値。派生ラッパーだけ上書きする。"""
+        return None
+
     async def _build_instance(
         self,
         ai_name: str,
@@ -333,6 +337,7 @@ Args:
             AI_MODEL=ai_model,
             api_key=api_key or None,
             system_instruction=system_instruction,
+            実行オプション=self._実行オプション(),
         )
         if temperature is not None and hasattr(instance, "temperature"):
             try:

@@ -10,6 +10,7 @@
 # -------------------------------------------------------------------------
 
 from AIコア.AI応答 import 応答正規化
+from AIコア.AI実行オプション import 既定実行オプション, 実行オプション取得, 会話継続適用
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -36,8 +37,11 @@ class ChatAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "gemini", AI_MODEL: str = "gemini-2.5-flash",
-                 api_key: str = None, system_instruction: str = None):
+                 api_key: str = None, system_instruction: str = None, 実行オプション=None):
         """初期化"""
+
+        # 実行オプション（会話継続・履歴保存・ストリーム送信・出力ファイル保存）
+        self.実行オプション = 実行オプション or 既定実行オプション
 
         # セッションID・チャンネル
         self.セッションID = セッションID
@@ -263,6 +267,8 @@ class ChatAI:
                                tools を含む場合は Gemini function calling に変換して実行する。
                                空 or None のときは従来のテキスト生成（挙動は不変）。
         """
+        # 会話継続が無効なら、前回の実行で残った履歴を引き継がない。
+        会話継続適用(self, completions_tools)
         self.last_completion_succeeded = False
         completion_succeeded = False
         try:
@@ -406,7 +412,7 @@ class ChatAI:
                         # インラインデータ（画像など）
                         else:
                             inline_data = response.candidates[0].content.parts[p].inline_data
-                            if inline_data is not None and getattr(self, "出力ファイル保存", True):
+                            if inline_data is not None and 実行オプション取得(self).出力ファイル保存:
                                 data_bytes = inline_data.data
                                 mime_type = inline_data.mime_type
                                 try:

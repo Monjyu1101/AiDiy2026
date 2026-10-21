@@ -68,13 +68,19 @@ def 初期モデル設定生成(app_conf) -> dict:
         "LIVE_OPENAI_VOICE": app_conf.json.get("LIVE_OPENAI_VOICE", "marin"),
         # PredictionAI設定
         "PREDICTION_AI_NAME": app_conf.json.get("PREDICTION_AI_NAME", "auto"),
-        "PREDICTION_AI_MODEL": app_conf.json.get("PREDICTION_AI_MODEL", "auto"),
+        "PREDICTION_OPENAI_MODEL": app_conf.json.get("PREDICTION_OPENAI_MODEL", "auto"),
+        "PREDICTION_OAUTH_MODEL": app_conf.json.get("PREDICTION_OAUTH_MODEL", "auto"),
+        "PREDICTION_GEMINI_MODEL": app_conf.json.get("PREDICTION_GEMINI_MODEL", "auto"),
+        "PREDICTION_FREEAI_MODEL": app_conf.json.get("PREDICTION_FREEAI_MODEL", "auto"),
+        "PREDICTION_CODEX_CLI_MODEL": app_conf.json.get("PREDICTION_CODEX_CLI_MODEL", "gpt-6-luna"),
+        "PREDICTION_COPILOT_CLI_MODEL": app_conf.json.get("PREDICTION_COPILOT_CLI_MODEL", "gpt-6-luna"),
+        "PREDICTION_AIDIY_HERMES_MODEL": app_conf.json.get("PREDICTION_AIDIY_HERMES_MODEL", "openai_oauth/gpt-6-luna"),
         # DecisionAI設定
         "DECISION_AI_NAME": app_conf.json.get("DECISION_AI_NAME", "auto"),
-        "DECISION_OPENAI_MODEL": app_conf.json.get("DECISION_OPENAI_MODEL", app_conf.json.get("DECISION_AI_MODEL", "auto")),
-        "DECISION_OAUTH_MODEL": app_conf.json.get("DECISION_OAUTH_MODEL", app_conf.json.get("DECISION_AI_MODEL", "auto")),
-        "DECISION_GEMINI_MODEL": app_conf.json.get("DECISION_GEMINI_MODEL", app_conf.json.get("DECISION_AI_MODEL", "auto")),
-        "DECISION_FREEAI_MODEL": app_conf.json.get("DECISION_FREEAI_MODEL", app_conf.json.get("DECISION_AI_MODEL", "auto")),
+        "DECISION_OPENAI_MODEL": app_conf.json.get("DECISION_OPENAI_MODEL", "auto"),
+        "DECISION_OAUTH_MODEL": app_conf.json.get("DECISION_OAUTH_MODEL", "auto"),
+        "DECISION_GEMINI_MODEL": app_conf.json.get("DECISION_GEMINI_MODEL", "auto"),
+        "DECISION_FREEAI_MODEL": app_conf.json.get("DECISION_FREEAI_MODEL", "auto"),
         # CodeAI設定
         "CODE_AI1_NAME": app_conf.json.get("CODE_AI1_NAME", "codex_cli"),
         "CODE_AI1_MODEL": app_conf.json.get("CODE_AI1_MODEL", "auto"),
@@ -94,10 +100,7 @@ def 初期モデル設定生成(app_conf) -> dict:
         "CODE_ANTIGRAVITY_CLI_MODEL": app_conf.json.get("CODE_ANTIGRAVITY_CLI_MODEL", "auto"),
         "CODE_CODEX_CLI_MODEL": app_conf.json.get("CODE_CODEX_CLI_MODEL", "auto"),
         "CODE_GROK_CLI_MODEL": app_conf.json.get("CODE_GROK_CLI_MODEL", "auto"),
-        "CODE_AIDIY_HERMES_MODEL": app_conf.json.get(
-            "CODE_AIDIY_HERMES_MODEL",
-            app_conf.json.get("CODE_HERMES_CLI_MODEL", "auto"),
-        ),
+        "CODE_AIDIY_HERMES_MODEL": app_conf.json.get("CODE_AIDIY_HERMES_MODEL", "auto"),
         "CODE_OPENCODE_CLI_MODEL": app_conf.json.get("CODE_OPENCODE_CLI_MODEL", "auto"),
         "CODE_CLAUDE_OLLAMA_MODEL": app_conf.json.get("CODE_CLAUDE_OLLAMA_MODEL", "auto"),
         "CODE_CODEX_OLLAMA_MODEL": app_conf.json.get("CODE_CODEX_OLLAMA_MODEL", "auto"),
@@ -118,30 +121,10 @@ def 初期モデル設定生成(app_conf) -> dict:
         "TEAM_AI_MODEL_do": app_conf.json.get("TEAM_AI_MODEL_do", "auto"),
         "TEAM_AI_MODEL_check": app_conf.json.get("TEAM_AI_MODEL_check", "auto"),
     }
-    設定 = モデル設定正規化(設定)
     models = getattr(app_conf, "models", None)
     if models is not None and callable(getattr(models, "normalize_initial_settings", None)):
         設定 = models.normalize_initial_settings(設定)
     return 設定
-
-
-def モデル設定正規化(設定: Optional[dict]) -> dict:
-    """旧 Hermes 設定名を現行名へ寄せる。"""
-    if not isinstance(設定, dict):
-        return {}
-
-    正規化後 = dict(設定)
-
-    旧hermesモデル = 正規化後.pop("CODE_HERMES_CLI_MODEL", None)
-    if "CODE_AIDIY_HERMES_MODEL" not in 正規化後 and 旧hermesモデル is not None:
-        正規化後["CODE_AIDIY_HERMES_MODEL"] = 旧hermesモデル
-
-    for i in range(1, 7):
-        ai_key = f"CODE_AI{i}_NAME"
-        if 正規化後.get(ai_key) == "hermes_cli":
-            正規化後[ai_key] = "aidiy_hermes"
-
-    return 正規化後
 
 
 class WebSocketConnection:
@@ -373,10 +356,10 @@ class SessionConnection:
             manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
     def update_model_settings(self, 設定: dict, manager=None):
-        self.モデル設定 = モデル設定正規化({
+        self.モデル設定 = {
             **self.モデル設定,
             **(設定 or {}),
-        })
+        }
         if manager:
             manager.save_session_state(self.セッションID, self.ボタン状態, self.モデル設定, self.ソース最終更新日時)
 
@@ -545,7 +528,7 @@ class WebSocketManager:
             session = SessionConnection(セッションID, voice_enabled=voice_enabled)
             if saved_state is not None:
                 session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態).copy()
-                session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
+                session.モデル設定 = dict(saved_state.get("モデル設定") or {})
                 session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
             else:
                 session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
@@ -635,7 +618,7 @@ class WebSocketManager:
         if セッションID in self.session_states:
             saved_state = self.session_states[セッションID]
             session.ボタン状態 = saved_state.get("ボタン", session.ボタン状態).copy()
-            session.モデル設定 = モデル設定正規化(saved_state.get("モデル設定", {}))
+            session.モデル設定 = dict(saved_state.get("モデル設定") or {})
             session.ソース最終更新日時 = saved_state.get("ソース最終更新日時")
         else:
             session.モデル設定 = self._新規セッション初期モデル設定(app_conf, セッションID)
@@ -652,7 +635,7 @@ class WebSocketManager:
         state["voice"] = session.voice_enabled if session else state.get("voice", True)
         state.setdefault("ソース最終更新日時", None)
         if モデル設定 is not None:
-            state["モデル設定"] = モデル設定正規化(モデル設定)
+            state["モデル設定"] = dict(モデル設定)
         if ソース最終更新日時 is not None:
             state["ソース最終更新日時"] = ソース最終更新日時
 

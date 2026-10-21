@@ -1,11 +1,12 @@
 import {ref,reactive,computed,nextTick} from 'vue';
 import {設定モデル音声を作成} from '../設定モデル/設定モデル音声.mjs';
-import {TRIAL_PROMPT,decisionQuestions,TRIAL_FAMILIES,predictionChatPassed} from '../../../モデル試行/defaults.mjs';
+import {TRIAL_PROMPT,decisionQuestions,TRIAL_FAMILIES} from '../../../モデル試行/defaults.mjs';
 
 export function AIモデル状態を作成({api,接続可能,createURL,revokeURL}){
  const 一覧=ref(null),区分=ref('CHAT'),結果一覧=ref({}),実行中=ref(false),読込中=ref(false),通知=ref('');
  const families=TRIAL_FAMILIES;
  const チャット成功=ref([]);
+ const 経過=ref([]);
  const question=decisionQuestions()[0];
  const forms=Object.fromEntries(families.map(f=>[f,reactive({provider:'',model:'',voice:'',prompt:TRIAL_PROMPT,type:question.type,name:question.name,instructions:question.instructions,choices:question.choices.map(c=>c.value).join('\n')})]));
  let 入力=forms.CHAT;
@@ -15,7 +16,7 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
  const プロバイダ=computed(()=>一覧.value?.区分?.[区分.value]?.プロバイダ||[]);
  const 選択肢=computed(()=>プロバイダ.value.find(p=>p.id===forms[区分.value].provider));
  const モデル=computed(()=>選択肢.value?.モデル||[]),音声候補=computed(()=>選択肢.value?.音声||[]);
- const 予測条件=computed(()=>{const form=forms.PREDICTION,provider=一覧.value?.区分?.PREDICTION?.プロバイダ?.find(p=>p.id===form.provider),model=provider?.モデル?.find(m=>m.id===form.model);return {プロバイダ:model?.解決プロバイダ,モデル:model?.解決モデル,テスト可能:model?.利用可能===true&&predictionChatPassed(チャット成功.value,model.解決プロバイダ,model.解決モデル),説明:model?.説明||'同じプロバイダ・モデルのChatテスト成功後に実行できます。'};});
+ const 予測条件=computed(()=>{const form=forms.PREDICTION,provider=一覧.value?.区分?.PREDICTION?.プロバイダ?.find(p=>p.id===form.provider),model=provider?.モデル?.find(m=>m.id===form.model);return {プロバイダ:model?.解決プロバイダ,モデル:model?.解決モデル,テスト可能:model?.利用可能===true&&チャット成功.value.length>0,説明:model?.説明||'先にChatテストを成功させてください。'};});
  const remembered=new Map();
  function 中止(message='',preserveChat=false){
   const invalidate=!preserveChat&&チャット成功.value.length>0;
@@ -31,7 +32,8 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
   入力.model=モデル.value.some(m=>m.id===prior?.model)?prior.model:選択肢.value?.現在モデル||モデル.value[0]?.id||'';
   入力.voice=音声候補.value.some(v=>v.id===prior?.voice)?prior.voice:選択肢.value?.現在音声||音声候補.value[0]?.id||'';
  }
- function 変更(key,value){remember();中止();入力[key]=value;if(key==='provider')連動();remember();}
+ // 予測の2ターンはChatでOKになったモデルで送るため、CHAT以外の入力変更ではChat成功と他の結果を残す。
+ function 変更(key,value){remember();const chat=区分.value==='CHAT';中止('',!chat);if(!chat){const {[区分.value]:_,...rest}=結果一覧.value;結果一覧.value=rest;}入力[key]=value;if(key==='provider')連動();remember();}
  function 表示を離れる(){if(実行中.value||読込中.value)中止();}
  function 区分変更(value){remember();表示を離れる();区分.value=value;入力=forms[value];if(!入力.provider){入力.provider=プロバイダ.value[0]?.id||'';連動();}}
  async function 読込(){
@@ -75,7 +77,12 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
    await nextTick();if(current!==世代||disposed||!接続可能())return;
    const body=entry.body||{family:entry.family};
    const rowId=entry.family==='CODE'?'CODE1':entry.family;
-   const result=await api(`api/モデル試行/${runId}/${rowId}`,'POST',signal);
+   // 予測は1回の要求で2ターン＋予測まで進むため、実行中の経過を1秒ごとに取得して表示する。
+   let timer;
+   if(entry.family==='PREDICTION'){const id=runId;経過.value=[];timer=setInterval(()=>{api(`api/モデル試行/${id}/経過`,'GET',signal).then(p=>{if(current===世代&&実行中.value)経過.value=p.経過||[];}).catch(()=>{});},1000);}
+   let result;
+   try{result=await api(`api/モデル試行/${runId}/${rowId}`,'POST',signal);}finally{clearInterval(timer);}
+   if(entry.family==='PREDICTION')経過.value=result.経過||経過.value;
    if(current!==世代||disposed||!接続可能())return;
    チャット成功.value=result.チャット成功||[];
    結果一覧.value={...結果一覧.value,[entry.family]:{...result,指定プロバイダ:body.provider,指定モデル:body.model}};通知.value=result.状態==='OK'?'完了':result.説明||'試行に失敗しました。';
@@ -87,5 +94,5 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
   }catch(error){if(current===世代){チャット成功.value=[];結果一覧.value={...結果一覧.value,[区分.value]:{状態:'NG',説明:error.message}};通知.value=error.message;}}
   finally{if(current===世代){if(runId){const id=runId;runId='';cancelled=api(`api/モデル試行/${id}`,'DELETE').catch(()=>{});}実行中.value=false;controller=null;}}
  }
- return {一覧,区分,予測条件,チャット成功,get 入力(){return forms[区分.value];},プロバイダ,モデル,音声候補,結果,結果一覧,実行中,読込中,通知,音声状態:音声.音声状態,変更,区分変更,読込,開始,中止,表示を離れる,音声読込:音声.読込,音声再生失敗:音声.再生失敗,終了(){中止();disposed=true;}};
+ return {一覧,区分,予測条件,チャット成功,経過,get 入力(){return forms[区分.value];},プロバイダ,モデル,音声候補,結果,結果一覧,実行中,読込中,通知,音声状態:音声.音声状態,変更,区分変更,読込,開始,中止,表示を離れる,音声読込:音声.読込,音声再生失敗:音声.再生失敗,終了(){中止();disposed=true;}};
 }

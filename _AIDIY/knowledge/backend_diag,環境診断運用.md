@@ -133,7 +133,7 @@ aidiy_diagは認証付きGET一覧に候補配列のIDそのものがある方�
 
 設定モデル・AIモデルともLive直後にPredictionを置きます。同一provider・実行modelのChat成功をサーバー側で確認し、auto解決後に一致したときだけ `/internal/prediction_llms` へ進みます。OAuth／APIキー、FreeAI／Geminiを混同しません。設定・モデル候補・OAuth認証の変更、再取得・再読込・手動入力変更、Chat再試行で過去の成功を破棄します。
 
-Chatの `aidiy_chat_llms/chat_llms_run`、Code系の `aidiy_code_agents/code_agents_run`、Predictionに同じCODE_BASE_PATHの絶対 `project_path` を渡します。相対パスはbackend_server基準、未設定は実行不可です。通常のMCP側で実際の入力と成功応答をA会話履歴へ保存し、Diagは `history_saved: true` まで確認して成功とします。Chat成功後の1往復は、Predictionが同一プロジェクトの直近2時間・最新最大5ターンを読む通常経路で参照できます。保存失敗・未確認ではPredictionを解禁せず、診断用交換・合成履歴・専用APIで代替しません。
+Chatの `aidiy_chat_llms/chat_llms_run`、Code系の `aidiy_code_agents/code_agents_run`、Predictionに同じCODE_BASE_PATHの絶対 `project_path` を渡します。相対パスはbackend_server基準、未設定は実行不可です。通常のMCP側で実際の入力と成功応答をA会話履歴へ保存し、Diagは `history_saved: true` まで確認して成功とします。Chat成功後の1往復は、Predictionが同一プロジェクトの直近2時間・最新最大10ターンを読む通常経路で参照できます。Predictionの試行は、Chat試行でOKになったモデル（予測モデルと同じでなくてよい）で「昔々、あるところに」「おじいさんと」の2ターンをChatとして送り、両方の履歴保存を確認してから予測する。非空の応答はOK、「おばあさん」を含めば `予測評価: 完璧`。1行の期限は通常の2倍。保存失敗・未確認ではPredictionを解禁せず、診断用交換・合成履歴・専用APIで代替しません。
 
 正常な非空応答は `!`／`！` で始まる説明も合格とし、NG・空応答・通信失敗・タイムアウトは合格にしません。予測結果を履歴に保存せず、ブラウザから履歴本文や成功判定を受け付けません。詳しい確認条件・経路・mock検証方針は [READMEのPrediction手動試行](../../backend_diag/README.md#predictionの手動試行) を参照します。
 
@@ -141,7 +141,7 @@ Chatの `aidiy_chat_llms/chat_llms_run`、Code系の `aidiy_code_agents/code_age
 
 設定モデル動作確認のPREDICTION直後に `DECISION / 挨拶の丁寧さ` を表示する。個別「テスト」と全体「動作確認」の両方で、既存MCP `/aidiy_decisions_check/mcp` の `decisions_check` を呼ぶ。HTTP `/check` への代替直結は行わない。Tools接続中の明示操作に限定し、headless・起動・全診断では実行しない。
 
-`DECISION_AI_NAME` と方式別 `DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL` が不足時はauto。方式が明示されている試行行は対応する方式別値を使い、キー未存在時だけ旧 `DECISION_AI_MODEL` を参照する。方式autoの行はモデルもautoで送り、Toolsで方式とモデルを解決する。autoの方式順はOAuth → FreeAI → Decisions API → Gemini。結果には実効モデルを表示し、設定ファイルへは書き戻さない。
+`DECISION_AI_NAME` と方式別 `DECISION_OPENAI_MODEL` / `DECISION_OAUTH_MODEL` / `DECISION_GEMINI_MODEL` / `DECISION_FREEAI_MODEL` が不足時はauto。方式が明示されている試行行は対応する方式別値を使う。方式autoの行はモデルもautoで送り、Toolsで方式とモデルを解決する。autoの方式順はOAuth → FreeAI → Decisions API → Gemini。結果には実効モデルを表示し、設定ファイルへは書き戻さない。
 
 入力は「おはよう」、質問は挨拶としての丁寧さ、choice名は `politeness`、選択肢は `high / medium / low`。3値すべてを正常な選択として受け付け、特定値を正解とはしない。MCPのJSON内のstatus、回答名・型・選択値、3候補の確率分布・合計、confidenceを検証する。不正JSON・欠落・未知選択肢・通信エラーはNG。結果詳細に選択値と検証済みJSON、実際の実行モデルを表示する。
 
@@ -195,7 +195,7 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 
 ## 個別確認と導入管理
 
-モデル一覧の `↺ 一覧再取得` 後の「書込」は、従来の合成JSONに加えて `_AIDIY/aidiy_diag/prediction_models_info.json` も生成する。headless / 全テストも同じ生成処理を使う。Predictionは `decisions_models_info.json` と生成関数を共用し、同じ低コスト候補・現在の認証条件を適用した後、`openai_decisions` 区分を `openai_chat` へ置き換える。予測JSONの方式は `openai_oauth` / `freeai_chat` / `openai_chat` / `gemini_chat` で、`openai_decisions` は含めない。認証済み一覧にない方式は出力せず、全て空なら `{}`。候補を書き出すだけで `PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` の設定値を変更せず、予測も実行しない。内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）は方式がautoの場合、候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` から選び、`openai_chat` は明示指定時だけ使う。判断側の挙動は変更しない。内容・候補管理は [READMEの予測用モデル一覧](../../backend_diag/README.md#予測用モデル一覧) を参照する。
+モデル一覧の `↺ 一覧再取得` 後の「書込」は、従来の合成JSONに加えて `_AIDIY/aidiy_diag/prediction_models_info.json` も生成する。headless / 全テストも同じ生成処理を使う。Predictionは `decisions_models_info.json` と生成関数を共用し、同じ低コスト候補・現在の認証条件を適用した後、`openai_decisions` 区分を `openai_chat` へ置き換える。予測JSONの方式は `openai_oauth` / `freeai_chat` / `openai_chat` / `gemini_chat` と、合成済み `code_models_info.json` から `auto` / `same` を除いて載せる `codex_cli` / `copilot_cli` / `aidiy_hermes` で、`openai_decisions` は含めない。CLI方式の試行も、Chat試行でOKになったモデルで2ターンを送ってから予測する。認証済み一覧にない方式は出力せず、全て空なら `{}`。候補を書き出すだけで `PREDICTION_AI_NAME` と方式別 `PREDICTION_*_MODEL` の設定値を変更せず、予測も実行しない。内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）は方式がautoの場合、候補がある `codex_cli` → `copilot_cli` → `aidiy_hermes` → `openai_oauth` → `freeai_chat` → `openai_chat` → `gemini_chat` から選ぶ。判断側の挙動は変更しない。内容・候補管理は [READMEの予測用モデル一覧](../../backend_diag/README.md#予測用モデル一覧) を参照する。
 
 - 各行の「確認」は認証付き `POST api/診断/<登録済みID>` を使用し、その項目だけ既存 probe で再確認する。全項目確認と書込は同じ実行排他を使う。今回確認していない前回保存済み結果は表示だけに使い、書込対象へ混ぜない。
 - 導入管理は `GET api/導入管理` で能力と実行状態を取得し、`POST api/導入管理/<登録済みID>/<導入・再導入・削除>` で開始、`DELETE api/導入管理/<実行ID>` で中止する。入力本文・クエリ・任意コマンドは不可。操作後は個別確認と共通の probe と結果反映を各対象に1回呼ぶ。FFmpeg は3行を確認し、`結果一覧` と対象行の `結果` を返す。

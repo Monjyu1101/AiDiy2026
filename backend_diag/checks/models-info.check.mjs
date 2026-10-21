@@ -26,7 +26,7 @@ test('no provider inserts xx/auto and partial merges discard old inserted record
   await writeFile(path.join(directory,'claude_models_info.json'),JSON.stringify({code:{aidiy_hermes:{models:{'claude_cli/same':'old','copilot_cli/same':'old','antigravity_cli/auto':'old','grok_cli/auto':'old'}}}}));
   await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{}});
   const code=JSON.parse(await readFile(path.join(directory,'code_models_info.json'),'utf8'));
-  assert.deepEqual(code.aidiy_hermes.models,{'openai_oauth/m1':'2026/10/01 - m1'});
+  assert.deepEqual(code.aidiy_hermes.models,{'openai_oauth/m1':'2026/10/01 - openai_oauth/m1'});
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
@@ -49,7 +49,7 @@ test('merged code includes only installed CLIs and Hermes starts with installed 
   }
   await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{}});
   code=await load();
-  assert.deepEqual(code,{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - m1'}}});
+  assert.deepEqual(code,{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - openai_oauth/m1'}}});
   const installed=await installedCodeClis({loadEntries:async()=>[{id:'claude'},{id:'agy'}],resolve:async entry=>'/fixture/'+entry.id});
   assert.deepEqual(installed,{...Object.fromEntries(Object.keys(allClis).map(key=>[key,false])),claude_cli:true,antigravity_cli:true});
  }finally{await rm(directory,{recursive:true,force:true});}
@@ -116,7 +116,7 @@ test('NG keeps the reason and Grok fixed candidates; only tested providers are w
  try{
   const providers=[{id:'grok',名前:'Grok'},{id:'gemini',名前:'Gemini'},{id:'discord',名前:'Discord'},{id:'openrt',名前:'OpenRouter'}];
   const saved=await writeModelsInfo(providers,{grok:{...ok(),状態:'NG',説明:'expired',警告:['fallback']},gemini:ok(),discord:ok(),openrt:{状態:'未実施'}},{directory,read,now});
-  assert.deepEqual(saved,['grok_models_info.json','gemini_models_info.json','chat_models_info.json','live_models_info.json','code_models_info.json','decisions_models_info.json','live_voices_info.json']);assert.deepEqual((await readdir(directory)).sort(),['chat_models_info.json','code_models_info.json','decisions_models_info.json','gemini_models_info.json','grok_models_info.json','live_models_info.json','live_voices_info.json']);
+  assert.deepEqual(saved,['grok_models_info.json','gemini_models_info.json','chat_models_info.json','live_models_info.json','code_models_info.json','prediction_models_info.json','decisions_models_info.json','live_voices_info.json']);assert.deepEqual((await readdir(directory)).sort(),['chat_models_info.json','code_models_info.json','decisions_models_info.json','gemini_models_info.json','grok_models_info.json','live_models_info.json','live_voices_info.json','prediction_models_info.json']);
   const grok=JSON.parse(await readFile(path.join(directory,modelsInfoFile('grok')),'utf8'));
   assert.equal(grok.状態,'NG');assert.equal(grok.説明,'expired');assert.match(grok.chat.取得元,/固定候補/);assert.deepEqual(grok.警告,['fallback']);
   assert.deepEqual(Object.keys(grok.code.grok_cli.models),['grok-4.7','grok-4.6']);
@@ -206,7 +206,7 @@ test('all selectable chat, live and code entries expose models; Claude API metad
 test('Codex excludes realtime; Hermes keeps acquired OAuth models with a provider prefix',async()=>{
  const info=await modelsInfo({id:'openai_oauth',名前:'OpenAI OAuth'},ok({モデル詳細:[{model_id:'gpt-new',作成日:'2026/10/15'},{model_id:'gpt-other'}]}),{read,now});
  assert.deepEqual(info.code.codex_cli.models,{'gpt-new':'2026/10/15 - gpt-new','gpt-other':'yyyy/mm/dd - gpt-other'});
- assert.deepEqual(info.code.aidiy_hermes.models,{'openai_oauth/gpt-new':'2026/10/15 - gpt-new','openai_oauth/gpt-other':'yyyy/mm/dd - gpt-other'});
+ assert.deepEqual(info.code.aidiy_hermes.models,{'openai_oauth/gpt-new':'2026/10/15 - openai_oauth/gpt-new','openai_oauth/gpt-other':'yyyy/mm/dd - openai_oauth/gpt-other'});
  const realtime=await modelsInfo({id:'openai_oauth',名前:'OpenAI OAuth'},ok({モデル詳細:[{model_id:'gpt-code'},{model_id:'gpt-realtime-2'}]}),{now});
  assert.deepEqual(realtime.code.codex_cli.models,{'gpt-code':'yyyy/mm/dd - gpt-code'});
  assert.ok(Object.hasOwn(realtime.code.aidiy_hermes.models,'openai_oauth/gpt-realtime-2'));
@@ -298,7 +298,7 @@ test('empty Live without configuration stays empty and Code keeps its fixed prov
   assert.deepEqual(await load('live'),emptyDefaults.live);assert.deepEqual(await load('code'),emptyDefaults.code);
   await writeModelsInfo([{id:'gemini',名前:'Gemini'},{id:'openai_oauth',名前:'OAuth'}],{gemini:ok({ライブ候補:['real-live']}),openai_oauth:ok()},options);
   assert.deepEqual(await load('live'),{gemini_live:{models:{'real-live':'yyyy/mm/dd - real-live'}}});
-  assert.deepEqual(await load('code'),{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - m1'}}});
+  assert.deepEqual(await load('code'),{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - openai_oauth/m1'}}});
   await writeModelsInfo([{id:'gemini',名前:'Gemini'},{id:'openai_oauth',名前:'OAuth'}],{gemini:{状態:'NG'},openai_oauth:{状態:'NG'}},{...options,installedClis:{copilot_cli:true}});
   assert.deepEqual(await load('live'),emptyDefaults.live);
   assert.deepEqual(Object.keys(await load('code')),['copilot_cli','aidiy_hermes']);

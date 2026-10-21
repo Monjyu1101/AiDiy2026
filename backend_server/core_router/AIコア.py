@@ -569,17 +569,13 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
         from AIコア.AI判断 import Decision
         共通設定 = getattr(getattr(http_request.app, "conf", None), "json", None)
         予測設定 = 共通設定 if 共通設定 is not None else 現在設定
-        for key in ("PREDICTION_AI_NAME", "PREDICTION_AI_MODEL"):
+        for key in ("PREDICTION_AI_NAME", "PREDICTION_OPENAI_MODEL", "PREDICTION_OAUTH_MODEL", "PREDICTION_GEMINI_MODEL", "PREDICTION_FREEAI_MODEL",
+                    "PREDICTION_CODEX_CLI_MODEL", "PREDICTION_COPILOT_CLI_MODEL", "PREDICTION_AIDIY_HERMES_MODEL"):
             現在設定[key] = 予測設定.get(key, "auto") or "auto"
         判断設定 = 共通設定 if 共通設定 is not None else 現在設定
         現在設定["DECISION_AI_NAME"] = 判断設定.get("DECISION_AI_NAME", "auto") or "auto"
         for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL"):
-            現在設定[key] = 判断設定.get(key, 判断設定.get("DECISION_AI_MODEL", "auto")) or "auto"
-        # 旧キーは既存ファイルにある場合だけ返し、新規設定には追加しない。
-        if 判断設定.get("DECISION_AI_MODEL") is not None:
-            現在設定["DECISION_AI_MODEL"] = 判断設定.get("DECISION_AI_MODEL")
-        else:
-            現在設定.pop("DECISION_AI_MODEL", None)
+            現在設定[key] = 判断設定.get(key, "auto") or "auto"
         利用可能モデル["decision_models"] = Decision.model_options(利用可能モデル.get("decision_models"))
 
         return {
@@ -701,17 +697,6 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
                 "message": f"セッションID {セッションID} が見つかりません"
             }
 
-        if "CODE_HERMES_CLI_MODEL" in 設定 and "CODE_AIDIY_HERMES_MODEL" not in 設定:
-            設定["CODE_AIDIY_HERMES_MODEL"] = 設定["CODE_HERMES_CLI_MODEL"]
-        if "CHAT_OPENAI_OAUTH_MODEL" in 設定:
-            if "CHAT_OPENAI_MODEL" not in 設定:
-                設定["CHAT_OPENAI_MODEL"] = 設定["CHAT_OPENAI_OAUTH_MODEL"]
-            del 設定["CHAT_OPENAI_OAUTH_MODEL"]
-        for idx in range(1, 7):
-            ai_key = f"CODE_AI{idx}_NAME"
-            if 設定.get(ai_key) == "hermes_cli":
-                設定[ai_key] = "aidiy_hermes"
-
         # 設定可能なキーのホワイトリスト（セキュリティのため）
         許可キー = {
             # ChatAI設定
@@ -721,9 +706,11 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
             "LIVE_FREEAI_MODEL", "LIVE_FREEAI_VOICE",
             "LIVE_OPENAI_MODEL", "LIVE_OPENAI_VOICE",
             # PredictionAI設定
-            "PREDICTION_AI_NAME", "PREDICTION_AI_MODEL",
+            "PREDICTION_AI_NAME",
+            "PREDICTION_OPENAI_MODEL", "PREDICTION_OAUTH_MODEL", "PREDICTION_GEMINI_MODEL", "PREDICTION_FREEAI_MODEL",
+            "PREDICTION_CODEX_CLI_MODEL", "PREDICTION_COPILOT_CLI_MODEL", "PREDICTION_AIDIY_HERMES_MODEL",
             # DecisionAI設定
-            "DECISION_AI_NAME", "DECISION_AI_MODEL",
+            "DECISION_AI_NAME",
             "DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL",
             # CodeAI設定
             "CODE_AI1_NAME", "CODE_AI2_NAME", "CODE_AI3_NAME", "CODE_AI4_NAME", "CODE_AI5_NAME", "CODE_AI6_NAME",

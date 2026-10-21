@@ -59,33 +59,32 @@ config.SOME_KEY = "value" # __setattr__ → 即座に _save()
 |---------|------|
 | `__getattr__` | `_config_data[SOME_KEY]` を返す。Ollama の `:cloud` 値もそのまま維持 |
 | `__setattr__` | `set()` 経由で検証し、保存成功後にメモリへ反映（即時保存） |
-| `_migrate_port_keys()` | 旧ポートキーを現行の `PORT_*` へ移行し、Task / Team を `PORT_TASKTEAM` に統合 |
 | `_apply_default_keys()` | 不足キーをデフォルト値で補完。キー順序も `DEFAULT_CONFIG` に合わせる |
 | `_save()` | 同じフォルダの一時ファイルへ書き、`os.replace()` で原子的に置換 |
 | `get(key, default)` | dict 形式フォールバック |
 | `update(dict)` | 複数キーを一括検証し、保存成功後にまとめて反映 |
 
-既存の旧ポートキーは読み込み時に自動移行する。`TASK_BASE` と `TEAM_BASE` が異なる場合は `TASK_BASE` を優先する。現行キーと旧キーが同時にある場合は現行キーを優先する。ポート値は `1`～`65535` の文字列へ正規化し、不正な JSON や不正なポート値は元ファイルを上書きせず初期化を失敗させる。
+旧キーの自動移行・読み替えは行わない（旧キーは未知キーとして末尾に残る）。ポート値は `1`～`65535` の文字列へ正規化し、不正な JSON や不正なポート値は元ファイルを上書きせず初期化を失敗させる。
 
 ### DEFAULT_CONFIG のキー構成
 
 | カテゴリ | 主なキー |
 |---------|---------|
 | サービス / WebUI | `PORT_WEB`, `PORT_CORE`, `PORT_AVATAR`, `PORT_TASKTEAM`, `PORT_TOOLS`, `PORT_LOCAL`, `PORT_APPS`, `WEBUI_FIRST_PAGE` |
-| Discord | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_USER_ID`, `DISCORD_TEXT_CHANNEL_ID`, `DISCORD_VOICE_CHANNEL_ID` の接続情報5項目。ID は単一文字列。旧 `*_IDS` の1件配列は自動移行。Live / Code は共通設定を使用（詳細は `frontend_channels/README.md`） |
+| Discord | `discord_bot_token`, `discord_guild_id`, `discord_allowed_user_id`, `discord_text_channel_id`, `discord_voice_channel_id` の接続情報5項目。ID は単一文字列。初期値は `< your discord bot token >` などの `<` で始まる仮設定（未設定扱い）。Live / Code は共通設定を使用（詳細は `frontend_channels/README.md`） |
 | API Key | `gemini_key_id`, `freeai_key_id`, `claude_key_id`, `openai_key_id`, `copilot_key_id`, `openrt_key_id`, `ollama_key_id` |
 | OpenAI/Azure | `openai_api_type`, `openai_organization`, `azure_endpoint`, `azure_version`, `azure_key_id` |
 | Ollama | `ollama_host` |
 | ChatAI | `CHAT_AI_NAME`, `CHAT_GEMINI_MODEL`, `CHAT_FREEAI_MODEL`, `CHAT_OPENRT_MODEL`, `CHAT_OPENAI_MODEL`, `CHAT_OLLAMA_MODEL`, `CHAT_LOCAL_MODEL` |
 | LiveAI | `LIVE_AI_NAME`, `LIVE_GEMINI_MODEL/VOICE`, `LIVE_FREEAI_MODEL/VOICE`, `LIVE_OPENAI_MODEL/VOICE` |
-| PredictionAI | LIVE設定ブロックの後、DecisionAIの直前に `PREDICTION_AI_NAME`, `PREDICTION_AI_MODEL`（初期値はともに `auto`）。内部RESTの `aidiy_prediction_llms` が次のユーザー入力予測に使用する。Web / AvatarのAI設定再起動画面でもLIVEとDECISIONの間に表示する |
-| DecisionAI | `DECISION_AI_NAME`, `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`, `DECISION_GEMINI_MODEL`, `DECISION_FREEAI_MODEL`（初期値はすべて `auto`）。旧 `DECISION_AI_MODEL` は保持する（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
+| PredictionAI | LIVE設定ブロックの後、DecisionAIの直前に `PREDICTION_AI_NAME`, `PREDICTION_OPENAI_MODEL`, `PREDICTION_OAUTH_MODEL`, `PREDICTION_GEMINI_MODEL`, `PREDICTION_FREEAI_MODEL`, `PREDICTION_CODEX_CLI_MODEL`, `PREDICTION_COPILOT_CLI_MODEL`, `PREDICTION_AIDIY_HERMES_MODEL`（初期値は方式とChat系4モデルが `auto`、`PREDICTION_CODEX_CLI_MODEL` / `PREDICTION_COPILOT_CLI_MODEL` が `gpt-6-luna`、`PREDICTION_AIDIY_HERMES_MODEL` が `openai_oauth/gpt-6-luna`）。内部RESTの `aidiy_prediction_llms` が次のユーザー入力予測に使用する。Web / AvatarのAI設定再起動画面でもLIVEとDECISIONの間に表示する |
+| DecisionAI | `DECISION_AI_NAME`, `DECISION_OPENAI_MODEL`, `DECISION_OAUTH_MODEL`, `DECISION_GEMINI_MODEL`, `DECISION_FREEAI_MODEL`（初期値はすべて `auto`）（[AI判断](./backend_server,backend_tools,AI判断追加手順.md)） |
 | CodeAI | `CODE_BASE_PATH`, `CODE_AI1~6_NAME/MODEL`, `CODE_CLAUDE_SDK_MODEL`, `CODE_MAX_TURNS`, `CODE_PLAN`, `CODE_VERIFY` |
 | TaskAI / TeamAI | `TASK_AI_NAME`, `TEAM_AI_NAME`, `TASK_AI_MODEL_plan/do/check`, `TEAM_AI_MODEL_plan/do/check`（各フェーズを別キーで保持） |
 
-`PREDICTION_AI_NAME` / `PREDICTION_AI_MODEL` がない既存JSONは通常の不足キー補完で `auto` を追加して保存する。設定済みの値は上書きせず、保存時は上記の順序へ並べる。
+予測キーがない既存JSONは通常の不足キー補完で `auto` を追加して保存する。設定済みの値は上書きせず、保存時は上記の順序へ並べる。
 
-予測実行は内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`）へ `project_path` を渡す。Live試行と同じ直接loopback・固定ヘッダーの制限があり、MCPには公開しない。明示引数を優先し、`auto` の引数は予測専用の設定値を使う。方式設定も `auto` なら、Diagの `prediction_models_info.json` に候補がある `openai_oauth` → `freeai_chat` → `gemini_chat` の順で選ぶ。`openai_chat` は明示指定時のみ使用する。モデルも `auto` なら選んだ方式の先頭候補を使い、候補外モデルには切り替えない。通常Chat・Decisionの設定や選択順とは独立する。Web / AvatarのAI設定再起動画面は `available_models.prediction_models` の候補を表示し、方式変更時はモデルを `auto` に戻す。保存済みの一覧外モデルは未確認の保持値として残す。履歴の範囲・非保存仕様は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
+予測実行は内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`）へ `project_path` を渡す。Live試行と同じ直接loopback・固定ヘッダーの制限があり、MCPには公開しない。明示引数を優先し、`auto` の引数は予測専用の設定値を使う。方式設定も `auto` なら、Diagの `prediction_models_info.json` に候補がある `codex_cli` → `copilot_cli` → `aidiy_hermes` → `openai_oauth` → `freeai_chat` → `openai_chat` → `gemini_chat` の順で選ぶ。モデルも `auto` なら選んだ方式の先頭候補を使い、候補外モデルには切り替えない。通常Chat・Decisionの設定や選択順とは独立する。Web / AvatarのAI設定再起動画面は `available_models.prediction_models` の候補を表示し、方式変更時はモデルを `auto` に戻す。保存済みの一覧外モデルは未確認の保持値として残す。履歴の範囲・非保存仕様は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
 
 ### `:cloud` サフィックスの扱い
 

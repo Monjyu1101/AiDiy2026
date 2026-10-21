@@ -298,6 +298,7 @@ Args:
         resume: bool = True,
         timeout_sec: int = 1800,
         self_check_loop: int = 0,
+        実行オプション: Optional[Any] = None,
     ) -> dict:
         """
         AIコード.py の CodeAgent を使ってコードエージェントを実行する。
@@ -319,6 +320,7 @@ Args:
             self_check_loop: バックアップ＋自己検証ループの最大回数。
                               default: 0 = 実行のみ（バックアップ・自己検証なし）。
                               1以上でその回数までAIコード.pyと同じバックアップ＋AI検証修正を実行する。
+            実行オプション: AIコア.AI実行オプション の AI実行オプション。省略時は既定値（すべて有効）。
 
         Returns:
             {"status": "OK"/"NG", "result": "...", "project_path": "...", ...}
@@ -356,6 +358,7 @@ Args:
                 "CODE_PERMISSIONS": code_permissions,
             }),
             保存関数=None,
+            実行オプション=実行オプション,
         )
         # HTTP / MCP 呼び出し側が指定した persona などのシステム指示を、
         # CodeAgent が生成する CodeAI インスタンスへ確実に引き継ぐ。

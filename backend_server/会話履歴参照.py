@@ -19,7 +19,7 @@ import sqlite3
 from 会話履歴パス import normalize_project_path
 
 
-HISTORY_MAX_TURNS = 5
+HISTORY_MAX_TURNS = 10
 HISTORY_WINDOW_SECONDS = 2 * 60 * 60
 _ROLES = {
     "input_text": "user",
@@ -48,7 +48,7 @@ def read_prediction_history(
     *,
     now: datetime | None = None,
 ) -> list[dict[str, str | int]]:
-    """直近2時間の同一プロジェクトから最新最大5ターンを古い順に返す。
+    """直近2時間の同一プロジェクトから最新最大10ターンを古い順に返す。
 
     1ターンは同一セッション・チャンネルのユーザー入力と、次の入力までの
     返答群。未返信入力も1ターン。期間外入力への返答だけを拾うことはしない。
@@ -75,7 +75,7 @@ def read_prediction_history(
         if type(value) is not int or value <= 0:
             raise ValueError(f"{name} は正の整数で指定してください")
     if max_turns > HISTORY_MAX_TURNS:
-        raise ValueError("max_turns は5以下で指定してください")
+        raise ValueError(f"max_turns は{HISTORY_MAX_TURNS}以下で指定してください")
     end = _local_second(now)
     start = end - timedelta(seconds=HISTORY_WINDOW_SECONDS)
     bounds = (start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))

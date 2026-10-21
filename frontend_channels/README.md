@@ -53,7 +53,7 @@ node checks/network-diagnostic.mjs
 
 1. [Discord Developer Portal](https://discord.com/developers/applications) で Application / Bot を作成します。
 2. Bot の **Message Content Intent** を有効にします。投稿本文の受信に必要です。
-3. Bot トークンを下記 `DISCORD_BOT_TOKEN` に保存します。通常ユーザーのトークンは使いません。
+3. Bot トークンを下記 `discord_bot_token` に保存します。通常ユーザーのトークンは使いません。
 4. OAuth2 の `bot` スコープでサーバーへ招待します。テキスト側に「チャンネルを見る」「メッセージを送信」「メッセージ履歴を読む」「ファイルを添付」、ボイス側に「チャンネルを見る」「接続」「発言」の権限を付けます。スレッドで利用するときは「スレッドでメッセージを送信」も必要です。
 5. Discord の開発者モードで、サーバー ID、利用者 ID、テキスト・ボイスチャンネル ID をコピーします。スレッドの場合はスレッド自身の ID を許可します。
 
@@ -61,27 +61,27 @@ node checks/network-diagnostic.mjs
 
 ## 接続情報
 
-既存の **`_config/AiDiy_key.json`** に設定します。新しい別名のキー管理ファイルは作りません。セットアップと Core 起動時に不足する `DISCORD_*` の初期値が補完されます。既存の AI キーや他の設定はそのまま残し、以下の項目を編集してください。
+既存の **`_config/AiDiy_key.json`** に設定します。新しい別名のキー管理ファイルは作りません。セットアップと Core 起動時に不足する `discord_*` の初期値が `< your discord bot token >` のような `<` で始まる仮設定で補完されます（未設定扱い）。既存の AI キーや他の設定はそのまま残し、以下の項目を編集してください。
 
 ```json
 {
-  "DISCORD_BOT_TOKEN": "Bot のトークン",
-  "DISCORD_GUILD_ID": "111111111111111111",
-  "DISCORD_ALLOWED_USER_ID": "222222222222222222",
-  "DISCORD_TEXT_CHANNEL_ID": "333333333333333333",
-  "DISCORD_VOICE_CHANNEL_ID": "444444444444444444"
+  "discord_bot_token": "Bot のトークン",
+  "discord_guild_id": "111111111111111111",
+  "discord_allowed_user_id": "222222222222222222",
+  "discord_text_channel_id": "333333333333333333",
+  "discord_voice_channel_id": "444444444444444444"
 }
 ```
 
 | 設定 | 意味 |
 |------|------|
-| `DISCORD_BOT_TOKEN` | Bot トークン。空欄・1文字（`<` など）・`<` で始まる仮設定ではパネルを起動しません |
-| `DISCORD_GUILD_ID` | 利用する1つのサーバー ID |
-| `DISCORD_ALLOWED_USER_ID` | 操作・音声入力を許可する利用者1人の ID |
-| `DISCORD_TEXT_CHANNEL_ID` | 普通の投稿に返信する専用テキストチャンネルの ID。音声会話の字幕・接続通知も送ります |
-| `DISCORD_VOICE_CHANNEL_ID` | 入室に合わせて自動接続する専用ボイスチャンネルの ID |
+| `discord_bot_token` | Bot トークン。空欄・1文字（`<` など）・`<` で始まる仮設定ではパネルを起動しません |
+| `discord_guild_id` | 利用する1つのサーバー ID |
+| `discord_allowed_user_id` | 操作・音声入力を許可する利用者1人の ID |
+| `discord_text_channel_id` | 普通の投稿に返信する専用テキストチャンネルの ID。音声会話の字幕・接続通知も送ります |
+| `discord_voice_channel_id` | 入室に合わせて自動接続する専用ボイスチャンネルの ID |
 
-Discord 専用設定はこの5項目だけです。すべて必須で、ID は配列や数値ではなく1つの文字列で指定します。それ以外は同じファイルの共通設定を使います。旧 `*_IDS` の1件配列はセットアップまたは backend 起動時に `*_ID` へ自動移行します。複数件が残る場合は、使う ID を新しいキーへ指定してください。
+Discord 専用設定はこの5項目だけです。すべて必須で、ID は配列や数値ではなく1つの文字列で指定します。それ以外は同じファイルの共通設定を使います。
 
 | 共通設定 | Discord での用途 |
 |----------|------------------|

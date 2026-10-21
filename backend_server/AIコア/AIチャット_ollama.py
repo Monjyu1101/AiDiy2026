@@ -10,6 +10,7 @@
 # -------------------------------------------------------------------------
 
 from AIコア.AI応答 import 応答正規化, エラー応答
+from AIコア.AI実行オプション import 既定実行オプション, 会話継続適用
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -58,8 +59,11 @@ class ChatAI:
 
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "ollama", AI_MODEL: str = "mistral-large-3:675b:cloud",
-                 api_key: str = None, system_instruction: str = None):
+                 api_key: str = None, system_instruction: str = None, 実行オプション=None):
         """初期化"""
+
+        # 実行オプション（会話継続・履歴保存・ストリーム送信・出力ファイル保存）
+        self.実行オプション = 実行オプション or 既定実行オプション
 
         # セッションID・チャンネル
         self.セッションID = セッションID
@@ -163,6 +167,8 @@ class ChatAI:
         completions_tools: OpenAI completions の追加パラメータ（例: {"tools": [...], "tool_choice": "auto"}）。
                            空 or None のときは何も付与せず、従来挙動と完全に同一。
         """
+        # 会話継続が無効なら、前回の実行で残った履歴を引き継がない。
+        会話継続適用(self, completions_tools)
         try:
             if not self.is_alive:
                 logger.warning("ChatAI(Ollama)実行: ChatAIが開始されていません")

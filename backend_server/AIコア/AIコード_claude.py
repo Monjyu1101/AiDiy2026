@@ -10,6 +10,7 @@
 # -------------------------------------------------------------------------
 
 from AIコア.AI応答 import 応答正規化, エラー応答
+from AIコア.AI実行オプション import 既定実行オプション
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -58,8 +59,11 @@ class CodeAI:
     def __init__(self, 親=None, セッションID: str = "", チャンネル: int = 0, 絶対パス: str = None,
                  AI_NAME: str = "claude", AI_MODEL: str = "sonnet", max_turns: int = 999,
                  code_plan: str = "auto", code_verify: str = "auto", code_permissions: str = "auto",
-                 system_instruction: str = None):
+                 system_instruction: str = None, 実行オプション=None):
         """初期化"""
+
+        # 実行オプション（会話継続・履歴保存・ストリーム送信・出力ファイル保存）
+        self.実行オプション = 実行オプション or 既定実行オプション
 
         # セッションID・チャンネル
         self.セッションID = セッションID
@@ -324,6 +328,9 @@ class CodeAI:
             変更ファイル一覧: 変更されたファイルのリスト（検証用、オプション）
             再プラン要求: 修正内容の再プラン要求フラグ（オプション）
         """
+        # 会話継続が無効な実行オプションでは、呼び出し側の指定に関わらず新しいセッションにする。
+        if not self.実行オプション.会話継続:
+            resume = False
         try:
             self._停止マーカー送信済み = False
             aidiy_prompt = self._aidiy参照プロンプト取得(絶対パス)

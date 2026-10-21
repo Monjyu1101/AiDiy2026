@@ -17,7 +17,7 @@ test('unknown and unsupported IDs never read config or fetch',async()=>{
  assert.equal((await runModels('test','bad',{reader:forbidden,fetch:forbidden})).error,'unsupported');
 });
 test('external integrations: read-only auth GET with fixed headers, role checks, safe names, unset keys never fetch',async()=>{
- const keys={huggingface_key_read:'hf-read-secret',huggingface_key_write:'hf-write-secret',DISCORD_BOT_TOKEN:'discord-secret'};
+ const keys={huggingface_key_read:'hf-read-secret',huggingface_key_write:'hf-write-secret',discord_bot_token:'discord-secret'};
  const run=async(id,body,values=keys)=>{const calls=[];const response=await runModels('test',id,{reader:reader(values),fetch:async(provider,headers)=>{calls.push([provider,headers]);if(body instanceof Error)throw body;return body;}});return {...response.data,calls};};
  let r=await run('huggingface_read',{name:'alice',email:'a@example.invalid',auth:{accessToken:{role:'read',displayName:'token-name'}}});
  assert.equal(r.状態,'OK');assert.match(r.説明,/alice/);assert.match(r.説明,/read/);assert.deepEqual(r.calls.map(([provider,headers])=>[provider,headers.Authorization]),[['huggingface','Bearer hf-read-secret']]);
@@ -32,7 +32,7 @@ test('external integrations: read-only auth GET with fixed headers, role checks,
  r=await run('discord',{bot:true,username:'<b>discord-secret</b>'});assert.equal(r.状態,'OK');assert.doesNotMatch(r.説明,/secret|<b>/);
  r=await run('discord',new Error('auth'));assert.equal(r.状態,'NG');assert.match(r.説明,/認証/);
  for(const id of ['huggingface_read','huggingface_write','discord']){r=await run(id,{},{});assert.equal(r.状態,'未実施');assert.equal(r.説明,'キーが未設定です。');assert.deepEqual(r.calls,[]);}
- const status=await runModels('status',undefined,{reader:reader({DISCORD_BOT_TOKEN:'discord-secret'}),fetch:forbidden});
+ const status=await runModels('status',undefined,{reader:reader({discord_bot_token:'discord-secret'}),fetch:forbidden});
  const rows=Object.fromEntries(status.data.項目.map(row=>[row.id,row]));
  assert.equal(rows.discord.テスト可能,true);assert.equal(rows.huggingface_read.テスト可能,false);assert.equal(rows.huggingface_read.理由,'キーが未設定です。');
 });

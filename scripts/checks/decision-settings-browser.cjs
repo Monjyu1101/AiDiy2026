@@ -24,7 +24,7 @@ function page(project) {
   const css = descriptor.styles.map(style => compileStyle({source:style.content, filename, id:'data-v-settings-qa', scoped:true}).code).join('\n');
   const vue = fs.readFileSync(path.join(root, project, 'node_modules/vue/dist/vue.global.prod.js'), 'utf8');
   return `<!doctype html><html lang="ja"><meta charset="utf-8"><title>判断設定 QA</title><style>body{margin:0;font-family:Arial,sans-serif}${css}</style><div id="app"></div><script>${vue}</script><script>
-  window.saved={CHAT_AI_NAME:'keep-chat',DECISION_AI_NAME:'freeai_chat',DECISION_AI_MODEL:'retained'};
+  window.saved={CHAT_AI_NAME:'keep-chat',DECISION_AI_NAME:'freeai_chat',DECISION_GEMINI_MODEL:'retained'};
   window.calls=[];
   window.catalogs={decision_models:{auto:{auto:'auto',oauth:'OAuth',native:'API',gemini:'Gemini'},openai_oauth:{oauth:'2026/10/18 - oauth'},freeai_chat:{},openai_decisions:{native:'2026/10/18 - native'},gemini_chat:{gemini:'2026/10/18 - gemini'}}};
   const api={post:async(url,body)=>{window.calls.push({url,body});if(url.endsWith('/取得'))return {data:{status:'OK',data:{モデル設定:{...window.saved},available_models:window.catalogs}}};if(body.save)window.saved={...body.モデル設定};return {data:{status:'OK'}}}};

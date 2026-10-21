@@ -152,7 +152,7 @@ test('指定ユーザーでも別のボイスチャンネルでは接続しな�
     assert.equal(started, 0);
     await bot.メッセージ受信(f.message('!aidiy live', { member: { voice: { channel: other, channelId: other.id } } }));
     assert.equal(started, 0);
-    assert.match(f.sent.at(-1).content, /DISCORD_VOICE_CHANNEL_ID/);
+    assert.match(f.sent.at(-1).content, /discord_voice_channel_id/);
   } finally { await bot.終了(); }
 });
 

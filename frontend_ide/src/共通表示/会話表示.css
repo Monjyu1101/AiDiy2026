@@ -177,8 +177,15 @@
 .ai-component .composer-meta { grid-column: 1; grid-row: 2; display: flex; justify-content: space-between; align-items: center; gap: 6px; color: var(--muted); font-size: 9px; line-height: 1.3; }
 .ai-component .keyboard-hint { grid-column: 1; grid-row: 1; text-align: left; color: var(--muted); font-size: 9px; line-height: 1.3; }
 .ai-component .keyboard-hint span { padding: 0 3px; }
-.code-component .verification-options { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: auto 52px; align-content: center; align-items: center; gap: 1px 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
-.code-component .verification-options > label { justify-self: start; padding: 0 4px; line-height: calc(1.65em - 2px); background: #fff; color: #000; }
+/* Code は「予測」「検証」「送信」の順。Live は従来の2列のまま。 */
+.code-component .composer-actions { grid-template-columns: minmax(0, 1fr) auto auto 34px; }
+.code-component .send, .code-component .stop { grid-column: 4; }
+/* 予測は1行。検証と同じ2段の枠（22px＋説明11px）にして、検証のラベル・回数と同じ高さに並べる。 */
+.code-component .prediction-options { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: auto auto; grid-template-rows: 22px 11px; align-content: center; align-items: center; gap: 1px 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.code-component .prediction-options .auto-suggest { gap: 4px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 10px; }
+.code-component .verification-options { grid-column: 3; grid-row: 1 / span 2; display: grid; grid-template-columns: auto 52px; align-content: center; align-items: center; gap: 1px 6px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+/* 予測と検証の見出しは同じ label 要素・同じ指定にして、VS Code のフォントでも高さをそろえる。 */
+.code-component .verification-options > label, .code-component .prediction-options > .prediction-caption { justify-self: start; padding: 0 4px; line-height: calc(1.65em - 2px); background: #fff; color: #000; }
 .code-component .verification-options select { width: 52px; height: 22px; min-height: 22px; padding: 0 2px; font-size: 11px; }
 .code-component .verification-hint { grid-column: 1 / -1; text-align: left; color: var(--muted); font-size: 9px; line-height: 11px; }
 .live-component .message { width: fit-content; margin-bottom: 4px; padding: 4px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; border: 1px solid var(--border); text-shadow: 0 1px 4px #000, 0 0 8px #000; }

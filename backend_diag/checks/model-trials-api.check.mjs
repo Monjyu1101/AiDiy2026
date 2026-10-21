@@ -9,7 +9,7 @@ import {createAudioStore} from '../モデル試行/audio_store.mjs';
 import {createHandler} from '../diag_main.mjs';
 import {createModelTrials} from '../モデル試行/trials.mjs';
 
-test('authenticated HTTP trial contract: 15 ordered rows, deduplication, body rejection and cancellation',async()=>{
+test('authenticated HTTP trial contract: 16 ordered rows, deduplication, body rejection and cancellation',async()=>{
   const config={CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr',CODE_AI1_NAME:'claude_cli',CODE_AI1_MODEL:'auto',TASK_AI_NAME:'claude_cli',TEAM_AI_NAME:'claude_cli'};
   for(let i=2;i<=6;i++)config[`CODE_AI${i}_NAME`]='auto';
   for(const family of ['TASK','TEAM'])for(const phase of ['plan','do','check'])config[`${family}_AI_MODEL_${phase}`]='auto';
@@ -31,7 +31,7 @@ test('authenticated HTTP trial contract: 15 ordered rows, deduplication, body re
   const base=`http://127.0.0.1:${server.address().port}/test/api/モデル試行`;
   async function call(suffix='',method='GET',authenticated=true,body){const response=await fetch(base+suffix,{method,headers:authenticated?{authorization:'Bearer synthetic-token'}:{},...(body===undefined?{}:{body})});return {status:response.status,data:await response.json()};}
   try{
-    assert.equal((await call()).data.項目.length,15);
+    assert.equal((await call()).data.項目.length,16);
     for(const [suffix,method] of [['','GET'],['/開始','POST']])assert.equal((await call(suffix,method,false)).status,401);
     assert.equal((await call('/開始','POST',true,'{}')).status,400);assert.equal(calls,0);
     const start=await call('/開始','POST');assert.equal(start.status,200);const id=start.data.実行ID;

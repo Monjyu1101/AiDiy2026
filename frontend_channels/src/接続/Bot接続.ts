@@ -215,7 +215,7 @@ export class DiscordBot {
     await this.チャンネルライブ開始(channel, message.channelId, text => 回答送信(message, text));
   }
   private async チャンネルライブ開始(channel: VoiceChannel, textId: string, notify: (text: string) => Promise<void>) {
-    if (channel.id !== this.config.voiceChannelId) throw new Error('DISCORD_VOICE_CHANNEL_ID に設定したボイスチャンネルに参加してください。');
+    if (channel.id !== this.config.voiceChannelId) throw new Error('discord_voice_channel_id に設定したボイスチャンネルに参加してください。');
     if (channel.guild.id !== this.config.guildId || !this.参加者あり(channel)) throw new Error('設定したサーバー内で、利用者が参加中のボイスチャンネルに接続してください。');
     const me = channel.guild.members.me;
     if (!me || !channel.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) throw new Error('Bot にボイスチャンネルの表示・接続・発言権限が必要です。');

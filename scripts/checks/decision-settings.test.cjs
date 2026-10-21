@@ -92,16 +92,16 @@ for (const [project, relative] of [
       assert.equal(f.calls.at(-1).body.モデル設定.DECISION_OPENAI_MODEL,'openai_decisions-new');
     } finally {f.stop();}
   });
-  test(project + ': 旧共通値と別名を保持し既存方式別autoは上書きしない', async () => {
-    const f=fixture({DECISION_AI_NAME:'openai_jsonchat',DECISION_AI_MODEL:'legacy',DECISION_OPENAI_MODEL:'auto'}, {decision_models:{openai_oauth:{known:'known'}}});
+  test(project + ': 別名を保持し方式別キーがなければautoで表示する', async () => {
+    const f=fixture({DECISION_AI_NAME:'openai_jsonchat',DECISION_OPENAI_MODEL:'auto'}, {decision_models:{openai_oauth:{known:'known'}}});
     try {
       const b=f.bindings;await b.loadConfig();
       assert.ok(b.decisionAiOptions.value.includes('openai_jsonchat'));
       assert.equal(b.decisionModels.DECISION_OPENAI_MODEL,'auto');
-      for(const [key] of fields.slice(1))assert.equal(b.decisionModels[key],'legacy');
+      for(const [key] of fields.slice(1))assert.equal(b.decisionModels[key],'auto');
       assert.ok(b.decisionModelOptions(b.decisionFields[1]).some(o=>o.value==='known'));
       await b.handleSaveOnly();await b.loadConfig();
-      assert.equal(b.buildNextSettings().DECISION_AI_MODEL,'legacy');
+      assert.ok(!('DECISION_AI_MODEL' in b.buildNextSettings()));
       assert.equal(b.buildNextSettings().DECISION_AI_NAME,'openai_jsonchat');
     } finally {f.stop();}
   });
@@ -119,13 +119,13 @@ for (const [project, relative] of [
       }
     } finally {f.stop();}
   });
-  test(project + ': 候補未取得でも他設定・未掲載値・旧共通キーを失わない', async () => {
-    const settings={CHAT_AI_NAME:'saved-chat',LIVE_AI_NAME:'saved-live',CODE_AI1_NAME:'saved-code',CODE_AI1_MODEL:'saved-model',TASK_AI_NAME:'saved-task',TASK_AI_MODEL_plan:'saved-plan',CUSTOM:'keep',DECISION_AI_NAME:'future-provider',DECISION_AI_MODEL:'future-model'};
+  test(project + ': 候補未取得でも他設定・未掲載値を失わない', async () => {
+    const settings={CHAT_AI_NAME:'saved-chat',LIVE_AI_NAME:'saved-live',CODE_AI1_NAME:'saved-code',CODE_AI1_MODEL:'saved-model',TASK_AI_NAME:'saved-task',TASK_AI_MODEL_plan:'saved-plan',CUSTOM:'keep',DECISION_AI_NAME:'future-provider',DECISION_FREEAI_MODEL:'future-model'};
     const f=fixture(settings);
     try {
       const b=f.bindings;await b.loadConfig();assert.match(await f.render(),/取得済み候補はありません/);
       b.selections.decisionAi='freeai_chat';await b.handleSaveOnly();
-      assert.deepEqual(JSON.parse(JSON.stringify(f.calls.at(-1).body.モデル設定)),{...settings,DECISION_AI_NAME:'freeai_chat',...Object.fromEntries(fields.map(([key])=>[key,'future-model']))});
+      assert.deepEqual(JSON.parse(JSON.stringify(f.calls.at(-1).body.モデル設定)),{...settings,DECISION_AI_NAME:'freeai_chat',PREDICTION_AI_NAME:'auto',PREDICTION_OPENAI_MODEL:'auto',PREDICTION_OAUTH_MODEL:'auto',PREDICTION_GEMINI_MODEL:'auto',PREDICTION_FREEAI_MODEL:'auto',PREDICTION_CODEX_CLI_MODEL:'auto',PREDICTION_COPILOT_CLI_MODEL:'auto',PREDICTION_AIDIY_HERMES_MODEL:'auto',...Object.fromEntries(fields.map(([key])=>[key,key==='DECISION_FREEAI_MODEL'?'future-model':'auto']))});
       await b.loadConfig();assert.equal(b.decisionModels.DECISION_FREEAI_MODEL,'future-model');
     } finally {f.stop();}
   });

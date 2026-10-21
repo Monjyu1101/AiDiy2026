@@ -60,11 +60,11 @@ class conf_json:
         'huggingface_key_write': '< your huggingface write key >',
 
         # Discord接続（未設定では起動しない。IDは文字列で指定）
-        'DISCORD_BOT_TOKEN': '',
-        'DISCORD_GUILD_ID': '',
-        'DISCORD_ALLOWED_USER_ID': '',
-        'DISCORD_TEXT_CHANNEL_ID': '',
-        'DISCORD_VOICE_CHANNEL_ID': '',
+        'discord_bot_token': '< your discord bot token >',
+        'discord_guild_id': '< your discord server id >',
+        'discord_allowed_user_id': '< your discord user id >',
+        'discord_text_channel_id': '< your discord text channel id >',
+        'discord_voice_channel_id': '< your discord voice channel id >',
 
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
@@ -85,9 +85,15 @@ class conf_json:
         'LIVE_OPENAI_MODEL': 'gpt-realtime-2.1-mini',
         'LIVE_OPENAI_VOICE': 'marin',
 
-        # PredictionAI設定（次のユーザー入力予測用）
+        # PredictionAI設定（次のユーザー入力予測用。方式別モデル）
         'PREDICTION_AI_NAME': 'auto',
-        'PREDICTION_AI_MODEL': 'auto',
+        'PREDICTION_OPENAI_MODEL': 'auto',
+        'PREDICTION_OAUTH_MODEL': 'auto',
+        'PREDICTION_GEMINI_MODEL': 'auto',
+        'PREDICTION_FREEAI_MODEL': 'auto',
+        'PREDICTION_CODEX_CLI_MODEL': 'gpt-6-luna',
+        'PREDICTION_COPILOT_CLI_MODEL': 'gpt-6-luna',
+        'PREDICTION_AIDIY_HERMES_MODEL': 'openai_oauth/gpt-6-luna',
 
         # DecisionAI設定（方式別モデル。autoは各方式の既定値）
         'DECISION_AI_NAME': 'auto',
@@ -139,33 +145,8 @@ class conf_json:
         'TEAM_AI_MODEL_check': 'auto',
     }
 
-    # Discord は接続情報のみ保持し、実行設定は共通の PORT_CORE / LIVE_* / CODE_* を使う。
-    # 旧上書き値を共通設定へ転記すると他フロントエンドへ影響するため、除去だけ行う。
-    REMOVED_DISCORD_KEYS = (
-        'DISCORD_COMMAND_PREFIX', 'DISCORD_CORE_URL',
-        'DISCORD_LIVE_AI_NAME', 'DISCORD_LIVE_MODEL', 'DISCORD_LIVE_VOICE',
-        'DISCORD_CODE_BASE_PATH', 'DISCORD_CODE_CLI', 'DISCORD_CODE_PYTHON',
-        'DISCORD_CODE_PROVIDER', 'DISCORD_CODE_MODEL',
-        'DISCORD_CODE_MAX_TURNS', 'DISCORD_CODE_TIMEOUT_SECONDS',
-    )
-
-    LEGACY_DISCORD_IDS = {
-        'DISCORD_ALLOWED_USER_IDS': 'DISCORD_ALLOWED_USER_ID',
-        'DISCORD_TEXT_CHANNEL_IDS': 'DISCORD_TEXT_CHANNEL_ID',
-        'DISCORD_VOICE_CHANNEL_IDS': 'DISCORD_VOICE_CHANNEL_ID',
-    }
-
-    # 旧版のポート設定は読み込み時に新しいキーへ一度だけ移行する。
-    # TASK/TEAM は同一プロセスのため PORT_TASKTEAM に統合する。
-    LEGACY_PORT_KEYS = {
-        'PORT_WEB': ('WEB_BASE',),
-        'PORT_CORE': ('CORE_BASE',),
-        'PORT_AVATAR': ('AVATAR_BASE',),
-        'PORT_TASKTEAM': ('TASK_BASE', 'TEAM_BASE'),
-        'PORT_TOOLS': ('TOOLS_BASE',),
-        'PORT_LOCAL': ('LOCAL_BASE',),
-        'PORT_APPS': ('APPS_BASE',),
-    }
+    # ポート番号として検証・正規化するキー
+    PORT_KEYS = ('PORT_WEB', 'PORT_CORE', 'PORT_AVATAR', 'PORT_TASKTEAM', 'PORT_TOOLS', 'PORT_LOCAL', 'PORT_APPS')
 
     def __init__(self, json: str = None):
         """
@@ -213,29 +194,6 @@ class conf_json:
             object.__setattr__(self, '_config_data', self.DEFAULT_CONFIG.copy())
             保存要否 = True
 
-        # 旧ポートキーを現行キーへ移行してから不足項目を補完
-        if self._migrate_port_keys():
-            保存要否 = True
-
-        # 旧 ChatAI 名を現行名へ移行
-        if self._migrate_chat_ai_name():
-            保存要否 = True
-
-        # OpenAI API / OAuth のモデル設定を共通キーへ統合
-        if self._migrate_openai_chat_model():
-            保存要否 = True
-
-        # Discord の1件配列を単一IDへ移行してから不足項目を補完する。
-        config_data = object.__getattribute__(self, '_config_data')
-        normalized = self._normalize_discord_ids(config_data)
-        if normalized != config_data:
-            object.__setattr__(self, '_config_data', normalized)
-            保存要否 = True
-
-        # 旧共通モデルは不足する方式別キーにだけ引き継ぐ。旧キー自体も保持する。
-        if self._migrate_decision_models():
-            保存要否 = True
-
         # 既存設定に不足しているデフォルト項目を補完
         if self._apply_default_keys():
             保存要否 = True
@@ -250,81 +208,6 @@ class conf_json:
 
         if 保存要否 and not self._save():
             raise OSError(f'設定ファイルを保存できません: {config_file}')
-
-    def _migrate_port_keys(self) -> bool:
-        """旧ポートキーを新キーへ移行し、旧キーを設定から除去する。"""
-        config_data = object.__getattribute__(self, '_config_data')
-        変更あり = False
-
-        for new_key, old_keys in self.LEGACY_PORT_KEYS.items():
-            existing_old_keys = [key for key in old_keys if key in config_data]
-            old_values = [config_data[key] for key in existing_old_keys]
-            new_key_was_missing = new_key not in config_data
-            normalized_old_values = (
-                [self._normalize_port_value(new_key, value) for value in old_values]
-                if new_key_was_missing
-                else []
-            )
-
-            if new_key_was_missing and normalized_old_values:
-                config_data[new_key] = normalized_old_values[0]
-                変更あり = True
-                logger.info(f'ポート設定を移行しました: {existing_old_keys[0]} -> {new_key}')
-            elif not new_key_was_missing:
-                normalized_value = self._normalize_port_value(new_key, config_data[new_key])
-                if normalized_value != config_data[new_key]:
-                    config_data[new_key] = normalized_value
-                    変更あり = True
-
-            if (
-                new_key_was_missing
-                and len(normalized_old_values) >= 2
-                and len(set(normalized_old_values)) > 1
-            ):
-                logger.warning(
-                    'TASK_BASE と TEAM_BASE の値が異なるため、'
-                    'PORT_TASKTEAM には TASK_BASE の値を採用します'
-                )
-
-            for old_key in old_keys:
-                if old_key in config_data:
-                    del config_data[old_key]
-                    変更あり = True
-
-        return 変更あり
-
-    def _migrate_decision_models(self) -> bool:
-        """旧共通値を失わず、既存の方式別値（autoを含む）は上書きしない。"""
-        config_data = object.__getattribute__(self, '_config_data')
-        if 'DECISION_AI_MODEL' not in config_data:
-            return False
-        changed = False
-        for key in ('DECISION_OPENAI_MODEL', 'DECISION_OAUTH_MODEL', 'DECISION_GEMINI_MODEL', 'DECISION_FREEAI_MODEL'):
-            if key not in config_data:
-                config_data[key] = config_data['DECISION_AI_MODEL']
-                changed = True
-        return changed
-
-    def _migrate_chat_ai_name(self) -> bool:
-        """openai_oauth_chat を簡潔な現行名 openai_oauth へ移行する。"""
-        config_data = object.__getattribute__(self, '_config_data')
-        if config_data.get('CHAT_AI_NAME') != 'openai_oauth_chat':
-            return False
-        config_data['CHAT_AI_NAME'] = 'openai_oauth'
-        logger.info('CHAT_AI_NAMEを移行しました: openai_oauth_chat -> openai_oauth')
-        return True
-
-    def _migrate_openai_chat_model(self) -> bool:
-        """旧 OAuth 専用モデルを統合し、現在利用中のモデルを引き継ぐ。"""
-        config_data = object.__getattribute__(self, '_config_data')
-        old_key = 'CHAT_OPENAI_OAUTH_MODEL'
-        if old_key not in config_data:
-            return False
-        if config_data.get('CHAT_AI_NAME') == 'openai_oauth' or 'CHAT_OPENAI_MODEL' not in config_data:
-            config_data['CHAT_OPENAI_MODEL'] = config_data[old_key]
-        del config_data[old_key]
-        logger.info('OpenAIチャットモデル設定を共通キーへ移行しました')
-        return True
 
     @staticmethod
     def _normalize_port_value(key: str, value: Any) -> str:
@@ -345,7 +228,7 @@ class conf_json:
         """現行ポートキーを検証し、値を文字列へ正規化する。"""
         config_data = object.__getattribute__(self, '_config_data')
         変更あり = False
-        for key in self.LEGACY_PORT_KEYS:
+        for key in self.PORT_KEYS:
             if key not in config_data:
                 continue
             normalized_value = self._normalize_port_value(key, config_data[key])
@@ -354,73 +237,14 @@ class conf_json:
                 変更あり = True
         return 変更あり
 
-    def _normalize_port_updates(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """書き込みデータ内の旧ポートキーを現行キーへ変換する。"""
-        normalized = dict(data)
-
-        for new_key, old_keys in self.LEGACY_PORT_KEYS.items():
-            existing_old_keys = [key for key in old_keys if key in normalized]
-            normalized_old_values = []
-
-            if new_key in normalized:
-                source_key = new_key
-            elif existing_old_keys:
-                source_key = existing_old_keys[0]
-                normalized_old_values = [
-                    self._normalize_port_value(new_key, normalized[key])
-                    for key in existing_old_keys
-                ]
-                normalized[new_key] = normalized_old_values[0]
-                logger.info(f'ポート設定を変換しました: {source_key} -> {new_key}')
-            else:
-                source_key = None
-
-            if (
-                source_key in old_keys
-                and len(normalized_old_values) >= 2
-                and len(set(normalized_old_values)) > 1
-            ):
-                logger.warning(
-                    'TASK_BASE と TEAM_BASE の値が異なるため、'
-                    'PORT_TASKTEAM には TASK_BASE の値を採用します'
-                )
-
-            for old_key in old_keys:
-                normalized.pop(old_key, None)
-
-            if source_key is not None:
-                normalized[new_key] = self._normalize_port_value(new_key, normalized[new_key])
-
-        return normalized
-
-    def _normalize_discord_ids(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """旧配列が1件なら単一IDへ移行。複数候補を勝手に選ばない。"""
-        normalized = dict(data)
-        for old_key, new_key in self.LEGACY_DISCORD_IDS.items():
-            if old_key not in normalized:
-                continue
-            value = normalized.pop(old_key)
-            if new_key in normalized:
-                continue
-            values = value.replace(',', ' ').split() if isinstance(value, str) else value
-            if not isinstance(values, list) or len(values) > 1 or any(
-                not isinstance(item, str) or not item.isascii() or not item.isdigit() or not 17 <= len(item) <= 20
-                for item in values
-            ):
-                raise ValueError(f'{new_key} に利用する1つのIDを文字列で設定してください（元ファイルは変更しません）')
-            normalized[new_key] = values[0] if values else ''
-        return normalized
-
     def _ordered_config_data(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """既定キーを先頭へ並べ、未知キーの現在順を末尾に維持する。"""
         ordered = {}
         for key in self.DEFAULT_CONFIG:
             if key in config_data:
                 ordered[key] = config_data[key]
-            if key == 'DECISION_FREEAI_MODEL' and 'DECISION_AI_MODEL' in config_data:
-                ordered['DECISION_AI_MODEL'] = config_data['DECISION_AI_MODEL']
         for key, value in config_data.items():
-            if key not in ordered and key not in self.REMOVED_DISCORD_KEYS and key not in self.LEGACY_DISCORD_IDS:
+            if key not in ordered:
                 ordered[key] = value
         return ordered
 
@@ -536,20 +360,10 @@ class conf_json:
 
         config_data = object.__getattribute__(self, '_config_data')
         updated = dict(config_data)
-        normalized = self._normalize_discord_ids(self._normalize_port_updates(data))
-        old_key = 'CHAT_OPENAI_OAUTH_MODEL'
-        if old_key in normalized:
-            if 'CHAT_OPENAI_MODEL' not in normalized:
-                normalized['CHAT_OPENAI_MODEL'] = normalized[old_key]
-            del normalized[old_key]
-        updated.update(normalized)
-        updated.pop(old_key, None)
+        updated.update(data)
 
-        # 防御的に旧キーを除去し、現行ポート値を再検証する
-        for old_keys in self.LEGACY_PORT_KEYS.values():
-            for old_key in old_keys:
-                updated.pop(old_key, None)
-        for key in self.LEGACY_PORT_KEYS:
+        # 現行ポート値を検証する
+        for key in self.PORT_KEYS:
             if key in updated:
                 updated[key] = self._normalize_port_value(key, updated[key])
 

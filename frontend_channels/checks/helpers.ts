@@ -18,8 +18,8 @@ export const textId = '333333333333333333';
 export const voiceId = '444444444444444444';
 export const botId = '555555555555555555';
 export const defaults = {
-  DISCORD_BOT_TOKEN: 'test-token', DISCORD_GUILD_ID: guildId,
-  DISCORD_ALLOWED_USER_ID: userId, DISCORD_TEXT_CHANNEL_ID: textId, DISCORD_VOICE_CHANNEL_ID: voiceId,
+  discord_bot_token: 'test-token', discord_guild_id: guildId,
+  discord_allowed_user_id: userId, discord_text_channel_id: textId, discord_voice_channel_id: voiceId,
 };
 export const config = () => 設定解析(defaults, プロジェクトルート);
 export async function waitFor(condition: () => boolean, timeout = 3000) {

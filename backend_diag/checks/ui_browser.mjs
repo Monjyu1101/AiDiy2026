@@ -70,7 +70,7 @@ try{
  // 外部連携は行ごとの「テスト」だけで認証を確認する（全テスト・一覧再取得では実行しない）。
  assert.equal(await page.locator('.integration-row .integration-test button').count(),3);
  await page.locator('.integration-row').filter({hasText:'Discord Bot'}).locator('.key-select').click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');
- assert.ok((await page.locator('.integration-panel article').innerText()).includes('DISCORD_BOT_TOKEN'));
+ assert.ok((await page.locator('.integration-panel article').innerText()).includes('discord_bot_token'));
  await page.screenshot({path:path.join(output,'integrations.png'),fullPage:true});
  await page.getByRole('button',{name:'モデル一覧',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
  await page.getByRole('button',{name:'外部連携',exact:true}).click();assert.equal(await page.locator('.integration-panel article h2').innerText(),'Discord Bot');

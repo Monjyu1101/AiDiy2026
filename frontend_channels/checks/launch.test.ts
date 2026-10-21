@@ -39,10 +39,10 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
     symlinkSync(join(プロジェクトルート, 'frontend_ide/host'), join(root, 'frontend_ide/host'), 'junction');
     for (const args of [[], ['--connect'], ['--wait', '--connect']]) {
       for (const token of ['', '<', '<secret-placeholder>', '>']) {
-        writeFileSync(join(root, '_config/AiDiy_key.json'), JSON.stringify({ ...defaults, DISCORD_BOT_TOKEN: token }));
+        writeFileSync(join(root, '_config/AiDiy_key.json'), JSON.stringify({ ...defaults, discord_bot_token: token }));
         const result = spawnSync(process.execPath, [join(frontend, 'panel/launch.mjs'), ...args], { cwd: tmpdir(), encoding: 'utf8', timeout: 15_000, windowsHide: true });
         assert.equal(result.status, 1, result.stderr);
-        assert.match(result.stderr, /DISCORD_BOT_TOKEN/);
+        assert.match(result.stderr, /discord_bot_token/);
         assert.doesNotMatch(result.stderr, /secret-placeholder|Electron|パネルの準備/);
         assert.equal(existsSync(join(frontend, 'out')), false, 'Electron 起動用のログも作らない');
       }

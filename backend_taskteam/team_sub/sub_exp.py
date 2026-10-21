@@ -85,14 +85,12 @@ def AIモデル(接頭辞: str, フェーズ: str, 既定: str = "auto") -> str:
     """`AiDiy_key.json` の `<接頭辞>_AI_MODEL_<フェーズ>` を返す。
 
     接頭辞は TASK / TEAM、フェーズは plan / do / check。
-    旧版の単一キーしかない設定でも読めるようにする。
     """
     path = os.path.normpath(os.path.join(BASE_DIR, DEFAULT_CONFIG_PATH))
-    旧キー = f"{接頭辞}_AI_MODEL"
     try:
         with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
-        値 = data.get(f"{旧キー}_{フェーズ}", data.get(旧キー, 既定))
+        値 = data.get(f"{接頭辞}_AI_MODEL_{フェーズ}", 既定)
         return str(値 or 既定).strip() or 既定
     except Exception:
         return 既定

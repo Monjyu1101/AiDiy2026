@@ -112,8 +112,7 @@ class Decision:
 
     @staticmethod
     def _default_model(provider: Provider, config: dict) -> str:
-        # 新キーがあればautoも尊重する。未移行ファイルだけ旧共通値へフォールバック。
-        model = str(config.get(provider.model_key, config.get("DECISION_AI_MODEL", "auto")) or "auto").strip()
+        model = str(config.get(provider.model_key, "auto") or "auto").strip()
         return provider.default_model if is_default(model) else model
 
     def get_config(self) -> dict:
@@ -124,11 +123,10 @@ class Decision:
             "default_model": f"{name}/{model}",
             "configured_defaults": {
                 "DECISION_AI_NAME": str(config.get("DECISION_AI_NAME") or "auto").strip() or "auto",
-                **{key: str(config.get(key, config.get("DECISION_AI_MODEL", "auto")) or "auto").strip() or "auto" for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL")},
-                **({"DECISION_AI_MODEL": config["DECISION_AI_MODEL"]} if "DECISION_AI_MODEL" in config else {}),
+                **{key: str(config.get(key, "auto") or "auto").strip() or "auto" for key in ("DECISION_OPENAI_MODEL", "DECISION_OAUTH_MODEL", "DECISION_GEMINI_MODEL", "DECISION_FREEAI_MODEL")},
             },
             "providers": [{"ai_name": key, "implementation": provider.module.rsplit(".", 1)[-1], "aliases": list(provider.aliases), "auth": provider.auth, "default_model": self._default_model(provider, config), "model_config_key": provider.model_key} for key, provider in PROVIDERS.items()],
-            "selection_note": "方式は明示引数、DECISION_AI_NAMEの順。autoなら起動チェック成功の方式からOAuth → FreeAI → Decisions API → Geminiの順。モデルは明示model/ai_model → 方式別MODEL設定（キー未存在時のみ旧DECISION_AI_MODEL）→ 低コスト既定値。Diagの候補は書き出し側で絞りますが、実行時のモデル指定を固定しません。既存設定値と明示プロバイダを保持します。",
+            "selection_note": "方式は明示引数、DECISION_AI_NAMEの順。autoなら起動チェック成功の方式からOAuth → FreeAI → Decisions API → Geminiの順。モデルは明示model/ai_model → 方式別MODEL設定 → 低コスト既定値。Diagの候補は書き出し側で絞りますが、実行時のモデル指定を固定しません。既存設定値と明示プロバイダを保持します。",
             "question_types": ["predicate", "choice", "score"],
             "availability": deepcopy(self.availability),
             "availability_checked": bool(self.availability),

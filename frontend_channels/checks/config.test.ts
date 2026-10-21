@@ -33,9 +33,9 @@ test('PORT_CORE、共通モデル、作業フォルダを読み込み、元設�
 
 test('未設定・不正ID・空の許可範囲・不正な共通設定を拒否し秘密値をエラーに出さない', () => {
   for (const change of [
-    { DISCORD_BOT_TOKEN: '' }, { DISCORD_GUILD_ID: '' }, { DISCORD_ALLOWED_USER_ID: '' },
-    { DISCORD_ALLOWED_USER_ID: 222222222222222222 }, { DISCORD_TEXT_CHANNEL_ID: [] },
-    { DISCORD_VOICE_CHANNEL_ID: '' }, { DISCORD_ALLOWED_USER_ID: ['222222222222222222'] },
+    { discord_bot_token: '' }, { discord_guild_id: '' }, { discord_allowed_user_id: '' },
+    { discord_allowed_user_id: 222222222222222222 }, { discord_text_channel_id: [] },
+    { discord_voice_channel_id: '' }, { discord_allowed_user_id: ['222222222222222222'] },
     { PORT_CORE: 'secret-value' }, { PORT_CORE: 65536 }, { PORT_CORE: true },
     { CODE_MAX_TURNS: 0 }, { CODE_MAX_TURNS: true },
     { CODE_BASE_PATH: './does-not-exist-secret-value' }, { CODE_AIDIY_HERMES_MODEL: 123 },
@@ -46,16 +46,16 @@ test('未設定・不正ID・空の許可範囲・不正な共通設定を拒否
     });
   }
   const parsed = 設定解析(defaults);
-  assert.equal(parsed.userId, defaults.DISCORD_ALLOWED_USER_ID);
-  assert.equal(parsed.textChannelId, defaults.DISCORD_TEXT_CHANNEL_ID);
-  assert.equal(parsed.voiceChannelId, defaults.DISCORD_VOICE_CHANNEL_ID);
+  assert.equal(parsed.userId, defaults.discord_allowed_user_id);
+  assert.equal(parsed.textChannelId, defaults.discord_text_channel_id);
+  assert.equal(parsed.voiceChannelId, defaults.discord_voice_channel_id);
 });
 
 test('空欄・1文字・< で始まるトークンの仮設定を拒否する', () => {
   for (const token of ['', '   ', '<', '>', '(', ')', '[', ']', '{', '}', 'a', '<secret-placeholder>', '  <secret-placeholder  ']) {
-    assert.throws(() => 設定解析({ ...defaults, DISCORD_BOT_TOKEN: token }), error => {
+    assert.throws(() => 設定解析({ ...defaults, discord_bot_token: token }), error => {
       assert.ok(error instanceof Error);
-      assert.match(error.message, /DISCORD_BOT_TOKEN/);
+      assert.match(error.message, /discord_bot_token/);
       assert.doesNotMatch(error.message, /secret-placeholder/);
       return true;
     });

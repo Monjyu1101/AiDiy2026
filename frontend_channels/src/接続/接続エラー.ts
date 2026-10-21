@@ -40,7 +40,7 @@ export function 接続失敗案内(error: unknown, stage: 接続段階): string 
     return 'Hermesの起動パスを確認できません。command_hermes のセットアップを確認してください。';
   }
   if (detail?.code === 'TokenInvalid' || detail?.code === 50014 || detail?.status === 401 || message === 'Authentication failed')
-    return 'DiscordのBotトークン認証に失敗しました。AiDiy_key.json の DISCORD_BOT_TOKEN を確認してください。';
+    return 'DiscordのBotトークン認証に失敗しました。AiDiy_key.json の discord_bot_token を確認してください。';
   if (detail?.code === 'DisallowedIntents' || message === 'Used disallowed intents')
     return 'Discordで必要なIntentが許可されていません。Developer PortalのBot設定で Message Content Intent を有効にしてください。';
   if (message === 'Used invalid intents') return 'Discordに指定したIntentが無効です。BotのGateway設定を確認してください。';

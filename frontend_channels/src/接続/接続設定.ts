@@ -38,19 +38,19 @@ export function 設定解析(data: Record<string, unknown>, root = プロジェ�
     if (!Number.isInteger(value) || value < min || value > max) throw new 設定エラー(`${key} は ${min}～${max} の整数で指定してください。`);
     return value;
   };
-  const token = text('DISCORD_BOT_TOKEN');
+  const token = text('discord_bot_token');
   if (token.length <= 1 || token.startsWith('<') || /\s/.test(token)) {
-    throw new 設定エラー('_config/AiDiy_key.json の DISCORD_BOT_TOKEN に Bot トークンを設定してください（空欄・1文字・< で始まる仮設定は使用できません）。');
+    throw new 設定エラー('_config/AiDiy_key.json の discord_bot_token に Bot トークンを設定してください（空欄・1文字・< で始まる仮設定は使用できません）。');
   }
   const id = (key: string) => {
     const value = text(key);
     if (!/^\d{17,20}$/.test(value)) throw new 設定エラー(`${key} に1つの Discord ID を文字列で設定してください。`);
     return value;
   };
-  const guildId = id('DISCORD_GUILD_ID');
-  const userId = id('DISCORD_ALLOWED_USER_ID');
-  const textChannelId = id('DISCORD_TEXT_CHANNEL_ID');
-  const voiceChannelId = id('DISCORD_VOICE_CHANNEL_ID');
+  const guildId = id('discord_guild_id');
+  const userId = id('discord_allowed_user_id');
+  const textChannelId = id('discord_text_channel_id');
+  const voiceChannelId = id('discord_voice_channel_id');
   const port = integer('PORT_CORE', 8091, 1, 65535);
   const url = new URL(`ws://127.0.0.1:${port}`);
   url.pathname = '/core/ws/AIコア';

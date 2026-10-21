@@ -21,6 +21,7 @@ from typing import Optional
 
 from AIコア.AI応答 import 応答正規化, エラー応答
 from AIコア.AI履歴コンテキスト import 履歴要求コピー, 履歴要求コンテキスト, セッション履歴パス
+from AIコア.AI実行オプション import AI実行オプション, 既定実行オプション, 接続適用, 保存関数適用
 from log_config import get_logger
 
 logger = get_logger(__name__)
@@ -93,11 +94,14 @@ class Chat:
         AI_MODEL: str = "",
         接続=None,
         保存関数=None,
+        実行オプション: Optional[AI実行オプション] = None,
     ):
         self.セッションID = セッションID
         self.チャンネル = チャンネル
-        self.接続 = 接続
-        self.保存関数 = 保存関数
+        # 会話継続・出力ファイル保存は ChatAI が自身のオプションで判定する。
+        self.実行オプション = 実行オプション or 既定実行オプション
+        self.接続 = 接続適用(接続, self.実行オプション)
+        self.保存関数 = 保存関数適用(保存関数, self.実行オプション)
         self.AI_NAME = AI_NAME
         self.AI_MODEL = AI_MODEL
         self.絶対パス = 絶対パス
@@ -169,6 +173,7 @@ class Chat:
                 絶対パス=self.絶対パス or None,
                 api_key=api_key or None,
                 system_instruction=self.システム指示,
+                実行オプション=self.実行オプション,
             )
             開始成功 = await self.AIインスタンス.開始()
             if (開始成功 is False) or (not getattr(self.AIインスタンス, "is_alive", False)):

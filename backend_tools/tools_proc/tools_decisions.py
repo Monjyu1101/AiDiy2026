@@ -57,7 +57,7 @@ def register_tools(mcp, decisions):
         方式は明示引数を優先し、省略・autoはAiDiy_key.jsonのDECISION_AI_NAMEを参照する。
         NAME設定もautoなら起動チェック成功のopenai_oauthを優先し、
         次にfreeai_chat、openai_decisions、gemini_chatの順。明示プロバイダは変更しない。
-        モデルは明示model/ai_model → 方式別MODEL設定（未存在時のみ旧DECISION_AI_MODEL）→ 既定値。
+        モデルは明示model/ai_model → 方式別MODEL設定 → 既定値。
         低コスト既定値はOpenAI両方式gpt-6-luna、FreeAI/Geminiはgemini-flash-lite-latest。
         Diagの書き出し候補で絞るが、モデル指定を実行側で固定・上書きしない。通常Chat等には適用しない。
         questions: type・name・instructionsを持つ配列。

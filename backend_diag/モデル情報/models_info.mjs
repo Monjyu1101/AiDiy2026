@@ -25,6 +25,10 @@ export async function installedCodeClis({loadEntries = catalog, resolve = resolv
   })));
 }
 
+// Hermes / OpenCode は渡す値（プロバイダ/モデル）をそのまま表示名にも使う。先頭の日付・仮設定表示は残す。
+export const routeLabel = (id, label) => `${/^(.*?) - /.exec(label)?.[1] ?? 'yyyy/mm/dd'} - ${id}`;
+const routeModels = models => Object.fromEntries(Object.entries(models).map(([id, label]) => [id, routeLabel(id, label)]));
+
 export function openCodeModels(models) {
   return Object.fromEntries(Object.entries(models).map(([id, label]) => {
     const model = id.startsWith('openai/') || ['auto', 'same'].includes(id) ? id : `openai/${id}`;
@@ -45,6 +49,7 @@ function availableCodeModels(code, installedClis) {
   if (Object.keys(routes).length || filtered.aidiy_hermes) {
     filtered.aidiy_hermes = {models:{...routes, ...filtered.aidiy_hermes?.models}};
   }
+  for (const key of ['aidiy_hermes', 'opencode_cli']) if (filtered[key]) filtered[key] = {models:routeModels(filtered[key].models)};
   const priority = key => key === 'antigravity_cli' ? 2
     : ['claude_sdk', 'claude_cli', 'copilot_cli', 'codex_cli', 'aidiy_hermes'].includes(key) ? 0 : 1;
   return Object.fromEntries(Object.entries(filtered).sort(([a], [b]) => priority(a) - priority(b)));
@@ -179,7 +184,7 @@ export async function modelsInfo(provider, result, {now = () => new Date()} = {}
           : key === 'codex_cli' || (['openai', 'openai_oauth'].includes(provider.id) && key === 'copilot_cli') ? latestCodexModels(chatModels) : chatModels;
         info.code[key] = {models:provider.id === 'claude' ? claudeLabels(chatModels, {versioned:key === 'copilot_cli'})
           : Object.fromEntries(Object.entries(labels(codeModels))
-            .map(([id, label]) => [prefix + id, label]))};
+            .map(([id, label]) => [prefix + id, prefix ? routeLabel(prefix + id, label) : label]))};
       }
     }
   }
@@ -283,7 +288,10 @@ export async function writeModelsInfo(providers, results, {directory = OUTPUT_DI
   }
   saved.push(...await writeMergedModelsInfo(directory, options.installedClis ?? await installedCodeClis(), providers, results, options));
   // 予測・判断用はディスクの旧一覧を認証証跡にしない。実行中の取得結果と現在の認証で再合成。
-  await writeResult(path.join(directory, PREDICTION_MODELS_FILE), await predictionModelsInfo(providers, results, options));
+  let codeModels = {};
+  try { codeModels = JSON.parse(await readFile(path.join(directory, modelsInfoFile('code')), 'utf8')); }
+  catch (error) { if (error?.code !== 'ENOENT') throw error; }
+  await writeResult(path.join(directory, PREDICTION_MODELS_FILE), await predictionModelsInfo(providers, results, {...options, codeModels}));
   saved.push(PREDICTION_MODELS_FILE);
   await writeResult(path.join(directory, DECISIONS_MODELS_FILE), await decisionsModelsInfo(providers, results, options));
   saved.push(DECISIONS_MODELS_FILE);
