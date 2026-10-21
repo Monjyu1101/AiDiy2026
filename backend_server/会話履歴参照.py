@@ -47,6 +47,7 @@ def read_prediction_history(
     max_message_chars: int = 4000,
     *,
     now: datetime | None = None,
+    user_only: bool = False,
 ) -> list[dict[str, str | int]]:
     """直近2時間の同一プロジェクトから最新最大10ターンを古い順に返す。
 
@@ -62,6 +63,8 @@ def read_prediction_history(
     期間内の候補をカーソルで順次処理し、最新 max_turns ターンだけを保持する。
     本文は各 max_message_chars 文字、最終総計 max_chars 文字まで。文字数制限時も
     入力を先に確保し、新しいターン・新しい返答を優先する。古い会話で補充しない。
+    user_only=True はユーザー入力のみを取得し、返答に本文予算を割り当てない。
+    既定値の False は従来どおり入力と返答を返す。
     DB 初期化・マイグレーション・書込は行わず、DB不在等は sqlite3.Error。
     """
     normalized_path = normalize_project_path(project_path)
@@ -76,6 +79,8 @@ def read_prediction_history(
             raise ValueError(f"{name} は正の整数で指定してください")
     if max_turns > HISTORY_MAX_TURNS:
         raise ValueError(f"max_turns は{HISTORY_MAX_TURNS}以下で指定してください")
+    if type(user_only) is not bool:
+        raise ValueError("user_only は真偽値で指定してください")
     end = _local_second(now)
     start = end - timedelta(seconds=HISTORY_WINDOW_SECONDS)
     bounds = (start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
@@ -102,6 +107,7 @@ def read_prediction_history(
                AND h."メッセージ識別" IN (
                    'input_text', 'input_request', 'output_text', 'output_request'
                )
+               AND (? = 0 OR h."メッセージ識別" IN ('input_text', 'input_request'))
                AND typeof(h."メッセージ内容") = 'text'
                AND h."メッセージ内容" != ''
                AND NOT (h."チャンネル" = '0' AND EXISTS (
@@ -119,7 +125,7 @@ def read_prediction_history(
                ))
              ORDER BY h."登録日時", h."セッションID", h."シーケンス"
             """,
-            (max_message_chars, normalized_path, *bounds, *mirror_bounds),
+            (max_message_chars, normalized_path, *bounds, user_only, *mirror_bounds),
         )
         for row in rows:
             # DB の保存形式以外や壊れた日時は推測せず除外する。

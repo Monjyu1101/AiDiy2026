@@ -11,6 +11,7 @@
  */
 
 import { backendUrl } from '../aidiy_live/src/host';
+import { isAbsolute } from 'node:path';
 import { 接続エラー詳細 } from '../aidiy_live/src/connection-error';
 import type { LiveSocket, Packet } from '../aidiy_live/src/protocol';
 import type { CodeModel } from './model-preferences';
@@ -58,6 +59,9 @@ export class CodeConnection {
   model: CodeModel = { provider: '', model: '' };
   error = '';
   get 接続中() { return this.connecting; }
+  // 起動引数や選択フォルダではなく、接続したセッションから取得できたパスだけを公開する。
+  private sessionProject = '';
+  get projectPath() { return this.connected ? this.sessionProject : ''; }
   constructor(backend: string, private onPacket: (packet: Packet) => void, private onState: () => void,
     private createSocket: (url: string) => LiveSocket = url => new WebSocket(url), private request: typeof fetch = fetch) {
     this.target = backendUrl(backend);
@@ -69,7 +73,8 @@ export class CodeConnection {
     this.outputHistory = messages.filter(item => item.種別 === 'assistant').map(item => item.本文).slice(-60);
     this.enabled = true; void this.connect();
   }
-  private async api(path: '取得' | '設定', body: object): Promise<Info> {
+  private async api(path: '取得' | '設定', body: { セッションID?: string; [key: string]: unknown }): Promise<Info> {
+    const generation = this.generation;
     const controller = new AbortController(); this.requests.add(controller);
     const timer = setTimeout(() => controller.abort(), 30000);
     try {
@@ -78,6 +83,10 @@ export class CodeConnection {
       });
       const value = await response.json() as { status: string; message?: string; data: Info };
       if (!response.ok || value.status !== 'OK') throw new Error(value.message || 'モデル情報を取得・設定できません。');
+      if (path === '取得' && body.セッションID && body.セッションID === this.session && generation === this.generation) {
+        const project = value.data.モデル設定?.CODE_BASE_PATH;
+        this.sessionProject = typeof project === 'string' && !project.includes('\0') && isAbsolute(project.trim()) ? project.trim() : '';
+      }
       return value.data;
     } catch (error) { throw new Error(接続エラー詳細(this.target, error)); }
     finally { clearTimeout(timer); this.requests.delete(controller); }
@@ -213,6 +222,7 @@ export class CodeConnection {
     for (const controller of this.requests) controller.abort();
     for (const socket of this.sockets.values()) socket.close(); this.sockets.clear();
     this.connected = false; this.connecting = false;
+    this.sessionProject = '';
     this.実行状態通知 = false; this.実行継続中 = false;
   }
   private lost() {

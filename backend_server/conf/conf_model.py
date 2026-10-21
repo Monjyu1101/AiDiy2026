@@ -71,7 +71,7 @@ class conf_models:
 
 
     def get_prediction_models(self) -> Dict[str, Dict[str, str]]:
-        """予測実行と同じChat方式・有効なモデルIDだけを画面へ渡す。"""
+        """予測実行と同じChat・CLI方式の有効なモデルIDだけを画面へ渡す。"""
         return self._get_diag_models("prediction") or {}
 
 
@@ -99,7 +99,10 @@ class conf_models:
             result = {}
             entries = payload.items()
             if kind == "prediction":
-                entries = ((name, payload.get(name)) for name in ("openai_oauth", "freeai_chat", "openai_chat", "gemini_chat"))
+                entries = ((name, payload.get(name)) for name in (
+                    "openai_oauth", "freeai_chat", "openai_chat", "gemini_chat",
+                    "codex_cli", "copilot_cli", "aidiy_hermes",
+                ))
             for provider, entry in entries:
                 models = entry.get(field) if isinstance(entry, dict) else None
                 if kind == "prediction":

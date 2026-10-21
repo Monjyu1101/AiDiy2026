@@ -39,6 +39,19 @@ _STDERR_STREAM_STDOUT_FINAL_AI = frozenset({
 })
 
 
+class 予測読取専用利用不可(ValueError):
+    """安全な予測CLIを構築できない場合。通常のCode実行には適用しない。"""
+
+
+# 設定は preflight と exec で同一にする。MCP の空マップは継承設定を消せない。
+# https://developers.openai.com/codex/config-reference/
+_予測CODEX無効機能 = (
+    "hooks", "apps", "multi_agent", "shell_snapshot", "plugins",
+    "browser_use", "computer_use", "image_generation",
+    "skill_mcp_dependency_install", "memories", "goals",
+)
+
+
 class _CopilotJSON出力:
     """Copilot の JSONL から表示用の進捗と親エージェントの最終回答を取り出す。"""
 
@@ -241,6 +254,9 @@ class CodeAI:
         self.code_ai = AI_NAME
         self.code_model = AI_MODEL
         self.最終実行モデル = ""
+        self.予測読取専用利用不可 = False
+        self._予測CodexMCP設定 = None
+        self._予測Codex検証パス = None
         self.max_turns = max_turns
         self.code_plan = code_plan
         self.code_verify = code_verify
@@ -542,6 +558,147 @@ class CodeAI:
             logger.warning(f"[CodeAI] --version 実行エラー: {cmd} {e}")
             return ""
 
+    def _予測CLI確認(self) -> None:
+        if self.code_ai not in {"codex_cli", "copilot_cli", "aidiy_hermes"}:
+            raise 予測読取専用利用不可(
+                f"{self.code_ai} は予測用の読取専用実行に未対応です。"
+                "codex_cli、copilot_cli または aidiy_hermes を選択してください。"
+            )
+
+    def _予測Hermesコマンド(self, repo_path: str) -> list:
+        # 通常HermesやカスタムCLIへはフォールバックせず、固定の読取専用アダプターだけを使う。
+        hermes_dir = Path(__file__).resolve().parents[2] / "command_hermes"
+        python_path = hermes_dir / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        entrypoint = hermes_dir / "prediction_main.py"
+        if not python_path.is_file() or not entrypoint.is_file():
+            raise 予測読取専用利用不可("Hermes の予測用アダプターまたは実行環境を利用できません。")
+        model = self._ollama_cloud_suffix除去(self.code_model or "")
+        provider = model.partition("/")[0].lower()
+        if provider in {
+            "copilot_cli", "copilot-cli", "claude_cli", "claude-code", "codex_cli", "codex-cli",
+            "antigravity_cli", "antigravity-cli", "opencode_cli", "opencode", "grok_cli", "grok-cli",
+        }:
+            raise 予測読取専用利用不可("Hermes の外部CLIモデルは読取専用予測に対応していません。")
+        # provider/モデルの最終解決後も、アダプター側で外部CLIと変更ツールを拒否する。
+        return [
+            str(python_path), str(entrypoint), "--workdir", repo_path or self.cwd_str,
+            "--model", model or "auto",
+        ]
+
+    def _予測Codex共通引数(self) -> list:
+        # --ignore-user-config は exec 専用であり、mcp list と有効設定がずれるので使わない。
+        # 個別サーバーを明示的に無効化し、設定検査と推論の双方で同じ制約を適用する。
+        args = []
+        for value in (
+            'approval_policy="never"', 'approvals_reviewer="user"',
+            'sandbox_mode="read-only"', 'notify=[]',
+            'history.persistence="none"', 'web_search="disabled"',
+        ):
+            args.extend(["-c", value])
+        for feature in _予測CODEX無効機能:
+            args.extend(["--disable", feature])
+        return args
+
+    async def _予測CodexMCP一覧(self, base: list, args: list, repo_path: str) -> list:
+        """CLIの有効MCP設定だけを取得。モデルやMCPツールは起動しない。"""
+        process = None
+        try:
+            flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            spawn = asyncio.create_task(asyncio.create_subprocess_exec(
+                sys.executable, str(_PROCESS_LIFETIME),
+                "--parent-pid", str(os.getpid()), "--creationflags", str(flags), "--",
+                *base, *args, "mcp", "list", "--json",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                cwd=repo_path, env=os.environ.copy(),
+                start_new_session=(os.name != "nt"), creationflags=flags,
+            ))
+            try:
+                process = await asyncio.shield(spawn)
+            except asyncio.CancelledError:
+                process = await spawn
+                raise
+            self.current_process = process
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=10)
+            if process.returncode != 0:
+                raise ValueError("mcp list failed")
+            # transport には環境変数や認証ヘッダーが含まれ得る。生JSONはログに出さない。
+            entries = json.loads(stdout.decode("utf-8"))
+            if not isinstance(entries, list) or any(
+                not isinstance(entry, dict)
+                or not isinstance(entry.get("name"), str) or not entry["name"]
+                or not isinstance(entry.get("enabled"), bool)
+                for entry in entries
+            ):
+                raise ValueError("invalid mcp list")
+            return [(entry["name"], entry["enabled"]) for entry in entries]
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            raise 予測読取専用利用不可(
+                "Codex の読取専用設定を検証できませんでした。"
+                "必要なCLI機能とMCP設定を確認してください。"
+            ) from None
+        finally:
+            if process is not None:
+                if process.returncode is None:
+                    await _所有プロセス終了(process)
+                if self.current_process is process:
+                    self.current_process = None
+
+    async def _予測CLI準備(self, repo_path: str) -> None:
+        self._予測CLI確認()
+        if self.code_ai != "codex_cli":
+            return
+        self._予測CodexMCP設定 = None
+        self._予測Codex検証パス = None
+        custom_cmd = os.environ.get("CODEX_CLI_CLI_PATH")
+        base, _ = self._CLI起動コマンド先頭(
+            custom_cmd or self._コマンドパス取得(), custom=bool(custom_cmd),
+        )
+        args = self._予測Codex共通引数()
+        entries = await self._予測CodexMCP一覧(base, args, repo_path)
+        # 空マップによる上書きは再帰mergeで無効。発見した各サーバーを明示無効化する。
+        # サーバー名の '.' 等を階層区切りにしないため、引用付きのinline tableを使う。
+        names = sorted({name for name, _ in entries})
+        override = "mcp_servers={" + ",".join(
+            f"{json.dumps(name, ensure_ascii=False)}={{enabled=false}}" for name in names
+        ) + "}" if names else ""
+        verify_args = args + (["-c", override] if override else [])
+        verified = await self._予測CodexMCP一覧(base, verify_args, repo_path)
+        if any(enabled for _, enabled in verified):
+            raise 予測読取専用利用不可("Codex のMCPを無効化できないため予測を中止しました。")
+        self._予測CodexMCP設定 = override
+        self._予測Codex検証パス = repo_path
+
+    def _予測読取専用コマンド構築(self, base: list, プロンプト: str, repo_path: str) -> list:
+        self._予測CLI確認()
+        if self.code_ai == "codex_cli":
+            if self._予測CodexMCP設定 is None or self._予測Codex検証パス != repo_path:
+                raise 予測読取専用利用不可("Codex の読取専用設定が未検証です。")
+            common = base + self._予測Codex共通引数()
+            if self._予測CodexMCP設定:
+                common.extend(["-c", self._予測CodexMCP設定])
+            common.extend([
+                "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+                "--ephemeral", "--ignore-rules",
+            ])
+        else:
+            # available-tools は許可対象のみをモデルへ公開する。MCPや委譲も含めて除外。
+            # https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference
+            common = base + [
+                "--output-format", "json", "--stream", "on",
+                "--available-tools=view,grep,glob", "--allow-tool=read",
+                "--deny-tool=write", "--deny-tool=shell", "--disable-builtin-mcps",
+                "--no-custom-instructions", "--no-ask-user", "--no-auto-update", "--no-bash-env",
+            ]
+            if repo_path:
+                common.extend(["--add-dir", repo_path])
+        if self.code_model and self.code_model.lower() not in ("auto", "same"):
+            common.extend(["--model", self.code_model])
+        # 予測では既存のCLIセッションや許可状態を継続しない。
+        return common + ([プロンプト] if self.code_ai == "codex_cli" else ["-p", プロンプト])
+
     def _コマンド構築(self, プロンプト: str, 初回: bool = False, repo_path: str = None, 読取専用: bool = False) -> list:
         """
         プロバイダー別のコマンドを構築
@@ -555,6 +712,17 @@ class CodeAI:
         """
         # 環境変数からカスタムコマンドパスを取得（オプション）
         custom_cmd = os.environ.get(f'{self.code_ai.upper()}_CLI_PATH')
+
+        if self.実行オプション.CLI読取専用:
+            self._予測CLI確認()
+            if self.code_ai == "aidiy_hermes":
+                return self._予測Hermesコマンド(repo_path)
+            base, cmd_exe経由 = self._CLI起動コマンド先頭(
+                custom_cmd or self._コマンドパス取得(), custom=bool(custom_cmd),
+            )
+            if cmd_exe経由:
+                プロンプト = self._CLI送信用テキスト正規化(プロンプト)
+            return self._予測読取専用コマンド構築(base, プロンプト, repo_path)
 
         if self.code_ai == "aidiy_hermes":
             # 完全プロンプトは argv に載せず、呼び出し側から UTF-8 stdin で渡す。
@@ -799,6 +967,12 @@ class CodeAI:
     async def 開始(self):
         """CodeAI開始（CLIツールのバージョン確認を含む）"""
         try:
+            if self.実行オプション.CLI読取専用:
+                # 単発予測では別プロセスの --version を起動しない。
+                # 実行時の制約付きpreflight/CLIが機能の有無を検証し、失敗時は閉じる。
+                self._予測CLI確認()
+                self.is_alive = True
+                return True
             self.is_alive = True
             self.バージョン = await self.バージョン確認()
             if not self.バージョン:
@@ -981,11 +1155,14 @@ class CodeAI:
             実行結果テキスト
         """
         # 会話継続が無効な実行オプションでは、呼び出し側の指定に関わらず新しいセッションにする。
-        if not self.実行オプション.会話継続:
+        if not self.実行オプション.会話継続 or self.実行オプション.CLI読取専用:
             resume = False
+        self.予測読取専用利用不可 = False
         try:
+            if self.実行オプション.CLI読取専用:
+                self._予測CLI確認()
             self._停止マーカー送信済み = False
-            aidiy_prompt = self._aidiy参照プロンプト取得(絶対パス)
+            aidiy_prompt = "" if self.実行オプション.CLI読取専用 else self._aidiy参照プロンプト取得(絶対パス)
             if aidiy_prompt:
                 要求テキスト += aidiy_prompt
             # 添付ファイル（絶対パス）がある場合は先に付与
@@ -1026,7 +1203,8 @@ class CodeAI:
                     logger.error(f"CodeAI: 変更ファイル一覧処理エラー: {e}")
 
             # 90秒以内の最終イメージがあれば要求テキストに追加（file_pathがない場合の補完）
-            if self.parent_manager and hasattr(self.parent_manager, 'セッションデータ'):
+            if (not self.実行オプション.CLI読取専用 and self.parent_manager
+                    and hasattr(self.parent_manager, 'セッションデータ')):
                 last_image_time = self.parent_manager.セッションデータ.get('最終イメージ時刻')
                 if last_image_time and (time.time() - last_image_time) <= 90:
                     last_image_base64 = self.parent_manager.セッションデータ.get('最終イメージ')
@@ -1153,6 +1331,8 @@ class CodeAI:
             # コマンド構築（プロバイダー別・初回判定付き）
             作業ディレクトリ = 絶対パス if 絶対パス else self.cwd_str
             repo_path = Path(作業ディレクトリ).resolve().as_posix()
+            if self.実行オプション.CLI読取専用:
+                await self._予測CLI準備(repo_path)
             設定モデル = self.code_model
             try:
                 # 同期的なコマンド構築だけに適用し、autoを次のターンにも維持する。
@@ -1210,6 +1390,7 @@ class CodeAI:
                 # auto で選んだモデルを CLI が拒否したときだけ、CLI 既定（same）で1回やり直す。
                 if (
                     選択モデル
+                    and not self.実行オプション.CLI読取専用
                     and (result_text or "").startswith("!")
                     and re.search(r"(?i)\bmodel\b.*\b(not available|not supported|unknown|invalid)\b", result_text or "")
                     and not self._強制停止要求あり()
@@ -1258,6 +1439,9 @@ class CodeAI:
 
             return final_result
 
+        except 予測読取専用利用不可 as e:
+            self.予測読取専用利用不可 = True
+            return f"! {e}"
         except Exception as e:
             # ツールエラーログ（必須）
             logger.error(
@@ -1506,6 +1690,13 @@ class CodeAI:
 
             if monitor_error is not None:
                 raise monitor_error
+
+            if self.実行オプション.CLI読取専用 and process.returncode == 2:
+                # adapterの未対応transportやCLIの未対応引数を、本文とは別の能力エラーにする。
+                # 設定・認証情報を含み得るstdout/stderrをログや戻り値へ出さない。
+                self.予測読取専用利用不可 = True
+                self.last_stderr_output = ""
+                return "! CLIの予測用読取専用モードを利用できません。"
 
             # stdout/stderr の行数と先頭内容を記録
             logger.info(f"[CodeAI] subprocess完了: stdout={stdout_line_count}行, stderr={len(stderr_lines)}行, ai={self.code_ai}, 終了コード={process.returncode}")

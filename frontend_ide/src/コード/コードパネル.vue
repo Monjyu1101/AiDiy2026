@@ -53,8 +53,9 @@ const canApplyModel = computed(() => catalogReady.value && !catalogBusy.value &&
   (model.value === '__custom__' ? !!custom.value.trim() : !offline.value || models.value.some(item => item.id === model.value)));
 const transport = codeTransport(props, receive);
 let disposed = false;
-const predictionScope = () => JSON.stringify([state.作業フォルダ?.パス, state.会話ID, state.セッションID || state.コアセッションID]);
-const predictionAllowed = () => autoSuggest.value && operable.value && state.自動接続 && state.接続済み && !offline.value && !busy.value;
+const predictionScope = () => JSON.stringify([state.作業フォルダ?.パス, state.接続プロジェクトパス, state.会話ID, state.セッションID || state.コアセッションID]);
+const predictionAllowed = () => autoSuggest.value && operable.value && state.自動接続 && state.接続済み
+  && !!state.接続プロジェクトパス && !!(state.セッションID || state.コアセッションID) && !offline.value && !busy.value;
 function cancelPrediction(notify = true) {
   predictionNotice.value = '';
   const request = prediction;
@@ -71,7 +72,7 @@ function startPrediction() {
   prediction = request; predicting.value = true;
   // ホスト応答・画面通信が失われても入力欄をロックしたままにしない。
   request.timer = setTimeout(() => { if (prediction === request) cancelPrediction(); }, 125000);
-  void transport.send({ type: 'predictInput', requestId: request.id, conversationId: state.会話ID,
+  void transport.send({ type: 'predictInput', requestId: request.id, projectPath: state.接続プロジェクトパス, conversationId: state.会話ID,
     sessionId: state.セッションID || state.コアセッションID || '' }).catch(() => { if (prediction === request) cancelPrediction(); });
 }
 function toggleSuggestion() {
@@ -105,6 +106,7 @@ function receive(packet) {
     const first = !state.会話ID;
     const changed = !!state.会話ID && state.会話ID !== packet.会話ID;
     const scopeChanged = !first && (state.作業フォルダ?.パス !== packet.作業フォルダ?.パス
+      || state.接続プロジェクトパス !== packet.接続プロジェクトパス
       || (state.セッションID || state.コアセッションID) !== (packet.セッションID || packet.コアセッションID));
     const completedReply = !first && !changed && !scopeChanged && state.実行中 && !packet.実行中 && predictionReply && !predictionFailed && !state.停止中 && !packet.停止中;
     if (first || changed || scopeChanged || !packet.接続済み || packet.画面接続済み === false || packet.停止中) {
@@ -119,7 +121,8 @@ function receive(packet) {
     // 同じ描画周期に終了→次の開始が届いても前の依頼の判定を持ち越さない。
     if (first || changed || !state.実行中 || !packet.実行中 ||
         (state.進捗.length > 0 && (packet.進捗 || []).length === 0)) hasStreamContent.value = false;
-    Object.assign(state, packet, { 自動接続: packet.自動接続 !== false, 画面接続済み: packet.画面接続済み !== false }); pending.value = false; autoPending.value = false;
+    Object.assign(state, packet, { 接続プロジェクトパス: typeof packet.接続プロジェクトパス === 'string' ? packet.接続プロジェクトパス : '',
+      自動接続: packet.自動接続 !== false, 画面接続済み: packet.画面接続済み !== false }); pending.value = false; autoPending.value = false;
     if (deleteTarget.value && (packet.実行中 || !state.履歴.some(item => item.id === deleteTarget.value.id))) deleteTarget.value = null;
     if (changed || !packet.実行中 || packet.停止中) stopPending.value = false;
     if (!checksRestored && [0, 1, 2, 3].includes(packet.検証回数)) { checks.value = packet.検証回数; checksRestored = true; }

@@ -61,7 +61,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     自動接続: !initialModel.offline, 接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
     検証回数: 検証回数読込(optionsFile) ?? 0,
     メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false, 停止中: false,
-    セッションID: undefined as string | undefined,
+    セッションID: undefined as string | undefined, 接続プロジェクトパス: '',
     HermesセッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
   };
@@ -98,8 +98,8 @@ export async function 単独起動(project: string, backend?: string, initialMod
   const 表示状態 = () => オフライン使用() ? { ...state, 実行モード: 'offline',
     ...(state.実行モード === 'offline' ? {} : modeModels.offline),
     セッションID: state.実行モード === 'offline' ? state.セッションID : state.HermesセッションID } : state;
-  const prediction = new InputPrediction(root, () => ({ projectPath: folder, conversationId: state.会話ID,
-    sessionId: state.セッションID || '', enabled: !closed && state.自動接続 && !オフライン使用() && !state.実行中 && !state.モデル変更中 }));
+  const prediction = new InputPrediction(root, () => ({ projectPath: connection.projectPath, conversationId: state.会話ID,
+    sessionId: connection.session, enabled: !closed && state.自動接続 && !オフライン使用() && !state.実行中 && !state.モデル変更中 }));
   const notify = () => { prediction.sync(); broadcast(表示状態()); };
   const save = (更新日時を変更 = true) => {
     if (!state.メッセージ.length && !state.セッションID) return;
@@ -143,6 +143,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     if (state.実行モード !== 'online' || closed) return;
     state.モデル変更中 = connection.modelChanging;
     state.接続済み = connection.connected; state.接続中 = connection.接続中; state.接続エラー = connection.error;
+    state.接続プロジェクトパス = connection.projectPath;
     if (connection.connected) {
       state.セッションID = connection.session;
       state.provider = connection.model.provider; state.model = connection.model.model;

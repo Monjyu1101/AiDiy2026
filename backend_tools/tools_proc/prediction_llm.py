@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import tempfile
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -55,9 +54,15 @@ _SYSTEM_INSTRUCTION = (
     "確定した事実や実際のユーザーの依頼として扱わず、会話にない個人情報を作らないでください。"
 )
 _CLI_INSTRUCTION = _SYSTEM_INSTRUCTION + (
-    "ファイル・コマンド・ツールは使わず、応答の先頭に必ず " + _CLI_MARKER + " を付けてください。"
+    "接続中のプロジェクトのファイル名や内容は読み取り専用で参照できます。"
+    "ファイルの作成・変更・削除、状態を変更するコマンドや外部ツールの実行は禁止です。"
+    "過去の依頼を実行せず、予測文だけを返し、応答の先頭に必ず " + _CLI_MARKER + " を付けてください。"
     "! で始める場合も " + _CLI_MARKER + " の直後に置きます。"
 )
+
+
+class PredictionReadonlyUnavailable(RuntimeError):
+    """CLIの予測用制約を確認できない場合は、制約を緩めず終了する。"""
 
 
 def _prediction_prompt(history):
@@ -214,7 +219,8 @@ class PredictionLLM:
         # DB初期化・履歴APIの登録処理・通常チャットの保存経路は通さない。
         try:
             history = await asyncio.to_thread(read_prediction_history, self.root / "_data" / "AiDiy" / "database.db", project,
-                                              max_turns=HISTORY_MAX_TURNS, max_chars=HISTORY_MAX_CHARS, now=requested_at)
+                                              max_turns=HISTORY_MAX_TURNS, max_chars=HISTORY_MAX_CHARS,
+                                              now=requested_at, user_only=True)
         except Exception:
             result["result"] = "会話履歴を読み取れません。DBの準備と現行スキーマを確認してください。"
             return result
@@ -231,11 +237,14 @@ class PredictionLLM:
         history_text = _prediction_prompt(history)
         try:
             with prediction_private_logs():
-                run = self._run_cli if name in CLI_PROVIDERS else self._run_chat
-                content = await asyncio.wait_for(run(name, model, history_text, timeout_sec), timeout=timeout_sec)
+                run = (self._run_cli(name, model, history_text, timeout_sec, project)
+                       if name in CLI_PROVIDERS else self._run_chat(name, model, history_text, timeout_sec))
+                content = await asyncio.wait_for(run, timeout=timeout_sec)
             result.update(status="OK", result=content.strip()[:4000])
         except asyncio.CancelledError:
             raise
+        except PredictionReadonlyUnavailable:
+            result["result"] = "選択したCLIでは予測用の読取専用制約を確認できません。CLIの対応オプションと設定を確認してください。制約を緩めた再実行は行いません。"
         except Exception:
             result["result"] = "予測を生成できませんでした。モデルの利用可否と接続状態を確認してください。"
         return result
@@ -254,18 +263,23 @@ class PredictionLLM:
             raise ValueError()
         return content
 
-    async def _run_cli(self, name, model, history_text, timeout_sec):
-        # CLIは作業フォルダを読み書きできるため、空の一時フォルダで権限none・継続なしの1回だけ実行する。
-        with tempfile.TemporaryDirectory(prefix="aidiy_prediction_") as folder:
-            response = await self._code.run_async(
-                prompt=history_text, project_path=folder, ai_name=name, ai_model=model,
-                code_permissions="none", system_instruction=_CLI_INSTRUCTION,
-                resume=False, timeout_sec=timeout_sec, self_check_loop=0,
-                実行オプション=AI実行オプション.単発(),
-            )
+    async def _run_cli(self, name, model, history_text, timeout_sec, project_path):
+        # セッションで確定したプロジェクトだけを使う。消滅時にcwdや設定値へ逃がさない。
+        project = Path(project_path)
+        if not project.is_absolute() or not project.is_dir():
+            raise ValueError("接続中のプロジェクトを参照できません。")
+        # 指示文ではなくCLI固有の実行境界で読取専用を強制する。
+        response = await self._code.run_async(
+            prompt=history_text, project_path=str(project), ai_name=name, ai_model=model,
+            code_permissions="none", system_instruction=_CLI_INSTRUCTION,
+            resume=False, timeout_sec=timeout_sec, self_check_loop=0,
+            実行オプション=AI実行オプション.読取専用予測(),
+        )
+        if response.get("prediction_readonly_unavailable"):
+            raise PredictionReadonlyUnavailable()
         content = response.get("result")
         content = content.strip() if isinstance(content, str) else ""
         # 目印がない応答はCLIの実行エラーとして扱う。
-        if not content.startswith(_CLI_MARKER) or not content[len(_CLI_MARKER):].strip():
+        if response.get("status") != "OK" or not content.startswith(_CLI_MARKER) or not content[len(_CLI_MARKER):].strip():
             raise ValueError()
         return content[len(_CLI_MARKER):]

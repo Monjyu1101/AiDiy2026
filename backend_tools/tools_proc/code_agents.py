@@ -330,6 +330,17 @@ Args:
         resolved_path = self._resolve_project_path(project_path)
         ai_name, ai_model = self._resolve_ai_params(ai_name, ai_model)
 
+        # 予測専用の制約は通常の permissions=none と別扱い。初期化・CLI起動より前に確認。
+        prediction_readonly = bool(getattr(実行オプション, "CLI読取専用", False))
+        if prediction_readonly and (ai_name not in {"codex_cli", "copilot_cli", "aidiy_hermes"} or self_check_loop > 0):
+            return {
+                "status": "NG",
+                "result": "! 指定CLIまたは自己検証ループは予測用の読取専用実行に未対応です。",
+                "prediction_readonly_unavailable": True,
+                "project_path": resolved_path, "ai_name": ai_name, "ai_model": ai_model,
+                "prompt_length": len(prompt),
+            }
+
         # 利用不可の AI が指定された場合は早期リターン
         if ai_name in self.version_info and not self.version_info[ai_name].get("ok"):
             reason = self.version_info[ai_name].get("version", "利用不可")
@@ -398,7 +409,7 @@ Args:
             await ai_instance.終了()
 
         result_text, result_status = _応答結果(result_text)
-        return {
+        result = {
             "status": result_status,
             "result": result_text,
             "project_path": resolved_path,
@@ -410,3 +421,6 @@ Args:
             "self_check_updated": self_check_updated,
             "self_check_files": self_check_files,
         }
+        if prediction_readonly:
+            result["prediction_readonly_unavailable"] = bool(getattr(ai_instance, "予測読取専用利用不可", False))
+        return result

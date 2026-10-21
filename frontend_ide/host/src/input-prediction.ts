@@ -13,7 +13,7 @@
 import { ローカルTools接続先 } from '../aidiy_live/local-backend.cjs';
 
 type PredictionContext = { projectPath: string; conversationId: string; sessionId: string; enabled: boolean };
-type PredictionRequest = { requestId?: unknown; conversationId?: unknown; sessionId?: unknown };
+type PredictionRequest = { requestId?: unknown; projectPath?: unknown; conversationId?: unknown; sessionId?: unknown };
 const identity = (value: PredictionContext) => JSON.stringify([value.projectPath, value.conversationId, value.sessionId]);
 
 /** 画面の任意URL・プロジェクト指定を通さず、現在のCode会話だけを内部RESTへ渡す。 */
@@ -33,7 +33,8 @@ export class InputPrediction {
     const result = { type: 'predictionResult' as const, requestId: data.requestId, text: '' };
     const current = this.context();
     if (typeof data.requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(data.requestId) || !current.enabled
-        || !current.projectPath || !current.sessionId || data.conversationId !== current.conversationId || data.sessionId !== current.sessionId
+        || !current.projectPath || !current.sessionId || data.projectPath !== current.projectPath
+        || data.conversationId !== current.conversationId || data.sessionId !== current.sessionId
         || this.requests.has(data.requestId) || this.requests.size >= 4) return result;
     const controller = new AbortController(), context = identity(current);
     this.requests.set(data.requestId, { controller, context });

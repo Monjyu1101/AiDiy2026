@@ -138,6 +138,24 @@ print(res.json())
 
 `aidiy_prediction_llms` はMCP非公開で、`POST /internal/prediction_llms` のみを提供する。`/aidiy_prediction_llms/*` の公開経路やMCP/CLI登録はない。Live試行と同じく接続元IPとHostがloopbackで、`X-AiDiy-Diag: model-trial` と `Content-Type: application/json` が必要。Origin・プロキシ転送ヘッダー・クエリは拒否する。JSON本文は64KiB以下・受信3秒以内で、`project_path` が必須。詳細と利用例は [backend_tools 構成](./backend_tools,構成.md#次のユーザー入力予測) を参照する。
 
+## 次入力予測の接続スコープ
+
+Codeの予測は、接続中Coreセッションのモデル情報で確定した `CODE_BASE_PATH` を履歴取得とCLIの作業フォルダに使用する。起動フォルダ・画面表示・共通設定にはフォールバックしない。セッションのパスが未取得、切断、プロジェクトが存在しない場合は予測しない。要求中のセッション・プロジェクト切替は取り消し、古い結果を下書きに適用しない。
+
+履歴は同じプロジェクトの直近2時間・最大10ターンのユーザー入力だけを予算に含める。通常の入出力履歴読取は従来のままで、予測だけが `read_prediction_history(user_only=True)` を指定する。
+
+### CLI予測の読取専用境界
+
+予測専用の `AI実行オプション.読取専用予測()` を使用する。通常のCode実行や `code_permissions=none` の意味は変更しない。指示文だけでは読取専用を保証しない。
+
+- Codex: 読取専用sandboxと承認禁止、`--ephemeral`、`--ignore-rules` を指定し、予測には不要な追加機能を無効にする。有効MCP一覧を取得し、各サーバーを明示的に無効化した一覧を再検証してから推論する。`mcp_servers={}` は継承設定を消さないため使用しない。検証と推論は同じ設定階層を使用する。
+- Copilot: `--available-tools=view,grep,glob` の許可一覧でモデルのツールを参照だけに絞り、write/shellを拒否する。通常の全ツール許可や既存セッション継続は使用しない。
+- Hermes: bundled環境の専用 `prediction_main.py` から、API方式のモデルだけを使用する。safe modeをimport前に設定し、`read_file` / `search_files` だけのtoolsetと実行時許可一覧の二重検査を行う。通常CLI・カスタム実行ファイルにはフォールバックしない。外部CLI委譲モデル、ACP、Codex App Server等の別ランタイムはこの制限を通らないため、予測では未対応として停止する。予測adapterはHermesの会話DB・JSON snapshot・trajectory保存とAPI失敗時の全文dumpも抑止する。読取りはローカルのテキストを対象にし、PDF・Office変換、外部OCR、依存パッケージの自動追加は行わない。検索のoption注入を避けるため、先頭が `-` の検索pattern/pathは拒否する（文字としては `[-]`、ファイル名は `./-name` を使用する）。
+- 対応していないオプション・検証不能な設定ではNGで終了する。制約を外した再試行や別プロジェクトへの切替は行わない。実インストール版の互換性は利用環境での確認が必要。
+- 非保存指定はAiDiyの会話DB・画面送信・生成ファイルを対象にする。Codexのephemeralはrollout保存も抑止するが、CLI自身の認証更新・キャッシュ・運用ログや管理者が強制する起動処理まで禁止するOS全体の隔離ではない。Copilot等の独自セッション保存とAiDiyの会話履歴保存は別扱い。
+
+公式仕様の確認先: [Codex CLI](https://developers.openai.com/codex/cli/reference)、[Codex設定](https://developers.openai.com/codex/config-reference)、[Copilot CLI](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)、[Hermes CLI](https://hermes-agent.nousresearch.com/docs/reference/cli-commands#hermes-chat)、[Hermes toolsets](https://hermes-agent.nousresearch.com/docs/reference/toolsets-reference)。CLI更新で必要な制約が使えなくなった場合は、弱い設定に戻さず対応を確認する。
+
 ## 環境変数
 
 | 変数名 | 既定 | 用途 |

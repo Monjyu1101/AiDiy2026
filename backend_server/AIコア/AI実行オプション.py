@@ -24,11 +24,20 @@ class AI実行オプション:
     履歴保存: bool = True        # 保存関数で A会話履歴 へ書き込む
     ストリーム送信: bool = True  # 接続の send_to_channel で画面へ送る
     出力ファイル保存: bool = True  # AIが返した画像などを temp/output へ保存する
+    CLI読取専用: bool = False    # 内部予測専用。通常の code_permissions=none とは別の制約
 
     @classmethod
     def 単発(cls) -> "AI実行オプション":
         """引き継がず・残さず・送らない1回だけの実行。"""
         return cls(会話継続=False, 履歴保存=False, ストリーム送信=False, 出力ファイル保存=False)
+
+    @classmethod
+    def 読取専用予測(cls) -> "AI実行オプション":
+        """単発予測を、モデルによる変更・副作用ツールを禁止したCLIで実行する。"""
+        return cls(
+            会話継続=False, 履歴保存=False, ストリーム送信=False,
+            出力ファイル保存=False, CLI読取専用=True,
+        )
 
 
 既定実行オプション = AI実行オプション()

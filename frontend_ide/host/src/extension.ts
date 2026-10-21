@@ -83,8 +83,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.prediction = new InputPrediction(context.extensionPath, () => ({
-      projectPath: this.現在フォルダ()?.uri.fsPath || '', conversationId: this.会話ID,
-      sessionId: this.会話.コアセッションID || '', enabled: !this.破棄済み && !!this.view && vscode.workspace.isTrusted
+      projectPath: this.connection?.projectPath || '', conversationId: this.会話ID,
+      sessionId: this.connection?.session || '', enabled: !this.破棄済み && !!this.view && vscode.workspace.isTrusted
         && this.自動接続 && !this.オフライン使用() && !this.実行中 && !this.モデル変更中(),
     }));
     const config = vscode.workspace.getConfiguration('aidiyHermes');
@@ -166,6 +166,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
       作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null,
+      接続プロジェクトパス: this.connection?.projectPath || '',
       新規可能: Boolean(this.選択フォルダ()), 信頼済み: vscode.workspace.isTrusted,
       モデル変更中: this.モデル変更中(), 接続済み: this.connection?.connected === true, 接続中: this.connection?.接続中 === true, 接続エラー: this.connection?.error || ''
     });
