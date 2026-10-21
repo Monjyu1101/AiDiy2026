@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import {ref,computed,onMounted,onBeforeUnmount,nextTick} from 'vue';
 import {loadMonaco,monacoLanguage} from '../ファイル閲覧/コード表示.js';
 import {createViewerActivity} from '../ファイル閲覧/閲覧待機.js';
@@ -64,7 +65,7 @@ onBeforeUnmount(()=>{userActivity.dispose();closed=true;revision++;controller?.a
       <header><h2 id="file-history-title">更新履歴</h2><span :title="root">{{ file.path }}</span><button v-if="embedded&&!pinned" class="viewer-pin" :disabled="pinBusy" title="別ウィンドウで開く" aria-label="ソース比較を別ウィンドウで開く" @click="emit('pin')">📌</button><button aria-label="更新履歴を閉じる" @click="close"><span class="close-icon" aria-hidden="true"></span></button></header>
       <div class="file-history-toolbar">
         <label>旧版 <select v-model="selected" :disabled="!versions.length" aria-label="比較するバックアップ" @change="loadComparison"><option v-for="version in versions" :key="version.id" :value="version.id">{{ version.label }}{{ version.fullBackup?'（全件）':'' }} · {{ version.backupPath.split('/backup/')[0]===version.backupPath?'ルート':version.backupPath.split('/backup/')[0] }}</option></select></label>
-        <button :disabled="loading" @click="refresh">再読み込み</button>
+        <RefreshButton :disabled="loading" :busy="loading" title="更新履歴を再読み込み" @click="refresh">再読み込み</RefreshButton>
         <span v-if="comparison&&!loading&&!error" class="file-history-changes" :class="{'has-changes':changes>0,'no-changes':changes===0}" role="status">{{ changes===0?'差分はありません':changes===null?'差分を計算中…':`${changes}か所の変更` }}</span>
       </div>
       <p v-if="chosen" class="file-history-path">{{ chosen.backupPath }}</p>
@@ -73,7 +74,7 @@ onBeforeUnmount(()=>{userActivity.dispose();closed=true;revision++;controller?.a
       <div class="file-history-content">
         <div ref="host" class="file-history-editor" :aria-busy="loading" />
         <p v-if="loading" class="file-history-message" role="status">比較を準備しています…</p>
-        <p v-else-if="error" class="file-history-message error" role="alert">{{ error }} <button @click="refresh">再試行</button></p>
+        <p v-else-if="error" class="file-history-message error" role="alert">{{ error }} <RefreshButton :disabled="loading" :busy="loading" title="更新履歴の取得を再試行" @click="refresh">再試行</RefreshButton></p>
         <p v-else-if="!versions.length" class="file-history-message">このファイルのバックアップはありません。</p>
       </div>
     </component>

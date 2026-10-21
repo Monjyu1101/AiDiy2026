@@ -33,6 +33,15 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 - Windows実機では、別アプリを含むON窓A/Bの交互選択、OFFへ変更したIDE子窓とIDE本体の前後入替、他アプリ選択、VR中の解除拒否、VR終了後の復元を実窓で確認する。headless・モックの成功を実デスクトップのZ順検証として扱わない。
 - `node frontend_ide/scripts/check-ide-pin-order.mjs` は隔離したWindows実窓とPython標準ライブラリの読み取りだけで、IDEを持ち上げた時の実際のWin32 Z順を検証する。ON・再ON・IDE自身のピン切替・VRロックでは子が前、OFF・VRからOFFへ復元した時は前後を入れ替えられることを確認する。`isAlwaysOnTop()` の報告と実際のZ順は区別する。
 
+## 再取得・再読込の表示
+
+再取得・再読込は `frontend_web/src/components/AiDiy/compornents/AIファイル.vue` の緑の **↺** に合わせる。通常は背景 `#22c55e`・枠 `#16a34a`・白い文字、hover は背景 `#34d399`・枠 `#22c55e`、disabled は背景 `#1f8a4b`・枠 `#166a39`・opacity `0.4` とする。記号だけのボタンは24px角・記号18pxで、hover時に1.2倍へ拡大する。文字付き操作は説明と既存の配置を保ち、記号だけを拡大する。
+
+- IDE・Explorer・Viewer・Browser・検索／履歴は `frontend_ide/src/共通表示/再読込ボタン.vue`、Avatar は `frontend_avatar/src/components/再読込ボタン.vue`、Diag は `backend_diag/ui/src/共通表示/再取得ボタン.css` を使う。2D・別窓のテーマや本文の文字サイズで色・記号の大きさを上書きしない。
+- 記号は `aria-hidden` とし、ボタンには操作名を付ける。既存の読込中・未接続・編集中などの無効条件と実行処理は維持する。Browser は読み込み中に停止操作へ切り替わり、停止を無効化しない。
+- 再起動・再接続・再導入・ループ設定・画面切替は再取得と区別する。操作がない画面へ追加せず、削除済みのDiagミニCLI・Explorer右クリックの再取得も復活させない。ピン・閉じる・時刻検索の配置は変えない。
+- 変更後は各Vueのコンパイルと配布物の一致に加え、通常・hover・disabled、繰り返し操作、Browserの停止切替、2D・別窓の表示を確認する。コンパイルや合成状態の検査を実画面の確認として扱わない。
+
 ## 0.5秒長押しドラッグ
 
 - `frontend_ide/デスクトップ/長押し窓移動.cjs` と `code-drag.cjs` を共用する。500msの静止判定をアプリごとに複製しない。

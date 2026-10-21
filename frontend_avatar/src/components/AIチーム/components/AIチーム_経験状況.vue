@@ -3,6 +3,7 @@
 // 開いている間は5秒、折り畳み中は10秒ごとに更新確認し、非表示中は停止する
 import { computed, onMounted, ref, watch } from 'vue';
 import { teamClient } from '@/api/client';
+import 再読込ボタン from '@/components/再読込ボタン.vue';
 import AIチーム_応答内容 from '../dialog/AIチーム_応答内容.vue';
 import type { チーム経験 } from '../AIチーム_型';
 import { use自由配置パネル } from '../use自由配置パネル';
@@ -201,7 +202,7 @@ onMounted(async () => {
       <div v-if="読込中" class="panel-message">チーム経験を読み込んでいます…</div>
       <div v-else-if="読込エラー" class="panel-message error">
         <span>{{ 読込エラー }}</span>
-        <button type="button" @click="() => 経験一覧読込()">再読込</button>
+        <component :is="再読込ボタン" label="再読込" @click="() => 経験一覧読込()" />
       </div>
       <div v-else-if="経験一覧.length === 0" class="panel-message">
         このプロジェクトの経験はまだありません。
@@ -469,15 +470,6 @@ td small {
   color: #ff9bab;
 }
 
-.panel-message button {
-  padding: 5px 8px;
-  border: 1px solid rgba(135, 114, 255, 0.48);
-  border-radius: 7px;
-  color: #d8ceff;
-  background: rgba(101, 76, 190, 0.18);
-  cursor: pointer;
-  font-size: 9px;
-}
 
 .panel-hint {
   padding: 5px 8px;

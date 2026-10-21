@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import { ref, computed, inject, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { loadMonaco, monacoLanguage } from '../ファイル閲覧/コード表示.js';
 import { searchReference, fileDraftReference } from '../ファイル閲覧/ファイル参照.js';
@@ -52,7 +53,7 @@ const params=value=>new URLSearchParams(value).toString();
 function disposeEditor(){scrollSubscription?.dispose();scrollSubscription=null;const previous=editor;editor=undefined;const model=previous?.getModel();previous?.dispose();model?.dispose();}
 async function checkHistory(file,run,signal){
   try{const response=await fetch('/api/file-history?'+new URLSearchParams({path:file.path}),{signal,cache:'no-store'});const value=await response.json();if(!response.ok)throw Error(value.error);if(run===revision)hasHistory.value=value.versions.length>0;}
-  catch(e){if(run===revision&&e.name!=='AbortError')historyError.value='更新履歴を確認できませんでした。⟳で再確認できます。';}
+  catch(e){if(run===revision&&e.name!=='AbortError')historyError.value='更新履歴を確認できませんでした。↺で再確認できます。';}
 }
 // ファイルを読み込む。リフレッシュでも同じ処理を使い、キャッシュを使わず最新の内容を取り直す。
 async function revealMatch(file,run){
@@ -144,8 +145,8 @@ defineExpose({moved:bindActivityWindow});
       <button v-if="hasHistory&&openHistory" class="viewer-history" @click="openHistory(file,root)">更新履歴</button>
       <button v-if="openAnalysis" class="viewer-analysis" title="AiDiy分析" aria-label="AiDiy分析" @click="openAnalysis(file,root)"><img :src="'/development/AiDiy.png'" alt="">AiDiy分析</button>
       <button v-if="openDraft" class="viewer-handoff" :disabled="!root" title="このファイルまたは選択範囲を起動中のCode / Liveの下書きへ追加" @pointerdown.prevent @click="handoff">Code / Liveへ</button>
-      <!-- 右端は ⟳ 📌 × の順。ページ内の📌で別ウィンドウを開く。 -->
-      <button class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" @click="refresh">⟳</button><button v-if="!pinned" class="viewer-pin" :disabled="pinBusy" title="別ウィンドウで開く" aria-label="ファイルを別ウィンドウで開く" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')"><span class="close-icon" aria-hidden="true"></span></button></header>
+      <!-- 右端は ↺ 📌 × の順。ページ内の📌で別ウィンドウを開く。 -->
+      <RefreshButton class="viewer-refresh" title="最新の内容に更新" aria-label="最新の内容に更新" :disabled="reloading" :busy="reloading" @click="refresh" /><button v-if="!pinned" class="viewer-pin" :disabled="pinBusy" title="別ウィンドウで開く" aria-label="ファイルを別ウィンドウで開く" @click="emit('pin',file)">📌</button><button v-if="!pinned" aria-label="プレビューを閉じる" @click="emit('close')"><span class="close-icon" aria-hidden="true"></span></button></header>
     <div class="viewer-path-row"><p class="viewer-path" :title="fullPath">{{ fullPath }}</p><div class="viewer-path-actions"><button class="viewer-copy" :disabled="!!actionBusy" aria-live="polite" @click="copy">{{ copied?'コピーしました':'パスをコピー' }}</button><button v-if="canOpenFile" class="viewer-open-app" :disabled="!!actionBusy" @click="openFile">{{ actionBusy==='open'?'開いています…':'アプリで開く' }}</button></div></div><div class="viewer-meta">{{ data?.kind }} · {{ data?.size?.toLocaleString() }} B · {{ new Date(stamp).toLocaleTimeString('ja-JP') }} 読込</div>
     <p v-if="actionError" class="error viewer-action-error" role="status">{{ actionError }}</p>
     <p v-if="file.unlisted" class="input-hint">現在の一覧に含まれない検索結果を直接表示しています。</p>

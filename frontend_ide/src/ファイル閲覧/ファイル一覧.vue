@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import { ref, shallowRef, computed, inject, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { createRouteExpansion } from '../ファイル閲覧/軌跡パネル展開.js';
 import { createPanelWindow, fadePanel } from '../ファイル閲覧/パネル別窓.js';
@@ -385,7 +386,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
       </div>
     </div>
     <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー" @contextmenu.self.prevent="contextMenu($event)" @pointerdown.capture="emit('activity')">
-      <header><button v-if="!allDisplays" class="burger-button explorer-burger" aria-label="エクスプローラーを閉じる" title="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button><span>エクスプローラー</span><button type="button" class="explorer-refresh" :class="{refreshing:fileActionState.refreshing}" :title="fileActionState.refreshing?'一覧を更新中…':'一覧を更新'" aria-label="一覧を更新" :aria-busy="fileActionState.refreshing" :disabled="!reload||fileActionState.busy||!!fileActionState.rename||!!fileActionState.dialog||searching||!!draftRequest" @click="fileActions.action('refresh')"><span aria-hidden="true">↻</span></button><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" :disabled="fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button><button v-if="(!detached||!nativePanels)&&(!allDisplays||!detached)" class="explorer-detach" :aria-label="detached?'本体へ戻す':'エクスプローラーを別ウィンドウで開く'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button></header>
+      <header><button v-if="!allDisplays" class="burger-button explorer-burger" aria-label="エクスプローラーを閉じる" title="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button><span>エクスプローラー</span><RefreshButton class="explorer-refresh" :class="{refreshing:fileActionState.refreshing}" :busy="fileActionState.refreshing" :title="fileActionState.refreshing?'一覧を更新中…':'一覧を更新'" aria-label="一覧を更新" :disabled="!reload||fileActionState.busy||!!fileActionState.rename||!!fileActionState.dialog||searching||!!draftRequest" @click="fileActions.action('refresh')" /><button v-show="mode!=='ai'" title="選択位置を表示" @click="cancelSinceExpansion();reveal()">◎</button><button v-show="mode!=='ai'" title="すべて閉じる" :disabled="fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()">⊟</button><button v-if="(!detached||!nativePanels)&&(!allDisplays||!detached)" class="explorer-detach" :aria-label="detached?'本体へ戻す':'エクスプローラーを別ウィンドウで開く'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()">{{ detached?'↙':'📌' }}</button></header>
       <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">時刻検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>
@@ -425,8 +426,6 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 
 <style scoped>
 .time-search>label{display:flex;align-items:center;gap:6px;margin-bottom:5px}.time-search input{flex:1;min-width:0}.time-search>small{display:block}.time-search>p{margin:5px 0;color:#ffaaa5;white-space:normal}
-.explorer-refresh span{display:inline-block;line-height:1}.explorer-refresh.refreshing span{animation:explorer-refresh-spin 1s linear infinite}.explorer-refresh:disabled{opacity:.5;cursor:default}
-@keyframes explorer-refresh-spin{to{transform:rotate(360deg)}}
 .explorer-rename{flex:1;min-width:0;width:0;height:23px;box-sizing:border-box;background:#0c1424;color:#fff;border:1px solid #8de6eb;padding:1px 4px;font:inherit}.explorer-rename:focus{outline:1px solid #8de6eb}
 
 .scan-warning{margin:0;padding:6px 8px;color:#ffe28a;font-size:var(--file-font-size,10px);overflow-wrap:anywhere;flex-shrink:0}

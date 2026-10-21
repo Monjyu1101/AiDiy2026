@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
+import 再読込ボタン from '@/components/再読込ボタン.vue';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import AiTeamConversation from '../dialog/AIチーム_会話要求.vue';
 import {
@@ -2429,7 +2430,7 @@ onBeforeUnmount(() => {
     <div v-else-if="要員読込エラー" class="viewer-message error">
       <strong>要員一覧を表示できません</strong>
       <span>{{ 要員読込エラー }}</span>
-      <button type="button" @click="emit('retry')">再試行</button>
+      <component :is="再読込ボタン" title="要員一覧を再読込" label="再試行" @click="emit('retry')" />
     </div>
     <div v-else-if="エージェント一覧.length === 0" class="viewer-message">
       <strong>召喚済みの要員がいません</strong>
@@ -2549,14 +2550,11 @@ onBeforeUnmount(() => {
 .viewer-message strong { font-size: 12px; }
 .viewer-message span { color: #7995a5; font-size: 9px; line-height: 1.5; }
 .viewer-message.error { border-color: rgba(255, 126, 182, 0.28); }
-.viewer-message button {
+.viewer-message .refresh-button {
   margin-top: 5px;
-  padding: 5px 12px;
-  border: 1px solid rgba(91, 217, 255, 0.3);
-  border-radius: 6px;
-  color: #9ceaff;
-  background: rgba(91, 217, 255, 0.08);
-  cursor: pointer;
+  --refresh-button-height: 36px;
+  --refresh-button-label-size: 16px;
+  --refresh-button-padding: 0 12px;
 }
 
 .scene-titlebar {

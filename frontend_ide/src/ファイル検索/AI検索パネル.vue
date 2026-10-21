@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue';
 const props=defineProps({root:String});
 const emit=defineEmits(['result','search']);
@@ -87,7 +88,7 @@ onBeforeUnmount(()=>{stop();++historyRun;historyController?.abort();});
 <template>
   <section class="ai-search-panel" aria-label="AiDiy検索">
     <div class="ai-history-header"><strong>AiDiy検索</strong><button type="button" :aria-expanded="showHistory" @click="showHistory=!showHistory;deleting=null;if(showHistory)loadHistory()">{{ showHistory?'検索へ戻る':`履歴 (${history.length})` }}</button></div>
-    <p v-if="historyError" role="alert">{{ historyError }} <button type="button" @click="loadHistory()">再読込</button></p>
+    <p v-if="historyError" role="alert">{{ historyError }} <RefreshButton :disabled="historyBusy" :busy="historyBusy" title="AiDiy検索履歴を再読込" @click="loadHistory()">再読込</RefreshButton></p>
     <section v-if="showHistory" class="ai-search-history" aria-label="このプロジェクトのAiDiy検索履歴">
       <p v-if="historyBusy" role="status">履歴を読み込んでいます…</p>
       <p v-else-if="!history.length">このプロジェクトに検索履歴はありません。</p>
@@ -107,7 +108,7 @@ onBeforeUnmount(()=>{stop();++historyRun;historyController?.abort();});
     <template v-if="job">
       <p class="ai-result-path">{{ job.path }}</p>
       <p v-if="!busy&&job.status!=='complete'">エージェントの実行状況をご確認ください。未実行の場合は、依頼文を使ってエージェントを実行してください。前回のAiDiy検索軌跡は保持します。</p>
-      <div class="ai-search-actions"><button type="button" @click="copy">依頼文をコピー</button><button type="button" :disabled="busy" @click="recheck">結果を再確認</button></div>
+      <div class="ai-search-actions"><button type="button" @click="copy">依頼文をコピー</button><RefreshButton :disabled="busy" :busy="busy" title="AiDiy検索の結果を再確認" @click="recheck">結果を再確認</RefreshButton></div>
       <p v-if="copyMessage" role="status">{{ copyMessage }}</p>
       <details><summary>依頼文</summary><textarea readonly :value="job.prompt" rows="5" aria-label="AiDiy検索の依頼文" /></details>
     </template>

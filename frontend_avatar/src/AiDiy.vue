@@ -29,6 +29,7 @@ import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
 import WindowShell from '@/components/_WindowShell.vue'
+import 再読込ボタン from '@/components/再読込ボタン.vue'
 import apiClient from '@/api/client'
 import { defaultModelSettings } from '@/api/config'
 import { AIWebSocket, createWebSocketUrl } from '@/api/websocket'
@@ -1412,13 +1413,11 @@ onBeforeUnmount(() => {
           <div class="web-tab-title-right">
             <span :class="['web-panel-status-dot', Webアクティブ状態クラス]"></span>
             <span class="web-panel-status-text">{{ Webアクティブ状態表示 }}</span>
-            <button
+            <component :is="再読込ボタン"
               v-if="アクティブタブ === 'file'"
-              class="web-panel-reload-btn"
-              type="button"
               :disabled="ファイルRef?.読込中"
               @click="ファイルRef?.ファイルリスト要求()"
-            >↺</button>
+            />
           </div>
         </div>
 
@@ -1819,7 +1818,7 @@ onBeforeUnmount(() => {
       <template #title-right>
         <span :class="['file-status-dot', ファイルRef?.出力接続済み ? 'on' : '']"></span>
         <span class="file-status-text">{{ ファイルRef?.出力接続済み ? '接続中' : '切断' }}</span>
-        <button class="file-reload-btn" type="button" :disabled="ファイルRef?.読込中" @click="ファイルRef?.ファイルリスト要求()">↺</button>
+        <component :is="再読込ボタン" :disabled="ファイルRef?.読込中" @click="ファイルRef?.ファイルリスト要求()" />
       </template>
       <component
         :is="AIコアファイル"
@@ -1973,21 +1972,6 @@ onBeforeUnmount(() => {
 }
 .file-status-dot.on { background: #44ff44; }
 .file-status-text { font-size: 10px; font-weight: bold; }
-.file-reload-btn {
-  background: #22c55e;
-  border: 1px solid #16a34a;
-  border-radius: 2px;
-  font-size: 14px;
-  color: #fff;
-  cursor: pointer;
-  width: 20px;
-  height: 20px;
-  line-height: 18px;
-  text-align: center;
-  padding: 0;
-}
-.file-reload-btn:hover:not(:disabled) { background: #34d399; }
-.file-reload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .chat-status-dot {
   width: 8px;
   height: 8px;
@@ -2432,27 +2416,6 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: bold;
   white-space: nowrap;
-}
-.web-panel-reload-btn {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid #16a34a;
-  background: #22c55e;
-  color: #ffffff;
-  border-radius: 2px;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 18px;
-  text-align: center;
-}
-.web-panel-reload-btn:hover:not(:disabled) {
-  background: #34d399;
-  border-color: #22c55e;
-}
-.web-panel-reload-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* タブコンテンツ */

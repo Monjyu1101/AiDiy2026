@@ -19,6 +19,7 @@ import アナログ時計 from '@/components/AIコア_アナログ時計.vue'
 import デジタル時計 from '@/components/AIコア_デジタル時計.vue'
 import カレンダー from '@/components/AIコア_カレンダー.vue'
 import WindowShell from '@/components/_WindowShell.vue'
+import 再読込ボタン from '@/components/再読込ボタン.vue'
 import { AudioController } from '@/components/AIコア_音声処理'
 import { AI_WS_ENDPOINT } from '@/api/config'
 import { AIWebSocket } from '@/api/websocket'
@@ -491,7 +492,7 @@ defineExpose({ 字幕追加 })
       >TASK</button>
       <span class="core-status-dot" :class="接続状態ドットクラス"></span>
       <span class="core-status-text">{{ タイトル接続状態表示 }}</span>
-      <button class="title-action-button" type="button" title="再表示" @click="再表示要求">↺</button>
+      <component :is="再読込ボタン" title="再表示" @click="再表示要求" />
       <span v-if="props.showUserLabel !== false" class="core-user-label" :title="props.userLabel">{{ props.userLabel }}</span>
     </template>
 

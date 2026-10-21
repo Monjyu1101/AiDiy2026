@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import 再読込ボタン from '@/components/再読込ボタン.vue';
 import type { チーム要員 } from '../AIチーム_型';
 
 const props = defineProps<{
@@ -84,9 +85,13 @@ const 召喚する = async () => {
         <p v-if="要員読込エラー" class="dialog-error">{{ 要員読込エラー }}</p>
 
         <footer>
-          <button type="button" :disabled="要員読込中 || 召喚中" @click="一覧を再読込">
-            一覧を再読込
-          </button>
+          <component :is="再読込ボタン"
+            class="summon-reload-button"
+            title="一覧を再読込"
+            label="一覧を再読込"
+            :disabled="要員読込中 || 召喚中"
+            @click="一覧を再読込"
+          />
           <button
             type="button"
             class="primary"
@@ -211,12 +216,19 @@ const 召喚する = async () => {
 .summon-dialog footer {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid rgba(121, 161, 186, 0.12);
 }
 
-.summon-dialog footer button {
+.summon-reload-button {
+  --refresh-button-height: 36px;
+  --refresh-button-label-size: 16px;
+  --refresh-button-padding: 0 14px;
+}
+
+.summon-dialog footer button:not(.refresh-button) {
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid rgba(105, 137, 175, 0.36);
@@ -232,7 +244,7 @@ const 召喚する = async () => {
   background: linear-gradient(135deg, #7557e8, #4f82df);
 }
 
-.summon-dialog button:disabled {
+.summon-dialog button:disabled:not(.refresh-button) {
   opacity: 0.45;
   cursor: default;
 }

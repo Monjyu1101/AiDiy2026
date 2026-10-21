@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import {ref,onMounted,onBeforeUnmount} from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),error=ref('');
@@ -28,7 +29,7 @@ onBeforeUnmount(()=>{disposed=true;stop();observer?.disconnect();});
   <form class="browser-toolbar" @submit.prevent="navigate">
    <button type="button" aria-label="戻る" title="戻る" :disabled="!page.available||!page.back" @click="action('back')">←</button>
    <button type="button" aria-label="進む" title="進む" :disabled="!page.available||!page.forward" @click="action('forward')">→</button>
-   <button type="button" :disabled="!page.available" :aria-label="page.loading?'読み込みを停止':'再読み込み'" :title="page.loading?'読み込みを停止':'再読み込み'" @click="action(page.loading?'stop':'reload')">{{ page.loading?'×':'⟳' }}</button>
+   <RefreshButton :disabled="!page.available" :stop="page.loading" :aria-label="page.loading?'読み込みを停止':'再読み込み'" :title="page.loading?'読み込みを停止':'再読み込み'" @click="action(page.loading?'stop':'reload')" />
    <button type="button" :disabled="!page.available" title="Google検索" aria-label="Google検索" @click="action('home')">⌂</button>
    <input v-model="address" :disabled="!page.available" aria-label="URLまたは検索語" placeholder="URLまたはGoogleで検索" spellcheck="false" @focus="editing=true" @blur="editing=false">
    <button type="submit" :disabled="!page.available">開く</button>

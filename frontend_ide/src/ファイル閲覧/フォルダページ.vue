@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import RefreshButton from '../共通表示/再読込ボタン.vue';
 import { computed, ref, shallowRef, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { fileDateInfo, nextLocalMidnight } from './ファイル日時.js';
 import FileTypeIcon from '../ファイル閲覧/ファイル種別アイコン.vue';
@@ -302,7 +303,7 @@ onBeforeUnmount(() => { disposed = true; folderSlide.dispose(); fileSlide.dispos
         <button :aria-current="!trail.length ? 'location' : undefined" @click="navigate('')">{{ tree?.n }}</button>
         <template v-for="(name, index) in trail" :key="index"><span aria-hidden="true">›</span><button :aria-current="index===trail.length-1 ? 'location' : undefined" @click="navigate(trail.slice(0,index+1).join('/'))">{{ name }}</button></template>
       </nav>
-      <button class="folder-page-refresh" title="一覧を更新" aria-label="一覧を更新" :disabled="manualRefresh" :aria-busy="manualRefresh" @click="refreshPage">↻</button>
+      <RefreshButton class="folder-page-refresh" title="一覧を更新" aria-label="一覧を更新" :disabled="manualRefresh" :busy="manualRefresh" @click="refreshPage" />
     </header>
     <p v-if="unlistedParent!==undefined" class="folder-page-reference-note" role="status">検索ファイルの親フォルダ「{{ unlistedParent || '/' }}」は現在の一覧にありません。プレビューは開いたままです。該当ページへ移動するには、フィルターをOFFにして一覧を更新し、検索結果を選び直してください。</p>
     <div class="folder-page-summary">
