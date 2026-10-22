@@ -48,13 +48,36 @@ class DiagCleanupTests(unittest.TestCase):
         root = (ROOT / 'space folder').resolve()
         self.assertTrue(processes.is_diag(dict(Name='node', CommandLine=f"node --require '/tmp/probe file.cjs' '{root.as_posix()}/diag_main.mjs'"), root, False))
 
+    def test_macos_orphan_electron_children(self):
+        distribution = ROOT / 'node_modules/electron/dist/Electron.app/Contents'
+        targets = [('Electron', distribution / 'MacOS/Electron')]
+        for suffix in ('', ' (GPU)', ' (Renderer)', ' (Plugin)'):
+            name = f'Electron Helper{suffix}'
+            targets.append((name, distribution / f'Frameworks/{name}.app/Contents/MacOS/{name}'))
+        for name, executable in targets:
+            with self.subTest(name=name):
+                self.assertTrue(processes.is_diag(dict(Name=name, CommandLine='', ExecutablePath=str(executable)), ROOT, False))
+                self.assertTrue(processes.is_diag(dict(Name=name, CommandLine=f'"{executable}" --type=renderer'), ROOT, False))
+
+    def test_posix_case_normalization_does_not_expand_project_scope(self):
+        name = 'Electron'
+        for other_root in (Path(str(ROOT) + '-other'), ROOT.with_name(ROOT.name.upper())):
+            executable = other_root / 'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
+            self.assertFalse(processes.is_diag(dict(Name=name, CommandLine='', ExecutablePath=str(executable)), ROOT, False))
+            self.assertFalse(processes.is_diag(dict(Name=name, CommandLine=f'Electron "{other_root / "起動/electron-main.cjs"}"'), ROOT, False))
+        self.assertTrue(processes.is_diag(dict(Name=name, CommandLine=f'Electron "{ROOT / "起動/electron-main.cjs"}"'), ROOT, False))
+        self.assertFalse(processes.is_diag(dict(Name=name, CommandLine=f'Electron other.js "{ROOT / "起動/electron-main.cjs"}"'), ROOT, False))
+
     def test_stop_uses_tree_termination_and_checks_exit(self):
         record = dict(ProcessId=987654, ParentProcessId=0, Name='node.exe', CommandLine=f'node.exe "{ROOT / "diag_main.mjs"}"')
         common = processes.common
         with patch.object(common, 'list_processes', side_effect=[[record], [record], []]), \
-                patch.object(common.sys, 'platform', 'win32'), patch.object(common.subprocess, 'run') as run, patch('builtins.print'):
+                patch.object(common.sys, 'platform', 'win32'), \
+                patch.object(common.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), \
+                patch.object(common.subprocess, 'run') as run, patch('builtins.print'):
             self.assertTrue(processes.stop(ROOT))
         self.assertEqual(run.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '987654'])
+        self.assertEqual(run.call_args.kwargs['creationflags'], 0x08000000)
 
     def test_stop_failure_preserves_launcher(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(diag, '__file__', str(Path(folder) / '_cleanup.py')), \

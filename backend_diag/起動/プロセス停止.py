@@ -20,11 +20,13 @@ def is_diag(process, root, windows):
     binary = normalize(executable)
     distribution = normalize(root / 'node_modules' / 'electron' / 'dist') + '/'
     # 親を失ったGPU・renderer・utilityも、このDiag専用の実行ファイルで識別する。
-    if binary.startswith(distribution) and binary.rsplit('/', 1)[-1] in (
+    # macOS の Electron / Electron Helper は大文字名。名前だけを正規化し、
+    # POSIX の作業コピー・実行ファイルのパス照合は大文字小文字を区別する。
+    if binary.startswith(distribution) and binary.rsplit('/', 1)[-1].casefold() in (
             'electron.exe', 'electron', 'electron helper', 'electron helper (gpu)',
             'electron helper (renderer)', 'electron helper (plugin)'):
         return True
-    name = normalize(process.get('Name') or '').rsplit('/', 1)[-1]
+    name = normalize(process.get('Name') or '').rsplit('/', 1)[-1].casefold()
     if name not in ('node', 'node.exe', 'electron', 'electron.exe') or not args:
         return False
     entries = {normalize(root / 'diag_main.mjs'), normalize(root / '起動' / 'electron-main.cjs')}

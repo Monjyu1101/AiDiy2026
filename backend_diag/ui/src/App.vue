@@ -20,7 +20,9 @@ import {起動状態を作成} from './起動/起動状態.mjs';
 import 起動ミニパネル from './起動/起動ミニパネル.vue';
 import マイクロランチャー from './アプリ起動/マイクロランチャー.vue';
 import {起動ミニ表示を作成} from './ウィンドウ/起動ミニ表示.mjs';
-const tab=ref('start'), key=ref(new URLSearchParams(location.hash.slice(1)).get('token') || ''), input=ref('');
+import {認証セッションを作成} from './ウィンドウ/認証セッション.mjs';
+const 認証セッション=認証セッションを作成({location});
+const tab=ref('start'), key=ref(認証セッション.初期キー), input=ref('');
 if(location.hash) history.replaceState(null,'',location.pathname+location.search);
 const connected=ref(false),connecting=ref(false);
 const message=ref('ローカル環境の外部プログラムを確認します。');
@@ -69,14 +71,16 @@ watch(connected,value=>tools.接続(value));
 watch(()=>connected.value&&toolsOnline.value,value=>{if(!value){試行.切断();手動.中止();}else if(tab.value==='trials')void 試行.読込();else if(tab.value==='manual')void 手動.読込();},{flush:'sync'});
 onUnmounted(()=>{導入操作.終了();手動.終了();試行.終了();終了();tools.終了();起動.終了();void ミニ.変更(false);});
 async function api(path,method='GET',signal,format='json',body) {
- const response=await fetch(new URL(path,location.href),{method,signal,headers:{Authorization:`Bearer ${key.value}`,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{}),cache:'no-store',credentials:'same-origin'});
+ const requestKey=key.value;
+ const response=await fetch(new URL(path,location.href),{method,signal,headers:{Authorization:`Bearer ${requestKey}`,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{}),cache:'no-store',credentials:'same-origin'});
  if(response.ok && format==='blob')return response.blob();
+ if(response.status===401&&key.value===requestKey){認証セッション.破棄();設定を破棄();key.value='';connected.value=false;}
  const data=await response.json();
- if(!response.ok){if(response.status===401){設定を破棄();key.value='';connected.value=false;}throw new Error(data.エラー || '通信に失敗しました。');}
+ if(!response.ok){throw new Error(data.エラー || '通信に失敗しました。');}
  return data;
 }
-async function connect(){if(connecting.value)return;connecting.value=true;try{const data=await api('api/一覧');一覧を反映(data);resetPublic();connected.value=true;message.value='';if(tab.value==='keys'||tab.value==='integrations')await loadKeys();}catch(error){message.value=error.message;void ミニ.変更(false);}finally{connecting.value=false;}}
-function submit(){if(connecting.value)return;key.value=input.value.trim();input.value='';connect();}
+async function connect(){if(connecting.value)return;connecting.value=true;try{const data=await api('api/一覧');一覧を反映(data);resetPublic();認証セッション.保存(key.value);connected.value=true;message.value='';if(tab.value==='keys'||tab.value==='integrations')await loadKeys();}catch(error){message.value=error.message;void ミニ.変更(false);}finally{connecting.value=false;}}
+function submit(){if(connecting.value)return;認証セッション.破棄();key.value=input.value.trim();input.value='';connect();}
 // 全テスト: 状況確認→書込、続けて一覧再取得→モデル情報の書込。
 // 実行中の処理に合わせて、導入状況→モデル一覧→外部連携の順に表示タブを切り替え、終わったら導入状況タブへ戻す。
 async function 全診断(){if(操作中.value||全診断中.value)return;全診断中.value=true;try{tab.value='install';if(!await 全テスト())return;tab.value='keys';await 一覧再取得();await モデル書込();tab.value='integrations';await 外部連携確認({再読込:false});await 外部連携書込();tab.value='install';}finally{全診断中.value=false;}}

@@ -16,8 +16,8 @@ test('all-tests and install panel share only installation action, key tests requ
  assert.match(app,/onMounted\(\(\)=>\{if\(key.value\)connect\(\);\}\)/);
  assert.match(source('モデル一覧/モデル一覧パネル.vue'),/まだモデルを取得していません/);
 });
-test('auth remains in memory with relative API and refresh discards stale key results',()=>{
- const app=source('App.vue');assert.match(app,/history.replaceState/);assert.match(app,/new URL\(path,location.href\)/);assert.match(app,/credentials:'same-origin'/);assert.doesNotMatch(app,/localStorage|sessionStorage/);
+test('auth uses only scoped session storage with relative API and clears stale key results',()=>{
+ const app=source('App.vue');assert.match(app,/history.replaceState/);assert.match(app,/new URL\(path,location.href\)/);assert.match(app,/credentials:'same-origin'/);const auth=source('ウィンドウ/認証セッション.mjs');assert.doesNotMatch(app+auth,/localStorage/);assert.match(auth,/globalThis\.sessionStorage/);assert.match(auth,/location\.origin\+location\.pathname/);assert.match(app,/認証セッション\.保存/);assert.match(app,/response\.status===401[^]*認証セッション\.破棄/);
  const state=source('キー設定共通/キー設定状態.mjs');assert.match(state,/if\(対象==='all'\)keyData.value=null;keyResults.value=保持/);assert.match(state,/generation!==keyGeneration/);
  assert.match(state,/generation===keyGeneration/);
  assert.match(app,/response.status===401/);
@@ -32,6 +32,7 @@ test('checked-in compiled assets match current Vue sources',async()=>{const {ver
 test('source edits and altered bundle invalidate deployment manifest',async()=>{
  const os=require('node:os');const {pathToFileURL}=require('node:url');const folder=fs.mkdtempSync(path.join(os.tmpdir(),'diag-build-sync-'));
  try{const root=path.join(__dirname,'..'),diag=path.join(folder,'backend_diag');fs.cpSync(path.join(root,'ui'),path.join(diag,'ui'),{recursive:true,filter:file=>!file.split(path.sep).includes('node_modules')});fs.cpSync(path.join(root,'static'),path.join(diag,'static'),{recursive:true});fs.cpSync(path.join(root,'runtime'),path.join(diag,'runtime'),{recursive:true});fs.mkdirSync(path.join(diag,'モデル試行'),{recursive:true});fs.copyFileSync(path.join(root,'モデル試行/defaults.mjs'),path.join(diag,'モデル試行/defaults.mjs'));fs.mkdirSync(path.join(folder,'frontend_ide/src/共通表示'),{recursive:true});fs.copyFileSync(path.join(root,'../frontend_ide/src/共通表示/シアンバー.css'),path.join(folder,'frontend_ide/src/共通表示/シアンバー.css'));
+ fs.mkdirSync(path.join(folder,'_icons'),{recursive:true});fs.copyFileSync(path.join(root,'../_icons/AiDiy.png'),path.join(folder,'_icons/AiDiy.png'));
  const {verify}=await import(pathToFileURL(path.join(diag,'ui/verify.mjs')));assert.equal(await verify(),true);
  const app=path.join(diag,'ui/src/App.vue'),original=fs.readFileSync(app);fs.appendFileSync(app,'\n<!-- stale source -->\n');assert.equal(await verify(),false);fs.writeFileSync(app,original);
  fs.appendFileSync(path.join(diag,'static/app.js'),'\n// changed bundle\n');assert.equal(await verify(),false);
@@ -40,7 +41,7 @@ test('source edits and altered bundle invalidate deployment manifest',async()=>{
 test('config key order and public acquisition status are separate from tests with no router prerequisite',async()=>{
  const app=source('App.vue'),panel=source('モデル一覧/モデル一覧パネル.vue');const {KEY_PROVIDERS}=await import('../モデル情報/key_status.mjs');assert.deepEqual(KEY_PROVIDERS.slice(0,9).map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt']);
  assert.match(panel,/公開モデル一覧取得: <component :is="状態バッジ" class="public-indicator" :state="公開状態"\/>/);const view=source('モデル一覧/モデル一覧表示.mjs');assert.match(view,/取得元 === 'キャッシュ' \? 'キャッシュ利用' : 'OK'/);
- assert.doesNotMatch(app+panel,/prerequisite|先に実行してください|OpenRouter を選択/);assert.match(panel,/public-indicator/);const state=source('キー設定共通/キー設定状態.mjs');assert.match(state,/api\/公開モデル/);assert.match(state,/Number\(data.世代\)>=Number\(publicModels.value.世代\)/);assert.match(app,/response.status===401\)\{設定を破棄\(\)/);assert.match(state,/generation!==publicGeneration/);
+ assert.doesNotMatch(app+panel,/prerequisite|先に実行してください|OpenRouter を選択/);assert.match(panel,/public-indicator/);const state=source('キー設定共通/キー設定状態.mjs');assert.match(state,/api\/公開モデル/);assert.match(state,/Number\(data.世代\)>=Number\(publicModels.value.世代\)/);assert.match(app,/response.status===401&&key.value===requestKey\)\{認証セッション\.破棄\(\);設定を破棄\(\)/);assert.match(state,/generation!==publicGeneration/);
 });
 test('Vue templates never use non-ASCII component tags (rendered as raw text); use <component :is>',()=>{
  const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()?walk(path.join(dir,entry.name)):entry.name.endsWith('.vue')?[path.join(dir,entry.name)]:[]);

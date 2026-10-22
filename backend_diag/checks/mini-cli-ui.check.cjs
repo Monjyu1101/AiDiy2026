@@ -41,17 +41,19 @@ test('実Vueタイトル欄: ミニ→最小化→最大化→ピン→終了の
  try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ランチャー表示','アイコン化','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ランチャー表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['アイコン化','最小化','元のサイズに戻す','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('元のサイズに戻す').props.disabled,false);ui.button('元のサイズに戻す').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ランチャー表示').props.disabled,true);}finally{ui.app.unmount();}
  const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{-webkit-app-region:drag\}/);assert.match(css,/\.panel-brand button,\.window-actions\{-webkit-app-region:no-drag\}/);
 });
-async function appState(switchMini=async()=>true){
+async function appState(switchMini=async()=>true,globals={}){
+ const {認証セッションを作成}=await import('../ui/src/ウィンドウ/認証セッション.mjs');
  const {起動ミニ表示を作成}=await import('../ui/src/ウィンドウ/起動ミニ表示.mjs');const displays=[],switches=[],noop=()=>{};
  const methods={接続:noop,終了:noop,中止:noop,切断:noop,表示を離れる:noop,読込:async()=>{},一覧:vue.ref(null),実行中:vue.ref(false)};
  const modules={
-  './導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({})},'./導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
-  './キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop})},'./ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
+  './ウィンドウ/認証セッション.mjs':{認証セッションを作成:options=>認証セッションを作成({...options,storage:()=>globals.sessionStorage})},
+  './導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({一覧を反映:noop})},'./導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
+  './キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop,resetPublic:noop,設定を破棄:noop})},'./ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
   './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({フォルダ:vue.ref('')})},
   './アプリ起動/CLI状態.mjs':{CLI状態を作成:()=>methods},'./ウィンドウ/起動ミニ表示.mjs':{起動ミニ表示を作成:options=>起動ミニ表示を作成({...options,切替:async value=>{switches.push(value);return switchMini(value);}})},
   './AIモデル/AIモデル状態.mjs':{AIモデル状態を作成:()=>methods},'./設定モデル/設定モデル状態.mjs':{設定モデル状態を作成:()=>methods},
  };
- const app=compile('App.vue',{inline:false,modules,globals:{location:{hash:'',pathname:'/',search:''},history:{replaceState(){}},window:{},fetch:async()=>{throw Error('unexpected request');}}});
+ const app=compile('App.vue',{inline:false,modules,globals:{location:{hash:'',pathname:'/',search:''},history:{replaceState(){}},window:{},fetch:async()=>{throw Error('unexpected request');},...globals}});
  const scope=vue.effectScope();let state;const warn=console.warn;console.warn=()=>{};try{state=scope.run(()=>app.setup({}, {expose(){}}));}finally{console.warn=warn;}
  return {scope,state,displays,switches};
 }
@@ -195,4 +197,25 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとC
   state.項目.value=state.項目.value.filter(item=>item.id!=='aidiy_hermes');await flush();assert.equal(upperButtons().length,6);assert.equal(lowerButtons().length,6);assert.equal(hermes(),undefined);
  }finally{upper.app.unmount();lower.app.unmount();}
  const css=source('起動/起動ミニ.css');assert.match(css,/\.mini-app-buttons\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-cli-buttons\{display:flex;justify-content:center;gap:2px\}/);assert.match(css,/\.mini-cli-buttons \.mini-cli-button\{flex:0 0 calc\(\(100% - 12px\)\/7\)/);assert.match(css,/\.mini-services\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-icon-frame\{[^}]*width:40px;height:40px/);assert.match(css,/\.mini-icon-frame img\{[^}]*width:40px;height:40px;object-fit:contain/);
+});
+
+test('実App認証: URLを消した後の再読込・手入力・401をセッションへ反映する',async()=>{
+ const data=new Map(),sessionStorage={getItem:key=>data.get(key)||null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};
+ let location=new URL('http://127.0.0.1:3456/#token=fixture'),ok=true,malformed=false,pending401;const headers=[];
+ const globals={URL,get location(){return location;},sessionStorage,history:{replaceState(_state,_title,target){location=new URL(target,location);}},fetch:async(_url,options)=>{headers.push(options.headers.Authorization);if(_url.pathname.endsWith('/delayed'))return new Promise(resolve=>pending401=resolve);return {ok,status:ok?200:401,json:async()=>{if(malformed)throw SyntaxError('invalid JSON');return {};}};}};
+ let current=await appState(undefined,globals);
+ try{
+  assert.equal(location.hash,'');await current.state.connect();assert.equal(current.state.connected.value,true);assert.equal(headers.at(-1),'Bearer fixture');
+ }finally{current.scope.stop();}
+ current=await appState(undefined,globals);
+ try{
+  assert.equal(current.state.key.value,'fixture');await current.state.connect();assert.equal(current.state.connected.value,true);
+  current.state.input.value=' manual ';current.state.submit();await flush();assert.equal(current.state.key.value,'manual');assert.equal(headers.at(-1),'Bearer manual');
+  ok=false;await assert.rejects(current.state.api('api/一覧'));assert.equal(current.state.key.value,'');assert.equal(current.state.connected.value,false);assert.equal(data.size,0);
+  ok=true;current.state.input.value='next';current.state.submit();await flush();assert.equal(data.size,1);
+  const delayed=current.state.api('api/delayed');const rejected=assert.rejects(delayed);current.state.input.value='newer';current.state.submit();await flush();
+  pending401({ok:false,status:401,json:async()=>({})});await rejected;assert.equal(current.state.key.value,'newer');assert.equal(current.state.connected.value,true);assert.ok([...data.values()].includes('newer'));
+  ok=false;malformed=true;await assert.rejects(current.state.api('api/一覧'),/invalid JSON/);assert.equal(current.state.key.value,'');assert.equal(data.size,0);
+ }finally{current.scope.stop();}
+ current=await appState(undefined,globals);try{assert.equal(current.state.key.value,'');}finally{current.scope.stop();}
 });

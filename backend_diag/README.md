@@ -485,3 +485,7 @@ Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリック�
 - アプリとCLIの起動状態・フォルダは既存状態を共有します。CLIから開くTermは作業領域中央に約800×600pxで表示します。
 
 画面は backend_diag/ui/src/アプリ起動/マイクロランチャー.vue / .css、共通寸法は同フォルダの 円周配置.cjs、窓制御は backend_diag/起動/マイクロ表示.cjs です。回帰確認は node --test backend_diag/checks/micro-window.check.mjs backend_diag/checks/icon-drag.check.mjs backend_diag/checks/desktop.check.mjs。配布画面を更新するときは npm --prefix backend_diag/ui run build と npm --prefix backend_diag/ui run check を実行します。
+
+### 再読込時の認証
+
+認証済みの起動キーは、同じタブ・ウィンドウの同じ公開元とパスの `sessionStorage` にだけ保持し、Ctrl+Rでも再接続します。URLのキーは従来どおり表示履歴から除去し、永続的な `localStorage` には保存しません。新しい起動URLや手入力は古いキーを置き換え、401応答では破棄します。サーバー再起動後は新しい認証URLまたはキーが必要です。ストレージを利用できない環境では従来のメモリ保持に戻り、再読込後は再入力が必要です。
