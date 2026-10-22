@@ -22,7 +22,7 @@ const 経過=computed(()=>s.区分.value!=='PREDICTION'?[]:s.実行中.value?s.�
  <p class="panel-note">各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → PREDICTION → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。</p>
  <div class="ai-model-scroll">
   <div class="ai-model-form">
-   <div class="ai-model-form-heading"><h3>{{s.区分.value}} / 入力</h3><button id="ai-model-test" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value || (s.区分.value==='PREDICTION' && !s.予測条件.value.テスト可能)" :title="s.区分.value==='PREDICTION'?s.予測条件.value.説明:'現在の種類だけをテストします'" @click="s.開始()">テスト</button></div>
+   <div class="ai-model-form-heading"><h3>{{s.区分.value}} / {{s.区分.value==='PREDICTION'?'入力予測':'入力'}}</h3><button id="ai-model-test" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value || (s.区分.value==='PREDICTION' && !s.予測条件.value.テスト可能)" :title="s.区分.value==='PREDICTION'?s.予測条件.value.説明:'現在の種類だけをテストします'" @click="s.開始()">テスト</button></div>
    <p v-if="!online" class="warning" role="status">Tools 接続時に利用できます。</p>
    <p v-if="s.一覧.value?.区分?.[s.区分.value]?.状態==='未取得'" class="warning">モデル一覧が未取得です。設定保持値がある場合だけ表示します。</p>
    <label class="ai-config-row"><span>{{s.区分.value}}_AI:</span><select aria-label="プロバイダ" :value="s.入力.provider" :disabled="s.読込中.value" @change="change('provider',$event)"><option v-if="!s.プロバイダ.value.length" value="">候補なし</option><option v-for="p in s.プロバイダ.value" :key="p.id" :value="p.id">{{p.id}}</option></select></label>

@@ -27,6 +27,12 @@ _ROLES = {
     "output_text": "assistant",
     "output_request": "assistant",
 }
+_NON_REPLY_TEXTS = (
+    "（応答なし）", "(応答なし)",
+    "プロジェクトが変更されたため要求を実行しませんでした。再送してください。",
+)
+# Python str.strip() と同じ空白を、切り詰め前の無応答判定にも使う。
+_STRIP_CHARS = "\t\n\v\f\r \x1c\x1d\x1e\x1f\x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
 
 def _local_second(now: datetime | None) -> datetime:
@@ -48,6 +54,7 @@ def read_prediction_history(
     *,
     now: datetime | None = None,
     user_only: bool = False,
+    include_latest_reply: bool = False,
 ) -> list[dict[str, str | int]]:
     """直近2時間の同一プロジェクトから最新最大10ターンを古い順に返す。
 
@@ -65,6 +72,10 @@ def read_prediction_history(
     入力を先に確保し、新しいターン・新しい返答を優先する。古い会話で補充しない。
     user_only=True はユーザー入力のみを取得し、返答に本文予算を割り当てない。
     既定値の False は従来どおり入力と返答を返す。
+    include_latest_reply=True は user_only に関係なく、入力へ先に予算を配分し、
+    残りで最新の正常な output_text を最大1件返す。元入力と同じ turn_id を保つ。
+    output_request は遅れて保存されるコード応答のミラーなので、この方式では
+    対象にしない。エラー・無応答・別レーン・対象外ターンの返答も補充しない。
     DB 初期化・マイグレーション・書込は行わず、DB不在等は sqlite3.Error。
     """
     normalized_path = normalize_project_path(project_path)
@@ -79,8 +90,9 @@ def read_prediction_history(
             raise ValueError(f"{name} は正の整数で指定してください")
     if max_turns > HISTORY_MAX_TURNS:
         raise ValueError(f"max_turns は{HISTORY_MAX_TURNS}以下で指定してください")
-    if type(user_only) is not bool:
-        raise ValueError("user_only は真偽値で指定してください")
+    for name, value in (("user_only", user_only), ("include_latest_reply", include_latest_reply)):
+        if type(value) is not bool:
+            raise ValueError(f"{name} は真偽値で指定してください")
     end = _local_second(now)
     start = end - timedelta(seconds=HISTORY_WINDOW_SECONDS)
     bounds = (start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
@@ -99,7 +111,9 @@ def read_prediction_history(
             """
             SELECT h."セッションID", h."シーケンス", h."チャンネル",
                    h."メッセージ識別", h."登録日時",
-                   substr(h."メッセージ内容", 1, ?) AS "本文"
+                   substr(h."メッセージ内容", 1, ?) AS "本文",
+                   CASE WHEN ? THEN trim(h."メッセージ内容", ?) IN (?, ?, ?)
+                        ELSE 0 END AS "非応答"
               FROM "A会話履歴" AS h
              WHERE h."プロジェクトパス" = ?
                AND h."登録日時" BETWEEN ? AND ?
@@ -109,7 +123,7 @@ def read_prediction_history(
                )
                AND (? = 0 OR h."メッセージ識別" IN ('input_text', 'input_request'))
                AND typeof(h."メッセージ内容") = 'text'
-               AND h."メッセージ内容" != ''
+               AND (h."メッセージ内容" != '' OR (? AND h."メッセージ識別" = 'output_text'))
                AND NOT (h."チャンネル" = '0' AND EXISTS (
                    SELECT 1 FROM "A会話履歴" AS p
                     WHERE p."セッションID" = h."セッションID"
@@ -125,7 +139,9 @@ def read_prediction_history(
                ))
              ORDER BY h."登録日時", h."セッションID", h."シーケンス"
             """,
-            (max_message_chars, normalized_path, *bounds, user_only, *mirror_bounds),
+            (max_message_chars, include_latest_reply, _STRIP_CHARS, *_NON_REPLY_TEXTS,
+             normalized_path, *bounds, user_only and not include_latest_reply,
+             include_latest_reply, *mirror_bounds),
         )
         for row in rows:
             # DB の保存形式以外や壊れた日時は推測せず除外する。
@@ -136,10 +152,16 @@ def read_prediction_history(
             if stored.strftime("%Y-%m-%d %H:%M:%S") != row["登録日時"] or not start <= stored <= end:
                 continue
             content = row["本文"].strip()
+            lane = (row["セッションID"], row["チャンネル"])
+            if (include_latest_reply and row["メッセージ識別"] == "output_text"
+                    and (not content or content.startswith(("!", "！")) or row["非応答"])):
+                # 後続の最終応答が失敗・無応答なら、同じ要求の古い成功は使わない。
+                if lane in active:
+                    active[lane].pop("latest_reply", None)
+                continue
             if not content:
                 continue
             ordinal += 1
-            lane = (row["セッションID"], row["チャンネル"])
             role = _ROLES[row["メッセージ識別"]]
             if role == "user":
                 turn = {"lane": lane, "user": (ordinal, "user", content[:max_chars]),
@@ -152,6 +174,11 @@ def read_prediction_history(
                         del active[old["lane"]]
             elif lane in active:
                 turn = active[lane]
+                if include_latest_reply:
+                    # output_request は検証後に元の回答を再掲することがあるため除外。
+                    if row["メッセージ識別"] == "output_text":
+                        turn["latest_reply"] = (ordinal, "assistant", content)
+                    continue
                 room = max_chars - len(turn["user"][2])
                 if room <= 0:
                     continue
@@ -176,10 +203,23 @@ def read_prediction_history(
         content = content[:remaining]
         selected.append((index, {"role": role, "content": content, "turn_id": turn_id}))
         remaining -= len(content)
+        if include_latest_reply:
+            continue
         for index, role, content in reversed(turn["replies"]):
             if remaining <= 0:
                 break
             content = content[:remaining]
             selected.append((index, {"role": role, "content": content, "turn_id": turn_id}))
             remaining -= len(content)
+    if include_latest_reply and remaining > 0:
+        # 入力を全て確保できた場合だけ返答を追加する。ターンの新旧ではなく
+        # 返答の実際の順序で1件を選び、予算不足でも古い返答へ差し替えない。
+        latest = max(
+            ((turn["latest_reply"], turn_id) for turn_id, turn in enumerate(turns, 1)
+             if "latest_reply" in turn),
+            key=lambda item: item[0][0], default=None,
+        )
+        if latest is not None:
+            (index, role, content), turn_id = latest
+            selected.append((index, {"role": role, "content": content[:remaining], "turn_id": turn_id}))
     return [message for _, message in sorted(selected, key=lambda item: item[0])]

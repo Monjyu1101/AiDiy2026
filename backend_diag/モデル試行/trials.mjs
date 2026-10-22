@@ -7,6 +7,7 @@ import {createHmac, randomBytes} from 'node:crypto';
 import {readConfig,readOAuth} from '../runtime/model_probe.mjs';
 import {getToolsStatus} from '../診断/tools_status.mjs';
 import {createAudioStore,validateAudio} from './audio_store.mjs';
+import {installedCodeClis} from '../モデル情報/models_info.mjs';
 
 // Live: 接続20秒 + 安定待ち15秒 + 応答60秒 + cleanup9秒 + 通信余裕。
 export const LIVE_HTTP_TIMEOUT_MS=135000;
@@ -49,7 +50,7 @@ export function configRows(config) {
   add('LIVE','LIVE','音声会話',live,config[`LIVE_${LIVE[live]}_MODEL`],config[`LIVE_${LIVE[live]}_VOICE`]);
   // 予測も方式別モデル。auto方式の行はモデルもautoで送り、解決後の方式のキーを使う。
   const prediction=text(config.PREDICTION_AI_NAME)||'auto';
-  add('PREDICTION','PREDICTION','次のユーザー入力',prediction,PREDICTION_MODEL_KEYS[prediction]?text(config[PREDICTION_MODEL_KEYS[prediction]])||'auto':'auto');
+  add('PREDICTION','PREDICTION','入力予測',prediction,PREDICTION_MODEL_KEYS[prediction]?text(config[PREDICTION_MODEL_KEYS[prediction]])||'auto':'auto');
   const decision=text(config.DECISION_AI_NAME)||'auto';
   const decisionKey={openai_decisions:'DECISION_OPENAI_MODEL',openai_oauth:'DECISION_OAUTH_MODEL',openai_jsonchat:'DECISION_OAUTH_MODEL',gemini_chat:'DECISION_GEMINI_MODEL',freeai_chat:'DECISION_FREEAI_MODEL'}[decision];
   // auto方式はToolsで方式とそのモデルを解決する。
@@ -149,18 +150,29 @@ function redact(value,config,limit=1500) {
   for(const [key,secret] of Object.entries(config))if(/key|token|secret|password/i.test(key) && typeof secret==='string' && secret.length>=4)result=result.split(secret).join('[非表示]');
   return result.replace(/\b(?:sk-[\w-]{8,}|AIza[\w-]{15,}|Bearer\s+\S+)\b/gi,'[非表示]').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').slice(0,limit);
 }
-export function createModelTrials({reader,statusFn=getToolsStatus,request=localRequest,timeoutMs=TRIAL_ROW_TIMEOUT_MS,catalogReader=readManualCatalog,credentialReader=()=>readOAuth('codex'),audioStore=createAudioStore()}={}) {
+export function createModelTrials({reader,statusFn=getToolsStatus,request=localRequest,timeoutMs=TRIAL_ROW_TIMEOUT_MS,catalogReader=readManualCatalog,credentialReader=()=>readOAuth('codex'),installedClisFn=installedCodeClis,audioStore=createAudioStore()}={}) {
   const salt=randomBytes(32);let run,contextVersion='',generation=0;
   const chats=new Map();
   const clearChat=()=>{chats.clear();generation++;};
   const successList=()=>[...chats.values()];
   const readCatalog=async name=>{try{const value=await catalogReader(name);return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}};
+  // 保存済みモデル一覧・認証状態ではなく、現在の実行ファイルの存在だけで判定する。
+  // SDK・Hermes本体・auto/sameの自動選択は外部CLIの未導入と混同しない。
+  const cliKeys=new Set(['claude_cli','copilot_cli','codex_cli','antigravity_cli','grok_cli','opencode_cli']);
+  const installationRow=(row,installed)=>{
+    if(!['CODE','TASK','TEAM'].includes(row.区分)||row.状態!=='未実行')return row;
+    let provider=({claude_ollama:'claude_cli',codex_ollama:'codex_cli'})[row.プロバイダ]||row.プロバイダ;
+    if(['aidiy_hermes','auto','same'].includes(provider))provider=row.モデル.split('/')[0];
+    return cliKeys.has(provider)&&installed[provider]===false
+      ? {...row,状態:'未実施',説明:`${provider} が未導入のため、テストをスキップしました。`}:row;
+  };
   const snapshot=async()=>{
     const [state,config]=await readConfig(reader);
     const [predictionCatalog,chatCatalog,credentials]=await Promise.all([readCatalog('prediction_models'),readCatalog('chat_models'),Promise.resolve().then(()=>credentialReader()).catch(()=>null)]);
     const version=createHmac('sha256',salt).update(JSON.stringify([config,predictionCatalog,chatCatalog,credentials,generation])).digest('hex');
     if(contextVersion!==version){chats.clear();contextVersion=version;}
-    return {state,config,version,predictionCatalog,rows:configRows(config)};
+    const installed=await installedClisFn();
+    return {state,config,version,predictionCatalog,installed,rows:configRows(config).map(row=>installationRow(row,installed))};
   };
   function predictionTarget(s,provider,model){
     let name=provider==='auto'?text(s.config.PREDICTION_AI_NAME)||'auto':provider;
@@ -259,7 +271,9 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
         const latest=await snapshot();if(latest.version!==current.version){cancel();throw Object.assign(failure('設定が変更されました。読み直して開始してください。'),{configChanged:true});}
         const base={id:row.id,状態:row.状態,応答:'',実行モデル:'',共有元:'',所要ms:0,説明:row.説明};
         if(current.controller.signal.aborted)throw failure('試行を中止しました。');
-        if(row.状態!=='未実行')return base;
+        // 開始後の削除・導入も再確認。古い成功・失敗の共有より先に未導入を除外する。
+        const checked=installationRow({...row,状態:row.状態==='未実施'?'未実行':row.状態},latest.installed);
+        if(checked.状態!=='未実行'){current.cache.delete(key);return {...base,状態:checked.状態,説明:checked.説明};}
         // 同じ設定版・固定オプションでのみ共有。CHAT/LIVE は CODE 系と混ぜない。
         if(current.cache.has(key)){const prior=current.cache.get(key);return {...prior,id:row.id,共有元:prior.id,所要ms:0};}
         let payload;

@@ -40,7 +40,7 @@ const windowPins=createWindowPins({onChanged(window,state){
  if(receiver&&!receiver.window.isDestroyed()&&!receiver.window.webContents.isDestroyed?.())receiver.window.webContents.send('development:pin-changed',{...state,...(record.name?{panelName:record.name}:{})});
 }});
 function registerWindowPin(record){
- windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner),owner:record.owner?.window});
+ windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner)});
 }
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
 const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
@@ -161,7 +161,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
  const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,revision:0,pending:new Map()};windows.set(contents,record);
- // 寿命はrecord.ownerで管理し、ピンON中だけOS親子窓にしてIDEより手前に保つ。
+ // 起動元・寿命はrecord.ownerで管理し、OS上は独立したパネルのままピンを設定する。
  registerWindowPin(record);
  attachWindowMove(record);
  if(kind==='ide')allDisplays.register(record);
@@ -323,7 +323,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:show-explorer',(event,name,reduced)=>panelWindows.show(event,name,reduced));
  ipcMain.handle('development:resize-routes',(event,name,height)=>panelWindows.resizeRoutes(event,name,height));
  ipcMain.handle('development:panel-action',(event,name,action)=>panelWindows.action(event,name,action));
- // ピン留め: IDEのプレビューを、同じIDEサーバーのファイルAPIを使う独立ウィンドウ（IDEの子ウィンドウ）で開く。
+ // ピン留め: IDEのプレビューを、同じIDEサーバーのファイルAPIを使う独立ウィンドウ（record.ownerでIDEに所属）で開く。
  // 同じファイルは既存の窓を前面へ出す。利用終了・セッション切り替えでは他の子ウィンドウと一緒に閉じる。
  ipcMain.handle('development:open-viewer',async(event,path,anchor)=>{
   const record=trustedEvent(event);

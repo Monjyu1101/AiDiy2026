@@ -42,16 +42,17 @@ test('VRはユーザー選択を変更せず強制ON、ロック中の連打を�
  const pins=createWindowPins(),during=windowFixture();pins.register(during,{pinned:true,locked:true});
  assert.deepEqual(pins.setLocked(during,false),{pinned:true,locked:false},'VR中にIDEから起動した窓は通常のIDE由来ONへ戻る');
 });
-test('IDE由来の全モジュールはON中だけIDEのOS子窓となり、OFF・VR復帰・購読解除で外れる',()=>{
+test('IDE由来の全モジュールはピン・VR中もOS上で独立し、IDE選択で再前面化しない',()=>{
  for(const kind of ['term','code','live','viewer','browser','explorer','compare','routes']){
-  const pins=createWindowPins(),ide=windowFixture('ide'),child=windowFixture(kind);
-  pins.register(ide);pins.register(child,{owner:ide,pinned:true});assert.equal(child.getParentWindow(),ide,kind);
-  ide.focus();assert.equal(child.getParentWindow(),ide,'IDE選択でも所属が外れない');
-  pins.toggle(ide);pins.toggle(ide);assert.equal(pins.state(child).pinned,true);assert.equal(child.getParentWindow(),ide,'本体のON/OFFでもIDEより手前の関係を維持する');
-  pins.toggle(child);assert.equal(child.getParentWindow(),null);assert.equal(child.top,false);
-  pins.setLocked(child,true);assert.equal(child.getParentWindow(),ide);assert.equal(child.top,true);
-  pins.setLocked(child,false);assert.equal(child.getParentWindow(),null);assert.equal(child.top,false);
-  pins.toggle(child);assert.equal(child.getParentWindow(),ide);pins.unregister(child);assert.equal(child.getParentWindow(),null);
+  const order=[],pins=createWindowPins(),ide=windowFixture('ide',order),child=windowFixture(kind,order);
+  child.setParentWindow=()=>assert.fail('ピン操作でOS親子関係を作らない');
+  pins.register(ide);pins.register(child,{owner:ide,pinned:true});assert.equal(child.getParentWindow(),null,kind);
+  child.focus();ide.focus();assert.deepEqual(order,[kind],'本体選択から他窓を持ち上げない');
+  pins.toggle(ide);ide.focus();assert.equal(order.at(-1),'ide','同じピン層では本体も選択順');
+  pins.toggle(child);assert.equal(child.top,false);
+  pins.setLocked(child,true);assert.equal(child.top,true);assert.equal(pins.toggle(child).pinned,true);
+  pins.setLocked(child,false);assert.equal(child.top,false);
+  pins.toggle(child);pins.unregister(child);assert.equal(child.getParentWindow(),null);
  }
 });
 test('別アプリ相当の管理器でも同じ層、選択されたON窓だけ持上げ、OFF・blurは何もしない',()=>{

@@ -33,13 +33,15 @@ export function 設定モデル状態を作成({ api, 接続可能 }) {
    if(現在!==世代||!有効()){void サーバー中止(id);return;}
    if(data.版!==前版)結果.value={};
    実行ID=id;設定.value=data;
+   // 個別再試行でも、現在未導入の行に古い成功・失敗を残さない。
+   for(const item of data.項目)if(item.状態==='未実施')結果.value={...結果.value,[item.id]:{id:item.id,状態:'未実施',説明:item.説明}};
    const 完了=new Set();
    for(const row of data.実行順||data.項目.map(item=>item.id)){
     const item=data.項目.find(item=>item.id===row);if(!item)throw new Error('試行する設定項目が見つかりません。');
     if(現在!==世代||!有効())return;
     const 対象=item.共有対象||[item.id];
     選択.value=item.id;通知.value=`${item.id} を確認中…`;
-    if(!完了.has(item.id))結果.value={...結果.value,...Object.fromEntries(対象.map(id=>[id,{id,状態:'実行中'}]))};
+    if(!完了.has(item.id))結果.value={...結果.value,...Object.fromEntries(対象.map(id=>[id,{id,状態:item.状態==='未実施'?'未実施':'実行中',説明:item.説明}]))};
     const result=await api(`api/モデル試行/${encodeURIComponent(id)}/${encodeURIComponent(item.id)}`,'POST',制御.signal);
     if(現在!==世代||!有効())return;
     設定.value={...設定.value,チャット成功:result.チャット成功||[],予測条件:result.予測条件||設定.value.予測条件};

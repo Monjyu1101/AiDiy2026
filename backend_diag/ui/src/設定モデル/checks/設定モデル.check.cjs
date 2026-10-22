@@ -165,3 +165,28 @@ test('判断の選択値とJSON応答を表示し、タイムアウトNGで全�
  });
  await state.読込();await state.開始();assert.deepEqual(calls,['CHAT','LIVE','DECISION']);assert.equal(state.結果.value.DECISION.状態,'NG');assert.match(state.通知.value,/制限時間/);
 });
+
+
+test('未導入CLIは個別開始時にも古い結果を未実施へ戻す',async()=>{
+ const data=structuredClone(snapshot);
+ const {state}=await setup(async(path,method)=>{
+  if(method==='GET')return data;
+  if(path.includes('/開始/'))return {...data,実行ID:'skip',実行順:['TASK_do'],項目:data.項目.map(item=>['CODE1','TASK_do','TEAM_check'].includes(item.id)?{...item,状態:'未実施',説明:'CLI が未導入です。'}:item)};
+  if(method==='DELETE')return {};
+  assert.equal(state.結果.value.TASK_do.状態,'未実施');
+  return {id:'TASK_do',状態:'未実施',説明:'CLI が未導入です。',応答:'',所要ms:0};
+ });
+ await state.読込();state.結果.value={CODE1:{状態:'OK',応答:'古い応答'},TASK_do:{状態:'NG'},TEAM_check:{状態:'OK'},CHAT:{状態:'OK'}};
+ await state.個別開始('TASK_do');
+ for(const id of ['CODE1','TASK_do','TEAM_check']){assert.equal(state.結果.value[id].状態,'未実施');assert.ok(!state.結果.value[id].応答);}
+ assert.equal(state.結果.value.CHAT.状態,'OK');state.終了();
+});
+
+
+test('Predictionの役割と設定モデルの簡易説明は入力予測に統一する',async()=>{
+ const {configRows}=await import('../../../../モデル試行/trials.mjs');
+ const row=configRows({}).find(item=>item.id==='PREDICTION');
+ assert.equal(row.役割,'入力予測');
+ const html=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[row]},selected:'PREDICTION',online:false});
+ assert.match(html,/PREDICTION \/ 入力予測/);assert.doesNotMatch(html,/次のユーザー入力/);
+});

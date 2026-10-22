@@ -54,11 +54,11 @@ test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、�
   const request=await f.controller.prepare(f.event,{left:9000,top:-9000,width:8000,height:4000},kind,{left:9000,top:-9000,width:8000,height:4000});assert.equal(request.ok,true);assert.equal(request.preview,undefined);
   const details={url:'about:blank',frameName:request.name},bounds=f.controller.open(f.owner,details).overrideBrowserWindowOptions;
   assert.ok(bounds.x>=area.x&&bounds.y>=area.y&&bounds.x+bounds.width<=area.x+area.width&&bounds.y+bounds.height<=area.y+area.height);assert.ok(bounds.width<=680);
-  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,f.owner.window);child.destroy();
+  const child=new f.Window();f.controller.created(f.owner,child,details);assert.equal(child.parent,null);child.destroy();
  }
 });
 
-test('Explorer: 承認済みabout:blankを一回だけ許可し、同じ親の子窓として登録',async()=>{
+test('Explorer: 承認済みabout:blankを一回だけ許可し、OS親子関係なしで起動元へ登録',async()=>{
  const f=fixture(),request=await f.controller.prepare(f.event,f.rect);assert.equal(request.ok,true);
  assert.equal(f.controller.open(f.owner,{url:'https://example.invalid',frameName:request.name}),null);
  assert.equal(f.controller.open(f.owner,{url:'about:blank',frameName:'wrong'}),null);
@@ -66,7 +66,7 @@ test('Explorer: 承認済みabout:blankを一回だけ許可し、同じ親の�
  assert.equal(f.controller.open(f.owner,details),null);
  const child=new f.Window();f.controller.created(f.owner,child,details);
  assert.equal(f.controller.dragTarget(f.owner,request.name),null,'表示前は移動対象にしない');
- assert.equal(child.parent,f.owner.window);
+ assert.equal(child.parent,null);
  assert.equal(f.windows.get(child.webContents).owner,f.owner);assert.equal(f.windows.get(child.webContents).linkKey,'offline:1');
  assert.equal((await f.controller.show(f.event,request.name,false)).ok,true);assert.equal(f.animations(),1);
  assert.equal(f.controller.dragTarget(f.owner,request.name),f.windows.get(child.webContents));
@@ -146,7 +146,7 @@ test('別窓ピン: Explorer・比較Viewer・軌跡はIDE由来ON、OFF後の�
  for(const kind of ['explorer','panel-viewer','panel-routes']){
   const f=fixture(),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
   f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
-  assert.deepEqual(f.controller.action(f.event,request.name,'pin-state'),{pinned:true,locked:false});
+  assert.deepEqual(f.controller.action(f.event,request.name,'pin-state'),{pinned:true,locked:false});assert.equal(child.parent,null);
   assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:false,locked:false});
   await f.controller.show(f.event,request.name);await f.controller.show(f.event,request.name);
   if(kind==='panel-routes')f.controller.resizeRoutes(f.event,request.name,200);
@@ -161,7 +161,7 @@ test('VR中に作成する全別窓はON固定、軌跡の最小化・最大化�
  for(const kind of ['explorer','panel-viewer','panel-routes']){
   const f=fixture({all:true}),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
   f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
-  assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:true,locked:true});assert.equal(child.top,true);
+  assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:true,locked:true});assert.equal(child.top,true);assert.equal(child.parent,null);
   f.controller.action(f.event,request.name,'minimize');assert.equal(!!child.minimized,kind!=='panel-routes');
   f.controller.action(f.event,request.name,'maximize');assert.equal(!!child.maximized,kind!=='panel-routes');
   child.destroy();

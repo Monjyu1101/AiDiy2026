@@ -30,7 +30,7 @@ watch(()=>props.running,完了時(()=>{if(props.selected===items.value[0]?.id)�
 <template>
 <section ref="パネル" class="panel model-trial-panel" aria-label="設定モデル">
  <div class="panel-heading trial-heading"><div class="heading-title"><h2>モデル動作確認</h2><button class="trial-reload refresh-button" aria-label="設定モデルを再読込" :aria-busy="loading" :disabled="!online || loading || running" title="設定中のモデルを読み直します" @click="$emit('refresh')"><span class="refresh-glyph" aria-hidden="true">↺</span><span>再読込</span></button></div><div class="panel-actions trial-actions"><button id="model-trial-start" :class="{'check-next': !items.some(実行済み)}" :disabled="!online || loading || running || !items.length" @click="$emit('start')">動作確認</button><button :disabled="!running" @click="$emit('cancel')">中止</button></div></div>
- <p class="panel-note">設定中のモデルで短い応答を確認します。試行は料金が発生する場合があります。同じ接続経路・プロバイダ・モデル・音声設定の試行結果はサーバーで共有します。</p>
+ <p class="panel-note">設定中のモデルで短い応答を確認します。未導入のCLIはテストせず「未実施」のままにします。試行は料金が発生する場合があります。同じ接続経路・プロバイダ・モデル・音声設定の試行結果はサーバーで共有します。</p>
  <p v-if="!online" class="panel-note warning" role="status">Tools 接続時に利用できます。</p>
  <p v-else-if="message" class="panel-note" role="status" aria-live="polite">{{message}}</p>
  <main class="trial-layout"><aside aria-label="設定モデル一覧"><p v-if="loading">設定を読込中…</p><p v-else-if="!items.length">設定項目がありません。設定を再読込してください。</p>

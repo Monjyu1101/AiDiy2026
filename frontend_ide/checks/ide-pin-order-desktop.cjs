@@ -36,18 +36,22 @@ while hwnd and index<10000:
 result['childTopmost']=bool(u.GetWindowLongPtrW(int(sys.argv[1]),-20)&8)
 result['ownerTopmost']=bool(u.GetWindowLongPtrW(int(sys.argv[2]),-20)&8)
 print(json.dumps(result))`;
- async function verify(label,above){
-  owner.moveTop();await sleep(250);
+ async function verify(label,above,selected=owner){
+  selected.moveTop();await sleep(250);
   const response=spawnSync('python',['-c',readOrder,handle(child),handle(owner)],{encoding:'utf8',windowsHide:true});assert.equal(response.status,0,response.stderr);
   const order=JSON.parse(response.stdout);assert.ok(Number.isInteger(order.child)&&Number.isInteger(order.owner));
   assert.equal(order.child<order.owner,above,label+': '+JSON.stringify(order));
-  results.push({label,order,childPinned:pins.state(child).pinned,nativeTopmostReported:child.isAlwaysOnTop(),owned:child.getParentWindow()===owner});
+  results.push({label,order,childPinned:pins.state(child).pinned,nativeTopmostReported:child.isAlwaysOnTop(),owned:child.getParentWindow()!==null});
  }
- await verify('on-above-pinned-ide',true);assert.equal(child.getParentWindow(),owner);
- pins.toggle(child);assert.equal(child.getParentWindow(),null);await verify('off-behind-ide',false);
- pins.toggle(child);await verify('on-again-above-ide',true);
- pins.toggle(owner);await verify('ide-unpinned-child-stays-on',true);
- pins.toggle(owner);await verify('ide-pinned-child-stays-on',true);
- pins.toggle(child);pins.setLocked(child,true);await verify('vr-lock-above-ide',true);pins.setLocked(child,false);assert.equal(child.getParentWindow(),null);await verify('vr-exit-restores-off',false);
+ assert.equal(child.getParentWindow(),null);
+ await verify('pinned-ide-selected',false);
+ await verify('pinned-panel-selected',true,child);
+ pins.toggle(child);await verify('off-behind-pinned-ide',false);
+ pins.toggle(child);await verify('on-again-ide-selected',false);await verify('on-again-panel-selected',true,child);
+ pins.toggle(owner);await verify('ide-unpinned-panel-stays-on',true);
+ pins.toggle(owner);await verify('ide-pinned-selected',false);
+ pins.toggle(child);pins.setLocked(child,true);assert.equal(child.getParentWindow(),null);
+ await verify('vr-lock-ide-selected',false);await verify('vr-lock-panel-selected',true,child);
+ pins.setLocked(child,false);assert.equal(child.getParentWindow(),null);await verify('vr-exit-restores-off',false);
  process.send?.({testPassed:true,results});console.log(JSON.stringify({testPassed:true,results}));
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{clearTimeout(timer);for(const window of windows)if(!window.isDestroyed())window.destroy();app.exit(process.exitCode||0);});

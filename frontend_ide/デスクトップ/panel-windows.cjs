@@ -66,7 +66,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
  function created(owner,window,details){
   const request=requests.get(owner);requests.delete(owner);
   if(!request?.used||request.name!==details.frameName||owner.window.isDestroyed()||owner.revision!==request.revision||isQuitting()){window.destroy();return;}
-  // 継承した親子関係を外してから、共通ピン管理がON中だけ所有IDEへ関連付ける。
+  // window.openのDOM連携は維持し、OSの親子関係だけ外す。所属・終了連携はrecord.ownerで管理する。
   window.setParentWindow(null);window.setBounds(request.bounds);
   const contents=window.webContents;
   const record={window,owner,kind:request.kind,url:'about:blank',linkKey:request.key,revision:0,ownerRevision:request.revision,barHeight:request.bounds.height,pending:new Map(),name:request.name};windows.set(contents,record);

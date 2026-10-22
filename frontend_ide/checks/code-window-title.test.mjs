@@ -101,13 +101,13 @@ test('IDE再フォーカスは子パネルのOFFを上書きせず、選択さ�
  const f=await desktopFixture(),child=await f.code(),other=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
  const action=(record,command)=>f.handlers.get('development:window')(f.event(record),command);
  assert.equal(child.window.top,true);assert.equal(other.window.top,true);assert.equal(standalone.top,false);assert.equal(f.owner.window.top,false);
- assert.equal(child.window.topLevel,'floating');assert.equal(child.window.getParentWindow(),f.owner.window,'ピンONはIDEより手前に保つ');
+ assert.equal(child.window.topLevel,'floating');assert.equal(child.window.getParentWindow(),null,'ピンONでもOS上は独立');
  const bounds=child.window.getBounds();action(child,'toggle-pin');assert.equal(child.window.top,false);assert.equal(child.window.getParentWindow(),null);
  const raises=other.window.raises;f.owner.window.focus();child.window.focus();
  assert.equal(child.window.top,false);assert.equal(other.window.raises,raises);assert.equal(child.window.getBounds(),bounds);
  other.window.focus();assert.equal(other.window.raises,raises+1);
  assert.equal(action(child,'pin-state').pinned,false);
- assert.equal(action(child,'toggle-pin').pinned,true);assert.equal(child.window.getParentWindow(),f.owner.window);child.window.focus();assert.ok(child.window.raises>0);
+ assert.equal(action(child,'toggle-pin').pinned,true);assert.equal(child.window.getParentWindow(),null);child.window.focus();assert.ok(child.window.raises>0);
  assert.equal(f.handlers.get('development:window')({sender:{},senderFrame:{}},'toggle-pin'),undefined);
  assert.equal(f.handlers.get('development:window')({...f.event(child),senderFrame:{url:child.url}},'toggle-pin'),undefined);
 });
@@ -123,6 +123,25 @@ test('VRは本体と既存・新規子窓のピンをロックし、終了後は
  for(const record of [on,during])assert.equal(action(record,'pin-state').pinned,true);
  for(const record of [f.owner,off,on,during])assert.equal(action(record,'pin-state').locked,false);
  assert.equal(action(on,'toggle-pin').pinned,false);
+});
+
+test('OS親子関係なしでもTerm / Code / Live / Viewerの起動元・個別終了・セッション終了を維持',async()=>{
+ const f=await desktopFixture(),records=[];let closed=0;
+ for(const kind of ['term','code','live','viewer']){
+  const url=kind==='viewer'?'http://127.0.0.1:1234/#viewer=sample.txt':'http://127.0.0.1:5678/';
+  const window=await f.createWindow(kind,url,{close:async()=>{closed++;}},f.owner,'online:10');
+  const record=f.windows.get(window.webContents);records.push(record);
+  assert.equal(window.options.parent,undefined);assert.notEqual(window.options.modal,true);
+  assert.equal(window.getParentWindow(),null);assert.equal(record.owner,f.owner);assert.equal(record.linkKey,'online:10');
+  assert.equal(window.top,true);assert.match(window.getTitle(),/^AiDiy IDE \/ /);
+ }
+ const counts=records.map(record=>record.window.raises);f.owner.window.focus();
+ assert.deepEqual(records.map(record=>record.window.raises),counts,'本体を選んでも所属パネルは再前面化しない');
+ records[0].window.close();assert.equal(f.owner.window.isDestroyed(),false);assert.equal(records[1].window.isDestroyed(),false);
+ await f.handlers.get('development:end-session')(f.event(f.owner));
+ for(const record of records){assert.equal(record.window.isDestroyed(),true);assert.equal(f.windows.has(record.window.webContents),false);}
+ assert.equal(closed,4);assert.equal(f.owner.window.isDestroyed(),false);
+ const next=await f.code();f.owner.window.destroy();assert.equal(next.window.isDestroyed(),true,'本体終了は所属窓を回収する');
 });
 
 test('preloadタイトル: 任意IPCを公開せずホストの同一ウィンドウタイトルだけを取得する',async()=>{

@@ -15,6 +15,7 @@ test('AI model test explains auto provider priorities only in Prediction and Dec
     for (const family of ['CHAT', 'LIVE', 'PREDICTION', 'DECISION', 'CODE']) {
       state.区分変更(family);
       const html = await render('AIモデル/AIモデルパネル.vue', {state, online: false, visible: true});
+      assert.ok(html.includes(`<h3>${family} / ${family === 'PREDICTION' ? '入力予測' : '入力'}</h3>`));
       if (orders[family]) {
         assert.ok(html.includes(`プロバイダ選択優先順（auto）: ${orders[family]}`));
         assert.ok(html.includes('使えるプロバイダ'));

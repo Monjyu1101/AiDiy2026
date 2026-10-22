@@ -22,7 +22,7 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 - Diagからのアプリ起動、単独Avatar（設定・タスク・チームを含む）、単独DiscordはIDE由来ではないためOFF。現行IDEにこれらの別プロセス起動経路はない。今後IDEから外部Electronを起動する場合は、mainが管理する起動元とVR状態の通知・切断処理を加え、単に別プロセスだからOFFと判断しない。
 - ONは全OS・全アプリで同じ `floating` 層。選択されたON窓だけ `focus` 時に `moveTop` する。`focus()` の奪い返し、タイマー再固定、IDE選択時の子窓一括持上げ、`pop-up-menu` 等の上位層は使わない。これにより別プロセスのON窓同士も通常のOS選択順に従う。OFF窓の選択では持上げ処理をしない。
 - IDEのVR中は、本体と所属する既存・新規子窓をONにロックする。UIは `aria-pressed` と理由付きdisabledで表示し、mainでもOFF要求を拒否する。F11・VR再押下・最大化によるVR終了後は、各窓のVR直前のユーザー選択へ戻す。VR中にIDEから新規生成した窓はONへ戻り、その後OFFにできる。
-- IDEの子窓の寿命・セッションは `record.owner` で管理する。ピンON中だけ `setParentWindow(owner)` を設定し、IDEを選択しても所属モジュールが必ずその前に残るようにする。OFF時と登録解除時は `setParentWindow(null)` で外す。VRロック解除時も復元したピン状態に従う。独立起動にはIDEのOS所有関係を付けない。
+- IDE所属パネルの寿命・セッション・VR連携は `record.owner` で管理し、OS上はピンON・OFFとも独立したトップレベル窓にする。`setParentWindow(owner)` は使わない。DOM別窓も `setParentWindow(null)` で切り離し、window.openのDOM連携は維持する。タイトル・配置・終了連携でIDE所属を示す。通常の非モーダル親子窓でもOSは子を親より手前に保つため、独立した選択順とは両立しない。ピンONはOFFのIDEより手前だが、本体もONのときは本体を含め最後に選択した窓が手前になる。
 - ページ内のExplorer・軌跡・Viewer・比較は従来の **📌** で別ウィンドウを開く。Explorer・軌跡の切離し📌は右端に置く。ElectronのExplorerはタイトルの×、軌跡は右端の×で独立窓を閉じ、同じDOMを本体内に開いたまま戻す。本文の↙は表示しない。Web popupの復帰操作と、別窓API・セッション・元DOMの保持は維持する。
 - rendererは自分の状態取得・切替・状態変更購読だけをpreload経由で使用する。DOM別窓は親IDEの限定 `panelAction` と、所属する `panelName` の通知を使う。他窓IDや任意IPCを公開せず、mainで所有者・フレーム・セッション世代を照合する。
 
@@ -31,7 +31,7 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 - `node --test frontend_ide/checks/window-pin.test.mjs frontend_ide/checks/window-pin-renderer.test.mjs frontend_ide/checks/code-window-title.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/all-displays.test.mjs`。OFF/ON初期値、選択順、VR入出、F11、連打・古い通知・閉鎖時の回収、他窓操作拒否を確認する。
 - `frontend_avatar/node_modules/.bin/electron frontend_ide/checks/window-pin-desktop.cjs --ozone-platform=headless` は隔離した合成画面だけを使う。Linux headlessでは `setAlwaysOnTop` を受け付けても `isAlwaysOnTop()` がfalseのままの環境がある。コントローラーの状態・API呼出検査と、OS最前面の実測を区別する。
 - Windows実機では、別アプリを含むON窓A/Bの交互選択、OFFへ変更したIDE子窓とIDE本体の前後入替、他アプリ選択、VR中の解除拒否、VR終了後の復元を実窓で確認する。headless・モックの成功を実デスクトップのZ順検証として扱わない。
-- `node frontend_ide/scripts/check-ide-pin-order.mjs` は隔離したWindows実窓とPython標準ライブラリの読み取りだけで、IDEを持ち上げた時の実際のWin32 Z順を検証する。ON・再ON・IDE自身のピン切替・VRロックでは子が前、OFF・VRからOFFへ復元した時は前後を入れ替えられることを確認する。`isAlwaysOnTop()` の報告と実際のZ順は区別する。
+- `node frontend_ide/scripts/check-ide-pin-order.mjs` は隔離したWindows実窓とPython標準ライブラリの読み取りだけで、IDEを持ち上げた時の実際のWin32 Z順を検証する。ON同士・再ON・VRロックで本体とパネルを交互に持ち上げられること、OFFのIDEよりONパネルが前、OFFパネルはONのIDEより後ろになることを確認する。このプローブは入力フォーカスやクリック操作の実測ではないため、それらはWindows実窓で別途確認する。`isAlwaysOnTop()` の報告と実際のZ順は区別する。
 
 ## 再取得・再読込の表示
 
