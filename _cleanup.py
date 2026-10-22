@@ -480,7 +480,7 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
         for name in list(directories):
             path = current_path / name
             lower = name.lower()
-            if lower == ".git" or _is_directory_link(path):
+            if lower in {".git", ".git_local"} or _is_directory_link(path):
                 directories.remove(name)
                 continue
             if lower in TEMP_DIR_NAMES or (lower in TEST_DIR_NAMES and not in_dependency):

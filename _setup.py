@@ -861,6 +861,18 @@ def main():
     finally:
         AUTO_MODE = selected_auto_mode
 
+    from scripts.local_git_setup import ensure_local_git
+    git_status, git_message = ensure_local_git(BASE_DIR)
+    if git_status in ("error", "skipped"):
+        print_warning(git_message)
+    else:
+        print_info(git_message)
+    if git_status == "error":
+        error_locations.append("Git: ローカル管理")
+        if not continue_on_error:
+            print_setup_summary(error_locations)
+            sys.exit(1)
+
     if choices["common"]:
         error_locations.extend(setup_common_global_tools(choices))
         if GLOBAL_CLI_INSTALL_PROCESSES:

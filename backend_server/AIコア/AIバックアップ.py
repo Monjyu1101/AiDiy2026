@@ -23,6 +23,7 @@ logger = get_logger("バックアップ")
 _バックアップ除外フォルダ = (
     "__pycache__",
     ".git",
+    ".git_local",
     ".venv",
     "venv",
     "_data",
@@ -205,6 +206,29 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
     return files
 
 
+def _ローカルGit記録(base_path: str, files: List[str]) -> None:
+    """Git の失敗で既存のファイルバックアップを止めない。"""
+    try:
+        import importlib.util
+        from pathlib import Path
+        helper = Path(__file__).resolve().parents[2] / "scripts" / "local_git_backup.py"
+        spec = importlib.util.spec_from_file_location("aidiy_local_git_backup", helper)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        state, detail = module.commit_local_backup(
+            base_path, files, excluded_dirs=_バックアップ除外フォルダ,
+            excluded_files=_バックアップ除外ファイル,
+            excluded_suffixes=_バックアップ除外拡張子,
+            excluded_pairs=_バックアップ除外フォルダ組,
+        )
+        if state == "error":
+            logger.warning(detail)
+        elif state == "created":
+            logger.info("ローカル Git 変更記録を作成しました。")
+    except Exception:
+        logger.warning("ローカル Git 記録を実行できませんでした。通常バックアップを継続します。")
+
+
 def _nul_nullファイル削除試行(file_path: str) -> bool:
     """Windows環境で nul/null ファイル削除を試行（失敗しても継続）"""
     if os.name != "nt":
@@ -266,6 +290,7 @@ def バックアップ実行(
 
         # 全ファイル一覧を走査（パス/更新日時/更新時刻）
         all_scan = _全ファイルスキャン(base_path, 最大件数=_バックアップキャンセル件数)
+        _ローカルGit記録(base_path, [f["パス"] for f in all_scan])
         if not all_scan:
             return None
         max_mtime = max(f["更新時刻"] for f in all_scan)

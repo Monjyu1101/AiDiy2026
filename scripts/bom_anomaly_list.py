@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 
 BOM = b'\xef\xbb\xbf'
-IGNORE_DIRS = {'.git', 'node_modules', 'dist', 'build', '.venv', '__pycache__', '.mypy_cache', '.pytest_cache'}
+IGNORE_DIRS = {'.git', '.git_local', 'node_modules', 'dist', 'build', '.venv', '__pycache__', '.mypy_cache', '.pytest_cache'}
 MAX_BYTES = 10 * 1024 * 1024  # 10MB
 
 

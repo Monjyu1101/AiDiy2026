@@ -6,7 +6,7 @@ from pathlib import Path
 # Default extensions: .py .vue .js .ts .json .md .txt .css .html .yml .yaml
 
 DEFAULT_EXTS = {'.py', '.vue', '.js', '.ts', '.json', '.md', '.txt', '.css', '.html', '.yml', '.yaml'}
-IGNORE_DIRS = {'.git', 'node_modules', 'dist', 'build', '.venv', '__pycache__', '.mypy_cache', '.pytest_cache'}
+IGNORE_DIRS = {'.git', '.git_local', 'node_modules', 'dist', 'build', '.venv', '__pycache__', '.mypy_cache', '.pytest_cache'}
 BOM = b'\xef\xbb\xbf'
 
 
