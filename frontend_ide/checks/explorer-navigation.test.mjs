@@ -12,6 +12,7 @@ import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as routeExpansion from '../src/ファイル閲覧/軌跡パネル展開.js';
 import * as routeTree from '../src/開発スペース/軌跡ツリー.js';
 import * as routeRecords from '../src/開発スペース/経路記録.js';
+import * as explorerDrag from '../src/ファイル閲覧/エクスプローラードラッグ.js';
 import * as explorerActions from '../src/ファイル閲覧/エクスプローラー操作.js';
 import {scanWarning} from '../src/ファイル閲覧/走査警告.js';
 import {createSpace} from '../src/開発スペース/宇宙描画.js';
@@ -35,7 +36,7 @@ function explorer(fetcher=async()=>reply({files:[]})){
     module,document,window:Object.assign(new EventTarget(),{innerHeight:800,setTimeout,clearTimeout}),fetch:fetcher,AbortController,URLSearchParams,Date,console,
     localStorage:{getItem:()=>null,setItem(){}},matchMedia:()=>({matches:true}),CSS:{escape:value=>value},
     setInterval:(callback,ms)=>{timers.set(++id,{callback,ms});return id;},clearInterval:key=>timers.delete(key),setTimeout,clearTimeout,
-    require:id=>id==='vue'?{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.includes('最新ファイル')?latest:id.includes('走査警告')?{scanWarning}:id.includes('軌跡パネル展開')?routeExpansion:id.includes('軌跡ツリー')?routeTree:id.includes('経路記録')?routeRecords:id.includes('エクスプローラー操作.js')?explorerActions:{},
+    require:id=>id==='vue'?{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)}:id.includes('最新ファイル')?latest:id.includes('走査警告')?{scanWarning}:id.includes('軌跡パネル展開')?routeExpansion:id.includes('軌跡ツリー')?routeTree:id.includes('経路記録')?routeRecords:id.includes('エクスプローラー操作.js')?explorerActions:id.includes('エクスプローラードラッグ.js')?explorerDrag:{},
   });
   const props=vue.reactive({root:'/project',tree:scan(['old.js']).tree,scan:scan(['old.js']),selected:'',current:'',startedAt:1,open:true,viewHistory:[],filter:true,color:()=>''});
   const scope=vue.effectScope(),state=scope.run(()=>module.exports.setup(props,{expose(){},emit:(...args)=>events.push(args)}));

@@ -306,3 +306,6 @@
 .close-icon{position:relative;display:inline-block;width:14px;height:14px;flex:none;vertical-align:-2px;pointer-events:none}
 .close-icon::before,.close-icon::after{content:"";position:absolute;left:0;top:6px;width:14px;height:2px;background:currentColor;transform:rotate(45deg)}
 .close-icon::after{transform:rotate(-45deg)}
+
+/* 本体内の別窓起動ピンだけを本文サイズから独立させる。別窓・タイトルバーには適用しない。 */
+.space-view .explorer-panel header .explorer-detach,.space-view .explorer-routes .route-detach,.space-view .viewer-popup header .viewer-pin{font-size:14px;line-height:14px}

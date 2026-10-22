@@ -4,6 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
+import { createExplorerDrag } from './エクスプローラードラッグ.js';
 import RefreshButton from '../共通表示/再読込ボタン.vue';
 import { ref, shallowRef, computed, inject, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { createRouteExpansion } from '../ファイル閲覧/軌跡パネル展開.js';
@@ -20,6 +21,7 @@ import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
 const props = defineProps({ tree: Object, scan: Object, root: String, selected: String, current: String, navigating: Boolean, startedAt: Number, open: Boolean, allDisplays: Boolean, viewHistory: { type: Array, default: () => [] }, viewVoyages: { type: Object, default: () => ({}) }, filter: { type: Boolean, default: true }, applyFileChange: Function, reload: Function, color: { type: Function, default: () => '#bac7da' } });
 const emit = defineEmits(['update:open', 'select', 'clear', 'marks', 'latest', 'freshness', 'route', 'clear-view-history', 'detached', 'activity']);
+const treeDrag=createExplorerDrag({activity:()=>emit('activity')});
 const panel=ref(),detached=ref(false),pinError=ref('');
 const draftActions=inject('fileDraftActions',null),draftRequest=ref(null);
 const nativePanels=!!window.aidiyWindow?.panelAction;
@@ -360,7 +362,7 @@ watch(()=>props.startedAt,()=>{mode.value='since';clearSearch();resetLatest();in
 watch(()=>props.filter,clearSearch);
 watch(mode,clearSearch);
 watch([mode,since,until,matches,aiResult],emitMarks,{immediate:true});
-onBeforeUnmount(()=>{fileActions.dispose();routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
+onBeforeUnmount(()=>{treeDrag.dispose();fileActions.dispose();routeDisposed=true;routeMotion.dispose();routeDocumentCleanup();routeWindow?.close();panelWindow?.close();cancelSinceExpansion();generation++;controller?.abort();clearInterval(latestTimer);latestDisposed=true;latestRun++;latestController?.abort();document.removeEventListener('pointerdown',closeRouteList);});
 defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 </script>
 <template>
@@ -410,7 +412,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
         <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching||fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
         <button class="explorer-root-name" :disabled="searching" @click="select({type:'dir',path:''})"><FileTypeIcon :name="tree?.n" directory :open="rootExpanded" /><span class="file-name">{{ tree?.n }}</span></button>
       </div>
-      <ul ref="treeElement" role="tree" tabindex="0" :data-aidiy-window-move-list="detached&&nativePanels?'':undefined" @keydown="key" @contextmenu.prevent.stop="contextMenu($event)"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :data-entry-type="row.type" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,'plain-folder':row.type==='dir'&&mode!=='ai',selected:selected===row.path,cursor:cursor===row.path}" @click="!fileActionState.rename&&!fileActionState.busy&&select(row,true)" @contextmenu.prevent.stop="contextMenu($event,row)">
+      <ul ref="treeElement" @pointerdown="treeDrag.down" @click.capture="treeDrag.click" @dblclick.capture="treeDrag.click" @dragstart="treeDrag.dragstart" role="tree" tabindex="0" :data-aidiy-window-move-list="detached&&nativePanels?'':undefined" @keydown="key" @contextmenu.prevent.stop="contextMenu($event)"><TransitionGroup name="explorer-branch" @before-leave="beforeTreeLeave" @after-leave="afterTreeLeave" @leave-cancelled="afterTreeLeave"><li v-for="row in rows" :key="row.path" role="treeitem" :aria-expanded="row.type==='dir'?row.open:undefined" :aria-selected="selected===row.path" :data-path="row.path" :data-entry-type="row.type" :title="mode==='ai'?aiFiles.get(row.path):undefined" :style="{'--depth':row.depth}" :class="{fresh:row.fresh,'plain-folder':row.type==='dir'&&mode!=='ai',selected:selected===row.path,cursor:cursor===row.path}" @click="!fileActionState.rename&&!fileActionState.busy&&select(row,true)" @contextmenu.prevent.stop="contextMenu($event,row)">
         <button v-if="row.type==='dir'" class="chevron" :aria-label="row.open?'折りたたむ':'展開する'" @click.stop="toggle(row)">{{ row.open?'▾':'▸' }}</button><span v-else class="chevron"></span><FileTypeIcon :name="row.name" :directory="row.type==='dir'" :open="row.open" /><input v-if="fileActionState.rename?.path===row.path" v-model="fileActionState.rename.value" class="explorer-rename" aria-label="新しい名前" :disabled="fileActionState.busy" maxlength="255" autocomplete="off" spellcheck="false" @click.stop @contextmenu.stop @keydown.stop="renameKey" @blur="!fileActionState.busy&&fileActions.cancel()"><span v-else class="file-name">{{ row.name }}</span><span v-if="fileActionState.rename?.path!==row.path" class="file-meta">{{ row.type==='dir'?(row.fresh?`${mode==='ai'?'関連':'更新'} ${row.fresh}`:''):new Date(row.mtime).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) }}</span><span v-if="row.fresh" class="file-mark">●</span>
       </li></TransitionGroup></ul>
       <!-- 最下部: 前回取得以降の更新。次の更新が来るまで維持する。 -->
@@ -430,6 +432,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 </template>
 
 <style scoped>
+.explorer-panel>ul[role="tree"]{user-select:none}.explorer-panel>ul.explorer-dragging,.explorer-panel>ul.explorer-dragging *{cursor:grabbing}.explorer-panel .explorer-rename{user-select:text}
 .explorer-panel .explorer-collapse{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;min-width:24px;padding:0}.explorer-collapse svg{display:block;pointer-events:none}
 .time-search>label{display:flex;align-items:center;gap:6px;margin-bottom:5px}.time-search input{flex:1;min-width:0}.time-search>small{display:block}.time-search>p{margin:5px 0;color:#ffaaa5;white-space:normal}
 .explorer-rename{flex:1;min-width:0;width:0;height:23px;box-sizing:border-box;background:#0c1424;color:#fff;border:1px solid #8de6eb;padding:1px 4px;font:inherit}.explorer-rename:focus{outline:1px solid #8de6eb}

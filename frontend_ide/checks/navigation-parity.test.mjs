@@ -20,6 +20,7 @@ import * as latest from '../src/ファイル閲覧/最新ファイル.js';
 import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
 import * as references from '../src/ファイル閲覧/ファイル参照.js';
 import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
+import * as explorerDrag from '../src/ファイル閲覧/エクスプローラードラッグ.js';
 import * as explorerActions from '../src/ファイル閲覧/エクスプローラー操作.js';
 import * as browserLaunch from '../src/ブラウザ/起動.js';
 import * as mediaTypes from '../viewer/media-types.mjs';
@@ -98,6 +99,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
   }
   t.mock.method(performance, 'now', () => clock);
   const moduleMap = {
+    './エクスプローラードラッグ.js': explorerDrag,
     '../ファイル閲覧/エクスプローラー操作.js': explorerActions, './エクスプローラー操作.js': explorerActions,
     '../ブラウザ/起動.js': browserLaunch,
     '../../viewer/media-types.mjs': mediaTypes,
