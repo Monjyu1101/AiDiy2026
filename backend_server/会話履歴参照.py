@@ -68,12 +68,13 @@ def read_prediction_history(
     now は呼び出し元で一度確定した時刻／検証用。aware値はサーバー時刻へ変換。
 
     期間内の候補をカーソルで順次処理し、最新 max_turns ターンだけを保持する。
-    本文は各 max_message_chars 文字、最終総計 max_chars 文字まで。文字数制限時も
+    本文は各 max_message_chars 文字、最終総計 max_chars 文字まで。既定の方式は
     入力を先に確保し、新しいターン・新しい返答を優先する。古い会話で補充しない。
     user_only=True はユーザー入力のみを取得し、返答に本文予算を割り当てない。
     既定値の False は従来どおり入力と返答を返す。
-    include_latest_reply=True は user_only に関係なく、入力へ先に予算を配分し、
-    残りで最新の正常な output_text を最大1件返す。元入力と同じ turn_id を保つ。
+    include_latest_reply=True は user_only に関係なく、最新の正常な output_text
+    最大1件とその元入力を先に確保し、残りを新しい入力から配分する。
+    元入力と同じ turn_id を保つ。2文字未満の予算では入力だけを返す。
     output_request は遅れて保存されるコード応答のミラーなので、この方式では
     対象にしない。エラー・無応答・別レーン・対象外ターンの返答も補充しない。
     DB 初期化・マイグレーション・書込は行わず、DB不在等は sqlite3.Error。
@@ -195,10 +196,33 @@ def read_prediction_history(
 
     selected = []
     remaining = max_chars
-    # 最新ターンから本文予算を割り当てる。返答だけが残ることはない。
+    reserved_turn_id = None
+    if include_latest_reply and max_chars >= 2:
+        # 返答の受信順で選び、その元入力と一組で確保する。古い入力が長くても
+        # 完了報告を落とさず、別レーンの新しい依頼へ結び付けない。
+        latest = max(
+            ((turn["latest_reply"], turn_id, turn) for turn_id, turn in enumerate(turns, 1)
+             if "latest_reply" in turn),
+            key=lambda item: item[0][0], default=None,
+        )
+        if latest is not None:
+            reply, reserved_turn_id, turn = latest
+            # 小さな検証用予算でも返答だけにはしない。通常の24,000文字なら
+            # 入力・返答の各4,000文字をともに確保できる。
+            index, role, content = turn["user"]
+            content = content[:remaining - 1]
+            selected.append((index, {"role": role, "content": content, "turn_id": reserved_turn_id}))
+            remaining -= len(content)
+            index, role, content = reply
+            content = content[:remaining]
+            selected.append((index, {"role": role, "content": content, "turn_id": reserved_turn_id}))
+            remaining -= len(content)
+    # 残りは最新入力から配分し、古い入力を先に削る。返答だけが残ることはない。
     for turn_id, turn in reversed(list(enumerate(turns, 1))):
         if remaining <= 0:
             break
+        if turn_id == reserved_turn_id:
+            continue
         index, role, content = turn["user"]
         content = content[:remaining]
         selected.append((index, {"role": role, "content": content, "turn_id": turn_id}))
@@ -211,15 +235,4 @@ def read_prediction_history(
             content = content[:remaining]
             selected.append((index, {"role": role, "content": content, "turn_id": turn_id}))
             remaining -= len(content)
-    if include_latest_reply and remaining > 0:
-        # 入力を全て確保できた場合だけ返答を追加する。ターンの新旧ではなく
-        # 返答の実際の順序で1件を選び、予算不足でも古い返答へ差し替えない。
-        latest = max(
-            ((turn["latest_reply"], turn_id) for turn_id, turn in enumerate(turns, 1)
-             if "latest_reply" in turn),
-            key=lambda item: item[0][0], default=None,
-        )
-        if latest is not None:
-            (index, role, content), turn_id = latest
-            selected.append((index, {"role": role, "content": content[:remaining], "turn_id": turn_id}))
     return [message for _, message in sorted(selected, key=lambda item: item[0])]

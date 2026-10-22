@@ -39,6 +39,13 @@ MODEL_KEYS = {
 }
 # CLIは実行エラーも「!」始まりで返すため、正常な応答だけに目印を付けさせて区別する。
 _CLI_MARKER = "[[PREDICTION]]"
+# Diag の prediction_info.mjs と同じ既知の非対応経路（parity fixture で照合）。
+# 設定から解決される未知の transport は Hermes アダプターの実行時検査で拒否する。
+HERMES_UNSUPPORTED_PREDICTION_ROUTES = frozenset({
+    "claude_cli", "claude-code", "codex_cli", "codex-cli", "copilot_cli", "copilot-cli",
+    "antigravity_cli", "antigravity-cli", "grok_cli", "grok-cli", "opencode_cli", "opencode",
+    "copilot-acp", "github-copilot-acp", "codex_app_server",
+})
 HISTORY_MAX_CHARS = 24000
 _SYSTEM_INSTRUCTION = (
     "あなたは次のユーザー入力を予測する専用モデルです。"
@@ -173,7 +180,9 @@ class PredictionLLM:
                     valid = {model: label for model, label in models.items()
                              if isinstance(model, str) and 0 < len(model) <= 200 and model.strip() == model
                              and not any(ord(c) < 32 or ord(c) == 127 for c in model) and model not in ("auto", "same")
-                             and isinstance(label, str)}
+                             and isinstance(label, str)
+                             and (name != "aidiy_hermes" or model.split("/", 1)[0].split(":", 1)[0].strip().lower()
+                                  not in HERMES_UNSUPPORTED_PREDICTION_ROUTES)}
                     if valid:
                         result[name] = {"models": valid}
             return result

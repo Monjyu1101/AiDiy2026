@@ -1,4 +1,4 @@
-"""隔離DBで、入力優先の予測履歴に最後の正常なAI応答だけを追加する。"""
+"""隔離DBで、最後の正常なAI応答と元入力を予測履歴に確保する。"""
 
 from contextlib import closing
 from datetime import datetime, timedelta
@@ -101,18 +101,57 @@ class PredictionLatestReplyTests(unittest.TestCase):
                          ["unrelated chat request", "検証して", "検証完了"])
         self.assertEqual(result[-1]["turn_id"], 2)
 
-    def test_users_receive_budget_before_latest_reply(self):
+    def test_latest_reply_and_original_input_receive_budget_first(self):
         self.add("aaa", -5)
         self.add("old", -4, kind="output_text")
         self.add("bbb", -3)
         self.add("newest response", -2, kind="output_text")
 
         partial = self.read(max_chars=8, max_message_chars=8)
-        self.assertEqual([item["content"] for item in partial], ["aaa", "bbb", "ne"])
-        no_room = self.read(max_chars=6)
-        self.assertEqual([item["content"] for item in no_room], ["aaa", "bbb"])
-        self.assertEqual(self.read(max_chars=5),
-                         self.read(max_chars=5, include_latest_reply=False))
+        self.assertEqual([item["content"] for item in partial], ["bbb", "newes"])
+        self.assertEqual([item["content"] for item in self.read(max_chars=6)], ["bbb", "new"])
+        for budget in (1, 2, 3, 4):
+            with self.subTest(budget=budget):
+                result = self.read(max_chars=budget)
+                self.assertEqual(sum(len(item["content"]) for item in result), budget)
+                self.assertTrue(all(item["content"] for item in result))
+                self.assertEqual(result[0]["role"], "user")
+                if budget > 1:
+                    self.assertEqual(result[-1]["role"], "assistant")
+                    self.assertEqual(result[0]["turn_id"], result[-1]["turn_id"])
+
+    def test_long_inputs_keep_complete_reply_and_drop_oldest_inputs(self):
+        for number in range(10):
+            self.add(str(number) * 5000, -30 + number)
+        self.add("検証完了" + "返" * 5000, -1, kind="output_text")
+        before = self.database.read_bytes()
+        result = self.read()
+        self.assertEqual([item["content"][0] for item in result if item["role"] == "user"],
+                         ["5", "6", "7", "8", "9"])
+        self.assertEqual(result[-1]["content"], ("検証完了" + "返" * 5000)[:4000])
+        self.assertEqual(result[-1]["turn_id"], result[-2]["turn_id"])
+        self.assertEqual(sum(len(item["content"]) for item in result), 24000)
+        self.assertTrue(all(len(item["content"]) <= 4000 for item in result))
+        self.assertEqual(self.database.read_bytes(), before)
+
+    def test_delayed_reply_reserves_older_original_input_under_pressure(self):
+        self.add("A" * 4000, -30, session="A")
+        for number in range(9):
+            self.add(str(number) * 4000, -29 + number, session="B")
+        self.add("A検証完了" + "返" * 4000, -1, kind="output_text", session="A")
+        result = self.read()
+        self.assertEqual([item["content"][0] for item in result if item["role"] == "user"],
+                         ["A", "5", "6", "7", "8"])
+        self.assertEqual(result[-1]["turn_id"], result[0]["turn_id"])
+        self.assertNotEqual(result[-1]["turn_id"], result[-2]["turn_id"])
+        self.assertEqual(sum(len(item["content"]) for item in result), 24000)
+
+    def test_partial_oldest_input_uses_only_budget_left_after_pair(self):
+        self.add("abcdef", -5)
+        self.add("latest", -3)
+        self.add("done", -2, kind="output_text")
+        result = self.read(max_chars=12)
+        self.assertEqual([item["content"] for item in result], ["ab", "latest", "done"])
 
     def test_error_progress_and_tool_identifiers_never_replace_valid_reply(self):
         self.add("検証して", -20)
