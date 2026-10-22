@@ -18,5 +18,12 @@ contextBridge.exposeInMainWorld('aidiyWindow',Object.freeze({
  selectProject:()=>ipcRenderer.invoke('diag:window','selectProject'),
  startMini:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMini',enabled):Promise.resolve(false),
  finishMini:()=>ipcRenderer.invoke('diag:window','finishMini'),
+ startMicro:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMicro',enabled):Promise.resolve(false),
+ expandMicro:(expanded,count=13)=>typeof expanded==='boolean'&&Number.isInteger(count)&&count>=0&&count<=32?ipcRenderer.invoke('diag:window','expandMicro',{expanded,count}):Promise.resolve(false),
+ beginMicroMove:()=>ipcRenderer.invoke('diag:window','beginMicroMove'),
+ moveMicro:token=>typeof token==='string'?ipcRenderer.invoke('diag:window','moveMicro',token):Promise.resolve(false),
+ endMicroMove:token=>typeof token==='string'?ipcRenderer.invoke('diag:window','endMicroMove',token):Promise.resolve(false),
+ beginDisplay:mode=>['normal','mini','micro'].includes(mode)?ipcRenderer.invoke('diag:window','beginDisplay',mode):Promise.resolve(false),
+ finishDisplay:()=>ipcRenderer.invoke('diag:window','finishDisplay'),
  resizeMini:height=>Number.isInteger(height)&&height>=80&&height<=360?ipcRenderer.invoke('diag:window','resizeMini',height):Promise.resolve(false),
 }));

@@ -32,7 +32,7 @@ test('project argument/cwd remain exact; Avatar retains app base; detached logs 
   assert.equal((await f.manager.launch(id,f.project)).受付,true);
   const call=f.calls.at(-1);assert.equal(call.options.cwd,id==='avatar'?f.root:f.project);
   assert.equal(call.options.detached,true);assert.equal(call.options.shell,false);assert.equal(call.options.windowsHide,true);assert.equal(call.options.stdio[0],'ignore');assert.equal(call.options.stdio.includes('ipc'),false);assert.equal(call.child.unreferenced,true);
-  if(id==='avatar'){assert.equal(call.command,'fixture-python');assert.equal(call.args.at(-1),join(f.root,'frontend_avatar','_start.py'));}
+  if(id==='avatar'){assert.equal(call.command,process.execPath);assert.equal(call.args.at(-1),join(f.root,'frontend_avatar','launch.mjs'));}
   else {assert.equal(call.args[call.args.indexOf('--project')+1],f.project);assert.equal(call.args.includes('--new-window'),['ide','term','code'].includes(id));}
  }
  assert.equal(f.calls.length,6);

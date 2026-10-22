@@ -542,3 +542,7 @@ VR中は `--vr-viewer-top:192px`・`--vr-viewer-bottom:48px` を確保し、最�
 ## エクスプローラーの明示ファイル操作
 
 右クリック・インライン名前変更・コピー・確認付きゴミ箱移動の境界と検証は [エクスプローラーファイル操作](./frontend_ide,エクスプローラーファイル操作.md) を参照してください。ビューア本文は読み取り専用のまま、項目管理だけを扱います。
+
+## CLI起動時のTerm窓
+
+`launch.mjs --app term --cli <ID>` はCLI起動専用の指定をElectronへ渡し、`デスクトップ/window-layout.cjs` で作業領域中央の約800×600pxに配置します。小さい画面では作業領域内に縮めます。通常のTermとIDEから開く子Termは従来の配置を使います。確認は `node --test frontend_ide/checks/window-layout.test.mjs`、実窓はDPIの丸めによる数px差を含め中央配置を確認します。

@@ -26,8 +26,6 @@ electronmon が spawn した electron.exe は別プロセスグループで残�
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-import errno
 import os
 import re
 import signal
@@ -138,12 +136,17 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
     return process
 
 
-def start(npm_command: str | None = None) -> subprocess.Popen[bytes]:
-    # npm_command引数は全体起動との互換用。GUI経路ではnpm配下の追加コンソールを避ける。
+def launch_command() -> list[str]:
     node = shutil.which('node')
     if node is None:
         raise RuntimeError("Node.js が見つかりません")
-    return launch_process("フロントエンド(Avatar)", [node, str(FRONTEND_AVATAR_DIR / 'electron/dev-start.cjs')], FRONTEND_AVATAR_DIR)
+    # aidiy_avatar と同じ入口。表示完了後すぐ戻り、Avatar は独立プロセスで動き続ける。
+    return [node, str(FRONTEND_AVATAR_DIR / 'launch.mjs')]
+
+
+def start(npm_command: str | None = None) -> subprocess.Popen[bytes]:
+    # npm_command引数は全体起動との互換用。監視・再起動はせず、aidiy_code と同じ独立起動にする。
+    return launch_process("フロントエンド(Avatar)", launch_command(), FRONTEND_AVATAR_DIR)
 
 
 def kill_electron_processes() -> None:
@@ -330,81 +333,12 @@ def _stop(process: subprocess.Popen[bytes], name: str) -> None:
         kill_electron_processes()
 
 
-@contextmanager
-def avatar_start_lock(path: Path | None = None):
-    """同時起動を防ぐ。ロックは終了時に OS が解放する。"""
-    path = path or Path.home() / ".aidiy" / "aidiy_avatar.lock"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+b") as lock:
-        lock.seek(0, os.SEEK_END)
-        if lock.tell() == 0:
-            lock.write(b"0")
-            lock.flush()
-        lock.seek(0)
-        try:
-            if sys.platform == "win32":
-                import msvcrt
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as error:
-            if error.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
-                raise
-            yield False
-            return
-        try:
-            yield True
-        finally:
-            lock.seek(0)
-            if sys.platform == "win32":
-                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(lock, fcntl.LOCK_UN)
-
-
-def _main() -> None:
-    try:
-        with socket.create_connection(("127.0.0.1", PORT_AVATAR), timeout=0.3):
-            print_info("aidiy_avatar は起動済みです。")
-            return
-    except (ConnectionError, TimeoutError):
-        pass
-    name = "フロントエンド(Avatar)"
-    print_header(f"{name} 起動")
-    ok, detail = check_environment()
-    if not ok:
-        print_error(f"環境が準備されていません: {detail}")
-        print_info(f"  対応例: {get_npm_command() or FRONTEND_COMMAND} install")
-        sys.exit(1)
-    print_success("環境確認: OK")
-
-    kill_ports()
-    time.sleep(1)
-
-    process = start()
-    threading.Thread(target=_stream_output, args=(name, process.stdout), daemon=True).start()
-    print_success(f"{name}: renderer http://127.0.0.1:{PORT_AVATAR}")
-    print_info("Ctrl+C で停止します")
-    try:
-        while process.poll() is None:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print_header("停止処理")
-        _stop(process, name)
-        print_success("停止しました")
-
-
 def main() -> None:
     argparse.ArgumentParser(
         prog="aidiy_avatar",
-        description="Electron 版 Avatar を起動します。Ctrl+C で停止します。renderer: http://127.0.0.1:8092",
+        description="Electron 版 Avatar を独立プロセスで起動し、すぐ戻ります。ログイン画面を閉じると renderer（8092）も停止します。",
     ).parse_args()
-    with avatar_start_lock() as acquired:
-        if not acquired:
-            print_info("aidiy_avatar は起動済みです。")
-            return
-        _main()
+    sys.exit(subprocess.run(launch_command(), cwd=str(FRONTEND_AVATAR_DIR)).returncode)
 
 
 if __name__ == "__main__":

@@ -53,12 +53,12 @@ try{
   const height=await evaluate(`Math.ceil(['.mini-content','.panel-brand','.connection-bar'].reduce((sum,selector)=>sum+document.querySelector(selector).getBoundingClientRect().height,0))`);
   assert.ok(height>=80&&height<=360);await send('Emulation.setDeviceMetricsOverride',{width:384,height,deviceScaleFactor:1,mobile:false});
  }
- await send('Runtime.enable');await send('Page.enable');await send('Network.enable');await send('Network.setBlockedURLs',{urls:['https://*']});
+ await send('Runtime.enable');await send('Page.enable');await send('Emulation.setFocusEmulationEnabled',{enabled:true});await send('Network.enable');await send('Network.setBlockedURLs',{urls:['https://*']});
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  const url=`http://127.0.0.1:${server.address().port}/proxy/8097/#token=app-browser-fixture`;
  await send('Page.navigate',{url});await until(`document.querySelector('.diag-meta')?.textContent.includes('接続済み')`);
  assert.equal(await evaluate(`document.querySelector('nav.tabs button.active').textContent`),'システム起動');
- await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
+ await click('ランチャー表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
  await fitMiniViewport();
  await until(`[...document.querySelectorAll('.mini-app-button img')].every(img=>img.complete&&img.naturalWidth>0)`);
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>button.disabled)`),true);
@@ -78,9 +78,10 @@ try{
  await click('アプリ起動パネルでプロジェクトを選択');await until(`!document.querySelector('.start-mini')&&document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  for(const [key,code,keyCode] of [['Enter','Enter',13],[' ','Space',32]]){
-  await click('導入状況');await click('ミニ表示');await until(`document.querySelector('.mini-project-link')`);await fitMiniViewport();
+  await click('導入状況');await click('ランチャー表示');await until(`document.querySelector('.mini-project-link')`);await fitMiniViewport();
   await evaluate(`document.querySelector('.mini-project-link').focus()`);
-  for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key,code,windowsVirtualKeyCode:keyCode,nativeVirtualKeyCode:keyCode});
+  await until(`document.activeElement===document.querySelector('.mini-project-link')`);
+  for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key,code,text:type==='keyDown'?(key==='Enter'?'\r':' '):undefined,windowsVirtualKeyCode:keyCode,nativeVirtualKeyCode:keyCode});
   await until(`!document.querySelector('.start-mini')&&document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
   await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  }
@@ -109,14 +110,14 @@ try{
  await capture('app-desktop');
  const before=requests.filter(route=>route.includes('アプリ起動')).length;await sleep(1200);assert.equal(requests.filter(route=>route.includes('アプリ起動')).length,before,'アプリの定時監視なし');assert.equal(taskChecks,3);
  await click('導入状況');await click('アプリ起動');assert.equal(await evaluate(`document.querySelector('#app-project-folder').value`),project);
- await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
+ await click('ランチャー表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
  assert.equal(await evaluate(`document.querySelector('.app-launch-panel').getClientRects().length`),0);
- await click('通常表示');await until(`document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
+ await click('元のサイズに戻す');await until(`document.querySelector('nav.tabs button.active').textContent==='アプリ起動'`);
  assert.equal(await evaluate(`document.querySelector('#app-project-folder').value`),project);
- await click('ミニ表示');await until(`document.querySelectorAll('.mini-service').length>0`);
+ await click('ランチャー表示');await until(`document.querySelectorAll('.mini-service').length>0`);
  await evaluate(`[...document.querySelectorAll('.mini-service')].find(button=>button.textContent==='Core').click()`);
  await until(`document.querySelector('nav.tabs button.active').textContent==='システム起動'&&!document.querySelector('.start-mini')`);
- await click('システム起動');await click('ミニ表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
+ await click('システム起動');await click('ランチャー表示');await until(`document.querySelectorAll('.mini-app-button').length===6`);
  await fitMiniViewport();
  assert.equal(await evaluate(`[...document.querySelectorAll('.mini-app-button')].every(button=>!button.disabled)`),true);
  await evaluate(`document.querySelector('.mini-app-button[data-app="live"]').click()`);
@@ -131,7 +132,7 @@ try{
  assert.equal(await evaluate(`(()=>{const view=document.querySelector('.start-mini');return view.scrollHeight<=view.clientHeight&&document.documentElement.scrollWidth<=innerWidth;})()`),true);
  await capture('app-mini-project');
  const miniRequests=requests.filter(route=>route.includes('アプリ起動')).length;await sleep(1200);assert.equal(requests.filter(route=>route.includes('アプリ起動')).length,miniRequests);
- await click('通常表示');await click('アプリ起動');
+ await click('元のサイズに戻す');await click('アプリ起動');
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:780,deviceScaleFactor:1,mobile:true});await sleep(150);await capture('app-mobile');
  assert.equal(await evaluate(`document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight`),false);
  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.app-launch-list')).overflowY`),'auto');

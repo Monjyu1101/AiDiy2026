@@ -1,0 +1,37 @@
+/* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE. */
+html.micro-mode,html.micro-mode body,html.micro-mode #app{background:transparent!important;overflow:hidden;height:100%;margin:0}
+.micro-launcher{position:fixed;inset:0;display:grid;place-items:center;isolation:isolate;pointer-events:none}
+.micro-launcher button{pointer-events:auto;-webkit-app-region:no-drag}
+.micro-move{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90px;height:90px;border-radius:50%;pointer-events:auto;z-index:2}
+.micro-core{position:absolute;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%);display:grid;place-items:center;padding:0;border:0;border-radius:0;background:transparent!important;z-index:3;cursor:pointer}
+.micro-core:disabled{opacity:1;cursor:pointer}
+.micro-core::before,.micro-app::before{content:'';position:absolute;inset:4px;background:#09121fd9;filter:blur(8px);box-shadow:0 3px 9px #0008;pointer-events:none}
+/* Codeの開始表示と同じ二重四角・20秒の逆回転・12秒の色循環。 */
+.micro-mark{position:relative;display:grid;place-items:center;width:48px;height:48px;pointer-events:none}
+.micro-core,.micro-move{touch-action:none;user-select:none}.micro-core img{-webkit-user-drag:none}.micro-launcher.moving,.micro-launcher.moving *{cursor:grabbing!important}
+.micro-mark::before,.micro-mark::after{content:'';position:absolute;inset:0;border:2px solid #8fffff;animation:micro-square 20s linear infinite,micro-rainbow 12s linear infinite,micro-glow 6s ease-in-out infinite}
+.micro-mark::after{animation-direction:reverse,normal,normal;animation-delay:0s,-6s,-3s}
+.micro-mark img{z-index:1;object-fit:contain;filter:none}
+@keyframes micro-square{from{transform:rotate(-6deg)}to{transform:rotate(354deg)}}
+@keyframes micro-rainbow{to{filter:hue-rotate(360deg)}}
+@keyframes micro-glow{0%,100%{opacity:.78}50%{opacity:1}}
+.micro-deploy{position:absolute;left:50%;top:50%;width:var(--menu-size);height:var(--menu-size);transform:translate(-50%,-50%) scale(.12) rotate(-24deg);opacity:0;transition:transform .44s cubic-bezier(.2,.8,.2,1),opacity .4s;pointer-events:none}
+.expanded .micro-deploy{transform:translate(-50%,-50%) scale(1) rotate(0);opacity:1}
+.micro-deploy[inert] button{pointer-events:none}
+.micro-orbit{position:absolute;inset:0;--period:120s;animation:micro-orbit var(--period) linear infinite}
+.micro-position{position:absolute;left:50%;top:50%;width:0;height:0;transform:rotate(var(--angle)) translateX(0) rotate(calc(-1 * var(--angle)));opacity:0;transition:transform .42s cubic-bezier(.2,.8,.2,1),opacity .25s}
+.expanded .micro-position{transform:rotate(var(--angle)) translateX(var(--radius)) rotate(calc(-1 * var(--angle)));opacity:1;transition-delay:var(--stagger)}
+.micro-upright{position:absolute;left:0;top:0;animation:micro-orbit var(--period) linear infinite reverse}
+.micro-app{position:absolute;transform:translate(-50%,-50%);width:48px;height:48px;padding:4px;border:0;border-radius:0;background:transparent!important;transition:border-color .2s}
+.micro-app::before{inset:-4px}
+.micro-app img{position:relative;z-index:1;width:40px;height:40px;object-fit:contain;display:block}
+.micro-app:hover{border-color:#b4ffff;box-shadow:0 0 8px #40d7ff66}
+.micro-launcher:has(.micro-app:hover) .micro-orbit,.micro-launcher:has(.micro-app:hover) .micro-upright,.micro-launcher:has(.micro-app:focus-visible) .micro-orbit,.micro-launcher:has(.micro-app:focus-visible) .micro-upright{animation-play-state:paused}
+@keyframes micro-orbit{to{transform:rotate(360deg)}}
+.launcher-selector{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;-webkit-app-region:no-drag}
+.launcher-selector>span{font-size:10px;color:#8caaba}
+.launcher-selector button{font-size:10px;padding:2px 7px;border-radius:4px;background:transparent;line-height:1.6}
+.launcher-selector button:disabled{cursor:not-allowed;opacity:.35}
+
+.micro-core:focus-visible{outline:none}.micro-core:focus-visible .micro-mark::before{border-color:#dfffff}

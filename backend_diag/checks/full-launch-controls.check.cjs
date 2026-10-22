@@ -3,6 +3,14 @@ const assert=require('node:assert/strict');
 const {render,source}=require('./ui-components.cjs');
 const value=value=>({value});
 
+test('アイコン化の有効条件は通常・ランチャー表示で同じ',async()=>{
+ for(const compact of [false,true])for(const connected of [false,true])for(const microAvailable of [false,true])for(const switching of [false,true]){
+  const html=await render('ウィンドウ/ステータスバー.vue',{compact,connected,microAvailable,switching});
+  const button=html.match(/<button class="title-micro-switch"[^>]*>/)[0];
+  assert.equal(/ disabled(?:[ >])/.test(button),!connected||!microAvailable||switching);
+ }
+});
+
 function startState({empty=false,loading=false,busy=false}={}){
  const item={id:'web',名前:'Web',フォルダ:'frontend_web',状態:'稼働中',設定:{起動対象:true,自動再起動:true,ブラウザ表示:true}};
  return {
@@ -79,15 +87,15 @@ test('通常のアプリ起動は受付・起動済み通知を隠し、エラ�
 
 test('ミニ切替の配線はタイトルバーだけに残し、通常ページの表示条件を維持する',async()=>{
  const app=source('App.vue');
- assert.equal((app.match(/@mini=/g)||[]).length,1);
- assert.match(app,/<component :is="ステータスバー"[^>]*@mini="ミニ\.変更\(true\)"[^>]*@restore="ミニ\.変更\(false\)"/);
+ assert.equal((app.match(/@mini=/g)||[]).length,2);
+ assert.match(app,/<component[^>]*:is="ステータスバー"[^>]*@mini="表示切替\('mini'\)"[^>]*@micro="表示切替\('micro'\)"[^>]*@restore="表示切替\('normal'\)"/);
  for(const [name,tab] of [['起動パネル','start'],['アプリ起動パネル','apps']]){
   const panel=app.match(new RegExp(`<component :is="${name}"[^>]*>`))[0];
   assert.ok(panel.includes(`:visible="tab==='${tab}'&&!ミニ表示"`));assert.doesNotMatch(panel,/@mini=/);
  }
  for(const connected of [true,false]){
   const html=await render('ウィンドウ/ステータスバー.vue',{connected,compact:false});
-  assert.equal((html.match(/aria-label="ミニ表示"/g)||[]).length,1);
+  assert.equal((html.match(/aria-label="ランチャー表示"/g)||[]).length,1);
   const button=html.match(/<button class="title-mini-switch"[^>]*>/)[0];
   assert.equal(/ disabled(?:[ >])/.test(button),!connected);
  }

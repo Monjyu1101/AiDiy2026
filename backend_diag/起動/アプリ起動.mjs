@@ -27,7 +27,7 @@ export function アプリタスク(id,{command=''}){
  // 実行入口に限定。引用された文章やテストの検索語を起動済みと誤認しない。
  if(/(?:^|\s)(?:--eval|-e|--test)(?:\s|$)/.test(text))return false;
  const entry=path=>new RegExp('(?:^|[\\s"\'])[^\\s"\']*'+path+'(?=[\\s"\']|$)','i').test(text);
- if(id==='avatar')return entry('frontend_avatar/(?:_start\\.py|dist-electron/main\\.js)')||entry('frontend_avatar/node_modules/[^\\s"\']*electron[^\\s"\']*')&&/\s\.\s*$/.test(text);
+ if(id==='avatar')return entry('frontend_avatar/(?:launch\\.mjs|_start\\.py|dist-electron/main\\.js)')||entry('frontend_avatar/node_modules/[^\\s"\']*electron[^\\s"\']*')&&/\s\.\s*$/.test(text);
  if(id==='live')return (entry('frontend_ide/desktop\\.cjs')||entry('frontend_ide/launch\\.mjs'))&&/--app(?:=|\s+)live(?:[\s"']|$)/.test(text)||entry('frontend_ide/(?:host/)?aidiy_live/(?:launch\\.mjs|desktop\\.cjs)');
  if(id==='discord')return entry('frontend_channels/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
  return false;
@@ -60,7 +60,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
     if(running)return {起動済み:true,通知:`${app.名前} は起動済みです。`};
    }
    let command=node,args,cwd=path;
-   if(id==='avatar'){const [cmd,initial]=await python();command=cmd;args=[...initial,'-u','-X','utf8',join(root,'frontend_avatar','_start.py')];cwd=root;}
+   if(id==='avatar'){args=[join(root,'frontend_avatar','launch.mjs')];cwd=root;}
    else if(id==='discord')args=[join(root,'frontend_channels','panel','launch.mjs'),'--project',path];
    else args=[join(root,'frontend_ide','launch.mjs'),'--app',id,'--project',path,...(id==='live'?[]:['--new-window'])];
    const env={...process.env,PYTHONIOENCODING:'utf-8',PYTHONUNBUFFERED:'1'};

@@ -173,11 +173,12 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
 def remove_standalone_launcher() -> bool:
     """この作業コピーの Avatar ランチャーだけを解除する。"""
     directory = Path.home() / '.local' / 'bin'
-    script = str(FRONTEND_AVATAR_DIR.resolve() / '_start.py')
+    # 現行の launch.mjs と、旧形式の _start.py 登録の両方を解除対象にする。
+    scripts = [str(FRONTEND_AVATAR_DIR.resolve() / name) for name in ('launch.mjs', '_start.py')]
     try:
         for name in ('aidiy_avatar.cmd', 'aidiy_avatar'):
             launcher = directory / name
-            if launcher.is_file() and launcher_owned_by(launcher.read_text(encoding='utf-8'), script):
+            if launcher.is_file() and any(launcher_owned_by(launcher.read_text(encoding='utf-8'), script) for script in scripts):
                 launcher.unlink()
                 print_success(f'起動ランチャーを解除しました: {launcher}')
         return remove_launcher_path(directory)

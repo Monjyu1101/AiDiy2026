@@ -21,39 +21,17 @@ class AvatarStartTest(unittest.TestCase):
         self.assertEqual(process.returncode, 0)
         self.assertEqual(output.strip(), b"0")
 
-    def test_other_process_is_rejected_and_exit_releases_lock(self):
-        with tempfile.TemporaryDirectory(prefix="avatar start ") as folder:
-            path = Path(folder) / "avatar.lock"
-            code = (
-                "import importlib.util; from pathlib import Path; "
-                f"spec=importlib.util.spec_from_file_location('avatar_start', {str(SCRIPT)!r}); "
-                "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
-                f"ctx=module.avatar_start_lock(Path({str(path)!r})); "
-                "print(ctx.__enter__(), flush=True); ctx.__exit__(None,None,None)"
-            )
-            with start.avatar_start_lock(path) as owned:
-                self.assertTrue(owned)
-                result = subprocess.run([sys.executable, "-X", "utf8", "-c", code], capture_output=True, text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout.strip(), "False")
-            with start.avatar_start_lock(path) as owned:
-                self.assertTrue(owned)
+    def test_start_uses_detached_launcher(self):
+        with patch.object(start.shutil, "which", return_value="node"), patch.object(start, "launch_process") as launch:
+            start.start("npm")
+            launch.assert_called_once_with("フロントエンド(Avatar)", ["node", str(SCRIPT.parent / "launch.mjs")], start.FRONTEND_AVATAR_DIR)
 
-    def test_existing_renderer_is_preserved(self):
-        with patch.object(start.socket, "create_connection"), patch.object(start, "kill_ports") as stop, patch.object(start, "start") as launch:
-            start._main()
-            stop.assert_not_called()
-            launch.assert_not_called()
-
-    def test_duplicate_does_not_check_environment_or_cleanup(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "avatar.lock"
-            real_lock = start.avatar_start_lock
-            with real_lock(path), patch.object(start, "avatar_start_lock", side_effect=lambda: real_lock(path)), patch.object(
-                start, "_main"
-            ) as launch, patch.object(start.sys, "argv", ["aidiy_avatar"]):
-                start.main()
-                launch.assert_not_called()
+    def test_cli_delegates_to_launcher_and_returns_its_code(self):
+        result = subprocess.CompletedProcess([], 0)
+        with patch.object(start.shutil, "which", return_value="node"), patch.object(start.subprocess, "run", return_value=result) as run,                 patch.object(start.sys, "argv", ["aidiy_avatar"]), self.assertRaises(SystemExit) as stop:
+            start.main()
+        run.assert_called_once_with(["node", str(SCRIPT.parent / "launch.mjs")], cwd=str(start.FRONTEND_AVATAR_DIR))
+        self.assertEqual(stop.exception.code, 0)
 
 
 if __name__ == "__main__":

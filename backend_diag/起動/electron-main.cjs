@@ -3,6 +3,7 @@ const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron')
 const path=require('node:path');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
 const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
+const {マイクロ表示を作成}=require('./マイクロ表示.cjs');
 const {画面サイズ演出を作成}=require('./サイズ切替.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
@@ -34,6 +35,8 @@ async function start(value) {
   let url;try{url=validUrl(value);}catch{fail('URL');return;}
   await app.whenReady();
   const initialMini=await checkPort(8095)===true;
+  // 通常表示は中央ではなく、ミニ（作業領域の左上角）より少し内側の左上から表示を始める。
+  const area=screen.getPrimaryDisplay().workArea,通常表示の余白=48;
   if(failed||!process.connected)return;
   // 非永続 session。preload は固定ウィンドウ操作だけ公開し、Node・任意IPCは公開しない。
   const isolated=session.fromPartition('aidiy-diag-'+process.pid,{cache:false});
@@ -42,35 +45,57 @@ async function start(value) {
   isolated.webRequest.onBeforeRequest((details,callback)=>{
     try {const target=new URL(details.url);callback({cancel:target.origin!==url.origin});} catch {callback({cancel:true});}
   });
-  window=new BrowserWindow({width:800,height:600,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,backgroundColor:'#080b10',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),additionalArguments:initialMini?['--aidiy-diag-initial-mini']:[],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+  window=new BrowserWindow({x:area.x+通常表示の余白,y:area.y+通常表示の余白,width:800,height:600,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,transparent:true,hasShadow:false,backgroundColor:'#00000000',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),additionalArguments:initialMini?['--aidiy-diag-initial-mini']:[],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
   pins.register(window);
   attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
   const mini=ミニ表示を作成(window,{screen});
+  const micro=マイクロ表示を作成(window,{screen,pins});
   const sizeEffect=画面サイズ演出を作成(BrowserWindow,window);
   window.once('closed',()=>sizeEffect.中止());
-  let firstLoad=true,opening=false,pendingMiniHeight;
+  let firstLoad=true,opening=false,pendingMiniHeight,displaySwitch=false,displayOrigin;
   window.webContents.on('did-start-loading',()=>{
     // 初回の描画より先にミニ状態にし、初期表示の高さ通知を取りこぼさない。
     // 再読込時は従来どおり通常表示へ戻す。
-    sizeEffect.中止();pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
+    sizeEffect.中止();displaySwitch=false;displayOrigin=undefined;micro.set(false);pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
   });
   let selectingFolder=false;
   ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
+    if(action==='beginDisplay'){
+      if(!['normal','mini','micro'].includes(value)||opening||displaySwitch||sizeEffect.active)return false;
+      displayOrigin=window.getBounds();
+      const base=micro.normalBounds||mini.normalBounds||window.getNormalBounds();
+      const target={...(value==='micro'?{width:104,height:104}:value==='mini'?{width:384,height:360}:base),x:displayOrigin.x,y:displayOrigin.y};
+      displaySwitch=true;
+      return sizeEffect.準備(target).then(ready=>{if(!ready)displaySwitch=false;return ready;});
+    }
+    if(action==='finishDisplay')return sizeEffect.完了().finally(()=>{
+      // アイコン化専用の最前面層を演出の完了後にも適用する。
+      micro.最前面維持();
+      displaySwitch=false;displayOrigin=undefined;
+    });
     if(action==='selectProject'){
       if(selectingFolder)return null;selectingFolder=true;
       return dialog.showOpenDialog(window,{title:'プロジェクトフォルダを選択',properties:['openDirectory']}).then(result=>result.canceled?null:result.filePaths[0]||null).finally(()=>{selectingFolder=false;});
     }
     if(action==='startMini'){
-      if(typeof value!=='boolean')return false;
+      if(typeof value!=='boolean'||micro.active)return false;
       if(value===false)pendingMiniHeight=undefined;
-      if(!opening&&window.isVisible()&&value!==mini.active)return sizeEffect.準備(mini.演出範囲(value)).then(ready=>ready&&mini.set(value));
-      return mini.set(value);
+      if(!displaySwitch&&!opening&&window.isVisible()&&value!==mini.active)return sizeEffect.準備(mini.演出範囲(value)).then(ready=>ready&&mini.set(value));
+      return mini.set(value,{origin:displayOrigin});
     }
-    if(action==='finishMini')return sizeEffect.完了();
+    if(action==='startMicro'){
+      if(typeof value!=='boolean'||opening||sizeEffect.active&&!displaySwitch||mini.active)return false;
+      return micro.set(value,{origin:displayOrigin});
+    }
+    if(action==='expandMicro')return value&&typeof value==='object'?micro.expand(value.expanded,value.count):false;
+    if(action==='beginMicroMove')return micro.beginMove();
+    if(action==='moveMicro')return typeof value==='string'&&micro.move(value);
+    if(action==='endMicroMove'){if(typeof value==='string')micro.endMove(value);return false;}
+    if(action==='finishMini')return displaySwitch?true:sizeEffect.完了();
     if(action==='resizeMini'){
       // 表示開始の拡大演出は撮影した寸法を保持し、最新の測定値だけを完了後に反映する。
       if(opening&&mini.active){if(!ミニ高さは有効(value))return false;pendingMiniHeight=value;return true;}
@@ -80,7 +105,7 @@ async function start(value) {
     if(action==='getPinState')return pins.state(window);
     if(action==='togglePin')return pins.toggle(window);
     if(action==='minimize')window.minimize();
-    else if(action==='maximize'&&!mini.active){
+    else if(action==='maximize'&&!mini.active&&!micro.active){
       if(sizeEffect.active)return false;
       const maximized=window.isMaximized(),target=maximized?window.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
       return sizeEffect.準備(target).then(async ready=>{if(!ready||window.isDestroyed())return false;if(maximized)window.unmaximize();else window.maximize();return sizeEffect.完了();});

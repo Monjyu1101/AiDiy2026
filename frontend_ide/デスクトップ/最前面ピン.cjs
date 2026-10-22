@@ -36,16 +36,19 @@ function createWindowPins({onChanged=()=>{}}={}) {
  function unregister(window) {
   const entry=entries.get(window);if(!entry)return;
   window.removeListener('focus',entry.focus);
+  window.removeListener('show',entry.show);
   window.removeListener('closed',entry.closed);
   entries.delete(window);
  }
  function register(window,{pinned=false,locked=false}={}) {
   if(!alive(window))return state(window);
   if(entries.has(window))return state(window);
+  // Windowsでは非表示中に付けた最前面が表示時に外れるため、ONの窓は表示のたびに付け直す。
   const entry={requested:pinned===true,locked:locked===true,applied:undefined,raising:false,
-   focus:()=>raiseSelected(window),closed:()=>unregister(window)};
+   focus:()=>raiseSelected(window),closed:()=>unregister(window),
+   show:()=>{if(alive(window)&&state(window).pinned)window.setAlwaysOnTop(true,'floating');}};
   entries.set(window,entry);
-  window.on('focus',entry.focus);window.once('closed',entry.closed);
+  window.on('focus',entry.focus);window.on('show',entry.show);window.once('closed',entry.closed);
   return apply(window);
  }
  function toggle(window) {

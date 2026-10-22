@@ -559,6 +559,10 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
     term_was_running = not keep_standalone and "フロントエンド(term)" in processes
     dev_was_running = not keep_standalone and "フロントエンド(IDE)" in processes
     for name, process in list(processes.items()):
+        if name == "フロントエンド(Avatar)":
+            # 起動通知後のランチャーPIDは終了済み。所有する8092とElectronを後段で回収する。
+            processes.pop(name, None)
+            continue
         if keep_standalone and name in ("フロントエンド(term)", "フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)"):
             print_info(f"[{name}] 全体停止の対象外として継続します")
             processes.pop(name, None)
@@ -590,9 +594,9 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
         finally:
             processes.pop(name, None)
 
-    # Avatar を起動していた場合は残留 Electron プロセスも終了する
+    # Avatar は Live と同じく全体終了時に停止し、Web（8092）も回収する。
     if avatar_was_running and AVATAR is not None:
-        AVATAR.kill_electron_processes()
+        AVATAR.kill_ports()
     if term_was_running and TERM is not None:
         TERM.kill_ports()
     if VSCODE is not None:
@@ -913,8 +917,7 @@ def start_initial_services(
             wait_for_services_quiet(last_output_times, ["フロントエンド(Web)"], label="フロントエンド(Web)")
 
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
-        selected_flags["フロントエンド(Avatar)"] = True
-        kill_process_on_port(AVATAR.PORT_AVATAR)
+        # aidiy_code と同じ独立プロセス。表示後すぐ戻り、終了検知・自動再起動の対象にしない。
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")

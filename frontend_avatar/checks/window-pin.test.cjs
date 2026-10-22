@@ -77,6 +77,7 @@ function mainFixture() {
     getAppPath: () => project,
     setAppUserModelId() {},
     requestSingleInstanceLock: () => true,
+    quit() { this.quitCalls = (this.quitCalls || 0) + 1; },
     whenReady: () => ({ then(callback) { ready = callback; } }),
   });
   const electron = {
@@ -96,16 +97,36 @@ function mainFixture() {
         : id.endsWith('長押し窓移動.cjs') ? { attachNativeWindowMove() {} } : load(id),
   };
   const source = fs.readFileSync(path.join(project, 'electron/main.ts'), 'utf8');
-  vm.runInNewContext(compile(source) + '\nglobalThis.probe = {createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,toggleTaskWindows,openTaskDialogWindow,openTeamWindow,openSettingsWindow,ウィンドウ表示,windowPins};', context);
+  vm.runInNewContext(compile(source) + '\nglobalThis.probe = {createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,toggleTaskWindows,openTaskDialogWindow,openTeamWindow,openSettingsWindow,openCoreWindow,openLoginWindow,ウィンドウ表示,windowPins};', context);
   ready();
   const event = window => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame });
-  return { ...context.probe, windows, Window, event,
+  return { ...context.probe, windows, Window, event, app,
     invoke: (channel, window, ...args) => handlers.get(channel)(event(window), ...args),
     raw: (channel, event) => handlers.get(channel)(event),
   };
 }
 
-test('全17窓はOFF起動し、本人だけ切替・通知、同じfloating層で選択された窓だけを前へ出す', async () => {
+test('ログインとAvatarの切替では終了せず、設定窓を残してログインを閉じてもアプリ終了', async () => {
+  const f = mainFixture();
+  await flush();
+  await f.openCoreWindow();
+  f.openSettingsWindow('fixture');
+  await flush();
+  await f.openLoginWindow();
+  assert.equal(f.app.quitCalls || 0, 0);
+  const login = f.windows.find(window => window.role === 'login');
+  login.close();
+  assert.equal(f.app.quitCalls, 1);
+});
+test('AvatarのOS閉じるでも非表示のログイン窓だけを残さない', async () => {
+  const f = mainFixture();
+  await flush();
+  await f.openCoreWindow();
+  f.windows.find(window => window.role === 'core').close();
+  assert.equal(f.app.quitCalls, 1);
+});
+
+test('ログイン窓だけON・他の16窓はOFF起動し、本人だけ切替・通知、同じfloating層で選択された窓だけを前へ出す', async () => {
   const f = mainFixture();
   f.createCoreWindow(false);
   for (const role of ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6']) f.createPanelWindow(role);
@@ -116,11 +137,12 @@ test('全17窓はOFF起動し、本人だけ切替・通知、同じfloating層�
   await flush();
   assert.equal(f.windows.length, 17);
   for (const window of f.windows) {
-    assert.deepEqual(window.topCalls, [[false]], window.role);
-    assert.deepEqual(copy(f.invoke('window:get-pin', window)), { pinned: false, locked: false });
+    const initial = window.role === 'login';
+    assert.deepEqual(window.topCalls, [initial ? [true, 'floating'] : [false]], window.role);
+    assert.deepEqual(copy(f.invoke('window:get-pin', window)), { pinned: initial, locked: false });
     const otherMessages = f.windows.filter(other => other !== window).map(other => other.webContents.messages.length);
-    assert.deepEqual(copy(f.invoke('window:toggle-pin', window, 'another-window')), { pinned: true, locked: false });
-    assert.deepEqual(window.topCalls.at(-1), [true, 'floating']);
+    assert.deepEqual(copy(f.invoke('window:toggle-pin', window, 'another-window')), { pinned: !initial, locked: false });
+    assert.deepEqual(window.topCalls.at(-1), initial ? [false] : [true, 'floating']);
     assert.deepEqual(f.windows.filter(other => other !== window).map(other => other.webContents.messages.length), otherMessages);
   }
   const [login, core, chat] = f.windows;
@@ -164,7 +186,8 @@ test('ピンとタイトル操作は所有main frameだけを許可し、ロッ�
   f.windowPins.setLocked(window, true);
   assert.deepEqual(copy(f.invoke('window:toggle-pin', window)), { pinned: true, locked: true });
   f.windowPins.setLocked(window, false);
-  assert.deepEqual(copy(f.invoke('window:get-pin', window)), { pinned: false, locked: false });
+  // 先頭はログイン窓。ロック解除後は起動時の希望（ON）へ戻る。
+  assert.deepEqual(copy(f.invoke('window:get-pin', window)), { pinned: true, locked: false });
   assert.equal(f.invoke('window:toggle-maximize', window), true);
   assert.equal(f.invoke('window:toggle-maximize', window), false);
   f.invoke('window:minimize-self', window);

@@ -9,7 +9,7 @@ const size=require('../host/scripts/window-size.cjs');
 function windowMinimumSize(kind,bounds){
  return{minWidth:Math.min(kind==='ide'?400:size.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:kind==='term'?180:size.会話最小高さ,bounds.height)};
 }
-function windowBounds(kind,area,owner,slot=0){
+function windowBounds(kind,area,owner,slot=0,cli=false){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
@@ -18,6 +18,10 @@ function windowBounds(kind,area,owner,slot=0){
   return{x:Math.round(Math.min(available.x+(available.width-width)/2+offset,available.x+available.width-width)),y:Math.round(Math.min(available.y+(available.height-height)/2+offset,available.y+available.height-height)),width,height};
  }
  if(kind==='term'){
+  if(cli){
+   const width=Math.min(800,available.width),height=Math.min(600,available.height);
+   return{x:Math.round(area.x+(area.width-width)/2),y:Math.round(area.y+(area.height-height)/2),width,height};
+  }
   const width=Math.min(Math.round(area.width*2/3),available.width),height=Math.min(Math.round(area.height/(area.width>area.height?3:4)),available.height);
   const originX=area.x+(area.width-width)/2,originY=available.y+available.height-height;
   const steps=Math.max(1,Math.floor(Math.min(available.x+available.width-width-originX,originY-available.y)/28)+1),offset=(slot%steps)*28;

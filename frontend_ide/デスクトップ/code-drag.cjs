@@ -8,6 +8,7 @@ const {randomUUID}=require('node:crypto');
 function createCodeDrag({trustedEvent,screen,resolvePanel=()=>null,isCenterMove=()=>false,setTimer=setTimeout,clearTimer=clearTimeout}){
  const active=new Map();
  const localEvents=new WeakMap();
+ const localStarts=new WeakMap();
  const sizes=new WeakMap();
  const movableKinds=new Set(['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']);
  const centerMode=record=>record.kind==='ide'&&isCenterMove(record);
@@ -32,7 +33,7 @@ function createCodeDrag({trustedEvent,screen,resolvePanel=()=>null,isCenterMove=
    if(record?.vrPanelMoving||record?.owner?.vrPanelMoving)return null;
    if(!record||!movableKinds.has(record.kind)||record.window.isDestroyed()||record.window.isMaximized()||record.window.isFullScreen()||!record.window.isFocused())return null;
    stop(record);
-   const drag={token:randomUUID(),revision:record.revision,cursor:screen.getCursorScreenPoint(),bounds:record.window.getBounds(),listeners:[],center:centerMode(record),zoom:record.window.webContents.getZoomFactor?.()||1};
+   const drag={token:randomUUID(),revision:record.revision,cursor:localStarts.get(event)||screen.getCursorScreenPoint(),bounds:record.window.getBounds(),listeners:[],center:centerMode(record),zoom:record.window.webContents.getZoomFactor?.()||1};
    const size=sizes.get(record.window);
    // 前回の移動で生じた1 DIP程度の端数を、次の長押しの基準寸法に足さない。
    // 利用者が窓サイズを変更していた場合は、その新しい寸法を採用する。
@@ -74,6 +75,9 @@ function createCodeDrag({trustedEvent,screen,resolvePanel=()=>null,isCenterMove=
   end(event,token,name){const current=valid(event,token,name);if(current)stop(current.record);},
  };
  // mainで所有確認した窓専用。rendererへrecordやこの入口を公開しない。
- return{...controller,forRecord(record){const event={};localEvents.set(event,record);return{isCenterMove:()=>centerMode(record),begin:()=>controller.begin(event),move:token=>controller.move(event,token),end:token=>controller.end(event,token)};}};
+ return{...controller,forRecord(record){const event={};localEvents.set(event,record);return{isCenterMove:()=>centerMode(record),begin:()=>controller.begin(event),
+  // mainが受け取ったnative mouseDownの座標だけを渡す。renderer IPCには公開しない。
+  beginAt(point){if(!point||!Number.isFinite(point.x)||!Number.isFinite(point.y))return null;localStarts.set(event,{x:point.x,y:point.y});try{return controller.begin(event);}finally{localStarts.delete(event);}},
+  move:token=>controller.move(event,token),end:token=>controller.end(event,token)};}};
 }
 module.exports={createCodeDrag};

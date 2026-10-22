@@ -22,3 +22,8 @@ test('直接起動した実補助プロセスもコンソールなしでログ�
  const child=background(process.env.AIDIY_TEST_PYTHON||'python',['-c','import ctypes;print(ctypes.windll.kernel32.GetConsoleWindow())'],{stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',data=>output+=data);
  const [code]=await once(child,'exit');assert.equal(code,0);assert.equal(output.trim(),'0');
 });
+test('アプリ自身の終了だけを検出し、ファイル変更の再起動では開発サーバーを止めない',()=>{
+ const {isAppClosed}=require('../electron/dev-filter.cjs');
+ for(const line of ['[electronmon] app exited due to signal (null), waiting for change to restart it','[electronmon] app exited with code 1, waiting for change to restart it'])assert.equal(isAppClosed(line),true,line);
+ for(const line of ['[electronmon] restarting app due to file change','[electronmon] ignoring exit with code 1','[electronmon] waiting for a change to restart it'])assert.equal(isAppClosed(line),false,line);
+});

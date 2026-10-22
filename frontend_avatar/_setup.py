@@ -151,8 +151,9 @@ def check_npm_installed():
 
 
 def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
-    """既存の Avatar 起動処理を aidiy_avatar コマンドとして登録する。"""
-    script_path = FRONTEND_AVATAR_DIR / "_start.py"
+    """Avatar の独立起動（launch.mjs）を aidiy_avatar コマンドとして登録する。"""
+    script_path = FRONTEND_AVATAR_DIR / "launch.mjs"
+    node = shutil.which("node") or "node"
     if not script_path.is_file():
         print_error(f"起動スクリプトが見つかりません: {script_path}")
         return False
@@ -164,12 +165,12 @@ def install_standalone_launcher(launcher_dir: Path | None = None) -> bool:
             content = (
                 "@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n"
                 + launcher_owner_comment(script_path) + "\n"
-                + windows_launcher_command([sys.executable, '-X', 'utf8', str(script_path)])
+                + windows_launcher_command([node, str(script_path)])
                 + "\nexit /b %ERRORLEVEL%\n"
             )
             launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
         else:
-            content = f'#!/usr/bin/env sh\nexec {shlex.quote(sys.executable)} -X utf8 {shlex.quote(str(script_path))} "$@"\n'
+            content = f'#!/usr/bin/env sh\nexec {shlex.quote(node)} {shlex.quote(str(script_path))} "$@"\n'
             launcher_path.write_text(content, encoding="utf-8")
             launcher_path.chmod(0o755)
     except OSError as exc:

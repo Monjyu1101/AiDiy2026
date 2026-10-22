@@ -1,5 +1,8 @@
 import importlib.util
+import base64
 import io
+import json
+import re
 from contextlib import redirect_stdout, ExitStack
 from pathlib import Path
 import tempfile
@@ -18,12 +21,19 @@ class LauncherTests(unittest.TestCase):
         windows=setup.launcher_content('C:\\space dir\\diag_main.mjs',True)
         self.assertIn('where node.exe',windows);self.assertIn('%*',windows);self.assertIn('%ERRORLEVEL%',windows)
     def test_special_checkout_paths(self):
-        windows=setup.launcher_content('C:\\repo%TEST%\\diag_main.mjs',True)
-        self.assertIn('repo%%TEST%%',windows);self.assertIn('setlocal DisableDelayedExpansion',windows)
+        script='C:\\日本語 repo%TEST%!&\\diag_main.mjs'
+        windows=setup.launcher_content(script,True)
+        # cmdの展開を避ける現行ランチャーは、起動引数をBase64のJSONでNodeへ渡す。
+        payload=re.search(r"Buffer\.from\('([A-Za-z0-9+/=]+)','base64'\)",windows)
+        self.assertIsNotNone(payload)
+        self.assertEqual(json.loads(base64.b64decode(payload.group(1))),['node.exe',script])
+        self.assertNotIn(script,windows)
+        self.assertIn('setlocal DisableDelayedExpansion',windows)
+        self.assertIn('-- %*',windows)
         shell=setup.launcher_content("/tmp/it's repo/diag_main.mjs",False)
         self.assertIn('aidiy_diag-owner:',shell)
     def test_cleanup_ownership(self):
-        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.object(cleanup,'__file__',str(Path(directory)/'_cleanup.py')):
+        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.object(cleanup,'__file__',str(Path(directory)/'_cleanup.py')),patch.object(cleanup,'stop_processes',return_value=True):
             folder=Path(directory)/'.local/bin';folder.mkdir(parents=True)
             launcher=folder/'aidiy_diag';launcher.write_text('another checkout')
             self.assertTrue(cleanup.cleanup());self.assertTrue(launcher.exists())
@@ -209,14 +219,14 @@ class SetupOrderingTests(unittest.TestCase):
             events.append('prerequisites')
             self.assertFalse(module.AUTO_MODE)
             raise RuntimeError('prerequisite failure')
-        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'_load_folder_module') as loader,patch.object(module,'setup_common_global_tools') as common,patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
+        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_live_avatar',side_effect=lambda:events.append('stop')),patch.object(module,'_load_folder_module') as loader,patch.object(module,'setup_common_global_tools') as common,patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
             with self.assertRaisesRegex(RuntimeError,'prerequisite failure'):
                 module.main()
             launcher=Path(directory)/'.local/bin'/('aidiy_diag.cmd' if setup.sys.platform=='win32' else 'aidiy_diag')
             self.assertFalse(launcher.exists())
             loader.assert_not_called();common.assert_not_called()
             self.assertTrue(module.AUTO_MODE)
-        self.assertEqual(events,['prerequisites'])
+        self.assertEqual(events,['stop','prerequisites'])
     def run_setup_order(self, *, common=True, diag=True, local=True, auto=False, failure=None, keep_going=False):
         from contextlib import ExitStack
         from types import SimpleNamespace
@@ -239,6 +249,7 @@ class SetupOrderingTests(unittest.TestCase):
         with ExitStack() as stack:
             for name,value in [('AUTO_MODE',auto),('GLOBAL_CLI_INSTALL_PROCESSES',['pending'])]:stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module,'collect_setup_choices',return_value=choices))
+            stack.enter_context(patch.object(module,'stop_live_avatar',side_effect=lambda:record('stop')))
             stack.enter_context(patch.object(module,'ensure_prerequisites',side_effect=prerequisites))
             stack.enter_context(patch.object(module,'setup_common_global_tools',side_effect=lambda selected:[] if record('common') else ['common-error']))
             stack.enter_context(patch.object(module,'wait_global_cli_tools_install',side_effect=lambda:[] if record('common-wait') else ['fixture-package']))
@@ -257,7 +268,7 @@ class SetupOrderingTests(unittest.TestCase):
         for auto in (False,True):
             with self.subTest(auto=auto):
                 events,errors,code=self.run_setup_order(auto=auto)
-                self.assertEqual(events,['prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless'])
+                self.assertEqual(events,['stop','prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless'])
                 self.assertEqual(errors,[]);self.assertEqual(code,0)
 
     def test_setup_selection_skips_only_unselected_stages(self):
@@ -266,12 +277,12 @@ class SetupOrderingTests(unittest.TestCase):
                 for local in (False,True):
                     with self.subTest(common=common,diag=diag,local=local):
                         events,errors,code=self.run_setup_order(common=common,diag=diag,local=local)
-                        expected=['prerequisites']+(['common','common-wait'] if common else [])+(['diag-launcher','diag-desktop'] if diag else [])+(['local','download'] if local else [])+['clear']+(['headless'] if diag else [])
+                        expected=['stop','prerequisites']+(['common','common-wait'] if common else [])+(['diag-launcher','diag-desktop'] if diag else [])+(['local','download'] if local else [])+['clear']+(['headless'] if diag else [])
                         self.assertEqual(events,expected);self.assertEqual(errors,[]);self.assertEqual(code,0)
 
     def test_diag_and_local_failures_preserve_continue_or_abort_policy(self):
         labels={'diag-launcher':'Diag','diag-desktop':'Diag: Electron','local':'Local'}
-        normal=['prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless']
+        normal=['stop','prerequisites','common','common-wait','diag-launcher','diag-desktop','local','download','clear','headless']
         for failure,label in labels.items():
             for keep_going in (False,True):
                 with self.subTest(failure=failure,keep_going=keep_going):
@@ -286,9 +297,10 @@ class SetupOrderingTests(unittest.TestCase):
             self.assertEqual(events[-2:],['clear','headless']);self.assertEqual(errors,[label]);self.assertEqual(code,0)
     def test_cancel_does_not_check_or_install_prerequisites(self):
         module=self.root_module('_setup')
-        with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
+        with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'stop_live_avatar') as stop,patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
             with self.assertRaises(SystemExit):module.main()
             prerequisites.assert_not_called()
+            stop.assert_not_called()
     def test_cache_clear_before_single_diag_and_error_policy(self):
         for success,keep_going in [(True,False),(False,True),(False,False)]:
             with self.subTest(success=success,keep_going=keep_going):
@@ -298,7 +310,7 @@ class SetupOrderingTests(unittest.TestCase):
                 from types import SimpleNamespace
                 fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda:True)
                 def diagnose():events.append('diag');return success
-                with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
+                with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_live_avatar'),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
                     if not success and not keep_going:
                         with self.assertRaises(SystemExit) as result:module.main()
                         self.assertEqual(result.exception.code,1)
@@ -312,7 +324,7 @@ class SetupOrderingTests(unittest.TestCase):
         def folder(name,choices):
             events.append(name)
             raise RuntimeError('stop test before unrelated cleanup')
-        with patch.object(module,'stop_all_services',side_effect=lambda *_:events.append('stop')),patch.object(module,'_run_folder_cleanup',side_effect=folder),patch.object(module,'cleanup_backup',side_effect=lambda *_:events.append('backup')),patch('builtins.print'):
+        with patch.object(module,'stop_all_services',side_effect=lambda *_,**kw:events.append('stop')),patch.object(module,'_run_folder_cleanup',side_effect=folder),patch.object(module,'cleanup_backup',side_effect=lambda *_:events.append('backup')),patch('builtins.print'):
             with self.assertRaisesRegex(RuntimeError,'stop test'):
                 module.execute_cleanup(ROOT.parent,{'diag':True,'npm_uninstall':False})
         self.assertEqual(events,['stop','backup','backend_diag'])
@@ -359,6 +371,7 @@ class SetupDisplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
             stack.enter_context(patch.object(Path,'home',return_value=Path(directory)))
             stack.enter_context(patch.object(module,'GLOBAL_CLI_INSTALL_PROCESSES',['fixture']))
+            stack.enter_context(patch.object(module,'stop_live_avatar'))
             for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:None),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
                 stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module.time,'sleep'))

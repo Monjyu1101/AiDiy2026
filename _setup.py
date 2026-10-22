@@ -124,14 +124,21 @@ def print_setup_summary(error_locations: list[str]) -> None:
 # ============================================================
 # フォルダ別 _setup.py のローダー
 # ============================================================
-def _load_folder_module(folder: str):
-    name = f"aidiy_{folder}_setup"
-    path = BASE_DIR / folder / "_setup.py"
+def _load_folder_module(folder: str, entry: str = "_setup.py"):
+    name = f"aidiy_{folder}_{Path(entry).stem.lstrip('_')}"
+    path = BASE_DIR / folder / entry
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def stop_live_avatar() -> None:
+    """依存物更新前にLiveとAvatarを停止する。作業中のCode/IDEは継続する。"""
+    print_header("Live / Avatar の停止")
+    _load_folder_module("frontend_ide/host", "_start.py").kill_ports("live")
+    _load_folder_module("frontend_avatar", "_start.py").kill_ports()
 
 
 def run_diag_headless() -> bool:
@@ -830,6 +837,8 @@ def main():
     if choices is None:
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
+
+    stop_live_avatar()
 
     if choices.get("node_refresh"):
         errors = setup_node_refresh()

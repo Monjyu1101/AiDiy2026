@@ -42,7 +42,9 @@ export async function inspectOpenCodeNpm({ prefix, root }, { platform = process.
     if (!info.isDirectory() || info.isSymbolicLink()) throw Error('OpenCode の npm link・不明なパッケージ配置は自動操作しません。');
     const metadata = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
     const bin = metadata.bin?.opencode;
-    if (metadata.name !== name || !metadata.bin || Object.keys(metadata.bin).join(',') !== 'opencode'
+    // 2.x は同じ実体の別名 opencode2 も宣言する。opencode と同じ値の別名だけを許し、別の実体は所有不明とする。
+    if (metadata.name !== name || !metadata.bin || typeof metadata.bin !== 'object'
+      || Object.entries(metadata.bin).some(([key, value]) => key !== 'opencode' && value !== bin)
       || typeof bin !== 'string' || !bin || /[\\\0\r\n]/.test(bin) || path.isAbsolute(bin) || /^[A-Za-z]:/.test(bin)
       || bin.split('/').includes('..')) throw Error('OpenCode のパッケージ名・bin の所有情報を確認できません。');
     const realRoot = await realpath(root), realDirectory = await realpath(directory);

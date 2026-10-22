@@ -267,14 +267,16 @@ def stop_all_services(
     keep_code: bool = False,
     keep_dev: bool = False,
     keep_discord: bool = False,
+    keep_diag: bool = True,
 ) -> bool:
-    """起動中の常駐サービス・単独実行・MCP 接続をすべて強制終了する。
+    """起動中の常駐サービス・単独実行・MCP 接続を強制終了する。
 
     `_cleanup.py` のファイル削除前と、`_start.py` の起動前・Ctrl+C 終了時で共通の停止手順。
     1 件失敗しても残りの停止は続け、最後に `strict` なら RuntimeError、そうでなければ
     警告だけ出して False を返す。`keep_code` なら aidiy_code の単独実行とその配下
     （hermes が使う tools の MCP 接続など）は止めず、aidiy_live だけを止める
     （`_start.py` 用）。`keep_dev` / `keep_discord` なら IDE / Discord 本体とその配下も停止しない。
+    Diagを操作元にした通常のstart/stopではDiagを維持し、cleanupはkeep_diag=Falseで停止する。
     """
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
     print_header(title)
@@ -287,6 +289,10 @@ def stop_all_services(
         except Exception as e:
             print_warning(f"{description} の停止に失敗しました: {e}")
             failures.append(description)
+
+    if not keep_diag:
+        print_info("バックエンド(Diag) の本体・残留Electronを停止します")
+        run_stop("Diag", lambda: _load_folder_module("backend_diag").stop_processes())
 
     for _choice_key, folder, description, _service_names in SERVICE_CLEANUP_TARGETS:
         if folder in ("frontend_ide/aidiy_term", "frontend_ide/viewer", "frontend_channels"):
@@ -677,7 +683,7 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     print_header("一括実行開始")
     cleanup_errors: list[str] = []
 
-    stop_all_services(choices)
+    stop_all_services(choices, keep_diag=False)
 
     print()
     cleanup_backup(base_dir, choices)

@@ -24,7 +24,7 @@ function component(name) {
   const compiled = compileScript(descriptor, { id: name, inlineTemplate: true });
   const { code } = transformSync(compiled.content, { format: 'cjs', loader: 'js' });
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: id => {
+  vm.runInNewContext(code, { module, exports: module.exports, ResizeObserver:class {observe(){}disconnect(){}}, require: id => {
     if (id.endsWith('.css')) return {};
     const relative = path.posix.normalize(path.posix.join(path.posix.dirname(name), id));
     if (id.endsWith('.vue')) return component(relative);

@@ -77,6 +77,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   const management=installManagerFactory({entries,probeFn,onResult:recordInstallResult});
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
+  assets.set('AiDiy.png',['AiDiy.png','image/png']);
   for(const id of ['avatar','ide','term','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])assets.set(`CLI_${id}.png`,[`CLI_${id}.png`,'image/png']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])assets.set(`CLI_${id}.svg`,[`CLI_${id}.svg`,'image/svg+xml']);

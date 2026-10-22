@@ -205,6 +205,16 @@ test('POSIX symlink と Windows npm shim の所有元を照合する',async t=>{
   const external=path.join(win.directory,'codex.cmd');await writeFile(external,'node_modules/@openai/codex/bin/cli.js');assert.deepEqual((await npmCapability(entry,win,{platform:'win32',resolve:async()=>external})).操作,[]);
 });
 
+test('OpenCode 2.x の同じ実体を指す opencode2 別名は所有を認め、別の実体は認めない',async t=>{
+  const entry=entries.find(item=>item.id==='opencode');
+  const alias=await packageTree(t,{id:'opencode',manifest:{name:NPM_PACKAGES.opencode,bin:{opencode:'bin/cli.js',opencode2:'./bin/cli.js'}}});
+  await writeFile(path.join(alias.directory,'package.json'),JSON.stringify({name:NPM_PACKAGES.opencode,bin:{opencode:'bin/cli.js',opencode2:'bin/cli.js'}}));
+  assert.deepEqual((await npmCapability(entry,alias,{resolve:async()=>null})).操作,['再導入','削除']);
+  await writeFile(path.join(alias.directory,'bin','other.js'),'// 合成。実行しない。');
+  await writeFile(path.join(alias.directory,'package.json'),JSON.stringify({name:NPM_PACKAGES.opencode,bin:{opencode:'bin/cli.js',opencode2:'bin/other.js'}}));
+  assert.deepEqual((await npmCapability(entry,alias,{resolve:async()=>null})).操作,[]);
+});
+
 test('不正 bin・パッケージ外参照・別所有者では再導入も削除も許可しない',async t=>{
   const tree=await packageTree(t),entry=entries.find(item=>item.id==='codex');
   for(const bin of [null,{}, {codex:'../../../foreign.js'}, {codex:tree.target}, {'bad/name':'bin/cli.js'}, {codex:42}]){

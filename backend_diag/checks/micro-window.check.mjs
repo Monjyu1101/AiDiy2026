@@ -1,0 +1,109 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {EventEmitter} from 'node:events';
+import micro from '../起動/マイクロ表示.cjs';
+import pinModule from '../../frontend_ide/デスクトップ/最前面ピン.cjs';
+import layout from '../ui/src/アプリ起動/円周配置.cjs';
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+test('有効数に応じて最小半径80から広げ、回転中も40px画像同士が重ならない',()=>{
+ let previous=0;
+ for(let n=0;n<=32;n++){
+  const {半径,幅}=layout.円周配置(n);assert.ok(半径>=80&&半径>=previous);previous=半径;
+  assert.equal(幅,2*(半径+38));
+  if(n>1)assert.ok(2*半径*Math.sin(Math.PI/n)>=40*Math.SQRT2);
+ }
+ assert.equal(layout.円周配置(6).幅,236);assert.equal(layout.円周配置(13).幅,320);
+ for(const n of [-1,33,NaN,'13',1.5])assert.equal(layout.円周配置(n),null);
+});
+test('展開中の有効数変更でも画面内に収まり、収納位置と移動量を保持',()=>{
+ const {w,control}=fixture();control.set(true);w.bounds={x:1816,y:976,width:104,height:104};
+ control.expand(true,6);assert.equal(w.bounds.width,236);
+ w.bounds.x-=20;w.bounds.y-=30;
+ control.expand(true,13);assert.equal(w.bounds.width,320);assert.ok(w.bounds.x+320<=1920&&w.bounds.y+320<=1080);
+ control.expand(true,6);assert.equal(w.bounds.width,236);
+ assert.equal(control.expand(true,33),false);assert.equal(w.bounds.width,236);
+ control.expand(false);assert.deepEqual(w.bounds,{x:1796,y:946,width:104,height:104});control.set(false);
+});
+function fixture(){
+ const w=new EventEmitter();Object.assign(w,{bounds:{x:100,y:80,width:800,height:600},minimum:[420,320],maximizable:true,resizable:true,top:false,
+ isDestroyed(){return false;},isAlwaysOnTop(){return !!this.top;},getBounds(){return {...this.bounds};},getNormalBounds(){return this.getBounds();},getMinimumSize(){return this.minimum;},isMaximized(){return !!this.maximized;},isMaximizable(){return this.maximizable;},isResizable(){return this.resizable;},setMinimumSize(...v){this.minimum=v;},setBounds(v){this.bounds=v;},setMaximizable(v){this.maximizable=v;},setResizable(v){this.resizable=v;},setAlwaysOnTop(v){this.top=v;},setIgnoreMouseEvents(v){this.ignored=v;},maximize(){this.maximized=true;},unmaximize(){this.maximized=false;},webContents:{executeJavaScript:async()=>false}});
+ const pins=pinModule.createWindowPins();pins.register(w);
+ const screen={getDisplayMatching:()=>({workArea:{x:0,y:0,width:1920,height:1080}}),getCursorScreenPoint:()=>({x:0,y:0})};
+ return {w,pins,screen,control:micro.マイクロ表示を作成(w,{screen,pins})};
+}
+test('アイコン化は最前面をロックし、展開・収納・復帰で元のピンと通常寸法を保持',()=>{
+ for(const pinned of [false,true]){
+  const {w,pins,control}=fixture(),original=w.getBounds();if(pinned)pins.toggle(w);
+  assert.equal(control.expand(true),false);assert.equal(control.set('true'),false);
+  control.set(true);assert.equal(w.bounds.x,original.x);assert.equal(w.bounds.y,original.y);assert.equal(w.bounds.width,104);assert.deepEqual(pins.state(w),{pinned:true,locked:true});pins.toggle(w);assert.equal(w.top,true);
+  const center=[w.bounds.x+52,w.bounds.y+52];control.expand(true);assert.equal(w.bounds.width,320);assert.deepEqual([w.bounds.x+160,w.bounds.y+160],center.map(value=>Math.max(160,value)));
+  control.expand(false);assert.equal(w.bounds.width,104);control.set(false);assert.deepEqual(w.bounds,original);assert.equal(w.top,pinned);assert.equal(w.resizable,true);assert.equal(pins.state(w).locked,false);
+ }
+});
+test('透明部分は背後へ通し、操作対象で解除。復帰後に遅れた判定を適用しない',async()=>{
+ const {w,control,screen}=fixture();let finish;
+ try{
+  control.set(true);await sleep(90);assert.equal(w.ignored,true);
+  screen.getCursorScreenPoint=()=>({x:w.bounds.x+52,y:w.bounds.y+52});w.webContents.executeJavaScript=async()=>true;
+  await sleep(90);assert.equal(w.ignored,false);
+  w.webContents.executeJavaScript=()=>new Promise(resolve=>finish=resolve);await sleep(90);assert.ok(finish);
+  control.set(false);finish(false);await sleep(20);assert.equal(w.ignored,false);
+ }finally{control.set(false);w.emit('closed');}
+});
+test('画面端の展開は領域内に収まり、通常復帰はフォーム左肩を保持',()=>{
+ const {w,control}=fixture();w.bounds={x:1700,y:900,width:800,height:600};w.maximized=true;
+ control.set(true);control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.x+320<=1920);assert.ok(w.bounds.y>=0&&w.bounds.y+320<=1080);
+ const origin=w.getBounds();control.set(false);assert.equal(w.maximized,false);assert.equal(w.bounds.x,origin.x);assert.equal(w.bounds.y,origin.y);assert.equal(w.bounds.width,800);
+});
+
+test('四隅では展開だけ内側へ補正し、収納後は元のアイコン位置へ戻る',()=>{
+ for(const point of [{x:0,y:0},{x:1816,y:0},{x:0,y:976},{x:1816,y:976}]){
+  const {w,control}=fixture();control.set(true);w.bounds={...point,width:104,height:104};const before=w.getBounds();
+  control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.y>=0&&w.bounds.x+320<=1920&&w.bounds.y+320<=1080);
+  control.expand(false);assert.deepEqual(w.getBounds(),before);
+  control.set(false);
+ }
+});
+
+test('端数DPIの寸法差を補正し、上中央の反復収納と別画面への移動を保持',()=>{
+ const {w,control,screen}=fixture();
+ screen.getDisplayMatching=()=>({workArea:{x:-1280,y:0,width:1280,height:720}});
+ w.setBounds=b=>{w.bounds={...b,height:b.height+1};};
+ control.set(true);w.bounds={x:-692,y:0,width:104,height:104};
+ for(let i=0;i<5;i++){
+  control.expand(true);assert.deepEqual(w.bounds,{x:-800,y:0,width:320,height:320});
+  control.expand(false);assert.deepEqual(w.bounds,{x:-692,y:0,width:104,height:104});
+ }
+ control.expand(true);w.bounds.x+=60;w.bounds.y+=40;control.expand(false);
+ assert.deepEqual(w.bounds,{x:-632,y:40,width:104,height:104});control.set(false);
+});
+
+test('アイコン化と通常復帰は切替開始時のフォーム左肩を引き継ぐ',()=>{
+ const {w,control}=fixture(),normal=w.getBounds();
+ control.set(true,{origin:{x:600,y:350,width:384,height:188}});
+ assert.deepEqual(w.bounds,{x:600,y:350,width:104,height:104});
+ w.bounds.x=720;w.bounds.y=400;control.set(false);assert.deepEqual(w.bounds,{...normal,x:720,y:400});
+});
+
+test('移動は所有トークンとOSカーソルだけを使い、解除後は移動させない',()=>{
+ const {w,control,screen}=fixture();w.isFullScreen=()=>false;w.isFocused=()=>true;
+ w.webContents=Object.assign(new EventEmitter(),{getZoomFactor:()=>1,executeJavaScript:async()=>true});
+ let cursor={x:130,y:110};screen.getCursorScreenPoint=()=>cursor;
+ assert.equal(control.beginMove(),null);control.set(true);const before=w.getBounds(),token=control.beginMove();assert.ok(token);
+ assert.equal(control.move('foreign'),false);cursor={x:190,y:140};assert.equal(control.move(token),true);
+ assert.equal(w.bounds.x,before.x+60);assert.equal(w.bounds.y,before.y+30);
+ control.endMove(token);assert.equal(control.move(token),false);control.set(false);
+});
+test('Windowsのfloating未反映でもアイコン化の最前面を確立し、解除時は元へ戻す',()=>{
+ const {w,control}=fixture();const calls=[];w.setAlwaysOnTop=(value,level)=>{calls.push([value,level]);w.top=value&&level==='pop-up-menu';};
+ control.set(true);if(process.platform==='win32')assert.equal(w.top,true);
+ assert.ok(calls.some(([value])=>value===false));control.set(false);assert.equal(w.top,false);
+});
+test('native mouseDownから開始位置を保持し、IPC到着前の高速移動を取りこぼさない',()=>{
+ const {w,screen,pins}=fixture();w.isFullScreen=()=>false;w.isFocused=()=>true;
+ w.webContents=Object.assign(new EventEmitter(),{getZoomFactor:()=>1,executeJavaScript:async()=>true});
+ const control=micro.マイクロ表示を作成(w,{screen,pins});control.set(true);const b=w.getBounds();
+ w.webContents.emit('before-mouse-event',{}, {type:'mouseDown',button:'left',x:52,y:52});
+ screen.getCursorScreenPoint=()=>({x:b.x+88,y:b.y+80});const token=control.beginMove();control.move(token);control.endMove(token);
+ assert.deepEqual(w.bounds,{...b,x:b.x+36,y:b.y+28});control.set(false);
+});

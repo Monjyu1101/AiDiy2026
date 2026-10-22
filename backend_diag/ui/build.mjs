@@ -11,6 +11,7 @@ await build({entryPoints:[path.join(root,'src/main.js')],outfile:path.join(root,
 await copyFile(path.join(root,'../static/app.css'),path.join(root,'../static/style.css'));
 await unlink(path.join(root,'../static/app.css')); 
 await copyFile(path.join(root,'src/index.html'),path.join(root,'../static/index.html'));
+await copyFile(path.join(root,'../../_icons/AiDiy.png'),path.join(root,'../static/AiDiy.png'));
 for(const id of ['avatar','ide','term','code','live','discord'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
 for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.png`),path.join(root,'../static',`CLI_${id}.png`));
 for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.svg`),path.join(root,'../static',`CLI_${id}.svg`));

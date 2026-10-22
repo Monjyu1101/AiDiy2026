@@ -290,7 +290,8 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
   })
 
   windowRoles.set(window.id, role)
-  windowPins.register(window)
+  // ログイン画面は他の窓に隠れないよう、最前面ピンONで表示を始める。
+  windowPins.register(window, { pinned: role === 'login' })
   attachNativeWindowMove(window, screen, 'avatar')
 
   // min サイズを独自管理し、ロード後に再適用（Electron Windowsバグ対策）
@@ -325,16 +326,18 @@ function waitForReady(window: BrowserWindow) {
   if (!window.webContents.isLoading()) {
     return Promise.resolve()
   }
+  // 読込中に窓が閉じられる（electronmonの再起動等）と window.webContents は参照できないため、先に保持する。
+  const contents = window.webContents
   return new Promise<void>((resolve) => {
     const done = () => {
       window.removeListener('ready-to-show', done)
       window.removeListener('closed', done)
-      window.webContents.removeListener('did-finish-load', done)
+      if (!contents.isDestroyed()) contents.removeListener('did-finish-load', done)
       resolve()
     }
     window.once('ready-to-show', done)
     window.once('closed', done)
-    window.webContents.once('did-finish-load', done)
+    contents.once('did-finish-load', done)
   })
 }
 
@@ -698,6 +701,8 @@ function createLoginWindow(show = true) {
       windowRoles.delete(loginWindow.id)
     }
     loginWindow = null
+    // ログイン画面の終了はアプリ全体の終了。残った設定窓も閉じる。
+    if (!isQuitting) app.quit()
   })
 
   return loginWindow
@@ -721,6 +726,7 @@ function createCoreWindow(show = true) {
       windowRoles.delete(coreWindow.id)
     }
     coreWindow = null
+    if (!isQuitting && (!loginWindow || !loginWindow.isVisible())) app.quit()
   })
 
   return coreWindow
@@ -842,8 +848,12 @@ function currentControlWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
   return window
 }
 
+let isQuitting = false
+app.on('before-quit', () => { isQuitting = true })
+
 if (!app.requestSingleInstanceLock()) {
-  app.quit()
+  if (process.connected) process.send?.({ avatarExisting: true }, () => app.quit())
+  else app.quit()
 } else {
 app.on('second-instance', () => {
   const window = coreWindow ?? loginWindow ?? BrowserWindow.getAllWindows().find(item => item.isVisible())
@@ -852,7 +862,7 @@ app.on('second-instance', () => {
   void ウィンドウ表示(window)
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (process.platform === 'darwin') {
     const { Macメニューを設定 } = require(path.join(__dirname, '../../frontend_ide/host/scripts/MacOS-Menu.cjs'))
     Macメニューを設定({ app, Menu, 名前: 'AiDiy Avatar', 閉じる: () => app.quit(), icon: path.join(app.getAppPath(), 'public/icons/AiDiy_avatar.png'), platform: process.platform })
@@ -1066,9 +1076,26 @@ app.whenReady().then(() => {
 
   ipcMain.handle('system:get-cpu-usage', () => getSystemCpuUsagePercent())
 
+  // 独立起動時は所有者確定後に8092を起動し、準備完了してから窓を作る。
+  if (process.env.AIDIY_AVATAR_MANAGED === '1' && process.connected) {
+    await new Promise<void>((resolve) => {
+      const onMessage = (message: unknown) => {
+        if ((message as { avatarRendererReady?: boolean })?.avatarRendererReady) {
+          process.off('message', onMessage)
+          resolve()
+        }
+      }
+      process.on('message', onMessage)
+      process.once('disconnect', () => app.quit())
+      process.send?.({ avatarPrimary: true })
+    })
+  }
   // 起動時のログイン画面も、読み込み後に拡大演出で表示する。
   const startupLogin = createLoginWindow(false)
-  void ウィンドウ表示(startupLogin)
+  // aidiy_avatar の起動処理へ表示完了を知らせ、呼出元のコマンドを解放させる。
+  void ウィンドウ表示(startupLogin).then(shown => {
+    if (shown && process.connected) process.send?.({ avatarShown: true })
+  })
 
   app.on('activate', () => {
     if (!loginWindow && !coreWindow && BrowserWindow.getAllWindows().length === 0) {

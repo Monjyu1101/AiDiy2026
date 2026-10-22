@@ -47,7 +47,7 @@ app.on('browser-window-created',(_event,window)=>{
     const current=window.getBounds();if(height===null||Math.abs(current.height-height)>2)return false;
     bounds=current;expectedHeight=height;return true;
    });
-   near(bounds,{x:area.x,y:area.y,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),false);
+   near(bounds,{x:area.x+8,y:area.y+8,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),false);
    assert.equal(await window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')"),'false');
    await window.webContents.executeJavaScript("document.querySelector('.window-pin').click()");
    await until(()=>window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='true'"));

@@ -47,6 +47,14 @@ const SETTINGS_BOUNDS = { width: 720, height: 580, minWidth: 580, minHeight: 400
 
 ## ウィンドウライフサイクル
 
+### 独立起動と8092
+
+`aidiy_avatar`、Diag の Avatar、ルート起動は `frontend_avatar/launch.mjs` を入口とします。Electron の単一起動ロックを確定してから Vite（8092）を起動し、ログイン画面の表示完了で呼出元へ戻ります。ログイン・Avatar 表示中は同じ8092で Web 版も利用できます。画面の切替では停止せず、ログイン画面を閉じたときは残った補助窓も終了します。Electron 終了で Vite を回収し、Vite が異常終了した場合も Electron を終了します。
+
+二重起動では既存の Electron を前面に出します。Electron が存在せず8092だけが使用中の場合は、起動済みと扱わず使用中エラーを返します。Avatar は Live と同じく、全体 start の起動前整理・終了時と setup / cleanup の停止対象です。IDE・Code の通常終了時の継続方針は変更しません。
+
+回帰確認は `node --test frontend_avatar/checks/launch.test.mjs frontend_avatar/checks/window-pin.test.cjs` と `python -B -X utf8 scripts/checks/test_avatar_lifetime.py`。8092を解放してから `node frontend_avatar/checks/lifecycle-desktop.mjs` を実行すると、実Electronのログイン表示、WebのHTTP応答、補助窓が残った状態でのログイン終了、8092解放、再起動を確認します。認証やAIへの送信は行いません。
+
 ### ログイン → コア
 
 ```text

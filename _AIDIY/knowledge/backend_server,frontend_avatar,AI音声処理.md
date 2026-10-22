@@ -60,6 +60,16 @@ Gemini / FreeAI の native-audio モデルでは、`backend_server/AIコア/AI�
 字幕対応 LiveAI の出力音声は `AI音声処理.py` でローカル音声認識へ再投入せず、二重表示を避ける。
 [Google の音声字幕仕様](https://ai.google.dev/gemini-api/docs/live-api/capabilities#audio-transcriptions)を参照する。
 
+### Gemini / FreeAI Liveの無応答を調べる
+
+接続済み・準備完了を確認して15秒待機し、初回送信後は最大60秒観測する。画面の実回答と、既存のCoreログの接続・送受信エラーを照合する。送信受付や入力エコーだけでは回答成功にしない。
+
+FreeAIで失敗・応答未確認となった場合は、利用枠制限の可能性も考慮し、同じLive処理を使うGeminiへ画面で切り替えて試験する。切替前後のモデルと結果を残し、利用枠制限は裏付けなしに断定しない。通常処理に送信時間・受信件数・文字数・音声バイト数などの調査用計測や進捗ログは追加しない。
+
+`受信ワーカー:終了` と `live_session破棄完了` は終了状態のINFOログで、実際の接続・受信例外は別のERRORログに残る。経過時間は受信ワーカー内で計測し、キャンセル時にも未定義変数による例外で上書きしない。外部AIを呼ばない確認は `backend_server/.venv/Scripts/python.exe -m unittest discover -s backend_server/checks -p test_live_gemini_lifecycle.py -v` で行う。
+
+### 接続準備中の送信とエラー通知
+
 接続準備中はプロバイダーの `is_alive` が `False` のため、この値だけでテキスト送信を拒否しない。
 明示的な停止は `中断停止フラグ` で判定し、接続準備中の送信は Gemini / OpenAI の `テキスト送信()` 内の最大5秒の接続待ちを通す。
 送信失敗の共通案内は接続状態の確認と再接続を促す。APIキー未設定が原因とは限らない。

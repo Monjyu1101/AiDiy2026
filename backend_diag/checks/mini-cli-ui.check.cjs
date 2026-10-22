@@ -10,10 +10,10 @@ test('通常のCLIアイコンは確認なしで起動し、未導入は表示�
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
  const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
  const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){}};
- let prompts=0;const launches=[];
+ let prompts=0,failLaunch=false;const launches=[];
  const cliState=CLI状態を作成({アプリ:state,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'codex',名前:'Codex CLI',利用可能:true},{id:'grok',名前:'Grok Build',利用可能:false}]};
-  launches.push(body);return {通知:'fixture launch'};
+  launches.push(body);if(failLaunch)throw Error('fixture CLI failure');return {通知:'fixture launch'};
  }});
  const ui=mount(compile('アプリ起動/アプリ起動パネル.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
  try{
@@ -22,15 +22,15 @@ test('通常のCLIアイコンは確認なしで起動し、未導入は表示�
   ui.button('Codex CLI をTermで起動').props.onClick();await flush();
   assert.equal(prompts,0);assert.deepEqual(launches,[{対象:'codex',フォルダ:'/fixture/project',自動承認確認:true}]);
   assert.doesNotMatch(text(ui.root),/fixture launch/);
-  cliState.失敗.value=true;cliState.通知.value='fixture CLI failure';await flush();assert.match(text(ui.root),/fixture CLI failure/);
+  failLaunch=true;ui.button('Codex CLI をTermで起動').props.onClick();await flush();assert.match(text(ui.root),/fixture CLI failure/);
  }finally{ui.app.unmount();}
 });
 function compile(name,{globals={},modules={},inline=true}={}){
  const {descriptor}=parse(source(name),{filename:name});const compiled=compileScript(descriptor,{id:name,inlineTemplate:inline,genDefaultAs:'component'}),module={exports:{}};
- vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,URLSearchParams,AbortController,...globals,require:id=>id==='vue'?vue:modules[id]||{}});return module.exports;
+ vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,URLSearchParams,AbortController,ResizeObserver:class{observe(){}disconnect(){}},...globals,require:id=>id==='vue'?vue:modules[id]||{}});return module.exports;
 }
 function mount(component,props){
- const make=(tag,text='')=>({tag,text,children:[],props:{},style:{},parent:null});
+ const make=(tag,text='')=>({tag,text,children:[],props:{},style:{setProperty(key,value){this[key]=value;}},offsetWidth:384,parent:null});
  const renderer=vue.createRenderer({createElement:tag=>make(tag),createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(node,value)=>node.text=value,setElementText:(node,value)=>{node.text=value;node.children=[];},parentNode:node=>node.parent,nextSibling:node=>node.parent?.children[node.parent.children.indexOf(node)+1]||null,patchProp:(node,key,_old,value)=>node.props[key]=value,insert(node,parent,anchor){if(node.parent)node.parent.children.splice(node.parent.children.indexOf(node),1);node.parent=parent;const index=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(index<0?parent.children.length:index,0,node);},remove(node){node.parent?.children.splice(node.parent.children.indexOf(node),1);}});
  const root=make('root'),app=renderer.createApp({render:()=>vue.h(component,props())});app.mount(root);return {root,app,nodes:()=>descendants(root),button:label=>descendants(root).find(n=>n.tag==='button'&&(n.props['aria-label']===label||text(n)===label))};
 }
@@ -38,7 +38,7 @@ test('実Vueタイトル欄: ミニ→最小化→最大化→ピン→終了の
  const calls=[],window=new EventTarget();window.aidiyWindow={isMaximized:async()=>false,minimize:async()=>calls.push('minimize'),maximize:async()=>calls.push('maximize'),close:async()=>calls.push('close')};
  const props=vue.reactive({connected:true,compact:false,switching:false,onMini:()=>calls.push('mini'),onRestore:()=>calls.push('restore')});
  const ui=mount(compile('ウィンドウ/ステータスバー.vue',{globals:{window}}),()=>props);
- try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ミニ表示','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ミニ表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['通常表示','最小化','最大化','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('最大化').props.disabled,true);ui.button('通常表示').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ミニ表示').props.disabled,true);}finally{ui.app.unmount();}
+ try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ランチャー表示','アイコン化','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ランチャー表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['アイコン化','最小化','元のサイズに戻す','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('元のサイズに戻す').props.disabled,false);ui.button('元のサイズに戻す').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ランチャー表示').props.disabled,true);}finally{ui.app.unmount();}
  const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{-webkit-app-region:drag\}/);assert.match(css,/\.panel-brand button,\.window-actions\{-webkit-app-region:no-drag\}/);
 });
 async function appState(switchMini=async()=>true){
@@ -47,7 +47,7 @@ async function appState(switchMini=async()=>true){
  const modules={
   './導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({})},'./導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
   './キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop})},'./ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
-  './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({})},
+  './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({フォルダ:vue.ref('')})},
   './アプリ起動/CLI状態.mjs':{CLI状態を作成:()=>methods},'./ウィンドウ/起動ミニ表示.mjs':{起動ミニ表示を作成:options=>起動ミニ表示を作成({...options,切替:async value=>{switches.push(value);return switchMini(value);}})},
   './AIモデル/AIモデル状態.mjs':{AIモデル状態を作成:()=>methods},'./設定モデル/設定モデル状態.mjs':{設定モデル状態を作成:()=>methods},
  };
@@ -58,7 +58,7 @@ async function appState(switchMini=async()=>true){
 test('実App状態: 全7タブからミニへ移行し元のタブへ復帰、ミニ中はポート監視を維持する',async()=>{
  const {scope,state,displays,switches}=await appState();
  try{state.connected.value=true;await flush();for(const tab of ['install','keys','integrations','trials','manual','start','apps']){state.tab.value=tab;await flush();assert.equal(state.ミニ表示.value,false);await state.ミニ.変更(true);await flush();assert.equal(state.tab.value,tab);assert.equal(state.ミニ表示.value,true);assert.deepEqual(displays.at(-1),[true,false]);await state.ミニ.変更(false);await flush();assert.equal(state.tab.value,tab);assert.equal(state.ミニ表示.value,false);}assert.equal(switches.length,14);await state.ミニ.変更(true);state.connected.value=false;await flush();assert.equal(state.ミニ表示.value,false);}finally{scope.stop();}
- const appSource=source('App.vue');for(const tab of ['install','keys','integrations','trials','manual'])assert.ok(appSource.includes(`v-show="tab==='${tab}'&&!ミニ表示"`));assert.match(appSource,/v-if="ミニ表示" :is="起動ミニパネル"/);
+ const appSource=source('App.vue');for(const tab of ['install','keys','integrations','trials','manual'])assert.ok(appSource.includes(`v-show="tab==='${tab}'&&!ミニ表示"`));assert.match(appSource,/v-if="ミニ\.表示中\.value&&!マイクロ表示" :is="起動ミニパネル"/);
 });
 test('電光掲示板はネイティブbuttonで、全7タブのミニからアプリ起動へ復帰し連打をまとめる',async()=>{
  const {scope,state,switches}=await appState();

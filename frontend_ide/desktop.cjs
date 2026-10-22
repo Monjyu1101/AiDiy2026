@@ -9,6 +9,7 @@ const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
 if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
+const cliTermWindow=kind==='term'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
 const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':'Term'}`;
 app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
@@ -148,7 +149,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  try{
   const display=selectedAllDisplay(owner,displayId);
   if(display){displaySlot=0;const occupied=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&item.displayId===displayId&&!item.window.isDestroyed()).map(item=>item.displaySlot));while(occupied.has(displaySlot))displaySlot++;}
-  bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot);
+  bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliTermWindow&&!owner);
  }catch(error){placement?.close();throw error;}
  const title=kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
  let window;

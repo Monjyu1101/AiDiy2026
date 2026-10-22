@@ -401,8 +401,6 @@ class LiveAI:
                 turns=_types.Content(role="user", parts=[_types.Part(text=text)]),
                 turn_complete=True,
             )
-            # logger.info(f"テキスト送信:完了 text={text[:50]}{'...' if len(text) > 50 else ''}")
-            pass
             return True
             
         except Exception as e:
@@ -655,8 +653,7 @@ class LiveAI:
                                 pass
                         
                         session_duration = time.time() - session_start_time
-                        self._logger.error(f"セッション維持ループ終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
-                        self._logger.error(f"async withブロック終了直前 - live_session破棄予定")
+                        self._logger.info(f"セッション維持ループ終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒): 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}")
                         
                 except Exception as e:
                     self.再接続試行回数 += 1  # エラー時にカウンタ増加
@@ -684,12 +681,13 @@ class LiveAI:
             self.live_session = None
             self.task_group = None
             self.is_alive = False  # ワーカー終了時にFalseに設定
-            self._logger.error(f"live_session破棄完了（ワーカー終了時）: is_alive={self.is_alive}")
+            self._logger.info(f"live_session破棄完了（ワーカー終了時）: セッション={self.セッションID}, is_alive={self.is_alive}, エラーフラグ={self.エラーフラグ}")
             # logger.info("ライブセッションワーカー:終了")
             pass
     
     async def _受信ワーカー(self):
         """受信専用ワーカー（TaskGroup内で実行）"""
+        開始時刻 = time.monotonic()
         try:
             # logger.info(f"受信ワーカー:開始 - is_alive={self.is_alive}")
             pass
@@ -711,7 +709,6 @@ class LiveAI:
                         self.live_session.receive().__anext__(),
                         timeout=LIVEAI_TIMEOUT
                     )
-                    
                     # テキスト、音声、ツールコール処理
                     await self._レスポンス処理(response)
                     self.live_lasttime = time.time()
@@ -746,9 +743,11 @@ class LiveAI:
             # logger.error(f"  総ループ数: {loop_count}")  # パフォーマンス最適化
             self.エラーフラグ = True
         finally:
-            session_duration = time.time() - session_start_time
-            self._logger.error(f"受信ワーカー:終了 (ID:{セッションID}, セッション時間{session_duration:.0f}秒) - 中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}, live_session={self.live_session is not None}")
-            pass
+            所要秒 = time.monotonic() - 開始時刻
+            self._logger.info(
+                f"受信ワーカー:終了: セッション={self.セッションID}, 所要秒={所要秒:.1f}, "
+                f"中断停止フラグ={self.中断停止フラグ}, エラーフラグ={self.エラーフラグ}"
+            )
     
     async def _設定構成作成(self):
         """設定構成を作成"""

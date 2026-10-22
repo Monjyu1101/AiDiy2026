@@ -1,34 +1,36 @@
 'use strict';
 
-const ミニ幅=384,初期ミニ高さ=134,最小ミニ高さ=80,最大ミニ高さ=360;
+const ミニ幅=384,初期ミニ高さ=134,最小ミニ高さ=80,最大ミニ高さ=360,ミニの余白=8;
 const ミニ高さは有効=height=>Number.isInteger(height)&&height>=最小ミニ高さ&&height<=最大ミニ高さ;
-// 元の位置・サイズ・最大化状態を保持し、ミニ表示中だけ内容に合わせて高さを変える。
+// 通常時の寸法を保持し、表示切替では現在の左肩を引き継ぐ。
 function ミニ表示を作成(window,{screen}={}){
  let original;
  return {
   get active(){return !!original;},
+  get normalBounds(){return original?.bounds;},
   演出範囲(enabled){
-   if(enabled){const bounds=window.getNormalBounds();return {...bounds,width:ミニ幅,height:最大ミニ高さ};}
-   if(original?.maximized)return screen.getDisplayMatching(original.bounds).workArea;
-   return original?.bounds||window.getBounds();
+   const origin=window.getBounds();
+   return enabled?{...origin,width:ミニ幅,height:最大ミニ高さ}:{...(original?.bounds||origin),x:origin.x,y:origin.y};
   },
-  set(enabled,{topLeft=false}={}){
+  set(enabled,{topLeft=false,origin}={}){
    if(typeof enabled!=='boolean'||!window||window.isDestroyed())return false;
    if(enabled===!!original)return true;
+   origin=origin||window.getBounds();
    if(enabled){
     original={bounds:window.getNormalBounds(),minimum:window.getMinimumSize(),maximized:window.isMaximized(),maximizable:window.isMaximizable()};
     if(original.maximized)window.unmaximize();
     window.setMinimumSize(ミニ幅,初期ミニ高さ);
     window.setMaximizable(false);
+    // 初期ミニは作業領域の左上角から数px内側に置く。
     const area=topLeft?screen.getPrimaryDisplay().workArea:null;
-    window.setBounds({...original.bounds,...(area?{x:area.x,y:area.y}:{}),width:ミニ幅,height:初期ミニ高さ});
+    window.setBounds({...original.bounds,x:origin.x,y:origin.y,...(area?{x:area.x+ミニの余白,y:area.y+ミニの余白}:{}),width:ミニ幅,height:初期ミニ高さ});
    }else{
     const saved=original;original=undefined;
     window.setMinimumSize(...saved.minimum);
     window.setMaximizable(saved.maximizable);
     // 最前面は共通ピンの所有。ミニ中の変更を通常表示へ戻しても保持する。
-    window.setBounds(saved.bounds);
-    if(saved.maximized)window.maximize();
+    // 自動最大化で左肩を画面原点へ戻さず、通常寸法を現在位置から広げる。
+    window.setBounds({...saved.bounds,x:origin.x,y:origin.y});
    }
    return true;
   },
