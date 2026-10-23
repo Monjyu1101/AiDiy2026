@@ -43,7 +43,7 @@ onBeforeUnmount(()=>{disposed=true;labelObserver?.disconnect();move.finish();cle
  <div class="micro-deploy" :inert="!expanded">
   <div class="micro-orbit micro-app-orbit" aria-label="アプリとCLI">
    <div v-for="(item,index) in apps" :key="item.kind+item.id" class="micro-position" :style="{'--angle':`${index*360/apps.length-90}deg`,'--stagger':`${index*22}ms`}">
-    <div class="micro-upright"><button data-micro-hit class="micro-app" :data-app="item.kind==='app'?item.id:undefined" :data-cli="item.kind==='cli'?item.id:undefined" :disabled="disabled(item)" :title="item.名前+' を起動 — '+appState.フォルダ.value" :aria-label="item.名前+' を起動'" @click="launch(item,$event)"><span class="launch-frame launch-frame-40" aria-hidden="true"><img :src="item.icon" alt="" width="40" height="40"><svg class="launch-trace" viewBox="0 0 100 100" focusable="false"><rect class="launch-trace-light" x="2" y="2" width="96" height="96" rx="5" pathLength="100" /></svg></span></button></div>
+    <div class="micro-upright"><button data-micro-hit class="micro-app" :data-app="item.kind==='app'?item.id:undefined" :data-cli="item.kind==='cli'?item.id:undefined" :disabled="disabled(item)" :title="item.名前+' を起動 — '+appState.フォルダ.value" :aria-label="item.名前+' を起動'" @click="launch(item,$event)"><span class="launch-frame launch-frame-40" aria-hidden="true"><img :src="item.icon" alt="" width="40" height="40"><svg class="launch-trace" viewBox="0 0 100 100" focusable="false"><rect class="launch-trace-light" x="2" y="2" width="96" height="96" rx="18" pathLength="100" /></svg></span></button></div>
    </div>
   </div>
  </div>

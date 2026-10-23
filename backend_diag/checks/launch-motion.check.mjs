@@ -10,10 +10,26 @@ function fixture(){
 }
 test('accepted light traces the frame clockwise once, repeated request restarts it, and event target is captured',async()=>{
  const f=fixture(),event={currentTarget:f.button},start=起動モーション(event);event.currentTarget=null;
- start();assert.deepEqual(f.runs[0].frames,[{strokeDashoffset:'0',opacity:1},{strokeDashoffset:'-100',opacity:1}]);assert.equal(f.runs[0].options.iterations,1);
+ start();assert.equal(f.runs[0].frames[0].strokeDashoffset,'0');assert.equal(f.runs[0].frames.at(-1).strokeDashoffset,'-100');assert.equal(f.runs[0].options.iterations,1);
  start();assert.equal(f.runs.length,2);assert.equal(f.runs[0].cancelled,true);f.runs[0].finish();await Promise.resolve();
  start();assert.equal(f.runs[1].cancelled,true);f.runs[2].finish();await Promise.resolve();
  start();assert.equal(f.runs[2].cancelled,false);
+});
+test('one continuous accelerating pass fades at the ends without intermediate speed resets',()=>{
+ const f=fixture();起動モーション({currentTarget:f.button})();const {frames,options}=f.runs[0];
+ assert.equal(options.duration,900);
+ assert.equal(options.easing,'cubic-bezier(0.333333,0,0.666667,0.333333)');
+ assert.equal(frames[0].opacity,0);assert.equal(frames.at(-1).opacity,0);
+ assert.deepEqual(frames.slice(1,-1).map(frame=>frame.opacity),[1,1]);
+ for(const frame of frames){assert.equal(Number(frame.strokeDashoffset),-100*frame.offset||0);assert.equal(frame.easing,undefined);}
+ // この Bézier は x≈t、y≈t²。等しい時間区間ごとの移動量が増え続ける。
+ const bezier=(t,p1,p2)=>3*(1-t)**2*t*p1+3*(1-t)*t*t*p2+t**3;
+ let previousDistance=0,previousProgress=0;
+ for(let i=1;i<=10;i++){
+  const t=i/10;assert.ok(Math.abs(bezier(t,.333333,.666667)-t)<.000001);
+  const progress=bezier(t,0,.333333),distance=progress-previousProgress;
+  assert.ok(distance>previousDistance);previousDistance=distance;previousProgress=progress;
+ }
 });
 test('accepted callback still animates if its own pending UI disables the button',()=>{
  const f=fixture(),start=起動モーション({currentTarget:f.button});f.button.disabled=true;start();assert.equal(f.runs.length,1);
@@ -54,7 +70,7 @@ test('stationary fixed-size icon has a short perimeter light and no obsolete fli
  for(const name of ['アプリ起動パネル','ミニアプリ起動','ミニCLI起動','マイクロランチャー']){
   const source=await readFile(new URL(`../ui/src/アプリ起動/${name}.vue`,import.meta.url),'utf8');
   assert.match(source,/import '\.\/起動モーション.css'/);assert.match(source,/class="launch-trace-light"/);
-  assert.match(source,/pathLength="100"/);assert.match(source,/focusable="false"/);
+  assert.match(source,/height="96" rx="18" pathLength="100"/);assert.match(source,/focusable="false"/);
   assert.doesNotMatch(source,/launch-card-back|launch-card-40|launch-card-72/);
  }
 });
