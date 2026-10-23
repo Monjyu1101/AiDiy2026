@@ -3,7 +3,7 @@ const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron')
 const path=require('node:path');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
 const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
-const {マイクロ表示を作成}=require('./マイクロ表示.cjs');
+const {マイクロ表示を作成,閉じた幅}=require('./マイクロ表示.cjs');
 const {画面サイズ演出を作成}=require('./サイズ切替.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
@@ -69,7 +69,7 @@ async function start(value) {
       if(!['normal','mini','micro'].includes(value)||opening||displaySwitch||sizeEffect.active)return false;
       displayOrigin=window.getBounds();
       const base=micro.normalBounds||mini.normalBounds||window.getNormalBounds();
-      const target={...(value==='micro'?{width:104,height:104}:value==='mini'?{width:384,height:360}:base),x:displayOrigin.x,y:displayOrigin.y};
+      const target={...(value==='micro'?{width:閉じた幅,height:閉じた幅}:value==='mini'?{width:384,height:360}:base),x:displayOrigin.x,y:displayOrigin.y};
       if(value==='micro'){
         const area=screen.getDisplayMatching(displayOrigin).workArea;
         target.x=Math.max(area.x,Math.min(area.x+area.width-target.width,target.x));

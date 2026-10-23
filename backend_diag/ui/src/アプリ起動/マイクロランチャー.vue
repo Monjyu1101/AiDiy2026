@@ -16,6 +16,8 @@ function coreClick(event){if(move.click())return;clearTimeout(clickTimer);if(eve
 function coreDouble(){if(move.double())return;clearTimeout(clickTimer);emit('mini');}
 function startMove(event){if(!props.switching&&!busy.value)move.down(event);}
 const apps=computed(()=>[...props.appState.項目.value.map(item=>({...item,kind:'app',icon:アプリアイコン[item.id]})),...props.cliState.項目.value.map(item=>({...item,kind:'cli',icon:`CLI_${item.id}.svg`}))]);
+// OSに依存せず、末尾の区切りを除いたフォルダ名だけを表示する。
+const projectName=computed(()=>{const folder=String(props.appState.フォルダ.value||'');return folder.replace(/[\\/]+$/,'').split(/[\\/]/).pop()||folder;});
 const orbit=computed(()=>配置.円周配置(apps.value.length));
 watch(()=>apps.value.length,async count=>{if(expanded.value)await window.aidiyWindow?.expandMicro(true,count);});
 watch(()=>props.online,value=>{if(value){void props.appState.読込();void props.cliState.読込();}},{immediate:true});
@@ -43,5 +45,6 @@ onBeforeUnmount(()=>{disposed=true;move.finish();clearTimeout(foldTimer);clearTi
  </div>
  <div data-micro-hit class="micro-move" title="ドラッグして移動" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish"></div>
  <button data-micro-hit class="micro-core" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish" @dragstart.prevent :aria-expanded="expanded" :aria-busy="busy" :title="(expanded?'メニューを閉じる':'ランチャーを開く')+' — '+appState.フォルダ.value+'（ドラッグで移動・ダブルクリックでランチャー表示・Escで戻る）'" aria-label="円形ランチャーを開閉" @click="coreClick" @dblclick.prevent="coreDouble"><span class="micro-mark"><img :src="expanded?'AiDiy_diag.png':'AiDiy.png'" alt="AiDiy" width="40" height="40"></span></button>
+ <span v-show="!expanded" data-micro-hit class="micro-project" :title="projectName" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish">{{projectName}}</span>
 </section>
 </template>

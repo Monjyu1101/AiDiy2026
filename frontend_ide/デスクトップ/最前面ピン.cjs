@@ -7,6 +7,7 @@
 // 全Electronアプリで同じ最前面層を使う。別プロセスの窓同士もOSの選択順に従う。
 // 起動元との関係はrecord.ownerで管理し、ピン状態からOSの親子関係を作らない。
 // 各パネルを独立して選択できるよう、フォーカス奪取や定期再固定はしない。
+// VRのExplorer・軌跡バーと本体の相対順だけはVRパネル前面.cjsで補正する。
 function createWindowPins({onChanged=()=>{}}={}) {
  const entries=new WeakMap();
  const alive=window=>window&&!window.isDestroyed();

@@ -15,6 +15,7 @@ import browserModule from '../デスクトップ/ブラウザ.cjs';
 import nativeMoveModule from '../デスクトップ/長押し窓移動.cjs';
 import pinModule from '../デスクトップ/最前面ピン.cjs';
 import placementModule from '../デスクトップ/VRパネル配置.cjs';
+import stackingModule from '../デスクトップ/VRパネル前面.cjs';
 import macMenuModule from '../host/scripts/MacOS-Menu.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -55,6 +56,7 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   './デスクトップ/長押し窓移動.cjs':nativeMoveModule,
   './デスクトップ/最前面ピン.cjs':pinModule,
   './デスクトップ/VRパネル配置.cjs':placementModule,
+  './デスクトップ/VRパネル前面.cjs':stackingModule,
   './デスクトップ/全画面横断.cjs':{createAllDisplays:({syncChildren})=>{let active=false;return{register(){},attachExitKey:()=>()=>{},leave:()=>false,isActive:()=>active,handle(event,action){if(action==='toggle')active=!active;const owner=[...api.windows.values()].find(record=>record.window.webContents===event.sender);syncChildren(owner);return{ok:true,active};}};}},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');

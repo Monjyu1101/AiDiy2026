@@ -22,7 +22,8 @@ import shutil
 import random
 from typing import Optional, Any
 from types import ModuleType
-from AIコア.AIバックアップ import バックアップ実行, コードベース絶対パス取得
+from AIコア.AIバックアップ import コードベース絶対パス取得
+from AIコア.AIバックアップ実行 import バックアップ完了待機
 from AIコア.AIストリーム制御 import AIストリーム開始, AIストリーム終了, AIストリーム中断
 
 from AIコア.AI応答 import 応答正規化, エラー応答, エラー応答判定
@@ -985,7 +986,10 @@ class CodeAgent:
 
             # 同じ実行先で初回全件・以後差分を保存する。
             logger.debug(f"[検証{n}回目] バックアップ実行を呼び出します")
-            result = バックアップ実行(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
+            result = await バックアップ完了待機(アプリ設定=アプリ設定, backend_dir=backend_dir, セッション設定=セッション設定)
+            if self.強制停止フラグ:
+                logger.info("[検証ループ] バックアップ待機中に停止 → 検証中断")
+                break
             
             # エラー → 終了
             if result is None:

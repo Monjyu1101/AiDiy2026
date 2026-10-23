@@ -191,7 +191,8 @@ try:
     from AIコア.AIストリーミング処理 import StreamingProcessor
     from AIコア.AI音声認識 import Recognition
     from AIコア.AI音声処理 import 音声入力データ処理, 統合音声分離ワーカー
-    from AIコア.AIバックアップ import バックアップ実行_共通ログ, コードベース絶対パス取得
+    from AIコア.AIバックアップ import コードベース絶対パス取得
+    from AIコア.AIバックアップ実行 import セッションバックアップ開始, セッションバックアップ完了待機, 対象パスキー
     from AIコア.AIチャット import Chat
     from AIコア.AIコード import CodeAgent
     from AIコア.AIライブ import Live
@@ -434,16 +435,11 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
             # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
             session = AIセッション管理.sessions.get(セッションID)
             if session and session.モデル設定:
-                _result = バックアップ実行_共通ログ(
-                    呼出しロガー=logger,
+                セッションバックアップ開始(
+                    session, AIセッション管理, 呼出しロガー=logger,
                     アプリ設定=getattr(http_request.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
-                    セッション設定=session.モデル設定,
                 )
-                if _result:
-                    session.ソース最終更新日時 = _result[0]
-                    session.全ファイルリスト = _result[1]
-                    session.バックアップベースパス = _result[4]
         else:
             # セッションを確実に作成（存在しなければ新規）
             AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
@@ -884,17 +880,18 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
         # 再起動要求があればバックアップ実行とフラグファイルを作成
         if 再起動要求あり:
             try:
-                # バックアップ実行（セッション固有のCODE_BASE_PATHを使用）
-                _result = バックアップ実行_共通ログ(
-                    呼出しロガー=logger,
+                # 待機中に別プロジェクトへ切り替わった場合は、再起動を発行しない。
+                再起動対象パス = 対象パスキー(コードベース絶対パス取得(
+                    セッション設定=接続.モデル設定, backend_dir=バックエンドディレクトリ))
+                await セッションバックアップ完了待機(
+                    接続, AIセッション管理, 呼出しロガー=logger,
                     アプリ設定=getattr(http_request.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
-                    セッション設定=接続.モデル設定,
                 )
-                if _result and 接続:
-                    接続.ソース最終更新日時 = _result[0]
-                    接続.全ファイルリスト = _result[1]
-                    接続.バックアップベースパス = _result[4]
+                if (AIセッション管理.get_session(接続.セッションID) is not 接続
+                        or 対象パスキー(コードベース絶対パス取得(
+                            セッション設定=接続.モデル設定, backend_dir=バックエンドディレクトリ)) != 再起動対象パス):
+                    return {"status": "NG", "message": "バックアップ待機中に接続または対象が変わったため、再起動を中止しました。", "data": {}}
                 if reboot_core:
                     with open(os.path.join(バックエンドディレクトリ, "temp", "reboot_core.txt"), "w", encoding="utf-8") as f:
                         f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -1021,16 +1018,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
         # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
         if 新規セッション and セッション.モデル設定 and ソケット番号 == "input":
             try:
-                _result = バックアップ実行_共通ログ(
-                    呼出しロガー=logger,
+                セッションバックアップ開始(
+                    セッション, AIセッション管理, 呼出しロガー=logger,
                     アプリ設定=getattr(WebSocket接続.app, "conf", None),
                     backend_dir=バックエンドディレクトリ,
-                    セッション設定=セッション.モデル設定,
                 )
-                if _result:
-                    セッション.ソース最終更新日時 = _result[0]
-                    セッション.全ファイルリスト = _result[1]
-                    セッション.バックアップベースパス = _result[4]
             except Exception as e:
                 logger.error(f"WebSocket接続時バックアップエラー: {e}")
 
@@ -1355,16 +1347,11 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         try:
                             # バックアップ再実行 → セッションのファイルリストを更新
                             if セッション and セッション.モデル設定:
-                                _result = バックアップ実行_共通ログ(
-                                    呼出しロガー=logger,
+                                await セッションバックアップ完了待機(
+                                    セッション, AIセッション管理, 呼出しロガー=logger,
                                     アプリ設定=getattr(WebSocket接続.app, "conf", None),
                                     backend_dir=バックエンドディレクトリ,
-                                    セッション設定=セッション.モデル設定,
                                 )
-                                if _result:
-                                    セッション.ソース最終更新日時 = _result[0]
-                                    セッション.全ファイルリスト = _result[1]
-                                    セッション.バックアップベースパス = _result[4]
                             logger.info(f"[files_save] バックアップ完了 ({セッションID})")
                         except Exception as e:
                             logger.error(f"[files_save] エラー: {e}", exc_info=True)

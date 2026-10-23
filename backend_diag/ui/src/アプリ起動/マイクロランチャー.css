@@ -5,6 +5,8 @@ html.micro-mode,html.micro-mode body,html.micro-mode #app{background:transparent
 .micro-launcher button{pointer-events:auto;-webkit-app-region:no-drag}
 .micro-move{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:90px;height:90px;border-radius:50%;pointer-events:auto;z-index:2}
 .micro-core{position:absolute;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%);display:grid;place-items:center;padding:0;border:0;border-radius:0;background:transparent!important;z-index:3;cursor:pointer}
+/* 閉じた128px窓内でアイコンの回転枠と重ならない1行表示。展開中は円周メニューを優先。 */
+.micro-project{position:absolute;left:50%;top:calc(50% + 38px);transform:translateX(-50%);box-sizing:border-box;width:120px;height:18px;padding:0 4px;border-radius:4px;background:#09121fe6;color:#fff;font-size:11px;line-height:18px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:auto;touch-action:none;user-select:none;-webkit-app-region:no-drag;z-index:3;cursor:grab}
 .micro-core:disabled{opacity:1;cursor:pointer}
 .micro-core::before,.micro-app::before{content:'';position:absolute;inset:4px;background:#09121fd9;filter:blur(8px);box-shadow:0 3px 9px #0008;pointer-events:none}
 /* Codeの開始表示と同じ二重四角・20秒の逆回転・12秒の色循環。 */

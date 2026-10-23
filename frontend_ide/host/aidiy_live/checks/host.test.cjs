@@ -68,3 +68,22 @@ test('Live ホスト: Windows PCM は前処理せず共通 Worklet へ渡し、�
     const count = packets.length; child.stdout.write(pcm); assert.equal(packets.length, count);
   } finally { host.dispose(); child.kill(); childProcess.spawn = original; }
 });
+
+test('Live ホスト: APIの35秒期限と停止による中断を区別する', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const originalFetch = global.fetch, packets = [];
+  global.fetch = (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+  const host = new LiveHost('http://127.0.0.1:8091', packet => packets.push(packet), () => 'python', '/microphone.py');
+  try {
+    const timeout = host.receive({ type: 'api', id: 1, path: 'core/AIコア/モデル情報/取得', body: {} });
+    t.mock.timers.tick(35000); await timeout;
+    assert.match(packets.find(packet => packet.id === 1).error, /応答待ちがタイムアウト.*[\s\S]*35秒/);
+    const cancelled = host.receive({ type: 'api', id: 2, path: 'core/AIコア/モデル情報/取得', body: {} });
+    host.stop(); await cancelled;
+    const message = packets.find(packet => packet.id === 2).error;
+    assert.match(message, /要求を中断/);
+    assert.doesNotMatch(message, /通信に失敗|タイムアウト|20:/);
+  } finally { host.dispose(); global.fetch = originalFetch; t.mock.timers.reset(); }
+});

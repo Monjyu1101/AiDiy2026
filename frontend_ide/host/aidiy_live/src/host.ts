@@ -93,7 +93,7 @@ export class LiveHost {
       const body = JSON.stringify(message.body || {});
       if (Buffer.byteLength(body) > 65536) { this.post({ type: 'reply', id, error: '要求が大きすぎます。' }); return; }
       const controller = new AbortController(); this.requests.add(controller);
-      const timeout = setTimeout(() => controller.abort(), 35000);
+      const timeout = setTimeout(() => controller.abort(new DOMException('AIコアの応答が35秒以内に返りませんでした。', 'TimeoutError')), 35000);
       try {
         const response = await fetch(new URL('/' + message.path, this.target), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
         const value = await response.json() as { message?: string };
@@ -160,7 +160,7 @@ export class LiveHost {
   stop() {
     this.stopMicrophone();
     this.clearHeartbeat();
-    for (const controller of this.requests) controller.abort(); this.requests.clear();
+    for (const controller of this.requests) controller.abort(new DOMException('接続の変更または終了により要求を中断しました。', 'AbortError')); this.requests.clear();
     for (const socket of this.sockets.values()) socket.close(); this.sockets.clear();
     if (!this.disposed) this.post({ type: 'host-stop' });
   }

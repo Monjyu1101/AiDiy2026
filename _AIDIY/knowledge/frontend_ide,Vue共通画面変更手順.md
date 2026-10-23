@@ -546,3 +546,13 @@ VR中は `--vr-viewer-top:192px`・`--vr-viewer-bottom:48px` を確保し、最�
 ## CLI起動時のTerm窓
 
 `launch.mjs --app term --cli <ID>` はCLI起動専用の指定をElectronへ渡し、`デスクトップ/window-layout.cjs` で作業領域中央の約800×600pxに配置します。小さい画面では作業領域内に縮めます。通常のTermとIDEから開く子Termは従来の配置を使います。確認は `node --test frontend_ide/checks/window-layout.test.mjs`、実窓はDPIの丸めによる数px差を含め中央配置を確認します。
+
+## VR中のExplorer・軌跡バーの重なり順
+
+`デスクトップ/VRパネル前面.cjs` はVR中だけ、所属する独立窓のExplorer・軌跡バーをIDE本体の直前へ配置します。画面は別rendererでも、BrowserWindowは同じElectron mainの `windows` で管理されるため、新しいプロセス間通信やOS親子関係は不要です。独立起動した別IDEやTerm / Code / Liveなどの選択順は変更しません。
+
+全窓のピン層は引き続き `floating` です。Windowsでは上位層名だけに頼らず、[ElectronのmoveAbove](https://www.electronjs.org/docs/latest/api/browser-window#winmoveabovemediasourceid) と本体の `getMediaSourceId()` で相対Z-orderを指定します。VR切替、表示、復元、本体の選択・最大化関連イベントで補正し、OSイベント完了後に一回だけ再適用します。focus()、blurからの奪い返し、定期タイマーは使用しません。非表示・最小化したパネルを勝手に表示せず、終了時に購読と未実行処理を解除します。通常表示へ戻ると補正を止め、ピンはVR前のユーザー選択へ戻します。
+
+確認は `node --test frontend_ide/checks/vr-panel-stacking.test.mjs frontend_ide/checks/window-pin.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/all-displays.test.mjs frontend_ide/checks/code-window-title.test.mjs frontend_ide/checks/project-instance.test.mjs frontend_ide/checks/vr-panel-placement.test.mjs`。`checks/vr-panel-stacking-desktop.cjs` は実Electron APIのスモークテストです。headlessでの合格はWindows実デスクトップの重なり順の保証ではありません。
+
+Windows実機では、すでに開いた両パネルでVRへ切り替え、本体を繰り返し選択、最小化・復元、画面構成変更、VR中のパネル再作成、VR解除を確認します。本体への入力が維持され、両パネルが本体に隠れず、通常表示では従来の選択順へ戻ることを撮影して確認してください。OSの保護画面・他アプリの特殊な最前面窓・Waylandの制約まで超える絶対的な最前面保証ではありません。今回の制御は直接読み込むmain側CJSなので、これだけの変更でVue配布bundleを再生成する必要はありません。

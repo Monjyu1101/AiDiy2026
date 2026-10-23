@@ -76,7 +76,7 @@ export class CodeConnection {
   private async api(path: '取得' | '設定', body: { セッションID?: string; [key: string]: unknown }): Promise<Info> {
     const generation = this.generation;
     const controller = new AbortController(); this.requests.add(controller);
-    const timer = setTimeout(() => controller.abort(), 30000);
+    const timer = setTimeout(() => controller.abort(new DOMException('AIコアの応答が30秒以内に返りませんでした。', 'TimeoutError')), 30000);
     try {
       const response = await this.request(new URL(`/core/AIコア/モデル情報/${path}`, this.target), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal,
@@ -219,7 +219,7 @@ export class CodeConnection {
     clearTimeout(this.retry); this.retry = undefined;
     clearInterval(this.heartbeat); this.heartbeat = undefined;
     for (const cancel of [...this.pending]) cancel();
-    for (const controller of this.requests) controller.abort();
+    for (const controller of this.requests) controller.abort(new DOMException('接続の変更または終了により要求を中断しました。', 'AbortError'));
     for (const socket of this.sockets.values()) socket.close(); this.sockets.clear();
     this.connected = false; this.connecting = false;
     this.sessionProject = '';

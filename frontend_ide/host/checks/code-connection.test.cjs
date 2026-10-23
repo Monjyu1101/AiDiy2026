@@ -166,3 +166,26 @@ test('Code 接続: 共通のモデル既定値を使う再接続で会話をリ�
     assert.ok(!backend.requests.some(request=>request.path.endsWith('設定')));
   } finally {client.dispose();t.mock.timers.reset();}
 });
+
+test('Code 接続: モデル取得の30秒期限と接続切替の中断を区別する', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const request = (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+  const client = new CodeConnection('http://127.0.0.1:18091', () => {}, () => {}, undefined, request);
+  try {
+    const timeout = assert.rejects(client.catalog(), error => {
+      assert.match(error.message, /応答待ちがタイムアウト/);
+      assert.match(error.message, /30秒/);
+      assert.doesNotMatch(error.message, /20:|This operation was aborted/);
+      return true;
+    });
+    t.mock.timers.tick(30000); await timeout;
+    const cancelled = assert.rejects(client.catalog(), error => {
+      assert.match(error.message, /要求を中断/);
+      assert.doesNotMatch(error.message, /通信に失敗|タイムアウト|20:/);
+      return true;
+    });
+    client.disconnect(); await cancelled;
+  } finally { client.dispose(); t.mock.timers.reset(); }
+});

@@ -1,7 +1,7 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 // Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 'use strict';
-const 閉じた幅=104,開いた幅=320;
+const 閉じた幅=128,開いた幅=320;
 const {円周配置}=require('../ui/src/アプリ起動/円周配置.cjs');
 const {createCodeDrag}=require('../../frontend_ide/デスクトップ/code-drag.cjs');
 function マイクロ表示を作成(window,{screen,pins}={}){

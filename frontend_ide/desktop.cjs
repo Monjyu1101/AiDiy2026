@@ -42,6 +42,7 @@ const windowPins=createWindowPins({onChanged(window,state){
 }});
 function registerWindowPin(record){
  windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner)});
+ vrPanelStacking.register(record);
 }
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
 const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
@@ -65,10 +66,13 @@ function attachWindowMove(record,contents){
 }
 const {createAllDisplays}=require('./デスクトップ/全画面横断.cjs');
 const {createVRPanelPlacement}=require('./デスクトップ/VRパネル配置.cjs');
+const {createVRPanelStacking}=require('./デスクトップ/VRパネル前面.cjs');
+const vrPanelStacking=createVRPanelStacking({windows,isActive:owner=>allDisplays.isActive(owner)});
 const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
 const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{
  const locked=allDisplays.isActive(owner);
  for(const record of windows.values())if(record===owner||record.owner===owner)windowPins.setLocked(record.window,locked);
+ vrPanelStacking.refresh(owner);
 }});
 const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デスクトップ/ブラウザ.cjs');
 const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
