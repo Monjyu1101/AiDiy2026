@@ -14,7 +14,7 @@ CLI ID と同じ名前の SVG / PNG をここに保存します。ライセン�
 | `agy.svg` / `agy.png` | Agy | `upstream/antigravity-logo-mark.svg` |
 | `grok.svg` / `grok.png` | Grok | `upstream/Grok_Logomark_Light.svg` |
 | `opencode.svg` / `opencode.png` | OpenCode | `upstream/opencode-logo-dark-square.svg` |
-| `vscode.svg` / `vscode.png` | なし（UI 側で VS Code と表示） | `upstream/vscode-stable.svg` / `upstream/vscode-stable.png` |
+| `vscode.svg` / `vscode.png` | VSCODE（青帯・白文字） | `upstream/vscode-stable.svg` / `upstream/vscode-stable.png` |
 | `aidiy_hermes.svg` / `aidiy_hermes.png` | HERMES | `upstream/AiDiy.png` |
 
 - 共通の外枠は `viewBox="0 0 120 120"`。外部CLI6件は上部の x=18、y=3、84×84px に原本を縦横比を維持して配置します。元のパス、グラデーション、色、viewBox は保持し、トレース・描き直し・切り抜きは行いません。Copilot は従来の暗色 UI 用 `#f0f6fc` を維持します。
@@ -28,7 +28,7 @@ SVG / PNG の外部ネットワーク参照はありません。保存原本は�
 
 ## Visual Studio Code の公式アイコン
 
-`vscode.svg`（100×100 viewBox）と `vscode.png`（1024×1024、透過 RGBA）は、[公式ブランドページ](https://code.visualstudio.com/brand)から配布される[アイコン ZIP](https://code.visualstudio.com/assets/branding/visual-studio-code-icons.zip)内の青色 stable アイコンを全バイト無改変で保存したものです。上記 CLI 7 件の合成仕様の対象ではありません。描き直し、色変更、白帯・文字の焼き込みは行いません。表示寸法と製品名キャプションは UI 側で制御し、公式図形と区別します。公式指針の余白も確保してください。
+`vscode.svg` は 120×120px の表示用合成画像です。公式青色 stable SVG を x=18、y=3、84×84px に等比配置し、x=0、y=90、120×30px の青帯 `#1e3a5f` と白 `#ffffff` の VSCODE を追加しています。文字は中央 x=60、基準線 y=111、Arial / Liberation Sans / sans-serif、22px、weight700。外部 CLI の白帯・黒文字とは配色で区別します。`vscode.png` はこの SVG を Inkscape で120×120pxの透過RGBAへ変換したものです。原画の形状・色は維持しますが、表示用全体は公式配布原画とは異なる加工物です。
 
 原本と配布元 README は `upstream/vscode-stable.svg`、`upstream/vscode-stable.png`、`upstream/README-VSCode.txt` に保存します。VS Code アイコンへ他素材の MIT ライセンスを適用しません。更新時も公式配布物を使用し、[LICENSE_ICONS.md](./LICENSE_ICONS.md) のハッシュと条件を更新してください。
 

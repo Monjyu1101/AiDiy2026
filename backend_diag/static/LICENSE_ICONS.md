@@ -8,12 +8,12 @@
 
 - 対象: `vscode.svg`、`vscode.png`。無改変原本: `upstream/vscode-stable.svg`、`upstream/vscode-stable.png`。
 - 公式引用元: [Visual Studio Code ブランド指針](https://code.visualstudio.com/brand)からリンクされた[公式アイコン ZIP](https://code.visualstudio.com/assets/branding/visual-studio-code-icons.zip)。配布元 README の版は `2021-06-21`、取得日は `2026-10-23`。
-- SVG 原本・表示用 SHA-256: `74ad401c6487a0dc5af1f6b2935556ab2d3553ae45effc7e1697b4d117d046b6`。
-- PNG 原本・表示用 SHA-256: `7ac29e00cd66e549acc2ea6a99a813f92cb23a6d165293be6959845670f0c5a4`。
+- SVG 原本 SHA-256: `74ad401c6487a0dc5af1f6b2935556ab2d3553ae45effc7e1697b4d117d046b6`。
+- PNG 原本 SHA-256: `7ac29e00cd66e549acc2ea6a99a813f92cb23a6d165293be6959845670f0c5a4`。
 - 配布元 README: `upstream/README-VSCode.txt`（全バイト無改変）、SHA-256: `e6d125cce511516b347d6b66b893e650a6a412fb9124231d9b008e1dc3a68d7e`。
-- 素材: 青色 stable アイコン。SVG は100×100の viewBox、PNG は1024×1024の透過画像です。表示用も原本と同一バイトで、再描画・色変更・名前帯・文字・背景の合成を行いません。表示寸法や起動操作のキャプションは UI 側の要素です。
+- 加工: 原本 SVG の形状・色・100×100 viewBox を保持し、120×120px の外枠内 x=18、y=3、84×84px に等比配置。下部 x=0、y=90、120×30px に青色 `#1e3a5f` の帯を追加し、白 `#ffffff`、22px 太字、Arial / Liberation Sans / sans-serif の VSCODE を中央配置。CLI の白帯・黒字とは区別します。表示用 PNG は合成 SVG から Inkscape で120×120px RGBAへ変換しています。公式原本は upstream に無改変で保持します。
 - 権利: Visual Studio Code、VS Code、アイコンは Microsoft Corporation の商標です。公式配布元は All rights reserved と記載しており、本フォルダの他素材の MIT 許諾を適用しません。
-- 公式ブランド指針は、アイコンの変形・文字や背景の追加・名称とのロゴ一体化・自社製品のロゴとしての利用を認めていません。図形を改変せず、必要な余白を確保し、起動先製品を識別する操作 UI と自社ロゴを混同しないでください。包括的な商標利用許諾や Microsoft の承認・提携を意味しません。
+- 公式ブランド指針は、アイコンの変形・文字や背景の追加・名称とのロゴ一体化・自社製品のロゴとしての利用を認めていません。今回の名称帯を含む合成画像について、公式指針への適合や権利者の個別許諾を確認したという意味ではありません。包括的な商標利用許諾や Microsoft の承認・提携を意味しません。
 - 公式指針の操作ボタンの項は「Open in VS Code」形式を案内しています。配布時も最新の指針を確認し、対象外の用途は権利者へ確認してください。
 
 ## GitHub Copilot

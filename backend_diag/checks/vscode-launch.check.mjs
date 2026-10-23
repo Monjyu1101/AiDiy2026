@@ -36,13 +36,22 @@ test('authenticated editor endpoint accepts only folder and never calls CLI auto
  for(const body of [{フォルダ:'/project',自動承認確認:true},{フォルダ:'/project',対象:'code'},{フォルダ:'relative'}])assert.equal((await fetch(base+'api/VSCode起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,400);
  assert.equal((await fetch(base+'api/VSCode起動/開始',{method:'POST',headers,body:JSON.stringify({フォルダ:'/project'})})).status,202);assert.equal(f.calls.length,1);
 });
-test('VS Code SVG and PNG are served as exact official assets; generated manifest matches',async t=>{
+test('VS Code SVG and PNG are served as exact generated assets; generated manifest matches',async t=>{
  const {readFile}=await import('node:fs/promises');const {verify}=await import('../ui/verify.mjs');
  assert.equal(await verify(),true);
  const server=createServer({token:'fixture',entries:[]});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
  for(const ext of ['svg','png']){
   const response=await fetch(`http://127.0.0.1:${server.address().port}/CLI_vscode.${ext}`);assert.equal(response.status,200);
-  const original=await readFile(new URL(`../ui/src/アプリ起動/CLIアイコン/upstream/vscode-stable.${ext}`,import.meta.url));
+  const original=await readFile(new URL(`../ui/src/アプリ起動/CLIアイコン/vscode.${ext}`,import.meta.url));
   assert.deepEqual(Buffer.from(await response.arrayBuffer()),original);
  }
+});
+
+test('VS Code label uses editor blue and white, with matching launcher geometry',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const svg=await readFile(new URL('../ui/src/アプリ起動/CLIアイコン/vscode.svg',import.meta.url),'utf8');
+ assert.match(svg,/viewBox="0 0 120 120"/);assert.match(svg,/x="18" y="3" width="84" height="84"/);
+ assert.match(svg,/id="caption-band" x="0" y="90" width="120" height="30" fill="#1e3a5f"/);
+ assert.match(svg,/font-size="22" font-weight="700" fill="#ffffff">VSCODE<\/text>/);
+ const png=await readFile(new URL('../ui/src/アプリ起動/CLIアイコン/vscode.png',import.meta.url));assert.equal(png.readUInt32BE(16),120);assert.equal(png.readUInt32BE(20),120);
 });

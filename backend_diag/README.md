@@ -494,4 +494,4 @@ Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリック�
 
 アプリ起動・ミニ・アイコン化の外部ランチャーに VS Code を表示します。導入タブと同じ実行ファイル探索を使用し、未導入時は通常画面で無効、ミニ・アイコン化では非表示です。選択した実在プロジェクトフォルダを `--new-window` で開きます。Term・AI CLI・自動承認は使用せず、フォルダ未選択・削除済みの場合は別フォルダへ代替しません。Windows の `code.cmd` は同梱 `Code.exe` を直接起動し、パスをシェル文字列に展開しません。呼び出し元のプロキシ環境変数を引き継ぎ、Diag 終了時にも VS Code は独立して継続します。
 
-公式アイコンは無改変で使用します。出典・利用条件は `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md`、コマンド仕様は https://code.visualstudio.com/docs/configure/command-line を参照してください。
+公式原画を保持したうえで、表示用は青帯・白字 VSCODE を含む SVG と120px PNGに合成しています。出典・利用条件は `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md`、コマンド仕様は https://code.visualstudio.com/docs/configure/command-line を参照してください。
