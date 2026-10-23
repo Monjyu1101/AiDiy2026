@@ -29,7 +29,7 @@ html.micro-mode,html.micro-mode body,html.micro-mode #app{background:transparent
 .micro-app:hover{border-color:#b4ffff;box-shadow:0 0 8px #40d7ff66}
 .micro-launcher:has(.micro-app:hover) .micro-orbit,.micro-launcher:has(.micro-app:hover) .micro-upright,.micro-launcher:has(.micro-app:focus-visible) .micro-orbit,.micro-launcher:has(.micro-app:focus-visible) .micro-upright{animation-play-state:paused}
 @keyframes micro-orbit{to{transform:rotate(360deg)}}
-.launcher-selector{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;-webkit-app-region:no-drag}
+.launcher-selector{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0}
 .launcher-selector>span{font-size:10px;color:#8caaba}
 .launcher-selector button{font-size:10px;padding:2px 7px;border-radius:4px;background:transparent;line-height:1.6}
 .launcher-selector button:disabled{cursor:not-allowed;opacity:.35}

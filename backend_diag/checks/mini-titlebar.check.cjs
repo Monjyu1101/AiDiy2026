@@ -59,3 +59,24 @@ test('ミニの内容を自然な高さで計測し、2段アイコン・案内�
  assert.equal(d('#app>.panel.start-mini').flex,'0 1 auto');assert.equal(d('.mini-content>*').flex,'none');
  assert.equal(d('.mini-services')['grid-template-columns'],'repeat(6,minmax(0,1fr))');
 });
+
+
+test('標準・ミニのタイトル文字と左側余白はdrag、操作ボタンと子要素だけをno-dragにする',()=>{
+ const chrome=source('ウィンドウ/ステータスバー.vue');
+ assert.match(chrome,/<header class="panel-brand" :class="\{desktop,compact\}">/);
+ const header=declarations(normal,'.panel-brand.desktop');
+ for(const property of ['-webkit-app-region','app-region']){
+  assert.equal(header[property],'drag');
+  assert.equal(declarations(normal,'.panel-brand.desktop>strong,.panel-brand.desktop>.launcher-selector')[property],'drag');
+  assert.equal(declarations(normal,'.panel-brand button,.window-actions')[property],'no-drag');
+  assert.equal(declarations(normal,'.panel-brand button *,.window-actions *')[property],'no-drag');
+ }
+ assert.equal(header['user-select'],'none');
+ const micro=parse(source('アプリ起動/マイクロランチャー.css'));
+ assert.equal(declarations(micro,'.launcher-selector')['-webkit-app-region'],undefined,'伸びたgrid列全体をno-dragにしない');
+ assert.equal(declarations(micro,'.micro-launcher button')['-webkit-app-region'],'no-drag','microの操作方式は変えない');
+ for(const css of [normal,mini,micro])css.walkRules(rule=>{
+  if(!rule.selector.includes('compact'))return;
+  rule.walkDecls(({prop,value})=>{if(prop.endsWith('app-region'))assert.notEqual(value,'no-drag','compact全域を除外しない');});
+ });
+});

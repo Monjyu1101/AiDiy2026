@@ -342,3 +342,23 @@ test('全表示経路は準備完了前にnative寸法を変更せず、遅れ�
   if(target==='micro')control(event,'startMicro',false);
  }
 });
+
+test('稼働サービスありで終了確認後に実窓を破棄しても、通常・ミニ両表示の後始末が完走',async()=>{
+ for(const toolsOpen of [false,true]){
+  const f=await mainFixture({toolsOpen,startStatus:{終了時停止あり:true},confirmClose:async()=>({response:0})});
+  f.proc.emit('message',{type:'diag-start',url});await flush();
+  const win=f.win,contents=win.webContents;
+  Object.defineProperty(win,'webContents',{get(){if(win.destroyed)throw new TypeError('Object has been destroyed');return contents;}});
+  let cleaned=false;
+  win.once('closed',()=>{cleaned=true;});
+  win.close=()=>{
+   const event={preventDefault(){this.prevented=true;}};win.emit('close',event);
+   if(!event.prevented){win.closed=true;win.destroyed=true;win.emit('closed');}
+  };
+  f.handlers['diag:window']({sender:contents,senderFrame:contents.mainFrame},'close');await flush();
+  assert.equal(f.dialogs.length,1);assert.match(f.dialogs[0].options.detail,/システム起動.*停止.*アプリ起動.*動作を続け/);
+  assert.equal(win.closed,true);assert.equal(cleaned,true);
+  assert.equal(contents.listenerCount('before-mouse-event'),0);
+  f.app.emit('window-all-closed');assert.equal(f.app.quitting,true);
+ }
+});

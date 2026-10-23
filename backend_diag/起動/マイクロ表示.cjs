@@ -6,6 +6,8 @@ const {円周配置}=require('../ui/src/アプリ起動/円周配置.cjs');
 const {createCodeDrag}=require('../../frontend_ide/デスクトップ/code-drag.cjs');
 function マイクロ表示を作成(window,{screen,pins}={}){
  let saved,expanded=false,timer,busy=false,generation=0,ignored=false,foldedBounds,expandedBounds;
+ // closed 後は BrowserWindow.webContents の取得自体が失敗するため、生存中に保持する。
+ const contents=window.webContents;
  const drag=createCodeDrag({screen,trustedEvent:()=>null}).forRecord({window,kind:'diag',revision:0});
  let moveToken,pressedPoint;
  const nativePress=(_event,input)=>{
@@ -13,7 +15,7 @@ function マイクロ表示を作成(window,{screen,pins}={}){
   const b=window.getBounds(),zoom=window.webContents.getZoomFactor?.()||1;
   pressedPoint={x:b.x+input.x/zoom,y:b.y+input.y/zoom,time:Date.now()};
  };
- window.webContents.on?.('before-mouse-event',nativePress);
+ contents.on?.('before-mouse-event',nativePress);
  function 最前面維持(){
   if(!saved||window.isDestroyed()||window.isAlwaysOnTop())return;
   // Windowsではfloatingの指定後、trueのままlevelだけ変えてもOSに反映されない。
@@ -62,7 +64,7 @@ function マイクロ表示を作成(window,{screen,pins}={}){
   return true;
  }
  window.on('blur',()=>endMove());
- window.once('closed',()=>{endMove();generation++;clearInterval(timer);saved=undefined;window.webContents.removeListener?.('before-mouse-event',nativePress);});
+ window.once('closed',()=>{endMove();generation++;clearInterval(timer);saved=undefined;contents.removeListener?.('before-mouse-event',nativePress);});
  return {get active(){return !!saved;},get normalBounds(){return saved?.bounds;},set,最前面維持,
  beginMove(){if(!saved)return null;endMove();moveToken=pressedPoint&&Date.now()-pressedPoint.time<1000?drag.beginAt(pressedPoint):drag.begin();pressedPoint=undefined;if(moveToken)ignore(false);return moveToken;},
  move(token){if(!saved||!token||token!==moveToken)return false;const ok=drag.move(token);if(!ok)endMove(token);return ok;},

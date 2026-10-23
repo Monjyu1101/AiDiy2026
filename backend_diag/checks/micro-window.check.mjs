@@ -24,9 +24,15 @@ test('展開中の有効数変更でも画面内に収まり、収納位置と�
  assert.equal(control.expand(true,33),false);assert.equal(w.bounds.width,236);
  control.expand(false);assert.deepEqual(w.bounds,{x:1796,y:946,width:104,height:104});control.set(false);
 });
-function fixture(){
+function fixture({strict=false}={}){
  const w=new EventEmitter();Object.assign(w,{bounds:{x:100,y:80,width:800,height:600},minimum:[420,320],maximizable:true,resizable:true,top:false,
  isDestroyed(){return false;},isAlwaysOnTop(){return !!this.top;},getBounds(){return {...this.bounds};},getNormalBounds(){return this.getBounds();},getMinimumSize(){return this.minimum;},isMaximized(){return !!this.maximized;},isMaximizable(){return this.maximizable;},isResizable(){return this.resizable;},setMinimumSize(...v){this.minimum=v;},setBounds(v){this.bounds=v;},setMaximizable(v){this.maximizable=v;},setResizable(v){this.resizable=v;},setAlwaysOnTop(v){this.top=v;},setIgnoreMouseEvents(v){this.ignored=v;},maximize(){this.maximized=true;},unmaximize(){this.maximized=false;},webContents:{executeJavaScript:async()=>false}});
+ if(strict){
+  const contents=Object.assign(new EventEmitter(),{executeJavaScript:async()=>false});
+  Object.defineProperty(w,'webContents',{get(){if(this.destroyed)throw new TypeError('Object has been destroyed');return contents;}});
+  w.isDestroyed=()=>!!w.destroyed;
+  w.destroy=()=>{w.destroyed=true;w.emit('closed');};
+ }
  const pins=pinModule.createWindowPins();pins.register(w);
  const screen={getDisplayMatching:()=>({workArea:{x:0,y:0,width:1920,height:1080}}),getCursorScreenPoint:()=>({x:0,y:0})};
  return {w,pins,screen,control:micro.マイクロ表示を作成(w,{screen,pins})};
@@ -106,4 +112,32 @@ test('native mouseDownから開始位置を保持し、IPC到着前の高速移�
  w.webContents.emit('before-mouse-event',{}, {type:'mouseDown',button:'left',x:52,y:52});
  screen.getCursorScreenPoint=()=>({x:b.x+88,y:b.y+80});const token=control.beginMove();control.move(token);control.endMove(token);
  assert.deepEqual(w.bounds,{...b,x:b.x+36,y:b.y+28});control.set(false);
+});
+
+// Electron は closed の時点で BrowserWindow.webContents の取得自体が例外になる。
+test('通常・アイコン表示の破棄後は窓を再参照せず、登録済み入力リスナーと移動を解除',()=>{
+ for(const active of [false,true]){
+  const {w,control}=fixture({strict:true}),contents=w.webContents;
+  assert.equal(contents.listenerCount('before-mouse-event'),1);
+  if(active){w.isFullScreen=()=>false;w.isFocused=()=>true;control.set(true);assert.ok(control.beginMove());}
+  let completed=false;w.once('closed',()=>{completed=true;});
+  assert.doesNotThrow(()=>w.destroy());
+  assert.equal(completed,true);assert.equal(control.active,false);
+  assert.equal(contents.listenerCount('before-mouse-event'),0);
+  assert.equal(contents.listenerCount('did-start-navigation'),0);
+  assert.equal(contents.listenerCount('render-process-gone'),0);
+  assert.equal(control.beginMove(),null);assert.equal(control.set(false),false);
+ }
+});
+test('破棄後に遅れて届くヒット判定の成功・失敗は窓に触れず、タイマーも停止',async()=>{
+ for(const reject of [false,true]){
+  const {w,control,screen}=fixture({strict:true}),contents=w.webContents;let finish,calls=0;
+  const pending=new Promise(resolve=>{
+   contents.executeJavaScript=()=>{calls++;return new Promise((yes,no)=>{finish=reject?()=>no(Error('renderer destroyed')):()=>yes(false);resolve();});};
+  });
+  control.set(true);screen.getCursorScreenPoint=()=>({x:w.bounds.x+52,y:w.bounds.y+52});
+  await Promise.race([pending,sleep(500).then(()=>assert.ok(finish,'hit test must start'))]);
+  assert.doesNotThrow(()=>w.destroy());finish();await sleep(90);
+  assert.equal(calls,1);assert.equal(control.active,false);assert.equal(w.ignored,undefined);
+ }
 });
