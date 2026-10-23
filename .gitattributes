@@ -1,0 +1,5 @@
+# ライセンス生成処理に合わせ、Windows でも対象ファイルの改行を LF に保つ。
+/frontend_ide/viewer/LICENSE text eol=lf
+/frontend_ide/viewer/web/LICENSE.txt text eol=lf
+/frontend_ide/viewer/web/THIRD_PARTY_NOTICES.txt text eol=lf
+/frontend_ide/viewer/web/licenses.html text eol=lf
