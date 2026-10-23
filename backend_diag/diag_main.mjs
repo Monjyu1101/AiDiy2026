@@ -22,6 +22,7 @@ import {createInstallManager} from './導入管理/導入管理.mjs';
 import {createStartManager} from './起動/サービス管理.mjs';
 import {createAppLauncher} from './起動/アプリ起動.mjs';
 import {createCliLauncher} from './起動/CLI起動.mjs';
+import {createVSCodeLauncher} from './起動/VSCode起動.mjs';
 import {createPortStatusChecker} from './起動/ポート状態.mjs';
 import {createWebBrowserOpener} from './起動/Webブラウザ.mjs';
 
@@ -65,7 +66,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
   const recordInstallResult=(result,started=new Date())=>{
@@ -79,8 +80,8 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
   assets.set('AiDiy.png',['AiDiy.png','image/png']);
   for(const id of ['avatar','ide','term','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
-  for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])assets.set(`CLI_${id}.png`,[`CLI_${id}.png`,'image/png']);
-  for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'])assets.set(`CLI_${id}.svg`,[`CLI_${id}.svg`,'image/svg+xml']);
+  for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.png`,[`CLI_${id}.png`,'image/png']);
+  for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.svg`,[`CLI_${id}.svg`,'image/svg+xml']);
   assets.set('LICENSE_ICONS.md',['LICENSE_ICONS.md','text/markdown; charset=utf-8']);
   for(const name of ['LICENSE-Octicons.txt','LICENSE-LobeHub.txt','LICENSE-OpenCode.txt'])assets.set(name,[name,'text/plain; charset=utf-8']);
   const handler=async (req,res) => {
@@ -111,14 +112,15 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
           return reply(200,await management.start(parts[0],parts[1]));
         }catch(error){return reply(error.status||500,{エラー:error.status?error.message:'導入操作でエラーが発生しました。'});}
       }
-      if(route==='api/CLI起動'&&req.method==='GET'){try{return reply(200,await cliLauncher.catalog());}catch(error){return reply(error.status||500,{エラー:error.status?error.message:'CLIの一覧を確認できませんでした。'});}}
-      if(route==='api/CLI起動/開始'&&req.method==='POST'){
+      if(route==='api/CLI起動'&&req.method==='GET'){try{return reply(200,{対象:[...(await cliLauncher.catalog()).対象,await vscodeLauncher.catalog()]});}catch(error){return reply(error.status||500,{エラー:error.status?error.message:'CLIの一覧を確認できませんでした。'});}}
+      if(['api/CLI起動/開始','api/VSCode起動/開始'].includes(route)&&req.method==='POST'){
+        const editor=route==='api/VSCode起動/開始';
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
         const chunks=[];let size=0;
         for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
-        if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['対象','フォルダ','自動承認確認'].includes(key)))return reply(400,{エラー:'入力が不正です。'});
-        try{return reply(202,await cliLauncher.launch(body.対象,body.フォルダ,body.自動承認確認));}
+        if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!(editor?['フォルダ']:['対象','フォルダ','自動承認確認']).includes(key)))return reply(400,{エラー:'入力が不正です。'});
+        try{return reply(202,(editor?await vscodeLauncher.launch(body.フォルダ):await cliLauncher.launch(body.対象,body.フォルダ,body.自動承認確認)));}
         catch(error){return reply(error.status||500,{エラー:error.status?error.message:'CLIの起動処理に失敗しました。'});}
       }
       if(route==='api/アプリ起動'&&req.method==='GET')return reply(200,appLauncher.catalog());

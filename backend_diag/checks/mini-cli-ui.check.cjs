@@ -219,3 +219,15 @@ test('実App認証: URLを消した後の再読込・手入力・401をセッシ
  }finally{current.scope.stop();}
  current=await appState(undefined,globals);try{assert.equal(current.state.key.value,'');}finally{current.scope.stop();}
 });
+test('VS Code は通常とミニで編集用ラベルを表示し同じフォルダの専用APIへ送る',async()=>{
+ const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/日本語 project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){}};
+ const launches=[];const cliState=CLI状態を作成({アプリ:state,確認:()=>assert.fail('editor confirmation'),api:async(route,_method,_signal,_format,body)=>{
+  if(route==='api/CLI起動')return {対象:[{id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:true}]};launches.push({route,body});return {};
+ }});
+ for(const [file,props] of [['アプリ起動/アプリ起動パネル.vue',{state,cliState,online:true,visible:true}],['アプリ起動/ミニCLI起動.vue',{state:cliState,appState:state,online:true}]]){
+  const ui=mount(compile(file,{modules:{'./アプリアイコン.mjs':icons}}),()=>props);
+  try{await flush();const button=ui.button('VS Code でフォルダを開く');assert.ok(button);assert.doesNotMatch(button.props.title,/モデル指定なし|自動承認/);button.props.onClick();await flush();assert.deepEqual(launches.at(-1),{route:'api/VSCode起動/開始',body:{フォルダ:state.フォルダ.value}});assert.ok(ui.nodes().some(node=>node.tag==='img'&&node.props.src==='CLI_vscode.svg'));}finally{ui.app.unmount();}
+ }
+});

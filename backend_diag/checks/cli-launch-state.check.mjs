@@ -88,3 +88,9 @@ test('failed launch is visible and retry remains possible; disconnect discards l
  let calls=0;const f=fixture({api:async()=>{calls++;throw Error('実行ファイルなし');}});f.state.項目.value=[{id:'copilot',名前:'Copilot',モード:'YOLO'}];await f.state.起動('copilot');assert.equal(f.state.失敗.value,true);assert.equal(f.state.通知.value,'実行ファイルなし');await f.state.起動('copilot');assert.equal(calls,2);
  let release;const slow=fixture({api:()=>new Promise(resolve=>release=resolve)});const pending=slow.state.読込();slow.state.切断();release({対象:[{id:'old',利用可能:true}]});await pending;assert.equal(slow.state.項目.value.length,0);
 });
+test('VS Code shares selected folder but uses editor endpoint without automatic approval or confirmation',async()=>{
+ const f=fixture({確認:()=>assert.fail('editor does not request CLI approval')});
+ f.state.項目.value=[{id:'vscode',名前:'VS Code',種類:'editor',利用可能:true}];
+ await f.state.起動('vscode');
+ assert.deepEqual(f.requests,[{route:'api/VSCode起動/開始',body:{フォルダ:f.アプリ.フォルダ.value}}]);
+});
