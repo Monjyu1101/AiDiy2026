@@ -1,8 +1,8 @@
 'use strict';
 
-// 内包される縮小は自窓、拡大・移動は背面の透明窓で画像を動かす。
+// 縮小・拡大・移動とも背面の透明窓で画像を動かす。
+// CSPを持つ実画面にはdata画像・動的styleを注入しない。
 // native寸法を毎フレーム変更せず、Windowsの未描画の縁を避ける。
-const {contains,縮小窓を作成,適用,準備script,演出script,cleanupScript}=require('./縮小表示.cjs');
 const 演出時間=380;
 const 待機=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const 描画待ち=contents=>Promise.race([
@@ -14,17 +14,14 @@ function 囲む(a,b){
  return {x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};
 }
 function 画面サイズ演出を作成(BrowserWindow,window,{topmostLevel=()=>'floating'}={}){
- let current,cleanup;
+ let current;
  function 終了(){
   const state=current;current=undefined;if(!state)return;
   clearTimeout(state.timer);
   if(!window.isDestroyed()){
-   try{適用(window,state);}catch{}
-   if(state.self)cleanup=window.webContents.executeJavaScript(cleanupScript).catch(()=>{});
    window.setOpacity(state.opacity);
   }
   if(state.canvas&&!state.canvas.isDestroyed())state.canvas.destroy();
-  return cleanup;
  }
  async function 準備(target){
   if(current)return false;
@@ -34,20 +31,11 @@ function 画面サイズ演出を作成(BrowserWindow,window,{topmostLevel=()=>'
   // rendererが切替完了を通知できなくても、実窓を透明なまま残さない。
   state.timer=setTimeout(終了,2500);state.timer.unref?.();
   try{
-   if(cleanup)await cleanup;if(current!==state||window.isDestroyed())return false;
    const from=window.getContentBounds();let area=囲む(from,target);
    const snapshot=await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
    if(snapshot.isEmpty())throw Error('画像なし');
    if(current!==state||window.isDestroyed())return false;
    state.from=from;state.area=area;state.target=target;
-   if(contains(from,target)){
-    state.self=true;state.bounds={...from};state.ops=new Map();
-    await window.webContents.executeJavaScript(準備script(snapshot.toDataURL(),from,target));
-    if(current!==state||window.isDestroyed())return false;
-    await 描画待ち(window.webContents);
-    if(current!==state||window.isDestroyed())return false;
-    state.covered=true;return true;
-   }
    const canvas=new BrowserWindow({title:'AiDiy サイズ切替',...area,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,skipTaskbar:true,show:false,alwaysOnTop:window.isAlwaysOnTop(),webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
    canvas.isAiDiyOpeningCanvas=true;canvas.isAiDiyResizeCanvas=true;state.canvas=canvas;
    canvas.setBounds(area);
@@ -74,27 +62,28 @@ function 画面サイズ演出を作成(BrowserWindow,window,{topmostLevel=()=>'
   }catch{if(current!==state)return false;終了();if(window.isDestroyed())return false;}
   return true;
  }
- async function 完了(){
+ async function 完了({beforeCapture}={}){
   const state=current;if(!state)return true;
   try{
    await 描画待ち(window.webContents);
    // Vueの描画後に届くResizeObserverの高さ通知まで待ち、完成した寸法へ一度だけ変形する。
    await 待機(60);
    if(current!==state||window.isDestroyed())return true;
-   if(state.self){
-    const to={...state.bounds};
-    await Promise.race([window.webContents.executeJavaScript(演出script(state.from,to,演出時間)),待機(演出時間+500)]);
-    if(current!==state||window.isDestroyed())return true;
-    // 最後のnative変更まで元窓を演出面に保つ。実フォームは寸法確定後の描画で戻す。
-    適用(window,state);
-    const actual=window.getContentBounds();
-    await window.webContents.executeJavaScript(`(()=>{const image=document.getElementById('aidiy-size-image');if(image){image.getAnimations().forEach(a=>a.cancel());image.style.width=${JSON.stringify(actual.width+'px')};image.style.height=${JSON.stringify(actual.height+'px')};image.style.transform='none';}})()`);
-    await 描画待ち(window.webContents);return true;
-   }
+   if(beforeCapture){beforeCapture();await 描画待ち(window.webContents);}
+   if(current!==state||window.isDestroyed())return true;
    const to=window.getContentBounds(),snapshot=await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
    if(snapshot.isEmpty())throw Error('画像なし');
    if(current!==state||window.isDestroyed()||!state.canvas||state.canvas.isDestroyed())return true;
-   const {from,area}=state,canvas=state.canvas;
+   const {from}=state,canvas=state.canvas;
+   let area=state.area;
+   // 折り返し名称など、測定後の最終寸法が予定範囲を越える場合も切り取らない。
+   const finalArea=囲む(area,to);
+   if(finalArea.x!==area.x||finalArea.y!==area.y||finalArea.width!==area.width||finalArea.height!==area.height){
+    canvas.setBounds(finalArea);area=canvas.getContentBounds();state.area=area;
+    await canvas.webContents.executeJavaScript(`document.querySelector('#image').style.transform=${JSON.stringify(`translate(${from.x-area.x}px,${from.y-area.y}px)`)}`);
+    await 描画待ち(canvas.webContents);
+    if(current!==state||window.isDestroyed()||canvas.isDestroyed())return true;
+   }
    // 相補的な透明度を同じ時間軸で加算合成する。通常のsource-over合成では
    // 2枚とも半透明になり実窓を隠した背後が透ける。アイコンの透明領域も維持する。
    const start=`translate(${from.x-area.x}px,${from.y-area.y}px) scale(1,1)`,end=`translate(${to.x-area.x}px,${to.y-area.y}px) scale(${to.width/from.width},${to.height/from.height})`;
@@ -109,6 +98,6 @@ function 画面サイズ演出を作成(BrowserWindow,window,{topmostLevel=()=>'
   finally{if(current===state)await 終了();}
   return true;
  }
- return {window:縮小窓を作成(window,()=>current),準備,完了,中止:終了,get active(){return !!current;},get preparing(){return !!current&&!current.covered;}};
+ return {window,準備,完了,中止:終了,get active(){return !!current;},get preparing(){return !!current&&!current.covered;}};
 }
 module.exports={画面サイズ演出を作成,演出時間};

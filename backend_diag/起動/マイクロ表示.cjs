@@ -68,7 +68,13 @@ function マイクロ表示を作成(window,{screen,pins}={}){
  return {get active(){return !!saved;},get normalBounds(){return saved?.bounds;},set,最前面維持,
  beginMove(){if(!saved)return null;endMove();moveToken=pressedPoint&&Date.now()-pressedPoint.time<1000?drag.beginAt(pressedPoint):drag.begin();pressedPoint=undefined;if(moveToken)ignore(false);return moveToken;},
  move(token){if(!saved||!token||token!==moveToken)return false;const ok=drag.move(token);if(!ok)endMove(token);return ok;},
- endMove,expand(value,count=13){
+ endMove,resizeLabel(height){
+  if(!saved||expanded||window.isDestroyed()||!Number.isInteger(height)||height<18||height>4096)return false;
+  const b=window.getBounds(),area=screen.getDisplayMatching(b).workArea;
+  const target=Math.min(area.height,Math.max(閉じた幅,102+height+8));
+  if(b.height!==target){window.setMinimumSize(閉じた幅-2,閉じた幅-2);place({...b,width:閉じた幅,height:target,y:Math.max(area.y,Math.min(area.y+area.height-target,b.y))});}
+  return true;
+ },expand(value,count=13){
   const layout=円周配置(count);
   if(!saved||typeof value!=='boolean'||!layout)return false;
   if(expanded&&value&&expandedBounds.width!==layout.幅){
@@ -77,7 +83,7 @@ function マイクロ表示を作成(window,{screen,pins}={}){
    fit(layout.幅);expandedBounds=window.getBounds();
   }else if(expanded!==value){
    expanded=value;
-   if(value){foldedBounds=window.getBounds();fit(layout.幅);expandedBounds=window.getBounds();}
+   if(value){foldedBounds=window.getBounds();fit(layout.幅,{...foldedBounds,height:閉じた幅});expandedBounds=window.getBounds();}
    else{
     const current=window.getBounds();
     // 展開時の画面端補正は収納時に戻す。展開中に移動した分だけは引き継ぐ。

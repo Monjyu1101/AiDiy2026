@@ -56,11 +56,11 @@ async function start(value) {
   const mini=ミニ表示を作成(sizingWindow,{screen});
   const micro=マイクロ表示を作成(sizingWindow,{screen,pins:{setLocked:(_target,value)=>pins.setLocked(window,value),state:()=>pins.state(window)}});
   window.once('closed',()=>sizeEffect.中止());
-  let firstLoad=true,opening=false,pendingMiniHeight,displaySwitch=false,displayOrigin;
+  let firstLoad=true,opening=false,pendingMiniHeight,pendingMicroHeight,displaySwitch=false,displayOrigin;
   window.webContents.on('did-start-loading',()=>{
     // 初回の描画より先にミニ状態にし、初期表示の高さ通知を取りこぼさない。
     // 再読込時は従来どおり通常表示へ戻す。
-    sizeEffect.中止();displaySwitch=false;displayOrigin=undefined;micro.set(false);pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
+    sizeEffect.中止();displaySwitch=false;displayOrigin=undefined;micro.set(false);pendingMicroHeight=undefined;pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
   });
   let selectingFolder=false;
   ipcMain.handle('diag:window',(event,action,value)=>{
@@ -75,15 +75,18 @@ async function start(value) {
         target.x=Math.max(area.x,Math.min(area.x+area.width-target.width,target.x));
         target.y=Math.max(area.y,Math.min(area.y+area.height-target.height,target.y));
       }
-      displaySwitch=true;
+      pendingMicroHeight=undefined;displaySwitch=true;
       return sizeEffect.準備(target).then(ready=>{if(!ready)displaySwitch=false;return ready;});
     }
-    if(action==='finishDisplay')return sizeEffect.完了().finally(()=>{
-      // アイコン化専用の最前面層を演出の完了後にも適用する。
-      micro.最前面維持();
-      displaySwitch=false;displayOrigin=undefined;
-      if(pendingMiniHeight!==undefined){mini.resize(pendingMiniHeight);pendingMiniHeight=undefined;}
-    });
+    if(action==='finishDisplay'){
+      if(pendingMicroHeight!==undefined){micro.resizeLabel(pendingMicroHeight);pendingMicroHeight=undefined;}
+      return sizeEffect.完了({beforeCapture:()=>{if(pendingMicroHeight!==undefined){micro.resizeLabel(pendingMicroHeight);pendingMicroHeight=undefined;}}}).finally(()=>{
+        // アイコン化専用の最前面層を演出の完了後にも適用する。
+        micro.最前面維持();
+        displaySwitch=false;displayOrigin=undefined;pendingMicroHeight=undefined;
+        if(pendingMiniHeight!==undefined){mini.resize(pendingMiniHeight);pendingMiniHeight=undefined;}
+      });
+    }
     if(action==='selectProject'){
       if(selectingFolder)return null;selectingFolder=true;
       return dialog.showOpenDialog(window,{title:'プロジェクトフォルダを選択',properties:['openDirectory']}).then(result=>result.canceled?null:result.filePaths[0]||null).finally(()=>{selectingFolder=false;});
@@ -100,6 +103,12 @@ async function start(value) {
     }
     // アイコンを離れる途中のwatcher/遅延収納で、撮影済みの元窓を動かさない。
     if(action==='expandMicro')return !opening&&!displaySwitch&&!sizeEffect.active&&value&&typeof value==='object'?micro.expand(value.expanded,value.count):false;
+    if(action==='resizeMicroLabel'){
+      if(!Number.isInteger(value)||value<18||value>4096||opening)return false;
+      // 準備中は旧画面を撮影するため寸法を変えず、完成画像の前に測定値を反映する。
+      if(displaySwitch){pendingMicroHeight=value;return true;}
+      return !sizeEffect.active?micro.resizeLabel(value):false;
+    }
     if(action==='beginMicroMove')return micro.beginMove();
     if(action==='moveMicro')return typeof value==='string'&&micro.move(value);
     if(action==='endMicroMove'){if(typeof value==='string')micro.endMove(value);return false;}

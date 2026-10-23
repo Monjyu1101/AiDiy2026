@@ -16,7 +16,7 @@ export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=m
   catch(error){if(version===revision){全項目.value=[];項目.value=[];読込エラー.value=error.message;}}
   finally{if(version===revision)読込中.value=false;}
  }
- async function 起動(id,{確認省略=false}={}){
+ async function 起動(id,{確認省略=false,開始時}={}){
   if(!接続可能()||確認待ち||アプリ.処理中.value&&!アプリ.処理中.value.startsWith('cli:')||アプリ.選択中.value||!アプリ.フォルダ.value)return;
   const item=項目.value.find(value=>value.id===id);if(!item||item.利用可能===false)return;
   const project=アプリ.フォルダ.value,run=++起動番号,connection=接続番号;
@@ -28,6 +28,7 @@ export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=m
    const accepted=item.種類==='editor'||確認省略===true?true:await 確認(`${item.名前} を aidiy_term で開始しますか？\n\nプロジェクト: ${project}\nモード: ${item.モード}\nモデル: 指定なし（CLI の既定設定）\n\nファイルの変更やコマンド実行が自動承認されます。CLIによってはサンドボックスも解除されます。信頼できるプロジェクトだけで使用してください。CLIの契約や設定によって利用料金が発生する場合があります。ログイン・組織の制限・初回の信頼確認はCLI側に残る場合があります。`);
    if(確認待ち===run)確認待ち=0;
    if(accepted!==true||!接続可能()||connection!==接続番号||project!==アプリ.フォルダ.value)return;
+   開始時?.();
    // 成功通知は保持しない。古いサーバーが通知文を返しても画面を押し下げない。
    if(item.種類==='editor')await api('api/VSCode起動/開始','POST',undefined,'json',{フォルダ:project});
    else await api('api/CLI起動/開始','POST',undefined,'json',{対象:id,フォルダ:project,自動承認確認:true});

@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {createRequire}=require('node:module'),req=createRequire(path.join(__dirname,'../ui/package.json'));
 const vue=req('vue'),{parse,compileScript}=req('@vue/compiler-sfc'),{transformSync}=req('esbuild');
-const {source,render,component}=require('./ui-components.cjs');
+const {source,render,component,dependency}=require('./ui-components.cjs');
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await vue.nextTick();};
 const descendants=node=>[node,...node.children.flatMap(descendants)];
 const text=node=>node.text+node.children.map(text).join('');
@@ -26,6 +26,7 @@ test('通常のCLIアイコンは確認なしで起動し、未導入は表示�
  }finally{ui.app.unmount();}
 });
 function compile(name,{globals={},modules={},inline=true}={}){
+ modules={'./起動モーション.mjs':dependency('アプリ起動/起動モーション.mjs'),...modules};
  const {descriptor}=parse(source(name),{filename:name});const compiled=compileScript(descriptor,{id:name,inlineTemplate:inline,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,URLSearchParams,AbortController,ResizeObserver:class{observe(){}disconnect(){}},...globals,require:id=>id==='vue'?vue:modules[id]||{}});return module.exports;
 }
@@ -39,7 +40,7 @@ test('実Vueタイトル欄: ミニ→最小化→最大化→ピン→終了の
  const props=vue.reactive({connected:true,compact:false,switching:false,onMini:()=>calls.push('mini'),onRestore:()=>calls.push('restore')});
  const ui=mount(compile('ウィンドウ/ステータスバー.vue',{globals:{window}}),()=>props);
  try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ランチャー表示','アイコン化','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ランチャー表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['アイコン化','最小化','元のサイズに戻す','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('元のサイズに戻す').props.disabled,false);ui.button('元のサイズに戻す').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ランチャー表示').props.disabled,true);}finally{ui.app.unmount();}
- const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{-webkit-app-region:drag\}/);assert.match(css,/\.panel-brand button,\.window-actions\{-webkit-app-region:no-drag\}/);
+ const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{[^}]*-webkit-app-region:drag[;}]/);assert.match(css,/\.panel-brand button,\.window-actions\{[^}]*-webkit-app-region:no-drag[;}]/);
 });
 async function appState(switchMini=async()=>true,globals={}){
  const {認証セッションを作成}=await import('../ui/src/ウィンドウ/認証セッション.mjs');

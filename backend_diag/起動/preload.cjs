@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('aidiyWindow',Object.freeze({
  finishMini:()=>ipcRenderer.invoke('diag:window','finishMini'),
  startMicro:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMicro',enabled):Promise.resolve(false),
  expandMicro:(expanded,count=13)=>typeof expanded==='boolean'&&Number.isInteger(count)&&count>=0&&count<=32?ipcRenderer.invoke('diag:window','expandMicro',{expanded,count}):Promise.resolve(false),
+ resizeMicroLabel:height=>Number.isInteger(height)&&height>=18&&height<=4096?ipcRenderer.invoke('diag:window','resizeMicroLabel',height):Promise.resolve(false),
  beginMicroMove:()=>ipcRenderer.invoke('diag:window','beginMicroMove'),
  moveMicro:token=>typeof token==='string'?ipcRenderer.invoke('diag:window','moveMicro',token):Promise.resolve(false),
  endMicroMove:token=>typeof token==='string'?ipcRenderer.invoke('diag:window','endMicroMove',token):Promise.resolve(false),

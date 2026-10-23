@@ -141,3 +141,19 @@ test('破棄後に遅れて届くヒット判定の成功・失敗は窓に触�
   assert.equal(calls,1);assert.equal(control.active,false);assert.equal(w.ignored,undefined);
  }
 });
+
+
+test('名前の折り返し高さだけ縦に広げ、中央アイコンの位置と展開収納・短名復帰を維持',()=>{
+ const {w,control}=fixture();assert.equal(control.resizeLabel(54),false);control.set(true);
+ const original=w.getBounds();assert.equal(control.resizeLabel(90),true);
+ assert.deepEqual(w.bounds,{...original,height:200});
+ control.expand(true,13);assert.equal(w.bounds.width,320);
+ assert.equal(w.bounds.x+160,Math.max(160,original.x+64));
+ assert.equal(w.bounds.y+160,Math.max(160,original.y+64));
+ assert.equal(control.resizeLabel(18),false);control.expand(false);
+ assert.deepEqual(w.bounds,{...original,height:200});
+ assert.equal(control.resizeLabel(18),true);assert.deepEqual(w.bounds,original);
+ for(const v of [17,4097,NaN,'54',54.5])assert.equal(control.resizeLabel(v),false);
+ w.bounds.y=1000;control.resizeLabel(180);assert.equal(w.bounds.height,290);assert.equal(w.bounds.y,790);
+ control.set(false);
+});

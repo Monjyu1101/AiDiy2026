@@ -1,0 +1,60 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {起動モーション} from '../ui/src/アプリ起動/起動モーション.mjs';
+import {アプリ状態を作成} from '../ui/src/アプリ起動/アプリ状態.mjs';
+import {CLI状態を作成} from '../ui/src/アプリ起動/CLI状態.mjs';
+import {readFile} from 'node:fs/promises';
+function fixture(){
+ const runs=[];const icon={animate:(frames,options)=>{let finish;const animation={frames,options,cancelled:false,cancel(){this.cancelled=true;},finished:new Promise(resolve=>finish=resolve),finish:()=>finish()};runs.push(animation);return animation;}};
+ return {runs,button:{disabled:false,querySelector:selector=>selector==='.launch-trace-light'?icon:null}};
+}
+test('accepted light traces the frame clockwise once, repeated request restarts it, and event target is captured',async()=>{
+ const f=fixture(),event={currentTarget:f.button},start=起動モーション(event);event.currentTarget=null;
+ start();assert.deepEqual(f.runs[0].frames,[{strokeDashoffset:'0',opacity:1},{strokeDashoffset:'-100',opacity:1}]);assert.equal(f.runs[0].options.iterations,1);
+ start();assert.equal(f.runs.length,2);assert.equal(f.runs[0].cancelled,true);f.runs[0].finish();await Promise.resolve();
+ start();assert.equal(f.runs[1].cancelled,true);f.runs[2].finish();await Promise.resolve();
+ start();assert.equal(f.runs[2].cancelled,false);
+});
+test('accepted callback still animates if its own pending UI disables the button',()=>{
+ const f=fixture(),start=起動モーション({currentTarget:f.button});f.button.disabled=true;start();assert.equal(f.runs.length,1);
+});
+test('disabled/missing targets, reduced motion and unsupported animation are safe',()=>{
+ const f=fixture();f.button.disabled=true;起動モーション({currentTarget:f.button})();assert.equal(f.runs.length,0);
+ f.button.disabled=false;const previous=globalThis.matchMedia;
+ try{globalThis.matchMedia=()=>({matches:true});起動モーション({currentTarget:f.button})();assert.equal(f.runs.length,0);}finally{if(previous)globalThis.matchMedia=previous;else delete globalThis.matchMedia;}
+ assert.doesNotThrow(()=>起動モーション()());assert.doesNotThrow(()=>起動モーション({currentTarget:{querySelector:()=>({})}})());
+ assert.doesNotThrow(()=>起動モーション({currentTarget:{querySelector(){throw Error('detached');}}})());
+});
+test('app accepted request animates before response, blocked duplicate does not, failure can retry',async()=>{
+ let release,animated=0,calls=0;const state=アプリ状態を作成({api:()=>{calls++;return new Promise(resolve=>release=resolve);}}),options={開始時:()=>animated++};
+ await state.起動('code',options);assert.equal(animated,0);state.フォルダ.value='/project';
+ const one=state.起動('code',options);assert.equal(animated,1);assert.equal(calls,1);
+ await state.起動('code',options);assert.equal(animated,1);release({});await one;
+ const two=state.起動('code',options);assert.equal(animated,2);release({});await two;
+});
+test('CLI guards and declined confirmation never animate; accepted editor and CLI do',async()=>{
+ const app=アプリ状態を作成({api:async()=>({})});app.フォルダ.value='/project';let count=0,accept=false;
+ const state=CLI状態を作成({アプリ:app,確認:async()=>accept,api:async()=>({})});
+ state.項目.value=[{id:'codex',名前:'Codex',利用可能:true},{id:'vscode',種類:'editor',利用可能:true},{id:'missing',利用可能:false}];
+ const options={開始時:()=>count++};await state.起動('missing',options);await state.起動('codex',options);assert.equal(count,0);
+ await state.起動('codex',{...options,確認省略:true});await state.起動('vscode',options);assert.equal(count,2);
+ app.選択中.value=true;await state.起動('codex',{...options,確認省略:true});assert.equal(count,2);
+});
+test('all normal mini and micro launch surfaces share the accepted-action callback',async()=>{
+ for(const name of ['アプリ起動パネル','ミニアプリ起動','ミニCLI起動','マイクロランチャー']){
+  const source=await readFile(new URL(`../ui/src/アプリ起動/${name}.vue`,import.meta.url),'utf8');assert.match(source,/import \{起動モーション\}/);assert.match(source,/開始時/);assert.match(source,/\$event/);
+ }
+});
+
+test('stationary fixed-size icon has a short perimeter light and no obsolete flip layers',async()=>{
+ const css=await readFile(new URL('../ui/src/アプリ起動/起動モーション.css',import.meta.url),'utf8');
+ assert.match(css,/stroke-dasharray:18 82/);assert.match(css,/opacity:0/);assert.match(css,/pointer-events:none/);
+ assert.doesNotMatch(css,/rotate|transform|backface|#808080|launch-card/);
+ assert.match(css,/width:40px;height:40px/);assert.match(css,/width:72px;height:72px/);
+ for(const name of ['アプリ起動パネル','ミニアプリ起動','ミニCLI起動','マイクロランチャー']){
+  const source=await readFile(new URL(`../ui/src/アプリ起動/${name}.vue`,import.meta.url),'utf8');
+  assert.match(source,/import '\.\/起動モーション.css'/);assert.match(source,/class="launch-trace-light"/);
+  assert.match(source,/pathLength="100"/);assert.match(source,/focusable="false"/);
+  assert.doesNotMatch(source,/launch-card-back|launch-card-40|launch-card-72/);
+ }
+});

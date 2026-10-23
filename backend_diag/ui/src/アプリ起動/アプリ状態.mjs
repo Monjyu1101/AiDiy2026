@@ -23,9 +23,9 @@ export function アプリ状態を作成({api,picker=()=>globalThis.aidiyWindow?
  function 決定(){if(!一覧.value||参照中.value)return;フォルダ.value=一覧.value.フォルダ;結果.value={};一覧.value=null;選択中.value=false;}
  function 取消(){folderVersion++;一覧.value=null;選択中.value=false;参照中.value=false;}
  function 解除(){if(処理中.value||選択中.value)return;フォルダ.value='';結果.value={};通知.value='';}
- async function 起動(id){
+ async function 起動(id,{開始時}={}){
   if(!フォルダ.value||処理中.value||選択中.value)return;処理中.value=id;通知.value='';
-  try{const data=await api('api/アプリ起動/開始','POST',undefined,'json',{対象:id,フォルダ:フォルダ.value});結果.value={...結果.value,[id]:{通知:data.通知,種別:data.起動済み?'existing':'accepted',ログ:data.ログ}};}
+  try{開始時?.();const data=await api('api/アプリ起動/開始','POST',undefined,'json',{対象:id,フォルダ:フォルダ.value});結果.value={...結果.value,[id]:{通知:data.通知,種別:data.起動済み?'existing':'accepted',ログ:data.ログ}};}
   catch(error){結果.value={...結果.value,[id]:{通知:error.message,種別:'error'}};}
   finally{処理中.value='';}
  }

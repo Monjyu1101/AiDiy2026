@@ -234,7 +234,10 @@ async function run() {
     assert.equal(result.actions.filter(action => action.action === 'toggle-pin').length, before);
   }
   assert.equal(await evaluate(explorer.window, `document.querySelector('.window-close').disabled`), true);
-  assert.equal(await evaluate(routes.window, `!!document.querySelector('.route-burger')`), false);
+  assert.equal(await evaluate(routes.window, `getComputedStyle(document.querySelector('.route-burger')).webkitAppRegion==='drag'`), true);
+  await click(routes.window, '.route-burger');
+  assert.equal(await evaluate(routes.window, `!!document.querySelector('.explorer-routes')`), true);
+  assert.equal(routes.window.isDestroyed(), false);
   await capture(explorer.window, '06-vr-explorer-locked');
   await capture(routes.window, '07-vr-routes-locked');
   await evaluate(owner, 'fixture.setVR(false)');
@@ -242,7 +245,7 @@ async function run() {
   for (let n = 0; n < 150 && (!explorer.window.isDestroyed() || !routes.window.isDestroyed()); n++) await sleep(20);
   assert.ok(explorer.window.isDestroyed() && routes.window.isDestroyed());
   assert.equal(await evaluate(owner, `fixture.saved.input.value`), '未送信の検索入力');
-  result.checks.push('VR pins are ON and disabled, return controls disappear, Explorer close is disabled and route burger is hidden; programmatic click cannot send a pin toggle; exiting VR restores both original DOM nodes and input state');
+  result.checks.push('VR pins are ON and disabled, return controls disappear, Explorer close is disabled and route burger remains a title drag surface; programmatic click cannot send a pin toggle; exiting VR restores both original DOM nodes and input state');
   await click(owner, '.explorer-toggle'); await click(owner, '.route-restore-toggle');
   await capture(owner, '08-restored-after-vr');
   assert.deepEqual(await evaluate(owner, 'fixture.log.errors'), []);

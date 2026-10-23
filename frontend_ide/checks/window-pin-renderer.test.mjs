@@ -7,6 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse, compileScript } from '@vue/compiler-sfc';
+import { compile } from '@vue/compiler-dom';
+import * as Vue from 'vue';
 import { createWindowPinController, createPanelWindowApi } from '../src/共通表示/窓操作.js';
 
 function fixture(initial = { pinned: false, locked: false }) {
@@ -118,4 +120,26 @@ test('軌跡バー: バーガーは即時ドラッグ、余分な縦線はなく
   assert.match(css, /\.native-route-window \.route-controls>\.route-burger\{[^}]*-webkit-app-region:drag/);
   assert.doesNotMatch(source, /route-drag-handle/);
   assert.doesNotMatch(css, /route-drag-handle|route-controls>\.route-burger[^}]*display:none|native-route-window \.route-choice:before\{display:none/);
+});
+
+test('軌跡バー: VR/ALLの別窓でも縦三本を残し、クリックで窓を閉じない', () => {
+  const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
+  const button = source.match(/<button[^>]*class="burger-button route-burger"[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button, '実コンポーネントの縦三本を検証する');
+  const render = new Function('Vue', compile(button, { mode: 'function' }).code)(Vue);
+  for (const allDisplays of [false, true]) {
+    for (const routeDetached of [false, true]) {
+      let closed = 0;
+      const node = render({ allDisplays, routeDetached, nativePanels: true, closeRoutes: () => { closed++; } }, []);
+      if (allDisplays && !routeDetached) {
+        assert.notEqual(node.type, 'button', 'VR移行前の本体内には閉じる操作を追加しない');
+        continue;
+      }
+      assert.equal(node.type, 'button');
+      assert.equal(node.props['aria-label'], routeDetached ? '軌跡ウィンドウを移動' : '軌跡バーを閉じる');
+      node.props.onClick();
+      assert.equal(closed, routeDetached ? 0 : 1, '別窓は移動専用、本体内は従来の折り畳み');
+      assert.equal(node.children[0].props.class, 'burger burger-v');
+    }
+  }
 });

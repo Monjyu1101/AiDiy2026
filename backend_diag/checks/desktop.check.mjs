@@ -218,13 +218,15 @@ test('frameless controls are fixed, main-frame-only and preserve sandbox',async(
  control(event,'openFile');assert.equal(f.win.closed,undefined);
  control(event,'minimize');assert.equal(f.win.minimized,true);await control(event,'maximize');assert.equal(control(event,'isMaximized'),true);await control(event,'maximize');assert.equal(control(event,'isMaximized'),false);control(event,'close');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.closed,true);assert.equal(f.dialogs.length,0);
  const exposed={};vm.runInNewContext(await readFile(new URL('../起動/preload.cjs',import.meta.url),'utf8'),{process:{argv:[]},require:()=>({contextBridge:{exposeInMainWorld:(name,api)=>exposed[name]=api},ipcRenderer:{invoke:(...args)=>args}})});
- assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['beginDisplay','beginMicroMove','close','endMicroMove','expandMicro','finishDisplay','finishMini','getPinState','initialMini','isMaximized','maximize','minimize','moveMicro','onPinState','resizeMini','selectProject','startMicro','startMini','togglePin']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
+ assert.deepEqual(Object.keys(exposed.aidiyWindow).sort(),['beginDisplay','beginMicroMove','close','endMicroMove','expandMicro','finishDisplay','finishMini','getPinState','initialMini','isMaximized','maximize','minimize','moveMicro','onPinState','resizeMicroLabel','resizeMini','selectProject','startMicro','startMini','togglePin']);assert.deepEqual(Array.from(exposed.aidiyWindow.close()),['diag:window','close']);
  assert.equal(exposed.aidiyWindow.initialMini,false);
  assert.deepEqual(Array.from(exposed.aidiyWindow.selectProject()),['diag:window','selectProject']);
  assert.deepEqual(Array.from(exposed.aidiyWindow.finishMini()),['diag:window','finishMini']);assert.deepEqual(Array.from(exposed.aidiyWindow.startMini(true)),['diag:window','startMini',true]);assert.equal(await exposed.aidiyWindow.startMini({width:100}),false);
  assert.deepEqual(Array.from(exposed.aidiyWindow.resizeMini(186)),['diag:window','resizeMini',186]);
  for(const height of [undefined,null,false,'134',{},[],NaN,Infinity,-Infinity,79,361,134.5])assert.equal(await exposed.aidiyWindow.resizeMini(height),false);
  for(const height of [80,360])assert.deepEqual(Array.from(exposed.aidiyWindow.resizeMini(height)),['diag:window','resizeMini',height]);
+ for(const height of [undefined,null,false,'18',{},[],NaN,Infinity,17,4097,18.5])assert.equal(await exposed.aidiyWindow.resizeMicroLabel(height),false);
+ for(const height of [18,4096])assert.deepEqual(Array.from(exposed.aidiyWindow.resizeMicroLabel(height)),['diag:window','resizeMicroLabel',height]);
 });
 
 test('native mini height IPC stays main-frame-only, bounded and cannot resize normal windows',async()=>{
@@ -329,6 +331,8 @@ test('全表示経路は準備完了前にnative寸法を変更せず、遅れ�
    assert.equal(control(event,'resizeMini',222),true);assert.notEqual(f.win.getBounds().height,222);
   }
   assert.equal(control(event,'expandMicro',{expanded:true,count:13}),false);
+  assert.equal(control(event,'resizeMicroLabel',170),!square);
+  assert.deepEqual(changes,[]);
   release();assert.equal(await pending,true);
   if(!square){
    if(source==='micro')control(event,'startMicro',false);
@@ -339,7 +343,7 @@ test('全表示経路は準備完了前にnative寸法を変更せず、遅れ�
   }
   assert.ok(changes.length>0);assert.equal(effect.active,false);
   if(target==='mini')assert.equal(f.win.getBounds().height,186,'最新の完成高さを古い予約値で戻さない');
-  if(target==='micro')control(event,'startMicro',false);
+  if(target==='micro'){assert.equal(f.win.getBounds().height,280);control(event,'startMicro',false);}
  }
 });
 
@@ -361,4 +365,19 @@ test('稼働サービスありで終了確認後に実窓を破棄しても、�
   assert.equal(contents.listenerCount('before-mouse-event'),0);
   f.app.emit('window-all-closed');assert.equal(f.app.quitting,true);
  }
+});
+
+
+test('micro label height IPC is main-frame-only and cannot resize normal or expanded windows',async()=>{
+ const f=await mainFixture();f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
+ const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
+ assert.equal(control(event,'resizeMicroLabel',90),false);assert.equal(control(event,'startMicro',true),true);
+ assert.equal(control({...event,senderFrame:{}},'resizeMicroLabel',90),false);
+ assert.equal(control({...event,sender:{}},'resizeMicroLabel',90),false);
+ for(const value of [17,4097,Infinity,NaN,'90',90.5])assert.equal(control(event,'resizeMicroLabel',value),false);
+ assert.equal(control(event,'resizeMicroLabel',90),true);assert.equal(f.win.bounds.width,128);assert.equal(f.win.bounds.height,200);
+ assert.equal(control(event,'expandMicro',{expanded:true,count:13}),true);assert.equal(control(event,'resizeMicroLabel',18),false);
+ assert.equal(control(event,'expandMicro',{expanded:false,count:13}),true);assert.equal(f.win.bounds.height,200);
+ assert.equal(control(event,'resizeMicroLabel',18),true);assert.equal(f.win.bounds.height,128);
+ control(event,'startMicro',false);
 });
