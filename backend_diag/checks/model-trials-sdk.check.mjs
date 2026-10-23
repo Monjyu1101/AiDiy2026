@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
-import {callMcp,createModelTrials,localRequest} from '../モデル試行/trials.mjs';
+import {callMcp,createModelTrials as createActualModelTrials,localRequest} from '../モデル試行/trials.mjs';
 
 // Windows 初回 import と並行回帰の負荷を考慮。AI応答は従来どおり合成の短文だけ。
+const createModelTrials=options=>createActualModelTrials({catalogReader:async()=>({}),credentialReader:async()=>null,installedClisFn:async()=>({}),...options});
 test('actual MCP SDK and production Chat/Code/Decision registrations return valid results', {skip:!process.env.DIAG_TEST_PYTHON,timeout:90000},async()=>{
  const child=spawn(process.env.DIAG_TEST_PYTHON,[fileURLToPath(new URL('./fixtures/model_trials_tools.py',import.meta.url))],{stdio:['ignore','pipe','pipe'],windowsHide:true});
  let errors='';child.stderr.on('data',chunk=>errors+=chunk);
@@ -19,12 +20,12 @@ test('actual MCP SDK and production Chat/Code/Decision registrations return vali
    child.once('error',error=>{clearTimeout(timer);reject(error);});
    child.once('exit',()=>{clearTimeout(timer);reject(new Error(`fixture exit: ${errors}`));});
   });
-  const config={PORT_TOOLS:port,CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',CODE_AI1_NAME:'codex_cli',CODE_AI1_MODEL:'auto',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr'};
+  const config={CODE_BASE_PATH:'/fixture/project',PORT_TOOLS:port,CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',CODE_AI1_NAME:'codex_cli',CODE_AI1_MODEL:'auto',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr'};
   const wire=[];
   const request=async options=>{const response=await localRequest(options);wire.push({options,response});return response;};
   for(const [区分,プロバイダ,モデル] of [['CHAT','freeai_chat','chat-test'],['CODE','codex_cli','auto']]){
    const result=await callMcp({区分,プロバイダ,モデル},config,{request});
-   assert.equal(result.status,'OK');assert.equal(result.result,'おはようございます');
+   assert.equal(result.status,'OK',JSON.stringify(result));assert.equal(result.result,'おはようございます');
   }
   const calls=wire.filter(x=>x.options.body?.method==='tools/call');
   assert.equal(calls.length,2);
@@ -40,9 +41,11 @@ test('actual MCP SDK and production Chat/Code/Decision registrations return vali
   const manualTrials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true})});
   try{
    const manuals=[['CHAT','freeai_chat','chat-test'],['LIVE','freeai_live','live-test'],['DECISION','freeai_chat','gemini-3.5-flash-lite'],['CODE','codex_cli','auto']].map(([family,provider,model])=>({family,provider,model,voice:family==='LIVE'?'Zephyr':'',prompt:'手動SDK入力',...(family==='DECISION'?{questions:decisionQuestions()}:{})}));
+   manuals.splice(2,0,{family:'PREDICTION',provider:'openai_chat',model:'chosen-model'});
    const start=await manualTrials.start({manuals});let audio;
-   for(const row of start.実行順){const result=await manualTrials.next(start.実行ID,row);assert.equal(result.状態,'OK',JSON.stringify(result));if(row==='LIVE'){audio=result.音声ファイル;assert.equal(audio.長さms,1000);}if(row==='DECISION'){assert.equal(JSON.parse(result.応答).data.answers[0].choice,'medium');assert.equal(result.実行プロバイダ,'freeai_chat');}}
+   for(const row of start.実行順){const result=await manualTrials.next(start.実行ID,row);assert.equal(result.状態,row==='PREDICTION'?'未実施':'OK',JSON.stringify(result));if(row==='LIVE'){audio=result.音声ファイル;assert.equal(audio.長さms,1000);}if(row==='DECISION'){assert.equal(JSON.parse(result.応答).data.answers[0].choice,'medium');assert.equal(result.実行プロバイダ,'freeai_chat');}}
    assert.ok(await manualTrials.audio(audio.id),'batch retains Live audio after Decision and Code');
   }finally{await manualTrials.close();}
  }finally{lines.close();child.kill();}
 });
+

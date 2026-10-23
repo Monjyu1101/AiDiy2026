@@ -246,7 +246,9 @@ Termの最小高さは `デスクトップ/window-layout.cjs` の `windowMinimum
 
 TermのElectron窓は作業領域の幅2/3・高さ1/2で画面下中央に開き、次の窓を28pxずつ右上へ配置します。親IDEの矩形には合わせず、親と同じディスプレイの作業領域を使います。画面端まで進んだら基点へ戻します。単独Termはsingle-instance lockを使わず、起動ごとの一時Chromiumプロファイルを終了時に片付けます。`デスクトップ/term-window-slot.cjs` は127.0.0.1の18440〜18567を操作受付のない排他用ポートとして使い、単独プロセスとIDE子窓で配置番号を共有します。番号は窓終了で解放し、プロセス異常終了でもOSが解放します。Code / Live / IDEの既存窓再利用は維持します。
 
-プロジェクトバーの「tools接続確認」はCodeの `auto-connect` トグルを共用します。既定ON、WebSocketの `tools-check` で切り替え、`tools` 応答の `enabled` / `online` で画面を同期します。OFFは疎通の定期実行を止め、シアン表示を解除して赤いバーにします。ONへ戻すと即時に疎通確認を再開します。シェルの再起動は行わず、端末の再起動でも同じサーバー内の選択を維持します。確認中にOFFへ変わった場合の古い応答は世代番号で無視してください。
+プロジェクトバーの「Tools接続確認」はCodeの `auto-connect` トグルを共用します。既定ON、WebSocketの `tools-check` で切り替え、`tools` 応答の `enabled` / `online` で画面を同期します。OFFは疎通の定期実行を止め、シアン表示を解除して赤いバーにします。ONへ戻すと即時に疎通確認を再開します。シェルの再起動は行わず、端末の再起動でも同じサーバー内の選択を維持します。確認中にOFFへ変わった場合の古い応答は世代番号で無視してください。
+
+キー変換は `src/ターミナル/キー入力.js` に集約します。Ctrl+C / Cmd+C はコピー、Ctrl+V / Cmd+V はxterm標準の貼り付けに任せ、それ以外の修飾キーを送信します。Ctrl+英字・記号は通常の制御文字、Alt+文字はESC付き、標準の制御文字がない組合せはCSI-uで送ります。Ctrl・Alt付きのTab、修飾Enter、修飾Insert / PageUp / PageDownも送信し、ブラウザー操作やxtermのローカルスクロールに使いません。日本語配列の記号はkeyCodeのUS配列換算ではなく `event.key` を使います。IME変換中・AltGraph・Deadキーはxtermへ委ね、keydownだけで送信してkeypress / keyupの重複を防ぎます。受信側CLIの対応によって解釈は異なります。`node --test frontend_ide/checks/term-keyboard.test.mjs frontend_ide/checks/term-size.test.mjs` と `node frontend_ide/scripts/check-term-keyboard.mjs` で、英字・記号・複合修飾、コピー、日本語の通常貼り付けとbracketed paste、IME、二重送信を確認します。実ブラウザー検証は専用プロファイルと模擬WebSocketを使い、コマンドを実行しません。
 
 Termの入力前はCodeと同じ `開始表示.vue` とアイコンを使い、実PTYの入力欄を下部へ小さく配置します。xtermの `onKey` とDOMの `input` / `paste` で初回操作を検出し、同じ端末要素を拡張・再fitします。シェルや端末を作り直さず、初回の文字・日本語IME・貼り付けを失わないようにしてください。シェルが自動送信する制御応答を入力開始と誤認しないよう、`onData` だけで判定しません。再起動時は初期表示へ戻し、タブ切替では表示状態を保持します。
 
@@ -522,7 +524,7 @@ Web別窓はOS背景の透明化を保証できず、ブラウザーが最小窓
 
 一時プロジェクトと隔離Chromeを使い、最終更新の通知データだけを試験用に指定します。CSSアニメーションを25%／75%などの途中時刻で固定し、斜線の座標・旧ページの切り抜き・設定時間を比較して撮影します。設定時間800ms／650msは実機のフレームレート測定とは区別してください。経由ページにも `folder-page-sheet` が付くため、旧ページの検査には `[data-page-layer="outgoing"]` を使います。
 
-画像・結果・ハッシュは `images/セルフテスト,aidiy_ide,操作編/` に `<実施ID>-ide-2d-motion__ide-操作_6nn_…画面.png` として保存します。記録先は `セルフテスト,aidiy_ide,操作編.md` の6-3です。関連確認は `node --test frontend_ide/checks/folder-pages.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/space-mode.test.mjs` です。
+画像・結果・ハッシュは `images/セルフテスト,aidiy_ide,操作編/` に `<実施ID>-ide-2d-motion__ide-操作_5nn_…画面.png` として保存します。記録先は `セルフテスト,aidiy_ide,操作編.md` の5章です。関連確認は `node --test frontend_ide/checks/folder-pages.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/space-mode.test.mjs` です。
 
 ## 横画面のビューアとVR操作領域の余白
 
@@ -530,7 +532,7 @@ Web別窓はOS背景の透明化を保証できず、ブラウザーが最小窓
 
 VR中は `--vr-viewer-top:192px`・`--vr-viewer-bottom:48px` を確保し、最大720pxの高さを画面内へ収めます。右上の復帰・部品起動メニューの縦並びを避け、ビューアと比較に同じ制限を使います。横位置は中心星の128px右を基本に、画面右端の16px余白へ収めます。
 
-`AIDIY_ALL_VIEWER_ONLY=1` を指定した `scripts/check-all-displays.mjs` は、実Electronで通常横画面の3サイズ・比較・VR移行と復帰を確認します。通常表示でのExplorerとの上下端の一致、上部操作との矩形交差、VRの上下の余白、単一ビューア、ピン留め・子窓の寿命を検証し、画像と `viewer-result.json` を保存します。設定方法は上のVR閲覧の項、正式な実施記録は `セルフテスト,aidiy_ide,操作編.md` の2-1を参照してください。
+`AIDIY_ALL_VIEWER_ONLY=1` を指定した `scripts/check-all-displays.mjs` は、実Electronで通常横画面の3サイズ・比較・VR移行と復帰を確認します。通常表示でのExplorerとの上下端の一致、上部操作との矩形交差、VRの上下の余白、単一ビューア、ピン留め・子窓の寿命を検証し、画像と `viewer-result.json` を保存します。設定方法は上のVR閲覧の項、正式な実施記録は `セルフテスト,aidiy_ide,操作編.md` の3章・6章を参照してください。
 
 ## 閉じる印の大きさと太さ
 
@@ -556,3 +558,12 @@ VR中は `--vr-viewer-top:192px`・`--vr-viewer-bottom:48px` を確保し、最�
 確認は `node --test frontend_ide/checks/vr-panel-stacking.test.mjs frontend_ide/checks/window-pin.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/all-displays.test.mjs frontend_ide/checks/code-window-title.test.mjs frontend_ide/checks/project-instance.test.mjs frontend_ide/checks/vr-panel-placement.test.mjs`。`checks/vr-panel-stacking-desktop.cjs` は実Electron APIのスモークテストです。headlessでの合格はWindows実デスクトップの重なり順の保証ではありません。
 
 Windows実機では、すでに開いた両パネルでVRへ切り替え、本体を繰り返し選択、最小化・復元、画面構成変更、VR中のパネル再作成、VR解除を確認します。本体への入力が維持され、両パネルが本体に隠れず、通常表示では従来の選択順へ戻ることを撮影して確認してください。OSの保護画面・他アプリの特殊な最前面窓・Waylandの制約まで超える絶対的な最前面保証ではありません。今回の制御は直接読み込むmain側CJSなので、これだけの変更でVue配布bundleを再生成する必要はありません。
+
+
+### VR中のピンと前面維持の確認
+
+画面内に埋め込まれたExplorer・軌跡・Viewerの📌はOFF表示、切り離した窓はON表示にします。VR中は新しく開いた子窓も共通ピン制御でON固定にし、VR解除後は元の利用者選択へ戻します。
+
+`デスクトップ/VRパネル前面.cjs` は同じIDEに属するピンON子窓を本体より前へ配置します。Windowsでは選択済み本体の再前面化でfocus通知が出ないため、WM_WINDOWPOSCHANGEDも監視し、OS処理後に一度だけ補正します。フォーカス奪取、OS親子化、上位topmost層、周期的な再固定は使いません。
+
+確認では本体を続けて2回選ぶ操作、別アプリへの切替、VR開始後のViewer・Code・Live・Term追加を含めます。`checks/vr-panel-stacking-desktop.cjs` を実Electronで起動し、WindowsのZ順とWS_EX_TOPMOSTを照合します。headlessのAPI成功だけで前面維持の合格にしません。全画面では本体をずらして裏を探せないため、パネルが見え続け、直接選択・移動できることを実画面でも確認します。

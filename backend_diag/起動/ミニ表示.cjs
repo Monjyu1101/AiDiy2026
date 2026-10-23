@@ -1,4 +1,5 @@
 'use strict';
+const {setWindowBounds}=require('../../frontend_ide/デスクトップ/全画面横断.cjs');
 
 const ミニ幅=384,初期ミニ高さ=134,最小ミニ高さ=80,最大ミニ高さ=360,ミニの余白=8;
 const ミニ高さは有効=height=>Number.isInteger(height)&&height>=最小ミニ高さ&&height<=最大ミニ高さ;
@@ -23,14 +24,14 @@ function ミニ表示を作成(window,{screen}={}){
     window.setMaximizable(false);
     // 初期ミニは作業領域の左上角から数px内側に置く。
     const area=topLeft?screen.getPrimaryDisplay().workArea:null;
-    window.setBounds({...original.bounds,x:origin.x,y:origin.y,...(area?{x:area.x+ミニの余白,y:area.y+ミニの余白}:{}),width:ミニ幅,height:初期ミニ高さ});
+    setWindowBounds(window,{...original.bounds,x:origin.x,y:origin.y,...(area?{x:area.x+ミニの余白,y:area.y+ミニの余白}:{}),width:ミニ幅,height:初期ミニ高さ});
    }else{
     const saved=original;original=undefined;
     window.setMinimumSize(...saved.minimum);
     window.setMaximizable(saved.maximizable);
     // 最前面は共通ピンの所有。ミニ中の変更を通常表示へ戻しても保持する。
     // 自動最大化で左肩を画面原点へ戻さず、通常寸法を現在位置から広げる。
-    window.setBounds({...saved.bounds,x:origin.x,y:origin.y});
+    setWindowBounds(window,{...saved.bounds,x:origin.x,y:origin.y});
    }
    return true;
   },
@@ -40,7 +41,7 @@ function ミニ表示を作成(window,{screen}={}){
    if(bounds.width===ミニ幅&&bounds.height===height)return true;
    // 縮小時は以前の最小高さに阻まれない順序にし、拡大時も現在の位置を保つ。
    window.setMinimumSize(ミニ幅,height);
-   window.setBounds({...bounds,width:ミニ幅,height});
+   setWindowBounds(window,{...bounds,width:ミニ幅,height});
    return true;
   },
  };

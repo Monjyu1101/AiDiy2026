@@ -144,6 +144,8 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   return {受理:true};
  }
  async function logSnapshot(id,cursor=0){await load();targetFor(id);if(!Number.isSafeInteger(cursor)||cursor<0)throw failure('ログ位置が不正です。');const value=logs.get(id)||{text:'',offset:0},end=value.offset+value.text.length;return {対象:id,ログ:value.text.slice(Math.max(0,Math.min(cursor,end)-value.offset)),位置:end,切替:cursor<value.offset||cursor>end};}
+ // 画面の通知欄へ出す。起動・停止の処理中は、その進捗表示を優先する。
+ function notify(text){if(!busy&&!stopping)operation=String(text);}
  async function close(){closed=true;await Promise.allSettled([...sessions.keys()].map(stop));await work;}
- return {snapshot,save,restart,stop,forceStopAll,logSnapshot,close,settled:()=>work};
+ return {snapshot,save,restart,stop,forceStopAll,logSnapshot,notify,close,settled:()=>work};
 }

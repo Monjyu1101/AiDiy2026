@@ -15,7 +15,7 @@
 全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live / Term / IDE の単独実行と tools の MCP 接続プロセスも強制終了・確認します。
 setup / start の Code / IDE 継続方針とは異なります。ルート固有の
-処理（全階層の temp / _temp / .temp / test / _test / .test とルート .backup_local の削除、グローバル npm ツールの
+処理（全階層の temp / _temp / .temp / tmp / test / _test / .test とルート .backup_local の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -70,12 +70,12 @@ BACKEND_HERMES_PATH = "command_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
 BACKUP_PATH = ".backup_local"
-TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp"))
+TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp", "tmp"))
 # 試験用の作業フォルダ。正式なテスト（tests/ など）は名前が違うため対象外。
 TEST_DIR_NAMES = frozenset(("test", "_test", ".test"))
 # test は依存パッケージ内で正規の構成要素にもなるため、この配下では test 系を削除しない。
 DEPENDENCY_DIR_NAMES = frozenset(("node_modules", ".venv", "venv", "site-packages"))
-TEMP_TARGET_LABEL = "temp / _temp / .temp / test / _test / .test"
+TEMP_TARGET_LABEL = "temp / _temp / .temp / tmp / test / _test / .test"
 CLEANUP_STOP_REQUEST_PATH = BASE_DIR / ".cleanup_stop_request.json"
 
 DATABASE_TYPE = "sqlite"

@@ -203,7 +203,7 @@ try {
   assert.match(await evaluate(`document.querySelector('.ai-search-panel').textContent`),/エージェントを実行/);
   await capture('nn-ai-search-timeout.png');
   writeFileSync(join(project,outputFor(second)),JSON.stringify(dataFor(second)));
-  await evaluate(`[...document.querySelectorAll('.ai-search-panel button')].find(b=>b.textContent==='結果を再確認').click()`);
+  await evaluate(`[...document.querySelectorAll('.ai-search-panel button')].find(b=>b.title==='AiDiy検索の結果を再確認').click()`);
   await until(`document.querySelector('.ai-search-panel').textContent.includes('2件の関連ファイル')`,'遅れた結果の再確認');
   // 続けて依頼し、古い結果が新しい依頼へ混ざらないことを確認する。
   await submit('古い検索');const third=await waitRequest(3);

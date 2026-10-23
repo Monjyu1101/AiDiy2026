@@ -420,7 +420,7 @@ class ImageGeneration:
         try:
             proc = subprocess.run(
                 command,
-                cwd=str(cwd),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), cwd=str(cwd),
                 env=os.environ.copy(),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
@@ -564,7 +564,7 @@ class ImageGeneration:
         try:
             proc = subprocess.run(
                 command,
-                cwd=str(cwd),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), cwd=str(cwd),
                 env=os.environ.copy(),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,

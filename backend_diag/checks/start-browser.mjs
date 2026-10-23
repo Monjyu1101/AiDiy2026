@@ -47,7 +47,7 @@ try{
  let seq=0;const pending=new Map(),errors=[];
  ws.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){pending.get(message.id)?.(message);pending.delete(message.id);}if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.text);});
  const send=(method,params={})=>new Promise(resolve=>{pending.set(++seq,resolve);ws.send(JSON.stringify({id:seq,method,params}));});
- async function evaluate(expression){const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.equal(response.result?.exceptionDetails,undefined,JSON.stringify(response));return response.result.result.value;}
+ async function evaluate(expression){const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.equal(response.result?.exceptionDetails,undefined,expression+JSON.stringify(response));return response.result.result.value;}
  async function until(expression){for(let i=0;i<140;i++){if(await evaluate(expression))return;await sleep(50);}assert.fail(expression);}
  const click=text=>evaluate(`[...document.querySelectorAll('button')].find(button=>(button.textContent.trim()===${JSON.stringify(text)}||button.getAttribute('aria-label')===${JSON.stringify(text)})).click()`);
  async function capture(name){const response=await send('Page.captureScreenshot',{format:'png'});writeFileSync(join(output,name+'.png'),Buffer.from(response.result.data,'base64'));}
@@ -115,7 +115,7 @@ try{
  await capture('start-desktop');
  const desktop=await evaluate(`(()=>{const consoleView=document.querySelector('.start-console');return {page:document.documentElement.scrollHeight>innerHeight,height:consoleView.clientHeight,overflow:getComputedStyle(consoleView).overflowY}})()`);
  assert.equal(desktop.page,false);assert.ok(desktop.height>200,JSON.stringify(desktop));assert.equal(desktop.overflow,'auto');
- await click('ミニ表示');await until(`document.querySelector('.start-mini')`);
+ await click('ランチャー表示');await until(`document.querySelector('.start-mini')`);
  await send('Emulation.setDeviceMetricsOverride',{width:384,height:248,deviceScaleFactor:1,mobile:false});await sleep(100);await capture('start-mini');
  assert.equal(await evaluate(`document.querySelectorAll('.mini-service').length`),6);
  assert.equal(await evaluate(`document.querySelector('nav.tabs').getClientRects().length`),0);
@@ -135,7 +135,7 @@ try{
  await until(`!document.querySelector('.start-mini')&&document.querySelector('.start-console-heading strong').textContent==='Core コンソール'`);
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  assert.deepEqual(calls,['local','tools','core','apps','taskteam','web'],'表示切替は起動・停止しない');assert.ok(children.every(child=>!child.closed));
- await click('ミニ表示');await until(`document.querySelector('.start-mini')`);await click('通常表示');await until(`!document.querySelector('.start-mini')`);
+ await click('ランチャー表示');await until(`document.querySelector('.start-mini')`);await click('元のサイズに戻す');await until(`!document.querySelector('.start-mini')`);
  await click('導入状況');assert.equal(await evaluate(`document.querySelectorAll('.start-mini-switch').length`),0);await click('システム起動');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);
  await until(`document.querySelector('.start-console-heading strong').textContent==='Local コンソール'`);

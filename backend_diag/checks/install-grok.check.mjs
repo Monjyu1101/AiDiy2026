@@ -9,6 +9,7 @@ import {officialIdentity} from '../導入管理/antigravity.mjs';
 import {NPM_PACKAGES,npmCapability} from '../導入管理/導入管理.mjs';
 
 const xai='OID.1.3.6.1.4.1.311.60.2.1.3=US, OID.2.5.4.15=Private Organization, CN=X.AI LLC, SERIALNUMBER=NV20243235882, O=X.AI LLC, L=Palo Alto, S=California, C=US';
+const xcorp='CN=X Corp., O=X Corp., L=Bastrop, S=Texas, C=US';
 const google='CN=Google LLC, O=Google LLC, L=Mountain View, S=California, C=US';
 
 test('Grok は公式 URL・固定ハッシュ・~/.grok/bin の固定ファイルだけを扱う',()=>{
@@ -16,9 +17,9 @@ test('Grok は公式 URL・固定ハッシュ・~/.grok/bin の固定ファイ�
   assert.deepEqual(GROK_FILES,['grok.exe','agent.exe','grove.exe','grove-fsmonitor.exe','grove-credential.exe']);assert.equal(Object.isFrozen(GROK_FILES),true);
 });
 
-test('Grok の署名は有効な X.AI の署名者だけを公式と判定する',()=>{
-  assert.equal(officialSigner({status:'Valid',subject:xai}),true);
-  for(const info of [null,{status:'NotSigned',subject:xai},{status:'HashMismatch',subject:xai},{status:'Valid',subject:'CN=X.AI LLC Fake, O=Other'},{status:'Valid',subject:'CN=Example, O=X.AI LLC'},{status:'Valid',subject:google}])assert.equal(officialSigner(info),false);
+test('Grok の署名は有効な X.AI / X Corp. の署名者だけを公式と判定する',()=>{
+  assert.equal(officialSigner({status:'Valid',subject:xai}),true);assert.equal(officialSigner({status:'Valid',subject:xcorp}),true);
+  for(const info of [null,{status:'NotSigned',subject:xai},{status:'NotSigned',subject:xcorp},{status:'Valid',subject:'CN=X Corp. Fake, O=Other'},{status:'Valid',subject:'CN=X Corp, O=X Corp.'},{status:'Valid',subject:'CN=Example, O=X Corp.'},{status:'HashMismatch',subject:xai},{status:'Valid',subject:'CN=X.AI LLC Fake, O=Other'},{status:'Valid',subject:'CN=Example, O=X.AI LLC'},{status:'Valid',subject:google}])assert.equal(officialSigner(info),false);
 });
 
 test('Antigravity は製品情報が空でも有効な Google 署名なら公式、値がある場合は一致を求める',()=>{

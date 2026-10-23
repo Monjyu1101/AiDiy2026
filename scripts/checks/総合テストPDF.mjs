@@ -33,7 +33,13 @@ try{
    for(const image of document.images)image.src=new URL(image.getAttribute('src'),document.baseURI).href;
    for(const a of document.querySelectorAll('a'))a.href=new URL(a.getAttribute('href'),document.baseURI).href;
    for(const d of document.querySelectorAll('details'))d.open=true;
-   for(const t of document.querySelectorAll('table'))if(t.rows.length<=10)t.classList.add('small-table');
+   for(const t of document.querySelectorAll('table')){
+    if(t.rows.length<=10)t.classList.add('small-table');
+    // ケースIDが「10 / 1」のように折り返されない幅を確保する。
+    if(t.rows[0]?.cells[0]?.textContent.trim()==='ID')for(const row of t.rows){
+     row.cells[0].style.whiteSpace='nowrap';row.cells[0].style.minWidth='10mm';
+    }
+   }
    const title=document.querySelector('h1');if(title)title.innerHTML=title.innerHTML.replace(' — ','<br>');
    for(const p of [...document.querySelectorAll('p')])if(p.children.length===1&&p.firstElementChild.tagName==='IMG'){
     const f=document.createElement('figure');const previous=p.previousElementSibling;

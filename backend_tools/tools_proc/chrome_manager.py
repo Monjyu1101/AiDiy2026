@@ -193,7 +193,7 @@ class ChromeManager:
         try:
             subprocess.Popen(
                 [chrome_path, f"--user-data-dir={self.profile_dir}", url],
-                stdout=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             return True
@@ -206,7 +206,7 @@ class ChromeManager:
         try:
             result = subprocess.run(
                 ["netstat", "-ano"],
-                capture_output=True, text=True, timeout=5,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), capture_output=True, text=True, timeout=5,
             )
             pid = None
             for line in result.stdout.splitlines():
@@ -218,7 +218,7 @@ class ChromeManager:
             if pid:
                 subprocess.run(
                     ["taskkill", "/PID", str(pid), "/F"],
-                    capture_output=True, timeout=5,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), capture_output=True, timeout=5,
                 )
                 logger.info(f"Chrome プロセス (PID={pid}, port={self.debug_port}) を停止しました")
                 time.sleep(1.5)
@@ -323,7 +323,7 @@ class ChromeManager:
         logger.info(f"起動: {chrome_path}")
         self._process = subprocess.Popen(
             args,
-            stdout=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 

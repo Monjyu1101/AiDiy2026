@@ -30,17 +30,17 @@ try {
   async function shot(name) { const result = await send('Page.captureScreenshot', { format: 'png' }); const path = join(dir, `${stamp}_${++number}_${name}.png`); writeFileSync(path, Buffer.from(result.result.data, 'base64')); console.log(path); }
   await send('Runtime.enable'); await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: app.url }); await until(`document.body.textContent.includes('オフライン利用')`); await evaluate(button('オフライン利用'));
-  await until(`!!document.querySelector('.ai-panel-toggle')`); await evaluate(`document.querySelector('.ai-panel-toggle').click()`);
+  await until(`Array.from(document.querySelectorAll('.ai-launchers button')).some(b=>b.textContent==='Term')`); await evaluate(button('Term'));
   await until(`!!document.querySelector('[role=tab]')`); await evaluate(button('Term'));
   await until(`document.querySelector('.term-component')?.textContent.includes('実行中')`);
   await until(`document.querySelector('.xterm-rows')?.textContent.includes('PS ')`);
   await until(`document.querySelector('.term-welcome img')?.naturalWidth>0`);
   assert.equal(await evaluate(`document.querySelector('.term-component [role=switch]').getAttribute('aria-checked')`), 'true');
-  await evaluate(button('tools接続確認'));
+  await evaluate(button('Tools接続確認'));
   await until(`document.querySelector('.term-component [role=switch]').getAttribute('aria-checked')==='false' && !!document.querySelector('.term-component .connection-bar.offline')`);
   assert.equal(await evaluate(`!!document.querySelector('.term-welcome')`), true);
   await shot('web-term-tools-off');
-  await evaluate(button('tools接続確認'));
+  await evaluate(button('Tools接続確認'));
   await until(`document.querySelector('.term-component [role=switch]').getAttribute('aria-checked')==='true' && !document.querySelector('.term-component .connection-bar.offline')`);
   assert.equal(await evaluate(`(()=>{const t=document.querySelector('.term-component').getBoundingClientRect(),s=document.querySelector('.term-screen').getBoundingClientRect();return s.top>t.top+t.height*0.65&&s.height<100})()`), true);
   // 文字送りの表示完了時点を撮影し、初期メッセージ全体を確認する。

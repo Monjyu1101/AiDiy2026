@@ -309,3 +309,9 @@
 
 /* 本体内の別窓起動ピンだけを本文サイズから独立させる。別窓・タイトルバーには適用しない。 */
 .space-view .explorer-panel header .explorer-detach,.space-view .explorer-routes .route-detach,.space-view .viewer-popup header .viewer-pin{font-size:14px;line-height:14px}
+
+/* 画面内はOFF、切り離し後はON。独立窓の最前面ピンと同じ色・沈み込みで示す。 */
+.panel-detach-pin{color:#748091;background:#06080c;box-shadow:inset 0 1px 4px #000c,inset 0 -1px 0 #ffffff0a}
+.panel-detach-pin span{display:inline-block;filter:grayscale(1);opacity:.55;transform:translateY(1px)}
+.panel-detach-pin.pin-active{color:#a7f6ff;background:#12343d;box-shadow:inset 0 0 0 1px #5bafb8,0 0 5px #55e8ff24}
+.panel-detach-pin.pin-active span{filter:none;opacity:1;transform:none}

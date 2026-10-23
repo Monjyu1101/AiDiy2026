@@ -5,9 +5,10 @@ const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs
 const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
 const {マイクロ表示を作成,閉じた幅}=require('./マイクロ表示.cjs');
 const {画面サイズ演出を作成}=require('./サイズ切替.cjs');
+const {通常窓サイズを作成}=require('./通常窓サイズ.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
-const {createWindowPins}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
+const {createWindowPins,pinLevel}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
 const {起動状態を読む,終了確認を作成}=require('./終了確認.cjs');
 const {アプリ名,Macメニューを設定}=require('./MacOS-Menu.cjs');
 if(process.platform==='darwin')app.setName(アプリ名);
@@ -51,8 +52,8 @@ async function start(value) {
   attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
-  const sizeEffect=画面サイズ演出を作成(BrowserWindow,window,{topmostLevel:()=>micro.active&&process.platform==='win32'?'pop-up-menu':'floating'});
-  const sizingWindow=sizeEffect.window||window;
+  const sizeEffect=画面サイズ演出を作成(BrowserWindow,window,{topmostLevel:()=>micro.active&&process.platform==='win32'?'pop-up-menu':pinLevel});
+  const sizingWindow=通常窓サイズを作成(sizeEffect.window||window,screen);
   const mini=ミニ表示を作成(sizingWindow,{screen});
   const micro=マイクロ表示を作成(sizingWindow,{screen,pins:{setLocked:(_target,value)=>pins.setLocked(window,value),state:()=>pins.state(window)}});
   window.once('closed',()=>sizeEffect.中止());
@@ -119,13 +120,13 @@ async function start(value) {
       if((opening||sizeEffect.preparing)&&mini.active){if(!ミニ高さは有効(value))return false;pendingMiniHeight=value;return true;}
       const accepted=mini.resize(value);if(accepted)pendingMiniHeight=undefined;return accepted;
     }
-    if(action==='isMaximized')return window.isMaximized();
+    if(action==='isMaximized')return sizingWindow.isMaximized();
     if(action==='getPinState')return pins.state(window);
     if(action==='togglePin')return pins.toggle(window);
     if(action==='minimize')window.minimize();
     else if(action==='maximize'&&!mini.active&&!micro.active){
       if(sizeEffect.active)return false;
-      const maximized=window.isMaximized(),target=maximized?window.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
+      const maximized=sizingWindow.isMaximized(),target=maximized?sizingWindow.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
       return sizeEffect.準備(target).then(async ready=>{if(!ready||window.isDestroyed())return false;if(maximized)sizingWindow.unmaximize();else sizingWindow.maximize();return sizeEffect.完了();});
     }
     else if(action==='close')window.close();

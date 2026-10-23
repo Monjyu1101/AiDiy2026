@@ -17,7 +17,8 @@ test('Avatar開発用ラッパーも実子プロセスにコンソールを作�
  fakeRequire.resolve=()=> 'fixture';
  let done;const ended=new Promise(r=>done=r);
  const fakeProcess={execPath:process.execPath,argv:['node',file],env:process.env,stdout:{write:s=>output+=s},stderr:{write:s=>output+=s},exit:done,kill:()=>assert.fail('unexpected signal'),pid:process.pid};
- vm.runInNewContext(readFileSync(file,'utf8'),{require:fakeRequire,process:fakeProcess});
+ const fixtureModule={exports:{}};fakeRequire.main=fixtureModule;
+ vm.runInNewContext(readFileSync(file,'utf8'),{require:fakeRequire,process:fakeProcess,module:fixtureModule});
  assert.equal(await ended,0);assert.equal(output.trim(),'0');assert.ok(child.pid);
 });
 

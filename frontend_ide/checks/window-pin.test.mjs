@@ -25,7 +25,7 @@ test('通常起動OFF、IDE由来ON、登録は一度だけで明示選択を消
  const changed=[],pins=createWindowPins({onChanged:(_window,state)=>changed.push(state)});
  const normal=windowFixture(),child=windowFixture();
  assert.deepEqual(pins.register(normal),{pinned:false,locked:false});assert.equal(normal.top,false);
- assert.deepEqual(pins.register(child,{pinned:true}),{pinned:true,locked:false});assert.equal(child.top,true);assert.equal(child.level,'floating');
+ assert.deepEqual(pins.register(child,{pinned:true}),{pinned:true,locked:false});assert.equal(child.top,true);assert.equal(child.level,process.platform==='win32'?'normal':'floating');
  pins.toggle(child);pins.register(child,{pinned:true});assert.equal(child.top,false);
  assert.equal(child.listenerCount('focus'),1);assert.equal(changed.length,3);
 });

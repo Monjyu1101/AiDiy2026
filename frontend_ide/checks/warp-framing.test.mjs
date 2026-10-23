@@ -54,7 +54,7 @@ function space(t,{width=1280,height=800,offset=false}={}){
   })){
     old.set(key,Object.getOwnPropertyDescriptor(globalThis,key));Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});
   }
-  t.mock.method(performance,'now',()=>clock);t.mock.method(Date,'now',()=>1000000+clock);
+  t.mock.method(performance,'now',()=>clock);t.mock.method(Date,'now',()=>Date.UTC(2026,9,23,3)+clock);
   const engine=createSpace(canvas,{tooltip:{style:{},querySelector:()=>({})}},{layout:()=>({centerX:width*(offset?.3:.5),centerY:height*(offset?.3:.5)})});
   engine.setAutoSpin(false);
   const pump=async(ms=16)=>{
@@ -88,7 +88,7 @@ for(const [width,height] of viewports)for(const offset of [false,true])test(`帰
     near(scale,2);assert.ok(fraction*scale<=.506,`ワープ最大幅比=${fraction*scale}`);
     // 中心球は外周中心線の35%、淡いDISKの透明な外縁は中心線の2.4倍。主要な外周と混同しない。
     assert.ok(h.arcs.some(([, ,r,start,end])=>Math.abs(r*2-diameter/1.035*.35)<1e-8&&end-start===Math.PI*2));
-    const halo=h.draws.find(draw=>draw.image===h.sprites[11]&&Math.abs(draw.width-diameter/1.035*2.4)<1e-8);
+    const halo=h.draws.find(draw=>h.sprites.includes(draw.image)&&Math.abs(draw.width-diameter/1.035*2.4)<1e-8);
     assert.ok(halo);assert.ok(halo.alpha<=.64+1e-10);
     const camera={...h.engine.cam};for(let n=0;n<8;n++)await h.pump(100);
     assert.deepEqual(h.engine.cam,camera,'フェード中に追加で接近しない');

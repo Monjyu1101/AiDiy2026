@@ -188,7 +188,7 @@ app.on('browser-window-created',(_,owner)=>{
     writeFileSync(shot,(await owner.webContents.capturePage({x:0,y:0,width:1000,height:80},{stayHidden:true,stayAwake:true})).toPNG());
     const roundTrips=[];
     for(let i=0;i<5;i++){
-     await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
+     await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
      await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'VR復帰');assert.deepEqual(owner.getBounds(),original,'VR往復で通常窓の位置・寸法を完全に維持');await checkBarsClosed();
      roundTrips.push(owner.getBounds());
      if(i<4){await evaluate(owner,`document.querySelector('.window-all').click()`);await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-transition')`),'VR再移行');near(owner.getBounds(),expected);}
@@ -265,7 +265,7 @@ app.on('browser-window-created',(_,owner)=>{
     await checkViewerSpacing('.viewer-popup',false);await spacingShot('restored-viewer-spacing');
     await evaluate(owner,`document.querySelector('.window-all').click()`);
     await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-transition')`),'再表示後のALL再開始');
-    await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
+    await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
     await checkBarsClosed();
     const result={testPassed:true,scope:'ALL inline viewer',displayCount:displays.length,autoPinned:['explorer','routes'],barCloseHiddenInAll:true,barsClosedOnExit:true,barsReopened:true,repeatedExit:true,viewerClosePreserved:true,inlineComparison:true,reuseSingleViewer:true,manualPin:true,viewerSpacingChecks,viewerSpacingShots,shots};
     writeFileSync(join(output,'viewer-result.json'),JSON.stringify(result,null,2));process.send?.(result);app.exit(0);return;
@@ -283,7 +283,7 @@ app.on('browser-window-created',(_,owner)=>{
    const hoverShot=join(output,`${stamp}_hover.png`);writeFileSync(hoverShot,(await owner.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
    owner.webContents.sendInputEvent({type:'mouseMove',x:400,y:400});await owner.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});await until(()=>evaluate(owner,`getComputedStyle(document.querySelector('.all-restore-button')).opacity==='0'`),'右上から離れると非表示');
    await evaluate(owner,`document.querySelector('.all-restore-button').focus()`);await until(()=>evaluate(owner,`getComputedStyle(document.querySelector('.all-restore-button')).opacity==='1'`),'キーボード復帰');
-   await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
+   await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);
    await until(()=>evaluate(owner,`document.querySelector('.window-all').getAttribute('aria-pressed')==='false'`),'ALL解除');near(owner.getBounds(),original);await checkBarsClosed();
    assert.ok(await evaluate(owner,`document.querySelector('.ide-heading').getBoundingClientRect().height>0&&!document.querySelector('.all-restore-zone')`));
    await headingShot('3d-all');
@@ -296,11 +296,11 @@ app.on('browser-window-created',(_,owner)=>{
    for(const child of children)assert.equal(child.isDestroyed(),true,'ALL解除で両方の別窓を終了');
    await evaluate(owner,`document.querySelector('.window-all').click()`);await until(()=>evaluate(owner,`document.querySelector('.window-all').getAttribute('aria-pressed')==='true'`),'ALL再開始');
    assert.equal(BrowserWindow.getAllWindows().filter(w=>w===owner||w.webContents.getURL()==='about:blank').length,3);
-   await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'再解除');
+   await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'再解除');
    owner.maximize();await until(()=>owner.isMaximized(),'通常最大化');
    await evaluate(owner,`document.querySelector('.window-all').click()`);await until(()=>evaluate(owner,`document.querySelector('.window-all').getAttribute('aria-pressed')==='true'`),'最大化からALL');
    near(owner.getBounds(),expected);assert.equal(owner.isMaximized(),false);
-   await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>owner.isMaximized(),'元の最大化へ復帰');
+   await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>owner.isMaximized(),'元の最大化へ復帰');
    owner.unmaximize();await sleep(300);near(owner.getBounds(),original);
    await checkBarsClosed();
    await until(()=>evaluate(owner,`originalExplorer.ownerDocument===document&&getComputedStyle(originalExplorer).display==='none'&&originalRoutes.ownerDocument===document&&getComputedStyle(originalRoutes).display==='none'`),'エクスプローラーと軌跡を閉じる');
@@ -311,7 +311,7 @@ app.on('browser-window-created',(_,owner)=>{
    assertPinOrder(reopened);
    const {shots:inlineShots,pinned:newViewer}=await checkInlineViewer();
    const viewerBounds=newViewer.getBounds(),newPanelShot=inlineShots.at(-1);
-   await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'最終復帰');near(owner.getBounds(),original);
+   await until(()=>evaluate(owner,`!!document.querySelector('.all-restore-button')&&!document.querySelector('.all-restore-button').disabled`),'VR移行完了後の復帰操作');await evaluate(owner,`document.querySelector('.all-restore-button').click()`);await until(()=>evaluate(owner,`!document.querySelector('.all-restore-button')`),'最終復帰');near(owner.getBounds(),original);
    near(newViewer.getBounds(),viewerBounds);assert.equal(newViewer.getParentWindow(),null);
    // preloadのない通常Web環境でも同じ実画面を読み、--browserの表示条件を確認する。
    await checkWeb();

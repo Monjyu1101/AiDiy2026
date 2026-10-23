@@ -193,7 +193,7 @@ class TextToSpeech:
         try:
             proc = subprocess.run(
                 [resolved, "-version"],
-                stdout=subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 timeout=10,
                 check=False,
@@ -585,7 +585,7 @@ class TextToSpeech:
                         "-y", "-loglevel", "error",
                         out_path,
                     ],
-                    timeout=30,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=30,
                     check=False,
                 )
                 if result.returncode == 0 and os.path.getsize(out_path) > 0:
@@ -659,7 +659,7 @@ class TextToSpeech:
                 "-y", "-loglevel", "error",
                 output_path,
             ]
-            result = subprocess.run(command, timeout=120, check=False)
+            result = subprocess.run(command, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120, check=False)
             if result.returncode != 0 or not os.path.isfile(output_path):
                 raise TextToSpeechError("ffmpeg による音声と無音の連結に失敗しました")
             with open(output_path, "rb") as f:
@@ -1026,7 +1026,7 @@ class TextToSpeech:
         try:
             subprocess.run(
                 [self.ffmpeg_path, "-i", wav_path, "-y", "-loglevel", "error", mp3_path],
-                check=True, timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=True, timeout=30,
             )
             if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
                 with open(mp3_path, "rb") as f:
@@ -1081,7 +1081,7 @@ class TextToSpeech:
             result = subprocess.run(
                 [self.ffmpeg_path, "-i", in_path, "-af", f"atempo={ratio}",
                  "-y", "-loglevel", "error", out_path],
-                timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=30,
             )
             if result.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 0:
                 with open(out_path, "rb") as f:
@@ -1111,7 +1111,7 @@ class TextToSpeech:
         try:
             result = subprocess.run(
                 [self.ffmpeg_path, "-i", in_path, "-y", "-loglevel", "error", out_path],
-                timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=30,
             )
             if result.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 0:
                 with open(out_path, "rb") as f:
@@ -1167,10 +1167,10 @@ class TextToSpeech:
             ctypes.windll.winmm.mciSendStringW(
                 'close _tts', None, 0, None)
         elif pf == "Darwin":
-            subprocess.run(["afplay", path], timeout=120)
+            subprocess.run(["afplay", path], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=120)
         else:
             subprocess.run(["gst-launch-1.0", "playbin", f"uri=file://{path}"],
-                           timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # ------------------------------------------------------------------ #
     # 出力

@@ -12,6 +12,8 @@ test('default Node runtime starts without Python on PATH and serves anonymous mo
   const diag=path.join(root,'backend_diag');
   await cp(new URL('../',import.meta.url),diag,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
   await cp(new URL('../../frontend_ide/src/共通表示/シアンバー.css',import.meta.url),path.join(root,'frontend_ide/src/共通表示/シアンバー.css'));
+  await cp(new URL('../../scripts/opencode-npm.mjs',import.meta.url),path.join(root,'scripts/opencode-npm.mjs'));
+  await cp(new URL('../../_icons/AiDiy.png',import.meta.url),path.join(root,'_icons/AiDiy.png'));
   await mkdir(path.join(root,'_config'));await writeFile(path.join(root,'_config/AiDiy_key.json'),JSON.stringify({gemini_key_id:'synthetic-gemini-key'}));
   await mkdir(path.join(root,'empty-path'));
   // Keep production startup/cache/runner/catalog. Replace HTTPS transport alone, not model behavior.
@@ -40,6 +42,7 @@ test('actual headless entrypoint works with missing config and no credentials, u
   const diag=path.join(root,'backend_diag');
   await cp(new URL('../',import.meta.url),diag,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
   await mkdir(path.join(root,'home'));await mkdir(path.join(root,'empty-path'));
+  await cp(new URL('../../scripts/opencode-npm.mjs',import.meta.url),path.join(root,'scripts/opencode-npm.mjs'));
   // 本物の設定・OAuthを読ませない。通信は匿名公開一覧とloopbackのみ許容し、接続せず失敗させる。
   const preload=path.join(root,'offline.mjs');
   await writeFile(preload,`import https from 'node:https';import http from 'node:http';import net from 'node:net';import {EventEmitter} from 'node:events';

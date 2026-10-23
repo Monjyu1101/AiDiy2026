@@ -483,6 +483,11 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 
 def collect_startup_choices() -> tuple[bool, ...]:
     print_header("起動条件の確認")
+    print("診断")
+    diag_enabled          = prompt_choice("  Diag      : 開始しますか?", default_yes=True)
+    if diag_enabled:
+        # 起動指示は aidiy_diag の画面で行うため、後続の入力はすべて省く。
+        return (False,) * 6 + (True,) + (False,) * 5
     print("バックエンド")
     local_enabled         = prompt_choice("  local     : 起動しますか?", default_yes=STARTUP_DEFAULTS['local'])
     backend_tools_enabled = prompt_choice("  tools     : 起動しますか?", default_yes=STARTUP_DEFAULTS['tools'])
@@ -492,8 +497,7 @@ def collect_startup_choices() -> tuple[bool, ...]:
     web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=STARTUP_DEFAULTS['web'])
     avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=STARTUP_DEFAULTS['avatar'])
     print("フロントエンド(IDE)")
-    diag_enabled          = False  # 診断はTools起動直前にheadless実行する。
-    term_enabled          = prompt_choice("  Term      : 起動しますか?", default_yes=STARTUP_DEFAULTS['term'])
+    term_enabled         = prompt_choice("  Term      : 起動しますか?", default_yes=STARTUP_DEFAULTS['term'])
     code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=STARTUP_DEFAULTS['code'])
     live_enabled          = prompt_choice("  Live      : 起動しますか?", default_yes=STARTUP_DEFAULTS['live'])
     dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=STARTUP_DEFAULTS['ide'])
@@ -1027,6 +1031,25 @@ def monitor_and_restart(
         time.sleep(1)
 
 
+def launch_diag_gui() -> None:
+    """aidiy_diag --auto の画面を開いて終了する。設定起動とその後の操作は画面側で行う。"""
+    print_header("バックエンド(Diag) 起動")
+    ok, detail = DIAG.check_environment()
+    if not ok:
+        print_error(f"バックエンド(Diag): 未準備 ({detail})")
+        print_info("必要に応じて次を実行してください: python _setup.py")
+        sys.exit(1)
+    try:
+        DIAG.launch_gui()
+    except (OSError, RuntimeError) as exc:
+        print_error(str(exc))
+        sys.exit(1)
+    print_success("バックエンド(Diag): aidiy_diag --auto を起動しました")
+    print_info("保存済みの起動設定で設定起動します。進捗は aidiy_diag のシステム起動タブで確認してください")
+    print_info("5秒後に終了します")
+    time.sleep(5)
+
+
 def main() -> None:
     _init_modules()
 
@@ -1049,6 +1072,10 @@ def main() -> None:
     if stop_all_tasks("AiDiy プロセスの停止（Code / IDE は継続）") is False:
         print_error("既存プロセスを停止できないため、起動を中止します。")
         raise SystemExit(1)
+
+    if diag_enabled:
+        launch_diag_gui()
+        return
 
     is_ready, npm_command = validate_initial_environment(
         local_enabled=local_enabled,

@@ -67,7 +67,7 @@ function attachWindowMove(record,contents){
 const {createAllDisplays}=require('./デスクトップ/全画面横断.cjs');
 const {createVRPanelPlacement}=require('./デスクトップ/VRパネル配置.cjs');
 const {createVRPanelStacking}=require('./デスクトップ/VRパネル前面.cjs');
-const vrPanelStacking=createVRPanelStacking({windows,isActive:owner=>allDisplays.isActive(owner)});
+const vrPanelStacking=createVRPanelStacking({windows,isActive:owner=>allDisplays.isActive(owner),isPinned:record=>windowPins.state(record.window).pinned});
 const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
 const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{
  const locked=allDisplays.isActive(owner);

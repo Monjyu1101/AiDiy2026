@@ -209,7 +209,7 @@ class CodeAgents:
 
                 result = subprocess.run(
                     cmd,
-                    capture_output=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), capture_output=True,
                     timeout=_VERSION_CHECK_TIMEOUT,
                 )
                 stdout = (result.stdout or b"").decode("utf-8", errors="replace").strip()

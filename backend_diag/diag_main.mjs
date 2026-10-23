@@ -55,6 +55,7 @@ export function parseArgs(args) {
     const arg = args[i];
     if (arg === '--browser') {options.browser = true;continue;}
     if (arg === '--headless') {options.headless = true;continue;}
+    if (arg === '--auto') {options.auto = true;continue;}
     if (arg === '--foreground' || arg === '--wait') options.foreground = true;
     else if (arg === '--no-open') options.noOpen = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
@@ -315,6 +316,16 @@ export function createServer(options) {
   server.on('clientError',(_err,socket)=>socket.destroy());
   return server;
 }
+// --auto: 画面表示と並行して「設定起動」を1回だけ実行する。直前の停止でポート解放が遅れる場合だけ待って再試行する。
+export async function autoStart(startManager,{retries=20,interval=500,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  for(let attempt=0;;attempt++){
+    try{await startManager.restart();return true;}
+    catch(error){
+      if(error?.status!==409||attempt>=retries){startManager.notify('自動起動できませんでした。'+(error?.status?error.message:'コンソールを確認してください。'));return false;}
+    }
+    await wait(interval);
+  }
+}
 function openBrowser(url) {
   // 固定 OS opener + 単一 URL 引数。Windows shell を必要とする start は使わない。
   let command,args;
@@ -330,7 +341,7 @@ export async function main(args=process.argv.slice(2)) {
   const startupDisconnect=()=>process.exit(1);
   if(launcherChild){if(!process.connected)throw startupError('DESKTOP');process.once('disconnect',startupDisconnect);}
   let options;try {options=parseArgs(args);}catch {throw startupError('ARGUMENTS');}
-  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--browser] [--no-open] [--foreground | --wait] [--port 8097] [--base-path /proxy/8097/]\n            aidiy_diag --headless   画面を開かず全診断を実行し _AIDIY/aidiy_diag/ へ保存'); return; }
+  if (options.help) { console.log('AiDiy 診断: aidiy_diag [--auto] [--browser] [--no-open] [--foreground | --wait] [--port 8097] [--base-path /proxy/8097/]\n            aidiy_diag --headless   画面を開かず全診断を実行し _AIDIY/aidiy_diag/ へ保存\n            --auto                  画面を開き、保存済みの起動設定で「設定起動」を自動実行'); return; }
   if (options.headless) { process.exitCode = await headlessMain(); return; }
   if (!await verifyUi()) throw startupError('UI');
   const useBrowser=browserMode(options);
@@ -346,7 +357,8 @@ export async function main(args=process.argv.slice(2)) {
   try {entries=await catalog();coverage=JSON.parse(await readFile(new URL('./診断/coverage.json',import.meta.url),'utf8'));}
   catch {throw startupError('CATALOG');}
   const publicCache=createPublicModelCache();
-  const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache,previousResults:createPreviousResults()});
+  const startManager=createStartManager();
+  const server=createServer({token,prefix:options.prefix,entries,coverage,publicCache,startManager,previousResults:createPreviousResults()});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(options.port,'127.0.0.1',resolve);});
   // 公開一覧だけを起動時に取得。キー設定や他 provider の API は自動で呼ばない。
   void publicCache.refresh();
@@ -380,6 +392,7 @@ export async function main(args=process.argv.slice(2)) {
   }
   stopWatching=watchStop(initialStop,close);
   server.once('close',()=>stopWatching());
+  if (options.auto && !closed) void autoStart(startManager);
   return server;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(error=>{console.error(startupMessage(error));process.exitCode=1;if(process.env.AIDIY_DIAG_LAUNCHER_CHILD==='1' && process.connected)process.send({type:'diag-launch-error',code:error.diagCode || error.code},()=>process.disconnect());});

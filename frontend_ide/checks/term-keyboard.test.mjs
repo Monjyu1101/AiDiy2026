@@ -28,7 +28,28 @@ test('Term modified Enter: Alt・Shiftを区別し、keyup/keypressは二重送�
 });
 test('Term IMEと通常キー: 変換確定・AltGr・既存の端末制御をxtermへ委ねる',()=>{
  const handle=terminalKeyHandler(()=>assert.fail('unexpected input'));
- for(const e of [event('Enter'),event('Enter',{shiftKey:true,isComposing:true}),event('Enter',{altKey:true,keyCode:229}),event('c',{ctrlKey:true,altKey:true}),event('d',{ctrlKey:true}),event('Tab'),event('ArrowUp'),event('Enter',{ctrlKey:true,shiftKey:true})]){assert.equal(handle(e),true);assert.equal(e.prevented,undefined);}
+ for(const e of [event('Enter'),event('Enter',{shiftKey:true,isComposing:true}),event('Enter',{altKey:true,keyCode:229}),event('@',{ctrlKey:true,altKey:true,getModifierState:name=>name==='AltGraph'}),event('Dead',{altKey:true}),event('A',{shiftKey:true}),event('Tab'),event('ArrowUp')]){assert.equal(handle(e),true);assert.equal(e.prevented,undefined);}
+});
+
+test('Term修飾キー: Ctrlの英字・JIS記号、AltとShiftの組合せを欠落・重複なく送信する',()=>{
+ const sent=[],handle=terminalKeyHandler(data=>sent.push(data));
+ const cases=[];
+ for(const shiftKey of [false,true])for(let code=97;code<=122;code++){
+  const key=String.fromCharCode(code);if(key==='c'||key==='v')continue;
+  cases.push([shiftKey?key.toUpperCase():key,{ctrlKey:true,shiftKey},String.fromCharCode(code-96)]);
+ }
+ for(const [key,expected] of [['?',127],['/',31],['@',0],['^',30],['_',31],['\\',28],['[',27],[']',29]])cases.push([key,{ctrlKey:true},String.fromCharCode(expected)]);
+ cases.push(['?',{ctrlKey:true,shiftKey:true},'\x7f'],['!',{ctrlKey:true,shiftKey:true},'\x1b[33;6u'],
+  ['a',{altKey:true},'\x1ba'],['A',{altKey:true,shiftKey:true},'\x1bA'],['@',{altKey:true,keyCode:192},'\x1b@'],
+  ['d',{ctrlKey:true,altKey:true},'\x1b\x04'],['Enter',{ctrlKey:true},'\x1b[13;5u'],
+  ['Enter',{ctrlKey:true,altKey:true,shiftKey:true},'\x1b[13;8u'],['Tab',{ctrlKey:true},'\x1b[9;5u'],
+  ['Tab',{altKey:true,shiftKey:true},'\x1b[9;4u'],['Insert',{shiftKey:true},'\x1b[2;2~'],
+  ['PageUp',{shiftKey:true},'\x1b[5;2~'],['PageDown',{altKey:true},'\x1b[6;3~']);
+ for(const [key,extra,expected] of cases){
+  const before=sent.length;
+  for(const type of ['keydown','keypress','keyup']){const e=event(key,{...extra,type});assert.equal(handle(e),false);assert.ok(e.prevented&&e.stopped);}
+  assert.deepEqual(sent.slice(before),[expected],`${key} ${JSON.stringify(extra)}`);
+ }
 });
 
 

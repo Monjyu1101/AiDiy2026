@@ -216,6 +216,7 @@ function 演出実行(メッセージID: string) {
   let index = 0
 
   const tick = () => {
+    if (演出状態Map.get(メッセージID) !== state) return
     const end = Math.min(index + batch, chunk.length)
     if (end > index) {
       state.textSpan.textContent += chunk.slice(index, end)
@@ -274,9 +275,14 @@ function 受信内容文字列(message: Record<string, unknown>) {
 }
 
 function ウェルカム処理(message: Record<string, unknown>) {
-  表示時アクティブ化()
   const 内容 = 受信内容文字列(message)
   if (内容) {
+    // 接続時に再送される履歴は置き換え、履歴だけではタブを切り替えない。
+    for (const state of 演出状態Map.values()) clearInterval(state.blinkInterval)
+    演出状態Map.clear()
+    メッセージ一覧.value = []
+    ストリームメッセージID = null
+    ウェルカムテキスト受信済み.value = false
     ウェルカム内容.value = 内容
   }
 }

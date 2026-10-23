@@ -6,18 +6,18 @@ import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createServer} from '../diag_main.mjs';
 import {createModelTrials} from '../モデル試行/trials.mjs';
-const config={CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr',CODE_AI1_NAME:'codex_cli',CODE_AI1_MODEL:'auto',TASK_AI_NAME:'codex_cli',TEAM_AI_NAME:'codex_cli'};
+const config={CODE_BASE_PATH:'/fixture/project',CHAT_AI_NAME:'freeai_chat',CHAT_FREEAI_MODEL:'chat-test',LIVE_AI_NAME:'freeai_live',LIVE_FREEAI_MODEL:'live-test',LIVE_FREEAI_VOICE:'Zephyr',CODE_AI1_NAME:'codex_cli',CODE_AI1_MODEL:'auto',TASK_AI_NAME:'codex_cli',TEAM_AI_NAME:'codex_cli'};
 for(let i=2;i<=6;i++)config[`CODE_AI${i}_NAME`]='auto';
 for(const family of ['TASK','TEAM'])for(const phase of ['plan','do','check'])config[`${family}_AI_MODEL_${phase}`]='auto';
 let release,calls=0,keyCalls=0,scanCalls=0;
 const gate=new Promise(resolve=>release=resolve);
-const trials=createModelTrials({reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true}),request:async request=>{
+const trials=createModelTrials({catalogReader:async()=>({}),credentialReader:async()=>null,installedClisFn:async()=>({}),reader:async()=>JSON.stringify(config),statusFn:async()=>({online:true}),request:async request=>{
  if(request.method==='DELETE')return {body:null};
  const {method,id}=request.body;
  if(method==='initialize')return {body:{jsonrpc:'2.0',id,result:{protocolVersion:'2024-11-05'}}};
  if(method==='notifications/initialized')return {body:null};
  assert.equal(method,'tools/call');calls++;await gate;
- return {body:{jsonrpc:'2.0',id,result:{structuredContent:{result:JSON.stringify({status:'OK',result:'おはようございます',selected_model:'code-test'})}}}};
+ return {body:{jsonrpc:'2.0',id,result:{structuredContent:{result:JSON.stringify({status:'OK',history_saved:true,result:'おはようございます',selected_model:'code-test'})}}}};
 }});
 const server=createServer({token:'synthetic-row-ui',modelTrials:trials,toolsStatusFn:async()=>({online:true}),publicCache:{snapshot:()=>({状態:'取得済',件数:0}),input:()=>({})},
  entries:[{id:'node',name:'Node.js',description:'合成データ',commands:['node'],menuGroup:'ベース'}],
@@ -57,34 +57,42 @@ try{
  await capture('install-desktop');await evaluate(`document.querySelector('#install-run').click()`);await until(`!document.querySelector('#install-write').disabled`);assert.equal(scanCalls,1);
  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='モデル一覧').click()`);await until(`document.querySelectorAll('.key-row').length===1`);
  assert.equal(await evaluate(`document.querySelector('.model-key-panel .panel-heading h2').textContent`),'モデル一覧取得');
- assert.equal(await evaluate(`document.querySelector('#latest-models').textContent`),'一覧再取得');
+ assert.equal(await evaluate(`document.querySelector('#latest-models').textContent`),'一括取得');
  await capture('models-desktop');await evaluate(`document.querySelector('#latest-models').click()`);await until(`!document.querySelector('#models-write').disabled`);assert.equal(keyCalls,1);
  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='外部連携').click()`);await until(`document.querySelectorAll('.integration-row').length===1`);
  assert.equal(await evaluate(`document.querySelector('.integration-panel .panel-heading h2').textContent`),'外部連携確認');
  assert.equal(await evaluate(`document.querySelectorAll('.integration-test button').length`),1);assert.equal(await evaluate(`document.querySelector('.integration-test button').disabled`),true,'未対応の外部連携もテストボタンを表示し、無効にする');await capture('integrations-desktop');
  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent==='設定モデル').click()`);
- await until(`document.querySelectorAll('[data-trial-id]').length===15`);
+ await until(`document.querySelectorAll('[data-trial-id]').length===16`);
  assert.equal(await evaluate(`document.querySelector('.trial-heading h2').textContent`),'モデル動作確認');
  assert.equal(await evaluate(`document.querySelector('#model-trial-start').textContent`),'動作確認');
  assert.equal(await evaluate(`!!document.querySelector('#model-trial-single')`),false);
- assert.equal(await evaluate(`document.querySelector('.trial-reload').textContent`),'再読込');
+ assert.equal(await evaluate(`document.querySelector('.trial-reload span:last-child').textContent`),'再読込');
  const header=await evaluate(`(()=>{const h=document.querySelector('.trial-heading'),title=h.querySelector('h2').getBoundingClientRect(),button=h.querySelector('.trial-reload').getBoundingClientRect(),start=h.querySelector('#model-trial-start').getBoundingClientRect();return {inline:Math.abs((title.top+title.bottom)-(button.top+button.bottom))<2,reloadInHeading:h.contains(document.querySelector('.trial-reload')),reloadLeft:button.left>title.right&&button.right<start.left};})()`);
  assert.deepEqual(header,{inline:true,reloadInHeading:true,reloadLeft:true});
  await evaluate(`document.querySelector('.trial-select').click()`);assert.equal(calls,0);
  await evaluate(`document.querySelector('[data-trial-id="CODE4"]').click();document.querySelector('[data-trial-id="CODE4"]').click()`);
  await until(`document.querySelectorAll('.trial-row .badge[data-state="実行中"]').length===12`);
  assert.equal(calls,1);assert.equal(await evaluate(`[...document.querySelectorAll('[data-trial-id]')].every(b=>b.disabled)`),true);
- assert.deepEqual(await evaluate(`[...document.querySelectorAll('.trial-group-title')].map(h=>h.firstChild.textContent)`),['チャット','ライブ','判断','コード','タスク','チーム']);
+ assert.deepEqual(await evaluate(`[...document.querySelectorAll('.trial-group-title')].map(h=>h.firstChild.textContent)`),['チャット','ライブ','入力予測','判断','コード','タスク','チーム']);
  const follow=await evaluate(`(()=>{const aside=document.querySelector('.model-trial-panel aside'),row=document.querySelector('.trial-row.selected').getBoundingClientRect(),box=aside.getBoundingClientRect();return {scrolled:aside.scrollTop>0,visible:row.top>=box.top&&row.bottom<=box.bottom};})()`);
  assert.deepEqual(follow,{scrolled:true,visible:true});
  await capture('pending-desktop');release();
  await until(`document.querySelectorAll('.trial-row .badge[data-state="OK"]').length===12`);
- assert.equal(calls,1);assert.ok(await evaluate(`document.querySelector('.trial-layout article').textContent.includes('応答を確認しました。')`),'成功した試行の結果説明を未実施と表示しない');await capture('result-desktop');
+ assert.equal(calls,1);assert.ok(await evaluate(`document.querySelector('.trial-layout article').textContent.includes('会話履歴への保存を確認しました。')`),'成功した試行の結果説明を未実施と表示しない');await capture('result-desktop');
  const layouts=[];
  for(const [width,height] of [[768,1000],[390,844]]){
   await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
   const layout=await evaluate(`(()=>{const panel=document.querySelector('.model-trial-panel'),buttons=[...panel.querySelectorAll('button')];return {overflow:document.documentElement.scrollWidth>innerWidth||panel.scrollWidth>panel.clientWidth,noButtonWrap:buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'||b.classList.contains('trial-select')),rowButtons:panel.querySelectorAll('[data-trial-id]').length};})()`);
-  assert.equal(layout.overflow,false);assert.equal(layout.noButtonWrap,true);assert.equal(layout.rowButtons,15);layouts.push({width,height,...layout});await capture(`result-${width}`);
+  assert.equal(layout.overflow,false);assert.equal(layout.noButtonWrap,true);assert.equal(layout.rowButtons,16);layouts.push({width,height,...layout});await capture(`result-${width}`);
+ }
+ // 全7タブからランチャーへ切替え、元の選択へ戻る（実ブラウザ）。
+ await send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
+ for(const name of ['導入状況','モデル一覧','外部連携','設定モデル','AIモデル','システム起動','アプリ起動']){
+  await evaluate(`[...document.querySelectorAll('.tabs button')].find(b=>b.textContent===${JSON.stringify(name)}).click()`);
+  await evaluate(`document.querySelector('.title-mini-switch').click()`);await until(`!!document.querySelector('.start-mini')`);
+  await evaluate(`document.querySelector('.mini-restore').click()`);await until(`!document.querySelector('.start-mini')`);
+  assert.equal(await evaluate(`document.querySelector('.tabs button.active')?.textContent`),name);
  }
  assert.deepEqual(errors,[]);const result={tabs:['導入状況','モデル一覧','外部連携','設定モデル'],header,layouts,modelCalls:calls,keyCalls,scanCalls,errors,output};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));
 }finally{

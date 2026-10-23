@@ -8,6 +8,8 @@
 // 起動元との関係はrecord.ownerで管理し、ピン状態からOSの親子関係を作らない。
 // 各パネルを独立して選択できるよう、フォーカス奪取や定期再固定はしない。
 // VRのExplorer・軌跡バーと本体の相対順だけはVRパネル前面.cjsで補正する。
+// Windowsではfloating指定でWS_EX_TOPMOSTが付かないため、標準のnormal層を使う。
+const pinLevel=process.platform==='win32'?'normal':'floating';
 function createWindowPins({onChanged=()=>{}}={}) {
  const entries=new WeakMap();
  const alive=window=>window&&!window.isDestroyed();
@@ -26,8 +28,8 @@ function createWindowPins({onChanged=()=>{}}={}) {
   if(!alive(window)||!entry)return state(window);
   const value=state(window);
   if(entry.applied!==value.pinned){
-   // pop-up-menu / screen-saver 等の上位層を使わず、全アプリを floating に揃える。
-   if(value.pinned)window.setAlwaysOnTop(true,'floating');
+   // pop-up-menu / screen-saver 等の上位層を使わず、全アプリを同じ標準の層に揃える。
+   if(value.pinned)window.setAlwaysOnTop(true,pinLevel);
    else window.setAlwaysOnTop(false);
    entry.applied=value.pinned;
   }
@@ -47,7 +49,7 @@ function createWindowPins({onChanged=()=>{}}={}) {
   // Windowsでは非表示中に付けた最前面が表示時に外れるため、ONの窓は表示のたびに付け直す。
   const entry={requested:pinned===true,locked:locked===true,applied:undefined,raising:false,
    focus:()=>raiseSelected(window),closed:()=>unregister(window),
-   show:()=>{if(alive(window)&&state(window).pinned)window.setAlwaysOnTop(true,'floating');}};
+   show:()=>{if(alive(window)&&state(window).pinned)window.setAlwaysOnTop(true,pinLevel);}};
   entries.set(window,entry);
   window.on('focus',entry.focus);window.on('show',entry.show);window.once('closed',entry.closed);
   return apply(window);
@@ -69,4 +71,4 @@ function createWindowPins({onChanged=()=>{}}={}) {
  }
  return {register,state,toggle,setLocked,unregister};
 }
-module.exports={createWindowPins};
+module.exports={createWindowPins,pinLevel};

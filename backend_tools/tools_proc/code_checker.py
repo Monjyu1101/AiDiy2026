@@ -59,7 +59,7 @@ class CodeChecker:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=cwd,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), cwd=cwd,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

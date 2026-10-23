@@ -103,7 +103,7 @@ test('IDE再フォーカスは子パネルのOFFを上書きせず、選択さ�
  const f=await desktopFixture(),child=await f.code(),other=await f.code(),standalone=await f.createWindow('code','http://127.0.0.1:6789/');
  const action=(record,command)=>f.handlers.get('development:window')(f.event(record),command);
  assert.equal(child.window.top,true);assert.equal(other.window.top,true);assert.equal(standalone.top,false);assert.equal(f.owner.window.top,false);
- assert.equal(child.window.topLevel,'floating');assert.equal(child.window.getParentWindow(),null,'ピンONでもOS上は独立');
+ assert.equal(child.window.topLevel,process.platform==='win32'?'normal':'floating');assert.equal(child.window.getParentWindow(),null,'ピンONでもOS上は独立');
  const bounds=child.window.getBounds();action(child,'toggle-pin');assert.equal(child.window.top,false);assert.equal(child.window.getParentWindow(),null);
  const raises=other.window.raises;f.owner.window.focus();child.window.focus();
  assert.equal(child.window.top,false);assert.equal(other.window.raises,raises);assert.equal(child.window.getBounds(),bounds);

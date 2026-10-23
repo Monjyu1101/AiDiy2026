@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
 import {createStartManager} from '../起動/サービス管理.mjs';
-import {createServer} from '../diag_main.mjs';
+import {createServer,autoStart} from '../diag_main.mjs';
 
 const targets=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(target=>target.起動管理!==false);
 async function fixture(t,{hold=false,fail=false,open=[],stopFailure}={}){
@@ -26,6 +26,17 @@ async function fixture(t,{hold=false,fail=false,open=[],stopFailure}={}){
  t.after(async()=>{await manager.close();await rm(root,{recursive:true,force:true});});
  return {root,manager,calls,children,openPorts,stops};
 }
+test('--auto waits for released ports, then runs the saved start once',async t=>{
+ const {manager,calls,openPorts}=await fixture(t,{open:['tools']});let waits=0;
+ assert.equal(await autoStart(manager,{retries:5,wait:async()=>{if(++waits===2)openPorts.delete('tools');}}),true);
+ await manager.settled();assert.equal(waits,2);
+ assert.deepEqual(calls.map(call=>call.id),targets.filter(target=>target.初期設定.起動対象).map(target=>target.id));
+});
+test('--auto gives up on a lasting conflict and shows the reason without starting',async t=>{
+ const {manager,calls}=await fixture(t,{open:['web']});
+ assert.equal(await autoStart(manager,{retries:2,wait:async()=>{}}),false);
+ assert.equal(calls.length,0);assert.match((await manager.snapshot()).通知,/^自動起動できませんでした。.*強制停止/);
+});
 test('auto defaults are shared, ordered, and viewing never starts a process',async t=>{
  const {manager,calls}=await fixture(t);const snapshot=await manager.snapshot();
  assert.deepEqual(snapshot.対象.filter(item=>item.設定.起動対象).map(item=>item.id),['tools','core','apps','taskteam','web']);assert.equal(calls.length,0);

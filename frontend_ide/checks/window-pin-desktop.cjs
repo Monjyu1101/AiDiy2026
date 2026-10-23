@@ -12,7 +12,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {app,BrowserWindow,ipcMain,session,nativeImage}=require('electron');
-const {createWindowPins}=require('../デスクトップ/最前面ピン.cjs');
+const {createWindowPins,pinLevel}=require('../デスクトップ/最前面ピン.cjs');
 
 const output=fs.mkdtempSync(path.join(os.tmpdir(),'aidiy-window-pin-'));
 const profile=path.join(output,'profile');
@@ -213,7 +213,7 @@ async function run() {
  });
  windows.push(capability);
  capability.show();
- capability.setAlwaysOnTop(true,'floating');
+ capability.setAlwaysOnTop(true,pinLevel);
  nativeTopmostSupported=capability.isAlwaysOnTop();
  capability.setAlwaysOnTop(false);
  assert.equal(capability.isAlwaysOnTop(),false,'native off capability');
@@ -292,7 +292,7 @@ async function run() {
  await sleep(250);
  assert.equal(nativeCalls.length,quietStart,'no periodic focus or topmost reassertion while idle');
  assert.ok(nativeCalls.filter(call=>call.method==='setAlwaysOnTop'&&call.args[0])
-  .every(call=>call.args.length===2&&call.args[1]==='floating'),'same floating level for both controllers');
+  .every(call=>call.args.length===2&&call.args[1]===pinLevel),'same platform level for both controllers');
  assert.equal(nativeCalls.filter(call=>call.method==='focus').length,0,'controller never steals focus');
  checks.push({label:'Explicit focus-event raise order',order:ordered.map(call=>call.window),
   scope:'instrumented focus events and native moveTop calls only; not observed OS z-order'});

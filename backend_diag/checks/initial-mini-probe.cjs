@@ -7,7 +7,7 @@ const {holdMove,checkNativeControls,probeBackground}=require('../../frontend_ide
 app.setPath('appData',process.env.DIAG_TEST_PROFILE);
 app.setPath('userData',process.env.DIAG_TEST_PROFILE);
 app.setPath('sessionData',process.env.DIAG_TEST_PROFILE);
-app.disableHardwareAcceleration();
+// 描画時間は通常起動と同じGPU設定で測定する。
 let checks=0;
 require('../起動/ポート接続.cjs').checkPort=async port=>{checks++;assert.equal(port,8095);return true;};
 const show=BrowserWindow.prototype.showInactive,opacity=BrowserWindow.prototype.setOpacity;
@@ -19,6 +19,8 @@ async function until(check){for(let i=0;i<150;i++){if(await check())return;await
 const near=(actual,expected)=>{for(const key of ['x','y','width','height'])assert.ok(Math.abs(actual[key]-expected[key])<=2,`${key}: ${actual[key]} / ${expected[key]}`);};
 let owner,openingMeasurement,openingCheck;const resizeChecks=[];
 app.on('browser-window-created',(_event,window)=>{
+ // ほぼ透明な試験窓でも、観測中のアニメーションを省電力抑制しない。
+ window.webContents.setBackgroundThrottling(false);
  if(owner){
   openingCheck=(async()=>{
    await sleep(0);
@@ -26,13 +28,13 @@ app.on('browser-window-created',(_event,window)=>{
    if(resize)resizeChecks.push(openingCheck);
    await until(()=>window.webContents.executeJavaScript("!!document.getAnimations().length"));
    const before=window.getBounds();
-   const timing=await window.webContents.executeJavaScript(`(async()=>{const a=document.getAnimations()[0],start=performance.now(),current=a.currentTime,duration=a.effect.getTiming().duration,node=document.querySelector('#image')||document.querySelector('div'),samples=[];while(a.playState==='running'){const r=node.getBoundingClientRect();samples.push({width:r.width,height:r.height});await new Promise(requestAnimationFrame);}return{duration,elapsedEstimateMs:current+performance.now()-start,samples};})()`);
+   const timing=await window.webContents.executeJavaScript(`(async()=>{const a=document.getAnimations()[0];await a.ready;const start=performance.now(),current=a.currentTime,duration=a.effect.getTiming().duration,node=document.querySelector('#image')||document.querySelector('div'),samples=[];while(a.playState==='running'){const r=node.getBoundingClientRect();samples.push({width:r.width,height:r.height});await new Promise(requestAnimationFrame);}return{duration,elapsedEstimateMs:current+performance.now()-start,samples};})()`);
    assert.equal(timing.duration,resize?380:750);assert.ok(Math.abs(timing.elapsedEstimateMs-timing.duration)<150,JSON.stringify(timing));
    if(resize){assert.ok(timing.samples.length>=3);assert.ok(Math.abs(timing.samples[0].width-timing.samples.at(-1).width)>10);}
    assert.deepEqual(window.getBounds(),before);return{...timing,bounds:before,boundsStable:true};
   })();openingCheck.catch(()=>{});return;
  }
- owner=window;const original=window.getNormalBounds();
+ owner=window;let original;const nativeSetBounds=window.setBounds.bind(window);window.setBounds=(bounds,...args)=>{if(!original&&bounds.width===384)original=window.getNormalBounds();return nativeSetBounds(bounds,...args);};
  window.webContents.once('did-finish-load',async()=>{
   try{
    await until(()=>window.isVisible()&&window.webContents.executeJavaScript("!!document.querySelector('.start-mini .mini-app-button')&&!document.documentElement.classList.contains('desktop-opening')"));
@@ -50,7 +52,7 @@ app.on('browser-window-created',(_event,window)=>{
    near(bounds,{x:area.x+8,y:area.y+8,width:384,height:expectedHeight});assert.equal(window.isAlwaysOnTop(),false);
    assert.equal(await window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')"),'false');
    await window.webContents.executeJavaScript("document.querySelector('.window-pin').click()");
-   await until(()=>window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='true'"));
+   try{await until(()=>window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='true'"));}catch(error){throw Error(JSON.stringify({top:window.isAlwaysOnTop(),state:await window.webContents.executeJavaScript("({button:document.querySelector('.window-pin').outerHTML})")}),{cause:error});}
    window.webContents.invalidate();
    writeFileSync(process.env.DIAG_TEST_SHOT,(await window.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
    openingMeasurement=await openingCheck;assert.ok(openingMeasurement);
@@ -59,10 +61,11 @@ app.on('browser-window-created',(_event,window)=>{
    const miniMove=await holdMove(window,window.webContents,miniBackground,'Diagミニ背景');
    await window.webContents.executeJavaScript(`document.querySelector('#move-probe-background').remove()`);
    assert.equal(await window.webContents.executeJavaScript("!!document.querySelector('.start-mini')"),true);
+   const restoreOrigin=window.getBounds();
    await window.webContents.executeJavaScript("document.querySelector('.mini-restore').click()");
    try{await until(()=>Math.abs(window.getBounds().width-original.width)<=2&&window.webContents.executeJavaScript("!document.querySelector('.start-mini')"));}
    catch(error){throw Error(JSON.stringify({bounds:window.getBounds(),original,ui:await window.webContents.executeJavaScript("({mini:!!document.querySelector('.start-mini'),message:document.querySelector('#message')?.textContent})")}),{cause:error});}
-   assert.equal(window.isAlwaysOnTop(),true);near(window.getNormalBounds(),original);
+   assert.equal(window.isAlwaysOnTop(),true);near(window.getNormalBounds(),{...original,x:restoreOrigin.x,y:restoreOrigin.y});
    await window.webContents.executeJavaScript("document.querySelector('.window-pin').click()");
    await until(()=>!window.isAlwaysOnTop()&&window.webContents.executeJavaScript("document.querySelector('.window-pin').getAttribute('aria-pressed')==='false'"));
    const normalControls=await checkNativeControls(window,window.webContents,'Diag通常');
@@ -74,8 +77,9 @@ app.on('browser-window-created',(_event,window)=>{
    await window.webContents.executeJavaScript("document.querySelector('.mini-restore').click()");
    await until(()=>window.webContents.executeJavaScript("!document.querySelector('.start-mini')&&!document.querySelector('.title-mini-switch').disabled"));
    near(window.getNormalBounds(),movedNormal);
-   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(window.isMaximized(),true);
-   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(window.isMaximized(),false);
+   await until(()=>BrowserWindow.getAllWindows().every(candidate=>!candidate.isAiDiyResizeCanvas));
+   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(await window.webContents.executeJavaScript('window.aidiyWindow.isMaximized()'),true);near(window.getBounds(),screen.getDisplayMatching(window.getBounds()).workArea);
+   await window.webContents.executeJavaScript('window.aidiyWindow.maximize()');assert.equal(await window.webContents.executeJavaScript('window.aidiyWindow.isMaximized()'),false);near(window.getBounds(),movedNormal);
    const resizeMeasurements=await Promise.all(resizeChecks);assert.equal(resizeMeasurements.length,5);
    assert.ok(BrowserWindow.getAllWindows().every(candidate=>!candidate.isAiDiyResizeCanvas));
    process.send({testPassed:true,bounds,expectedHeight,initialPin:false,pinRoundTrip:true,restored:true,openingMeasurement,resizeMeasurements,miniMove,normalMove,miniControls,normalControls,shot:process.env.DIAG_TEST_SHOT},()=>process.disconnect());

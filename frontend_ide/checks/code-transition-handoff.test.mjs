@@ -89,6 +89,12 @@ async function panel(t, { host = false, desktop = false } = {}) {
 }
 
 async function extensionPanel(t) {
+  const predictionModule = { exports: {} };
+  vm.runInNewContext(transformSync(readFileSync(new URL('../host/src/input-prediction.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
+    module: predictionModule, exports: predictionModule.exports, AbortController,
+    fetch: () => assert.fail('この会話切替試験では予測の外部接続は禁止'),
+    require: id => id === '../aidiy_live/local-backend.cjs' ? {} : assert.fail(id),
+  });
   const f = await panel(t, { host: true }), pending = [], posts = [];
   const uri = path => ({ scheme: 'file', fsPath: path, toString: () => `file://${path}` });
   const folders = ['/project', '/other'].map(path => ({ name: path.slice(1), uri: uri(path) }));
@@ -100,6 +106,7 @@ async function extensionPanel(t) {
       createOutputChannel: () => ({ appendLine() {}, clear() {}, dispose() {} }), registerWebviewViewProvider(_id, value) { provider = value; return subscription; } },
     Uri: { joinPath: (_root, path) => uri(path) }, commands: { registerCommand: () => subscription } };
   const modules = { vscode,
+    './input-prediction': predictionModule.exports,
     './vscode-html': { developmentHtml: () => '' },
     './code-connection': { コード選択: value => ({ provider: value.provider || '', model: value.model || '' }), CodeConnection: class { constructor() { assert.fail('外部接続は禁止'); } } },
     './model-preferences': { モデル保存先: () => 'model.json', オフラインモデル保存先: () => 'offline.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込: () => 0 },

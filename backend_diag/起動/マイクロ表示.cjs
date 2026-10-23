@@ -1,7 +1,9 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 // Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 'use strict';
-const 閉じた幅=128,開いた幅=320;
+const {pinLevel}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
+// 名前上端: 中央アイコン中心(64px)+回転枠の外側(48px)。CSS の .micro-project と合わせる。
+const 閉じた幅=128,開いた幅=320,名前上端=112;
 const {円周配置}=require('../ui/src/アプリ起動/円周配置.cjs');
 const {createCodeDrag}=require('../../frontend_ide/デスクトップ/code-drag.cjs');
 function マイクロ表示を作成(window,{screen,pins}={}){
@@ -59,7 +61,7 @@ function マイクロ表示を作成(window,{screen,pins}={}){
    expanded=false;foldedBounds=expandedBounds=undefined;fit(閉じた幅,{...start,width:閉じた幅,height:閉じた幅});最前面維持();timer=setInterval(hit,60);timer.unref?.();
   }else{
    endMove();clearInterval(timer);ignore(false);const previous=saved;saved=undefined;expanded=false;
-   pins.setLocked(window,false);window.setAlwaysOnTop(pins.state(window).pinned,'floating');window.setMinimumSize(...previous.minimum);window.setResizable(previous.resizable);window.setMaximizable(previous.maximizable);window.setBounds({...previous.bounds,x:start.x,y:start.y});
+   pins.setLocked(window,false);window.setAlwaysOnTop(pins.state(window).pinned,pinLevel);window.setMinimumSize(...previous.minimum);window.setResizable(previous.resizable);window.setMaximizable(previous.maximizable);window.setBounds({...previous.bounds,x:start.x,y:start.y});
   }
   return true;
  }
@@ -71,7 +73,7 @@ function マイクロ表示を作成(window,{screen,pins}={}){
  endMove,resizeLabel(height){
   if(!saved||expanded||window.isDestroyed()||!Number.isInteger(height)||height<18||height>4096)return false;
   const b=window.getBounds(),area=screen.getDisplayMatching(b).workArea;
-  const target=Math.min(area.height,Math.max(閉じた幅,102+height+8));
+  const target=Math.min(area.height,Math.max(閉じた幅,名前上端+height+8));
   if(b.height!==target){window.setMinimumSize(閉じた幅-2,閉じた幅-2);place({...b,width:閉じた幅,height:target,y:Math.max(area.y,Math.min(area.y+area.height-target,b.y))});}
   return true;
  },expand(value,count=13){

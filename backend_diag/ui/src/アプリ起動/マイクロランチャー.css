@@ -6,12 +6,16 @@ html.micro-mode,html.micro-mode body,html.micro-mode #app{background:transparent
 .micro-launcher button{pointer-events:auto;-webkit-app-region:no-drag}
 .micro-move{position:absolute;left:50%;top:var(--core-y,64px);transform:translate(-50%,-50%);width:90px;height:90px;border-radius:50%;pointer-events:auto;z-index:2}
 .micro-core{position:absolute;left:50%;top:var(--core-y,64px);width:64px;height:64px;transform:translate(-50%,-50%);display:grid;place-items:center;padding:0;border:0;border-radius:0;background:transparent!important;z-index:3;cursor:pointer}
-/* 名前幅は維持し、実測した折り返し高さだけ収納窓を縦へ広げる。 */
-.micro-project{position:absolute;left:50%;top:102px;transform:translateX(-50%);box-sizing:border-box;width:120px;min-height:18px;padding:0 4px;background:transparent;color:#fff;font-size:11px;line-height:18px;text-align:center;white-space:normal;overflow-wrap:anywhere;text-shadow:0 1px 3px #000,0 0 3px #000;pointer-events:auto;touch-action:none;user-select:none;-webkit-app-region:no-drag;z-index:3;cursor:grab}
+/* 名前幅は維持し、実測した折り返し高さだけ収納窓を縦へ広げる。展開中も中心アイコンの下に残す。 */
+.micro-project{position:absolute;left:50%;top:calc(var(--core-y,64px) + 48px);transform:translateX(-50%);box-sizing:border-box;width:120px;min-height:18px;padding:0 4px;background:transparent;color:#fff;font-size:11px;line-height:18px;text-align:center;white-space:normal;overflow-wrap:anywhere;text-shadow:0 1px 3px #000,0 0 3px #000;pointer-events:auto;touch-action:none;user-select:none;-webkit-app-region:no-drag;z-index:3;cursor:grab}
+/* 展開中は周回アイコンへ重ねないよう2行までにする。全文は title で確認できる。 */
+.micro-launcher.unfolded .micro-project{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .micro-core:disabled{opacity:1;cursor:pointer}
 .micro-core::before,.micro-app::before{content:'';position:absolute;inset:4px;background:#09121fd9;filter:blur(8px);box-shadow:0 3px 9px #0008;pointer-events:none}
-/* Codeの開始表示と同じ二重四角・20秒の逆回転・12秒の色循環。 */
-.micro-mark{position:relative;display:grid;place-items:center;width:48px;height:48px;pointer-events:none}
+/* Codeの開始表示と同じ二重四角・20秒の逆回転・12秒の色循環。
+ * 大きさもCodeと同じ比率（枠≒アイコン×1.63）とし、回転中も四角がアイコンに掛からない。
+ * 斜めの角は中心から約45pxまで届くため、名前はその下（中心+48px）に置く。 */
+.micro-mark{position:relative;display:grid;place-items:center;width:64px;height:64px;pointer-events:none}
 .micro-core,.micro-move{touch-action:none;user-select:none}.micro-core img{-webkit-user-drag:none}.micro-launcher.moving,.micro-launcher.moving *{cursor:grabbing!important}
 .micro-mark::before,.micro-mark::after{content:'';position:absolute;inset:0;border:2px solid #8fffff;animation:micro-square 20s linear infinite,micro-rainbow 12s linear infinite,micro-glow 6s ease-in-out infinite}
 .micro-mark::after{animation-direction:reverse,normal,normal;animation-delay:0s,-6s,-3s}

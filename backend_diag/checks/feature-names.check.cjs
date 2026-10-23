@@ -18,10 +18,10 @@ test('headings and main actions match each tab and valid write/refresh actions r
  const install=await render('導入状況/導入状況パネル.vue',{項目:[],結果:[],接続済み:true});
  assert.match(install,/<h2>導入状況<\/h2>/);assert.match(install,/id="install-run"[^>]*>状況確認<\/button>/);assert.match(install,/id="install-write"/);
  const models=await render('モデル一覧/モデル一覧パネル.vue',{data:{項目:[]},results:{},connected:true});
- assert.match(models,/<h2>モデル一覧取得<\/h2>/);assert.match(models,/id="latest-models"[^>]*>一覧再取得<\/button>/);assert.match(models,/id="models-write"/);
+ assert.match(models,/<h2>モデル一覧取得<\/h2>/);assert.match(models,/id="latest-models"[^>]*>一括取得<\/button>/);assert.match(models,/id="models-write"/);
  const external=await render('外部連携/外部連携パネル.vue',{data:{項目:[]},connected:true});
  assert.match(external,/<h2>外部連携確認<\/h2>/);assert.match(external,/id="integration-run"[^>]*>状況確認<\/button>/);assert.match(external,/id="integration-write"/);assert.doesNotMatch(external,/設定状況を更新/);
  const configured=await render('設定モデル/設定モデルパネル.vue',{data:{項目:[]},results:{},online:true});
  assert.match(configured,/<h2>モデル動作確認<\/h2>/);assert.match(configured,/id="model-trial-start"[^>]*>動作確認<\/button>/);
- assert.match(configured,/<div class="panel-heading trial-heading">[^]*?class="trial-reload"[^>]*>再読込<\/button>/);
+ assert.match(configured,/<div class="panel-heading trial-heading">[^]*?<button class="trial-reload refresh-button"[^>]*aria-label="設定モデルを再読込"[^>]*><span[^>]*>↺<\/span><span>再読込<\/span><\/button>/);
 });

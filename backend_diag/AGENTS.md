@@ -5,9 +5,9 @@ Node.js 標準モジュールの診断・起動管理サーバーと Electron / 
 - `起動/desktop.mjs` / `起動/electron-main.cjs`: 既存共有セットアップで用意した Electron を通常表示に使います。ブラウザ・Codespaces は Node.js のみです。
 - `diag_main.mjs`: ループバック HTTP、起動単位の認証、ブラウザ起動。
 - `起動/サービス管理.mjs` / `ui/src/起動/`: 起動対象の保存、機能別コンソール、順次再起動と停止。起動順・既定値はルートと共通の `scripts/起動対象.json`、各 `_start.py` の Diag 経路は `scripts/_diag_start.py` が担当します。
-- `モデル情報/models_info.mjs`: プロバイダ別モデル情報とchat / live / code / prediction / decisionsの合成JSON。取得モデルから `models` を生成し、API の詳細情報も保持。PredictionはDecisionsと同じ認証済み低コスト候補を使い、OpenAI API区分を `openai_decisions` から `openai_chat` に置き換えます。予測JSONに `openai_decisions` は含めません。Diagは候補を書き出すだけで、予測処理は `backend_tools` の内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）が担います。Grok / backend_local の固定候補と、Copilot導入済み・合成候補なし時の固定8モデルを管理。本体・クライアントは合成JSONを読み、`_config` 上のモデル設定ファイルには依存しません。
+- `モデル情報/models_info.mjs`: プロバイダ別モデル情報とchat / live / code / prediction / decisionsの合成JSON。取得モデルから `models` を生成し、API の詳細情報も保持。PredictionはDecisionsと同じ認証済み低コスト候補を使い、OpenAI API区分を `openai_decisions` から `openai_chat` に置き換えます。予測JSONに `openai_decisions` は含めません。Diagは候補を書き出すだけで、予測処理は `backend_tools` の内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）が担います。Grok / backend_local の固定候補と、Copilot／OpenCode導入済み・合成候補なし時の固定8モデルを管理。本体・クライアントは合成JSONを読み、`_config` 上のモデル設定ファイルには依存しません。
 - `モデル情報/voices_info.mjs`: Gemini / FreeAI / OpenAIの固定音声候補。取得・認証状態にかかわらず3区分の `live_voices_info.json` を生成します。候補の存在は認証成功を意味しません。
-- `診断/headless.mjs`: `--headless` の全診断と、画面の書込と共通の保存形式。画面・待受なしで最速実行し、`_AIDIY/aidiy_diag/*.json` へ成功時だけ保存します（現在は `install_info.json`）。
+- `診断/headless.mjs`: `--headless` の全診断と、画面の書込と共通の保存形式。画面・待受なしで最速実行し、`_AIDIY/aidiy_diag/*.json` へ成功時だけ保存します（導入状況の `install_info.json` とプロバイダ別・用途別のモデル情報）。
 - `診断/catalog.json`: リポジトリの利用箇所から整理した外部プログラムの登録情報。
 - `診断/probes.mjs`: 固定引数での存在・バージョン確認。任意コマンド API は設けません。
 - `導入管理/導入管理.mjs`: 明示操作専用の固定 npm / Windows WinGet / Antigravity / Grok Build 導入・再導入・削除。導入元の照合、項目単位の排他（別項目は並行実行）、期限・中止・コンソールを管理し、終了後は個別確認と共通の probe・結果反映を使います。
@@ -22,6 +22,6 @@ Node.js 標準モジュールの診断・起動管理サーバーと Electron / 
 - `checks/reference/`: 移植前の Python 実装から生成・凍結した合成ゴールデン。比較専用で本番実行から参照しません。
 - `_setup.py` / `_cleanup.py`: この作業コピーのランチャー配置・解除。
 
-診断の確認処理はインストール・接続設定の変更・ログインを行いません。導入状況の導入・再導入・削除だけは、利用者の明示操作と確認後に登録済みの固定パッケージと公式 Antigravity バイナリを変更します。認証・設定・履歴を削除せず、headless・全テスト・初期表示から実行しません。起動タブは利用者の明示操作で起動設定を保存し、サービスを起動・停止します。全テストは導入状況・モデル一覧・外部連携の確認と書込を順に行い、終わると導入状況タブへ切り替えます。起動管理と、会話生成を伴う config モデル試行は headless・全テストには含めません。モデル試行は Tools 接続中の明示操作専用です。匿名の公開 OpenRouter 一覧だけを起動時に取得し、キーを使うモデル API と外部連携（Hugging Face / Discord）の読み取り専用の認証確認は、画面の明示操作（各行のテスト・一覧再取得・状況確認・全テスト）時だけ接続します。外部連携の結果は `_AIDIY/aidiy_diag/integration_info.json` へ保存し、headless では確認しません。API は起動時の認証が必須で、公開する静的ファイルに診断結果や認証キーを埋め込みません。
+診断の確認処理はインストール・接続設定の変更・ログインを行いません。導入状況の導入・再導入・削除だけは、利用者の明示操作と確認後に登録済みの固定パッケージと公式 Antigravity バイナリを変更します。認証・設定・履歴を削除せず、headless・全テスト・初期表示から実行しません。起動タブは利用者の明示操作で起動設定を保存し、サービスを起動・停止します。`--auto` 指定時（全体起動の Diag 選択）だけ、画面表示と並行して保存済みの設定で設定起動を1回実行します。全テストは導入状況・モデル一覧・外部連携の確認と書込を順に行い、終わると導入状況タブへ切り替えます。起動管理と、会話生成を伴う config モデル試行は headless・全テストには含めません。モデル試行は Tools 接続中の明示操作専用です。通常の画面起動時は匿名の公開 OpenRouter 一覧だけを取得します。キーを使うモデル API は、画面の明示操作（各行のテスト・一括取得・全テスト）または明示的な headless 実行時に接続します。外部連携（Hugging Face / Discord）の読み取り専用の認証確認は、画面の明示操作（状況確認・全テスト）時だけ接続します。外部連携の結果は `_AIDIY/aidiy_diag/integration_info.json` へ保存し、headless では確認しません。API は起動時の認証が必須で、公開する静的ファイルに診断結果や認証キーを埋め込みません。
 
 起動・検証・追加手順は [README.md](./README.md) を参照してください。

@@ -216,11 +216,11 @@ class FfmpegControl:
             if capture_output:
                 proc = await asyncio.create_subprocess_exec(
                     *argv,
-                    stdout=asyncio.subprocess.PIPE,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
             else:
-                proc = await asyncio.create_subprocess_exec(*argv)
+                proc = await asyncio.create_subprocess_exec(*argv, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except FileNotFoundError as e:
             raise FfmpegControlError(f"{label} を起動できません: {e}") from e
         except OSError as e:
@@ -330,7 +330,7 @@ class FfmpegControl:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
-                stdout=asyncio.subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
         except OSError as e:
@@ -583,7 +583,7 @@ class FfmpegControl:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
-                stdout=asyncio.subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
         except OSError as e:
@@ -690,7 +690,7 @@ class FfmpegControl:
             try:
                 proc = subprocess.run(
                     [resolved, "-version"],
-                    stdout=subprocess.PIPE,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     timeout=10,
                     check=False,

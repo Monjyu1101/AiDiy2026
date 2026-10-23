@@ -331,7 +331,7 @@ test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Li
   assert.match(css, /@keyframes folder-page-edge-forward\{from\{left:100%\}to\{left:calc\(0% - var\(--page-turn-slant\)\)\}/);
   assert.match(css, /@keyframes folder-page-edge-back\{from\{left:calc\(0% - var\(--page-turn-slant\)\)\}to\{left:100%\}/);
   assert.doesNotMatch(css, /rotateY\(/);
-  assert.doesNotMatch(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'), /requestAnimationFrame|setInterval/);
+  assert.doesNotMatch(readFileSync(new URL('../src/ファイル閲覧/フォルダページ.vue', import.meta.url), 'utf8'), /setInterval/);
 });
 
 test('2Dページの斜線: 切り抜きと同じ時間/イージングで動き、ページは不透明な重なりを保つ', () => {
@@ -523,7 +523,7 @@ test('2D行色: フォルダを少し濃く、ファイルを微かな縞にし�
   const folder = '.mode-2d .folder-page-entry.folder', stripe = '.mode-2d .folder-page-entry.striped';
   assert.equal(rules.get(folder).background, '#f3edde');
   assert.equal(rules.get('.folder-page-entry.folder')['border-radius'], '0');
-  assert.match(rules.get('.folder-page-entry.folder')['box-shadow'], /inset 0 0/); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
+  assert.equal(rules.get('.folder-page-entry.folder')['box-shadow'], 'none'); assert.equal(rules.get(stripe).background, 'var(--aidiy-cream-base)');
   assert.equal(rules.get(folder)['border-color'], '#d8d0c4');
   const selectors = [...rules.keys()];
   for (const state of [':hover', '[data-cursor=true]', '.selected']) {
@@ -596,6 +596,12 @@ test('共通画面: 2Dの遅延初期化・共通ビューアEsc・入力中の�
 });
 
 async function mountedPages(globals = {}) {
+  const refreshSource = parse(readFileSync(new URL('../src/共通表示/再読込ボタン.vue', import.meta.url), 'utf8')).descriptor;
+  const refreshScript = compileScript(refreshSource, { id: 'mounted-refresh', genDefaultAs: 'component', inlineTemplate: true });
+  const refreshModule = { exports: {} };
+  vm.runInNewContext(transformSync(refreshScript.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
+    module: refreshModule, require: id => id === 'vue' ? vue : assert.fail(id),
+  });
   // アイコンも実際のSFCをコンパイルし、旧ページ・経由ページを含む表示を検証する。
   const iconSource = parse(readFileSync(new URL('../src/ファイル閲覧/ファイル種別アイコン.vue', import.meta.url), 'utf8')).descriptor;
   const iconScript = compileScript(iconSource, { id: 'mounted-icon', genDefaultAs: 'component', inlineTemplate: true });
@@ -607,7 +613,7 @@ async function mountedPages(globals = {}) {
   const script = compileScript(descriptor, { id: 'mounted-pages', genDefaultAs: 'component', inlineTemplate: true });
   const module = { exports: {} };
   vm.runInNewContext(transformSync(script.content + '\nmodule.exports=component;', { format: 'cjs' }).code, {
-    module, Date, setTimeout:()=>1,clearTimeout(){},require: id => id === 'vue' ? vue : id.endsWith('ファイル日時.js') ? fileDates : id.endsWith('ファイル種別アイコン.vue') ? iconModule.exports : folderPages, ...globals,
+    module, Date, setTimeout:()=>1,clearTimeout(){},require: id => id === 'vue' ? vue : id.endsWith('再読込ボタン.vue') ? refreshModule.exports : id.endsWith('ファイル日時.js') ? fileDates : id.endsWith('ファイル種別アイコン.vue') ? iconModule.exports : folderPages, ...globals,
   });
   const walk = (element, predicate) => predicate(element) ? element : (element.children || []).map(child => walk(child, predicate)).find(Boolean);
   const node = type => ({ type, children: [], props: {}, scrollTop: 0,

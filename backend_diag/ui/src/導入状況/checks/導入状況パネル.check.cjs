@@ -47,8 +47,8 @@ test('全項目に独立した確認ボタンがあり、実行中の1行だけ�
  const props={項目:[{id:'node',name:'Node.js',commands:['node'],menuGroup:'ベース'},{id:'ollama',name:'Ollama',commands:['ollama'],menuGroup:'CLI群'}],結果:[{id:'node',状態:'確認中'},{id:'ollama',状態:'OK'}],接続済み:true,確認済み:true,個別確認中:'node'};
  const html=await render('導入状況/導入状況パネル.vue',props);
  assert.equal((html.match(/data-install-check=/g)||[]).length,2);
- assert.match(html,/<button data-install-check="node"[^>]*aria-label="Node.js の導入状況を確認"[^>]*disabled[^>]*>確認中…<\/button>/);
- assert.match(html,/<button data-install-check="ollama"[^>]*disabled[^>]*>確認<\/button>/);
+ assert.match(html,/<button\b[^>]*data-install-check="node"[^>]*aria-label="Node.js の導入状況を確認"[^>]*disabled[^>]*>確認中…<\/button>/);
+ assert.match(html,/<button\b[^>]*data-install-check="ollama"[^>]*disabled[^>]*>確認<\/button>/);
  assert.match(html,/id="install-run"[^>]*disabled/);assert.match(html,/id="install-write"[^>]*disabled/);
  assert.doesNotMatch(html,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/,'選択ボタンに確認ボタンを入れ子にしない');
  const ready=await render('導入状況/導入状況パネル.vue',{...props,個別確認中:''});

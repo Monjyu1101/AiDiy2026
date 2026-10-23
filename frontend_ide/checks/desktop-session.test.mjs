@@ -29,7 +29,7 @@ test('Electron子窓監視: 通信断・不明は保持し、確定終了とセ�
  const body=source.slice(source.indexOf('async function checkChildren(owner){'),source.indexOf('function trustedEvent(event){'));
  const owner={window:{isDestroyed:()=>false}},child={owner,linkKey:'online:10'},windows=new Map([['child',child]]);
  let result=valid,error,closed=0;
- const context={windows,readState:async()=>{if(error)throw error;return validateDevelopmentState(result);},sessionKey:state=>state.active?`${state.mode}:${state.startedAt}`:'',closeChildren:()=>closed++};
+ const context={browserViews:null,windows,readState:async()=>{if(error)throw error;return validateDevelopmentState(result);},sessionKey:state=>state.active?`${state.mode}:${state.startedAt}`:'',closeChildren:()=>closed++};
  vm.runInNewContext(body+';globalThis.check=checkChildren;',context);
  error=Error('temporary');await context.check(owner);assert.equal(closed,0);assert.equal(owner.checking,false);
  error=null;result={};await context.check(owner);assert.equal(closed,0);
@@ -43,7 +43,7 @@ test('Electron子窓監視: 取得待ち中に利用を終了し直したら古�
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('async function checkChildren(owner){'),source.indexOf('function trustedEvent(event){'));
  const owner={window:{isDestroyed:()=>false},revision:1},windows=new Map([['child',{owner,linkKey:'online:10'}]]);let resolve,closed=0;
- const context={windows,readState:()=>new Promise(done=>{resolve=done;}),sessionKey:()=>'',closeChildren:()=>closed++};vm.runInNewContext(body+';globalThis.check=checkChildren;',context);
+ const context={browserViews:null,windows,readState:()=>new Promise(done=>{resolve=done;}),sessionKey:()=>'',closeChildren:()=>closed++};vm.runInNewContext(body+';globalThis.check=checkChildren;',context);
  const waiting=context.check(owner);owner.revision++;resolve({active:false});await waiting;
  assert.equal(closed,0);assert.equal(owner.checking,false);
 });

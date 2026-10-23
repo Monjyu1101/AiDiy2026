@@ -6,11 +6,11 @@ import {CLI状態を作成} from '../ui/src/アプリ起動/CLI状態.mjs';
 import {readFile} from 'node:fs/promises';
 function fixture(){
  const runs=[];const icon={animate:(frames,options)=>{let finish;const animation={frames,options,cancelled:false,cancel(){this.cancelled=true;},finished:new Promise(resolve=>finish=resolve),finish:()=>finish()};runs.push(animation);return animation;}};
- return {runs,button:{disabled:false,querySelector:selector=>selector==='.launch-trace-light'?icon:null}};
+ return {runs,button:{disabled:false,querySelector:selector=>selector==='.launch-trace'?icon:null}};
 }
 test('accepted light traces the frame clockwise once, repeated request restarts it, and event target is captured',async()=>{
  const f=fixture(),event={currentTarget:f.button},start=起動モーション(event);event.currentTarget=null;
- start();assert.equal(f.runs[0].frames[0].strokeDashoffset,'0');assert.equal(f.runs[0].frames.at(-1).strokeDashoffset,'-100');assert.equal(f.runs[0].options.iterations,1);
+ start();assert.equal(f.runs[0].frames[0]['--launch-spin'],'0deg');assert.equal(f.runs[0].frames.at(-1)['--launch-spin'],'360deg');assert.equal(f.runs[0].options.iterations,1);
  start();assert.equal(f.runs.length,2);assert.equal(f.runs[0].cancelled,true);f.runs[0].finish();await Promise.resolve();
  start();assert.equal(f.runs[1].cancelled,true);f.runs[2].finish();await Promise.resolve();
  start();assert.equal(f.runs[2].cancelled,false);
@@ -21,7 +21,7 @@ test('one continuous accelerating pass fades at the ends without intermediate sp
  assert.equal(options.easing,'cubic-bezier(0.333333,0,0.666667,0.333333)');
  assert.equal(frames[0].opacity,0);assert.equal(frames.at(-1).opacity,0);
  assert.deepEqual(frames.slice(1,-1).map(frame=>frame.opacity),[1,1]);
- for(const frame of frames){assert.equal(Number(frame.strokeDashoffset),-100*frame.offset||0);assert.equal(frame.easing,undefined);}
+ for(const frame of frames){assert.ok(Math.abs(parseFloat(frame['--launch-spin'])-360*frame.offset)<1e-9);assert.equal(frame.easing,undefined);}
  // この Bézier は x≈t、y≈t²。等しい時間区間ごとの移動量が増え続ける。
  const bezier=(t,p1,p2)=>3*(1-t)**2*t*p1+3*(1-t)*t*t*p2+t**3;
  let previousDistance=0,previousProgress=0;
@@ -34,10 +34,10 @@ test('one continuous accelerating pass fades at the ends without intermediate sp
 test('accepted callback still animates if its own pending UI disables the button',()=>{
  const f=fixture(),start=起動モーション({currentTarget:f.button});f.button.disabled=true;start();assert.equal(f.runs.length,1);
 });
-test('disabled/missing targets, reduced motion and unsupported animation are safe',()=>{
+test('disabled/missing targets and unsupported animation are safe; reduced motion still shows the light',()=>{
  const f=fixture();f.button.disabled=true;起動モーション({currentTarget:f.button})();assert.equal(f.runs.length,0);
  f.button.disabled=false;const previous=globalThis.matchMedia;
- try{globalThis.matchMedia=()=>({matches:true});起動モーション({currentTarget:f.button})();assert.equal(f.runs.length,0);}finally{if(previous)globalThis.matchMedia=previous;else delete globalThis.matchMedia;}
+ try{globalThis.matchMedia=()=>({matches:true});起動モーション({currentTarget:f.button})();assert.equal(f.runs.length,1,'Windows のアニメーション効果オフでも光を回す');}finally{if(previous)globalThis.matchMedia=previous;else delete globalThis.matchMedia;}
  assert.doesNotThrow(()=>起動モーション()());assert.doesNotThrow(()=>起動モーション({currentTarget:{querySelector:()=>({})}})());
  assert.doesNotThrow(()=>起動モーション({currentTarget:{querySelector(){throw Error('detached');}}})());
 });
@@ -62,15 +62,17 @@ test('all normal mini and micro launch surfaces share the accepted-action callba
  }
 });
 
-test('stationary fixed-size icon has a short perimeter light and no obsolete flip layers',async()=>{
+test('stationary fixed-size icon has a vivid comet ring starting from the bottom and no obsolete flip layers',async()=>{
  const css=await readFile(new URL('../ui/src/アプリ起動/起動モーション.css',import.meta.url),'utf8');
- assert.match(css,/stroke-dasharray:18 82/);assert.match(css,/opacity:0/);assert.match(css,/pointer-events:none/);
+ assert.match(css,/@property --launch-spin\{syntax:'<angle>'/);assert.match(css,/conic-gradient\(from calc\(180deg \+ var\(--launch-spin\)\)/);
+ assert.match(css,/#ffffff 357deg,transparent 360deg/);assert.match(css,/content-box exclude/);assert.match(css,/drop-shadow/);
+ assert.match(css,/opacity:0/);assert.match(css,/pointer-events:none/);assert.doesNotMatch(css,/stroke-dasharray/);
  assert.doesNotMatch(css,/rotate|transform|backface|#808080|launch-card/);
  assert.match(css,/width:40px;height:40px/);assert.match(css,/width:72px;height:72px/);
  for(const name of ['アプリ起動パネル','ミニアプリ起動','ミニCLI起動','マイクロランチャー']){
   const source=await readFile(new URL(`../ui/src/アプリ起動/${name}.vue`,import.meta.url),'utf8');
-  assert.match(source,/import '\.\/起動モーション.css'/);assert.match(source,/class="launch-trace-light"/);
-  assert.match(source,/height="96" rx="18" pathLength="100"/);assert.match(source,/focusable="false"/);
+  assert.match(source,/import '\.\/起動モーション.css'/);assert.match(source,/<span class="launch-trace"><\/span>/);
+  assert.doesNotMatch(source,/<svg class="launch-trace"/);
   assert.doesNotMatch(source,/launch-card-back|launch-card-40|launch-card-72/);
  }
 });

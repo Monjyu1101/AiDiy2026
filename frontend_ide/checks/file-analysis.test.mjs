@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,rm,symlink,readFile,readdir} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,rm,symlink,readFile,readdir,rename} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createFileAnalysis} from '../ファイル機能/file-analysis.mjs';
@@ -36,10 +36,10 @@ test('ファイル解析: 古い結果・壊れたJSONを採用せず、編集�
 
 test('ファイル解析: ダイアログから再取得しなくても完了結果を内部保存する',async t=>{
  const root=await fixture(t);const service=createFileAnalysis(root,{...options,pollMs:10,runAgent:async({prompt})=>{
-   const spec=JSON.parse(prompt.split('形式: ')[1].split('\n')[0]);const target=prompt.match(/結果は (temp\/[^ ]+)\.tmp に/)[1];await writeFile(join(root,target),JSON.stringify({...spec,content:'自動保存した結果'}));
+   const spec=JSON.parse(prompt.split('形式: ')[1].split('\n')[0]);const target=prompt.match(/結果は (temp\/[^ ]+)\.tmp に/)[1];await writeFile(join(root,target+'.tmp'),JSON.stringify({...spec,content:'自動保存した結果'}));await rename(join(root,target+'.tmp'),join(root,target));
  }});t.after(()=>service.close());await service.start('main.js','概要');
  const folder=join(root,'_AIDIY','aidiy_ide','file_analyses');let stored;
- for(let i=0;i<100;i++){const name=(await readdir(folder)).find(x=>x.endsWith('.json'));stored=JSON.parse(await readFile(join(folder,name),'utf8'));if(stored.result)break;await new Promise(r=>setTimeout(r,10));}
+ for(const deadline=Date.now()+10000;Date.now()<deadline;){const name=(await readdir(folder)).find(x=>x.endsWith('.json'));stored=JSON.parse(await readFile(join(folder,name),'utf8'));if(stored.result)break;await new Promise(r=>setTimeout(r,10));}
  assert.equal(stored.result.content,'自動保存した結果');
 });
 

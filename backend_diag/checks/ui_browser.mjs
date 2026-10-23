@@ -81,7 +81,7 @@ try{
  await page.getByRole('button',{name:'モデル一覧',exact:true}).click();assert.equal(await page.locator('.model-key-panel article h2').innerText(),'OpenAI API');
  // 一覧再取得: 設定を読み直し、テストできる行を上から順に取得して、選択（右側）も追従する。
  assert.equal(await page.locator('.model-key-panel').getByRole('button',{name:'設定状況を更新'}).count(),0);
- await page.locator('#latest-models').click();await page.waitForFunction(()=>document.querySelector('#latest-models').textContent==='一覧再取得'&&document.querySelectorAll('.key-row .key-test .badge[data-state="OK"]').length===2);
+ await page.locator('#latest-models').click();await page.waitForFunction(()=>document.querySelector('#latest-models').textContent==='一括取得'&&document.querySelectorAll('.key-row .key-test .badge[data-state="OK"]').length===2);
  // 取得が終わったら、1項目目を表示する。
  await page.locator('.model-key-panel article h2',{hasText:'OpenAI API'}).waitFor({timeout:5000});
  assert.equal(await page.evaluate(()=>document.querySelector('.model-key-panel aside').scrollTop),0);

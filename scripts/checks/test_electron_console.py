@@ -1,5 +1,6 @@
 """起動入口の実子プロセスにコンソールがなく、ログを取得できることを確認する。"""
 import importlib.util
+import asyncio
 import json
 from pathlib import Path
 import subprocess
@@ -41,6 +42,47 @@ class ElectronConsoleTest(unittest.TestCase):
     def test_diag_start(self):
         module = load('backend_diag/_start.py')
         self.check_child(module, module.start)
+
+    def test_diag_auto_launcher_has_no_console(self):
+        module = load('backend_diag/_start.py')
+        real_run = subprocess.run
+        observed = []
+
+        def run(_command, **kwargs):
+            result = real_run([sys.executable, '-X', 'utf8', '-c', PROBE],
+                              **kwargs, capture_output=True)
+            observed.append(json.loads(result.stdout))
+            return result
+
+        with patch.object(module.subprocess, 'run', side_effect=run):
+            module.launch_gui()
+        self.assertEqual(observed, [{'console': 0, 'log': '起動ログ'}])
+
+    def test_tools_checker_has_no_console_and_keeps_output(self):
+        module = load('backend_tools/tools_proc/code_checker.py')
+        result = module.CodeChecker(str(ROOT))._run(
+            [sys.executable, '-X', 'utf8', '-c', PROBE], str(ROOT))
+        self.assertEqual(json.loads(result['stdout']), {'console': 0, 'log': '起動ログ'})
+
+    def test_tools_audio_helpers_have_no_console(self):
+        with patch.dict(sys.modules, {'log_config': Mock(get_logger=Mock(return_value=Mock()))}):
+            tts = load('backend_tools/tools_proc/text_to_speech.py')
+            ffmpeg = load('backend_tools/tools_proc/ffmpeg_control.py')
+        real_run = subprocess.run
+        observed = []
+
+        def run(_command, **kwargs):
+            result = real_run([sys.executable, '-X', 'utf8', '-c', PROBE], **kwargs)
+            observed.append(json.loads(result.stdout))
+            return result
+
+        with patch.object(tts.subprocess, 'run', side_effect=run), patch.object(tts.shutil, 'which', return_value=sys.executable):
+            tts.TextToSpeech._probe_ffmpeg()
+        self.assertEqual(observed, [{'console': 0, 'log': '起動ログ'}])
+        control = object.__new__(ffmpeg.FfmpegControl)
+        with patch.object(control, '_split_args', return_value=['-X', 'utf8', '-c', PROBE]):
+            result = asyncio.run(control._exec(sys.executable, 'probe', '', 10, True))
+        self.assertEqual(json.loads(result['stdout']), {'console': 0, 'log': '起動ログ'})
 
     def test_code_and_live_start(self):
         module = load('frontend_ide/host/_start.py')

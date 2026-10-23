@@ -212,6 +212,7 @@ const 演出実行 = (メッセージID: string) => {
   const { interval, batch } = 速度設定(chunk.length)
   let index = 0
   const tick = () => {
+    if (演出状態Map.get(メッセージID) !== state) return
     const end = Math.min(index + batch, chunk.length)
     if (end > index) {
       state.textSpan.textContent += chunk.slice(index, end)
@@ -300,10 +301,16 @@ const 受信チャンネル一致 = (受信データ: any): boolean => {
 
 const ウェルカム受信処理 = (受信データ: any) => {
   if (!受信チャンネル一致(受信データ)) return
-  表示時アクティブ化()
   console.log('[チャット] welcome_info受信:', 受信データ)
   const 内容 = 受信内容文字列(受信データ)
   if (!内容) return
+  // welcome_info の後には会話履歴が再送される。再接続前の表示へ追記しない。
+  // 履歴の受信中はタブを自動選択せず、利用者が開いている画面を保つ。
+  for (const state of 演出状態Map.values()) clearInterval((state as any).blinkInterval)
+  演出状態Map.clear()
+  メッセージ一覧.value = []
+  ストリームメッセージID = null
+  ウェルカムテキスト受信済み.value = false
   ウェルカム内容.value = 内容
 }
 

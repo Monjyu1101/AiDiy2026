@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cp,mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
+import {cp,mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
@@ -14,7 +14,10 @@ const stoppedBySigterm=([code,signal])=>process.platform==='win32'?signal==='SIG
 const REAL_TIMEOUT=30000;
 async function until(fn){for(let n=0;n<150;n++){const value=await fn();if(value)return value;await pause(20);}throw Error('fixture readiness timeout');}
 async function fixture(mode='normal') {
- const root=await mkdtemp(path.join(os.tmpdir(),'diag-launch-'));
+ const workspace=await mkdtemp(path.join(os.tmpdir(),'diag-launch-'));
+ const root=path.join(workspace,'backend_diag');
+ await mkdir(path.join(workspace,'scripts'));
+ await cp(new URL('../../scripts/opencode-npm.mjs',import.meta.url),path.join(workspace,'scripts/opencode-npm.mjs'));
  await cp(new URL('../',import.meta.url),root,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
  // ネットワーク API と UI build のみ fixture 化。HTTP、CLI、IPC、所有関係は実プロセス。
  await writeFile(path.join(root,'モデル情報/public_models.mjs'),`export function createPublicModelCache(){return {refresh:async()=>({}),snapshot:()=>({}),input:()=>({})};}`);
@@ -47,11 +50,18 @@ async function gone(url){await until(async()=>{try{await fetch(url);return false
 async function cleanup(root,child,info){
  if(child?.exitCode===null && child?.signalCode===null)child.kill('SIGTERM');
  if(info)for(const pid of [info.pid,info.parent]){if(pid===child?.pid)continue;try{process.kill(pid,'SIGTERM');}catch{}}
- await rm(root,{recursive:true,force:true});
+ const workspace=path.dirname(root);
+ assert.equal(path.dirname(workspace),os.tmpdir());assert.match(path.basename(workspace),/^diag-launch-/);
+ await rm(workspace,{recursive:true,force:true});
 }
 test('foreground/wait options are explicit; browser/no-open retain foreground mode',()=>{
  assert.equal(parseArgs(['--foreground']).foreground,true);assert.equal(parseArgs(['--wait']).foreground,true);
  assert.equal(parseArgs([]).foreground,undefined);
+});
+test('--auto is opt-in, combines with display options, and not with --headless',()=>{
+ assert.equal(parseArgs([]).auto,undefined);assert.equal(parseArgs(['--auto']).auto,true);
+ assert.equal(parseArgs(['--auto','--browser','--no-open']).auto,true);
+ assert.throws(()=>parseArgs(['--headless','--auto']));
 });
 test('real desktop launcher returns after shown while supervisor owns HTTP and Electron',{timeout:REAL_TIMEOUT},async()=>{
  const root=await fixture();let child,info;

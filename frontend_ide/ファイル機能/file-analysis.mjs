@@ -105,7 +105,11 @@ export function createFileAnalysis(project,{state,runAgent=runSearchAgent,now=Da
 contentは空でない20万文字以内のMarkdownです。5分以内を目安に、必ず結果ファイルへ保存してください。`;
       await update(path,record=>({...record,instruction:job.instruction}));
       if(!current(job))throw Error('利用が終了しました。');
-      void Promise.resolve().then(()=>runAgent({project:file.root,prompt:job.prompt,signal:job.controller.signal})).then(()=>{job.agentFinished=true;}).catch(()=>{job.agentError=true;}).finally(()=>{if(current(job))void check(job).catch(()=>{});});
+      void Promise.resolve().then(()=>runAgent({project:file.root,prompt:job.prompt,signal:job.controller.signal})).then(()=>{job.agentFinished=true;}).catch(()=>{job.agentError=true;}).finally(async()=>{
+        // 終了直前のpollがENOENTを読んでいても、その結果だけで終了判定しない。
+        // 進行中の確認が終わってから、エージェントが確定したファイルを再読込する。
+        try{await job.checking;if(current(job))await check(job);}catch{}
+      });
       watch(job);return describe(job);
     }catch(error){job.status='failed';job.message=error.message;throw error;}
   }

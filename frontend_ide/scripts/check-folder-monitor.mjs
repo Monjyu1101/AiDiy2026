@@ -68,14 +68,14 @@ try{
   await evaluate(`document.querySelector('[data-page-layer="live"]').scrollTop=0`);await sleep(100);
   const layout=await evaluate(`(()=>{
    const body=document.querySelector('[data-page-layer="live"]'),folders=[...body.querySelectorAll('.folder-page-entry.folder')],file=body.querySelector('.folder-page-entry:not(.folder)'),rects=folders.map(e=>e.getBoundingClientRect());
-   return {count:folders.length,columns:new Set(rects.map(r=>Math.round(r.left))).size,overflow:body.scrollWidth>body.clientWidth,filesAfter:Math.min(file.getBoundingClientRect().top)>=Math.max(...rects.map(r=>r.bottom)),minHeight:Math.min(...rects.map(r=>r.height)),namesFit:folders.every(e=>{const n=e.querySelector('.folder-page-name');return n.scrollWidth<=n.clientWidth&&n.scrollHeight<=n.clientHeight;}),fileHeight:file.getBoundingClientRect().height};
+   return {count:folders.length,columns:new Set(folders.map(e=>e.offsetLeft)).size,overflow:body.scrollWidth>body.clientWidth,filesAfter:Math.min(file.getBoundingClientRect().top)>=Math.max(...rects.map(r=>r.bottom)),minHeight:Math.min(...rects.map(r=>r.height)),namesFit:folders.every(e=>{const n=e.querySelector('.folder-page-name');return n.scrollWidth<=n.clientWidth&&n.scrollHeight<=n.clientHeight;}),fileHeight:file.getBoundingClientRect().height};
   })()`);
   assert.equal(layout.overflow,false);assert.equal(layout.filesAfter,true);assert.equal(layout.namesFit,true);assert.ok(layout.minHeight>=111);assert.ok(layout.count>=24);
-  if(width===1280)assert.ok(layout.columns>1);if(width===390)assert.equal(layout.columns,1);
+  assert.equal(layout.columns,layout.count,'現行のフォルダカードは画面幅によらず横一列');
   layouts.push({width,height,...layout});await capture(`${width}x${height}`);
  }
  const decoration=await evaluate(`(()=>{const folder=document.querySelector('[data-page-layer="live"] .folder-page-entry.folder'),today=document.querySelector('[data-page-layer="live"] [title="file000.txt"] time'),old=document.querySelector('[data-page-layer="live"] [title="README.txt"] time'),style=getComputedStyle(folder);return {radius:style.borderRadius,shadow:style.boxShadow,image:style.backgroundImage,today:today.textContent,todayColor:getComputedStyle(today).color,todayTitle:today.title,old:old.textContent};})()`);
- assert.equal(decoration.radius,'0px');assert.ok(decoration.shadow.includes('inset'));assert.equal(decoration.image,'none');assert.match(decoration.today,/^今日 /);assert.equal(decoration.todayColor,'rgb(180, 35, 24)');assert.doesNotMatch(decoration.old,/今日/);
+ assert.equal(decoration.radius,'0px');assert.equal(decoration.shadow,'none');assert.equal(decoration.image,'none');assert.match(decoration.today,/^今日 /);assert.equal(decoration.todayColor,'rgb(180, 35, 24)');assert.doesNotMatch(decoration.old,/今日/);
  // 横幅に余裕がある名前は一行。狭幅では欠落せず折り返す。
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
  const nameMetrics=await evaluate(`(()=>{const e=[...document.querySelectorAll('[data-page-layer="live"] .folder-page-entry')].find(e=>e.title===${JSON.stringify(longFile)}),n=e.querySelector('.folder-page-name'),m=e.querySelector('.folder-page-meta');return {height:n.getBoundingClientRect().height,width:n.getBoundingClientRect().width,metaWidth:m.getBoundingClientRect().width,text:n.textContent};})()`);
@@ -89,9 +89,8 @@ try{
  await evaluate(`aidiyIDE.setAutoSpin(true);aidiyIDE.interact()`);
  writeFileSync(join(project,'file000.txt'),'updated content in fixture');
  await until(`!!document.querySelector('.page-turn-refresh')`);
- const line1=await evaluate(`document.querySelector('.folder-page-turn-edge').getBoundingClientRect().top`);await capture('refresh-sweep');await sleep(160);
- const line2=await evaluate(`document.querySelector('.folder-page-turn-edge')?.getBoundingClientRect().top`);
- assert.ok(line2>line1,`${line1} -> ${line2}`);
+ const [line1,line2]=await evaluate(`new Promise(resolve=>{const edge=document.querySelector('.folder-page-turn-edge'),first=edge.getBoundingClientRect().top;requestAnimationFrame(()=>requestAnimationFrame(()=>resolve([first,edge.getBoundingClientRect().top])));})`);
+ assert.ok(line2>line1,`${line1} -> ${line2}`);await capture('refresh-sweep');
  await until(`!document.querySelector('.page-turn-refresh')`);
  const after=await evaluate(`({cursor:document.querySelector('[data-page-layer="live"] [data-cursor="true"]').title,scroll:document.querySelector('[data-page-layer="live"]').scrollTop})`);
  assert.deepEqual(after,before);
@@ -186,7 +185,7 @@ try{
  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='利用終了').click()`);
  await until(`!document.querySelector('.folder-pages')`);const endCount=await evaluate('folderCalls.length');await sleep(31000);assert.equal(await evaluate('folderCalls.length'),endCount);
  assert.deepEqual(errors,[]);
- const evidence={treeRows,grepPaths,normalFolder,sinceFolder,grepFolder,decoration,nameMetrics,before,after,line1,line2,layouts,operations:['横幅による折り返し修正','矩形カードの四辺陰影','今日だけ赤字・元日時tooltip','差分なしの手動更新と連打','変更時の下方向モーション','カーソルとスクロール維持','OFF/ON','追加削除と連続更新','フォルダ切替','reduced-motion','非表示/3D/利用終了の監視停止','閲覧軌跡のみクリアと位置保持','起点/grepのフォルダ色保持と件数表示','3分類の独立ツリーとフォルダ入場対の順次移動'],shots,errors};
+ const evidence={treeRows,grepPaths,normalFolder,sinceFolder,grepFolder,decoration,nameMetrics,before,after,line1,line2,layouts,operations:['フォルダカードの横一列配置','矩形カードの枠線と影なし表示','今日だけ赤字・元日時tooltip','差分なしの手動更新と連打','変更時の下方向モーション','カーソルとスクロール維持','OFF/ON','追加削除と連続更新','フォルダ切替','reduced-motion','非表示/3D/利用終了の監視停止','閲覧軌跡のみクリアと位置保持','起点/grepのフォルダ色保持と件数表示','3分類の独立ツリーとフォルダ入場対の順次移動'],shots,errors};
  writeFileSync(join(output,'result.json'),JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify(evidence,null,2));
 }finally{
  ws?.close();chrome.kill();await app.close();await sleep(300);

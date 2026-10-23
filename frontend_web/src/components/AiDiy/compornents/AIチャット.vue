@@ -272,6 +272,7 @@ const 演出実行 = (メッセージID: string) => {
   let index = 0;
 
   const tick = () => {
+    if (演出状態Map.get(メッセージID) !== state) return;
     const end = Math.min(index + batch, chunk.length);
     if (end > index) {
       state.textSpan.textContent += chunk.slice(index, end);
@@ -363,10 +364,15 @@ const 受信チャンネル一致 = (受信データ: any): boolean => {
 
 const ウェルカム受信処理 = (受信データ: any) => {
   if (!受信チャンネル一致(受信データ)) return;
-  表示時アクティブ化();
   console.log('[チャット] welcome_info受信:', 受信データ);
   const 内容 = 受信内容文字列(受信データ);
   if (!内容) return;
+  // 再接続で送られる履歴は置換し、復元だけではパネルを切り替えない。
+  for (const state of 演出状態Map.values()) clearInterval((state as any).blinkInterval);
+  演出状態Map.clear();
+  メッセージ一覧.value = [];
+  ストリームメッセージID = null;
+  ウェルカムテキスト受信済み.value = false;
   ウェルカム内容.value = 内容;
 };
 const 入力テキスト受信処理 = (受信データ: any) => {

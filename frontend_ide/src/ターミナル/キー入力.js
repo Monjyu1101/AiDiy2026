@@ -8,16 +8,39 @@
 // xtermのcopy/pasteイベントへ任せ、権限付きClipboard APIや二重貼付けを避ける。
 export function terminalKeyHandler(send) {
   return event => {
-    if (event.isComposing || event.keyCode === 229) return true;
+    if (event.isComposing || event.keyCode === 229 || event.getModifierState?.('AltGraph')) return true;
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && !event.altKey && (key === 'c' || key === 'v')) return false;
-    if (key === 'enter' && !event.ctrlKey && !event.metaKey && (event.altKey || event.shiftKey)) {
+    if (event.metaKey) return true;
+    const modifiers = 1 + (event.shiftKey ? 1 : 0) + (event.altKey ? 2 : 0) + (event.ctrlKey ? 4 : 0);
+    let data;
+    if (key === 'enter' && modifiers > 1) {
+      // Alt+EnterのESC+CRは維持し、Shift/CtrlはCSI-uで区別する。
+      data = !event.ctrlKey && !event.shiftKey ? '\x1b\r' : `\x1b[13;${modifiers}u`;
+    } else if (key === 'tab' && (event.ctrlKey || event.altKey)) {
+      data = `\x1b[9;${modifiers}u`;
+    } else if (modifiers > 1 && ['insert', 'pageup', 'pagedown'].includes(key)) {
+      // xterm標準のコピー・貼付け・ローカルスクロールに奪われないよう送る。
+      data = `\x1b[${{ insert: 2, pageup: 5, pagedown: 6 }[key]};${modifiers}~`;
+    } else if (event.key.length === 1 && (event.ctrlKey || event.altKey)) {
+      // keyCodeのUS配列換算ではなく、実際に入力された記号を使う。
+      let character = event.key;
+      if (event.ctrlKey) {
+        if (/^[a-z]$/i.test(character)) character = String.fromCharCode(key.charCodeAt(0) - 96);
+        else {
+          const controls = { ' ': 0, '@': 0, '`': 0, '2': 0, '[': 27, '{': 27, '3': 27,
+            '\\': 28, '|': 28, '4': 28, ']': 29, '}': 29, '5': 29, '^': 30, '~': 30, '6': 30,
+            '_': 31, '/': 31, '-': 31, '7': 31, '?': 127, '8': 127 };
+          character = Object.hasOwn(controls, character) ? String.fromCharCode(controls[character]) : null;
+        }
+      }
+      data = character === null ? `\x1b[${event.key.codePointAt(0)};${modifiers}u` : (event.altKey ? '\x1b' : '') + character;
+    }
+    if (data !== undefined) {
       event.preventDefault();
       event.stopPropagation();
       if (event.type === 'keydown') {
-        // Alt+Enterは従来のESC+CR。Shift+EnterはEnterと区別できるCSI-u。
-        // 両方押した場合も修飾を失わない（1 + Shift 1 + Alt 2）。
-        send(event.shiftKey ? `\x1b[13;${event.altKey ? 4 : 2}u` : '\x1b\r');
+        send(data);
       }
       return false;
     }

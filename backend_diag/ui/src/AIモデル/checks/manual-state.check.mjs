@@ -4,7 +4,7 @@ import {watch} from 'vue';
 import {AIモデル状態を作成} from '../AIモデル状態.mjs';
 import {TRIAL_PROMPT,decisionQuestions} from '../../../../モデル試行/defaults.mjs';
 import {createModelTrials} from '../../../../モデル試行/trials.mjs';
-const catalog={区分:Object.fromEntries(['CHAT','LIVE','DECISION','CODE'].map(f=>[f,{プロバイダ:[{id:'first',モデル:[{id:'one',名前:'One'},{id:'two',名前:'Two'}],音声:[{id:'voice'}]},{id:'second',モデル:[{id:'three'}],音声:[{id:'other'}]}]}]))};
+const catalog={区分:Object.fromEntries(['CHAT','LIVE','PREDICTION','DECISION','CODE'].map(f=>[f,{プロバイダ:[{id:'first',モデル:[{id:'one',名前:'One'},{id:'two',名前:'Two'}],音声:[{id:'voice'}]},{id:'second',モデル:[{id:'three'}],音声:[{id:'other'}]}]}]))};
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:v=>resolve(v)};};
 const settle=()=>new Promise(r=>setImmediate(r));
 
@@ -39,14 +39,14 @@ test('Decision inputs map directly to all three schemas; invalid choices never s
 test('empty candidates/offline block start and errors can retry',async()=>{
  let online=false,count=0;const s=AIモデル状態を作成({接続可能:()=>online,api:async()=>{count++;return {区分:{}};}});await s.読込();await s.開始();assert.equal(count,0);online=true;await s.読込();await s.開始();assert.equal(count,1);assert.match(s.通知.value,/確認/);s.終了();
 });
-test('config initial selection, CODE1 and greeting defaults are used without auto-running; batch snapshots four inputs',async()=>{
- const calls=[],data=structuredClone(catalog);data.初期値=Object.fromEntries(['CHAT','LIVE','DECISION','CODE'].map(f=>[f,{provider:'second',model:'three',voice:'other'}]));
- const s=AIモデル状態を作成({接続可能:()=>true,api:async(path,method,_signal,_format,body)=>{calls.push({path,method,body});if(path==='api/AIモデル')return data;if(path.endsWith('/開始'))return {実行ID:'batch',実行順:['CHAT','LIVE','DECISION','CODE1']};return {状態:path.endsWith('/CHAT')?'NG':'OK'};}});
- await s.読込();for(const f of ['CHAT','LIVE','DECISION','CODE']){s.区分変更(f);assert.equal(s.入力.provider,'second');assert.equal(s.入力.model,'three');assert.equal(s.入力.prompt,TRIAL_PROMPT);}assert.equal(calls.length,1);
+test('config initial selection, CODE1 and greeting defaults are used without auto-running; batch snapshots five inputs',async()=>{
+ const calls=[],data=structuredClone(catalog);data.初期値=Object.fromEntries(['CHAT','LIVE','PREDICTION','DECISION','CODE'].map(f=>[f,{provider:'second',model:'three',voice:'other'}]));
+ const s=AIモデル状態を作成({接続可能:()=>true,api:async(path,method,_signal,_format,body)=>{calls.push({path,method,body});if(path==='api/AIモデル')return data;if(path.endsWith('/開始'))return {実行ID:'batch',実行順:['CHAT','LIVE','PREDICTION','DECISION','CODE1']};return {状態:path.endsWith('/CHAT')?'NG':'OK'};}});
+ await s.読込();for(const f of ['CHAT','LIVE','PREDICTION','DECISION','CODE']){s.区分変更(f);assert.equal(s.入力.provider,'second');assert.equal(s.入力.model,'three');if(f!=='PREDICTION')assert.equal(s.入力.prompt,TRIAL_PROMPT);}assert.equal(calls.length,1);
  s.区分変更('DECISION');assert.equal(s.入力.name,decisionQuestions()[0].name);assert.equal(s.入力.instructions,decisionQuestions()[0].instructions);assert.equal(s.入力.choices,decisionQuestions()[0].choices.map(c=>c.value).join('\n'));
  const shown=[];const stop=watch(s.区分,value=>shown.push(value),{flush:'sync'});
- await s.開始(true);stop();assert.deepEqual(shown,['CHAT','LIVE','DECISION','CODE','CHAT']);assert.equal(s.区分.value,'CHAT');assert.equal(s.入力.model,'three');assert.equal(s.結果.value.状態,'NG');assert.deepEqual(calls.filter(c=>c.path.endsWith('/開始'))[0].body.items.map(i=>i.family),['CHAT','LIVE','DECISION','CODE']);assert.deepEqual(calls.filter(c=>c.path.startsWith('api/モデル試行/batch/')).map(c=>c.path.split('/').at(-1)),['CHAT','LIVE','DECISION','CODE1']);assert.deepEqual(Object.keys(s.結果一覧.value),['CHAT','LIVE','DECISION','CODE']);s.終了();
+ await s.開始(true);stop();assert.deepEqual(shown,['CHAT','LIVE','PREDICTION','DECISION','CODE','CHAT']);assert.equal(s.区分.value,'CHAT');assert.equal(s.入力.model,'three');assert.equal(s.結果.value.状態,'NG');assert.deepEqual(calls.filter(c=>c.path.endsWith('/開始'))[0].body.items.map(i=>i.family),['CHAT','LIVE','PREDICTION','DECISION','CODE']);assert.deepEqual(calls.filter(c=>c.path.startsWith('api/モデル試行/batch/')).map(c=>c.path.split('/').at(-1)),['CHAT','LIVE','PREDICTION','DECISION','CODE1']);assert.deepEqual(Object.keys(s.結果一覧.value),['CHAT','LIVE','PREDICTION','DECISION','CODE']);s.終了();
 });
 test('batch edit or disconnect prevents all later requests and stale results',async()=>{
- for(const mode of ['edit','disconnect']){let online=true;const wait=deferred(),calls=[],s=AIモデル状態を作成({接続可能:()=>online,api:async(path,method)=>{calls.push([path,method]);if(path==='api/AIモデル')return catalog;if(path.endsWith('/開始'))return {実行ID:'batch',実行順:['CHAT','LIVE','DECISION','CODE1']};if(method==='DELETE')return {};return wait.promise;}});await s.読込();const pending=s.開始(true);await settle();if(mode==='edit')s.変更('model','two');else{online=false;s.中止();}wait.resolve({状態:'OK',応答:'old'});await pending;assert.equal(calls.some(c=>c[0].endsWith('/LIVE')),false);assert.deepEqual(s.結果一覧.value,{});s.終了();}
+ for(const mode of ['edit','disconnect']){let online=true;const wait=deferred(),calls=[],s=AIモデル状態を作成({接続可能:()=>online,api:async(path,method)=>{calls.push([path,method]);if(path==='api/AIモデル')return catalog;if(path.endsWith('/開始'))return {実行ID:'batch',実行順:['CHAT','LIVE','PREDICTION','DECISION','CODE1']};if(method==='DELETE')return {};return wait.promise;}});await s.読込();const pending=s.開始(true);await settle();if(mode==='edit')s.変更('model','two');else{online=false;s.中止();}wait.resolve({状態:'OK',応答:'old'});await pending;assert.equal(calls.some(c=>c[0].endsWith('/LIVE')),false);assert.deepEqual(s.結果一覧.value,{});s.終了();}
 });

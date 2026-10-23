@@ -54,7 +54,8 @@ test('npm 全4パッケージの実際の能力情報を使い、確認は insta
   t.after(() => rm(prefix, { recursive: true, force: true }));
   for (const [id, pkg] of Object.entries(NPM_PACKAGES)) {
     const directory = path.join(root, ...pkg.split('/'));
-    await mkdir(directory, { recursive: true }); await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: pkg }));
+    await mkdir(directory, { recursive: true }); await writeFile(path.join(directory, 'package.json'), JSON.stringify({ name: pkg, bin: { [id]: 'cli.js' } }));
+    await writeFile(path.join(directory, 'cli.js'), '// fixture');
     const capability = await npmCapability({ id }, { prefix, root }, { platform: 'linux', resolve: async () => null });
     assert.deepEqual(capability.操作, ['再導入', '削除']);
     const f = await fixture(); f.setData({ 項目: [capability], 実行: null }); await f.state.接続(true);
@@ -66,8 +67,8 @@ test('npm 全4パッケージの実際の能力情報を使い、確認は insta
 });
 
 test('開始連打は一度だけ送信し、POST本文なし。進行ログ・確認中・完了までGETで追跡する', async () => {
-  let finish;
-  const f = await fixture({ api: async (url, method) => method === 'POST' ? new Promise(resolve => { finish = resolve; }) : snapshot(null) });
+  let finish, current = snapshot(null);
+  const f = await fixture({ api: async (url, method) => method === 'POST' ? new Promise(resolve => { finish = resolve; }) : current });
   // 個別応答を変えられる API に差し替える代わりに、この fixture の後半は可変 snapshot を使用する。
   await f.state.接続(true);
   const start = f.state.開始('claude', '導入', 'Claude Code'); await flush();
@@ -77,7 +78,7 @@ test('開始連打は一度だけ送信し、POST本文なし。進行ログ・�
   assert.equal(f.approvals.length, 1);
   const sent = f.calls.find(([, method]) => method === 'POST');
   assert.equal(sent[0], `api/導入管理/claude/${encodeURIComponent('導入')}`); assert.equal(sent.length, 3);
-  finish(snapshot(running())); assert.equal(await start, true);
+  current = snapshot(running()); finish(current); assert.equal(await start, true);
   assert.equal(f.state.実行.value.ログ, 'installing\n'); assert.equal(f.timers.size, 1);
   f.state.終了(); assert.equal(f.timers.size, 0);
 
@@ -138,7 +139,7 @@ test('切断・再接続・終了は通信を破棄し、遅れた応答と確�
   f.接続済み.value = true; await f.state.接続(true);
   finish(snapshot(completed())); await old;
   assert.equal(f.state.実行.value, null); assert.deepEqual(f.state.可能操作('claude'), []); assert.equal(f.merged.length, 0);
-  defer = true; const destroyed = f.state.読込(); f.state.終了(); finish(snapshot(running())); await destroyed;
+  defer = true; const destroyed = f.state.読込(); f.state.終了(); current = snapshot(running()); finish(current); await destroyed;
   assert.equal(f.操作中.value, false); assert.equal(f.timers.size, 0); assert.equal(f.state.実行.value, null);
 
   let approve;

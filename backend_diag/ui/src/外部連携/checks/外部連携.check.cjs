@@ -6,7 +6,7 @@ test('外部連携は行ごとの「テスト」で認証を確認し、キー�
  const html=await render('外部連携/外部連携パネル.vue',{data,results:{huggingface_read:{状態:'OK'}},connected:true});
  assert.equal((html.match(/class="integration-row"/g)||[]).length,3);
  assert.equal((html.match(/>テスト<\/button>/g)||[]).length,3);
- assert.equal((html.match(/<button disabled[^>]*>テスト<\/button>/g)||[]).length,2,'キー未設定・読込不可の行は押せない');
+ assert.equal((html.match(/<button\b[^>]*\sdisabled[^>]*>テスト<\/button>/g)||[]).length,2,'キー未設定・読込不可の行は押せない');
  assert.equal((html.match(/data-state="未実施"/g)||[]).length,2);assert.equal((html.match(/data-state="OK"/g)||[]).length,1);
  assert.match(html,/>外部連携確認<\/h2>/);assert.match(html,/id="integration-run"[^>]*>状況確認<\/button>/);assert.match(html,/id="integration-write"[^>]*>書込<\/button>/);assert.doesNotMatch(html,/<button[^>]*disabled[^>]*id="integration-write"|id="integration-write"[^>]*disabled/,'確認結果があれば書込できる');
  assert.match(html,/キーが未設定です/);assert.match(html,/確認不可/);assert.match(html,/未設定/);

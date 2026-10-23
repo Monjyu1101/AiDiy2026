@@ -68,7 +68,7 @@ async function holdUnmoved(window,contents,selector,label,{frame='',dom=true,clo
   if(closePopup){contents.sendInputEvent({type:'keyDown',keyCode:'Escape'});contents.sendInputEvent({type:'keyUp',keyCode:'Escape'});}
   return{label,bounds:before,originalPressDelivered:true,noDrag:true,noSyntheticPress:true};
  }finally{
-  try{if(dom&&!contents.isDestroyed())await contents.executeJavaScript(`(()=>{const doc=${doc};for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])doc?.removeEventListener(type,controlInput,true);})()`);}
+  try{if(dom&&!contents.isDestroyed())await contents.executeJavaScript(`(()=>{const doc=${doc};if(window.controlInput)for(const type of ['pointerdown','mousedown','pointerup','mouseup','click'])doc?.removeEventListener(type,window.controlInput,true);})()`);}
   finally{contents.sendInputEvent=originalSend;window.isFocused=originalFocus;screen.getCursorScreenPoint=originalCursor;}
  }
 }

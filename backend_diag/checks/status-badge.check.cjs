@@ -28,10 +28,10 @@ test('key list keeps public acquisition and individual test outcomes separate', 
   assert.match(html, /<span class="public-status"[^>]*>公開モデル一覧取得: <span class="badge public-indicator" data-state="OK" data-tone="success"/);
   assert.equal((html.match(/public-indicator/g) || []).length, 1);
   const cached = await render('モデル一覧/モデル一覧パネル.vue', { data: { 設定状態: '読込済み', 項目: [] }, results: {}, connected: true, publicModels: { 状態: '取得済', 取得元: 'キャッシュ' } });
-  assert.match(cached, /class="badge public-indicator" data-state="キャッシュ利用" data-tone="cache"[^]*?<\/span><button class="public-retry"[^>]*>再取得<\/button><\/span>/);
+  assert.match(cached, /class="badge public-indicator" data-state="キャッシュ利用" data-tone="cache"[^]*?<\/span><button class="public-retry refresh-button"[^>]*>[^]*?<span>再取得<\/span><\/button><\/span>/);
   assert.match(html, /data-state="NG" data-tone="danger"/);
   assert.match(html, />テスト<\/button>/);
-  assert.match(html, /<button id="latest-models"[^>]*>一覧再取得<\/button>/);
+  assert.match(html, /<button id="latest-models"[^>]*>一括取得<\/button>/);
   assert.doesNotMatch(html, /設定状況を更新/);
   assert.doesNotMatch(html, /public-retry/);
   assert.match(html, /class="config-state">設定済/);

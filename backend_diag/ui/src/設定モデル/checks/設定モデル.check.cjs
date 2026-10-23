@@ -68,7 +68,7 @@ test('個別テストは選択行だけ要求し、サーバー指定の同一�
  for(const id of group)assert.equal(state.結果.value[id].状態,'実行中');
  assert.equal(state.結果.value.CHAT.応答,'previous');assert.equal(state.結果.value.CODE3,undefined);
  const html=await render('設定モデル/設定モデルパネル.vue',{data:grouped,results:state.結果.value,selected:'TASK_do',online:true,running:true});
- assert.match(html,/テスト中/);assert.match(html,/>再読込<\/button>/);assert.equal((html.match(/data-trial-id="[^"]+"[^>]* disabled/g)||[]).length,15);assert.doesNotMatch(html,/model-trial-single/);
+ assert.match(html,/テスト中/);assert.match(html,/>再読込<\/span><\/button>/);assert.equal((html.match(/data-trial-id="[^"]+"[^>]* disabled/g)||[]).length,15);assert.doesNotMatch(html,/model-trial-single/);
  pending.resolve({id:'TASK_do',状態:'OK',応答:'おはよう',所要ms:123});await run;
  for(const id of group){assert.equal(state.結果.value[id].状態,'OK');assert.equal(state.結果.value[id].共有元,id==='TASK_do'?'':'TASK_do');}
  assert.deepEqual(calls.filter(x=>x[1]==='POST').map(x=>x[0]),['api/モデル試行/開始/TASK_do','api/モデル試行/single/TASK_do']);assert.equal(state.実行中.value,false);
@@ -117,7 +117,7 @@ test('全15行のテストボタンは接続・読込・実行状態で制御し
   assert.equal(buttons.length,15);
   assert.ok(buttons.every(button=>button.includes(' disabled')===(!flags.online||!!flags.loading||!!flags.running)));
   assert.doesNotMatch(html,/model-trial-single|選択項目をテスト/);
-  assert.match(html,/>再読込<\/button>/);assert.match(html,/動作確認/);
+  assert.match(html,/>再読込<\/span><\/button>/);assert.match(html,/動作確認/);
  }
 });
 

@@ -13,6 +13,8 @@ async function fixture(){
  const root=path.join(workspace,'backend_diag');
  await cp(new URL('../',import.meta.url),root,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
  await cp(new URL('../../frontend_ide/src/共通表示/シアンバー.css',import.meta.url),path.join(workspace,'frontend_ide/src/共通表示/シアンバー.css'));
+ await cp(new URL('../../scripts/opencode-npm.mjs',import.meta.url),path.join(workspace,'scripts/opencode-npm.mjs'));
+ await cp(new URL('../../_icons/AiDiy.png',import.meta.url),path.join(workspace,'_icons/AiDiy.png'));
  return root;
 }
 async function cleanup(root){

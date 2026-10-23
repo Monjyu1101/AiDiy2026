@@ -18,6 +18,15 @@ import * as mediaTypes from '../viewer/media-types.mjs';
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
 const { transformSync } = require('esbuild');
+// 共通ボタンも実Vueを読み込み、ビューアの現在の部品構成で検証する。
+const refreshFilename = fileURLToPath(new URL('../src/共通表示/再読込ボタン.vue', import.meta.url));
+const refreshDescriptor = parse(readFileSync(refreshFilename, 'utf8')).descriptor;
+const refreshScript = compileScript(refreshDescriptor, { id: 'RefreshButton', inlineTemplate: true });
+const refreshModule = { exports: {} };
+vm.runInNewContext(transformSync(refreshScript.content, { format: 'cjs' }).code, {
+  module: refreshModule, exports: refreshModule.exports,
+  require: id => id === 'vue' ? vue : assert.fail(`Unexpected refresh import ${id}`),
+});
 const flush = async () => { for (let n = 0; n < 30; n++) await Promise.resolve(); };
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { resolve, promise }; };
 const walk = (node, predicate) => predicate(node) ? node : node.children?.map(child => walk(child, predicate)).find(Boolean);
@@ -57,7 +66,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     localStorage: { getItem: () => null },
     fetch: async () => ({ ok: true, json: async () => fileData }),
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
-    require: id => id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
+    require: id => id === '../共通表示/再読込ボタン.vue' ? refreshModule.exports : id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
       : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
         : id === '../ブラウザ/起動.js' ? browser : id === '../../viewer/media-types.mjs' ? mediaTypes : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });

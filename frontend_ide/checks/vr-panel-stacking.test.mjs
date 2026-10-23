@@ -9,10 +9,10 @@ import {EventEmitter} from 'node:events';
 import {readFileSync} from 'node:fs';
 import stacking from '../デスクトップ/VRパネル前面.cjs';
 import pinModule from '../デスクトップ/最前面ピン.cjs';
-function fixture(){
+function fixture(platform="linux"){
  const windows=new Map(),order=[],calls=[],tasks=new Map(),errors=[];let serial=0,active=false;
  const pins=pinModule.createWindowPins();
- const controller=stacking.createVRPanelStacking({windows,isActive:owner=>active&&owner===ide,schedule:fn=>{tasks.set(++serial,fn);return serial;},cancel:id=>tasks.delete(id),onError:error=>errors.push(error)});
+ const controller=stacking.createVRPanelStacking({windows,platform,isPinned:record=>record.stack!==false,isActive:owner=>active&&owner===ide,schedule:fn=>{tasks.set(++serial,fn);return serial;},cancel:id=>tasks.delete(id),onError:error=>errors.push(error)});
  function add(kind,owner){
   const id=`window:${windows.size+1}:0`,window=new EventEmitter();
   const record={window,kind,owner};
@@ -46,9 +46,9 @@ test('表示・復元・最大化・画面更新・VR中に新規作成したパ
  f.ide.window.moveTop();f.controller.refresh(f.ide);f.above(explorer);f.above(routes);
  explorer.window.focus();f.controller.refresh(f.ide);assert.equal(f.order.at(-1),explorer.window.getMediaSourceId(),'選択パネルをパネル群の最上段に保つ');
 });
-test('他のIDE、通常部品、非表示・最小化したパネルを持ち上げない',()=>{
+test('他のIDE、ピンOFF、非表示・最小化したパネルを持ち上げない',()=>{
  const f=fixture(),other=f.add('ide'),foreign=f.add('explorer',other),code=f.add('code',f.ide),hidden=f.add('explorer',f.ide),minimized=f.add('panel-routes',f.ide);
- hidden.window.visible=false;minimized.window.minimized=true;f.calls.length=0;f.vr(true);f.ide.window.focus();f.flush();assert.equal(f.calls.length,0);
+ code.stack=false;hidden.window.visible=false;minimized.window.minimized=true;f.calls.length=0;f.vr(true);f.ide.window.focus();f.flush();assert.equal(f.calls.length,0);
  for(const record of [other,foreign,code,hidden,minimized])assert.ok(!f.calls.some(([id])=>id===record.window.getMediaSourceId()));
  hidden.window.visible=true;hidden.window.emit('show');f.above(hidden);assert.ok(!minimized.window.isFocused());
  f.calls.length=0;f.ide.window.minimized=true;f.controller.refresh(f.ide);f.flush();assert.equal(f.calls.length,0);
@@ -65,5 +65,16 @@ test('再入・終了・VR解除後の遅延処理を安全に扱い、購読を
 test('実mainはピン登録後の全窓登録とVRロック更新後の再配置を接続',()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  assert.match(source,/windowPins\.register\(record\.window,[^\n]+\n vrPanelStacking\.register\(record\);/);
- assert.match(source,/windowPins\.setLocked\(record\.window,locked\);\n vrPanelStacking\.refresh\(owner\);/);
+ assert.match(source,/windowPins\.setLocked\(record\.window,locked\);\r?\n vrPanelStacking\.refresh\(owner\);/);
+});
+
+test('Windowsは同じ最前面層のmoveTopで本体選択後もパネルを維持する',()=>{
+ const f=fixture('win32'),explorer=f.add('explorer',f.ide),routes=f.add('panel-routes',f.ide);
+ explorer.window.moveAbove=routes.window.moveAbove=()=>assert.fail('WindowsではmoveAboveを使わない');
+ f.vr(true);for(let i=0;i<5;i++){f.ide.window.focus();f.flush();f.above(explorer);f.above(routes);assert.equal(f.ide.window.isFocused(),true);}
+});
+
+test('VR中に追加した全種別のパネルはピン固定で本体より前に出る',()=>{
+ const f=fixture('win32');f.vr(true);
+ for(const kind of ['explorer','panel-routes','panel-viewer','code','live','term']){const record=f.add(kind,f.ide);assert.deepEqual(f.pins.state(record.window),{pinned:true,locked:true});f.pins.toggle(record.window);assert.equal(f.pins.state(record.window).pinned,true);f.ide.window.focus();f.flush();f.above(record);}
 });

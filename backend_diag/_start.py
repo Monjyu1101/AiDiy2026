@@ -36,6 +36,18 @@ def run_headless():
         raise RuntimeError(f'aidiy_diag --headless に失敗しました（終了コード {result.returncode}）。')
 
 
+def launch_gui():
+    """全体起動の診断選択から呼ぶ。画面を切り離して起動し、表示準備の完了で戻る。
+    --auto により、画面側で保存済みの起動設定による「設定起動」を自動実行する。"""
+    node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
+    if not node:
+        raise RuntimeError('Node.js が見つかりません: https://nodejs.org/')
+    result = subprocess.run([node, str(ROOT / 'diag_main.mjs'), '--auto'], cwd=ROOT, stdin=subprocess.DEVNULL,
+                            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+    if result.returncode:
+        raise RuntimeError(f'aidiy_diag の起動に失敗しました（終了コード {result.returncode}）。')
+
+
 def start():
     node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
     if not node:

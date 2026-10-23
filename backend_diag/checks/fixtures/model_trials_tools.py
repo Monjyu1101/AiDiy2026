@@ -19,7 +19,13 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "backend_tools"))
 # Import the production registrations without creating real service logs.
 sys.modules["log_config"] = types.SimpleNamespace(get_logger=logging.getLogger)
-from tools_proc import tools_agents, tools_chat, tools_decisions
+from tools_proc import tools_agents, tools_chat, tools_decisions, conversation_history
+
+# SDK契約試験は利用者のDBに書き込まず、履歴境界の呼出しだけ記録する。
+history_records = []
+def record_history(*args, **kwargs):
+    history_records.append(kwargs)
+conversation_history.write_history_message = record_history
 from tools_proc.decisions_check import Decision
 from tools_proc.live_model_check import LiveModelCheck, register_live_model_check
 
@@ -36,8 +42,12 @@ class Model:
         if args:
             assert args[6] is False and args[10] is False
         else:
-            assert kwargs["resume"] is False and kwargs["self_check_loop"] == 0
-        return {"status": "OK", "result": "おはようございます", "ai_model": "chat-test", "selected_model": "code-test", "ai_name": "freeai_chat"}
+            assert kwargs["resume"] is False
+            if kwargs["ai_name"] == "codex_cli":
+                assert kwargs["self_check_loop"] == 0
+            else:
+                assert kwargs["use_tools"] is False
+        return {"status": "OK", "history_saved": True, "result": "おはようございます", "ai_model": "chat-test", "selected_model": "code-test", "ai_name": "freeai_chat"}
 
 
 class Live:

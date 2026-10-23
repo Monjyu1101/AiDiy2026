@@ -16,8 +16,21 @@ async function fixture({switching=false}={}){
  const renderer=vue.createRenderer({createElement:make,createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[];},parentNode:n=>n.parent,nextSibling:n=>n.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,k,_old,v)=>n.props[k]=v,insert(n,p){n.parent=p;p.children.push(n);},remove(n){n.parent?.children.splice(n.parent.children.indexOf(n),1);}});
  const appState={フォルダ:vue.ref('/work/project'),項目:vue.ref([]),処理中:vue.ref(''),選択中:vue.ref(false),読込(){}},cliState={項目:vue.ref([]),読込(){}};
  const root=make('root'),app=renderer.createApp({render:()=>vue.h(module.exports,{appState,cliState,online:true,switching})});app.mount(root);
- return {app,root,appState,calls,sizes,label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
+ return {app,root,appState,cliState,calls,sizes,label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
 }
+
+test('VS Codeを含む6アプリ・7CLI・エディターの14個をアイコン表示へ渡す',async()=>{
+ const f=await fixture();
+ try{
+  f.appState.項目.value=['avatar','ide','term','code','live','discord'].map(id=>({id,名前:id}));
+  f.cliState.項目.value=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'].map(id=>({id,名前:id,利用可能:true}));
+  f.cliState.項目.value.push({id:'vscode',名前:'VS Code',種類:'editor',利用可能:true});
+  await flush();
+  assert.equal(nodes(f.root).filter(n=>n.props.class==='micro-app').length,14);
+  assert.ok(nodes(f.root).some(n=>n.tag==='img'&&n.props.src==='CLI_vscode.svg'));
+  f.core().props.onClick({detail:0});await flush();assert.deepEqual(f.calls.at(-1),[true,14]);
+ }finally{f.app.unmount();}
+});
 
 test('アイコンの下に1つだけプロジェクト名を表示し、Windows/POSIX・末尾区切り・変更・長名を扱う',async()=>{
  const f=await fixture();
@@ -31,9 +44,9 @@ test('アイコンの下に1つだけプロジェクト名を表示し、Windows
   }
   const image=nodes(f.core()).find(n=>n.tag==='img');assert.equal(image.props.src,'AiDiy.png');assert.equal(image.props.width,'40');assert.equal(image.props.height,'40');
   f.core().props.onClick({detail:0});await flush();
-  assert.equal(f.label().style.display,'none','展開メニューに名前を重ねない');
+  assert.notEqual(f.label().style.display,'none','展開中も名前を表示したままにする');
   f.core().props.onClick({detail:0});await new Promise(resolve=>setTimeout(resolve,480));await flush();
-  assert.notEqual(f.label().style.display,'none','収納時は名前を戻す');
+  assert.notEqual(f.label().style.display,'none','収納後も名前を表示する');
  }finally{f.app.unmount();}
 });
 
@@ -43,7 +56,9 @@ test('名前は透明な同幅領域で日本語・空白なし英字も折り�
  assert.equal(d.background,'transparent');assert.equal(d['white-space'],'normal');assert.equal(d['overflow-wrap'],'anywhere');
  assert.equal(d.width,'120px');assert.equal(d['min-height'],'18px');assert.equal(d['text-overflow'],undefined);
  assert.equal(d['pointer-events'],'auto');assert.equal(d['-webkit-app-region'],'no-drag');
- assert.equal(d.top,'102px');assert.ok(parseFloat(d.width)<閉じた幅);
+ assert.equal(d.top,'calc(var(--core-y,64px) + 48px)');assert.ok(parseFloat(d.width)<閉じた幅);
+ const unfolded={};css.walkRules(r=>{if(r.selector==='.micro-launcher.unfolded .micro-project')r.walkDecls(v=>unfolded[v.prop]=v.value);});
+ assert.equal(unfolded['-webkit-line-clamp'],'2');assert.equal(unfolded.overflow,'hidden');
 });
 
 test('ラベルの実測高さを送り、長名から短名へ戻しても縮める',async()=>{

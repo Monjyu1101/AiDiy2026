@@ -567,7 +567,7 @@ test('軌跡3分類: 起点/grep開始・結果・失敗・再検索・空結果
   const ex=h.states.get('FileExplorer');
   await h.engine.goTo({type:'file',path:'root.js'});await flush();
   const saved=JSON.parse(localStorage.getItem('aidiy_ide:/project'));
-  await h.click(n=>n.text==='検索軌跡');assert.equal(ex.routeRows.value.length,0);assert.equal(h.engine.routeState.mode,'search');
+  await h.click(n=>n.text==='時刻軌跡');assert.equal(ex.routeRows.value.length,0);assert.equal(h.engine.routeState.mode,'search');
   await h.click(n=>n.text==='閲覧軌跡');
   ex.choose('start');await flush();assert.equal(ex.routeMode.value,'search');assert.ok(ex.routePaths.value.includes('root.js'));
   assert.ok(ex.routeRows.value.every(row=>row.parent===null));
@@ -618,7 +618,7 @@ test('実AI検索部品: 開始・失敗・再検索・再確認でAiDiy分類�
   response=reply({status:'complete',result:{id:'fixture',query:'query',files:[],route:['src/main.js']}});
   await h.click(n=>n.text==='閲覧軌跡');await ai.search();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
   await h.click(n=>n.text==='閲覧軌跡');response=reply({status:'failed',message:'fixture fail',id:'test'});await ai.search();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
-  await h.click(n=>n.text==='検索軌跡');ai.recheck();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
+  await h.click(n=>n.text==='時刻軌跡');ai.recheck();await flush();assert.equal(ex.routeMode.value,'ai');assert.deepEqual([...ex.aiRoute.value],['src/main.js']);
  }finally{h.dispose();}
 });
 

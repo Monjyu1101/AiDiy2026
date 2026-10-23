@@ -22,8 +22,9 @@ const stopped=signal=>{if(signal?.aborted)throw failure('操作を中止しま�
 const unsafe=value=>typeof value!=='string'||!path.isAbsolute(value)||/^[/\\]{2}/.test(value)||/["!%&|<>^;\r\n\0]/.test(value);
 const success=result=>result?.code===0&&!result.error&&!result.cancelled&&!result.timedOut&&!result.overflow;
 
+// 2026-10-22 の配布から署名者が X.AI LLC から X Corp.（Bastrop, Texas）に変わった。
 export function officialSigner(info) {
-  return info?.status==='Valid'&&/(?:^|,\s*)CN=X\.AI (?:LLC|Corp\.?)(?:,|$)/.test(info.subject||'');
+  return info?.status==='Valid'&&/(?:^|,\s*)CN=(?:X\.AI (?:LLC|Corp\.?)|X Corp\.)(?:,|$)/.test(info.subject||'');
 }
 
 function environment(env,context,temporary) {
