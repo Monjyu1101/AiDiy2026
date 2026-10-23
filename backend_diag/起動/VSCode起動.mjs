@@ -16,7 +16,7 @@ export async function resolveVSCode({platform=process.platform,env=process.env,r
  for(const name of names){const candidate=p.join(root,name);try{if((await statFn(candidate)).isFile())return candidate;}catch{}}
  return null;
 }
-export function createVSCodeLauncher({spawnFn=spawn,resolveFn=resolveVSCode,env=process.env,platform=process.platform,realpathFn=realpath,statFn=stat}={}){
+export function createVSCodeLauncher({spawnFn=spawn,resolveFn=resolveVSCode,env=process.env,platform=process.platform,realpathFn=realpath,statFn=stat,startupGrace=1000}={}){
  async function catalog(){let available=false;try{available=Boolean(await resolveFn({platform,env}));}catch{}
   return {id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:available};
  }
@@ -28,9 +28,18 @@ export function createVSCodeLauncher({spawnFn=spawn,resolveFn=resolveVSCode,env=
   const childEnv={...env};
   for(const key of Object.keys(childEnv))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(key))delete childEnv[key];
   try{
-   const child=spawnFn(executable,['--new-window',cwd],{cwd,env:childEnv,detached:true,windowsHide:true,shell:false,stdio:'ignore'});
-   await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
-  }catch{throw fail('VS Code を起動できませんでした。導入状況を確認してください。',503);}
+   const child=spawnFn(executable,['--new-window',cwd],{cwd,env:childEnv,detached:true,windowsHide:false,shell:false,stdio:'ignore'});
+   // GUI 実体へ SW_HIDE を渡さない。spawn は窓の表示完了を意味しないため、
+   // 起動直後の異常終了だけは検出する。既存 VS Code への引渡し後の exit=0 は正常。
+   await new Promise((resolve,reject)=>{
+    let timer,finished=false;
+    const finish=error=>{if(finished)return;finished=true;clearTimeout(timer);child.off('exit',exited);error?reject(error):resolve();};
+    const exited=(code,signal)=>finish(code===0&&!signal?undefined:fail(`VS Code が起動直後に終了しました（終了コード: ${Number.isInteger(code)?code:'なし'}）。導入状況を確認してください。`,503));
+    child.once('spawn',()=>{if(!finished)timer=setTimeout(()=>finish(),startupGrace);});
+    child.once('error',()=>finish(fail('VS Code を起動できませんでした。導入状況を確認してください。',503)));
+    child.once('exit',exited);
+   });child.unref();
+  }catch(error){throw error.status?error:fail('VS Code を起動できませんでした。導入状況を確認してください。',503);}
   return {受付:true,通知:''};
  }
  return {catalog,launch};

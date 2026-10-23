@@ -5,11 +5,11 @@ import {createServer} from '../diag_main.mjs';
 import {createVSCodeLauncher,resolveVSCode} from '../起動/VSCode起動.mjs';
 function fixture(options={}){
  const calls=[],env={PATH:'/bin',HTTPS_PROXY:'http://proxy.test:8080',NO_PROXY:'localhost',ELECTRON_RUN_AS_NODE:'1',NODE_OPTIONS:'--inspect'};
- const manager=createVSCodeLauncher({env,resolveFn:async()=>'/bin/code',realpathFn:async x=>x,statFn:async()=>({isDirectory:()=>true}),spawnFn(command,args,opts){calls.push({command,args,opts});const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;},...options});return {manager,calls,env};
+ const manager=createVSCodeLauncher({startupGrace:1,env,resolveFn:async()=>'/bin/code',realpathFn:async x=>x,statFn:async()=>({isDirectory:()=>true}),spawnFn(command,args,opts){calls.push({command,args,opts});const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;},...options});return {manager,calls,env};
 }
 test('VS Code opens exact selected folder without shell, model, Term, or approval flags; inherits proxy',async()=>{
  const f=fixture(),project="/tmp/日本語 project ' & $ % ;";assert.equal((await f.manager.launch(project)).受付,true);
- assert.deepEqual(f.calls[0].args,['--new-window',project]);assert.equal(f.calls[0].opts.cwd,project);assert.equal(f.calls[0].opts.shell,false);
+ assert.deepEqual(f.calls[0].args,['--new-window',project]);assert.equal(f.calls[0].opts.cwd,project);assert.equal(f.calls[0].opts.shell,false);assert.equal(f.calls[0].opts.windowsHide,false);
  assert.equal(f.calls[0].opts.env.HTTPS_PROXY,f.env.HTTPS_PROXY);assert.equal(f.calls[0].opts.env.NO_PROXY,'localhost');assert.equal(f.calls[0].opts.env.ELECTRON_RUN_AS_NODE,undefined);assert.equal(f.env.ELECTRON_RUN_AS_NODE,'1');
 });
 test('missing executable, invalid folder and spawn error do not fall back to another folder',async()=>{
@@ -23,7 +23,7 @@ test('Windows code.cmd maps to actual Code.exe without cmd interpolation; handle
   const root='C:\\Users\\日本語 user\\Microsoft VS Code',checks=[];
   const result=await resolveVSCode({platform:'win32',resolveFn:async(entry)=>{assert.equal(entry.id,'code');return root+'\\bin\\'+cmd;},statFn:async p=>{checks.push(p);return {isFile:()=>true};}});
   assert.equal(result,root+'\\'+exe);assert.deepEqual(checks,[result]);
-  const f=fixture({platform:'win32',resolveFn:async()=>result});const folder='C:\\work 日本語\\a & %PATH%';await f.manager.launch(folder);assert.deepEqual(f.calls[0].args,['--new-window',folder]);assert.equal(f.calls[0].opts.shell,false);
+  const f=fixture({platform:'win32',resolveFn:async()=>result});const folder='C:\\work 日本語\\a & %PATH%';await f.manager.launch(folder);assert.deepEqual(f.calls[0].args,['--new-window',folder]);assert.equal(f.calls[0].opts.shell,false);assert.equal(f.calls[0].opts.windowsHide,false);
  }
  assert.equal(await resolveVSCode({platform:'win32',resolveFn:async()=>'C:\\Code\\bin\\code.cmd',statFn:async()=>{throw Error();}}),null);
 });
@@ -54,4 +54,18 @@ test('VS Code label uses editor blue and white, with matching launcher geometry'
  assert.match(svg,/id="caption-band" x="0" y="90" width="120" height="30" fill="#1e3a5f"/);
  assert.match(svg,/font-size="22" font-weight="700" fill="#ffffff">VSCODE<\/text>/);
  const png=await readFile(new URL('../ui/src/アプリ起動/CLIアイコン/vscode.png',import.meta.url));assert.equal(png.readUInt32BE(16),120);assert.equal(png.readUInt32BE(20),120);
+});
+
+test('GUI process failures after spawn are reported; an existing-window handoff exit=0 succeeds',async()=>{
+ for(const code of [1,42,null,0]){
+  let unref=false;
+  const f=fixture({startupGrace:20,spawnFn(){const c=new EventEmitter();c.unref=()=>{unref=true;};queueMicrotask(()=>{c.emit('spawn');c.emit('exit',code,code===null?'SIGTERM':null);});return c;}});
+  if(code===0){assert.equal((await f.manager.launch('/project')).受付,true);assert.equal(unref,true);}
+  else {await assert.rejects(f.manager.launch('/project'),/起動直後に終了/);assert.equal(unref,false);}
+ }
+});
+test('real child exiting nonzero after successful OS spawn is not accepted as successful launch',async()=>{
+ const {spawn}=await import('node:child_process');
+ const f=fixture({startupGrace:2000,spawnFn(_exe,_args,opts){return spawn(process.execPath,['-e','process.exit(23)'],{...opts,cwd:process.cwd()});}});
+ await assert.rejects(f.manager.launch('/project'),/終了コード: 23/);
 });
