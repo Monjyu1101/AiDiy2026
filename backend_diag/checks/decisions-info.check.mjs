@@ -27,6 +27,10 @@ const fetch=async(provider,headers,token)=>{
 const acquire=async(id,extra={})=>probe(id,{reader:configReader,oauthReader,fetch,cache,now,...extra});
 const allResults=async()=>Object.fromEntries(await Promise.all(providers.map(async({id})=>[id,await acquire(id)])));
 
+test('Google decision auto default is the requested model',()=>{
+ assert.equal(FREEAI_DECISION_MODEL,'gemini-3.5-flash-lite');
+});
+
 test('four methods use authenticated raw lists without public, synthetic or nontext candidates',async()=>{
  const results=await allResults();
  assert.deepEqual(results.gemini.モデル,['gemini-live'],'legacy public filtering is unchanged');
@@ -100,8 +104,8 @@ test('writer creates exact schema, invalidates old cache and reports headless ou
 });
 
 
-test('FreeAI never invents latest alias from a versioned, public or unavailable model',async()=>{
- for(const ids of [['gemini-3.5-flash-lite'],['gemini-3.8-flash-lite-tts'],[]]){
+test('FreeAI never invents the configured candidate from another, public or unavailable model',async()=>{
+ for(const ids of [['gemini-flash-lite-latest'],['gemini-3.8-flash-lite-tts'],[]]){
   const result=await acquire('freeai',{fetch:async()=>({models:ids.map(id=>({name:'models/'+id,supportedGenerationMethods:['generateContent']}))}),cache:{公開状態:'取得済',公開モデル:{['google/'+FREEAI_DECISION_MODEL]:{作成日:'2026/10/18'}}}});
   assert.equal((await decisionsModelsInfo(providers,{freeai:result},options)).freeai_chat,undefined);
  }

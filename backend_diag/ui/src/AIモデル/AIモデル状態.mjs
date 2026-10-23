@@ -18,10 +18,10 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
  const モデル=computed(()=>選択肢.value?.モデル||[]),音声候補=computed(()=>選択肢.value?.音声||[]);
  const 予測条件=computed(()=>{const form=forms.PREDICTION,provider=一覧.value?.区分?.PREDICTION?.プロバイダ?.find(p=>p.id===form.provider),model=provider?.モデル?.find(m=>m.id===form.model);return {プロバイダ:model?.解決プロバイダ,モデル:model?.解決モデル,テスト可能:model?.利用可能===true&&チャット成功.value.length>0,説明:model?.説明||'先にChatテストを成功させてください。'};});
  const remembered=new Map();
- function 中止(message='',preserveChat=false){
+ function 中止(message='',preserveChat=false,preserveResults=false,preserveAudio=false){
   const invalidate=!preserveChat&&チャット成功.value.length>0;
   if(!preserveChat)チャット成功.value=[];
-  世代++;controller?.abort();controller=null;音声.破棄();結果一覧.value=preserveChat?Object.fromEntries(Object.entries(結果一覧.value).map(([key,{音声ファイル,...value}])=>[key,value])):{};実行中.value=false;読込中.value=false;通知.value=message;
+  世代++;controller?.abort();controller=null;if(!preserveAudio)音声.破棄();if(!preserveResults)結果一覧.value=preserveChat?Object.fromEntries(Object.entries(結果一覧.value).map(([key,{音声ファイル,...value}])=>[key,value])):{};実行中.value=false;読込中.value=false;通知.value=message;
   const id=runId;runId='';
   if(id||invalidate)cancelled=Promise.all([...(id?[api(`api/モデル試行/${id}`,'DELETE').catch(()=>{})]:[]),...(invalidate?[api('api/モデル試行/チャット成功','DELETE')]:[])]);
   cancelled.catch(()=>{});
@@ -32,8 +32,8 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
   入力.model=モデル.value.some(m=>m.id===prior?.model)?prior.model:選択肢.value?.現在モデル||モデル.value[0]?.id||'';
   入力.voice=音声候補.value.some(v=>v.id===prior?.voice)?prior.voice:選択肢.value?.現在音声||音声候補.value[0]?.id||'';
  }
- // 予測の2ターンはChatでOKになったモデルで送るため、CHAT以外の入力変更ではChat成功と他の結果を残す。
- function 変更(key,value){remember();const chat=区分.value==='CHAT';中止('',!chat);if(!chat){const {[区分.value]:_,...rest}=結果一覧.value;結果一覧.value=rest;}入力[key]=value;if(key==='provider')連動();remember();}
+ // 表示結果とChat成功資格は別管理。入力変更は対象結果だけを消し、Chat変更時は予測の資格を無効化する。
+ function 変更(key,value){remember();const chat=区分.value==='CHAT';中止('',!chat,true,区分.value!=='LIVE');const {[区分.value]:_,...rest}=結果一覧.value;結果一覧.value=rest;入力[key]=value;if(key==='provider')連動();remember();}
  function 表示を離れる(){if(実行中.value||読込中.value)中止();}
  function 区分変更(value){remember();表示を離れる();区分.value=value;入力=forms[value];if(!入力.provider){入力.provider=プロバイダ.value[0]?.id||'';連動();}}
  async function 読込(){
@@ -64,7 +64,10 @@ export function AIモデル状態を作成({api,接続可能,createURL,revokeURL
   const queue=all===true?families:[区分.value];
   const snapshots=queue.map(family=>{try{return {family,body:payload(family,forms[family])};}catch(error){return {family,error:error.message};}});
   if(all!==true&&snapshots[0].error){通知.value=snapshots[0].error;return;}
-  中止('',!queue.includes('CHAT'));const current=世代;controller=new AbortController();const signal=controller.signal;実行中.value=true;通知.value='実行中…';
+  中止('',!queue.includes('CHAT'),all!==true,!queue.includes('LIVE'));
+  // 単発再試行では対象だけ更新し、他区分の前回結果（音声を含む）を保持する。
+  if(all!==true){const {[queue[0]]:_,...rest}=結果一覧.value;結果一覧.value=rest;}
+  const current=世代;controller=new AbortController();const signal=controller.signal;実行中.value=true;通知.value='実行中…';
   try{
    await cancelled;if(current!==世代)return;
    const start=await api('api/AIモデル/開始','POST',signal,'json',all===true?{items:snapshots.map(e=>e.body||{family:e.family})}:snapshots[0].body);

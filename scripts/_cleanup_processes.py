@@ -22,7 +22,7 @@ def list_processes() -> list[dict]:
         script = (
             '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); '
             'Get-CimInstance Win32_Process | '
-            'Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress'
+            'Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,CreationDate | ConvertTo-Json -Compress'
         )
         result = subprocess.run(['powershell', '-NoProfile', '-Command', script],
                                 check=True, capture_output=True, encoding='utf-8', timeout=15,

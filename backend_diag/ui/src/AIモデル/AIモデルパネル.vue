@@ -18,8 +18,8 @@ const 経過=computed(()=>s.区分.value!=='PREDICTION'?[]:s.実行中.value?s.�
 <template>
 <section class="panel ai-model-panel" aria-label="AIモデル">
  <div class="panel-heading ai-model-heading"><div class="heading-title"><h2>AIモデルを試す</h2><button class="ai-model-reload refresh-button" title="AIモデルの候補を再読込します" :aria-busy="s.読込中.value" :disabled="!online || s.読込中.value || s.実行中.value" @click="s.読込"><span class="refresh-glyph" aria-hidden="true">↺</span><span>候補を再読込</span></button></div><div class="panel-actions"><button id="ai-model-start" :class="{'check-next': !s.結果.value}" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value" title="CHAT → LIVE → PREDICTION → DECISION → CODE を順に確認します" @click="s.開始(true)">{{s.実行中.value?'実行中…':'動作確認'}}</button><button :disabled="!s.実行中.value" @click="s.中止('試行を中止しました。')">中止</button></div></div>
- <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','PREDICTION','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family}}</button></nav>
  <p class="panel-note">各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → PREDICTION → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。</p>
+ <nav class="tabs ai-model-tabs" aria-label="AIモデルの種類"><button v-for="family in ['CHAT','LIVE','PREDICTION','DECISION','CODE']" :key="family" :class="{active:s.区分.value===family}" :aria-pressed="s.区分.value===family" @click="s.区分変更(family)">{{family}}</button></nav>
  <div class="ai-model-scroll">
   <div class="ai-model-form">
    <div class="ai-model-form-heading"><h3>{{s.区分.value}} / {{s.区分.value==='PREDICTION'?'入力予測':'入力'}}</h3><button id="ai-model-test" :disabled="!online || s.実行中.value || s.読込中.value || !s.一覧.value || (s.区分.value==='PREDICTION' && !s.予測条件.value.テスト可能)" :title="s.区分.value==='PREDICTION'?s.予測条件.value.説明:'現在の種類だけをテストします'" @click="s.開始()">テスト</button></div>

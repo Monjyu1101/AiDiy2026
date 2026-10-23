@@ -35,8 +35,11 @@ function 画面サイズ演出を作成(BrowserWindow,window){
    const canvas=new BrowserWindow({title:'AiDiy サイズ切替',...area,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,skipTaskbar:true,show:false,alwaysOnTop:window.isAlwaysOnTop(),webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
    canvas.isAiDiyOpeningCanvas=true;canvas.isAiDiyResizeCanvas=true;state.canvas=canvas;
    canvas.setBounds(area);
-   const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:transparent}#image{position:absolute;left:0;top:0;width:${from.width}px;height:${from.height}px;transform-origin:0 0;transform:translate(${from.x-area.x}px,${from.y-area.y}px)}img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}#next{opacity:0}</style></head><body><div id="image"><img id="old" alt="" src="${snapshot.toDataURL()}"><img id="next" alt=""></div></body></html>`;
+   const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:transparent}#image{position:absolute;left:0;top:0;width:${from.width}px;height:${from.height}px;transform-origin:0 0;isolation:isolate;transform:translate(${from.x-area.x}px,${from.y-area.y}px)}img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;mix-blend-mode:plus-lighter}#next{opacity:0}</style></head><body><div id="image"><img id="old" alt="" src="${snapshot.toDataURL()}"><img id="next" alt=""></div></body></html>`;
    await canvas.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+   if(current!==state||window.isDestroyed()){if(!canvas.isDestroyed())canvas.destroy();return false;}
+   // 表示前に旧画像のdecodeを完了し、空の演出面を実窓へ重ねない。
+   await canvas.webContents.executeJavaScript("document.querySelector('#old').decode()");
    if(current!==state||window.isDestroyed()){if(!canvas.isDestroyed())canvas.destroy();return false;}
    canvas.showInactive();await 描画待ち(canvas.webContents);
    if(current!==state||window.isDestroyed()){if(current===state)終了();return false;}
@@ -55,9 +58,11 @@ function 画面サイズ演出を作成(BrowserWindow,window){
    if(snapshot.isEmpty())throw Error('画像なし');
    if(current!==state||window.isDestroyed()||!state.canvas||state.canvas.isDestroyed())return true;
    const {from,area}=state,canvas=state.canvas;
+   // 相補的な透明度を同じ時間軸で加算合成する。通常のsource-over合成では
+   // 2枚とも半透明になり実窓を隠した背後が透ける。アイコンの透明領域も維持する。
    const start=`translate(${from.x-area.x}px,${from.y-area.y}px) scale(1,1)`,end=`translate(${to.x-area.x}px,${to.y-area.y}px) scale(${to.width/from.width},${to.height/from.height})`;
    await Promise.race([
-    canvas.webContents.executeJavaScript(`(async()=>{const image=document.querySelector('#image'),next=document.querySelector('#next'),old=document.querySelector('#old');next.src=${JSON.stringify(snapshot.toDataURL())};await next.decode();const options={duration:${演出時間},easing:'cubic-bezier(.33,1,.68,1)',fill:'forwards'};const motion=image.animate([{transform:${JSON.stringify(start)}},{transform:${JSON.stringify(end)}}],options);next.animate([{opacity:0},{opacity:0,offset:.2},{opacity:1}],options);old.animate([{opacity:1},{opacity:0}],options);await motion.finished.catch(()=>{});})()`),
+    canvas.webContents.executeJavaScript(`(async()=>{const image=document.querySelector('#image'),next=document.querySelector('#next'),old=document.querySelector('#old');next.src=${JSON.stringify(snapshot.toDataURL())};await next.decode();const options={duration:${演出時間},easing:'cubic-bezier(.33,1,.68,1)',fill:'forwards'};const motion=image.animate([{transform:${JSON.stringify(start)}},{transform:${JSON.stringify(end)}}],options);next.animate([{opacity:0},{opacity:1}],options);old.animate([{opacity:1},{opacity:0}],options);await motion.finished.catch(()=>{});})()`),
     待機(演出時間+500),
    ]);
    if(current===state&&!window.isDestroyed()){

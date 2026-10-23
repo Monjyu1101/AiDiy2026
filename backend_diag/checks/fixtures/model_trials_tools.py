@@ -75,12 +75,12 @@ async def main():
     decision = MCPServer("aidiy_decisions_check")
     def judgment(req):
         assert req.url.host == "generativelanguage.googleapis.com"
-        assert req.url.path.endswith("/gemini-flash-lite-latest:generateContent")
+        assert req.url.path.endswith("/gemini-3.5-flash-lite:generateContent")
         value = {"answers": [{"type": "choice", "name": "politeness", "choice": "medium", "confidence": 1,
             "probabilities": [{"value": "high", "probability": 0}, {"value": "medium", "probability": 1}, {"value": "low", "probability": 0}]}]}
         return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": json.dumps(value)}]}}]})
     service = Decision(config={"DECISION_AI_NAME": "freeai_chat", "freeai_key_id": "synthetic-only"}, transport=httpx.MockTransport(judgment))
-    service.availability = {"freeai_chat": {"ok": True, "model": "gemini-flash-lite-latest"}}
+    service.availability = {"freeai_chat": {"ok": True, "model": "gemini-3.5-flash-lite"}}
     tools_decisions.register_tools(decision, service)
     decision_app = decision.streamable_http_app()
     chat_app, code_app = chat.streamable_http_app(), code.streamable_http_app()

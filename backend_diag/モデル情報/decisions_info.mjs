@@ -1,8 +1,8 @@
 // 判断用候補は認証付き取得一覧だけから合成する。生成・課金APIは呼ばない。
 import {readConfig,configured,currentDecisionModels} from '../runtime/model_probe.mjs';
 
-// backend_server/AIコア/AI判断共通.py と同じ公式alias（parity testで照合）。
-export const FREEAI_DECISION_MODEL = 'gemini-flash-lite-latest';
+// backend_server/AIコア/AI判断共通.py と同じ既定モデル（parity testで照合）。
+export const FREEAI_DECISION_MODEL = 'gemini-3.5-flash-lite';
 export const OPENAI_DECISION_MODEL = 'gpt-6-luna';
 // 候補の絞り込みは書き出し側だけで管理する。モデル変更時はこの配列を調整する。
 export const DECISION_MODEL_CANDIDATES = Object.freeze({openai_oauth:[OPENAI_DECISION_MODEL],freeai_chat:[FREEAI_DECISION_MODEL],openai_decisions:[OPENAI_DECISION_MODEL],gemini_chat:[FREEAI_DECISION_MODEL]});

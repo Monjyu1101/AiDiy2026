@@ -219,7 +219,7 @@ class SetupOrderingTests(unittest.TestCase):
             events.append('prerequisites')
             self.assertFalse(module.AUTO_MODE)
             raise RuntimeError('prerequisite failure')
-        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_live_avatar',side_effect=lambda:events.append('stop')),patch.object(module,'_load_folder_module') as loader,patch.object(module,'setup_common_global_tools') as common,patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
+        with tempfile.TemporaryDirectory() as directory,patch.object(Path,'home',return_value=Path(directory)),patch.dict('os.environ',{'PATH':''}),patch.object(module,'AUTO_MODE',True),patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_setup_apps',side_effect=lambda:events.append('stop')),patch.object(module,'_load_folder_module') as loader,patch.object(module,'setup_common_global_tools') as common,patch.object(module,'ensure_prerequisites',side_effect=prerequisites),patch('builtins.print'):
             with self.assertRaisesRegex(RuntimeError,'prerequisite failure'):
                 module.main()
             launcher=Path(directory)/'.local/bin'/('aidiy_diag.cmd' if setup.sys.platform=='win32' else 'aidiy_diag')
@@ -249,7 +249,7 @@ class SetupOrderingTests(unittest.TestCase):
         with ExitStack() as stack:
             for name,value in [('AUTO_MODE',auto),('GLOBAL_CLI_INSTALL_PROCESSES',['pending'])]:stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module,'collect_setup_choices',return_value=choices))
-            stack.enter_context(patch.object(module,'stop_live_avatar',side_effect=lambda:record('stop')))
+            stack.enter_context(patch.object(module,'stop_setup_apps',side_effect=lambda:record('stop')))
             stack.enter_context(patch.object(module,'ensure_prerequisites',side_effect=prerequisites))
             stack.enter_context(patch.object(module,'setup_common_global_tools',side_effect=lambda selected:[] if record('common') else ['common-error']))
             stack.enter_context(patch.object(module,'wait_global_cli_tools_install',side_effect=lambda:[] if record('common-wait') else ['fixture-package']))
@@ -297,7 +297,7 @@ class SetupOrderingTests(unittest.TestCase):
             self.assertEqual(events[-2:],['clear','headless']);self.assertEqual(errors,[label]);self.assertEqual(code,0)
     def test_cancel_does_not_check_or_install_prerequisites(self):
         module=self.root_module('_setup')
-        with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'stop_live_avatar') as stop,patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
+        with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'stop_setup_apps') as stop,patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
             with self.assertRaises(SystemExit):module.main()
             prerequisites.assert_not_called()
             stop.assert_not_called()
@@ -310,7 +310,7 @@ class SetupOrderingTests(unittest.TestCase):
                 from types import SimpleNamespace
                 fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda:True)
                 def diagnose():events.append('diag');return success
-                with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_live_avatar'),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
+                with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_setup_apps'),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
                     if not success and not keep_going:
                         with self.assertRaises(SystemExit) as result:module.main()
                         self.assertEqual(result.exception.code,1)
@@ -371,7 +371,7 @@ class SetupDisplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
             stack.enter_context(patch.object(Path,'home',return_value=Path(directory)))
             stack.enter_context(patch.object(module,'GLOBAL_CLI_INSTALL_PROCESSES',['fixture']))
-            stack.enter_context(patch.object(module,'stop_live_avatar'))
+            stack.enter_context(patch.object(module,'stop_setup_apps'))
             for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:None),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
                 stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module.time,'sleep'))

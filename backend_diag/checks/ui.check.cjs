@@ -57,3 +57,11 @@ test('all-tests button sits at the end of the tab bar without the scope caption'
  // tools 接続確認の ON/OFF・再確認の行は持たない（接続状態はステータスバーに表示）。
  assert.doesNotMatch(app,/component-toolbar|tools-toggle|tools接続確認|再確認/);assert.match(app,/:enabled="true"/);
 });
+
+test('AI model trial guidance precedes the family tabs',()=>{
+ const panel=source('AIモデル/AIモデルパネル.vue');
+ const note='各タブのモデルと入力を選び、「動作確認」でCHAT → LIVE → PREDICTION → DECISION → CODEを順に試します。完了後はCHATへ戻ります。選択は設定へ保存されません。';
+ assert.equal(panel.split(note).length-1,1);
+ assert.ok(panel.indexOf(note)<panel.indexOf('<nav class="tabs ai-model-tabs"'));
+ assert.match(panel,/<p class="panel-note">[^<]+<\/p>\s*<nav class="tabs ai-model-tabs"/);
+});

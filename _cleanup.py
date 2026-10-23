@@ -13,8 +13,8 @@
 各フォルダの `_cleanup.py` を import し、不要なキャッシュ・ビルド成果物・
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
 全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
-Code / Live の単独実行と tools の MCP 接続プロセスも強制終了・確認します。この停止手順
-（`stop_all_services`）はルート `_start.py` の起動前・Ctrl+C 終了時にも共通で使います。ルート固有の
+Code / Live / Term / IDE の単独実行と tools の MCP 接続プロセスも強制終了・確認します。
+setup / start の Code / IDE 継続方針とは異なります。ルート固有の
 処理（全階層の temp / _temp / .temp / test / _test / .test とルート backup の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
@@ -271,12 +271,12 @@ def stop_all_services(
 ) -> bool:
     """起動中の常駐サービス・単独実行・MCP 接続を強制終了する。
 
-    `_cleanup.py` のファイル削除前と、`_start.py` の起動前・Ctrl+C 終了時で共通の停止手順。
+    `_cleanup.py` のファイル削除前に実行する停止手順。setup / start の共通停止とは別。
     1 件失敗しても残りの停止は続け、最後に `strict` なら RuntimeError、そうでなければ
     警告だけ出して False を返す。`keep_code` なら aidiy_code の単独実行とその配下
-    （hermes が使う tools の MCP 接続など）は止めず、aidiy_live だけを止める
-    （`_start.py` 用）。`keep_dev` / `keep_discord` なら IDE / Discord 本体とその配下も停止しない。
-    Diagを操作元にした通常のstart/stopではDiagを維持し、cleanupはkeep_diag=Falseで停止する。
+    （hermes が使う tools の MCP 接続など）は止めず、aidiy_live は停止対象とする。
+    `keep_dev` / `keep_discord` は互換オプションで、Term・IDE / Discord 本体とその配下も停止しない。
+    keep_diag=True は Diag を維持する互換オプション。全体cleanupはkeep_diag=Falseで停止する。
     """
     _ = choices  # 呼び出し側との互換性を維持する。停止対象は常に全サービス。
     print_header(title)
@@ -351,7 +351,7 @@ def stop_all_services(
             lambda: _load_folder_module("backend_tools").stop_tools_processes(),
         )
 
-    # `_start.py` の起動前整理と同様に、OS側のポート解放を短時間待つ。
+    # OS側のポート解放を短時間待つ。
     time.sleep(1)
 
     if not failures:
@@ -569,7 +569,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
 
     print_header("クリーンアップ内容の選択")
     print_info("最初に実行項目をまとめて選択してください。処理はまとめて一括実行されます。")
-    print_info("常駐サービスが起動中の場合は、削除開始前にすべて停止します。")
+    print_info("削除開始前に、この配置先の AiDiy サービス・単独実行を停止します（Code / IDE も対象）。")
     print_info(f"全階層の {TEMP_TARGET_LABEL} はフォルダ選択に関係なく、最後にまとめて削除します（ダウンロード済みモデルを含む）。")
 
     choices: dict = {

@@ -27,12 +27,13 @@
 - frontend_ide/viewer/_start.py     check_environment / start / kill_ports（空きポート）
 - frontend_channels/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
-起動前と Ctrl+C 終了時は、常駐サービス・Live の単独実行・tools の MCP 接続を
-`_cleanup.stop_all_services` と同じ手順で停止します。aidiy_term / aidiy_code / aidiy_ide / aidiy_discord とその配下は
-停止対象から外し、全体起動スクリプトの終了後も継続します。
+開始承認後と Ctrl+C 終了時は、setupと共通のプロセス照合で停止します。
+この配置先の aidiy_code / aidiy_ide と必要な補助プロセスを保持します。
+独立して起動された Live / Term 等は、Code / IDE の子でも停止対象です。
+cleanupの全停止とは別の保持方針です。
 
 標準の起動順:
-0. 既存プロセス整理（aidiy_term / aidiy_code / aidiy_ide / aidiy_discord とその配下を除いて停止）
+0. 開始承認後に既存プロセス整理（aidiy_code / aidiy_ide を継続。サービス起動直前の再停止なし）
 1. バックエンド(local)
 2. バックエンド(tools)
 3. バックエンド(core)
@@ -552,18 +553,18 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standalone: bool = True) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
-    # 通常終了では Term / Code / IDE / Discord を継続し、明示的な cleanup 要求では停止する。
+    # 通常終了では Code / IDE を継続し、明示的な cleanup 要求では停止する。
     standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
                           if f"フロントエンド({module})" in processes]
-    discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
-    term_was_running = not keep_standalone and "フロントエンド(term)" in processes
+    discord_was_running = "フロントエンド(Discord)" in processes
+    term_was_running = "フロントエンド(term)" in processes
     dev_was_running = not keep_standalone and "フロントエンド(IDE)" in processes
     for name, process in list(processes.items()):
         if name == "フロントエンド(Avatar)":
             # 起動通知後のランチャーPIDは終了済み。所有する8092とElectronを後段で回収する。
             processes.pop(name, None)
             continue
-        if keep_standalone and name in ("フロントエンド(term)", "フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)"):
+        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)"):
             print_info(f"[{name}] 全体停止の対象外として継続します")
             processes.pop(name, None)
             continue
@@ -608,25 +609,20 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
         DISCORD.kill_ports()
 
 
-def stop_all_tasks(title: str = "起動中サービスの一括停止") -> None:
-    """起動前・Ctrl+C 終了時に `_cleanup.py` と同じ手順で全サービスを停止する。
+def stop_all_tasks(title: str = "起動中サービスの一括停止") -> bool:
+    """setupと共通の照合で、この配置先のCode / IDE以外を停止する。
 
-    常駐サービス、Live の単独実行、tools の MCP 接続を止める。
-    aidiy_term / aidiy_code / aidiy_ide / aidiy_discord は継続するため、本体とその配下を強制停止しない。
-    停止手順は `_cleanup.stop_all_services` に一本化し、ここで個別に重複させない。
-    停止できないものがあっても起動・終了は続ける。
+    cleanupの全停止とは分ける。ポート番号だけでは判定せず、呼出元と
+    Code / IDEを保護した個別PID停止を使う。
     """
+    print_header(title)
     try:
-        spec = importlib.util.spec_from_file_location("aidiy_root_cleanup_for_start", BASE_DIR / "_cleanup.py")
-        cleanup = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cleanup)
-        cleanup.stop_all_services({}, title=title, strict=False, keep_code=True, keep_dev=True, keep_discord=True)
+        sys.path.insert(0, str(BASE_DIR / "scripts"))
+        from _setup_processes import stop_setup_processes
+        return stop_setup_processes(BASE_DIR, print_info, print_warning)
     except Exception as exc:
         print_warning(f"一部のタスクを停止できませんでした: {exc}")
-    finally:
-        # 停止用に import したフォルダ側スクリプトのキャッシュを畳む。
-        for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels"):
-            _remove_folder_import_cache(folder)
+        return False
 
 
 # ============================================================
@@ -881,9 +877,6 @@ def start_initial_services(
         "フロントエンド(Discord)": False,
     }
 
-    # Code / IDE / Discord とその配下を継続し、それ以外の前回の残り・別起動分を止める。
-    stop_all_tasks("既存プロセス整理（Code / IDE / Discord は継続）")
-
     if start_backend_local_enabled:
         print_header("バックエンド(local) 起動")
         start_service("バックエンド(local)", processes, last_output_times, npm_command)
@@ -917,7 +910,7 @@ def start_initial_services(
             wait_for_services_quiet(last_output_times, ["フロントエンド(Web)"], label="フロントエンド(Web)")
 
     if avatar_enabled and ensure_optional_service_ready("フロントエンド(Avatar)", npm_command):
-        # aidiy_code と同じ独立プロセス。表示後すぐ戻り、終了検知・自動再起動の対象にしない。
+        # 表示後すぐ戻り、終了検知・自動再起動の対象にしない。全体終了時は停止する。
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
@@ -1052,6 +1045,11 @@ def main() -> None:
         discord_enabled,
     ) = collect_startup_choices()
 
+    # 開始承認後に一度だけ停止する。各サービスの起動直前には重ねて停止しない。
+    if stop_all_tasks("AiDiy プロセスの停止（Code / IDE は継続）") is False:
+        print_error("既存プロセスを停止できないため、起動を中止します。")
+        raise SystemExit(1)
+
     is_ready, npm_command = validate_initial_environment(
         local_enabled=local_enabled,
         backend_tools_enabled=backend_tools_enabled,
@@ -1077,6 +1075,7 @@ def main() -> None:
         processes: dict[str, subprocess.Popen[bytes]] = {}
         last_output_times: dict[str, float] = {}
         reboot_requested = False
+        shutdown_verified = None
 
         try:
             selected_services = start_initial_services(
@@ -1128,10 +1127,10 @@ def main() -> None:
 
         except KeyboardInterrupt:
             print_header("停止処理")
-            print_info("Ctrl+C を検出しました。Code / IDE / Discord を継続し、他のプロセスを停止します")
+            print_info("Ctrl+C を検出しました。Code / IDE を継続し、この配置先の他の AiDiy プロセスを停止します")
             stop_processes(processes)
-            print_info("Code / IDE / Discord とその配下を除き、残っているタスクを停止します")
-            stop_all_tasks("終了時の既存プロセス整理（Code / IDE / Discord は継続）")
+            print_info("Code / IDE と必要な補助プロセスを保持し、残る停止対象を確認します")
+            shutdown_verified = stop_all_tasks("終了時の既存プロセス整理（Code / IDE は継続）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()
@@ -1153,12 +1152,22 @@ def main() -> None:
                 os.system("cls")
             continue
 
-        print_header("停止完了")
-        print_success("すべての対象サービスを停止しました")
+        if shutdown_verified is True:
+            print_header("停止完了")
+            print_success("この配置先の停止対象を確認しました（Code / IDE と必要な補助プロセスは継続）")
+        elif shutdown_verified is False:
+            print_header("停止確認未完了")
+            print_warning("停止できなかったプロセス、または確認できない対象があります。上記の警告を確認してください")
+        else:
+            print_header("終了処理完了")
+            print_info("起動プロセスの終了処理を行いました。全体の停止確認は実施していません")
         print_info("5秒後に終了します")
         time.sleep(5)
         break
 
 
 if __name__ == "__main__":
-    main()
+    sys.path.insert(0, str(BASE_DIR / "scripts"))
+    from _setup_processes import register_start_owner
+    with register_start_owner(BASE_DIR):
+        main()

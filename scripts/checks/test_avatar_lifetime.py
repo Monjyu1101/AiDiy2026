@@ -15,14 +15,26 @@ def load(name):
 
 
 class AvatarLifetimeTest(unittest.TestCase):
-    def test_setup_stops_only_live_and_avatar(self):
+    def test_setup_stops_apps_through_shared_inventory(self):
         setup = load('_setup')
-        host, avatar = Mock(), Mock()
-        with patch.object(setup, '_load_folder_module', side_effect=[host, avatar]) as loader:
-            setup.stop_live_avatar()
-        self.assertEqual([call.args for call in loader.call_args_list], [('frontend_ide/host', '_start.py'), ('frontend_avatar', '_start.py')])
-        host.kill_ports.assert_called_once_with('live')
-        avatar.kill_ports.assert_called_once_with()
+        import sys
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        import _setup_processes
+        with patch.object(_setup_processes, 'stop_setup_processes', return_value=True) as stop:
+            setup.stop_setup_apps()
+        self.assertEqual(stop.call_args.args[0], setup.BASE_DIR)
+
+
+    def test_setup_stop_failure_reports_setup_abort(self):
+        setup = load('_setup')
+        import sys
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        import _setup_processes
+        with patch.object(_setup_processes, 'stop_setup_processes', return_value=False), patch.object(setup, 'print_error') as error:
+            with self.assertRaises(SystemExit) as raised:
+                setup.stop_setup_apps()
+        self.assertEqual(raised.exception.code, 1)
+        self.assertIn('セットアップを中止', error.call_args.args[0])
 
     def test_normal_stop_closes_avatar_but_preserves_code_and_ide(self):
         start = load('_start')

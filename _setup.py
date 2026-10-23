@@ -134,11 +134,14 @@ def _load_folder_module(folder: str, entry: str = "_setup.py"):
     return mod
 
 
-def stop_live_avatar() -> None:
-    """依存物更新前にLiveとAvatarを停止する。作業中のCode/IDEは継続する。"""
-    print_header("Live / Avatar の停止")
-    _load_folder_module("frontend_ide/host", "_start.py").kill_ports("live")
-    _load_folder_module("frontend_avatar", "_start.py").kill_ports()
+def stop_setup_apps() -> None:
+    """Code / IDE以外の、この作業コピーのAiDiy実行を依存物更新前に停止する。"""
+    print_header("AiDiy プロセスの停止（Code / IDE は継続）")
+    sys.path.insert(0, str(BASE_DIR / "scripts"))
+    from _setup_processes import stop_setup_processes
+    if not stop_setup_processes(BASE_DIR, print_info, print_error):
+        print_error("既存プロセスの停止を確認できないため、セットアップを中止します。")
+        raise SystemExit(1)
 
 
 def run_diag_headless() -> bool:
@@ -838,7 +841,7 @@ def main():
         print_warning("セットアップをキャンセルしました。")
         sys.exit(0)
 
-    stop_live_avatar()
+    stop_setup_apps()
 
     if choices.get("node_refresh"):
         errors = setup_node_refresh()

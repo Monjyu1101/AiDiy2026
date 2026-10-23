@@ -1,4 +1,4 @@
-const test=require('node:test'),assert=require('node:assert/strict');
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {画面サイズ演出を作成}=require('../起動/サイズ切替.cjs');
 function fixture(){
  const windows=[],scripts=[],calls=[];
@@ -55,4 +55,39 @@ test('UIはミニ描画後に演出完了を通知し、完了までは切替中
  state.変更(false);release(true);await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls,[true,'mini-ready',false,'normal-ready']);assert.equal(state.切替中.value,true);
  release(true);await pending;assert.equal(state.表示中.value,false);assert.equal(state.切替中.value,false);
+});
+
+test('旧画像のdecode後に演出窓を表示し、相補合成で途中の背景抜けを作らない',async()=>{
+ const f=fixture();await f.effect.準備({x:-120,y:40,width:384,height:184});
+ const canvas=f.windows[0];
+ assert.equal(f.scripts[0],"document.querySelector('#old').decode()");
+ assert.match(canvas.html,/isolation:isolate/);
+ assert.match(canvas.html,/mix-blend-mode:plus-lighter/);
+ f.window.bounds={x:-120,y:40,width:384,height:184};await f.effect.完了();
+ const animation=f.scripts.find(script=>script.includes('const motion='));
+ const frames={},elements=Object.fromEntries(['image','next','old'].map(id=>[id,{
+  decode:async()=>{},animate(keyframes,options){frames[id]={keyframes,options};return {finished:Promise.resolve()};},
+ }]));
+ await vm.runInNewContext(animation,{document:{querySelector:selector=>elements[selector.slice(1)]}});
+ assert.deepEqual(Array.from(frames.next.keyframes,x=>x.opacity),[0,1]);
+ assert.deepEqual(Array.from(frames.old.keyframes,x=>x.opacity),[1,0]);
+ assert.equal(frames.next.options,frames.old.options);
+ assert.equal(frames.next.options,frames.image.options);
+ // 加算合成では両方不透明な画素が途中で暗くならず、アイコンの透明画素は滑らかに消える。
+ for(const progress of [0,.1,.2,.5,.8,1]){
+  const old=1-progress,next=progress;
+  assert.equal(old+next,1);
+  assert.equal(old+next*0,1-progress);
+ }
+});
+test('旧画像decode中の中止で遅れて実窓を透明化しない',async()=>{
+ const f=fixture();let release;
+ // captureの後で作成される演出窓のdecodeだけを保留する。
+ const prepare=f.effect.準備(f.window.bounds);
+ await Promise.resolve();
+ const canvas=f.windows[0];
+ canvas.webContents.executeJavaScript=()=>new Promise(resolve=>release=resolve);
+ await new Promise(resolve=>setImmediate(resolve));
+ f.effect.中止();release();
+ assert.equal(await prepare,false);assert.equal(f.window.opacity,1);assert.equal(canvas.dead,true);
 });

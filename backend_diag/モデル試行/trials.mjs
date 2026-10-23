@@ -103,13 +103,52 @@ export function localRequest({port,path,method='POST',body,headers={},signal,id,
     req.on('error',()=>finish(failure('Tools に接続できません。')));req.end(bytes);
   });
 }
+// MCPの生エラーには資格情報や入力が混ざり得るため、判断系の既知カテゴリだけを固定文言へ変換。
+// 文字列そのものや未対応の詳細は画面へ渡さない。
+function decisionFailureDetail(error) {
+  const parts=[error?.message,...(Array.isArray(error?.content)?error.content.filter(item=>item?.type==='text').map(item=>item.text):[])];
+  const detail=parts.filter(item=>typeof item==='string').map(item=>item.slice(0,8192)).join('\n').slice(0,16384);
+  const routes=[
+    ['Decisions API','OpenAI Decisions API（APIキー方式）','APIキー・利用権限・課金・入力'],
+    ['OAuth Responses','OpenAI OAuth Responses','OAuth認証・モデル・JSON Schema対応'],
+    ['Gemini JSON判断','Gemini / FreeAI JSON判断','APIキー・モデル・JSON対応・利用枠'],
+  ];
+  for(const [prefix,name,check] of routes){
+    const match=detail.match(new RegExp(`${prefix} HTTP ([45][0-9]{2})(?![0-9])`));
+    if(match)return `${name} が HTTP ${match[1]} を返しました。${check}を確認してください。`;
+  }
+  const known=[
+    ['AI判断の起動チェックが未完了','AI判断の起動チェックが未完了です。Toolsの起動完了を待って再試行してください。'],
+    ['すべてのAI判断プロバイダが利用できません','AI判断の起動チェックで利用可能なプロバイダがありません。設定・認証とToolsの起動ログを確認してください。'],
+    ['Codex OAuth認証が必要です','OpenAI OAuth認証が必要です。codex login または aidiy_hermes の認証状態を確認してください。'],
+    ['AI判断の設定ファイルを読み込めません','AI判断の設定ファイルを読み込めません。'],
+    ['未対応のAI判断プロバイダ:','AI判断のプロバイダ設定が未対応です。'],
+    ['model と ai_model の指定が競合しています','判断モデルの指定が競合しています。'],
+    ['ai_name と model のプロバイダが競合しています','判断プロバイダとモデルの指定が競合しています。'],
+    ['モデル名が空です','判断モデル名が空です。'],
+    ['AI判断がタイムアウトしました','AI判断がタイムアウトしました。'],
+    ['AI判断の接続に失敗しました','AI判断の接続に失敗しました。'],
+    ['AI判断の応答形式が不正です','AI判断の応答形式が不正です（JSON・回答名・型・確率分布）。'],
+    ['Gemini JSON判断は入力を拒否しました','Gemini / FreeAI JSON判断が入力を拒否しました。'],
+    ['Gemini JSON判断の回答候補が不正です','Gemini / FreeAI JSON判断の回答候補が不正です。'],
+    ['Gemini JSON判断が拒否・未完了・異常終了しました','Gemini / FreeAI JSON判断が拒否・未完了・異常終了しました。'],
+    ['Gemini JSON判断の本文がありません','Gemini / FreeAI JSON判断の応答本文がありません。'],
+    ['Gemini JSON判断の本文形式が不正です','Gemini / FreeAI JSON判断の応答本文形式が不正です。'],
+    ['OAuth Responses が失敗または未完了で終了しました','OpenAI OAuth Responses が失敗または未完了で終了しました。'],
+    ['OAuth Responses の完了状態が不正です','OpenAI OAuth Responses の完了状態が不正です。'],
+    ['OAuth Responses のストリームが完了前に切断されました','OpenAI OAuth Responses のストリームが完了前に切断されました。'],
+  ];
+  for(const [match,message] of known)if(detail.includes(match))return message;
+  if(/(?:openai_key_id|gemini_key_id|freeai_key_id)(?: \/ (?:gemini_key_id|freeai_key_id))? が未設定です/.test(detail))return 'AI判断のAPIキーが未設定です。';
+  return '';
+}
 export async function callMcp(row, config, {signal,request=localRequest,manual}={}) {
   const chat=row.区分==='CHAT',decision=row.区分==='DECISION',path=decision?'/aidiy_decisions_check/mcp':chat?'/aidiy_chat_llms/mcp':'/aidiy_code_agents/mcp',port=portOf(config);
   const project=decision?'':trialProjectPath(config);
   if(!decision&&!project)throw failure('CODE_BASE_PATHに会話履歴の対象プロジェクトを設定してください。');
   let session,protocol='2024-11-05';
   const headers=()=>({'MCP-Protocol-Version':protocol,...(session?{'Mcp-Session-Id':session}:{})});
-  const rpc=async(id,method,params)=>{const response=await request({port,path,signal,id,headers:headers(),body:{jsonrpc:'2.0',...(id===undefined?{}:{id}),method,params}});session=response.session || session;if(id!==undefined && response.body?.jsonrpc!=='2.0')throw failure('MCP 応答が不正です。');if(response.body?.error)throw failure('MCP ツールの実行に失敗しました。');return response.body?.result;};
+  const rpc=async(id,method,params)=>{const response=await request({port,path,signal,id,headers:headers(),body:{jsonrpc:'2.0',...(id===undefined?{}:{id}),method,params}});session=response.session || session;if(id!==undefined && response.body?.jsonrpc!=='2.0')throw failure('MCP 応答が不正です。');if(response.body?.error)throw failure((decision&&decisionFailureDetail(response.body.error))||'MCP ツールの実行に失敗しました。');return response.body?.result;};
   try {
     const init=await rpc(1,'initialize',{protocolVersion:protocol,capabilities:{},clientInfo:{name:'aidiy-diag',version:'1.0'}});
     if(!init || !['2024-11-05','2025-03-26','2025-06-18'].includes(init.protocolVersion))throw failure('MCP 初期化に失敗しました。');protocol=init.protocolVersion;
@@ -118,7 +157,7 @@ export async function callMcp(row, config, {signal,request=localRequest,manual}=
     const option=(key,allowed,fallback='auto')=>allowed.includes(config[key])?config[key]:fallback;
     const args=decision?{input:manual?.prompt??TRIAL_PROMPT,questions:manual?.questions??decisionQuestions(),ai_name:row.プロバイダ,ai_model:row.モデル,timeout_sec:60}:{prompt:manual?.prompt??TRIAL_PROMPT,project_path:project,ai_name:row.プロバイダ,ai_model:row.モデル,resume:false,timeout_sec:60,...(chat?{use_tools:false,session_id:`diag_${randomBytes(12).toString('hex')}`}:{code_permissions:option('CODE_PERMISSIONS',['auto','full','none']),self_check_loop:0})};
     const result=await rpc(2,'tools/call',{name:decision?'decisions_check':chat?'chat_llms_run':'code_agents_run',arguments:args});
-    if(result?.isError)throw failure('MCP ツールがエラーを返しました。');
+    if(result?.isError)throw failure((decision&&decisionFailureDetail(result))||'MCP ツールがエラーを返しました。');
     try{return toolPayload(result);}catch(error){
       if(!decision||!manual)throw error;
       const raw=result?.structuredContent?.result??result?.content?.filter(item=>item.type==='text').map(item=>item.text).join('\n');
