@@ -193,6 +193,10 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
             info(f"{label}: Electron v{version} の配置を確認しました。")
             return True
 
+        if _runtime_in_use(frontend_dir):
+            error(f"{label}: Electron が使用中のため修復・置換できません。Code / IDE 等を閉じて再実行してください。")
+            return False
+
         # npm 更新後も dist が一致する場合は path.txt の修復だけでよい。
         electron_dir = frontend_dir / "node_modules" / "electron"
         if _dist_ready(electron_dir / "dist", version):
@@ -236,8 +240,103 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
         return False
 
 
+def _runtime_in_use(frontend_dir: Path) -> bool:
+    """Windowsの正確な実行パスだけで、更新対象を使用中か確認する。停止はしない。"""
+    if sys.platform != "win32":
+        return False
+    import ntpath
+    from _cleanup_processes import list_processes, process_arguments
+    roots = [frontend_dir]
+    if frontend_dir.name == "frontend_ide":
+        roots += [frontend_dir / "host", frontend_dir / "viewer"]
+    executables = {ntpath.normcase(str(root.resolve() / "node_modules" / "electron" / "dist" / "electron.exe")) for root in roots}
+    for process in list_processes():
+        if frontend_dir.name == "frontend_ide":
+            from _setup_processes import process_role
+            if process_role(process, frontend_dir.parent, windows=True) in ("code", "ide", "term", "live"):
+                return True
+        executable = process.get("ExecutablePath") or ""
+        if not executable:
+            args = process_arguments(process.get("CommandLine") or "", True)
+            executable = args[0] if args else ""
+        if ntpath.normcase(executable) in executables:
+            return True
+        if not executable and (process.get("Name") or "").lower() == "electron.exe":
+            raise ValueError("実行中 Electron の所属を確認できません")
+    return False
+
+
+def _locked_dependencies_ready(frontend_dir: Path) -> bool:
+    """npm ciの代替として使える既存依存か確認。欠損・版違いは成功扱いしない。"""
+    try:
+        package = json.loads((frontend_dir / "package.json").read_text(encoding="utf-8"))
+        locked = json.loads((frontend_dir / "package-lock.json").read_text(encoding="utf-8"))["packages"]
+        for key in ("dependencies", "devDependencies", "optionalDependencies"):
+            if package.get(key, {}) != locked[""].get(key, {}):
+                return False
+        if not locked or len(locked) < 2:
+            return False
+        for name, metadata in locked.items():
+            if not name:
+                continue
+            path = PurePosixPath(name)
+            if path.is_absolute() or ".." in path.parts or not name.startswith("node_modules/") or metadata.get("link"):
+                return False
+            target = frontend_dir / name / "package.json"
+            if not target.exists() and metadata.get("optional"):
+                plat, arch = _electron_platform_arch()
+                def excluded(values, current):
+                    return bool(values) and (f"!{current}" in values or (any(not v.startswith("!") for v in values) and current not in values))
+                if excluded(metadata.get("os", []), plat) or excluded(metadata.get("cpu", []), arch):
+                    continue
+                return False
+            installed = json.loads(target.read_text(encoding="utf-8"))
+            if not metadata.get("version") or installed.get("version") != metadata["version"]:
+                return False
+            # package.jsonだけ残った不完全な導入も検出する。
+            main = installed.get("main")
+            if main and not (target.parent / main).exists() and not (target.parent / (main + ".js")).exists():
+                return False
+        if "node-pty" in package.get("dependencies", {}):
+            plat, arch = _electron_platform_arch()
+            native = frontend_dir / "node_modules" / "node-pty"
+            filenames = ("conpty.node", "conpty_console_list.node") if plat == "win32" else ("pty.node",)
+            if not any(all((native / folder / name).is_file() for name in filenames) for folder in (
+                "build/Release", "build/Debug", f"prebuilds/{plat}-{arch}",
+            )):
+                return False
+        return True
+    except (OSError, KeyError, ValueError, TypeError):
+        return False
+
+
+def frontend_dependency_guard(frontend_dir: Path, label: str, *, info=print, warning=print, error=print, desktop=True):
+    """None=通常導入、True=使用中の整合した依存を再利用、False=更新を安全に中止。"""
+    try:
+        if not _runtime_in_use(frontend_dir):
+            return None
+        binary_ready = not desktop or electron_binary_ready(frontend_dir)
+        if desktop and sys.platform == "win32":
+            # exe/versionだけ残る途中失敗を正常なruntimeと誤認しない。
+            dist = frontend_dir / "node_modules" / "electron" / "dist"
+            binary_ready = binary_ready and all((dist / name).is_file() for name in (
+                "dxcompiler.dll", "ffmpeg.dll", "icudtl.dat", "resources.pak",
+            ))
+        if not _locked_dependencies_ready(frontend_dir) or not binary_ready:
+            error(f"{label}: 使用中の Electron / 共有依存に欠損・版違いがあります。Code / IDE を閉じてセットアップを再実行してください。依存更新は実施していません。")
+            return False
+        warning(f"{label}: Code / IDE 等が使用中のため、整合を確認した既存依存を再利用します。npm 導入・更新は保留です。更新する場合は画面を閉じてセットアップを再実行してください。")
+        return True
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        error(f"{label}: 使用中プロセスを確認できないため依存更新を中止します: {exc}")
+        return False
+
+
 def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True) -> bool:
     """npm での重複取得を避け、依存導入後に Electron を一度だけ準備する。"""
+    guarded = frontend_dependency_guard(frontend_dir, label, info=info, warning=warning, error=error, desktop=desktop)
+    if guarded is not None:
+        return guarded
     env = {**os.environ, "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"}
     recovery_needed = False
     # pull後の再配置では導入済み依存を残して同期し、範囲内最新版への更新は行わない。

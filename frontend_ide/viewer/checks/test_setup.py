@@ -45,6 +45,8 @@ class ViewerSetupTests(unittest.TestCase):
         self.enterContext(patch.object(common.platform, 'machine', return_value='AMD64'))
         self.enterContext(patch.dict(os.environ, {}, clear=True))
         self.enterContext(patch.object(viewer.shutil, 'which', return_value='npm.cmd'))
+        self.guard = self.enterContext(patch.object(viewer, 'frontend_dependency_guard', return_value=None))
+        self.enterContext(patch.object(common, '_runtime_in_use', return_value=False))
         self.run = self.enterContext(patch.object(viewer.subprocess, 'run'))
         self.launcher = self.enterContext(patch.object(viewer, 'install_launcher'))
         self.download = self.enterContext(patch.object(common.urllib.request, 'urlopen', side_effect=OSError('network unavailable')))
@@ -272,12 +274,64 @@ class ViewerSetupTests(unittest.TestCase):
                 prepare.assert_not_called()
         self.download.assert_not_called()
 
+    def test_in_use_matching_dependencies_only_build_and_register(self):
+        self.guard.return_value = True
+        with patch.object(viewer, 'prepare_electron_binary') as prepare:
+            self.assertTrue(viewer.setup())
+        self.run.assert_called_once_with(['npm.cmd', 'run', 'build'], cwd=self.target.parent, check=True)
+        prepare.assert_not_called()
+        self.launcher.assert_called_once_with(self.target)
+        self.guard.assert_called_once()
+        self.assertEqual(self.guard.call_args.args, (self.target, 'IDE'))
+
+    def test_in_use_mismatch_aborts_before_any_npm_or_launcher(self):
+        self.guard.return_value = False
+        with patch.object(viewer, 'prepare_electron_binary') as prepare:
+            self.assertFalse(viewer.setup())
+        self.run.assert_not_called()
+        prepare.assert_not_called()
+        self.launcher.assert_not_called()
+
+    def test_missing_shared_dependencies_are_guarded_before_ci(self):
+        (self.target.parent / 'node_modules/node-pty').rmdir()
+        self.guard.side_effect = [True, False]
+        self.assertFalse(viewer.setup())
+        self.run.assert_not_called()
+        self.launcher.assert_not_called()
+        self.assertEqual(self.guard.call_args.args[0], self.target.parent)
+        self.assertFalse(self.guard.call_args.kwargs['desktop'])
+
+    def test_missing_shared_dependencies_install_when_not_in_use(self):
+        (self.target.parent / 'node_modules/node-pty').rmdir()
+        self.guard.side_effect = [True, None]
+        self.assertTrue(viewer.setup())
+        self.assertEqual([call.args[0][1] for call in self.run.call_args_list], ['ci', 'run'])
+        self.assertTrue(all(call.kwargs['cwd'] == self.target.parent for call in self.run.call_args_list))
+
     def test_npm_failure_stops_before_binary_and_launcher(self):
         self.run.side_effect = subprocess.CalledProcessError(1, 'npm ci')
         with patch.object(viewer, 'prepare_electron_binary') as prepare:
             self.assertFalse(viewer.setup())
             prepare.assert_not_called()
         self.launcher.assert_not_called()
+
+
+class SharedUiSetupTests(unittest.TestCase):
+    def test_prepare_respects_guard_without_mutating_active_dependencies(self):
+        spec = importlib.util.spec_from_file_location('shared_ui_setup_test', ROOT / 'frontend_ide/_setup.py')
+        shared = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(shared)
+        for guard_result in (True, False, None):
+            with self.subTest(guard_result=guard_result), \
+                    patch.object(shared.shutil, 'which', return_value='npm'), \
+                    patch.object(shared, 'frontend_dependency_guard', return_value=guard_result) as guard, \
+                    patch.object(shared.subprocess, 'run') as run:
+                self.assertEqual(shared.prepare(), guard_result is not False)
+                guard.assert_called_once_with(shared.ROOT, 'Term / Code / Live / IDE 共通UI', desktop=False)
+                if guard_result is None:
+                    run.assert_called_once()
+                else:
+                    run.assert_not_called()
 
 
 if __name__ == '__main__':

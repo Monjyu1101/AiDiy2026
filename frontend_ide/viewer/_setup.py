@@ -32,7 +32,7 @@ _launcher = importlib.util.module_from_spec(_launcher_spec)
 _launcher_spec.loader.exec_module(_launcher)
 install_launcher = _launcher.install_launcher
 sys.path.insert(0, str(THIS_DIR.parents[1] / 'scripts'))
-from _setup_electron import prepare_electron_binary
+from _setup_electron import prepare_electron_binary, frontend_dependency_guard
 
 
 class Colors:
@@ -57,6 +57,10 @@ def print_error(message):
     print(f"{Colors.FAIL}[NG] {message}{Colors.ENDC}")
 
 
+def print_warning(message):
+    print(f"[WARN] {message}")
+
+
 def print_info(message):
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
@@ -73,29 +77,43 @@ def setup(choices=None) -> bool:
     # ロックファイルがあれば再現性のある npm ci、初回だけ npm install で作る。
     command = "ci" if (THIS_DIR / "package-lock.json").exists() else "install"
     try:
-        print_info(f"実行中: {npm} {command} --no-fund --no-audit")
-        # postinstall での Node.js による取得を避け、他の画面と共通の準備処理を使う。
-        env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
-        browser_only = env.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not env.get('DISPLAY') and not env.get('WAYLAND_DISPLAY'))
-        if browser_only:
-            print_info("Web 起動環境のため Electron 本体のダウンロードは省略します。")
-        subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
-        # ロック済みの旧版バイナリを取得する前に、宣言範囲内の最新版へ更新する。
-        print_info(f"実行中: {npm} update electron --include=dev --no-fund --no-audit")
-        updated = True
-        try:
-            subprocess.run([npm, "update", "electron", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
-        except (OSError, subprocess.CalledProcessError) as exc:
-            updated = False
-            print_info(f"Electron の更新に失敗しました（最新版は未確認）: {exc}")
-        if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
-            if not updated:
-                print_info("導入済みバージョンに一致する配置済み本体・共有 ZIP から復旧します（ダウンロードなし）。")
-            if not prepare_electron_binary(THIS_DIR, 'IDE', allow_download=updated, info=print_info, error=print_error):
-                return False
+        # 起動中のElectronを壊さず、依存が一致するときだけ配置済み資産を使う。
+        reuse = frontend_dependency_guard(
+            THIS_DIR, 'IDE', info=print_info, warning=print_warning, error=print_error,
+        )
+        if reuse is False:
+            return False
+        if reuse is not True:
+            print_info(f"実行中: {npm} {command} --no-fund --no-audit")
+            # postinstall での Node.js による取得を避け、他の画面と共通の準備処理を使う。
+            env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
+            browser_only = env.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not env.get('DISPLAY') and not env.get('WAYLAND_DISPLAY'))
+            if browser_only:
+                print_info("Web 起動環境のため Electron 本体のダウンロードは省略します。")
+            subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+            # ロック済みの旧版バイナリを取得する前に、宣言範囲内の最新版へ更新する。
+            print_info(f"実行中: {npm} update electron --include=dev --no-fund --no-audit")
+            updated = True
+            try:
+                subprocess.run([npm, "update", "electron", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+            except (OSError, subprocess.CalledProcessError) as exc:
+                updated = False
+                print_info(f"Electron の更新に失敗しました（最新版は未確認）: {exc}")
+            if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
+                if not updated:
+                    print_info("導入済みバージョンに一致する配置済み本体・共有 ZIP から復旧します（ダウンロードなし）。")
+                if not prepare_electron_binary(THIS_DIR, 'IDE', allow_download=updated, info=print_info, error=print_error):
+                    return False
         vue = THIS_DIR.parent.parent / 'frontend_ide'
         if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
-            subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True)
+            vue_reuse = frontend_dependency_guard(
+                vue, 'Term / Code / Live / IDE 共通UI', desktop=False,
+                info=print_info, warning=print_warning, error=print_error,
+            )
+            if vue_reuse is False:
+                return False
+            if vue_reuse is not True:
+                subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True)
         subprocess.run([npm, 'run', 'build'], cwd=vue, check=True)
         install_launcher(THIS_DIR)
     except (OSError, subprocess.CalledProcessError):

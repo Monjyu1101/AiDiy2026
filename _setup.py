@@ -750,6 +750,11 @@ def setup_node_refresh() -> list[str]:
             return helper.setup_dependencies(directory, npm, folder, run_command,
                                              update=False, desktop=desktop,
                                              info=print_info, warning=print_warning, error=print_error)
+        guarded = helper.frontend_dependency_guard(
+            directory, folder, desktop=False, info=print_info, warning=print_warning, error=print_error,
+        )
+        if guarded is not None:
+            return guarded
         return run_command([npm, "install", "--include=dev", "--no-fund", "--no-audit"], cwd=directory)
 
     def build(folder, script="build"):

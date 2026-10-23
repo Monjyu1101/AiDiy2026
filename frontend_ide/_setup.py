@@ -11,12 +11,17 @@ import subprocess
 import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent / "scripts"))
+from _setup_electron import frontend_dependency_guard
 
 def prepare():
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
     if not npm:
         return False
     try:
+        reuse = frontend_dependency_guard(ROOT, 'Term / Code / Live / IDE 共通UI', desktop=False)
+        if reuse is not None:
+            return reuse
         subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=ROOT, check=True)
         return True
     except (OSError, subprocess.CalledProcessError):
