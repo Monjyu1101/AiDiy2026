@@ -10,6 +10,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import StatusBar from '../共通表示/状態バー.vue';
 import TerminalWelcome from '../ターミナル/開始表示.vue';
+import { terminalKeyHandler } from './キー入力.js';
 import { terminalCompletion, cliCompletions } from '../ターミナル/コマンド補完.js';
 const props = defineProps({ base: String, icon: String, desktop: Boolean, linked: Boolean, visible: { type: Boolean, default: true } });
 const windowTitle = ref('');
@@ -56,6 +57,14 @@ function updateCompletion() {
   ghostRows.value = rows;
 }
 function send(value) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value)); }
+function sendInput(data) {
+  if (!connected.value) return;
+  for (let i = 0; i < data.length; i += 16000) send({ type: 'input', data: data.slice(i, i + 16000) });
+}
+function interrupt() {
+  if (!connected.value) return;
+  startInput(); sendInput('\x03'); terminal.focus();
+}
 function toggleTools() {
   if (!socketReady.value || toolsChanging.value) return;
   toolsChanging.value = true;
@@ -91,14 +100,8 @@ onMounted(() => {
   terminal = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: 'Consolas, "Noto Sans Mono", monospace', scrollback: 5000,
     theme: { background: '#080b10', foreground: '#dce6f2', cursor: '#81e4e8', selectionBackground: '#365b78' } });
   fit = new FitAddon(); terminal.loadAddon(fit); terminal.open(container.value); fitTerminal();
-  terminal.attachCustomKeyEventHandler(event => {
-    // 選択がある時だけCtrl+Cをコピーに使い、それ以外はシェルへの割り込み。
-    if (event.type === 'keydown' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && terminal.hasSelection()) {
-      void navigator.clipboard.writeText(terminal.getSelection()).catch(() => { error.value = 'コピーできません。'; }); return false;
-    }
-    return true;
-  });
-  input = terminal.onData(data => { if (!connected.value) return; for (let i = 0; i < data.length; i += 16000) send({ type: 'input', data: data.slice(i, i + 16000) }); });
+  terminal.attachCustomKeyEventHandler(terminalKeyHandler(data => { startInput(); sendInput(data); }));
+  input = terminal.onData(sendInput);
   key = terminal.onKey(startInput);
   container.value.addEventListener('input', startInput, true);
   container.value.addEventListener('paste', startInput, true);
@@ -114,7 +117,7 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
 <template>
   <section class="term-component" :class="{ 'desktop-window': desktop, 'term-waiting': !inputStarted }">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Term' : 'AiDiy Term')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
-    <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">{{ cli ? '再接続' : '再起動' }}</button></nav></div>
+    <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button :disabled="!connected" title="実行中の処理へ割り込みを送信（キーボードのCtrl+Cはコピー専用）" @click="interrupt">Ctrl+C送信</button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">{{ cli ? '再接続' : '再起動' }}</button></nav></div>
     <div v-if="!inputStarted" class="term-welcome"><TerminalWelcome kind="term" :icon="icon || '/development/AiDiy.png'" /></div>
     <div class="term-screen" aria-label="ターミナル"><div ref="container" class="term-viewport"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
     <div class="term-meta"><span :title="cli ? `${cli.name} · ${cli.mode} · モデル指定なし` : completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell}${cli ? ` · ${cli.mode} · モデル指定なし` : ''} · ${status}` }}</span><span :title="'toolsサーバーの稼働状態'">tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>

@@ -4,6 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
+import * as keyboard from '../src/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -26,7 +27,7 @@ async function fixture(t){
   cols=80;rows=24;options={scrollback:5000};listeners={};buffer={active:{}};
   _core={_renderService:{dimensions:{css:{cell:{width:8,height:17}}},clear(){}}};
   constructor(){terminal=this;resources.terminals++;}
-  open(parent){this.element={parentElement:parent};} loadAddon(addon){addon.activate(this);} attachCustomKeyEventHandler(){} reset(){} clear(){} focus(){} writeln(){} dispose(){resources.disposed++;}
+  open(parent){this.element={parentElement:parent};} loadAddon(addon){addon.activate(this);} attachCustomKeyEventHandler(handler){this.handleKey=handler;} reset(){} clear(){} focus(){} writeln(){} dispose(){resources.disposed++;}
   resize(cols,rows){this.cols=cols;this.rows=rows;this.listeners.Resize?.({cols,rows});}
  }
  for(const event of ['Data','Key','Resize','CursorMove','Scroll','Render'])Terminal.prototype['on'+event]=function(callback){this.listeners[event]=callback;return{dispose:()=>delete this.listeners[event]};};
@@ -38,7 +39,7 @@ async function fixture(t){
  class ResizeObserver{
   constructor(callback){this.callback=callback;observers.add(this);} observe(target){this.target=target;} disconnect(){observers.delete(this);}
  }
- const modules={'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
+ const modules={'./キー入力.js':keyboard,'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
  const script=compileScript(descriptor,{id:'TermPanel',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
   module,URL,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},
@@ -115,4 +116,22 @@ test('CLI Term: 開始時から全体表示、モード保持、クリア・再�
  assert.equal(f.state.connected.value,false);assert.equal(f.state.inputStarted.value,true);assert.equal(f.state.status.value,'終了');
  f.sockets.at(-1).receive({type:'error',message:'起動失敗fixture'});assert.equal(f.state.error.value,'起動失敗fixture');assert.equal(f.state.status.value,'エラー');
  assert.match(descriptor.template.content,/モデル指定なし/);assert.match(descriptor.template.content,/再接続/);
+});
+
+
+test('Term入力: 修飾EnterはWebSocketへ一度だけ送信し、Ctrl+Cはボタンだけで送る',async t=>{
+ const f=await fixture(t);
+ const event=(key,extra={})=>({type:'keydown',key,preventDefault(){},stopPropagation(){},...extra});
+ let count=f.packets.length;
+ assert.equal(f.terminal.handleKey(event('c',{ctrlKey:true})),false);
+ assert.equal(f.terminal.handleKey(event('v',{ctrlKey:true})),false);
+ assert.equal(f.packets.length,count);
+ for(const [extra,data] of [[{shiftKey:true},'\x1b[13;2u'],[{altKey:true},'\x1b\r']]){
+  f.terminal.handleKey(event('Enter',extra));
+  assert.deepEqual(f.packets.at(-1),{type:'input',data});
+  count=f.packets.length;f.terminal.handleKey(event('Enter',{...extra,type:'keyup'}));assert.equal(f.packets.length,count);
+ }
+ f.state.interrupt();assert.deepEqual(f.packets.at(-1),{type:'input',data:'\x03'});
+ f.sockets[0].receive({type:'exit',exitCode:0});count=f.packets.length;
+ f.state.interrupt();f.terminal.handleKey(event('Enter',{shiftKey:true}));assert.equal(f.packets.length,count);
 });

@@ -60,8 +60,7 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await until(`!document.querySelector('.term-completion') && document.querySelector('.xterm-rows')?.textContent.includes('codex --dangerously-bypass-approvals-and-sandbox')`);
   // Enterは送らず、実際のCodexを起動せずに補完確認を終える。
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
-  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
+  await evaluate(button('Ctrl+C送信'));
   await sleep(200);
   await evaluate(`document.querySelector('.xterm-helper-textarea').focus()`);
   await send('Input.insertText', { text: 'claude' });
@@ -70,8 +69,7 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await until(`!document.querySelector('.term-completion') && document.querySelector('.xterm-rows')?.textContent.includes('claude --dangerously-skip-permissions --chrome')`);
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
-  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
+  await evaluate(button('Ctrl+C送信'));
   await sleep(200);
   await evaluate(button('Code')); await evaluate(button('Term')); await type("Write-Output ('保持_'+$termCheck)");
   await until(`document.querySelector('.xterm-rows')?.textContent.includes('保持_41')`);
@@ -86,8 +84,7 @@ try {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
   await until(`!document.querySelector('.term-completion') && document.querySelector('.xterm-rows')?.textContent.includes('copilot --allow-all-tools')`);
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
-  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
+  await evaluate(button('Ctrl+C送信'));
   await sleep(200);
   await evaluate(button('表示クリア'));
   await until(`!!document.querySelector('.term-welcome') && document.querySelector('.term-screen').getBoundingClientRect().height<100`);

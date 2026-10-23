@@ -4,6 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
+import * as keyboard from '../src/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -22,7 +23,7 @@ function fixture({desktop=true,linked=true,title=()=>Promise.resolve('AiDiy IDE 
  const module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{
   module,console,URL,window:{aidiyWindow:{title:()=>{calls++;return title();}}},location:{href:'http://localhost/'},ResizeObserver:class{observe(){}disconnect(){}},WebSocket:class{close(){}},
-  require:id=>id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../ターミナル/コマンド補完.js'?{cliCompletions:{}}:{},
+  require:id=>id==='./キー入力.js'?keyboard:id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../ターミナル/コマンド補完.js'?{cliCompletions:{}}:{},
  });
  const scope=vue.effectScope(),component=module.exports,props={desktop,linked,visible:true,base:'/term/'};
  const state=scope.run(()=>component.setup(props,{expose(){}}));state.container.value={addEventListener:noop,removeEventListener:noop};

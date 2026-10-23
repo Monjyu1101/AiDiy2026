@@ -79,7 +79,8 @@ Code / Live は、これまでどおり単独起動（`aidiy_code` / `aidiy_live
 - Electron版は画面の作業領域の幅2/3・高さ1/2で、画面下中央に開きます。単独コマンドの再実行も別窓になり、IDEの「＋ Term」と共通で28pxずつ右上へずらします。画面端まで進んだら中央下へ戻ります。
 - IDE: 利用開始後の「＋ Term」で別ウィンドウを開きます。複数起動できます。Web版はTermタブです。
 - 最初の入力まではCodeと同じアイコン付き初期表示と、画面下部の端末入力欄を表示します。文字入力・貼り付け・キー操作で端末を全体へ広げ、同じシェルと入力を引き継ぎます。「再起動」で初期表示に戻ります。
-- ANSIカラー、日本語入力、矢印キー、Ctrl+C、貼り付け、スクロール履歴、ウィンドウサイズへの追従に対応します。文字を選択した状態のCtrl+Cはコピーです。
+- Ctrl+C / Cmd+C はコピー専用で、割り込みは「Ctrl+C送信」ボタンから送ります。Ctrl+V / Cmd+V は通常の貼り付けです。Alt+Enter は ESC+CR、Shift+Enter は CSI-u（ESC [13;2u）を送ります。改行としての解釈は受信側CLIの対応に依存します。
+- ANSIカラー、日本語入力、矢印キー、Ctrl+C送信ボタン、貼り付け、スクロール履歴、ウィンドウサイズへの追従に対応します。文字を選択した状態のCtrl+Cはコピーです。
 - 「表示クリア」は端末の表示を消して、アイコン付きの初期画面と下部の入力欄に戻ります。シェルと変数・作業フォルダは維持し、次の入力で再び全体表示になります。`exit`でシェルを終了した後は「再起動」で新しいシェルを開けます。
 - タイトルバーとプロジェクトバーはCodeと共通の配置です。「tools接続確認」トグルは既定ONで、tools（既定8095）の応答があればシアンで明滅し、応答がなければ黒になります。OFFでは疎通確認を止め、Codeと同じ赤いバーに切り替えます。端末や実行中のコマンドは維持します。
 - Windowsでは下記CLI名だけを入力すると、続きの起動オプションを入力行に薄いグレーで表示します。Tabで確定すると通常の文字になり、Enterで実行します。通常のTab補完は維持し、モデル指定は変更しません。
@@ -254,6 +255,7 @@ Canvas描画は `src/開発スペース/宇宙描画.js`、通信は `src/コー
 
 - AiDiy検索の自動検証: `npm test`。模擬エージェントで実画面まで確認する場合はルートから `node frontend_ide/scripts/check-ai-search.mjs`（AI呼び出しなし、`nn-ai-search-*.png` を保存）。実際のエージェントとの疎通は `node frontend_ide/scripts/check-ai-search-live.mjs`（明示実行専用・AI利用あり）。
 
+- Termキー入力: `node --test checks/term-keyboard.test.mjs checks/term-size.test.mjs checks/term-window-title.test.mjs`。実ブラウザーのclipboard / 修飾Enter確認は `node scripts/check-term-keyboard.mjs`（`CHROME_PATH` でChromiumを指定可能、PTYはfixture）。Windows Electron / 各CLIでの改行動作は別途確認します。
 - 配布画面更新: このフォルダで `npm run build`。同じbundleをCode / LiveのVS Code配布先にもコピーします。
 - 拡張作成: `frontend_ide/host` で `npm run package`。既存の2つの拡張IDとVSIX名を維持します。
 - 共通テスト: このフォルダで `npm test`。アイコンの対応・Vue部品・HTTP配信・配布物と帰属は `node --test checks/file-icons.test.mjs`。先に共通画面とCode / Liveをビルドしてください。
