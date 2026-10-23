@@ -39,7 +39,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
     <aside aria-label="診断項目"><nav id="list"><details open><summary>導入状況</summary><template v-for="group in 分類" :key="group"><details :open="!折り畳み.has(group)" @toggle="開閉(group,$event)"><summary>{{group}} · {{項目.filter(e=>(e.menuGroup || 'その他拡張')===group).length}}</summary>
       <div v-for="item in 項目.filter(e=>(e.menuGroup || 'その他拡張')===group)" :key="item.id" class="install-item" :class="{selected:選択ID===item.id}">
         <button class="item" :class="{selected:選択ID===item.id}" :aria-pressed="選択ID===item.id" @click="選択ID=item.id;詳細表示=true"><span>{{item.name}}</span></button>
-        <div class="install-check"><button :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="操作禁止" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{個別確認中===item.id?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
+        <div class="install-check"><button class="single-test-button" :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="操作禁止" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{個別確認中===item.id?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
         <div v-if="可能操作(item.id).length" class="install-manage"><button v-for="action in 可能操作(item.id)" :key="action" type="button" :data-install-action="action" :data-install-id="item.id" :aria-label="`${item.name} を${action}`" :class="{'install-delete':action==='削除'}" :disabled="項目操作禁止(item.id)" :title="能力(item.id)?.説明" @click="実行開始(item,action)">{{action}}</button></div>
       </div>
     </details></template></details></nav></aside>

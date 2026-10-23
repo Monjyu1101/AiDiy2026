@@ -1,16 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {画面サイズ演出を作成}=require('../起動/サイズ切替.cjs');
-function fixture(){
+function fixture({offset={x:0,y:0}}={}){
  const windows=[],scripts=[],calls=[];
- const window={bounds:{x:-120,y:40,width:800,height:600},opacity:1,isDestroyed(){return !!this.destroyed;},isVisible:()=>true,isMinimized:()=>false,isAlwaysOnTop:()=>false,getOpacity(){return this.opacity;},setOpacity(value){this.opacity=value;calls.push(value);},getContentBounds(){return {...this.bounds};},webContents:{executeJavaScript:async()=>{},capturePage:async()=>({isEmpty:()=>false,toDataURL:()=> 'data:image/png;base64,fixture'})}};
+ const window={bounds:{x:-120,y:40,width:800,height:600},opacity:1,isDestroyed(){return !!this.destroyed;},isVisible:()=>true,isMinimized:()=>false,isAlwaysOnTop:()=>false,getOpacity(){return this.opacity;},setOpacity(value){this.opacity=value;calls.push(value);},moveAbove(id){this.above=id;},getBounds(){return {...this.bounds};},getNormalBounds(){return {...this.bounds};},setBounds(value){this.bounds={...value};this.resizes=(this.resizes||0)+1;},setMinimumSize(){},setMaximizable(){},setResizable(){},unmaximize(){this.maximized=false;},isMaximized(){return !!this.maximized;},getContentBounds(){return {...this.bounds};},webContents:{executeJavaScript:async()=>{},capturePage:async()=>({isEmpty:()=>false,toDataURL:()=> 'data:image/png;base64,fixture'})}};
  class Canvas{
   constructor(options){this.options=options;windows.push(this);this.webContents={executeJavaScript:async script=>scripts.push(script)};}
-  setBounds(value){this.bounds=value;}async loadURL(url){this.html=decodeURIComponent(url.split(',')[1]);}showInactive(){this.shown=true;}isDestroyed(){return !!this.dead;}destroy(){this.dead=true;}
+  setOpacity(value){this.opacity=value;}getMediaSourceId(){return 'window:overlay:0';}setAlwaysOnTop(){}
+  setBounds(value){this.bounds={...value,x:value.x+offset.x,y:value.y+offset.y};}getContentBounds(){return {...this.bounds};}async loadURL(url){this.html=decodeURIComponent(url.split(',')[1]);}showInactive(){this.shown=true;}isDestroyed(){return !!this.dead;}destroy(){this.dead=true;}
  }
  return {window,windows,scripts,calls,effect:画面サイズ演出を作成(Canvas,window)};
 }
 test('縮小・拡大は元画面と完成画面の画像を使い、実窓の連続リサイズを行わない',async()=>{
- const f=fixture(),mini={x:-120,y:40,width:384,height:184};
+ const f=fixture(),mini={x:-121,y:40,width:384,height:184};
  for(const target of [mini,{x:-120,y:40,width:800,height:600}]){
   assert.equal(await f.effect.準備(target),true);assert.equal(f.window.opacity,0);
   const canvas=f.windows.at(-1);assert.equal(canvas.options.transparent,true);assert.equal(canvas.options.alwaysOnTop,false);assert.equal(canvas.shown,true);
@@ -33,14 +34,14 @@ test('撮影失敗・中止・破棄でも透明な実窓や演出窓を残さ�
  }
 });
 test('非表示の初期窓には切替演出を重ねず、ピンONは同じ層を継承する',async()=>{
- const f=fixture();f.window.isVisible=()=>false;await f.effect.準備(f.window.bounds);assert.equal(f.windows.length,0);assert.equal(f.window.opacity,1);
- f.window.isVisible=()=>true;f.window.isAlwaysOnTop=()=>true;await f.effect.準備(f.window.bounds);assert.equal(f.windows[0].options.alwaysOnTop,true);f.effect.中止();
+ const f=fixture();f.window.isVisible=()=>false;await f.effect.準備({...f.window.bounds,x:f.window.bounds.x-1});assert.equal(f.windows.length,0);assert.equal(f.window.opacity,1);
+ f.window.isVisible=()=>true;f.window.isAlwaysOnTop=()=>true;await f.effect.準備({...f.window.bounds,x:f.window.bounds.x-1});assert.equal(f.windows[0].options.alwaysOnTop,true);f.effect.中止();
 });
 test('撮影待ちに再読込・中止された切替を後から適用しない',async()=>{
  for(const rejected of [false,true]){
   const f=fixture();let resolve,reject;
   f.window.webContents.capturePage=()=>new Promise((yes,no)=>{resolve=yes;reject=no;});
-  const preparing=f.effect.準備(f.window.bounds);f.effect.中止();
+  const preparing=f.effect.準備({...f.window.bounds,x:f.window.bounds.x-1});f.effect.中止();
   if(rejected)reject(Error('late capture failure'));else resolve({isEmpty:()=>false});
   assert.equal(await preparing,false);assert.equal(f.window.opacity,1);assert.equal(f.windows.length,0);
  }
@@ -58,7 +59,7 @@ test('UIはミニ描画後に演出完了を通知し、完了までは切替中
 });
 
 test('旧画像のdecode後に演出窓を表示し、相補合成で途中の背景抜けを作らない',async()=>{
- const f=fixture();await f.effect.準備({x:-120,y:40,width:384,height:184});
+ const f=fixture();await f.effect.準備({x:-121,y:40,width:384,height:184});
  const canvas=f.windows[0];
  assert.equal(f.scripts[0],"document.querySelector('#old').decode()");
  assert.match(canvas.html,/isolation:isolate/);
@@ -83,11 +84,74 @@ test('旧画像のdecode後に演出窓を表示し、相補合成で途中の�
 test('旧画像decode中の中止で遅れて実窓を透明化しない',async()=>{
  const f=fixture();let release;
  // captureの後で作成される演出窓のdecodeだけを保留する。
- const prepare=f.effect.準備(f.window.bounds);
+ const prepare=f.effect.準備({...f.window.bounds,x:f.window.bounds.x-1});
  await Promise.resolve();
  const canvas=f.windows[0];
  canvas.webContents.executeJavaScript=()=>new Promise(resolve=>release=resolve);
  await new Promise(resolve=>setImmediate(resolve));
  f.effect.中止();release();
  assert.equal(await prepare,false);assert.equal(f.window.opacity,1);assert.equal(canvas.dead,true);
+});
+
+test('透明化後の描画を待つまでnativeサイズ変更へ進めず、中止後も遅延変更しない',async()=>{
+ for(const cancel of [false,true]){
+  const f=fixture();let release,completed=false;
+  const preparing=f.effect.準備({...f.window.bounds,x:f.window.bounds.x-1}).then(ready=>{completed=true;return ready;});
+  await Promise.resolve();
+  f.windows[0].webContents.executeJavaScript=async script=>{
+   f.scripts.push(script);
+   if(f.window.opacity===0)await new Promise(resolve=>release=resolve);
+  };
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.window.opacity,0);assert.equal(typeof release,'function');assert.equal(completed,false);
+  if(cancel)f.effect.中止();
+  release();assert.equal(await preparing,!cancel);
+  f.effect.中止();assert.equal(f.window.opacity,1);assert.ok(f.windows.every(canvas=>canvas.dead));
+ }
+});
+
+test('演出窓のDPI補正後の実座標から画像を配置し、表示開始時に左肩が跳ねない',async()=>{
+ const f=fixture({offset:{x:1,y:-1}}),target={x:0,y:0,width:1920,height:1080};
+ await f.effect.準備(target);
+ const canvas=f.windows[0],origin=canvas.getContentBounds();
+ assert.match(canvas.html,new RegExp(`transform:translate\\(${f.window.bounds.x-origin.x}px,${f.window.bounds.y-origin.y}px\\)`));
+ f.window.bounds=target;await f.effect.完了();
+ const animation=f.scripts.find(script=>script.includes('const motion='));
+ assert.ok(animation.includes(`translate(${target.x-origin.x}px,${target.y-origin.y}px)`));
+});
+
+test('内包される縮小は自窓の画像で演出し、測定後のnative寸法を最後に一度だけ変える',async()=>{
+ const f=fixture(),from={...f.window.bounds};let release;
+ await f.effect.準備({...from,width:384,height:360});
+ assert.equal(f.windows.length,0);assert.equal(f.window.opacity,1);
+ const sizing=f.effect.window;
+ sizing.setMinimumSize(384,134);sizing.setBounds({...from,width:384,height:134});
+ sizing.setMinimumSize(384,186);sizing.setBounds({...from,width:384,height:186});
+ assert.deepEqual(f.window.bounds,from);assert.equal(sizing.getBounds().height,186);
+ f.window.webContents.executeJavaScript=async script=>{
+  f.scripts.push(script);
+  if(script.includes('const motion='))await new Promise(resolve=>release=resolve);
+ };
+ const finishing=f.effect.完了();
+ await new Promise(resolve=>setTimeout(resolve,80));
+ assert.equal(typeof release,'function');assert.equal(f.window.resizes,undefined);
+ release();await finishing;
+ assert.equal(f.window.resizes,1);assert.equal(f.window.bounds.height,186);
+ assert.equal(f.effect.active,false);assert.equal(f.calls.includes(0),false);
+ assert.ok(f.scripts.some(script=>script.includes("style.transform='none'")));
+ assert.ok(f.scripts.at(-1).includes("delete globalThis.__aidiySizeLayer"));
+});
+test('自窓で最大化解除を予約し、終端で元の位置寸法へ戻す',async()=>{
+ const f=fixture(),target={x:0,y:80,width:400,height:300};f.window.maximized=true;
+ await f.effect.準備(target);f.effect.window.unmaximize();
+ assert.equal(f.window.maximized,true);assert.equal(f.effect.window.isMaximized(),false);
+ assert.deepEqual(f.effect.window.getBounds(),target);
+ await f.effect.完了();assert.equal(f.window.maximized,false);assert.deepEqual(f.window.bounds,target);assert.equal(f.window.resizes,1);
+});
+test('拡大用窓は透明状態で背面へ配置してから表示し、focusやshowで実窓を奪わない',async()=>{
+ const f=fixture(),events=[];
+ f.window.moveAbove=id=>{events.push(['above',id]);assert.equal(f.windows[0].opacity,0);assert.equal(f.windows[0].shown,true);};
+ await f.effect.準備({x:-120,y:40,width:1920,height:1080});
+ assert.deepEqual(events,[['above','window:overlay:0']]);assert.equal(f.windows[0].opacity,1);assert.equal(f.window.opacity,0);
+ f.effect.中止();assert.equal(f.window.opacity,1);
 });

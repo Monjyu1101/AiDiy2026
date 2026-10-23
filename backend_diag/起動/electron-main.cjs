@@ -51,9 +51,10 @@ async function start(value) {
   attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
-  const mini=ミニ表示を作成(window,{screen});
-  const micro=マイクロ表示を作成(window,{screen,pins});
-  const sizeEffect=画面サイズ演出を作成(BrowserWindow,window);
+  const sizeEffect=画面サイズ演出を作成(BrowserWindow,window,{topmostLevel:()=>micro.active&&process.platform==='win32'?'pop-up-menu':'floating'});
+  const sizingWindow=sizeEffect.window||window;
+  const mini=ミニ表示を作成(sizingWindow,{screen});
+  const micro=マイクロ表示を作成(sizingWindow,{screen,pins:{setLocked:(_target,value)=>pins.setLocked(window,value),state:()=>pins.state(window)}});
   window.once('closed',()=>sizeEffect.中止());
   let firstLoad=true,opening=false,pendingMiniHeight,displaySwitch=false,displayOrigin;
   window.webContents.on('did-start-loading',()=>{
@@ -69,6 +70,11 @@ async function start(value) {
       displayOrigin=window.getBounds();
       const base=micro.normalBounds||mini.normalBounds||window.getNormalBounds();
       const target={...(value==='micro'?{width:104,height:104}:value==='mini'?{width:384,height:360}:base),x:displayOrigin.x,y:displayOrigin.y};
+      if(value==='micro'){
+        const area=screen.getDisplayMatching(displayOrigin).workArea;
+        target.x=Math.max(area.x,Math.min(area.x+area.width-target.width,target.x));
+        target.y=Math.max(area.y,Math.min(area.y+area.height-target.height,target.y));
+      }
       displaySwitch=true;
       return sizeEffect.準備(target).then(ready=>{if(!ready)displaySwitch=false;return ready;});
     }
@@ -76,6 +82,7 @@ async function start(value) {
       // アイコン化専用の最前面層を演出の完了後にも適用する。
       micro.最前面維持();
       displaySwitch=false;displayOrigin=undefined;
+      if(pendingMiniHeight!==undefined){mini.resize(pendingMiniHeight);pendingMiniHeight=undefined;}
     });
     if(action==='selectProject'){
       if(selectingFolder)return null;selectingFolder=true;
@@ -91,15 +98,17 @@ async function start(value) {
       if(typeof value!=='boolean'||opening||sizeEffect.active&&!displaySwitch||mini.active)return false;
       return micro.set(value,{origin:displayOrigin});
     }
-    if(action==='expandMicro')return value&&typeof value==='object'?micro.expand(value.expanded,value.count):false;
+    // アイコンを離れる途中のwatcher/遅延収納で、撮影済みの元窓を動かさない。
+    if(action==='expandMicro')return !opening&&!displaySwitch&&!sizeEffect.active&&value&&typeof value==='object'?micro.expand(value.expanded,value.count):false;
     if(action==='beginMicroMove')return micro.beginMove();
     if(action==='moveMicro')return typeof value==='string'&&micro.move(value);
     if(action==='endMicroMove'){if(typeof value==='string')micro.endMove(value);return false;}
-    if(action==='finishMini')return displaySwitch?true:sizeEffect.完了();
+    if(action==='finishMini')return displaySwitch?true:sizeEffect.完了().finally(()=>{if(pendingMiniHeight!==undefined){mini.resize(pendingMiniHeight);pendingMiniHeight=undefined;}});
     if(action==='resizeMini'){
-      // 表示開始の拡大演出は撮影した寸法を保持し、最新の測定値だけを完了後に反映する。
-      if(opening&&mini.active){if(!ミニ高さは有効(value))return false;pendingMiniHeight=value;return true;}
-      return mini.resize(value);
+      // 表示開始・切替準備の撮影中は元寸法を保持し、最新の測定値を失わない。
+      // 透明化後のmini初期測定は通常どおり適用し、完成画像へ反映する。
+      if((opening||sizeEffect.preparing)&&mini.active){if(!ミニ高さは有効(value))return false;pendingMiniHeight=value;return true;}
+      const accepted=mini.resize(value);if(accepted)pendingMiniHeight=undefined;return accepted;
     }
     if(action==='isMaximized')return window.isMaximized();
     if(action==='getPinState')return pins.state(window);
@@ -108,7 +117,7 @@ async function start(value) {
     else if(action==='maximize'&&!mini.active&&!micro.active){
       if(sizeEffect.active)return false;
       const maximized=window.isMaximized(),target=maximized?window.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
-      return sizeEffect.準備(target).then(async ready=>{if(!ready||window.isDestroyed())return false;if(maximized)window.unmaximize();else window.maximize();return sizeEffect.完了();});
+      return sizeEffect.準備(target).then(async ready=>{if(!ready||window.isDestroyed())return false;if(maximized)sizingWindow.unmaximize();else sizingWindow.maximize();return sizeEffect.完了();});
     }
     else if(action==='close')window.close();
     return false;

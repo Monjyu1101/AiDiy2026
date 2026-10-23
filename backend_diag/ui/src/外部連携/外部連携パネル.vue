@@ -22,7 +22,7 @@ watch(()=>props.busy,完了時(()=>先頭へスクロール(パネル.value)));
   <template v-else><p v-if="data.設定状態!=='読込済み'" role="status">設定ファイル: {{data.設定状態}}</p><p v-if="data.説明" role="status">{{data.説明}}</p>
    <div v-for="item in items" :key="item.id" class="integration-row" :class="{selected:selected===item.id}">
     <button class="key-select" :aria-pressed="selected===item.id" @click="selected=item.id"><span>{{item.名前}}</span><span class="config-state">{{config(item)}}</span></button>
-    <div class="integration-test"><button :disabled="!connected || busy || writeBusy || Boolean(testing) || loading || !item.テスト可能" :title="item.理由 || '読み取り専用の認証確認を1回行います'" @click="selected=item.id;$emit('test',item.id)">{{testing===item.id?'確認中…':'テスト'}}</button><component :is="状態バッジ" :state="results?.[item.id]?.状態 || '未実施'"/><span v-if="item.理由" class="integration-reason">{{item.理由}}</span></div>
+    <div class="integration-test"><button class="single-test-button" :disabled="!connected || busy || writeBusy || Boolean(testing) || loading || !item.テスト可能" :title="item.理由 || '読み取り専用の認証確認を1回行います'" @click="selected=item.id;$emit('test',item.id)">{{testing===item.id?'確認中…':'テスト'}}</button><component :is="状態バッジ" :state="results?.[item.id]?.状態 || '未実施'"/><span v-if="item.理由" class="integration-reason">{{item.理由}}</span></div>
    </div>
   </template>
  </aside>
