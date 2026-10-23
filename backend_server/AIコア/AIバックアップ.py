@@ -30,7 +30,7 @@ _バックアップ除外フォルダ = (
     "temp",
     "log",
     "logs",
-    "backup",
+    ".backup_local",
     "node_modules",
     "dist",
     "build",
@@ -283,7 +283,7 @@ def バックアップ実行(
         if not os.path.isdir(base_path):
             return None
 
-        backup_root = os.path.join(base_path, "backup")
+        backup_root = os.path.join(base_path, ".backup_local")
 
         # 最終バックアップ時刻を取得
         最終バックアップ結果 = _バックアップ全体の最終日時取得(backup_root)
@@ -474,7 +474,7 @@ def 差分ファイル取得(
         if not os.path.isdir(base_path):
             return None
 
-        backup_root = os.path.join(base_path, "backup")
+        backup_root = os.path.join(base_path, ".backup_local")
 
         # バックアップフォルダ全体から最終日時を取得
         result = _バックアップ全体の最終日時取得(backup_root)

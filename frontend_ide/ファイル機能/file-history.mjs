@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 const MAX_TEXT=1024*1024,MAX_SNAPSHOTS=5000;
 const within=(root,path)=>{const back=relative(root,path);return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back);};
 const failure=(status,message)=>Object.assign(Error(message),{status});
-const validPath=path=>typeof path==='string'&&path.length<=2000&&!/[\\:\0]/.test(path)&&path.split('/').every(part=>part&&part!=='.'&&part!=='..'&&part.toLowerCase()!=='backup');
+const validPath=path=>typeof path==='string'&&path.length<=2000&&!/[\\:\0]/.test(path)&&path.split('/').every(part=>part&&part!=='.'&&part!=='..'&&part.toLowerCase()!=='.backup_local');
 async function safe(root,path){try{const full=await realpath(path);return within(root,full)?full:null;}catch(e){if(e.code==='ENOENT'||e.code==='ENOTDIR')return null;throw e;}}
 async function directories(path){return (await readdir(path,{withFileTypes:true})).filter(entry=>entry.isDirectory());}
 
@@ -25,7 +25,7 @@ export function createFileHistory(project,{state}={}) {
     const {root}=await source(path),parts=path.split('/'),versions=[];let checked=0,truncated=false;
     // 対象ファイルの祖先だけを調べる。バックアップの中を再帰走査しない。
     outer:for(let depth=0;depth<parts.length;depth++){
-      const base=parts.slice(0,depth),backup=await safe(root,join(root,...base,'backup'));
+      const base=parts.slice(0,depth),backup=await safe(root,join(root,...base,'.backup_local'));
       if(!backup)continue;
       const days=(await directories(backup)).filter(d=>/^\d{8}$/.test(d.name)).sort((a,b)=>b.name.localeCompare(a.name));
       for(const day of days){
@@ -36,7 +36,7 @@ export function createFileHistory(project,{state}={}) {
           const snapshot=await safe(backup,join(dayPath,time.name));if(!snapshot)continue;
           const full=await safe(snapshot,join(snapshot,...parts.slice(depth)));if(!full)continue;
           const info=await stat(full);if(!info.isFile())continue;
-          const backupPath=[...base,'backup',day.name,time.name,...parts.slice(depth)].join('/');
+          const backupPath=[...base,'.backup_local',day.name,time.name,...parts.slice(depth)].join('/');
           const stamp=day.name+time.name.slice(0,6);
           versions.push({id:createHash('sha256').update(backupPath).digest('hex'),backupPath,stamp,
             label:`${stamp.slice(0,4)}/${stamp.slice(4,6)}/${stamp.slice(6,8)} ${stamp.slice(8,10)}:${stamp.slice(10,12)}:${stamp.slice(12,14)}`,
@@ -66,7 +66,7 @@ export function createFileHistory(project,{state}={}) {
     if(!version)throw failure(404,'選択したバックアップが見つかりません。');
     const {root,full}=await source(path);
     const segments=version.backupPath.split('/');
-    const snapshotRelative=segments.slice(0,segments.indexOf('backup')+3).join('/');
+    const snapshotRelative=segments.slice(0,segments.indexOf('.backup_local')+3).join('/');
     const snapshot=await safe(root,join(root,snapshotRelative));
     const previous=snapshot&&await safe(snapshot,join(root,version.backupPath));
     if(!previous)throw failure(404,'バックアップが見つかりません。');

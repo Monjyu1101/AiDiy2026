@@ -15,7 +15,7 @@
 全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live / Term / IDE の単独実行と tools の MCP 接続プロセスも強制終了・確認します。
 setup / start の Code / IDE 継続方針とは異なります。ルート固有の
-処理（全階層の temp / _temp / .temp / test / _test / .test とルート backup の削除、グローバル npm ツールの
+処理（全階層の temp / _temp / .temp / test / _test / .test とルート .backup_local の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -69,7 +69,7 @@ BACKEND_LOCAL_ENV_LIST = [".venv", "venv"]
 BACKEND_HERMES_PATH = "command_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
-BACKUP_PATH = "backup"
+BACKUP_PATH = ".backup_local"
 TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp"))
 # 試験用の作業フォルダ。正式なテスト（tests/ など）は名前が違うため対象外。
 TEST_DIR_NAMES = frozenset(("test", "_test", ".test"))
@@ -459,7 +459,7 @@ def _is_directory_link(path: Path) -> bool:
 
 
 def find_temp_directories(base_dir: Path) -> list[Path]:
-    """全階層の一時・試験用ディレクトリを集める。Git 管理情報とリンク先は巡回しない。
+    """全階層の一時・試験用ディレクトリを集める。Git 管理情報・保存版・リンク先は巡回しない。
 
     temp 系は依存フォルダの中も含めて全階層、test 系は依存フォルダ（node_modules / venv 等）の
     外側だけを対象にする。名前は大文字・小文字を区別せず完全一致で判定する。
@@ -467,6 +467,7 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
     root = base_dir.resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(root)
+    # .backup_local は保持選択を尊重し、専用の確認済み cleanup_backup だけで削除する。
     targets: list[Path] = []
 
     def scan_error(error):
@@ -480,7 +481,7 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
         for name in list(directories):
             path = current_path / name
             lower = name.lower()
-            if lower in {".git", ".git_local"} or _is_directory_link(path):
+            if lower in {".git", ".git_local", BACKUP_PATH} or _is_directory_link(path):
                 directories.remove(name)
                 continue
             if lower in TEMP_DIR_NAMES or (lower in TEST_DIR_NAMES and not in_dependency):
@@ -521,11 +522,11 @@ def cleanup_backup(base_dir: Path, choices: dict):
     backup_dir = base_dir / BACKUP_PATH
     if not backup_dir.exists():
         return
-    print_header("backup フォルダのクリーンアップ")
+    print_header(".backup_local フォルダのクリーンアップ")
     if choices.get("backup") is True:
-        remove_directory(backup_dir, "backup")
+        remove_directory(backup_dir, ".backup_local")
     elif choices.get("backup") is False:
-        print_info("backup フォルダはそのまま残します")
+        print_info(".backup_local フォルダはそのまま残します")
 
 
 def uninstall_global_npm_tools():
@@ -600,7 +601,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     }
 
     if (base_dir / BACKUP_PATH).exists():
-        choices["backup"] = ask_yes_no("backup フォルダを削除しますか？", default="y")
+        choices["backup"] = ask_yes_no(".backup_local フォルダを削除しますか？", default="y")
 
     choices["diag"] = ask_yes_no("バックエンド(Diag)のランチャーを解除しますか？", default="y")
     choices["npm_uninstall"] = ask_yes_no(
@@ -795,7 +796,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  0. ルート backup フォルダ")
+    print_info("  0. ルート .backup_local フォルダ")
     print_info("  1. バックエンド(Diag)")
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")

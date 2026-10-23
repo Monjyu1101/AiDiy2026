@@ -125,3 +125,18 @@ test('音声・動画: プレビューAPIは AiDiy の public を正式なリン
     web.closeAllConnections();web.close();await app.close();await rm(root,{recursive:true,force:true});
   }
 });
+
+test('プレビューは通常のbackupを公開し、.backup_localの保存版は公開しない',async t=>{
+  const root=await mkdtemp(join(tmpdir(),'aidiy-preview-storage-'));
+  const preview=createPreview(root,()=>true);
+  t.after(async()=>{await preview.close();await rm(root,{recursive:true,force:true});});
+  for(const folder of ['backup','nested/backup','.backup_local','nested/.backup_local']){
+    await mkdir(join(root,folder),{recursive:true});await writeFile(join(root,folder,'index.html'),'<p>source</p>');
+  }
+  for(const folder of ['backup','nested/backup']){
+    const url=await preview.url(folder+'/index.html');assert.ok(url);assert.equal((await fetch(url)).status,200);
+    const prefix=new URL(url).pathname.split('/').slice(0,3).join('/')+'/';
+    for(const hidden of ['.backup_local','nested/.backup_local'])assert.equal((await fetch(new URL(prefix+hidden+'/index.html',url))).status,404);
+  }
+  for(const hidden of ['.backup_local','nested/.backup_local'])assert.equal(await preview.url(hidden+'/index.html'),null);
+});

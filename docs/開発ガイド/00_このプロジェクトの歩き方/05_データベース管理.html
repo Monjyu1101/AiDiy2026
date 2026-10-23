@@ -178,6 +178,7 @@ python _start.py</code></pre>
 
  <h3>バックアップと復元</h3>
  <p>データベースファイルをコピーするだけでバックアップできます。</p>
+ <p>以下の <code>backup/</code> は利用者が任意に用意する手動DBバックアップ先の例です。AiDiy の差分バックアップ先 <code>.backup_local/</code> とは別用途で、AiDiy の保存版の自動保存先・履歴参照先ではありません。保存先は用途を確認し、既存ファイルを上書きしないように選んでください。</p>
  <pre><code><span># バックアップ</span>
 copy workspace/AiDiy2026/_data\AiDiy\database.db workspace/AiDiy2026/backup\database_20260214.db
 

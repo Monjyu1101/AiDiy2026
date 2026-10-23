@@ -159,7 +159,7 @@ Thumbs.db
 _cache/
 _controls/
 _datas/
-backup/
+.backup_local/
 julius/
 _MCP/
 

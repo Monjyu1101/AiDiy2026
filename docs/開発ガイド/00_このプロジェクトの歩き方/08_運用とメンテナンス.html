@@ -213,13 +213,13 @@ npm install</code></pre>
  <tr><th>対象</th><th>説明</th><th>デフォルト</th></tr>
  </thead>
  <tbody>
- <tr><td><code>backup/</code></td><td><code>aidiy_backup</code> の差分バックアップ出力。内部のtemp / _temp / .temp / test / _test / .testは共通削除対象</td><td>存在時 y</td></tr>
+ <tr><td><code>.backup_local/</code></td><td><code>aidiy_backup</code> の差分バックアップ出力。内部のtemp / _temp / .temp / test / _test / .testも含め共通削除対象から除外。専用の削除確認で保持を選ぶと内容も保持</td><td>存在時 y</td></tr>
  </tbody>
  </table>
 
  <div>
  <strong>Tip</strong>
- <p>SQLite DBとbackup本体は選択式で削除します。ダウンロード済みモデルを含む一時フォルダは共通処理で削除します。<br>
+ <p>SQLite DBと <code>.backup_local</code> 本体は選択式で削除します。<code>.backup_local</code> 内部は共通処理で削除せず、保持選択時は保存版の内容も維持します。旧 <code>backup/</code> は通常フォルダとして一般規則を適用します。ダウンロード済みモデルを含む、それ以外の一時フォルダは共通処理で削除します。<br>
  仮想環境やnode_modulesを削除した後は <code>python _setup.py</code> で再セットアップします。</p>
  </div>
  </section>
@@ -230,6 +230,7 @@ npm install</code></pre>
 
  <h3>SQLiteバックアップ</h3>
  <p>SQLiteはファイルコピーでバックアップできます。</p>
+ <p>以下の <code>backup/</code> は利用者が任意に用意する手動DBバックアップ先の例です。AiDiy の差分バックアップ先 <code>.backup_local/</code> とは別用途で、AiDiy の保存版の自動保存先・履歴参照先ではありません。保存先は用途を確認し、既存ファイルを上書きしないように選んでください。</p>
 
  <pre><code><span># バックアップの作成</span>
 copy workspace/AiDiy2026/_data\AiDiy\database.db workspace/AiDiy2026/backup\database_20260214.db

@@ -163,7 +163,7 @@
   "メッセージ内容": {
     "要求日時": 0,
     "プロジェクトパス": "D:/OneDrive/_sandbox/AiDiy2026",
-    "バックアップベースパス": "D:/OneDrive/_sandbox/AiDiy2026/backend_server/temp/backup",
+    "バックアップベースパス": "D:/OneDrive/_sandbox/AiDiy2026/.backup_local",
     "最終ファイル日時": "2026/04/04 21:00:00",
     "ファイルリスト": [
       { "パス": "frontend_web/src/main.ts", "更新日時": "2026/04/04 20:55:00" }

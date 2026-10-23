@@ -35,7 +35,7 @@ const TYPES = {
   '.vrm': 'application/octet-stream', '.vrma': 'application/octet-stream', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
 };
 // 配らないフォルダ・ファイル（設定・鍵・依存物・生成物・バックアップ）。隠しファイル・隠しフォルダ（. 始まり）も配らない。
-const BLOCKED_DIRS = new Set(['node_modules', '.git', '.git_local', '.venv', 'venv', '__pycache__', '_config', 'backup', '_cache', '.pytest_cache', '.mypy_cache', '.ruff_cache']);
+const BLOCKED_DIRS = new Set(['node_modules', '.git', '.git_local', '.venv', 'venv', '__pycache__', '_config', '.backup_local', '_cache', '.pytest_cache', '.mypy_cache', '.ruff_cache']);
 const BLOCKED_FILE = /(^|[_.-])(keys?|secrets?|tokens?|credentials?|passwords?)\.(json|txt|ya?ml|ini)$|\.(pem|key|pfx|p12|crt)$/i;
 // プレビュー内の相対SVG参照などは同一オリジンで動かす。IDEのAPIは別ポートで隔離する。
 const DOCUMENT_CSP = 'sandbox allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock';

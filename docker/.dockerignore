@@ -51,7 +51,7 @@ temp/
 *.log
 
 # Backup
-backup/
+.backup_local/
 
 # Docker
 docker/ssl/

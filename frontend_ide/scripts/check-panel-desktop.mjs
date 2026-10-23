@@ -14,7 +14,7 @@ import {electronExecutable} from '../viewer/launch-options.mjs';
 const project=mkdtempSync(join(tmpdir(),'aidiy-panel-project-')),profile=mkdtempSync(join(tmpdir(),'aidiy-panel-electron-'));
 writeFileSync(join(project,'sample.txt'),'Electron pin fixture');
 writeFileSync(join(project,'sample.html'),'<!doctype html><meta charset="utf-8"><style>body{padding:20px;background:#081426;color:white}</style><p>別オリジンのHTML本文</p><a href="sample.txt">選択は離した時だけ</a>');
-const history=join(project,'backup','20261010','120000.all');mkdirSync(history,{recursive:true});writeFileSync(join(history,'sample.txt'),'Previous Electron fixture');
+const history=join(project,'.backup_local','20261010','120000.all');mkdirSync(history,{recursive:true});writeFileSync(join(history,'sample.txt'),'Previous Electron fixture');
 const server=await startDevelopment(project);
 try{
  const env={...process.env,AIDIY_DEVELOPMENT_URL:server.url,AIDIY_DEVELOPMENT_KIND:'ide',AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_TEST_PROFILE:profile};delete env.ELECTRON_RUN_AS_NODE;

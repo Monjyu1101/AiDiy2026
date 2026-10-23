@@ -27,21 +27,21 @@ function orderedScanFs(onOpen = () => {}) {
 async function backupFixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'aidiy-grep-backup-budget-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, 'backup', 'archive'), { recursive: true });
-  for (let i = 0; i < 6; i++) await writeFile(join(root, 'backup', 'archive', `${i}.txt`), 'needle');
-  await mkdir(join(root, 'src', 'backup'), { recursive: true });
-  await writeFile(join(root, 'src', 'backup', 'hidden.txt'), 'needle');
+  await mkdir(join(root, '.backup_local', 'archive'), { recursive: true });
+  for (let i = 0; i < 6; i++) await writeFile(join(root, '.backup_local', 'archive', `${i}.txt`), 'needle');
+  await mkdir(join(root, 'src', '.backup_local'), { recursive: true });
+  await writeFile(join(root, 'src', '.backup_local', 'hidden.txt'), 'needle');
   await writeFile(join(root, 'src', 'current.txt'), 'needle');
   return root;
 }
 
-test('grepの走査はbackup配下へ入る前に除外し、件数・階層・時間の予算を使わない', async t => {
+test('grepの走査は.backup_local配下へ入る前に除外し、件数・階層・時間の予算を使わない', async t => {
   const root = await backupFixture(t);
   for (const limits of [{ maxFiles: 1 }, { maxDirectories: 2 }, { maxEntries: 5 }, { maxDepth: 1 }, { timeMs: 1000 }]) {
     const opened = []; let time = 0;
     const scan = await scanTree(root, { scope: 'grep', limits, now: () => time, fs: orderedScanFs(path => {
       opened.push(relative(root, path));
-      if (basename(path) === 'backup') time = 1001;
+      if (basename(path) === '.backup_local') time = 1001;
     }) });
     assert.equal(scan.truncated, false, JSON.stringify(limits));
     assert.equal(scan.files, 1); assert.equal(scan.directories, 2); assert.equal(scan.entries, 4);
@@ -51,11 +51,11 @@ test('grepの走査はbackup配下へ入る前に除外し、件数・階層・�
     assert.equal(scan.tree.d[0].f[0][0], 'current.txt');
   }
   const ordinary = await scanTree(root, { fs: orderedScanFs() });
-  assert.equal(ordinary.files, 8, '通常の宇宙・ツリー走査はbackupを表示し続ける');
-  assert.deepEqual(ordinary.tree.d.map(node => node.n), ['backup', 'src']);
+  assert.equal(ordinary.files, 8, '通常の宇宙・ツリー走査は.backup_localを表示し続ける');
+  assert.deepEqual(ordinary.tree.d.map(node => node.n), ['.backup_local', 'src']);
 });
 
-test('grep APIはbackupで上限に達した通常キャッシュを使わず、対象ファイルを検索する', async t => {
+test('grep APIは.backup_localで上限に達した通常キャッシュを使わず、対象ファイルを検索する', async t => {
   const root = await backupFixture(t);
   for (const limits of [{ maxFiles: 1 }, { maxDirectories: 2 }, { maxEntries: 5 }, { maxDepth: 1 }, { timeMs: 1000 }]) {
     const connection = createCoreConnection(root); connection.offline();
@@ -65,7 +65,7 @@ test('grep APIはbackupで上限に達した通常キャッシュを使わず、
       let time = 0;
       return scanTree(root, { ...options, now: () => time, fs: orderedScanFs(path => {
         opened.push(relative(root, path));
-        if (basename(path) === 'backup') time = 1001;
+        if (basename(path) === '.backup_local') time = 1001;
       }) });
     } } });
     try {
@@ -78,7 +78,7 @@ test('grep APIはbackupで上限に達した通常キャッシュを使わず、
       assert.equal(grep.checked, 1); assert.equal(grep.scannedFiles, 1); assert.equal(grep.truncated, false);
       assert.equal(grep.scan.files, 1); assert.equal(grep.scan.directories, 2);
       assert.deepEqual(scopes, ['tree', 'grep']);
-      assert.ok(opened.every(path => !path.split(sep).includes('backup')));
+      assert.ok(opened.every(path => !path.split(sep).includes('.backup_local')));
       assert.deepEqual((await (await fetch(app.url + 'api/grep?q=needle')).json()).paths, grep.paths);
       assert.equal((await (await fetch(app.url + 'api/galaxy')).json()).truncated, true);
       assert.equal(scopes.length, 2, '通常・grepの完了キャッシュをそれぞれ再利用する');
@@ -88,7 +88,7 @@ test('grep APIはbackupで上限に達した通常キャッシュを使わず、
   }
 });
 
-test('grepを先に実行してもgalaxyはbackupを含む独自のスナップショットを取得する', async t => {
+test('grepを先に実行してもgalaxyは.backup_localを含む独自のスナップショットを取得する', async t => {
   const root = await backupFixture(t), connection = createCoreConnection(root); connection.offline();
   const scopes = [];
   const app = await startServer(root, 0, { connection, scanPoolOptions: { ttlMs: 60000, scan: (root, options) => {
@@ -97,17 +97,28 @@ test('grepを先に実行してもgalaxyはbackupを含む独自のスナップ�
   const grep = await (await fetch(app.url + 'api/grep?q=needle')).json();
   assert.deepEqual(grep.paths, ['src/current.txt']); assert.equal(grep.scan.files, 1);
   const galaxy = await (await fetch(app.url + 'api/galaxy')).json();
-  assert.equal(galaxy.files, 8); assert.deepEqual(galaxy.tree.d.map(node => node.n), ['backup', 'src']);
+  assert.equal(galaxy.files, 8); assert.deepEqual(galaxy.tree.d.map(node => node.n), ['.backup_local', 'src']);
   const latest = await (await fetch(app.url + 'api/latest')).json();
   assert.equal(latest.scan.files, 8);
   assert.deepEqual(scopes, ['grep', 'tree'], 'latestは通常のgalaxyだけと走査を共有する');
 });
 
-test('直接のgrepもbackupのファイル数を候補走査の上限へ数えない', async t => {
+test('直接のgrepも.backup_localのファイル数を候補走査の上限へ数えない', async t => {
   const root = await backupFixture(t);
   const result = await grepFiles(root, 'needle', { limits: { scan: { maxFiles: 1, maxDirectories: 2 } } });
   assert.deepEqual(result.paths, ['src/current.txt']); assert.equal(result.truncated, false);
   assert.equal(result.scan.files, 1); assert.equal(result.scan.directories, 2);
+});
+
+test('grepは通常のbackupフォルダを検索し、.backup_localだけを保存版として除外する', async t => {
+  const root = await backupFixture(t);
+  for (const folder of ['backup', 'src/backup']) {
+    await mkdir(join(root, folder), { recursive: true });
+    await writeFile(join(root, folder, 'source.txt'), 'needle');
+  }
+  const result = await grepFiles(root, 'needle');
+  assert.deepEqual(result.paths.sort(), ['backup/source.txt', 'src/backup/source.txt', 'src/current.txt']);
+  assert.equal(result.scannedFiles, 3); assert.equal(result.truncated, false);
 });
 
 test('grep は内容の部分一致で検索し、除外フォルダ・バイナリ・巨大ファイル・外部リンクを読まない', async () => {
@@ -115,14 +126,14 @@ test('grep は内容の部分一致で検索し、除外フォルダ・バイナ
   const root = join(temp, 'project');
   await mkdir(root);
   try {
-    for (const dir of ['src', 'node_modules', 'backup']) await mkdir(join(root, dir));
+    for (const dir of ['src', 'node_modules', '.backup_local']) await mkdir(join(root, dir));
     await writeFile(join(root, 'src', '日本語.txt'), 'AiDiy 日本語 (a+b)');
     await writeFile(join(root, 'data.csv'), '名前,値\nAiDiy,1');
     await writeFile(join(root, 'AiDiy.txt'), '名前だけ一致');
     await writeFile(join(root, 'binary.bin'), Buffer.from([0, 65, 105, 68, 105, 121]));
     await writeFile(join(root, 'large.txt'), 'AiDiy'.repeat(300000));
     await writeFile(join(root, 'node_modules', 'hidden.txt'), 'AiDiy');
-    await writeFile(join(root, 'backup', 'hidden.txt'), 'AiDiy');
+    await writeFile(join(root, '.backup_local', 'hidden.txt'), 'AiDiy');
     const outside = join(temp, 'outside');
     await mkdir(outside); await writeFile(join(outside, 'hidden.txt'), 'AiDiy');
     await symlink(outside, join(root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');

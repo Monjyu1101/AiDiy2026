@@ -32,18 +32,72 @@ class LocalBackupTests(unittest.TestCase):
         lexists_patch.start();run_patch.start()
         self.addCleanup(lexists_patch.stop);self.addCleanup(run_patch.stop)
         self.meta = self.root / ".git_local"
-        self.git("init", "--template=", "--separate-git-dir="+str(self.meta))
+        self.git("init", "--template=", "--initial-branch=main")
     def git(self, *args):
         env = {k:v for k,v in os.environ.items() if not k.upper().startswith("GIT_")}
-        return subprocess.run(["git", "-C", str(self.root), *args], env=env, capture_output=True, text=True)
+        return subprocess.run(["git", "-C", str(self.root), "--git-dir="+str(self.meta), "--work-tree="+str(self.root), *args], env=env, capture_output=True, text=True)
     def snapshot(self):
         return commit_local_backup(self.root, [p.relative_to(self.root).as_posix() for p in self.root.rglob("*") if p.is_file()])
+    def metadata_bytes(self):
+        return {p.relative_to(self.root).as_posix(): p.read_bytes()
+                for p in self.root.rglob("*") if p.is_file() and not p.is_symlink()}
+
+    def assert_protected(self):
+        before = self.metadata_bytes()
+        with patch("subprocess.run", side_effect=AssertionError("Git must not run")):
+            self.assertEqual(self.snapshot()[0], "skipped")
+            from scripts.local_git_setup import ensure_local_git
+            self.assertEqual(ensure_local_git(self.root)[0], "existing")
+        self.assertEqual(self.metadata_bytes(), before)
+
+    def test_coexisting_normal_git_and_local_metadata_never_touched(self):
+        subprocess.run(["git", "-C", str(self.root), "init"], capture_output=True, check=True)
+        (self.root / "source.txt").write_text("source")
+        self.assert_protected()
+
+    def test_old_aidiy_pointer_is_preserved_not_migrated(self):
+        (self.root / ".git").write_text("gitdir: .git_local\n")
+        self.assert_protected()
+
+    def test_worktree_and_submodule_pointer_shapes_are_preserved(self):
+        for pointer in ("gitdir: ../repo/.git/worktrees/child\n", "gitdir: ../repo/.git/modules/child\n", "invalid"):
+            with self.subTest(pointer=pointer):
+                (self.root / ".git").write_text(pointer)
+                self.assert_protected()
+
+    def test_broken_git_symlink_is_preserved(self):
+        (self.root / ".git").symlink_to(self.root / "absent")
+        self.assert_protected()
+        self.assertTrue((self.root / ".git").is_symlink())
+
+    def test_ancestor_git_with_existing_local_metadata_is_preserved(self):
+        (self.root.parent / ".git").mkdir()
+        self.assert_protected()
+
+    def test_bare_git_with_local_metadata_is_preserved(self):
+        subprocess.run(["git", "init", "--bare", str(self.root)], capture_output=True, check=True)
+        self.assert_protected()
+
+    def test_explicit_git_environment_is_preserved(self):
+        for variable in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"):
+            with self.subTest(variable=variable), patch.dict(os.environ, {variable: str(self.root.parent)}):
+                self.assert_protected()
+
+    def test_git_local_symlink_is_not_followed(self):
+        target = self.root.parent / "metadata"
+        self.meta.rename(target)
+        self.meta.symlink_to(target, target_is_directory=True)
+        before = {p.relative_to(target): p.read_bytes() for p in target.rglob("*") if p.is_file()}
+        self.assertEqual(self.snapshot()[0], "error")
+        self.assertEqual(before, {p.relative_to(target): p.read_bytes() for p in target.rglob("*") if p.is_file()})
+
     def test_missing_repo_created_and_first_backup_committed(self):
         # 既存fixtureの隣に、Git管理されていない別のプロジェクトを作る。
         plain=self.root.parent/"new project"
         plain.mkdir();(plain/"source.txt").write_text("source")
         self.assertEqual(commit_local_backup(plain,["source.txt"])[0],"created")
         self.assertTrue((plain/".git_local").is_dir())
+        self.assertFalse((plain/".git").exists())
         self.assertEqual(commit_local_backup(plain,["source.txt"])[0],"unchanged")
     def test_normal_repository_not_initialized_or_committed(self):
         plain=self.root.parent/"normal"
@@ -53,6 +107,7 @@ class LocalBackupTests(unittest.TestCase):
         self.assertEqual(commit_local_backup(plain,["source.txt"])[0],"skipped")
         self.assertFalse((plain/".git_local").exists())
     def test_ancestor_repository_not_initialized(self):
+        (self.root / ".git").write_text("gitdir: .git_local\n")
         child=self.root/"nested"
         child.mkdir();(child/"source.txt").write_text("source")
         self.assertEqual(commit_local_backup(child,["source.txt"])[0],"skipped")
@@ -61,7 +116,7 @@ class LocalBackupTests(unittest.TestCase):
         plain=self.root.parent/"incomplete"
         plain.mkdir();(plain/".git_local").mkdir()
         (plain/".git_local"/"keep").write_text("keep")
-        self.assertEqual(commit_local_backup(plain,[])[0],"skipped")
+        self.assertEqual(commit_local_backup(plain,[])[0],"error")
         self.assertFalse((plain/".git").exists())
         self.assertEqual((plain/".git_local"/"keep").read_text(),"keep")
     def test_new_modified_deleted_unchanged(self):
@@ -83,6 +138,16 @@ class LocalBackupTests(unittest.TestCase):
         (self.root/"db.sqlite").write_text("db")
         self.assertEqual(self.snapshot()[0], "created")
         self.assertEqual(self.git("ls-files").stdout, "")
+    def test_backup_storage_never_enters_snapshot_but_ordinary_backup_does(self):
+        # 既存 .git_local に info/exclude がない場合も保存版を再帰記録しない。
+        for directory in (".backup_local", "backup"):
+            (self.root / directory).mkdir()
+            (self.root / directory / "source.txt").write_text("fixture")
+        self.assertEqual(self.snapshot()[0], "created")
+        self.assertEqual(self.git("ls-files").stdout, "backup/source.txt\n")
+        (self.root / ".backup_local" / "source.txt").write_text("new snapshot")
+        self.assertEqual(self.snapshot()[0], "unchanged")
+
     def test_no_git_or_no_metadata_skips(self):
         with patch("scripts.local_git_backup.shutil.which",return_value=None):
             self.assertEqual(self.snapshot()[0], "skipped")
@@ -134,6 +199,20 @@ class LocalBackupTests(unittest.TestCase):
         self.assertIsNotNone(module.バックアップ実行(セッション設定=context, ログ出力=False))
         self.assertNotEqual(self.git("rev-parse","HEAD").stdout,first)
         self.assertEqual(self.git("ls-files").stdout,"source.txt\n")
+    def test_file_backup_continues_when_git_management_is_protected(self):
+        spec = importlib.util.spec_from_file_location("protected_backup_under_test", Path(__file__).resolve().parents[2] / "backend_server/AIコア/AIバックアップ.py")
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"log_config": types.SimpleNamespace(get_logger=logging.getLogger)}):
+            spec.loader.exec_module(module)
+        subprocess.run(["git", "-C", str(self.root), "init"], capture_output=True, check=True)
+        (self.root / "source.txt").write_text("source")
+        before = {p.relative_to(self.root): p.read_bytes() for folder in (self.meta, self.root / ".git") for p in folder.rglob("*") if p.is_file()}
+        with patch("subprocess.run", side_effect=AssertionError("Git must not run")):
+            result = module.バックアップ実行(セッション設定={"CODE_BASE_PATH": str(self.root)}, ログ出力=False)
+        self.assertIsNotNone(result)
+        self.assertTrue(list((self.root / ".backup_local").rglob("source.txt")))
+        self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for folder in (self.meta, self.root / ".git") for p in folder.rglob("*") if p.is_file()})
+
     def test_identity_not_written_to_config(self):
         (self.root/"source.txt").write_text("data")
         before=(self.meta/"config").read_bytes()

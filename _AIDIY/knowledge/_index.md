@@ -146,6 +146,7 @@
 | Discord 音声のチャンク境界で無音が混ざる、発話末尾が欠ける、Opus 回帰テストを見直す | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md)（「出力チャンク境界と末尾処理の再修正チェック」） |
 | command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
 | backend_tools の起動・SSE・環境変数 | [`backend_tools,backend_server,運用手順.md`](./backend_tools,backend_server,運用手順.md) |
+| バックアップ保存先、旧 `backup/` から `.backup_local/` への移行、保存版との比較 | [`command_hermes,共通,MCPバックアップ検証手順.md`](./command_hermes,共通,MCPバックアップ検証手順.md) |
 | backend_tools の `/tts` `/imageGen` `/movieGen` HTTP API、save_path 挙動、SSE マウント方法 | [`backend_tools,HTTP_API_save_path挙動.md`](./backend_tools,HTTP_API_save_path挙動.md) |
 | Markdown、BOM、ナレッジ整理 | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md)、[`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
 | フォルダ確認結果の件数・参照内容・検証範囲を照合する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「フォルダ確認結果の根拠と記録の整合性」） |

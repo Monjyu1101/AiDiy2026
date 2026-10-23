@@ -28,29 +28,26 @@ def commit_local_backup(base_dir, files, *, excluded_dirs=(), excluded_files=(),
     git = shutil.which("git")
     if not git or not root.is_dir():
         return "skipped", ""
-    if not os.path.lexists(metadata):
-        try:
-            spec = importlib.util.spec_from_file_location("aidiy_local_git_setup", Path(__file__).with_name("local_git_setup.py"))
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            state, detail = module.ensure_local_git(root)
-        except (OSError, RuntimeError, ImportError):
-            return "error", "ローカル Git の初期化処理を利用できません。"
-        if state == "error":
-            return "error", detail
-        if state != "created":
+    try:
+        spec = importlib.util.spec_from_file_location("aidiy_local_git_setup", Path(__file__).with_name("local_git_setup.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        # .git_local の有無に関わらず、既存 .git / 親の管理環境を最優先する。
+        if module.has_existing_git_management(root):
             return "skipped", ""
+        if not os.path.lexists(metadata):
+            state, detail = module.ensure_local_git(root)
+            if state == "error":
+                return "error", detail
+            if state != "created":
+                return "skipped", ""
+    except (OSError, RuntimeError, ImportError):
+        return "error", "ローカル Git の初期化処理を利用できません。"
     if not metadata.is_dir():
         return "error", "ローカル Git の管理情報が不完全なため記録しません。"
     if metadata.is_symlink() or getattr(metadata, "is_junction", lambda: False)():
         return "error", "ローカル Git の管理先がリンクのため記録しません。"
-    pointer = root / ".git"
     try:
-        if not pointer.is_file() or pointer.is_symlink():
-            return "skipped", ""
-        line = pointer.read_text(encoding="utf-8").strip()
-        if not line.startswith("gitdir: ") or (root / line[8:]).resolve() != metadata:
-            return "skipped", ""
         # 外部worktree、共有object、リンク経由の管理情報は対象外。
         if any((metadata / name).exists() for name in ("commondir", "objects/info/alternates")):
             return "error", "共有 Git 管理情報は記録対象外です。"
@@ -78,7 +75,7 @@ def commit_local_backup(base_dir, files, *, excluded_dirs=(), excluded_files=(),
         old_sha = old.stdout.strip().decode() if old.returncode == 0 else None
         if old.returncode and run("show-ref", check=False).returncode not in (1,):
             return "error", "Git の履歴状態を確認できません。"
-        dirs = set(excluded_dirs) | {".git", ".git_local", "_config", ".env", ".ssh"}
+        dirs = set(excluded_dirs) | {".git", ".git_local", ".backup_local", "_config", ".env", ".ssh"}
         names = set(excluded_files) | {".git", ".gitignore", ".env", "aidiy_key.json"}
         suffixes = tuple(excluded_suffixes) + (".db", ".sqlite", ".sqlite3", ".pem", ".key")
         candidates = []
@@ -101,6 +98,9 @@ def commit_local_backup(base_dir, files, *, excluded_dirs=(), excluded_files=(),
                 raise RuntimeError("ignore check failed")
             excluded = {os.fsdecode(p) for p in ignored.stdout.split(b"\0") if p}
             candidates = [p for p in candidates if p not in excluded]
+        # ファイル確認中に既存 Git 環境へ変わった場合も書き込まない。
+        if module.has_existing_git_management(root):
+            return "skipped", ""
         # 一時 index で記録を組み立て、利用者の通常 .git は一切参照しない。
         with _index_lock(metadata), tempfile.TemporaryDirectory(prefix="aidiy-backup-", dir=metadata) as temporary:
             staged = run("diff", "--cached", "--quiet", "--no-ext-diff", "--no-textconv", check=False)

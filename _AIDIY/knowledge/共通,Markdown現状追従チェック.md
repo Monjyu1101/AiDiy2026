@@ -101,7 +101,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
 ## 横断検索
 
 ```powershell
-$files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/backup/**'
+$files = rg --files -g '*.md' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/dist/**' -g '!**/.backup_local/**'
 
 rg -n '6 サーバー|6 MCP|6 SSE|2 つの MCP|MCP サーバーも同居|16 サーバー|16 個の MCP|17 サーバー|17 個の MCP' $files
 rg -n 'hermes_cli|aidiy_hermes|3サーバー構成|_start\.py.*command_hermes|AiDiy_code_hermes_cli' $files

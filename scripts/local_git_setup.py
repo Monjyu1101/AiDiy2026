@@ -7,6 +7,16 @@ import shutil
 import subprocess
 
 
+def has_existing_git_management(root: Path) -> bool:
+    """明示的な Git 環境や .git は、壊れた情報も含めて利用者の管理として保護。"""
+    if any(key.upper() in {"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"}
+           for key in os.environ):
+        return True
+    return any(os.path.lexists(directory / ".git") or
+               all(os.path.lexists(directory / name) for name in ("HEAD", "objects", "refs"))
+               for directory in (root, *root.parents))
+
+
 def ensure_local_git(base_dir: Path) -> tuple[str, str]:
     """既存 Git 管理情報は変更しない。初回 add / commit / remote 設定も行わない。"""
     root = Path(base_dir).resolve(strict=True)
@@ -14,9 +24,8 @@ def ensure_local_git(base_dir: Path) -> tuple[str, str]:
         return "error", "Git: 対象がフォルダではありません。"
     # .git はディレクトリだけでなく worktree/submodule のファイルも有効。
     # 壊れたポインタやリンクも再初期化せず、利用者の管理情報を保護する。
-    for directory in (root, *root.parents):
-        if os.path.lexists(directory / ".git"):
-            return "existing", "Git: 既存の管理環境を維持します。"
+    if has_existing_git_management(root):
+        return "existing", "Git: 既存の管理環境があるため操作しません。"
     metadata = root / ".git_local"
     if os.path.lexists(metadata):
         return "skipped", "Git: .git_local が既にあるため変更しません。"
@@ -41,17 +50,23 @@ def ensure_local_git(base_dir: Path) -> tuple[str, str]:
             return "existing", "Git: 既存の管理環境を維持します。"
         if "not a git repository" not in probe.stderr.lower():
             return "error", "Git: 管理状態を確認できないため初期化しません。"
+        # 探索中に別プロセスが管理情報を作成した場合も初期化しない。
+        if has_existing_git_management(root):
+            return "existing", "Git: 既存の管理環境があるため操作しません。"
         # テンプレートの独自フックを持ち込まず、空の履歴だけを作る。
-        result = run("init", "--template=", "--initial-branch=main",
-                     f"--separate-git-dir={metadata}", str(root))
+        result = run(f"--git-dir={metadata}", f"--work-tree={root}",
+                     "init", "--template=", "--initial-branch=main")
         if result.returncode != 0:
             return "error", "Git: ローカル管理の初期化に失敗しました（既存情報は削除しません）。"
-        # 作業フォルダごとの移動でも利用できる相対参照にする。
-        (root / ".git").write_text("gitdir: .git_local\n", encoding="utf-8")
+        # .git ポインタは作らない。専用管理情報だけを明示して操作する。
+        # 作業フォルダの移動後も使えるよう、管理ディレクトリからの相対参照。
+        result = run(f"--git-dir={metadata}", "config", "--local", "core.worktree", "..")
+        if result.returncode != 0:
+            return "error", "Git: ローカル管理の設定に失敗しました（既存情報は削除しません）。"
         exclude = metadata / "info" / "exclude"
         exclude.parent.mkdir(parents=True, exist_ok=True)
         with exclude.open("a", encoding="utf-8") as stream:
-            stream.write("\n# AiDiy local Git metadata and ignore definitions\n/.git_local/\n.gitignore\n")
+            stream.write("\n# AiDiy local Git metadata, backup storage and ignore definitions\n/.git_local/\n.backup_local/\n.gitignore\n")
         return "created", "Git: .git_local を作成しました（ローカル履歴専用・未コミット）。"
     except (OSError, subprocess.SubprocessError):
         return "error", "Git: ローカル管理を準備できませんでした（既存情報は削除しません）。"

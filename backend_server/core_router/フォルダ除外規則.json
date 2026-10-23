@@ -25,7 +25,7 @@
     "temp",
     "log",
     "logs",
-    "backup",
+    ".backup_local",
     "node_modules",
     "dist",
     "build",

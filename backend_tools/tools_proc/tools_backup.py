@@ -46,7 +46,7 @@ def register_tools(mcp_bk, bsave, bchk):
     @mcp_bk.tool()
     async def backup_run() -> str:
         """
-        AiDiy ネイティブの差分バックアップを実行する。
+        対象プロジェクト直下の .backup_local/ に AiDiy ネイティブの差分バックアップを保存する。
         初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）を保存。
         """
         try:
@@ -166,7 +166,7 @@ def create_router(bsave, bchk) -> APIRouter:
                 },
                 "run": {
                     "summary": "差分バックアップ実行",
-                    "description": "変更ファイルを backup/ ディレクトリへコピーする。初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）保存。コード作業の区切りや本番前の安全確認として定期実行を推奨。",
+                    "description": "変更ファイルを対象プロジェクト直下の .backup_local/ ディレクトリへコピーする。初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）保存。コード作業の区切りや本番前の安全確認として定期実行を推奨。",
                     "parameters": {
                         "project_root": {"type": "string", "required": False, "description": "対象プロジェクトルートの絶対パス（省略時は AiDiy 自身）"},
                     },

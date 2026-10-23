@@ -35,20 +35,22 @@ class LocalGitSetupTests(unittest.TestCase):
 
     def git(self, *args, root=None):
         env = {k: v for k, v in os.environ.items() if not k.upper().startswith("GIT_")}
-        return subprocess.run(["git", "-C", str(root or self.root), *args],
+        target = root or self.root
+        explicit = [] if args[0] == "init" else ["--git-dir=" + str(target / ".git_local"), "--work-tree=" + str(target)]
+        return subprocess.run(["git", "-C", str(target), *explicit, *args],
                               capture_output=True, text=True, env=env, check=False)
 
     def test_create_empty_local_repo_no_remote(self):
         (self.root / "secret.txt").write_text("fixture only")
         self.assertEqual(ensure_local_git(self.root)[0], "created")
-        self.assertEqual((self.root / ".git").read_text(), "gitdir: .git_local\n")
+        self.assertFalse((self.root / ".git").exists())
         self.assertEqual(self.git("status", "--porcelain").stdout, "?? secret.txt\n")
         self.assertEqual(self.git("remote").stdout, "")
         self.assertEqual(self.git("ls-files").stdout, "")
         self.assertNotEqual(self.git("rev-parse", "--verify", "HEAD").returncode, 0)
         self.assertEqual(self.git("config", "--local", "--get", "user.name").returncode, 1)
         before = (self.root / ".git_local" / "config").read_bytes()
-        self.assertEqual(ensure_local_git(self.root)[0], "existing")
+        self.assertEqual(ensure_local_git(self.root)[0], "skipped")
         self.assertEqual((self.root / ".git_local" / "config").read_bytes(), before)
 
     def test_gitignore_not_recorded_but_rules_apply(self):
@@ -60,6 +62,15 @@ class LocalGitSetupTests(unittest.TestCase):
         self.assertEqual(self.git("status", "--porcelain").stdout, "?? source.txt\n")
         self.assertEqual(ignore.read_text(), "private.txt\n")
         self.assertEqual(self.git("ls-files").stdout, "")
+
+    def test_backup_storage_ignored_without_hiding_ordinary_backup(self):
+        for directory in (".backup_local", "backup"):
+            (self.root / directory).mkdir()
+            (self.root / directory / "source.txt").write_text("fixture")
+        self.assertEqual(ensure_local_git(self.root)[0], "created")
+        self.assertEqual(self.git("check-ignore", ".backup_local/source.txt").returncode, 0)
+        self.assertEqual(self.git("check-ignore", "backup/source.txt").returncode, 1)
+        self.assertEqual(self.git("status", "--porcelain").stdout, "?? backup/\n")
 
     def test_existing_git_directory_unchanged(self):
         self.git("init")
@@ -97,15 +108,18 @@ class LocalGitSetupTests(unittest.TestCase):
                                       "GIT_CONFIG_COUNT": "1",
                                       "GIT_CONFIG_KEY_0": "core.bare",
                                       "GIT_CONFIG_VALUE_0": "true"}):
-            self.assertEqual(ensure_local_git(self.root)[0], "created")
+            self.assertEqual(ensure_local_git(self.root)[0], "existing")
         self.assertEqual(list(elsewhere.iterdir()), [])
-        self.assertEqual(self.git("rev-parse", "--is-bare-repository").stdout.strip(), "false")
+        self.assertFalse((self.root / ".git_local").exists())
 
     def test_folder_can_be_moved(self):
         self.assertEqual(ensure_local_git(self.root)[0], "created")
         moved = self.root.with_name("moved project")
         self.root.rename(moved)
         self.assertEqual(self.git("status", "--porcelain", root=moved).returncode, 0)
+        result = subprocess.run(["git", "--git-dir=" + str(moved / ".git_local"), "status", "--porcelain"], capture_output=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertFalse((moved / ".git").exists())
 
     def test_git_absent_skips_without_writes(self):
         with patch("scripts.local_git_setup.shutil.which", return_value=None):

@@ -14,7 +14,7 @@ const ROOT=path.resolve(rootArg),OUTPUT=path.resolve(outputArg),COMMIT=commitArg
 const SELECTED=selectedArg?new Set((JSON.parse(readFileSync(selectedArg,'utf8')) as {path:string}[]).map(e=>e.path)):null;
 const EXT=new Set(['.py','.js','.mjs','.cjs','.ts','.cts','.mts','.vue','.sh','.bat','.cmd','.ps1','.toml','.json','.yaml','.yml','.ini','.conf','.cnf','.c','.h','.html','.css','.tmpl','.service','.fixture','.lock','.example','.sql']);
 const SPECIAL=new Set(['Dockerfile','Makefile','AGENTS.md','README.md','hermes-gateway']);
-const SKIP=new Set(['.git','.git_local','.venv','node_modules','__pycache__']);
+const SKIP=new Set(['.git','.git_local','.backup_local','.venv','node_modules','__pycache__']);
 // Python の Unicode 単語境界 \b を再現する（JS の \b は ASCII のみ）。
 const W='[\\p{L}\\p{N}\\p{M}_]';
 const REFERENCE=new RegExp(`(?:(?<!${W})(?:subprocess|Popen|create_subprocess|spawnSync|spawn|execSync|execFileSync|execFile|exec|os\\.system|os\\.popen|find_executable|find_node_executable|shutil\\.which|command|executable|INSTALL_RECIPES)|(?<=${W})\\.exe)(?!${W})`,'iu');

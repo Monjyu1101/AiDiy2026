@@ -1,6 +1,8 @@
 # クリーンアップ手順
 
-> 文書: `共通,クリーンアップ手順.md` | 実装: `_cleanup.py`, `_start.py`, `frontend_ide/host/_cleanup.py`, `backend_server/temp/`
+> 文書: `共通,クリーンアップ手順_old.md` | 実装: `_cleanup.py`, `_start.py`, `frontend_ide/host/_cleanup.py`, `backend_server/temp/`
+
+本書は旧版の記録です。本文の `backup/` は当時の保存先を示します。現行の AiDiy バックアップ先は `.backup_local/` です。実際の操作には [現行クリーンアップ手順](./共通,クリーンアップ手順.md) を使い、旧 `backup/` を現行の削除対象とみなさないでください。
 
 ## このメモを使う場面
 - `_cleanup.py` の削除対象や確認プロンプトを変更する
