@@ -24,11 +24,11 @@
 
 Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。
 
-![Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__101_ログイン.png)
+![Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_101_ログイン.png)
 
 コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。
 
-![コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__102_コア操作ボタン.png)
+![コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_102_コア操作ボタン.png)
 
 ## 2. ChatとCodeで会話する
 
@@ -41,15 +41,15 @@ Avatar起動直後です。利用者認証を済ませて会話画面へ進み�
 
 Chatを選んで送信した結果です。入力の下に返答が表示されています。
 
-![Chatを選んで送信した結果です。入力の下に返答が表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__201_Chat応答.png)
+![Chatを選んで送信した結果です。入力の下に返答が表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_201_Chat応答.png)
 
 Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。
 
-![Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__202_Code1応答.png)
+![Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_202_Code1応答.png)
 
 Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。
 
-![Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__203_Code6応答.png)
+![Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_203_Code6応答.png)
 
 ## 3. Liveで会話する
 
@@ -63,7 +63,7 @@ Providerはfreeai_live、画面に表示されたモデルはgemini-2.5-flash-na
 
 Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。
 
-![Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__301_Live応答.png)
+![Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_301_Live応答.png)
 
 ## 4. ファイルを探して中身を見る
 
@@ -75,11 +75,11 @@ Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつ�
 
 File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。
 
-![File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__401_ファイル窓.png)
+![File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_401_ファイル窓.png)
 
 PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。
 
-![PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest__402_画像プレビュー.png)
+![PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_402_画像プレビュー.png)
 
 ## 5. 接続が切れたときと終了
 
@@ -93,7 +93,7 @@ Liveの会話文脈は、サーバー側で接続しているLive APIの同じ�
 
 Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。
 
-![Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/20261024-retest2__501_再接続後Live応答.png)
+![Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_501_再接続後Live応答.png)
 
 終了するときは応答待ちの処理がないことを確認し、使用中の8092のブラウザタブを先に閉じます。その後Avatarを終了します。Avatar終了で8092も停止するため、Web版利用中は終了しません。
 

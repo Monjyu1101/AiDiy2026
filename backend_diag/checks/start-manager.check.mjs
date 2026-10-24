@@ -9,7 +9,7 @@ import {createStartManager} from '../起動/サービス管理.mjs';
 import {createServer,autoStart} from '../diag_main.mjs';
 
 const targets=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(target=>target.起動管理!==false);
-async function fixture(t,{hold=false,fail=false,open=[],stopFailure}={}){
+async function fixture(t,{hold=false,fail=false,open=[],stopFailure,portStatusFn}={}){
  const root=await mkdtemp(join(tmpdir(),'aidiy-start-'));await mkdir(join(root,'scripts'));await writeFile(join(root,'scripts','起動対象.json'),JSON.stringify(targets));
  const calls=[],children=[];
  const spawnFn=(command,args,options)=>{
@@ -21,7 +21,7 @@ async function fixture(t,{hold=false,fail=false,open=[],stopFailure}={}){
  };
  const openPorts=new Set(open),stops=[];
  const manager=createStartManager({root,python:'fixture-python',spawnFn,stopTimeout:200,readyTimeout:500,
-  portStatusFn:async()=>({対象:targets.map(target=>({...target,開放:openPorts.has(target.id)}))}),
+  portStatusFn:portStatusFn|| (async()=>({対象:targets.map(target=>({...target,開放:openPorts.has(target.id)}))})),
   forceStopFn:async target=>{stops.push(target.id);if(target.id===stopFailure)throw Error('fixture stop failure');openPorts.delete(target.id);}});
  t.after(async()=>{await manager.close();await rm(root,{recursive:true,force:true});});
  return {root,manager,calls,children,openPorts,stops};
@@ -37,6 +37,45 @@ test('--auto gives up on a lasting conflict and shows the reason without startin
  assert.equal(await autoStart(manager,{retries:2,wait:async()=>{}}),false);
  assert.equal(calls.length,0);assert.match((await manager.snapshot()).通知,/^自動起動できませんでした。.*強制停止/);
 });
+for(const action of ['forceStopAll','stop','restart','close']){
+ test(`--auto retry is cancelled by explicit ${action} without overwriting its result`,async t=>{
+  const {manager,calls,openPorts}=await fixture(t,{open:['tools']});let waits=0,notice;
+  const result=await autoStart(manager,{wait:async()=>{
+   waits++;
+   if(action==='stop')await manager.stop('tools');
+   else if(action==='restart')await manager.restart('local');
+   else await manager[action]();
+   await manager.settled();notice=(await manager.snapshot()).通知;
+   openPorts.clear();
+  }});
+  assert.equal(result,false);assert.equal(waits,1);
+  assert.deepEqual(calls.map(call=>call.id),action==='restart'?['local']:[]);
+  assert.equal((await manager.snapshot()).通知,notice);
+  // 明示的な次の起動は妨げず、古い auto だけを取り消す。
+  if(action!=='close'){
+   await manager.restart('web');await manager.settled();assert.equal(calls.at(-1).id,'web');
+  }
+ });
+}
+for(const action of ['forceStopAll','stop','restart','close']){
+ test(`--auto pending port check cannot accept startup after ${action}`,async t=>{
+  let release,entered;
+  const portEntered=new Promise(resolve=>{entered=resolve;});
+  const blocked=new Promise(resolve=>{release=resolve;});let first=true;
+  const {manager,calls}=await fixture(t,{portStatusFn:async()=>{
+   if(first){first=false;entered();await blocked;}
+   return {対象:targets.map(target=>({...target,開放:false}))};
+  }});
+  const automatic=autoStart(manager,{wait:async()=>assert.fail('cancelled startup must not retry')});
+  await portEntered;
+  if(action==='stop')await manager.stop('tools');
+  else if(action==='restart')await manager.restart('local');
+  else await manager[action]();
+  await manager.settled();release();
+  assert.equal(await automatic,false);await manager.settled();
+  assert.deepEqual(calls.map(call=>call.id),action==='restart'?['local']:[]);
+ });
+}
 test('auto defaults are shared, ordered, and viewing never starts a process',async t=>{
  const {manager,calls}=await fixture(t);const snapshot=await manager.snapshot();
  assert.deepEqual(snapshot.対象.filter(item=>item.設定.起動対象).map(item=>item.id),['tools','core','apps','taskteam','web']);assert.equal(calls.length,0);

@@ -11,7 +11,7 @@ import {join} from 'node:path';
 import {EventEmitter,once} from 'node:events';
 import {WebSocket} from 'ws';
 import bridgeModule from '../デスクトップ/ブラウザCDP.cjs';
-test('Browser CDP: 専用ページだけ公開、tools切断・別ドメイン拒否、所有パネルだけ終了',async t=>{
+test('Browser CDP: 専用ページだけ公開、tools切断・別ドメイン拒否、所有パネルだけ終了',{timeout:5000},async t=>{
  const directory=await mkdtemp(join(tmpdir(),'aidiy-cdp-test-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  let connected=true,closed=0,destroyed=false;const commands=[];
  const contents=new EventEmitter();Object.assign(contents,{getTitle:()=> 'test',getURL:()=> 'https://example.com/',isDestroyed:()=>destroyed});
@@ -30,6 +30,10 @@ test('Browser CDP: 専用ページだけ公開、tools切断・別ドメイン�
  for(const method of ['Target.getTargets','Browser.close','Page.navigate'])assert.ok((await call(method,{url:'file:///secret'})).error);
  assert.equal(commands.length,1);
  connected=false;assert.equal((await fetch(base+'/json')).status,409);assert.ok((await call('Runtime.evaluate')).error);
- connected=true;const ended=once(socket,'close');await fetch(base+'/close');await ended;assert.equal(closed,1);assert.equal(debuggerAPI.listenerCount('message'),0);
+ // クライアントのclose受信とサーバーのclose処理は別イベント。
+ // 固定時間待ちではなく、サーバーが購読を解除したことも確認する。
+ connected=true;const ended=once(socket,'close'),released=once(debuggerAPI,'removeListener');
+ await fetch(base+'/close');await ended;assert.equal((await released)[0],'message');
+ assert.equal(closed,1);assert.equal(debuggerAPI.listenerCount('message'),0);
  bridge.close();assert.deepEqual(await readdir(directory),[]);
 });

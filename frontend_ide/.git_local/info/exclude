@@ -1,5 +1,0 @@
-
-# AiDiy local Git metadata, backup storage and ignore definitions
-/.git_local/
-.backup_local/
-.gitignore

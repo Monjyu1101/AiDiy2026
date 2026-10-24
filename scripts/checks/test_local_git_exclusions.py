@@ -4,11 +4,34 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class LocalGitExclusionTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('git'), 'Git が未導入')
+    def test_parent_repository_ignores_local_git_at_every_depth(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shutil.copyfile(ROOT / '.gitignore', root / '.gitignore')
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            paths = ['.git_local/HEAD', 'frontend_ide/.git_local/config',
+                     'nested/project/.git_local/objects/ab/example']
+            for name in paths + ['nested/project/source.py']:
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('fixture\n', encoding='utf-8')
+            result = subprocess.run(['git', '-C', str(root), 'check-ignore', '--stdin'],
+                                    input='\n'.join(paths) + '\n', text=True,
+                                    capture_output=True, check=True)
+            self.assertEqual(result.stdout.splitlines(), paths)
+            subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+            tracked = subprocess.check_output(['git', '-C', str(root), 'ls-files'], text=True)
+            self.assertIn('nested/project/source.py', tracked.splitlines())
+            self.assertFalse(any('.git_local/' in p for p in tracked.splitlines()))
+
     def test_cleanup_does_not_descend_into_git_metadata(self):
         spec = importlib.util.spec_from_file_location('cleanup_local_git_test', ROOT / '_cleanup.py')
         module = importlib.util.module_from_spec(spec)

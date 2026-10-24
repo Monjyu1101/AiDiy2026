@@ -887,6 +887,9 @@ def main():
             print()
             failed_packages = wait_global_cli_tools_install()
             error_locations.extend([f"共通: AI CLI ツール導入 ({package})" for package in failed_packages])
+        if error_locations and not continue_on_error:
+            print_setup_summary(error_locations)
+            sys.exit(1)
     else:
         print_warning("共通セットアップをスキップしました。")
 
@@ -1051,11 +1054,17 @@ def main():
     print_info("    Discord起動: aidiy_discord")
 
     print()
-    print_success("セットアップは正常終了しました。")
+    if error_locations:
+        print_error("セットアップに失敗した項目があります。上記のエラー発生場所を確認してください。")
+    else:
+        print_success("セットアップは正常終了しました。")
     if choices["local"] and choices.get("local_download") in ("one", "all"):
         print_info("Local のモデルダウンロードは別プロセスで継続中です。")
     print_info("5秒後に終了します...")
     time.sleep(5)
+    # 「続行」は残りの項目を実行する指定であり、失敗を成功には変えない。
+    if error_locations:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

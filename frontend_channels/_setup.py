@@ -69,6 +69,11 @@ def setup(choices=None) -> bool:
         # ロック済みの旧版に留めず、他のフロントエンドと同じ宣言範囲で更新する。
         print_info(f"実行中: {npm} update electron --no-fund --no-audit")
         subprocess.run([npm, "update", "electron", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        # npm update は lockfile も変更する。検証対象を省略せず、導入済み依存から
+        # 実際に Vue 配布物を生成して manifest と揃える（通常起動では再ビルドしない）。
+        for script in ('build:panel', 'check:panel'):
+            print_info(f"実行中: {npm} run {script}")
+            subprocess.run([npm, "run", script], cwd=THIS_DIR, env=env, check=True)
         if not prepare_electron_binary(THIS_DIR, 'Discord'):
             return False
         install_launcher(THIS_DIR)
@@ -83,7 +88,7 @@ def setup(choices=None) -> bool:
         conf_json_mod.conf_json()
         print_success("共通設定の不足キーを補完しました。")
     except (OSError, ValueError, ImportError, subprocess.CalledProcessError):
-        print_error("Discord の依存導入または共通設定の補完に失敗しました。")
+        print_error("Discord の依存導入・パネル生成検証・共通設定の補完のいずれかに失敗しました。")
         return False
     print_success("Discord: aidiy_discord で起動できます。")
     return True

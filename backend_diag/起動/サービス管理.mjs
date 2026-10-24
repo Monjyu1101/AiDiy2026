@@ -16,6 +16,9 @@ export function validateSettings(target,value){
 export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=300000,stopTimeout=30000,portStatusFn,forceStopFn}={}){
  let targets,settings,loading,writing=Promise.resolve(),busy=false,stopping=false,closed=false,operation='',work=Promise.resolve(),focus=null,portChecker;
  const sessions=new Map(),cancelled=new Set(),logs=new Map();
+ // 明示操作は待機中の --auto を世代ごと無効にする。内部の停止では世代を変えない。
+ let startRevision=0;
+ const checkRevision=revision=>{if(revision!==startRevision)throw failure('起動操作は取り消されました。',499);};
  const settingsFile=join(root,'_config','AiDiy_diag_start.json'),runtime=join(root,'_AIDIY','aidiy_diag','起動');
  const log=(id,text)=>{const old=logs.get(id)||{text:'',offset:0};old.text+=stripVTControlCharacters(String(text));if(old.text.length>120000){const size=old.text.length-120000;old.offset+=size;old.text=old.text.slice(size);}logs.set(id,old);};
  async function load(){
@@ -54,6 +57,7 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   }throw failure('Python 3 が見つかりません。Python を導入してターミナルを開き直してください。',503);
  }
  async function stop(id,{cancel=true}={}){
+  if(cancel)startRevision++;
   await load();targetFor(id);if(cancel)cancelled.add(id);
   const session=sessions.get(id);if(!session?.child||session.exited)return {停止済み:true};
   session.stopping=true;session.state='停止中';
@@ -102,9 +106,10 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   const timeout=setTimeout(()=>readyReject(failure('起動完了の確認がタイムアウトしました。',504)),readyTimeout);
   try{await started;}catch(error){await stop(id);throw error;}finally{clearTimeout(timeout);}
  }
- async function restart(id){
-  await load();await writing.catch(()=>{});if(closed)throw failure('起動画面を終了しています。',409);if(busy||stopping)throw failure('起動・停止処理の完了を待ってください。',409);
-  if(!id){if(hasOwned()||(await ports()).some(item=>item.開放!==false))throw failure('稼働中または未確認の機能があります。強制停止してから設定起動してください。',409);if(busy||stopping||closed)throw failure('起動・停止処理の完了を待ってください。',409);}
+ async function restart(id,{revision=++startRevision}={}){
+  checkRevision(revision);
+  await load();await writing.catch(()=>{});checkRevision(revision);if(closed)throw failure('起動画面を終了しています。',409);if(busy||stopping)throw failure('起動・停止処理の完了を待ってください。',409);
+  if(!id){if(hasOwned()||(await ports()).some(item=>item.開放!==false))throw failure('稼働中または未確認の機能があります。強制停止してから設定起動してください。',409);checkRevision(revision);if(busy||stopping||closed)throw failure('起動・停止処理の完了を待ってください。',409);}
   const ids=id?[targetFor(id).id]:targets.filter(target=>settings[target.id].起動対象).map(target=>target.id);
   if(!ids.length)throw failure('起動対象を選択してください。');
   if(id){const old=logs.get(id)||{text:'',offset:0};logs.set(id,{text:'',offset:old.offset+old.text.length+1});}
@@ -116,6 +121,7 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   })();return {受理:true};
  }
  async function forceStopAll(){
+  startRevision++;
   await load();if(closed||stopping)throw failure('停止処理の完了を待ってください。',409);
   stopping=true;for(const target of targets)cancelled.add(target.id);
   const previous=work;operation='タブの逆順で停止しています。';
@@ -146,6 +152,6 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
  async function logSnapshot(id,cursor=0){await load();targetFor(id);if(!Number.isSafeInteger(cursor)||cursor<0)throw failure('ログ位置が不正です。');const value=logs.get(id)||{text:'',offset:0},end=value.offset+value.text.length;return {対象:id,ログ:value.text.slice(Math.max(0,Math.min(cursor,end)-value.offset)),位置:end,切替:cursor<value.offset||cursor>end};}
  // 画面の通知欄へ出す。起動・停止の処理中は、その進捗表示を優先する。
  function notify(text){if(!busy&&!stopping)operation=String(text);}
- async function close(){closed=true;await Promise.allSettled([...sessions.keys()].map(stop));await work;}
- return {snapshot,save,restart,stop,forceStopAll,logSnapshot,notify,close,settled:()=>work};
+ async function close(){startRevision++;closed=true;await Promise.allSettled([...sessions.keys()].map(stop));await work;}
+ return {snapshot,save,restart,stop,forceStopAll,logSnapshot,notify,close,settled:()=>work,startRevision:()=>startRevision};
 }

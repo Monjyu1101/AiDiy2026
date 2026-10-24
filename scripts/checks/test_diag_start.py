@@ -215,11 +215,19 @@ print(module.get_npm_command(),flush=True)
             module.run(folder, 'web', {'起動対象': True, '自動再起動': True, 'command': 'evil'})
         folder.start.assert_not_called(); folder.kill_ports.assert_not_called()
 
-    def test_root_auto_prompts_use_shared_defaults(self):
+    def test_root_default_diag_skips_other_prompts(self):
         root = load(ROOT / '_start.py')
-        with patch.object(root, 'prompt_choice', side_effect=lambda _, default_yes: default_yes), patch('builtins.print'):
+        with patch.object(root, 'prompt_choice', side_effect=lambda _, default_yes: default_yes) as prompt, patch('builtins.print'):
+            values = root.collect_startup_choices()
+        self.assertEqual(values, (False,) * 6 + (True,) + (False,) * 5)
+        prompt.assert_called_once_with('  Diag      : 開始しますか?', default_yes=True)
+
+    def test_root_without_diag_prompts_use_shared_defaults(self):
+        root = load(ROOT / '_start.py')
+        with patch.object(root, 'prompt_choice', side_effect=lambda label, default_yes: False if 'Diag' in label else default_yes) as prompt, patch('builtins.print'):
             values = root.collect_startup_choices()
         self.assertEqual(values, (False, True, True, True, True, False, False, False, False, False, False, False))
+        self.assertEqual(prompt.call_count, 12)
 
     def test_diag_children_cannot_consume_console_control_input(self):
         for folder in ('backend_local', 'backend_tools', 'backend_server', 'backend_taskteam', 'frontend_web'):

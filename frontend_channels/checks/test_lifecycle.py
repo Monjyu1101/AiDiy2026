@@ -60,10 +60,12 @@ class DiscordSetupTest(unittest.TestCase):
         self.assertEqual([call.args[0] for call in self.run.call_args_list], [
             ['npm', 'ci', '--no-fund', '--no-audit'],
             ['npm', 'update', 'electron', '--no-fund', '--no-audit'],
+            ['npm', 'run', 'build:panel'],
+            ['npm', 'run', 'check:panel'],
         ])
         for call in self.run.call_args_list:
             self.assertEqual(call.kwargs['env']['ELECTRON_SKIP_BINARY_DOWNLOAD'], '1')
-        self.assertEqual([call[0] for call in calls.mock_calls], ['npm', 'npm', 'prepare'])
+        self.assertEqual([call[0] for call in calls.mock_calls], ['npm', 'npm', 'npm', 'npm', 'prepare'])
         self.launcher.assert_called_once()
 
     def test_failed_electron_update_does_not_prepare_binary_or_publish_launcher(self):
@@ -71,6 +73,20 @@ class DiscordSetupTest(unittest.TestCase):
         self.assertFalse(discord_setup.setup())
         self.prepare.assert_not_called()
         self.launcher.assert_not_called()
+
+    def test_failed_panel_build_or_verification_does_not_publish_launcher(self):
+        for failed_step in ('build:panel', 'check:panel'):
+            with self.subTest(failed_step=failed_step):
+                self.run.reset_mock()
+                def run(command, **kwargs):
+                    if command[-1] == failed_step:
+                        raise subprocess.CalledProcessError(1, command)
+                self.run.side_effect = run
+                self.assertFalse(discord_setup.setup())
+                self.prepare.assert_not_called()
+                self.launcher.assert_not_called()
+                commands = [call.args[0] for call in self.run.call_args_list]
+                self.assertEqual(commands[-1], ['npm', 'run', failed_step])
 
 
 class DiscordLifecycleTest(unittest.TestCase):
@@ -85,7 +101,7 @@ class DiscordLifecycleTest(unittest.TestCase):
         ) as ask:
             self.assertTrue(setup.collect_setup_choices()['discord'])
         self.assertEqual(next(call.kwargs['default'] for call in ask.call_args_list if 'Discord' in call.args[0]), 'y')
-        with patch.object(start, 'prompt_choice', side_effect=lambda _prompt, default_yes: default_yes) as ask:
+        with patch.object(start, 'prompt_choice', side_effect=lambda prompt, default_yes: False if 'Diag' in prompt else default_yes) as ask:
             flags = start.collect_startup_choices()
         self.assertEqual(len(flags), 12)
         self.assertFalse(flags[-1])
@@ -111,14 +127,14 @@ class DiscordLifecycleTest(unittest.TestCase):
         with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'start_service') as launch, patch.object(start.time, 'sleep'):
             flags = start.start_initial_services(False, False, False, False, False, False, running, {}, None)
         launch.assert_not_called()
-        stop_all.assert_called_once()  # 未選択でも Code / Discord を保護した既存プロセス整理を行う。
+        stop_all.assert_not_called()  # 一括停止は main が担当し、個別起動では繰り返さない。
         self.assertFalse(flags[NAME]); self.assertNotIn(NAME, running)
         module = Mock()
         with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'DISCORD', module), patch.object(start, 'attach_output_thread'), patch.object(
             start, 'cleanup_stop_requested_services', return_value=set()
         ), patch.object(start, 'wait_for_services_quiet'), patch.object(start.time, 'sleep'):
             flags = start.start_initial_services(False, False, False, False, False, False, running, {}, None, discord_enabled=True)
-        stop_all.assert_called_once()
+        stop_all.assert_not_called()
         module.start.assert_called_once_with(auto_connect=True)
         self.assertIn(NAME, running)
         self.assertFalse(flags[NAME])  # 手動で閉じた画面を監視ループから再表示しない。
@@ -231,7 +247,7 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertFalse(cleanup.stop_all_services({}, strict=False, keep_code=True, keep_discord=True))
         tools.stop_tools_processes.assert_not_called()
 
-    def test_shutdown_preserves_started_discord_but_explicit_cleanup_stops_it(self):
+    def test_shutdown_stops_discord_for_normal_and_explicit_cleanup(self):
         for keep in (True, False):
             module = Mock()
             proc = Mock(pid=123456)
@@ -241,11 +257,9 @@ class DiscordLifecycleTest(unittest.TestCase):
                 running = {NAME: proc}
                 start.stop_processes(running, keep_standalone=keep)
             self.assertEqual(running, {})
-            if keep:
-                kill.assert_not_called(); module.kill_ports.assert_not_called(); proc.wait.assert_not_called()
-            else:
-                self.assertEqual(kill.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
-                module.kill_ports.assert_called_once()
+            self.assertEqual(kill.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
+            module.kill_ports.assert_called_once()
+            proc.wait.assert_called_once_with(timeout=5)
 
 
 class DiscordProcessMatchingTest(unittest.TestCase):

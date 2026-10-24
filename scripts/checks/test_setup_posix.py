@@ -172,7 +172,7 @@ class PosixPathTests(unittest.TestCase):
         node.write_text(stub, encoding='utf-8'); node.chmod(0o755)
         files = {'backend_diag': 'diag_main.mjs', 'frontend_ide/viewer': 'launch.mjs',
                  'frontend_ide/aidiy_term': 'launch.mjs', 'frontend_channels': 'panel/launch.mjs',
-                 'frontend_ide/host': 'aidiy_code/launch.mjs', 'frontend_avatar': '_start.py',
+                 'frontend_ide/host': 'aidiy_code/launch.mjs', 'frontend_avatar': 'launch.mjs',
                  'command_hermes': 'cli_main.py'}
         for folder, file in files.items():
             target = checkout / folder / file

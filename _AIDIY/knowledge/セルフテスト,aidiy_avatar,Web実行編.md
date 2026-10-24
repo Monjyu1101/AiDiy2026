@@ -24,15 +24,15 @@
 
 8092のログイン画面です。通常Webの8090とは接続先が異なります。
 
-![8092のログイン画面です。通常Webの8090とは接続先が異なります。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest__101_ログイン.png)
+![8092のログイン画面です。通常Webの8090とは接続先が異なります。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_101_ログイン.png)
 
 新しいタブではログインが必要です。誤ったパスワードには案内が表示されます。
 
-![新しいタブではログインが必要です。誤ったパスワードには案内が表示されます。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__102_別タブと認証エラー.png)
+![新しいタブではログインが必要です。誤ったパスワードには案内が表示されます。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_102_別タブと認証エラー.png)
 
 同じタブを再読み込みした結果です。再ログインせず会話画面へ戻りました。
 
-![同じタブを再読み込みした結果です。再ログインせず会話画面へ戻りました。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__103_再読み込み後.png)
+![同じタブを再読み込みした結果です。再ログインせず会話画面へ戻りました。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_103_再読み込み後.png)
 
 ## 2. タブを切り替えてChatとCodeを使う
 
@@ -51,15 +51,15 @@
 
 左はコード6、右はコード5です。左右の表示は別々に選べます。
 
-![左はコード6、右はコード5です。左右の表示は別々に選べます。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__204_タブ切替.png)
+![左はコード6、右はコード5です。左右の表示は別々に選べます。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_204_タブ切替.png)
 
 Chatの返答です。入力に続いて全文が表示されました。
 
-![Chatの返答です。入力に続いて全文が表示されました。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__201_Chat応答全文.png)
+![Chatの返答です。入力に続いて全文が表示されました。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_201_Chat応答全文.png)
 
 Code1とCode6が返答した画面です。両方の処理が完了してから撮影しています。
 
-![Code1とCode6が返答した画面です。両方の処理が完了してから撮影しています。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__203_Code1とCode6応答.png)
+![Code1とCode6が返答した画面です。両方の処理が完了してから撮影しています。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_203_Code1とCode6応答.png)
 
 ## 3. Liveで会話する
 
@@ -73,7 +73,7 @@ Providerはfreeai_live、画面のモデルはgemini-2.5-flash-native-audio-prev
 
 Liveの初回応答です。入力の下に新しい返答が表示されています。
 
-![Liveの初回応答です。入力の下に新しい返答が表示されています。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest__301_Live応答.png)
+![Liveの初回応答です。入力の下に新しい返答が表示されています。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_301_Live応答.png)
 
 ## 4. 再接続と終了
 
@@ -87,7 +87,7 @@ Liveの会話文脈は、サーバー側で接続しているLive APIの同じ�
 
 Core再起動後に送信した結果です。ChatとLiveの新しい返答がそれぞれ表示されています。
 
-![Core再起動後に送信した結果です。ChatとLiveの新しい返答がそれぞれ表示されています。](./images/セルフテスト,aidiy_avatar,Web実行編/20261024-retest2__501_再接続後ChatとLive応答.png)
+![Core再起動後に送信した結果です。ChatとLiveの新しい返答がそれぞれ表示されています。](./images/セルフテスト,aidiy_avatar,Web実行編/aidiy_avatar-Web実行_501_再接続後ChatとLive応答.png)
 
 終了するときは、応答待ちがないことを確認して8092のタブを閉じます。Web版をもう使わない場合は、起動元のAvatarも終了します。ブラウザタブを閉じる操作と、画面内のログアウトは別です。
 

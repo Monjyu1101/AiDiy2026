@@ -3,11 +3,17 @@ import json
 import sys
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import patch, Mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _setup_electron as subject
 import _cleanup_processes
+
+class WindowsPathFixture(PureWindowsPath):
+    """実ファイルに触れず、Windows の絶対パスを任意のホスト OS で使う。"""
+    def resolve(self):
+        return self
+
 
 class InUseTest(unittest.TestCase):
     def setUp(self):
@@ -56,16 +62,15 @@ class InUseTest(unittest.TestCase):
         run.assert_not_called()
 
     def test_windows_matches_exact_runtime_and_shared_parent(self):
-        import ntpath
-        root=self.root/'frontend_ide'
+        root=WindowsPathFixture(r'C:\fixture\frontend_ide')
         exe=str(root/'viewer/node_modules/electron/dist/electron.exe')
         with patch.object(subject.sys,'platform','win32'),patch.object(_cleanup_processes,'list_processes',return_value=[{'ExecutablePath':exe,'Name':'electron.exe'}]):
             self.assertTrue(subject._runtime_in_use(root))
             self.assertTrue(subject._runtime_in_use(root/'viewer'))
-            self.assertFalse(subject._runtime_in_use(self.root/'other/frontend_ide/viewer'))
+            self.assertFalse(subject._runtime_in_use(root.parent/'other/frontend_ide/viewer'))
 
     def test_shared_node_pty_protected_for_browser_or_worker(self):
-        root=self.root/'frontend_ide'
+        root=WindowsPathFixture(r'C:\fixture\frontend_ide')
         for entry in ('launch.mjs --app code --browser','aidiy_term/terminal-worker.mjs'):
             records=[{'Name':'node.exe','CommandLine':f'node "{root}/{entry.split()[0]}" '+ ' '.join(entry.split()[1:])}]
             with patch.object(subject.sys,'platform','win32'),patch.object(_cleanup_processes,'list_processes',return_value=records):

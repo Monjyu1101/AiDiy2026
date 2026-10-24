@@ -27,7 +27,7 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 
 独自実装のソース・パネル・起動スクリプト・検証コードには、README にある AiDiy の著作権・ライセンス定型文を付ける。JS / TS / CSS は `/*! ... */`、その他は各言語のコメント形式を使う。`frontend_channels/LICENSE` はルート `LICENSE` の全文と揃え、`package.json` の `license` は `SEE LICENSE IN LICENSE` とする。第三者ライブラリの表記には独自実装の定型文を適用しない。
 
-`frontend_channels` で `npm run check` と `npm test` を実行する。通常起動には同梱の配布物を使うためビルド不要。Vue の画面・状態管理・描画ソースや依存関係を変更した場合だけ `npm run build:panel` で `panel/view.js` と `panel/build-manifest.json` を更新する。`npm run check:panel` はソースと配布物の一致を確認する。
+`frontend_channels` で `npm run check` と `npm test` を実行する。通常起動には同梱の配布物を使うためビルド不要。Vue の画面・状態管理・描画ソースや依存関係を変更した場合だけ `npm run build:panel` で `panel/view.js` と `panel/build-manifest.json` を更新する。`npm run check:panel` はソースと配布物の一致を確認する。 セットアップは Electron 更新で lockfile が変わり得るため、依存導入後に `build:panel` → `check:panel` を実行し、いずれかが失敗した場合は導入失敗とする。manifest だけの書き換えや package-lock の検証除外で不一致を隠さない。
 
 - `checks/code.test.ts`: stdin、ユーザー別・チャンネル別の resume、停止・終了。
 - `checks/bot.test.ts`: 通常投稿→CLI→返信、連続投稿の順序、許可拒否、長文添付、起動・入室時の自動接続と準備中の退出、手動操作との競合、Live OFF / Code OFF 時の接続制御。
@@ -42,7 +42,7 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 
 全体スクリプトの検証はルートで `python -X utf8 -m unittest discover -s frontend_channels/checks -p "test_*.py"` を実行する。プロセス停止はモック、削除は一時ディレクトリで確認し、実環境の `_cleanup.py` を検証目的で実行しない。全体 `_setup.py` は Discord 既定 Yes、`_start.py` の Discord 選択は既定 No、`_cleanup.py` の削除選択は既定 Yes。
 
-`aidiy_discord` / `npm start` は `panel/launch.mjs` から Electron の小型パネルを開く。プロジェクトフォルダ（Code の作業フォルダ）は aidiy_code / aidiy_live と共通の `frontend_ide/host/scripts/launch-project.mjs` で決め、`[作業フォルダ]` / `--project` 未指定時は起動したフォルダとする。worker へは `AIDIY_DISCORD_PROJECT` で渡し、未設定（`src/main.ts` 直接実行など）の場合だけ `CODE_BASE_PATH` を使う。全体起動はリポジトリ直下で起動する。画面位置はマウスのあるディスプレイの workArea 上部中央とする。単独起動は未接続、全体 `_start.py` で Yes の場合は `--connect` を渡して自動接続する。`--wait` を付けず独立起動し、起動前整理・Ctrl+C 終了時には Discord 本体と Hermes / MCP の子孫を保護して継続する。明示的な `_cleanup.py` は停止対象に含める。接続開始時に共通設定を再読込し、前回のモデルを適用する。接続・再接続中でも停止でき、終了時は worker に shutdown を送り、Code CLI・Live・Gateway を回収する。正常終了に応答しない場合だけ worker の子孫を停止する。Electron はセットアップで事前配置し、起動中にはダウンロードしない。
+`aidiy_discord` / `npm start` は `panel/launch.mjs` から Electron の小型パネルを開く。プロジェクトフォルダ（Code の作業フォルダ）は aidiy_code / aidiy_live と共通の `frontend_ide/host/scripts/launch-project.mjs` で決め、`[作業フォルダ]` / `--project` 未指定時は起動したフォルダとする。worker へは `AIDIY_DISCORD_PROJECT` で渡し、未設定（`src/main.ts` 直接実行など）の場合だけ `CODE_BASE_PATH` を使う。全体起動はリポジトリ直下で起動する。画面位置はマウスのあるディスプレイの workArea 上部中央とする。単独起動は未接続、全体 `_start.py` で Yes の場合は `--connect` を渡して自動接続する。`--wait` を付けず独立起動する。全体の起動前整理・Ctrl+C 終了・明示的な `_cleanup.py` は Discord を停止対象に含める。接続開始時に共通設定を再読込し、前回のモデルを適用する。接続・再接続中でも停止でき、終了時は worker に shutdown を送り、Code CLI・Live・Gateway を回収する。正常終了に応答しない場合だけ worker の子孫を停止する。Electron はセットアップで事前配置し、起動中にはダウンロードしない。
 
 ブラウザ版（`--browser`、または Codespaces・画面のない Linux で自動）は Electron の代わりに `src/web-server.ts` を Node で起動し、同じ `panel/` の画面へ `panel/web-bridge.js` が `window.discordPanel` を WebSocket で提供する。操作の中継は Electron 版の `src/panel-worker.ts` と共通の `src/接続パネル/パネル中継.ts` に置き、通信路だけを入口ごとに分ける。接続元は aidiy_code / aidiy_live と共通の `frontend_ide/host/src/forwarded-origin.ts`（127.0.0.1、Codespaces ではポート転送先と localhost 転送も）だけを許可し、画面は推測できないトークン付きパスで配信する。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒（初回は120秒）後に Bot も終了する（`--wait` でも同じ）。専用ウィンドウを開けなければ理由を表示してブラウザ版に切り替える。3本の起動規則は `frontend_ide/host/scripts/launch-project.mjs` 冒頭に一覧し、共通の関数（`ブラウザ自動判定` / `ブラウザ版表示` / `ブラウザ版へ切替`）を使う。入口ごとに独自の判定や案内文を追加しない。`checks/launch-restart.test.ts` で Electron 不可時のブラウザ版への切替と転送先 URL を確認する。`checks/web-server.test.ts` で接続元の拒否、要求・通知の中継、終了を確認する。Codespaces 実機と音声UDPは別途確認する。
 

@@ -343,21 +343,21 @@ Liveの上限は接続準備20秒、内部HTTP135秒、1試行150秒、全実行
 
 隔離ブラウザの最終確認画面です。合成データによる表示・操作試験で、実AIの応答とは区別しています。
 
-![result-desktop](./images/セルフテスト,aidiy_diag,環境確認編/20261023-completion__aidiy_diag-環境確認_818_result-desktop.png)
+![result-desktop](./images/セルフテスト,aidiy_diag,環境確認編/aidiy_diag-環境確認_818_診断結果のデスクトップ表示.png)
 
 
 隔離ブラウザの最終確認画面です。合成データによる表示・操作試験で、実AIの応答とは区別しています。
 
-![result-390](./images/セルフテスト,aidiy_diag,環境確認編/20261023-completion__aidiy_diag-環境確認_818_result-390.png)
+![result-390](./images/セルフテスト,aidiy_diag,環境確認編/aidiy_diag-環境確認_818_診断結果の幅390表示.png)
 
 
 隔離ブラウザの最終確認画面です。合成データによる表示・操作試験で、実AIの応答とは区別しています。
 
-![live-1280](./images/セルフテスト,aidiy_diag,環境確認編/20261023-completion__aidiy_diag-環境確認_818_live-1280.png)
+![live-1280](./images/セルフテスト,aidiy_diag,環境確認編/aidiy_diag-環境確認_818_Live診断の幅1280表示.png)
 
 
 隔離ブラウザの最終確認画面です。合成データによる表示・操作試験で、実AIの応答とは区別しています。
 
-![chat-1280](./images/セルフテスト,aidiy_diag,環境確認編/20261023-completion__aidiy_diag-環境確認_818_chat-1280.png)
+![chat-1280](./images/セルフテスト,aidiy_diag,環境確認編/aidiy_diag-環境確認_818_Chat診断の幅1280表示.png)
 
 

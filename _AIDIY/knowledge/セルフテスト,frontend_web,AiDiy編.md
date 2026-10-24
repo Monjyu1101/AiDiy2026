@@ -28,11 +28,11 @@
 
 パスワードが違うと理由が表示されます。入力を直してからログインします。
 
-![パスワードが違うと理由が表示されます。入力を直してからログインします。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__101_ログインと誤入力.png)
+![パスワードが違うと理由が表示されます。入力を直してからログインします。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_101_ログインと誤入力.png)
 
 ログイン後のメニューです。利用者名を確認して目的の機能へ進みます。
 
-![ログイン後のメニューです。利用者名を確認して目的の機能へ進みます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__102_メニュー.png)
+![ログイン後のメニューです。利用者名を確認して目的の機能へ進みます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_102_メニュー.png)
 
 ## 2. ChatとCodeで話しかける
 
@@ -45,11 +45,11 @@
 
 Chatで挨拶に返答した画面です。通常の文章を入力して会話できます。
 
-![Chatで挨拶に返答した画面です。通常の文章を入力して会話できます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__201_Chat応答.png)
+![Chatで挨拶に返答した画面です。通常の文章を入力して会話できます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_201_Chat応答.png)
 
 新規会話で直前の発言を尋ねた結果です。別の会話の内容は混ざっていません。
 
-![新規会話で直前の発言を尋ねた結果です。別の会話の内容は混ざっていません。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__209_会話の分離.png)
+![新規会話で直前の発言を尋ねた結果です。別の会話の内容は混ざっていません。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_209_会話の分離.png)
 
 Code1〜6を順に追加し、それぞれ「おはよう」の正式な返答まで確認しました。今回の挨拶試験では検証を0回にしました。実装を依頼するときは必要な検証回数に戻します。再読み込み後は画面の初期値が1回になるため、画像と送信時の指定値を混同しません。
 
@@ -64,15 +64,15 @@ Code1〜6を順に追加し、それぞれ「おはよう」の正式な返答�
 
 Code1とCode2の返答です。番号ごとにProviderと会話を確認できます。
 
-![Code1とCode2の返答です。番号ごとにProviderと会話を確認できます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__202_Code1とCode2応答.png)
+![Code1とCode2の返答です。番号ごとにProviderと会話を確認できます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_202_Code1とCode2応答.png)
 
 Code3とCode4の返答です。長い返答はパネル内をスクロールして読みます。
 
-![Code3とCode4の返答です。長い返答はパネル内をスクロールして読みます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__204_Code3とCode4応答.png)
+![Code3とCode4の返答です。長い返答はパネル内をスクロールして読みます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_204_Code3とCode4応答.png)
 
 Code5とCode6の返答です。再接続後も各1回分の挨拶が残っています。
 
-![Code5とCode6の返答です。再接続後も各1回分の挨拶が残っています。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__206_Code5とCode6応答.png)
+![Code5とCode6の返答です。再接続後も各1回分の挨拶が残っています。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_206_Code5とCode6応答.png)
 
 ## 3. パネルを増やす・再接続する
 
@@ -84,7 +84,7 @@ Liveの会話文脈は、サーバー側で接続しているLive APIの同じ�
 
 再接続後の9パネルです。Code5・6を含め、開いたパネルが残ります。
 
-![再接続後の9パネルです。Code5・6を含め、開いたパネルが残ります。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__208_9パネル再接続.png)
+![再接続後の9パネルです。Code5・6を含め、開いたパネルが残ります。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_208_9パネル再接続.png)
 
 ## 4. Liveで文字を送る
 
@@ -94,7 +94,7 @@ Chatパネルの「Live」を選び、準備完了を確認して15秒以上待�
 
 Liveを選んで挨拶した結果です。入力モードと返答を確認します。
 
-![Liveを選んで挨拶した結果です。入力モードと返答を確認します。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__401_Live応答.png)
+![Liveを選んで挨拶した結果です。入力モードと返答を確認します。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_401_Live応答.png)
 
 ## 5. ファイルを添付する
 
@@ -104,7 +104,7 @@ Chatの入力欄へテキストやPNGをドラッグ＆ドロップします。�
 
 日本語のファイル名と青い丸のサムネイルが表示されています。
 
-![日本語のファイル名と青い丸のサムネイルが表示されています。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__301_ファイル添付.png)
+![日本語のファイル名と青い丸のサムネイルが表示されています。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_301_ファイル添付.png)
 
 ## 6. 設定を保存する
 
@@ -117,7 +117,7 @@ Chatの入力欄へテキストやPNGをドラッグ＆ドロップします。�
 
 フォルダを指定した設定画面です。「保存(json書換)」と「設定/再起動」を区別して使います。
 
-![フォルダを指定した設定画面です。「保存(json書換)」と「設定/再起動」を区別して使います。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__504_設定保存.png)
+![フォルダを指定した設定画面です。「保存(json書換)」と「設定/再起動」を区別して使います。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_504_設定保存.png)
 
 ## 7. 管理画面とデモを開く
 
@@ -125,7 +125,7 @@ Chatの入力欄へテキストやPNGをドラッグ＆ドロップします。�
 
 C管理の利用者一覧です。IDと名前を確認してから対象を選びます。
 
-![C管理の利用者一覧です。IDと名前を確認してから対象を選びます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__502_利用者一覧.png)
+![C管理の利用者一覧です。IDと名前を確認してから対象を選びます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_502_利用者一覧.png)
 
 「Xその他」では紹介、映像、3D表示、ゲームの入口を選べます。今回は11画面を開き、以下の範囲を確認しました。起動表示とゲーム全体の合格は別です。
 
@@ -143,19 +143,19 @@ C管理の利用者一覧です。IDと名前を確認してから対象を選�
 
 自己紹介を開いた画面です。特徴や各機能の説明を読めます。
 
-![自己紹介を開いた画面です。特徴や各機能の説明を読めます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__601_自己紹介.png)
+![自己紹介を開いた画面です。特徴や各機能の説明を読めます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_601_自己紹介.png)
 
 アバター訓練中の画面です。番号でモーション候補を選びます。
 
-![アバター訓練中の画面です。番号でモーション候補を選びます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest2__603_アバター訓練.png)
+![アバター訓練中の画面です。番号でモーション候補を選びます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_603_アバター訓練_確認02.png)
 
 写真の読み込み後の世界の絶景です。出典と説明を確認できます。
 
-![写真の読み込み後の世界の絶景です。出典と説明を確認できます。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest3__604_世界の絶景.png)
+![写真の読み込み後の世界の絶景です。出典と説明を確認できます。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_604_世界の絶景_確認03.png)
 
 立体リバーシの初期画面です。ルールと置ける場所の案内があります。
 
-![立体リバーシの初期画面です。ルールと置ける場所の案内があります。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__610_立体リバーシ.png)
+![立体リバーシの初期画面です。ルールと置ける場所の案内があります。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_610_立体リバーシ.png)
 
 ## 8. ログアウトして終了する
 
@@ -165,7 +165,7 @@ C管理の利用者一覧です。IDと名前を確認してから対象を選�
 
 ログアウト後に保護URLを開いた結果です。利用を再開するときはログインします。
 
-![ログアウト後に保護URLを開いた結果です。利用を再開するときはログインします。](./images/セルフテスト,frontend_web,AiDiy編/20261024-retest__701_ログアウト後保護.png)
+![ログアウト後に保護URLを開いた結果です。利用を再開するときはログインします。](./images/セルフテスト,frontend_web,AiDiy編/frontend_web-AiDiy_701_ログアウト後保護.png)
 
 ## 確認範囲
 

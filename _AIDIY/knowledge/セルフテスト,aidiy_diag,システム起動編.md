@@ -134,7 +134,7 @@ Diagの通知だけでなく、実際のWeb画面が表示されれば完了で�
 
 ミニ表示でも6機能の状態を読めます。掲載画像は10/24の現行Electronを再撮影したもので、上記の5機能稼働試験とは稼働状態が異なります。VS Codeを含む14項目が並びます。
 
-![ミニ表示のサービス状態](./images/セルフテスト,aidiy_diag,システム起動編/20261024-vscode__ランチャー14項目.png)
+![ミニ表示のサービス状態](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_103_ランチャー表示の14項目.png)
 
 ## 5. ログを読む・コピーする
 
@@ -158,7 +158,7 @@ Diagの通知だけでなく、実際のWeb画面が表示されれば完了で�
 
 機能名を選んだコンソールの例です。下部のログを読み、停止するときは右上の「停止（Ctrl+C）」を押します。キーボードのCtrl+Cは選択文字のコピーです。
 
-![機能別のログ表示](./images/セルフテスト,aidiy_diag,システム起動編/20261023-completion__aidiy_diag-システム起動_707_Local稼働と再読込接続維持.png)
+![機能別のログ表示](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_707_Local稼働と再読込接続維持.png)
 
 ## 6. システムを停止してDiagを閉じる
 
@@ -267,19 +267,19 @@ Diagの通知だけでなく、実際のWeb画面が表示されれば完了で�
 
 隔離ブラウザの最終確認画面です。合成データによる表示・操作試験で、実AIの応答とは区別しています。
 
-![start-desktop](./images/セルフテスト,aidiy_diag,システム起動編/20261023-completion__aidiy_diag-システム起動_801_start-desktop.png)
+![start-desktop](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_801_デスクトップ起動画面.png)
 
 
 10/24に現行Electronのランチャー表示を再撮影しました。VS Codeを含む14項目と6機能の状態欄を確認できます。
 
-![start-mini](./images/セルフテスト,aidiy_diag,システム起動編/20261024-vscode__ランチャー14項目.png)
+![start-mini](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_103_ランチャー表示の14項目.png)
 
 
 Localの実起動と、画面再読込後も診断接続が維持されることを確認しました。
 
-![Localの実起動と、画面再読込後も診断接続が維持されることを確認しました。](./images/セルフテスト,aidiy_diag,システム起動編/20261023-completion__aidiy_diag-システム起動_707_Local稼働と再読込接続維持.png)
+![Localの実起動と、画面再読込後も診断接続が維持されることを確認しました。](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_707_Local稼働と再読込接続維持.png)
 
 
 手動表示で開いたChromeのWeb認証フォームです。ログインの送信は行っていません。
 
-![手動表示で開いたChromeのWeb認証フォームです。ログインの送信は行っていません。](./images/セルフテスト,aidiy_diag,システム起動編/20261023-completion__aidiy_diag-システム起動_708_Web認証フォーム.png)
+![手動表示で開いたChromeのWeb認証フォームです。ログインの送信は行っていません。](./images/セルフテスト,aidiy_diag,システム起動編/aidiy_diag-システム起動_708_Web認証フォーム.png)

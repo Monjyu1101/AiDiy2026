@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess  # msvcrt の模擬登録より先にホスト OS の subprocess を初期化する。
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -38,7 +39,7 @@ class PathTests(unittest.TestCase):
             SetValueEx=Mock(side_effect=self.write),
             DeleteValue=Mock(side_effect=self.delete),
         )
-        self.enterContext(patch.dict('sys.modules', {'winreg': self.registry}))
+        self.enterContext(patch.dict('sys.modules', {'winreg': self.registry, 'msvcrt': SimpleNamespace()}))
         self.enterContext(patch.object(helper.sys, 'platform', 'win32'))
         self.enterContext(patch.dict(os.environ, {'PATH': r'C:\Windows\System32',
                                                 'USERPROFILE': self.temp}))
@@ -190,7 +191,8 @@ class PathTests(unittest.TestCase):
         launcher.write_text(setup.launcher_content(fixture / 'diag_main.mjs', True), encoding='utf-8')
         with patch.object(Path, 'home', return_value=Path(self.temp)), \
                 patch.object(cleanup, '__file__', str(fixture / '_cleanup.py')), \
-                patch.object(cleanup._path_helper, '_notify_environment_change'):
+                patch.object(cleanup._path_helper, '_notify_environment_change'), \
+                patch.object(cleanup, 'stop_processes', return_value=True):
             self.assertTrue(cleanup.cleanup())
         self.assertFalse(launcher.exists())
         self.assertEqual(self.value, (r'%USERPROFILE%\tools;', 2))
@@ -238,7 +240,7 @@ class PathTests(unittest.TestCase):
             'frontend_ide/aidiy_term': 'launch.mjs',
             'frontend_channels': 'panel/launch.mjs',
             'frontend_ide/host': 'aidiy_code/launch.mjs',
-            'frontend_avatar': '_start.py',
+            'frontend_avatar': 'launch.mjs',
             'command_hermes': 'pyproject.toml',
         }
         for folder, script in scripts.items():
@@ -264,7 +266,8 @@ class PathTests(unittest.TestCase):
         self.enterContext(patch.object(hermes, 'run_command', return_value=True))
         self.assertTrue(diag.setup(desktop=False))
         self.assertTrue(host.install_standalone_launcher())
-        self.assertTrue(avatar.install_standalone_launcher())
+        with patch.object(shutil, 'which', return_value='node.exe'):
+            self.assertTrue(avatar.install_standalone_launcher())
         self.assertTrue(hermes.setup())
         with patch.object(shutil, 'which', return_value='node.exe'):
             viewer.install_launcher(project / 'frontend_ide/viewer')
@@ -273,7 +276,10 @@ class PathTests(unittest.TestCase):
         commands = ('diag', 'ide', 'term', 'code', 'live', 'avatar', 'hermes', 'discord')
         for command in commands:
             name = f'aidiy_{command}.cmd'
-            self.assertEqual(Path(shutil.which(name, path=os.environ['PATH'])), self.directory / name)
+            # PATH / PATHEXT は Windows 形式で解釈し、POSIX の実行権限には依存しない。
+            with patch.object(os, 'pathsep', ';'), patch.dict(os.environ, {'PATHEXT': '.COM;.EXE;.BAT;.CMD'}):
+                resolved = shutil.which(name, mode=os.F_OK, path=os.environ['PATH'])
+            self.assertEqual(Path(resolved), self.directory / name)
         self.registry.SetValueEx.assert_called_once()
 
         diag_cleanup = load(ROOT / 'backend_diag/_cleanup.py')
@@ -288,6 +294,7 @@ class PathTests(unittest.TestCase):
         self.enterContext(patch.object(avatar_cleanup, 'FRONTEND_AVATAR_DIR', project / 'frontend_avatar'))
         self.enterContext(patch.object(hermes_cleanup, 'BACKEND_HERMES_DIR', project / 'command_hermes'))
         self.enterContext(patch.object(diag_cleanup, '__file__', str(project / 'backend_diag/_cleanup.py')))
+        self.enterContext(patch.object(diag_cleanup, 'stop_processes', return_value=True))
         self.assertTrue(viewer.remove_launcher(project / 'frontend_ide/viewer'))
         self.assertTrue(viewer.remove_launcher(project / 'frontend_ide/aidiy_term', 'term'))
         self.assertTrue(discord.remove_launcher(project / 'frontend_channels'))

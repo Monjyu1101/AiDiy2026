@@ -6,7 +6,8 @@
 
 // falseはxtermの変換だけを止める。コピー・貼付けはブラウザーの既定動作と
 // xtermのcopy/pasteイベントへ任せ、権限付きClipboard APIや二重貼付けを避ける。
-export function terminalKeyHandler(send) {
+export function terminalKeyHandler(send, { platform = globalThis.navigator?.platform || '' } = {}) {
+  const isMac = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'].includes(platform);
   return event => {
     if (event.isComposing || event.keyCode === 229 || event.getModifierState?.('AltGraph')) return true;
     const key = event.key.toLowerCase();
@@ -23,6 +24,9 @@ export function terminalKeyHandler(send) {
       // xterm標準のコピー・貼付け・ローカルスクロールに奪われないよう送る。
       data = `\x1b[${{ insert: 2, pageup: 5, pagedown: 6 }[key]};${modifiers}~`;
     } else if (event.key.length === 1 && (event.ctrlKey || event.altKey)) {
+      // MacのOptionは文字入力用。xterm既定のmacOptionIsMeta:falseに合わせ、
+      // Option/Shift+Optionの入力・dead key合成をESC付き文字へ置き換えない。
+      if (isMac && event.altKey && !event.ctrlKey) return true;
       // keyCodeのUS配列換算ではなく、実際に入力された記号を使う。
       let character = event.key;
       if (event.ctrlKey) {

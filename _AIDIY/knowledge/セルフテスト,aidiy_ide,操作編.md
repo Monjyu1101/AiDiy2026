@@ -40,7 +40,7 @@
 
 利用中の画面です。左がエクスプローラー、中央が宇宙表示、右が選択したファイルのビューアです。画面内のピンはOFF表示です。
 
-![利用中の画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-retest__pin-off.jpg)
+![利用中の画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_101_利用中の画面とピンOFF.jpg)
 
 ### セルフテスト項目
 
@@ -67,7 +67,7 @@
 
 エクスプローラーから深い階層のファイルを選んだ例です。中央のパンくずと右のファイル名で現在地を確認できます。
 
-![エクスプローラーから深い階層のファイルを選んだ例です](./images/セルフテスト,aidiy_ide,操作編/20261023215615-ide-2d-motion__ide-操作_607_エクスプローラー選択先のファイル表示画面.png)
+![エクスプローラーから深い階層のファイルを選んだ例です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_607_エクスプローラー選択先のファイル表示画面.png)
 
 ### セルフテスト項目
 
@@ -96,19 +96,19 @@
 
 Wordを開いた画面です。文書の上部にページ移動と表示倍率があります。
 
-![Wordを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_301_Word.png)
+![Wordを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_301_Word.png)
 
 Excelを開いた画面です。下部のシート名を押して表を切り替えます。
 
-![Excelを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_302_Excel.png)
+![Excelを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_302_Excel.png)
 
 PDFを開いた画面です。ページ番号を確かめながら前後へ移動します。
 
-![PDFを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_303_PDF.png)
+![PDFを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_303_PDF.png)
 
 PowerPointを開いた画面です。スライドのページを切り替えて内容を読みます。
 
-![PowerPointを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_304_PowerPoint.png)
+![PowerPointを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_304_PowerPoint.png)
 
 ### 検索して、見た場所へ戻る
 
@@ -118,11 +118,11 @@ PowerPointを開いた画面です。スライドのページを切り替えて�
 
 AiDiy検索の結果画面です。関連ファイル名を選ぶと内容を表示します。この画面例は固定AI回答によるUI試験で、実AI検索の成功結果は末尾に別記しています。
 
-![AiDiy検索の結果画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_305_AI検索.png)
+![AiDiy検索の結果画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_305_AI検索.png)
 
 検索履歴を開いた画面です。目的の結果を選び直し、関連ファイルを再び読めます。
 
-![検索履歴を開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_306_検索履歴.png)
+![検索履歴を開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_306_検索履歴.png)
 
 ### セルフテスト項目
 
@@ -158,7 +158,7 @@ Codeの下書きへ参照ファイルを追加した例です。下部の入力�
 
 Liveに文字の正式回答が表示された画面です。接続表示だけで会話が成功したとは判断しません。
 
-![Liveに文字の正式回答が表示された画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-retest__live-response.jpg)
+![Liveに文字の正式回答が表示された画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_402_Liveの正式回答.jpg)
 
 Termの入力待ち画面です。表示された作業パスを確認してからコマンドを入力します。
 
@@ -166,7 +166,7 @@ Termの入力待ち画面です。表示された作業パスを確認してか�
 
 BrowserでローカルHTMLを開いた画面です。上部に戻る・進む・再読込とアドレス欄があります。
 
-![BrowserでローカルHTMLを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-guide__aidiy_ide-操作_407_Browser.png)
+![BrowserでローカルHTMLを開いた画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_407_Browser.png)
 
 ### セルフテスト項目
 
@@ -193,11 +193,11 @@ BrowserでローカルHTMLを開いた画面です。上部に戻る・進む・
 
 2Dの一覧画面です。フォルダとファイルが並び、下部に操作の案内があります。
 
-![2Dの一覧画面です](./images/セルフテスト,aidiy_ide,操作編/20261023215615-ide-2d-motion__ide-操作_601_2D初期表示画面.png)
+![2Dの一覧画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_601_2D初期表示画面.png)
 
 3Dへ戻った画面です。エクスプローラーとビューアで選択中のファイルを引き続き確認できます。
 
-![3Dへ戻った画面です](./images/セルフテスト,aidiy_ide,操作編/20261023215615-ide-2d-motion__ide-操作_613_3D復帰と選択維持画面.png)
+![3Dへ戻った画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_613_3D復帰と選択維持画面.png)
 
 ### セルフテスト項目
 
@@ -223,11 +223,11 @@ BrowserでローカルHTMLを開いた画面です。上部に戻る・進む・
 
 VR中に新しく開いたビューアです。エクスプローラーと軌跡バーも前面に残っています。
 
-![VR中に新しく開いたビューアです](./images/セルフテスト,aidiy_ide,操作編/20261023-retest__vr-new-viewer.jpg)
+![VR中に新しく開いたビューアです](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_503_VRで新しいビューアを表示.jpg)
 
 VR本体を選び直した後の画面です。ピン留めしたパネルを見失わず、そのまま使えます。
 
-![VR本体を選び直した後の画面です](./images/セルフテスト,aidiy_ide,操作編/20261023-retest__vr-owner-selected.jpg)
+![VR本体を選び直した後の画面です](./images/セルフテスト,aidiy_ide,操作編/aidiy_ide-操作_503_VR本体を再選択した後のパネル.jpg)
 
 ### セルフテスト項目
 

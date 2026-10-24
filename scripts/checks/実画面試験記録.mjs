@@ -22,7 +22,8 @@ const BOOK_DOCUMENTS = Object.freeze({
   ide: 'セルフテスト,aidiy_ide,操作編',
 });
 
-// 参照元Markdownの名前で保存先を決め、実施IDはファイル名に付ける。
+// 参照元Markdownの名前で保存先を決め、画像名は内容を先頭にする。
+// 実施IDは記録JSONで保持し、同じ場面の再撮影は確認番号で区別する。
 // 例: createEvidenceRecorder('20261019-1039-computer-use', 'environment', { toPng })
 export async function createEvidenceRecorder(runId, book = 'environment', { toPng } = {}) {
   const prefix = BOOK_NAMES[book];
@@ -46,11 +47,20 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
     const sequence = 1 + Math.max(0, ...records.filter(r => r.paragraph === paragraph).map(r => r.sequence));
     if (sequence > 99) throw new Error('段落内の証跡は99件まで');
     const id = String(paragraph) + String(sequence).padStart(2, '0');
-    const file = runId + '__' + prefix + '_' + id + '_' + title.replace(/画面$/u, '') + '画面.png';
+    const stem = prefix + '_' + id + '_' + title.replace(/画面$/u, '') + '画面';
     const raw = Buffer.from(shot.url.slice(shot.url.indexOf(',') + 1), 'base64');
     const bytes = shot.url.startsWith('data:image/png;') ? raw : await toPng?.(raw);
     if (!bytes || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('JPEG画面には toPng エンコーダーを渡してください');
-    await fs.writeFile(path.join(root, file), bytes, { flag: 'wx' });
+    let file = stem + '.png';
+    for (let confirmation = 2; ; confirmation++) {
+      try {
+        await fs.writeFile(path.join(root, file), bytes, { flag: 'wx' });
+        break;
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        file = stem + '_確認' + String(confirmation).padStart(2, '0') + '.png';
+      }
+    }
     const row = { book, id, paragraph, sequence, file, title, status, note, time: new Date().toISOString(), window: state.window, width: shot.width, height: shot.height, sha256: createHash('sha256').update(bytes).digest('hex'), accessibility: state.accessibility };
     records.push(row);
     await fs.writeFile(manifest + '.new', JSON.stringify(records, null, 2) + '\n', 'utf8');
