@@ -25,7 +25,7 @@ def load_setup():
 
 class SetupResultTests(unittest.TestCase):
     @contextlib.contextmanager
-    def execution(self, *, continue_on_error=True):
+    def execution(self, *, continue_on_error=True, real_common=False):
         module = load_setup()
         choices = dict.fromkeys((
             "common", "local", "mcp", "mcp_config", "backend", "taskteam",
@@ -54,8 +54,9 @@ class SetupResultTests(unittest.TestCase):
                 stack.enter_context(patch.object(module.time, "sleep"))
                 stack.enter_context(patch.object(module, "_load_folder_module", side_effect=component))
                 stack.enter_context(patch.object(local_git_setup, "ensure_local_git", return_value=("skipped", "fixture")))
-                stack.enter_context(patch.object(module, "setup_common_global_tools", return_value=[]))
-                stack.enter_context(patch.object(module, "wait_global_cli_tools_install", return_value=[]))
+                if not real_common:
+                    stack.enter_context(patch.object(module, "setup_common_global_tools", return_value=[]))
+                    stack.enter_context(patch.object(module, "wait_global_cli_tools_install", return_value=[]))
                 stack.enter_context(patch.object(module, "run_diag_headless", return_value=True))
                 stack.enter_context(patch.object(module, "setup_node_refresh", return_value=[]))
                 stack.enter_context(patch.object(module, "setup_launchers_only", return_value=[]))
@@ -128,6 +129,116 @@ class SetupResultTests(unittest.TestCase):
                 module.wait_global_cli_tools_install.assert_called_once()
                 component("backend_diag").setup.assert_not_called()
                 module.run_diag_headless.assert_not_called()
+
+    def test_prerequisite_failure_always_stops_and_restores_auto_mode(self):
+        for continue_on_error in (False, True):
+            with self.subTest(continue_on_error=continue_on_error), self.execution(continue_on_error=continue_on_error) as (module, _, component, output, git):
+                module.AUTO_MODE = True
+                def prerequisite():
+                    self.assertFalse(module.AUTO_MODE)
+                    return False
+                module.ensure_prerequisites.side_effect = prerequisite
+                with self.assertRaises(SystemExit) as caught:
+                    module.main()
+                self.assertEqual(caught.exception.code, 1)
+                self.assertTrue(module.AUTO_MODE)
+                git.ensure_local_git.assert_not_called()
+                module.setup_common_global_tools.assert_not_called()
+                component("backend_diag").setup.assert_not_called()
+                self.assertIn("前提条件: Git / Node.js", output.getvalue())
+                self.assertNotIn("セットアップは正常終了しました。", output.getvalue())
+
+    def test_cli_preparation_and_spawn_failures_reach_final_summary(self):
+        for continue_on_error in (False, True):
+            with self.subTest(continue_on_error=continue_on_error), self.execution(continue_on_error=continue_on_error, real_common=True) as (module, choices, component, output, _git):
+                choices["common_npm_install"] = True
+                with patch.object(module, "check_npm_installed", return_value=True), \
+                     patch.object(module, "prepare_antigravity_installer", return_value=(None, None)), \
+                     patch.object(module, "prepare_grok_build_installer", return_value=(None, None)), \
+                     patch.object(module.subprocess, "Popen", side_effect=OSError("fixture spawn failure")) as spawn:
+                    with self.assertRaises(SystemExit) as caught:
+                        module.main()
+                self.assertEqual(caught.exception.code, 1)
+                self.assertEqual(spawn.call_count, 4)
+                for package in ("@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "@opencode/cli", "antigravity", "grok-build"):
+                    self.assertIn(f"  - 共通: AI CLI ツール導入 ({package})", output.getvalue())
+                self.assertEqual(component("backend_diag").setup.call_count, int(continue_on_error))
+                self.assertNotIn("セットアップは正常終了しました。", output.getvalue())
+
+    def test_cli_mixed_failures_wait_for_started_processes_before_stopping(self):
+        with self.execution(continue_on_error=False, real_common=True) as (module, choices, component, output, _git):
+            choices["common_npm_install"] = True
+            success = Mock(returncode=0)
+            success.communicate.return_value = ("", "")
+            failed = Mock(returncode=2)
+            failed.communicate.return_value = ("", "fixture failure")
+            opencode = Mock(returncode=0)
+            opencode.communicate.return_value = ("", "")
+            temp = Mock()
+            with patch.object(module, "check_npm_installed", return_value=True), \
+                 patch.object(module, "prepare_antigravity_installer", return_value=(["fixture"], temp)), \
+                 patch.object(module, "prepare_grok_build_installer", return_value=(None, None)), \
+                 patch.object(module.subprocess, "Popen", side_effect=[success, OSError("spawn"), failed, opencode, OSError("spawn")]):
+                with self.assertRaises(SystemExit) as caught:
+                    module.main()
+            self.assertEqual(caught.exception.code, 1)
+            success.communicate.assert_called_once_with(timeout=300)
+            failed.communicate.assert_called_once_with(timeout=300)
+            opencode.communicate.assert_called_once_with(timeout=None)
+            temp.unlink.assert_called_once()
+            self.assertEqual(module.GLOBAL_CLI_INSTALL_PROCESSES, [])
+            for package in ("@github/copilot", "@openai/codex", "antigravity", "grok-build"):
+                self.assertIn(f"  - 共通: AI CLI ツール導入 ({package})", output.getvalue())
+            self.assertNotIn("  - 共通: AI CLI ツール導入 (@opencode/cli)", output.getvalue())
+            component("backend_diag").setup.assert_not_called()
+
+    def test_partial_preparation_and_spawn_failure_with_other_cli_success(self):
+        with self.execution(real_common=True) as (module, choices, component, output, _git):
+            choices["common_npm_install"] = True
+            processes = [Mock(returncode=0) for _ in range(4)]
+            for process in processes:
+                process.communicate.return_value = ("", "")
+            with patch.object(module, "check_npm_installed", return_value=True), \
+                 patch.object(module, "prepare_antigravity_installer", return_value=(None, None)), \
+                 patch.object(module, "prepare_grok_build_installer", return_value=(["fixture"], None)), \
+                 patch.object(module.subprocess, "Popen", side_effect=[OSError("spawn"), *processes]):
+                with self.assertRaises(SystemExit) as caught:
+                    module.main()
+            self.assertEqual(caught.exception.code, 1)
+            for process in processes:
+                process.communicate.assert_called_once()
+            self.assertIn("  - 共通: AI CLI ツール導入 (antigravity)", output.getvalue())
+            self.assertIn("  - 共通: AI CLI ツール導入 (@anthropic-ai/claude-code)", output.getvalue())
+            self.assertNotIn("  - 共通: AI CLI ツール導入 (grok-build)", output.getvalue())
+            self.assertNotIn("セットアップは正常終了しました。", output.getvalue())
+            component("frontend_channels").setup.assert_called_once()
+
+    def test_all_cli_success_keeps_success_result(self):
+        with self.execution(real_common=True) as (module, choices, _component, output, _git):
+            choices["common_npm_install"] = True
+            processes = [Mock(returncode=0) for _ in range(6)]
+            for process in processes:
+                process.communicate.return_value = ("", "")
+            with patch.object(module, "check_npm_installed", return_value=True), \
+                 patch.object(module, "prepare_antigravity_installer", return_value=(["fixture"], None)), \
+                 patch.object(module, "prepare_grok_build_installer", return_value=(["fixture"], None)), \
+                 patch.object(module.subprocess, "Popen", side_effect=processes):
+                self.assertIsNone(module.main())
+            for process in processes:
+                process.communicate.assert_called_once()
+            self.assertEqual(module.GLOBAL_CLI_INSTALL_PROCESSES, [])
+            self.assertIn("セットアップは正常終了しました。", output.getvalue())
+
+    def test_missing_npm_records_all_requested_npm_packages(self):
+        module = load_setup()
+        with contextlib.redirect_stdout(io.StringIO()), \
+             patch.object(module, "check_npm_installed", return_value=False), \
+             patch.object(module, "prepare_antigravity_installer", return_value=(None, None)), \
+             patch.object(module, "prepare_grok_build_installer", return_value=(None, None)), \
+             patch.object(module.subprocess, "Popen", side_effect=AssertionError("process forbidden")) as spawn:
+            failures = module.start_global_cli_tools_install()
+        self.assertEqual(set(failures), {"@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "@opencode/cli", "antigravity", "grok-build"})
+        spawn.assert_not_called()
 
     def test_build_and_launcher_modes_keep_failure_exit(self):
         for mode in ("node_refresh", "launchers"):

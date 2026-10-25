@@ -332,7 +332,7 @@ Liveの上限は接続準備20秒、内部HTTP135秒、1試行150秒、全実行
 
 ケースごとに実施日時・環境・操作・期待結果・実際の結果・判定を記録します。複数対象は枝番にし、単体試験・合成画面・実環境の実画面を分けます。過去のテスト件数やモデル名を今回の結果へ引き継ぎません。
 
-画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,環境確認編/` に、`<実施ID>__aidiy_diag-環境確認_501_設定モデル応答画面.png` の形式で保存し、直前に説明を添えます。確認済み画像は本文に掲載しています。音声の聴取は未実施、PDFも同名ファイルへ更新しました。キーやJWTを記録へ含めません。
+画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,環境確認編/` に、`aidiy_diag-環境確認_501_設定モデル応答画面.png` の形式で保存し、直前に説明を添えます。確認済み画像は本文に掲載しています。音声の聴取は未実施、PDFも同名ファイルへ更新しました。キーやJWTを記録へ含めません。実施日時は本文に記録し、再確認は画像名に `_確認02` などを付けて区別します。
 
 自動試験の入口は `backend_diag/checks/install-*.check.mjs`、`headless.check.mjs`、`models-info.check.mjs`、`voices-info.check.mjs`、`previous-results.check.mjs`、`model-trials.check.mjs`、`manual-models.check.mjs` と各Vue機能フォルダの `checks/` です。Liveの経路と15秒待機は `backend_diag/checks/model-trials-sdk.check.mjs` とその合成アダプターで確認します。画面は `model-trials-browser.mjs`・`manual-models-browser.mjs` も使います。実パッケージの変更・実AIの結果と合成試験を区別します。
 

@@ -88,16 +88,25 @@ class RootIntegrationTests(unittest.TestCase):
             with patch.object(module,'ask_start_mode',return_value=(True,False)),patch.object(module,'ask_yes_no',return_value=False),patch('builtins.print'):
                 choices=getattr(module,method)(ROOT.parent) if name=='_cleanup' else getattr(module,method)()
             self.assertEqual(choices['diag'], name == '_setup')
-    def test_start_has_no_diag_choice(self):
-        module=self.root_module('_start');calls=[]
-        def choice(prompt,default_yes=False):
-            calls.append((prompt,default_yes));return 'Diag' in prompt
-        with patch.object(module,'prompt_choice',side_effect=choice),patch('builtins.print'):
-            values=module.collect_startup_choices()
-        self.assertEqual(len(values),12)
-        self.assertFalse(values[6])
-        self.assertFalse(any('Diag' in prompt for prompt,_ in calls))
-        self.assertIn('Term',calls[6][0])
+    def test_start_diag_choice_skips_or_exposes_individual_choices(self):
+        for selected in (True,False):
+            with self.subTest(diag=selected):
+                module=self.root_module('_start');calls=[]
+                def choice(prompt,default_yes=False):
+                    calls.append((prompt,default_yes))
+                    return selected if 'Diag' in prompt else default_yes
+                with patch.object(module,'prompt_choice',side_effect=choice),patch('builtins.print'):
+                    values=module.collect_startup_choices()
+                self.assertEqual(len(values),12)
+                self.assertEqual(values[6],selected)
+                self.assertIn('Diag',calls[0][0]);self.assertTrue(calls[0][1])
+                if selected:
+                    self.assertEqual(len(calls),1)
+                    self.assertEqual(values,(False,)*6+(True,)+(False,)*5)
+                else:
+                    self.assertEqual(len(calls),12)
+                    self.assertIn('Term',calls[7][0])
+                    self.assertEqual(values[:6]+values[7:],tuple(default for _,default in calls[1:]))
 
     def test_start_choices_do_not_run_headless(self):
         from types import SimpleNamespace
@@ -239,6 +248,7 @@ class SetupOrderingTests(unittest.TestCase):
             return failure != name
         def prerequisites():
             events.append('prerequisites');self.assertFalse(module.AUTO_MODE)
+            return True
         def launcher(selected, *, desktop):
             self.assertIs(selected,choices);self.assertFalse(desktop)
             return record('diag-launcher')
@@ -288,13 +298,19 @@ class SetupOrderingTests(unittest.TestCase):
                 with self.subTest(failure=failure,keep_going=keep_going):
                     events,errors,code=self.run_setup_order(failure=failure,keep_going=keep_going)
                     self.assertEqual(events,normal if keep_going else normal[:normal.index(failure)+1])
-                    self.assertEqual(errors,[label]);self.assertEqual(code,0 if keep_going else 1)
+                    self.assertEqual(errors,[label]);self.assertEqual(code,1)
 
     def test_common_errors_keep_existing_summary_and_continuation_behavior(self):
         for failure,label in [('common','common-error'),('common-wait','共通: AI CLI ツール導入 (fixture-package)')]:
-            events,errors,code=self.run_setup_order(failure=failure)
-            self.assertLess(events.index('common-wait'),events.index('diag-launcher'))
-            self.assertEqual(events[-2:],['clear','headless']);self.assertEqual(errors,[label]);self.assertEqual(code,0)
+            for keep_going in (False,True):
+                with self.subTest(failure=failure,keep_going=keep_going):
+                    events,errors,code=self.run_setup_order(failure=failure,keep_going=keep_going)
+                    if keep_going:
+                        self.assertLess(events.index('common-wait'),events.index('diag-launcher'))
+                        self.assertEqual(events[-2:],['clear','headless'])
+                    else:
+                        self.assertEqual(events,['stop','prerequisites','common','common-wait'])
+                    self.assertEqual(errors,[label]);self.assertEqual(code,1)
     def test_cancel_does_not_check_or_install_prerequisites(self):
         module=self.root_module('_setup')
         with patch.object(module,'collect_setup_choices',return_value=None),patch.object(module,'stop_setup_apps') as stop,patch.object(module,'ensure_prerequisites') as prerequisites,patch('builtins.print'):
@@ -311,7 +327,7 @@ class SetupOrderingTests(unittest.TestCase):
                 fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda:True)
                 def diagnose():events.append('diag');return success
                 with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_setup_apps'),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
-                    if not success and not keep_going:
+                    if not success:
                         with self.assertRaises(SystemExit) as result:module.main()
                         self.assertEqual(result.exception.code,1)
                     else:module.main()
@@ -372,7 +388,7 @@ class SetupDisplayTests(unittest.TestCase):
             stack.enter_context(patch.object(Path,'home',return_value=Path(directory)))
             stack.enter_context(patch.object(module,'GLOBAL_CLI_INSTALL_PROCESSES',['fixture']))
             stack.enter_context(patch.object(module,'stop_setup_apps'))
-            for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:None),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
+            for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:True),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
                 stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module.time,'sleep'))
             stack.enter_context(patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True))

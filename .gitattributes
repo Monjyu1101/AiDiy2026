@@ -8,3 +8,6 @@
 /frontend_ide/dist/assets/catppuccin_icons/** -text
 /frontend_ide/host/dist/development/assets/catppuccin_icons/** -text
 /frontend_ide/host/aidiy_live/dist/development/assets/catppuccin_icons/** -text
+
+# PDF はバイナリとして扱い、改行変換しない。
+*.pdf binary

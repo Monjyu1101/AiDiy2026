@@ -256,7 +256,7 @@ Diagの通知だけでなく、実際のWeb画面が表示されれば完了で�
 
 各ケースの結果を、実施日時・環境・操作・実際の結果・判定へ更新します。複数条件は枝番で分け、実機と合成サービスを明記します。`✅ OK`、`❌ NG`、`⏸ 未実施`、`⏸ 未測定`、環境不足による `PASS (別途環境調整必要)` を使います。未実施を合格へ置き換えません。
 
-画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編/` に、`<実施ID>__aidiy_diag-システム起動_101_起動直後画面.png` の形式で保存します。先頭の数字は章、後ろ2桁は章内連番です。画像の直前に説明を添え、実施した結果だけを本文へ記載します。認証キー・JWTを含めません。
+画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編/` に、`aidiy_diag-システム起動_101_起動直後画面.png` の形式で保存します。先頭の数字は章、後ろ2桁は章内連番です。画像の直前に説明を添え、実施した結果だけを本文へ記載します。認証キー・JWTを含めません。実施日時は本文に記録し、再確認は画像名に `_確認02` などを付けて区別します。
 
 自動試験の入口は `backend_diag/checks/start-manager.check.mjs`、`start-bulk-state.check.mjs`、`web-browser.check.mjs`、`start-mini.check.mjs`、`desktop.check.mjs`、`size-transition.check.cjs`、`mini-titlebar.check.cjs`、`mini-height.check.mjs`、`scripts/checks/test_diag_stop.py` です。画面確認は `start-browser.mjs`、隔離Electronは `initial-mini-desktop.mjs` を使います。自動試験の成功を実機試験へ転記しません。
 

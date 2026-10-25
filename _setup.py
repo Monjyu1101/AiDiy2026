@@ -520,33 +520,43 @@ def print_ai_cli_manual_setup():
     print_info(f"    Ollama     : {OLLAMA_INSTALL_COMMAND}")
 
 
-def start_global_cli_tools_install():
+def start_global_cli_tools_install() -> list[str]:
+    """導入を投入し、準備・投入に失敗したパッケージを返す。"""
     print_header("AI CLI: 導入開始")
     print_info("対象: Claude Code / GitHub Copilot / OpenAI Codex / OpenCode / Antigravity / Grok Build")
     print_info(f"参考: Hermes Agent: {HERMES_AGENT_INSTALL_COMMAND}")
     print_info(f"参考: Ollama: {OLLAMA_INSTALL_COMMAND}")
     print_info("AI CLI: 並列導入中（完了待ち）")
 
+    failed_packages = []
+    npm_packages = ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex", "@opencode/cli"]
     targets = []
     if check_npm_installed():
         cmd = npm_command()
-        for package in ["@anthropic-ai/claude-code", "@github/copilot", "@openai/codex"]:
+        for package in npm_packages[:-1]:
             command = [cmd, "install", "-g", package]
             targets.append((package, command, " ".join(command), None))
         command = [shutil.which("node") or "node", str(BASE_DIR / "scripts" / "cli_bat" / "install_opencode.mjs")]
         print_info("OpenCode: 所有確認した旧 opencode-ai がある場合だけ削除して V2 へ移行します。導入失敗時は利用できなくなる場合があります。")
         targets.append(("@opencode/cli", command, " ".join(command), None))
     else:
-        print_warning("共通: npm がインストールされていないため、npm 系 CLI はスキップします。")
+        failed_packages.extend(npm_packages)
+        print_warning("共通: npm がインストールされていないため、npm 系 CLI を導入できません。")
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
 
     antigravity_command, antigravity_temp_path = prepare_antigravity_installer()
     if antigravity_command:
         targets.append(("antigravity", antigravity_command, get_antigravity_install_command(), antigravity_temp_path))
+    else:
+        failed_packages.append("antigravity")
+        cleanup_temp_file(antigravity_temp_path)
 
     grok_build_command, grok_build_temp_path = prepare_grok_build_installer()
     if grok_build_command:
         targets.append(("grok-build", grok_build_command, get_grok_build_install_command(), grok_build_temp_path))
+    else:
+        failed_packages.append("grok-build")
+        cleanup_temp_file(grok_build_temp_path)
 
     GLOBAL_CLI_INSTALL_PROCESSES.clear()
     for i, (label, command, display_command, temp_path) in enumerate(targets, 1):
@@ -563,14 +573,14 @@ def start_global_cli_tools_install():
             print_success(f"  [{i}/{len(targets)}] {label}: 投入完了")
         except Exception as exc:
             print_error(f"  [{i}/{len(targets)}] {label}: 投入失敗 - {exc}")
+            failed_packages.append(label)
             cleanup_temp_file(temp_path)
 
     if not GLOBAL_CLI_INSTALL_PROCESSES:
         print_warning("共通: AI CLI ツールの投入対象がありませんでした。")
-        return False
-
-    print_success("共通: AI CLI ツールの投入を開始しました。")
-    return True
+    else:
+        print_success("共通: AI CLI ツールの投入を開始しました。")
+    return failed_packages
 
 
 def wait_global_cli_tools_install() -> list[str]:
@@ -639,7 +649,8 @@ def setup_common_global_tools(choices: dict) -> list[str]:
         print_warning("共通: Python ツールのアップグレードをスキップしました。")
 
     if choices.get("common_npm_install"):
-        start_global_cli_tools_install()
+        failed_packages = start_global_cli_tools_install()
+        error_locations.extend([f"共通: AI CLI ツール導入 ({package})" for package in failed_packages])
     else:
         print_warning("共通: AI CLI ツールのインストールをスキップしました。")
         print_ai_cli_manual_setup()
@@ -865,9 +876,15 @@ def main():
     selected_auto_mode = AUTO_MODE
     try:
         AUTO_MODE = False
-        ensure_prerequisites()
+        prerequisites_ok = ensure_prerequisites()
     finally:
         AUTO_MODE = selected_auto_mode
+
+    # 前提不足では後続処理の安全な実行を保証できないため、続行指定でも停止する。
+    if not prerequisites_ok:
+        error_locations.append("前提条件: Git / Node.js")
+        print_setup_summary(error_locations)
+        sys.exit(1)
 
     from scripts.local_git_setup import ensure_local_git
     git_status, git_message = ensure_local_git(BASE_DIR)

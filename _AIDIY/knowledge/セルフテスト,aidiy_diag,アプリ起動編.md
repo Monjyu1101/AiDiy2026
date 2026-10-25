@@ -414,7 +414,7 @@ freeai_chatの準備完了を確認して送信し、「おはようございま
 
 実施日時・対象・プロジェクト・操作・期待結果・実際の結果・判定を記録します。通常／ランチャー／アイコン、実機／合成、各アプリ／各CLIを枝番で分けます。起動要求の受付だけで成功にせず、実窓とCLI自身の状態を確認します。
 
-画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,アプリ起動編/` に、`<実施ID>__aidiy_diag-アプリ起動_401_Hermes起動画面.png` の形式で保存します。画像の直前に説明を添えます。確認済み画像は本文に掲載し、通過した本冊子と同名のPDFにも反映します。
+画像は `_AIDIY/knowledge/images/セルフテスト,aidiy_diag,アプリ起動編/` に、`aidiy_diag-アプリ起動_401_Hermes起動画面.png` の形式で保存します。画像の直前に説明を添えます。確認済み画像は本文に掲載し、通過した本冊子と同名のPDFにも反映します。実施日時は本文に記録し、再確認は画像名に `_確認02` などを付けて区別します。
 
 自動試験の入口は `backend_diag/checks/app-launch.check.mjs`、`app-launch-state.check.mjs`、`cli-launch.check.mjs`、`cli-launch-state.check.mjs`、`mini-cli-ui.check.cjs`、`full-launch-controls.check.cjs`、`frontend_ide/checks/project-instance.test.mjs` とCLI／端末の `cli-parallel-lifecycle.test.mjs` です。ブラウザの合成起動確認は `backend_diag/checks/app-launch-browser.mjs` を使います。実CLI・有料APIの結果へ置き換えません。
 
