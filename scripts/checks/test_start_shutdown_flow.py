@@ -109,7 +109,7 @@ class ShutdownFlowTests(unittest.TestCase):
             self.assertTrue(module.stop_all_tasks())
         self.assertEqual(stop.call_args.args[0], ROOT)
 
-    def test_normal_stop_preserves_only_code_and_ide(self):
+    def test_normal_stop_preserves_code_ide_and_discord(self):
         module = load()
         processes = {f'フロントエンド({name})': Mock(pid=10 + index)
                      for index, name in enumerate(('code', 'IDE', 'term', 'Discord'))}
@@ -120,11 +120,12 @@ class ShutdownFlowTests(unittest.TestCase):
                 patch.object(module, 'DISCORD', Mock()) as discord:
             module.stop_processes(processes)
         stopped = {call.args[0][-1] for call in run.call_args_list}
-        self.assertEqual(stopped, {str(original['フロントエンド(term)'].pid), str(original['フロントエンド(Discord)'].pid)})
+        self.assertEqual(stopped, {str(original['フロントエンド(term)'].pid)})
         term.kill_ports.assert_called_once_with()
-        discord.kill_ports.assert_called_once_with()
+        discord.kill_ports.assert_not_called()
         original['フロントエンド(code)'].wait.assert_not_called()
         original['フロントエンド(IDE)'].wait.assert_not_called()
+        original['フロントエンド(Discord)'].wait.assert_not_called()
         self.assertFalse(processes)
 
 

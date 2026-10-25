@@ -24,7 +24,10 @@ _launcher = importlib.util.module_from_spec(_launcher_spec)
 _launcher_spec.loader.exec_module(_launcher)
 install_launcher = _launcher.install_launcher
 sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
-from _setup_electron import prepare_electron_binary
+from _setup_electron import prepare_electron_binary, _runtime_in_use
+from _setup_processes import snapshot, process_role
+from _cleanup_processes import process_arguments
+from discord_processes import is_discord_process
 
 
 class Colors:
@@ -53,11 +56,38 @@ def print_info(message):
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
+def _discord_in_use() -> bool:
+    """この配置先の Bot / パネルを読み取りだけで確認する。判定不能時は更新しない。"""
+    if _runtime_in_use(THIS_DIR):
+        return True
+    windows = sys.platform == 'win32'
+    for process in snapshot():
+        if process.get('ProcessId') == os.getpid():
+            continue  # この _setup.py 自身は Discord の稼働ではない。
+        if (process_role(process, THIS_DIR.parent, windows) == 'frontend_channels'
+                or is_discord_process(process, THIS_DIR, windows)):
+            return True
+        name = (process.get('Name') or '').lower()
+        if name in ('node', 'node.exe') or name.startswith('electron'):
+            # 権限不足・壊れた引数一覧を「未起動」と見なさない。
+            if not process_arguments(process.get('CommandLine') or '', windows):
+                raise ValueError('Node / Electron の所属を確認できません')
+    return False
+
+
 def setup(choices=None) -> bool:
     del choices
     print_header("Discord セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
     print_info("対象: Discord / Node.js / TypeScript / Electron")
+    # npm ci は node_modules を削除するため、Electron の準備より先に確認する。
+    try:
+        if _discord_in_use():
+            print_error('起動中の Discord は停止せず、この Discord の依存更新を保留しました。他項目だけ更新する場合は Discord を選択しないでください。')
+            return False
+    except (OSError, ValueError, subprocess.SubprocessError):
+        print_error('Discord の停止状態を確認できないためセットアップを中止します。依存・設定は変更しません。')
+        return False
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.12 以降と npm を導入してください。")

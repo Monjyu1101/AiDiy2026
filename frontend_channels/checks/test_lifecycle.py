@@ -44,6 +44,7 @@ import launcher
 class DiscordSetupTest(unittest.TestCase):
     def setUp(self):
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
+        self.enterContext(patch.object(discord_setup, '_discord_in_use', return_value=False))
         self.enterContext(patch.object(discord_setup.shutil, 'which', return_value='npm'))
         self.run = self.enterContext(patch.object(discord_setup.subprocess, 'run'))
         self.prepare = self.enterContext(patch.object(discord_setup, 'prepare_electron_binary', return_value=True))
@@ -157,6 +158,15 @@ class DiscordLifecycleTest(unittest.TestCase):
                 self.assertFalse(flags[name])
                 with cleanup.cleanup_stop_request({}, services=[NAME]):
                     self.assertEqual(start.cleanup_stop_requested_services(), {NAME})
+                    stop.reset_mock()
+                    discord_proc = Mock()
+                    discord_running = {NAME: discord_proc}
+                    discord_flags = {NAME: True}
+                    start.suspend_services_for_cleanup(discord_flags, discord_running, {})
+                    stop.assert_called_once_with({NAME: discord_proc}, keep_standalone=False)
+                    self.assertFalse(discord_flags[NAME])
+                    self.assertNotIn(NAME, discord_running)
+                    self.assertFalse(start.start_service(NAME, {}, {}, None))
 
     def test_root_cleanup_stops_discord_even_when_deletion_not_selected(self):
         modules = {folder: Mock() for _, folder, _, _ in cleanup.SERVICE_CLEANUP_TARGETS}
@@ -247,7 +257,7 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertFalse(cleanup.stop_all_services({}, strict=False, keep_code=True, keep_discord=True))
         tools.stop_tools_processes.assert_not_called()
 
-    def test_shutdown_stops_discord_for_normal_and_explicit_cleanup(self):
+    def test_shutdown_preserves_discord_except_explicit_cleanup(self):
         for keep in (True, False):
             module = Mock()
             proc = Mock(pid=123456)
@@ -257,9 +267,16 @@ class DiscordLifecycleTest(unittest.TestCase):
                 running = {NAME: proc}
                 start.stop_processes(running, keep_standalone=keep)
             self.assertEqual(running, {})
-            self.assertEqual(kill.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
-            module.kill_ports.assert_called_once()
-            proc.wait.assert_called_once_with(timeout=5)
+            if keep:
+                kill.assert_not_called()
+                module.kill_ports.assert_not_called()
+                proc.wait.assert_not_called()
+                proc.kill.assert_not_called()
+                proc.terminate.assert_not_called()
+            else:
+                self.assertEqual(kill.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
+                module.kill_ports.assert_called_once()
+                proc.wait.assert_called_once_with(timeout=5)
 
 
 class DiscordProcessMatchingTest(unittest.TestCase):

@@ -28,8 +28,8 @@
 - frontend_channels/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
 開始承認後と Ctrl+C 終了時は、setupと共通のプロセス照合で停止します。
-この配置先の aidiy_code / aidiy_ide と必要な補助プロセスを保持します。
-独立して起動された Live / Term 等は、Code / IDE の子でも停止対象です。
+この配置先の aidiy_code / aidiy_ide / aidiy_discord と必要な補助プロセスを保持します。
+独立して起動された Live / Term 等は、Code / IDE / Discord の子でも停止対象です。
 cleanupの全停止とは別の保持方針です。
 
 標準の起動順:
@@ -557,10 +557,10 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standalone: bool = True) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
-    # 通常終了では Code / IDE を継続し、明示的な cleanup 要求では停止する。
+    # 通常終了では Code / IDE / Discord を継続し、明示的な cleanup 要求では停止する。
     standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
                           if f"フロントエンド({module})" in processes]
-    discord_was_running = "フロントエンド(Discord)" in processes
+    discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
     term_was_running = "フロントエンド(term)" in processes
     dev_was_running = not keep_standalone and "フロントエンド(IDE)" in processes
     for name, process in list(processes.items()):
@@ -568,7 +568,7 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
             # 起動通知後のランチャーPIDは終了済み。所有する8092とElectronを後段で回収する。
             processes.pop(name, None)
             continue
-        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)"):
+        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)"):
             print_info(f"[{name}] 全体停止の対象外として継続します")
             processes.pop(name, None)
             continue
@@ -614,10 +614,10 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
 
 
 def stop_all_tasks(title: str = "起動中サービスの一括停止") -> bool:
-    """setupと共通の照合で、この配置先のCode / IDE以外を停止する。
+    """setupと共通の照合で、この配置先のCode / IDE / Discord以外を停止する。
 
     cleanupの全停止とは分ける。ポート番号だけでは判定せず、呼出元と
-    Code / IDEを保護した個別PID停止を使う。
+    Code / IDE / Discordを保護した個別PID停止を使う。
     """
     print_header(title)
     try:
@@ -1069,7 +1069,7 @@ def main() -> None:
     ) = collect_startup_choices()
 
     # 開始承認後に一度だけ停止する。各サービスの起動直前には重ねて停止しない。
-    if stop_all_tasks("AiDiy プロセスの停止（Code / IDE は継続）") is False:
+    if stop_all_tasks("AiDiy プロセスの停止（Code / IDE / Discord は継続）") is False:
         print_error("既存プロセスを停止できないため、起動を中止します。")
         raise SystemExit(1)
 
@@ -1154,10 +1154,10 @@ def main() -> None:
 
         except KeyboardInterrupt:
             print_header("停止処理")
-            print_info("Ctrl+C を検出しました。Code / IDE を継続し、この配置先の他の AiDiy プロセスを停止します")
+            print_info("Ctrl+C を検出しました。Code / IDE / Discord を継続し、この配置先の他の AiDiy プロセスを停止します")
             stop_processes(processes)
-            print_info("Code / IDE と必要な補助プロセスを保持し、残る停止対象を確認します")
-            shutdown_verified = stop_all_tasks("終了時の既存プロセス整理（Code / IDE は継続）")
+            print_info("Code / IDE / Discord と必要な補助プロセスを保持し、残る停止対象を確認します")
+            shutdown_verified = stop_all_tasks("終了時の既存プロセス整理（Code / IDE / Discord は継続）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()
@@ -1181,7 +1181,7 @@ def main() -> None:
 
         if shutdown_verified is True:
             print_header("停止完了")
-            print_success("この配置先の停止対象を確認しました（Code / IDE と必要な補助プロセスは継続）")
+            print_success("この配置先の停止対象を確認しました（Code / IDE / Discord と必要な補助プロセスは継続）")
         elif shutdown_verified is False:
             print_header("停止確認未完了")
             print_warning("停止できなかったプロセス、または確認できない対象があります。上記の警告を確認してください")

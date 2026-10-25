@@ -17,11 +17,48 @@ def app(pid, kind, parent=1):
     return proc(pid, f'node {ROOT}/frontend_ide/launch.mjs --app {kind}', parent)
 
 class SetupProcessesTest(unittest.TestCase):
-    def test_all_components_except_code_ide(self):
+    def test_all_components_except_code_ide_discord(self):
         records = [app(10, 'code'), app(11, 'ide'), app(12, 'live'), app(13, 'term')]
         for i, folder in enumerate(subject.COMPONENTS[:-1], 20):
             records.append(proc(i, f'node {ROOT}/{folder}/launch.mjs'))
-        self.assertEqual(set(subject.select_targets(records, ROOT, current_pid=999)), {12, 13, *range(20,29)})
+        self.assertEqual(set(subject.select_targets(records, ROOT, current_pid=999)), {12, 13, *range(20,27), 28})
+
+    def test_discord_entries_and_cli_mcp_descendants_are_preserved(self):
+        for windows in (False, True):
+            root = r'C:\repo\AiDiy' if windows else ROOT
+            for entry in ('panel/launch.mjs', 'panel/desktop.cjs', 'src/panel-worker.ts',
+                          'src/web-server.ts', 'src/main.ts'):
+                with self.subTest(windows=windows, entry=entry):
+                    records = [proc(5, f'python {root}/_start.py', name='python'),
+                               proc(10, f'node "{root}/frontend_channels/{entry}"', 5),
+                               proc(11, f'python "{root}/command_hermes/cli_main.py"', 10, 'python'),
+                               proc(12, f'python "{root}/backend_tools/mcp_stdio.py"', 11, 'python'),
+                               proc(13, 'electron --type=renderer', 10, 'electron'),
+                               proc(20, f'node "{root}/frontend_ide/launch.mjs" --app live', 10),
+                               proc(21, 'electron --type=renderer', 20, 'electron')]
+                    self.assertEqual(set(subject.select_targets(records, root, windows, 999)), {5, 20, 21})
+
+    def test_orphan_discord_electron_is_preserved(self):
+        exe = f'{ROOT}/frontend_channels/node_modules/electron/dist/electron'
+        p = proc(10, f'{exe} --type=gpu-process', name='electron', executable=exe)
+        self.assertEqual(subject.select_targets([p], ROOT, current_pid=999), {})
+
+    def test_setup_and_start_share_discord_preserving_selector(self):
+        import importlib.util
+        root = Path(__file__).resolve().parents[2]
+        for filename, method in (('_setup.py', 'stop_setup_apps'), ('_start.py', 'stop_all_tasks')):
+            spec = importlib.util.spec_from_file_location('discord_route_' + method, root / filename)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            records = [proc(10, f'node {root}/frontend_channels/src/web-server.ts'),
+                       proc(11, f'python {root}/command_hermes/cli_main.py', 10, 'python'),
+                       proc(12, f'python {root}/backend_tools/mcp_stdio.py', 11, 'python')]
+            with patch.object(subject, 'snapshot', return_value=records), patch.object(subject.os, 'kill') as kill, \
+                 patch.object(subject.subprocess, 'run') as run, patch.object(module, 'print_header'), \
+                 patch.object(module, 'print_info'):
+                getattr(module, method)()
+            kill.assert_not_called()
+            run.assert_not_called()
 
     def test_backend_venvs_and_hermes_relative(self):
         for folder in ('backend_server', 'backend_tools', 'backend_local', 'backend_taskteam', 'command_hermes'):
@@ -188,7 +225,7 @@ class StopOutputTest(unittest.TestCase):
         with patch.object(subject, 'snapshot', side_effect=[[p], [p], []]), patch.object(subject.os, 'kill'):
             self.assertTrue(subject.stop_setup_processes(ROOT, info.append, errors.append))
         self.assertIn('この配置先で確認した停止対象', info[-1])
-        self.assertIn('Code / IDE は継続', info[-1])
+        self.assertIn('Code / IDE / Discord は継続', info[-1])
         self.assertEqual(errors, [])
 
     def test_remaining_and_snapshot_error_never_claim_success_or_setup(self):

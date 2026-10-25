@@ -135,8 +135,8 @@ def _load_folder_module(folder: str, entry: str = "_setup.py"):
 
 
 def stop_setup_apps() -> None:
-    """Code / IDE以外の、この作業コピーのAiDiy実行を依存物更新前に停止する。"""
-    print_header("AiDiy プロセスの停止（Code / IDE は継続）")
+    """Code / IDE / Discord以外の、この作業コピーのAiDiy実行を依存物更新前に停止する。"""
+    print_header("AiDiy プロセスの停止（Code / IDE / Discord は継続）")
     sys.path.insert(0, str(BASE_DIR / "scripts"))
     from _setup_processes import stop_setup_processes
     if not stop_setup_processes(BASE_DIR, print_info, print_error):
