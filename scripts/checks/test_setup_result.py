@@ -37,6 +37,7 @@ class SetupResultTests(unittest.TestCase):
         def component(folder):
             if folder not in components:
                 components[folder] = Mock()
+                components[folder].launch_model_download.return_value = False
                 for name in ("setup", "setup_desktop", "setup_dependencies", "configure_clients"):
                     getattr(components[folder], name).return_value = True
             return components[folder]
@@ -114,6 +115,59 @@ class SetupResultTests(unittest.TestCase):
             component("frontend_avatar").setup.assert_not_called()
             module.run_diag_headless.assert_not_called()
             self.assertNotIn("セットアップは正常終了しました。", output.getvalue())
+
+    def test_model_download_launch_failure_is_reported_and_honors_continue(self):
+        for continue_on_error in (False, True):
+            with self.subTest(continue_on_error=continue_on_error), self.execution(continue_on_error=continue_on_error) as (module, choices, component, output, _git):
+                choices["local_download"] = "one"
+                component("backend_local").launch_model_download.return_value = False
+                with self.assertRaises(SystemExit) as caught:
+                    module.main()
+                self.assertEqual(caught.exception.code, 1)
+                self.assertIn("  - Local: モデルダウンロード投入", output.getvalue())
+                self.assertNotIn("別プロセスで継続中", output.getvalue())
+                self.assertNotIn("セットアップは正常終了しました。", output.getvalue())
+                self.assertEqual(component("command_hermes").setup.call_count, int(continue_on_error))
+
+    def test_failed_local_setup_never_launches_download(self):
+        with self.execution() as (module, choices, component, output, _git):
+            choices["local_download"] = "all"
+            component("backend_local").setup.return_value = False
+            with self.assertRaises(SystemExit) as caught:
+                module.main()
+            self.assertEqual(caught.exception.code, 1)
+            component("backend_local").launch_model_download.assert_not_called()
+            component("command_hermes").setup.assert_called_once()
+            self.assertNotIn("別プロセスで継続中", output.getvalue())
+
+    def test_requested_model_download_success_is_reported(self):
+        for mode in ("one", "all", True):
+            with self.subTest(mode=mode), self.execution() as (module, choices, component, output, _git):
+                choices["local_download"] = mode
+                component("backend_local").launch_model_download.return_value = True
+                self.assertIsNone(module.main())
+                component("backend_local").launch_model_download.assert_called_once_with(choices)
+                self.assertIn("モデルダウンロードは別プロセスに投入済み", output.getvalue())
+
+    def test_other_setup_failure_still_allows_requested_local_download(self):
+        with self.execution() as (module, choices, component, output, _git):
+            choices["local_download"] = "one"
+            component("frontend_web").setup.return_value = False
+            component("backend_local").launch_model_download.return_value = True
+            with self.assertRaises(SystemExit) as caught:
+                module.main()
+            self.assertEqual(caught.exception.code, 1)
+            component("backend_local").launch_model_download.assert_called_once_with(choices)
+            self.assertIn("  - Web", output.getvalue())
+            self.assertIn("モデルダウンロードは別プロセスに投入済み", output.getvalue())
+
+    def test_unrequested_model_download_is_not_a_failure(self):
+        for enabled, mode in ((True, "no"), (True, False), (False, "one")):
+            with self.subTest(enabled=enabled, mode=mode), self.execution() as (module, choices, component, output, _git):
+                choices.update(local=enabled, local_download=mode)
+                component("backend_local").launch_model_download.return_value = False
+                self.assertIsNone(module.main())
+                self.assertNotIn("モデルダウンロードは別プロセス", output.getvalue())
 
     def test_common_fail_fast_also_waits_for_already_started_cli(self):
         for failure in ("common", "cli"):

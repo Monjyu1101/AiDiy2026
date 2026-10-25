@@ -869,6 +869,8 @@ def main():
     print_header("一括実行開始")
     continue_on_error = choices["continue_on_error"]
     error_locations: list[str] = []
+    local_setup_ok = False
+    model_download_launched = False
 
     print()
     # 共通・Diag・local のセットアップ前に Git / Node.js の前提を確認する。
@@ -927,7 +929,8 @@ def main():
     print()
     if choices["local"]:
         local_mod = _load_folder_module("backend_local")
-        if not local_mod.setup(choices):
+        local_setup_ok = local_mod.setup(choices)
+        if not local_setup_ok:
             error_locations.append("Local")
             if not continue_on_error:
                 print_setup_summary(error_locations)
@@ -1003,9 +1006,15 @@ def main():
     # モデル事前ダウンロードは時間がかかるため、別プロセスで投入する。
     # Hermes はセットアップ全体の最後に回すため、その前に投入だけ済ませる。
     print()
-    if choices["local"]:
+    if local_setup_ok:
         local_mod = _load_folder_module("backend_local")
-        local_mod.launch_model_download(choices)
+        model_download_launched = local_mod.launch_model_download(choices)
+        download_requested = choices.get("local_download") is True or choices.get("local_download") in ("one", "all")
+        if download_requested and not model_download_launched:
+            error_locations.append("Local: モデルダウンロード投入")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
 
     print()
     if choices["hermes"]:
@@ -1075,8 +1084,8 @@ def main():
         print_error("セットアップに失敗した項目があります。上記のエラー発生場所を確認してください。")
     else:
         print_success("セットアップは正常終了しました。")
-    if choices["local"] and choices.get("local_download") in ("one", "all"):
-        print_info("Local のモデルダウンロードは別プロセスで継続中です。")
+    if model_download_launched:
+        print_info("Local のモデルダウンロードは別プロセスに投入済みです。進捗はコンソールまたはログで確認してください。")
     print_info("5秒後に終了します...")
     time.sleep(5)
     # 「続行」は残りの項目を実行する指定であり、失敗を成功には変えない。

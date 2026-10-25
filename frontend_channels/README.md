@@ -193,3 +193,10 @@ https://github.com/monjyu1101/AiDiy2026
 ```
 
 第三者ライブラリには各配布元のライセンスが適用されます。再配布時は、それぞれの著作権表示・ライセンス文書も保持してください。
+
+### lockfile の検証と Electron 更新
+
+- `npm run check:lock` は package.json と lock の直接宣言、および Opus の optional peer 解決を確認します。npm 全体の依存検証の代替ではなく、配布前には clean な一時フォルダで `npm ci` も確認します。
+- Electron 更新は `npm run update:electron` を使います。npm 11 の `npm update electron` が変更対象外の `prism-media` 用 `opusscript@0.0.8` の lock を省略し、npm 10 の次回 `ci` が `Missing: opusscript@0.0.8` で失敗する場合があります。OS 固有ではありません。
+- 更新前の正常 lock と変更されていない peer 所有パッケージを照合し、この省略が起きた場合だけ既存 entry の維持を明示して `npm ci` で導入物も揃えます。元から Opus peer が不整合な lock や、peer 宣言が変わった不整合は自動修復せず失敗にします。
+- `build:panel` / `check:panel` もこの整合確認を行うため、manifest のハッシュ更新だけで依存欠落を承認しません。依存更新後は実際に `npm run build:panel` を実行します。

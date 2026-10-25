@@ -10,6 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
+import { verifyLock } from './verify-lock.mjs';
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, resolve, relative } from 'node:path';
@@ -21,13 +22,14 @@ async function files(folder) {
   return (await Promise.all(entries.map(entry => entry.isDirectory() ? files(resolve(folder, entry.name)) : resolve(folder, entry.name)))).flat();
 }
 export async function 配布物一覧() {
-  const paths = ['package.json', 'package-lock.json', 'scripts/build-panel.mjs', 'scripts/verify-panel.mjs', 'panel/main.js', 'panel/view.js', 'panel/index.html', 'panel/style.css', 'panel/visualizer.js', 'panel/THIRD_PARTY_NOTICES.txt'];
+  const paths = ['package.json', 'package-lock.json', 'scripts/build-panel.mjs', 'scripts/verify-panel.mjs', 'scripts/verify-lock.mjs', 'panel/main.js', 'panel/view.js', 'panel/index.html', 'panel/style.css', 'panel/visualizer.js', 'panel/THIRD_PARTY_NOTICES.txt'];
   for (const folder of ['画面', '接続', 'ライブ']) paths.push(...(await files(resolve(root, 'panel', folder))).map(path => relative(root, path).replaceAll('\\', '/')));
   const entries = await Promise.all(paths.sort().map(async path => [path, createHash('sha256').update((await readFile(resolve(root, path), 'utf8')).replace(/\r\n/g, '\n')).digest('hex')]));
   return Object.fromEntries(entries);
 }
 export async function 配布物確認() {
   try {
+    await verifyLock(root);
     const expected = JSON.parse(await readFile(resolve(root, 'panel/build-manifest.json'), 'utf8'));
     const actual = await 配布物一覧();
     return expected && Object.keys(expected).length === Object.keys(actual).length && Object.entries(actual).every(([name, hash]) => expected[name] === hash);

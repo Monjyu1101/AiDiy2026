@@ -67,8 +67,8 @@ def setup(choices=None) -> bool:
         print_info(f"実行中: {npm} ci --no-fund --no-audit")
         subprocess.run([npm, "ci", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         # ロック済みの旧版に留めず、他のフロントエンドと同じ宣言範囲で更新する。
-        print_info(f"実行中: {npm} update electron --no-fund --no-audit")
-        subprocess.run([npm, "update", "electron", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        print_info(f"実行中: {npm} run update:electron")
+        subprocess.run([npm, "run", "update:electron"], cwd=THIS_DIR, env=env, check=True)
         # npm update は lockfile も変更する。検証対象を省略せず、導入済み依存から
         # 実際に Vue 配布物を生成して manifest と揃える（通常起動では再ビルドしない）。
         for script in ('build:panel', 'check:panel'):

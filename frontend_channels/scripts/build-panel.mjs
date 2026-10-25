@@ -15,9 +15,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { parse, compileScript } from '@vue/compiler-sfc';
+import { verifyLock } from './verify-lock.mjs';
 import { 配布物一覧 } from './verify-panel.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+await verifyLock(root);
 // file:// の Electron と token 配下の Web の両方で同じ URL を使用する。
 // SFC を事前コンパイルし、unsafe-eval と CDN を必要としない配布用成果物を作る。
 await build({

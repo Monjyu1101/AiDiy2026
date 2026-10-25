@@ -297,7 +297,11 @@ class SetupOrderingTests(unittest.TestCase):
             for keep_going in (False,True):
                 with self.subTest(failure=failure,keep_going=keep_going):
                     events,errors,code=self.run_setup_order(failure=failure,keep_going=keep_going)
-                    self.assertEqual(events,normal if keep_going else normal[:normal.index(failure)+1])
+                    expected=normal if keep_going else normal[:normal.index(failure)+1]
+                    if failure == 'local' and keep_going:
+                        # Local の依存導入失敗後は、後続項目を続けてもモデル取得を投入しない。
+                        expected=[event for event in expected if event != 'download']
+                    self.assertEqual(events,expected)
                     self.assertEqual(errors,[label]);self.assertEqual(code,1)
 
     def test_common_errors_keep_existing_summary_and_continuation_behavior(self):

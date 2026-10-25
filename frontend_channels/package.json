@@ -13,7 +13,9 @@
     "check": "tsc --noEmit && node scripts/verify-panel.mjs",
     "test": "tsx --test checks/*.test.ts",
     "build:panel": "node scripts/build-panel.mjs",
-    "check:panel": "node scripts/verify-panel.mjs"
+    "check:panel": "node scripts/verify-panel.mjs",
+    "check:lock": "node scripts/verify-lock.mjs",
+    "update:electron": "node scripts/update-electron.mjs"
   },
   "dependencies": {
     "@discordjs/voice": "0.19.2",
@@ -34,6 +36,7 @@
     "typescript": "^5.9.0",
     "@vue/compiler-sfc": "3.5.43",
     "esbuild": "0.28.2",
-    "happy-dom": "20.8.4"
+    "happy-dom": "20.8.4",
+    "semver": "7.8.5"
   }
 }

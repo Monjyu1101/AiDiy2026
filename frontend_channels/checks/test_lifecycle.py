@@ -59,7 +59,7 @@ class DiscordSetupTest(unittest.TestCase):
         self.assertTrue(discord_setup.setup())
         self.assertEqual([call.args[0] for call in self.run.call_args_list], [
             ['npm', 'ci', '--no-fund', '--no-audit'],
-            ['npm', 'update', 'electron', '--no-fund', '--no-audit'],
+            ['npm', 'run', 'update:electron'],
             ['npm', 'run', 'build:panel'],
             ['npm', 'run', 'check:panel'],
         ])

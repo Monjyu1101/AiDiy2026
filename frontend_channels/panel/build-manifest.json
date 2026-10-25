@@ -1,6 +1,6 @@
 {
-  "package-lock.json": "23ee91ef74aca7814b2aba00f9bb143997e6b5a6a738f8f7fc626f44058f48a7",
-  "package.json": "a31006abc78a8118e8cdcad3ef1780da9b6290b72127af9c376f93bca2286ae9",
+  "package-lock.json": "dc859e15ddf15f0d32a6f7eae0d085de64b464c2c6b7c986eeefd677acde0b80",
+  "package.json": "62f12b5a5e84e6a4687e11594eaeed99885edc1b882cddf43614a53d8ff5d4d6",
   "panel/THIRD_PARTY_NOTICES.txt": "991f108cf9b45856e7f9864d918cb66c1f6f9ab41f18dd885f0c95bf8aa10d12",
   "panel/index.html": "a6bd2ff29d8416ec53d3b3b0f572d4278b75a3be8ad24c8cbb3459df520bfe74",
   "panel/main.js": "616f09741642b2e3598fa0677e7fef28ca2b2f9528ec364fe28c161391c83c8c",
@@ -11,6 +11,7 @@
   "panel/接続/パネル状態.js": "2940c531def4e18e2ad73c62d9c17f6a2fa15e627260f0e43a446363fd3a1711",
   "panel/画面/接続パネル.vue": "5a735a2cff61484d957f6cf32b12c49699193ca98ef46c0529f3b2fa0c6becbb",
   "panel/画面/機能切替.vue": "1cd911c0dac6c2f3fc14c810c5c4bcbdb8d54e0f02959b3d65b0a7fa459051f2",
-  "scripts/build-panel.mjs": "187a9c9a943f5f226e0bc17bc8130da8ce852c3c2b524f216c6b5327b1afe973",
-  "scripts/verify-panel.mjs": "dbe9f4dd8f3df7d41d1e04bcabc8a76932325a63700ebd930e0bc3f293b37619"
+  "scripts/build-panel.mjs": "a36d2d85a101968d9c3c5a300208c5be297cc3697a653840cadcede8ac232b3c",
+  "scripts/verify-lock.mjs": "d88f888bf600d543ee6ed93382524b4268f02537e15f6ca156a99ee30a540670",
+  "scripts/verify-panel.mjs": "f48218010343c69aeb7d13e3180931ce3c6f581c04ec025fb03d3786aedebb08"
 }

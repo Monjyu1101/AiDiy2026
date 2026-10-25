@@ -16,7 +16,7 @@ import { cp, mkdtemp, readFile, writeFile, symlink, rm } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -31,7 +31,7 @@ test('依存更新後は実ビルドで manifest を揃え、ソースと配布�
     assert.equal(run('verify-panel.mjs').status, 0);
     const lockPath = join(folder, 'package-lock.json');
     const lock = JSON.parse(await readFile(lockPath, 'utf8'));
-    lock.packages['node_modules/electron'].version += '-setup-fixture';
+    lock.packages['node_modules/electron'].license += '-setup-fixture';
     await writeFile(lockPath, JSON.stringify(lock, null, 2) + '\n');
     assert.equal(run('verify-panel.mjs').status, 1, 'lock の更新だけでは古い manifest を承認しない');
     const built = run('build-panel.mjs');
@@ -46,6 +46,16 @@ test('依存更新後は実ビルドで manifest を揃え、ソースと配布�
       await writeFile(path, original);
       assert.equal(run('verify-panel.mjs').status, 0);
     }
+    // manifest のハッシュだけが一致しても、欠けた optional peer は承認しない。
+    delete lock.packages['node_modules/@discordjs/voice/node_modules/opusscript'];
+    await writeFile(lockPath, JSON.stringify(lock, null, 2) + '\n');
+    assert.equal(run('build-panel.mjs').status, 1, '不正 lock から配布物を再生成しない');
+    const rehash = spawnSync(process.execPath, ['--input-type=module', '-e',
+      `import { 配布物一覧 } from ${JSON.stringify(pathToFileURL(join(folder, 'scripts/verify-panel.mjs')).href)}; ` +
+      `import { writeFile } from 'node:fs/promises'; await writeFile(${JSON.stringify(join(folder, 'panel/build-manifest.json'))}, JSON.stringify(await 配布物一覧()));`
+    ], { encoding: 'utf8' });
+    assert.equal(rehash.status, 0, rehash.stderr);
+    assert.equal(run('verify-panel.mjs').status, 1, 'hash の再承認で依存欠落を隠せない');
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
