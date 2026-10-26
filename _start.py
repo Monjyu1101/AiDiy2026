@@ -270,9 +270,12 @@ def get_npm_command() -> str | None:
     candidates = [f"{FRONTEND_COMMAND}.cmd", FRONTEND_COMMAND] if sys.platform == "win32" else [FRONTEND_COMMAND]
     for candidate in candidates:
         try:
-            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True)
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=15, check=True)
             return candidate
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
+            print_warning(f"{candidate} のバージョン確認が15秒でタイムアウトしました。")
+            continue
+        except (subprocess.CalledProcessError, FileNotFoundError):
             continue
     return None
 
@@ -688,7 +691,7 @@ def validate_initial_environment(
 
     if web_enabled or avatar_enabled:
         if npm_command is None:
-            print_error("npm コマンドが見つかりません (Node.js をインストールしてください)")
+            print_error("npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)")
             has_error = True
         else:
             print_success(f"npm: OK ({npm_command})")
@@ -757,8 +760,8 @@ def validate_initial_environment(
 
 def ensure_optional_service_ready(name: str, npm_command: str | None) -> bool:
     if npm_command is None:
-        print_warning(f"{name}: npm コマンドが見つからないため起動をスキップします")
-        print_info("  対応例: Node.js をインストールしてください")
+        print_warning(f"{name}: npm を確認できないため起動をスキップします")
+        print_info("  Node.js / npm の導入状態と、直前のタイムアウト表示を確認してください")
         return False
     ok, detail = AVATAR.check_environment()
     if ok:
@@ -814,12 +817,12 @@ def start_service(
             process = SERVER.start_apps()
         elif name == "フロントエンド(Web)":
             if npm_command is None:
-                print_error("フロントエンド(Web): npm コマンドが見つかりません")
+                print_error("フロントエンド(Web): npm を確認できません (未導入・実行失敗・タイムアウト)")
                 return False
             process = WEB.start(npm_command)
         elif name == "フロントエンド(Avatar)":
             if npm_command is None:
-                print_error("フロントエンド(Avatar): npm コマンドが見つかりません")
+                print_error("フロントエンド(Avatar): npm を確認できません (未導入・実行失敗・タイムアウト)")
                 return False
             process = AVATAR.start(npm_command)
         elif name == "バックエンド(Diag)":

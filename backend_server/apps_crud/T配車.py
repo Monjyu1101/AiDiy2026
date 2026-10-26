@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, Dict
 import apps_models as models, apps_schema as schemas
 from apps_crud.utils import create_audit_fields, update_audit_fields
+from apps_crud.日時検証 import 日時範囲検証
 from log_config import get_logger
 import datetime
 import random
@@ -30,6 +31,8 @@ def create_T配車(db: Session, 配車: schemas.T配車Create, 認証情報: Opt
     """配車データを作成（配車伝票IDは必須、ルーター側で採番済み）"""
     if not 配車.配車伝票ID:
         raise ValueError("配車伝票IDが指定されていません")
+
+    日時範囲検証(配車.配車開始日時, 配車.配車終了日時)
 
     audit = create_audit_fields(認証情報)
 
@@ -56,6 +59,10 @@ def update_T配車(db: Session, 配車伝票ID: str, 配車: schemas.T配車Upda
         return None
 
     update_data = 配車.model_dump(exclude_unset=True)
+    日時範囲検証(
+        update_data.get("配車開始日時", db_配車.配車開始日時),
+        update_data.get("配車終了日時", db_配車.配車終了日時),
+    )
     audit = update_audit_fields(認証情報)
 
     for key, value in update_data.items():

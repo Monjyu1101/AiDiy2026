@@ -47,7 +47,7 @@ class BackupLocalTest(unittest.TestCase):
     def write(self, relative, content="fixture\n", mtime=1_800_000_000):
         path = self.root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8", newline="")
         os.utime(path, (mtime, mtime))
         return path
 
@@ -135,6 +135,16 @@ class BackupLocalTest(unittest.TestCase):
         self.assertNotIn("backup", folder_status.規則["backupDirectories"])
         with self.assertRaises(ValueError):
             folder_status.状態走査(self.root, ".backup_local")
+
+    def test_exclusion_is_relative_to_selected_project(self):
+        for ancestor in ("temp", "log", "_AIDIY/aidiy_code"):
+            with self.subTest(ancestor=ancestor):
+                project = self.root / ancestor / "project"
+                self.write(f"{ancestor}/project/main.txt")
+                self.write(f"{ancestor}/project/temp/ignored.txt")
+                self.write(f"{ancestor}/project/_AIDIY/aidiy_code/ignored.md")
+                scanned = self.native._全ファイルスキャン(str(project))
+                self.assertEqual({item["パス"] for item in scanned}, {"main.txt"})
 
 
 if __name__ == "__main__":

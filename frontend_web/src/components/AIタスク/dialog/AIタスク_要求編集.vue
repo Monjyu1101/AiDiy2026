@@ -838,6 +838,7 @@ const 登録 = async () => {
   font-weight: 600;
   font-size: 13px;
   text-align: right;
+  overflow-wrap: anywhere;
   padding: 6px 10px;
   border: 1px solid rgba(93, 68, 168, 0.85);
   background: linear-gradient(135deg, rgba(55, 71, 79, 0.98), rgba(70, 104, 205, 0.74));

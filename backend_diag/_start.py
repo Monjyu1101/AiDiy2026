@@ -16,9 +16,11 @@ def check_environment():
     try:
         version = subprocess.run([node, '--version'], stdin=subprocess.DEVNULL, capture_output=True, text=True,
                                  creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0,
-                                 timeout=5, check=True).stdout.strip()
+                                 timeout=15, check=True).stdout.strip()
         if int(version.lstrip('v').split('.')[0]) < 18:
             return False, 'Node.js 18 以降が必要です: https://nodejs.org/'
+    except subprocess.TimeoutExpired:
+        return False, 'Node.js のバージョン確認が15秒でタイムアウトしました。'
     except (ValueError, OSError, subprocess.SubprocessError):
         return False, 'Node.js のバージョンを確認できません。'
     return True, 'Node.js / Electron またはブラウザ / AIコア不要'
@@ -38,7 +40,7 @@ def run_headless():
 
 def launch_gui():
     """全体起動の診断選択から呼ぶ。画面を切り離して起動し、表示準備の完了で戻る。
-    --auto により、画面側で保存済みの起動設定による「設定起動」を自動実行する。"""
+    --auto により、画面側で保存済みの起動設定による「一括起動」を自動実行する。"""
     node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
     if not node:
         raise RuntimeError('Node.js が見つかりません: https://nodejs.org/')

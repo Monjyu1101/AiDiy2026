@@ -14,13 +14,15 @@ import asyncio
 import json
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from log_config import get_logger
 from tools_proc.code_agents import CodeAgentsError
 from tools_proc.conversation_history import run_with_history
 from tools_proc.tool_availability import availability_status
+from tools_proc.request_lifetime import ClientDisconnected, run_until_disconnect
 
 logger = get_logger(__name__)
 
@@ -224,7 +226,7 @@ def create_router(code_agents) -> APIRouter:
         }
 
     @router.post("/aidiy_code_agents/{method_name}", summary="コードエージェント実行")
-    async def http_agents(method_name: str, req: AgentsRequest = AgentsRequest()) -> dict:
+    async def http_agents(method_name: str, request: Request, req: AgentsRequest = AgentsRequest()) -> dict:
         """
         | method_name | 説明 |
         |---|---|
@@ -237,7 +239,7 @@ def create_router(code_agents) -> APIRouter:
                 info = {**info, **availability_status("Code Agents", code_agents.version_info)}
                 return info if isinstance(info, dict) else {"result": info}
             elif method_name == "run":
-                result = await run_with_history(
+                result = await run_until_disconnect(request, run_with_history(
                     code_agents.run_async, "code",
                     prompt=req.prompt,
                     project_path=req.project_path,
@@ -251,10 +253,13 @@ def create_router(code_agents) -> APIRouter:
                     resume=req.resume,
                     timeout_sec=req.timeout_sec,
                     self_check_loop=req.self_check_loop,
-                )
+                ))
                 return result
             else:
                 return {"error": f"未知のメソッド: {method_name}"}
+        except ClientDisconnected:
+            logger.info("http_agents: 呼び出し元の切断により実行を中止しました")
+            return JSONResponse(status_code=499, content={"status": "NG", "result": "実行がキャンセルされました。"})
         except Exception as e:
             logger.warning(f"http_agents [{method_name}] error: {e}")
             return {"error": str(e)}

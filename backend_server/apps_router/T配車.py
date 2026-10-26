@@ -101,7 +101,11 @@ def create_T配車(
         return schemas.ResponseBase(status="NG", message="この配車伝票IDは既に登録されています", error={"code": "DUPLICATE"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
-    item = crud.create_T配車(db, request, 認証情報=認証情報)
+    try:
+        item = crud.create_T配車(db, request, 認証情報=認証情報)
+    except ValueError as exc:
+        db.rollback()
+        return schemas.ResponseBase(status="NG", message=str(exc), error={"code": "VALIDATION_ERROR"})
     return schemas.ResponseBase(
         status="OK",
         message=f"配車を作成しました（伝票ID: {request.配車伝票ID}）",
@@ -120,7 +124,11 @@ def update_T配車(
         return schemas.ResponseBase(status="NG", message="指定された配車伝票が見つかりません", error={"code": "NOT_FOUND"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
-    updated_item = crud.update_T配車(db, 配車伝票ID, request, 認証情報=認証情報)
+    try:
+        updated_item = crud.update_T配車(db, 配車伝票ID, request, 認証情報=認証情報)
+    except ValueError as exc:
+        db.rollback()
+        return schemas.ResponseBase(status="NG", message=str(exc), error={"code": "VALIDATION_ERROR"})
 
     return schemas.ResponseBase(
         status="OK",

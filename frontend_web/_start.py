@@ -78,9 +78,12 @@ def get_npm_command() -> str | None:
     for candidate in candidates:
         try:
             # Diag の停止要求用パイプを npm の確認処理へ継承させない。
-            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True)
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=15, check=True)
             return candidate
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
+            print_warning(f"{candidate} のバージョン確認が15秒でタイムアウトしました。")
+            continue
+        except (subprocess.CalledProcessError, FileNotFoundError):
             continue
     return None
 
@@ -104,7 +107,7 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
 
 def check_environment() -> tuple[bool, str]:
     if get_npm_command() is None:
-        return False, "npm コマンドが見つかりません (Node.js をインストールしてください)"
+        return False, "npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)"
     return check_npm_project_environment(FRONTEND_WEB_DIR)
 
 
@@ -128,7 +131,7 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
 def start(npm_command: str | None = None) -> subprocess.Popen[bytes]:
     npm_command = npm_command or get_npm_command()
     if npm_command is None:
-        raise RuntimeError("npm コマンドが見つかりません")
+        raise RuntimeError("npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)")
     return launch_process(
         "フロントエンド(Web)",
         [npm_command, "run", "dev", "--", "--port", str(PORT_WEB)],

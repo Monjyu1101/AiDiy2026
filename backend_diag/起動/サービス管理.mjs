@@ -53,7 +53,7 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
  async function pythonCommand(){
   if(python)return [python,[]];
   for(const [command,args] of [[process.env.DIAG_START_PYTHON||'python',[]],['python3',[]],['py',['-3']]]){
-   if(await new Promise(resolve=>execFile(command,[...args,'--version'],{windowsHide:true,timeout:5000},(error,stdout)=>resolve(!error&&/^Python 3\./.test(stdout.trim())))))return [command,args];
+   if(await new Promise(resolve=>execFile(command,[...args,'--version'],{windowsHide:true,timeout:15000},(error,stdout)=>resolve(!error&&/^Python 3\./.test(stdout.trim())))))return [command,args];
   }throw failure('Python 3 が見つかりません。Python を導入してターミナルを開き直してください。',503);
  }
  async function stop(id,{cancel=true}={}){
@@ -109,7 +109,7 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
  async function restart(id,{revision=++startRevision}={}){
   checkRevision(revision);
   await load();await writing.catch(()=>{});checkRevision(revision);if(closed)throw failure('起動画面を終了しています。',409);if(busy||stopping)throw failure('起動・停止処理の完了を待ってください。',409);
-  if(!id){if(hasOwned()||(await ports()).some(item=>item.開放!==false))throw failure('稼働中または未確認の機能があります。強制停止してから設定起動してください。',409);checkRevision(revision);if(busy||stopping||closed)throw failure('起動・停止処理の完了を待ってください。',409);}
+  if(!id){if(hasOwned()||(await ports()).some(item=>item.開放!==false))throw failure('稼働中または未確認の機能があります。強制停止してから一括起動してください。',409);checkRevision(revision);if(busy||stopping||closed)throw failure('起動・停止処理の完了を待ってください。',409);}
   const ids=id?[targetFor(id).id]:targets.filter(target=>settings[target.id].起動対象).map(target=>target.id);
   if(!ids.length)throw failure('起動対象を選択してください。');
   if(id){const old=logs.get(id)||{text:'',offset:0};logs.set(id,{text:'',offset:old.offset+old.text.length+1});}

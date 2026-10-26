@@ -21,6 +21,10 @@ test('GUI/no version and Windows wrappers only discover',async()=>{
 test('safe actual Node version',async()=>{
  const result=await probe({id:'node',commands:['node'],version_args:['--version']});assert.equal(result.状態,'OK');assert.equal(result.バージョン,process.versions.node);
 });
+test('default deadline accepts a version command taking longer than five seconds',async()=>{
+ const result=await fixture('setTimeout(()=>console.log("1.2.3"),6000)',{timeout:undefined});
+ assert.equal(result.状態,'OK');assert.equal(result.バージョン,'1.2.3');
+});
 test('failure, timeout and output caps',async()=>{
  assert.equal((await fixture('process.exit(9)')).状態,'NG');
  assert.match((await fixture('setInterval(()=>{},1000)',{timeout:250})).説明,/タイムアウト/);

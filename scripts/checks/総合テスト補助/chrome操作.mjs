@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 /**
  * Web・Avatar総合テスト用の aidiy_chrome_devtools（Tools 8095 の HTTP API）呼び出し補助。
- * Diagの設定起動でToolsが待受中であることが前提。認証情報は画像・ログへ出さない。
+ * Diagの一括起動でToolsが待受中であることが前提。認証情報は画像・ログへ出さない。
  *
  * CLI:   node scripts/checks/総合テスト補助/chrome操作.mjs <method> '<json>'
  *        node scripts/checks/総合テスト補助/chrome操作.mjs prepare        … 最大化＋1920x945
@@ -56,8 +56,10 @@ export async function prepare(tabId = TAB) {
 
 const BOOK_DOCUMENTS = Object.freeze({
   'frontend_web-AiDiy': 'セルフテスト,frontend_web,AiDiy編',
-  'frontend_web-taskteam': 'セルフテスト,frontend_web,taskteam編',
-  'frontend_web-業務アプリ': 'セルフテスト,frontend_web,業務アプリ編',
+  'frontend_web-AIタスク': 'セルフテスト,frontend_web,AIタスク編',
+  'frontend_web-AIチーム': 'セルフテスト,frontend_web,AIチーム編',
+  'frontend_web-配車管理': 'セルフテスト,frontend_web,配車管理編',
+  'frontend_web-生産・在庫管理': 'セルフテスト,frontend_web,生産・在庫管理編',
   'aidiy_avatar-Electron実行': 'セルフテスト,aidiy_avatar,Electron実行編',
   'aidiy_avatar-Web実行': 'セルフテスト,aidiy_avatar,Web実行編',
 });
@@ -72,7 +74,16 @@ const evDir = () => {
 export async function shot(no, title, caseId, note = '') {
   if (!RUN_ID) throw new Error('RUN_ID を指定してください');
   mkdirSync(evDir(), { recursive: true });
-  const file = `${RUN_ID}__${BOOK}_${no}_${title}画面.png`;
+  const shortBook = {
+    'frontend_web-AiDiy': 'AiDiy',
+    'aidiy_avatar-Electron実行': 'Avatar-Electron',
+    'aidiy_avatar-Web実行': 'Avatar-Web',
+    'frontend_web-配車管理': '配車管理',
+    'frontend_web-生産・在庫管理': '生産在庫',
+    'frontend_web-AIタスク': 'AIタスク',
+    'frontend_web-AIチーム': 'AIチーム',
+  }[BOOK];
+  const file = `${shortBook}_${no}_${title}.png`;
   const path = `${evDir()}/${file}`;
   if (existsSync(path)) throw new Error(`既存画像を上書きしません: ${file}`);
   await call('screenshot', { save_path: path });

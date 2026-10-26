@@ -92,10 +92,10 @@ try{
  assert.equal(await evaluate(`${browserOption}.checked`),false,'Web のブラウザ設定を再読込後も保持する');
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Local')).click()`);await until(`document.querySelector('.start-settings input')?.checked`);
  await evaluate(`[...document.querySelectorAll('.start-targets button')].find(button=>button.textContent.includes('Web')).click()`);await until(`document.querySelector('.start-console-heading strong')?.textContent==='Web コンソール'`);
- openPorts.clear();await until(`document.querySelector('#run').textContent==='設定起動'&&!document.querySelector('#run').disabled`);
+ openPorts.clear();await until(`document.querySelector('#run').textContent==='一括起動'&&!document.querySelector('#run').disabled`);
  await evaluate(`document.querySelector('#run').click()`);
  await until(`document.querySelectorAll('.start-targets button[data-tone=stopped]').length===6`);
- assert.equal(await evaluate(`Boolean(document.querySelector('.start-mini'))`),false,'設定起動ではミニへ自動切替しない');
+ assert.equal(await evaluate(`Boolean(document.querySelector('.start-mini'))`),false,'一括起動ではミニへ自動切替しない');
  await capture('start-waiting-tabs');
  for(const [index,name] of ['Local','Tools / MCP','Core','Apps','Task / Team','Web'].entries()){
   for(let attempt=0;children.length<=index&&attempt<140;attempt++)await sleep(50);
@@ -176,7 +176,7 @@ try{
  assert.equal(await evaluate(`document.querySelector('.start-console').clientHeight>100`),true);
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:850,deviceScaleFactor:1,mobile:false});
  await until(`document.querySelector('#run').textContent==='強制停止'&&!document.querySelector('#run').disabled`);
- await click('強制停止');await until(`document.querySelector('#run').textContent==='設定起動'&&!document.querySelector('#run').disabled`);
+ await click('強制停止');await until(`document.querySelector('#run').textContent==='一括起動'&&!document.querySelector('#run').disabled`);
  assert.deepEqual(stopCalls,['web','taskteam','apps','core','tools','local']);assert.ok(children.every(child=>child.closed));
  assert.equal(openPorts.size,0);await capture('start-all-stopped');
  assert.deepEqual(errors,[]);console.log('起動画面: 起動タブの追従・新着ログの最下部表示・手動選択保持・コピーと停止・ミニ表示・384/390/1280px表示 OK');

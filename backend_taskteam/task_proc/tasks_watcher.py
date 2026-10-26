@@ -68,6 +68,20 @@ from . import tasks_db
 # 利用者が原因を直すまで待つ。1 周期でも成功すれば数え直す。
 繰り返し自動復旧上限 = 3
 
+# AI が完了を報告してDBのPIDが消えても、HTTP応答と後処理は残り得る。
+# 起動時のPopenを保持し、前周期の実プロセス終了前に明細をリセットしない。
+_所有明細プロセス: dict[str, list[subprocess.Popen]] = {}
+
+
+def _前周期の処理が残る(タスクID: str) -> bool:
+    for key, processes in list(_所有明細プロセス.items()):
+        alive = [proc for proc in processes if proc.poll() is None]
+        if alive:
+            _所有明細プロセス[key] = alive
+        else:
+            _所有明細プロセス.pop(key, None)
+    return bool(_所有明細プロセス.get(タスクID))
+
 # 実行開始条件は hh:mm が変わった確認回だけ処理する（毎分 1 回）
 _前回確認分 = ""
 # エラーで終わった周期から自動で再開した連続回数（タスクID 単位）。
@@ -254,6 +268,7 @@ def _明細実行開始(行: dict, logger: logging.Logger) -> None:
         creationflags=creationflags,
         env=_サブプロセス環境(),
     )
+    _所有明細プロセス.setdefault(str(タスクID), []).append(proc)
     tasks_db.明細実行開始記録(タスクID, 明細SEQ, proc.pid)
     logger.info(
         f"ステップ実行を開始しました: {タスクID} SEQ={明細SEQ} タイプ={タイプ} "
@@ -506,6 +521,8 @@ def _即時実行条件確認(logger: logging.Logger) -> None:
         利用者ID = str(行["利用者ID"])
         タスクID = str(行["タスクID"])
         try:
+            if _前周期の処理が残る(タスクID):
+                continue
             if tasks_db.タスク発火(タスクID):
                 logger.info(f"即時実行のため待機に戻しました: {利用者ID}/{タスクID}")
         except Exception:
@@ -602,6 +619,11 @@ def _実行条件確認(logger: logging.Logger) -> None:
                     次回送り()  # 変化なし: 発火せず次周期へ
                     continue
 
+            if _前周期の処理が残る(タスクID):
+                # 報告済みでも呼出元の後処理が終わるまで次周期へ進めない。
+                # 予定を保持し、次の監視で終了を確認してから発火する。
+                continue
+
             if not tasks_db.タスク発火(タスクID, エラー再開=エラー再開):
                 # 明細が実行途中など: 発火せずに次周期へスキップ（消さない）
                 次回送り()
@@ -692,6 +714,8 @@ def _未定義タスク通知(タスクID: str, logger: logging.Logger) -> None:
 
 
 def _起動監視1回(logger: logging.Logger) -> None:
+    # 繰り返し要求が無くても終了したPopen参照を定期的に解放する。
+    _前周期の処理が残る("")
     # --- 死んだ PID の解放（残したままだと同一タスクの後続明細が起動できない） ---
     _残存PIDクリーンアップ(logger)
 

@@ -1,8 +1,29 @@
-"""この作業コピーに属する診断ランチャーのみ解除する。"""
+"""この作業コピーに属する診断ランチャーと依存関係を解除する。"""
 from pathlib import Path
 import hashlib
 import secrets
 import importlib.util
+import shutil
+
+
+def cleanup_dependencies(root: Path) -> bool:
+    """配布済みstaticは保持し、再セットアップ可能な依存物だけを削除する。"""
+    root = root.resolve(strict=True)
+    for relative in ('node_modules', 'ui/node_modules'):
+        target = root / relative
+        if not target.exists():
+            continue
+        try:
+            resolved = target.resolve(strict=True)
+            if (target.is_symlink() or getattr(target, 'is_junction', lambda: False)()
+                    or resolved != target or not resolved.is_relative_to(root)):
+                raise ValueError(f'通常フォルダ以外は削除できません: {target}')
+            shutil.rmtree(target)
+            print(f'Diag依存関係を削除しました: {target}')
+        except (OSError, ValueError) as exc:
+            print(f'Diag依存関係の削除に失敗しました: {exc}')
+            return False
+    return True
 
 
 _path_spec = importlib.util.spec_from_file_location('aidiy_diag_cleanup_path', Path(__file__).resolve().parent.parent / 'scripts' / '_setup_path.py')
@@ -32,6 +53,8 @@ def cleanup(choices=None):
         temporary.write_text(secrets.token_hex(16), encoding='utf-8')
         temporary.replace(stop_file)
         if not stop_processes():
+            return False
+        if not cleanup_dependencies(Path(__file__).resolve().parent):
             return False
         for name in ('aidiy_diag', 'aidiy_diag.cmd'):
             launcher = Path.home() / '.local' / 'bin' / name

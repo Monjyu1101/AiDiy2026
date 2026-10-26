@@ -80,7 +80,7 @@ def get_weekly_processes(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    processes = db.query(models.M生産工程).order_by(models.M生産工程.生産工程ID).all()
+    processes = db.query(models.M生産工程).filter(models.M生産工程.有効 == True).order_by(models.M生産工程.生産工程ID).all()
     items = [
         {
             "生産工程ID": process.生産工程ID,

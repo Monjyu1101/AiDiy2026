@@ -197,6 +197,17 @@ def 起動時クリーンアップ(logger: logging.Logger) -> None:
         logger.exception("Aチーム作業の起動時クリーンアップに失敗しました")
 
 
+_依頼プロセス: dict[str, subprocess.Popen] = {}
+
+
+def 準備プロセス停止(依頼ID: str, logger: logging.Logger) -> None:
+    """このサーバーが所有する生存プロセスだけを停止する。"""
+    proc = _依頼プロセス.pop(依頼ID, None)
+    if proc is not None and proc.poll() is None:
+        _プロセス強制停止(proc.pid, logger)
+        proc.wait(timeout=15)
+
+
 def _依頼実行開始(行: dict, logger: logging.Logger) -> None:
     """投入待ち依頼 1 件について入力 JSON を出力し、sub_init.py を起動して PID を記録する。"""
     依頼ID = str(行["依頼ID"])
@@ -239,6 +250,14 @@ def _依頼実行開始(行: dict, logger: logging.Logger) -> None:
             creationflags=creationflags,
             env=_サブプロセス環境(),
         )
+        for key, previous in list(_依頼プロセス.items()):
+            if previous.poll() is not None:
+                _依頼プロセス.pop(key, None)
+        _依頼プロセス[依頼ID] = proc
+        現行 = team_work_db.依頼取得(str(行.get("要員ID", "")), 依頼ID)
+        if not 現行 or 現行["状態"] != "準備中":
+            準備プロセス停止(依頼ID, logger)
+            return
         team_work_db.実行開始記録(依頼ID, proc.pid)
         logger.info(f"チーム依頼のタスク投入を開始しました: {依頼ID} PID={proc.pid}")
     except Exception as e:

@@ -183,7 +183,15 @@ class FfmpegControl:
             raise FfmpegControlError("args_str は文字列で指定してください")
         try:
             # posix=False で Windows パスのバックスラッシュをエスケープ扱いしない
-            return shlex.split(args_str, posix=False)
+            tokens = shlex.split(args_str, posix=False)
+            # subprocess の argv には区切り用の引用符を含めない。
+            # バックスラッシュは維持し、引用されたパス内の空白を1引数に保つ。
+            return [
+                token[1:-1]
+                if len(token) >= 2 and token[0] == token[-1] and token[0] in ('"', "'")
+                else token
+                for token in tokens
+            ]
         except ValueError as e:
             raise FfmpegControlError(f"args_str の解析に失敗しました: {e}") from e
 

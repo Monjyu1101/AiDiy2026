@@ -163,17 +163,31 @@ def _remove_folder_import_cache(folder: str) -> None:
         print_warning(f"__pycache__ ({folder}) の削除に失敗しました: {e}")
 
 
-def _remove_root_python_caches() -> None:
-    """ルート直下と `scripts/` の `__pycache__` を消す（フォルダ別の担当外）。"""
-    targets = [BASE_DIR / "__pycache__"]
-    for relative_path in ROOT_CACHE_SCAN_PATHS:
-        scan_dir = BASE_DIR / relative_path
-        if scan_dir.is_dir():
-            targets.extend(sorted(scan_dir.rglob("__pycache__")))
-    for pycache_dir in targets:
-        if not pycache_dir.is_dir():
-            continue
-        remove_directory(pycache_dir, "__pycache__ (ルート)")
+def _remove_root_python_caches() -> bool:
+    """保存版・Git・リンク先を除き、全階層のPythonキャッシュを最後に掃除する。"""
+    root = BASE_DIR.resolve(strict=True)
+    ok = True
+    def scan_error(error):
+        raise error
+    try:
+        for current, directories, _files in os.walk(root, followlinks=False, onerror=scan_error):
+            for name in list(directories):
+                path = Path(current) / name
+                if name.lower() in {'.git', '.git_local', BACKUP_PATH} or _is_directory_link(path):
+                    directories.remove(name)
+                    continue
+                if name.lower() not in {'__pycache__', '.pytest_cache'}:
+                    continue
+                directories.remove(name)
+                resolved = path.resolve(strict=True)
+                if resolved != path or not resolved.is_relative_to(root) or resolved == root:
+                    raise ValueError(f'キャッシュの削除対象がプロジェクト外です: {path}')
+                if not remove_directory(path, 'Pythonキャッシュ'):
+                    ok = False
+    except (OSError, RuntimeError, ValueError) as exc:
+        print_error(f'Pythonキャッシュの整理に失敗しました: {exc}')
+        return False
+    return ok
 
 
 def _run_folder_cleanup(folder: str, choices: dict) -> bool:
@@ -603,7 +617,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     if (base_dir / BACKUP_PATH).exists():
         choices["backup"] = ask_yes_no(".backup_local フォルダを削除しますか？", default="y")
 
-    choices["diag"] = ask_yes_no("バックエンド(Diag)のランチャーを解除しますか？", default="y")
+    choices["diag"] = ask_yes_no("バックエンド(Diag)のランチャー・依存関係を解除しますか？", default="y")
     choices["npm_uninstall"] = ask_yes_no(
         "グローバルnpmツール(AI CLIツール)をアンインストールしますか？", default="n",
     )
@@ -770,7 +784,8 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
     for folder in IMPORT_CACHE_FOLDERS:
         _remove_folder_import_cache(folder)
-    _remove_root_python_caches()
+    if not _remove_root_python_caches():
+        cleanup_errors.append("全階層のPythonキャッシュ")
 
     print()
     print_header("クリーンアップ完了")

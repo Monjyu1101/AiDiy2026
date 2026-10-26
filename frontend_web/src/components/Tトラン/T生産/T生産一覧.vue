@@ -509,6 +509,37 @@ watch([件数制限, 無効も表示, 開始日付, 終了日付, 生産区分ID
   margin-bottom: 8px;
 }
 
+/* 検索欄より画面が低くても、一覧を潰さず親領域でスクロールする。 */
+.section :deep(.table-wrapper) {
+  min-height: 240px;
+}
+
+@media (max-width: 600px) {
+  .search-panel {
+    width: 100%;
+    --range-width: 100%;
+  }
+  .toolbar-left {
+    width: 100%;
+    min-width: 0;
+  }
+  .detail-label {
+    width: 88px;
+    padding: 8px 4px;
+  }
+  .detail-value {
+    flex: 1;
+    min-width: 0;
+    padding: 4px;
+  }
+  .date-range {
+    flex-wrap: wrap;
+  }
+  .date-input {
+    max-width: 100%;
+  }
+}
+
 .checkbox-label {
   display: flex;
   align-items: center;

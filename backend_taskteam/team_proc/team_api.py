@@ -29,6 +29,7 @@ from . import (
     team_pdca_db,
     team_status_db,
     team_talk_db,
+    team_task_control,
     team_work_db,
 )
 from .config import AIモデル, 設定読込
@@ -542,7 +543,12 @@ async def チーム依頼登録(request: チーム依頼保存要求) -> dict:
 @router.post("/依頼/変更", tags=["チーム依頼"])
 async def チーム依頼変更(request: チーム依頼保存要求) -> dict:
     try:
-        item = team_work_db.依頼変更(_依頼データ(request, 編集中=True), request.操作者())
+        更新 = _依頼データ(request, 編集中=True)
+        現行 = team_work_db.依頼取得(更新["要員ID"], 更新["依頼ID"])
+        if 現行 is None:
+            raise KeyError(更新["依頼ID"])
+        await team_task_control.依頼操作反映(現行, 更新)
+        item = team_work_db.依頼変更(更新, request.操作者())
         return ok(f"依頼 {item['依頼ID']} を変更しました", {"item": item})
     except KeyError:
         return ng("対象依頼が見つかりません")

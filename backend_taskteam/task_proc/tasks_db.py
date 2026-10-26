@@ -1105,6 +1105,12 @@ def 仮タスク登録(
     初期化()
     conn = 接続取得()
     try:
+        # チームの準備中止と同じSQLite書込ロックで投入可否を決める。
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='Aチーム依頼'").fetchone():
+            依頼 = conn.execute('SELECT 状態 FROM "Aチーム依頼" WHERE 依頼ID=?', [タスクID]).fetchone()
+            if 依頼 and 依頼["状態"] != "準備中":
+                raise ValueError("チーム依頼は準備中ではないため、タスク投入を中止しました")
         監査 = _監査項目(利用者ID, 利用者ID)
         監査カラム = ", ".join(監査.keys())
         監査値 = list(監査.values())
@@ -2426,7 +2432,7 @@ def タイムアウト対象一覧(
         now = datetime.now()
         閾値 = (now - timedelta(minutes=制限分)).strftime("%Y-%m-%d %H:%M:%S")
         準備閾値 = (now - timedelta(minutes=準備制限分)).strftime("%Y-%m-%d %H:%M:%S")
-        共通条件 = "開始日時 != '' AND 終了日時 = '' AND 状態 != 'エラー'"
+        共通条件 = "開始日時 != '' AND 終了日時 = '' AND 実行有効 = 1 AND 状態 NOT IN ('エラー', '中止', '完了', '済')"
         結果: list[dict] = []
         rows = conn.execute(
             f"SELECT 利用者ID, タスクID, '' AS 明細SEQ, 状態, PID, 開始日時 "
@@ -2440,7 +2446,10 @@ def タイムアウト対象一覧(
             結果.append({"テーブル": AIタスク要求テーブル, "制限分": 適用, **dict(row)})
         rows = conn.execute(
             f"SELECT タスクID, 明細SEQ, 状態, PID, 開始日時, 予測分数 "
-            f"FROM {AIタスク明細テーブル} WHERE {共通条件}",
+            f"FROM {AIタスク明細テーブル} WHERE {共通条件} AND 状態 = '実行中' "
+            f"AND EXISTS (SELECT 1 FROM {AIタスク要求テーブル} r "
+            f"WHERE r.タスクID = {AIタスク明細テーブル}.タスクID "
+            "AND r.実行有効 = 1 AND r.状態 NOT IN ('中止', '完了', '済', 'エラー'))",
         ).fetchall()
         for row in rows:
             適用 = 明細タイムアウト分(row["予測分数"], 明細最低分, 明細倍率)
@@ -2533,8 +2542,9 @@ def タスク本登録(
     初期化()
     conn = 接続取得()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         仮 = _タスク要求取得(conn, タスクID)
-        if str(仮.get("状態", "")) == "エラー":
+        if str(仮.get("状態", "")) in ("エラー", "中止"):
             return 仮
         # 所有者は仮登録の値を引き継ぐ（置き換え後も利用者IDが変わらないようにする）
         利用者ID = str(仮.get("利用者ID", "")) or 利用者ID
@@ -2615,7 +2625,7 @@ def タスク失敗(タスクID: str, メッセージ: str) -> dict:
         conn.execute(
             f"UPDATE {AIタスク要求テーブル} SET 状態 = 'エラー', 実行有効 = 0, "
             "応答タイトル = ?, 応答内容 = ?, "
-            "PID = '', 終了日時 = ?, 更新日時 = ? WHERE タスクID = ?",
+            "PID = '', 終了日時 = ?, 更新日時 = ? WHERE タスクID = ? AND 状態 != '中止'",
             ["エラー", f"[エラー] {メッセージ}", now, now, タスクID],
         )
         conn.commit()

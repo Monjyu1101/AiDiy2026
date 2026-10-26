@@ -101,7 +101,11 @@ def create_T生産(
         return schemas.ResponseBase(status="NG", message="この生産伝票IDは既に登録されています", error={"code": "DUPLICATE"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
-    行一覧 = crud.create_T生産(db, request, 認証情報=認証情報)
+    try:
+        行一覧 = crud.create_T生産(db, request, 認証情報=認証情報)
+    except ValueError as exc:
+        db.rollback()
+        return schemas.ResponseBase(status="NG", message=str(exc), error={"code": "VALIDATION_ERROR"})
     return schemas.ResponseBase(
         status="OK",
         message=f"生産を作成しました（伝票ID: {request.生産伝票ID}）",
@@ -121,7 +125,11 @@ def update_T生産(
         return schemas.ResponseBase(status="NG", message="指定された生産伝票が見つかりません", error={"code": "NOT_FOUND"})
 
     認証情報 = {"利用者ID": 現在利用者.利用者ID, "利用者名": 現在利用者.利用者名}
-    行一覧 = crud.update_T生産(db, 生産伝票ID, request, 認証情報=認証情報)
+    try:
+        行一覧 = crud.update_T生産(db, 生産伝票ID, request, 認証情報=認証情報)
+    except ValueError as exc:
+        db.rollback()
+        return schemas.ResponseBase(status="NG", message=str(exc), error={"code": "VALIDATION_ERROR"})
 
     return schemas.ResponseBase(
         status="OK",

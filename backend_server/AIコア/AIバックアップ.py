@@ -160,7 +160,9 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
     # 高速ルックアップ用セット
     _除外フォルダセット = set(_バックアップ除外フォルダ)
     for root, dirs, file_names in os.walk(workspace_root):
-        root_parts = os.path.normpath(root).split(os.sep)
+        # 除外は選択したプロジェクトの内側だけに適用する。
+        # 親が temp/log 等でも、明示された作業フォルダを丸ごと除外しない。
+        root_parts = os.path.relpath(root, workspace_root).split(os.sep)
         if any(pair in _バックアップ除外フォルダ組 for pair in zip(root_parts, root_parts[1:])):
             dirs[:] = []
             continue
@@ -168,7 +170,7 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
         dirs[:] = [
             d for d in dirs
             if d not in _除外フォルダセット and not d.startswith(".")
-            and (os.path.basename(root), d) not in _バックアップ除外フォルダ組
+            and (root_parts[-1], d) not in _バックアップ除外フォルダ組
         ]
         for file_name in file_names:
             # Office の一時ロックファイルは、件数判定・差分判定・コピーのすべてから除外する。
@@ -186,7 +188,7 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
 
             # パス構成要素の完全一致チェック（サブストリング一致は使わない）
             # 例: "log" in "qAlertDialog.vue" は True になるが、これは誤除外
-            path_parts = os.path.normpath(file_path).split(os.sep)
+            path_parts = os.path.relpath(file_path, workspace_root).split(os.sep)
             if any(part in _除外フォルダセット for part in path_parts):
                 continue
             if file_name in _バックアップ除外ファイル or file_name.endswith(_バックアップ除外拡張子):

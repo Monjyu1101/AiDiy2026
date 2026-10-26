@@ -82,7 +82,7 @@ def get_daily_vehicles(
     db: Session = Depends(deps.get_db),
     現在利用者: models.C利用者 = Depends(deps.get_現在利用者)
 ):
-    vehicles = db.query(models.M車両).order_by(models.M車両.車両ID).all()
+    vehicles = db.query(models.M車両).filter(models.M車両.有効 == True).order_by(models.M車両.車両ID).all()
     items = [
         {
             "車両ID": vehicle.車両ID,

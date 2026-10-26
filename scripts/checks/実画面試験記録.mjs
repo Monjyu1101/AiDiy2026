@@ -11,10 +11,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const BOOK_NAMES = Object.freeze({
-  system: 'aidiy_diag-システム起動',
-  apps: 'aidiy_diag-アプリ起動',
-  environment: 'aidiy_diag-環境確認',
-  ide: 'ide-操作',
+  system: 'Diag-システム起動',
+  apps: 'Diag-アプリ起動',
+  environment: 'Diag-環境確認',
+  ide: 'IDE',
 });
 const BOOK_DOCUMENTS = Object.freeze({
   system: 'セルフテスト,aidiy_diag,システム起動編',

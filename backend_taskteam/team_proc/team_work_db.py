@@ -519,6 +519,21 @@ def 実行開始記録(依頼ID: str, pid: int) -> None:
         conn.close()
 
 
+def 準備停止確保(依頼ID: str) -> bool:
+    """遅れて届くタスク投入より先に停止を確定する。"""
+    conn = 接続取得()
+    try:
+        cursor = conn.execute(
+            f"UPDATE {依頼テーブル} SET 状態='中止', 実行有効=0, PID='', 終了日時=?, 更新日時=? "
+            "WHERE 依頼ID=? AND 状態 IN ('準備開始','準備中')",
+            [_現在日時(), _現在日時(), 依頼ID],
+        )
+        conn.commit()
+        return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
 def 投入成功記録(依頼ID: str, タスクID: str) -> None:
     """aidiy_task_agentsへの投入成功を依頼行へ反映する。"""
     now = _現在日時()
@@ -555,7 +570,7 @@ def 投入失敗記録(依頼ID: str, メッセージ: str) -> None:
                    更新日時 = ?, 更新利用者ID = 'system',
                    更新利用者名 = 'システム', 更新端末ID = 'backend_team'
              WHERE 依頼ID = ?
-               AND (状態 = '準備中' OR PID != '')
+               AND 状態 = '準備中'
             """,
             [now, メッセージ[:2000], now, 依頼ID],
         )

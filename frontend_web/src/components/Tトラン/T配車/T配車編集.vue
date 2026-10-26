@@ -161,6 +161,14 @@ const validateForm = () => {
     }
   });
 
+  if (form.配車開始日時 && form.配車終了日時 &&
+      new Date(form.配車終了日時).getTime() < new Date(form.配車開始日時).getTime()) {
+    errors.配車終了日時 = '終了日時は開始日時以降にしてください。';
+    touched.配車終了日時 = true;
+    isValid = false;
+    if (!firstErrorField) firstErrorField = '配車終了日時';
+  }
+
   if (firstErrorField) {
     const fieldMap = {
       '配車開始日時': 'form-start-datetime',

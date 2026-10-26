@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, Dict
 import apps_models as models, apps_schema as schemas
 from apps_crud.utils import create_audit_fields, update_audit_fields
+from apps_crud.日時検証 import 日時範囲検証
 from log_config import get_logger
 import datetime
 import random
@@ -212,6 +213,8 @@ def create_T生産(db: Session, 生産: schemas.T生産Create, 認証情報: Opt
     if not 生産.生産伝票ID:
         raise ValueError("生産伝票IDが指定されていません")
 
+    日時範囲検証(生産.生産開始日時, 生産.生産終了日時)
+
     audit = create_audit_fields(認証情報)
 
     _create_行一覧(
@@ -255,6 +258,7 @@ def update_T生産(db: Session, 生産伝票ID: str, 生産: schemas.T生産Upda
     生産時間 = 生産.生産時間 if 生産.生産時間 is not None else 見出し.生産時間
     生産開始日時 = 生産.生産開始日時 if 生産.生産開始日時 is not None else 見出し.生産開始日時
     生産終了日時 = 生産.生産終了日時 if 生産.生産終了日時 is not None else 見出し.生産終了日時
+    日時範囲検証(生産開始日時, 生産終了日時)
     生産内容 = 生産.生産内容 if 生産.生産内容 is not None else 見出し.生産内容
     生産備考 = 生産.生産備考 if 生産.生産備考 is not None else 見出し.生産備考
     有効 = 生産.有効 if 生産.有効 is not None else 見出し.有効

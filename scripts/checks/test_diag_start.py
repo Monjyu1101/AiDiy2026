@@ -106,6 +106,18 @@ class StartTests(unittest.TestCase):
                 with patch.object(module.subprocess, 'run') as execute:
                     self.assertIsNotNone(module.get_npm_command())
                 self.assertEqual(execute.call_args.kwargs['stdin'], subprocess.DEVNULL)
+                self.assertEqual(execute.call_args.kwargs['timeout'], 15)
+
+    def test_npm_timeout_is_reported_and_next_candidate_can_succeed(self):
+        for name in ('_start.py', 'frontend_web/_start.py', 'frontend_avatar/_start.py'):
+            with self.subTest(name=name):
+                module = load(ROOT / name)
+                with patch.object(module.sys, 'platform', 'win32'), \
+                        patch.object(module, 'print_warning') as warning, \
+                        patch.object(module.subprocess, 'run', side_effect=[
+                            subprocess.TimeoutExpired('npm.cmd', 15), Mock(returncode=0)]):
+                    self.assertEqual(module.get_npm_command(), 'npm')
+                self.assertIn('15秒でタイムアウト', warning.call_args.args[0])
 
     def test_npm_probe_finishes_while_supervisor_control_pipe_stays_open(self):
         with tempfile.TemporaryDirectory(prefix='diag npm ') as temporary:

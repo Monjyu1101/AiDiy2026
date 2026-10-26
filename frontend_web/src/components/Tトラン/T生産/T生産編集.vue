@@ -418,6 +418,14 @@ const validateForm = () => {
     if (!firstErrorField) firstErrorField = '生産時間';
   }
 
+  if (form.生産開始日時 && form.生産終了日時 &&
+      new Date(form.生産終了日時).getTime() < new Date(form.生産開始日時).getTime()) {
+    errors.生産終了日時 = '終了日時は開始日時以降にしてください。';
+    touched.生産終了日時 = true;
+    isValid = false;
+    if (!firstErrorField) firstErrorField = '生産終了日時';
+  }
+
   if (firstErrorField) {
     const fieldMap: Record<string, string> = {
       '生産開始日時': 'form-start-datetime',

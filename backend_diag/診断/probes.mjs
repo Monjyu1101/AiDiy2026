@@ -10,7 +10,7 @@ import {recordProbeFailure} from '../起動/desktop-log.mjs';
 const activeProbes = new Set();
 let shuttingDown = false;
 export function cancelProbes() { shuttingDown = true; for (const cancel of [...activeProbes]) cancel(); }
-export const TIMEOUT = 5000;
+export const TIMEOUT = 15000;
 export const OUTPUT_LIMIT = 16384;
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const CATALOG_PATH = fileURLToPath(new URL('./catalog.json', import.meta.url));

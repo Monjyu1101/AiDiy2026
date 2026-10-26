@@ -22,6 +22,7 @@
 import json
 import ntpath
 import os
+import re
 import shutil
 import stat
 import sys
@@ -468,11 +469,35 @@ def is_tools_process(process: dict, root: Path, windows: bool) -> bool:
                                for filename in ('mcp_stdio.py', 'tools_main.py')}
 
 
+def is_tools_chrome_process(process: dict, root: Path, windows: bool) -> bool:
+    """通常のChromeには触れず、この配置先の専用プロファイルだけ照合する。"""
+    if (process.get('Name') or '').lower() not in ('chrome.exe', 'chrome', 'google-chrome', 'chromium', 'chromium-browser'):
+        return False
+    try:
+        args = process_arguments(process.get('CommandLine') or '', windows)
+    except ValueError:
+        return False
+    path_api = ntpath if windows else os.path
+    for index, arg in enumerate(args):
+        if arg.startswith('--user-data-dir='):
+            profile = arg.split('=', 1)[1]
+        elif arg == '--user-data-dir' and index + 1 < len(args):
+            profile = args[index + 1]
+        else:
+            continue
+        profile = path_api.normcase(path_api.normpath(profile))
+        parent = path_api.normcase(path_api.normpath(path_api.join(str(root), 'temp')))
+        return (path_api.dirname(profile) == parent
+                and re.fullmatch(r'_chrome_profile(?:_s\d+)?', path_api.basename(profile)) is not None)
+    return False
+
+
 def stop_tools_processes(exclude_pids: frozenset[int] = frozenset()) -> bool:
     """tools の Python / MCP 接続を止める。`exclude_pids`（例: aidiy_code 配下）は対象外。"""
     return stop_matching(lambda p: p.get('ProcessId') not in exclude_pids
-                         and is_tools_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32'),
-                         print_info, print_warning, 'バックエンド(tools) の Python / MCP 接続')
+                         and (is_tools_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32')
+                              or is_tools_chrome_process(p, BACKEND_TOOLS_DIR.resolve(), sys.platform == 'win32')),
+                         print_info, print_warning, 'バックエンド(tools) の Python / MCP 接続・専用Chrome')
 
 
 def cleanup(choices: dict) -> bool:

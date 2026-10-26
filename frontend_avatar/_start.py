@@ -87,9 +87,12 @@ def get_npm_command() -> str | None:
     candidates = [f"{FRONTEND_COMMAND}.cmd", FRONTEND_COMMAND] if sys.platform == "win32" else [FRONTEND_COMMAND]
     for candidate in candidates:
         try:
-            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True, **_hidden_process_options())
+            subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL, capture_output=True, timeout=15, check=True, **_hidden_process_options())
             return candidate
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
+            print_warning(f"{candidate} のバージョン確認が15秒でタイムアウトしました。")
+            continue
+        except (subprocess.CalledProcessError, FileNotFoundError):
             continue
     return None
 
@@ -113,7 +116,7 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
 
 def check_environment() -> tuple[bool, str]:
     if get_npm_command() is None:
-        return False, "npm コマンドが見つかりません (Node.js をインストールしてください)"
+        return False, "npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)"
     return check_npm_project_environment(FRONTEND_AVATAR_DIR)
 
 

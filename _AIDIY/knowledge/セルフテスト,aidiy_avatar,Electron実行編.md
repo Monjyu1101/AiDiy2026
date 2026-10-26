@@ -1,12 +1,18 @@
 # aidiy_avatar Electron実行編 — 操作ガイドとセルフテスト
 
+> 本書はセルフテスト結果を、操作説明・解説書としても読みやすく整理しています。再テスト後は結果・注意書き・エビデンスを更新し、章立て・操作手順・図解の配置などの様式を維持します。
+
 > 文書: `セルフテスト,aidiy_avatar,Electron実行編.md` | 実装: `frontend_avatar/src/AiDiy.vue`, `frontend_avatar/src/components/`, `frontend_avatar/launch.mjs`
 
 ## 総合評価
 
-**2026年10月24日・Windowsで実画面を再試験しました。ログイン、Chat・Code1・Code6・Liveの文字応答、Core再起動後の自動再接続は✅ OKです。** 掲載画面は今回の操作で撮り直しています。
+**総合評価：✅ OK。2026年10月24日・Windowsで実画面で確認しました。ログイン、Chat・Code1・Code6・Liveの文字応答、Core再起動後の自動再接続は✅ OKです。** 掲載画面は上記試験日に撮影したものです。
 
-マイク入力機器はブラウザの機器列挙で0台でした。実マイク入力は **PASS（環境調整が必要・総合判定から除外）** とします。音声の聴取とMac／Linux実機試験は別途確認します。本冊は簡易応答と画面操作の確認で、全機能・全Providerの合格を示すものではありません。
+対象環境はWindowsです。Mac／Linux実機と長時間連続運転は **PASS（環境依存・判定対象外）** とし、今回は未実施です。実行成功とは区別し、NGには数えません。
+
+試験日は各結果に記載しています。文書・画像名の整理日は2026年10月26日であり、試験の再実施日ではありません。
+
+マイク入力機器はブラウザの機器列挙で0台でした。実マイク入力は **PASS（環境依存・判定対象外）** とします。音声の聴取は⏸ 未実施です。本冊は簡易応答と画面操作の確認で、全機能・全プロバイダの合格を示すものではありません。
 
 ## 始める前に
 
@@ -24,11 +30,11 @@
 
 Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。
 
-![Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_101_ログイン.png)
+![Avatar起動直後です。利用者認証を済ませて会話画面へ進みます。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_101_ログイン.png)
 
 コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。
 
-![コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_102_コア操作ボタン.png)
+![コア窓の右側から、ファイル・チャット・番号別のCode窓を開けます。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_102_コア操作ボタン.png)
 
 ## 2. ChatとCodeで会話する
 
@@ -41,15 +47,15 @@ Avatar起動直後です。利用者認証を済ませて会話画面へ進み�
 
 Chatを選んで送信した結果です。入力の下に返答が表示されています。
 
-![Chatを選んで送信した結果です。入力の下に返答が表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_201_Chat応答.png)
+![Chatを選んで送信した結果です。入力の下に返答が表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_201_Chat応答.png)
 
 Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。
 
-![Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_202_Code1応答.png)
+![Code1の返答です。「今日はどんな作業をお手伝いしましょうか？」まで表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_202_Code1応答.png)
 
 Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。
 
-![Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_203_Code6応答.png)
+![Code6の返答です。「今日は何をお手伝いしましょうか？」まで確認しました。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_203_Code6応答.png)
 
 ## 3. Liveで会話する
 
@@ -59,11 +65,11 @@ Code6の返答です。「今日は何をお手伝いしましょうか？」ま
 
 **✅ OK（AE-301）**：初回送信で「おはようございます!今日もよろしくお願いします。」と返答しました。※注意:15s以上待機後送信しました。初回の送信から応答までの厳密な時間は計測していません。Core再起動後の試験では、送信から19秒後の画面取得時に返答を確認しました。再送していません。
 
-Providerはfreeai_live、画面に表示されたモデルはgemini-2.5-flash-native-audio-preview-09-2025、声はZephyrです。ここでは文字の応答を判定しています。
+プロバイダはfreeai_live、画面に表示されたモデルはgemini-2.5-flash-native-audio-preview-09-2025、声はZephyrです。ここでは文字の応答を判定しています。
 
 Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。
 
-![Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_301_Live応答.png)
+![Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつです。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_301_Live応答.png)
 
 ## 4. ファイルを探して中身を見る
 
@@ -75,11 +81,11 @@ Liveでの初回応答です。ChatとLiveの入力は、それぞれ1回ずつ�
 
 File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。
 
-![File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_401_ファイル窓.png)
+![File Managerの一覧です。作業フォルダ内のファイルを選んで閲覧します。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_401_ファイル窓.png)
 
 PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。
 
-![PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_402_画像プレビュー.png)
+![PNGを選択した結果です。撮影したログイン画面がプレビューに表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_402_画像プレビュー.png)
 
 ## 5. 接続が切れたときと終了
 
@@ -93,7 +99,7 @@ Liveの会話文脈は、サーバー側で接続しているLive APIの同じ�
 
 Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。
 
-![Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/aidiy_avatar-Electron実行_501_再接続後Live応答.png)
+![Core再起動後です。接続中に戻り、新しいLiveの返答が1回表示されています。](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_501_再接続後Live応答.png)
 
 終了するときは応答待ちの処理がないことを確認し、使用中の8092のブラウザタブを先に閉じます。その後Avatarを終了します。Avatar終了で8092も停止するため、Web版利用中は終了しません。
 
@@ -102,3 +108,5 @@ Core再起動後です。接続中に戻り、新しいLiveの返答が1回表�
 窓の移動・開始ズーム、表示選択、画像生成、設定保存、ファイル添付、AIタスク・チームの実行は、この冊子の今回の実画面試験には含めません。接続処理の回帰テスト10件とAvatarの型チェックは成功しました。
 
 透明部分へ別アプリが映り込まないよう、撮影用の白い背景窓を背面に置いて撮影しました。画面の内容を合成・修正せず、掲載用には縦横比を保って長辺960px以下へ縮小しています。
+
+[PDF版](./セルフテスト,aidiy_avatar,Electron実行編.pdf)
