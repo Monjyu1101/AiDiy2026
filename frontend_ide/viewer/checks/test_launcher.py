@@ -47,6 +47,24 @@ class LauncherTests(unittest.TestCase):
                     self.assertTrue(load(second, '_cleanup').remove_launcher(ROOT / second))
                     self.assertFalse(paths[second].exists())
 
+    def test_console_replaces_only_this_checkout_legacy_launcher(self):
+        for platform in ('win32', 'linux', 'darwin'):
+            for owned in (True, False):
+                with self.subTest(platform=platform, owned=owned), tempfile.TemporaryDirectory() as temp:
+                    launcher = load('frontend_ide/viewer', 'launcher')
+                    home = Path(temp)
+                    root = home / 'repo' / 'frontend_ide' / 'aidiy_console'
+                    root.mkdir(parents=True)
+                    (root / 'launch.mjs').write_text('// fixture', encoding='utf-8')
+                    old_script = root.parent / 'aidiy_term' / 'launch.mjs' if owned else home / 'other' / 'aidiy_term' / 'launch.mjs'
+                    with patch.object(Path, 'home', return_value=home), patch.object(launcher.sys, 'platform', platform), patch.object(launcher.shutil, 'which', return_value='/fixture/node'), patch.object(launcher, 'ensure_launcher_path', return_value=True):
+                        old = launcher.launcher_path('term')
+                        old.parent.mkdir(parents=True)
+                        old.write_text(launcher.launcher_owner_comment(old_script), encoding='utf-8')
+                        launcher.install_launcher(root, 'console')
+                        self.assertTrue(launcher.launcher_path('console').is_file())
+                        self.assertEqual(old.exists(), not owned)
+
     def test_missing_entry_does_not_overwrite_registered_command(self):
         for folder in ('frontend_ide/viewer', 'frontend_channels'):
             with self.subTest(folder=folder), tempfile.TemporaryDirectory() as temp:

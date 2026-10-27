@@ -115,39 +115,39 @@ onMounted(() => {
 onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect(); input?.dispose(); key?.dispose(); container.value?.removeEventListener('input', startInput, true); container.value?.removeEventListener('paste', startInput, true); resize?.dispose(); cursor?.dispose(); scroll?.dispose(); render?.dispose(); terminal?.dispose(); });
 </script>
 <template>
-  <section class="term-component" :class="{ 'desktop-window': desktop, 'term-waiting': !inputStarted }">
-    <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Term' : 'AiDiy Term')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
+  <section class="console-component" :class="{ 'desktop-window': desktop, 'console-waiting': !inputStarted }">
+    <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Console' : 'AiDiy Console')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`Tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>Tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button :disabled="!connected" title="実行中の処理へ割り込みを送信（キーボードのCtrl+Cはコピー専用）" @click="interrupt">Ctrl+C送信</button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">{{ cli ? '再接続' : '再起動' }}</button></nav></div>
-    <div v-if="!inputStarted" class="term-welcome"><TerminalWelcome kind="term" :icon="icon || '/development/AiDiy.png'" /></div>
-    <div class="term-screen" aria-label="ターミナル"><div ref="container" class="term-viewport"><div v-if="completion" class="term-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="term-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
-    <div class="term-meta"><span :title="cli ? `${cli.name} · ${cli.mode} · モデル指定なし` : completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell}${cli ? ` · ${cli.mode} · モデル指定なし` : ''} · ${status}` }}</span><span :title="'Toolsサーバーの稼働状態'">Tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>
-    <p v-if="error" class="term-error" role="alert">{{ error }}</p>
+    <div v-if="!inputStarted" class="console-welcome"><TerminalWelcome kind="console" :icon="icon || '/development/AiDiy.png'" /></div>
+    <div class="console-screen" aria-label="ターミナル"><div ref="container" class="console-viewport"><div v-if="completion" class="console-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="console-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>
+    <div class="console-meta"><span :title="cli ? `${cli.name} · ${cli.mode} · モデル指定なし` : completionDescription">{{ completion ? 'Tabで補完 · Enterで実行' : `${shell}${cli ? ` · ${cli.mode} · モデル指定なし` : ''} · ${status}` }}</span><span :title="'Toolsサーバーの稼働状態'">Tools {{ !toolsEnabled ? '確認OFF' : toolsOnline ? 'オンライン' : 'オフライン' }}</span></div>
+    <p v-if="error" class="console-error" role="alert">{{ error }}</p>
   </section>
 </template>
 <style scoped>
-.term-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#080b10;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif);container:term-panel / size}
+.console-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#080b10;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif);container:console-panel / size}
 .component-toolbar button{padding:2px 7px;border-color:var(--border);font-size:11px;line-height:1.4;background:transparent}
-.term-welcome{flex:1;min-height:0;overflow:auto;background:var(--surface);container-type:size}
-.term-waiting .term-screen{flex:none;height:84px;max-height:30%;border-top:1px solid var(--border)}
-.term-meta{display:flex;justify-content:space-between;gap:8px;flex:none;padding:2px 8px;color:var(--muted);font-size:10px;border-top:1px solid var(--border)}
-.term-meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.term-meta>span:last-child{flex:none;white-space:nowrap}
-.term-screen{position:relative;flex:1;min-height:0;min-width:0;padding:8px;overflow:hidden}.term-error{color:#ffbac3;margin:6px 10px;font-size:12px}
+.console-welcome{flex:1;min-height:0;overflow:auto;background:var(--surface);container-type:size}
+.console-waiting .console-screen{flex:none;height:84px;max-height:30%;border-top:1px solid var(--border)}
+.console-meta{display:flex;justify-content:space-between;gap:8px;flex:none;padding:2px 8px;color:var(--muted);font-size:10px;border-top:1px solid var(--border)}
+.console-meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.console-meta>span:last-child{flex:none;white-space:nowrap}
+.console-screen{position:relative;flex:1;min-height:0;min-width:0;padding:8px;overflow:hidden}.console-error{color:#ffbac3;margin:6px 10px;font-size:12px}
 /* FitAddonには余白を除いた領域を渡し、小さな画面でも最後の入力行を切らない。 */
-.term-viewport{position:relative;width:100%;height:100%;min-width:0;min-height:0}
-.term-completion{pointer-events:none}.term-ghost-row{position:absolute;z-index:4;white-space:pre;overflow:hidden;font:14px Consolas,"Noto Sans Mono",monospace;color:#77818f;background:#080b10}
+.console-viewport{position:relative;width:100%;height:100%;min-width:0;min-height:0}
+.console-completion{pointer-events:none}.console-ghost-row{position:absolute;z-index:4;white-space:pre;overflow:hidden;font:14px Consolas,"Noto Sans Mono",monospace;color:#77818f;background:#080b10}
 /* 単独窓・IDE内タブとも、低い時は起動案内より端末の数行を優先する。 */
-@container term-panel (max-height:240px){
- .term-welcome{display:none}
- .term-waiting .term-screen{flex:1;height:auto;max-height:none;border-top:0}
- .term-error{flex:none;max-height:1.65em;overflow:auto;margin:2px 8px;overflow-wrap:anywhere}
+@container console-panel (max-height:240px){
+ .console-welcome{display:none}
+ .console-waiting .console-screen{flex:1;height:auto;max-height:none;border-top:0}
+ .console-error{flex:none;max-height:1.65em;overflow:auto;margin:2px 8px;overflow-wrap:anywhere}
 }
 @container (max-height:240px){
- .term-welcome :deep(.terminal-welcome){padding:4px 0}
- .term-welcome :deep(.welcome-mark){width:36px;height:36px;margin-bottom:6px}
- .term-welcome :deep(.welcome-mark img){width:28px;height:28px}
- .term-welcome :deep(.welcome-eyebrow){font-size:9px;margin-bottom:4px}
- .term-welcome :deep(h1){font-size:16px;margin-bottom:4px}
- .term-welcome :deep(.welcome-caption){font-size:9px;line-height:1.4}
+ .console-welcome :deep(.terminal-welcome){padding:4px 0}
+ .console-welcome :deep(.welcome-mark){width:36px;height:36px;margin-bottom:6px}
+ .console-welcome :deep(.welcome-mark img){width:28px;height:28px}
+ .console-welcome :deep(.welcome-eyebrow){font-size:9px;margin-bottom:4px}
+ .console-welcome :deep(h1){font-size:16px;margin-bottom:4px}
+ .console-welcome :deep(.welcome-caption){font-size:9px;line-height:1.4}
 }
 </style>
 

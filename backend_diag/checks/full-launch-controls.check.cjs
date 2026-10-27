@@ -62,7 +62,7 @@ test('通常画面は8アプリ・7CLI・VS Codeの16項目を並べ、未導入
  entries.push({id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:true});
  const cliState={全項目:value(entries),処理中:value(''),通知:value(''),失敗:value(false),読込:async()=>{}};
  for(const online of [true,false])for(const folder of ['/fixture/project','']){
-  const state=appState({folder});state.項目=value(['avatar','task','team','ide','term','code','live','discord'].map(id=>({id,名前:id})));
+  const state=appState({folder});state.項目=value(['avatar','task','team','ide','console','code','live','discord'].map(id=>({id,名前:id})));
   const html=await render('アプリ起動/アプリ起動パネル.vue',{state,cliState,online,visible:true});
   assert.equal((html.match(/class="app-launch-button"/g)||[]).length,16);
   assert.equal((html.match(/width="72" height="72"/g)||[]).length,16);

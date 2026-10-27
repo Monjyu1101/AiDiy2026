@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, chmod, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CLI_LAUNCHERS, resolveCliLaunch, validateCliOptions } from '../aidiy_term/cli-launch.mjs';
+import { CLI_LAUNCHERS, resolveCliLaunch, validateCliOptions } from '../aidiy_console/cli-launch.mjs';
 import { launch } from '../launch.mjs';
 import { startDevelopment } from '../server.mjs';
 
@@ -153,24 +153,24 @@ test('Windows npm .cmd: 別パッケージ・未宣言bin・外部シンボリ�
   }
 }));
 
-test('CLI起動オプション: Term専用、モデル・providerを混在させない', async () => {
-  for (const kind of ['ide', 'code', 'live']) assert.throws(() => validateCliOptions(kind, { cli: 'copilot' }), /term/);
-  assert.throws(() => validateCliOptions('term', { cliAutoApprove: true }), /必要/);
+test('CLI起動オプション: Console専用、モデル・providerを混在させない', async () => {
+  for (const kind of ['ide', 'code', 'live']) assert.throws(() => validateCliOptions(kind, { cli: 'copilot' }), /console/);
+  assert.throws(() => validateCliOptions('console', { cliAutoApprove: true }), /必要/);
   for (const option of ['provider', 'model']) {
-    assert.throws(() => validateCliOptions('term', { cli: 'copilot', [option]: '' }), /同時/);
-    await assert.rejects(launch('term', ['--cli', 'copilot', `--${option}`, 'bad', '--no-open']), /同時/);
-    await assert.rejects(startDevelopment(tmpdir(), { kind: 'term', cli: 'copilot', [option]: 'bad' }), /同時/);
+    assert.throws(() => validateCliOptions('console', { cli: 'copilot', [option]: '' }), /同時/);
+    await assert.rejects(launch('console', ['--cli', 'copilot', `--${option}`, 'bad', '--no-open']), /同時/);
+    await assert.rejects(startDevelopment(tmpdir(), { kind: 'console', cli: 'copilot', [option]: 'bad' }), /同時/);
   }
-  await assert.rejects(launch('ide', ['--cli', 'copilot', '--no-open']), /term/);
-  await assert.rejects(launch('term', ['--cli-auto-approve', '--no-open']), /必要/);
+  await assert.rejects(launch('ide', ['--cli', 'copilot', '--no-open']), /console/);
+  await assert.rejects(launch('console', ['--cli-auto-approve', '--no-open']), /必要/);
 });
 
 
-for (const cli of ['copilot', 'aidiy_hermes']) test(`startDevelopmentからTermへ${cli}・承認モード・作業フォルダを転送する（CLI実行なし）`, async () => fixture(async project => {
+for (const cli of ['copilot', 'aidiy_hermes']) test(`startDevelopmentからConsoleへ${cli}・承認モード・作業フォルダを転送する（CLI実行なし）`, async () => fixture(async project => {
   await executable(path.join(project, cli + (process.platform === 'win32' ? '.exe' : '')));
-  const app = await startDevelopment(project, { kind: 'term', cli, cliAutoApprove: true, env: { PATH: project } });
+  const app = await startDevelopment(project, { kind: 'console', cli, cliAutoApprove: true, env: { PATH: project } });
   try {
-    const response = await fetch(app.url + 'api/panels/term', { method: 'POST' }); assert.equal(response.status, 200);
+    const response = await fetch(app.url + 'api/panels/console', { method: 'POST' }); assert.equal(response.status, 200);
     const panel = await response.json(), config = await fetch(new URL(panel.url + 'config', app.url)).then(response => response.json());
     assert.equal(config.project, project); assert.equal(config.cli.id, cli); assert.equal(config.cli.autoApprove, true); assert.equal(config.cli.mode, 'YOLO');
     assert.equal(config.model, undefined); assert.equal(config.provider, undefined);

@@ -294,24 +294,24 @@ test('3Dラッパー: モード切替は同じengineへ停止/再開を伝え、
   h.dispose(); assert.equal(disposed.length, 1);
 });
 
-test('IDE: 3Dが既定。2D切替で利用状態・Term/Code/Live・下書き対象を作り直さない', async () => {
+test('IDE: 3Dが既定。2D切替で利用状態・Console/Code/Live・下書き対象を作り直さない', async () => {
   const h = setup('App', { props: { config: { kind: 'ide' } } });
   try {
     const state = { active: true, mode: 'online', startedAt: 10, project: { path: '/same', name: 'same' } };
     h.state.update(state); assert.equal(h.state.viewMode.value, '3d');
-    h.state.base.term = '/term'; h.state.base.code = '/code'; h.state.base.live = '/live';
+    h.state.base.console = '/console'; h.state.base.code = '/code'; h.state.base.live = '/live';
     h.state.tab.value = 'live'; h.state.panelOpen.value = true; h.state.liveOpen.value = true;
     const request = { text: '下書き' }; h.state.draftRequest.value = request;
     const identity = h.state.state.value;
     h.state.viewMode.value = '2d'; await flush(); h.state.update({ ...state, connected: false });
-    assert.equal(h.state.viewMode.value, '2d'); assert.equal(h.state.base.code, '/code'); assert.equal(h.state.base.term, '/term'); assert.equal(h.state.base.live, '/live');
+    assert.equal(h.state.viewMode.value, '2d'); assert.equal(h.state.base.code, '/code'); assert.equal(h.state.base.console, '/console'); assert.equal(h.state.base.live, '/live');
     assert.equal(h.state.draftRequest.value.text, request.text); assert.equal(h.state.panelOpen.value, true); assert.equal(h.state.tab.value, 'live'); assert.equal(h.state.liveOpen.value, true);
     h.state.viewMode.value = '3d'; await flush(); assert.equal(identity.project.path, h.state.state.value.project.path);
     h.state.update({ ...state, startedAt: 11 }); assert.equal(h.state.viewMode.value, '3d'); assert.equal(h.state.base.code, '');
   } finally { h.dispose(); }
 });
 
-test('部品境界/配置: プロジェクト右に3D/2D、右端にTerm/Code/Live、共通機能はモード外', () => {
+test('部品境界/配置: プロジェクト右に3D/2D、右端にConsole/Code/Live、共通機能はモード外', () => {
   const app = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8');
   const view = readFileSync(new URL('../src/開発スペース/開発スペース.vue', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');

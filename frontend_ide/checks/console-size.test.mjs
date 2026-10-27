@@ -40,7 +40,7 @@ async function fixture(t){
   constructor(callback){this.callback=callback;observers.add(this);} observe(target){this.target=target;} disconnect(){observers.delete(this);}
  }
  const modules={'./キー入力.js':keyboard,'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
- const script=compileScript(descriptor,{id:'TermPanel',genDefaultAs:'component'}),module={exports:{}};
+ const script=compileScript(descriptor,{id:'ConsolePanel',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
   module,URL,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},
   require(id){if(id==='vue')return{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};if(id in modules)return modules[id];throw Error(id);},
@@ -53,7 +53,7 @@ async function fixture(t){
  return{state,props,terminal,container,sockets,packets,resources,observers,resize(height,width=344){container.clientHeight=height;container.clientWidth=width;for(const observer of observers)observer.callback();}};
 }
 
-test('Term: 数行の初期サイズ・縮小・拡大・最下行が実FitAddonとresize送信へ反映する',async t=>{
+test('Console: 数行の初期サイズ・縮小・拡大・最下行が実FitAddonとresize送信へ反映する',async t=>{
  const f=await fixture(t);
  assert.deepEqual(f.packets[0],{type:'start',cols:41,rows:4});
  assert.equal(f.terminal.rows*17<=f.container.clientHeight,true);
@@ -66,7 +66,7 @@ test('Term: 数行の初期サイズ・縮小・拡大・最下行が実FitAddon
  f.resize(76);f.terminal.listeners.Data('日本語\r');assert.deepEqual(f.packets.at(-1),{type:'input',data:'日本語\r'});
 });
 
-test('Term: 小さな画面の入力・表示クリア・タブ往復・再起動でも同じ端末を維持する',async t=>{
+test('Console: 小さな画面の入力・表示クリア・タブ往復・再起動でも同じ端末を維持する',async t=>{
  const f=await fixture(t);assert.equal(f.state.inputStarted.value,false);
  f.terminal.listeners.Key();await vue.nextTick();assert.equal(f.state.inputStarted.value,true);
  await f.state.clearDisplay();assert.equal(f.state.inputStarted.value,false);assert.equal(f.terminal.rows,4);
@@ -77,7 +77,7 @@ test('Term: 小さな画面の入力・表示クリア・タブ往復・再起�
  assert.equal(f.state.inputStarted.value,false);assert.equal(f.resources.terminals,1);assert.equal(f.observers.size,1);
 });
 
-test('Term: 内側の領域を原点に補完候補を置き、最後の表示行で切り詰める',async t=>{
+test('Console: 内側の領域を原点に補完候補を置き、最後の表示行で切り詰める',async t=>{
  const f=await fixture(t),text='PS X> codex';
  const line={length:f.terminal.cols,isWrapped:false,translateToString:()=>text,getCell:x=>({getChars:()=>text[x]||'',isItalic:()=>false})};
  const buffer=f.terminal.buffer.active={type:'normal',baseY:10,viewportY:10,cursorX:text.length,cursorY:3,getLine:row=>row===10+buffer.cursorY?line:undefined};
@@ -95,19 +95,19 @@ test('Term: 内側の領域を原点に補完候補を置き、最後の表示�
  f.props.visible=false;f.state.updateCompletion();assert.equal(f.state.ghostRows.value.length,0);
 });
 
-test('Term CSS: 高さ240以下だけ案内を畳み、余白なしの内側へfitする',()=>{
- const css=descriptor.styles[0].content,result=compileStyle({source:css,id:'data-v-term',scoped:true});
+test('Console CSS: 高さ240以下だけ案内を畳み、余白なしの内側へfitする',()=>{
+ const css=descriptor.styles[0].content,result=compileStyle({source:css,id:'data-v-console',scoped:true});
  assert.deepEqual(result.errors,[]);
- assert.match(css,/\.term-component\{[^}]*container:term-panel \/ size/);
- assert.match(css,/@container term-panel \(max-height:240px\)\{\s*\.term-welcome\{display:none\}\s*\.term-waiting \.term-screen\{flex:1;height:auto;max-height:none;border-top:0\}/);
- assert.match(css,/\.term-viewport\{[^}]*height:100%;[^}]*min-height:0/);
- assert.match(descriptor.template.content,/<div class="term-screen"[^>]*><div ref="container" class="term-viewport">/);
- assert.match(css,/\.term-error\{flex:none;max-height:1\.65em;overflow:auto/);
- assert.match(css,/\.term-meta>span:first-child\{[^}]*white-space:nowrap/);
+ assert.match(css,/\.console-component\{[^}]*container:console-panel \/ size/);
+ assert.match(css,/@container console-panel \(max-height:240px\)\{\s*\.console-welcome\{display:none\}\s*\.console-waiting \.console-screen\{flex:1;height:auto;max-height:none;border-top:0\}/);
+ assert.match(css,/\.console-viewport\{[^}]*height:100%;[^}]*min-height:0/);
+ assert.match(descriptor.template.content,/<div class="console-screen"[^>]*><div ref="container" class="console-viewport">/);
+ assert.match(css,/\.console-error\{flex:none;max-height:1\.65em;overflow:auto/);
+ assert.match(css,/\.console-meta>span:first-child\{[^}]*white-space:nowrap/);
 });
 
 
-test('CLI Term: 開始時から全体表示、モード保持、クリア・再接続・起動エラー',async t=>{
+test('CLI Console: 開始時から全体表示、モード保持、クリア・再接続・起動エラー',async t=>{
  const f=await fixture(t),cli={id:'copilot',name:'GitHub Copilot CLI',mode:'YOLO',autoApprove:true};
  f.sockets[0].receive({type:'ready',project:'/fixture 日本語',shell:cli.name,cli,state:'running',completion:false});
  await vue.nextTick();assert.equal(f.state.inputStarted.value,true);assert.equal(f.state.connected.value,true);assert.equal(f.state.cli.value.mode,'YOLO');
@@ -119,7 +119,7 @@ test('CLI Term: 開始時から全体表示、モード保持、クリア・再�
 });
 
 
-test('Term入力: 修飾EnterはWebSocketへ一度だけ送信し、Ctrl+Cはボタンだけで送る',async t=>{
+test('Console入力: 修飾EnterはWebSocketへ一度だけ送信し、Ctrl+Cはボタンだけで送る',async t=>{
  const f=await fixture(t);
  const event=(key,extra={})=>({type:'keydown',key,preventDefault(){},stopPropagation(){},...extra});
  let count=f.packets.length;
@@ -134,4 +134,11 @@ test('Term入力: 修飾EnterはWebSocketへ一度だけ送信し、Ctrl+Cはボ
  f.state.interrupt();assert.deepEqual(f.packets.at(-1),{type:'input',data:'\x03'});
  f.sockets[0].receive({type:'exit',exitCode:0});count=f.packets.length;
  f.state.interrupt();f.terminal.handleKey(event('Enter',{shiftKey:true}));assert.equal(f.packets.length,count);
+});
+
+
+test('Console welcome: styles target the current console kind', () => {
+ const css = readFileSync(new URL('../src/共通表示/会話表示.css', import.meta.url), 'utf8');
+ assert.match(css, /\.terminal-welcome\.console h1/);
+ assert.doesNotMatch(css, /\.terminal-welcome\.term[ .{]/);
 });

@@ -8,7 +8,7 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 import { inspectOpenCodeNpm } from '../../scripts/opencode-npm.mjs';
 
-// 診断メニューとTermが共有する固定許可リスト。モデル・プロンプト・任意コマンドは渡さない。
+// 診断メニューとConsoleが共有する固定許可リスト。モデル・プロンプト・任意コマンドは渡さない。
 // 各オプションはCLIのツール承認用。ログイン・信頼確認や組織の禁止設定は解除しない。
 export const CLI_LAUNCHERS = Object.freeze([
   ['claude', 'Claude Code', '--dangerously-skip-permissions', '承認省略'],
@@ -27,7 +27,7 @@ const envValue = (env, key, platform) => env[key] || (platform === 'win32' ? Obj
 export function validateCliOptions(kind, { cli, cliAutoApprove, provider, model } = {}) {
   if (cli !== undefined && (typeof cli !== 'string' || !Object.hasOwn(byId, cli))) throw Error('--cli は claude / codex / copilot / agy / grok / opencode / aidiy_hermes から指定してください。');
   if (cliAutoApprove !== undefined && typeof cliAutoApprove !== 'boolean') throw Error('--cli-auto-approve は真偽値で指定してください。');
-  if (cli !== undefined && kind !== 'term') throw Error('--cli は --app term 専用です。');
+  if (cli !== undefined && kind !== 'console') throw Error('--cli は --app console 専用です。');
   if (cliAutoApprove && !cli) throw Error('--cli-auto-approve には --cli が必要です。');
   if (cli && (provider !== undefined || model !== undefined)) throw Error('--cli と --provider / --model は同時に指定できません。CLI側の既定モデルを使用します。');
 }
@@ -94,7 +94,7 @@ async function hermesInvocation(shim, platform) {
 
 // ファイルの存在と形式だけを検査する。--versionを含め、CLIやシェルは一切実行しない。
 export async function resolveCliLaunch(id, { autoApprove = false, env = process.env, platform = process.platform } = {}) {
-  validateCliOptions('term', { cli: id, cliAutoApprove: autoApprove });
+  validateCliOptions('console', { cli: id, cliAutoApprove: autoApprove });
   if (!id) throw Error('CLIを指定してください。');
   const definition = byId[id], windows = platform === 'win32';
   const get = key => envValue(env, key, platform);

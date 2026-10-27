@@ -16,7 +16,7 @@ import { createCliSession } from './cli-session.mjs';
 // IDEのパネル中継だけが接続する、ランダムパス付きのローカル端末。
 // シェル・開始フォルダはサーバー側で決め、ブラウザから指定させない。
 export async function startTerminal(project, { spawnTerminal, env = process.env, cli, cliAutoApprove = false, cliReconnectGrace = 30000, onCliStarted, onCliAbandoned, checkTools, toolsPollInterval = 10000 } = {}) {
-  validateCliOptions('term', { cli, cliAutoApprove });
+  validateCliOptions('console', { cli, cliAutoApprove });
   if (!Number.isFinite(cliReconnectGrace) || cliReconnectGrace < 0) throw Error('CLI再接続の猶予時間が不正です。');
   const cliLaunch = cli ? await resolveCliLaunch(cli, { autoApprove: cliAutoApprove, env }) : undefined;
   checkTools ??= async () => {
@@ -92,7 +92,7 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
             cliDisconnectTimer = undefined;
             if (closed || cliClients.size) return;
             cliAbandoned = true;
-            const pending = cliSession.terminate('再接続の猶予時間を過ぎたためCLIを終了しました。再実行するには新しいTerm窓を開いてください。');
+            const pending = cliSession.terminate('再接続の猶予時間を過ぎたためCLIを終了しました。再実行するには新しいConsole窓を開いてください。');
             stopping.add(pending);
             const abandoned = () => { stopping.delete(pending); void Promise.resolve().then(() => onCliAbandoned?.()).catch(() => {}); };
             void pending.then(abandoned, abandoned);

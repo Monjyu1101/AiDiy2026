@@ -253,7 +253,7 @@ def _runtime_in_use(frontend_dir: Path) -> bool:
     for process in list_processes():
         if frontend_dir.name == "frontend_ide":
             from _setup_processes import process_role
-            if process_role(process, frontend_dir.parent, windows=True) in ("code", "ide", "term", "live"):
+            if process_role(process, frontend_dir.parent, windows=True) in ("code", "ide", "console", "live"):
                 return True
         executable = process.get("ExecutablePath") or ""
         if not executable:

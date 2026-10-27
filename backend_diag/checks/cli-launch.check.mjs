@@ -23,7 +23,7 @@ test('CLI catalog is fixed; availability uses resolver only, no process executio
 });
 test('all CLI launches pass only fixed id, approval, and exact cwd; omit models and shell strings',async t=>{
  const f=await fixture(t);
- for(const id of ids){const result=await f.manager.launch(id,f.project,true);assert.equal(result.受付,true);assert.equal(result.通知,'');const c=f.calls.at(-1);assert.equal(c.opts.cwd,f.project);assert.equal(c.opts.shell,false);assert.equal(c.opts.detached,true);assert.equal(c.opts.env.AIDIY_LAUNCHER_CHILD,'1');assert.deepEqual(c.args,[join(f.root,'frontend_ide','launch.mjs'),'--app','term','--project',f.project,'--new-window','--cli',id,'--cli-auto-approve','--foreground']);assert.equal(c.opts.stdio.at(-1),'ipc');assert.equal(c.child.connected,false);assert.doesNotMatch(c.args.join(' '),/--model|--provider|--prompt/);}
+ for(const id of ids){const result=await f.manager.launch(id,f.project,true);assert.equal(result.受付,true);assert.equal(result.通知,'');const c=f.calls.at(-1);assert.equal(c.opts.cwd,f.project);assert.equal(c.opts.shell,false);assert.equal(c.opts.detached,true);assert.equal(c.opts.env.AIDIY_LAUNCHER_CHILD,'1');assert.deepEqual(c.args,[join(f.root,'frontend_ide','launch.mjs'),'--app','console','--project',f.project,'--new-window','--cli',id,'--cli-auto-approve','--foreground']);assert.equal(c.opts.stdio.at(-1),'ipc');assert.equal(c.child.connected,false);assert.doesNotMatch(c.args.join(' '),/--model|--provider|--prompt/);}
 });
 test('invalid ids, unconfirmed mode, missing project and missing executable never spawn',async t=>{
  const f=await fixture(t,{missing:'grok'});
@@ -46,7 +46,7 @@ test('every CLI including Hermes opens independent windows for repeated and conc
   assert.ok(f.calls.every(call=>call.args.includes('--new-window')&&!call.child.killed));
   f.calls[0].child.emit('exit',0);
   assert.ok(f.calls.slice(1).every(call=>!call.child.killed));
-  assert.ok(f.calls.every(call=>call.child.listenerCount('exit')===0&&call.child.listenerCount('message')===0),'successful windows are owned by Term, not tracked by CLI/project');
+  assert.ok(f.calls.every(call=>call.child.listenerCount('exit')===0&&call.child.listenerCount('message')===0),'successful windows are owned by Console, not tracked by CLI/project');
  }
 });
 test('one concurrent startup failure kills only its own unfinished child and leaves the other launch usable',async t=>{
@@ -71,7 +71,7 @@ test('real IPC launchers keep separate processes and ports; closing one owner or
    res.end(JSON.stringify({pid:process.pid,cwd:process.cwd(),args:process.argv.slice(2)}));
    if(req.url==='/close')server.close(()=>process.exit(0));
   });
-  process.on('disconnect',()=>{}); // 表示完了後はTerm自身がサーバーを所有する。
+  process.on('disconnect',()=>{}); // 表示完了後はConsole自身がサーバーを所有する。
   process.on('SIGTERM',()=>server.close(()=>process.exit(0)));
   server.listen(0,'127.0.0.1',()=>process.send({launchReady:true,url:'http://127.0.0.1:'+server.address().port}));
  `,'utf8');
@@ -129,7 +129,7 @@ test('authenticated CLI API limits body fields, confirmation, asset names and me
  assert.ok(repeated.every(response=>response.status===202));assert.equal(f.calls.length,4);
 });
 
-test('missing optional Term files do not prevent Diag construction and fail only on CLI use',async()=>{
+test('missing optional Console files do not prevent Diag construction and fail only on CLI use',async()=>{
  let loads=0;const manager=createCliLauncher({loadDefinitions:async()=>{loads++;throw Error('private missing module path');}});assert.equal(loads,0);
  await assert.rejects(manager.catalog(),error=>error.status===503&&!error.message.includes('private'));assert.equal(loads,1);
 });

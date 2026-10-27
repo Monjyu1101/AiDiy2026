@@ -29,7 +29,7 @@ test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止
  }
 });
 test('全パネル: nativeのdown/upを直ちに一度だけ渡し、短押しを再送しない',async()=>{
- for(const kind of ['ide','code','live','term','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']){
+ for(const kind of ['ide','code','live','console','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']){
   const f=fixture(kind);assert.notEqual(f.emit('mouseDown').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown']);assert.equal(f.calls.length,0);
   assert.notEqual(f.emit('mouseUp').prevented,true);await f.advance();assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.equal(f.timers.size,0);assert.deepEqual(f.sent,[]);assert.deepEqual(f.calls,[]);f.dispose();
  }

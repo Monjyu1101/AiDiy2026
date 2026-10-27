@@ -8,7 +8,7 @@ export const componentPaths = {
   "RefreshButton": "共通表示/再読込ボタン.vue",
   "CodePanel": "コード/コードパネル.vue",
   "LivePanel": "ライブ/ライブパネル.vue",
-  "TermPanel": "ターミナル/ターミナルパネル.vue",
+  "ConsolePanel": "ターミナル/ターミナルパネル.vue",
   "TerminalProgress": "ターミナル/進捗表示.vue",
   "TerminalWelcome": "ターミナル/開始表示.vue",
   "SpaceView": "開発スペース/開発スペース.vue",

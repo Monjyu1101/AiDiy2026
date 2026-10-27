@@ -18,7 +18,7 @@ def app(pid, kind, parent=1):
 
 class SetupProcessesTest(unittest.TestCase):
     def test_all_components_except_code_ide_discord(self):
-        records = [app(10, 'code'), app(11, 'ide'), app(12, 'live'), app(13, 'term')]
+        records = [app(10, 'code'), app(11, 'ide'), app(12, 'live'), app(13, 'console')]
         for i, folder in enumerate(subject.COMPONENTS[:-1], 20):
             records.append(proc(i, f'node {ROOT}/{folder}/launch.mjs'))
         self.assertEqual(set(subject.select_targets(records, ROOT, current_pid=999)), {12, 13, *range(20,27), 28})
@@ -101,16 +101,16 @@ class SetupProcessesTest(unittest.TestCase):
     def test_keep_code_ide_helpers_but_stop_explicit_other_apps(self):
         records = [app(10,'code'), app(20,'ide'), proc(11,'python worker.py',10,'python'),
                    proc(21,'electron --type=renderer',20,'electron'), app(22,'live',20),
-                   proc(23,'electron --type=renderer',22,'electron'), app(24,'term',20)]
+                   proc(23,'electron --type=renderer',22,'electron'), app(24,'console',20)]
         self.assertEqual(set(subject.select_targets(records, ROOT, current_pid=999)), {22,23,24})
 
     def test_stop_supervisor_without_killing_kept_descendants(self):
         records = [proc(5,f'python {ROOT}/_start.py',name='python'), app(10,'code',5),
-                   app(20,'ide',5), app(30,'term',5), proc(11,'python mcp.py',10,'python')]
+                   app(20,'ide',5), app(30,'console',5), proc(11,'python mcp.py',10,'python')]
         self.assertEqual(set(subject.select_targets(records,ROOT,current_pid=999)), {5,30})
 
     def test_current_process_ancestors_and_children_protected(self):
-        records = [proc(5,f'python {ROOT}/_start.py',name='python'), app(6,'term',5),
+        records = [proc(5,f'python {ROOT}/_start.py',name='python'), app(6,'console',5),
                    proc(7,'python _setup.py',6,'python'), proc(8,'ps -axo',7,'ps'), app(9,'live',5)]
         self.assertEqual(set(subject.select_targets(records,ROOT,current_pid=7)), {9})
 
@@ -127,9 +127,15 @@ class SetupProcessesTest(unittest.TestCase):
         p['CommandLine'] = p['CommandLine'].replace('code','live')
         self.assertEqual(subject.process_role(p,r'c:\space dir\aidiy',True),'live')
 
+    def test_old_term_process_is_console_cleanup_boundary(self):
+        # 改名前から動く同じcheckoutのプロセスも対象判定を失わない。
+        for command in (f'node {ROOT}/frontend_ide/launch.mjs --app term',
+                        f'node {ROOT}/frontend_ide/aidiy_term/launch.mjs'):
+            self.assertEqual(subject.process_role(proc(31, command), ROOT), 'console')
+
     def test_legacy_app_entries(self):
         for entry, kind in (('host/aidiy_code/desktop.cjs','code'),('host/dist/aidiy_live/server.cjs','live'),
-                            ('viewer/launch.mjs','ide'),('aidiy_term/launch.mjs','term')):
+                            ('viewer/launch.mjs','ide'),('aidiy_console/launch.mjs','console')):
             self.assertEqual(subject.process_role(proc(10,f'node {ROOT}/frontend_ide/{entry}'),ROOT),kind)
 
     def test_orphan_dedicated_electron_but_not_shared(self):
@@ -141,7 +147,7 @@ class SetupProcessesTest(unittest.TestCase):
 
     def test_shared_electron_profile_identifies_live_not_code(self):
         exe=f'{ROOT}/frontend_ide/node_modules/electron/dist/electron'
-        for kind in ('live', 'term', 'code'):
+        for kind in ('live', 'console', 'code'):
             p=proc(10,f'{exe} --type=renderer --user-data-dir=/tmp/aidiy_{kind}_vue',name='electron')
             self.assertEqual(subject.process_role(p,ROOT),kind)
             self.assertEqual(bool(subject.select_targets([p],ROOT,current_pid=999)), kind != 'code')

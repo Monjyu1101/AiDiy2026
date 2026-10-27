@@ -23,7 +23,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_web/_setup.py     フロントエンド(Web)
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
-- frontend_ide/_setup.py     IDE群(Term / Code / Live / IDE / Task / Team)
+- frontend_ide/_setup.py     IDE群(Console / Code / Live / IDE / Task / Team)
 - frontend_channels/_setup.py フロントエンド(Discord、任意)
 
 Usage:
@@ -726,7 +726,7 @@ def collect_setup_choices() -> dict | None:
     choices["web"] = ask_yes_no("Web のセットアップを実行しますか？", default="y")
     choices["avatar"] = ask_yes_no("Avatar のセットアップを実行しますか？", default="y")
     choices["hermes"] = ask_yes_no("Hermes のセットアップを実行しますか？", default="y")
-    choices["ide"] = ask_yes_no("Term / Code / Live / IDE / Task / Team のセットアップを実行しますか？", default="y")
+    choices["ide"] = ask_yes_no("Console / Code / Live / IDE / Task / Team のセットアップを実行しますか？", default="y")
     choices["discord"] = ask_yes_no("Discord のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
@@ -740,7 +740,7 @@ def collect_setup_choices() -> dict | None:
 def setup_node_refresh() -> list[str]:
     """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
     print_header("Node.js系の再ビルド")
-    print_info("対象: Diag / Web / Avatar / Term / Code / Live / IDE / Task / Team / Discord")
+    print_info("対象: Diag / Web / Avatar / Console / Code / Live / IDE / Task / Team / Discord")
     print_info("依存同期 / 再ビルド / 起動コマンド登録")
     print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
     if get_node_version() is None or get_npm_version() is None:
@@ -788,7 +788,7 @@ def setup_node_refresh() -> list[str]:
         ("Code / Live / IDE: ビルド・配置", lambda: _load_folder_module("frontend_ide/host").setup_assets(npm)),
         ("IDE Viewer: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
         ("IDE: aidiy_ide", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
-        ("Term: aidiy_term", lambda: _load_folder_module("frontend_ide/aidiy_term").setup()),
+        ("Console: aidiy_console", lambda: _load_folder_module("frontend_ide/aidiy_console").setup()),
         ("Task: aidiy_task", lambda: _load_folder_module("frontend_ide/aidiy_task").setup()),
         ("Team: aidiy_team", lambda: _load_folder_module("frontend_ide/aidiy_team").setup()),
         ("Discord: 依存", lambda: dependencies("frontend_channels", electron=True)),
@@ -816,7 +816,7 @@ def setup_launchers_only() -> list[str]:
         ('Diag', lambda: _load_folder_module('backend_diag').setup(desktop=False)),
         ('Avatar', lambda: _load_folder_module('frontend_avatar').install_standalone_launcher()),
         ('Hermes', lambda: _load_folder_module('command_hermes').install_standalone_launcher()),
-        ('Term', lambda: _load_folder_module('frontend_ide/aidiy_term').setup()),
+        ('Console', lambda: _load_folder_module('frontend_ide/aidiy_console').setup()),
         ('Code / Live', lambda: _load_folder_module('frontend_ide/host').install_standalone_launcher()),
         ('IDE', lambda: _load_folder_module('frontend_ide/viewer').install_launcher(BASE_DIR / 'frontend_ide/viewer')),
         ('Task', lambda: _load_folder_module('frontend_ide/aidiy_task').setup()),
@@ -852,7 +852,7 @@ def main():
     print_info("  6. Web")
     print_info("  7. Avatar")
     print_info("  8. Hermes")
-    print_info("  9. Term / Code / Live / IDE / Task / Team")
+    print_info("  9. Console / Code / Live / IDE / Task / Team")
     print_info(" 10. Discord")
     print()
 
@@ -1034,12 +1034,12 @@ def main():
     print()
     if choices.get("ide"):
         if not _load_folder_module("frontend_ide").setup(choices):
-            error_locations.append("Term / Code / Live / IDE / Task / Team")
+            error_locations.append("Console / Code / Live / IDE / Task / Team")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("Term / Code / Live / IDE / Task / Team のセットアップをスキップしました。")
+        print_warning("Console / Code / Live / IDE / Task / Team のセットアップをスキップしました。")
 
     print()
     if choices.get("discord"):
@@ -1077,7 +1077,7 @@ def main():
     print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
     print_info("    Diag起動   : aidiy_diag （ブラウザ版: aidiy_diag --browser）")
     print_info("    Hermes起動 : aidiy_hermes")
-    print_info("    Term起動   : aidiy_term")
+    print_info("    Console起動   : aidiy_console")
     print_info("    Task起動   : aidiy_task")
     print_info("    Team起動   : aidiy_team")
     print_info("    Code起動   : aidiy_code")

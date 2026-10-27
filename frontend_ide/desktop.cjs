@@ -8,16 +8,16 @@ const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
-if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term','task','team'].includes(kind))throw Error('起動元が不正です。');
-const cliTermWindow=kind==='term'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
-const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':'Term'}`;
+if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','console','task','team'].includes(kind))throw Error('起動元が不正です。');
+const cliConsoleWindow=kind==='console'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
+const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':'Console'}`;
 app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
 const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
 if(kind==='ide')mkdirSync(profile,{recursive:true});
 app.setPath('userData',profile);
 if(kind==='ide')app.setPath('sessionData',profile);
-const independent=kind==='term'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
+const independent=kind==='console'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
 if(independent){
  const temporaryProfile=mkdtempSync(join(app.getPath('temp'),`aidiy-${kind}-profile-`));
  app.setPath('userData',temporaryProfile);
@@ -26,9 +26,9 @@ if(independent){
 }
 const {windowBounds,windowMinimumSize,allWindowBounds}=require('./デスクトップ/window-layout.cjs');
 const {createTaskWindows,taskWindowBounds}=require('./デスクトップ/task-windows.cjs');
-const {reserveTermSlot}=require('./デスクトップ/term-window-slot.cjs');
+const {reserveConsoleSlot}=require('./デスクトップ/console-window-slot.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
-// IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
+// IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Consoleは複数起動する。
 if(!independent&&!app.requestSingleInstanceLock()){
  if(process.send)process.send({existingWindow:true},()=>app.exit(0));else app.exit(0);
  return;
@@ -154,19 +154,19 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  const area=(ownerBounds?screen.getDisplayMatching(ownerBounds):screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
  const used=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).map(item=>item.slot));
  const ownerRevision=owner?.revision;
- const placement=kind==='term'?await reserveTermSlot():null;
+ const placement=kind==='console'?await reserveConsoleSlot():null;
  if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
  let slot=placement?.slot||0;if(owner&&['code','viewer','browser'].includes(kind))while(used.has(slot))slot++;
  let bounds,displaySlot;
  try{
   const display=selectedAllDisplay(owner,displayId);
   if(display){displaySlot=0;const occupied=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&item.displayId===displayId&&!item.window.isDestroyed()).map(item=>item.displaySlot));while(occupied.has(displaySlot))displaySlot++;}
-  bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliTermWindow&&!owner);
+  bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliConsoleWindow&&!owner);
  }catch(error){placement?.close();throw error;}
  if(kind==='task')bounds=taskWindowBounds(taskView,area);
- const title=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
+ const title=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','console','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
@@ -300,7 +300,7 @@ app.whenReady().then(async()=>{
  });
  ipcMain.handle('development:open-app',async(event,type,displayId)=>{
   const source=trustedEvent(event),record=source?.kind==='viewer'?source.owner:source;
-  if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','term'].includes(type))return{ok:false,error:'この画面からは開けません。'};
+  if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','console'].includes(type))return{ok:false,error:'この画面からは開けません。'};
   // ピン留めからの明示起動も、元のIDEと同じ利用セッションだけに限定する。
   const revision=record.revision;let state;
   try{

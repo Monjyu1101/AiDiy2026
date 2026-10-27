@@ -31,7 +31,7 @@ async function fixture(t){
   const record={kind,owner,window,url:frame.url,viewerPath:kind==='viewer'?'readme.txt':'',linkKey:key(state),revision:0};
   records.set(sender,record);return record;
  };
- const owner=add('ide'),viewer=add('viewer',owner),code=add('code',owner),live=add('live',owner),term=add('term',owner);
+ const owner=add('ide'),viewer=add('viewer',owner),code=add('code',owner),live=add('live',owner),consoleWindow=add('console',owner);
  // 本番trustedEventをそのまま使用し、Electron自体は起動しない。
  const trust={windows:records};vm.runInNewContext(desktop.slice(desktop.indexOf('function trustedEvent(event){'),desktop.indexOf('function audioAllowed('))+';globalThis.trusted=trustedEvent;',trust);
  const event=record=>({sender:record.window.webContents,senderFrame:record.window.webContents.mainFrame});
@@ -39,7 +39,7 @@ async function fixture(t){
  const actions=createNativePreviewActions({records,trustedEvent:trust.trusted,readState:async record=>{assert.equal(record,owner);reads++;await readHook?.(reads);return structuredClone(state);},sessionKey:key,
   clipboard:{writeText:path=>{copyHook?.();copies.push(path);}},shell:{openPath:async path=>{opens.push(path);return await openHook?.()||'';}},
   dialog:{showMessageBox:async(window,options)=>{dialogs.push({window,options});return await dialogHook?.()||{response:1};}},isQuitting:()=>quitting});
- return{temp,root,records,state,owner,viewer,code,live,term,add,event,actions,copies,opens,dialogs,
+ return{temp,root,records,state,owner,viewer,code,live,consoleWindow,add,event,actions,copies,opens,dialogs,
   readHook:hook=>{readHook=hook;},dialogHook:hook=>{dialogHook=hook;},openHook:hook=>{openHook=hook;},copyHook:hook=>{copyHook=hook;},quit:()=>{quitting=true;}};
 }
 
@@ -94,10 +94,10 @@ test('ネイティブプレビュー: 不正型・長すぎる値・URL・絶対
  assert.deepEqual(f.copies,[]);assert.deepEqual(f.opens,[]);assert.deepEqual(f.dialogs,[]);
 });
 
-test('ネイティブプレビュー: 不明窓・iframe・別URL・Code/Live/Term・異なるピン留めファイルを拒否',async t=>{
+test('ネイティブプレビュー: 不明窓・iframe・別URL・Code/Live/Console・異なるピン留めファイルを拒否',async t=>{
  const f=await fixture(t),ownerEvent=f.event(f.owner);
  const unknown={mainFrame:{url:f.owner.url}};
- for(const event of [f.event(f.code),f.event(f.live),f.event(f.term),{sender:unknown,senderFrame:unknown.mainFrame},{...ownerEvent,senderFrame:{url:f.owner.url}},{...ownerEvent,senderFrame:null}]){
+ for(const event of [f.event(f.code),f.event(f.live),f.event(f.consoleWindow),{sender:unknown,senderFrame:unknown.mainFrame},{...ownerEvent,senderFrame:{url:f.owner.url}},{...ownerEvent,senderFrame:null}]){
   assert.equal((await f.actions.copyFilePath(event,'readme.txt')).ok,false);
   assert.equal((await f.actions.openFile(event,'readme.txt')).ok,false);
  }

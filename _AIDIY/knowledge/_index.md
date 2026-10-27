@@ -26,7 +26,7 @@
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
 | `frontend_channels` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
-| `frontend_ide` | Term / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
+| `frontend_ide` | Console / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
 
 例:
 
@@ -239,8 +239,8 @@
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Term / Code / Live / IDE の日本語機能フォルダ・共通 Vue 部品・配布・検証を確認する | [`frontend_ide,Vue共通画面変更手順.md`](./frontend_ide,Vue共通画面変更手順.md) |
-| Code / Live の画面隅・複数窓、Term の縦横別サイズを調整する | [`frontend_ide,初期ウィンドウ配置.md`](./frontend_ide,初期ウィンドウ配置.md) |
+| Console / Code / Live / IDE の日本語機能フォルダ・共通 Vue 部品・配布・検証を確認する | [`frontend_ide,Vue共通画面変更手順.md`](./frontend_ide,Vue共通画面変更手順.md) |
+| Code / Live の画面隅・複数窓、Console の縦横別サイズを調整する | [`frontend_ide,初期ウィンドウ配置.md`](./frontend_ide,初期ウィンドウ配置.md) |
 | IDE の今日・本日最新の強調、電子の周回、描画負荷を確認する | [`frontend_ide,更新の目印と電子表示.md`](./frontend_ide,更新の目印と電子表示.md) |
 | IDE の文書表示（Word / Excel / PowerPoint / PDF）を変更する | [`frontend_ide,文書ビューア.md`](./frontend_ide,文書ビューア.md) |
 

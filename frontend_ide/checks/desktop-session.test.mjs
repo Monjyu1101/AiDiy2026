@@ -75,8 +75,8 @@ function launchFixture(){
  return{launch,state,owner,viewer,windows,starts,created,focused,closed,hold:promise=>{hold=promise;}};
 }
 
-test('Electron明示起動: 同じセッションのピン留めからだけCode/Live/Termを開ける',async()=>{
- for(const kind of ['code','live','term']){
+test('Electron明示起動: 同じセッションのピン留めからだけCode/Live/Consoleを開ける',async()=>{
+ for(const kind of ['code','live','console']){
   const f=launchFixture();assert.equal((await f.launch({record:f.viewer},kind)).ok,true);assert.equal(f.starts.length,1);
   assert.equal(f.starts[0].path,'/fixture');assert.equal(f.starts[0].options.kind,kind);assert.equal(f.created[0][3],f.owner);assert.equal(f.created[0][4],'online:10');
  }

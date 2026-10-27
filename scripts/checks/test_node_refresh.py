@@ -111,7 +111,9 @@ class NodeRefreshTests(unittest.TestCase):
             "frontend_avatar": SimpleNamespace(install_standalone_launcher=Mock(return_value=True)),
             "frontend_ide/host": SimpleNamespace(setup_assets=Mock(return_value=True)),
             "frontend_ide/viewer": SimpleNamespace(install_launcher=Mock(return_value=None)),
-            "frontend_ide/aidiy_term": SimpleNamespace(setup=Mock(return_value=True)),
+            "frontend_ide/aidiy_console": SimpleNamespace(setup=Mock(return_value=True)),
+            "frontend_ide/aidiy_task": SimpleNamespace(setup=Mock(return_value=True)),
+            "frontend_ide/aidiy_team": SimpleNamespace(setup=Mock(return_value=True)),
             # setup()やconf_jsonは用意しない。設定補完経路へ入れば失敗する。
             "frontend_channels": SimpleNamespace(install_launcher=Mock(return_value=None)),
         }

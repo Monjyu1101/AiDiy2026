@@ -13,7 +13,7 @@ import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const vscodeRoot = fileURLToPath(new URL('../host/', import.meta.url));
 async function launch(kind, project, state) {
-  if (kind === 'term') return (await import('../aidiy_term/terminal.mjs')).startTerminal(project);
+  if (kind === 'console') return (await import('../aidiy_console/terminal.mjs')).startTerminal(project);
   let module;
   try { module = require(join(vscodeRoot, 'dist', `aidiy_${kind}`, 'server.cjs')); }
   catch { throw new Error('Code / Live のセットアップが必要です。frontend_ide/host のセットアップを実行してください。'); }
@@ -27,7 +27,7 @@ export function createPanels(project, state, launchPanel = launch) {
   const entries = new Map(), streams = new Set(), resetting = new Set();
   let generation = 0, session = '', disposed = false;
   const key = () => { const s = state(); return s.active ? `${s.mode}:${s.startedAt}` : ''; };
-  const permitted = kind => state().active && (kind === 'code' || kind === 'term' || (kind === 'live' && state().mode === 'online'));
+  const permitted = kind => state().active && (kind === 'code' || kind === 'console' || (kind === 'live' && state().mode === 'online'));
   function reset() {
     generation++;
     const previous = [...entries.values()]; entries.clear();
@@ -59,7 +59,7 @@ export function createPanels(project, state, launchPanel = launch) {
   }
   async function resolve(req) {
     sync();
-    const kind = /^\/panels\/(code|live|term)\//.exec(req.url)?.[1];
+    const kind = /^\/panels\/(code|live|console)\//.exec(req.url)?.[1];
     if (!permitted(kind) || !entries.has(kind)) return null;
     const entry = await entries.get(kind);
     if (!req.url.startsWith(entry.prefix)) return null;
@@ -89,7 +89,7 @@ export function createPanels(project, state, launchPanel = launch) {
   }
   async function upgrade(req, socket, head) {
     const entry = await resolve(req);
-    if (!entry || !['live', 'term'].includes(entry.kind) || !entry.url.pathname.endsWith('/socket')) { socket.destroy(); return; }
+    if (!entry || !['live', 'console'].includes(entry.kind) || !entry.url.pathname.endsWith('/socket')) { socket.destroy(); return; }
     const proxy = track(request(entry.url, { headers: headers(req, entry.target) }));
     track(socket);
     proxy.on('upgrade', (response, upstream, upstreamHead) => {

@@ -60,16 +60,16 @@ def process_role(process, root, windows=False):
         if python and parts[1].startswith(('.venv', 'venv')):
             return parts[0]
         if electron and '/node_modules/electron/dist/' in '/' + binary:
-            # IDEのElectronはCode/Live/Termと共用。入口/親子関係不明なら保護。
+            # IDEのElectronはCode/Live/Consoleと共用。入口/親子関係不明なら保護。
             if parts[0] != 'frontend_ide':
                 return parts[0]
             for arg in args:
                 if not arg.startswith('--user-data-dir='):
                     continue
                 profile = path.basename(arg.split('=', 1)[1]).casefold()
-                for kind in ('code', 'live', 'term', 'task', 'team'):
+                for kind in ('code', 'live', 'console', 'term', 'task', 'team'):
                     if profile == f'aidiy_{kind}_vue' or profile.startswith(f'aidiy-{kind}-profile-'):
-                        return kind
+                        return 'console' if kind == 'term' else kind
 
     index = 1
     while index < len(args):
@@ -107,10 +107,11 @@ def process_role(process, root, windows=False):
                     selected = tail[position + 1]
                 elif arg.startswith('--app='):
                     selected = arg.split('=', 1)[1]
-            return selected if selected in ('code', 'live', 'ide', 'term', 'task', 'team') else None
-        for kind in ('code', 'live', 'term', 'ide', 'task', 'team'):
+            selected = 'console' if selected == 'term' else selected
+            return selected if selected in ('code', 'live', 'ide', 'console', 'task', 'team') else None
+        for kind in ('code', 'live', 'console', 'term', 'ide', 'task', 'team'):
             if f'/aidiy_{kind}/' in '/' + entry:
-                return kind
+                return 'console' if kind == 'term' else kind
         if entry.startswith('frontend_ide/viewer/'):
             return 'ide'
         # 共用runtimeは所有元の親プロセスから判別し、単体では止めない。
@@ -135,7 +136,7 @@ def select_targets(processes, root, windows=False, current_pid=None):
         if roles[process['ProcessId']] is None and registered_supervisor(process, root):
             roles[process['ProcessId']] = 'supervisor'
     # Code/IDE/Discordの補助/MCP子孫を保護。ただし独立アプリLive等は保護の境界にする。
-    boundaries = {'live', 'term', 'task', 'team', 'frontend_avatar', 'backend_diag', 'supervisor'}
+    boundaries = {'live', 'console', 'task', 'team', 'frontend_avatar', 'backend_diag', 'supervisor'}
     protected = {pid for pid, role in roles.items() if role in KEEP}
     while True:
         children = {p['ProcessId'] for p in processes if p.get('ParentProcessId') in protected

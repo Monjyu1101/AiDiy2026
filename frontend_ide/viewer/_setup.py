@@ -107,7 +107,7 @@ def setup(choices=None) -> bool:
         vue = THIS_DIR.parent.parent / 'frontend_ide'
         if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
             vue_reuse = frontend_dependency_guard(
-                vue, 'Term / Code / Live / IDE 共通UI', desktop=False,
+                vue, 'Console / Code / Live / IDE 共通UI', desktop=False,
                 info=print_info, warning=print_warning, error=print_error,
             )
             if vue_reuse is False:

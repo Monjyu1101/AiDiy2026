@@ -13,13 +13,13 @@ import { basename,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAISearch } from './ファイル機能/ai-search.mjs';
 import { createFileAnalysis } from './ファイル機能/file-analysis.mjs';
-import { startTerminal } from './aidiy_term/terminal.mjs';
-import { validateCliOptions, resolveCliLaunch } from './aidiy_term/cli-launch.mjs';
+import { startTerminal } from './aidiy_console/terminal.mjs';
+import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch.mjs';
 import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
- if(!['code','live','ide','term','task','team'].includes(kind))throw Error('アプリはcode / live / ide / term / task / teamから指定してください。');
+ if(!['code','live','ide','console','task','team'].includes(kind))throw Error('アプリはcode / live / ide / console / task / teamから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  if(cli)await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env});
  const taskTeam=['task','team'].includes(kind);
@@ -50,7 +50,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
   },
   panelsFactory:(project,state)=>createPanels(project,state,async(type,folder,snapshot)=>{
    if(kind!=='ide'&&type!==kind)throw Error('このアプリでは利用できません。');
-   if(type==='term')return startTerminal(folder,{env,cli,cliAutoApprove,onCliStarted,onCliAbandoned});
+   if(type==='console')return startTerminal(folder,{env,cli,cliAutoApprove,onCliStarted,onCliAbandoned});
    const bundle=require(join(vscodeRoot,'dist',`aidiy_${type}`,'server.cjs'));
    if(type==='code')return bundle.単独起動(folder,backend,{offline:snapshot.mode==='offline',lockedMode:kind==='ide'||linked,keepAlive:true,provider,model});
    const vendor=provider==='openai_live'?'OPENAI':provider==='freeai_live'?'FREEAI':'GEMINI';

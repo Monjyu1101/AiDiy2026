@@ -12,13 +12,13 @@
 
 AiDiy が所有する Electron の操作画面は、**通常画面の背景を同じ位置で左ボタンで0.5秒長押しした後のドラッグ移動**と、**表示開始時のズーム**を基本とする。選択欄・入力欄などの操作と、ポップアップ中のモデル選択を窓移動より優先する。新規のアプリ・別窓にも最初から組み込む。光沢・影が走る追加の登場演出は入れない。
 
-対象は aidiy_diag、Avatar、Term、Code、Live、IDE、Discord と、その機能別ウィンドウ。IDE の Explorer、Viewer、ソース比較、軌跡バー、Browser 本文、Avatar の設定・タスク・チームも含む。Webブラウザ版・VS Code拡張の埋め込み画面にはOS窓移動を導入しない。演出用の短命な透明キャンバスは操作画面ではないため、長押しを取り付けない。
+対象は aidiy_diag、Avatar、Console、Code、Live、IDE、Discord と、その機能別ウィンドウ。IDE の Explorer、Viewer、ソース比較、軌跡バー、Browser 本文、Avatar の設定・タスク・チームも含む。Webブラウザ版・VS Code拡張の埋め込み画面にはOS窓移動を導入しない。演出用の短命な透明キャンバスは操作画面ではないため、長押しを取り付けない。
 
 ## タイトル操作と最前面ピン
 
 - 操作の並びは **ー □ 📌 Ｘ**。既存のタイトル位置・高さ・窓寸法は維持する。Diagのミニ表示では最大化を理由付きで無効化する。軌跡バーは通常タイトルバーを持たない例外で、最小化・最大化を追加しない。左端のバーガーを即時ドラッグ面とし、隣の二重縦線は表示しない。右端はピン・×の順にする。
 - 最前面の管理は `frontend_ide/デスクトップ/最前面ピン.cjs` の `createWindowPins` を全アプリで共用する。通常起動はOFF、沈んだ表示。再起動を越えてON状態を保存しない。Diagのミニ表示への切替・復帰も、その時点のユーザー選択を維持する。
-- IDEから開くTerm / Code / Live / Viewer / Browser / Explorer / 比較 / 軌跡だけはONで生成する。現在これらはIDEと同じElectronプロセスで、main側の `record.owner` が起動元の根拠となる。CLIの `--linked`、URL、rendererからの任意フラグを根拠にしない。
+- IDEから開くConsole / Code / Live / Viewer / Browser / Explorer / 比較 / 軌跡だけはONで生成する。現在これらはIDEと同じElectronプロセスで、main側の `record.owner` が起動元の根拠となる。CLIの `--linked`、URL、rendererからの任意フラグを根拠にしない。
 - Diagからのアプリ起動、単独Avatar（設定・タスク・チームを含む）、単独DiscordはIDE由来ではないためOFF。現行IDEにこれらの別プロセス起動経路はない。今後IDEから外部Electronを起動する場合は、mainが管理する起動元とVR状態の通知・切断処理を加え、単に別プロセスだからOFFと判断しない。
 - ONは全OS・全アプリで同じ `floating` 層。選択されたON窓だけ `focus` 時に `moveTop` する。`focus()` の奪い返し、タイマー再固定、IDE選択時の子窓一括持上げ、`pop-up-menu` 等の上位層は使わない。これにより別プロセスのON窓同士も通常のOS選択順に従う。OFF窓の選択では持上げ処理をしない。
 - IDEのVR中は、本体と所属する既存・新規子窓をONにロックする。UIは `aria-pressed` と理由付きdisabledで表示し、mainでもOFF要求を拒否する。F11・VR再押下・最大化によるVR終了後は、各窓のVR直前のユーザー選択へ戻す。VR中にIDEから新規生成した窓はONへ戻り、その後OFFにできる。
@@ -78,7 +78,7 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 |------|------------------|----------|
 | aidiy_diag 通常・ミニ | `backend_diag/起動/electron-main.cjs` | 内容読込と初期ミニ寸法の確定後に共通 `拡大表示` |
 | Avatar 全17種類 | `createBaseWindow`、`openSettingsWindow`、`openTeamWindow` | `electron/main.ts` の `ウィンドウ表示` に集約。読込待ち、連打抑制、非表示要求を共用 |
-| Term / Code / Live / IDE / 独立Viewer / Browser | `frontend_ide/desktop.cjs` の `attachWindowMove`。BrowserのWebContentsView本文にも取り付ける | `createWindow` で内容・配置確定後に共通 `拡大表示` |
+| Console / Code / Live / IDE / 独立Viewer / Browser | `frontend_ide/desktop.cjs` の `attachWindowMove`。BrowserのWebContentsView本文にも取り付ける | `createWindow` で内容・配置確定後に共通 `拡大表示` |
 | Explorer / 比較・Viewer / 軌跡の別窓 | `frontend_ide/デスクトップ/panel-windows.cjs` の `created` | `show` から共通 `拡大表示`。元DOM・状態・表示の保持を崩さない |
 | Discord | `frontend_channels/panel/desktop.cjs` | 内容・配置確定後に共通 `拡大表示`。Botの実接続は演出と独立 |
 
@@ -94,7 +94,7 @@ AiDiy が所有する Electron の操作画面は、**通常画面の背景を�
 - Avatarのmain変更後は `frontend_avatar` の `npm run build:electron` で `dist-electron` を同期する。`node frontend_avatar/checks/window-move-desktop.mjs` は全17種類の実生成関数と共通ズーム・長押しを検査する。本文だけを無害な合成画面へ置き換える。
 - `node backend_diag/checks/initial-mini-desktop.mjs`：実Vueの通常・ミニ表示、長押し、位置・サイズ・最前面・復元。
 - `node frontend_channels/checks/window-behavior-desktop.mjs`：Discordの本番Vue・preload・ズーム・背景の長押し・選択欄と入力欄のnative操作。Bot workerだけを合成し、接続・保存・外部送信をしない。
-- `node frontend_ide/scripts/check-module-move.mjs`：Code / Live / Termの単独・IDE連携、独立Viewer。`node frontend_ide/scripts/check-panel-desktop.mjs`：Explorer、Viewer、比較、iframe、軌跡。Monacoを含む既定の依存物を先にセットアップする。導入済みElectronの指定は各スクリプトの実装を確認する。
+- `node frontend_ide/scripts/check-module-move.mjs`：Code / Live / Consoleの単独・IDE連携、独立Viewer。`node frontend_ide/scripts/check-panel-desktop.mjs`：Explorer、Viewer、比較、iframe、軌跡。Monacoを含む既定の依存物を先にセットアップする。導入済みElectronの指定は各スクリプトの実装を確認する。
 - ズームの画像確認では、キャンバスの透明領域と内側の拡大、実画面のサイズ維持、終了後のキャンバス回収を区別する。光沢の掃引を追加しない。
 
 実Electronの入力とOSの窓位置・寸法を使う検証でも、無操作のためカーソル位置・フォーカス判定だけを模擬する場合がある。Windowsでの結果をMac / Linuxの実機確認として扱わない。異なるDPIの画面間移動やMac / Linuxの描画は各実機でも確認する。
@@ -127,6 +127,6 @@ AvatarのGUI起動は `electron/dev-start.cjs` がVite・TypeScript監視・Elec
 
 ## 起動元コンソールの保持
 
-Term / Code / Live / IDE の Electron 起動完了は1行で案内し、ブラウザ版・`--no-open` / `--serve` のURL、失敗理由、診断ログは維持します。Windows の直接 `.cmd` と PATH ランチャーは起動元で `chcp` / `cls` を実行しません。登録時は `scripts/_setup_path.py` の共通生成を使い、実行ファイル・固定引数をASCIIの実行文から復元して渡すため、日本語の配置先でもコンソールのコードページを変更しません。既存の PATH ランチャーはセットアップで再登録してください。
+Console / Code / Live / IDE の Electron 起動完了は1行で案内し、ブラウザ版・`--no-open` / `--serve` のURL、失敗理由、診断ログは維持します。Windows の直接 `.cmd` と PATH ランチャーは起動元で `chcp` / `cls` を実行しません。登録時は `scripts/_setup_path.py` の共通生成を使い、実行ファイル・固定引数をASCIIの実行文から復元して渡すため、日本語の配置先でもコンソールのコードページを変更しません。既存の PATH ランチャーはセットアップで再登録してください。
 
-Avatar の両 Vite 設定は `clearScreen: false` とし、開発サーバー再起動でも過去の出力を消しません。アプリ内のTerm・対話CLIの画面制御や、全体起動の明示的なリブート操作は別機能なので変更しません。Windows実機では、起動前の文字列が残ること、日本語の配置先・作業フォルダ、空白入り引数、失敗時の終了コード、`--wait` / Avatar の Ctrl+C を確認してください。
+Avatar の両 Vite 設定は `clearScreen: false` とし、開発サーバー再起動でも過去の出力を消しません。アプリ内のConsole・対話CLIの画面制御や、全体起動の明示的なリブート操作は別機能なので変更しません。Windows実機では、起動前の文字列が残ること、日本語の配置先・作業フォルダ、空白入り引数、失敗時の終了コード、`--wait` / Avatar の Ctrl+C を確認してください。

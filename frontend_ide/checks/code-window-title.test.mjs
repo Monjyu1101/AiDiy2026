@@ -46,8 +46,8 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
  const Menu={buildFromTemplate:items=>items,setApplicationMenu(value){app.menu=value;}};
  const modules={
   electron:{app,BrowserWindow:Window,Menu,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{x:0,y:0,width:1920,height:1040}}),getDisplayNearestPoint:()=>({workArea:{x:0,y:0,width:1920,height:1040}}),getCursorScreenPoint:()=>({})},dialog:{showMessageBox:async(_window,options)=>{dialogs.push(options);return{response};}}},
-  'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){},mkdtempSync:()=>'/tmp/term-fixture',rmSync(){}},
-  './デスクトップ/project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./デスクトップ/window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./デスクトップ/term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
+  'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){},mkdtempSync:()=>'/tmp/console-fixture',rmSync(){}},
+  './デスクトップ/project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./デスクトップ/window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./デスクトップ/console-window-slot.cjs':{reserveConsoleSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
   './host/scripts/MacOS-Menu.cjs':macMenuModule,
   './デスクトップ/task-windows.cjs':taskWindowsModule,
@@ -69,8 +69,8 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   async code(){const window=await api.createWindow('code','http://127.0.0.1:5678/',undefined,owner,'online:10');const record=api.windows.get(window.webContents);api.draftRouter.register(record,{kind:'code',contextId:`context-${record.slot}`,projectPath:'/project',label:'Code'});return record;}};
 }
 
-test('Mac のTerm / Code / Live / IDEは名称と最小メニューを各起動入口から設定する',async()=>{
- for(const [kind,name] of [['term','Term'],['code','Code'],['live','Live'],['ide','IDE']]){
+test('Mac のConsole / Code / Live / IDEは名称と最小メニューを各起動入口から設定する',async()=>{
+ for(const [kind,name] of [['console','Console'],['code','Code'],['live','Live'],['ide','IDE']]){
   const f=await desktopFixture({platform:'darwin',kind,active:false});assert.equal(f.app.name,'AiDiy '+name);assert.equal(f.app.menu[0].label,'AiDiy '+name);
   f.app.menu[0].submenu[0].click();await tick();await tick();assert.equal(f.owner.window.isDestroyed(),true);assert.equal(f.app.quitComplete,true);assert.equal(f.dialogs.length,0);
  }
@@ -129,9 +129,9 @@ test('VRは本体と既存・新規子窓のピンをロックし、終了後は
  assert.equal(action(on,'toggle-pin').pinned,false);
 });
 
-test('OS親子関係なしでもTerm / Code / Live / Viewerの起動元・個別終了・セッション終了を維持',async()=>{
+test('OS親子関係なしでもConsole / Code / Live / Viewerの起動元・個別終了・セッション終了を維持',async()=>{
  const f=await desktopFixture(),records=[];let closed=0;
- for(const kind of ['term','code','live','viewer']){
+ for(const kind of ['console','code','live','viewer']){
   const url=kind==='viewer'?'http://127.0.0.1:1234/#viewer=sample.txt':'http://127.0.0.1:5678/';
   const window=await f.createWindow(kind,url,{close:async()=>{closed++;}},f.owner,'online:10');
   const record=f.windows.get(window.webContents);records.push(record);
@@ -155,14 +155,14 @@ test('preloadタイトル: 任意IPCを公開せずホストの同一ウィン�
 });
 
 
-test('IDE Term番号: 共有配置slot・タイトルIPC・閉鎖後の再利用が一致し、単独Termは従来タイトルを保つ',async()=>{
+test('IDE Console番号: 共有配置slot・タイトルIPC・閉鎖後の再利用が一致し、単独Consoleは従来タイトルを保つ',async()=>{
  const f=await desktopFixture();
- const create=async owner=>{const window=await f.createWindow('term','http://127.0.0.1:6789/',undefined,owner,'online:10');return f.windows.get(window.webContents);};
- const standalone=await create();assert.equal(standalone.slot,0);assert.equal(standalone.window.getTitle(),'AiDiy Term');
+ const create=async owner=>{const window=await f.createWindow('console','http://127.0.0.1:6789/',undefined,owner,'online:10');return f.windows.get(window.webContents);};
+ const standalone=await create();assert.equal(standalone.slot,0);assert.equal(standalone.window.getTitle(),'AiDiy Console');
  const terms=await Promise.all([create(f.owner),create(f.owner),create(f.owner)]);
  assert.deepEqual(terms.map(record=>record.slot),[1,2,3]);
  const verify=record=>{
-  const title=`AiDiy IDE / Term ${record.slot+1}`;
+  const title=`AiDiy IDE / Console ${record.slot+1}`;
   assert.equal(record.window.getTitle(),title);
   assert.equal(f.handlers.get('development:window')(f.event(record),'title'),title);
   let prevented=false;record.window.title='shell title';record.window.webContents.emit('page-title-updated',{preventDefault(){prevented=true;}});

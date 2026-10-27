@@ -73,7 +73,7 @@ class RootIntegrationTests(unittest.TestCase):
             '3. Tools','4. Core / Apps',
             '5. Task / Team','6. Web',
             '7. Avatar','8. Hermes',
-            '9. Term / Code / Live / IDE','10. Discord',
+            '9. Console / Code / Live / IDE','10. Discord',
         ])
     def test_cleanup_auto_includes_diag_first(self):
         module=self.root_module('_cleanup');calls=[];original=module.ask_yes_no
@@ -105,7 +105,7 @@ class RootIntegrationTests(unittest.TestCase):
                     self.assertEqual(values,(False,)*6+(True,)+(False,)*5)
                 else:
                     self.assertEqual(len(calls),12)
-                    self.assertIn('Term',calls[7][0])
+                    self.assertIn('Console',calls[7][0])
                     self.assertEqual(values[:6]+values[7:],tuple(default for _,default in calls[1:]))
 
     def test_start_choices_do_not_run_headless(self):

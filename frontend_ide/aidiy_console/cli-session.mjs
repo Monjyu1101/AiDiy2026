@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 
-// 1つのTerm窓が1つのCLIプロセスを所有する。通信の再接続・重複startは再実行にしない。
+// 1つのConsole窓が1つのCLIプロセスを所有する。通信の再接続・重複startは再実行にしない。
 // 再接続猶予中は直近の出力を保持し、猶予切れまたは所有サーバー終了時にプロセスを片付ける。
 export function createCliSession(launch, project, spawnTerminal, { outputLimit = 256 * 1024 } = {}) {
   let terminal, state = 'idle', output = '', exitCode, error, closing;

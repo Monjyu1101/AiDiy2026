@@ -131,7 +131,7 @@ class PosixPathTests(unittest.TestCase):
         with patch.object(root, '_load_folder_module', side_effect=folder), patch.object(root.subprocess, 'run') as process:
             self.assertEqual(root.setup_launchers_only(), ['Diag'])
             process.assert_not_called()
-        self.assertEqual(events, ['backend_diag', 'frontend_avatar', 'command_hermes', 'frontend_ide/aidiy_term',
+        self.assertEqual(events, ['backend_diag', 'frontend_avatar', 'command_hermes', 'frontend_ide/aidiy_console',
                                   'frontend_ide/host', 'frontend_ide/viewer', 'frontend_ide/aidiy_task',
                                   'frontend_ide/aidiy_team', 'frontend_channels'])
 
@@ -172,7 +172,7 @@ class PosixPathTests(unittest.TestCase):
         stub = '#!' + sys.executable + '\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n'
         node.write_text(stub, encoding='utf-8'); node.chmod(0o755)
         files = {'backend_diag': 'diag_main.mjs', 'frontend_ide/viewer': 'launch.mjs',
-                 'frontend_ide/aidiy_term': 'launch.mjs', 'frontend_channels': 'panel/launch.mjs',
+                 'frontend_ide/aidiy_console': 'launch.mjs', 'frontend_channels': 'panel/launch.mjs',
                  'frontend_ide/host': 'aidiy_code/launch.mjs', 'frontend_avatar': 'launch.mjs',
                  'command_hermes': 'cli_main.py'}
         for folder, file in files.items():
@@ -203,9 +203,9 @@ class PosixPathTests(unittest.TestCase):
         self.assertTrue(hermes.install_standalone_launcher())
         with patch.object(shutil, 'which', return_value=str(node)):
             viewer.install_launcher(checkout / 'frontend_ide/viewer')
-            viewer.install_launcher(checkout / 'frontend_ide/aidiy_term', 'term')
+            viewer.install_launcher(checkout / 'frontend_ide/aidiy_console', 'console')
             discord.install_launcher(checkout / 'frontend_channels')
-        for kind in ('diag', 'ide', 'term', 'code', 'live', 'avatar', 'hermes', 'discord'):
+        for kind in ('diag', 'ide', 'console', 'code', 'live', 'avatar', 'hermes', 'discord'):
             with self.subTest(kind=kind):
                 launcher = self.directory / ('aidiy_' + kind)
                 self.assertEqual(launcher.read_bytes().count(b'\r'), 0)
@@ -217,7 +217,7 @@ class PosixPathTests(unittest.TestCase):
                                         env=env, text=True, capture_output=True, check=True)
                 self.assertEqual(json.loads(result.stdout)[-3:], ['--test', '引数 with spaces', 'literal$'])
         self.assertTrue(viewer.remove_launcher(checkout / 'frontend_ide/viewer'))
-        self.assertTrue(viewer.remove_launcher(checkout / 'frontend_ide/aidiy_term', 'term'))
+        self.assertTrue(viewer.remove_launcher(checkout / 'frontend_ide/aidiy_console', 'console'))
         self.assertTrue(discord.remove_launcher(checkout / 'frontend_channels'))
         diag_cleanup = load(ROOT / 'backend_diag/_cleanup.py')
         self.enterContext(patch.object(diag_cleanup, '__file__', str(checkout / 'backend_diag/_cleanup.py')))

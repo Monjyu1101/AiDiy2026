@@ -7,7 +7,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import { ref, reactive, computed, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { installWindowMove } from './共通表示/長押し窓移動.js';
 import CodePanel from './コード/コードパネル.vue';
-import TermPanel from './ターミナル/ターミナルパネル.vue';
+import ConsolePanel from './ターミナル/ターミナルパネル.vue';
 import LivePanel from './ライブ/ライブパネル.vue';
 import SpaceView from './開発スペース/開発スペース.vue';
 import StatusBar from './共通表示/状態バー.vue';
@@ -35,7 +35,7 @@ const { config }=defineProps({config:Object});
 // IDEのピン留めで開いた独立ウィンドウ（URLの #viewer=ファイル）。IDE本体の画面・接続監視は動かさない。
 const viewerPath=config.kind==='ide'&&location.hash.startsWith('#viewer=')?decodeURIComponent(location.hash.slice('#viewer='.length)):'';
 const browserPanel=config.kind==='ide'&&location.hash==='#browser'&&!!window.aidiyWindow;
-const state=ref({active:false}),base=reactive({term:'',code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
+const state=ref({active:false}),base=reactive({console:'',code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
 const statusError=ref('');
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false),viewMode=ref('3d');
 let stopWindowMove=()=>{};
@@ -85,7 +85,7 @@ async function status(){
 function update(data){
   if(disposed)return;
   const next=data.active?`${data.mode}:${data.startedAt}:${data.project?.path||''}`:'';
-  if(next!==session){lastDraftKind='';analysis.value=null;history.value=null;draftRequest.value=null;pinnedViewers.clear();for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';base.term='';panelOpen.value=false;tab.value='code';liveOpen.value=false;viewMode.value='3d';}
+  if(next!==session){lastDraftKind='';analysis.value=null;history.value=null;draftRequest.value=null;pinnedViewers.clear();for(const key of Object.keys(opening))delete opening[key];session=next;base.code='';base.live='';base.console='';panelOpen.value=false;tab.value='code';liveOpen.value=false;viewMode.value='3d';}
   state.value=data;error.value=data.message||'';
 }
 async function start(action){
@@ -192,8 +192,8 @@ onBeforeUnmount(()=>{stopWindowMove();stopAllDisplays();disposed=true;revision++
             <nav v-if="state.active" class="ide-view-modes" aria-label="ファイルの表示モード"><button :aria-pressed="viewMode==='3d'" @click="viewMode='3d'">3D</button><button :aria-pressed="viewMode==='2d'" @click="viewMode='2d'">2D</button></nav>
           </div>
           <div class="ide-toolbar-right">
-            <nav v-if="state.active&&desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" title="ターミナルを別ウィンドウで開く" @click="openWindow('term')">{{ launching==='term'?'起動中…':'＋ Term' }}</button><button :disabled="!!launching" title="コード支援を別ウィンドウで開く" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" title="音声会話を別ウィンドウで開く" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button><button :disabled="!!launching||!browserAvailable" :title="browserAvailable?'ブラウザを別ウィンドウで開く':'tools接続中のみ起動できます'" @click="openWindow('browser')">{{ launching==='browser'?'起動中…':'＋ Browser' }}</button></nav>
-            <nav v-else-if="state.active" class="ai-launchers" aria-label="パネルを開く"><button :aria-pressed="panelOpen&&tab==='term'" @click="openPanel('term')">Term</button><button :aria-pressed="panelOpen&&tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" :aria-pressed="panelOpen&&tab==='live'" @click="openPanel('live')">Live</button><button :disabled="!browserAvailable||!!launching" @click="openWindow('browser')" :title="browserAvailable?'新しいブラウザタブでGoogle検索を開く':'tools接続中のみ起動できます'">＋ Browser</button></nav>
+            <nav v-if="state.active&&desktop" class="ai-launchers" aria-label="別ウィンドウを開く"><button :disabled="!!launching" title="ターミナルを別ウィンドウで開く" @click="openWindow('console')">{{ launching==='console'?'起動中…':'＋ Console' }}</button><button :disabled="!!launching" title="コード支援を別ウィンドウで開く" @click="openWindow('code')">{{ launching==='code'?'起動中…':'＋ Code' }}</button><button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching" title="音声会話を別ウィンドウで開く" @click="openWindow('live')">{{ launching==='live'?'起動中…':'＋ Live' }}</button><button :disabled="!!launching||!browserAvailable" :title="browserAvailable?'ブラウザを別ウィンドウで開く':'tools接続中のみ起動できます'" @click="openWindow('browser')">{{ launching==='browser'?'起動中…':'＋ Browser' }}</button></nav>
+            <nav v-else-if="state.active" class="ai-launchers" aria-label="パネルを開く"><button :aria-pressed="panelOpen&&tab==='console'" @click="openPanel('console')">Console</button><button :aria-pressed="panelOpen&&tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" :aria-pressed="panelOpen&&tab==='live'" @click="openPanel('live')">Live</button><button :disabled="!browserAvailable||!!launching" @click="openWindow('browser')" :title="browserAvailable?'新しいブラウザタブでGoogle検索を開く':'tools接続中のみ起動できます'">＋ Browser</button></nav>
             <nav><template v-if="!state.active"><button :disabled="pending" @click="start('connect')">AiDiy接続利用</button><button :disabled="pending" @click="start('offline')">オフライン利用</button></template><button v-else :disabled="pending" @click="start('disconnect')">{{ desktop?'終了':'利用終了' }}</button></nav>
           </div>
         </div>
@@ -201,7 +201,7 @@ onBeforeUnmount(()=>{stopWindowMove();stopAllDisplays();disposed=true;revision++
       <template v-if="allDisplayState.active"><nav v-for="toolbar in allToolbars" :key="toolbar.displayId" class="all-restore-zone" :data-display-id="toolbar.displayId" :style="allRestoreStyle(toolbar)" aria-label="この画面のVR操作" @mouseenter="status" @focusin="status">
         <button class="all-restore-button" :disabled="allBusy" aria-label="VRモードを終了して元の表示に戻す" title="VRモードを終了" @click="toggleAllDisplays"><span class="all-restore-icon" aria-hidden="true"></span></button>
         <div class="all-launchers">
-          <button :disabled="!!launching||allBusy" title="この画面の下部にターミナルを開く" @click="openWindow('term',toolbar.displayId)">{{ launching==='term'?'起動中…':'＋ Term' }}</button>
+          <button :disabled="!!launching||allBusy" title="この画面の下部にターミナルを開く" @click="openWindow('console',toolbar.displayId)">{{ launching==='console'?'起動中…':'＋ Console' }}</button>
           <button :disabled="!!launching||allBusy" title="この画面の右上にコード支援を開く" @click="openWindow('code',toolbar.displayId)">{{ launching==='code'?'起動中…':'＋ Code' }}</button>
           <button v-if="state.mode==='online'&&!liveOpen" :disabled="!!launching||allBusy" title="この画面の左上に音声会話を開く" @click="openWindow('live',toolbar.displayId)">{{ launching==='live'?'起動中…':'＋ Live' }}</button>
           <button :disabled="!!launching||allBusy||!browserAvailable" :title="browserAvailable?'この画面にブラウザを開く':'tools接続中のみ起動できます'" @click="openWindow('browser',toolbar.displayId)">{{ launching==='browser'?'起動中…':'＋ Browser' }}</button>
@@ -211,17 +211,17 @@ onBeforeUnmount(()=>{stopWindowMove();stopAllDisplays();disposed=true;revision++
       <TerminalWelcome v-if="!state.active" kind="ide" :icon="config.icon" />
       <template v-else>
         <SpaceView ref="spaceView" :key="`${state.mode}:${state.startedAt}:${state.project?.path||''}`" :started-at="state.startedAt" :view-mode="viewMode" :all-displays="allDisplayState.active" />
-        <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='term'" @click="openPanel('term')">Term</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false"><span class="close-icon" aria-hidden="true"></span></button></nav>
+        <aside v-if="!desktop" v-show="panelOpen" class="ai-popup"><nav class="ai-tabs" role="tablist"><button role="tab" :aria-selected="tab==='console'" @click="openPanel('console')">Console</button><button role="tab" :aria-selected="tab==='code'" @click="openPanel('code')">Code</button><button v-if="state.mode==='online'" role="tab" :aria-selected="tab==='live'" @click="openPanel('live')">Live</button><button class="close" aria-label="パネルを閉じる" @click="panelOpen=false"><span class="close-icon" aria-hidden="true"></span></button></nav>
           <CodePanel ref="codePanel" v-if="base.code" v-show="tab==='code'" :key="base.code" :base="base.code" :icon="config.icon" embedded />
           <LivePanel ref="livePanel" v-if="base.live&&state.mode==='online'" v-show="panelOpen&&tab==='live'" :visible="panelOpen&&tab==='live'" :key="base.live" :base="base.live" :icon="config.icon" />
-          <TermPanel v-if="base.term" v-show="tab==='term'" :key="base.term" :base="base.term" :icon="config.icon" :visible="panelOpen&&tab==='term'" linked />
+          <ConsolePanel v-if="base.console" v-show="tab==='console'" :key="base.console" :base="base.console" :icon="config.icon" :visible="panelOpen&&tab==='console'" linked />
           <p v-if="!base[tab]" class="panel-loading">読み込み中…</p>
         </aside>
       </template>
     </template>
     <CodePanel v-else-if="config.kind==='code'&&base.code" :base="config.host?'':base.code" :host="config.host" :embedded="config.linked" :linked="config.linked" :icon="config.icon" :desktop="desktop" />
     <LivePanel v-else-if="config.kind==='live'&&base.live" :base="config.host?'':base.live" :config="config.live||{}" :linked="config.linked" :icon="config.icon" :desktop="desktop" />
-    <TermPanel v-else-if="config.kind==='term'&&base.term" :base="base.term" :icon="config.icon" :desktop="desktop" :linked="config.linked" />
+    <ConsolePanel v-else-if="config.kind==='console'&&base.console" :base="base.console" :icon="config.icon" :desktop="desktop" :linked="config.linked" />
     <p v-else class="panel-loading">読み込み中…</p>
     <p v-if="error||statusError" class="app-error" role="alert">{{ error||statusError }}</p>
   </div>

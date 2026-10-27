@@ -64,10 +64,10 @@ class TaskTeamStartTests(unittest.TestCase):
         module = load()
         for task, team in ((False, False), (True, False), (False, True), (True, True)):
             with self.subTest(task=task, team=team), patch.object(module, 'start_service', return_value=True) as start, patch.object(module, 'wait_for_services_quiet'), patch.object(module, 'ensure_optional_service_ready', return_value=True), redirect_stdout(io.StringIO()):
-                flags = module.start_initial_services(False, False, False, True, True, False, {}, {}, 'npm', task_enabled=task, team_enabled=team, term_enabled=True)
+                flags = module.start_initial_services(False, False, False, True, True, False, {}, {}, 'npm', task_enabled=task, team_enabled=team, console_enabled=True)
             expected = ['バックエンド(task,team)', 'フロントエンド(Avatar)']
             expected += [f'フロントエンド({kind})' for kind, enabled in (('task', task), ('team', team)) if enabled]
-            expected += ['フロントエンド(term)']
+            expected += ['フロントエンド(console)']
             self.assertEqual([call.args[0] for call in start.call_args_list], expected)
             self.assertFalse(flags['フロントエンド(task)'])
             self.assertFalse(flags['フロントエンド(team)'])

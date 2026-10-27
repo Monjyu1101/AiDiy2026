@@ -23,7 +23,7 @@ async function fixture({switching=false}={}){
 test('VS Codeを含む6アプリ・7CLI・エディターの14個をアイコン表示へ渡す',async()=>{
  const f=await fixture();
  try{
-  f.appState.項目.value=['avatar','ide','term','code','live','discord'].map(id=>({id,名前:id}));
+  f.appState.項目.value=['avatar','ide','console','code','live','discord'].map(id=>({id,名前:id}));
   f.cliState.項目.value=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'].map(id=>({id,名前:id,利用可能:true}));
   f.cliState.項目.value.push({id:'vscode',名前:'VS Code',種類:'editor',利用可能:true});
   await flush();

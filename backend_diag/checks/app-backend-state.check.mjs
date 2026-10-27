@@ -26,6 +26,6 @@ test('all launcher sizes gate Task/Team and expose disabled reason; app owns pol
  for(const name of ['アプリ起動パネル.vue','ミニアプリ起動.vue','マイクロランチャー.vue']){const s=await readFile(new URL('../ui/src/アプリ起動/'+name,import.meta.url),'utf8');assert.match(s,/利用可能\(item.id\)/);assert.match(s,/不可理由\(item.id\)/);}
  const app=await readFile(new URL('../ui/src/App.vue',import.meta.url),'utf8');assert.match(app,/アプリ\.接続\(value\)/);assert.match(app,/アプリ\.終了\(\)/);
 });
-test('Task/Team icons are distinct original SVGs with readable captions',async()=>{
- for(const id of ['task','team']){assert.equal(アプリアイコン[id],`AiDiy_${id}.svg`);const s=await readFile(new URL(`../ui/src/アプリ起動/アプリアイコン/${id}.svg`,import.meta.url),'utf8');assert.match(s,/viewBox="0 0 120 120"/);assert.ok(s.includes(id.toUpperCase()));assert.doesNotMatch(s,/<script|https?:\/\/(?!www.w3.org)/);}
+test('Task/Team icons are shared AiDiy SVGs with readable captions',async()=>{
+ for(const id of ['task','team']){assert.equal(アプリアイコン[id],`AiDiy_${id}.svg`);const s=await readFile(new URL(`../ui/src/アプリ起動/アプリアイコン/${id}.svg`,import.meta.url),'utf8');assert.match(s,/viewBox="0 0 512 512"/);assert.ok(s.includes(id.toUpperCase()));assert.doesNotMatch(s,/<script|https?:\/\/(?!www.w3.org)/);}
 });

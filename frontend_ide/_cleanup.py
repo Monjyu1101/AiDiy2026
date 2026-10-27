@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""IDE群(Term / Code / Live / IDE / Task / Team)を一括でクリーンアップする。"""
+"""IDE群(Console / Code / Live / IDE / Task / Team)を一括でクリーンアップする。"""
 import importlib.util
 import shutil
 import sys
@@ -21,10 +21,10 @@ def cleanup(choices=None):
     if choices is not None and choices.get('ide') is False:
         return True
     print('\n' + '=' * 60)
-    print('IDE群(Term / Code / Live / IDE / Task / Team) のクリーンアップ')
+    print('IDE群(Console / Code / Live / IDE / Task / Team) のクリーンアップ')
     print('=' * 60 + '\n')
     # 子側で停止・解除を確認できなければ共通依存を残す。
-    term_ok = _load_cleanup('aidiy_term').cleanup(choices, report=False)
+    term_ok = _load_cleanup('aidiy_console').cleanup(choices, report=False)
     host = _load_cleanup('host')
     results = [host.cleanup_app(module, report=False) for module in ('code', 'live')]
     results.append(_load_cleanup('viewer').cleanup(choices, report=False))
@@ -43,14 +43,14 @@ def cleanup(choices=None):
         if target.exists():
             shutil.rmtree(target)
             print(f'[OK] {name} (共通UI) を削除しました: {target}')
-    print('[OK] IDE群(Term / Code / Live / IDE / Task / Team) のクリーンアップ完了')
+    print('[OK] IDE群(Console / Code / Live / IDE / Task / Team) のクリーンアップ完了')
     return True
 
 if __name__ == '__main__':
-    answer = input('IDE群(Term / Code / Live / IDE / Task / Team)を停止し、拡張・ランチャー・依存関係を解除しますか？ ([n]/y): ')
+    answer = input('IDE群(Console / Code / Live / IDE / Task / Team)を停止し、拡張・ランチャー・依存関係を解除しますか？ ([n]/y): ')
     if answer.strip().lower() == 'y':
         spec = importlib.util.spec_from_file_location('ide_root_cleanup', ROOT.parent / '_cleanup.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        with module.cleanup_stop_request({}, services=['フロントエンド(term)', 'フロントエンド(code)', 'フロントエンド(live)', 'フロントエンド(IDE)']):
+        with module.cleanup_stop_request({}, services=['フロントエンド(console)', 'フロントエンド(code)', 'フロントエンド(live)', 'フロントエンド(IDE)']):
             sys.exit(0 if cleanup() else 1)

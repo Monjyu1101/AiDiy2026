@@ -140,7 +140,7 @@ async function start(value) {
   window.webContents.once('render-process-gone',()=>fail('RENDERER'));
   try{await window.loadURL(url.href);}catch{fail('LOAD');return;}
   if(failed || window.isDestroyed())return;
-  // Code / Live / Term / IDE と同じ共通演出。内容は拡大完了後にフェード表示する。
+  // Code / Live / Console / IDE と同じ共通演出。内容は拡大完了後にフェード表示する。
   await window.webContents.executeJavaScript("document.documentElement.classList.add('desktop-opening','desktop-window')");
   opening=true;
   const shown=await 拡大表示(BrowserWindow,window,{background:'#080b10'});opening=false;

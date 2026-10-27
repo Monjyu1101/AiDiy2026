@@ -9,8 +9,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { startDevelopment } from './server.mjs';
-import { validateCliOptions, resolveCliLaunch } from './aidiy_term/cli-launch.mjs';
-import { createCliOwnerLifetime } from './aidiy_term/cli-session.mjs';
+import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch.mjs';
+import { createCliOwnerLifetime } from './aidiy_console/cli-session.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
 import { ブラウザで開く } from './host/scripts/launch-project.mjs';
 import { spawnDesktop } from './デスクトップ/desktop-process.mjs';
@@ -18,7 +18,7 @@ import projectProfiles from './デスクトップ/project-profile.cjs';
 const {projectIdentity}=projectProfiles;
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){
- const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='term'?'Term':defaultKind==='task'?'Task':defaultKind==='team'?'Team':'Code';
+ const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='console'?'Console':defaultKind==='task'?'Task':defaultKind==='team'?'Team':'Code';
  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--app',defaultKind,'--foreground',...args],{cwd:process.cwd(),env:{...process.env,AIDIY_LAUNCHER_CHILD:'1'},detached:true,windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
  try{
   const result=await new Promise((done,reject)=>{
@@ -37,8 +37,8 @@ async function launchDetached(defaultKind,args){
 export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},cli:{type:'string'},'cli-auto-approve':{type:'boolean'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
  const kind=values.app||defaultKind;
- if(!['code','live','ide','term','task','team'].includes(kind))throw Error('--app はcode / live / ide / term / task / teamから指定してください。');
- if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port]${['task','team'].includes(kind)?'':' [--provider 名前] [--model モデル]'}${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='term'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
+ if(!['code','live','ide','console','task','team'].includes(kind))throw Error('--app はcode / live / ide / console / task / teamから指定してください。');
+ if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port]${['task','team'].includes(kind)?'':' [--provider 名前] [--model モデル]'}${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='console'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
  if(['task','team'].includes(kind)&&['provider','model','offline','connect'].some(name=>values[name]!==undefined))throw Error('Task / Team のモデル・接続設定は画面内で指定してください（--provider / --model / --offline / --connect は利用できません）。');
  validateCliOptions(kind,{cli:values.cli,cliAutoApprove:values['cli-auto-approve'],provider:values.provider,model:values.model});
  if(values.cli)await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']});
@@ -85,7 +85,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  await publishReady(browser);
  if(browser){
   const opened=await ブラウザで開く(app.publicUrl,{ローカルURL:app.url});
-  if(values.cli&&!opened){await stop();throw Error('CLI用のTerm画面をブラウザで開けませんでした。既定ブラウザまたはElectronのセットアップを確認して、もう一度起動してください。');}
+  if(values.cli&&!opened){await stop();throw Error('CLI用のConsole画面をブラウザで開けませんでした。既定ブラウザまたはElectronのセットアップを確認して、もう一度起動してください。');}
  }
  lifetime?.arm();
  notifyReady(ready);

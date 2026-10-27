@@ -4,14 +4,14 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""Termのランチャーを登録する。共有依存はIDE群のセットアップで導入する。"""
+"""Consoleのランチャーを登録する。共有依存はIDE群のセットアップで導入する。"""
 import importlib.util
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 def setup(choices=None):
-    spec = importlib.util.spec_from_file_location('aidiy_term_launcher', ROOT.parent / 'viewer/launcher.py')
+    spec = importlib.util.spec_from_file_location('aidiy_console_launcher', ROOT.parent / 'viewer/launcher.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    module.install_launcher(ROOT, 'term')
+    module.install_launcher(ROOT, 'console')
     return True

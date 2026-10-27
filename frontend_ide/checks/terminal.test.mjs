@@ -10,7 +10,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocket } from 'ws';
-import { startTerminal } from '../aidiy_term/terminal.mjs';
+import { startTerminal } from '../aidiy_console/terminal.mjs';
 import { startDevelopment } from '../server.mjs';
 import { cliCompletions } from '../src/ターミナル/コマンド補完.js';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -96,13 +96,13 @@ test('小さい端末: 1〜5行の起動・縮小・復元をPTYへそのまま�
   assert.equal(starts.length,4);
  }finally{await app.close();}
 });
-test('IDEのTerm: 実PTYで日本語・作業フォルダ・リサイズ・Ctrl+C・セッション終了', { timeout: 30000 }, async () => {
-  const project = await mkdtemp(join(tmpdir(), 'aidiy-term-'));
+test('IDEのConsole: 実PTYで日本語・作業フォルダ・リサイズ・Ctrl+C・セッション終了', { timeout: 30000 }, async () => {
+  const project = await mkdtemp(join(tmpdir(), 'aidiy-console-'));
   const app = await startDevelopment(project); let ws;
   try {
-    assert.equal((await fetch(app.url + 'api/panels/term', { method: 'POST' })).status, 503);
+    assert.equal((await fetch(app.url + 'api/panels/console', { method: 'POST' })).status, 503);
     await fetch(app.url + 'api/connection/offline', { method: 'POST' });
-    const { url } = await fetch(app.url + 'api/panels/term', { method: 'POST' }).then(r => r.json());
+    const { url } = await fetch(app.url + 'api/panels/console', { method: 'POST' }).then(r => r.json());
     const client = await connect(new URL(url, app.url).href, new URL(app.url).origin); ws = client.ws;
     client.send({ type: 'start', cols: 100, rows: 30 }); await until(() => client.messages.some(m => m.type === 'ready'));
     const windows = process.platform === 'win32';

@@ -13,7 +13,7 @@
 
 - Discord は、開発中にも外部から調整依頼を受け付けるための窓口として使う。通常の setup / start 開始時と全体 start の Ctrl+C 終了時は、Code / IDE と同じく強制終了から除外する。
 - パネル、Bot worker、ブラウザ版サーバーだけでなく、依頼処理に必要な Hermes / CLI / MCP の子孫も保持する。共通判定は `scripts/_setup_processes.py`、全体 start の通常終了は `_start.py::stop_processes` で揃える。
-- Core 停止中の Live など、停止したバックエンドに依存する機能まで利用できることは保証しない。独立した Live / Term 等を Discord 配下という理由だけで保持しない。
+- Core 停止中の Live など、停止したバックエンドに依存する機能まで利用できることは保証しない。独立した Live / Console 等を Discord 配下という理由だけで保持しない。
 - 明示的な `_cleanup.py` とパネルからの停止・終了は従来どおり対象を停止する。cleanup の停止要求は自動再起動を抑止する。
 - 起動中の Discord は依存更新でも停止させない。`frontend_channels/_setup.py` は稼働確認を npm 実行より先に行い、起動中または判定不能なら依存・ランチャー・共通設定を変更せず `False`（エラー）で保留・中止を報告する。成功扱いにしない。他項目だけ更新する場合はセットアップ対象から Discord を外す。
 - 回帰確認は `python -B -m unittest discover -s scripts/checks -p test_setup_processes.py`、`python -B -m unittest discover -s scripts/checks -p test_start_shutdown_flow.py`、`python -B -m unittest discover -s frontend_channels/checks -p test_lifecycle.py`。合成プロセスとモックで保持・停止を検証し、実際のサービスは停止しない。

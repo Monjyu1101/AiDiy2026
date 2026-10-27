@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""Termを停止し、この配置先のランチャーを解除する。共有依存は残す。"""
+"""Consoleを停止し、この配置先のランチャーを解除する。共有依存は残す。"""
 import importlib.util
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
@@ -19,8 +19,8 @@ def cleanup(choices=None, *, report=True):
     if choices is not None and choices.get('ide') is False:
         return True
     try:
-        load('aidiy_term_cleanup_start', ROOT / '_start.py').kill_ports()
-        return load('aidiy_term_cleanup_launcher', ROOT.parent / 'viewer/launcher.py').remove_launcher(ROOT, 'term')
+        load('aidiy_console_cleanup_start', ROOT / '_start.py').kill_ports()
+        return load('aidiy_console_cleanup_launcher', ROOT.parent / 'viewer/launcher.py').remove_launcher(ROOT, 'console')
     except Exception as error:
-        print(f'[NG] Termの解除に失敗しました: {error}')
+        print(f'[NG] Consoleの解除に失敗しました: {error}')
         return False

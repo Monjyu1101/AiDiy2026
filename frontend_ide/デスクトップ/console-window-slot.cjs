@@ -6,7 +6,7 @@
 const {createServer}=require('node:net');
 // 別ElectronプロセスとIDE子窓で配置番号を共有する。OSが終了時に解放する。
 // データや操作は受け付けず、ループバックの排他だけに使う。
-async function reserveTermSlot(){
+async function reserveConsoleSlot(){
  for(let slot=0;slot<128;slot++){
   const server=createServer(socket=>socket.destroy());
   try{
@@ -15,6 +15,6 @@ async function reserveTermSlot(){
    return{slot,close(){server.close();}};
   }catch(error){if(error.code!=='EADDRINUSE')throw error;}
  }
- throw Error('Termのウィンドウ配置番号を確保できません。');
+ throw Error('Consoleのウィンドウ配置番号を確保できません。');
 }
-module.exports={reserveTermSlot};
+module.exports={reserveConsoleSlot};

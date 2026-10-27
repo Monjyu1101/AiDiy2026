@@ -237,7 +237,7 @@ class PathTests(unittest.TestCase):
         scripts = {
             'backend_diag': 'diag_main.mjs',
             'frontend_ide/viewer': 'launch.mjs',
-            'frontend_ide/aidiy_term': 'launch.mjs',
+            'frontend_ide/aidiy_console': 'launch.mjs',
             'frontend_channels': 'panel/launch.mjs',
             'frontend_ide/host': 'aidiy_code/launch.mjs',
             'frontend_avatar': 'launch.mjs',
@@ -271,9 +271,9 @@ class PathTests(unittest.TestCase):
         self.assertTrue(hermes.setup())
         with patch.object(shutil, 'which', return_value='node.exe'):
             viewer.install_launcher(project / 'frontend_ide/viewer')
-            viewer.install_launcher(project / 'frontend_ide/aidiy_term', 'term')
+            viewer.install_launcher(project / 'frontend_ide/aidiy_console', 'console')
             discord.install_launcher(project / 'frontend_channels')
-        commands = ('diag', 'ide', 'term', 'code', 'live', 'avatar', 'hermes', 'discord')
+        commands = ('diag', 'ide', 'console', 'code', 'live', 'avatar', 'hermes', 'discord')
         for command in commands:
             name = f'aidiy_{command}.cmd'
             # PATH / PATHEXT は Windows 形式で解釈し、POSIX の実行権限には依存しない。
@@ -296,7 +296,7 @@ class PathTests(unittest.TestCase):
         self.enterContext(patch.object(diag_cleanup, '__file__', str(project / 'backend_diag/_cleanup.py')))
         self.enterContext(patch.object(diag_cleanup, 'stop_processes', return_value=True))
         self.assertTrue(viewer.remove_launcher(project / 'frontend_ide/viewer'))
-        self.assertTrue(viewer.remove_launcher(project / 'frontend_ide/aidiy_term', 'term'))
+        self.assertTrue(viewer.remove_launcher(project / 'frontend_ide/aidiy_console', 'console'))
         self.assertTrue(discord.remove_launcher(project / 'frontend_channels'))
         self.assertTrue(host_cleanup.cleanup_app('code', report=False))
         self.assertTrue(host_cleanup.cleanup_app('live', report=False))

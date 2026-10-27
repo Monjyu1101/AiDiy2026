@@ -78,9 +78,9 @@
 .terminal-welcome.welcome-input-started .welcome-type::after { display: none; }
 
 .terminal-welcome.live h1 { font-size: clamp(9px, 3.4vw, 18px); --typing-steps: 31; }
-.terminal-welcome.term .welcome-eyebrow { font-size: 10px; letter-spacing: .08em; --typing-steps: 30; }
-.terminal-welcome.term h1 { font-size: clamp(14px, 3.4vw, 22px); --typing-steps: 26; }
-.terminal-welcome.term .welcome-caption { --typing-steps: 30; }
+.terminal-welcome.console .welcome-eyebrow { font-size: 10px; letter-spacing: .08em; --typing-steps: 30; }
+.terminal-welcome.console h1 { font-size: clamp(14px, 3.4vw, 22px); --typing-steps: 26; }
+.terminal-welcome.console .welcome-caption { --typing-steps: 30; }
 .terminal-welcome.live .welcome-eyebrow { --typing-steps: 25; }
 .terminal-welcome.live .welcome-caption { --typing-steps: 26; }
 .terminal-welcome.live p { font-family: var(--vscode-editor-font-family, Consolas, monospace); font-size: clamp(9px, 2.6vw, 12px); text-shadow: 0 1px 4px #000, 0 0 8px #000; }

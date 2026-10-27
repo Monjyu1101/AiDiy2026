@@ -64,7 +64,7 @@ node frontend_ide/viewer\launch.mjs . --no-open   # サーバーだけ起動
 
 - 初期画面で「AiDiy接続利用」「オフライン利用」のどちらかを選びます。自動開始はせず、初回接続失敗も手動で再試行します。利用前はファイルビューアを隠し、ファイル取得 API を 503 で停止します。
 - 接続先は AiDiy 配置先を優先して `_config/AiDiy_key.json` の `PORT_TOOLS` を読み、ホストは `127.0.0.1` に固定します。設定がなければ 8095 です。設定ファイルのキー情報は画面へ返しません。
-- IDEはTermと同じ `GET /aidiy_code_agents/ping` で稼働を確認し、`status: "ok"` と `name: "aidiy_code_agents"` を確認します。Code / Live 子パネルの接続先は従来どおり `PORT_CORE` です。
+- IDEはConsoleと同じ `GET /aidiy_code_agents/ping` で稼働を確認し、`status: "ok"` と `name: "aidiy_code_agents"` を確認します。Code / Live 子パネルの接続先は従来どおり `PORT_CORE` です。
 - AiDiy接続利用: toolsの応答を確認して開始し、上部のシアンバーが Live と同じ4.5秒周期で明滅します。10秒ごとにtoolsを確認（応答期限1.5秒）します。tools停止中もファイル表示・ファイル API・Code子窓・作業起点を維持し、復帰時に同じセッションで再接続します。
 - オフライン利用: コアに接続せずファイルビューアを利用でき、同じバーが赤で明滅します。toolsの状態確認も行いません。
 - 「終了」（Web版は「利用終了」）でCode / Liveを停止して起動画面に戻り、利用方法を選び直せます。Electron版のタイトルバーの×は、利用中だけ「AiDiy IDE を終了しますか？」の確認後にIDE全体を終了します。初期画面・起動画面へ戻った後は確認せずに終了します。

@@ -12,7 +12,7 @@ await copyFile(path.join(root,'../static/app.css'),path.join(root,'../static/sty
 await unlink(path.join(root,'../static/app.css')); 
 await copyFile(path.join(root,'src/index.html'),path.join(root,'../static/index.html'));
 await copyFile(path.join(root,'../../_icons/AiDiy.png'),path.join(root,'../static/AiDiy.png'));
-for(const id of ['avatar','ide','term','code','live','discord'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
+for(const id of ['avatar','ide','console','code','live','discord'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
 for(const id of ['task','team'])await copyFile(path.join(root,'src/アプリ起動/アプリアイコン',`${id}.svg`),path.join(root,'../static',`AiDiy_${id}.svg`));
 for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.png`),path.join(root,'../static',`CLI_${id}.png`));
 for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.svg`),path.join(root,'../static',`CLI_${id}.svg`));

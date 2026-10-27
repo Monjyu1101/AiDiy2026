@@ -10,8 +10,8 @@ import { mkdtemp, writeFile, chmod, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocket } from 'ws';
-import { startTerminal } from '../aidiy_term/terminal.mjs';
-import { createCliSession } from '../aidiy_term/cli-session.mjs';
+import { startTerminal } from '../aidiy_console/terminal.mjs';
+import { createCliSession } from '../aidiy_console/cli-session.mjs';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(condition) { for (let i = 0; i < 200; i++) { if (condition()) return; await delay(10); } throw Error('timeout'); }
 async function connect(url) {
@@ -120,7 +120,7 @@ test('CLI再接続猶予: 期限切れ通知から所有サーバーを閉じて
 }));
 
 test('CLI起動所有者: 最初の端末開始なしで期限終了、開始・破棄後は終了タイマーなし', async () => {
-  const { createCliOwnerLifetime } = await import('../aidiy_term/cli-session.mjs');
+  const { createCliOwnerLifetime } = await import('../aidiy_console/cli-session.mjs');
   let stopped = 0;
   const missing = createCliOwnerLifetime(() => stopped++, { activationGrace: 20 });
   missing.arm(); missing.arm(); await delay(50); assert.equal(stopped, 1); missing.arm(); await delay(30); assert.equal(stopped, 1);

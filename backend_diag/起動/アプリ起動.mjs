@@ -10,7 +10,7 @@ import {createTaskTeamStatus} from './TaskTeam接続.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-export const アプリ一覧=Object.freeze(['avatar','task','team','ide','term','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',term:'Term',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
+export const アプリ一覧=Object.freeze(['avatar','task','team','ide','console','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',console:'Console',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
 const execute=(command,args,options={})=>new Promise((resolve,reject)=>execFile(command,args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:8*1024*1024,...options},(error,stdout)=>error?reject(error):resolve(stdout)));
 
 // 明示起動時だけ取得する。タスクのコマンドラインや一覧を画面・ログへ返さない。

@@ -4,4 +4,4 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import { launch } from '../launch.mjs';
-await launch('term').catch(error => { console.error(error.message); process.exitCode = 1; });
+await launch('console').catch(error => { console.error(error.message); process.exitCode = 1; });

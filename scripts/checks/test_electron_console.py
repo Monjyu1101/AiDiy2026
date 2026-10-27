@@ -97,7 +97,7 @@ class ElectronConsoleTest(unittest.TestCase):
     def test_ide_and_term_detached_start(self):
         module = load('frontend_ide/viewer/_start.py')
         with tempfile.TemporaryDirectory() as directory, patch.object(module, 'THIS_DIR', Path(directory) / 'viewer'):
-            for kind in ('ide', 'term'):
+            for kind in ('ide', 'console'):
                 with self.subTest(kind=kind):
                     self.check_child(module, lambda: module.start(kind=kind))
 

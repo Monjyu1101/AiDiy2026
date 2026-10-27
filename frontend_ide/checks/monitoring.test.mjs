@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { tmpdir } from 'node:os';
-import { startTerminal } from '../aidiy_term/terminal.mjs';
+import { startTerminal } from '../aidiy_console/terminal.mjs';
 import { createSpace, ORBIT_PATH_SCALE } from '../src/開発スペース/宇宙描画.js';
 import { validConnectionState } from '../src/共通表示/接続状態.js';
 import { createDraftTargetRegistry } from '../src/下書き連携/連携先登録.js';
@@ -83,7 +83,7 @@ test('ピン留めビューア: 10秒間隔、遅い応答を重ねず、閉じ�
   assert.equal(fixture.timers.size,0);
 });
 
-test('Term: toolsの初回確認は即時、既定10秒、遅い確認は重複せず終了で止まる',async t=>{
+test('Console: toolsの初回確認は即時、既定10秒、遅い確認は重複せず終了で止まる',async t=>{
   t.mock.timers.enable({apis:['setInterval']});let calls=0,release;
   const app=await startTerminal(tmpdir(),{spawnTerminal(){throw Error('PTYを起動しない');},checkTools:()=>{calls++;return new Promise(resolve=>{release=resolve;});}});
   try{
@@ -156,22 +156,22 @@ test('IDE: 状態確認の通信失敗・不正応答でも作業、下書き、
   const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async()=>{if(fail)throw Error('offline');return{ok:true,json:async()=>reply};}});
   try{
     await fixture.mount();const state=fixture.state;
-    Object.assign(state.base,{code:'/code/',live:'/live/',term:'/term/'});state.panelOpen.value=true;
+    Object.assign(state.base,{code:'/code/',live:'/live/',console:'/console/'});state.panelOpen.value=true;
     state.analysis.value={file:'sample'};state.history.value={file:'history'};
     fail=true;await state.status();
-    assert.equal(state.state.value.active,true);assert.equal(state.base.term,'/term/');assert.equal(state.base.code,'/code/');assert.equal(state.base.live,'/live/');
+    assert.equal(state.state.value.active,true);assert.equal(state.base.console,'/console/');assert.equal(state.base.code,'/code/');assert.equal(state.base.live,'/live/');
     assert.equal(state.panelOpen.value,true);assert.equal(state.analysis.value.file,'sample');assert.equal(state.history.value.file,'history');assert.match(state.statusError.value,/保持/);
-    fail=false;reply={};await state.status();assert.equal(state.base.term,'/term/');assert.equal(state.state.value.active,true);
-    reply={active:true};await state.status();assert.equal(state.base.term,'/term/');
-    reply={...active,connected:false};await state.status();assert.equal(state.state.value.connected,false);assert.equal(state.statusError.value,'');assert.equal(state.base.term,'/term/');
-    reply={...active,startedAt:2};await state.status();assert.equal(state.base.term,'');assert.equal(state.analysis.value,null);
-    state.base.term='/next/';reply={...active,active:false};await state.status();assert.equal(state.base.term,'');assert.equal(state.state.value.active,false);
+    fail=false;reply={};await state.status();assert.equal(state.base.console,'/console/');assert.equal(state.state.value.active,true);
+    reply={active:true};await state.status();assert.equal(state.base.console,'/console/');
+    reply={...active,connected:false};await state.status();assert.equal(state.state.value.connected,false);assert.equal(state.statusError.value,'');assert.equal(state.base.console,'/console/');
+    reply={...active,startedAt:2};await state.status();assert.equal(state.base.console,'');assert.equal(state.analysis.value,null);
+    state.base.console='/next/';reply={...active,active:false};await state.status();assert.equal(state.base.console,'');assert.equal(state.state.value.active,false);
   }finally{fixture.dispose();}
 });
 
 test('IDE: 子ウィンドウの確認失敗は有効な接続状態を利用終了に変えない',async()=>{
   const fixture=component('App',{props:{config:{kind:'ide'}},windowAPI:{childWindows:async()=>{throw Error('ipc');}},fetcher:async()=>({ok:true,json:async()=>({active:true,startedAt:1,mode:'online',connected:false,project:{path:'/fixture'}})})});
-  try{await fixture.mount();fixture.state.base.term='/term/';await fixture.state.status();assert.equal(fixture.state.state.value.active,true);assert.equal(fixture.state.base.term,'/term/');assert.match(fixture.state.statusError.value,/子ウィンドウ/);}
+  try{await fixture.mount();fixture.state.base.console='/console/';await fixture.state.status();assert.equal(fixture.state.state.value.active,true);assert.equal(fixture.state.base.console,'/console/');assert.match(fixture.state.statusError.value,/子ウィンドウ/);}
   finally{fixture.dispose();}
 });
 
@@ -179,7 +179,7 @@ test('IDE: 手動終了より前に始めた遅い状態応答は終了後の画
   let release,delay=false;
   const active={active:true,startedAt:1,mode:'offline',project:{path:'/fixture'}};
   const fixture=component('App',{props:{config:{kind:'ide'}},fetcher:async url=>url.endsWith('/disconnect')?{ok:true,json:async()=>({active:false})}:delay?new Promise(resolve=>{release=resolve;}):{ok:true,json:async()=>active}});
-  try{await fixture.mount();delay=true;const polling=fixture.state.status();await fixture.state.start('disconnect');release({ok:true,json:async()=>active});await polling;assert.equal(fixture.state.state.value.active,false);assert.equal(fixture.state.base.term,'');}
+  try{await fixture.mount();delay=true;const polling=fixture.state.status();await fixture.state.start('disconnect');release({ok:true,json:async()=>active});await polling;assert.equal(fixture.state.state.value.active,false);assert.equal(fixture.state.base.console,'');}
   finally{fixture.dispose();}
 });
 
@@ -191,9 +191,9 @@ test('IDE: 下書き連携の遅い状態確認は手動終了・新セッショ
     await fixture.mount();delayed=true;
     const checking=fixture.state.confirmDraftSession({projectPath:'/fixture'});
     await fixture.state.start('disconnect');
-    fixture.state.update({...active,startedAt:2});fixture.state.base.term='/new-term/';
+    fixture.state.update({...active,startedAt:2});fixture.state.base.console='/new-console/';
     release({ok:true,json:async()=>active});await assert.rejects(checking,/利用状態が変わり/);
-    assert.equal(fixture.state.state.value.startedAt,2);assert.equal(fixture.state.base.term,'/new-term/');
+    assert.equal(fixture.state.state.value.startedAt,2);assert.equal(fixture.state.base.console,'/new-console/');
   }finally{fixture.dispose();}
 });
 

@@ -12,7 +12,7 @@ async function fixture(t){const root=await mkdtemp(join(tmpdir(),'diag-taskteam-
 test('catalog order and backend availability update without disabling other apps',async t=>{
  const root=await fixture(t);let online=false;
  const m=createAppLauncher({root,taskTeamStatus:async()=>({利用可能:online,無効理由:online?'':'backend stopped'})});
- let data=await m.catalog();assert.deepEqual(data.対象.map(x=>x.id),['avatar','task','team','ide','term','code','live','discord']);
+ let data=await m.catalog();assert.deepEqual(data.対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord']);
  assert.equal(data.対象[1].利用可能,false);assert.equal(data.対象[2].利用可能,false);assert.equal(data.対象[0].利用可能,undefined);
  online=true;data=await m.catalog();assert.equal(data.対象[1].利用可能,true);assert.equal(data.対象[2].利用可能,true);
 });

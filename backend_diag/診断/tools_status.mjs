@@ -1,4 +1,4 @@
-// Term と同じローカル Tools の ping のみ。設定・応答・例外の内容は公開しない。
+// Console と同じローカル Tools の ping のみ。設定・応答・例外の内容は公開しない。
 import http from 'node:http';
 import {readConfig} from '../runtime/model_probe.mjs';
 

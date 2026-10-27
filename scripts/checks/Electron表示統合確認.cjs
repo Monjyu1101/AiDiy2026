@@ -12,7 +12,7 @@ const jobs=[
  ['00-console-node',['--test','scripts/checks/electron-console.test.cjs','frontend_avatar/checks/dev-start.test.cjs']],
  ['01-common',['--test','frontend_ide/checks/window-opening.test.mjs','frontend_ide/checks/native-window-move.test.mjs','frontend_ide/checks/folder-pages.test.mjs','frontend_ide/checks/panel-windows.test.mjs','frontend_ide/checks/route-expansion.test.mjs','backend_diag/checks/desktop.check.mjs','backend_diag/checks/statusbar.check.cjs']],
  ['02-diag',['backend_diag/checks/initial-mini-desktop.mjs']],
- ['03-term-code-live-ide',['frontend_ide/scripts/check-module-move.mjs']],
+ ['03-console-code-live-ide',['frontend_ide/scripts/check-module-move.mjs']],
  ['04-ide-panels',['frontend_ide/scripts/check-panel-desktop.mjs']],
  ['05-ide-vr',['frontend_ide/scripts/check-all-displays.mjs'],{AIDIY_ALL_PANEL_POSITION_ONLY:'1'}],
  ['06-ide-2d',['frontend_ide/scripts/check-2d-motion.mjs']],
