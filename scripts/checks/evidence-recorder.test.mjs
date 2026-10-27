@@ -19,14 +19,17 @@ test('証跡画像は内容順の名前を使い、再撮影でも旧画像を�
   const first = await (await createEvidenceRecorder('20261023-first', 'system'))(entry);
   const second = await (await createEvidenceRecorder('20261024-second', 'system'))(entry);
   const third = await (await createEvidenceRecorder('20261024-third', 'system'))(entry);
-  assert.equal(first.file, 'aidiy_diag-システム起動_101_起動直後画面.png');
-  assert.equal(second.file, 'aidiy_diag-システム起動_101_起動直後画面_確認02.png');
-  assert.equal(third.file, 'aidiy_diag-システム起動_101_起動直後画面_確認03.png');
+  assert.equal(first.file, 'Diag-システム起動_101_起動直後画面.png');
+  assert.equal(second.file, 'Diag-システム起動_101_起動直後画面_確認02.png');
+  assert.equal(third.file, 'Diag-システム起動_101_起動直後画面_確認03.png');
   const folder = join(root, '_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編');
   for (const row of [first, second, third]) assert.deepEqual(await readFile(join(folder, row.file)), bytes);
+  assert.ok((await readdir(folder)).every(name => name.endsWith('.png')));
+  const cache = join(root, '.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
+  assert.equal((await readdir(cache)).filter(name => name.endsWith('__evidence.json')).length, 3);
   const next = await (await createEvidenceRecorder('20261023-first', 'system'))(entry);
   assert.equal(next.id, '102');
-  assert.equal(next.file, 'aidiy_diag-システム起動_102_起動直後画面.png');
+  assert.equal(next.file, 'Diag-システム起動_102_起動直後画面.png');
 });
 
 // 合成バイトだけを一時コピーへ保存する。実機画面・正式な証跡には触れない。
@@ -41,8 +44,9 @@ async function fixture(t) {
   const bytes = Buffer.from('89504e470d0a1a0a00000000', 'hex');
   const entry = {paragraph: 1, title: '並行記録画面', status: '観測', note: '合成試験',
     state: {screenshots: [{url: 'data:image/png;base64,' + bytes.toString('base64')}]}};
-  const manifest = join(folder, 'shared__evidence.json');
-  return {root, script, folder, bytes, entry, manifest,
+  const work = join(root, '.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
+  const manifest = join(work, 'shared__evidence.json');
+  return {root, script, folder, work, bytes, entry, manifest,
     recorder: options => createEvidenceRecorder('shared', 'system', options),
     rows: async () => JSON.parse(await readFile(manifest, 'utf8'))};
 }
@@ -71,7 +75,7 @@ test('同じ recorder の同時呼び出しでID重複や共有一時ファイ�
   const record = await f.recorder();
   await Promise.all(Array.from({length: 8}, (_, i) => record({...f.entry, note: String(i)})));
   await assertSaved(f, 8);
-  assert.deepEqual((await readdir(f.folder)).filter(name => /\.(new|lock)$/.test(name)), []);
+  assert.deepEqual((await readdir(f.work)).filter(name => /\.(new|lock)$/.test(name)), []);
 });
 
 test('既存の古いロックを奪わず、待機失敗時もJSON・画像・一時ファイルを維持する', async t => {
@@ -118,9 +122,9 @@ test('manifest置換失敗後も既存JSON・画像を保持し、次の保存�
   t.mock.restoreAll();
   assert.deepEqual(await readFile(f.manifest), before);
   assert.deepEqual(await readFile(join(f.folder, first.file)), f.bytes);
-  const failedImage = 'aidiy_diag-システム起動_102_並行記録画面.png';
+  const failedImage = 'Diag-システム起動_102_並行記録画面.png';
   assert.deepEqual(await readFile(join(f.folder, failedImage)), f.bytes);
-  assert.deepEqual((await readdir(f.folder)).filter(name => /\.(new|lock)$/.test(name)), []);
+  assert.deepEqual((await readdir(f.work)).filter(name => /\.(new|lock)$/.test(name)), []);
   const retry = await record({...f.entry, note: 'retry'});
   assert.equal(retry.id, '102');
   assert.match(retry.file, /_確認02\.png$/);
@@ -197,15 +201,15 @@ test('writer異常終了後のロック・一時ファイル・画像は自動�
   await writer.wait('committing');
   writer.child.kill('SIGKILL');
   await writer.exited;
-  const names = await readdir(f.folder);
+  const names = await readdir(f.work);
   const temporary = names.find(name => name.endsWith('.new'));
   assert.ok(temporary);
-  const tempBefore = await readFile(join(f.folder, temporary));
+  const tempBefore = await readFile(join(f.work, temporary));
   await assert.rejects(record(f.entry), /ロック待機がタイムアウト/);
   assert.deepEqual(await readFile(f.manifest), before);
-  assert.deepEqual(await readdir(f.folder), names);
+  assert.deepEqual(await readdir(f.work), names);
   await rmdir(f.manifest + '.lock');
   await record(f.entry);
   await assertSaved(f, 2);
-  assert.deepEqual(await readFile(join(f.folder, temporary)), tempBefore);
+  assert.deepEqual(await readFile(join(f.work, temporary)), tempBefore);
 });

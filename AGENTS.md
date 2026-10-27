@@ -295,8 +295,8 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 
 | 拡張 | 拡張 ID | 役割 | 単独起動 |
 |------|---------|------|----------|
-| AiDiy (Code) | `aidiy.aidiy-code` | 既存AIコアへ接続するコード支援チャット。`AIコード.vue` と同じ Code CLI・モデルを選択する | `aidiy_code`（`vscode_code.bat`） |
-| AiDiy (Live) | `aidiy.aidiy-live` | 既存 AIコア（`backend_server` 8091）へ接続するライブ音声・文字会話。VS Code 拡張内のマイクは Windows の Python 標準ライブラリ（WinMM）で取り込む | `aidiy_live`（`vscode_live.bat`） |
+| AiDiy (Code) | `aidiy.aidiy-code` | 既存AIコアへ接続するコード支援チャット。`AIコード.vue` と同じ Code CLI・モデルを選択する | `aidiy_code` |
+| AiDiy (Live) | `aidiy.aidiy-live` | 既存 AIコア（`backend_server` 8091）へ接続するライブ音声・文字会話。VS Code 拡張内のマイクは Windows の Python 標準ライブラリ（WinMM）で取り込む | `aidiy_live` |
 
 - 拡張 ID、ビュー、設定、VSIX（`dist/aidiy-code-0.1.0.vsix` / `dist/aidiy-live-0.1.0.vsix`）を分け、片方を無効にしても他方が動作する。
 - Code は選択コード添付、Provider / モデル選択、会話継続、停止、実行ログ、対話 CLI を提供し、既存 AIコードと同じ packet 識別子で進捗と正式回答を分離する。

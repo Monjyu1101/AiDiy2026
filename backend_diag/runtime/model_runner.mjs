@@ -727,14 +727,25 @@ async function integrationProbe(id, provider, key, output, secrets, fetch, signa
 function createModelRunner() {
   const active = /* @__PURE__ */ new Set();
   let stopping = false;
+  const queue = [];
+  const pending = /* @__PURE__ */ new Map();
+  const notify = (callback, state) => {
+    try {
+      callback?.(state);
+    } catch {
+    }
+  };
+  const drain = () => {
+    while (!stopping && active.size < 2 && queue.length) queue.shift().start();
+  };
   const cancel = () => {
     stopping = true;
+    for (const job of [...queue]) job.stop();
     for (const controller of active) controller.abort();
   };
-  const run = async (action, id, options = {}) => {
+  const execute = async (action, id, options = {}) => {
     if (!["status", "public", "test"].includes(action) || action === "test" && !KEY_PROVIDERS.some((p) => p.id === id)) return { error: "unsupported" };
     if (stopping || options.signal?.aborted) return { error: "stopped" };
-    if (active.size >= 2) return { error: "busy" };
     const controller = new AbortController();
     active.add(controller);
     let timeout = false, timer;
@@ -774,6 +785,53 @@ function createModelRunner() {
       active.delete(controller);
       controller.abort();
     }
+  };
+  const run = (action, id, options = {}) => {
+    if (!["status", "public", "test"].includes(action) || action === "test" && !KEY_PROVIDERS.some((p) => p.id === id)) return Promise.resolve({ error: "unsupported" });
+    if (stopping || options.signal?.aborted) return Promise.resolve({ error: "stopped" });
+    const key = action === "test" ? `${action}:${id}` : action, existing = pending.get(key);
+    if (existing) {
+      if (options.onState) existing.listeners.add(options.onState);
+      notify(options.onState, existing.state);
+      return existing.promise;
+    }
+    let resolve;
+    const entry = { promise: new Promise((r) => {
+      resolve = r;
+    }), state: "\u5F85\u6A5F\u4E2D", listeners: /* @__PURE__ */ new Set() };
+    if (options.onState) entry.listeners.add(options.onState);
+    pending.set(key, entry);
+    let started = false, finished = false;
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+      options.signal?.removeEventListener("abort", job.stop);
+      pending.delete(key);
+      resolve(result);
+      drain();
+    };
+    const job = {
+      stop: () => {
+        if (started) return;
+        const index = queue.indexOf(job);
+        if (index >= 0) queue.splice(index, 1);
+        finish({ error: "stopped" });
+      },
+      start: () => {
+        started = true;
+        options.signal?.removeEventListener("abort", job.stop);
+        entry.state = "\u78BA\u8A8D\u4E2D";
+        const execution = execute(action, id, options);
+        for (const listener of entry.listeners) notify(listener, entry.state);
+        execution.then(finish, () => finish({ error: "failed" }));
+      }
+    };
+    queue.push(job);
+    options.signal?.addEventListener("abort", job.stop, { once: true });
+    for (const listener of entry.listeners) notify(listener, "\u5F85\u6A5F\u4E2D");
+    if (options.signal?.aborted) job.stop();
+    else drain();
+    return entry.promise;
   };
   return { run, cancel };
 }

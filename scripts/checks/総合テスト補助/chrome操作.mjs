@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 /**
- * Web・Avatar総合テスト用の aidiy_chrome_devtools（Tools 8095 の HTTP API）呼び出し補助。
+ * Web・Avatar・独立Task/Team総合テスト用の aidiy_chrome_devtools（Tools 8095 の HTTP API）呼び出し補助。
  * Diagの一括起動でToolsが待受中であることが前提。認証情報は画像・ログへ出さない。
  *
  * CLI:   node scripts/checks/総合テスト補助/chrome操作.mjs <method> '<json>'
@@ -56,8 +56,8 @@ export async function prepare(tabId = TAB) {
 
 const BOOK_DOCUMENTS = Object.freeze({
   'frontend_web-AiDiy': 'セルフテスト,frontend_web,AiDiy編',
-  'frontend_web-AIタスク': 'セルフテスト,frontend_web,AIタスク編',
-  'frontend_web-AIチーム': 'セルフテスト,frontend_web,AIチーム編',
+  'aidiy_task-操作': 'セルフテスト,aidiy_task,操作編',
+  'aidiy_team-操作': 'セルフテスト,aidiy_team,操作編',
   'frontend_web-配車管理': 'セルフテスト,frontend_web,配車管理編',
   'frontend_web-生産・在庫管理': 'セルフテスト,frontend_web,生産・在庫管理編',
   'aidiy_avatar-Electron実行': 'セルフテスト,aidiy_avatar,Electron実行編',
@@ -70,7 +70,14 @@ const evDir = () => {
   return `${ROOT}/_AIDIY/knowledge/images/${document}`;
 };
 
-// 画面を保存し、evidence.json へ日時・寸法・ハッシュ・ケースIDを追記する。既存画像は上書きしない。
+const workDir = () => {
+  evDir(); // 実施IDと現行冊子を共通検証する。
+  const dir = `${ROOT}/.aidiy_cache/selftest/${BOOK_DOCUMENTS[BOOK]}`;
+  mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
+// 正式画像と作業記録を分離し、キャッシュのevidence.json へ日時・寸法・ハッシュ・ケースIDを追記する。既存画像は上書きしない。
 export async function shot(no, title, caseId, note = '') {
   if (!RUN_ID) throw new Error('RUN_ID を指定してください');
   mkdirSync(evDir(), { recursive: true });
@@ -80,8 +87,8 @@ export async function shot(no, title, caseId, note = '') {
     'aidiy_avatar-Web実行': 'Avatar-Web',
     'frontend_web-配車管理': '配車管理',
     'frontend_web-生産・在庫管理': '生産在庫',
-    'frontend_web-AIタスク': 'AIタスク',
-    'frontend_web-AIチーム': 'AIチーム',
+    'aidiy_task-操作': 'Task',
+    'aidiy_team-操作': 'Team',
   }[BOOK];
   const file = `${shortBook}_${no}_${title}.png`;
   const path = `${evDir()}/${file}`;
@@ -89,7 +96,7 @@ export async function shot(no, title, caseId, note = '') {
   await call('screenshot', { save_path: path });
   const buf = readFileSync(path);
   const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
-  const ledgerPath = `${evDir()}/${RUN_ID}__evidence.json`;
+  const ledgerPath = `${workDir()}/${RUN_ID}__evidence.json`;
   const ledger = existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, 'utf8')) : { run_id: RUN_ID, book: BOOK, method: 'aidiy_chrome_devtools（CDP 9222）による実画面操作', images: [] };
   ledger.images.push({ file, case_id: caseId, captured_at: new Date().toISOString(), width: w, height: h, sha256: createHash('sha256').update(buf).digest('hex'), note });
   writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2));
@@ -99,8 +106,7 @@ export async function shot(no, title, caseId, note = '') {
 // results.json へケース結果を追記する。再試験は別レコードにして retest_of で前の記録を指す。
 export function record(rec) {
   if (!RUN_ID) throw new Error('RUN_ID を指定してください');
-  mkdirSync(evDir(), { recursive: true });
-  const p = `${evDir()}/${RUN_ID}__results.json`;
+  const p = `${workDir()}/${RUN_ID}__results.json`;
   const all = existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : [];
   all.push({ recorded_at: new Date().toISOString(), method: 'aidiy_chrome_devtools 実画面操作', ...rec });
   writeFileSync(p, JSON.stringify(all, null, 2));

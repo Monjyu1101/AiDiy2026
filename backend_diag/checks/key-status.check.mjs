@@ -76,10 +76,10 @@ test('deadline aborts provider operation and returns a safe error',async()=>{
 test('isolated runners bound concurrency and shutdown cancels every operation',async()=>{
  const {createModelRunner}=await import('../モデル情報/key_status.mjs');const runner=createModelRunner();let started=0;const signals=[];
  const options={reader:reader({openai_key_id:'fixture-secret'}),fetch:async(_p,_h,_t,signal)=>{started++;signals.push(signal);return new Promise(()=>{});}};
- const first=runner.run('test','openai',options),second=runner.run('test','openai',options);
+ const first=runner.run('test','openai',options),second=runner.run('test','gemini',{...options,reader:reader({gemini_key_id:'fixture-secret'})});
  while(started<2)await new Promise(resolve=>setImmediate(resolve));
- assert.equal((await runner.run('status',undefined,{reader:forbidden})).error,'busy');
- runner.cancel();assert.equal((await first).error,'stopped');assert.equal((await second).error,'stopped');assert.ok(signals.every(signal=>signal.aborted));
+ const queued=runner.run('status',undefined,{reader:forbidden});
+ runner.cancel();assert.equal((await queued).error,'stopped');assert.equal((await first).error,'stopped');assert.equal((await second).error,'stopped');assert.ok(signals.every(signal=>signal.aborted));
  assert.equal((await runner.run('status',undefined,{reader:forbidden})).error,'stopped');
 });
 test('external abort prevents startup and aborts an active request',async()=>{

@@ -31,7 +31,7 @@
 | Live 拡張、通信、マイク | `aidiy_live/src/extension.ts`, `src/host.ts`, `microphone.py`（いずれも `aidiy_live/` 内） | `aidiy_live/checks/host.test.cjs`, `aidiy_live/checks/extension.test.cjs`, `aidiy_live/README.md` |
 | Live 画面、音声、音量表示 | `frontend_ide/src/ライブ/ライブパネル.vue`, `aidiy_live/src/audio.ts`, `src/visualizer.ts`, `src/protocol.ts`, `media/capture.js`（`aidiy_live/` 内） | frontend_ide の `checks/`, `aidiy_live/checks/live.test.cjs` |
 | Live 単独起動、中継、マイク許可 | `aidiy_live/launch.mjs`, `aidiy_live/src/server.ts`, `frontend_ide/desktop.cjs`（`audioAllowed`） | `aidiy_live/checks/launcher.test.cjs`, `aidiy_live/checks/live.test.cjs` |
-| セットアップ、ランチャー、クリーンアップ | `_setup.py`, `_cleanup.py`, `scripts/vscode_extensions.py`, `scripts/standalone_processes.py`, ルートの `vscode_code.bat` / `vscode_live.bat` | `checks/test_setup.py`, `checks/test_extensions.py`, `checks/test_cleanup_processes.py` |
+| セットアップ、ランチャー、クリーンアップ | `_setup.py`, `_cleanup.py`, `scripts/vscode_extensions.py`, `scripts/standalone_processes.py` | `checks/test_setup.py`, `checks/test_extensions.py`, `checks/test_cleanup_processes.py` |
 
 ## 実装上の維持事項
 
@@ -270,7 +270,7 @@ Code / Live はどちらも `package.json` の `extensionKind` を `["workspace"
 
 Code / Live の単独起動では、Electron の引数をエントリファイルだけにする。Chromium が追加のファイル引数を解釈して異常終了する場合があるため、起動設定は子プロセスの環境変数で渡す。Code は `AIDIY_CODE_PROJECT` / `AIDIY_CODE_READY` / `AIDIY_CODE_MODEL`、Live は `AIDIY_LIVE_BACKEND` / `AIDIY_LIVE_READY` / `AIDIY_LIVE_PROJECT` / `AIDIY_LIVE_MODELS` を使う。表示後の `windowShown: true` 通知は維持する。Code のブラウザ版は Node.js の引数で従来どおり渡す。
 
-ルートの `vscode_code.bat` / `vscode_live.bat` は `scripts/cli_bat/_hermes_cli.bat` と同じ形式でモデルを選び、セットアップ済みの `aidiy_code` / `aidiy_live` コマンドを呼ぶ。`%USERPROFILE%\.local\bin\` の生成済み `.cmd` があれば使い、無ければ PATH 上の同名コマンドを呼ぶ。bat を別プロジェクトのルートへコピーすると、bat の配置先が作業フォルダになる。コピー先に `frontend_ide/host` を置く必要はない。起動失敗時は `pause` し、終了コードを保持する。ダブルクリックで起動した場合も、閉じる前に表示されたエラーを確認できる。Electron が未配置なら AiDiy の配置先で `python frontend_ide/host/_setup.py` を実行して準備する。ブラウザ版を確認する場合は、各 bat に `--browser` を付ける。bat 本体の案内とメニューは ASCII、改行は CRLF で保存する。Node.js の日本語出力とパス表示が文字化けしないよう、bat / `.cmd` の先頭では `chcp 65001 >nul` を実行する。生成済みランチャーだけを更新する場合は `python frontend_ide/host/_setup.py --launchers-only` を使う。
+単独起動にはセットアップ済みの `aidiy_code` / `aidiy_live` コマンドを使います。Electron が未配置なら AiDiy の配置先で `python frontend_ide/host/_setup.py` を実行して準備します。ブラウザ版を確認する場合は各コマンドに `--browser` を付けます。Node.js の日本語出力とパス表示が文字化けしないよう、生成する `.cmd` の先頭では `chcp 65001 >nul` を実行します。生成済みランチャーだけを更新する場合は `python frontend_ide/host/_setup.py --launchers-only` を使います。
 
 Live の単独画面では起動設定の `モデル設定` にモデル名がある場合、または `--connect` が指定された場合、初期設定の読み込み後に1回だけ自動接続する。`--connect` は Electron の `AIDIY_LIVE_CONNECT` とブラウザ起動引数を通り、中継の画面設定 `自動接続` へ渡す。モデル未指定なら保存済み選択（未保存なら Core の既定設定）を使う。モデル未指定・Provider だけの指定で `--connect` が無い場合と、VS Code 拡張は手動で接続する。自動接続は音声再生の許可待ちで止めず、マイクは OFF にする。接続失敗・手動切断・画面終了の後には自動再試行しない。frontend_ide の `checks/` で3種のモデル、接続失敗、音声再生の許可待ち、画面終了を検証する。
 

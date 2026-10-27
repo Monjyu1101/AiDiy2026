@@ -77,7 +77,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `scripts/vscode_extensions.py` / `scripts/standalone_processes.py` | セットアップ・クリーンアップ共通の `aidiy-*` 拡張解除と、この作業コピーの単独起動プロセス停止 |
 | `checks/` | CLI 実行、protocol、停止、API サーバー、起動、拡張の Node.js テスト（`npm test`）と、セットアップ・クリーンアップ・モデル候補の Python テスト。Live のテストは `aidiy_live/checks/`（`npm run live:test`） |
 | `aidiy_live/` | Live 拡張（`package.json` を別に持つ）、AudioWorklet 音声処理、localhost 通信中継、Windows マイク補助 |
-| `aidiy_code.cmd` / `aidiy_live.cmd`、ルートの `vscode_code.bat` / `vscode_live.bat` | 単独起動の入口。bat はモデル選択メニューから `--provider` / `--model` を渡す |
+| `aidiy_code.cmd` / `aidiy_live.cmd` | 単独起動の入口 |
 | `_setup.py` / `_cleanup.py` | 依存・Electron の準備、VSIX の生成・配置、`aidiy_code` / `aidiy_live` ランチャーの作成と、拡張・単独起動プロセス・ランチャー・生成物の解除 |
 | `launch-extension-dev.ps1` | Code / Live を読み込んだ VS Code 開発ホストの Windows 起動入口 |
 | `scripts/test-extension-host.ps1` | 実 VS Code の拡張ホストで Code / Live の登録・起動を確認する（`-Scenario Both` / `Code` / `Live`） |

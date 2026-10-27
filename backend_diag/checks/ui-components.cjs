@@ -14,7 +14,7 @@ const cache = new Map();
 function dependency(name) {
  const module = { exports: {} };
  const transformed = transformSync(source(name), { format: 'cjs', loader: 'js' }).code;
- vm.runInNewContext(transformed, { module, exports: module.exports, setTimeout, clearTimeout, require: id => id.endsWith('.mjs') ? dependency(path.posix.normalize(path.posix.join(path.posix.dirname(name), id))) : uiRequire(id) });
+ vm.runInNewContext(transformed, { module, exports: module.exports, setTimeout, clearTimeout, AbortController, require: id => id.endsWith('.mjs') ? dependency(path.posix.normalize(path.posix.join(path.posix.dirname(name), id))) : uiRequire(id) });
  return module.exports;
 }
 function component(name) {

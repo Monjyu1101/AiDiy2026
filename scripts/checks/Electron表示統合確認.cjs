@@ -6,7 +6,7 @@ const {mkdirSync,writeFileSync,copyFileSync,existsSync}=require('node:fs');
 const {resolve,join}=require('node:path');
 process.chdir(resolve(__dirname,'../..'));
 const stamp=new Date().toISOString().replace(/[-:.TZ]/g,'');
-const output=resolve(process.env.AIDIY_ELECTRON_AUDIT_DIR||'_AIDIY/knowledge/images/'+stamp+'-electron-motion-audit');mkdirSync(output,{recursive:true});
+const output=resolve(process.env.AIDIY_ELECTRON_AUDIT_DIR||'.aidiy_cache/selftest/electron/'+stamp+'-electron-motion-audit');mkdirSync(output,{recursive:true});
 const jobs=[
  ['00-console-python',['-B','-X','utf8','-m','unittest','scripts/checks/test_electron_console.py','frontend_avatar/checks/test_start.py','scripts/checks/test_start_native_output.py','scripts/checks/test_diag_start.py'],{},process.env.AIDIY_TEST_PYTHON||'python'],
  ['00-console-node',['--test','scripts/checks/electron-console.test.cjs','frontend_avatar/checks/dev-start.test.cjs']],

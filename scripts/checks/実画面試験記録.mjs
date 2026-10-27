@@ -66,7 +66,7 @@ async function replaceManifest(manifest, records) {
 }
 
 // 参照元Markdownの名前で保存先を決め、画像名は内容を先頭にする。
-// 実施IDは記録JSONで保持し、同じ場面の再撮影は確認番号で区別する。
+// 実施IDと作業JSONはGit対象外のキャッシュへ置き、同じ場面の再撮影は確認番号で区別する。
 // 例: createEvidenceRecorder('20261019-1039-computer-use', 'environment', { toPng })
 export async function createEvidenceRecorder(runId, book = 'environment', { toPng, lockTimeoutMs = 10000 } = {}) {
   const prefix = BOOK_NAMES[book];
@@ -76,7 +76,9 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
   const images = fileURLToPath(new URL('../../_AIDIY/knowledge/images/', import.meta.url));
   const root = path.join(images, BOOK_DOCUMENTS[book]);
   await fs.mkdir(root, { recursive: true });
-  const manifest = path.join(root, `${runId}__evidence.json`);
+  const work = fileURLToPath(new URL(`../../.aidiy_cache/selftest/${BOOK_DOCUMENTS[book]}/`, import.meta.url));
+  await fs.mkdir(work, { recursive: true });
+  const manifest = path.join(work, `${runId}__evidence.json`);
   await readRecords(manifest);
   return async function record({ paragraph, title, state, status, note, screenshot = 0 }) {
     if (!Number.isInteger(paragraph) || paragraph < 0 || paragraph > 9) throw new Error('段落番号は0〜9');

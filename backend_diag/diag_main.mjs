@@ -70,7 +70,7 @@ export function parseArgs(args) {
 }
 export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager,coreSettingsBridge=createCoreSettingsBridge()}) {
   let results = [], busy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
-  const individualProbes = new Set(), keyBusy = new Set();
+  const individualProbes = new Set(), keyBusy = new Set(), keyProgress = new Map();
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
   const recordInstallResult=(result,started=new Date())=>{
     const byId=new Map(results.map(item=>[item.id,item]));byId.set(result.id,result);
@@ -249,6 +249,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'公開モデル取得への引数は指定できません。'});
         modelTrials.invalidateChat?.();return reply(200,await publicCache.refresh());
       }
+      if (req.method === 'GET' && route === 'api/キーテスト/進捗') return reply(200,{項目:[...keyProgress].map(([id,状態])=>({id,状態}))});
       if (req.method === 'POST' && route?.startsWith('api/キーテスト/')) {
         const id=route.slice('api/キーテスト/'.length);
         if (!KEY_PROVIDERS.some(provider=>provider.id===id)) return reply(404,{エラー:'未対応の項目です。'});
@@ -257,7 +258,10 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         modelTrials.invalidateChat?.();keyBusy.add(id);
         // 外部連携（Hugging Face / Discord）の認証確認はモデル情報の保存対象にしない。
         const integration=INTEGRATION_PROBES.includes(KEY_PROVIDERS.find(provider=>provider.id===id)?.probe);
-        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {keyBusy.delete(id);}
+        const controller=new AbortController();
+        const disconnected=()=>{if(!res.writableEnded)controller.abort();};
+        res.on?.('close',disconnected);keyProgress.set(id,'待機中');
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results,signal:controller.signal,onState:state=>{if(!controller.signal.aborted)keyProgress.set(id,state);}});if(controller.signal.aborted)return;if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {res.off?.('close',disconnected);keyProgress.delete(id);keyBusy.delete(id);}
         return;
       }
       // 確認中に終わった項目だけを返す（画面の逐次表示用。引数・任意コマンドは受け付けない）。

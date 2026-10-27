@@ -18,7 +18,7 @@ export async function testKey(id,options={}) {
   if(!KEY_PROVIDERS.some(p=>p.id===id && p.probe))return result;
   // 未確認・検出エラーは未導入と見なさず、今回のインストール確認で未検出の場合だけ省略する。
   if(id==='ollama' && options.installResults?.some(row=>row?.id==='ollama' && row.状態==='未検出'))return {...result,スキップ:true,説明:'Ollama が未検出のため、モデル一覧の取得をスキップしました。'};
-  const response=await (options.run || runModels)('test',id,{input:options.publicCache || {公開モデル:{},公開状態:'未取得'}});
+  const response=await (options.run || runModels)('test',id,{input:options.publicCache || {公開モデル:{},公開状態:'未取得'},signal:options.signal,onState:options.onState});
   if(response.error)return {...result,説明:reason(response.error)};
   const data=response.data;
   if(!data || data.id!==id || !['未実施','OK','NG','PASS'].includes(data.状態) || !Array.isArray(data.モデル))return {...result,説明:reason('invalid')};
