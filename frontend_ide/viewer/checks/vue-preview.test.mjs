@@ -10,15 +10,15 @@ import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {routesFor} from '../vue-preview.mjs';
 
-test('Vueルート探索は.backup_localの保存版を読まず、通常のbackupをソースとして扱う',async t=>{
+test('Vueルート探索は.aidiy_backupの保存版を読まず、通常のbackupをソースとして扱う',async t=>{
   const root=await mkdtemp(join(tmpdir(),'aidiy-vue-storage-'));
   t.after(()=>rm(root,{recursive:true,force:true}));
   const files={
     'components/Widget.vue':'<template>current</template>',
     'router/backup/current.ts':"export default [{path:'/current',component:()=>import('@/components/Widget.vue')}];",
-    'router/.backup_local/20261010/120000/previous.ts':"export default [{path:'/old',component:()=>import('@/components/Widget.vue')}];",
-    'components/.backup_local/20261010/120000/OldPage.vue':"<script setup>import Widget from '@/components/Widget.vue';</script>",
-    'router/old-page.ts':"export default [{path:'/indirect-old',component:()=>import('@/components/.backup_local/20261010/120000/OldPage.vue')}];",
+    'router/.aidiy_backup/20261010/120000/previous.ts':"export default [{path:'/old',component:()=>import('@/components/Widget.vue')}];",
+    'components/.aidiy_backup/20261010/120000/OldPage.vue':"<script setup>import Widget from '@/components/Widget.vue';</script>",
+    'router/old-page.ts':"export default [{path:'/indirect-old',component:()=>import('@/components/.aidiy_backup/20261010/120000/OldPage.vue')}];",
   };
   for(const [name,body] of Object.entries(files)){
     const path=join(root,'frontend_web/src',name);await mkdir(dirname(path),{recursive:true});await writeFile(path,body);

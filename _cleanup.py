@@ -15,7 +15,7 @@
 全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live / Term / IDE の単独実行と tools の MCP 接続プロセスも強制終了・確認します。
 setup / start の Code / IDE 継続方針とは異なります。ルート固有の
-処理（全階層の temp / _temp / .temp / tmp / test / _test / .test とルート .backup_local の削除、グローバル npm ツールの
+処理（全階層の temp / _temp / .temp / tmp / test / _test / .test とルート .aidiy_backup の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
@@ -69,7 +69,7 @@ BACKEND_LOCAL_ENV_LIST = [".venv", "venv"]
 BACKEND_HERMES_PATH = "command_hermes"
 BACKEND_HERMES_ENV_LIST = [".venv", "venv"]
 
-BACKUP_PATH = ".backup_local"
+BACKUP_PATH = ".aidiy_backup"
 TEMP_DIR_NAMES = frozenset(("temp", "_temp", ".temp", "tmp"))
 # 試験用の作業フォルダ。正式なテスト（tests/ など）は名前が違うため対象外。
 TEST_DIR_NAMES = frozenset(("test", "_test", ".test"))
@@ -173,7 +173,7 @@ def _remove_root_python_caches() -> bool:
         for current, directories, _files in os.walk(root, followlinks=False, onerror=scan_error):
             for name in list(directories):
                 path = Path(current) / name
-                if name.lower() in {'.git', '.git_local', BACKUP_PATH} or _is_directory_link(path):
+                if name.lower() in {'.git', '.git_local', BACKUP_PATH, '.backup_local', '.aidiy_cache'} or _is_directory_link(path):
                     directories.remove(name)
                     continue
                 if name.lower() not in {'__pycache__', '.pytest_cache'}:
@@ -481,7 +481,7 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
     root = base_dir.resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(root)
-    # .backup_local は保持選択を尊重し、専用の確認済み cleanup_backup だけで削除する。
+    # .aidiy_backup は保持選択を尊重し、専用の確認済み cleanup_backup だけで削除する。
     targets: list[Path] = []
 
     def scan_error(error):
@@ -495,7 +495,7 @@ def find_temp_directories(base_dir: Path) -> list[Path]:
         for name in list(directories):
             path = current_path / name
             lower = name.lower()
-            if lower in {".git", ".git_local", BACKUP_PATH} or _is_directory_link(path):
+            if lower in {".git", ".git_local", BACKUP_PATH, ".backup_local", ".aidiy_cache"} or _is_directory_link(path):
                 directories.remove(name)
                 continue
             if lower in TEMP_DIR_NAMES or (lower in TEST_DIR_NAMES and not in_dependency):
@@ -536,11 +536,11 @@ def cleanup_backup(base_dir: Path, choices: dict):
     backup_dir = base_dir / BACKUP_PATH
     if not backup_dir.exists():
         return
-    print_header(".backup_local フォルダのクリーンアップ")
+    print_header(".aidiy_backup フォルダのクリーンアップ")
     if choices.get("backup") is True:
-        remove_directory(backup_dir, ".backup_local")
+        remove_directory(backup_dir, ".aidiy_backup")
     elif choices.get("backup") is False:
-        print_info(".backup_local フォルダはそのまま残します")
+        print_info(".aidiy_backup フォルダはそのまま残します")
 
 
 def uninstall_global_npm_tools():
@@ -615,7 +615,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
     }
 
     if (base_dir / BACKUP_PATH).exists():
-        choices["backup"] = ask_yes_no(".backup_local フォルダを削除しますか？", default="y")
+        choices["backup"] = ask_yes_no(".aidiy_backup フォルダを削除しますか？", default="y")
 
     choices["diag"] = ask_yes_no("バックエンド(Diag)のランチャー・依存関係を解除しますか？", default="y")
     choices["npm_uninstall"] = ask_yes_no(
@@ -811,7 +811,7 @@ def main():
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
     print_info("クリーンアップ対象:")
-    print_info("  0. ルート .backup_local フォルダ")
+    print_info("  0. ルート .aidiy_backup フォルダ")
     print_info("  1. バックエンド(Diag)")
     print_info("  2. バックエンド(local)")
     print_info("  3. バックエンド(tools)")

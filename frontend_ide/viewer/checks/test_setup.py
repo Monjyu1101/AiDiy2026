@@ -38,7 +38,7 @@ class ViewerSetupTests(unittest.TestCase):
         (self.target / 'package-lock.json').write_text('{}', encoding='utf-8')
         for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws'):
             (self.target.parent / 'node_modules' / name).mkdir(parents=True)
-        self.cache = self.project / '_cache/electron'
+        self.cache = self.project / '.aidiy_cache/electron'
         self.enterContext(patch.object(viewer, 'THIS_DIR', self.target))
         self.enterContext(patch.object(common, 'CACHE_DIR', self.cache))
         self.enterContext(patch.object(viewer.sys, 'platform', 'win32'))

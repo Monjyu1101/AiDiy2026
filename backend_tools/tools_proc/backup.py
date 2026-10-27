@@ -141,7 +141,7 @@ class BackupSave:
 class BackupCheck:
     """AiDiy バックアップフォルダの横断照合を提供"""
 
-    BACKUP_DIR_NAME = ".backup_local"
+    BACKUP_DIR_NAME = ".aidiy_backup"
     MAX_CONTENT_BYTES = 512 * 1024
 
     _DATE_RE = re.compile(r"^\d{8}$")

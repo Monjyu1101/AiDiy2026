@@ -122,7 +122,7 @@ export async function scanTree(root, { filter, scope, folder = '', signal, limit
         const path = join(full, entry.name);
         if (entry.isDirectory()) {
           // grep対象外の保存版は走査前に除外し、候補や時間の上限を消費させない。
-          if (scope === 'grep' && entry.name === '.backup_local') continue;
+          if (scope === 'grep' && ['.aidiy_backup', '.backup_local'].includes(entry.name)) continue;
           if (backup ? !backupDirAllowed(entry.name) || !backupPathAllowed(path) : IGNORED.has(entry.name)) continue;
           const child = { n: entry.name, d: [], f: [] };
           node.d.push(child);

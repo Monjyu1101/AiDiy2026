@@ -75,7 +75,7 @@ def commit_local_backup(base_dir, files, *, excluded_dirs=(), excluded_files=(),
         old_sha = old.stdout.strip().decode() if old.returncode == 0 else None
         if old.returncode and run("show-ref", check=False).returncode not in (1,):
             return "error", "Git の履歴状態を確認できません。"
-        dirs = set(excluded_dirs) | {".git", ".git_local", ".backup_local", "_config", ".env", ".ssh"}
+        dirs = set(excluded_dirs) | {".git", ".git_local", ".aidiy_backup", ".backup_local", ".aidiy_cache", "_config", ".env", ".ssh"}
         names = set(excluded_files) | {".git", ".gitignore", ".env", "aidiy_key.json"}
         suffixes = tuple(excluded_suffixes) + (".db", ".sqlite", ".sqlite3", ".pem", ".key")
         candidates = []

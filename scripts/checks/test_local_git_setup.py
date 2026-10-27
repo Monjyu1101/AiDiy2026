@@ -64,11 +64,11 @@ class LocalGitSetupTests(unittest.TestCase):
         self.assertEqual(self.git("ls-files").stdout, "")
 
     def test_backup_storage_ignored_without_hiding_ordinary_backup(self):
-        for directory in (".backup_local", "backup"):
+        for directory in (".aidiy_backup", ".backup_local", ".aidiy_cache", "backup"):
             (self.root / directory).mkdir()
             (self.root / directory / "source.txt").write_text("fixture")
         self.assertEqual(ensure_local_git(self.root)[0], "created")
-        self.assertEqual(self.git("check-ignore", ".backup_local/source.txt").returncode, 0)
+        self.assertEqual(self.git("check-ignore", ".aidiy_backup/source.txt").returncode, 0)
         self.assertEqual(self.git("check-ignore", "backup/source.txt").returncode, 1)
         self.assertEqual(self.git("status", "--porcelain").stdout, "?? backup/\n")
 

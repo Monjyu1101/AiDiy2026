@@ -21,7 +21,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-CACHE_DIR = Path(__file__).resolve().parents[1] / "_cache" / "electron"
+CACHE_DIR = Path(__file__).resolve().parents[1] / ".aidiy_cache" / "electron"
 DOWNLOAD_TIMEOUT = 30
 
 

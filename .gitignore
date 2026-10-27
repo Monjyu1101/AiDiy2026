@@ -157,8 +157,11 @@ Thumbs.db
 # 環境診断（aidiy_diag）の出力。インストール状況・モデル情報は PC ごとの個別環境データ。
 **/_AIDIY/aidiy_diag/
 _cache/
+.aidiy_cache/
 _controls/
 _datas/
+.aidiy_backup/
+# 旧保存版も公開しない。自動移動・削除はしない。
 .backup_local/
 # ローカル専用の Git 履歴は親リポジトリにも登録しない（全階層）。
 .git_local/

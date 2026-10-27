@@ -140,12 +140,12 @@ class LocalBackupTests(unittest.TestCase):
         self.assertEqual(self.git("ls-files").stdout, "")
     def test_backup_storage_never_enters_snapshot_but_ordinary_backup_does(self):
         # 既存 .git_local に info/exclude がない場合も保存版を再帰記録しない。
-        for directory in (".backup_local", "backup"):
+        for directory in (".aidiy_backup", ".backup_local", ".aidiy_cache", "backup"):
             (self.root / directory).mkdir()
             (self.root / directory / "source.txt").write_text("fixture")
         self.assertEqual(self.snapshot()[0], "created")
         self.assertEqual(self.git("ls-files").stdout, "backup/source.txt\n")
-        (self.root / ".backup_local" / "source.txt").write_text("new snapshot")
+        (self.root / ".aidiy_backup" / "source.txt").write_text("new snapshot")
         self.assertEqual(self.snapshot()[0], "unchanged")
 
     def test_no_git_or_no_metadata_skips(self):
@@ -210,7 +210,7 @@ class LocalBackupTests(unittest.TestCase):
         with patch("subprocess.run", side_effect=AssertionError("Git must not run")):
             result = module.バックアップ実行(セッション設定={"CODE_BASE_PATH": str(self.root)}, ログ出力=False)
         self.assertIsNotNone(result)
-        self.assertTrue(list((self.root / ".backup_local").rglob("source.txt")))
+        self.assertTrue(list((self.root / ".aidiy_backup").rglob("source.txt")))
         self.assertEqual(before, {p.relative_to(self.root): p.read_bytes() for folder in (self.meta, self.root / ".git") for p in folder.rglob("*") if p.is_file()})
 
     def test_identity_not_written_to_config(self):

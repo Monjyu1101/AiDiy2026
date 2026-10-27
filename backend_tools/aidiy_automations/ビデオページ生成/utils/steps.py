@@ -119,7 +119,7 @@ def _テンプレートを機械コピー(
 
     戻り値: (コピーしたファイル名, 既存のため据え置いたファイル名)
     """
-    除外フォルダ = {"audio", "__pycache__", ".git", ".git_local", ".backup_local"}
+    除外フォルダ = {"audio", "__pycache__", ".git", ".git_local", ".aidiy_backup", ".backup_local", ".aidiy_cache"}
     if not 画像コピー:
         除外フォルダ.add("images")
     コピー済: list[str] = []

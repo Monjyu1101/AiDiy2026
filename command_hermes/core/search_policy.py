@@ -26,5 +26,5 @@ SEARCH_PRUNE_DIR_NAMES = frozenset({
     ".pytest_cache", ".ruff_cache", ".npm", ".yarn", ".pnpm-store",
     ".gradle", ".m2", ".nuget",
     # Backup copies.
-    "backups", "backup", ".backups", ".backup_local",
+    "backups", "backup", ".backups", ".aidiy_backup", ".backup_local", ".aidiy_cache",
 })

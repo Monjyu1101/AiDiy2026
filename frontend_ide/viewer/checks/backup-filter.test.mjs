@@ -52,16 +52,16 @@ test('Officeの~$ロックを全階層で除外し、元文書と通常の~名�
   assert.deepEqual(paths((await scanTree(root)).tree).sort(), [...included, ...locks].sort(), 'フィルターOFFでは通常一覧で確認できる');
 });
 
-test('バックアップフィルターは.backup_localだけを保存先として除外し、通常のbackupを残す', async t => {
+test('バックアップフィルターは新旧保存先とキャッシュを除外し、通常のbackupを残す', async t => {
   const root = await mkdtemp(join(tmpdir(), 'aidiy-storage-filter-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  for (const folder of ['.backup_local', 'nested/.backup_local', 'backup', 'nested/backup']) {
+  for (const folder of ['.aidiy_backup', 'nested/.aidiy_backup', '.backup_local', 'nested/.backup_local', '.aidiy_cache', 'nested/.aidiy_cache', 'backup', 'nested/backup']) {
     await mkdir(join(root, folder), { recursive: true });
     await writeFile(join(root, folder, 'source.txt'), 'source');
   }
   const filtered = await scanTree(root, { filter: 'backup' });
   assert.deepEqual(filtered.fileList.map(file => file.path), ['backup/source.txt', 'nested/backup/source.txt']);
   assert.equal((await scanTree(root, { filter: 'backup', folder: 'backup' })).missing, false);
-  assert.equal((await scanTree(root, { filter: 'backup', folder: '.backup_local' })).missing, true);
-  assert.equal((await scanTree(root)).files, 4, 'フィルターOFFは従来どおり保存先も表示する');
+  assert.equal((await scanTree(root, { filter: 'backup', folder: '.aidiy_backup' })).missing, true);
+  assert.equal((await scanTree(root)).files, 6, 'フィルターOFFは従来どおり保存先も表示する');
 });

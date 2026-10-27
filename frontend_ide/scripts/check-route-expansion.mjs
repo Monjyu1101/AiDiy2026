@@ -27,7 +27,7 @@ writeFileSync(join(project,'README.txt'),'Second fixture file.');
 for(let i=0;i<80;i++)writeFileSync(join(project,'src',`file-${String(i).padStart(2,'0')}.txt`),'Searchable fixture '+i);
 const lines=Array.from({length:250},(_,i)=>`const line${i} = ${i};`).join('\n');
 writeFileSync(join(project,'src','sample.txt'),lines);
-for(const date of ['20261010','20261011']){const backup=join(project,'.backup_local',date,'120000.all','src');mkdirSync(backup,{recursive:true});writeFileSync(join(backup,'sample.txt'),lines.replace('line100 = 100',`line100 = ${date}`));}
+for(const date of ['20261010','20261011']){const backup=join(project,'.aidiy_backup',date,'120000.all','src');mkdirSync(backup,{recursive:true});writeFileSync(join(backup,'sample.txt'),lines.replace('line100 = 100',`line100 = ${date}`));}
 const app=await startDevelopment(project);
 const chrome=spawn(chromePath,['--headless=new','--remote-debugging-port=0',`--user-data-dir=${profile}`,'--no-first-run','--no-default-browser-check','about:blank'],{stdio:'ignore',windowsHide:true});
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));

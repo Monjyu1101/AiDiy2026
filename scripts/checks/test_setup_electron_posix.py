@@ -37,6 +37,8 @@ def payload(platform_name):
             add(base + 'Versions/Current', 'A', stat.S_IFLNK | 0o777)
             add(base + 'Electron Framework', 'Versions/Current/Electron Framework', stat.S_IFLNK | 0o777)
             add(base + 'Helpers', 'Versions/Current/Helpers', stat.S_IFLNK | 0o777)
+        elif platform_name == 'win32':
+            add('electron.exe', b'binary')
         else:
             add('electron', b'#!/bin/sh\nprintf main', stat.S_IFREG | 0o755)
             add('chrome_crashpad_handler', b'#!/bin/sh\nprintf helper', stat.S_IFREG | 0o755)
@@ -45,10 +47,27 @@ def payload(platform_name):
     return output.getvalue()
 
 
+class ElectronCacheLocationTests(unittest.TestCase):
+    def test_cache_is_project_relative_not_working_directory_or_user_cache(self):
+        original = Path.cwd()
+        with tempfile.TemporaryDirectory(prefix='electron cache ') as other:
+            try:
+                os.chdir(other)
+                # 単体 setup とルート setup のどちらでも同じ絶対パスになる。
+                spec = importlib.util.spec_from_file_location(
+                    'electron_cache_location', ROOT / 'scripts/_setup_electron.py')
+                helper = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(helper)
+                self.assertEqual(helper.CACHE_DIR, ROOT / '.aidiy_cache' / 'electron')
+                self.assertTrue(helper.CACHE_DIR.is_absolute())
+            finally:
+                os.chdir(original)
+
+
 class ElectronPosixTests(unittest.TestCase):
     def setUp(self):
         self.folder = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        self.cache = self.folder / '_cache/electron'
+        self.cache = self.folder / '.aidiy_cache/electron'
         self.cache.mkdir(parents=True)
         self.enterContext(patch.object(setup, 'CACHE_DIR', self.cache))
         self.enterContext(patch('sys.stdout', new=io.StringIO()))
@@ -59,6 +78,25 @@ class ElectronPosixTests(unittest.TestCase):
         directory.mkdir(parents=True)
         (directory / 'package.json').write_text(json.dumps({'version': VERSION}), encoding='utf-8')
         return project
+
+    def test_all_component_paths_reuse_new_cache_on_windows_and_posix(self):
+        for platform_name in ('win32', 'darwin', 'linux'):
+            for name in ('backend_diag', 'frontend_avatar', 'frontend_ide/host',
+                         'frontend_ide/viewer', 'frontend_channels'):
+                with self.subTest(platform=platform_name, component=name), \
+                        patch.object(setup.sys, 'platform', platform_name), \
+                        patch.object(setup.platform, 'machine', return_value='x86_64'), \
+                        patch.object(setup, '_runtime_in_use', return_value=False), \
+                        patch.object(setup.urllib.request, 'urlopen') as download:
+                    # 別プロジェクトにして peer dist の流用ではなく ZIP 読込を確認する。
+                    target = self.project(f'{platform_name}/{name.replace("/", "-")}/{name}')
+                    archive = self.cache / f'electron-v{VERSION}-{platform_name}-x64.zip'
+                    archive.write_bytes(payload(platform_name))
+                    self.assertTrue(setup.prepare_electron_binary(target, 'fixture', allow_download=False))
+                    self.assertTrue(setup.electron_binary_ready(target))
+                    self.assertTrue(archive.is_file())
+                    self.assertFalse((self.folder / '_cache').exists())
+                    download.assert_not_called()
 
     @unittest.skipIf(os.name == 'nt', 'Mac のリンクと POSIX 権限は POSIX 実環境で確認')
     def test_cached_zip_and_peer_preserve_framework_links_and_helper_permissions_without_unzip(self):

@@ -328,7 +328,7 @@ Python、uv を先頭に表示します。CLI や拡張は利用する機能に�
 
 macOS / Linux でも `~/.local/bin` のランチャーを zsh / bash の設定へ自動登録します。既にセットアップ済みでコマンドが見つからない場合は、プロジェクトルートで `python3 _setup.py --launchers-only` を実行してから新しいターミナルを開いてください。現在のターミナルで使う場合は `export PATH="$HOME/.local/bin:$PATH"` で反映できます。この修復は8コマンドのランチャー・PATH 登録だけを行い、依存導入・ビルド・サービス起動はしません。クリーンアップでは登録したランチャーを解除し、共有 bin が空になった場合に自動追記分の PATH 設定も解除します。
 
-Electron は既存 `scripts/_setup_electron.py` を使い、配置済み、他コンポーネントの同版 dist、`_cache/electron` の共有 ZIP の順で再利用し、不足時だけ取得します。Diag は既存 frontend と同じ `^44.7.0` の Electron パッケージを使います。同版 Diag dist も後段 frontend から再利用でき、専用の別キャッシュは作りません。起動時の npm install / ダウンロードはしません。
+Electron は既存 `scripts/_setup_electron.py` を使い、配置済み、他コンポーネントの同版 dist、`.aidiy_cache/electron` の共有 ZIP の順で再利用し、不足時だけ取得します。Diag は既存 frontend と同じ `^44.7.0` の Electron パッケージを使います。同版 Diag dist も後段 frontend から再利用でき、専用の別キャッシュは作りません。起動時の npm install / ダウンロードはしません。
 
 Electron の認証 URL は親子プロセス専用 IPC で渡し、引数・環境変数・ログへ出しません。Windows の Electron は標準入力が常に EOF になるため、標準入力は使いません。renderer は sandbox / contextIsolation を有効、nodeIntegration を無効にします。非永続 session を使い、権限要求・別ウィンドウ・外部 navigation を拒否します。ウィンドウを閉じると診断サーバーも停止します。
 

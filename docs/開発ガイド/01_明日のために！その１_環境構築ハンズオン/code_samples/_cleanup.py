@@ -420,13 +420,13 @@ def main():
  else:
  print_info("グローバルnpmツールのアンインストールをスキップしました")
 
- # .backup_local フォルダの削除確認（先に実施）
- backup_dir = base_dir / ".backup_local"
+ # .aidiy_backup フォルダの削除確認（先に実施）
+ backup_dir = base_dir / ".aidiy_backup"
  if backup_dir.exists():
- if ask_yes_no(".backup_local フォルダを削除しますか？", default="y"):
- remove_directory(backup_dir, ".backup_local")
+ if ask_yes_no(".aidiy_backup フォルダを削除しますか？", default="y"):
+ remove_directory(backup_dir, ".aidiy_backup")
  else:
- print_info(".backup_local フォルダはそのまま残します")
+ print_info(".aidiy_backup フォルダはそのまま残します")
  
  # バックエンドフォルダのクリーンアップ
  if ask_yes_no("バックエンドをクリーンアップしますか？", default="y"):

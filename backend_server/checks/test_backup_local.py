@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 # Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
-"""一時プロジェクトだけで .backup_local の保存・参照・除外を検証する。"""
+"""一時プロジェクトだけで .aidiy_backup の保存・参照・除外を検証する。"""
 
 import importlib.util
 import logging
@@ -53,6 +53,8 @@ class BackupLocalTest(unittest.TestCase):
 
     def test_first_save_uses_new_store_and_keeps_ordinary_backup_sources(self):
         self.write("main.txt", "first\n")
+        legacy = self.write(".backup_local/20990101/000000.all/main.txt", "legacy\n")
+        self.write(".aidiy_cache/electron/fixture.zip", "cache\n")
         self.write("backup/ordinary.txt")
         self.write("src/backup/nested.txt")
         # 旧名の日時フォルダを保存履歴として使わない。ここでは合成した通常ソースとして扱う。
@@ -63,7 +65,7 @@ class BackupLocalTest(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertTrue(result["全件フラグ"])
         target = Path(result["バックアップ先"])
-        self.assertTrue(target.is_relative_to(self.root / ".backup_local"))
+        self.assertTrue(target.is_relative_to(self.root / ".aidiy_backup"))
         self.assertTrue(target.name.endswith(".all"))
         self.assertEqual(result["全件数"], 4)
         self.assertEqual((target / "main.txt").read_text(encoding="utf-8"), "first\n")
@@ -71,6 +73,9 @@ class BackupLocalTest(unittest.TestCase):
         self.assertTrue((target / "src/backup/nested.txt").is_file())
         self.assertEqual(old_file.read_text(encoding="utf-8"), "ordinary old-name fixture\n")
         self.assertFalse((self.root / ".git_local").exists())
+        self.assertEqual(legacy.read_text(), "legacy\n")
+        self.assertFalse((target / ".backup_local").exists())
+        self.assertFalse((target / ".aidiy_cache").exists())
 
     def test_second_save_and_mcp_queries_share_new_store(self):
         self.write("main.txt", "first\n")
@@ -91,7 +96,7 @@ class BackupLocalTest(unittest.TestCase):
         self.assertTrue(second["ok"])
         self.assertFalse(second["全件フラグ"])
         self.assertEqual(second["バックアップ件数"], 1)
-        self.assertTrue(Path(second["バックアップ先"]).is_relative_to(self.root / ".backup_local"))
+        self.assertTrue(Path(second["バックアップ先"]).is_relative_to(self.root / ".aidiy_backup"))
         self.assertFalse(Path(second["バックアップ先"]).name.endswith(".all"))
         self.assertEqual(self.saver.diff_scan()["count"], 0)
         self.assertEqual(self.checker.list_versions("main.txt")["count"], 2)
@@ -101,14 +106,15 @@ class BackupLocalTest(unittest.TestCase):
     def test_old_store_is_not_a_reader_or_diff_fallback(self):
         self.write("main.txt", "current\n")
         self.write("backup/20990101/000000.all/main.txt", "not history\n")
+        self.write(".backup_local/20990101/000000.all/main.txt", "legacy history\n")
         info = self.checker.backup_root_path()
-        self.assertEqual(info["backup_root"], (self.root / ".backup_local").as_posix())
+        self.assertEqual(info["backup_root"], (self.root / ".aidiy_backup").as_posix())
         self.assertFalse(info["exists"])
         self.assertIsNone(self.checker.get_before_after("main.txt")["before"])
         self.assertEqual(self.checker.list_versions("main.txt")["count"], 0)
         self.assertEqual(self.checker.find_changed("20000101_000000")["count"], 0)
         self.assertEqual(self.saver.diff_scan()["最終バックアップ日時"], "")
-        self.assertFalse((self.root / ".backup_local").exists())
+        self.assertFalse((self.root / ".aidiy_backup").exists())
 
     def test_project_named_backup_is_not_excluded(self):
         self.write("backup/project/main.txt")
@@ -118,23 +124,25 @@ class BackupLocalTest(unittest.TestCase):
         result = saver.run()
         self.assertTrue(result["ok"])
         self.assertEqual(result["バックアップ件数"], 1)
-        self.assertTrue(Path(result["バックアップ先"]).is_relative_to(project / ".backup_local"))
+        self.assertTrue(Path(result["バックアップ先"]).is_relative_to(project / ".aidiy_backup"))
 
     def test_scanners_exclude_new_store_but_not_ordinary_backup(self):
         expected = {"main.txt", "backup/ordinary.txt", "src/backup/nested.txt"}
         for name in expected:
             self.write(name)
-        self.write(".backup_local/20990101/000000.all/private.txt")
-        self.write("src/.backup_local/private.txt")
+        self.write(".aidiy_backup/20990101/000000.all/private.txt")
+        self.write("src/.aidiy_backup/private.txt")
+        for directory in (".backup_local", ".aidiy_cache", "nested/.backup_local", "nested/.aidiy_cache"):
+            self.write(f"{directory}/private.txt")
         native = self.native._全ファイルスキャン(str(self.root))
         status = folder_status.状態走査(self.root)
         self.assertEqual({entry["パス"] for entry in native}, expected)
         self.assertEqual({entry["パス"] for entry in status["ファイル一覧"]}, expected)
         self.assertFalse(status["不完全"])
-        self.assertIn(".backup_local", folder_status.規則["backupDirectories"])
+        self.assertIn(".aidiy_backup", folder_status.規則["backupDirectories"])
         self.assertNotIn("backup", folder_status.規則["backupDirectories"])
         with self.assertRaises(ValueError):
-            folder_status.状態走査(self.root, ".backup_local")
+            folder_status.状態走査(self.root, ".aidiy_backup")
 
     def test_exclusion_is_relative_to_selected_project(self):
         for ancestor in ("temp", "log", "_AIDIY/aidiy_code"):

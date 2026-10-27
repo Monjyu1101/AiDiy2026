@@ -12,10 +12,10 @@ import {startDevelopment} from '../server.mjs';
 const project=mkdtempSync(join(tmpdir(),'aidiy-history-ui-')),profile=mkdtempSync(join(tmpdir(),'aidiy-history-chrome-'));
 const lines=Array.from({length:220},(_,i)=>`export const value${i+1} = ${i+1};`);
 const previous=[...lines];previous.splice(4,0,'// 旧版だけの行','export const removed = true;');previous[25]='export const value24 = "以前の値";';
-mkdirSync(join(project,'src'),{recursive:true});mkdirSync(join(project,'.backup_local/20261010/100000.all/src'),{recursive:true});mkdirSync(join(project,'src/.backup_local/20261011/120000'),{recursive:true});
+mkdirSync(join(project,'src'),{recursive:true});mkdirSync(join(project,'.aidiy_backup/20261010/100000.all/src'),{recursive:true});mkdirSync(join(project,'src/.aidiy_backup/20261011/120000'),{recursive:true});
 writeFileSync(join(project,'src/sample.ts'),lines.join('\n'));
-writeFileSync(join(project,'.backup_local/20261010/100000.all/src/sample.ts'),lines.join('\n'));
-writeFileSync(join(project,'src/.backup_local/20261011/120000/sample.ts'),previous.join('\n'));
+writeFileSync(join(project,'.aidiy_backup/20261010/100000.all/src/sample.ts'),lines.join('\n'));
+writeFileSync(join(project,'src/.aidiy_backup/20261011/120000/sample.ts'),previous.join('\n'));
 writeFileSync(join(project,'no-history.ts'),'export const empty=true;');
 const app=await startDevelopment(project);await fetch(app.url+'api/connection/offline',{method:'POST'});
 const chromePath=process.env.CHROME_PATH||[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).flatMap(base=>['Google/Chrome/Application/chrome.exe','Microsoft/Edge/Application/msedge.exe'].map(tail=>join(base,tail))).find(existsSync)
@@ -56,7 +56,7 @@ try{
  await until(`window.historyDiff?.getLineChanges()?.length>0`,'差分計算完了');
  assert.equal(await evaluate(`document.querySelectorAll('.file-history-toolbar option').length`),2);
  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.file-history-toolbar option'),option=>option.textContent.trim().split(' · ').at(-1))`),['src','ルート'],'新しい保存先でも祖先とルートを区別する');
- assert.ok((await evaluate(`document.querySelector('.file-history-path').textContent`)).includes('.backup_local/'));
+ assert.ok((await evaluate(`document.querySelector('.file-history-path').textContent`)).includes('.aidiy_backup/'));
  assert.equal(await evaluate(`historyDiff.getOriginalEditor().getModel().getLineContent(5)`),'// 旧版だけの行');
  assert.equal(await evaluate(`historyDiff.getModifiedEditor().getModel().getLineContent(5)`),lines[4]);
  assert.equal(await evaluate(`historyDiff.getOriginalEditor().getOption(monaco.editor.EditorOption.readOnly)&&historyDiff.getModifiedEditor().getOption(monaco.editor.EditorOption.readOnly)`),true);

@@ -66,7 +66,7 @@ def ensure_local_git(base_dir: Path) -> tuple[str, str]:
         exclude = metadata / "info" / "exclude"
         exclude.parent.mkdir(parents=True, exist_ok=True)
         with exclude.open("a", encoding="utf-8") as stream:
-            stream.write("\n# AiDiy local Git metadata, backup storage and ignore definitions\n/.git_local/\n.backup_local/\n.gitignore\n")
+            stream.write("\n# AiDiy local Git metadata, backup storage and ignore definitions\n/.git_local/\n.aidiy_backup/\n.backup_local/\n.aidiy_cache/\n.gitignore\n")
         return "created", "Git: .git_local を作成しました（ローカル履歴専用・未コミット）。"
     except (OSError, subprocess.SubprocessError):
         return "error", "Git: ローカル管理を準備できませんでした（既存情報は削除しません）。"

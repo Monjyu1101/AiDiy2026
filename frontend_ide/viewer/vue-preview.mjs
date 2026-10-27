@@ -16,7 +16,7 @@ import { join, posix } from 'node:path';
 
 const WEB = 'frontend_web';
 const SOURCE = `${WEB}/src`;
-const SKIP = new Set(['node_modules', 'dist', '.git', '.git_local', '.backup_local', '__pycache__']);
+const SKIP = new Set(['node_modules', 'dist', '.git', '.git_local', '.aidiy_backup', '.backup_local', '.aidiy_cache', '__pycache__']);
 
 async function listSources(root) {
   const files = [];

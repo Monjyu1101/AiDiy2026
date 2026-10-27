@@ -15,7 +15,7 @@ const project=mkdtempSync(join(tmpdir(),'aidiy-all-project-')),profile=mkdtempSy
 for(const folder of ['ソース','資料','画像']){mkdirSync(join(project,folder));for(let i=0;i<8;i++)writeFileSync(join(project,folder,`sample-${i}.txt`),'ALL display fixture');}
 writeFileSync(join(project,'sample.txt'),'ALL current source');
 writeFileSync(join(project,'second.txt'),'ALL new panel source');
-const history=join(project,'.backup_local','20261010','120000.all');mkdirSync(history,{recursive:true});writeFileSync(join(history,'sample.txt'),'ALL previous source');
+const history=join(project,'.aidiy_backup','20261010','120000.all');mkdirSync(history,{recursive:true});writeFileSync(join(history,'sample.txt'),'ALL previous source');
 writeFileSync(join(history,'second.txt'),'ALL previous second source');
 const launcherOnly=process.env.AIDIY_ALL_LAUNCHERS_ONLY==='1';
 // メニュー検証のオンライン状態は固定fixture。実AIコア・音声へ接続しない。

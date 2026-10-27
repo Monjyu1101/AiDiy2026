@@ -50,7 +50,8 @@ class ResidualTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             for relative in ('deep/checks/__pycache__', 'docs/examples/.pytest_cache',
-                             '.backup_local/saved/__pycache__', '.git/__pycache__', 'source'):
+                             '.aidiy_backup/saved/__pycache__', '.backup_local/saved/__pycache__',
+                             '.aidiy_cache/__pycache__', '.git/__pycache__', 'source'):
                 folder = root / relative
                 folder.mkdir(parents=True)
                 (folder / 'keep.txt').write_text('evidence', encoding='utf-8')
@@ -58,7 +59,7 @@ class ResidualTests(unittest.TestCase):
                 self.assertTrue(cleanup._remove_root_python_caches())
             self.assertFalse((root / 'deep/checks/__pycache__').exists())
             self.assertFalse((root / 'docs/examples/.pytest_cache').exists())
-            self.assertTrue((root / '.backup_local/saved/__pycache__/keep.txt').exists())
+            self.assertTrue((root / '.aidiy_backup/saved/__pycache__/keep.txt').exists())
             self.assertTrue((root / '.git/__pycache__/keep.txt').exists())
             self.assertTrue((root / 'source/keep.txt').exists())
 

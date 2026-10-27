@@ -51,7 +51,9 @@ temp/
 *.log
 
 # Backup
+.aidiy_backup/
 .backup_local/
+.aidiy_cache/
 
 # Docker
 docker/ssl/
