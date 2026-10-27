@@ -53,7 +53,7 @@ export function AI設定状態を作成({api,利用可能=()=>true,setTimer=setT
   const tick=()=>{if(disposed||run!==revision)return;if(--待機秒.value>0){timer=setTimer(tick,1000);return;}通知.value='再起動の待機時間が終了しました。設定を再読込します。';void 再読込();};
   timer=setTimer(tick,1000);
  }
- function 切断(){clear();通知.value='Diagへ接続してください。';}
+ function 切断(reason='Diagへ接続してください。'){clear();通知.value=reason;}
  function 終了(){clear();disposed=true;}
  return {認証済み,処理中,通知,セッションID,待機秒,画面版,変更中,ログイン,ログアウト,request,再読込,保存後,切断,終了};
 }

@@ -1,13 +1,32 @@
-import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rename,unlink,realpath} from 'node:fs/promises';
 import {spawn,execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {join} from 'node:path';
+import {join,relative,isAbsolute} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {stripVTControlCharacters} from 'node:util';
 import {createPortStatusChecker} from './ポート状態.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
+// 起動対象外のLocalやTask/Teamの旧名も含む。再起動時だけ使う補助パスも残さない。
+const 再起動ファイル=Object.freeze([
+ ['backend_server','reboot_core.txt'],['backend_server','reboot_apps.txt'],
+ ['backend_server','reboot_apps_code_base_path.txt'],['backend_tools','reboot_tools.txt'],
+ ['backend_local','reboot_local.txt'],['backend_taskteam','reboot_taskteam.txt'],
+ ['backend_taskteam','reboot_task.txt'],['backend_taskteam','reboot_team.txt'],
+]);
+async function clearRebootFiles(root){
+ const base=await realpath(root);
+ for(const [folder,name] of 再起動ファイル){
+  try{
+   const parent=await realpath(join(base,folder,'temp')),within=relative(base,parent);
+   if(within==='..'||within.startsWith('..\\')||within.startsWith('../')||isAbsolute(within))throw Error('outside root');
+   await unlink(join(parent,name));
+  }catch(error){
+   if(error.code!=='ENOENT')throw failure('再起動ファイルを除去できないため一括起動を中止しました: '+folder+'/temp/'+name,500);
+  }
+ }
+}
 export function validateSettings(target,value){
  const keys=Object.keys(target.初期設定);
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||keys.some(key=>typeof value[key]!=='boolean'))throw failure('起動設定は指定の項目を真偽値で設定してください。');
@@ -123,7 +142,9 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
   const progress=id?null:(autoProgressRevision===revision&&batchProgress?.状態==='running'?batchProgress:beginBatch('start',operation));
   autoProgressRevision=null;updateBatch(progress,operation);
   work=(async()=>{
-   try{for(const current of ids){if(closed)break;if(cancelled.has(current))continue;focus={対象:current,実行ID:randomUUID()};operation=targetFor(current).名前+' を再起動しています。';updateBatch(progress,operation);await startOne(current,selected[current]);}if(!closed){operation='起動処理が完了しました。';updateBatch(progress,operation,'done');}}
+   try{
+    if(!id){operation='残っている再起動ファイルを除去しています。';updateBatch(progress,operation);await clearRebootFiles(root);checkRevision(revision);}
+    for(const current of ids){if(closed)break;if(cancelled.has(current))continue;focus={対象:current,実行ID:randomUUID()};operation=targetFor(current).名前+' を再起動しています。';updateBatch(progress,operation);await startOne(current,selected[current]);}if(!closed){operation='起動処理が完了しました。';updateBatch(progress,operation,'done');}}
    catch(error){operation=error.message||'起動に失敗したため後続の起動を中止しました。';updateBatch(progress,operation,'error');}
    finally{busy=false;}
   })();return {受理:true};

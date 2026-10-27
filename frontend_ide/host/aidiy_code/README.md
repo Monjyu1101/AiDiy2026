@@ -12,7 +12,7 @@ AIコアへ未接続の間も、文字を入力すると送信できます。送
 - 最後に手動選択したモデルは、オンラインを `~/.aidiy/aidiy_code_model.json`、オフラインを `~/.aidiy/aidiy_code_model_offline.json` へ別々に保存します。起動引数・モード切り替えだけでは保存値を上書きしません。
 - 自動切り替えでは表示中の会話を保ち、AIコアとHermesのセッションIDを別々に保持します。手動のモード切り替えでは新しい会話を開始します。前の会話は画面を開いている間「一覧」から戻せます。オンラインのAIコアセッションとオフラインのHermesセッションは共用しません。実行中の切り替えはできません。
 
-ルートの `vscode_code.bat` は Sonnet 5.5（Copilot CLI）、GPT-6 Astra／GPT-6.1 Sol／GPT-5.6 Terra／GPT-6 Luna（`openai_oauth`） の選択メニューを表示します。**未入力で Enter を押すと、Provider／モデルの起動引数を付けずに起動し、既定値とモデル選択は Code モジュールに任せます。** 番号を入力した場合は、対応する `--provider` / `--model` を渡します。追加の引数はそのまま転送します。起動後も画面の「モデル」から選択できます。`vscode_code.bat --browser` でブラウザ起動もできます。
+ルートの `vscode_code.bat` は Sonnet 5.5（Copilot CLI）、GPT-6 Astra／GPT-6.1 Sol／GPT-6.1 Terra／GPT-6 Luna（`openai_oauth`） の選択メニューを表示します。**未入力で Enter を押すと、Provider／モデルの起動引数を付けずに起動し、既定値とモデル選択は Code モジュールに任せます。** 番号を入力した場合は、対応する `--provider` / `--model` を渡します。追加の引数はそのまま転送します。起動後も画面の「モデル」から選択できます。`vscode_code.bat --browser` でブラウザ起動もできます。
 
 直接指定する場合:
 

@@ -47,7 +47,9 @@ async function openTaskWindows(view: string) {
 function clearSession(message = '') { selectionCache?.dispose(); selectionCache = null; revision++; token(''); user.value = null; password.value = initialPassword; error.value = message; busy.value = false; restoring.value = false; }
 async function receiveSession(value: string) {
   if (disposed) return;
-  clearSession();
+  // 自分のログイン失敗・失効通知が空セッションとして戻っても、理由を消さない。
+  // 別利用者のログインを受け取った時や、ログイン済み窓のログアウト時は初期化する。
+  clearSession(!value && !user.value ? error.value : '');
   if (!value) return;
   const run = ++revision; token(value); restoring.value = true;
   try {

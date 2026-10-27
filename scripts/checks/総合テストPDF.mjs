@@ -36,13 +36,21 @@ try{
    for(const t of document.querySelectorAll('table')){
     if(t.rows.length<=10)t.classList.add('small-table');
     // ケースIDが「10 / 1」のように折り返されない幅を確保する。
-    if(t.rows[0]?.cells[0]?.textContent.trim()==='ID')for(const row of t.rows){
+    if(['ID','ケース'].includes(t.rows[0]?.cells[0]?.textContent.trim()))for(const row of t.rows){
      row.cells[0].style.whiteSpace='nowrap';row.cells[0].style.minWidth='10mm';
     }
    }
    const title=document.querySelector('h1');if(title)title.innerHTML=title.innerHTML.replace(' — ','<br>');
+   // 最終の短い記録方法が数行だけ次ページへ分かれないようにする。
+   const record=[...document.querySelectorAll('h2')].find(h=>h.textContent.includes('試験の記録方法'));
+   if(record){const section=document.createElement('section');section.style.breakInside='avoid';record.before(section);let item=record;while(item){const next=item.nextElementSibling;section.append(item);item=next;}}
    for(const p of [...document.querySelectorAll('p')])if(p.children.length===1&&p.firstElementChild.tagName==='IMG'){
     const f=document.createElement('figure');const previous=p.previousElementSibling;
+    // 番号付きの図では、その直前の説明も同じページに保持する。
+    if(previous?.tagName==='P'&&/^図\d+/.test(previous.textContent.trim())){
+     const description=previous.previousElementSibling;
+     if(description?.tagName==='P'){const c=document.createElement('figcaption');c.innerHTML=description.innerHTML;f.append(c);description.remove();}
+    }
     if(previous?.tagName==='P'){const c=document.createElement('figcaption');c.innerHTML=previous.innerHTML;f.append(c);previous.remove();}
     p.replaceWith(f);f.append(p.firstElementChild);
    }

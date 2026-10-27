@@ -64,7 +64,7 @@ test('個別・一括・書込の重複を互いに拒否し、完了後は再�
     scanFn:async()=>{if(mode==='scan')await new Promise(resolve=>{finish=resolve;});return entries.map(entry=>({id:entry.id,状態:'OK'}));},
     installWriteFn:async()=>{await new Promise(resolve=>{finish=resolve;});return {件数:3};}});
   const single=request(handler,'api/診断/node');
-  for(const route of ['api/診断/node','api/診断/ollama','api/診断','api/書込'])assert.equal((await request(handler,route)).status,409);
+  for(const route of ['api/診断/node','api/診断','api/書込'])assert.equal((await request(handler,route)).status,409);
   assert.equal(calls,1);finish();assert.equal((await single).status,200);
   mode='scan';const bulk=request(handler,'api/診断');assert.equal((await request(handler,'api/診断/node')).status,409);finish();await bulk;
   const writing=request(handler,'api/書込');assert.equal((await request(handler,'api/診断/node')).status,409);finish();await writing;

@@ -85,3 +85,12 @@ html,body{height:100%;overflow:hidden}#app{height:100vh;height:100dvh;display:fl
 
 /* 外寸を保った1px外周。装飾を重ねず、操作項目は枠の内側へ収める。 */
 #app{box-sizing:border-box;border:1px solid #383838}
+
+/* 白に近い淡色で分類し、選択中は下線で区別する。 */
+.tabs .tab-headless{--tab-bg:#e7f4fa;--tab-line:#72a8bf}
+.tabs .tab-model{--tab-bg:#eaf5ec;--tab-line:#78a382}
+.tabs .tab-settings{--tab-bg:#fff0df;--tab-line:#c69862}
+.tabs .tab-launch{--tab-bg:#fbeaf0;--tab-line:#bf8ca0}
+.tabs button[class*="tab-"]{background:var(--tab-bg);color:#475569}
+.tabs button[class*="tab-"]:hover:not(:disabled){color:#1e293b;box-shadow:inset 0 0 0 1px var(--tab-line)}
+.tabs button[class*="tab-"].active{background:var(--tab-bg);color:#1e293b;border-bottom-color:var(--tab-line)}

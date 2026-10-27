@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 export const 分類順 = ['ベース', 'CLI群', 'その他拡張'];
 const 待機 = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -6,7 +6,8 @@ const 待機 = ms => new Promise(resolve => setTimeout(resolve, ms));
 // 認証付き API と通知欄は App と共有し、キー試験には触れません。
 export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 = 80, 進捗間隔 = 250, 操作中 = ref(false), 確認後 = async () => {} }) {
   const 確認中 = ref(false), 確認済み = ref(false), 書込中 = ref(false), 書込済み = ref(false), 表示中 = ref(null);
-  const 前回実行日時 = ref(null), 個別確認中 = ref('');
+  const 前回実行日時 = ref(null), 個別確認IDs = ref(new Set());
+  const 個別確認中 = computed(() => [...個別確認IDs.value][0] || '');
   const 項目 = ref([]), 結果 = ref([]), 調査 = ref({});
   function 一覧を反映(data) {
     項目.value = data.項目;
@@ -54,13 +55,13 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
   }
   // 対象の1行だけ更新し、一括確認の選択追従・先頭への移動は行わない。
   async function 個別確認(id) {
-    if (操作中.value || 確認中.value || 個別確認中.value || 書込中.value || !接続済み.value || !項目.value.some(entry => entry.id === id)) return false;
-    const 前回 = 結果.value;
+    if (操作中.value || 確認中.value || 個別確認IDs.value.has(id) || 書込中.value || !接続済み.value || !項目.value.some(entry => entry.id === id)) return false;
+    const 前回 = 結果.value.find(item => item.id === id);
     const 反映 = result => {
       const byId = new Map(結果.value.map(item => [item.id, item]));byId.set(id, result);
       結果.value = 項目.value.flatMap(entry => byId.has(entry.id) ? [byId.get(entry.id)] : []);
     };
-    個別確認中.value = id; 確認済み.value = false; 書込済み.value = false; 通知.value = '';
+    個別確認IDs.value = new Set([...個別確認IDs.value, id]); 確認済み.value = false; 書込済み.value = false; 通知.value = '';
     反映({ id, 状態: '確認中', 説明: '最新の導入状況を確認しています。' });
     try {
       const data = await api(`api/診断/${encodeURIComponent(id)}`, 'POST');
@@ -68,10 +69,11 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
       前回実行日時.value = data.前回実行日時 || new Date().toISOString();
       // 保存済みの表示を今回の確認結果として扱わず、サーバーの全項目確認を待つ。
       確認済み.value = data.確認済み === true;
-      await 確認後();
+      // 導入管理の能力再読込は確認ボタンの完了を遅らせない。
+      void Promise.resolve().then(確認後).catch(() => {});
       return true;
-    } catch (error) { 結果.value = 前回; 通知.value = error.message; return false; }
-    finally { 個別確認中.value = ''; }
+    } catch (error) { if (前回) 反映(前回); else 結果.value = 結果.value.filter(item => item.id !== id); 通知.value = error.message; return false; }
+    finally { const next = new Set(個別確認IDs.value); next.delete(id); 個別確認IDs.value = next; }
   }
   // 操作後も各行を個別確認と同じ結果で更新する。FFmpeg 一式以外の結果は受け取らない。
   function 操作結果を反映(data) {
@@ -104,5 +106,5 @@ export function 導入状況状態を作成({ api, 接続済み, 通知, 間隔 
   }
   // 全テスト: 確認してから書き込む。
   async function 全テスト() { return await 状況確認() && await 書込(); }
-  return { 前回実行日時, 確認中, 個別確認中, 確認済み, 書込中, 書込済み, 表示中, 項目, 結果, 調査, 一覧を反映, 状況確認, 個別確認, 操作結果を反映, 書込, 全テスト };
+  return { 前回実行日時, 確認中, 個別確認中, 個別確認IDs, 確認済み, 書込中, 書込済み, 表示中, 項目, 結果, 調査, 一覧を反映, 状況確認, 個別確認, 操作結果を反映, 書込, 全テスト };
 }

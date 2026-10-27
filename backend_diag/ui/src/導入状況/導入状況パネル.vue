@@ -6,9 +6,9 @@ import { 先頭へスクロール, 完了時 } from '../共通表示/先頭表�
 import { 導入状況表示を作成 } from './導入状況表示.mjs';
 import './導入状況.css';
 
-const props = defineProps(['lastRun','項目', '結果', '確認中', '個別確認中', '接続済み', '確認済み', '書込中', '書込済み', '表示中', '操作', '操作中', '全診断中']);
+const props = defineProps(['lastRun','項目', '結果', '確認中', '個別確認中', '個別確認Ids', '接続済み', '確認済み', '書込中', '書込済み', '表示中', '操作', '操作中', '全診断中']);
 defineEmits(['確認', '個別確認', '書込']);
-const { 選択ID, 折り畳み, 分類, 状態, 選択項目, 詳細項目, 参照箇所, 開閉 } = 導入状況表示を作成(props);
+const { 選択ID, 折り畳み, 分類, 状態, 選択項目, 選択結果, 詳細項目, 参照箇所, 開閉 } = 導入状況表示を作成(props);
 const パネル = ref(null), 詳細表示 = ref(true), コンソール = ref(null);
 // 導入操作は項目ごとに並行する。選択中の項目（関連項目を含む）の最新の実行を表示する。
 const 実行一覧 = computed(() => unref(props.操作?.実行一覧) || (unref(props.操作?.実行) ? [unref(props.操作.実行)] : []));
@@ -16,6 +16,8 @@ const 選択実行 = computed(() => 選択ID.value ? [...実行一覧.value].rev
 const 実行中一覧 = computed(() => 実行一覧.value.filter(run => run.実行中 || ['実行中', '確認中'].includes(run.状態)));
 const 操作後結果 = computed(() => 選択実行.value?.結果一覧 || (選択実行.value?.結果 ? [選択実行.value.結果] : []));
 const 操作受付 = computed(() => unref(props.操作?.受付一覧)?.[選択ID.value] || null);
+const 行確認中 = id => props.個別確認Ids ? props.個別確認Ids.has(id) : props.個別確認中===id;
+const 行確認禁止 = id => !props.接続済み || props.確認中 || props.書込中 || props.操作中 || props.全診断中 || 行確認中(id);
 const 操作禁止 = computed(() => !props.接続済み || props.確認中 || Boolean(props.個別確認中) || props.書込中 || props.操作中);
 const 可能操作 = id => props.操作?.可能操作(id) || [];
 // 他の項目の導入操作中でも押せる。押せないのは診断・書込中と、この項目自身の実行中・受付中だけ。
@@ -39,13 +41,14 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
     <aside aria-label="診断項目"><nav id="list"><details open><summary>導入状況</summary><template v-for="group in 分類" :key="group"><details :open="!折り畳み.has(group)" @toggle="開閉(group,$event)"><summary>{{group}} · {{項目.filter(e=>(e.menuGroup || 'その他拡張')===group).length}}</summary>
       <div v-for="item in 項目.filter(e=>(e.menuGroup || 'その他拡張')===group)" :key="item.id" class="install-item" :class="{selected:選択ID===item.id}">
         <button class="item" :class="{selected:選択ID===item.id}" :aria-pressed="選択ID===item.id" @click="選択ID=item.id;詳細表示=true"><span>{{item.name}}</span></button>
-        <div class="install-check"><button class="single-test-button" :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="操作禁止" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{個別確認中===item.id?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
+        <div class="install-check"><button class="single-test-button" :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="行確認禁止(item.id)" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{行確認中(item.id)?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
         <div v-if="可能操作(item.id).length" class="install-manage"><button v-for="action in 可能操作(item.id)" :key="action" type="button" :data-install-action="action" :data-install-id="item.id" :aria-label="`${item.name} を${action}`" :class="{'install-delete':action==='削除'}" :disabled="項目操作禁止(item.id)" :title="能力(item.id)?.説明" @click="実行開始(item,action)">{{action}}</button></div>
       </div>
     </details></template></details></nav></aside>
     <article id="detail" aria-live="polite">
       <template v-if="選択項目">
         <span class="eyebrow">導入状況 / {{選択項目.menuGroup || 'その他拡張'}}</span><h2>{{選択項目.name}}</h2>
+        <div v-if="詳細表示 && 選択結果?.状態==='注意' && ['python','node'].includes(選択項目.id)" class="security-version-warning" role="status"><strong>⚠ バージョンの注意</strong><p>{{選択結果.説明}}</p></div>
         <div class="install-detail-tabs" v-if="選択実行 || !詳細表示"><button type="button" :aria-pressed="詳細表示" @click="詳細表示=true">詳細</button><button type="button" :aria-pressed="!詳細表示" @click="詳細表示=false">コンソール</button></div>
         <template v-if="!詳細表示">
           <div class="install-console-heading"><span>{{操作受付?.操作 || 選択実行?.操作 || '導入操作'}}</span><component v-if="選択実行 && !操作受付" :is="状態バッジ" :state="選択実行.状態"/><span v-if="操作受付">開始受付中…</span><button v-if="選択実行?.実行中" id="install-cancel" type="button" :disabled="!接続済み || Boolean(取消状態(選択実行))" @click="操作.中止(選択実行.実行ID)">{{取消状態(選択実行)==='要求済み'?'中止確認中…':'中止'}}</button></div>

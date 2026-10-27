@@ -1,18 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,readFile,writeFile,rm,access} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {EventEmitter} from 'node:events';
+import {existsSync} from 'node:fs';
 import {PassThrough} from 'node:stream';
 import {createStartManager} from '../起動/サービス管理.mjs';
 import {createServer,autoStart} from '../diag_main.mjs';
 
 const targets=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(target=>target.起動管理!==false);
-async function fixture(t,{hold=false,fail=false,open=[],stopFailure,portStatusFn}={}){
+async function fixture(t,{hold=false,fail=false,open=[],stopFailure,portStatusFn,onSpawn}={}){
  const root=await mkdtemp(join(tmpdir(),'aidiy-start-'));await mkdir(join(root,'scripts'));await writeFile(join(root,'scripts','起動対象.json'),JSON.stringify(targets));
  const calls=[],children=[];
  const spawnFn=(command,args,options)=>{
+  onSpawn?.();
   calls.push({command,args,options,id:args.at(-1)});
   const child=new EventEmitter();child.pid=100000+children.length;child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new PassThrough();child.closed=false;
   child.stdin.on('data',data=>{if(JSON.parse(data).action==='stop'&&!child.closed){child.closed=true;setImmediate(()=>child.emit('close',0));}});
@@ -237,4 +239,33 @@ test('batch progress is stable and isolated from snapshots; force stop supersede
 
 test('individual restart does not create batch progress',async t=>{
  const {manager}=await fixture(t);await manager.restart('local');await manager.settled();assert.equal((await manager.snapshot()).一括進捗,null);
+});
+
+const rebootPaths=[['backend_server','reboot_core.txt'],['backend_server','reboot_apps.txt'],['backend_server','reboot_apps_code_base_path.txt'],['backend_tools','reboot_tools.txt'],['backend_local','reboot_local.txt'],['backend_taskteam','reboot_taskteam.txt'],['backend_taskteam','reboot_task.txt'],['backend_taskteam','reboot_team.txt']];
+for(const mode of ['manual','auto'])test(`${mode} removes all reboot inputs before first spawn, including unselected Local`,async t=>{
+ let paths=[];
+ const {root,manager,calls}=await fixture(t,{onSpawn:()=>{for(const p of paths)assert.equal(existsSync(p),false,p);}});
+ for(const [folder,name] of rebootPaths){const dir=join(root,folder,'temp');await mkdir(dir,{recursive:true});const p=join(dir,name);await writeFile(p,'test');paths.push(p);}
+ const keep=join(root,'backend_server','temp','keep.txt');await writeFile(keep,'keep');
+ if(mode==='auto')await autoStart(manager);else await manager.restart();
+ await manager.settled();assert.ok(calls.length>0);assert.equal(await readFile(keep,'utf8'),'keep');assert.equal((await manager.snapshot()).一括進捗.状態,'done');
+});
+test('failed reboot cleanup prevents every service launch',async t=>{
+ const {root,manager,calls}=await fixture(t);await mkdir(join(root,'backend_server','temp','reboot_core.txt'),{recursive:true});
+ await manager.restart();await manager.settled();assert.equal(calls.length,0);assert.equal((await manager.snapshot()).一括進捗.状態,'error');
+});
+test('individual restart preserves unrelated reboot requests',async t=>{
+ const {root,manager}=await fixture(t);const dir=join(root,'backend_server','temp');await mkdir(dir,{recursive:true});const p=join(dir,'reboot_core.txt');await writeFile(p,'test');
+ await manager.restart('local');await manager.settled();await access(p);
+});
+
+test('cleanup covers every reboot txt literal emitted or consumed by current backends',async t=>{
+ const sources=[['backend_server','core_main.py'],['backend_server','apps_main.py'],['backend_server','core_router/AIコア.py'],['backend_tools','tools_main.py'],['backend_local','local_main.py'],['backend_taskteam','taskteam_proc/runtime.py']];
+ const emitted=new Set();
+ for(const [folder,file] of sources){const code=await readFile(new URL(`../../${folder}/${file}`,import.meta.url),'utf8');for(const m of code.matchAll(/["'](reboot_[a-z_]+\.txt)["']/g))emitted.add(m[1]);}
+ assert.deepEqual([...emitted].sort(),rebootPaths.map(([,name])=>name).sort(),'new reboot input requires cleanup coverage');
+ const {root,manager}=await fixture(t);
+ for(const [folder,name] of rebootPaths){await mkdir(join(root,folder,'temp'),{recursive:true});await writeFile(join(root,folder,'temp',name),'test');}
+ await manager.restart();await manager.settled();
+ for(const [folder,name] of rebootPaths)assert.equal(existsSync(join(root,folder,'temp',name)),false,name);
 });

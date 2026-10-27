@@ -69,7 +69,8 @@ export function parseArgs(args) {
   return options;
 }
 export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager,coreSettingsBridge=createCoreSettingsBridge()}) {
-  let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
+  let results = [], busy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
+  const individualProbes = new Set(), keyBusy = new Set();
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
   const recordInstallResult=(result,started=new Date())=>{
     const byId=new Map(results.map(item=>[item.id,item]));byId.set(result.id,result);
@@ -130,7 +131,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
           if(req.method==='DELETE'&&parts.length===1)return reply(200,await management.cancel(parts[0]));
           if(req.method!=='POST'||parts.length!==2)return reply(404,{エラー:'見つかりません。'});
           // 別項目の導入操作とは並行できる。同じ項目の重複は management.start が拒否する。
-          if(busy||writing)return reply(409,{エラー:'診断・書込の実行中です。完了後に再試行してください。'});
+          if(busy||individualProbes.size||writing)return reply(409,{エラー:'診断・書込の実行中です。完了後に再試行してください。'});
           return reply(200,await management.start(parts[0],parts[1]));
         }catch(error){return reply(error.status||500,{エラー:error.status?error.message:'導入操作でエラーが発生しました。'});}
       }
@@ -238,6 +239,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       }
       // 明示的に読み直す側だけ破棄し、別タブの確認結果は書込まで保持する。
       if (req.method === 'GET' && ['api/キー設定','api/キー設定/モデル一覧','api/キー設定/外部連携'].includes(route)) {
+        if(keyBusy.size)return reply(409,{エラー:'個別確認中です。設定の再読込は完了後に実行してください。'});
         if(route!=='api/キー設定/外部連携'&&!modelWriting){modelResults={};modelTrials.invalidateChat?.();}
         if(route!=='api/キー設定/モデル一覧'&&!integrationWriting)integrationResults={};
         return reply(200,{...await keyStatusFn(),前回結果:await previousResults?.snapshot(),公開モデル:publicCache.snapshot()});
@@ -251,11 +253,11 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const id=route.slice('api/キーテスト/'.length);
         if (!KEY_PROVIDERS.some(provider=>provider.id===id)) return reply(404,{エラー:'未対応の項目です。'});
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'キーテストへの引数は指定できません。'});
-        if (keyBusy) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
-        modelTrials.invalidateChat?.();keyBusy=true;
+        if (keyBusy.has(id) || modelWriting || integrationWriting) return reply(409,{エラー:'キーテスト実行中です。完了後に再試行してください。'});
+        modelTrials.invalidateChat?.();keyBusy.add(id);
         // 外部連携（Hugging Face / Discord）の認証確認はモデル情報の保存対象にしない。
         const integration=INTEGRATION_PROBES.includes(KEY_PROVIDERS.find(provider=>provider.id===id)?.probe);
-        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {keyBusy=false;}
+        try {const result=await keyTestFn(id,{publicCache:publicCache.input(),installResults:results});if(integration&&['OK','NG','PASS','未実施'].includes(result?.状態)&&!integrationWriting)integrationResults={...integrationResults,[id]:result};if(!integration&&(['OK','NG','PASS'].includes(result?.状態)||(id==='ollama'&&result?.スキップ===true&&result?.状態==='未実施'))&&!modelWriting)modelResults={...modelResults,[id]:result};const date=new Date().toISOString();reply(200,{...result,前回実行日時:date});} finally {keyBusy.delete(id);}
         return;
       }
       // 確認中に終わった項目だけを返す（画面の逐次表示用。引数・任意コマンドは受け付けない）。
@@ -265,19 +267,19 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const entry=entries.find(item=>item.id===route.slice('api/診断/'.length));
         if (!entry) return reply(404,{エラー:'未対応の項目です。'});
         if (hasBody(req)) return reply(400,{エラー:'診断への引数は指定できません。'});
-        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
-        busy=true;
+        if (busy || individualProbes.has(entry.id) || writing || management.busy()) return reply(409,{エラー:'この項目の確認・一括診断・書込・導入操作の実行中です。'});
+        individualProbes.add(entry.id);
         const started=new Date();
         try {
           const result=await probeFn(entry);
           const state=recordInstallResult(result,started);management.invalidate();
           reply(200,{結果:result,...state});
-        } finally { busy=false; }
+        } finally { individualProbes.delete(entry.id); }
         return;
       }
       if (req.method === 'POST' && route === 'api/診断') {
         if (req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0')) return reply(400,{エラー:'診断への引数は指定できません。'});
-        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
+        if (busy || individualProbes.size || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
         busy=true;
         try { results=[];progress=[];scanFinished=null;scanStarted=new Date();results=await scanFn(entries,async entry=>{const result=await probeFn(entry);progress=[...progress,result];return result;});scanFinished=new Date();management.invalidate();reply(200,{結果:results,前回実行日時:scanFinished.toISOString()}); } finally { busy=false;progress=[]; }
         return;
@@ -285,7 +287,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       // モデル情報: このサーバーが直前に取得したキーテスト結果だけを、プロバイダ別ファイルへ保存する。
       if (req.method === 'POST' && route === 'api/モデル書込') {
         if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
-        if (keyBusy || modelWriting) return reply(409,{エラー:'モデル取得または書込の実行中です。完了後に再試行してください。'});
+        if (keyBusy.size || modelWriting) return reply(409,{エラー:'モデル取得または書込の実行中です。完了後に再試行してください。'});
         if (!Object.keys(modelResults).length) return reply(409,{エラー:'先に最新モデル取得を実行してください。'});
         modelTrials.invalidateChat?.();modelWriting=true;
         try { const status=await keyStatusFn();const saved=await modelsWriteFn(status.項目,modelResults); reply(200,{保存先:saved.map(file=>'_AIDIY/aidiy_diag/'+file),件数:saved.length}); }
@@ -296,7 +298,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       // 外部連携: このサーバーが直前に確認した認証結果だけを保存する（画面の値・キーは受け取らない）。
       if (req.method === 'POST' && route === 'api/外部連携書込') {
         if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
-        if (keyBusy || integrationWriting) return reply(409,{エラー:'確認または書込の実行中です。完了後に再試行してください。'});
+        if (keyBusy.size || integrationWriting) return reply(409,{エラー:'確認または書込の実行中です。完了後に再試行してください。'});
         if (!Object.keys(integrationResults).length) return reply(409,{エラー:'先に外部連携の状況確認を実行してください。'});
         integrationWriting=true;
         try { const status=await keyStatusFn();const report=await integrationWriteFn(status.項目,integrationResults); reply(200,{保存先:'_AIDIY/aidiy_diag/'+INTEGRATION_FILE,件数:report.件数,集計:report.集計}); }
@@ -307,7 +309,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
       // 画面からは値を受け取らず、このサーバーが直前に確認した結果だけを保存する。
       if (req.method === 'POST' && route === 'api/書込') {
         if (hasBody(req)) return reply(400,{エラー:'書込への引数は指定できません。'});
-        if (busy || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
+        if (busy || individualProbes.size || writing || management.busy()) return reply(409,{エラー:'診断・書込・導入操作の実行中です。完了後に再試行してください。'});
         if (!scanFinished || results.length !== entries.length) return reply(409,{エラー:'先にインストール確認を実行してください。'});
         writing=true;
         try { const report=await installWriteFn(entries,results,scanStarted,scanFinished); reply(200,{保存先:'_AIDIY/aidiy_diag/'+INSTALL_FILE,件数:report.件数,集計:report.集計}); }

@@ -11,7 +11,7 @@ export function モデル一覧表示を作成(props) {
  // 公開モデル一覧の取得状態。ネットワーク取得は OK、同梱キャッシュはキャッシュ利用。
  const 公開状態 = computed(() => props.publicModels?.状態 === '取得済' ? (props.publicModels.取得元 === 'キャッシュ' ? 'キャッシュ利用' : 'OK') : props.publicModels?.状態 || '未取得');
  // 一覧再取得中は、取得している行へ選択（右側のモデル一覧）を順に切り替える。
- watch(() => props.testing, id => { if (id && items.value.some(item => item.id === id)) selected.value = id; });
+ watch(() => props.testing, id => { if (props.latestBusy && id && items.value.some(item => item.id === id)) selected.value = id; });
  // 一覧再取得が終わったら、一覧の1項目目を表示する。
  watch(() => props.latestBusy, 完了時(() => { selected.value = items.value[0]?.id || ''; }));
  // 設定状況の説明は「接続は未確認」だが、テスト（OK / NG）後は接続を試した旨に置き換えて矛盾させない。

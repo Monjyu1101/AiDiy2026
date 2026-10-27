@@ -103,7 +103,7 @@ test('Appは接続・終了・全テストロックを配線し、管理完了�
   const app = source('App.vue');
   assert.match(app, /watch\(connected,value=>\{void 導入操作.接続\(value\);\},\{flush:'sync'\}\)/);
   assert.match(app, /onUnmounted\(\(\)=>\{導入操作.終了\(\)/);
-  assert.match(app, /if\(操作中.value\|\|全診断中.value\)return/);
+  assert.match(app, /if\([^;]*操作中.value\|\|全診断中.value[^;]*keyTesting.value[^;]*\)return/);
   assert.match(app, /id="run"[^>]*:disabled="[^"]*操作中/);
   assert.match(app, /:操作="導入操作" :操作中="操作中"/);
   assert.doesNotMatch(source('導入状況/導入操作状態.mjs'), /tab\.value|表示中\.value|選択ID\.value/);

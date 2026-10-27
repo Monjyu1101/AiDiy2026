@@ -58,7 +58,7 @@ test('Python launcher is fallback with fixed -3 --version; dotted executable nam
 test('stderr Python version, BOM and minimum version are supported', async () => withTree(async root => {
   const script = path.join(root,'python-fixture.cjs'); await writeFile(script, 'process.stderr.write("\\uFEFFPython 3.13.7\\r\\n")');
   const result = await probe({id:'python',version_args:[script],minimumVersion:'3.13'}, {resolve:async()=>process.execPath});
-  assert.equal(result.状態,'OK'); assert.equal(result.バージョン,'3.13.7');
+  assert.equal(result.状態,'注意'); assert.equal(result.バージョン,'3.13.7'); assert.match(result.説明,/判定対象外/);
 }));
 
 // Uses an existing local npm distribution only; never installs or accesses a registry.

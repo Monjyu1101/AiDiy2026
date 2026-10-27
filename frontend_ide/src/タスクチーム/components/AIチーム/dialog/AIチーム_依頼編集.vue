@@ -528,7 +528,7 @@ const 登録 = async () => {
 }
 
 .detail-label {
-  width: 120px;
+  width: 180px;
   min-height: 34px;
   flex-shrink: 0;
   display: flex;
@@ -541,6 +541,8 @@ const 登録 = async () => {
   box-sizing: border-box;
   font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
   z-index: 1;
 }
 
@@ -608,7 +610,7 @@ const 登録 = async () => {
 .one-line-row,
 .one-line-row .detail-label,
 .one-line-row .detail-value {
-  height: 34px;
+  height: auto;
   min-height: 34px;
 }
 

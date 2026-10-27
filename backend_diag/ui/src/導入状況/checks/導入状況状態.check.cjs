@@ -131,7 +131,7 @@ test('個別確認は対象だけ確認中にし、連打・一括・書込を�
  assert.equal(state.個別確認中.value,'claude');assert.equal(state.確認中.value,false);
  assert.deepEqual(state.結果.value.map(row=>row.状態),['OK','確認中','OK']);
  assert.deepEqual(state.結果.value.filter(row=>row.id!=='claude'),previous.filter(row=>row.id!=='claude'));
- for(const run of [()=>state.個別確認('claude'),()=>state.個別確認('node'),state.状況確認,state.書込,state.全テスト])assert.equal(await run(),false);
+ for(const run of [()=>state.個別確認('claude'),state.状況確認,state.書込,state.全テスト])assert.equal(await run(),false);
  assert.deepEqual(calls,[['api/診断/claude','POST']]);
  finish({結果:{id:'claude',状態:'未検出',確認日時:'2026-10-19T00:00:00Z'},前回実行日時:'2026-10-19T00:00:00Z',確認済み:false});
  assert.equal(await pending,true);assert.equal(state.個別確認中.value,'');assert.equal(state.確認済み.value,false);

@@ -36,7 +36,7 @@ ECHO.
 ECHO Codex CLI model list
 ECHO   1: GPT-6 Astra - frontier reasoning and coding
 ECHO   2: GPT-6.1 Sol - frontier reasoning and coding
-ECHO   3: GPT-5.6 Terra - balanced quality and cost
+ECHO   3: GPT-6.1 Terra - balanced quality and cost
 ECHO   4: GPT-6 Luna - fast, high-volume work
 ECHO   0: Exit
 ECHO.

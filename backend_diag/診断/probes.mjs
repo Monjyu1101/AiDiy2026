@@ -6,6 +6,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {recordProbeFailure} from '../起動/desktop-log.mjs';
+import {applySecurityVersionWarning} from './セキュリティバージョン.mjs';
 
 const activeProbes = new Set();
 let shuttingDown = false;
@@ -175,11 +176,11 @@ export async function probe(entry, options = {}) {
       const required = entry.minimumVersion.split('.').map(Number);
       for (let index=0; index<Math.max(found.length,required.length); index++) {
         const actual=found[index] || 0, minimum=required[index] || 0;
-        if (actual < minimum) { logProbeFailure(entry.id, 'below_minimum_version'); return {...checked,状態:'注意',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`}; }
+        if (actual < minimum) { logProbeFailure(entry.id, 'below_minimum_version'); return applySecurityVersionWarning({...checked,状態:'注意',説明:`検出したバージョンは要件 ${entry.minimumVersion} 以降を満たしません。別の仮想環境や機能全体の利用可否は未判定です。`}); }
         if (actual > minimum) break;
       }
     }
-    return checked;
+    return applySecurityVersionWarning(checked);
   } catch (error) { logProbeFailure(entry.id, 'probe_setup_error', {errorCode:safeCode(error.code)}); return {...result,状態:'ERR',説明:'確認用の一時領域を準備できませんでした。'}; }
   finally { if (directory) await rm(directory, {recursive:true,force:true,maxRetries:0}).catch(() => {}); }
 }

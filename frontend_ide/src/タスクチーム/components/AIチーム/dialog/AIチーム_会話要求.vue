@@ -406,7 +406,7 @@ onBeforeUnmount(() => 経過計測停止());
   flex: 0 0 auto;
 }
 .detail-label {
-  width: 120px;
+  width: 180px;
   min-height: 34px;
   flex-shrink: 0;
   display: flex;
@@ -419,6 +419,8 @@ onBeforeUnmount(() => 経過計測停止());
   box-sizing: border-box;
   font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
   z-index: 1;
 }
 .detail-value {
@@ -466,7 +468,7 @@ onBeforeUnmount(() => 経過計測停止());
 .one-line-row,
 .one-line-row .detail-label,
 .one-line-row .detail-value {
-  height: 34px;
+  height: auto;
   min-height: 34px;
 }
 .one-line-row .detail-value {

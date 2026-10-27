@@ -48,7 +48,7 @@ test('全項目に独立した確認ボタンがあり、実行中の1行だけ�
  const html=await render('導入状況/導入状況パネル.vue',props);
  assert.equal((html.match(/data-install-check=/g)||[]).length,2);
  assert.match(html,/<button\b[^>]*data-install-check="node"[^>]*aria-label="Node.js の導入状況を確認"[^>]*disabled[^>]*>確認中…<\/button>/);
- assert.match(html,/<button\b[^>]*data-install-check="ollama"[^>]*disabled[^>]*>確認<\/button>/);
+ assert.doesNotMatch(html,/<button\b[^>]*data-install-check="ollama"[^>]*disabled/);
  assert.match(html,/id="install-run"[^>]*disabled/);assert.match(html,/id="install-write"[^>]*disabled/);
  assert.doesNotMatch(html,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/,'選択ボタンに確認ボタンを入れ子にしない');
  const ready=await render('導入状況/導入状況パネル.vue',{...props,個別確認中:''});
@@ -95,11 +95,18 @@ test('実Vueイベントで選択は確認せず、確認ボタンは対象だ�
   for(let parent=check.parent;parent;parent=parent.parent)assert.notEqual(parent.tag,'button');
   check.props.onClick();check.props.onClick();await nextTick();
   assert.deepEqual(calls,[['api/診断/ollama','POST']]);assert.equal(select('ollama').props['aria-pressed'],true);
-  assert.ok(descendants(root).filter(node=>node.props['data-install-check']).every(node=>node.props.disabled));
+  assert.equal(check.props.disabled,true);
+  assert.equal(descendants(root).find(node=>node.props['data-install-check']==='node').props.disabled,false);
   select('node').props.onClick();await nextTick();
   finish({結果:{id:'ollama',状態:'OK'},確認済み:false});await Promise.all(runs);await nextTick();
   assert.equal(select('node').props['aria-pressed'],true);assert.equal(select('ollama').props['aria-pressed'],false);
   assert.ok(descendants(root).filter(node=>node.props['data-install-check']).every(node=>!node.props.disabled));
   assert.deepEqual(state.結果.value.map(row=>[row.id,row.状態]),[['node','OK'],['ollama','OK']]);
+  state.結果.value=[{id:'node',状態:'注意',バージョン:'24.22.0',説明:'バージョンが古い！ セキュリティパッチ未対応です。'}];await nextTick();
+  const warning=descendants(root).find(node=>node.props.class==='security-version-warning');
+  assert.ok(warning);assert.equal(warning.props.role,'status');
+  assert.ok(descendants(warning).some(node=>node.text.includes('セキュリティパッチ未対応')));
+  state.結果.value=[{id:'node',状態:'OK',バージョン:'24.22.1',説明:'正常終了'}];await nextTick();
+  assert.equal(descendants(root).some(node=>node.props.class==='security-version-warning'),false);
  }finally{app.unmount();}
 });

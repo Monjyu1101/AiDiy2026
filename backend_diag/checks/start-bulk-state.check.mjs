@@ -38,3 +38,20 @@ test('only checked closed ports pulse red while another service runs, and recove
  ports.web=true;await refresh();assert.deepEqual([...state.停止警告対象.value],[],'復帰したら赤を解除する');
  ports.tools=false;await refresh();assert.deepEqual([...state.停止警告対象.value],['tools'],'内部再起動のポート閉鎖も同じ判定');
 });
+
+test('設定再起動はCoreのポート確認成功時だけ有効、タブ変更で落とさず停止・失敗・切断で無効',async t=>{
+ let opened=false,failed=false;let poll;const state=起動状態を作成({setTimer:f=>(poll=f,1),clearTimer(){},api:async route=>{
+  if(route==='api/起動')return {対象:[{id:'core',設定:{},状態:'未起動'}],実行中:false};
+  if(route==='api/起動/ポート'){if(failed)throw Error('offline');return {対象:[{id:'core',開放:opened}]};}
+  return {ログ:'',位置:0};
+ }});t.after(()=>state.終了());
+ const settle=async()=>{await flush();await flush();};
+ assert.equal(state.Core利用可能.value,false);state.表示(true);await settle();assert.equal(state.Core利用可能.value,false);
+ opened=true;await poll();assert.equal(state.Core利用可能.value,true);
+ state.表示(true,false);assert.equal(state.Core利用可能.value,true,'タブ変更では既知の接続状態を維持');await settle();
+ opened=null;await poll();assert.equal(state.Core利用可能.value,false);
+ opened=true;await poll();failed=true;await poll();assert.equal(state.Core利用可能.value,false);
+ failed=false;await poll();assert.equal(state.Core利用可能.value,true);
+ opened=false;await poll();assert.equal(state.Core利用可能.value,false);
+ opened=true;await poll();state.表示(false);assert.equal(state.Core利用可能.value,false);
+});

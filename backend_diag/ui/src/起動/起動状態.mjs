@@ -14,6 +14,7 @@ export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearT
  const 一括停止中=ref(false);
  const 稼働あり=computed(()=>起動中.value||項目.value.some(item=>item.管理中||!['未起動','停止済み','エラー'].includes(item.状態))||ポート項目.value.some(item=>item.開放===true));
  const 設定起動可能=computed(()=>!更新失敗.value&&!稼働あり.value&&項目.value.length>0&&項目.value.every(item=>ポート項目.value.some(port=>port.id===item.id&&port.開放===false)));
+ const Core利用可能=computed(()=>!更新失敗.value&&ポート項目.value.some(item=>item.id==='core'&&item.開放===true));
  const ブラウザ起動中=ref(false),ブラウザ通知=ref('');
  const ブラウザ起動可能=computed(()=>!更新失敗.value&&['tools','web'].every(id=>ポート項目.value.some(item=>item.id===id&&item.開放===true)));
  const ログ=ref({}),位置=new Map();let visible=false,logsVisible=true,timer,controller,version=0,最後の起動表示='';
@@ -42,7 +43,7 @@ export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearT
   }catch(error){if(error.name!=='AbortError'&&revision===version){通知.value=error.message;更新失敗.value=true;}}
   finally{if(revision===version){読込中.value=false;controller=undefined;if(visible)timer=setTimer(refresh,logsVisible||一括進捗.value?.状態==='running'?800:5000);}}
  }
- function 表示(value,logs=true){if(!value){lifecycle++;pendingBatch=false;処理中.value=false;一括進捗.value=null;}visible=value;logsVisible=logs;version++;clearTimer(timer);controller?.abort();if(value){読込中.value=!項目.value.length;if(!logs)ポート項目.value=[];void refresh();}}
+ function 表示(value,logs=true){if(!value){lifecycle++;pendingBatch=false;処理中.value=false;一括進捗.value=null;ポート項目.value=[];}visible=value;logsVisible=logs;version++;clearTimer(timer);controller?.abort();if(value){読込中.value=!項目.value.length;void refresh();}}
  watch(選択,()=>{if(visible){version++;clearTimer(timer);controller?.abort();void refresh();}});
  async function 設定変更(id,key,value){
   if(保存中.value)return;const item=項目.value.find(item=>item.id===id);if(!item)return;
@@ -77,5 +78,5 @@ export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearT
   catch(error){ブラウザ通知.value=error.message;}finally{ブラウザ起動中.value=false;}
  }
  function 終了(){表示(false);}
- return {進捗表示,進捗を閉じる,項目,ポート項目,停止警告対象,選択,選択対象,読込中,保存中,処理中,起動中,一括停止中,稼働あり,設定起動可能,一括操作,通知,保存表示,更新失敗,コンソール,表示,設定変更,再起動,停止,終了,ブラウザ起動中,ブラウザ通知,ブラウザ起動可能,ブラウザで開く};
+ return {Core利用可能,進捗表示,進捗を閉じる,項目,ポート項目,停止警告対象,選択,選択対象,読込中,保存中,処理中,起動中,一括停止中,稼働あり,設定起動可能,一括操作,通知,保存表示,更新失敗,コンソール,表示,設定変更,再起動,停止,終了,ブラウザ起動中,ブラウザ通知,ブラウザ起動可能,ブラウザで開く};
 }

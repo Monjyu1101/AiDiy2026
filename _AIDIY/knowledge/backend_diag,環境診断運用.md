@@ -27,6 +27,8 @@ Electronの長押し操作と表示開始ズームは [共通の基本方針](./
 
 ## システム起動管理
 
+導入状況のPython／Node.jsは `backend_diag/診断/セキュリティバージョン.mjs` の系列別基準で緊急パッチを確認します。Python 3.14.10／3.15.2、Node.js 24.22.1／26.12.1が基準です。同系列の基準未満は「注意」とし、右側詳細に「バージョンが古い！ セキュリティパッチ未対応」と更新先を表示します。基準一致・以降は警告しません。Python 3.14未満・Node.jsの旧系列は判定対象外として更新を促す注意にします。Python 3.16以降・Node.js 27以降の未来系列は対応済み扱いにする運用方針です。これは最新版や全脆弱性の安全性保証ではありません。基準は同ファイル記載の公式発表で更新し、境界値の試験 `node --test backend_diag/checks/security-version.check.mjs` を実行します。警告によってエラーや起動禁止にはしません。未検出・コマンド実行失敗は元の判定を維持します。
+
 一括起動（`--auto` のポート解放待機を含む）と強制停止は、タブ下の非モーダル進行ボックスに現在の処理と完了・失敗を表示します。タブの切り替えや他画面の操作を遮らず、別タブでも状態確認を続けます。進行中は表示を閉じず、完了・失敗後は「閉じる」で消せます。ミニ表示はコンパクトなボックス、アイコン表示は短い状態とツールチップです。アイコンから通常表示へ戻すと詳細を確認できます。通信失敗は処理完了と判断せず、状態の再確認を案内します。検証は `checks/start-progress.check.mjs` と `checks/start-manager.check.mjs`。
 
 ミニ表示への切り替えはユーザーが行います。設定起動では自動で切り替えず、通常表示では今までどおり起動に合わせてタブとコンソールを切り替えます。ミニ表示を選んだ場合はその表示を保ちます。起動処理中、または1つでもTCPポートが開放されている間は、「起動対象」がONでポートが未開放の機能を赤く脈動させます。ポートが開けば緑の脈動へ戻ります。通常タブとミニ表示で同じ判定を使い、内部再起動中の一時的なポート閉鎖も赤で示します。起動対象外・未確認だけの場合・全停止後は赤くしません。通常表示は約800ms、ミニ表示は約5秒ごとに確認します。
@@ -198,6 +200,10 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 
 ## 個別確認と導入管理
 
+導入状況・モデル一覧・外部連携の各行は、別項目なら並行して確認できます。実行中の行だけ「確認中…」として二重実行を防ぎます。一括確認・結果書込・設定状況の再読込は個別確認の完了を待ちます。導入・再導入・削除は確認対象の実行ファイルを変更するため、導入状況の確認とは同時実行しません。導入管理情報の再読込は個別確認ボタンの解除を待たせません。これら3タブは同じ薄い水色で表示します。
+
+回帰確認は `node --test backend_diag/checks/individual-parallel.check.mjs`。異なる項目の同時実行、同じ項目の重複拒否、完了順の逆転、一方の失敗、切断後の古い応答破棄を確認します。
+
 モデル一覧の 「一括取得」 後の「書込」は、従来の合成JSONに加えて `_AIDIY/aidiy_diag/prediction_models_info.json` も生成する。headless / 全テストも同じ生成処理を使う。Predictionは `decisions_models_info.json` と生成関数を共用し、同じ低コスト候補・現在の認証条件を適用した後、`openai_decisions` 区分を `openai_chat` へ置き換える。予測JSONの方式は `openai_oauth` / `freeai_chat` / `openai_chat` / `gemini_chat` と、合成済み `code_models_info.json` から `auto` / `same` を除いて載せる `codex_cli` / `copilot_cli` / `aidiy_hermes` で、`openai_decisions` は含めない。CLI方式の試行も、Chat試行でOKになったモデルで2ターンを送ってから予測する。認証済み一覧にない方式は出力せず、全て空なら `{}`。候補を書き出すだけで `PREDICTION_AI_NAME` と方式別 `PREDICTION_*_MODEL` の設定値を変更せず、予測も実行しない。内部REST `POST /internal/prediction_llms`（`aidiy_prediction_llms`、MCP非公開）は方式がautoの場合、候補がある `codex_cli` → `copilot_cli` → `aidiy_hermes` → `openai_oauth` → `freeai_chat` → `openai_chat` → `gemini_chat` から選ぶ。判断側の挙動は変更しない。内容・候補管理は [READMEの予測用モデル一覧](../../backend_diag/README.md#予測用モデル一覧) を参照する。
 
 - 各行の「確認」は認証付き `POST api/診断/<登録済みID>` を使用し、その項目だけ既存 probe で再確認する。全項目確認と書込は同じ実行排他を使う。今回確認していない前回保存済み結果は表示だけに使い、書込対象へ混ぜない。
@@ -251,3 +257,18 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 アプリ起動の並びは Avatar、Task、Team の順です。Task / Team は `frontend_ide` の独立ランチャーを使用し、Avatar 内の既存画面は変更しません。通常・ミニ・アイコン表示とも、配置先 `_config/AiDiy_key.json` の `PORT_TASKTEAM`（省略時8093）にある TaskTeam バックエンドの `/health` が正常な場合だけ選択できます。停止・接続不明・設定不正時は無効となり、受付時にも再確認します。Core の起動・認証はアプリ側で確認してください。
 
 これは手動アプリ起動への追加です。一括起動や `--auto` の既定対象を増やしません。
+
+## 一括起動前の再起動要求の清掃
+
+手動の一括起動と `--auto` は、全対象の未起動を確認した後、最初のプロセスを生成する前に再起動要求を削除します。起動対象に選んでいない Local も含めます。
+
+- Core / Apps: `backend_server/temp/reboot_core.txt`、`reboot_apps.txt`、補助ファイル `reboot_apps_code_base_path.txt`。
+- Tools: `backend_tools/temp/reboot_tools.txt`。
+- Local: `backend_local/temp/reboot_local.txt`。
+- TaskTeam: `backend_taskteam/temp/reboot_taskteam.txt`、互換入力 `reboot_task.txt`、`reboot_team.txt`。
+
+固定の8ファイルだけを削除し、設定・モデル・その他の一時ファイルは残します。ファイルがなければ続行し、削除に失敗した場合は一括起動を中止します。個別再起動では他バックエンドの再起動要求を削除しません。追加・改名時は各バックエンドの監視処理と Core の再起動要求発行を照合し、`backend_diag/checks/start-manager.check.mjs` の削除対象・起動前順序テストも更新してください。
+
+## 設定再起動のCore接続条件
+
+設定再起動タブはDiag接続済みかつ既存の起動ポート監視でCoreの開放を確認した場合だけ操作できます。未確認・停止・状態取得失敗時は無効です。設定画面を開いたままCoreが停止した場合もフォームを閉じ、画面内のCore認証と処理を破棄します。タブ移動だけでは接続済み状態を消しません。実操作は固定Core APIが毎回認証し、接続不能なら書込みを成功扱いにしません。確認は `checks/start-bulk-state.check.mjs` と `checks/ai-settings-*.check.*` を使います。

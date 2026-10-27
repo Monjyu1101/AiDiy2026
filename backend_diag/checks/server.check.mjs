@@ -81,7 +81,7 @@ test('key test concurrency is bounded and installation action never runs key tes
  let release,tests=0;const h=createHandler({token:'test-key',scanFn:async()=>[],keyStatusFn:async()=>({項目:[]}),keyTestFn:async()=>{tests++;return new Promise(resolve=>{release=resolve;});}});
  assert.equal((await request(h,'/api/診断','POST',auth)).status,200);assert.equal(tests,0);
  await request(h,'/api/キー設定','GET',auth);
- const first=request(h,'/api/キーテスト/openai','POST',auth);assert.equal((await request(h,'/api/キーテスト/gemini','POST',auth)).status,409);
+ const first=request(h,'/api/キーテスト/openai','POST',auth);assert.equal((await request(h,'/api/キーテスト/openai','POST',auth)).status,409);
  release({状態:'OK',モデル:[]});assert.equal((await first).status,200);assert.equal(tests,1);
 });
 test('public status/retry authenticated, bounded and separate from individual test results',async()=>{
