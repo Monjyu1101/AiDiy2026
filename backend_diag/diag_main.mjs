@@ -319,13 +319,14 @@ export function createServer(options) {
 // --auto: 画面表示と並行して「設定起動」を1回だけ実行する。直前の停止でポート解放が遅れる場合だけ待って再試行する。
 export async function autoStart(startManager,{retries=20,interval=500,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   const revision=startManager.startRevision();
+  startManager.beginAutoStart?.(revision);
   for(let attempt=0;;attempt++){
     if(startManager.startRevision()!==revision)return false;
     try{await startManager.restart(undefined,{revision});return true;}
     catch(error){
       // 停止・手動再起動・終了の通知を古い自動起動の失敗で上書きしない。
       if(startManager.startRevision()!==revision)return false;
-      if(error?.status!==409||attempt>=retries){startManager.notify('自動起動できませんでした。'+(error?.status?error.message:'コンソールを確認してください。'));return false;}
+      if(error?.status!==409||attempt>=retries){const message='自動起動できませんでした。'+(error?.status?error.message:'コンソールを確認してください。');startManager.notify(message);startManager.failAutoStart?.(revision,message);return false;}
     }
     await wait(interval);
   }

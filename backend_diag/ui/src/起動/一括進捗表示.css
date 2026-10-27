@@ -1,0 +1,15 @@
+/* 非モーダル。通常フロー内で領域を確保し、タブ・タイトル・他パネルの操作を覆わない。 */
+.batch-progress{display:flex;align-items:center;gap:12px;margin:8px 16px;padding:9px 12px;border:1px solid #48616e;border-radius:6px;background:#15232d;color:#dcebf2;min-width:0;max-height:24vh;overflow:auto;-webkit-app-region:no-drag}
+.batch-progress-message{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px;font-size:12px;overflow-wrap:anywhere}
+.batch-progress-message strong{display:flex;align-items:center;gap:8px;color:#b9e7df;font-size:13px}
+.batch-progress-message small,.batch-progress-hint{font-size:11px;color:#a7bbca}
+.batch-progress-hint{max-width:180px}
+.batch-progress button{flex:none;padding:3px 9px;font-size:11px}
+.batch-progress[data-state=error]{border-color:#ae7650}.batch-progress[data-state=error] strong{color:#ffcf91}
+.batch-progress-spinner{width:12px;height:12px;flex:none;border:2px solid #48616e;border-top-color:#b9e7df;border-radius:50%;animation:batch-progress-spin .9s linear infinite}
+.batch-progress.compact{margin:5px 6px;padding:5px 8px;max-height:110px;gap:6px}
+.batch-progress.compact .batch-progress-message{font-size:10px}.batch-progress.compact strong{font-size:11px}
+.micro-batch-status{display:block;font-size:10px;color:#b9e7df;line-height:16px}
+@keyframes batch-progress-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.batch-progress-spinner{animation:none}}
+@media(max-width:600px){.batch-progress-hint{display:none}.batch-progress{margin:6px 8px}}

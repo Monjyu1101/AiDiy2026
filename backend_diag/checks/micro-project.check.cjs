@@ -12,11 +12,12 @@ async function fixture({switching=false}={}){
  const {descriptor}=parse(source('アプリ起動/マイクロランチャー.vue'));
  const compiled=compileScript(descriptor,{id:'micro-project',inlineTemplate:true,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,window,document:{documentElement:{classList:{add(){},remove(){}}}},setTimeout,clearTimeout,require:id=>id==='vue'?vue:modules[id]||{}});
- const make=(tag,text='')=>({tag,text,children:[],props:{},style:{},parent:null,querySelector(){return null;},getBoundingClientRect(){return {height:Math.max(18,Math.ceil(this.text.length/10)*18)};}});
+ const make=(tag,text='')=>({tag,_text:text,get text(){return this._text+this.children.filter(n=>n.tag!=='#comment').map(n=>n.text).join('');},set text(value){this._text=value;},children:[],props:{},style:{},parent:null,querySelector(){return null;},getBoundingClientRect(){return {height:Math.max(18,Math.ceil(this.text.length/10)*18)};}});
  const renderer=vue.createRenderer({createElement:make,createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[];},parentNode:n=>n.parent,nextSibling:n=>n.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,k,_old,v)=>n.props[k]=v,insert(n,p){n.parent=p;p.children.push(n);},remove(n){n.parent?.children.splice(n.parent.children.indexOf(n),1);}});
  const appState={フォルダ:vue.ref('/work/project'),項目:vue.ref([]),処理中:vue.ref(''),選択中:vue.ref(false),読込(){}},cliState={項目:vue.ref([]),読込(){}};
- const root=make('root'),app=renderer.createApp({render:()=>vue.h(module.exports,{appState,cliState,online:true,switching})});app.mount(root);
- return {app,root,appState,cliState,calls,sizes,label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
+ const state={進捗表示:vue.ref(null)};
+ const root=make('root'),app=renderer.createApp({render:()=>vue.h(module.exports,{appState,cliState,state,online:true,switching})});app.mount(root);
+ return {app,root,appState,cliState,state,calls,sizes,label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
 }
 
 test('VS Codeを含む6アプリ・7CLI・エディターの14個をアイコン表示へ渡す',async()=>{
@@ -74,4 +75,15 @@ test('ラベルの実測高さを送り、長名から短名へ戻しても縮�
 test('切替中もラベル高さを通知し、main側で完成画像に反映できる',async()=>{
  const f=await fixture({switching:true});
  try{f.appState.フォルダ.value='/work/'+'長い名称'.repeat(50);await flush();assert.equal(f.sizes.at(-1),Math.ceil(f.label().text.length/10)*18);}finally{f.app.unmount();}
+});
+
+ test('アイコン表示も短い進行状況を表示し、ランチャーの操作を妨げない',async()=>{
+ const f=await fixture();
+ try{
+  f.state.進捗表示.value={種別:'stop',状態:'running',通知:'Tools を停止しています。'};await flush();
+  const notice=nodes(f.root).find(n=>n.props.class==='micro-batch-status');
+  assert.equal(notice.text,'停止中…');assert.equal(notice.props.title,'Tools を停止しています。');
+  assert.equal(f.core().props.disabled,undefined);
+  f.state.進捗表示.value=null;await flush();assert.equal(nodes(f.root).some(n=>n.props.class==='micro-batch-status'),false);
+ }finally{f.app.unmount();}
 });

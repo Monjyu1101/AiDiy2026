@@ -27,15 +27,20 @@ async function fixture(t,{hold=false,fail=false,open=[],stopFailure,portStatusFn
  return {root,manager,calls,children,openPorts,stops};
 }
 test('--auto waits for released ports, then runs the saved start once',async t=>{
- const {manager,calls,openPorts}=await fixture(t,{open:['tools']});let waits=0;
- assert.equal(await autoStart(manager,{retries:5,wait:async()=>{if(++waits===2)openPorts.delete('tools');}}),true);
- await manager.settled();assert.equal(waits,2);
+ const {manager,calls,openPorts}=await fixture(t,{open:['tools']});let waits=0,progressId;
+ assert.equal(await autoStart(manager,{retries:5,wait:async()=>{
+  const progress=(await manager.snapshot()).一括進捗;
+  assert.equal(progress.種別,'start');assert.equal(progress.状態,'running');assert.match(progress.通知,/自動起動/);
+  progressId??=progress.実行ID;assert.equal(progress.実行ID,progressId);
+  if(++waits===2)openPorts.delete('tools');
+ }}),true);
+ await manager.settled();assert.equal(waits,2);assert.equal((await manager.snapshot()).一括進捗.実行ID,progressId);assert.equal((await manager.snapshot()).一括進捗.状態,'done');
  assert.deepEqual(calls.map(call=>call.id),targets.filter(target=>target.初期設定.起動対象).map(target=>target.id));
 });
 test('--auto gives up on a lasting conflict and shows the reason without starting',async t=>{
  const {manager,calls}=await fixture(t,{open:['web']});
  assert.equal(await autoStart(manager,{retries:2,wait:async()=>{}}),false);
- assert.equal(calls.length,0);assert.match((await manager.snapshot()).通知,/^自動起動できませんでした。.*強制停止/);
+ assert.equal(calls.length,0);assert.match((await manager.snapshot()).通知,/^自動起動できませんでした。.*強制停止/);assert.equal((await manager.snapshot()).一括進捗.状態,'error');
 });
 for(const action of ['forceStopAll','stop','restart','close']){
  test(`--auto retry is cancelled by explicit ${action} without overwriting its result`,async t=>{
@@ -51,6 +56,8 @@ for(const action of ['forceStopAll','stop','restart','close']){
   assert.equal(result,false);assert.equal(waits,1);
   assert.deepEqual(calls.map(call=>call.id),action==='restart'?['local']:[]);
   assert.equal((await manager.snapshot()).通知,notice);
+  const progress=(await manager.snapshot()).一括進捗;
+  if(action==='forceStopAll'){assert.equal(progress.種別,'stop');assert.equal(progress.状態,'done');}else assert.equal(progress,null);
   // 明示的な次の起動は妨げず、古い auto だけを取り消す。
   if(action!=='close'){
    await manager.restart('web');await manager.settled();assert.equal(calls.at(-1).id,'web');
@@ -167,7 +174,7 @@ test('force stop cancels startup and owned auto-restart sessions without launchi
 test('force stop continues after a failed target and reports the remaining service',async t=>{
  const {manager,stops,openPorts}=await fixture(t,{open:['web','tools','core'],stopFailure:'web'});
  await manager.forceStopAll();await manager.settled();assert.deepEqual(stops,['web','core','tools']);
- assert.deepEqual([...openPorts],['web']);assert.match((await manager.snapshot()).通知,/停止できない.*fixture stop failure/);
+ assert.deepEqual([...openPorts],['web']);assert.match((await manager.snapshot()).通知,/停止できない.*fixture stop failure/);assert.equal((await manager.snapshot()).一括進捗.状態,'error');
  await assert.rejects(()=>manager.restart(),{status:409});
 });
 
@@ -185,7 +192,7 @@ test('a duplicate bulk action is rejected and a stop cancels pending startup',as
  await assert.rejects(()=>manager.restart(),{status:409});await manager.stop('tools');await manager.settled();assert.equal(calls.length,1);assert.equal(children[0].closed,true);
 });
 test('a startup failure stops later targets and reports the failure',async t=>{
- const {manager,calls}=await fixture(t,{fail:true});await manager.restart();await manager.settled();assert.equal(calls.length,1);assert.match((await manager.snapshot()).通知,/fixture failure/);
+ const {manager,calls}=await fixture(t,{fail:true});await manager.restart();await manager.settled();assert.equal(calls.length,1);assert.match((await manager.snapshot()).通知,/fixture failure/);assert.equal((await manager.snapshot()).一括進捗.状態,'error');
 });
 test('bounded per-feature console logs do not leak to other consoles',async t=>{
  const {manager,children}=await fixture(t);await manager.restart('local');await manager.settled();
@@ -207,4 +214,27 @@ test('the start API requires auth, JSON and fixed inputs; read-only calls do not
  assert.equal((await fetch(stopEndpoint,{method:'POST',headers,body:'{"対象":"web"}'})).status,400);
  assert.equal((await fetch(stopEndpoint,{method:'POST',headers,body:'{}'})).status,202);await manager.settled();
  assert.equal((await manager.snapshot()).終了時停止あり,false);
+});
+
+
+test('batch progress is stable and isolated from snapshots; force stop supersedes startup completion',async t=>{
+ const {manager,children}=await fixture(t,{hold:true});
+ assert.equal((await manager.snapshot()).一括進捗,null);
+ await manager.restart();
+ const start=(await manager.snapshot()).一括進捗;
+ assert.equal(start.種別,'start');assert.equal(start.状態,'running');assert.ok(start.実行ID);
+ start.状態='error';assert.equal((await manager.snapshot()).一括進捗.状態,'running','snapshot cannot mutate the operation');
+ while(!children.length)await new Promise(resolve=>setTimeout(resolve,5));
+ assert.equal((await manager.snapshot()).一括進捗.実行ID,start.実行ID);
+ await manager.forceStopAll();
+ const stop=(await manager.snapshot()).一括進捗;
+ assert.equal(stop.種別,'stop');assert.equal(stop.状態,'running');assert.notEqual(stop.実行ID,start.実行ID);
+ await manager.settled();
+ const done=(await manager.snapshot()).一括進捗;
+ assert.equal(done.実行ID,stop.実行ID);assert.equal(done.種別,'stop');assert.equal(done.状態,'done');assert.match(done.通知,/すべて停止/);
+ await manager.close();assert.equal((await manager.snapshot()).一括進捗,null);
+});
+
+test('individual restart does not create batch progress',async t=>{
+ const {manager}=await fixture(t);await manager.restart('local');await manager.settled();assert.equal((await manager.snapshot()).一括進捗,null);
 });

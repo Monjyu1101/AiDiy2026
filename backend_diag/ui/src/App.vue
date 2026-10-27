@@ -17,6 +17,7 @@ import {アプリ状態を作成} from './アプリ起動/アプリ状態.mjs';
 import {CLI状態を作成} from './アプリ起動/CLI状態.mjs';
 import 起動パネル from './起動/起動パネル.vue';
 import {起動状態を作成} from './起動/起動状態.mjs';
+import 一括進捗表示 from './起動/一括進捗表示.vue';
 import 起動ミニパネル from './起動/起動ミニパネル.vue';
 import マイクロランチャー from './アプリ起動/マイクロランチャー.vue';
 import {起動ミニ表示を作成} from './ウィンドウ/起動ミニ表示.mjs';
@@ -59,7 +60,7 @@ async function 表示切替(mode){
  }
 }
 watch([connected,アプリ.フォルダ],()=>{if(マイクロ表示.value&&(!connected.value||!アプリ.フォルダ.value))void 表示切替('normal');});
-watch([tab,connected,ミニ表示],([value,online,mini])=>{起動.表示((value==='start'||mini)&&online,!mini);if(!online){CLI.切断();void ミニ.変更(false);}});
+watch([tab,connected,ミニ表示],([value,online,mini])=>{起動.表示(online,value==='start'&&!mini);if(!online){CLI.切断();void ミニ.変更(false);}});
 watch(ミニ.エラー,error=>{if(error)message.value=error;});
 function コンソールへ戻る(id){起動.選択.value=id;tab.value='start';void 表示切替('normal');}
 function アプリ起動へ戻る(){tab.value='apps';void 表示切替('normal');}
@@ -91,6 +92,7 @@ onMounted(()=>{if(key.value)connect();});
 <component v-if="!マイクロ表示" :is="ステータスバー" :online="toolsOnline" :enabled="true" :checking="toolsChecking" :connected="connected" :compact="ミニ表示" :micro-available="!!アプリ.フォルダ.value" :switching="ミニ.切替中.value||マイクロ切替中" @mini="表示切替('mini')" @micro="表示切替('micro')" @restore="表示切替('normal')"/>
 <component v-if="マイクロ表示" :is="マイクロランチャー" :app-state="アプリ" :cli-state="CLI" :state="起動" :online="connected" :switching="マイクロ切替中" @restore="表示切替('normal')" @mini="表示切替('mini')" @select="コンソールへ戻る"/>
 <nav class="tabs" v-show="!ミニ表示" aria-label="診断の種類"><button :aria-pressed="tab==='install'" :class="{active:tab==='install'}" @click="changeTab('install')">導入状況</button><button :aria-pressed="tab==='keys'" :class="{active:tab==='keys'}" @click="changeTab('keys')">モデル一覧</button><button :aria-pressed="tab==='integrations'" :class="{active:tab==='integrations'}" @click="changeTab('integrations')">外部連携</button><button :aria-pressed="tab==='trials'" :class="{active:tab==='trials'}" :disabled="!connected || !toolsOnline" title="Tools 接続時に利用できます" @click="changeTab('trials')">設定モデル</button><button :aria-pressed="tab==='manual'" :class="{active:tab==='manual'}" :disabled="!connected || !toolsOnline" @click="changeTab('manual')">AIモデル</button><button :aria-pressed="tab==='start'" :class="{active:tab==='start'}" @click="changeTab('start')">システム起動</button><button :aria-pressed="tab==='apps'" :class="{active:tab==='apps'}" @click="changeTab('apps')">アプリ起動</button><button id="run" class="run-all" :class="{'force-stop':tab==='start'&&起動.稼働あり.value}" v-show="tab!=='apps'" :disabled="tab==='start'?(!connected||起動.読込中.value||起動.保存中.value||起動.処理中.value||起動.一括停止中.value||(!起動.稼働あり.value&&!起動.設定起動可能.value)):!connected || 操作中 || 全診断中 || 確認中 || Boolean(個別確認中) || 書込中 || latestBusy || modelWriteBusy || integrationBusy || integrationWriteBusy || (tab==='manual' && (!toolsOnline || 手動.実行中.value || 手動.読込中.value || !手動.一覧.value))" @click="tab==='start'?起動.一括操作():tab==='manual'?手動.開始(true):全診断()" :title="tab==='start'?(起動.稼働あり.value?'稼働中の機能をタブの逆順に停止します':'選択した機能をタブの順に起動します'):tab==='manual'?'Chat→Live→Prediction→Decision→Codeを順に試行します':'導入状況・モデル一覧・外部連携を順に確認し、結果を書き込みます'">{{tab==='start'?(起動.一括停止中.value?'停止中…':起動.稼働あり.value?'強制停止':'一括起動'):tab==='manual'?(手動.実行中.value?'実行中…':'一括試行'):確認中 || 個別確認中 || integrationBusy ? '確認中…' : 書込中 || modelWriteBusy || integrationWriteBusy ? '書込中…' : latestBusy ? '取得中…' : '全テスト'}}</button></nav>
+<component v-if="connected&&!ミニ表示" :is="一括進捗表示" :state="起動"/>
 <section v-if="!connected&&!ミニ表示" id="login" class="login"><label for="token">起動したターミナルの認証 URL を開くか、認証キーを入力してください。</label><form @submit.prevent="submit"><input id="token" v-model="input" :disabled="connecting" type="password" autocomplete="off" placeholder="起動中のみ有効な認証キー"><button id="connect" :disabled="connecting">接続</button></form></section>
 <p v-if="message" id="message" role="status" aria-live="polite" v-show="!ミニ表示">{{message}}</p>
 <component :is="導入状況パネル" :last-run="前回実行日時" v-show="tab==='install'&&!ミニ表示" :項目="項目" :結果="結果" :確認中="確認中" :個別確認中="個別確認中" :接続済み="connected" :確認済み="確認済み" :書込中="書込中" :書込済み="書込済み" :表示中="表示中" :操作="導入操作" :操作中="操作中" :全診断中="全診断中" @確認="状況確認" @個別確認="個別確認" @書込="書込"/>

@@ -1,4 +1,5 @@
 <script setup>
+import 一括進捗表示 from './一括進捗表示.vue';
 import {computed,ref,onMounted,onBeforeUnmount} from 'vue';
 import './起動ミニ.css';
 import ミニアプリ起動 from '../アプリ起動/ミニアプリ起動.vue';
@@ -19,6 +20,7 @@ function 状態(item){return !props.online?'未接続':`ポート ${item.ポー�
 <template>
 <section class="panel start-mini" aria-label="起動ミニ表示">
  <div ref="content" class="mini-content">
+ <component v-if="appOnline" :is="一括進捗表示" :state="state" compact/>
  <component v-if="appState" :is="ミニアプリ起動" :state="appState" :cli-state="cliState" :online="appOnline" @open-apps="$emit('open-apps')"/>
  <component v-if="cliState&&appState" :is="ミニCLI起動" :state="cliState" :app-state="appState" :online="appOnline"/>
  <div class="mini-services">
