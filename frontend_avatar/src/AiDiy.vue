@@ -2140,6 +2140,19 @@ onBeforeUnmount(() => {
   opacity: 0.85;
 }
 
+/* 外寸は維持し、枠の1pxを内容領域から確保する（操作面に重ねない）。 */
+.web-left-pane,
+.web-right-pane,
+.web-task-layout,
+.web-team-layout {
+  box-sizing: border-box;
+  border: 1px solid #383838;
+}
+/* 外側ペインが枠を所有。内部の同じ枠を二重表示しない。 */
+.web-right-content :deep(.window-shell) {
+  border-color: transparent;
+}
+
 /* ===== Web版 左右分割レイアウト ===== */
 .web-core-root {
   width: 100%;

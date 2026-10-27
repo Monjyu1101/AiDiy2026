@@ -65,3 +65,8 @@ test('AI model trial guidance precedes the family tabs',()=>{
  assert.ok(panel.indexOf(note)<panel.indexOf('<nav class="tabs ai-model-tabs"'));
  assert.match(panel,/<p class="panel-note">[^<]+<\/p>\s*<nav class="tabs ai-model-tabs"/);
 });
+test('panel perimeter reserves one pixel inside the unchanged viewport box',()=>{
+ const css=source('style.css');
+ assert.match(css,/#app\{box-sizing:border-box;border:1px solid #383838\}/);
+ assert.match(css,/#app\{height:100vh;height:100dvh/);
+});

@@ -82,3 +82,6 @@ html,body{height:100%;overflow:hidden}#app{height:100vh;height:100dvh;display:fl
 
 /* ピン OFF は沈んだ表示。寸法は共通のタイトルバー操作を維持する。 */
 .window-actions .window-pin{background:#070a0f;box-shadow:inset 0 1px 3px #000;color:#778394;font-size:14px}.window-pin>span{display:inline-block;filter:grayscale(1);opacity:.65;transform:translateY(1px)}.window-actions .window-pin.pinned{background:#263b49;box-shadow:inset 0 0 0 1px #6bbed0;color:#c3f7ff}.window-pin.pinned>span{filter:none;opacity:1;transform:none}.window-actions .window-pin:focus-visible{outline:2px solid #8d9fff;outline-offset:-2px}.window-actions button:disabled{cursor:not-allowed}.window-actions .window-pin:disabled{opacity:.75}
+
+/* 外寸を保った1px外周。装飾を重ねず、操作項目は枠の内側へ収める。 */
+#app{box-sizing:border-box;border:1px solid #383838}

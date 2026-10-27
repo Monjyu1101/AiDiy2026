@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  border: 1px solid rgba(153, 153, 153, 0.88);
+  border: 1px solid #383838;
   background: rgba(12, 12, 12, 0.72);
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -353,7 +353,7 @@ onBeforeUnmount(() => {
 }
 
 .theme-purple {
-  border-color: rgba(143, 124, 255, 0.58);
+  border-color: #383838;
   background: rgba(6, 8, 14, 0.18);
 }
 

@@ -567,3 +567,7 @@ Windows実機では、すでに開いた両パネルでVRへ切り替え、本�
 `デスクトップ/VRパネル前面.cjs` は同じIDEに属するピンON子窓を本体より前へ配置します。Windowsでは選択済み本体の再前面化でfocus通知が出ないため、WM_WINDOWPOSCHANGEDも監視し、OS処理後に一度だけ補正します。フォーカス奪取、OS親子化、上位topmost層、周期的な再固定は使いません。
 
 確認では本体を続けて2回選ぶ操作、別アプリへの切替、VR開始後のViewer・Code・Live・Term追加を含めます。`checks/vr-panel-stacking-desktop.cjs` を実Electronで起動し、WindowsのZ順とWS_EX_TOPMOSTを照合します。headlessのAPI成功だけで前面維持の合格にしません。全画面では本体をずらして裏を探せないため、パネルが見え続け、直接選択・移動できることを実画面でも確認します。
+
+## 控えめなパネル外周
+
+Electron・Web・VS Code の共通画面は濃いグレー `#383838` の1px外周を表示します。`src/style.css` の`border-box` で外寸を変えず内側に1pxを確保し、操作やスクロールバーへ装飾を重ねません。固定ヘッダーとCanvasもその内側に合わせます。Web内の子パネルは既存の1px境界の色だけを変更し、Code / Live / Term自身へ枠を重ねません。透明な軌跡窓とVR全面には画面全体の四角枠を追加せず、実パネルの境界を使います。検証は `node --test checks/panel-perimeter.test.mjs`。実機のElectron境界や倍率別の描画は別途目視確認してください。

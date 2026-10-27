@@ -93,11 +93,10 @@ function closeWindow() {
   width: min(100%, 212px);
   padding: 0 4px 4px;
   border-radius: 0;
-  border: 1px solid rgba(118, 97, 204, 0.82);
+  border: 1px solid #383838;
   background: rgba(2, 2, 4, 0.46);
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.24),
-    0 0 0 1px rgba(130, 105, 220, 0.18),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
 }
