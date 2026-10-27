@@ -264,7 +264,7 @@ def get_installed_extensions(vscode_cli: str, show_versions: bool = False) -> se
         return None
 
 
-def install_standalone_launcher() -> bool:
+def install_standalone_launcher(*, register_path: bool = True) -> bool:
     """aidiy_code / aidiy_live の単独起動コマンドを配置する。"""
     launcher_dir = Path.home() / ".local" / "bin"
     scripts = {name: FRONTEND_VSCODE_DIR / name / "launch.mjs" for name in ("aidiy_code", "aidiy_live")}
@@ -286,7 +286,7 @@ def install_standalone_launcher() -> bool:
             launcher_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8") if sys.platform == "win32" else content.encode("utf-8"))
             if sys.platform != "win32":
                 launcher_path.chmod(0o755)
-            print_success(f"{name} を登録しました: {launcher_path}")
+            print_success(f"{launcher_path.name} を登録しました: {launcher_path}")
         # この配置先から作った旧名だけを解除する。他の作業コピーのランチャーは残す。
         old_script = FRONTEND_VSCODE_DIR / "scripts" / "launch-standalone.mjs"
         for name in ("aidiy_vscode.cmd", "aidiy_vscode"):
@@ -297,7 +297,7 @@ def install_standalone_launcher() -> bool:
     except OSError as exc:
         print_error(f"aidiy_code / aidiy_live を登録できません: {launcher_dir} ({exc})")
         return False
-    return ensure_launcher_path(launcher_dir)
+    return ensure_launcher_path(launcher_dir) if register_path else True
 
 
 def install_extensions(vscode_cli: str) -> bool:
@@ -379,8 +379,9 @@ def setup_assets(npm_path: str, *, choices=None) -> bool:
         if not install_extensions(vscode_cli):
             return False
 
-    if not install_standalone_launcher():
-        return False
+    if not (choices and choices.get("_defer_ide_launchers")):
+        if not install_standalone_launcher():
+            return False
 
     if vscode_cli is not None:
         print_success(f"{label}: VS Code 拡張のセットアップが完了しました。")

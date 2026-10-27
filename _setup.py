@@ -834,6 +834,25 @@ def setup_launchers_only() -> list[str]:
     return errors
 
 
+def print_app_launch_commands():
+    """アプリ名の最長幅に揃えて起動コマンドを表示する。"""
+    app_commands = (
+        ('Avatar', 'aidiy_avatar （または cd frontend_avatar && npm run dev）'),
+        ('Diag', 'aidiy_diag （ブラウザ版: aidiy_diag --browser）'),
+        ('Hermes', 'aidiy_hermes'),
+        ('Console', 'aidiy_console'),
+        ('Task', 'aidiy_task'),
+        ('Team', 'aidiy_team'),
+        ('Code', 'aidiy_code'),
+        ('Live', 'aidiy_live'),
+        ('IDE', 'aidiy_ide'),
+        ('Discord', 'aidiy_discord'),
+    )
+    app_width = max(len(name) for name, _ in app_commands)
+    for name, command in app_commands:
+        print_info(f"    {name:<{app_width}}起動: {command}")
+
+
 def main():
     global AUTO_MODE
     if sys.argv[1:] == ['--launchers-only']:
@@ -1074,16 +1093,7 @@ def main():
     print_info("    Task / Team起動:")
     print_info(f"                 cd backend_taskteam && uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port {PORT_TASKTEAM}")
     print_info("    Web開発    : cd frontend_web && npm run dev")
-    print_info("    Avatar起動 : aidiy_avatar （または cd frontend_avatar && npm run dev）")
-    print_info("    Diag起動   : aidiy_diag （ブラウザ版: aidiy_diag --browser）")
-    print_info("    Hermes起動 : aidiy_hermes")
-    print_info("    Console起動   : aidiy_console")
-    print_info("    Task起動   : aidiy_task")
-    print_info("    Team起動   : aidiy_team")
-    print_info("    Code起動   : aidiy_code")
-    print_info("    Live起動   : aidiy_live")
-    print_info("    IDE起動    : aidiy_ide")
-    print_info("    Discord起動: aidiy_discord")
+    print_app_launch_commands()
 
     print()
     if error_locations:

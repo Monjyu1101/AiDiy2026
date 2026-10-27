@@ -1,6 +1,7 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 // Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 import http from 'node:http';
+import {createCoreSettingsBridge,AI_SETTINGS_ACTIONS,AI_SETTINGS_BODY_LIMIT} from './AI設定/コア設定接続.mjs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -67,7 +68,7 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager,coreSettingsBridge=createCoreSettingsBridge()}) {
   let results = [], busy = false, keyBusy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
   const recordInstallResult=(result,started=new Date())=>{
@@ -102,6 +103,25 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
     const authorized = auth.length === expected.length && timingSafeEqual(auth,expected);
     try {
       if (route?.startsWith('api/') && !authorized) return reply(401,{エラー:'起動時の認証キーを入力してください。'});
+      if(route?.startsWith('api/AI設定/')){
+        const action=route.slice('api/AI設定/'.length);
+        if(!Object.hasOwn(AI_SETTINGS_ACTIONS,action))return reply(404,{エラー:'操作が見つかりません。'});
+        if(req.method!=='POST')return reply(405,{エラー:'POST を使用してください。'});
+        if(req.headers['sec-fetch-site']==='cross-site')return reply(403,{エラー:'同じ画面から操作してください。'});
+        if(req.headers.origin){
+          try{if(new URL(req.headers.origin).host!==req.headers.host)return reply(403,{エラー:'同じ画面から操作してください。'});}
+          catch{return reply(403,{エラー:'送信元が不正です。'});}
+        }
+        if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
+        if(Number(req.headers['content-length'])>AI_SETTINGS_BODY_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});
+        const chunks=[];let size=0;
+        for await(const chunk of req){size+=chunk.length;if(size>AI_SETTINGS_BODY_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
+        const controller=new AbortController();const cancel=()=>controller.abort();res.on?.('close',cancel);
+        try{return reply(200,await coreSettingsBridge(action,body,{signal:controller.signal}));}
+        catch(error){return reply(error.status||503,{エラー:error.status?error.message:'Core への接続を確認してください。'});}
+        finally{res.off?.('close',cancel);}
+      }
       if(route==='api/導入管理'&&req.method==='GET')return reply(200,await management.snapshot());
       if(route?.startsWith('api/導入管理/')&&['POST','DELETE'].includes(req.method)){
         if(hasBody(req))return reply(400,{エラー:'導入操作への引数は指定できません。'});

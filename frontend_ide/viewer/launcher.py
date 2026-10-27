@@ -29,7 +29,7 @@ def launcher_path(kind: str = 'ide') -> Path:
     return Path.home() / '.local' / 'bin' / (f'aidiy_{kind}.cmd' if sys.platform == 'win32' else f'aidiy_{kind}')
 
 
-def install_launcher(root: Path, kind: str = 'ide') -> None:
+def install_launcher(root: Path, kind: str = 'ide', *, register_path: bool = True) -> None:
     node = shutil.which('node')
     if not node:
         raise OSError('Node.js が見つかりません。')
@@ -57,7 +57,7 @@ def install_launcher(root: Path, kind: str = 'ide') -> None:
         path.write_text(f'#!/bin/sh\nexec {shlex.quote(node)} {shlex.quote(str(script))} "$@"\n', encoding='utf-8')
         path.chmod(0o755)
     print(f'[OK] {path.name} を登録しました: {path}')
-    if not ensure_launcher_path(path.parent):
+    if register_path and not ensure_launcher_path(path.parent):
         raise OSError('ランチャーの PATH 登録に失敗しました。')
 
 

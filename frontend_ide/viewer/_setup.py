@@ -115,7 +115,8 @@ def setup(choices=None) -> bool:
             if vue_reuse is not True:
                 subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True)
         subprocess.run([npm, 'run', 'build'], cwd=vue, check=True)
-        install_launcher(THIS_DIR)
+        if not (choices and choices.get("_defer_ide_launchers")):
+            install_launcher(THIS_DIR)
     except (OSError, subprocess.CalledProcessError):
         print_error("IDE の依存導入または aidiy_ide の登録に失敗しました。")
         return False

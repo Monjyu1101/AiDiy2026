@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 def setup(choices=None):
+    if choices and choices.get("_defer_ide_launchers"):
+        return True
     spec = importlib.util.spec_from_file_location('aidiy_team_launcher', ROOT.parent / 'viewer/launcher.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
