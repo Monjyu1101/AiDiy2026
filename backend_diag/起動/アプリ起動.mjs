@@ -1,11 +1,12 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
 // Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 import {spawn,execFile} from 'node:child_process';
-import {stat,realpath,readdir,mkdir,open} from 'node:fs/promises';
-import {join,dirname,isAbsolute} from 'node:path';
+import {stat,realpath,readdir,mkdir,open,readFile} from 'node:fs/promises';
+import {join,dirname,isAbsolute,resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {readConfig} from '../runtime/model_probe.mjs';
 import {createTaskTeamStatus} from './TaskTeam接続.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
@@ -38,7 +39,18 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
  const checkTaskTeam=taskTeamStatus||createTaskTeamStatus({root});
  const taskTeam=id=>id==='task'||id==='team';
  const availability=async()=>{try{return await checkTaskTeam();}catch{return {利用可能:false,無効理由:'Task / Team バックエンドを確認できません。'};}};
- async function catalog(){const state=await availability();return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app)};}
+ async function catalog(){
+  const state=await availability();
+  const [,config]=await readConfig(()=>readFile(join(root,'_config','AiDiy_key.json'),'utf8'));
+  const project=config.CODE_BASE_PATH;
+  // 設定全体やキーは公開せず、明示されたプロジェクトだけを初期値として渡す。
+  const フォルダ=typeof project==='string'?project:'';
+  const normalized=フォルダ.trim().replaceAll('\\','/');
+  // 表示は設定値そのまま。起動引数だけAIコアと同じbackend_server基準で解決する。
+  // 空欄・制御文字・ドライブ相対値から別のフォルダを補完しない。
+  const 起動フォルダ=!normalized||フォルダ.length>4096||/[\u0000-\u001f\u007f]/.test(フォルダ)||(/^[a-z]:/i.test(normalized)&&!isAbsolute(normalized))?'':resolve(root,'backend_server',normalized);
+  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app),フォルダ,起動フォルダ};
+ }
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
   try{const path=await realpath(value);if(!(await stat(path)).isDirectory())throw Error();return path;}catch{throw fail('フォルダが見つからないか、アクセスできません。');}

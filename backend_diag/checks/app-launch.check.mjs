@@ -93,3 +93,38 @@ test('real detached app survives Diag server shutdown and inherits chosen cwd',a
   const after=JSON.parse(await readFile(marker,'utf8'));assert.equal(after.cwd,f.project);assert.equal(after.pid,child.pid);assert.ok(after.time>before.time);
  }finally{if(server.listening)await new Promise(resolve=>server.close(resolve));if(child?.exitCode===null){await new Promise(resolve=>{child.once('exit',resolve);child.kill();});}}
 });
+
+test('catalog copies CODE_BASE_PATH including ../ without modifying config or launching apps',async t=>{
+ const f=await fixture(t);await mkdir(join(f.root,'_config'));
+ const filename=join(f.root,'_config','AiDiy_key.json');
+ const manager=createAppLauncher({root:f.root,taskTeamStatus:async()=>({利用可能:false}),spawnFn(){throw Error('must not launch');}});
+ assert.equal((await manager.catalog()).フォルダ,'');
+ for(const value of [undefined,null,42,{},[],false,'','   ','../',' ../ ',f.project,'C:\\日本語 空白\\project','../other-project']){
+  const raw='\uFEFF'+JSON.stringify({CODE_BASE_PATH:value,openai_key_id:'synthetic-private-key',OTHER:'private'});
+  await writeFile(filename,raw);const data=await manager.catalog();
+  assert.deepEqual(Object.keys(data).sort(),['対象','フォルダ','起動フォルダ'].sort());
+  assert.equal(data.フォルダ,typeof value==='string'?value:'');
+  assert.ok(!JSON.stringify(data).includes('private'));
+  assert.equal(await readFile(filename,'utf8'),raw);
+ }
+ for(const raw of ['{invalid','null','[]']){await writeFile(filename,raw);assert.equal((await manager.catalog()).フォルダ,'');assert.equal(await readFile(filename,'utf8'),raw);}
+ assert.equal(f.calls.length,0);
+});
+
+test('configured ../ and relative folders resolve against backend_server for validated app launch',async t=>{
+ const f=await fixture(t);await mkdir(join(f.root,'_config'));
+ const config=join(f.root,'_config','AiDiy_key.json');
+ for(const [configured,expected] of [['../',await realpath(f.root)],['..\\',await realpath(f.root)],['../日本語 空白 project',f.project],[f.project,f.project]]){
+  await writeFile(config,JSON.stringify({CODE_BASE_PATH:configured}));
+  const data=await f.manager.catalog();assert.equal(data.フォルダ,configured);assert.equal(data.起動フォルダ,expected);
+  await f.manager.launch('code',data.起動フォルダ);assert.equal(f.calls.at(-1).options.cwd,expected);
+ }
+ for(const configured of ['', '   ', 'C:relative', 'bad\0path', 'bad\npath', '../\n', 'x'.repeat(4097)]){
+  await writeFile(config,JSON.stringify({CODE_BASE_PATH:configured}));const data=await f.manager.catalog();
+  assert.equal(data.フォルダ,configured);assert.equal(data.起動フォルダ,'');await assert.rejects(f.manager.launch('code',data.起動フォルダ),{status:400});
+ }
+ await writeFile(config,JSON.stringify({CODE_BASE_PATH:'../deleted-project'}));
+ await assert.rejects(f.manager.launch('code',(await f.manager.catalog()).起動フォルダ),{status:400});
+ // 任意のAPI相対入力を許可する変更ではない。
+ await assert.rejects(f.manager.launch('code','../'),{status:400});
+});

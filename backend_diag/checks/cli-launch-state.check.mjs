@@ -94,3 +94,16 @@ test('VS Code shares selected folder but uses editor endpoint without automatic 
  await f.state.起動('vscode');
  assert.deepEqual(f.requests,[{route:'api/VSCode起動/開始',body:{フォルダ:f.アプリ.フォルダ.value}}]);
 });
+
+test('configured relative display uses shared resolved path for CLI and VS Code payloads',async()=>{
+ const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs');
+ const requests=[];let selected='/manual';
+ const アプリ=アプリ状態を作成({picker:()=>selected,api:async route=>route==='api/アプリ起動'?{対象:[],フォルダ:'../',起動フォルダ:'/repo'}:{フォルダ:selected}});
+ const state=CLI状態を作成({アプリ,api:async(route,_method,_signal,_format,body)=>{requests.push({route,body});return {};}});
+ state.項目.value=[{id:'copilot',利用可能:true},{id:'vscode',種類:'editor',利用可能:true}];await アプリ.読込();
+ for(const id of ['copilot','vscode']){await state.起動(id,{確認省略:true});assert.equal(requests.at(-1).body.フォルダ,'/repo');}
+ assert.equal(requests[0].route,'api/CLI起動/開始');assert.equal(requests[1].route,'api/VSCode起動/開始');assert.equal(アプリ.フォルダ.value,'../');
+ await アプリ.選択();await アプリ.読込();
+ for(const id of ['copilot','vscode']){await state.起動(id,{確認省略:true});assert.equal(requests.at(-1).body.フォルダ,'/manual');}
+ アプリ.解除();await アプリ.読込();await state.起動('vscode');assert.equal(requests.length,4);
+});

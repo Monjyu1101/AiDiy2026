@@ -19,7 +19,7 @@ export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=m
  async function 起動(id,{確認省略=false,開始時}={}){
   if(!接続可能()||確認待ち||アプリ.処理中.value&&!アプリ.処理中.value.startsWith('cli:')||アプリ.選択中.value||!アプリ.フォルダ.value)return;
   const item=項目.value.find(value=>value.id===id);if(!item||item.利用可能===false)return;
-  const project=アプリ.フォルダ.value,run=++起動番号,connection=接続番号;
+  const project=アプリ.フォルダ.value,launchProject=アプリ.起動フォルダ?.()??project,run=++起動番号,connection=接続番号;
   起動待ち.set(run,id);処理を反映();起動エラー.value=null;読込エラー.value=null;
   if(確認省略!==true)確認待ち=run;
   try{
@@ -30,8 +30,8 @@ export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=m
    if(accepted!==true||!接続可能()||connection!==接続番号||project!==アプリ.フォルダ.value)return;
    開始時?.();
    // 成功通知は保持しない。古いサーバーが通知文を返しても画面を押し下げない。
-   if(item.種類==='editor')await api('api/VSCode起動/開始','POST',undefined,'json',{フォルダ:project});
-   else await api('api/CLI起動/開始','POST',undefined,'json',{対象:id,フォルダ:project,自動承認確認:true});
+   if(item.種類==='editor')await api('api/VSCode起動/開始','POST',undefined,'json',{フォルダ:launchProject});
+   else await api('api/CLI起動/開始','POST',undefined,'json',{対象:id,フォルダ:launchProject,自動承認確認:true});
   }catch(error){if(run===起動番号&&connection===接続番号)起動エラー.value=error.message;}
   finally{if(確認待ち===run)確認待ち=0;起動待ち.delete(run);処理を反映();}
  }
