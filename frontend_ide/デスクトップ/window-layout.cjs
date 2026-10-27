@@ -7,12 +7,16 @@
 const size=require('../host/scripts/window-size.cjs');
 // Termは操作バーと端末の数行を残せればよい。初期配置・会話画面の最小寸法とは分ける。
 function windowMinimumSize(kind,bounds){
- return{minWidth:Math.min(kind==='ide'?400:size.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:kind==='term'?180:size.会話最小高さ,bounds.height)};
+ return{minWidth:Math.min(['ide','task','team'].includes(kind)?400:size.最小幅,bounds.width),minHeight:Math.min(kind==='ide'?550:kind==='term'?180:size.会話最小高さ,bounds.height)};
 }
 function windowBounds(kind,area,owner,slot=0,cli=false){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
+ if(kind==='task'||kind==='team'){
+  const width=Math.min(1200,available.width),height=Math.min(820,available.height);
+  return{x:Math.round(area.x+(area.width-width)/2),y:Math.round(area.y+(area.height-height)/2),width,height};
+ }
  if(kind==='browser'){
   const width=Math.min(1100,Math.round(available.width*.8)),height=Math.min(820,Math.round(available.height*.85)),offset=(slot%6)*24;
   return{x:Math.round(Math.min(available.x+(available.width-width)/2+offset,available.x+available.width-width)),y:Math.round(Math.min(available.y+(available.height-height)/2+offset,available.y+available.height-height)),width,height};

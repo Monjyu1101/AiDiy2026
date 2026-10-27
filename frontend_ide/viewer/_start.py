@@ -95,14 +95,14 @@ def check_environment() -> tuple[bool, str]:
 
 def start(open_window: bool | None = None, *, kind='ide') -> subprocess.Popen[bytes]:
     """空きポートで独立起動する。親の終了後もログファイルへ出力して継続する。"""
-    label = 'フロントエンド(term)' if kind == 'term' else NAME
+    label = f'フロントエンド({kind})' if kind != 'ide' else NAME
     node = node_command()
     if node is None:
         raise RuntimeError("Node.js が見つかりません")
     if open_window is None:
         open_window = True
     project = THIS_DIR.parent.parent
-    entry = THIS_DIR / 'launch.mjs' if kind == 'ide' else THIS_DIR.parent / 'aidiy_term/launch.mjs'
+    entry = THIS_DIR / 'launch.mjs' if kind == 'ide' else THIS_DIR.parent / f'aidiy_{kind}/launch.mjs'
     command = [node, str(entry), str(project)]
     if not open_window:
         command.append("--no-open")
@@ -135,7 +135,7 @@ def is_dev_process(process: dict, root: Path, windows: bool, kind='ide') -> bool
     path = ntpath if windows else os.path
     entries = {path.normcase(path.normpath(path.join(str(root), name))) for name in ("launch.mjs", "desktop.cjs")}
     development = path.join(str(root), '..')
-    if kind == 'term':
+    if kind != 'ide':
         entries.clear()
     entries.add(path.normcase(path.normpath(path.join(development, f'aidiy_{kind}', 'launch.mjs'))))
     if len(args) > 1 and path.normcase(path.normpath(args[1])) in {path.normcase(path.normpath(path.join(development, file))) for file in ('launch.mjs', 'desktop.cjs')}:

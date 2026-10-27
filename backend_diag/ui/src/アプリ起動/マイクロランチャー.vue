@@ -25,7 +25,7 @@ const projectName=computed(()=>{const folder=String(props.appState.フォルダ.
 const orbit=computed(()=>配置.円周配置(apps.value.length));
 watch(()=>apps.value.length,async count=>{if(expanded.value)await window.aidiyWindow?.expandMicro(true,count);});
 watch(()=>props.online,value=>{if(value){void props.appState.読込();void props.cliState.読込();}},{immediate:true});
-function disabled(item){return !props.online||!props.appState.フォルダ.value||props.appState.選択中.value||Boolean(props.appState.処理中.value)&&!(item.kind==='cli'&&props.appState.処理中.value.startsWith('cli:'));}
+function disabled(item){return !props.online||(item.kind==='app'&&!props.appState.利用可能(item.id))||!props.appState.フォルダ.value||props.appState.選択中.value||Boolean(props.appState.処理中.value)&&!(item.kind==='cli'&&props.appState.処理中.value.startsWith('cli:'));}
 function launch(item,event){if(disabled(item))return;const 開始時=起動モーション(event);if(item.kind==='cli')void props.cliState.起動(item.id,{確認省略:true,開始時});else void props.appState.起動(item.id,{開始時});}
 async function toggle(){
  if(busy.value||props.switching)return;busy.value=true;
@@ -43,7 +43,7 @@ onBeforeUnmount(()=>{disposed=true;labelObserver?.disconnect();move.finish();cle
  <div class="micro-deploy" :inert="!expanded">
   <div class="micro-orbit micro-app-orbit" aria-label="アプリとCLI">
    <div v-for="(item,index) in apps" :key="item.kind+item.id" class="micro-position" :style="{'--angle':`${index*360/apps.length-90}deg`,'--stagger':`${index*22}ms`}">
-    <div class="micro-upright"><button data-micro-hit class="micro-app" :data-app="item.kind==='app'?item.id:undefined" :data-cli="item.kind==='cli'?item.id:undefined" :disabled="disabled(item)" :title="item.名前+' を起動 — '+appState.フォルダ.value" :aria-label="item.名前+' を起動'" @click="launch(item,$event)"><span class="launch-frame launch-frame-40" aria-hidden="true"><img :src="item.icon" alt="" width="40" height="40"><span class="launch-trace"></span></span></button></div>
+    <div class="micro-upright"><button data-micro-hit class="micro-app" :data-app="item.kind==='app'?item.id:undefined" :data-cli="item.kind==='cli'?item.id:undefined" :disabled="disabled(item)" :title="(item.kind==='app'&&appState.不可理由(item.id))||item.名前+' を起動 — '+appState.フォルダ.value" :aria-label="item.名前+' を起動'+(item.kind==='app'&&appState.不可理由(item.id)?' — '+appState.不可理由(item.id):'')" @click="launch(item,$event)"><span class="launch-frame launch-frame-40" aria-hidden="true"><img :src="item.icon" alt="" width="40" height="40"><span class="launch-trace"></span></span></button></div>
    </div>
   </div>
  </div>

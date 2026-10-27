@@ -19,6 +19,20 @@
 
 移動時は通常のimportに加え、テストのreadFile・仮想require、型宣言の隣接、`viewer/server.mjs` の最新ファイル共有、`aidiy_term/terminal.mjs` のPowerShell補完情報を確認してください。日本語パスをファイルAPIへ渡すときはURLオブジェクトか `fileURLToPath()` を使い、URLの `.pathname` を直接ファイル名として使わないでください。`checks/component-paths.mjs` は実Vueマウントの論理名とファイルの対応を一か所にまとめます。
 
+## Task / Team の独立版（Avatarからのコピー）
+
+`frontend_ide/src/タスクチーム/` は Avatar の AIタスク・AIチームをコピーした独立画面です。元の `frontend_avatar` の画面は残し、実行時に Avatar の配布物やサーバーを読み込みません。Task / Team 専用の `taskteam.js` / `taskteam.css` を生成し、Code / Live の画面 bundle へ Three.js・Mermaid を混ぜません。
+
+- `python frontend_ide/_setup.py` または全体setupのIDE群を選択して準備します。`aidiy_task` / `aidiy_team` で個別Electron起動、`--browser` で同じ画面をWeb起動します。
+- ElectronのTaskは元Avatarと同じ要求・フロー図・明細の3独立ウィンドウと編集／応答内容用の別窓を持ちます。3画面はそれぞれ閉じられ、各画面右上のボタンで閉じた画面を再表示できます。3画面すべてを閉じると編集窓も閉じ、Taskアプリだけが終了します。Web版は3ペイン一体表示です。
+- Taskの認証は同一起動のメインプロセス内メモリで同期し、要求画面を先に閉じても残りの画面を利用できます。他アプリへ共有せず、最終終了時に破棄します。選択タスクと編集完了は同じ起動元の画面間で同期します。
+- ログインは既存Coreの利用者認証を使用します。Task / Team とAvatarの認証保存を分け、片方のログアウトで別アプリの保存情報を消しません。バックエンドの業務データは共通です。
+- Coreは `PORT_CORE`（既定8091）、Task / Teamは共通の `PORT_TASKTEAM`（既定8093）です。起動元サーバーが配置先設定からloopback宛先を決定し、画面から任意URLや秘密設定を渡せないようにします。
+- Codeと共通の状態バーを使いますが、シアン脈動の判定はtoolsではなくTask / Teamの `/health` による実疎通です。停止・通信失敗時は接続済みに見せません。
+- 元Avatarのコピー元を更新した際は必要な変更だけを明示的に反映します。コピー版から元ファイルを削除・自動同期しません。
+
+検証は `node --test frontend_ide/checks/taskteam-*.test.mjs frontend_ide/checks/task-team-launchers.test.mjs` と `python -m unittest discover -s scripts/checks -p test_task_team_launchers.py` を使用します。実業務の登録・実行はテストで行わず、模擬APIと一時フォルダで確認します。
+
 ## このメモを使う場面
 
 - Code / Live / IDEの共通画面やファイルエクスプローラーを変更するとき。

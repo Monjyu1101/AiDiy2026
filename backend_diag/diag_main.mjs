@@ -81,6 +81,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
   assets.set('AiDiy.png',['AiDiy.png','image/png']);
   for(const id of ['avatar','ide','term','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
+  for(const id of ['task','team'])assets.set(`AiDiy_${id}.svg`,[`AiDiy_${id}.svg`,'image/svg+xml']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.png`,[`CLI_${id}.png`,'image/png']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.svg`,[`CLI_${id}.svg`,'image/svg+xml']);
   assets.set('LICENSE_ICONS.md',['LICENSE_ICONS.md','text/markdown; charset=utf-8']);
@@ -124,7 +125,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         try{return reply(202,(editor?await vscodeLauncher.launch(body.フォルダ):await cliLauncher.launch(body.対象,body.フォルダ,body.自動承認確認)));}
         catch(error){return reply(error.status||500,{エラー:error.status?error.message:'CLIの起動処理に失敗しました。'});}
       }
-      if(route==='api/アプリ起動'&&req.method==='GET')return reply(200,appLauncher.catalog());
+      if(route==='api/アプリ起動'&&req.method==='GET')return reply(200,await appLauncher.catalog());
       if(route?.startsWith('api/アプリ起動/')&&req.method==='POST'){
         if(!['api/アプリ起動/開始','api/アプリ起動/フォルダ'].includes(route))return reply(404,{エラー:'見つかりません。'});
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});

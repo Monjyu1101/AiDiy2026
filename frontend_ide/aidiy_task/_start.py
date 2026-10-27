@@ -1,0 +1,28 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
+"""Taskの独立起動・環境確認・この配置先だけの停止。"""
+import importlib.util
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('aidiy_task_shared_start', ROOT.parent / 'viewer/_start.py')
+shared = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(shared)
+
+def check_environment():
+    if shared.node_command() is None:
+        return False, 'Node.jsが見つかりません。'
+    return ((True, 'Vue Task') if (ROOT.parent / 'dist/taskteam.js').is_file()
+            else (False, 'Vue画面が未準備です。'))
+
+def start(open_window=None):
+    return shared.start(open_window, kind='task')
+
+def kill_ports():
+    return shared.kill_ports(kind='task')
+
+def process_tree_pids():
+    return shared.process_tree_pids(kind='task')

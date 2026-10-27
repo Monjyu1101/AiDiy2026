@@ -11,7 +11,10 @@
     "live": "node launch.mjs --app live",
     "test": "node --test checks/*.test.mjs",
     "ide": "node launch.mjs --app ide",
-    "term": "node launch.mjs --app term"
+    "term": "node launch.mjs --app term",
+    "taskteam:type-check": "vue-tsc --noEmit -p tsconfig.taskteam.json",
+    "task": "node launch.mjs --app task",
+    "team": "node launch.mjs --app team"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",
@@ -19,12 +22,17 @@
     "markdown-it": "14.1.0",
     "node-pty": "1.1.0",
     "vue": "3.5.43",
-    "ws": "8.22.0"
+    "ws": "8.22.0",
+    "axios": "1.20.0",
+    "mermaid": "11.17.2",
+    "three": "0.185.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.10",
     "esbuild": "^0.27.0",
     "typescript": "^5.9.3",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "vue-tsc": "3.3.13",
+    "@types/three": "0.185.4"
   }
 }

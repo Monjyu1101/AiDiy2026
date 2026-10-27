@@ -8,9 +8,9 @@ const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
-if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term'].includes(kind))throw Error('起動元が不正です。');
+if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','term','task','team'].includes(kind))throw Error('起動元が不正です。');
 const cliTermWindow=kind==='term'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
-const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':'Term'}`;
+const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':'Term'}`;
 app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
 const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
@@ -25,6 +25,7 @@ if(independent){
  app.on('quit',()=>{try{rmSync(temporaryProfile,{recursive:true,force:true,maxRetries:2,retryDelay:100});}catch{}});
 }
 const {windowBounds,windowMinimumSize,allWindowBounds}=require('./デスクトップ/window-layout.cjs');
+const {createTaskWindows,taskWindowBounds}=require('./デスクトップ/task-windows.cjs');
 const {reserveTermSlot}=require('./デスクトップ/term-window-slot.cjs');
 const {拡大表示}=require('./host/scripts/window-opening.cjs');
 // IDEは同じプロジェクトだけ既存窓へ戻す。Code / Liveは種別ごと、Termは複数起動する。
@@ -33,6 +34,7 @@ if(!independent&&!app.requestSingleInstanceLock()){
  return;
 }
 const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
+const taskWindows=createTaskWindows({records:windows,trustedEvent,focusWindow,isQuitting:()=>quitting,onLastClosed:()=>app.quit(),createWindow:(view,payload)=>createWindow('task',url+'#task-view='+view,undefined,undefined,undefined,undefined,undefined,undefined,{view,payload})});
 const {createWindowPins}=require('./デスクトップ/最前面ピン.cjs');
 const windowPins=createWindowPins({onChanged(window,state){
  const record=windows.get(window.webContents);if(!record)return;
@@ -51,6 +53,11 @@ const {createNativePreviewActions}=require('./デスクトップ/native-preview-
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false,forcedQuit=false;
 function closeApplication(){
+ if(kind==='task'){
+  const peers=[...windows.values()].filter(record=>record.kind==='task'&&['request','flow','detail'].includes(record.taskView)&&!record.window.isDestroyed());
+  if(peers.length){for(const record of peers)record.window.close();}else app.quit();
+  return;
+ }
  const main=[...windows.values()].find(record=>!record.owner&&!record.window.isDestroyed())?.window;
  if(main)main.close();else app.quit();
 }
@@ -138,10 +145,11 @@ function selectedAllDisplay(owner,displayId){
  if(!display)throw Error('選んだディスプレイが見つかりません。');
  return display;
 }
-async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,browserTarget){
+async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,browserTarget,taskOptions){
  // ピン留めのビューアは #viewer=ファイル で開く。照合・遷移の判定は # より前の URL で行う。
  const [base,hash='']=url.split('#');
  const viewerPath=kind==='viewer'&&hash.startsWith('viewer=')?decodeURIComponent(hash.slice('viewer='.length)):'';
+ const taskView=kind==='task'?(taskOptions?.view||'request'):undefined;
  const ownerBounds=owner?.window.getBounds();
  const area=(ownerBounds?screen.getDisplayMatching(ownerBounds):screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
  const used=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).map(item=>item.slot));
@@ -155,9 +163,10 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   if(display){displaySlot=0;const occupied=new Set([...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&item.displayId===displayId&&!item.window.isDestroyed()).map(item=>item.displaySlot));while(occupied.has(displaySlot))displaySlot++;}
   bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliTermWindow&&!owner);
  }catch(error){placement?.close();throw error;}
- const title=kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:'Live'}`;
+ if(kind==='task')bounds=taskWindowBounds(taskView,area);
+ const title=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='term'?`Term${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
  let window;
- try{window=new BrowserWindow({title,...bounds,...windowMinimumSize(kind,bounds),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','term'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
@@ -165,7 +174,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  const contents=window.webContents;
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
- const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,revision:0,pending:new Map()};windows.set(contents,record);
+ const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,taskView,taskPayload:taskOptions?.payload,revision:0,pending:new Map()};windows.set(contents,record);
  // 起動元・寿命はrecord.ownerで管理し、OS上は独立したパネルのままピンを設定する。
  registerWindowPin(record);
  attachWindowMove(record);
@@ -188,7 +197,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   });
  }
  const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
+ window.once('closed',()=>{if(kind==='task')taskWindows.closed(record);clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
  contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame){nativePreviewActions.invalidate(record);if(!isInPlace)draftRouter.invalidate(record);}});
  contents.on('render-process-gone',()=>{draftRouter.invalidate(record);nativePreviewActions.invalidate(record);});
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
@@ -234,6 +243,8 @@ app.whenReady().then(async()=>{
   return sameOrigin&&audioAllowed(contents,permission,details)&&details.mediaType==='audio';
  });
  session.defaultSession.setPermissionRequestHandler((contents,permission,callback,details)=>callback(audioAllowed(contents,permission,details)&&details.mediaTypes?.length===1&&details.mediaTypes[0]==='audio'));
+ ipcMain.handle('development:task-windows',(event,action,payload)=>taskWindows.handle(event,action,payload));
+ ipcMain.handle('development:task-session',(event,action,value)=>taskWindows.session(event,action,value));
  ipcMain.handle('development:window',(event,action)=>{
   const record=trustedEvent(event);if(!record)return;
   if(action==='minimize')record.window.minimize();else if(action==='close')record.window.close();
@@ -348,5 +359,5 @@ app.whenReady().then(async()=>{
   record.pending.set(pendingKey,opening);
   try{return await opening;}finally{if(record.pending.get(pendingKey)===opening)record.pending.delete(pendingKey);}
  });
- await createWindow(kind,url);process.send?.({windowShown:true});
+ await createWindow(kind,kind==='task'?url+'#task-view=request':url);if(kind==='task')await taskWindows.start();process.send?.({windowShown:true});
 }).catch(error=>{console.error(error);app.quit();});

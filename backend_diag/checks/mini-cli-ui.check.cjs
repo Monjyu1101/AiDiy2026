@@ -9,7 +9,7 @@ const text=node=>node.text+node.children.map(text).join('');
 test('通常のCLIアイコンは確認なしで起動し、未導入は表示して起動要求を送らない',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
  const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
- const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){}};
+ const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  let prompts=0,failLaunch=false;const launches=[];
  const cliState=CLI状態を作成({アプリ:state,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'codex',名前:'Codex CLI',利用可能:true},{id:'grok',名前:'Grok Build',利用可能:false}]};
@@ -50,7 +50,7 @@ async function appState(switchMini=async()=>true,globals={}){
   './ウィンドウ/認証セッション.mjs':{認証セッションを作成:options=>認証セッションを作成({...options,storage:()=>globals.sessionStorage})},
   './導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({一覧を反映:noop})},'./導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
   './キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop,resetPublic:noop,設定を破棄:noop})},'./ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
-  './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({フォルダ:vue.ref('')})},
+  './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({...methods,フォルダ:vue.ref('')})},
   './アプリ起動/CLI状態.mjs':{CLI状態を作成:()=>methods},'./ウィンドウ/起動ミニ表示.mjs':{起動ミニ表示を作成:options=>起動ミニ表示を作成({...options,切替:async value=>{switches.push(value);return switchMini(value);}})},
   './AIモデル/AIモデル状態.mjs':{AIモデル状態を作成:()=>methods},'./設定モデル/設定モデル状態.mjs':{設定モデル状態を作成:()=>methods},
  };
@@ -65,8 +65,8 @@ test('実App状態: 全7タブからミニへ移行し元のタブへ復帰、�
 });
 test('電光掲示板はネイティブbuttonで、全7タブのミニからアプリ起動へ復帰し連打をまとめる',async()=>{
  const {scope,state,switches}=await appState();
- const app={項目:vue.ref([]),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){}};
- const services={ポート項目:vue.ref([]),項目:vue.ref([]),停止警告対象:vue.ref(new Set())};
+ const app={項目:vue.ref([]),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
+ const services={進捗表示:vue.ref(null),ポート項目:vue.ref([]),項目:vue.ref([]),停止警告対象:vue.ref(new Set())};
  const panel=component('起動/起動ミニパネル.vue').default;
  const ui=mount({render:()=>state.ミニ表示.value?vue.h(panel,{appState:app,appOnline:true,state:services,online:true,onOpenApps:state.アプリ起動へ戻る}):null},()=>({}));
  try{
@@ -134,7 +134,7 @@ test('実Vue AiDiy行: 6アプリは確認なしで起動し、処理中・成�
  }finally{ui.app.unmount();}
 });
 test('CLIの名前は安全なテキスト、エラーはミニに表示しない',async()=>{
- const state={項目:vue.ref([{id:'copilot',名前:'<script>bad</script>',モード:'YOLO'}]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref('<script>error</script>'),失敗:vue.ref(true),読込(){},切断(){}};
+ const state={項目:vue.ref([{id:'copilot',名前:'<script>bad</script>',モード:'YOLO'}]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref('<script>error</script>'),失敗:vue.ref(true),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},切断(){}};
  const html=await render('アプリ起動/ミニCLI起動.vue',{state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true});assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;bad/);assert.doesNotMatch(html,/&lt;script&gt;error|mini-cli-message/);
 });
 
@@ -154,7 +154,7 @@ test('ミニのCLI更新ボタンと空見出しをなくし、表示・再接�
 
 test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermesは件数に含めない',async()=>{
  const ids=['claude','codex','copilot','agy','grok','opencode'],entry=id=>({id,名前:id,モード:'YOLO'});
- const state={項目:vue.ref([entry('aidiy_hermes')]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref(''),失敗:vue.ref(false),読込(){},切断(){}};
+ const state={項目:vue.ref([entry('aidiy_hermes')]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref(''),失敗:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},切断(){}};
  const ui=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true}));
  try{
   for(const count of [0,1,3,6,0]){
@@ -174,7 +174,7 @@ test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermes�
 test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとCLIは並行起動・成功非表示',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
  const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'],apps=['avatar','ide','term','code','live','discord'];let prompts=0;const launches=[],appLaunches=[],pending=[];
- const app={項目:vue.ref(apps.map((id,i)=>({id,名前:['Avatar','IDE','Term','Code','Live','Discord'][i]}))),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},起動:id=>appLaunches.push(id)};
+ const app={項目:vue.ref(apps.map((id,i)=>({id,名前:['Avatar','IDE','Term','Code','Live','Discord'][i]}))),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},利用可能:()=>true,不可理由:()=>'',起動:id=>appLaunches.push(id)};
  const state=CLI状態を作成({アプリ:app,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>route==='api/CLI起動'?{対象:ids.map(id=>({id,名前:id,モード:'YOLO',利用可能:true}))}:(launches.push(body),new Promise((resolve,reject)=>pending.push({resolve,reject})))});
  const upper=mount(compile('アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state:app,cliState:state,online:true}));
  const lower=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:app,online:true}));
@@ -223,7 +223,7 @@ test('実App認証: URLを消した後の再読込・手入力・401をセッシ
 test('VS Code は通常とミニで編集用ラベルを表示し同じフォルダの専用APIへ送る',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
  const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
- const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/日本語 project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){}};
+ const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/日本語 project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  const launches=[];const cliState=CLI状態を作成({アプリ:state,確認:()=>assert.fail('editor confirmation'),api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:true}]};launches.push({route,body});return {};
  }});

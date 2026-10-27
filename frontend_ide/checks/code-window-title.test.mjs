@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {EventEmitter} from 'node:events';
 import vm from 'node:vm';
+import taskWindowsModule from '../デスクトップ/task-windows.cjs';
 import routerModule from '../デスクトップ/draft-router.cjs';
 import panelModule from '../デスクトップ/panel-windows.cjs';
 import codeDragModule from '../デスクトップ/code-drag.cjs';
@@ -44,11 +45,12 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
  const app=new EventEmitter();Object.assign(app,{setName(name){this.name=name;},getPath:()=>'/tmp',setPath(){},requestSingleInstanceLock:()=>true,whenReady:()=>Promise.resolve(),quit(){const event={preventDefault(){this.prevented=true;}};app.emit('before-quit',event);if(!event.prevented)app.quitComplete=true;},dock:{setMenu(value){this.menu=value;},setIcon(value){this.icon=value;}}});
  const Menu={buildFromTemplate:items=>items,setApplicationMenu(value){app.menu=value;}};
  const modules={
-  electron:{app,BrowserWindow:Window,Menu,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{}}),getDisplayNearestPoint:()=>({workArea:{}}),getCursorScreenPoint:()=>({})},dialog:{showMessageBox:async(_window,options)=>{dialogs.push(options);return{response};}}},
+  electron:{app,BrowserWindow:Window,Menu,ipcMain:{handle:(name,fn)=>handlers.set(name,fn),on(){}},shell:{},clipboard:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:{getDisplayMatching:()=>({workArea:{x:0,y:0,width:1920,height:1040}}),getDisplayNearestPoint:()=>({workArea:{x:0,y:0,width:1920,height:1040}}),getCursorScreenPoint:()=>({})},dialog:{showMessageBox:async(_window,options)=>{dialogs.push(options);return{response};}}},
   'node:path':{join:(...parts)=>parts.join('/')},'node:fs':{mkdirSync(){},mkdtempSync:()=>'/tmp/term-fixture',rmSync(){}},
   './デスクトップ/project-profile.cjs':{projectProfile:()=>'/tmp/test'},'./デスクトップ/window-layout.cjs':{windowBounds:()=>({}),windowMinimumSize:()=>({})},'./デスクトップ/term-window-slot.cjs':{reserveTermSlot:async()=>{let slot=0;while(reserved.has(slot))slot++;reserved.add(slot);return{slot,close(){reserved.delete(slot);}};}},
   './host/scripts/window-opening.cjs':{拡大表示:async(_Window,window)=>{window.focus();return true;}},
   './host/scripts/MacOS-Menu.cjs':macMenuModule,
+  './デスクトップ/task-windows.cjs':taskWindowsModule,
   './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
   './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
   './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
@@ -173,4 +175,36 @@ test('IDE Term番号: 共有配置slot・タイトルIPC・閉鎖後の再利用
  for(const record of [...terms,reopened,first])if(!record.window.isDestroyed())record.window.destroy();
  const restarted=await create(f.owner);assert.equal(restarted.slot,0);verify(restarted);
  restarted.window.destroy();
+});
+
+
+test('Task実host: 起動3枚は同格、要求を閉じても継続し他窓から再表示、3枚全閉で終了',async()=>{
+ const f=await desktopFixture({kind:'task'});await tick();
+ const records=()=>[...f.windows.values()];
+ assert.equal(records().length,3);
+ assert.deepEqual(records().map(r=>r.taskView).sort(),['detail','flow','request']);
+ for(const r of records()){
+  assert.equal(r.owner,undefined);assert.equal(r.server,undefined);assert.equal(r.window.getParentWindow(),null);
+  assert.equal(r.window.options.width,520);assert.equal(r.window.options.height,620);
+  assert.ok(r.window.getTitle().startsWith('AiDiy Task / '));assert.ok(!r.window.getTitle().includes('IDE'));
+ }
+ const request=records().find(r=>r.taskView==='request'),flow=records().find(r=>r.taskView==='flow');
+ request.window.close();await tick();assert.equal(flow.window.isDestroyed(),false);assert.equal(f.app.quitComplete,undefined);
+ const action=(record,type,payload)=>f.handlers.get('development:task-windows')(f.event(record),type,payload);
+ assert.equal((await action(flow,'open',{view:'request'})).ok,true);assert.equal(records().length,3);
+ await action(flow,'dialog',{kind:'request',編集タスク:null});assert.equal(records().length,4);
+ const editor=records().find(r=>r.taskView==='dialog');
+ for(const r of records())if(r.taskView!=='dialog')r.window.close();await tick();await tick();
+ assert.equal(editor.window.isDestroyed(),true);assert.equal(f.app.quitComplete,true);assert.equal(f.windows.size,0);
+});
+
+test('Mac Task: CmdW closes one peer but application/Dock Quit closes all peers and editor',async()=>{
+ const f=await desktopFixture({platform:'darwin',kind:'task'});await tick();
+ const records=()=>[...f.windows.values()];const request=records().find(r=>r.taskView==='request'),flow=records().find(r=>r.taskView==='flow');
+ const closeWindow=f.app.menu[0].submenu.find(item=>item.accelerator==='Command+W');
+ closeWindow.click(null,request.window);await tick();assert.equal(records().length,2);assert.equal(f.app.quitComplete,undefined);
+ await f.handlers.get('development:task-windows')(f.event(flow),'dialog',{kind:'request',編集タスク:null});
+ f.app.dock.menu[0].click();await tick();await tick();assert.equal(records().length,0);assert.equal(f.app.quitComplete,true);assert.equal(f.dialogs.length,0);
+ const second=await desktopFixture({platform:'darwin',kind:'task'});await tick();second.app.quit();await tick();await tick();
+ assert.equal(second.windows.size,0);assert.equal(second.app.quitComplete,true);
 });

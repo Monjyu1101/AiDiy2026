@@ -68,9 +68,9 @@ const 手動=AIモデル状態を作成({api,接続可能:()=>connected.value&&t
 watch(tab,(value,old)=>{if(old==='manual')手動.表示を離れる();if(old==='trials')試行.表示を離れる();},{flush:'sync'});
 const 試行=設定モデル状態を作成({api,接続可能:()=>connected.value&&toolsOnline.value});
 const {設定:試行設定,結果:試行結果,読込中:試行読込中,実行中:試行実行中,選択:試行選択,通知:試行通知,音声状態:試行音声}=試行;
-watch(connected,value=>tools.接続(value));
+watch(connected,value=>{tools.接続(value);アプリ.接続(value);});
 watch(()=>connected.value&&toolsOnline.value,value=>{if(!value){試行.切断();手動.中止();}else if(tab.value==='trials')void 試行.読込();else if(tab.value==='manual')void 手動.読込();},{flush:'sync'});
-onUnmounted(()=>{導入操作.終了();手動.終了();試行.終了();終了();tools.終了();起動.終了();void ミニ.変更(false);});
+onUnmounted(()=>{導入操作.終了();手動.終了();試行.終了();終了();tools.終了();アプリ.終了();起動.終了();void ミニ.変更(false);});
 async function api(path,method='GET',signal,format='json',body) {
  const requestKey=key.value;
  const response=await fetch(new URL(path,location.href),{method,signal,headers:{Authorization:`Bearer ${requestKey}`,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{}),cache:'no-store',credentials:'same-origin'});

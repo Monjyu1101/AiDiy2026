@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Task">
+<!-- COPYRIGHT (C) 2026 Mitsuo KONDOU and contributors. AiDiy 公開利用ライセンス v1.1. Original Task icon. -->
+<rect x="1" y="1" width="118" height="118" rx="15" fill="#101820" stroke="#383838" stroke-width="2"/>
+<g fill="none" stroke="#55dce8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 23h56v58H32z"/><path d="m41 40 5 5 8-10m-13 25 5 5 8-10M64 40h14M64 60h14"/></g>
+<path d="M1 90h118v14a15 15 0 0 1-15 15H16a15 15 0 0 1-15-15z" fill="#f4f6f7"/><text x="60" y="113" text-anchor="middle" fill="#111820" font-family="Arial,sans-serif" font-weight="900" font-size="23">TASK</text>
+</svg>

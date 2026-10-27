@@ -6,6 +6,9 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('aidiyWindow',{
  nativeWindowMove:true,
+ taskWindows:(action,payload)=>ipcRenderer.invoke('development:task-windows',action,payload),
+ taskSession:(action,value)=>ipcRenderer.invoke('development:task-session',action,value),
+ onTaskSession:callback=>{if(typeof callback!=='function')return()=>{};const listener=(_event,value)=>callback(value);ipcRenderer.on('development:task-session',listener);return()=>ipcRenderer.removeListener('development:task-session',listener);},
  pinState:()=>ipcRenderer.invoke('development:window','pin-state'),
  togglePin:()=>ipcRenderer.invoke('development:window','toggle-pin'),
  onPinChanged:callback=>{if(typeof callback!=='function')return()=>{};const listener=(_event,state)=>callback(state);ipcRenderer.on('development:pin-changed',listener);return()=>ipcRenderer.removeListener('development:pin-changed',listener);},

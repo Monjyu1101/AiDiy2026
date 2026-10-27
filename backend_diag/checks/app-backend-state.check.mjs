@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {アプリ状態を作成} from '../ui/src/アプリ起動/アプリ状態.mjs';
+import {アプリアイコン} from '../ui/src/アプリ起動/アプリアイコン.mjs';
+const catalog=online=>({対象:[{id:'avatar'},{id:'task',利用可能:online,無効理由:online?'':'TaskTeam 未起動'},{id:'team',利用可能:online,無効理由:online?'':'TaskTeam 未起動'},{id:'code'}]});
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+test('Task/Team fail closed until checked and track backend start/stop without blocking Code',async()=>{
+ let online=false,launches=0;const state=アプリ状態を作成({api:async path=>path.endsWith('/開始')?(launches++,{受付:true}):catalog(online)});state.フォルダ.value='/project';
+ assert.equal(state.利用可能('task'),false);await state.起動('task');assert.equal(launches,0);
+ await state.読込();assert.equal(state.利用可能('team'),false);assert.equal(state.不可理由('task'),'TaskTeam 未起動');
+ await state.起動('code');assert.equal(launches,1);
+ online=true;await state.読込();assert.equal(state.利用可能('task'),true);await state.起動('task');await state.起動('team');assert.equal(launches,3);
+ online=false;await state.読込();await state.起動('team');assert.equal(launches,3);
+});
+test('background polling refreshes all tabs; disconnect and late response cannot re-enable Task',async()=>{
+ let callback,release,delay;const state=アプリ状態を作成({api:()=>new Promise(resolve=>release=resolve),schedule:(fn,ms)=>{callback=fn;delay=ms;return 1;},unschedule:()=>{callback=null;}});
+ state.接続(true);release(catalog(true));await flush();assert.equal(state.利用可能('task'),true);assert.equal(delay,2500);
+ callback();state.接続(false);release(catalog(true));await flush();assert.equal(state.利用可能('task'),false);assert.equal(callback,null);
+ state.接続(true);release(catalog(true));await flush();assert.equal(state.利用可能('team'),true);state.終了();assert.equal(state.利用可能('team'),false);assert.equal(callback,null);
+});
+test('catalog request failure disables only backend-gated apps',async()=>{
+ let fail=false;const state=アプリ状態を作成({api:async()=>{if(fail)throw Error('offline');return catalog(true);}});await state.読込();fail=true;await state.読込();assert.equal(state.利用可能('task'),false);assert.equal(state.利用可能('team'),false);assert.equal(state.利用可能('code'),true);
+});
+test('all launcher sizes gate Task/Team and expose disabled reason; app owns polling lifecycle',async()=>{
+ for(const name of ['アプリ起動パネル.vue','ミニアプリ起動.vue','マイクロランチャー.vue']){const s=await readFile(new URL('../ui/src/アプリ起動/'+name,import.meta.url),'utf8');assert.match(s,/利用可能\(item.id\)/);assert.match(s,/不可理由\(item.id\)/);}
+ const app=await readFile(new URL('../ui/src/App.vue',import.meta.url),'utf8');assert.match(app,/アプリ\.接続\(value\)/);assert.match(app,/アプリ\.終了\(\)/);
+});
+test('Task/Team icons are distinct original SVGs with readable captions',async()=>{
+ for(const id of ['task','team']){assert.equal(アプリアイコン[id],`AiDiy_${id}.svg`);const s=await readFile(new URL(`../ui/src/アプリ起動/アプリアイコン/${id}.svg`,import.meta.url),'utf8');assert.match(s,/viewBox="0 0 120 120"/);assert.ok(s.includes(id.toUpperCase()));assert.doesNotMatch(s,/<script|https?:\/\/(?!www.w3.org)/);}
+});

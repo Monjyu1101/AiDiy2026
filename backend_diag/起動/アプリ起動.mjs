@@ -6,10 +6,11 @@ import {join,dirname,isAbsolute} from 'node:path';
 import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {createTaskTeamStatus} from './TaskTeam接続.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-export const アプリ一覧=Object.freeze(['avatar','ide','term','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',ide:'IDE',term:'Term',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
+export const アプリ一覧=Object.freeze(['avatar','task','team','ide','term','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',term:'Term',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
 const execute=(command,args,options={})=>new Promise((resolve,reject)=>execFile(command,args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:8*1024*1024,...options},(error,stdout)=>error?reject(error):resolve(stdout)));
 
 // 明示起動時だけ取得する。タスクのコマンドラインや一覧を画面・ログへ返さない。
@@ -32,8 +33,12 @@ export function アプリタスク(id,{command=''}){
  if(id==='discord')return entry('frontend_channels/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
  return false;
 }
-export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand}={}){
+export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus}={}){
  const pending=new Set();
+ const checkTaskTeam=taskTeamStatus||createTaskTeamStatus({root});
+ const taskTeam=id=>id==='task'||id==='team';
+ const availability=async()=>{try{return await checkTaskTeam();}catch{return {利用可能:false,無効理由:'Task / Team バックエンドを確認できません。'};}};
+ async function catalog(){const state=await availability();return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app)};}
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
   try{const path=await realpath(value);if(!(await stat(path)).isDirectory())throw Error();return path;}catch{throw fail('フォルダが見つからないか、アクセスできません。');}
@@ -55,6 +60,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   if(pending.has(id))throw fail('このアプリの起動処理中です。',409);
   pending.add(id);
   try{
+   if(taskTeam(id)){const state=await availability();if(state.利用可能!==true)throw fail(state.無効理由||'Task / Team バックエンドを起動してください。',409);}
    if(app.単一起動){
     let running;try{running=(await tasks()).some(task=>アプリタスク(id,task));}catch{throw fail('起動中のタスクを確認できませんでした。もう一度お試しください。',503);}
     if(running)return {起動済み:true,通知:`${app.名前} は起動済みです。`};
@@ -78,5 +84,5 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
    return {受付:true,通知:`${app.名前} の起動を要求しました。`,ログ:logPath};
   }finally{pending.delete(id);}
  }
- return {catalog:()=>({対象:アプリ一覧}),folders,launch};
+ return {catalog,folders,launch};
 }

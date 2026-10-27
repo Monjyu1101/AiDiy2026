@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import { startServer } from './viewer/server.mjs';
 import { createCoreConnection, coreTarget } from './viewer/core-connection.mjs';
+import { createTaskTeamProxy } from './タスクチーム/api-proxy.mjs';
 import { createPanels } from './viewer/panels.mjs';
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
@@ -18,26 +19,31 @@ import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
- if(!['code','live','ide','term'].includes(kind))throw Error('アプリはcode / live / ide / termから指定してください。');
+ if(!['code','live','ide','term','task','team'].includes(kind))throw Error('アプリはcode / live / ide / term / task / teamから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  if(cli)await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env});
+ const taskTeam=['task','team'].includes(kind);
+ const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project):undefined;
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
  connection??=kind==='ide'?createCoreConnection(project):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
- const files={'/':['index.html','text/html; charset=utf-8'],'/development/app.js':['app.js','text/javascript; charset=utf-8'],'/development/app.css':['app.css','text/css; charset=utf-8'],'/development/AiDiy.png':['AiDiy.png','image/png'],'/development/sending.png':['sending.png','image/png'],'/development/abort.png':['abort.png','image/png'],'/development/speaker.png':['speaker.png','image/png'],'/development/microphone.png':['microphone.png','image/png'],'/development/THIRD_PARTY_NOTICES.txt':['THIRD_PARTY_NOTICES.txt','text/plain; charset=utf-8'],'/development/LICENSE':['LICENSE','text/plain; charset=utf-8']};
+ const files={'/':[taskTeam?'taskteam.html':'index.html','text/html; charset=utf-8'],'/development/app.js':['app.js','text/javascript; charset=utf-8'],'/development/app.css':['app.css','text/css; charset=utf-8'],'/development/AiDiy.png':['AiDiy.png','image/png'],'/development/sending.png':['sending.png','image/png'],'/development/abort.png':['abort.png','image/png'],'/development/speaker.png':['speaker.png','image/png'],'/development/microphone.png':['microphone.png','image/png'],'/development/THIRD_PARTY_NOTICES.txt':['THIRD_PARTY_NOTICES.txt','text/plain; charset=utf-8'],'/development/LICENSE':['LICENSE','text/plain; charset=utf-8']};
+ files['/development/taskteam.js']=['taskteam.js','text/javascript; charset=utf-8'];
+ files['/development/taskteam.css']=['taskteam.css','text/css; charset=utf-8'];
  const aiSearch=createAISearch(project,{...aiSearchOptions,state:connection.state});
  const fileAnalysis=createFileAnalysis(project,{...fileAnalysisOptions,state:connection.state});
  const fileHistory=createFileHistory(project,{state:connection.state});
  const app=await startServer(project,port,{strict,env,connection,explorerOptions,
   requestHandler:async(req,res,url)=>{
+   if(taskTeamProxy && await taskTeamProxy.handle(req,res,url))return true;
    if(kind==='ide'&&await aiSearch.handle(req,res,url))return true;
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;
    if(kind==='ide'&&await fileHistory.handle(req,res,url))return true;
    if(url.pathname==='/development/config'){
-    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,icon:'/development/AiDiy.png'}));return true;
+    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(taskTeam?{taskTeamBase:'/taskteam-api'}:{}),icon:'/development/AiDiy.png'}));return true;
    }
    const iconAsset=url.pathname.startsWith('/development/')?catppuccinAsset(url.pathname.slice('/development/'.length)):undefined;
-   const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset)return false;
+   const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset){if(taskTeam){res.writeHead(404).end();return true;}return false;}
    if(req.method!=='GET'){res.writeHead(405).end();return true;}
    const content=await readFile(join(root,'dist',asset[0]));
    res.writeHead(200,{'content-type':asset[1],'cache-control':'no-store','x-content-type-options':'nosniff',...(iconAsset?{'content-security-policy':"default-src 'none'; sandbox"}:{})}).end(content);return true;
@@ -52,7 +58,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
    return bundle.ライブ起動(vscodeRoot,backend,false,folder,settings,undefined,autoConnect);
   })
  });
- app.server.once('close',()=>{aiSearch.close();fileAnalysis.close();});
- const close=app.close;app.close=async()=>{aiSearch.close();fileAnalysis.close();await close();};
+ app.server.once('close',()=>{taskTeamProxy?.close();aiSearch.close();fileAnalysis.close();});
+ const close=app.close;app.close=async()=>{taskTeamProxy?.close();aiSearch.close();fileAnalysis.close();await close();};
  return app;
 }

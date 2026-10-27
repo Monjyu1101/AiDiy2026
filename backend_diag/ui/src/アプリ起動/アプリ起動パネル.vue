@@ -8,7 +8,7 @@ const props=defineProps({state:Object,cliState:Object,online:Boolean,visible:Boo
 const folderInput=ref();
 watch(()=>!!props.state.一覧.value,async value=>{if(value){await nextTick();folderInput.value?.focus();}});
 watch(()=>props.online&&props.visible,value=>{if(value){void props.state.読込();void props.cliState?.読込();}},{immediate:true});
-const descriptions={avatar:'AIコアのアバター画面を開きます。',ide:'プロジェクトの開発スペースを開きます。',term:'プロジェクトでターミナルを開きます。',code:'プロジェクトのコード支援画面を開きます。',live:'プロジェクトのライブ会話画面を開きます。',discord:'プロジェクトのDiscord接続パネルを開きます。'};
+const descriptions={avatar:'AIコアのアバター画面を開きます。',task:'タスク要求・フロー図・明細を開きます。',team:'チーム活動画面を開きます。',ide:'プロジェクトの開発スペースを開きます。',term:'プロジェクトでターミナルを開きます。',code:'プロジェクトのコード支援画面を開きます。',live:'プロジェクトのライブ会話画面を開きます。',discord:'プロジェクトのDiscord接続パネルを開きます。'};
 const CLI項目=computed(()=>[...(props.cliState?.全項目?.value||[])].sort((a,b)=>(a.id==='aidiy_hermes'?-1:0)-(b.id==='aidiy_hermes'?-1:0)));
 const CLI名=item=>item.id==='aidiy_hermes'?'aidiy_hermes':item.名前;
 const CLI禁止=item=>item.利用可能!==true||!props.online||!props.state.フォルダ.value||!!props.state.処理中.value&&!props.state.処理中.value.startsWith('cli:')||props.state.選択中.value;
@@ -21,7 +21,7 @@ const CLI禁止=item=>item.利用可能!==true||!props.online||!props.state.フ�
  <p v-if="cliState?.失敗.value&&cliState.通知.value" class="app-launch-message error" role="status">{{cliState.通知.value}}</p>
  <div class="app-launch-list">
   <article v-for="item in state.項目.value" :key="item.id" class="app-launch-card" :data-app="item.id">
-   <button class="app-launch-button" :aria-label="`${item.名前} を起動`" :title="`${item.名前} — ${descriptions[item.id]}`" :disabled="!online||!state.フォルダ.value||!!state.処理中.value||state.選択中.value" @click="state.起動(item.id,{開始時:起動モーション($event)})"><span v-if="item.単一起動" class="app-single">単一起動</span><span class="launch-frame launch-frame-72" aria-hidden="true"><img class="app-launch-icon" :src="アプリアイコン[item.id]" alt="" width="72" height="72"><span class="launch-trace"></span></span><span class="app-launch-state">{{state.処理中.value===item.id?'起動確認中…':''}}</span></button>
+   <button class="app-launch-button" :aria-label="`${item.名前} を起動${state.不可理由(item.id)?' — '+state.不可理由(item.id):''}`" :title="state.不可理由(item.id)||`${item.名前} — ${descriptions[item.id]}`" :disabled="!online||!state.利用可能(item.id)||!state.フォルダ.value||!!state.処理中.value||state.選択中.value" @click="state.起動(item.id,{開始時:起動モーション($event)})"><span v-if="item.単一起動" class="app-single">単一起動</span><span class="launch-frame launch-frame-72" aria-hidden="true"><img class="app-launch-icon" :src="アプリアイコン[item.id]" alt="" width="72" height="72"><span class="launch-trace"></span></span><span class="app-launch-state">{{!state.利用可能(item.id)?'バックエンド未起動':state.処理中.value===item.id?'起動確認中…':''}}</span></button>
    <p v-if="state.結果.value[item.id]?.種別==='error'&&state.結果.value[item.id].通知" class="app-launch-result" role="status" data-tone="error">{{state.結果.value[item.id].通知}}</p>
   </article>
   <article v-for="item in CLI項目" :key="'cli-'+item.id" class="app-launch-card app-cli-card" :class="{unavailable:item.利用可能!==true}" :data-cli="item.id">

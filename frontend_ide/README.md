@@ -288,3 +288,7 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026
 
 自作部分は `LICENSE`、Vue / Markdown等は配布物の `THIRD_PARTY_NOTICES.txt` を参照してください。Office関連の帰属・利用条件は既存ビューアのライセンス情報を引き継ぎます。画面上に著作権リンクは追加しません。
+
+## Task / Team の独立起動
+
+Avatar の Task / Team をコピーした独立版を `aidiy_task` / `aidiy_team` で起動できます。元Avatarの機能はそのまま残ります。IDE群のsetupで両コマンドを登録します。TaskのElectron版は要求・フロー図・明細の3窓で、各窓右上から閉じた他画面を再表示できます。3画面をすべて閉じるとTaskアプリを終了します。Core（既定8091）と共通Task / Teamサーバー（既定8093）を別途起動してログインしてください。`--browser` も利用可能です。シアンの状態バーはTask / Teamポートの疎通に連動します。詳しくは `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。

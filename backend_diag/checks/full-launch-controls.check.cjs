@@ -24,7 +24,7 @@ function startState({empty=false,loading=false,busy=false}={}){
 function appState({empty=false,folder='',busy=false}={}){
  return {
   一覧:value(null),フォルダ:value(folder),処理中:value(busy?'code':''),選択中:value(false),通知:value(''),
-  項目:value(empty?[]:[{id:'code',名前:'Code',単一起動:false}]),結果:value({}),読込:async()=>{},
+  項目:value(empty?[]:[{id:'code',名前:'Code',単一起動:false}]),結果:value({}),読込:async()=>{},利用可能:id=>!['task','team'].includes(id),不可理由:id=>['task','team'].includes(id)?'TaskTeam 未起動':'',
  };
 }
 
@@ -56,17 +56,19 @@ test('通常のアプリ起動は未接続・未選択・処理中でもペー�
  assert.doesNotMatch(source('アプリ起動/アプリ起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
 });
 
-test('通常画面は6アプリ・7CLI・VS Codeの14項目を並べ、未導入を無効にする',async()=>{
+test('通常画面は8アプリ・7CLI・VS Codeの16項目を並べ、未導入を無効にする',async()=>{
  const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'];
  const entries=ids.map(id=>({id,名前:id,モード:'fixture',利用可能:!['grok','opencode'].includes(id)}));
  entries.push({id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:true});
  const cliState={全項目:value(entries),処理中:value(''),通知:value(''),失敗:value(false),読込:async()=>{}};
  for(const online of [true,false])for(const folder of ['/fixture/project','']){
-  const state=appState({folder});state.項目=value(['avatar','ide','term','code','live','discord'].map(id=>({id,名前:id})));
+  const state=appState({folder});state.項目=value(['avatar','task','team','ide','term','code','live','discord'].map(id=>({id,名前:id})));
   const html=await render('アプリ起動/アプリ起動パネル.vue',{state,cliState,online,visible:true});
-  assert.equal((html.match(/class="app-launch-button"/g)||[]).length,14);
-  assert.equal((html.match(/width="72" height="72"/g)||[]).length,14);
+  assert.equal((html.match(/class="app-launch-button"/g)||[]).length,16);
+  assert.equal((html.match(/width="72" height="72"/g)||[]).length,16);
   assert.match(html,/VS Code でフォルダを開く/);
+  for(const id of ['task','team']){const card=html.match(new RegExp(`<article[^>]*data-app="${id}"[^>]*>([\\s\\S]*?)</article>`))[1];assert.match(card,/<button[^>]* disabled/);assert.match(card,/TaskTeam 未起動/);}
+  assert.ok(html.indexOf('data-app="avatar"')<html.indexOf('data-app="task"'));assert.ok(html.indexOf('data-app="task"')<html.indexOf('data-app="team"'));assert.ok(html.indexOf('data-app="team"')<html.indexOf('data-app="ide"'));
   assert.doesNotMatch(html,/app-launch-name/);
   assert.ok(html.indexOf('data-cli="aidiy_hermes"')<html.indexOf('data-cli="claude"'));
   for(const item of entries){

@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""Term / Code / Live / IDEの依存・拡張・ランチャーをまとめて準備する。"""
+"""Term / Code / Live / IDE / Task / Teamの依存・拡張・ランチャーをまとめて準備する。"""
 import importlib.util
 import shutil
 import subprocess
@@ -19,7 +19,7 @@ def prepare():
     if not npm:
         return False
     try:
-        reuse = frontend_dependency_guard(ROOT, 'Term / Code / Live / IDE 共通UI', desktop=False)
+        reuse = frontend_dependency_guard(ROOT, 'Term / Code / Live / IDE / Task / Team 共通UI', desktop=False)
         if reuse is not None:
             return reuse
         subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=ROOT, check=True)
@@ -31,21 +31,23 @@ def setup(choices=None):
     if choices is not None and choices.get("ide") is False:
         return True
     print("\n" + "=" * 60)
-    print("Term / Code / Live / IDE セットアップ")
+    print("Term / Code / Live / IDE / Task / Team セットアップ")
     print("=" * 60 + "\n")
     child_choices = {**(choices or {}), "ide": True}
     # hostからprepareだけを呼ぶため再帰しない。
-    for name in ('frontend_ide/aidiy_term', 'frontend_ide/host', 'frontend_ide/viewer'):
+    for name in ('frontend_ide/aidiy_term', 'frontend_ide/host', 'frontend_ide/viewer', 'frontend_ide/aidiy_task', 'frontend_ide/aidiy_team'):
         spec = importlib.util.spec_from_file_location('ide_setup_' + name.replace('/', '_'), ROOT.parent / name / '_setup.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         if not module.setup(child_choices):
             return False
-    print("Term / Code / Live / IDE セットアップ完了")
+    print("Term / Code / Live / IDE / Task / Team セットアップ完了")
     print("Term 起動: aidiy_term")
     print("Code 起動: aidiy_code")
     print("Live 起動: aidiy_live")
     print("IDE  起動: aidiy_ide")
+    print("Task 起動: aidiy_task")
+    print("Team 起動: aidiy_team")
     return True
 
 if __name__ == '__main__':
