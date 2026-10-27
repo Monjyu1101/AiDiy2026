@@ -1,6 +1,8 @@
 /* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
  * Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE. */
 html.micro-mode,html.micro-mode body,html.micro-mode #app{background:transparent!important;overflow:hidden;height:100%;margin:0}
+/* アイコン表示の透明領域には通常パネルの外周枠を描かない。 */
+html.micro-mode #app{border:0}
 .micro-launcher{position:fixed;inset:0;display:grid;place-items:center;isolation:isolate;pointer-events:none}
 .micro-launcher.unfolded{--core-y:50%}
 .micro-launcher button{pointer-events:auto;-webkit-app-region:no-drag}

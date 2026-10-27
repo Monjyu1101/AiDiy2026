@@ -70,3 +70,14 @@ test('panel perimeter reserves one pixel inside the unchanged viewport box',()=>
  assert.match(css,/#app\{box-sizing:border-box;border:1px solid #383838\}/);
  assert.match(css,/#app\{height:100vh;height:100dvh/);
 });
+
+test('icon mode removes only the panel perimeter and restores it on unmount',()=>{
+ const css=source('アプリ起動/マイクロランチャー.css');
+ assert.match(css,/html\.micro-mode #app\{border:0\}/);
+ assert.match(source('style.css'),/#app\{box-sizing:border-box;border:1px solid #383838\}/);
+ const launcher=source('アプリ起動/マイクロランチャー.vue');
+ assert.match(launcher,/onMounted\(\(\)=>\{document\.documentElement\.classList\.add\('micro-mode'\)/);
+ assert.match(launcher,/onBeforeUnmount\(\(\)=>\{[^\n]*document\.documentElement\.classList\.remove\('micro-mode'\)/);
+ const deployed=fs.readFileSync(path.join(__dirname,'../static/style.css'),'utf8');
+ assert.match(deployed,/html\.micro-mode #app\{border:0\}/);
+});
