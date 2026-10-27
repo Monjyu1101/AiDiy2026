@@ -65,7 +65,7 @@ test('Copilot standalone fallback is used only when installed and merged models 
   'claude-haiku-5.5':'2026/10/07 - claude-haiku-5.5',
   'gpt-6-astra':'2026/08/28 - gpt-6-astra',
   'gpt-6.1-sol':'2026/09/28 - gpt-6.1-sol',
-  'gpt-5.6-terra':'2026/06/24 - gpt-5.6-terra',
+  'gpt-6.1-terra':'yyyy/mm/dd - gpt-6.1-terra',
   'gpt-6-luna':'2026/09/15 - gpt-6-luna',
  };
  try{
@@ -217,10 +217,10 @@ test('Codex excludes realtime; Hermes keeps acquired OAuth models with a provide
 });
 
 test('Codex keeps the numerically newest version per family and context variant',async()=>{
- const ids=['gpt-5.6-sol','gpt-6.1-sol','gpt-5.6-luna','gpt-6-luna','gpt-5.6-terra','gpt-6.9-pro','gpt-6.10-pro','gpt-5.6-sol-900k','gpt-6.1-sol-900k','gpt-5.4','gpt-5.5','gpt-5.4-mini','gpt-realtime-2'];
+ const ids=['gpt-5.6-sol','gpt-6.1-sol','gpt-5.6-luna','gpt-6-luna','gpt-6.1-terra','gpt-6.9-pro','gpt-6.10-pro','gpt-5.6-sol-900k','gpt-6.1-sol-900k','gpt-5.4','gpt-5.5','gpt-5.4-mini','gpt-realtime-2'];
  for(const id of ['openai','openai_oauth']){
   const info=await modelsInfo({id,名前:id},ok({モデル詳細:ids.map(model_id=>({model_id}))}),{now});
-  assert.deepEqual(Object.keys(info.code.codex_cli.models),['gpt-6.1-sol','gpt-6-luna','gpt-5.6-terra','gpt-6.10-pro','gpt-6.1-sol-900k','gpt-5.5','gpt-5.4-mini']);
+  assert.deepEqual(Object.keys(info.code.codex_cli.models),['gpt-6.1-sol','gpt-6-luna','gpt-6.1-terra','gpt-6.10-pro','gpt-6.1-sol-900k','gpt-5.5','gpt-5.4-mini']);
   assert.deepEqual(info.code.copilot_cli,info.code.codex_cli);
   assert.deepEqual(info.chat.モデル.map(row=>row.model_id),ids);
  }
@@ -235,9 +235,9 @@ test('combined files merge providers and model keys, retain dated labels and pre
    claude:ok({モデル詳細:[{model_id:'claude-haiku-5-5',作成日:'2026/10/07'}]}),
    openai:ok({モデル詳細:[{model_id:'gpt-6.1-sol',作成日:'2026/09/28'},{model_id:'gpt-6-luna',作成日:'2026/09/15'}],ライブ候補:['gpt-realtime-2']}),
   },{directory,now});
-  await writeModelsInfo([provider('openai_oauth')],{openai_oauth:ok({モデル詳細:[{model_id:'gpt-6.1-sol'},{model_id:'gpt-6.1-sol-900k'},{model_id:'gpt-5.6-terra',作成日:'2026/10/01'}]})},{directory,now});
+  await writeModelsInfo([provider('openai_oauth')],{openai_oauth:ok({モデル詳細:[{model_id:'gpt-6.1-sol'},{model_id:'gpt-6.1-sol-900k'},{model_id:'gpt-6.1-terra',作成日:'2026/10/01'}]})},{directory,now});
   const code=await load('code');
-  assert.deepEqual(Object.keys(code.codex_cli.models).sort(),['gpt-5.6-terra','gpt-6-luna','gpt-6.1-sol','gpt-6.1-sol-900k'].sort());
+  assert.deepEqual(Object.keys(code.codex_cli.models).sort(),['gpt-6.1-terra','gpt-6-luna','gpt-6.1-sol','gpt-6.1-sol-900k'].sort());
   assert.equal(code.codex_cli.models['gpt-6.1-sol'],'2026/09/28 - gpt-6.1-sol');
   assert.equal(code.copilot_cli.models['claude-haiku-5.5'],'2026/10/07 - claude-haiku-5.5');
   assert.equal(Object.keys(code.copilot_cli.models).length,5);

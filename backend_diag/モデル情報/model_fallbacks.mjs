@@ -8,7 +8,7 @@ export const COPILOT_FALLBACK_MODELS = Object.freeze({
   'claude-haiku-5.5':'2026/10/07 - claude-haiku-5.5',
   'gpt-6-astra':'2026/08/28 - gpt-6-astra',
   'gpt-6.1-sol':'2026/09/28 - gpt-6.1-sol',
-  'gpt-5.6-terra':'2026/06/24 - gpt-5.6-terra',
+  'gpt-6.1-terra':'yyyy/mm/dd - gpt-6.1-terra',
   'gpt-6-luna':'2026/09/15 - gpt-6-luna',
 });
 export const OAUTH_FALLBACK_SOURCE = 'Copilot既定OpenAIモデル（未検証）';

@@ -48,7 +48,7 @@ if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6-astra"
 if "%MODEL_NUMBER%"=="3" set "PROVIDER=openai_oauth"
 if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-6.1-sol"
 if "%MODEL_NUMBER%"=="4" set "PROVIDER=openai_oauth"
-if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-6.1-terra"
 if "%MODEL_NUMBER%"=="5" set "PROVIDER=openai_oauth"
 if "%MODEL_NUMBER%"=="5" set "MODEL=gpt-6-luna"
 if defined MODEL goto LAUNCH_SELECTED

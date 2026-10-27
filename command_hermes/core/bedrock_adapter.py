@@ -73,7 +73,7 @@ BEDROCK_OPENAI_RESPONSES_MODEL_IDS: Tuple[str, ...] = (
     # cards list bedrock-runtime/Converse as unsupported.
     # https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-openai.html
     "openai.gpt-6.1-sol",
-    "openai.gpt-5.6-terra",
+    "openai.gpt-6.1-terra",
     "openai.gpt-6-luna",
 )
 _BEDROCK_OPENAI_HOST_RE = re.compile(
@@ -1933,7 +1933,7 @@ BEDROCK_CONTEXT_LENGTHS: Dict[str, int] = {
     # https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-openai.html
     "openai.gpt-5.5":                272_000,
     "openai.gpt-6.1-sol":            272_000,
-    "openai.gpt-5.6-terra":          272_000,
+    "openai.gpt-6.1-terra":          272_000,
     "openai.gpt-6-luna":           272_000,
 }
 

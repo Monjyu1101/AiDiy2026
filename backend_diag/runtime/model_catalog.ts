@@ -96,10 +96,10 @@ export function withoutRetired(models:Catalog):Catalog {
 }
 // command_hermes/hermes_cli/codex_models.py（DEFAULT_CODEX_MODELS・_FORWARD_COMPAT_TEMPLATE_MODELS）と
 // core/model_metadata.py（-900k 対象）、AIチャット_openai.py（_FALLBACK_MODELS）の写し。
-export const DEFAULT_CODEX_MODELS=Object.freeze(['gpt-6-astra','gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna']);
-export const OAUTH_FALLBACK_MODELS=Object.freeze(['gpt-6-astra','gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna']);
-const FORWARD_COMPAT:readonly [string,readonly string[]][]=[['gpt-6-astra',['gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna']],['gpt-6.1-sol',['gpt-5.5','gpt-5.4']],['gpt-5.6-terra',['gpt-5.5','gpt-5.4']],['gpt-6-luna',['gpt-5.5','gpt-5.4']]];
-const CONTEXT_SUFFIX='-900k',CONTEXT_BASES=new Set(['gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna','gpt-5.4','gpt-daybreak-blue-latest']),CONTEXT_SNAPSHOT_BASES=['gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna'];
+export const DEFAULT_CODEX_MODELS=Object.freeze(['gpt-6-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna']);
+export const OAUTH_FALLBACK_MODELS=Object.freeze(['gpt-6-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna']);
+const FORWARD_COMPAT:readonly [string,readonly string[]][]=[['gpt-6-astra',['gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna']],['gpt-6.1-sol',['gpt-5.5','gpt-5.4']],['gpt-6.1-terra',['gpt-5.5','gpt-5.4']],['gpt-6-luna',['gpt-5.5','gpt-5.4']]];
+const CONTEXT_SUFFIX='-900k',CONTEXT_BASES=new Set(['gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna','gpt-5.4','gpt-daybreak-blue-latest']),CONTEXT_SNAPSHOT_BASES=['gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna'];
 export function isCodex900kBase(model:string):boolean {
  const slug=model.trim().toLowerCase().split('/').at(-1)??'';
  if(!slug||slug.endsWith(CONTEXT_SUFFIX))return false;

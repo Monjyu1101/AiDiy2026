@@ -38,7 +38,7 @@ if "%MODEL_NUMBER%"=="0" goto END
 if not defined MODEL_NUMBER goto LAUNCH
 if "%MODEL_NUMBER%"=="1" set "MODEL=gpt-6-astra"
 if "%MODEL_NUMBER%"=="2" set "MODEL=gpt-6.1-sol"
-if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-5.6-terra"
+if "%MODEL_NUMBER%"=="3" set "MODEL=gpt-6.1-terra"
 if "%MODEL_NUMBER%"=="4" set "MODEL=gpt-6-luna"
 if "%MODEL_NUMBER%"=="5" set "MODEL=claude-fable-5.1"
 if "%MODEL_NUMBER%"=="6" set "MODEL=claude-opus-5.5"

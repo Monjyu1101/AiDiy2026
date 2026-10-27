@@ -507,7 +507,7 @@ DEFAULT_CONTEXT_LENGTHS = {
     # direct OpenAI API (same as gpt-5.5). Codex OAuth caps these at 272K.
     # (Lookups length-sort keys at match time, so dict order is cosmetic.)
     "gpt-6-luna": 1050000,
-    "gpt-5.6-terra": 1050000,
+    "gpt-6.1-terra": 1050000,
     "gpt-6.1-sol": 1050000,
     "gpt-5.5": 1050000,
     "gpt-5.4-nano": 400000,           # 400k (not 1.05M like full 5.4)
@@ -2632,7 +2632,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
     "gpt-5.2-codex": 272_000,
     "gpt-5.4-mini": 272_000,
     "gpt-6.1-sol": 272_000,
-    "gpt-5.6-terra": 272_000,
+    "gpt-6.1-terra": 272_000,
     "gpt-6-luna": 272_000,
     "gpt-daybreak-blue-latest": 272_000,
     "gpt-5.5": 272_000,
@@ -2648,7 +2648,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
 # Verified live against chatgpt.com/backend-api/codex/responses the same
 # day: 911,276 input tokens completed OK on the then-current Sol model;
 # ~925K+ rejected with ``context_length_exceeded`` (the 1.05M window minus
-# reserved output headroom). gpt-5.6-terra, gpt-6-luna, and gpt-5.4 all completed 900,026
+# reserved output headroom). The then-current Terra model, gpt-6-luna, and gpt-5.4 completed 900,026
 # tokens OK. gpt-5.5 and gpt-5.4-mini still rejected >272K, so their
 # advertisement is real enforcement and they are NOT listed. 900K keeps
 # ≥11K margin under the observed ceiling and matches the compaction point
@@ -2668,7 +2668,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
 # the advertised number in either direction (the sol/terra/luna tier shifted
 # 272K → 372K → 272K during July 2026, back when sol and luna were still
 # named gpt-5.6-sol/gpt-5.6-luna), the catalog is trusted again and this
-# table is inert. Each of ``gpt-6.1-sol`` / ``gpt-5.6-terra`` / ``gpt-6-luna``
+# table is inert. Each of ``gpt-6.1-sol`` / ``gpt-6.1-terra`` / ``gpt-6-luna``
 # is listed as its own PREFIX (covers dated snapshots too; ``-pro`` slugs
 # are not routable on Codex OAuth — the backend 400s them — so over-matching
 # there is moot). ``gpt-5.4`` is EXACT: gpt-5.4-mini was probed and
@@ -2676,7 +2676,7 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
 # family would over-report for mini.
 _CODEX_OAUTH_VERIFIED_ABOVE_ADVERTISED_PREFIXES: Dict[str, int] = {
     "gpt-6.1-sol": 900_000,    # carried over from Sol; verify on this revision
-    "gpt-5.6-terra": 900_000,  # verified live at 900K
+    "gpt-6.1-terra": 900_000,  # carried over from Terra; verify on this revision
     "gpt-6-luna": 900_000,     # verified live at 900K
 }
 _CODEX_OAUTH_VERIFIED_ABOVE_ADVERTISED_EXACT: Dict[str, int] = {
@@ -2692,7 +2692,7 @@ _CODEX_OAUTH_STALE_ADVERTISED_CTX = 272_000
 CODEX_CONTEXT_VARIANT_SUFFIX = "-900k"
 
 # The ONLY base slugs eligible for a ``-900k`` variant. The gpt-6.1-sol
-# entry carries forward the earlier Sol limit pending direct verification.
+# and gpt-6.1-terra entries carry forward earlier limits pending verification.
 # gpt-5.6 family-prefix matching is deliberately NOT
 # used here — it would synthesize dead variants for ``-pro`` slugs (the
 # Codex backend 400s them) and accept arbitrary future descendants that
@@ -2700,12 +2700,12 @@ CODEX_CONTEXT_VARIANT_SUFFIX = "-900k"
 # via _CODEX_900K_SNAPSHOT_RE.
 _CODEX_900K_ELIGIBLE_BASES = frozenset({
     "gpt-6.1-sol",
-    "gpt-5.6-terra",
+    "gpt-6.1-terra",
     "gpt-6-luna",
     "gpt-5.4",                    # exact; gpt-5.4-mini enforces 272K
     "gpt-daybreak-blue-latest",   # verified Sol alias
 })
-_CODEX_900K_SNAPSHOT_BASES = ("gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna")
+_CODEX_900K_SNAPSHOT_BASES = ("gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna")
 _CODEX_900K_SNAPSHOT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 

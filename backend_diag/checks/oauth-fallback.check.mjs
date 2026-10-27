@@ -8,7 +8,7 @@ import {testKey} from '../モデル情報/key_status.mjs';
 import {modelsInfo,writeModelsInfo} from '../モデル情報/models_info.mjs';
 import {COPILOT_FALLBACK_MODELS,oauthModelFallback} from '../モデル情報/model_fallbacks.mjs';
 
-const expected=['gpt-6-astra','gpt-6.1-sol','gpt-5.6-terra','gpt-6-luna'];
+const expected=['gpt-6-astra','gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna'];
 const provider={id:'openai_oauth',名前:'OpenAI OAuth',設定済み:true};
 const oauthReader=()=>JSON.stringify({tokens:{access_token:'fixture-token'}});
 const configReader=()=>JSON.stringify({CHAT_AI_NAME:'openai_oauth',CHAT_OPENAI_MODEL:'gpt-6.1-sol'});
