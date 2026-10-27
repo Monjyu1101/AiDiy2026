@@ -24,17 +24,17 @@ function fixture(){
   require:id=>id==='electron'?{BrowserWindow:Window,app:{getAppPath:()=>path.join(__dirname,'..'),requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}}),on(){}},screen:{getPrimaryDisplay:()=>({workArea:{x:0,y:0,width:1920,height:1080}})}}
   :id.endsWith('window-opening.cjs')?{拡大表示:async(_Constructor,window,options)=>{assert.equal(window.visible,false);openings.push(window);await gate;if(window.dead||!options.canShow())return false;window.show();return true;}}
   :id.endsWith('長押し窓移動.cjs')?{attachNativeWindowMove(){}}:load(id)};
- vm.runInNewContext(readFileSync(filename,'utf8')+'\nglobalThis.probe={createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,toggleTaskWindows,openTaskDialogWindow,openTeamWindow,openSettingsWindow,ウィンドウ表示,ウィンドウ非表示};',context);
+ vm.runInNewContext(readFileSync(filename,'utf8')+'\nglobalThis.probe={createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,openSettingsWindow,ウィンドウ表示,ウィンドウ非表示};',context);
  return{...context.probe,windows,openings,flush:()=>new Promise(resolve=>setImmediate(resolve)),hold(){let release;gate=new Promise(resolve=>release=resolve);return release;}};
 }
-test('全17種類の公開表示経路は読込・配置後に共通ズームし、表示中の再要求では繰り返さない',async()=>{
+test('全12種類の公開表示経路は読込・配置後に共通ズームし、表示中の再要求では繰り返さない',async()=>{
  const f=fixture();f.createLoginWindow();f.createCoreWindow();
  for(const role of ['chat','file','image','code1','code2','code3','code4','code5','code6']){f.createPanelWindow(role);await f.setPanelVisibility(role,true);}
- await f.toggleTaskWindows();f.openTaskDialogWindow({});await f.openTeamWindow();f.openSettingsWindow('test-session');await f.flush();
- assert.equal(f.windows.length,17);assert.equal(f.openings.length,17);assert.equal(new Set(f.openings).size,17);
+ f.openSettingsWindow('test-session');await f.flush();
+ assert.equal(f.windows.length,12);assert.equal(f.openings.length,12);assert.equal(new Set(f.openings).size,12);
  assert.ok(f.windows.every(window=>window.visible));
  for(const window of f.windows)await f.ウィンドウ表示(window);
- assert.equal(f.openings.length,17);
+ assert.equal(f.openings.length,12);
 });
 test('表示連打を一つへまとめ、ズーム待ちの非表示要求を優先し、次の表示は再開できる',async()=>{
  const f=fixture(),window=f.createPanelWindow('chat'),release=f.hold();

@@ -17,14 +17,6 @@ import AIコアコントロール from '@/components/AIコア.vue'
 import AIコアコード from '@/components/AIコード.vue'
 import AIコアファイル from '@/components/AIファイル.vue'
 import AIコアイメージ from '@/components/AIイメージ.vue'
-import AIタスクビュー from '@/components/AIタスク/AIタスク.vue'
-import AIタスク要求ウィンドウ from '@/components/AIタスク/windows/AIタスク_要求ウィンドウ.vue'
-import AIタスクフローウィンドウ from '@/components/AIタスク/windows/AIタスク_フローウィンドウ.vue'
-import AIタスク明細ウィンドウ from '@/components/AIタスク/windows/AIタスク_明細ウィンドウ.vue'
-import AIタスク要求編集 from '@/components/AIタスク/dialog/AIタスク_要求編集.vue'
-import AIタスク明細編集 from '@/components/AIタスク/dialog/AIタスク_明細編集.vue'
-import AIタスク応答内容 from '@/components/AIタスク/dialog/AIタスク_応答内容.vue'
-import AIチームビュー from '@/components/AIチーム/AIチーム.vue'
 import ログイン from '@/components/ログイン.vue'
 import AI設定再起動 from '@/dialog/AI設定再起動.vue'
 import 再起動カウントダウン from '@/dialog/再起動カウントダウン.vue'
@@ -37,8 +29,7 @@ import type { AuthUser, ChatMessage, MessageKind, ModelSettings } from '@/types'
 import { AIストリーム制御判定, AIストリーム表示内容 } from '@/utils/AIストリーム制御'
 
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
-type TaskKey = 'task1' | 'task2' | 'task3'
-type WindowRole = 'login' | 'core' | PanelKey | TaskKey | 'settings' | 'taskDialog' | 'team'
+type WindowRole = 'login' | 'core' | PanelKey | 'settings'
 type チャットモード型 = 'chat' | 'live' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
 type コードチャンネル = '1' | '2' | '3' | '4' | '5' | '6'
 type 右ペインタブ型 = 'core' | 'image' | 'code1' | 'code3' | 'code5'
@@ -66,7 +57,6 @@ type コードパネル参照型 = {
 const isElectron = !!window.desktopApi
 const 認証Storage = isElectron ? localStorage : sessionStorage
 const PANEL_KEYS: PanelKey[] = ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6']
-const TASK_KEYS: TaskKey[] = ['task1', 'task2', 'task3']
 const WEB_CORE_PATH = '/AiDiy'
 
 function URLセッションID取得(): string {
@@ -138,10 +128,8 @@ function フォールバックロール解決(): WindowRole {
   }
   const role = new URLSearchParams(window.location.search).get('role')
   if (
-    role === 'core' || role === 'login' || role === 'settings' || role === 'team'
-    || role === 'taskDialog'
+    role === 'core' || role === 'login' || role === 'settings'
     || PANEL_KEYS.includes(role as PanelKey)
-    || TASK_KEYS.includes(role as TaskKey)
   ) {
     return role as WindowRole
   }
@@ -206,33 +194,12 @@ const コード6Ref = ref<コードパネル参照型 | null>(null)
 const 自動選択表示 = ref(true)
 const 認証エラーメッセージKey = 'avatar_auth_error'
 const コアViewRef = ref<{ 字幕追加: (text: string) => void } | null>(null)
-const タスク要求WindowRef = ref<{
-  新規ダイアログ表示: () => void;
-  自分のみ表示: boolean;
-  管理者か: boolean;
-  表示範囲切替: () => void;
-} | null>(null)
-
 const versions = window.desktopApi?.versions
 
 const アクティブタブ = ref<PanelKey>('chat')
 const 右アクティブタブ = ref<右ペインタブ型>('core')
-// AIタスク画面の表示状態（Web: 左上の切替ボタン、Electron: 右下の TASK ボタン）
-const AIタスク表示 = ref(false)
-// AIチームはWebでは同一画面内、ElectronではAvatar rendererの専用ウィンドウで表示する
-const AIチーム表示 = ref(false)
 const 分割比率 = ref(50)
 const リサイズ中 = ref(false)
-
-async function チーム画面切替() {
-  if (isElectron) {
-    await window.desktopApi?.toggleTeamWindow?.()
-    return
-  }
-
-  AIタスク表示.value = false
-  AIチーム表示.value = !AIチーム表示.value
-}
 
 function リサイズ開始(e: MouseEvent) {
   e.preventDefault()
@@ -391,17 +358,11 @@ const 認証済み = computed(() => Boolean(認証トークン.value && 利用�
 const コアウィンドウ = computed(() => ウィンドウロール.value === 'core')
 const ログインウィンドウ = computed(() => ウィンドウロール.value === 'login')
 const 設定ウィンドウ = computed(() => ウィンドウロール.value === 'settings')
-const タスク編集ウィンドウ = computed(() => ウィンドウロール.value === 'taskDialog')
-const チームウィンドウ = computed(() => ウィンドウロール.value === 'team')
 const 設定SessionID = ref(new URLSearchParams(window.location.search).get('sessionId') || '')
 const 設定キー = ref(0)
-const タスク編集Payload = ref<Record<string, any> | null>(null)
 const Web設定表示 = ref(false)
 const 現在パネルキー = computed<PanelKey | null>(() => {
   return PANEL_KEYS.includes(ウィンドウロール.value as PanelKey) ? (ウィンドウロール.value as PanelKey) : null
-})
-const 現在タスクキー = computed<TaskKey | null>(() => {
-  return TASK_KEYS.includes(ウィンドウロール.value as TaskKey) ? (ウィンドウロール.value as TaskKey) : null
 })
 const 利用者ラベル = computed(() => 利用者.value?.利用者名 || 利用者.value?.利用者ID || '未ログイン')
 
@@ -715,8 +676,6 @@ function 認証クリア(message = '') {
     認証Storage.removeItem(認証エラーメッセージKey)
   }
   セッションID.value = ''
-  AIタスク表示.value = false
-  AIチーム表示.value = false
   WebURL同期('')
   コア切断()
   ウィンドウロール.value = 'login'
@@ -1023,11 +982,6 @@ async function 再起動後再接続() {
   デスクトップチャンネル?.postMessage({ type: 'reboot-reconnect' })
 }
 
-// Electron: タイトルの TASK ボタンで AIタスク 3 ウィンドウ（要求 / フロー図 / 明細）を開閉する
-function タスクウィンドウ切替() {
-  void window.desktopApi?.toggleTaskWindows?.()
-}
-
 function 設定再起動を開く() {
   if (isElectron) {
     void window.desktopApi?.openSettingsWindow?.(セッションID.value || '')
@@ -1044,21 +998,6 @@ function 設定ウィンドウを閉じる() {
   } else {
     Web設定表示.value = false
   }
-}
-
-function タスク編集ウィンドウを閉じる() {
-  void window.desktopApi?.closeCurrentWindow?.()
-}
-
-function タスク編集登録完了(item: Record<string, any> | null) {
-  const channel = new BroadcastChannel('avatar-task-dialog')
-  channel.postMessage({
-    type: 'task-dialog-registered',
-    kind: タスク編集Payload.value?.kind,
-    item,
-  })
-  channel.close()
-  タスク編集ウィンドウを閉じる()
 }
 
 async function 設定保存完了通知(waitSeconds: number = 30) {
@@ -1297,26 +1236,6 @@ onMounted(async () => {
     return
   }
 
-  // AIタスクウィンドウは localStorage の認証情報だけで動く（コア接続は行わない）
-  if (現在タスクキー.value) {
-    認証読込中.value = false
-    return
-  }
-
-  // AIチーム専用ウィンドウはAvatarのlocalStorage認証だけを使い、AIコア接続は開始しない
-  if (チームウィンドウ.value) {
-    ストレージ認証同期()
-    if (認証トークン.value && !利用者.value) {
-      try {
-        await 現在利用者取得()
-      } catch {
-        認証クリア('認証状態を確認できませんでした。再ログインしてください。')
-      }
-    }
-    認証読込中.value = false
-    return
-  }
-
   if (設定ウィンドウ.value) {
     認証読込中.value = false
     window.desktopApi?.onSettingsPrepare?.((sid) => {
@@ -1325,15 +1244,6 @@ onMounted(async () => {
     })
     window.desktopApi?.onWindowShown?.(() => {
       設定キー.value++
-    })
-    return
-  }
-
-  if (タスク編集ウィンドウ.value) {
-    認証読込中.value = false
-    タスク編集Payload.value = await window.desktopApi?.getTaskDialogPayload?.() ?? null
-    window.desktopApi?.onTaskDialogPayload?.((payload) => {
-      タスク編集Payload.value = payload
     })
     return
   }
@@ -1389,19 +1299,13 @@ onBeforeUnmount(() => {
       @submit="ログイン送信"
     />
 
-    <!-- ======= Web版 左右分割レイアウト（左上ボタンで AIタスク画面と切替） ======= -->
+    <!-- ======= Web版 左右分割レイアウト ======= -->
     <div v-else-if="コアウィンドウ && 認証済み && !isElectron" class="web-core-root">
-    <div v-show="!AIタスク表示 && !AIチーム表示" class="web-split-layout" :class="{ resizing: リサイズ中 }">
+    <div class="web-split-layout" :class="{ resizing: リサイズ中 }">
 
       <!-- 左ペイン：タブナビ + タブコンテンツ -->
       <div class="web-left-pane" :style="{ width: 分割比率 + '%' }">
         <nav class="web-tab-bar">
-          <button
-            type="button"
-            class="view-flip-btn"
-            title="AIタスク画面へ切り替え"
-            @click="AIタスク表示 = true"
-          >🔄</button>
           <button
             v-for="tab in webTabs"
             :key="tab.key"
@@ -1568,12 +1472,10 @@ onBeforeUnmount(() => {
               :core-busy="コア処理中"
               :core-error="コアエラー"
               :show-user-label="false"
-              :show-team-button="true"
               title-status-source="input"
               @toggle-panel="パネル切替"
               @reconnect="再接続"
               @open-setting-restart="設定再起動を開く"
-              @open-team="チーム画面切替"
               @logout="認証クリア()"
             />
           </div>
@@ -1644,48 +1546,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Web版 AIタスク画面（要求 / フロー図 / 明細） -->
-    <div v-if="AIタスク表示" class="web-task-layout">
-      <div class="web-task-topbar">
-        <button
-          type="button"
-          class="view-flip-btn"
-          title="アバター画面へ切り替え"
-          @click="AIタスク表示 = false"
-        >🔄</button>
-        <span class="web-task-title">AIタスク</span>
-        <span class="web-tab-spacer" />
-        <span class="web-right-user" :title="利用者ラベル">{{ 利用者ラベル }}</span>
-      </div>
-      <div class="web-task-body">
-        <component :is="AIタスクビュー" :利用者ID="String(利用者?.利用者ID || '')" :権限ID="String(利用者?.権限ID || '')" />
-      </div>
     </div>
 
-    <!-- Web版 AIチーム画面（frontend_avatar内へ移植した画面を同一ページで表示） -->
-    <div v-if="AIチーム表示" class="web-team-layout">
-      <div class="web-task-topbar">
-        <button
-          type="button"
-          class="view-flip-btn"
-          title="アバター画面へ切り替え"
-          @click="AIチーム表示 = false"
-        >🔄</button>
-        <span class="web-task-title">AIチーム</span>
-        <span class="web-tab-spacer" />
-        <span class="web-right-user" :title="利用者ラベル">{{ 利用者ラベル }}</span>
-      </div>
-      <div class="web-team-body">
-        <component
-          :is="AIチームビュー"
-          :利用者ID="String(利用者?.利用者ID || '')"
-          :利用者名="String(利用者?.利用者名 || 利用者?.利用者ID || '')"
-        />
-      </div>
-    </div>
-    </div>
-
-    <!-- ======= Electron コアウィンドウ（タイトルの TASK ボタンで AIタスク 3 ウィンドウを開く） ======= -->
+    <!-- ======= Electron コアウィンドウ ======= -->
     <component
       :is="AIコアコントロール"
       v-else-if="コアウィンドウ && 認証済み && isElectron"
@@ -1704,26 +1567,11 @@ onBeforeUnmount(() => {
       :panel-visibility="パネル表示状態"
       :core-busy="コア処理中"
       :core-error="コアエラー"
-      :show-task-button="true"
-      :show-team-button="true"
       @toggle-panel="パネル切替"
       @reconnect="再接続"
       @open-setting-restart="設定再起動を開く"
-      @open-task="タスクウィンドウ切替"
-      @open-team="チーム画面切替"
       @logout="認証クリア()"
     />
-
-    <!-- Electron AIチーム専用ウィンドウ -->
-    <div v-else-if="チームウィンドウ && 認証済み && isElectron" class="team-window-root">
-      <WindowShell title="AiDiy AI Team" theme="purple">
-        <component
-          :is="AIチームビュー"
-          :利用者ID="String(利用者?.利用者ID || '')"
-          :利用者名="String(利用者?.利用者名 || 利用者?.利用者ID || '')"
-        />
-      </WindowShell>
-    </div>
 
     <div v-else-if="設定ウィンドウ" class="settings-window-root">
       <component
@@ -1740,48 +1588,6 @@ onBeforeUnmount(() => {
           :session-id="設定SessionID"
           @close="設定ウィンドウを閉じる"
           @saved="(s: number) => 設定保存完了通知(s)"
-        />
-      </component>
-    </div>
-
-    <div v-else-if="タスク編集ウィンドウ" class="task-dialog-window-root">
-      <component
-        :is="WindowShell"
-        :title="タスク編集Payload?.kind === 'detail' ? 'AiDiy AI Task (タスク明細 修正)' : タスク編集Payload?.kind === 'response' ? (タスク編集Payload?.タイトル || '応答内容') : `AiDiy AI Task (タスク要求 ${タスク編集Payload?.編集タスク ? '修正' : '新規'})`"
-        theme="purple"
-        close-mode="event"
-        @close="タスク編集ウィンドウを閉じる"
-      >
-        <div v-if="!タスク編集Payload" class="task-dialog-loading">
-          読み込み中...
-        </div>
-        <component
-          :is="AIタスク明細編集"
-          v-else-if="タスク編集Payload.kind === 'detail'"
-          :is-open="true"
-          :key="`detail-${タスク編集Payload?.編集明細?.タスクID || ''}-${タスク編集Payload?.編集明細?.明細SEQ || ''}`"
-          :編集明細="タスク編集Payload?.編集明細 || null"
-          @close="タスク編集ウィンドウを閉じる"
-          @registered="タスク編集登録完了"
-        />
-        <component
-          :is="AIタスク応答内容"
-          v-else-if="タスク編集Payload.kind === 'response'"
-          :is-open="true"
-          :タイトル="タスク編集Payload?.タイトル || '応答内容'"
-          :要求内容="タスク編集Payload?.要求内容 || ''"
-          :内容="タスク編集Payload?.内容 || ''"
-          @close="タスク編集ウィンドウを閉じる"
-        />
-        <component
-          :is="AIタスク要求編集"
-          v-else
-          :is-open="true"
-          :key="`request-${タスク編集Payload?.編集タスク?.タスクID || 'new'}`"
-          :利用者ID="String(タスク編集Payload?.利用者ID || '')"
-          :編集タスク="タスク編集Payload?.編集タスク || null"
-          @close="タスク編集ウィンドウを閉じる"
-          @registered="タスク編集登録完了"
         />
       </component>
     </div>
@@ -1894,55 +1700,6 @@ onBeforeUnmount(() => {
       />
     </component>
 
-    <!-- ======= Electron AIタスクウィンドウ（task1: 要求 / task2: フロー図 / task3: 明細） ======= -->
-    <component
-      :is="WindowShell"
-      v-else-if="現在タスクキー === 'task1'"
-      title="AiDiy AI Task (タスク要求)"
-      theme="purple"
-    >
-      <template #title-right>
-        <button
-          type="button"
-          class="task-title-scope-btn"
-          :class="{ locked: !タスク要求WindowRef?.管理者か }"
-          :disabled="!タスク要求WindowRef?.管理者か"
-          :title="タスク要求WindowRef?.管理者か ? 'クリックで自分限定/全ユーザー表示を切り替え' : '自分のタスクのみ表示できます（admin限定で全ユーザー表示可）'"
-          @click="タスク要求WindowRef?.表示範囲切替()"
-        >{{ タスク要求WindowRef?.自分のみ表示 ?? true ? '✅' : '⬜' }} {{ String(利用者?.利用者ID || '') }}限定</button>
-        <button
-          class="task-title-new-btn"
-          type="button"
-          title="タスク要求を新規作成"
-          @click="タスク要求WindowRef?.新規ダイアログ表示()"
-        >新規</button>
-      </template>
-      <component
-        :is="AIタスク要求ウィンドウ"
-        ref="タスク要求WindowRef"
-        :利用者ID="String(利用者?.利用者ID || '')"
-        :権限ID="String(利用者?.権限ID || '')"
-      />
-    </component>
-
-    <component
-      :is="WindowShell"
-      v-else-if="現在タスクキー === 'task2'"
-      title="AiDiy AI Task (フロー図)"
-      theme="purple"
-    >
-      <component :is="AIタスクフローウィンドウ" />
-    </component>
-
-    <component
-      :is="WindowShell"
-      v-else-if="現在タスクキー === 'task3'"
-      title="AiDiy AI Task (タスク明細)"
-      theme="purple"
-    >
-      <component :is="AIタスク明細ウィンドウ" />
-    </component>
-
     <section v-else class="loading-state">
       <img class="loading-logo" src="/icons/loading.gif" alt="loading" />
       <p>認証状態を確認しています...</p>
@@ -2043,108 +1800,9 @@ onBeforeUnmount(() => {
 .settings-window-root :deep(select),
 .settings-window-root :deep(input) { -webkit-app-region: no-drag; }
 
-.task-dialog-window-root {
-  width: 100%;
-  height: 100%;
-  background: #07080c;
-}
-
-.task-dialog-window-root :deep(.window-body) {
-  background: #07080c;
-}
-
-.task-dialog-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #e5e7eb;
-  font-size: 14px;
-}
-
-.task-dialog-window-root :deep(.dialog-overlay) {
-  position: static;
-  inset: auto;
-  background: transparent;
-  z-index: auto;
-  width: 100%;
-  height: 100%;
-  align-items: stretch;
-  justify-content: stretch;
-}
-
-.task-dialog-window-root :deep(.dialog-content) {
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.task-dialog-window-root :deep(.dialog-header) {
-  display: none;
-}
-
-.task-dialog-window-root :deep(.dialog-body) {
-  flex: 1;
-  overflow: auto;
-}
-
-.task-dialog-window-root :deep(button),
-.task-dialog-window-root :deep(select),
-.task-dialog-window-root :deep(input),
-.task-dialog-window-root :deep(textarea) {
-  -webkit-app-region: no-drag;
-  pointer-events: auto;
-}
-
-.task-title-new-btn {
-  height: 20px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(40, 167, 69, 0.92);
-  color: #fff;
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-}
-
-.task-title-new-btn:hover {
-  background: rgba(30, 126, 52, 0.96);
-  border-color: rgba(255, 255, 255, 0.68);
-}
-
-.task-title-scope-btn {
-  height: 20px;
-  padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  font-size: 11px;
-  line-height: 18px;
-  cursor: pointer;
-  white-space: nowrap;
-  -webkit-app-region: no-drag;
-}
-
-.task-title-scope-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.68);
-}
-
-.task-title-scope-btn:disabled,
-.task-title-scope-btn.locked {
-  cursor: default;
-  opacity: 0.85;
-}
-
 /* 外寸は維持し、枠の1pxを内容領域から確保する（操作面に重ねない）。 */
 .web-left-pane,
-.web-right-pane,
-.web-task-layout,
-.web-team-layout {
+.web-right-pane {
   box-sizing: border-box;
   border: 1px solid #383838;
 }
@@ -2171,71 +1829,6 @@ onBeforeUnmount(() => {
   user-select: none;
   cursor: col-resize;
 }
-
-/* 画面切替ボタン（カメラの裏表切替風の丸ボタン） */
-.view-flip-btn {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  margin-right: 4px;
-  border: 1px solid rgba(150, 120, 240, 0.8);
-  border-radius: 50%;
-  background: rgba(118, 97, 204, 0.45);
-  color: #fff;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, transform 0.15s;
-}
-.view-flip-btn:hover {
-  background: rgba(150, 120, 240, 0.9);
-  transform: rotate(180deg);
-}
-
-/* Web版 AIタスク / AIチーム画面 */
-.web-task-layout,
-.web-team-layout {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100vh;
-  background: #1a1a1a;
-  overflow: hidden;
-}
-.web-task-topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  background: rgba(10, 8, 20, 0.96);
-  border-bottom: 1px solid rgba(118, 97, 204, 0.5);
-  flex-shrink: 0;
-}
-.web-task-title {
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-  letter-spacing: 1px;
-}
-.web-task-body,
-.web-team-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.team-window-root {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  background: #07111d;
-}
-
 
 /* 左ペイン */
 .web-left-pane {

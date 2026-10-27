@@ -178,9 +178,11 @@ test('IDE Term番号: 共有配置slot・タイトルIPC・閉鎖後の再利用
 });
 
 
-test('Task実host: 起動3枚は同格、要求を閉じても継続し他窓から再表示、3枚全閉で終了',async()=>{
+test('Task実host: ログイン後3枚は同格、要求を閉じても継続し他窓から再表示、3枚全閉で終了',async()=>{
  const f=await desktopFixture({kind:'task'});await tick();
  const records=()=>[...f.windows.values()];
+ assert.equal(records().length,1);
+ await f.handlers.get('development:task-session')(f.event(records()[0]),'set',{token:'test-token',expectedRevision:0});
  assert.equal(records().length,3);
  assert.deepEqual(records().map(r=>r.taskView).sort(),['detail','flow','request']);
  for(const r of records()){
@@ -200,7 +202,9 @@ test('Task実host: 起動3枚は同格、要求を閉じても継続し他窓か
 
 test('Mac Task: CmdW closes one peer but application/Dock Quit closes all peers and editor',async()=>{
  const f=await desktopFixture({platform:'darwin',kind:'task'});await tick();
- const records=()=>[...f.windows.values()];const request=records().find(r=>r.taskView==='request'),flow=records().find(r=>r.taskView==='flow');
+ const records=()=>[...f.windows.values()];
+ await f.handlers.get('development:task-session')(f.event(records()[0]),'set',{token:'test-token',expectedRevision:0});
+ const request=records().find(r=>r.taskView==='request'),flow=records().find(r=>r.taskView==='flow');
  const closeWindow=f.app.menu[0].submenu.find(item=>item.accelerator==='Command+W');
  closeWindow.click(null,request.window);await tick();assert.equal(records().length,2);assert.equal(f.app.quitComplete,undefined);
  await f.handlers.get('development:task-windows')(f.event(flow),'dialog',{kind:'request',編集タスク:null});
@@ -208,3 +212,14 @@ test('Mac Task: CmdW closes one peer but application/Dock Quit closes all peers 
  const second=await desktopFixture({platform:'darwin',kind:'task'});await tick();second.app.quit();await tick();await tick();
  assert.equal(second.windows.size,0);assert.equal(second.app.quitComplete,true);
 });
+
+ test('Task real host logout with closed primary restores login panel without quitting',async()=>{
+ const f=await desktopFixture({kind:'task'});await tick();
+ const records=()=>[...f.windows.values()];const primary=records()[0];
+ const session=(record,value)=>f.handlers.get('development:task-session')(f.event(record),'set',value);
+ await session(primary,{token:'test-token',expectedRevision:0});
+ const flow=records().find(r=>r.taskView==='flow');primary.window.close();await tick();
+ await session(flow,{token:'',expectedRevision:1});await tick();
+ assert.deepEqual(records().map(r=>r.taskView),['request']);assert.equal(f.app.quitComplete,undefined);
+ records()[0].window.close();await tick();await tick();assert.equal(f.app.quitComplete,true);
+ });

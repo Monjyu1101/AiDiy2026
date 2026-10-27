@@ -70,16 +70,4 @@ export const coreRoutes: RouteRecordRaw[] = [
         component: AIコア画面,
         meta: { requiresAuth: true, title: 'AiDiy' }
     },
-    {
-        path: '/AIタスク',
-        name: 'AIタスク',
-        component: () => import('../components/AIタスク/AIタスク.vue'),
-        meta: { requiresAuth: true, title: 'AIタスク' }
-    },
-    {
-        path: '/AIチーム',
-        name: 'AIチーム',
-        component: () => import('../components/AIチーム/AIチーム.vue'),
-        meta: { requiresAuth: true, title: 'AIチーム' }
-    },
 ]

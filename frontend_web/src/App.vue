@@ -35,13 +35,6 @@ const isLogin = computed(() => route.path === '/ログイン');
 const isAIコア = computed(() => {
   return AIコアパス判定(route.path) || AIコアパス判定(window.location.pathname);
 });
-const isAIチーム単体表示 = computed(() => {
-  try {
-    return decodeURIComponent(route.path) === '/AIチーム' && route.query.単体表示 === '1';
-  } catch {
-    return false;
-  }
-});
 
 onMounted(() => {
   if (colorPickerRef.value) {
@@ -52,9 +45,6 @@ onMounted(() => {
 
 <template>
   <div v-if="isLogin">
-    <RouterView />
-  </div>
-  <div v-else-if="isAIチーム単体表示" class="standalone-route">
     <RouterView />
   </div>
   <Layout v-else>
@@ -77,9 +67,4 @@ onMounted(() => {
   background: #1a1a1a;
 }
 
-.standalone-route {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
 </style>

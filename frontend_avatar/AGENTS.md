@@ -31,7 +31,7 @@ Electron デスクトップアプリと通常 Web ブラウザの両方で動作
 | 認証 storage | `localStorage` | `sessionStorage` |
 | UI | 複数 BrowserWindow | 左アバター + 右タブ |
 | パネル | IPC で show / hide | `アクティブタブ` |
-| API | `/core` `/task` `/team` proxy / config（本番は core 8091、task・team 8093 直結） | `/core` `/task` `/team` proxy / 動的 URL |
+| API | `/core` proxy / config（本番は core 8091 直結） | `/core` proxy / 動的 URL |
 
 Web 版 AI 画面は `/AiDiy` 系の route / query で role を表現します。
 Electron 版は BrowserWindow の role を main process で管理します。
@@ -55,12 +55,10 @@ Electron 版は BrowserWindow の role を main process で管理します。
 | `electron/preload.ts` | renderer へ `desktopApi` を公開 |
 | `src/AiDiy.vue` | 認証、接続、role / panel 状態、Web layout の中心 |
 | `src/main.ts` | renderer 初期化 |
-| `src/api/client.ts` | REST API client（`apiClient` = core、`taskClient` / `teamClient` = backend_taskteam） |
+| `src/api/client.ts` | REST API client（`apiClient` = core） |
 | `src/api/websocket.ts` | AI コア WebSocket |
-| `src/api/config.ts` | API URL（`CORE_BASE_URL` / `TASKTEAM_BASE_URL`）、モデル設定、VRM / VRMA 定数 |
+| `src/api/config.ts` | API URL（`CORE_BASE_URL`）、モデル設定、VRM / VRMA 定数 |
 | `src/components/` | AIコア、Avatar、音声、チャット、コードなどの各パネル |
-| `src/components/AIタスク/` | AIタスク画面（components / dialog / windows。windows は Electron 分割ウィンドウ用） |
-| `src/components/AIチーム/` | AIチーム画面（3D空間、要員、依頼、経験、作業、会話、編集ダイアログ） |
 | `src/dialog/` | AI 設定などの dialog |
 | `public/vrm/` | VRM モデル |
 | `public/vrma/` | VRMA モーション |
@@ -76,24 +74,14 @@ Electron 版は BrowserWindow の role を main process で管理します。
 - `image`
 - `code1`〜`code6`
 - `settings`
-- `task1`〜`task3`（AIタスクの要求 / フロー図 / 明細ウィンドウ）
-- `taskDialog`（タスク要求 / 明細の編集ダイアログウィンドウ）
-- `team`（`frontend_avatar` 内のAIチームを表示する専用ウィンドウ。`frontend_web` には依存しない）
 
 Electron では role ごとに BrowserWindow を持ちます。
-Web では単一ページ内で表示を切り替えます（AIタスクは3パネル一体表示、AIチームは全画面表示）。
+Web では単一ページ内でコアのパネルを表示します。Task / Team は独立アプリ `aidiy_task` / `aidiy_team` に分離しています。
 
 ## 状態同期
 
 Electron / Web 間の状態同期は BroadcastChannel `avatar-desktop-sync` を使います。
 パネル表示状態、セッション、必要な snapshot は `src/AiDiy.vue` を中心に構築します。
-
-AIタスク関連は追加で 2 つの BroadcastChannel を使います。
-
-- `avatar-task-sync`: 要求ウィンドウ（task1）の選択タスクをフロー図（task2）/ 明細（task3）へ配信
-- `avatar-task-dialog`: taskDialog ウィンドウの登録完了を一覧側へ通知
-
-taskDialog へ渡す行データは IPC（structured clone）を通るため、リアクティブ Proxy をそのまま渡さず `{ ...row }` で複製します。
 
 `frontend_web` と異なり、Vue Router / Pinia 中心の構成ではありません。
 
@@ -102,8 +90,6 @@ taskDialog へ渡す行データは IPC（structured clone）を通るため、�
 - REST API は認証、設定取得、初期化に使う。
 - WebSocket はチャット、音声、画像、ファイル、コードパネルのリアルタイム通信に使う。
 - WebSocket の packet 形式は `AIコアWebSocket仕様.md` を参照する。
-- AIタスクは `taskClient`（backend_taskteam 8093）で REST + 5 秒ポーリング。WebSocket は使わない。
-- AIチームは `teamClient`（backend_taskteam 8093）を中心に、プロジェクト選択を同じ統合サーバーの `taskClient`、モデル情報とフォルダ参照を `apiClient` で取得する。`frontend_web` は起動不要。
 
 ## 実装時の入口
 

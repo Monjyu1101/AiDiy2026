@@ -23,11 +23,12 @@
 ブラウザ → Vite dev server (8090/8092)
         → /core/* → backend core (8091)
         → /apps/* → backend apps (8098)
-        → /task/* → backend taskteam (8093)
-        → /team/* → backend taskteam (8093)
+        → /task/* → backend taskteam (8093) ※ Avatar のみ
+        → /team/* → backend taskteam (8093) ※ Avatar のみ
         → /mcp/*  → backend tools (8095)   ※ frontend_web のみ。prefix は rewrite で除去
 ```
 
+- `frontend_web` の Task / Team 画面とメニューは削除済みです。単独アプリ `aidiy_task` / `aidiy_team` を使い、Web用の `/task` / `/team` プロキシは設けません。
 - 画面側では `/core/...`、`/apps/...`、`/task/...`、`/team/...` の相対URLだけを書く。
 - backend の `http://127.0.0.1:8091` / `8098` / `8093` をコンポーネントへ直書きしない。
 - 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` / `/task` / `/team` プロキシを用意する。
@@ -38,6 +39,7 @@
 proxy: {
   '/core': { target: 'http://127.0.0.1:8091', changeOrigin: true, ws: true },
   '/apps': { target: 'http://127.0.0.1:8098', changeOrigin: true, ws: true },
+  // 以下の /task と /team は frontend_avatar のみ。frontend_web には定義しない
   '/task': { target: 'http://127.0.0.1:8093', changeOrigin: true },
   '/team': { target: 'http://127.0.0.1:8093', changeOrigin: true },
   // frontend_web のみ。backend_tools は prefix を持たないため rewrite で除去する

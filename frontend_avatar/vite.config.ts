@@ -4,7 +4,6 @@ import { fileURLToPath, URL } from 'node:url'
 
 const PORT_CORE = 8091
 const PORT_AVATAR = 8092
-const PORT_TASKTEAM = 8093
 const PORT_APPS = 8098
 
 export default defineConfig({
@@ -13,7 +12,6 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'monaco-editor',
-      'mermaid',
       'three',
       '@pixiv/three-vrm',
       '@pixiv/three-vrm-animation',
@@ -38,14 +36,6 @@ export default defineConfig({
         target: `http://127.0.0.1:${PORT_APPS}`,
         changeOrigin: true,
         ws: true,
-      },
-      '/task': {
-        target: `http://127.0.0.1:${PORT_TASKTEAM}`,
-        changeOrigin: true,
-      },
-      '/team': {
-        target: `http://127.0.0.1:${PORT_TASKTEAM}`,
-        changeOrigin: true,
       },
     },
   },

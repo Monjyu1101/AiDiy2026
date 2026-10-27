@@ -21,7 +21,6 @@
     "@pixiv/three-vrm": "^3.5.5",
     "@pixiv/three-vrm-animation": "^3.5.5",
     "axios": "^1.20.0",
-    "mermaid": "^11.17.2",
     "monaco-editor": "^0.56.0",
     "three": "^0.185.1",
     "vue": "^3.5.41"

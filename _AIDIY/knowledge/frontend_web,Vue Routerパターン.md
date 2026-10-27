@@ -16,7 +16,7 @@
 | ファイル | 担当 | 含まれるルート |
 |---------|------|--------------|
 | `index.ts` | 基底 + router 生成 | ログイン、ログアウト、メニュー、X系全般 |
-| `coreRouter.ts` | Core 系 | C管理（権限/利用者/採番）、AiDiy、AIタスク、AIチーム |
+| `coreRouter.ts` | Core 系 | C管理（権限/利用者/採番）、AiDiy |
 | `appsRouter.ts` | Apps 系 | Mマスタ、Tトラン、Vビュー、Sスケジュール |
 
 ```typescript
@@ -26,6 +26,8 @@ const router = createRouter({
   routes: [...baseRoutes, ...coreRoutes, ...appsRoutes],
 })
 ```
+
+AIタスク・AIチームは `aidiy_task` / `aidiy_team` の単独アプリへ分離しています。`frontend_web` に `/AIタスク` / `/AIチーム` のルートやメニューを追加しません。
 
 ## ルート定義パターン
 

@@ -10,10 +10,11 @@ function fixture(){
  const root=make();
  controller=createTaskWindows({records,trustedEvent:e=>e?.record,focusWindow:()=>focused++,onLastClosed:()=>ended++,createWindow:async(view,payload)=>{created++;const r=make('task',view,payload);if(gate)await gate;return r.window;}});
  const call=(action,payload,record=root)=>controller.handle({record},action,payload);
- return{records,root,make,controller,call,messages,get created(){return created;},get focused(){return focused;},get ended(){return ended;},gate(promise){gate=promise;}};
+ const login=()=>controller.session({record:root},'set',{token:'test-token',expectedRevision:0});
+ return{records,root,make,controller,call,login,messages,get created(){return created;},get focused(){return focused;},get ended(){return ended;},gate(promise){gate=promise;}};
 }
 test('Task three peers reopen closed request from surviving flow, ending only after all three close',async()=>{
- const f=fixture();assert.equal((await f.call('open-all')).ok,true);assert.equal(f.created,2);
+ const f=fixture();assert.equal((await f.login()).ok,true);assert.equal((await f.call('open-all')).ok,true);assert.equal(f.created,2);
  const flow=[...f.records.values()].find(r=>r.taskView==='flow');f.root.window.destroy();assert.equal(f.ended,0);
  assert.deepEqual((await f.call('state',undefined,flow)).views.sort(),['detail','flow']);
  await f.call('open',{view:'request'},flow);assert.equal(f.created,3);assert.equal(f.ended,0);
@@ -21,13 +22,13 @@ test('Task three peers reopen closed request from surviving flow, ending only af
  for(const r of [...f.records.values()])r.window.destroy();assert.equal(f.ended,1);
 });
 test('Task concurrent open deduplicates, last-close invalidates pending creation',async()=>{
- const f=fixture();let release;f.gate(new Promise(resolve=>release=resolve));
- const a=f.call('open',{view:'flow'}),b=f.call('open',{view:'flow'});assert.equal(f.created,1);
+ const f=fixture();await f.login();for(const r of [...f.records.values()])if(r!==f.root)r.window.destroy();let release;f.gate(new Promise(resolve=>release=resolve));
+ const a=f.call('open',{view:'flow'}),b=f.call('open',{view:'flow'});assert.equal(f.created,3);
  for(const r of [...f.records.values()])r.window.destroy();release();
  assert.equal((await a).ok,false);assert.equal((await b).ok,false);assert.equal(f.ended,1);
 });
 test('Task dialog replaces prior window, payload is editor-only and editor cannot keep process alive',async()=>{
- const f=fixture();const payload={kind:'request',利用者ID:'tester',編集タスク:{要求内容:'sample'}};
+ const f=fixture();await f.login();for(const r of [...f.records.values()])if(r!==f.root)r.window.destroy();const payload={kind:'request',利用者ID:'tester',編集タスク:{要求内容:'sample'}};
  await f.call('dialog',payload);let editor=[...f.records.values()].find(r=>r.taskView==='dialog');
  payload.編集タスク.要求内容='mutated';assert.equal((await f.call('dialog-payload',undefined,editor)).payload.編集タスク.要求内容,'sample');
  assert.equal((await f.call('dialog-payload')).ok,false);
@@ -41,14 +42,18 @@ test('Task manager rejects other apps, invalid actions and untrusted contents',a
  for(const payload of [null,{}, {view:'http://evil.invalid'}, {view:'../code'}])assert.equal((await f.call('open',payload)).ok,false);
  for(const payload of [null,[],{kind:'code'},{kind:'request',text:'x'.repeat(2*1024*1024)}])assert.equal((await f.call('dialog',payload)).ok,false);
 });
-test('Task memory session survives request closure, revisions and logout propagate only to Task',async()=>{
- const f=fixture();await f.call('open-all');const flow=[...f.records.values()].find(r=>r.taskView==='flow');const other=f.make('team');
+test('Task memory session logout recreates primary before closing surviving peers and editors',async()=>{
+ const f=fixture();await f.login();const flow=[...f.records.values()].find(r=>r.taskView==='flow');const other=f.make('team');
  const session=(record,action,value)=>f.controller.session({record},action,value);
- assert.equal((await session(f.root,'set',{token:'token-for-test',expectedRevision:0})).revision,1);assert.equal(f.messages.length,3);
  assert.equal((await session(other,'get')).ok,false);f.root.window.destroy();
- assert.equal((await session(flow,'get')).token,'token-for-test');
- assert.equal((await session(flow,'set',{token:'',expectedRevision:1})).revision,2);assert.equal((await session(flow,'get')).token,'');
- assert.equal((await session(flow,'set',{token:'bad\ntoken',expectedRevision:2})).ok,false);
+ assert.equal((await session(flow,'get')).token,'test-token');
+ await f.call('dialog',{kind:'request'},flow);
+ assert.equal((await session(flow,'set',{token:'',expectedRevision:1})).revision,2);
+ const taskRecords=[...f.records.values()].filter(r=>r.kind==='task');
+ assert.deepEqual(taskRecords.map(r=>r.taskView),['request']);assert.equal(f.ended,0);
+ const primary=taskRecords[0];assert.equal((await session(primary,'get')).token,'');
+ assert.equal((await session(primary,'set',{token:'bad\ntoken',expectedRevision:2})).ok,false);
+ assert.equal(other.window.isDestroyed(),false);
 });
 test('Task windows and editor preserve original sizing while clamping small/negative screens',()=>{
  for(const area of [{x:0,y:0,width:1920,height:1040},{x:-1000,y:-500,width:800,height:600},{x:0,y:0,width:320,height:240}])for(const view of ['request','flow','detail','dialog']){
@@ -59,10 +64,26 @@ test('Task windows and editor preserve original sizing while clamping small/nega
  assert.throws(()=>copyPayload({kind:'unknown'}));
 });
 
-test('Task desktop startup opens all three once without coupling authentication to reopen',async()=>{
- const f=fixture();await f.controller.start();assert.equal(f.records.size,3);
+test('Task starts primary-only, opens peers on login, and returns primary-only on logout',async()=>{
+ const f=fixture();await f.controller.start();assert.equal(f.records.size,1);
+ for(const action of ['open-all','dialog'])assert.equal((await f.call(action,{kind:'request'})).ok,false);
+ assert.equal((await f.call('open',{view:'flow'})).ok,false);
+ await f.login();assert.equal(f.records.size,3);
  const flow=[...f.records.values()].find(r=>r.taskView==='flow');flow.window.destroy();
- await f.controller.session({record:f.root},'set',{token:'new-token',expectedRevision:0});assert.equal(f.records.size,2);
+ await f.controller.session({record:f.root},'set',{token:'renewed',expectedRevision:1});assert.equal(f.records.size,2);
+ await f.controller.session({record:f.root},'set',{token:'',expectedRevision:2});assert.equal(f.records.size,1);
+ await f.controller.session({record:f.root},'set',{token:'again',expectedRevision:3});assert.equal(f.records.size,3);
+});
+
+test('Task prelogin primary closure exits without creating hidden windows',async()=>{
+ const f=fixture();await f.controller.start();f.root.window.destroy();assert.equal(f.ended,1);assert.equal(f.created,0);
+});
+
+test('Task logout invalidates windows still opening after a login',async()=>{
+ const f=fixture();let release;f.gate(new Promise(resolve=>release=resolve));
+ const login=f.login();assert.equal(f.records.size,3);
+ const logout=f.controller.session({record:f.root},'set',{token:'',expectedRevision:1});
+ release();await Promise.all([login,logout]);assert.deepEqual([...f.records.values()].map(r=>r.taskView),['request']);assert.equal(f.ended,0);
 });
 
 test('Task stale logout cannot clear newer login token',async()=>{

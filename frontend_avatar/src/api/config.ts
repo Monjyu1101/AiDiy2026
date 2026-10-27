@@ -11,7 +11,6 @@
 import type { ModelSettings } from '@/types'
 
 const PORT_CORE = 8091
-const PORT_TASKTEAM = 8093
 
 function resolveHttpBaseUrl(): string {
   if (import.meta.env.VITE_CORE_BASE_URL) {
@@ -38,21 +37,8 @@ function resolveWebSocketEndpoint(): string {
   return `ws://127.0.0.1:${PORT_CORE}/core/ws/AIコア`
 }
 
-function resolveTaskTeamBaseUrl(): string {
-  if (import.meta.env.VITE_TASKTEAM_BASE_URL) {
-    return import.meta.env.VITE_TASKTEAM_BASE_URL
-  }
-
-  // dev は Vite proxy（/task・/team → 8093）、Electron 本番は backend_taskteam へ直接接続
-  if (import.meta.env.DEV) {
-    return '/'
-  }
-
-  return `http://127.0.0.1:${PORT_TASKTEAM}`
-}
 
 export const CORE_BASE_URL = resolveHttpBaseUrl()
-export const TASKTEAM_BASE_URL = resolveTaskTeamBaseUrl()
 export const AI_WS_ENDPOINT = resolveWebSocketEndpoint()
 export const DEFAULT_VRM_MODEL_URL = '/vrm/VRM_AiDiy.vrm'
 export const SAMPLE_VRMA_FOLDER_NAME = 'サンプル'

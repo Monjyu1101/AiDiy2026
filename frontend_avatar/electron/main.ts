@@ -36,8 +36,7 @@ const windowPins = createWindowPins({
 
 type WindowMode = 'login' | 'core'
 type PanelKey = 'chat' | 'file' | 'image' | 'code1' | 'code2' | 'code3' | 'code4' | 'code5' | 'code6'
-type TaskKey = 'task1' | 'task2' | 'task3'
-type WindowRole = WindowMode | PanelKey | TaskKey | 'settings' | 'taskDialog' | 'team'
+type WindowRole = WindowMode | PanelKey | 'settings'
 type WindowBounds = { x: number; y: number; width: number; height: number }
 type WindowPointerSnapshot = {
   role: WindowRole | null
@@ -64,8 +63,6 @@ const LOGIN_BOUNDS: BoundsPreset = { width: 320, height: 240, minWidth: 320, min
 const CORE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const CHAT_BASE_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 const SETTINGS_BOUNDS: BoundsPreset = { width: 720, height: 580, minWidth: 580, minHeight: 400 }
-const TASK_DIALOG_BOUNDS: BoundsPreset = { width: 1280, height: 800, minWidth: 640, minHeight: 480 }
-const TEAM_BOUNDS: BoundsPreset = { width: 1280, height: 800, minWidth: 800, minHeight: 520 }
 const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   chat: CHAT_BASE_BOUNDS,
   file: CHAT_BASE_BOUNDS,
@@ -77,8 +74,6 @@ const PANEL_BOUNDS: Record<PanelKey, BoundsPreset> = {
   code5: CHAT_BASE_BOUNDS,
   code6: CHAT_BASE_BOUNDS,
 }
-const TASK_KEYS: TaskKey[] = ['task1', 'task2', 'task3']
-const TASK_BOUNDS: BoundsPreset = { width: 520, height: 620, minWidth: 440, minHeight: 420 }
 
 const panelStates: Record<PanelKey, boolean> = {
   chat: false,
@@ -95,19 +90,14 @@ const panelStates: Record<PanelKey, boolean> = {
 let loginWindow: BrowserWindow | null = null
 let coreWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
-let taskDialogWindow: BrowserWindow | null = null
-let teamWindow: BrowserWindow | null = null
 const panelWindows = new Map<PanelKey, BrowserWindow>()
-const taskWindows = new Map<TaskKey, BrowserWindow>()
 const windowRoles = new Map<number, WindowRole>()
-const taskDialogPayloads = new Map<number, Record<string, any>>()
 let selectedDisplaySourceId: string | null = null
 let previousCpuTimes: { idle: number; total: number } | null = null
 // Electronのバグ回避: getMinimumSize()が初期サイズを返す場合があるため独自管理
 const windowMinSizes = new Map<number, { minWidth: number; minHeight: number }>()
 const 表示処理 = new WeakMap<BrowserWindow, Promise<boolean>>()
 const 表示希望 = new WeakMap<BrowserWindow, boolean>()
-let taskWindowsVisible = false
 
 function getWorkArea() {
   return screen.getPrimaryDisplay().workArea
@@ -380,12 +370,6 @@ function getWindowByRole(role: WindowRole): BrowserWindow | null {
   if (role === 'login') return loginWindow && !loginWindow.isDestroyed() ? loginWindow : null
   if (role === 'core') return coreWindow && !coreWindow.isDestroyed() ? coreWindow : null
   if (role === 'settings') return settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : null
-  if (role === 'taskDialog') return taskDialogWindow && !taskDialogWindow.isDestroyed() ? taskDialogWindow : null
-  if (role === 'team') return teamWindow && !teamWindow.isDestroyed() ? teamWindow : null
-  if (TASK_KEYS.includes(role as TaskKey)) {
-    const taskWindow = taskWindows.get(role as TaskKey)
-    return taskWindow && !taskWindow.isDestroyed() ? taskWindow : null
-  }
   const panelWindow = panelWindows.get(role as PanelKey)
   return panelWindow && !panelWindow.isDestroyed() ? panelWindow : null
 }
@@ -448,189 +432,6 @@ function closeAllPanelWindows() {
   ;(Object.keys(panelStates) as PanelKey[]).forEach((panel) => {
     closePanelWindow(panel)
   })
-}
-
-// AIタスクウィンドウ（要求 / フロー図 / 明細 の 3 枚）を画面左上へ横並びで配置する
-function getTaskInitialPosition(order: number, width: number) {
-  const area = getWorkArea()
-  const margin = 16
-  const x = Math.min(
-    area.x + margin + (width + 12) * order,
-    area.x + Math.max(0, area.width - width - margin),
-  )
-  return { x, y: area.y + margin }
-}
-
-function createTaskWindow(key: TaskKey): BrowserWindow {
-  const existing = taskWindows.get(key)
-  if (existing && !existing.isDestroyed()) {
-    return existing
-  }
-
-  const window = createBaseWindow(TASK_BOUNDS, key, false)
-  const order = TASK_KEYS.indexOf(key)
-  const { x, y } = getTaskInitialPosition(order, TASK_BOUNDS.width)
-  window.setPosition(x, y)
-
-  taskWindows.set(key, window)
-  window.on('closed', () => {
-    taskWindows.delete(key)
-    if (taskWindows.size === 0) taskWindowsVisible = false
-    windowRoles.delete(window.id)
-  })
-
-  return window
-}
-
-function openTaskDialogWindow(payload: Record<string, any>) {
-  if (taskDialogWindow && !taskDialogWindow.isDestroyed()) {
-    taskDialogWindow.destroy()
-  }
-
-  const dialogWindow = createBaseWindow(TASK_DIALOG_BOUNDS, 'taskDialog', false)
-  taskDialogWindow = dialogWindow
-  taskDialogPayloads.set(dialogWindow.id, payload)
-  dialogWindow.setBounds({
-    ...getCenteredPosition(TASK_DIALOG_BOUNDS.width, TASK_DIALOG_BOUNDS.height),
-    width: TASK_DIALOG_BOUNDS.width,
-    height: TASK_DIALOG_BOUNDS.height,
-  }, false)
-
-  dialogWindow.once('ready-to-show', async () => {
-    if (dialogWindow.isDestroyed()) return
-    dialogWindow.setMinimumSize(TASK_DIALOG_BOUNDS.minWidth, TASK_DIALOG_BOUNDS.minHeight)
-    dialogWindow.webContents.send('task-dialog:payload', payload)
-    if (await ウィンドウ表示(dialogWindow, '#000', () => taskDialogWindow === dialogWindow)) dialogWindow.webContents.send('window:shown')
-  })
-
-  dialogWindow.on('closed', () => {
-    taskDialogPayloads.delete(dialogWindow.id)
-    windowRoles.delete(dialogWindow.id)
-    if (taskDialogWindow === dialogWindow) {
-      taskDialogWindow = null
-    }
-  })
-}
-
-function anyTaskWindowVisible(): boolean {
-  return TASK_KEYS.some((key) => {
-    const window = taskWindows.get(key)
-    return Boolean(window && !window.isDestroyed() && window.isVisible())
-  })
-}
-
-async function toggleTaskWindows(): Promise<boolean> {
-  if (taskWindowsVisible || anyTaskWindowVisible()) {
-    taskWindowsVisible = false
-    TASK_KEYS.forEach((key) => {
-      const window = taskWindows.get(key)
-      if (window && !window.isDestroyed()) {
-        ウィンドウ非表示(window)
-      }
-    })
-    return false
-  }
-
-  taskWindowsVisible = true
-  const windows = TASK_KEYS.map((key) => createTaskWindow(key))
-  await Promise.all(windows.map(async (window) => {
-    if (await ウィンドウ表示(window, '#000', () => taskWindowsVisible)) {
-      window.webContents.send('window:shown')
-    }
-  }))
-  return taskWindowsVisible
-}
-
-function closeAllTaskWindows() {
-  taskWindowsVisible = false
-  TASK_KEYS.forEach((key) => {
-    const window = taskWindows.get(key)
-    if (window && !window.isDestroyed()) {
-      window.destroy()
-    }
-    taskWindows.delete(key)
-  })
-}
-
-function closeTeamWindow() {
-  const window = teamWindow
-  teamWindow = null
-  if (window) {
-    windowRoles.delete(window.id)
-    windowMinSizes.delete(window.id)
-  }
-  if (window && !window.isDestroyed()) {
-    window.destroy()
-  }
-}
-
-async function openTeamWindow(): Promise<boolean> {
-  if (!teamWindow || teamWindow.isDestroyed()) {
-    const appPath = app.getAppPath()
-    const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
-    teamWindow = new BrowserWindow({
-      width: TEAM_BOUNDS.width,
-      height: TEAM_BOUNDS.height,
-      minWidth: TEAM_BOUNDS.minWidth,
-      minHeight: TEAM_BOUNDS.minHeight,
-      show: false,
-      backgroundColor: '#07111f',
-      frame: false,
-      resizable: true,
-      minimizable: true,
-      autoHideMenuBar: true,
-      title: 'AiDiy AI Team',
-      icon: iconPath,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: false,
-        webSecurity: false,
-        backgroundThrottling: false,
-      },
-    })
-    windowRoles.set(teamWindow.id, 'team')
-    windowPins.register(teamWindow)
-    attachNativeWindowMove(teamWindow, screen, 'avatar')
-    windowMinSizes.set(teamWindow.id, {
-      minWidth: TEAM_BOUNDS.minWidth,
-      minHeight: TEAM_BOUNDS.minHeight,
-    })
-    teamWindow.setBounds({
-      ...getCenteredPosition(TEAM_BOUNDS.width, TEAM_BOUNDS.height),
-      width: TEAM_BOUNDS.width,
-      height: TEAM_BOUNDS.height,
-    }, false)
-    const createdTeamWindow = teamWindow
-    createdTeamWindow.on('closed', () => {
-      windowPins.unregister(createdTeamWindow)
-      windowRoles.delete(createdTeamWindow.id)
-      windowMinSizes.delete(createdTeamWindow.id)
-      if (teamWindow === createdTeamWindow) teamWindow = null
-    })
-    try {
-      await createdTeamWindow.loadURL(getRendererUrl('team'))
-    } catch (error) {
-      console.error('[team] renderer load failed:', error)
-      if (teamWindow === createdTeamWindow) closeTeamWindow()
-      return false
-    }
-  }
-
-  const targetWindow = teamWindow
-  if (await ウィンドウ表示(targetWindow, '#07111f', () => teamWindow === targetWindow)) {
-    targetWindow.webContents.send('window:shown')
-  }
-  return true
-}
-
-async function toggleTeamWindow(): Promise<boolean> {
-  if (teamWindow && !teamWindow.isDestroyed()) {
-    closeTeamWindow()
-    return false
-  }
-  return openTeamWindow()
 }
 
 function applyPrimaryMode(window: BrowserWindow, mode: WindowMode) {
@@ -720,8 +521,6 @@ function createCoreWindow(show = true) {
 
   coreWindow.on('closed', () => {
     closeAllPanelWindows()
-    closeAllTaskWindows()
-    closeTeamWindow()
     if (coreWindow) {
       windowRoles.delete(coreWindow.id)
     }
@@ -752,8 +551,6 @@ async function openCoreWindow(sourceWindow?: BrowserWindow | null) {
 
 async function openLoginWindow(sourceWindow?: BrowserWindow | null) {
   closeAllPanelWindows()
-  closeAllTaskWindows()
-  closeTeamWindow()
   const nextLoginWindow = createLoginWindow(false)
   await waitForReady(nextLoginWindow)
   if (!nextLoginWindow.isDestroyed()) {
@@ -945,18 +742,6 @@ app.whenReady().then(async () => {
     const window = currentControlWindow(event)
     if (!window) return
     const role = windowRoles.get(window.id)
-    if (role && TASK_KEYS.includes(role as TaskKey)) {
-      ウィンドウ非表示(window)
-      return
-    }
-    if (role === 'taskDialog') {
-      window.close()
-      return
-    }
-    if (role === 'team') {
-      closeTeamWindow()
-      return
-    }
     if (role && role !== 'login' && role !== 'core' && role !== 'settings') {
       setPanelVisibility(role as PanelKey, false)
       return
@@ -1036,23 +821,6 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('panel:get-states', () => ({ ...panelStates }))
-
-  ipcMain.handle('task:toggle-all', async () => toggleTaskWindows())
-
-  ipcMain.handle('team:toggle-window', () => toggleTeamWindow())
-  ipcMain.handle('team:close-window', () => {
-    closeTeamWindow()
-  })
-
-  ipcMain.handle('task-dialog:open', (_event, payload: Record<string, any>) => {
-    openTaskDialogWindow(payload)
-  })
-
-  ipcMain.handle('task-dialog:get-payload', (event) => {
-    const window = BrowserWindow.fromWebContents(event.sender)
-    if (!window) return null
-    return taskDialogPayloads.get(window.id) ?? null
-  })
 
   ipcMain.handle('settings:open', (_event, sessionId: string) => {
     openSettingsWindow(sessionId)

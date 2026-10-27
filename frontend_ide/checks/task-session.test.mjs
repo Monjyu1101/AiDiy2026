@@ -23,7 +23,7 @@ test('host event wins over delayed get and stale logout uses revision compare-an
   const start = sync.start(); notify({ revision: 2, token: 'current' });
   getResult({ revision: 1, token: 'old' }); await start;
   assert.deepEqual(applied, ['current']);
-  await sync.set(''); assert.deepEqual(setArgs, { token: '', expectedRevision: 2 });
+  await assert.rejects(sync.set(''), /タスク認証状態/); assert.deepEqual(setArgs, { token: '', expectedRevision: 2 });
   assert.deepEqual(applied, ['current', 'new-login']);
   sync.dispose(); assert.equal(stopped, true); notify({ revision: 4, token: '' }); assert.equal(applied.length, 2);
 });
@@ -52,4 +52,19 @@ test('selection and editor acknowledgments are isolated by authentication revisi
   notify({ revision: 91, token: '' }); assert.equal(taskChannelName('dialog'), 'aidiy-task-dialog-91');
   notify({ revision: 92, token: 'other-user' }); assert.equal(taskChannelName('sync'), 'aidiy-task-sync-92');
   assert.doesNotMatch(taskChannelName('dialog'), /private-token|other-user/); session.dispose();
+});
+
+
+test('same-revision host rejection surfaces failure without replacing session revision', async () => {
+  const applied = []; let value;
+  const api = {
+    onTaskSession() { return () => {}; },
+    async taskSession(action, payload) {
+      if (action === 'get') return { ok: true, revision: 0, token: '' };
+      value = payload; return { ok: false, revision: 0, token: '', error: 'rejected' };
+    },
+  };
+  const sync = createTaskSession({ api, applyToken: token => applied.push(token) }); await sync.start();
+  await assert.rejects(sync.set('invalid'), /rejected/);
+  assert.deepEqual(value, { token: 'invalid', expectedRevision: 0 }); assert.deepEqual(applied, ['']); sync.dispose();
 });

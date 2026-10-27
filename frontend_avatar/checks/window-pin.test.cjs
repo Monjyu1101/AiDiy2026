@@ -97,10 +97,10 @@ function mainFixture() {
         : id.endsWith('長押し窓移動.cjs') ? { attachNativeWindowMove() {} } : load(id),
   };
   const source = fs.readFileSync(path.join(project, 'electron/main.ts'), 'utf8');
-  vm.runInNewContext(compile(source) + '\nglobalThis.probe = {createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,toggleTaskWindows,openTaskDialogWindow,openTeamWindow,openSettingsWindow,openCoreWindow,openLoginWindow,ウィンドウ表示,windowPins};', context);
+  vm.runInNewContext(compile(source) + '\nglobalThis.probe = {createLoginWindow,createCoreWindow,createPanelWindow,setPanelVisibility,openSettingsWindow,openCoreWindow,openLoginWindow,ウィンドウ表示,windowPins};', context);
   ready();
   const event = window => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame });
-  return { ...context.probe, windows, Window, event, app,
+  return { ...context.probe, windows, Window, event, app, handlers,
     invoke: (channel, window, ...args) => handlers.get(channel)(event(window), ...args),
     raw: (channel, event) => handlers.get(channel)(event),
   };
@@ -126,16 +126,13 @@ test('AvatarのOS閉じるでも非表示のログイン窓だけを残さない
   assert.equal(f.app.quitCalls, 1);
 });
 
-test('ログイン窓だけON・他の16窓はOFF起動し、本人だけ切替・通知、同じfloating層で選択された窓だけを前へ出す', async () => {
+test('ログイン窓だけON・他の11窓はOFF起動し、本人だけ切替・通知、同じfloating層で選択された窓だけを前へ出す', async () => {
   const f = mainFixture();
   f.createCoreWindow(false);
   for (const role of ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6']) f.createPanelWindow(role);
-  await f.toggleTaskWindows();
-  f.openTaskDialogWindow({});
-  await f.openTeamWindow();
   f.openSettingsWindow('fixture');
   await flush();
-  assert.equal(f.windows.length, 17);
+  assert.equal(f.windows.length, 12);
   for (const window of f.windows) {
     const initial = window.role === 'login';
     assert.deepEqual(window.topCalls, [initial ? [true, 'floating'] : [false]], window.role);
@@ -158,8 +155,6 @@ test('ログイン窓だけON・他の16窓はOFF起動し、本人だけ切替�
   assert.equal(core.topCalls.length, calls, '表示の再要求でOFFを上書きしない');
   assert.equal(core.pinned, false);
   assert.equal(login.options.frame, false);
-  assert.equal(f.windows.find(window => window.role === 'team').options.frame, false);
-  assert.equal(f.windows.find(window => window.role === 'team').options.minimizable, true);
   for (const window of f.windows) {
     window.destroy();
     assert.equal(window.listenerCount('focus'), 0, '破棄時にピン購読を解除');
@@ -288,4 +283,16 @@ test('読込中の新しい通知を古い取得結果で上書きせず、Web�
   web.buttons()[0].props.onClick();
   web.buttons()[1].props.onClick();
   web.close();
+});
+
+
+test('独立アプリへ移したTask/TeamのIPCは登録せず、残ったAvatar IPCを維持する', () => {
+  const f = mainFixture();
+  for (const channel of ['task:toggle-all', 'team:toggle-window', 'team:close-window', 'task-dialog:open', 'task-dialog:get-payload']) {
+    assert.equal(f.handlers.has(channel), false, channel);
+  }
+  for (const channel of ['panel:toggle', 'panel:apply-states', 'window:open-core', 'settings:open']) assert.equal(f.handlers.has(channel), true, channel);
+  const preload = fs.readFileSync(path.join(project, 'electron/preload.ts'), 'utf8');
+  const declarations = fs.readFileSync(path.join(project, 'src/env.d.ts'), 'utf8');
+  for (const source of [preload, declarations]) assert.doesNotMatch(source, /toggleTaskWindows|toggleTeamWindow|closeTeamWindow|openTaskDialogWindow|getTaskDialogPayload|onTaskDialogPayload/);
 });

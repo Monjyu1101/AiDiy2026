@@ -109,7 +109,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 | `frontend_ide` | Term / Code / Live / IDE の共通 Vue 画面・単独起動。`viewer/` はファイルAPI・Office表示 | 自動割り当て |
 
 `core_main.py`、`apps_main.py`、`taskteam_main.py` は同じ SQLite DB を共有します。`taskteam_main.py` は `Aタスク*` と `Aチーム*` を同一プロセスで管理します。
-フロントエンドは Vite proxy で `/core/*` を 8091、`/apps/*` を 8098、`/task/*` と `/team/*` を同じ 8093 へ振り分けます。
+frontend_web は Vite proxy で `/core/*` を 8091、`/apps/*` を 8098 へ振り分けます。Task / Team は frontend_ide の単独アプリで操作し、`/task/*` と `/team/*` は同じ 8093 へ接続します。
 
 ## ディレクトリ概要
 
@@ -210,7 +210,7 @@ AiDiy は 5 つの常駐サーバーと 1 つの on-demand CLI 基盤で構成�
 
 - `AIコア`: WebSocket + マルチベンダー AI + Code CLI パネル。
 - `A会話履歴`: 会話履歴保存。
-- `Aタスク要求` / `Aタスク明細`: AIタスク自動実行（backend_taskteam が管理、Web / Avatar の AIタスク画面から操作）。明細は `先行SEQ` による DAG で、直列だけでなく水平の並行分岐を含む自由なタスクフローを定義でき、フロー図はクリティカルパス基準で表示する。
+- `Aタスク要求` / `Aタスク明細`: AIタスク自動実行（backend_taskteam が管理、単独アプリ aidiy_task から操作）。明細は `先行SEQ` による DAG で、直列だけでなく水平の並行分岐を含む自由なタスクフローを定義でき、フロー図はクリティカルパス基準で表示する。
 - `Aチーム要員`: backend_taskteam のエージェント要員マスタ。初期要員 `admin` は削除不可。
 
 ### X系 Experimental

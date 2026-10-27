@@ -37,12 +37,33 @@ function createTaskWindows({records,trustedEvent,createWindow,focusWindow,onLast
   pending.set(view,request);
   try{return await request;}finally{if(pending.get(view)===request)pending.delete(view);}
  }
- return{closed,start:()=>Promise.all(['flow','detail'].map(view=>open(view))),async session(event,action,value){try{source(event);if(action==='get')return{ok:true,...session()};if(action!=='set'||!value||typeof value.token!=='string'||value.token.length>16384||/[\r\n\0]/.test(value.token)||!Number.isSafeInteger(value.expectedRevision)||value.expectedRevision<0)throw Error('Task認証情報が不正です。');if(value.expectedRevision!==authRevision)return{ok:false,error:'認証状態が更新されました。',...session()};token=value.token;authRevision++;broadcastSession();return{ok:true,...session()};}catch(error){return{ok:false,error:error.message};}},async handle(event,action,payload){
+ async function setSession(event,value){
+  source(event);
+  if(!value||typeof value.token!=='string'||value.token.length>16384||/[\r\n\0]/.test(value.token)||!Number.isSafeInteger(value.expectedRevision)||value.expectedRevision<0)throw Error('Task認証情報が不正です。');
+  if(value.expectedRevision!==authRevision)return{ok:false,error:'認証状態が更新されました。',...session()};
+  const wasLoggedIn=!!token;token=value.token;const run=++authRevision;
+  // Pending windows from a previous authentication must not survive logout.
+  if(!token){revision++;dialogRevision++;pending.clear();}
+  broadcastSession();
+  if(token&&!wasLoggedIn){
+   const results=await Promise.all([...views].map(view=>open(view)));
+   if(run===authRevision){const failed=results.find(result=>!result.ok);if(failed)return{...failed,...session()};}
+  }else if(!token){
+   // Keep a primary panel alive before removing the last surviving peer.
+   const result=await open('request');
+   if(run!==authRevision)return{ok:false,error:'認証状態が更新されました。',...session()};
+   if(!result.ok)return{...result,...session()};
+   for(const record of live())if(record.taskView!=='request')record.window.destroy();
+  }
+  return{ok:true,...session()};
+ }
+ return{closed,start:()=>open('request'),async session(event,action,value){try{source(event);if(action==='get')return{ok:true,...session()};if(action!=='set')throw Error('Task認証操作が不正です。');return await setSession(event,value);}catch(error){return{ok:false,error:error.message,...session()};}},async handle(event,action,payload){
   try{
    const record=source(event);
    if(action==='state')return{ok:true,views:live().filter(r=>views.has(r.taskView)).map(r=>r.taskView)};
    if(action==='dialog-payload')return record.taskView==='dialog'?{ok:true,payload:copyPayload(record.taskPayload)}:{ok:false,error:'編集画面から取得してください。'};
    if(action==='close-children'){revision++;dialogRevision++;pending.clear();for(const r of live())if(r!==record)r.window.destroy();return{ok:true};}
+   if(!token)throw Error('ログイン後にタスク画面を開いてください。');
    if(action==='dialog')return await open('dialog',copyPayload(payload));
    if(action==='open-all'){const result=await Promise.all([...views].map(view=>open(view)));return result.find(r=>!r.ok)||{ok:true};}
    if(action==='open'&&views.has(payload?.view))return await open(payload.view);

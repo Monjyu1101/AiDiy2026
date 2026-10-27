@@ -44,8 +44,6 @@ const props = defineProps<{
   coreError: string;
   showUserLabel?: boolean;
   titleStatusSource?: 'core' | 'input';
-  showTaskButton?: boolean;
-  showTeamButton?: boolean;
 }>()
 
 // --- 字幕キュー（最小5秒・最大30秒表示） ---
@@ -98,8 +96,6 @@ const emit = defineEmits<{
   openSettingRestart: [];
   audioStateChange: [payload: { micEnabled: boolean; speakerEnabled: boolean; audioConnected: boolean }];
   logout: [];
-  openTask: [];
-  openTeam: [];
 }>()
 
 const UI自動非表示秒数 = 15000
@@ -476,20 +472,6 @@ defineExpose({ 字幕追加 })
     @close="emit('logout')"
   >
     <template v-if="UI表示中" #title-right>
-      <button
-        v-if="props.showTeamButton"
-        class="title-action-button title-team-button"
-        type="button"
-        title="AIチーム画面を表示"
-        @click="emit('openTeam')"
-      >TEAM</button>
-      <button
-        v-if="props.showTaskButton"
-        class="title-action-button title-task-button"
-        type="button"
-        title="AIタスク画面（要求 / フロー図 / 明細）を表示"
-        @click="emit('openTask')"
-      >TASK</button>
       <span class="core-status-dot" :class="接続状態ドットクラス"></span>
       <span class="core-status-text">{{ タイトル接続状態表示 }}</span>
       <component :is="再読込ボタン" title="再表示" @click="再表示要求" />
@@ -811,37 +793,9 @@ defineExpose({ 字幕追加 })
   transform: translateY(-1px);
 }
 
-.title-task-button {
-  width: auto;
-  padding: 0 8px;
-  background: #4c1d95;
-  border-color: #3b0764;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
 
-.title-task-button:hover {
-  background: #581c87;
-  border-color: #4c1d95;
-}
 
-.title-team-button {
-  width: auto;
-  padding: 0 8px;
-  background: #075985;
-  border-color: #0c4a6e;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
 
-.title-team-button:hover {
-  background: #0369a1;
-  border-color: #075985;
-}
 
 .audio-visualizer-overlay {
   position: absolute;

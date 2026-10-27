@@ -11,7 +11,7 @@ test('既存shell枠の太さ・外寸・透明表示を維持', () => {
 });
 test('Web枠は内容領域を確保し、内側shellの二重枠を抑止', () => {
   const s = source('AiDiy.vue');
-  assert.match(s, /\.web-left-pane,\s*\.web-right-pane,\s*\.web-task-layout,\s*\.web-team-layout\s*\{\s*box-sizing: border-box;\s*border: 1px solid #383838;/);
+  assert.match(s, /\.web-left-pane,\s*\.web-right-pane\s*\{\s*box-sizing: border-box;\s*border: 1px solid #383838;/);
   assert.match(s, /\.web-right-content :deep\(\.window-shell\)\s*\{\s*border-color: transparent;/);
 });
 test('loginは既存枠を着色し追加の外周リングを除去', () => {

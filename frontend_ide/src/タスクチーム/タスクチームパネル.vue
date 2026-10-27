@@ -17,7 +17,11 @@ const taskView = resolveTaskView(props.config.kind, window.location.hash, window
 const suffix = ({ request: '要求', flow: 'フロー図', detail: '明細', dialog: '編集' } as Record<string, string>)[taskView] || '';
 const title = props.config.kind === 'task' ? `AiDiy Task${suffix ? ' / ' + suffix : ''}` : 'AiDiy Team';
 const connected = ref(false), port = ref(8093), checking = ref(true);
-const user = ref<Record<string, string> | null>(null), userId = ref(''), password = ref('');
+// Avatar と同じ初期表示。前回 ID だけをアプリ別に保存し、パスワードは保存しない。
+const lastUserKey = `aidiy_${props.config.kind}_last_user`;
+function initialUserId() { try { return localStorage.getItem(lastUserKey) || 'admin'; } catch { return 'admin'; } }
+const initialPassword = '********';
+const user = ref<Record<string, string> | null>(null), userId = ref(initialUserId()), password = ref(initialPassword);
 const error = ref(''), busy = ref(false), restoring = ref(taskView !== 'combined' || !!token());
 let disposed = false, revision = 0, timer: ReturnType<typeof setTimeout>;
 const lifetime = new AbortController();
@@ -32,7 +36,7 @@ async function refreshTaskWindows() {
   finally { windowsPolling = false; if (!disposed) { clearTimeout(windowTimer); windowTimer = setTimeout(refreshTaskWindows, 2000); } }
 }
 async function openTaskWindows(view: string) {
-  if (!['request', 'flow', 'detail'].includes(view)) return;
+  if (!user.value || !['request', 'flow', 'detail'].includes(view)) return;
   error.value = '';
   try {
     const result = await window.aidiyWindow?.taskWindows('open', { view });
@@ -40,7 +44,7 @@ async function openTaskWindows(view: string) {
     clearTimeout(windowTimer); await refreshTaskWindows();
   } catch (cause) { if (!disposed) error.value = cause instanceof Error ? cause.message : 'タスクウィンドウを開けません。'; }
 }
-function clearSession(message = '') { selectionCache?.dispose(); selectionCache = null; revision++; token(''); user.value = null; password.value = ''; error.value = message; busy.value = false; restoring.value = false; }
+function clearSession(message = '') { selectionCache?.dispose(); selectionCache = null; revision++; token(''); user.value = null; password.value = initialPassword; error.value = message; busy.value = false; restoring.value = false; }
 async function receiveSession(value: string) {
   if (disposed) return;
   clearSession();
@@ -48,8 +52,8 @@ async function receiveSession(value: string) {
   const run = ++revision; token(value); restoring.value = true;
   try {
     await currentUser(run);
-    if (!disposed && run === revision && user.value) selectionCache = createTaskSelectionCache();
-  } catch { if (!disposed && run === revision) clearSession('認証を確認できませんでした。再ログインしてください。'); }
+    if (!disposed && run === revision && user.value) { password.value = ''; selectionCache = createTaskSelectionCache(); }
+  } catch { if (!disposed && run === revision) logout('認証を確認できませんでした。再ログインしてください。'); }
   finally { if (!disposed && run === revision) restoring.value = false; }
 }
 
@@ -79,8 +83,13 @@ async function login() {
     const response = await apiClient.post('/core/auth/ログイン', { 利用者ID: userId.value, パスワード: password.value });
     if (disposed || run !== revision) return;
     if (response.data.status !== 'OK' || !response.data.data?.access_token) throw Error(response.data.message || 'ログインに失敗しました。');
-    token(response.data.data.access_token); password.value = '';
-    if (sessionSync) await sessionSync.set(token()); else await currentUser(run);
+    token(response.data.data.access_token);
+    // 利用者確認が成功する前に他の Task 窓を開かない。
+    await currentUser(run);
+    if (disposed || run !== revision || !user.value) return;
+    try { localStorage.setItem(lastUserKey, userId.value); } catch {}
+    password.value = '';
+    if (sessionSync) await sessionSync.set(token());
   } catch (cause) { if (!disposed && run === revision) logout(cause instanceof Error ? cause.message : 'ログインできませんでした。'); }
   finally { if (!disposed && run === revision) busy.value = false; }
 }
@@ -106,7 +115,7 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
 <template>
   <main class="taskteam-shell" :data-app="config.kind">
     <StatusBar :title="title" :connected="connected" :busy="checking" :desktop="desktop" :clock-pulse="true" :status="`Task / Team :${port} ${connected ? '接続済み' : '未接続'}`" />
-    <div class="component-toolbar"><span>{{ user ? `${user.利用者名 || user.利用者ID} (${user.利用者ID})` : '利用者認証' }}</span><nav><template v-if="taskView !== 'combined' && taskView !== 'dialog'"><button v-for="view in (['request','flow','detail'] as const).filter(view => view !== taskView && !openViews.includes(view))" :key="view" @click="openTaskWindows(view)">{{ {request:'要求',flow:'フロー図',detail:'明細'}[view] }}</button></template><button v-if="user" @click="logout()">ログアウト</button></nav></div>
+    <div class="component-toolbar"><span>{{ user ? `${user.利用者名 || user.利用者ID} (${user.利用者ID})` : '利用者認証' }}</span><nav><template v-if="user && taskView !== 'combined' && taskView !== 'dialog'"><button v-for="view in (['request','flow','detail'] as const).filter(view => view !== taskView && !openViews.includes(view))" :key="view" @click="openTaskWindows(view)">{{ {request:'要求',flow:'フロー図',detail:'明細'}[view] }}</button></template><button v-if="user" @click="logout()">ログアウト</button></nav></div>
     <p v-if="restoring" class="taskteam-message" role="status">認証を確認しています…</p>
     <form v-else-if="!user" class="taskteam-login" @submit.prevent="login">
       <h2>{{ title }}</h2>

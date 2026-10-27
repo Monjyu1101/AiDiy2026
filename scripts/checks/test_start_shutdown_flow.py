@@ -28,7 +28,7 @@ class ShutdownFlowTests(unittest.TestCase):
         module = load()
         order = []
         with patch.object(module, '_init_modules'), \
-                patch.object(module, 'collect_startup_choices', return_value=(False,) * 12), \
+                patch.object(module, 'collect_startup_choices', return_value=(False,) * 14), \
                 patch.object(module, 'stop_all_tasks', side_effect=lambda *a: order.append('stop') or True) as stop, \
                 patch.object(module, 'validate_initial_environment', side_effect=lambda **kw: (order.append('validate') or True, None)), \
                 patch.object(module, 'start_initial_services', side_effect=lambda **kw: order.append('start') or {}), \
@@ -43,7 +43,7 @@ class ShutdownFlowTests(unittest.TestCase):
             with self.subTest(verified=verified):
                 module = load()
                 with patch.object(module, '_init_modules'), \
-                        patch.object(module, 'collect_startup_choices', return_value=(False,) * 12), \
+                        patch.object(module, 'collect_startup_choices', return_value=(False,) * 14), \
                         patch.object(module, 'stop_all_tasks', side_effect=[True, verified]), \
                         patch.object(module, 'validate_initial_environment', return_value=(True, None)), \
                         patch.object(module, 'start_initial_services', return_value={}), \
@@ -70,7 +70,7 @@ class ShutdownFlowTests(unittest.TestCase):
     def test_unverified_exit_does_not_claim_all_stopped(self):
         module = load()
         with patch.object(module, '_init_modules'), \
-                patch.object(module, 'collect_startup_choices', return_value=(False,) * 12), \
+                patch.object(module, 'collect_startup_choices', return_value=(False,) * 14), \
                 patch.object(module, 'stop_all_tasks', return_value=True), \
                 patch.object(module, 'validate_initial_environment', return_value=(True, None)), \
                 patch.object(module, 'start_initial_services', return_value={}), \
@@ -86,7 +86,7 @@ class ShutdownFlowTests(unittest.TestCase):
     def test_stop_failure_aborts_before_validation(self):
         module = load()
         with patch.object(module, '_init_modules'), \
-                patch.object(module, 'collect_startup_choices', return_value=(False,) * 12), \
+                patch.object(module, 'collect_startup_choices', return_value=(False,) * 14), \
                 patch.object(module, 'stop_all_tasks', return_value=False), \
                 patch.object(module, 'validate_initial_environment') as validate, patch('builtins.print'):
             with self.assertRaises(SystemExit) as caught:

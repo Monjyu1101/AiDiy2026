@@ -5,7 +5,7 @@
 ## 前提
 
 - `backend_server`（`8091` / `8098`）が起動していること
-- AIタスク画面（TASK ボタン / task ウィンドウ）または AIチーム画面を使う場合は `backend_taskteam`（`8093`）も起動していること
+- Task / Team は独立アプリ `aidiy_task` / `aidiy_team` を使用します。Avatar 内には画面・起動メニューを持ちません。
 - Claude 系のブラウザ自動操作まで使う場合は `backend_tools`（`8095`）も起動していること
 
 ## 開発起動
@@ -43,7 +43,6 @@ http://127.0.0.1:8092
 
 - Core API / WebSocket: `http://127.0.0.1:8091` / `ws://127.0.0.1:8091/core/ws/AIコア`
 - Apps API: `http://127.0.0.1:8098`
-- Task / Team API（AIタスク・AIチーム）: `http://127.0.0.1:8093`（開発時は Vite proxy `/task` / `/team` 経由、Electron 本番は直結）
 - Backend MCP（Windows は19、Linux / macOS は18サーバー）: `http://127.0.0.1:8095/`（一覧）、`http://127.0.0.1:8095/{mcp_name}/sse`（SSE 接続）
 
 ## 補足コマンド

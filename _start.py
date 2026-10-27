@@ -11,7 +11,7 @@
 """開発環境起動スクリプト（まとめ役）
 
 各フォルダの `_start.py` を import し、バックエンド(local/tools/core/apps/task,team)・
-フロントエンド(Web/Avatar/term/code/live/IDE/Discord) を統一手順で起動します。各サービスの環境確認・
+フロントエンド(Web/Avatar/task/team/term/code/live/IDE/Discord) を統一手順で起動します。各サービスの環境確認・
 起動コマンドはフォルダ側に委譲し、このスクリプトは起動順序・出力集約・
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
 
@@ -22,6 +22,8 @@
 - backend_taskteam/_start.py PORT_TASKTEAM / check_environment / start / kill_ports
 - frontend_web/_start.py     PORT_WEB / check_environment / start / kill_ports
 - frontend_avatar/_start.py  PORT_AVATAR / check_environment / start / kill_electron_processes
+- frontend_ide/aidiy_task/_start.py  check_environment / start / kill_ports
+- frontend_ide/aidiy_team/_start.py  check_environment / start / kill_ports
 - frontend_ide/aidiy_term/_start.py  check_environment / start / kill_ports
 - frontend_ide/host/_start.py  check_environment / start_code / start_live / kill_ports
 - frontend_ide/viewer/_start.py     check_environment / start / kill_ports（空きポート）
@@ -41,13 +43,15 @@ cleanupの全停止とは別の保持方針です。
 5. バックエンド(task,team)
 6. フロントエンド(Web)
 7. フロントエンド(Avatar)
-8. フロントエンド(term)
-9. フロントエンド(code)
-10. フロントエンド(live、選択時に自動接続)
-11. フロントエンド(IDE・選択時)
-12. フロントエンド(Discord、選択時にパネルを開いて自動接続)
-13. ページ表示
-14. 自動再起動監視
+8. フロントエンド(task・選択時)
+9. フロントエンド(team・選択時)
+10. フロントエンド(term)
+11. フロントエンド(code)
+12. フロントエンド(live、選択時に自動接続)
+13. フロントエンド(IDE・選択時)
+14. フロントエンド(Discord、選択時にパネルを開いて自動接続)
+15. ページ表示
+16. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -141,13 +145,15 @@ MANAGED_SERVICE_NAMES = frozenset({
     "バックエンド(Diag)",
     "フロントエンド(Web)",
     "フロントエンド(Avatar)",
+    "フロントエンド(task)",
+    "フロントエンド(team)",
     "フロントエンド(code)",
     "フロントエンド(live)",
     "フロントエンド(Discord)",
 })
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = DEV = TERM = DIAG = None
+LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = DEV = TERM = DIAG = TASK = TEAM = None
 
 
 def _load_folder_module(folder: str):
@@ -177,7 +183,7 @@ def _remove_folder_import_cache(folder: str) -> None:
 
 
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD, DEV, TERM, DIAG
+    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD, DEV, TERM, DIAG, TASK, TEAM
     DIAG = _load_folder_module("backend_diag")
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
@@ -185,6 +191,8 @@ def _init_modules() -> None:
     TASKTEAM = _load_folder_module("backend_taskteam")
     WEB = _load_folder_module("frontend_web")
     AVATAR = _load_folder_module("frontend_avatar")
+    TASK = _load_folder_module("frontend_ide/aidiy_task")
+    TEAM = _load_folder_module("frontend_ide/aidiy_team")
     TERM = _load_folder_module("frontend_ide/aidiy_term")
     VSCODE = _load_folder_module("frontend_ide/host")
     DEV = _load_folder_module("frontend_ide/viewer")
@@ -490,7 +498,7 @@ def collect_startup_choices() -> tuple[bool, ...]:
     diag_enabled          = prompt_choice("  Diag      : 開始しますか?", default_yes=True)
     if diag_enabled:
         # 起動指示は aidiy_diag の画面で行うため、後続の入力はすべて省く。
-        return (False,) * 6 + (True,) + (False,) * 5
+        return (False,) * 6 + (True,) + (False,) * 7
     print("バックエンド")
     local_enabled         = prompt_choice("  local     : 起動しますか?", default_yes=STARTUP_DEFAULTS['local'])
     backend_tools_enabled = prompt_choice("  tools     : 起動しますか?", default_yes=STARTUP_DEFAULTS['tools'])
@@ -499,6 +507,8 @@ def collect_startup_choices() -> tuple[bool, ...]:
     print("フロントエンド")
     web_enabled           = prompt_choice("  Web       : 起動しますか?", default_yes=STARTUP_DEFAULTS['web'])
     avatar_enabled        = prompt_choice("  Avatar    : 起動しますか?", default_yes=STARTUP_DEFAULTS['avatar'])
+    task_enabled          = prompt_choice("  aidiy_task: 起動しますか?", default_yes=False)
+    team_enabled          = prompt_choice("  aidiy_team: 起動しますか?", default_yes=False)
     print("フロントエンド(IDE)")
     term_enabled         = prompt_choice("  Term      : 起動しますか?", default_yes=STARTUP_DEFAULTS['term'])
     code_enabled          = prompt_choice("  Code      : 起動しますか?", default_yes=STARTUP_DEFAULTS['code'])
@@ -506,7 +516,7 @@ def collect_startup_choices() -> tuple[bool, ...]:
     dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=STARTUP_DEFAULTS['ide'])
     print("フロントエンド(その他)")
     discord_enabled       = prompt_choice("  Discord   : 起動しますか?", default_yes=STARTUP_DEFAULTS['discord'])
-    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, diag_enabled, term_enabled, code_enabled, live_enabled, dev_enabled, discord_enabled
+    return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, diag_enabled, term_enabled, code_enabled, live_enabled, dev_enabled, discord_enabled, task_enabled, team_enabled
 
 
 # ============================================================
@@ -564,6 +574,8 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
     standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
                           if f"フロントエンド({module})" in processes]
     discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
+    task_windows = [module for label, module in (("task", TASK), ("team", TEAM))
+                    if f"フロントエンド({label})" in processes and module is not None]
     term_was_running = "フロントエンド(term)" in processes
     dev_was_running = not keep_standalone and "フロントエンド(IDE)" in processes
     for name, process in list(processes.items()):
@@ -605,6 +617,8 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
     # Avatar は Live と同じく全体終了時に停止し、Web（8092）も回収する。
     if avatar_was_running and AVATAR is not None:
         AVATAR.kill_ports()
+    for module in task_windows:
+        module.kill_ports()
     if term_was_running and TERM is not None:
         TERM.kill_ports()
     if VSCODE is not None:
@@ -648,6 +662,8 @@ def validate_initial_environment(
     live_enabled: bool = False,
     dev_enabled: bool = False,
     diag_enabled: bool = False,
+    task_enabled: bool = False,
+    team_enabled: bool = False,
 ) -> tuple[bool, str | None]:
     print_header("環境確認")
     has_error = False
@@ -713,6 +729,15 @@ def validate_initial_environment(
             print_error(f"フロントエンド(Avatar): 未準備 ({detail})")
             print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
             has_error = True
+
+    for label, module, enabled in (("task", TASK, task_enabled), ("team", TEAM, team_enabled)):
+        if enabled:
+            ok, detail = module.check_environment()
+            if ok:
+                print_success(f"フロントエンド({label}): OK ({detail})")
+            else:
+                print_error(f"フロントエンド({label}): 未準備 ({detail})")
+                has_error = True
 
     if diag_enabled:
         print_header("バックエンド(Diag)")
@@ -827,6 +852,10 @@ def start_service(
             process = AVATAR.start(npm_command)
         elif name == "バックエンド(Diag)":
             process = DIAG.start()
+        elif name == "フロントエンド(task)":
+            process = TASK.start()
+        elif name == "フロントエンド(team)":
+            process = TEAM.start()
         elif name == "フロントエンド(term)":
             process = TERM.start()
         elif name == "フロントエンド(code)":
@@ -866,6 +895,8 @@ def start_initial_services(
     live_enabled: bool = False,
     dev_enabled: bool = False,
     diag_enabled: bool = False,
+    task_enabled: bool = False,
+    team_enabled: bool = False,
 ) -> dict[str, bool]:
     selected_flags = {
         "バックエンド(local)": start_backend_local_enabled,
@@ -876,6 +907,8 @@ def start_initial_services(
         "フロントエンド(Web)": web_enabled,
         "フロントエンド(Avatar)": False,
         # 手動で閉じた単独ウィンドウ・パネルは自動で開き直さない。
+        "フロントエンド(task)": False,
+        "フロントエンド(team)": False,
         "バックエンド(Diag)": False,
         "フロントエンド(term)": False,
         "フロントエンド(code)": False,
@@ -921,6 +954,13 @@ def start_initial_services(
         print_header("フロントエンド(Avatar) 起動")
         start_service("フロントエンド(Avatar)", processes, last_output_times, npm_command)
         wait_for_services_quiet(last_output_times, ["フロントエンド(Avatar)"], label="フロントエンド(Avatar)")
+
+    for label, enabled in (("task", task_enabled), ("team", team_enabled)):
+        if enabled:
+            name = f"フロントエンド({label})"
+            print_header(f"{name} 起動")
+            if start_service(name, processes, last_output_times, npm_command):
+                wait_for_services_quiet(last_output_times, [name], label=name)
 
     if diag_enabled:
         print_header("バックエンド(Diag) 起動")
@@ -1069,6 +1109,8 @@ def main() -> None:
         live_enabled,
         dev_enabled,
         discord_enabled,
+        task_enabled,
+        team_enabled,
     ) = collect_startup_choices()
 
     # 開始承認後に一度だけ停止する。各サービスの起動直前には重ねて停止しない。
@@ -1087,6 +1129,8 @@ def main() -> None:
         backend_taskteam_enabled=backend_taskteam_enabled,
         web_enabled=web_enabled,
         avatar_enabled=avatar_enabled,
+        task_enabled=task_enabled,
+        team_enabled=team_enabled,
         discord_enabled=discord_enabled,
         diag_enabled=diag_enabled,
         term_enabled=term_enabled,
@@ -1114,6 +1158,8 @@ def main() -> None:
                 start_backend_enabled=backend_enabled,
                 start_backend_taskteam_enabled=backend_taskteam_enabled,
                 avatar_enabled=avatar_enabled,
+                task_enabled=task_enabled,
+                team_enabled=team_enabled,
                 web_enabled=web_enabled,
                 processes=processes,
                 last_output_times=last_output_times,

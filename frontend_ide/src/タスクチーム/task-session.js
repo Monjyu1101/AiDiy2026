@@ -24,7 +24,11 @@ export function createTaskSession({ api, applyToken }) {
   const stop = api.onTaskSession(value => { void accept(value).catch(() => {}); });
   return {
     async start() { await accept(await api.taskSession('get')); },
-    async set(token) { await accept(await api.taskSession('set', { token, expectedRevision: revision })); },
+    async set(token) {
+      const result = await api.taskSession('set', { token, expectedRevision: revision });
+      await accept(result);
+      if (result.ok === false) throw Error(result.error || 'タスク認証状態を反映できませんでした。');
+    },
     dispose() { disposed = true; stop?.(); },
   };
 }
