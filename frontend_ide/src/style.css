@@ -93,11 +93,6 @@
 .ai-search-actions{display:flex;gap:5px;flex-wrap:wrap}.ai-search-panel button{font-size:11px}.ai-search-panel details{margin-top:6px}.ai-search-panel summary{cursor:pointer;color:#a7bacf}
 .ai-history-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0}.ai-search-history{max-height:230px;overflow:auto}.ai-history-row{display:flex;align-items:center;gap:4px;border-bottom:1px solid #233048;padding:4px 0}.ai-history-row.active{border-left:2px solid #68dce8}.ai-history-open{flex:1;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere}.ai-history-open span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ai-history-open small{display:block;color:#92a5bf;margin-top:4px}.ai-history-confirm{position:sticky;bottom:0;padding:8px;background:#17212f;border:1px solid #8c6170}.ai-history-confirm button{margin-right:6px}
 .explorer-panel .explorer-search{max-height:55%;min-height:0;overflow:auto;flex-shrink:0}
-.explorer-panel.ai-search-mode>:is(.explorer-root,[role=tree],.explorer-footer){display:none}
-.explorer-panel.ai-search-mode>.explorer-search{flex:1;min-height:0;max-height:none;border-bottom:0}
-.explorer-panel.ai-search-mode :is(.ai-route-results ol,.ai-search-history){max-height:none;overflow:visible}
-.ai-route-results>p{color:#a7f6ff;overflow-wrap:anywhere}.ai-route-results ol{padding-left:20px;max-height:150px;overflow:auto}
-.explorer-panel .ai-route-results li{display:list-item;height:auto;padding:4px 0;white-space:normal}.ai-route-results button{text-align:left;overflow-wrap:anywhere;max-width:100%;font-size:11px}.ai-route-results small{display:block;color:#92a5bf;line-height:1.5;margin-top:3px}
 @media (max-width:480px){.explorer-panel fieldset{flex-wrap:wrap}.since-presets{flex-wrap:wrap}.explorer-search{padding:8px}.explorer-panel .file-meta{display:none}}
 .explorer-routes.explorer-collapsed{left:64px;width:var(--route-width)}
 .route-choice:before{content:'▶︎';margin-right:4px}.route-choice[aria-expanded=true]:before{content:'▼'}

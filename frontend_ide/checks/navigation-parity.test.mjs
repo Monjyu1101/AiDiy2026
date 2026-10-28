@@ -214,8 +214,10 @@ test('2D統合: AI結果の通知は移動せず、結果クリック・前後�
     assert.equal(h.engine.selected, null); assert.equal(h.props.get('FolderPages').current, '');
     assert.deepEqual(h.engine.routeState, { mode: 'ai', paths: route });
     assert.equal(h.states.get('FolderPages').entries.value.find(entry => entry.path === 'src').marked, 1);
-    const results = h.find(node => hasClass(node, 'ai-route-results'));
-    await h.click(node => node.type === 'button' && textOf(node) === route[0] && results.contains(node)); selected(h, route[0]);
+    assert.equal(h.states.get('FileExplorer').searchResultsOpen.value,false);
+    await h.click(node => hasClass(node,'search-results-toggle'));
+    const results = h.find(node => hasClass(node, 'explorer-search-results'));
+    await h.click(node => node.type === 'button' && node.props?.title === route[0] && results.contains(node)); selected(h, route[0]);
     await h.click(node => node.props?.['aria-label'] === '次の関連ファイル'); selected(h, route[1]);
     await h.click(node => node.props?.['aria-label'] === '次の関連ファイル'); selected(h, route[2]);
     await h.click(node => node.props?.['aria-label'] === '前の関連ファイル'); selected(h, route[1]);
@@ -239,6 +241,7 @@ test('2D統合: grep行の検索時メタデータを共有ビューアまで渡
     const explorer = h.states.get('FileExplorer'); explorer.mode.value = 'grep'; await flush();
     explorer.query.value = '日本語'; explorer.caseSensitive.value = true; await explorer.grep(); await flush();
     explorer.query.value = 'changed'; explorer.caseSensitive.value = false;
+    await h.click(node => hasClass(node,'search-results-toggle'));
     const row = node => node.type === 'button' && node.props?.title === `${match.path}:2:3`;
     await h.click(row); selected(h, match.path);
     assert.equal(h.navigation.mock.calls.at(-1).arguments[0].source, 'grep');
@@ -345,6 +348,7 @@ test('2D統合: フィルター外grepは既知の親へ移動し、親も一覧
   try {
     const explorer = h.states.get('FileExplorer'); explorer.mode.value = 'grep'; await flush();
     explorer.query.value = '日本語'; await explorer.grep(); await flush();
+    await h.click(node => hasClass(node,'search-results-toggle'));
     await h.click(node => node.type === 'button' && node.props?.title === `${paths[0]}:2:3`);
     assert.equal(h.props.get('FolderPages').current, 'src'); assert.equal(h.engine.trail.join('/'), 'src');
     assert.equal(h.props.get('FileViewer').file.path, paths[0]); assert.equal(h.props.get('FileViewer').file.unlisted, true);
@@ -377,8 +381,10 @@ test('2D統合: 一覧外AI結果と削除済み閲覧履歴は既存ページ�
     await h.engine.goTo({ type: 'file', path: 'src/main.js' }); await flush(); selected(h, 'src/main.js');
     data.tree.f = [];
     h.emitAI({ title: '一覧外の関連ファイル', query: '不明な参照', route: ['missing/ai.js'], files: [{ path: 'missing/ai.js', reason: '保存済み検索' }] }); await flush();
-    const results = h.find(node => hasClass(node, 'ai-route-results'));
-    await h.click(node => node.type === 'button' && textOf(node) === 'missing/ai.js' && results.contains(node));
+    assert.equal(h.states.get('FileExplorer').searchResultsOpen.value,false);
+    await h.click(node => hasClass(node,'search-results-toggle'));
+    const results = h.find(node => hasClass(node, 'explorer-search-results'));
+    await h.click(node => node.type === 'button' && node.props?.title === 'missing/ai.js' && results.contains(node));
     selected(h, 'src/main.js');
     assert.match(h.states.get('SpaceView').error.value, /フィルターをOFF/);
     assert.match(h.states.get('SpaceView').error.value, /一覧を更新/);
@@ -639,4 +645,32 @@ test('フォルダA/Bの対とリスト連続移動: 2つの関係は1操作、�
   await h.click(n=>n.props?.['aria-label']==='前の閲覧ファイル');assert.equal(h.engine.trail.join('/'),'A');
   assert.deepEqual(JSON.parse(localStorage.getItem('aidiy_ide:/project')).voyages,stored);
  }finally{h.dispose();}
+});
+
+
+test('共通検索一覧DOM: ツリーより上、初期折畳み、手動開閉と空結果・状態表示',async t=>{
+  const h=await workspace(t,{fetcher:url=>url.startsWith('/api/grep?')?reply({paths:[],matches:[],checked:4,skipped:0,truncated:false}):undefined});
+  try{
+    const explorer=h.states.get('FileExplorer');
+    const panel=h.find(node=>hasClass(node,'explorer-panel'));
+    const section=h.find(node=>hasClass(node,'explorer-search-results'));
+    const root=h.find(node=>hasClass(node,'explorer-root'));
+    assert.ok(section);assert.ok(panel.children.indexOf(section)<panel.children.indexOf(root));
+    assert.equal(h.find(node=>hasClass(node,'search-results-toggle')).props['aria-expanded'],false);
+    assert.equal(h.find(node=>hasClass(node,'search-results-content')),undefined);
+    await h.click(node=>hasClass(node,'search-results-toggle'));
+    assert.equal(explorer.searchResultsOpen.value,true);assert.ok(h.find(node=>hasClass(node,'search-results-content')));
+    await h.click(node=>hasClass(node,'search-results-toggle'));
+    assert.equal(explorer.searchResultsOpen.value,false);assert.equal(h.find(node=>hasClass(node,'search-results-content')),undefined);
+    explorer.mode.value='grep';await flush();explorer.query.value='absent';await explorer.grep();await flush();
+    assert.equal(h.find(node=>hasClass(node,'explorer-search-results')),undefined);
+    assert.ok(h.find(node=>node.props?.role==='status'&&textOf(node).includes('0ファイル一致')),'空一覧の外に検索完了状況を残す');
+    h.emitAI({title:'関連',query:'検索',route:['root.js'],files:[{path:'root.js',reason:'入口'}]});await flush();
+    assert.equal(explorer.searchResultsOpen.value,false);assert.ok(h.find(node=>hasClass(node,'explorer-root')));
+    assert.equal(h.find(node=>hasClass(node,'search-results-content')),undefined);
+    await h.click(node=>hasClass(node,'search-results-toggle'));
+    assert.match(textOf(h.find(node=>hasClass(node,'search-results-content'))),/入口/);
+    h.emitAI({title:'別の結果',query:'検索',route:['src/main.js'],files:[{path:'src/main.js',reason:'本体'}]});await flush();
+    assert.equal(explorer.searchResultsOpen.value,true,'明示的に開いた状態は結果更新で維持');
+  }finally{h.dispose();}
 });

@@ -90,11 +90,13 @@ try{
  await explorer.evaluate(`document.querySelector('input[value="grep"]').click()`);
  await explorer.evaluate(`const input=document.querySelector('input[type=search]');input.value='Searchable';input.dispatchEvent(new Event('input',{bubbles:true}));Array.from(document.querySelectorAll('form button')).find(b=>b.textContent==='検索').click()`);
  await explorer.until(`document.querySelector('form [role=status]')?.textContent.includes('80ファイル一致')`);
- const grepBefore=await explorer.evaluate(`({query:document.querySelector('input[type=search]').value,status:document.querySelector('form [role=status]').textContent,count:document.querySelectorAll('.grep-results li').length})`);
+ assert.equal(await explorer.evaluate(`document.querySelector('.search-results-toggle').getAttribute('aria-expanded')`),'false','別窓の検索結果も初期は閉じる');
+ await explorer.evaluate(`document.querySelector('.search-results-toggle').click()`);
+ const grepBefore=await explorer.evaluate(`({query:document.querySelector('input[type=search]').value,status:document.querySelector('form [role=status]').textContent,count:document.querySelectorAll('.search-results-content li').length})`);
  await explorer.capture('explorer-pinned');
  await explorer.send('Page.reload');
- await explorer.until(`!!document.querySelector('.grep-results')`);
- assert.deepEqual(await explorer.evaluate(`({query:document.querySelector('input[type=search]').value,status:document.querySelector('form [role=status]').textContent,count:document.querySelectorAll('.grep-results li').length})`),grepBefore);
+ await explorer.until(`!!document.querySelector('.search-results-content')`);
+ assert.deepEqual(await explorer.evaluate(`({query:document.querySelector('input[type=search]').value,status:document.querySelector('form [role=status]').textContent,count:document.querySelectorAll('.search-results-content li').length})`),grepBefore);
  await explorer.send('Page.close');await main.until(`getComputedStyle(explorerNode).display==='none'`);
  await main.evaluate(`document.querySelector('.explorer-toggle').click()`);await main.until(`getComputedStyle(explorerNode).display!=='none'`);
  assert.equal(await main.evaluate(`explorerNode===document.querySelector('.explorer-panel')&&treeNode===document.querySelector('[role=tree]')`),true);
@@ -103,7 +105,7 @@ try{
  await main.evaluate(`Array.from(document.querySelectorAll('.ide-view-modes button')).find(b=>b.textContent==='3D').click();document.querySelector('[aria-label="エクスプローラーを別ウィンドウで開く"]').click()`);
  await main.until(`!document.querySelector('.explorer-panel')`);
  explorerTarget=(await targets()).find(t=>t.title==='AiDiy IDE / Explorer');const again=await connect(explorerTarget);
- await again.until(`!!document.querySelector('.grep-results')`);
+ await again.until(`!!document.querySelector('.search-results-content')`);
  // AI検索の未送信入力も同じインスタンス。APIを呼ばず再pin・本体への復帰で保持する。
  await again.evaluate(`document.querySelector('input[value="ai"]').click()`);
  await again.evaluate(`const input=document.querySelector('.ai-search-panel textarea');input.value='未送信の調査内容';input.dispatchEvent(new Event('input',{bubbles:true}))`);

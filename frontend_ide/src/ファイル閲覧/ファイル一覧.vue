@@ -187,6 +187,27 @@ function acceptAI(result,activate=true){
 const grepResults = shallowRef([]), resultQuery = ref(''), resultCase = ref(false);
 const query = ref(''), caseSensitive = ref(false), matches = ref(new Set()), status = ref(''), treeElement = ref();
 const rootExpanded = ref(true), searching = ref(false);
+// 検索結果の開閉は手動だけ。結果の到着・検索方法の切替では開かない。
+const searchResultsOpen = ref(false);
+const searchResults = computed(() => {
+  if (mode.value === 'grep') return grepResults.value.map(match => ({ ...match, source: 'grep' }));
+  if (mode.value === 'ai') return aiRoute.value.map(path => ({ path, reason: aiFiles.value.get(path), source: 'ai' }));
+  const result = [];
+  function walk(node, prefix = '') {
+    if (!node) return;
+    for (const [name, size, mtime] of node.f) if (inTimeRange(mtime, since.value, until.value)) result.push({ path: prefix + name, size, mtime, source: 'since' });
+    for (const dir of node.d) walk(dir, prefix + dir.n + '/');
+  }
+  walk(tree.value);
+  return result.sort((a, b) => b.mtime - a.mtime || a.path.localeCompare(b.path, 'ja', { numeric: true }));
+});
+const searchResultsLabel = computed(() => mode.value === 'ai' ? 'AiDiy検索' : mode.value === 'grep' ? 'grep検索' : '時刻検索');
+function selectSearchResult(result) {
+  if (result.source === 'grep') selectMatch(result);
+  else select({ type: 'file', ...result });
+}
+watch(() => props.root, () => { searchResultsOpen.value = false; });
+
 const leavingRows=new Set();
 let pendingSince=null,sinceExpandTimer;
 function cancelSinceExpansion(){clearTimeout(sinceExpandTimer);pendingSince=null;}
@@ -386,10 +407,10 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
       </section>
       </div>
     </div>
-    <aside ref="panel" v-show="open" class="explorer-panel" :class="{'ai-search-mode':mode==='ai'}" aria-label="ファイルエクスプローラー" @contextmenu.self.prevent="contextMenu($event)" @pointerdown.capture="emit('activity')">
+    <aside ref="panel" v-show="open" class="explorer-panel" aria-label="ファイルエクスプローラー" @contextmenu.self.prevent="contextMenu($event)" @pointerdown.capture="emit('activity')">
       <header>
         <button v-if="!allDisplays" class="burger-button explorer-burger" aria-label="エクスプローラーを閉じる" title="エクスプローラーを閉じる" :aria-expanded="true" @click="closeExplorer"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button><span>エクスプローラー</span>
-        <button v-show="mode!=='ai'" type="button" class="explorer-collapse" title="全てを閉じる" aria-label="全てを閉じる" :disabled="fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 7V4a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v10"/><path d="M3 7h5l2 2h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><path d="M7 15h6"/></svg></button>
+        <button type="button" class="explorer-collapse" title="全てを閉じる" aria-label="全てを閉じる" :disabled="fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=true;expanded=new Set();save()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 7V4a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v10"/><path d="M3 7h5l2 2h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><path d="M7 15h6"/></svg></button>
         <RefreshButton class="explorer-refresh" :class="{refreshing:fileActionState.refreshing}" :busy="fileActionState.refreshing" :title="fileActionState.refreshing?'一覧を更新中…':'一覧を更新'" aria-label="一覧を更新" :disabled="!reload||fileActionState.busy||!!fileActionState.rename||!!fileActionState.dialog||searching||!!draftRequest" @click="fileActions.action('refresh')" />
         <button v-if="(!detached||!nativePanels)&&(!allDisplays||!detached)" class="explorer-detach panel-detach-pin" :class="{'pin-active':detached}" :aria-pressed="detached" :aria-label="detached?'本体へ戻す':'エクスプローラーを別ウィンドウで開く'" :title="detached?'本体へ戻す':'別ウィンドウで開く'" @click="detached?panelWindow.restore():pinExplorer()"><span aria-hidden="true">📌</span></button>
       </header>
@@ -402,10 +423,16 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
           <label><input v-model="caseSensitive" type="checkbox">大文字・小文字を区別</label>
           <div><button type="button" @click="grep">検索</button><button type="button" @click="query='';clearSearch()">解除</button></div>
           <p role="status">{{ status }}</p>
-          <ol v-if="grepResults.length" class="grep-results" aria-label="grep検索の一致箇所"><li v-for="(match,index) in grepResults" :key="`${match.path}:${match.line}:${match.column}:${index}`"><button type="button" :title="`${match.path}:${match.line}:${match.column}`" @click="selectMatch(match)"><span>{{ match.path }}:{{ match.line }}:{{ match.column }}</span><small>{{ match.snippet }}</small></button></li></ol>
         </form>
         <AISearchPanel :key="root" :root="root" v-show="mode==='ai'" @search="beginSearch('ai')" @result="acceptAI" />
-        <div v-if="mode==='ai'&&aiResult" class="ai-route-results"><p v-if="hiddenAI">{{ hiddenAI }}件は現在の一覧にありません。フィルターをOFFにするか一覧を更新してください。</p><p :title="aiResult.query">{{ aiResult.title || aiResult.query }} · {{ aiRoute.length }}件</p><ol><li v-for="path in aiRoute" :key="path"><button :title="aiFiles.get(path)" @click="select({type:'file',path})">{{ path }}</button><small>{{ aiFiles.get(path) }}</small></li></ol></div>
+        <p v-if="mode==='ai'&&hiddenAI" role="status">{{ hiddenAI }}件は現在の一覧にありません。フィルターをOFFにするか一覧を更新してください。</p>
+      </section>
+      <section v-if="searchResults.length" class="explorer-search-results" aria-label="検索一覧">
+        <button type="button" class="search-results-toggle" :aria-expanded="searchResultsOpen" aria-controls="explorer-search-result-list" @click="searchResultsOpen=!searchResultsOpen"><span aria-hidden="true">{{ searchResultsOpen?'▼':'▶' }}</span> 検索一覧 · {{ searchResultsLabel }} · {{ searchResults.length }}件</button>
+        <div v-if="searchResultsOpen" id="explorer-search-result-list" class="search-results-content">
+          <p v-if="mode==='ai'&&aiResult" :title="aiResult.query">{{ aiResult.title || aiResult.query }}</p>
+          <ol :aria-label="searchResultsLabel+'の検索結果'"><li v-for="(result,index) in searchResults" :key="`${result.path}:${result.line||0}:${result.column||0}:${index}`"><button type="button" :title="result.line?`${result.path}:${result.line}:${result.column}`:result.path" :aria-current="selected===result.path?'true':undefined" @click="selectSearchResult(result)"><span>{{ result.path }}<template v-if="result.line">:{{ result.line }}:{{ result.column }}</template></span><small v-if="result.source==='grep'" class="search-result-snippet">{{ result.snippet }}</small><small v-else-if="result.source==='ai'">{{ result.reason }}</small><small v-else>{{ new Date(result.mtime).toLocaleString('ja-JP') }}</small></button></li></ol>
+        </div>
       </section>
       <div class="explorer-root" :title="root" @contextmenu.prevent.stop="contextMenu($event,{type:'dir',path:'',name:tree?.n})" @keydown="rowKey($event,{type:'dir',path:'',name:tree?.n})">
         <button class="chevron" :aria-label="rootExpanded?'ルートフォルダを折りたたむ':'ルートフォルダを展開する'" :aria-expanded="rootExpanded" :disabled="searching||fileActionState.busy||!!fileActionState.rename" @click="cancelSinceExpansion();rootExpanded=!rootExpanded">{{ rootExpanded?'▾':'▸' }}</button>
@@ -437,9 +464,14 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 .explorer-rename{flex:1;min-width:0;width:0;height:23px;box-sizing:border-box;background:#0c1424;color:#fff;border:1px solid #8de6eb;padding:1px 4px;font:inherit}.explorer-rename:focus{outline:1px solid #8de6eb}
 
 .scan-warning{margin:0;padding:6px 8px;color:#ffe28a;font-size:var(--file-font-size,10px);overflow-wrap:anywhere;flex-shrink:0}
-.grep-results{list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto}
-.explorer-panel .grep-results li{display:block;height:auto;padding:0;margin:4px 0}
-.grep-results button{display:block;width:100%;text-align:left;overflow-wrap:anywhere}
-.grep-results small{display:block;white-space:pre-wrap;color:#bac7da;font-family:var(--mono);margin-top:3px}
+.explorer-search-results{flex:none;min-height:0;max-height:min(180px,25%);display:flex;flex-direction:column;border-bottom:1px solid #29334c}
+.explorer-panel .search-results-toggle{flex:none;width:100%;text-align:left;padding:6px 8px}
+.search-results-content{min-height:0;overflow:auto;padding:0 8px 6px;font-size:11px}
+.search-results-content p{overflow-wrap:anywhere;color:#a7f6ff}
+.search-results-content ol{list-style:none;margin:0;padding:0}
+.explorer-panel .search-results-content li{display:block;height:auto;padding:0;margin:4px 0}
+.search-results-content button{display:block;width:100%;text-align:left;overflow-wrap:anywhere}
+.search-results-content button[aria-current=true]{background:#18293c}
+.search-results-content small{display:block;white-space:pre-wrap;color:#92a5bf;line-height:1.5;margin-top:3px}
+.search-result-snippet{font-family:var(--mono)}
 </style>
-

@@ -80,7 +80,8 @@ test('grep: 行・列・検索時の条件を選択へ渡し、ツリーマー�
     h.state.mode.value='grep';await vue.nextTick();h.state.query.value='日本語';h.state.caseSensitive.value=true;await h.state.grep();
     assert.equal(h.state.matches.value.has(match.path),true);assert.equal(h.state.expanded.value.has('src'),true);
     h.state.query.value='edited input';h.state.caseSensitive.value=false;
-    h.state.selectMatch(h.state.grepResults.value[0]);const value=h.events.at(-1)[1];
+    assert.equal(h.state.searchResultsOpen.value,false);
+    h.state.selectSearchResult(h.state.searchResults.value[0]);const value=h.events.at(-1)[1];
     assert.equal(value.line,8);assert.equal(value.column,3);assert.equal(value.query,'日本語');assert.equal(value.caseSensitive,true);assert.equal(value.matchMtime,2000);assert.equal(value.matchLength,3);
     assert.equal(h.state.matches.value.has(match.path),true);
   }finally{h.dispose();}
@@ -96,6 +97,8 @@ test('grep: 再検索・解除・フィルター変更・セッション変更�
     for(const cancel of [()=>h.state.clearSearch(),()=>{h.props.filter=!h.props.filter;},()=>{h.props.startedAt++;},()=>h.dispose()]){
       h.state.query.value='pending';const run=h.state.grep();cancel();await vue.nextTick();requests.at(-1).resolve(result('stale.js'));await run;
       assert.equal(h.state.matches.value.size,0);assert.equal(h.state.grepResults.value.length,0);
+      if(h.state.mode.value==='grep')assert.equal(h.state.searchResults.value.length,0);
+      assert.equal(h.state.searchResultsOpen.value,false);
     }
   }finally{for(const request of requests)request.resolve(result('done.js'));}
 });
@@ -230,5 +233,38 @@ test('時刻プリセット: 境界のマーク・軌跡と終了入力を同期
     assert.equal(h.state.since.value,null);assert.equal(h.state.until.value,null);
     assert.equal(h.state.dateInput.value,'');assert.equal(h.state.endDateInput.value,'');
     assert.deepEqual([...h.state.routePaths.value],[]);
+  }finally{h.dispose();}
+});
+
+
+test('共通検索一覧: 初期は閉じ、時刻の境界・階層・表示フィルターに追従する',async()=>{
+  const h=explorer();
+  try{
+    assert.equal(h.state.searchResultsOpen.value,false);
+    h.props.tree={n:'project',f:[['before.txt',1,999],['start.txt',2,1000],['end.txt',3,2000]],d:[{n:'src',f:[['inside.txt',4,1500]],d:[]}]};
+    h.state.since.value=1000;h.state.until.value=2000;await vue.nextTick();
+    assert.deepEqual([...h.state.searchResults.value.map(row=>row.path)].sort(),['src/inside.txt','start.txt']);
+    assert.equal(h.state.searchResultsOpen.value,false,'結果到着では開かない');
+    const row=h.state.searchResults.value.find(row=>row.path==='src/inside.txt');
+    h.state.selectSearchResult(row);assert.equal(h.events.at(-1)[1].path,row.path);assert.equal(h.events.at(-1)[1].mtime,1500);
+    h.state.searchResultsOpen.value=true;
+    h.props.tree={n:'project',f:[['start.txt',2,1000]],d:[]};await vue.nextTick();
+    assert.deepEqual([...h.state.searchResults.value.map(row=>row.path)],['start.txt']);
+    h.state.until.value=1000;await vue.nextTick();assert.equal(h.state.searchResults.value.length,0);
+    h.state.until.value=null;h.state.since.value=null;await vue.nextTick();assert.equal(h.state.searchResults.value.length,0);
+  }finally{h.dispose();}
+});
+
+test('共通検索一覧: AIの理由・一覧外候補を保ち、空結果と失敗でも勝手に展開しない',async()=>{
+  const h=explorer(async url=>url.startsWith('/api/grep')?{ok:false,text:async()=> '検索失敗'}:reply({files:[]}));
+  try{
+    h.state.acceptAI({title:'構成',query:'関連を探す',route:['hidden/file.js'],files:[{path:'hidden/file.js',reason:'設定を読み込む'}]});await vue.nextTick();
+    assert.equal(h.state.searchResultsOpen.value,false);
+    assert.equal(h.state.searchResults.value[0].path,'hidden/file.js');assert.equal(h.state.searchResults.value[0].reason,'設定を読み込む');
+    assert.equal(h.state.hiddenAI.value,1);
+    h.state.selectSearchResult(h.state.searchResults.value[0]);assert.equal(h.events.at(-1)[1].path,'hidden/file.js');
+    h.state.acceptAI({title:'なし',query:'なし',route:[],files:[]});await vue.nextTick();assert.equal(h.state.searchResults.value.length,0);
+    h.state.mode.value='grep';await vue.nextTick();h.state.query.value='bad';await h.state.grep();
+    assert.match(h.state.status.value,/検索失敗/);assert.equal(h.state.searchResults.value.length,0);assert.equal(h.state.searchResultsOpen.value,false);
   }finally{h.dispose();}
 });

@@ -150,13 +150,13 @@ try {
   await preset('10分');
   await evaluate(`document.querySelector('input[value=ai]').click()`);
   const treeVisible=()=>evaluate(`document.querySelector('[role=tree]').getClientRects().length>0`);
-  assert.equal(await treeVisible(),false,'AiDiy検索中はファイルツリーを隠す');
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.explorer-search')).maxHeight`),'none','検索画面はパネル全体を使う');
+  assert.equal(await treeVisible(),true,'AiDiy検索でもファイルツリーを表示する');
+  assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.explorer-search')).maxHeight`),'none','検索操作はツリーの領域を残す');
   for(const mode of ['since','grep']){
     await evaluate(`document.querySelector('input[value=${mode}]').click()`);
     assert.equal(await treeVisible(),true,'通常の検索へ戻るとツリーを再表示');
     await evaluate(`document.querySelector('input[value=ai]').click()`);
-    assert.equal(await treeVisible(),false);
+    assert.equal(await treeVisible(),true,'検索方法を切り替えてもツリーを維持する');
   }
   async function until(expression,message){const end=Date.now()+15000;while(Date.now()<end){await evaluate('window.orbitTestAdvance(250)');if(await evaluate(expression))return;await sleep(60);}await capture('failure.png');throw Error(message+' '+JSON.stringify(await evaluate(`({paths:[...document.querySelectorAll('.viewer-path')].map(x=>x.textContent),trail:aidiyIDE.trail,text:document.body.innerText.slice(-1600)})`)));}
   async function submit(query){await evaluate(`(()=>{const input=document.querySelector('.ai-search-panel textarea');input.value=${JSON.stringify(query)};input.dispatchEvent(new Event('input',{bubbles:true}));})()`);await evaluate(`document.querySelector('.ai-search-panel form').requestSubmit()`);}
@@ -176,6 +176,9 @@ try {
   assert.deepEqual(await evaluate('window.aidiyIDE.routeState'),{mode:'ai',paths:['main.ts','src/login.ts']});
   assert.equal(await evaluate(`document.querySelector('[data-path="src/login.ts"]').classList.contains('fresh')`),true);
   assert.equal(await evaluate(`document.querySelector('[data-path="src"]').classList.contains('fresh')`),true);
+  assert.equal(await evaluate(`document.querySelector('.search-results-toggle').getAttribute('aria-expanded')`),'false','結果到着で自動展開しない');
+  assert.equal(await evaluate(`!!document.querySelector('.search-results-content')`),false);
+  await evaluate(`document.querySelector('.search-results-toggle').click()`);
   await capture('nn-ai-search-results.png');
   await evaluate(`[...document.querySelectorAll('.explorer-routes button')].find(b=>b.textContent==='閲覧軌跡').click()`);
   assert.equal(await evaluate('window.aidiyIDE.routeState.mode'),'view');
@@ -213,7 +216,7 @@ try {
   assert.ok(!(await evaluate(`document.querySelector('.ai-search-panel').textContent`)).includes('2件の関連ファイル'));
   const fourthData=dataFor(fourth);fourthData.files=fourthData.files.slice(1);fourthData.route=fourthData.route.slice(1);
   writeFileSync(join(project,outputFor(fourth)),JSON.stringify(fourthData));
-  await until(`document.querySelector('.ai-route-results').textContent.includes('新しい検索')`,'最後の依頼だけを反映');
+  await until(`document.querySelector('.search-results-content')?.textContent.includes('新しい検索')`,'最後の依頼だけを反映');
   await until(`document.querySelector('.ai-history-header').textContent.includes('履歴 (3)')`,'履歴3件');
   await evaluate(`document.querySelector('.ai-history-header button').click()`);
   await until(`document.querySelectorAll('.ai-history-open').length===3&&!document.querySelector('.ai-history-open').disabled`,'履歴一覧');
@@ -221,7 +224,7 @@ try {
   await capture('nn-ai-search-history.png');
   const historyBefore=await evaluate(`({trail:window.aidiyIDE.trail,cam:{...window.aidiyIDE.cam}})`);
   await evaluate(`[...document.querySelectorAll('.ai-history-open')].find(b=>b.textContent.includes('認証処理の関連ファイル')).click()`);
-  await until(`document.querySelector('.ai-route-results').textContent.includes('認証処理の関連ファイル')`,'過去結果へ切替');
+  await until(`document.querySelector('.search-results-content')?.textContent.includes('認証処理の関連ファイル')`,'過去結果へ切替');
   assert.deepEqual(await evaluate('window.aidiyIDE.routeState.paths'),['main.ts','src/login.ts']);
   assert.deepEqual(await evaluate(`({trail:window.aidiyIDE.trail,cam:{...window.aidiyIDE.cam}})`),historyBefore,'履歴切替だけで移動しない');
   await send('Page.reload');
