@@ -136,7 +136,8 @@ const color = await qColorPicker('#ff0000', '色を選択')
 | `utils/qAlert.ts` | ほぼ同一（web に qMessage 追加） |
 | `api/websocket.ts` | 同一インターフェース、実装に若干の差異あり |
 | `components/_share/*.vue`（qTublerFrame, qBooleanCheckbox など） | ほぼ同一 |
-| `components/AIタスク/**/*.vue`、`components/AIチーム/**/*.vue` | ほぼ同一（列定義・セル描画・scoped CSS まで同じ） |
+
+Task／Teamは `frontend_ide/src/タスクチーム/` が所有します。Web／Avatar内の旧実装は撤去済みで、上記のコピー同期対象には含めません。
 
 コンポーネントは `<template>` だけでなく **`<style scoped>` も両方に書く**こと。
 scoped CSS は片方に入れても他方へ波及しないため、見た目だけ片側に残る差異が生まれやすい。

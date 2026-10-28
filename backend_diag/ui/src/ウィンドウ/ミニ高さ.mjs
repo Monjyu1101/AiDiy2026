@@ -1,5 +1,5 @@
 // 内容の自然な高さだけを測る。窓の高さを測らないので、縮小後も余白やresize循環が残らない。
-export function ミニ高さを合わせる(content,{api=globalThis.window?.aidiyWindow,Observer=globalThis.ResizeObserver}={}){
+export function ミニ高さを合わせる(content,{api=globalThis.window?.aidiyWindow,Observer=globalThis.ResizeObserver,style=globalThis.getComputedStyle}={}){
  if(!content?.getBoundingClientRect||typeof api?.resizeMini!=='function')return()=>{};
  const root=content.closest('#app'),title=root?.querySelector('.panel-brand'),bar=root?.querySelector('.connection-bar');
  if(!title||!bar)return()=>{};
@@ -8,7 +8,10 @@ export function ミニ高さを合わせる(content,{api=globalThis.window?.aidi
   if(stopped||scheduled)return;scheduled=true;
   Promise.resolve().then(()=>{
    scheduled=false;if(stopped)return;
-   const raw=[content,title,bar].reduce((sum,node)=>sum+node.getBoundingClientRect().height,0);
+   // 外周1px枠の上下を内容高へ足す。省くと最下段に縦スクロールが残る。
+   const frame=root&&style?style(root):null;
+   const border=(parseFloat(frame?.borderTopWidth)||0)+(parseFloat(frame?.borderBottomWidth)||0);
+   const raw=[content,title,bar].reduce((sum,node)=>sum+node.getBoundingClientRect().height,0)+border;
    if(!Number.isFinite(raw)||raw<=0)return;
    const height=Math.max(80,Math.min(360,Math.ceil(raw)));if(height===last)return;last=height;
    try{Promise.resolve(api.resizeMini(height)).then(accepted=>{if(accepted!==true&&last===height)last=0;},()=>{if(last===height)last=0;});}catch{last=0;}

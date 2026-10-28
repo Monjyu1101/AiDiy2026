@@ -116,17 +116,18 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
 </script>
 <template>
   <main class="taskteam-shell" :data-app="config.kind">
-    <StatusBar :title="title" :connected="connected" :busy="checking" :desktop="desktop" :clock-pulse="true" :status="`Task / Team :${port} ${connected ? '接続済み' : '未接続'}`" />
+    <StatusBar :title="user ? title : `AiDiy ${config.kind === 'task' ? 'Task' : 'Team'}`" :connected="connected" :busy="checking" :desktop="desktop" :clock-pulse="true" :status="`Task / Team :${port} ${connected ? '接続済み' : '未接続'}`" />
     <div class="component-toolbar"><span>{{ user ? `${user.利用者名 || user.利用者ID} (${user.利用者ID})` : '利用者認証' }}</span><nav><template v-if="user && taskView !== 'combined' && taskView !== 'dialog'"><button v-for="view in (['request','flow','detail'] as const).filter(view => view !== taskView && !openViews.includes(view))" :key="view" @click="openTaskWindows(view)">{{ {request:'要求',flow:'フロー図',detail:'明細'}[view] }}</button></template><button v-if="user" @click="logout()">ログアウト</button></nav></div>
     <p v-if="restoring" class="taskteam-message" role="status">認証を確認しています…</p>
-    <form v-else-if="!user" class="taskteam-login" @submit.prevent="login">
-      <h2>{{ title }}</h2>
+    <div v-else-if="!user" class="taskteam-login-screen">
+      <div class="welcome-mark" aria-hidden="true"><img :src="'/development/AiDiy.png'" alt=""></div>
+    <form class="taskteam-login" @submit.prevent="login">
       <label>利用者ID<input v-model="userId" autocomplete="username" required :disabled="busy" /></label>
       <label>パスワード<input v-model="password" type="password" autocomplete="current-password" required :disabled="busy" /></label>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button type="submit" :disabled="busy">{{ busy ? 'ログイン中…' : 'ログイン' }}</button>
-      <p>Core と Task / Team サーバーを起動してください。</p>
     </form>
+    </div>
     <section v-else class="taskteam-content">
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <TaskRequest v-if="taskView === 'request'" :key="user.利用者ID" :利用者ID="user.利用者ID" :権限ID="user.権限ID || ''" />
@@ -141,8 +142,18 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
 <style scoped>
 .taskteam-shell{width:100%;height:100%;box-sizing:border-box;border:1px solid #383838;background:#000;display:flex;flex-direction:column;overflow:hidden;color:#d9e0f2}
 .taskteam-content{flex:1;min-height:0;overflow:auto;position:relative}
-.taskteam-login{width:min(360px,calc(100% - 32px));margin:auto;display:grid;gap:14px;background:#080a10;border:1px solid #343943;padding:24px}
-.taskteam-login h2{margin:0;font-size:16px;text-align:center}.taskteam-login label{display:grid;gap:6px}.taskteam-login p{margin:0;font-size:11px;color:#9aa7b8}.taskteam-login .error{color:#ffb7b7}.taskteam-message{padding:12px}
+.taskteam-login{box-sizing:border-box;width:min(408px,calc(100% - 32px));margin:auto;display:grid;gap:16px;background:linear-gradient(145deg,rgba(70,104,205,.19),rgba(108,78,196,.17) 60%,rgba(143,104,221,.12)),#080a10;border:1px solid rgba(143,104,221,.5);border-radius:12px;padding:32px 28px 24px;box-shadow:0 16px 48px #0005,inset 0 1px 0 #c4b5fd14}
+.taskteam-login-screen{box-sizing:border-box;flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:36px 0 24px;gap:32px}
+.taskteam-login-screen .welcome-mark{margin:0;flex-shrink:0}
+.taskteam-login-screen .taskteam-login{margin:0;flex-shrink:0;padding-top:24px}
+.taskteam-login label{display:grid;gap:7px;font-size:12px;color:#c3c5df}
+.taskteam-login input{min-width:0;padding:10px 12px;border:1px solid #6972a45c;border-radius:6px;background:#080c1a99;color:#eef0ff;outline:none}
+.taskteam-login input:focus-visible{border-color:#ab9bea;box-shadow:0 0 0 2px #9984d526}
+.taskteam-login button[type=submit]{padding:10px;border:1px solid #a798e480;border-radius:6px;background:linear-gradient(115deg,#4668cda6,#6c4ec4a6);color:#f0edff;font-weight:600}
+.taskteam-login button[type=submit]:hover:not(:disabled){background:linear-gradient(115deg,#4668cdcf,#6c4ec4cf);border-color:#b8a9ef}
+.taskteam-login button[type=submit]:focus-visible{outline:2px solid #b8a9ef;outline-offset:3px}
+.taskteam-login p{margin:0;font-size:11px;line-height:1.6;color:#a8accb}.taskteam-login .error{color:#ffb7b7}.taskteam-message{padding:12px}
+@media(max-height:560px){.taskteam-login-screen{padding:24px 0 16px;gap:24px}.taskteam-login{gap:12px;padding:20px 24px}.taskteam-login-screen .welcome-mark{width:64px;height:64px}.taskteam-login-screen .welcome-mark img{width:42px;height:42px}}
 /* コピー元の機能は維持し、外側の操作面は Code と同じ黒・細枠へ揃える。 */
 .taskteam-content :deep(.ai-task-view){background:#000}.taskteam-content :deep(.task-grid){gap:4px;padding:4px}.taskteam-content :deep(.task-panel){border:1px solid #343943;background:#080a10;border-radius:0;box-shadow:none}.taskteam-content :deep(.task-panel:hover){border-color:#56606e;box-shadow:none}
 .taskteam-shell .taskteam-content :deep(.panel-header){background:#080a10;border-bottom:1px solid #242424;box-shadow:none}

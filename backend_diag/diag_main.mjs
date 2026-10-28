@@ -85,7 +85,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   assets.set('Chrome.svg',['Chrome.svg','image/svg+xml']);
   assets.set('AiDiy.png',['AiDiy.png','image/png']);
   for(const id of ['avatar','ide','console','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
-  for(const id of ['task','team'])assets.set(`AiDiy_${id}.svg`,[`AiDiy_${id}.svg`,'image/svg+xml']);
+  for(const id of ['task','team','browser'])assets.set(`AiDiy_${id}.svg`,[`AiDiy_${id}.svg`,'image/svg+xml']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.png`,[`CLI_${id}.png`,'image/png']);
   for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])assets.set(`CLI_${id}.svg`,[`CLI_${id}.svg`,'image/svg+xml']);
   assets.set('LICENSE_ICONS.md',['LICENSE_ICONS.md','text/markdown; charset=utf-8']);

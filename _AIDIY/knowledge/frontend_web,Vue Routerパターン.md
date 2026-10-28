@@ -29,6 +29,8 @@ const router = createRouter({
 
 AIタスク・AIチームは `aidiy_task` / `aidiy_team` の単独アプリへ分離しています。`frontend_web` に `/AIタスク` / `/AIチーム` のルートやメニューを追加しません。
 
+`public/` の独立HTMLはVue Routerの画面と区別し、それぞれのimportmapで外部ライブラリを解決します。`vite.config.ts` の `optimizeDeps.entries` はアプリ本体の `index.html` に限定します。依存削除後にpublic内のthree／VRM参照で探索エラーが出る場合は、不要な依存を戻す前に探索入口を確認してください。空の専用キャッシュを使った依存探索と通常画面の起動で検証します。
+
 ## ルート定義パターン
 
 全ルートはフラット（ネストなし）で定義します。
@@ -134,8 +136,8 @@ router.afterEach((to) => {
 | `/C管理/C利用者/一覧` / `/C管理/C利用者/編集` | C利用者 |
 | `/C管理/C採番/一覧` / `/C管理/C採番/編集` | C採番 |
 | `/AiDiy` | AI コア（eager import） |
-| `/AIタスク` | AIタスク（backend_taskteam の `/task/*`） |
-| `/AIチーム` | AIチーム（backend_taskteam の `/team/*`） |
+
+Task／Teamは `aidiy_task`／`aidiy_team` の独立画面です。旧 `/AIタスク`／`/AIチーム` はCoreルートに含めません。
 
 ### appsRoutes（appsRouter.ts）
 

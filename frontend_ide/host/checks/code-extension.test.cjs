@@ -46,6 +46,7 @@ test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存�
     require(name) {
       if (name === 'vscode') return vscode;
       if (name === './conversation-store') return store;
+      if (name === './input-prediction') return require('../out/input-prediction.cjs');
       if (name === './code-connection') return { コード選択: value => ({ provider: value.provider, model: value.model }) };
       if (name === './model-preferences') return { モデル保存先: () => 'model.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込() {} };
       if (name === '../aidiy_code/src/offline') return { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline.json' };
@@ -92,6 +93,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
       if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../src/vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
       if(name==='vscode') return vscode;
       if(name==='./code-connection') return require('../out/code-connection.cjs');
+      if(name==='./input-prediction') return require('../out/input-prediction.cjs');
       if(name==='./model-preferences') return {
         モデル保存先:()=> 'online.json', コードモデル読込:(file='online.json')=>preferences.get(file),
         コードモデル保存:(value,file='online.json')=>{ selected=JSON.parse(JSON.stringify(value));preferences.set(file,selected);return selected; },
@@ -102,6 +104,8 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
       if(name==='./runner') return {起動解決:()=>({実行ファイル:'fake-hermes',引数:[]})};
       if(name==='../aidiy_code/src/offline') return {
         ...require('../out/offline.cjs'),Hermes既定モデル:()=> 'openai_oauth/gpt-6-astra',
+        // この試験は選択・保存を検証する。利用者のDiag保存済み候補に依存させない。
+        オフラインモデル候補:()=>[{id:'same',label:'変更なし'},{id:'openai_oauth/gpt-6.1-sol',label:'fixture Sol'},{id:'copilot_cli/auto',label:'fixture Copilot'}],
         オフライン実行(root,project,model,text,session,receive,launch) {
           let finish;
           const run={root,project,model,text,session,launch,receive,stops:0,

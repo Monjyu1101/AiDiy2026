@@ -1,6 +1,7 @@
 'use strict';
 const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron');
 const path=require('node:path');
+const {アイコンメニューを作成}=require('./アイコンメニュー.cjs');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
 const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs');
 const {マイクロ表示を作成,閉じた幅}=require('./マイクロ表示.cjs');
@@ -63,9 +64,15 @@ async function start(value) {
     // 再読込時は従来どおり通常表示へ戻す。
     sizeEffect.中止();displaySwitch=false;displayOrigin=undefined;micro.set(false);pendingMicroHeight=undefined;pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
   });
+  const iconMenu=アイコンメニューを作成(window);
   let selectingFolder=false;
   ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
+    if(action==='microMenu'){
+      if(!micro.active||opening||displaySwitch||!Array.isArray(value)||value.length>32||value.some(item=>!item||typeof item.key!=='string'||!/^(app|cli):[a-z_]+$/.test(item.key)||typeof item.label!=='string'||item.label.length>100))return false;
+      const send=action=>{if(!window.isDestroyed())window.webContents.send('diag:micro-menu',action);};
+      iconMenu.open(value,send);return true;
+    }
     if(action==='beginDisplay'){
       if(!['normal','mini','micro'].includes(value)||opening||displaySwitch||sizeEffect.active)return false;
       displayOrigin=window.getBounds();

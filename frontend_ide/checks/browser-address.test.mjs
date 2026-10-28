@@ -40,7 +40,7 @@ function fixture(){
  const template=compileTemplate({source:descriptor.template.content,filename:'Browser.vue',id:'browser',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
  const module={exports:{}},snapshot=()=>({ok:true,url:raw,available:true,back:true,forward:true});
  vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{
-  module,console,ResizeObserver:class{observe(){}disconnect(){}},window:{aidiyWindow:{onBrowserChanged(fn){listener=fn;return()=>{listener=null;};},async browserAction(name,value){calls.push([name,value]);if(name==='navigate')raw=browser.browserURL(value);return snapshot();}}},
+  module,console,requestAnimationFrame:()=>1,cancelAnimationFrame:()=>{},ResizeObserver:class{observe(){}disconnect(){}},window:{aidiyWindow:{onBrowserChanged(fn){listener=fn;return()=>{listener=null;};},async browserAction(name,value){calls.push([name,value]);if(name==='navigate')raw=browser.browserURL(value);return snapshot();}}},
   require:id=>id==='./URL表示.js'?addressTools:id==='vue'?{...vue,withDirectives:node=>node,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:{},
  });
  const state=module.exports.setup({},{expose(){}}),render=()=>module.exports.render({},[],{},vue.proxyRefs(state),{},{});
@@ -50,10 +50,11 @@ function fixture(){
 test('Browser実コンポーネント: 状態/履歴/再読込/編集保護/Enter/破棄',async()=>{
  const f=fixture();try{
   await flush();assert.equal(f.state.address.value,readable);assert.equal(f.state.page.value.url,encoded);
-  const input=()=>f.render().children[1].children[4];
+  const form=()=>f.render().children[0].children.find(node=>node.type==='form');
+  const input=()=>form().children.find(node=>node.type==='input');
   input().props.onFocus();input().props['onUpdate:modelValue']('https://example.test/編集%20後?値=漢字%2F');
   f.notify(encoded+'#changed');assert.equal(f.state.address.value,'https://example.test/編集%20後?値=漢字%2F');
-  f.render().children[1].props.onSubmit({preventDefault(){}});await flush();
+  form().props.onSubmit({preventDefault(){}});await flush();
   assert.equal(f.calls.find(([name])=>name==='navigate')[1],'https://example.test/編集%20後?値=漢字%2F');
   assert.equal(f.state.page.value.url,'https://example.test/'+encodeURIComponent('編集')+'%20'+encodeURIComponent('後')+'?'+encodeURIComponent('値')+'='+encodeURIComponent('漢字')+'%2F');
   for(const name of ['back','forward','reload']){f.notify(encoded);await f.state.action(name);assert.equal(f.state.address.value,readable);assert.equal(f.state.page.value.url,encoded);}

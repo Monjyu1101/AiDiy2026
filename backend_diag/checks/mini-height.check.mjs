@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ミニ高さを合わせる} from '../ui/src/ウィンドウ/ミニ高さ.mjs';
 const flush=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
-function fixture(resize=()=>true){
+function fixture(resize=()=>true,style){
  let height=99.2,observer;const calls=[],observed=[];
  const title={getBoundingClientRect:()=>({height:31})},bar={getBoundingClientRect:()=>({height:3})};
  const content={getBoundingClientRect:()=>({height}),closest:()=>({querySelector:selector=>selector==='.panel-brand'?title:bar})};
  class Observer{constructor(callback){this.callback=callback;observer=this;}observe(node){observed.push(node);}disconnect(){this.disconnected=true;}}
- const stop=ミニ高さを合わせる(content,{Observer,api:{resizeMini:value=>{calls.push(value);return resize(value);}}});
+ const stop=ミニ高さを合わせる(content,{Observer,style,api:{resizeMini:value=>{calls.push(value);return resize(value);}}});
  return{calls,observed,content,stop,get observer(){return observer;},change(value){height=value;observer.callback();}};
 }
+test('外周1px枠の上下を含め、最下段をスクロールなしで表示する',async()=>{
+ const f=fixture(()=>true,()=>({borderTopWidth:'1px',borderBottomWidth:'1px'}));
+ await flush();assert.deepEqual(f.calls,[136]);f.stop();
+});
 test('ミニ高さは0件→CLIあり→エラー→0件に追従し、同じ寸法の通知では再リサイズしない',async()=>{
  const f=fixture();await flush();assert.deepEqual(f.calls,[134]);assert.equal(f.observed.length,3);
  f.change(151.2);f.change(151.2);await flush();assert.deepEqual(f.calls,[134,186]);

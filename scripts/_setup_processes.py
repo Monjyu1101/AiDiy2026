@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 import shlex
 import ntpath
+import posixpath
 import os
 from pathlib import Path
 import signal
@@ -20,7 +21,7 @@ KEEP = frozenset(('code', 'ide', 'frontend_channels'))
 
 def process_role(process, root, windows=False):
     """実行入口/実行環境の完全な所属を照合。引数の途中のパスやポートは使わない。"""
-    path = ntpath if windows else os.path
+    path = ntpath if windows else posixpath
     norm = lambda value: path.normcase(path.normpath(str(value)))
     root = norm(root)
     try:

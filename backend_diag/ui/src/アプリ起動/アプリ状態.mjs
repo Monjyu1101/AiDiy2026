@@ -6,11 +6,11 @@ export function アプリ状態を作成({api,picker=()=>globalThis.aidiyWindow?
  let folderInitialized=false,configuredFolder=null,configuredLaunchFolder='';
  function 起動フォルダ(){return configuredFolder!==null&&フォルダ.value===configuredFolder?configuredLaunchFolder:フォルダ.value;}
  let folderVersion=0,catalogVersion=0,online=false,timer=null,loading=null;
- const backendApps=new Set(['task','team','chrome']);
+ const backendApps=new Set(['task','team','chrome','browser']);
  function 利用可能(id){const item=項目.value.find(item=>item.id===id);return backendApps.has(id)?item?.利用可能===true:item?.利用可能!==false;}
  function フォルダ必要(id){return id!=='chrome';}
- function 不可理由(id){return 利用可能(id)?'':項目.value.find(item=>item.id===id)?.無効理由||(id==='chrome'?'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。':'TaskTeam バックエンド起動中のみ利用できます。');}
- function unavailable(){項目.value=項目.value.map(item=>backendApps.has(item.id)?{...item,利用可能:false,無効理由:item.id==='chrome'?'Tools / MCP と Web の状態を確認できません。':'TaskTeam バックエンドの状態を確認できません。'}:item);}
+ function 不可理由(id){return 利用可能(id)?'':項目.value.find(item=>item.id===id)?.無効理由||(id==='browser'?'Tools / MCP が稼働中の場合だけ開けます。':id==='chrome'?'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。':'TaskTeam バックエンド起動中のみ利用できます。');}
+ function unavailable(){項目.value=項目.value.map(item=>backendApps.has(item.id)?{...item,利用可能:false,無効理由:item.id==='browser'?'Tools / MCP の状態を確認できません。':item.id==='chrome'?'Tools / MCP と Web の状態を確認できません。':'TaskTeam バックエンドの状態を確認できません。'}:item);}
  async function 読込(){
   if(loading)return loading;const version=catalogVersion;
   const request=(async()=>{try{const data=await api('api/アプリ起動');if(version===catalogVersion){

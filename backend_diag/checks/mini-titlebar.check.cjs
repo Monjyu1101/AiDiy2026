@@ -52,9 +52,10 @@ test('ミニの内容を自然な高さで計測し、2段アイコン・案内�
  assert.deepEqual(d('.mini-cli-message'),{});
  const statuses=verticalPadding(d('.mini-services').padding)+px(d('.mini-services .mini-service').height);
  assert.equal(chrome,34);assert.ok(chrome+appHeight+cliHeight+statuses<=360);
- assert.equal(d('#app>.panel.start-mini')['max-width'],'384px');assert.equal(d('#app>.panel.start-mini').overflow,'auto');
+ assert.equal(d('#app>.panel.start-mini')['max-width'],'384px');assert.equal(d('#app>.panel.start-mini')['overflow-y'],'auto');assert.equal(d('#app>.panel.start-mini')['overflow-x'],'hidden');
  assert.equal(d('.mini-app-buttons')['grid-template-columns'],'repeat(7,minmax(0,1fr))');
  assert.equal(d('.mini-cli-buttons').display,'flex');assert.equal(d('.mini-cli-buttons')['justify-content'],'center');
+ assert.equal(d('.mini-cli-buttons')['flex-wrap'],'wrap','7個を超える外部アイコンは次の段へ送り、両端を隠さない');
  assert.equal(d('.mini-cli-buttons .mini-cli-button').flex,'0 0 calc((100% - 12px)/7)','Copilotを含むCLIの外枠をAiDiyと同じ7列の幅に揃える');
  assert.equal(d('#app>.panel.start-mini').flex,'0 1 auto');assert.equal(d('.mini-content>*').flex,'none');
  assert.equal(d('.mini-services')['grid-template-columns'],'repeat(6,minmax(0,1fr))');

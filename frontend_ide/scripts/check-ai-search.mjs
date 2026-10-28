@@ -83,12 +83,10 @@ try {
     if (response.result?.exceptionDetails) throw new Error(JSON.stringify(response.result.exceptionDetails));
     return response.result?.result?.value;
   }
-  const captureStamp=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date()).replace(/\D/g,'');
-  let captureNumber=0;
   async function capture(name) {
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     const directory=resolve('temp/ai-search-check');mkdirSync(directory,{recursive:true});
-    const path=join(directory,`${captureStamp}_${String(++captureNumber).padStart(2,'0')}_${name.replace(/^nn-/,'')}`);
+    const path=join(directory,name.replace(/^nn-/,''));
     writeFileSync(path, Buffer.from(shot.result.data, 'base64'));
     console.log(path);
   }
@@ -109,18 +107,18 @@ try {
   };
   const initialTrail=await evaluate(`window.aidiyIDE.trail`);
   await evaluate(`document.querySelector('[data-path="archive"] .chevron').click();document.querySelector('.explorer-root .chevron').click()`);
-  await preset('10分');
+  await preset('15分');
   assert.deepEqual(await openFolders(),['recent','recent/deep','src'],'古い手動展開を閉じ、一致ファイルの祖先だけ展開');
   assert.equal(await evaluate(`document.querySelector('.explorer-root .chevron').getAttribute('aria-expanded')`),'true');
   await evaluate(`document.querySelector('[data-path="archive"] .chevron').click();document.querySelector('[data-path="recent"] .chevron').click()`);
-  await preset('10分');
+  await preset('15分');
   assert.deepEqual(await openFolders(),['recent','recent/deep','src'],'同じプリセットの再クリックでも展開を組み直す');
   await preset('1時間');assert.deepEqual(await openFolders(),['older','recent','recent/deep','src']);
-  await evaluate(`[...document.querySelectorAll('.since-presets button')].find(b=>b.textContent==='10分').click()`);
+  await evaluate(`[...document.querySelectorAll('.since-presets button')].find(b=>b.textContent==='15分').click()`);
   await evaluate('window.orbitTestAdvance(500)');await sleep(40);
   await evaluate(`[...document.querySelectorAll('.since-presets button')].find(b=>b.textContent==='1時間').click()`);
   await settlePreset();assert.deepEqual(await openFolders(),['older','recent','recent/deep','src'],'連続選択では最後の期間だけ展開');
-  await evaluate(`[...document.querySelectorAll('.since-presets button')].find(b=>b.textContent==='10分').click();document.querySelector('input[value=grep]').click()`);
+  await evaluate(`[...document.querySelectorAll('.since-presets button')].find(b=>b.textContent==='15分').click();document.querySelector('input[value=grep]').click()`);
   await settlePreset();assert.deepEqual(await openFolders(),[],'検索方式の変更後に古い展開を再開しない');
   await evaluate(`document.querySelector('input[value=since]').click()`);
   await preset('起動');assert.deepEqual(await openFolders(),[],'一致なしはルート直下だけ');
@@ -129,7 +127,7 @@ try {
   await evaluate(`{const input=document.querySelector('input[type="datetime-local"]');input.value='2099-01-01T00:00:00';input.dispatchEvent(new Event('change',{bubbles:true}));}`);
   assert.deepEqual(await openFolders(),[]);
   assert.deepEqual(await evaluate(`window.aidiyIDE.trail`),initialTrail,'起点検索では宇宙を移動しない');
-  await preset('10分');await capture('nn-since-matching-folders.png');
+  await preset('15分');await capture('nn-since-matching-folders.png');
   // CSSの実時間で途中の高さを測り、一括表示・消去になっていないことを確認する。
   await evaluate(`document.querySelector('[data-path="recent"] .chevron').click()`);
   // Vueの二重rAFを別々の描画フレームへ進める。一括で進めるとCSS開始前に両方実行される。
@@ -146,8 +144,12 @@ try {
   assert.ok(expanding>0&&expanding<25,'展開途中で行の高さが連続して伸びる');
   await settleTree();
   for(let i=0;i<3;i++){await evaluate(`document.querySelector('[data-path="recent"] .chevron').click()`);await evaluate('window.orbitTestAdvance(500)');await sleep(30);}
-  await settleTree();assert.equal(await evaluate(`!!document.querySelector('[data-path="recent/deep/changed.ts"]')`),false,'連打後も最後の折りたたみ状態になる');
-  await preset('10分');
+  await settleTree();
+  assert.equal(await evaluate(`document.querySelector('[data-path="recent"]').getAttribute('aria-expanded')`),'false','連打後のフォルダ状態は閉じる');
+  // leaveの取消・再開始で予約された二重rAFも進め、実CSSの終了を待つ。
+  for(let i=0;i<30&&await evaluate(`!!document.querySelector('[data-path="recent/deep/changed.ts"]')`);i++){await evaluate('window.orbitTestAdvance(500)');await sleep(100);}
+  assert.equal(await evaluate(`!!document.querySelector('[data-path="recent/deep/changed.ts"]')`),false,'連打後も最後の折りたたみ状態になる');
+  await preset('15分');
   await evaluate(`document.querySelector('input[value=ai]').click()`);
   const treeVisible=()=>evaluate(`document.querySelector('[role=tree]').getClientRects().length>0`);
   assert.equal(await treeVisible(),true,'AiDiy検索でもファイルツリーを表示する');

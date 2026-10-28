@@ -12,6 +12,7 @@ const menuItems = computed(() => {
   const menu = state.menu, item = !!menu?.target.path;
   const paste = !!state.clipboard && !(state.clipboard.type === 'dir' && containsPath(state.clipboard.path, menu?.directory || ''));
   return [
+    ...(item && menu.target.type === 'file' && /\.md$/i.test(menu.target.path) ? [['pdf','PDF化','',true,'同じフォルダに同名のPDFを作成します。']] : []),
     ['open-app','アプリで開く','',item && menu.target.type === 'file' && props.actions.canOpenFile,
       !props.actions.canOpenFile ? 'デスクトップ版で利用できます。' : menu?.target.type !== 'file' ? 'ファイルを選択してください。' : 'OSに関連付けられた既定のアプリで開きます。'],
     ['handoff','Code / Liveへ','',item && menu.target.type === 'file' && props.actions.canOpenDraft(),

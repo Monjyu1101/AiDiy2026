@@ -70,3 +70,10 @@ test('Explorer: 途中コピー失敗は再試行せず一覧更新して残存�
   const actions=createExplorerActions({root:()=>'/project',document:()=>null,refresh:async()=>refreshes++,request:async()=>{requests++;return new Response(JSON.stringify({message:'途中のコピーが残っています: copy.txt',partialPath:'copy.txt'}),{status:408});}});
   await actions.action('duplicate',file);assert.equal(requests,1);assert.equal(refreshes,1);assert.match(actions.state.error,/copy.txt/);actions.dispose();
 });
+
+test('Explorer PDF化: .mdのみを要求し、成功後に作成先を一覧へ反映する',async()=>{
+ const f=fixture();await f.actions.action('pdf',file);assert.equal(f.requests.length,0);
+ f.response(new Response(JSON.stringify({action:'pdf',path:'docs/日本語.pdf',name:'日本語.pdf',type:'file'})));
+ await f.actions.action('pdf',{type:'file',path:'docs/日本語.MD',name:'日本語.MD'});
+ assert.deepEqual(f.requests[0].payload,{action:'pdf',path:'docs/日本語.MD'});assert.equal(f.changes.length,1);assert.match(f.state.notice,/日本語.pdf.*作成/);f.actions.dispose();
+});

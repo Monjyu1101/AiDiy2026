@@ -49,6 +49,10 @@ function registerWindowPin(record){
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
 const {readDevelopmentState}=require('./デスクトップ/desktop-session.cjs');
 const draftRouter=createDraftRouter({records:windows,readState,sessionKey:state=>sessionKey(state),focusWindow,isQuitting:()=>quitting});
+const {createSharedDraftBridge}=require('./デスクトップ/下書き共有.cjs');
+let sharedDraftBridge;
+const sharedDrafts=()=>sharedDraftBridge??=createSharedDraftBridge({directory:join(app.getPath('temp'),'aidiy-draft-links'),records:windows,router:draftRouter,readState,sessionKey:state=>sessionKey(state)});
+app.on('quit',()=>{void sharedDraftBridge?.then(bridge=>bridge.close(),()=>{});});
 const {createNativePreviewActions}=require('./デスクトップ/native-preview-actions.cjs');
 const nativePreviewActions=createNativePreviewActions({records:windows,trustedEvent,readState,sessionKey:state=>sessionKey(state),clipboard,shell,dialog,isQuitting:()=>quitting});
 let quitting=false,forcedQuit=false;
@@ -82,6 +86,7 @@ const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChi
  vrPanelStacking.refresh(owner);
 }});
 const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デスクトップ/ブラウザ.cjs');
+const {saveBrowserCapture}=require('./デスクトップ/ブラウザ撮影.cjs');
 const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
 let browserViews;
 const browserBridges=new WeakMap();
@@ -155,7 +160,7 @@ async function checkChildren(owner){
  }catch{ /* 一時的な通信断・不正応答は終了の根拠にせず、次回の監視で再確認する。 */ }finally{owner.checking=false;}
 }
 function trustedEvent(event){
- const record=windows.get(event.sender),frame=event.senderFrame;
+ const record=windows.get(event.sender)||browserViews?.trustedHeader(event),frame=event.senderFrame;
  return record&&!record.window.isDestroyed()&&frame&&frame===event.sender.mainFrame&&typeof frame.url==='string'&&frame.url.split('#')[0]===record.url?record:null;
 }
 function audioAllowed(contents,permission,details){
@@ -231,7 +236,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  contents.on('did-create-window',(child,details)=>panelWindows.created(record,child,details));
  try{
   if(kind==='browser'){
-   browserViews??=createBrowserViews({WebContentsView,session,trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
+   browserViews??=createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive:record=>allDisplays.isActive(record.owner||record),captureImage:({png})=>saveBrowserCapture(process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd(),png),trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
    const bridge=await (owner?ensureBrowserBridge(owner):ensureStandaloneBrowserBridge());
    const current=await readState(owner||record);
    if(window.isDestroyed()||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current)))throw Error('tools接続中のみBrowserを起動できます。');
@@ -282,7 +287,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:all-displays',(event,action)=>allDisplays.handle(event,action));
  ipcMain.handle('development:browser-action',async(event,action,value)=>{
   const record=trustedEvent(event);
-  if(record?.kind==='browser'&&!['bounds','state'].includes(action)){
+  if(record?.kind==='browser'&&!['bounds','state','size','fullscreen','draft-dialog','header-size','header-pin-state','header-toggle-pin'].includes(action)){
    try{if(!browserConnected(await readState(record.owner||record)))return{ok:false,error:'tools接続中のみBrowserを操作できます。'};}catch{return{ok:false,error:'toolsの接続を確認できません。'};}
   }
   return browserViews?.action(event,action,value)||{ok:false,error:'ブラウザが起動していません。'};
@@ -309,11 +314,14 @@ app.whenReady().then(async()=>{
    return{ok:true};
   }catch(error){return{ok:false,error:error.message};}
  });
- ipcMain.handle('development:draft-target-register',(event,value)=>draftRouter.register(trustedEvent(event),value));
+ ipcMain.handle('development:draft-target-register',async(event,value)=>{const result=draftRouter.register(trustedEvent(event),value);if(result.ok&&value)await sharedDrafts();return result;});
  ipcMain.handle('development:copy-file-path',(event,path)=>nativePreviewActions.copyFilePath(event,path));
  ipcMain.handle('development:open-file',(event,path)=>nativePreviewActions.openFile(event,path));
- ipcMain.handle('development:draft-targets',event=>draftRouter.list(trustedEvent(event)));
- ipcMain.handle('development:draft-insert',(event,value)=>draftRouter.insert(trustedEvent(event),value));
+ ipcMain.handle('development:draft-targets',async event=>{const source=trustedEvent(event);try{return source?.kind==='browser'?await(await sharedDrafts()).list(source):await draftRouter.list(source);}catch(error){return{ok:false,error:error.message};}});
+ ipcMain.handle('development:draft-insert',async(event,value)=>{
+  const source=trustedEvent(event);if(source?.kind!=='browser')return draftRouter.insert(source,value);
+  try{const draft=await browserViews.action(event,'draft');if(!draft.ok)return draft;return await(await sharedDrafts()).insert(source,{...value,text:draft.request.text});}catch(error){return{ok:false,error:error.message};}
+ });
  ipcMain.on('development:draft-result',(event,value)=>draftRouter.acknowledge(trustedEvent(event),value));
  ipcMain.handle('development:end-session',async event=>{
   const record=trustedEvent(event);if(!record||record.kind!=='ide')return;

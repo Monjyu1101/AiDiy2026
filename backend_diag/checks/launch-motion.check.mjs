@@ -5,23 +5,23 @@ import {アプリ状態を作成} from '../ui/src/アプリ起動/アプリ状�
 import {CLI状態を作成} from '../ui/src/アプリ起動/CLI状態.mjs';
 import {readFile} from 'node:fs/promises';
 function fixture(){
- const runs=[];const icon={animate:(frames,options)=>{let finish;const animation={frames,options,cancelled:false,cancel(){this.cancelled=true;},finished:new Promise(resolve=>finish=resolve),finish:()=>finish()};runs.push(animation);return animation;}};
- return {runs,button:{disabled:false,querySelector:selector=>selector==='.launch-trace'?icon:null}};
+ const classes=new Set();const runs=[];const icon={parentElement:{classList:{add:name=>classes.add(name),remove:name=>classes.delete(name)}},animate:(frames,options)=>{let finish;const animation={frames,options,cancelled:false,cancel(){this.cancelled=true;},finished:new Promise(resolve=>finish=resolve),finish:()=>finish()};runs.push(animation);return animation;}};
+ return {runs,classes,button:{disabled:false,querySelector:selector=>selector==='.launch-trace'?icon:null}};
 }
-test('accepted light traces the frame clockwise once, repeated request restarts it, and event target is captured',async()=>{
+test('accepted light traces the frame clockwise twice, repeated request restarts it, and event target is captured',async()=>{
  const f=fixture(),event={currentTarget:f.button},start=起動モーション(event);event.currentTarget=null;
- start();assert.equal(f.runs[0].frames[0]['--launch-spin'],'0deg');assert.equal(f.runs[0].frames.at(-1)['--launch-spin'],'360deg');assert.equal(f.runs[0].options.iterations,1);
- start();assert.equal(f.runs.length,2);assert.equal(f.runs[0].cancelled,true);f.runs[0].finish();await Promise.resolve();
- start();assert.equal(f.runs[1].cancelled,true);f.runs[2].finish();await Promise.resolve();
- start();assert.equal(f.runs[2].cancelled,false);
+ start();assert.equal(f.runs[0].frames[0]['--launch-spin'],'0deg');assert.equal(f.runs[0].frames.at(-1)['--launch-spin'],'720deg');assert.equal(f.runs[0].options.iterations,1);
+ start();assert.equal(f.classes.has('launch-active'),true);assert.equal(f.runs.length,2);assert.equal(f.runs[0].cancelled,true);f.runs[0].finish();await Promise.resolve();
+ assert.equal(f.classes.has('launch-active'),true);start();assert.equal(f.runs[1].cancelled,true);f.runs[2].finish();await Promise.resolve();
+ assert.equal(f.classes.has('launch-active'),false);start();assert.equal(f.runs[2].cancelled,false);
 });
 test('one continuous accelerating pass fades at the ends without intermediate speed resets',()=>{
  const f=fixture();起動モーション({currentTarget:f.button})();const {frames,options}=f.runs[0];
- assert.equal(options.duration,900);
+ assert.equal(options.duration,1800);
  assert.equal(options.easing,'cubic-bezier(0.333333,0,0.666667,0.333333)');
  assert.equal(frames[0].opacity,0);assert.equal(frames.at(-1).opacity,0);
  assert.deepEqual(frames.slice(1,-1).map(frame=>frame.opacity),[1,1]);
- for(const frame of frames){assert.ok(Math.abs(parseFloat(frame['--launch-spin'])-360*frame.offset)<1e-9);assert.equal(frame.easing,undefined);}
+ for(const frame of frames){assert.ok(Math.abs(parseFloat(frame['--launch-spin'])-720*frame.offset)<1e-9);assert.equal(frame.easing,undefined);}
  // この Bézier は x≈t、y≈t²。等しい時間区間ごとの移動量が増え続ける。
  const bezier=(t,p1,p2)=>3*(1-t)**2*t*p1+3*(1-t)*t*t*p2+t**3;
  let previousDistance=0,previousProgress=0;

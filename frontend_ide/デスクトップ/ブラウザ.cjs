@@ -5,8 +5,10 @@
 // https://github.com/monjyu1101/AiDiy2026
 const HOME='https://www.google.com/';
 const {pathToFileURL,fileURLToPath}=require('node:url');
-const {relative,isAbsolute,sep}=require('node:path');
+const {relative,isAbsolute,sep,resolve}=require('node:path');
 const {previewFile}=require('./native-preview-actions.cjs');
+const {setWindowBounds}=require('./全画面横断.cjs');
+const {createBrowserHeader}=require('./ブラウザ全画面パネル.cjs');
 function browserFileURL(root,path){return pathToFileURL(previewFile(root,path).full).href;}
 // Browser で開けるのは HTML と音声・動画。
 async function browserOpenable(path){
@@ -29,8 +31,13 @@ function browserURL(value){
  const address=/^https?:\/\//i.test(text)?text:/^(localhost(?::\d+)?|\[[\da-f:]+\]|[\w-]+(?:\.[\w-]+)+)(?::\d+)?(?:[/?#]|$)/i.test(text)&&! /\s/.test(text)?(/^(localhost|127\.)/i.test(text)?'http://':'https://')+text:HOME+'search?q='+encodeURIComponent(text);
  const url=new URL(address);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('このURLは開けません。');return url.href;
 }
-function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
- const entries=new Map(),blockedOrigins=new Set();
+function browserDraftRequest(projectRoot,url,capture,now=Date.now()){
+ const age=capture?now-capture.at:Infinity;
+ const image=capture&&age>=0&&age<=60000?resolve(projectRoot,capture.path):'';
+ return{projectPath:projectRoot,path:url,text:url+(image?'\n画像: '+image:''),selection:false};
+}
+function createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive=()=>false,captureImage,trustedEvent,projectRoot,now=Date.now}){
+ const entries=new Map(),headers=new Map(),blockedOrigins=new Set();
  const localFileAllowed=url=>{try{const path=relative(projectRoot,fileURLToPath(url)).split(sep).join('/');browserFileURL(projectRoot,path);return true;}catch{return false;}};
  const isolated=session.fromPartition('aidiy-browser');
  isolated.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));
@@ -41,13 +48,42 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
  });
  const allowed=url=>{if(url==='about:blank')return true;try{const parsed=new URL(url);if(parsed.protocol==='file:')return localFileAllowed(parsed);return ['http:','https:'].includes(parsed.protocol)&&!parsed.username&&!parsed.password&&!blockedOrigins.has(parsed.origin);}catch{return false;}};
  function attach(record,target=HOME,available=true){
+  const hostContents=record.window.webContents;
   blockedOrigins.add(new URL(record.url).origin);
   const view=new WebContentsView({webPreferences:{session:isolated,sandbox:true,contextIsolation:true,nodeIntegration:false,nodeIntegrationInSubFrames:false,webSecurity:true}});
   const contents=view.webContents,entry={view,error:'',rect:null,run:0,available,pendingTarget:available?null:target};entries.set(record,entry);
   record.window.contentView.addChildView(view);view.setVisible(false);
-  const snapshot=()=>({url:contents.getURL()||target,title:contents.getTitle(),session:record.browserSession,available:entry.available,loading:contents.isLoading(),back:contents.navigationHistory.canGoBack(),forward:contents.navigationHistory.canGoForward(),error:entry.available?entry.error:'toolsとの接続が切れています。再接続後に操作できます。'});
-  const notify=()=>{if(!record.window.isDestroyed()&&!contents.isDestroyed())record.window.webContents.send('development:browser-changed',snapshot());};
+  const snapshot=()=>({url:contents.getURL()||target,title:contents.getTitle(),session:record.browserSession,available:entry.available,fullscreen:record.window.isFullScreen(),headerVisible:!!entry.headerVisible,headerPinned:!!entry.headerPinned,capturePath:entry.capture?.path||'',loading:contents.isLoading(),back:contents.navigationHistory.canGoBack(),forward:contents.navigationHistory.canGoForward(),error:entry.available?entry.error:'toolsとの接続が切れています。再接続後に操作できます。'});
+  const notify=()=>{if(!record.window.isDestroyed()&&!contents.isDestroyed()){const value=snapshot();hostContents.send('development:browser-changed',value);entry.header?.send('development:browser-changed',value);}};
   entry.snapshot=snapshot;entry.notify=notify;
+  const toggleFullscreen=()=>record.window.setFullScreen(!record.window.isFullScreen());
+  entry.toggleFullscreen=toggleFullscreen;
+  let pointerTimer,previousLock=false;
+  function pointer(){
+   if(record.window.isDestroyed()||!record.window.isFullScreen())return;
+   const point=screen.getCursorScreenPoint(),bounds=record.window.getContentBounds();
+   const inside=point.x>=bounds.x&&point.x<bounds.x+bounds.width;
+   const top=inside&&point.y>=bounds.y&&point.y<=bounds.y+4;
+   if(entry.headerSuppressed&&!top&&!entry.header?.contains(point,true))entry.headerSuppressed=false;
+   const visible=!entry.dialogOpen&&!record.window.isMinimized?.()&&!entry.headerSuppressed&&(!!entry.headerPinned||top||entry.header?.contains(point));
+   if(visible!==!!entry.headerVisible){entry.headerVisible=visible;entry.header?.show(visible);notify();}
+  }
+  function fullscreenChanged(){
+   clearInterval(pointerTimer);pointerTimer=undefined;entry.headerVisible=false;entry.headerSuppressed=false;entry.header?.show(false);
+   if(record.window.isFullScreen()){
+    previousLock=windowPins?.state(record.window).locked||false;
+    windowPins?.setLocked(record.window,true);
+    pointerTimer=setInterval(pointer,80);pointerTimer.unref?.();
+   }else windowPins?.setLocked(record.window,previousLock);
+   entry.layout?.();notify();
+  }
+  function fullscreenKey(event,key){
+   if(key.type!=='keyDown'||key.key!=='F11'||key.control||key.alt||key.shift||key.meta||isVRActive(record))return;
+   event.preventDefault();if(!key.isAutoRepeat)toggleFullscreen();
+  }
+  entry.header=createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscreenKey,headers});
+  entry.pointer=pointer;
+  for(const page of [hostContents,contents])page.on('before-input-event',fullscreenKey);
   entry.navigate=async value=>{
    const url=browserURL(value);if(!entry.available||!allowed(url))throw Error('このURLはブラウザパネルでは開けません。');
    const run=++entry.run;entry.error='';
@@ -65,11 +101,12 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
    if(!entry.rect||record.window.isDestroyed())return;
    const zoom=record.window.webContents.getZoomFactor(),bounds=record.window.getContentBounds(),r=entry.rect;
    const x=Math.max(0,Math.round(r.left*zoom)),y=Math.max(0,Math.round(r.top*zoom));
-   view.setBounds({x,y,width:Math.max(0,Math.min(Math.round(r.width*zoom),bounds.width-x)),height:Math.max(0,Math.min(Math.round(r.height*zoom),bounds.height-y))});
-   view.setVisible(entry.available);
+   view.setBounds(record.window.isFullScreen()?{x:0,y:0,width:bounds.width,height:bounds.height}:{x,y,width:Math.max(0,Math.min(Math.round(r.width*zoom),bounds.width-x)),height:Math.max(0,Math.min(Math.round(r.height*zoom),bounds.height-y))});
+   view.setVisible(entry.available&&!entry.dialogOpen);
   }
   entry.layout=layout;record.window.on('resize',layout);
-  record.window.once('closed',()=>{entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
+  record.window.on('enter-full-screen',fullscreenChanged);record.window.on('leave-full-screen',fullscreenChanged);
+  record.window.once('closed',()=>{clearInterval(pointerTimer);entry.header.close();for(const page of [hostContents,contents])page.removeListener('before-input-event',fullscreenKey);entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
   if(available)void entry.navigate(target).catch(error=>{entry.error=error.message;notify();});
   return contents;
  }
@@ -84,14 +121,54 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
    else if(name==='forward'){if(contents.navigationHistory.canGoForward())contents.navigationHistory.goForward();}
    else if(name==='reload'){entry.error='';contents.reload();}
    else if(name==='stop')contents.stop();
+   else if(name==='draft')return{ok:true,request:browserDraftRequest(projectRoot,contents.getURL(),entry.capture,now())};
+   else if(name==='draft-dialog'){entry.dialogOpen=value===true;entry.layout();entry.pointer();}
+   else if(name==='open-draft'){record.window.webContents.send('development:browser-open-draft');}
+   else if(name==='header-size'){
+    if(headers.get(event.sender)!==record||!Number.isFinite(value)||value<1||value>1000)throw Error('パネルの高さが不正です。');
+    entry.header.measure(value);
+   }
+   else if(name==='header-pin-state'||name==='header-toggle-pin'){
+    if(name==='header-toggle-pin'){entry.headerPinned=!entry.headerPinned;entry.headerSuppressed=!entry.headerPinned;entry.pointer();entry.notify();}
+    return{pinned:!!entry.headerPinned,locked:false};
+   }
+   else if(name==='capture'){
+    if(!entry.available)throw Error('tools接続中のみ撮影できます。');
+    if(entry.capturing)throw Error('撮影中です。しばらくお待ちください。');
+    if(!captureImage)throw Error('画像の送信先が設定されていません。');
+    entry.capturing=true;
+    try{
+     const at=now(),url=contents.getURL(),image=await contents.capturePage();
+     if(contents.isDestroyed()||record.window.isDestroyed()||!entry.available||contents.getURL()!==url)throw Error('表示中のページや接続が変わりました。もう一度撮影してください。');
+     if(image.isEmpty())throw Error('Web画面を撮影できませんでした。');
+     const result=await captureImage({record,png:image.toPNG(),size:image.getSize()});
+     entry.capture={path:result.path,at};entry.notify();
+     return{ok:true,...entry.snapshot(),...result};
+    }finally{entry.capturing=false;}
+   }
+   else if(name==='fullscreen')entry.toggleFullscreen();
+   else if(name==='size'){
+    const size={fhd:[1920,945],portrait:[1080,1920-(1080-945)]}[value];
+    if(!Array.isArray(size))throw Error('対応していないウィンドウサイズです。');
+    const area=screen.getDisplayMatching(record.window.getBounds()).workArea;
+    if(record.window.isFullScreen())record.window.setFullScreen(false);
+    if(record.window.isMaximized())record.window.unmaximize();
+    const width=Math.min(size[0],area.width),height=Math.min(size[1],area.height);
+    setWindowBounds(record.window,{x:area.x+Math.floor((area.width-width)/2),y:area.y+Math.floor((area.height-height)/2),width,height});
+   }
    else if(name==='bounds'){
     if(!value||!['left','top','width','height'].every(key=>Number.isFinite(value[key])&&value[key]>=0&&value[key]<100000))throw Error('表示領域が不正です。');
+    if(Number.isFinite(value.chromeHeight)&&value.chromeHeight>=0&&value.chromeHeight<1000)entry.chromeHeight=value.chromeHeight*record.window.webContents.getZoomFactor();
     entry.rect=value;entry.layout();
    }else if(name!=='state')throw Error('対応していない操作です。');
    return{ok:true,...entry.snapshot()};
   }catch(error){return{ok:false,error:error.message};}
  }
  function setAvailable(owner,available){for(const [record,entry]of entries)if((record===owner||record.owner===owner)&&entry.available!==available){entry.available=available;if(!available)entry.view.webContents.stop();else if(entry.pendingTarget!==null){const target=entry.pendingTarget;entry.pendingTarget=null;void entry.navigate(target).catch(error=>{entry.error=error.message;entry.notify();});}entry.layout();entry.notify();}}
- return{attach,action,setAvailable,allowedURL:allowed};
+ function trustedHeader(event){
+  const record=headers.get(event.sender),frame=event.senderFrame;
+  return record&&!record.window.isDestroyed()&&frame===event.sender.mainFrame&&frame?.url===record.url+'#browser-header'?record:null;
+ }
+ return{attach,action,setAvailable,trustedHeader,allowedURL:allowed};
 }
-module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews};
+module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews,browserDraftRequest};

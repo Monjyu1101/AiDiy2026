@@ -18,7 +18,7 @@ const noNetwork = () => { throw new Error('実通信は禁止'); };
 function load(file, dependencies = {}, globals = {}) {
   const module = { exports: {} }, path = resolve(root, file);
   runInNewContext(transformSync(readFileSync(path, 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
-    module, exports: module.exports, __dirname: dirname(path), URL, AbortController, AbortSignal,
+    module, exports: module.exports, __dirname: dirname(path), URL, AbortController, AbortSignal, DOMException,
     fetch: noNetwork, setTimeout, clearTimeout, setInterval, clearInterval,
     require(id) {
       if (Object.hasOwn(dependencies, id)) return dependencies[id];

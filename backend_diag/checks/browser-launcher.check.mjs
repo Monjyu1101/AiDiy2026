@@ -24,11 +24,12 @@ test('Chrome has the manual Web gate and fixed MCP call; no project, process spa
 });
 test('standalone Browser receives exact project and independent window args without Chrome debugger flags',async t=>{
  const root=await mkdtemp(join(tmpdir(),'diag-browser-')),project=join(root,'日本語 project');await mkdir(project);t.after(()=>rm(root,{recursive:true,force:true}));
- const calls=[];const manager=createAppLauncher({root,spawnFn(command,args,options){calls.push({command,args,options});const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;}});
+ let toolsOnline=true;const calls=[];const manager=createAppLauncher({root,portStatusFn:async()=>({対象:[{id:"tools",開放:toolsOnline}]}),spawnFn(command,args,options){calls.push({command,args,options});const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;}});
  await assert.rejects(manager.launch('browser',''),{status:400});
  await manager.launch('browser',project);await manager.launch('browser',project);
+ toolsOnline=false;assert.equal((await manager.catalog()).対象.find(x=>x.id==='browser').利用可能,false);await assert.rejects(manager.launch('browser',project),{status:409});
  assert.equal(calls.length,2);for(const call of calls){assert.deepEqual(call.args,[join(root,'frontend_ide','launch.mjs'),'--app','browser','--project',project,'--new-window']);assert.equal(call.options.cwd,project);assert.equal(call.options.detached,true);assert.equal(call.options.shell,false);}
- assert.equal(アプリアイコン.browser,'AiDiy.png');assert.equal(アプリアイコン.chrome,'Chrome.svg');
+ assert.equal(アプリアイコン.browser,'AiDiy_browser.svg');assert.equal(アプリアイコン.chrome,'Chrome.svg');
 });
 test('all launcher sizes share Chrome state: exact manual endpoint, no project requirement, duplicate lock, disconnect fail closed',async()=>{
  let release,calls=[];const state=アプリ状態を作成({api:async(route,method,signal,format,body)=>{calls.push({route,body});if(route==='api/アプリ起動')return {対象:[{id:'chrome',利用可能:true},{id:'browser'}],フォルダ:''};return new Promise(resolve=>release=resolve);}});
@@ -46,7 +47,7 @@ test('Chrome launcher and manual Web API share opener and concurrent request loc
  const server=createServer({token:'fixture',portStatusFn,webBrowserOpenFn,modelTrials:{close(){}},startManager:{close(){}}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
  const base=`http://127.0.0.1:${server.address().port}/`,headers={Authorization:'Bearer fixture','Content-Type':'application/json'};
- assert.equal((await fetch(base+'Chrome.svg')).status,200);
+ for(const asset of ['Chrome.svg','AiDiy_browser.svg'])assert.equal((await fetch(base+asset)).status,200);
  const one=fetch(base+'api/起動/ブラウザ',{method:'POST',headers,body:'{}'});
  while(!release)await new Promise(resolve=>setImmediate(resolve));
  const second=await fetch(base+'api/アプリ起動/開始',{method:'POST',headers,body:JSON.stringify({対象:'chrome'})});

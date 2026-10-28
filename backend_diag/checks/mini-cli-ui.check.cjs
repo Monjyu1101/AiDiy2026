@@ -179,12 +179,12 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとC
  const upper=mount(compile('アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state:app,cliState:state,online:true}));
  const lower=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:app,online:true}));
  const upperButtons=()=>upper.nodes().filter(n=>n.props['data-app']||n.props['data-cli']),lowerButtons=()=>lower.nodes().filter(n=>n.props['data-cli']),hermes=()=>upper.nodes().find(n=>n.props['data-cli']==='aidiy_hermes');
- try{await flush();assert.equal(upperButtons().length,7);assert.deepEqual(upperButtons().map(n=>n.props['data-app']||n.props['data-cli']),[...apps,'aidiy_hermes']);assert.deepEqual(lowerButtons().map(n=>n.props['data-cli']),ids.filter(id=>id!=='aidiy_hermes'));assert.equal(lowerButtons().length,6);assert.ok(!lowerButtons().some(n=>n.props['data-cli']==='aidiy_hermes'));assert.equal(hermes().props.disabled,true);
+ try{await flush();assert.equal(upperButtons().length,7);assert.deepEqual(upperButtons().map(n=>n.props['data-app']||n.props['data-cli']),[...apps.filter(id=>id!=='discord'),'aidiy_hermes','discord']);assert.deepEqual(lowerButtons().map(n=>n.props['data-cli']),ids.filter(id=>id!=='aidiy_hermes'));assert.equal(lowerButtons().length,6);assert.ok(!lowerButtons().some(n=>n.props['data-cli']==='aidiy_hermes'));assert.equal(hermes().props.disabled,true);
   assert.ok([...upper.nodes(),...lower.nodes()].every(n=>!n.props.class?.includes('mini-icon-caption')));
   for(const button of [...upperButtons(),...lowerButtons()]){
    const img=descendants(button).find(n=>n.tag==='img'),appId=button.props['data-app'],cliId=button.props['data-cli'];
    assert.equal(img.props.width,'40');assert.equal(img.props.height,'40');assert.equal(button.children[0].props.class,'mini-icon-frame');assert.equal(text(button),'');
-   const name=appId?app.項目.value.find(item=>item.id===appId).名前:state.項目.value.find(item=>item.id===cliId).名前;
+   const name=cliId==='aidiy_hermes'?'Hermes':appId?app.項目.value.find(item=>item.id===appId).名前:state.項目.value.find(item=>item.id===cliId).名前;
    assert.ok(button.props['aria-label'].includes(name));assert.ok(button.props.title.includes(name));
    assert.equal(img.props.src,appId?icons.アプリアイコン[appId]:cliId==='aidiy_hermes'?'CLI_aidiy_hermes.svg':'CLI_'+cliId+'.svg');
   }
@@ -238,14 +238,16 @@ test('Chrome / Browser icons render in full and mini launchers; Chrome works wit
  const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs');
  const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
  for(const name of ['アプリ起動/アプリ起動パネル.vue','アプリ起動/ミニアプリ起動.vue']){
-  const calls=[];const state=アプリ状態を作成({api:async(route,_method,_signal,_format,body)=>{calls.push({route,body});return route==='api/アプリ起動'?{対象:[{id:'chrome',名前:'Chrome',利用可能:true},{id:'browser',名前:'aidiy_browser'}],フォルダ:''}:{メッセージ:'opened'};}});
+  const calls=[];const state=アプリ状態を作成({api:async(route,_method,_signal,_format,body)=>{calls.push({route,body});return route==='api/アプリ起動'?{対象:[{id:'chrome',名前:'Chrome',利用可能:true},{id:'browser',名前:'aidiy_browser',利用可能:true}],フォルダ:''}:{メッセージ:'opened'};}});
   await state.読込();const cliState={項目:vue.ref([]),全項目:vue.ref([]),読込(){},失敗:vue.ref(false)};
-  const ui=mount(compile(name,{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
+  const modules={'./アプリアイコン.mjs':icons};
+  const target=name.includes('ミニアプリ')?{setup:()=>()=>vue.h('div',[vue.h(compile(name,{modules}),{state,cliState,online:true}),vue.h(compile('アプリ起動/ミニCLI起動.vue',{modules}),{state:cliState,appState:state,online:true})])}:compile(name,{modules});
+  const ui=mount(target,()=>({state,cliState,online:true,visible:true}));
   try{
-   await flush();assert.equal(ui.button('Chrome を起動').props.disabled,false);assert.equal(ui.button('aidiy_browser を起動').props.disabled,true);
-   assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy.png'));
+   await flush();assert.deepEqual(ui.nodes().filter(n=>n.props['data-app']).map(n=>n.props['data-app']),['browser','chrome']);assert.equal(ui.button('Chrome を起動').props.disabled,false);assert.equal(ui.button('Browser を起動').props.disabled,true);
+   assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy_browser.svg'));
    ui.button('Chrome を起動').props.onClick({});await flush();assert.deepEqual(calls.at(-1),{route:'api/起動/ブラウザ',body:{}});
-   state.フォルダ.value='/project';await flush();assert.equal(ui.button('aidiy_browser を起動').props.disabled,false);
+   state.フォルダ.value='/project';await flush();assert.equal(ui.button('Browser を起動').props.disabled,false);
    state.項目.value[0].利用可能=false;await flush();assert.equal(ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動')).props.disabled,true);
   }finally{ui.app.unmount();state.終了();}
  }

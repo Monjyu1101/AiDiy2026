@@ -36,7 +36,7 @@ try{
    for(const t of document.querySelectorAll('table')){
     if(t.rows.length<=10)t.classList.add('small-table');
     // ケースIDが「10 / 1」のように折り返されない幅を確保する。
-    if(['ID','ケース'].includes(t.rows[0]?.cells[0]?.textContent.trim()))for(const row of t.rows){
+    if(['ID','ケース','計画ID'].includes(t.rows[0]?.cells[0]?.textContent.trim()))for(const row of t.rows){
      row.cells[0].style.whiteSpace='nowrap';row.cells[0].style.minWidth='10mm';
     }
    }

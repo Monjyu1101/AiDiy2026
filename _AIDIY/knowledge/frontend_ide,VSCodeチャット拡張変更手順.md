@@ -264,6 +264,10 @@ Windows の実 VS Code で拡張ホストまで確認するときは、依存導
 ./scripts/test-extension-host.ps1 -Scenario Live
 ```
 
+外周枠・入力領域の確認は `node frontend_ide/host/scripts/check-webview-layout.mjs` をルートから実行します。専用プロファイルの実VS CodeでCode／Liveを順に開き、Webview内の外周色・境界幅・外寸・入力／送信領域を実測し、`temp/vscode-layout/` に画面と寸法を出力します。試験後はVS Codeと専用プロファイルを終了・削除します。AIへの送信は行いません。既定ではCodex同梱のplaywright-coreを利用し、別配置の場合は `AIDIY_TEST_PLAYWRIGHT_MODULE` に `playwright-core/index.mjs` の絶対パスを指定します。
+
+VS CodeはWebview本文に既定の左右paddingを入れます。`src/vscode-html.ts` で `body.vscode-host` に `padding:0` を指定し、共有Vue画面の外周をWebview端へ揃えます。端数DPIでの境界幅はChromiumの描画ピクセルへの切り下げを考慮し、内側へ二重枠を追加しません。変更時はCode／Live両方をcompileし、VSIXを再生成・配置します。
+
 通常の VS Code プロファイルへ配置する確認は `_setup.py` を使う。試用ホストの `out/manual-profile` と混同しない。
 
 Code / Live はどちらも `package.json` の `extensionKind` を `["workspace"]` とし、配置・解除の対象環境を揃える。Remote SSH / WSL / Codespaces では接続先の拡張ホストで動かす。旧版の Live の `["ui", "workspace"]` は接続元を優先するため、Windows 側に配置された Live を Linux の Remote CLI で解除できない。既存の接続元 Live は接続元の拡張機能一覧、または `code --uninstall-extension aidiy.aidiy-live` で一度解除する。`npm run package` で VSIX を再生成し、`python frontend_ide/host/_setup.py --extensions-only` で接続先に配置して、Code / Live の両 ID が同じ拡張一覧にあることを確認する。Live の WinMM マイクは Windows の拡張ホスト用であり、Linux の拡張ホストでは単独ブラウザ版を使用する。Linux の cleanup は接続先で両 ID の解除と解除後の一覧を確認し、Live が残れば失敗にする。Remote CLI では接続元の旧 Live を確認できないことも表示する。

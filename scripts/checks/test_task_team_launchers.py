@@ -33,6 +33,8 @@ class Launchers(unittest.TestCase):
             proc={'Name':'node','CommandLine':f'node "{(ROOT / "frontend_ide/launch.mjs").as_posix()}" --app {kind}'}
             self.assertTrue(start.is_dev_process(proc, ROOT / 'frontend_ide/viewer', False, kind))
             self.assertFalse(start.is_dev_process(proc, ROOT / 'frontend_ide/viewer', False, 'ide'))
-            self.assertEqual(scope.process_role(proc, ROOT, False), kind)
+            fixture_root = '/repo/AiDiy'
+            fixture = {'Name': 'node', 'CommandLine': f'node {fixture_root}/frontend_ide/launch.mjs --app {kind}'}
+            self.assertEqual(scope.process_role(fixture, fixture_root, False), kind)
         self.assertEqual(scope.KEEP, frozenset(('code','ide','frontend_channels')))
 if __name__ == '__main__': unittest.main()

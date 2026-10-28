@@ -32,7 +32,7 @@ const server=createServer({cliLauncher:{catalog:async()=>({対象:[]}),launch(){
  toolsStatusFn:async()=>({online:false}),previousResults:{snapshot:async()=>({})},
  publicCache:{snapshot:()=>({状態:'未取得'}),input:()=>({})},modelTrials:{close(){}},
  keyStatusFn:async()=>({項目:[]})});
-const requests=[];server.on('request',request=>requests.push(decodeURIComponent(request.url)));
+const requests=[],portRequests=[];server.on('request',request=>{const route=decodeURIComponent(request.url);requests.push(route);if(route.endsWith('/起動/ポート'))portRequests.push(Date.now());});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const executable=process.env.CHROME_PATH||[[process.env.PROGRAMFILES,'Google/Chrome/Application/chrome.exe'],[process.env['PROGRAMFILES(X86)'],'Microsoft/Edge/Application/msedge.exe']].filter(([base])=>base).map(([base,name])=>join(base,name)).find(existsSync)||['/usr/bin/google-chrome','/usr/bin/chromium'].find(existsSync);
 assert.ok(executable,'既存Chrome/Edgeが必要です');
@@ -127,7 +127,11 @@ try{
  children[1].stdout.write(JSON.stringify({type:'status',state:'再起動待ち'})+'\n');openPorts.delete('tools');
  await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='stopped'&&element.title.includes('未開放'))`);
  assert.equal(await evaluate(`getComputedStyle([...document.querySelectorAll('.mini-service')].find(button=>button.dataset.tone==='stopped')).animationName`),'mini-stopped-blink');
- assert.ok(portSamples.at(-1)-portSamples.at(-2)>=4900,'ミニのTCP確認は約5秒間隔');
+ // 起動受付やアプリ稼働判定からの内部呼出しを、画面の定期取得へ混ぜない。
+ const samples=portRequests.length;
+ for(let i=0;i<240&&portRequests.length<samples+2;i++)await sleep(50);
+ assert.ok(portRequests.length>=samples+2,'ミニの定期取得が継続する');
+ assert.ok(portRequests.at(-1)-portRequests.at(-2)>=4900,'ミニの定期取得は約5秒間隔');
  assert.equal(requests.filter(route=>route.endsWith('/起動/ログ')).length,previousLogs,'ミニ表示は状態だけを取得');
  children[1].stdout.write(JSON.stringify({type:'ready'})+'\n');openPorts.add('tools');
  await until(`[...document.querySelectorAll('.mini-service')].some(element=>element.textContent.includes('Tools')&&element.dataset.tone==='running')`);

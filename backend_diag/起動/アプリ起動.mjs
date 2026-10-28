@@ -41,8 +41,9 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
  const checkTaskTeam=taskTeamStatus||createTaskTeamStatus({root});
  const taskTeam=id=>id==='task'||id==='team';
  const availability=async()=>{try{return await checkTaskTeam();}catch{return {利用可能:false,無効理由:'Task / Team バックエンドを確認できません。'};}};
+ async function browserAvailability(){try{const ports=await portStatusFn();if(ports.対象.some(item=>item.id==='tools'&&item.開放===true))return {利用可能:true,無効理由:''};}catch{}return {利用可能:false,無効理由:'Tools / MCP が稼働中の場合だけ開けます。'};}
  async function catalog(){
-  const state=await availability();
+  const state=await availability(),browserState=await browserAvailability();
   let chromeState={利用可能:false,無効理由:'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。'};
   try{const ports=await portStatusFn();if(['tools','web'].every(id=>ports.対象.some(item=>item.id===id&&item.開放===true)))chromeState={利用可能:true,無効理由:''};}catch{}
   const [,config]=await readConfig(()=>readFile(join(root,'_config','AiDiy_key.json'),'utf8'));
@@ -53,7 +54,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   // 表示は設定値そのまま。起動引数だけAIコアと同じbackend_server基準で解決する。
   // 空欄・制御文字・ドライブ相対値から別のフォルダを補完しない。
   const 起動フォルダ=!normalized||フォルダ.length>4096||/[\u0000-\u001f\u007f]/.test(フォルダ)||(/^[a-z]:/i.test(normalized)&&!isAbsolute(normalized))?'':resolve(root,'backend_server',normalized);
-  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='chrome'?{...app,...chromeState}:app),フォルダ,起動フォルダ};
+  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='chrome'?{...app,...chromeState}:app.id==='browser'?{...app,...browserState}:app),フォルダ,起動フォルダ};
  }
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
@@ -77,6 +78,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   if(pending.has(id))throw fail('このアプリの起動処理中です。',409);
   pending.add(id);
   try{
+   if(id==='browser'){const state=await browserAvailability();if(!state.利用可能)throw fail(state.無効理由,409);}
    if(taskTeam(id)){const state=await availability();if(state.利用可能!==true)throw fail(state.無効理由||'Task / Team バックエンドを起動してください。',409);}
    if(app.単一起動){
     let running;try{running=(await tasks()).some(task=>アプリタスク(id,task));}catch{throw fail('起動中のタスクを確認できませんでした。もう一度お試しください。',503);}

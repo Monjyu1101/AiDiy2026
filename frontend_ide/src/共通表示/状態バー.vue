@@ -6,7 +6,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import WindowActions from './窓操作.vue';
-const props = defineProps({ title: String, status: String, mode: String, connected: Boolean, busy: Boolean, active: Boolean, desktop: Boolean, clockPulse: Boolean, windowApi: Object, windowContext: Object, allowAll: Boolean, allDisplays: Boolean, allBusy: Boolean, hideClose: Boolean });
+const props = defineProps({ title: String, status: String, mode: String, connected: Boolean, busy: Boolean, active: Boolean, desktop: Boolean, clockPulse: Boolean, windowApi: Object, windowContext: Object, allowAll: Boolean, allDisplays: Boolean, allBusy: Boolean, hideClose: Boolean, pinTitle: String });
 const emit = defineEmits(['toggle-all']);
 const pulseLevel = ref(0);
 let pulseTimer;
@@ -24,9 +24,9 @@ onBeforeUnmount(() => {document.removeEventListener('visibilitychange',syncPulse
 </script>
 <template>
   <header class="panel-brand" :class="{ desktop }">
-    <span class="connection-label" role="status"><i :class="{ online: connected, active: active || busy }"></i>{{ status || (busy ? '接続中' : connected ? '接続済み' : '未接続') }}</span>
+    <span class="connection-label" role="status"><i :class="{ online: connected, active: active || busy }"></i>{{ status || (busy ? '接続中' : connected ? '接続済み' : '未接続') }}<slot name="connection-tools"></slot></span>
     <strong>{{ title }}</strong>
-    <WindowActions v-if="desktop" :window-api="windowApi" :window-context="windowContext" :allow-all="allowAll" :all-displays="allDisplays" :all-busy="allBusy" :hide-close="hideClose" @toggle-all="emit('toggle-all')" />
+    <WindowActions v-if="desktop" :window-api="windowApi" :window-context="windowContext" :allow-all="allowAll" :all-displays="allDisplays" :all-busy="allBusy" :hide-close="hideClose" :pin-title="pinTitle" @toggle-all="emit('toggle-all')"><slot name="window-tools"></slot></WindowActions>
   </header>
   <div class="connection-bar" :class="{ online: connected && mode !== 'offline', offline: mode === 'offline' }" :style="pulseStyle"></div>
 </template>

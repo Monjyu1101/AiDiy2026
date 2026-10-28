@@ -4,11 +4,13 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, utimes } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, unlink, utimes } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {renderMarkdownPdf} from './MarkdownPDF.mjs';
 import { createNativeExplorer } from './explorer-native.mjs';
 
-const ACTIONS = new Set(['copy', 'rename', 'trash', 'create-file', 'create-folder']);
+const ACTIONS = new Set(['copy', 'rename', 'trash', 'create-file', 'create-folder', 'pdf']);
 const MAX_BODY = 16 * 1024;
 const issue = (status, message, code = 'explorer_error') => Object.assign(new Error(message), { status, code });
 const sameEntry = (a, b) => a.dev === b.dev && a.ino === b.ino && a.isDirectory() === b.isDirectory();
@@ -61,7 +63,7 @@ function readBody(req) {
 
 /** ファイル本文の編集APIではなく、Explorer の明示操作だけを扱う。 */
 export function createExplorerFiles(root, { state = () => ({ active: true }), onChange = () => {}, native = createNativeExplorer(),
-  limits = {} } = {}) {
+  limits = {}, pdfRenderer = renderMarkdownPdf } = {}) {
   const caps = { maxEntries: 20000, maxBytes: 512 * 1024 * 1024, maxPending: 16, timeMs: 120000, ...limits };
   let generation = 0, closed = false, pending = 0, tail = Promise.resolve();
   const rootPromise = realpath(root).then(async full => ({ full, info: await lstat(full) }));
@@ -156,6 +158,27 @@ export function createExplorerFiles(root, { state = () => ({ active: true }), on
         return { action, path, name, type: action === 'create-folder' ? 'directory' : 'file' };
       }
       const source = await locate(body.path), name = basename(source.full);
+      if (action === 'pdf') {
+        if(source.type!=='file'||!/\.md$/i.test(name))throw issue(400,'Markdown（.md）ファイルを選択してください。','not_markdown');
+        if(source.info.size>1024*1024)throw issue(413,'MarkdownのPDF化は1MBまでです。','pdf_limit');
+        const parentPath=source.path.includes('/')?source.path.slice(0,source.path.lastIndexOf('/')):'';
+        const parent=await locate(parentPath,{directory:true,allowRoot:true}),pdfName=name.slice(0,-3)+'.pdf',path=toPath(parentPath,pdfName),full=join(parent.full,pdfName);
+        const checkTarget=async()=>{if(!await absent(full)){const target=await locate(path);if(target.type!=='file')throw issue(409,'PDFの保存先に同名のフォルダがあります。','not_file');}};
+        await checkTarget();
+        const pdf=await pdfRenderer({root:(await rootPromise).full,path:source.path});
+        if(!Buffer.isBuffer(pdf)||pdf.subarray(0,5).toString()!=='%PDF-'||pdf.length>50*1024*1024)throw issue(503,'PDFの生成結果を確認できません。','pdf_failed');
+        const current=await recheck(source);await recheck(parent);check();
+        if(current.info.size!==source.info.size||current.info.mtimeMs!==source.info.mtimeMs)throw issue(409,'PDF化中にMarkdownが変更されました。もう一度お試しください。','changed_path');
+        // 完成した一時ファイルとの置換で、生成・書き込み失敗時は既存PDFを残す。
+        const temporary=join(parent.full,`.aidiy-pdf-${randomUUID()}.tmp`);
+        const output=await open(temporary,'wx');
+        try{
+          try{await output.writeFile(pdf);}finally{await output.close();}
+          await recheck(parent);await checkTarget();check();
+          await rename(temporary,full);changed=true;
+        }finally{await unlink(temporary).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+        return {action,path,name:pdfName,type:'file',previousPath:source.path};
+      }
       if (action === 'trash') {
         if (body.confirmed !== true) throw issue(400, 'ゴミ箱への移動には確認が必要です。', 'confirmation_required');
         await recheck(source); check();

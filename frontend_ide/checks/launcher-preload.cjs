@@ -29,11 +29,13 @@ if(process.versions.electron&&process.type==='browser')process.nextTick(()=>{
     }
    },100);
    window.once('closed',()=>clearInterval(timer));
-   setTimeout(async()=>{
+   const captureReady=async()=>{
     if(window.isDestroyed())return;
+    if(!window.isVisible()||await window.webContents.executeJavaScript(`document.documentElement.classList.contains('desktop-opening')`)){setTimeout(captureReady,100);return;}
     writeFileSync(join(folder,'window.json'),JSON.stringify({pid:process.pid,visible:window.isVisible(),url:window.webContents.getURL(),bounds:window.getBounds(),area:screen.getDisplayMatching(window.getBounds()).workArea}));
-    writeFileSync(join(__dirname,`../../nn-launcher-${process.env.AIDIY_DEVELOPMENT_KIND}.png`),(await window.webContents.capturePage()).toPNG());
-   },1800);
+    writeFileSync(join(folder,'launcher.png'),(await window.webContents.capturePage()).toPNG());
+   };
+   setTimeout(captureReady,100);
   });
  });
 });

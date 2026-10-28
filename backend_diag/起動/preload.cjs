@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('aidiyWindow',Object.freeze({
   ipcRenderer.on('diag:pin-state',listener);
   return ()=>ipcRenderer.removeListener('diag:pin-state',listener);
  },
+ showMicroMenu:items=>Array.isArray(items)?ipcRenderer.invoke('diag:window','microMenu',items):Promise.resolve(false),
+ onMicroMenu:callback=>{
+  if(typeof callback!=='function')return ()=>{};
+  const listener=(_event,action)=>{if(['mini','normal'].includes(action))callback(action);else if(action?.type==='launch'&&typeof action.key==='string')callback({type:'launch',key:action.key});};
+  ipcRenderer.on('diag:micro-menu',listener);
+  return ()=>ipcRenderer.removeListener('diag:micro-menu',listener);
+ },
  close:()=>ipcRenderer.invoke('diag:window','close'),
  selectProject:()=>ipcRenderer.invoke('diag:window','selectProject'),
  startMini:enabled=>typeof enabled==='boolean'?ipcRenderer.invoke('diag:window','startMini',enabled):Promise.resolve(false),

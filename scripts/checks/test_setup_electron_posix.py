@@ -89,6 +89,8 @@ class ElectronPosixTests(unittest.TestCase):
                         patch.object(setup, '_runtime_in_use', return_value=False), \
                         patch.object(setup.urllib.request, 'urlopen') as download:
                     # 別プロジェクトにして peer dist の流用ではなく ZIP 読込を確認する。
+                    if os.name == 'nt' and platform_name == 'darwin':
+                        self.skipTest('Mac frameworkのシンボリックリンク展開はPOSIX実環境で確認')
                     target = self.project(f'{platform_name}/{name.replace("/", "-")}/{name}')
                     archive = self.cache / f'electron-v{VERSION}-{platform_name}-x64.zip'
                     archive.write_bytes(payload(platform_name))

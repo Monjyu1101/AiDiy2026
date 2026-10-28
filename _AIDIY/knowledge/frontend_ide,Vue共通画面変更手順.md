@@ -19,14 +19,17 @@
 
 移動時は通常のimportに加え、テストのreadFile・仮想require、型宣言の隣接、`viewer/server.mjs` の最新ファイル共有、`aidiy_console/terminal.mjs` のPowerShell補完情報を確認してください。日本語パスをファイルAPIへ渡すときはURLオブジェクトか `fileURLToPath()` を使い、URLの `.pathname` を直接ファイル名として使わないでください。`checks/component-paths.mjs` は実Vueマウントの論理名とファイルの対応を一か所にまとめます。
 
-## Task / Team の独立版（Avatarからのコピー）
+## Task / Team の独立版（Avatarからの移設）
 
-`frontend_ide/src/タスクチーム/` は Avatar の AIタスク・AIチームをコピーした独立画面です。元の `frontend_avatar` の画面は残し、実行時に Avatar の配布物やサーバーを読み込みません。Task / Team 専用の `taskteam.js` / `taskteam.css` を生成し、Code / Live の画面 bundle へ Three.js・Mermaid を混ぜません。
+`frontend_ide/src/タスクチーム/` は Avatar から移設した AIタスク・AIチームの独立画面です。Web／Avatar内の旧画面・メニュー・専用通信設定は撤去済みで、実行時に Avatar の配布物やサーバーを読み込みません。Task / Team 専用の `taskteam.js` / `taskteam.css` を生成し、Code / Live の画面 bundle へ Three.js・Mermaid を混ぜません。
 
 - `python frontend_ide/_setup.py` または全体setupのIDE群を選択して準備します。`aidiy_task` / `aidiy_team` で個別Electron起動、`--browser` で同じ画面をWeb起動します。
 - ElectronのTaskは元Avatarと同じ要求・フロー図・明細の3独立ウィンドウと編集／応答内容用の別窓を持ちます。起動直後とログアウト後は要求の主画面だけを表示し、ログイン成功時にフロー図・明細を開きます。ログアウトは編集窓も閉じ、主画面を閉じていた場合は先に主画面を再表示します。3画面はそれぞれ閉じられ、各画面右上のボタンで閉じた画面を再表示できます。3画面すべてを閉じると編集窓も閉じ、Taskアプリだけが終了します。Web版は3ペイン一体表示です。
 - Taskの認証は同一起動のメインプロセス内メモリで同期し、要求画面を先に閉じても残りの画面を利用できます。他アプリへ共有せず、最終終了時に破棄します。選択タスクと編集完了は同じ起動元の画面間で同期します。
+- 実Windowsでの窓寿命の確認は、Core／TaskTeamを起動して `node frontend_ide/scripts/check-task-desktop.mjs` を実行します。ローカル試験用アカウントで認証し、各主画面の個別終了・右上ボタンからの再表示・連打・主画面なしのログアウト・再ログイン・全終了を確認します。業務データは変更しません。アニメーション用の一時窓は主画面数に含めず、起動完了通知を待ちます。
+- 3窓の切断・復帰も調べる場合は、環境変数 `AIDIY_TEST_CONNECTION_INTERRUPT=1` を付けて同じ試験を実行します。`TASK_CONNECTION_READY` が出てからDiagでTaskTeamだけを停止し、`TASK_CONNECTION_OFFLINE` の後に再起動します。全3窓の表示が接続済みに戻ってから窓寿命の試験へ進みます。Coreは維持し、試験後は環境変数を解除します。
 - ログインは既存Coreの利用者認証を使用します。Task / Team とAvatarの認証保存を分け、片方のログアウトで別アプリの保存情報を消しません。バックエンドの業務データは共通です。
+- Task / Teamのログインは共通パネルで管理します。上部のAiDiyアイコンは黒背景に置き、Code未入力画面と同じ `welcome-mark` の二重四角形・逆回転を再利用します。入力カードは既存ダイアログに合わせた薄い青紫で、アイコンまでカード色で囲みません。カード内の重複タイトルやサーバー案内は表示しません。低い窓ではスクロールできます。回転はCodeと同じ共通CSSに任せ、Task / Teamだけを停止する上書きは加えません。
 - Coreは `PORT_CORE`（既定8091）、Task / Teamは共通の `PORT_TASKTEAM`（既定8093）です。起動元サーバーが配置先設定からloopback宛先を決定し、画面から任意URLや秘密設定を渡せないようにします。
 - Codeと共通の状態バーを使いますが、シアン脈動の判定はtoolsではなくTask / Teamの `/health` による実疎通です。停止・通信失敗時は接続済みに見せません。
 - 元Avatarのコピー元を更新した際は必要な変更だけを明示的に反映します。コピー版から元ファイルを削除・自動同期しません。
@@ -196,7 +199,7 @@ MCPは `session="aidiy_ide"`、複数IDEでは `aidiy_ide-2` 以降です。`bac
 
 Electron全体のremote-debugging-portは使わず、専用ページのCDPだけを中継します。HTTP・WebSocketはloopbackとトークンで限定し、WebページからのOrigin付き要求を拒否します。IDE本体やCode/ConsoleのTargetへアクセスするBrowser/Targetドメインは転送しません。`new_tab` だけは専用アダプターから所有IDEへ新しいBrowserパネルを要求します。Web起動の通常タブは登録しません。
 
-確認は `node --test frontend_ide/checks/browser*.test.mjs` と `backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_tools/tests -p test_ide_browser_session.py`。実画面確認は共通Vueの配布物生成と変更済みtoolsの起動後、`node frontend_ide/scripts/check-browser.mjs` を実行します。Googleへの実接続、HTML/HTMと相対CSS・リンク、履歴、MCPからの一覧・クリック・入力・移動・撮影・新規パネル・終了、各ディスプレイのVR起動配置、利用終了連携を確認し、`temp/browser-check/` に画像と結果を保存します。テスト用プロジェクトとElectronプロファイルを使い、有料AIや音声は起動しません。
+確認は `node --test frontend_ide/checks/browser*.test.mjs` と `backend_tools/.venv/Scripts/python.exe -m unittest discover -s frontend_ide/checks -p test_browser_sessions.py`。実画面確認は共通Vueの配布物生成と変更済みtoolsの起動後、`node frontend_ide/scripts/check-browser.mjs` を実行します。Googleへの実接続、HTML/HTMと相対CSS・リンク、履歴、MCPからの一覧・クリック・入力・移動・撮影・新規パネル・終了、各ディスプレイのVR起動配置、利用終了連携を確認し、`temp/browser-check/` に画像と結果を保存します。テスト用プロジェクトとElectronプロファイルを使い、有料AIや音声は起動しません。
 
 ## VRボタンの表示と切り替え
 
@@ -590,6 +593,17 @@ Electron・Web・VS Code の共通画面は濃いグレー `#383838` の1px外�
 
 ## Browserの日本語URL表示
 
+「Code / Liveへ」は、表示中URLを同じプロジェクトの下書きへ追加します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
+
+Browserの接続表示の右には「撮影」を置きます。表示中のWebContentsViewだけを`capturePage()`でPNG化し、選択プロジェクトの`temp/input/browser-<UUID>.png`へ保存します。タイトルバー・URL欄・デスクトップ全体・スクロール外のページは含めません。任意の保存パスはrendererから受け取らず、撮影中の連打・切断・ページ遷移は拒否します。保存後は画面に保存先を示します。Avatarの`input_image`はAIコアの`backend_server/temp/input`への保存とLive送信であり、このBrowserのプロジェクト内保存とは別の経路です。Browserの撮影だけではLiveやAI推論を起動しません。
+
+Browserのタイトルバーには「FHD」（1920×945上限）、「縦表示」（1080×1785上限）、「F11」を置きます。縦の高さは `1920-(1080-945)=1785` です。サイズボタンはBrowserがあるディスプレイの作業領域を取得し、その中央にウィンドウ全体を配置します。画面より大きい寸法は作業領域まで縮め、負座標の画面にも対応します。最大化・全画面中は通常表示へ戻してから配置します。「F11」ボタンとF11キーは現在のディスプレイのネイティブ全画面表示を切り替え、再押下で戻します。全画面中は最前面を維持し、通常のヘッダー・外周枠を隠して本文を全面に広げます。FHD／縦表示は窓全体の寸法、F11は実ディスプレイの寸法です。
+
+全画面専用パネルは `デスクトップ/ブラウザ全画面パネル.cjs` が透明な子BrowserWindowとして管理し、同じVueの `#browser-header` を読みます。上端4pxへのマウスオーバーで約0.22秒かけて展開します。Windows 11ではacrylic、他環境では対応する半透明背景を使います。WebContentsViewは全画面の同じ矩形を維持し、パネルを重ねても本文を縮めません。専用パネルの📌は表示の継続です。オンで常時表示、オフで即収納し、マウスが離れてから次の上端オーバーで再表示します。背景・タイトルの0.5秒長押しは共通の `長押し窓移動.cjs` を使い、移動開始時に自動で常時表示をオンにします。位置の固定ではなく、オンのまま何度でも移動できます。通常時の📌（窓の最前面維持）とは状態を分けます。
+
+専用パネルの操作は主窓の所有レコードを解決し、同一mainFrameと完全なヘッダーURLを検証します。窓一覧に重複した所有レコードを作りません。撮影は本文だけをキャプチャし、下書き連携のダイアログは主窓へ表示して、その間は本文と専用パネルを隠します。本文・ホスト・専用パネルでF11を受け、キー長押しの反復は無視します。IDEのVR中は従来のF11解除を優先します。全画面終了時は元の窓のピン留め状態へ戻します。サイズ・F11・表示継続の操作はTools切断中も利用でき、ページ操作の接続制約とは分けます。再試験は `scripts/check-browser-window.mjs` で、本文寸法の維持、常時表示の解除、500msの移動、自動ピン留め、専用パネルの撮影と連携を確認します。
+
 `src/ブラウザ/URL表示.js` はURL欄のpath/query/hashに含まれる漢字・かな・日本語句読点だけを表示用に復号します。ホスト名（IDNを含む）やユーザー情報は変換せず、`%20`、ASCIIのエスケープ（`%2F`・`%3F`・`%23`・`%25`など）、不可視文字・方向制御文字・不正UTF-8は保持します。URL全体を `decodeURI` / `decodeURIComponent` に渡さないでください。
 
 `page.url` はElectronの生URLのままです。未編集のEnterは元URLを使い、編集時だけ既存のURL解決・権限検査へ入力を渡します。編集中の状態通知は下書きを上書きしません。確認は `node --test frontend_ide/checks/browser-address.test.mjs frontend_ide/checks/browser.test.mjs frontend_ide/checks/browser-cdp.test.mjs`。実画面では日本語ファイル名・検索語・フラグメント、空白、戻る／進む、再読込、URL編集後のEnterを確認します。
+

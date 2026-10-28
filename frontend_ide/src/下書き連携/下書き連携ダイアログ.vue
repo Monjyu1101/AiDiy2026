@@ -6,7 +6,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import ModalDialog from '../共通表示/共通ダイアログ.vue';
-const props=defineProps({request:Object,loadTargets:Function,insertDraft:Function,launchTarget:Function});
+const props=defineProps({request:Object,loadTargets:Function,insertDraft:Function,launchTarget:Function,emptyHint:String});
 const emit=defineEmits(['close']);
 const snapshot=ref(null),selected=ref(''),busy=ref(false),error=ref('');
 let generation=0,disposed=false;
@@ -45,12 +45,12 @@ onMounted(()=>refresh(true));onBeforeUnmount(()=>{disposed=true;generation++;});
     <p class="draft-source">{{ request.path }}{{ request.selection?'（選択範囲）':'' }}</p>
     <p>起動中の連携先の入力欄へ追加します。既存の下書きを残し、送信はその画面で行います。</p>
     <div class="draft-target-row">
-      <label v-if="targets.length>1||(targets.length===1&&!selected)">連携先<select v-model="selected" :disabled="busy" aria-label="下書きの連携先"><option disabled value="">連携先を選択してください</option><option v-for="item in targets" :key="item.id" :value="item.id">{{ item.label }}</option></select></label>
+      <label v-if="targets.length>1||(targets.length===1&&!selected)">連携先<select v-model="selected" :disabled="busy" aria-label="下書きの連携先" @change="error='' "><option disabled value="">連携先を選択してください</option><option v-for="item in targets" :key="item.id" :value="item.id">{{ item.label }}</option></select></label>
       <span v-else>連携先: {{ targets[0]?.label || '未選択' }}</span>
       <button :disabled="busy" @click="refresh(true)">最前面を再選択</button>
     </div>
     <p v-if="target&&targets.length===1&&snapshot.frontmostTargetId!==target.id" class="draft-target-note">連携先は1件です。最前面は未確認ですが、この連携先を選択しています。</p>
-    <p v-if="!targets.length&&!busy&&!error">起動中のCode / Liveがありません。IDEの「＋ Code」または「＋ Live」から起動してください。</p>
+    <p v-if="!targets.length&&!busy&&!error">{{emptyHint||'起動中のCode / Liveがありません。IDEの「＋ Code」または「＋ Live」から起動してください。'}}</p>
     <p v-if="target&&request.text.length>target.maxLength" class="error">選択範囲が連携先の入力上限を超えています。範囲を短くしてください。</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="busy" role="status">確認中…</p>

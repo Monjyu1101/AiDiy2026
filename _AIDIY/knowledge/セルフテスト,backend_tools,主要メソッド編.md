@@ -6,6 +6,8 @@
 
 ## 総合評価
 
+バックアップは2026年10月28日、隔離フォルダで初回保存、直後の差分0件、変更後の差分と再保存を確認しました。保存先は `.aidiy_backup` です。主要メソッド全体の実施日は10月26日です。
+
 **総合評価：✅ OK（実行対象の主要メソッド）。2026年10月26日・Windowsで確認しました。** 20個のMCPすべての死活確認と仕様取得に成功し、うち18個で選定した主要メソッドの実動作を確認しました。PostgreSQLと動画生成の2個は **PASS（環境依存・判定対象外）** です。全メソッド・全モデルの網羅試験ではありません。
 
 対象環境はWindowsです。Mac／Linux実機と長時間連続運転は **PASS（環境依存・判定対象外）** とし、今回は未実施です。実行成功とは区別し、NGには数えません。
@@ -84,7 +86,7 @@ MCP名は共通の `aidiy_` を省略しています。記載したメソッド�
 | sqlite_query → /aidiy_sqlite/query | sql：SELECT文、params：値の配列、max_rows：上限、allow_write=false | columns／rows／returnedを返す。SQL中の`?`にparamsを対応させる |
 | logs_tail → /aidiy_logs/tail | server=mcp、lines=3、grep：省略可 | linesにログ末尾。今回は取得処理を確認し、ログ全体の無エラー判定は行わない |
 | check_python_syntax → /aidiy_code_check/python_syntax | file_path：絶対パス、venv_project=backend_tools | 指定venvで構文確認。returncode=0を成功とする |
-| backup_run → /aidiy_backup/save/run | project_root：専用試験フォルダ（REST指定） | .backup_localへ保存。バックアップ件数を返す |
+| backup_run → /aidiy_backup/save/run | project_root：専用試験フォルダ（REST指定） | .aidiy_backupへ保存。バックアップ件数を返す |
 | backup_diff_scan → /aidiy_backup/save/scan | project_root：同じ専用フォルダ（REST指定） | 保存後に変更がなければcount=0 |
 
 **注意：** `project_root`はREST側の指定です。MCPのbackup_run／backup_diff_scanにはこの引数がなく、既定のプロジェクトが対象になります。今回の専用フォルダ試験はREST経由です。既存の本体バックアップを参照・変更していません。

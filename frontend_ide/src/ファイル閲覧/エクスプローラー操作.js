@@ -95,6 +95,10 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     const run = epoch, current = () => !disposed && run === epoch;
     row = { ...activeRow(row) }; closeMenu(); clearMessage();
     const path = row.path, destination = directory(row);
+    if(action==='pdf'){
+      if(row.type!=='file'||! /\.md$/i.test(path)){state.error='Markdown（.md）ファイルを選択してください。';return;}
+      return perform({action:'pdf',path});
+    }
     if (action === 'handoff') {
       try {
         if (row.type !== 'file' || !path) throw Error('Code / Liveへ渡すファイルを選択してください。');

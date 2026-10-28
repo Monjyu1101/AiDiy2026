@@ -27,6 +27,14 @@
 
 なお、同一サーバー内では操作を直列化するが、別プロセスが最終検査とOS呼出しの間に祖先フォルダを差し替える攻撃まで防ぐOSレベルのサンドボックスではない。信頼できないプロセスが同じプロジェクトを同時に書き換える環境では利用しない。
 
+## MarkdownのPDF化
+
+`.md` ファイルの右クリックにだけ「PDF化」を表示する。同じフォルダへ拡張子を `.pdf` に変えて保存し、既存PDFは確認なしで上書きする。作成後は一覧を更新する。
+
+描画は `viewer/preview.mjs` のMarkdownプレビューを共用し、非表示のElectronでA4のPDFへ出力する。日本語・表・コード・相対画像を扱い、印刷時は白背景にする。元Markdownは変更しない。Markdownは1MBまで、PDFは50MBまで。生成や書き込みが失敗した場合は既存PDFを保持するため、同じフォルダの一時ファイルを完成させてから置換する。保存先の同名フォルダやリンクは拒否する。
+
+Windowsで実PDF生成も検証する場合は `$env:AIDIY_TEST_PDF_RENDER='1'` を設定し、`node --test checks/markdown-pdf.test.mjs checks/markdown-preview.test.mjs checks/explorer-actions.test.mjs` を実行する。
+
 ## 再検証
 
 `frontend_ide` で次を実行する。

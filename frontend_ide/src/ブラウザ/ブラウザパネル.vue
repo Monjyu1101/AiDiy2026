@@ -7,27 +7,66 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import RefreshButton from '../共通表示/再読込ボタン.vue';
 import {ref,onMounted,onBeforeUnmount} from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
+import DraftHandoffDialog from '../下書き連携/下書き連携ダイアログ.vue';
 import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
-defineProps({standalone:Boolean});
-const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),error=ref('');
-let stop=()=>{},observer,disposed=false,editing=false;
-function update(value){if(disposed||!value)return;page.value=value;if(!editing)address.value=displayBrowserURL(value.url);}
+const props=defineProps({standalone:Boolean,headerOnly:Boolean});
+const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),chrome=ref(),chromeHeight=ref(100),error=ref(''),capturing=ref(false),captureMessage=ref('');
+let stop=()=>{},stopFrame=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame;
+const headerOffset=ref(0);
+const headerWindowApi=props.headerOnly?{
+ ...window.aidiyWindow,
+ pinState:()=>window.aidiyWindow.browserAction('header-pin-state'),
+ togglePin:()=>window.aidiyWindow.browserAction('header-toggle-pin'),
+ onPinChanged:callback=>window.aidiyWindow.onBrowserChanged(value=>callback({pinned:!!value.headerPinned,locked:false})),
+}:undefined;
+const draftRequest=ref(null),handing=ref(false);
+async function handoff(){
+ if(props.headerOnly){await action('open-draft');return;}
+ if(handing.value)return;handing.value=true;
+ try{const result=await window.aidiyWindow.browserAction('draft');if(!result.ok)throw Error(result.error);await window.aidiyWindow.browserAction('draft-dialog',true);draftRequest.value=result.request;}
+ catch(e){error.value=e.message;}finally{handing.value=false;}
+}
+function closeDraft(){draftRequest.value=null;void window.aidiyWindow.browserAction('draft-dialog',false);}
+const loadDraftTargets=()=>window.aidiyWindow.draftTargets();
+const insertDraft=request=>window.aidiyWindow.insertDraft(request);
+function update(value){if(disposed||!value)return;page.value=value;if(value.capturePath)captureMessage.value=value.capturePath;if(!editing)address.value=displayBrowserURL(value.url);}
 async function action(name,value){
  const result=await window.aidiyWindow.browserAction(name,value).catch(e=>({ok:false,error:e.message}));
  if(disposed)return;if(!result?.ok){error.value=result?.error||'ブラウザを操作できません。';return;}
  error.value='';update(result);
 }
 function navigate(){editing=false;void action('navigate',browserAddressTarget(address.value,page.value.url));}
-function resize(){const rect=surface.value?.getBoundingClientRect();if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height}).catch(()=>{});}
+async function capture(){
+ if(capturing.value)return;capturing.value=true;captureMessage.value='';
+ try{
+  const result=await window.aidiyWindow.browserAction('capture');
+  if(!result?.ok)throw Error(result?.error||'撮影できませんでした。');
+  captureMessage.value=result.message||'撮影しました。';error.value='';
+ }catch(e){error.value=e.message;}finally{capturing.value=false;}
+}
+function resize(){const rect=surface.value?.getBoundingClientRect();chromeHeight.value=chrome.value?.getBoundingClientRect().height||100;if(props.headerOnly)void window.aidiyWindow.browserAction('header-size',chromeHeight.value).catch(()=>{});else if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height,chromeHeight:chromeHeight.value}).catch(()=>{});}
+function transition(){cancelAnimationFrame(frame);const end=performance.now()+260;function step(){resize();if(!disposed&&performance.now()<end)frame=requestAnimationFrame(step);}step();}
 onMounted(()=>{
  stop=window.aidiyWindow.onBrowserChanged(update);void action('state');
- observer=new ResizeObserver(resize);observer.observe(surface.value);resize();
+ if(props.headerOnly){document.documentElement.classList.add('browser-header-document');stopFrame=window.aidiyWindow.onBrowserHeaderFrame?.(value=>{headerOffset.value=value;})||(()=>{});}
+ else stopDraft=window.aidiyWindow.onBrowserOpenDraft?.(()=>{void handoff();})||(()=>{});
+ observer=new ResizeObserver(resize);if(surface.value)observer.observe(surface.value);if(chrome.value)observer.observe(chrome.value);resize();
 });
-onBeforeUnmount(()=>{disposed=true;stop();observer?.disconnect();});
+onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.headerOnly)document.documentElement.classList.remove('browser-header-document');observer?.disconnect();cancelAnimationFrame(frame);});
 </script>
 <template>
- <main class="development-app browser-panel desktop-window" data-app="browser">
-  <StatusBar :title="standalone?'AiDiy Browser':'AiDiy IDE / Browser'" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" />
+ <main class="development-app browser-panel desktop-window" :class="{'browser-fullscreen':page.fullscreen,'browser-header-only':headerOnly}" :style="{'--header-offset':headerOffset+'px'}" data-app="browser" @transitionrun.self="transition">
+  <div ref="chrome" class="browser-chrome" data-aidiy-window-move-handle @transitionrun="transition">
+  <StatusBar :title="standalone?'AiDiy Browser':'AiDiy IDE / Browser'" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" :window-api="headerWindowApi" :pin-title="headerOnly?(page.headerPinned?'ヘッダーの常時表示を解除':'ヘッダーを常時表示'):undefined">
+   <template #connection-tools><button type="button" class="browser-capture" :disabled="capturing||!page.available" :title="captureMessage||'表示中のWeb画面をtemp/inputに保存'" aria-label="Web画面を撮影" @click="capture">{{capturing?'撮影中…':'📷 撮影'}}</button><button type="button" class="browser-handoff" :disabled="handing||capturing||!page.available" title="URLと1分以内の撮影画像パスを下書きへ追加" @click="handoff">Code / Liveへ</button><span v-if="captureMessage" class="browser-capture-status" :title="captureMessage" role="status">保存済み</span></template>
+   <template #window-tools>
+    <span class="browser-window-sizes">
+     <button type="button" title="1920×945を上限に現在の画面内へ配置" @click="action('size','fhd')">FHD</button>
+     <button type="button" title="1080×1785を上限に現在の画面内へ配置" @click="action('size','portrait')">縦表示</button>
+     <button type="button" :title="page.fullscreen?'全画面表示を終了':'現在の画面全体に表示'" :aria-pressed="!!page.fullscreen" @click="action('fullscreen')">F11</button>
+    </span>
+   </template>
+  </StatusBar>
   <form class="browser-toolbar" @submit.prevent="navigate">
    <button type="button" aria-label="戻る" title="戻る" :disabled="!page.available||!page.back" @click="action('back')">←</button>
    <button type="button" aria-label="進む" title="進む" :disabled="!page.available||!page.forward" @click="action('forward')">→</button>
@@ -38,13 +77,29 @@ onBeforeUnmount(()=>{disposed=true;stop();observer?.disconnect();});
   </form>
   <p class="browser-page-title" :title="page.title">{{ page.loading?'読み込み中…':page.title||'Browser' }}<span v-if="page.session"> · session={{ page.session }}</span></p>
   <p v-if="error||page.error" class="error browser-error" role="status">{{ error||page.error }}</p>
-  <div ref="surface" class="browser-surface"></div>
+  </div>
+  <div v-if="!headerOnly" ref="surface" class="browser-surface"></div>
+  <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertDraft" empty-hint="同じプロジェクトで aidiy_code または aidiy_live を起動してください。" @close="closeDraft" />
  </main>
 </template>
 <style scoped>
 .browser-panel{height:100vh;display:flex;flex-direction:column;background:#080c1a;color:#dce6f4}
+.browser-chrome{flex:none;background:#080c1a;z-index:1}
+.browser-capture,.browser-handoff{margin-left:7px;padding:0 6px;height:24px;font-size:11px;white-space:nowrap;-webkit-app-region:no-drag}
+.browser-capture-status{margin-left:5px;white-space:nowrap;font-size:10px;color:#9edfff}
+.development-app.browser-panel.browser-fullscreen{border:0;position:relative}
+.browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
+.development-app.browser-header-only{height:auto;min-height:0;background:transparent;border:0;overflow:visible}
+.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0 0 12px 12px;overflow:hidden;background:linear-gradient(135deg,#17243fa8,#25305288);backdrop-filter:blur(24px) saturate(145%)}
+.browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
+.browser-header-only .browser-toolbar input{background:#07132266}
+.browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}
+.browser-window-sizes button{width:auto;min-width:42px;height:24px;padding:0 7px;font-size:11px;white-space:nowrap}
 .browser-toolbar{display:flex;align-items:center;gap:5px;padding:7px 9px;border-bottom:1px solid #2c4055;flex:none}
 .browser-toolbar button{padding:5px 9px;flex:none}.browser-toolbar input{flex:1;min-width:60px;background:#080f1b;color:#e2ecf8;border:1px solid #375067;border-radius:3px;padding:6px 9px;font:inherit}
 .browser-page-title{margin:0;padding:3px 10px;font-size:11px;color:#9eb4c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 .browser-error{margin:0;padding:6px 10px;flex:none}.browser-surface{flex:1;min-height:0}
+</style>
+<style>
+html.browser-header-document,html.browser-header-document body,html.browser-header-document #app{background:transparent!important;overflow:hidden}
 </style>

@@ -10,6 +10,8 @@ const PORT_APPS = 8098
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
+    // public配下の独立HTMLは各ページのimportmapを使う。アプリの依存探索へ混ぜない。
+    entries: ['index.html'],
     include: ['monaco-editor'],
   },
   resolve: {

@@ -92,7 +92,7 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - 確認項目: `商品分類ID`, `有効`, `件数制限`, `無効も表示`, `qBooleanCheckbox`, `ListRequest`
 - [ ] X系に `X立体リバーシ`、`X世界の絶景`、`X太陽系`、`Xドッグファイト`、`Xビデオ`（独立ルート `/Xビデオ`）を含める。
   - 同期元: `frontend_web/src/router/index.ts`, `frontend_web/src/components/Xその他/`
-- [ ] `frontend_web` の Core 系ルートに `/AiDiy`、`/AIタスク`、`/AIチーム` を含める。
+- [ ] `frontend_web` の Core 系ルートに `/AiDiy` を含め、旧 `/AIタスク`／`/AIチーム` は含めない。Task／Teamは独立コマンドへ案内する。
   - 同期元: `frontend_web/src/router/coreRouter.ts`
 - [ ] `frontend_avatar` の表示選択は現行コンポーネント名で書く。
   - `AIコア_xneko.vue`, `AIコア_xeyes.vue`, `AIコア_アナログ時計.vue`, `AIコア_デジタル時計.vue`, `AIコア_カレンダー.vue`

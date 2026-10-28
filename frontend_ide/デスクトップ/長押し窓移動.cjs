@@ -85,7 +85,7 @@ function rendererMoveGesture(action,owner,id,backgroundTarget){
  if(action==='disarm')tracker.disarm(id);
  return false;
 }
-function installNativeWindowMove({record,contents=record.window.webContents,drag,screen,setTimer=setTimeout,clearTimer=clearTimeout,setTick=setInterval,clearTick=clearInterval}){
+function installNativeWindowMove({record,contents=record.window.webContents,drag,screen,onMoveStart=()=>{},setTimer=setTimeout,clearTimer=clearTimeout,setTick=setInterval,clearTick=clearInterval}){
  if(!movableKinds.has(record.kind))return()=>{};
  const control=drag.forRecord(record),win=record.window,listeners=[];
  let current=null,disposed=false,replaying=0,owner=randomUUID();
@@ -120,6 +120,7 @@ function installNativeWindowMove({record,contents=record.window.webContents,drag
   if(!valid(state)||armed!==true){finish();return;}
   state.token=control.begin();
   if(!state.token){finish();return;}
+  onMoveStart();
   const zoom=contents.getZoomFactor();
   state.center=control.isCenterMove?.();state.zoom=zoom;state.origin=screen.getCursorScreenPoint();
   state.feedback=showWindowMoveFeedback(contents,{x:state.down.x/zoom,y:state.down.y/zoom});
@@ -163,9 +164,9 @@ function installNativeWindowMove({record,contents=record.window.webContents,drag
  return dispose;
 }
 // 他アプリもmainが所有する窓だけを取り付ける。rendererへIPC・座標指定を追加しない。
-function attachNativeWindowMove(window,screen,kind){
+function attachNativeWindowMove(window,screen,kind,options={}){
  const record={window,kind,revision:0};
  const drag=createCodeDrag({trustedEvent:()=>null,screen});
- return installNativeWindowMove({record,drag,screen});
+ return installNativeWindowMove({...options,record,drag,screen});
 }
 module.exports={installNativeWindowMove,attachNativeWindowMove,backgroundMoveTarget,rendererMoveGesture};

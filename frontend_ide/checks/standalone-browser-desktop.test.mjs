@@ -63,6 +63,8 @@ test('Standalone Browser: 専用プロファイル、共有CDP、最終窓終了
  const second=await a.bridgeOptions.openPanel('https://example.com/');assert.equal(a.windows.length,2);assert.equal(second.owner,undefined);
  assert.equal(a.pages.length,2);assert.equal(a.messages[0].windowShown,true);
  a.setConnected(false);assert.equal(await a.bridgeOptions.canUse(),false);
+ assert.equal((await a.request('development:browser-action',a.windows[0],'size','portrait')).ok,true);
+ assert.equal((await a.request('development:browser-action',a.windows[0],'fullscreen')).ok,true);
  assert.equal((await a.request('development:browser-action',a.windows[0],'navigate','https://example.com/')).ok,false);
  await assert.rejects(a.bridgeOptions.openPanel('https://example.com/'),/tools/);
  a.setConnected(true);assert.equal((await a.request('development:browser-action',a.windows[0],'navigate','https://example.com/')).ok,true);

@@ -15,21 +15,21 @@ function createDraftRouter({records,readState,sessionKey,focusWindow,isQuitting=
  const alive=record=>!!record&&!record.window.isDestroyed()&&[...records.values()].includes(record);
  function ownerOf(source){
   if(!alive(source))return null;
-  const owner=source.kind==='ide'&&!source.owner?source:source.kind==='viewer'?source.owner:null;
-  return alive(owner)&&owner.kind==='ide'?owner:null;
+  const owner=['ide','code','live'].includes(source.kind)&&!source.owner?source:['viewer','browser'].includes(source.kind)?source.owner:null;
+  return alive(owner)&&['ide','code','live'].includes(owner.kind)?owner:null;
  }
  function linked(source,owner,state,revision){
   return !isQuitting()&&ownerOf(source)===owner&&owner.revision===revision&&!!state?.active&&bounded(state.project?.path,4096)&&bounded(sessionKey(state),1024)&&(source===owner||source.linkKey===sessionKey(state));
  }
  function currentTarget(target,owner,state){
-  return alive(target)&&target.owner===owner&&target.linkKey===sessionKey(state)&&Object.hasOwn(limits,target.kind)&&(target.kind!=='live'||state.mode==='online')&&target.draftTarget?.projectPath===state.project.path;
+  return alive(target)&&(target===owner||target.owner===owner&&target.linkKey===sessionKey(state))&&Object.hasOwn(limits,target.kind)&&(target.kind!=='live'||state.mode==='online')&&target.draftTarget?.projectPath===state.project.path;
  }
  // OSのfocusイベントだけを記録する。IDE・ビューア・登録更新では順番を変えない。
  function focused(record){
-  if(alive(record)&&record.owner&&Object.hasOwn(limits,record.kind))focusOrder.set(record,++focusSequence);
+  if(alive(record)&&Object.hasOwn(limits,record.kind))focusOrder.set(record,++focusSequence);
  }
  function register(record,value){
-  if(!alive(record)||!record.owner||!Object.hasOwn(limits,record.kind))return fail('この画面は渡し先として登録できません。');
+  if(!alive(record)||!Object.hasOwn(limits,record.kind))return fail('この画面は渡し先として登録できません。');
   if(value===null){record.draftTarget=null;return{ok:true};}
   if(!value||value.kind!==record.kind||!bounded(value.contextId,128)||!bounded(value.projectPath,4096)||typeof value.label!=='string'||value.label.length>200)return fail('渡し先の情報が不正です。');
   record.draftId??=uuid();

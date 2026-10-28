@@ -27,6 +27,10 @@ class InUseTest(unittest.TestCase):
         (dep/'package.json').write_text(json.dumps({'version':'1.0.0'}))
 
     def test_healthy_runtime_reused_without_npm_or_binary_replacement(self):
+        dist = self.root / 'node_modules/electron/dist'
+        dist.mkdir(parents=True)
+        for name in ('dxcompiler.dll', 'ffmpeg.dll', 'icudtl.dat', 'resources.pak'):
+            (dist / name).write_bytes(b'fixture')
         run=Mock();warning=Mock()
         with patch.object(subject,'_runtime_in_use',return_value=True),patch.object(subject,'electron_binary_ready',return_value=True),patch.object(subject,'prepare_electron_binary') as prepare:
             self.assertTrue(subject.setup_dependencies(self.root,'npm','IDE',run,warning=warning))

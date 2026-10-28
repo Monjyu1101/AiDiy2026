@@ -7,8 +7,8 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await vue.nex
 const nodes=node=>[node,...node.children.flatMap(nodes)];
 async function fixture({switching=false}={}){
  const modules={'./アプリアイコン.mjs':await import('../ui/src/アプリ起動/アプリアイコン.mjs'),'./アイコン移動.mjs':await import('../ui/src/アプリ起動/アイコン移動.mjs'),'./円周配置.cjs':require('../ui/src/アプリ起動/円周配置.cjs')};
- const window=new EventTarget(),calls=[],sizes=[];
- window.aidiyWindow={resizeMicroLabel:async height=>{sizes.push(height);return true;},expandMicro:async(...args)=>{calls.push(args);return true;}};
+ const window=new EventTarget(),calls=[],sizes=[],menus=[];let menuCallback;
+ window.aidiyWindow={onMicroMenu:callback=>{menuCallback=callback;return ()=>menuCallback=null;},showMicroMenu:items=>menus.push(items),resizeMicroLabel:async height=>{sizes.push(height);return true;},expandMicro:async(...args)=>{calls.push(args);return true;}};
  const {descriptor}=parse(source('アプリ起動/マイクロランチャー.vue'));
  const compiled=compileScript(descriptor,{id:'micro-project',inlineTemplate:true,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,window,document:{documentElement:{classList:{add(){},remove(){}}}},setTimeout,clearTimeout,require:id=>id==='vue'?vue:modules[id]||{}});
@@ -17,7 +17,7 @@ async function fixture({switching=false}={}){
  const appState={フォルダ:vue.ref('/work/project'),項目:vue.ref([]),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}},cliState={項目:vue.ref([]),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  const state={進捗表示:vue.ref(null)};
  const root=make('root'),app=renderer.createApp({render:()=>vue.h(module.exports,{appState,cliState,state,online:true,switching})});app.mount(root);
- return {app,root,appState,cliState,state,calls,sizes,label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
+ return {app,root,appState,cliState,state,calls,sizes,menus,menu:action=>menuCallback?.(action),label:()=>nodes(root).find(n=>n.props.class==='micro-project'),core:()=>nodes(root).find(n=>n.props.class==='micro-core')};
 }
 
 test('VS Codeを含む6アプリ・7CLI・エディターの14個をアイコン表示へ渡す',async()=>{
@@ -96,5 +96,39 @@ test('切替中もラベル高さを通知し、main側で完成画像に反映�
   const error=nodes(f.root).find(n=>n.props.class==='micro-batch-status');assert.match(error.text,/要確認/);assert.match(error.props.title,/停止失敗/);
   assert.ok(nodes(error).some(n=>n.tag==='button'),'エラー詳細を通常表示で確認できる');
   f.state.進捗表示.value=null;await flush();assert.equal(nodes(f.root).some(n=>n.props.class==='micro-batch-status'),false);
+ }finally{f.app.unmount();}
+});
+
+
+test('右クリック一覧は表示アイコンと同じ順序・件数で、非表示項目や無効表示を加えない',async()=>{
+ const f=await fixture();
+ try{
+  f.appState.項目.value=[{id:'chrome',名前:'Chrome'},{id:'browser',名前:'aidiy_browser'},{id:'discord',名前:'Discord'},{id:'code',名前:'Code'}];
+  f.cliState.項目.value=[{id:'aidiy_hermes',名前:'AiDiy Hermes'}];
+  f.appState.利用可能=()=>false;
+  await flush();
+  nodes(f.root).find(n=>n.props['aria-label']==='アイコン化ランチャー').props.onContextmenu({preventDefault(){}});
+  assert.deepEqual(Array.from(f.menus.at(-1),x=>x.key),['app:code','app:browser','cli:aidiy_hermes','app:discord','app:chrome']);
+  assert.deepEqual(Array.from(f.menus.at(-1),x=>x.label),['Code','Browser','Hermes','Discord','Chrome']);
+  assert.ok(f.menus.at(-1).every(x=>!Object.hasOwn(x,'enabled')));
+  f.cliState.項目.value=[];await flush();
+  nodes(f.root).find(n=>n.props['aria-label']==='アイコン化ランチャー').props.onContextmenu({preventDefault(){}});
+  assert.equal(f.menus.at(-1).length,4);
+ }finally{f.app.unmount();}
+});
+
+
+test('二重円は外側完了後に内側を展開し、収納は同じ遅延を反転する',async()=>{
+ const f=await fixture();
+ try{
+  f.appState.項目.value=['avatar','task','team','ide','console','code','live','discord','browser','chrome'].map(id=>({id,名前:id}));
+  f.cliState.項目.value=['aidiy_hermes','claude','codex','copilot','agy','grok','opencode','vscode'].map(id=>({id,名前:id}));await flush();
+  const positions=nodes(f.root).filter(n=>n.props.class==='micro-position');
+  assert.equal(positions.length,18);
+  const start=n=>parseFloat(n.props.style['--open-delay']),end=n=>parseFloat(n.props.style['--close-delay']);
+  const inner=positions.slice(0,7),outer=positions.slice(7);
+  assert.equal(start(outer[0]),0);assert.ok(start(inner[0])>=start(outer.at(-1))+420);
+  assert.equal(end(inner.at(-1)),0);assert.ok(end(outer.at(-1))>=end(inner[0])+420);
+  for(const n of positions)assert.equal(start(n)+end(n),1140);
  }finally{f.app.unmount();}
 });

@@ -8,9 +8,10 @@ import {resolve,join,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createServer} from '../diag_main.mjs';
 import {desktopBinary} from '../起動/desktop.mjs';
+import {createAppLauncher} from '../起動/アプリ起動.mjs';
 const profile=await mkdtemp(join(tmpdir(),'diag-initial-mini-')),output=resolve('temp/diag-initial-mini.png');await mkdir(resolve('temp'),{recursive:true});
 const catalog=JSON.parse(await readFile(new URL('../../scripts/起動対象.json',import.meta.url),'utf8')).filter(item=>item.起動管理!==false);
-const token='a'.repeat(43),server=createServer({token,entries:[],coverage:{},toolsStatusFn:async()=>({online:true}),
+const token='a'.repeat(43),server=createServer({token,entries:[],coverage:{},toolsStatusFn:async()=>({online:true}),appLauncher:createAppLauncher({root:profile,taskTeamStatus:async()=>({利用可能:false}),portStatusFn:async()=>({対象:[]})}),
  portStatusFn:async()=>({対象:catalog.map(item=>({...item,開放:item.id==='tools'}))}),
  startManager:{snapshot:async()=>({対象:catalog.map(item=>({...item,状態:'未起動',設定:item.初期設定})),終了時停止あり:false}),logSnapshot:async()=>({ログ:'',位置:0}),close(){}},
  previousResults:{snapshot:async()=>({})},publicCache:{snapshot:()=>({状態:'未取得'})},modelTrials:{close(){}}});

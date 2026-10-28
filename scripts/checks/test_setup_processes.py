@@ -17,6 +17,15 @@ def app(pid, kind, parent=1):
     return proc(pid, f'node {ROOT}/frontend_ide/launch.mjs --app {kind}', parent)
 
 class SetupProcessesTest(unittest.TestCase):
+    def setUp(self):
+        # POSIXの合成記録を使う。Windows固有ケースは各テスト内で上書きする。
+        platform = patch.object(subject.sys, 'platform', 'linux')
+        platform.start()
+        self.addCleanup(platform.stop)
+        signal = patch.object(subject.signal, 'SIGKILL', 9, create=True)
+        signal.start()
+        self.addCleanup(signal.stop)
+
     def test_all_components_except_code_ide_discord(self):
         records = [app(10, 'code'), app(11, 'ide'), app(12, 'live'), app(13, 'console')]
         for i, folder in enumerate(subject.COMPONENTS[:-1], 20):
@@ -216,6 +225,14 @@ class SetupProcessesTest(unittest.TestCase):
         kill.assert_not_called()
 
 class StopOutputTest(unittest.TestCase):
+    def setUp(self):
+        platform = patch.object(subject.sys, 'platform', 'linux')
+        platform.start()
+        self.addCleanup(platform.stop)
+        signal = patch.object(subject.signal, 'SIGKILL', 9, create=True)
+        signal.start()
+        self.addCleanup(signal.stop)
+
     def test_no_targets_is_not_stop_success(self):
         info, errors = [], []
         with patch.object(subject, 'snapshot', return_value=[]):
