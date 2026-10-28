@@ -16,6 +16,7 @@ const props = defineProps({ base: String, icon: String, desktop: Boolean, linked
 const windowTitle = ref('');
 const container = ref(null), connected = ref(false), status = ref('起動中'), project = ref(''), shell = ref(''), error = ref('');
 const completion = ref(''), toolsOnline = ref(false), cli = ref(null);
+const title = computed(() => (windowTitle.value || (props.linked ? 'AiDiy IDE / Console' : 'AiDiy Console')) + (cli.value?.name ? ' / ' + cli.value.name : ''));
 const toolsEnabled = ref(true), toolsChanging = ref(false), socketReady = ref(false);
 const ghostRows = ref([]);
 const inputStarted = ref(false);
@@ -116,7 +117,7 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
 </script>
 <template>
   <section class="console-component" :class="{ 'desktop-window': desktop, 'console-waiting': !inputStarted }">
-    <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Console' : 'AiDiy Console')" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
+    <StatusBar :title="title" :mode="toolsEnabled ? 'online' : 'offline'" :status="toolsEnabled ? '' : '確認OFF'" :connected="toolsOnline" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="project">プロジェクト: {{ projectName }}</span><nav><button class="auto-connect" role="switch" :aria-checked="toolsEnabled" :title="`Tools接続確認 ${toolsEnabled ? 'ON' : 'OFF'}`" :disabled="!socketReady || toolsChanging" @click="toggleTools"><span>Tools接続確認</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button><button :disabled="!connected" title="実行中の処理へ割り込みを送信（キーボードのCtrl+Cはコピー専用）" @click="interrupt">Ctrl+C送信</button><button @click="clearDisplay">表示クリア</button><button v-if="!connected" @click="connect">{{ cli ? '再接続' : '再起動' }}</button></nav></div>
     <div v-if="!inputStarted" class="console-welcome"><TerminalWelcome kind="console" :icon="icon || '/development/AiDiy.png'" /></div>
     <div class="console-screen" aria-label="ターミナル"><div ref="container" class="console-viewport"><div v-if="completion" class="console-completion" role="status" :aria-label="`${completion}（Tabで補完）`"><span v-for="(row, i) in ghostRows" :key="i" class="console-ghost-row" :style="row.style" aria-hidden="true">{{ row.text }}</span></div></div></div>

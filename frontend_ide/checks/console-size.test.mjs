@@ -16,13 +16,14 @@ const {descriptor}=parse(readFileSync(new URL('../src/ターミナル/ターミ�
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 
 // 実Vueのsetupと実FitAddonを通す。文字セルの測定・描画・WebSocketだけを代替する。
-async function fixture(t){
+async function fixture(t,{desktop=false,linked=false,nativeTitle=''}={}){
  const mounted=[],unmounted=[],observers=new Set(),sockets=[],packets=[],resources={terminals:0,disposed:0};
  const container=new EventTarget();container.clientWidth=344;container.clientHeight=76;
  const window={getComputedStyle:element=>({getPropertyValue:key=>key==='height'?String(element.clientHeight):key==='width'?String(element.clientWidth):'0'})};
  const fitModule={exports:{}};
  vm.runInNewContext(readFileSync(require.resolve('@xterm/addon-fit'),'utf8'),{window,module:fitModule,exports:fitModule.exports});
- let terminal;
+ let terminal,titleCalls=0;
+ window.aidiyWindow={title:async()=>{titleCalls++;return nativeTitle;}};
  class Terminal{
   cols=80;rows=24;options={scrollback:5000};listeners={};buffer={active:{}};
   _core={_renderService:{dimensions:{css:{cell:{width:8,height:17}}},clear(){}}};
@@ -42,15 +43,15 @@ async function fixture(t){
  const modules={'./キー入力.js':keyboard,'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
  const script=compileScript(descriptor,{id:'ConsolePanel',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
-  module,URL,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},
+  module,URL,window,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},
   require(id){if(id==='vue')return{...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};if(id in modules)return modules[id];throw Error(id);},
  });
- const props=vue.reactive({base:'/',visible:true}),scope=vue.effectScope(),state=scope.run(()=>module.exports.setup(props,{expose(){}}));
+ const props=vue.reactive({base:'/',visible:true,desktop,linked}),scope=vue.effectScope(),state=scope.run(()=>module.exports.setup(props,{expose(){}}));
  state.container.value=vue.markRaw(container);
  t.after(()=>{for(const callback of unmounted)callback();scope.stop();});
  for(const callback of mounted)await callback();
  sockets[0].onopen();sockets[0].receive({type:'ready',project:'/fixture',shell:'bash',completion:false});
- return{state,props,terminal,container,sockets,packets,resources,observers,resize(height,width=344){container.clientHeight=height;container.clientWidth=width;for(const observer of observers)observer.callback();}};
+ return{state,props,terminal,container,sockets,packets,resources,observers,titleCalls:()=>titleCalls,resize(height,width=344){container.clientHeight=height;container.clientWidth=width;for(const observer of observers)observer.callback();}};
 }
 
 test('Console: 数行の初期サイズ・縮小・拡大・最下行が実FitAddonとresize送信へ反映する',async t=>{
@@ -141,4 +142,31 @@ test('Console welcome: styles target the current console kind', () => {
  const css = readFileSync(new URL('../src/共通表示/会話表示.css', import.meta.url), 'utf8');
  assert.match(css, /\.terminal-welcome\.console h1/);
  assert.doesNotMatch(css, /\.terminal-welcome\.term[ .{]/);
+});
+
+
+test('Console title: CLI display name is appended once, survives reconnect and exit, and leaves project unchanged',async t=>{
+ const f=await fixture(t);
+ assert.equal(f.state.title.value,'AiDiy Console');
+ for(const name of ['Claude Code','Codex CLI','GitHub Copilot CLI','Antigravity CLI','Grok Build','OpenCode','AiDiy Hermes']){
+  const ready={type:'ready',project:'/日本語 プロジェクト',shell:'fixture',cli:{name},state:'running'};
+  f.sockets[0].receive(ready);f.sockets[0].receive(ready);
+  assert.equal(f.state.title.value,`AiDiy Console / ${name}`);
+  assert.equal(f.state.projectName.value,'日本語 プロジェクト');
+  f.sockets[0].receive({type:'exit',code:0});assert.equal(f.state.title.value,`AiDiy Console / ${name}`);
+ }
+ f.sockets[0].receive({type:'ready',project:'/fixture',shell:'bash'});
+ f.props.linked=true;f.state.windowTitle.value='AiDiy IDE / Console 2';
+ assert.equal(f.state.title.value,'AiDiy IDE / Console 2');
+});
+
+
+test('desktop CLI Console does not append its native suffix twice; linked Console still reads its numbered native title',async t=>{
+ const cli=await fixture(t,{desktop:true,nativeTitle:'AiDiy Console / Codex CLI'});
+ cli.sockets[0].receive({type:'ready',project:'/fixture',shell:'codex',cli:{name:'Codex CLI'},state:'running'});
+ await flush();
+ assert.equal(cli.titleCalls(),0,'standalone Console uses terminal metadata, not the already-suffixed native title');
+ assert.equal(cli.state.title.value,'AiDiy Console / Codex CLI');
+ const linked=await fixture(t,{desktop:true,linked:true,nativeTitle:'AiDiy IDE / Console 2'});
+ await flush();assert.equal(linked.titleCalls(),1);assert.equal(linked.state.title.value,'AiDiy IDE / Console 2');
 });

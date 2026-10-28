@@ -20,7 +20,7 @@ import stackingModule from '../デスクトップ/VRパネル前面.cjs';
 import macMenuModule from '../host/scripts/MacOS-Menu.cjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
-async function desktopFixture({platform='win32',kind='ide',active=true,response=1}={}){
+async function desktopFixture({platform='win32',kind='ide',active=true,response=1,env={}}={}){
  const reserved=new Set();
  const handlers=new Map(),state={active,mode:'online',startedAt:10,project:{path:'/project'}},created=[],dialogs=[];
  class Window extends EventEmitter{
@@ -62,7 +62,7 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   './デスクトップ/全画面横断.cjs':{createAllDisplays:({syncChildren})=>{let active=false;return{register(){},attachExitKey:()=>()=>{},leave:()=>false,isActive:()=>active,handle(event,action){if(action==='toggle')active=!active;const owner=[...api.windows.values()].find(record=>record.window.webContents===event.sender);syncChildren(owner);return{ok:true,active};}};}},
  };
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
- const proc=new EventEmitter();Object.assign(proc,{platform,env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:kind},cwd:()=>'/project'});
+ const proc=new EventEmitter();Object.assign(proc,{platform,env:{AIDIY_DEVELOPMENT_URL:'http://127.0.0.1:1234/',AIDIY_DEVELOPMENT_KIND:kind,...env},cwd:()=>'/project'});
  const api=vm.runInNewContext(`(()=>{${source}\nreturn {createWindow,windows,draftRouter};})()`,{require:id=>{if(!(id in modules))throw Error(id);return modules[id];},process:proc,__dirname:'/fixture',console,setInterval:()=>({unref(){}}),clearInterval(){}});
  await tick();const owner=[...api.windows.values()][0];
  return{...api,app,proc,dialogs,owner,handlers,event:record=>({sender:record.window.webContents,senderFrame:record.window.webContents.mainFrame}),
@@ -223,3 +223,34 @@ test('Mac Task: CmdW closes one peer but application/Dock Quit closes all peers 
  assert.deepEqual(records().map(r=>r.taskView),['request']);assert.equal(f.app.quitComplete,undefined);
  records()[0].window.close();await tick();await tick();assert.equal(f.app.quitComplete,true);
  });
+
+
+test('CLI Console: native title and title IPC retain the selected display name after page title changes',async()=>{
+ for(const name of ['Claude Code','Codex CLI','GitHub Copilot CLI','Antigravity CLI','Grok Build','OpenCode','AiDiy Hermes']){
+  const f=await desktopFixture({kind:'console',env:{AIDIY_DEVELOPMENT_CLI_WINDOW:'1',AIDIY_DEVELOPMENT_CLI_NAME:name}});
+  const record=f.owner,title=`AiDiy Console / ${name}`;
+  assert.equal(record.window.getTitle(),title);
+  assert.equal(f.handlers.get('development:window')(f.event(record),'title'),title);
+  record.window.title='CLI process title';record.window.webContents.emit('page-title-updated',{preventDefault(){}});
+  assert.equal(record.window.getTitle(),title);
+  record.window.destroy();
+ }
+ const ordinary=await desktopFixture({kind:'console',env:{AIDIY_DEVELOPMENT_CLI_NAME:'stale name'}});
+ assert.equal(ordinary.owner.window.getTitle(),'AiDiy Console');ordinary.owner.window.destroy();
+});
+
+
+test('Console browser tab title uses launch metadata and leaves ordinary and linked titles unchanged',async()=>{
+ const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'');
+ for(const [config,title] of [
+  [{kind:'console',cliName:'GitHub Copilot CLI'},'AiDiy Console / GitHub Copilot CLI'],
+  [{kind:'console'},'AiDiy Console'],
+  [{kind:'console',linked:true},'AiDiy IDE / Console'],
+  [{kind:'code',cliName:'ignored'},'AiDiy Code'],
+ ]){
+  const document={documentElement:{style:{setProperty(){}}},getElementById:id=>id==='development-config'?{textContent:JSON.stringify(config)}:{}};
+  const mounted=[];
+  vm.runInNewContext(source,{document,devicePixelRatio:1,addEventListener(){},App:{},createApp:(_app,props)=>({provide(){return this;},mount(){mounted.push(props);}})});
+  await tick();assert.equal(document.title,title);assert.equal(mounted.length,1);
+ }
+});

@@ -21,7 +21,7 @@ const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',impo
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
  if(!['code','live','ide','console','task','team'].includes(kind))throw Error('アプリはcode / live / ide / console / task / teamから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
- if(cli)await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env});
+ const cliLaunch=cli?await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env}):undefined;
  const taskTeam=['task','team'].includes(kind);
  const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project):undefined;
  const backend=coreTarget(root,project);
@@ -40,7 +40,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;
    if(kind==='ide'&&await fileHistory.handle(req,res,url))return true;
    if(url.pathname==='/development/config'){
-    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(taskTeam?{taskTeamBase:'/taskteam-api'}:{}),icon:'/development/AiDiy.png'}));return true;
+    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(cliLaunch?{cliName:cliLaunch.name}:{}),...(taskTeam?{taskTeamBase:'/taskteam-api'}:{}),icon:'/development/AiDiy.png'}));return true;
    }
    const iconAsset=url.pathname.startsWith('/development/')?catppuccinAsset(url.pathname.slice('/development/'.length)):undefined;
    const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset){if(taskTeam){res.writeHead(404).end();return true;}return false;}

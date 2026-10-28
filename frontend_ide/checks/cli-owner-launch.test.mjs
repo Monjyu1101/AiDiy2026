@@ -14,8 +14,8 @@ import vm from 'node:vm';
 import { transformSync } from 'esbuild';
 
 // 実launch関数を使い、ブラウザ・Electron・HTTPサーバー・CLIは全てmockする。
-function fixture(opened) {
-  let closed = 0, armed = 0, disposed = 0, openCalls = 0, options;
+function fixture(opened, browser = true) {
+  let closed = 0, armed = 0, disposed = 0, openCalls = 0, options, desktopEnv;
   const messages = [], process = new EventEmitter();
   Object.assign(process, { argv: [], env: { AIDIY_LAUNCHER_CHILD: '1' }, cwd: () => '/fixture', pid: 123, send: value => messages.push(value) });
   const app = { url: 'http://127.0.0.1:9999/', publicUrl: 'http://127.0.0.1:9999/', close: async () => { closed++; } };
@@ -23,19 +23,19 @@ function fixture(opened) {
     'node:child_process': { spawn() { throw Error('process spawning is forbidden in fixture'); } },
     'node:fs': { existsSync: () => true }, 'node:path': path, 'node:url': url, 'node:util': { parseArgs },
     './server.mjs': { startDevelopment: async (_project, value) => { options = value; return app; } },
-    './aidiy_console/cli-launch.mjs': { validateCliOptions() {}, resolveCliLaunch: async () => ({}) },
+    './aidiy_console/cli-launch.mjs': { validateCliOptions() {}, resolveCliLaunch: async () => ({name:'GitHub Copilot CLI'}) },
     './aidiy_console/cli-session.mjs': { createCliOwnerLifetime: () => ({ arm: () => armed++, dispose: () => disposed++, started() {} }) },
-    './viewer/launch-options.mjs': { projectFolder: () => '/fixture', useBrowser: () => true },
+    './viewer/launch-options.mjs': { projectFolder: () => '/fixture', useBrowser: () => browser, electronExecutable: () => 'fixture-electron' },
     './host/scripts/launch-project.mjs': { ブラウザで開く: async () => { openCalls++; return opened; } },
-    './デスクトップ/desktop-process.mjs': { spawnDesktop() { throw Error('desktop forbidden in fixture'); } },
+    './デスクトップ/desktop-process.mjs': { spawnDesktop(_executable,_args,{env}) { desktopEnv=env;const child=new EventEmitter();child.kill=()=>{};queueMicrotask(()=>child.emit('message',{windowShown:true}));return child; } },
     './デスクトップ/project-profile.cjs': { projectIdentity: value => ({ path: value }) },
   };
   let source = readFileSync(new URL('../launch.mjs', import.meta.url), 'utf8');
   source = source.slice(0, source.indexOf('if(process.argv[1]'));
   const module = { exports: {} };
   vm.runInNewContext(transformSync(source, { format: 'cjs', define: { 'import.meta.url': JSON.stringify(new URL('../launch.mjs', import.meta.url).href) } }).code,
-    { module, exports: module.exports, process, URL, console: { log() {}, warn() {} }, require: id => { if (!(id in modules)) throw Error(id); return modules[id]; } });
-  return { launch: module.exports.launch, messages, process, stats: () => ({ closed, armed, disposed, openCalls, options }) };
+    { module, exports: module.exports, process, URL, queueMicrotask, setTimeout, clearTimeout, console: { log() {}, warn() {} }, require: id => { if (!(id in modules)) throw Error(id); return modules[id]; } });
+  return { launch: module.exports.launch, messages, process, stats: () => ({ closed, armed, disposed, openCalls, options, desktopEnv }) };
 }
 
 test('CLIのブラウザ起動失敗: 所有サーバーを閉じ、launchReadyを返さない', async () => {
@@ -57,4 +57,16 @@ test('通常Consoleのブラウザ起動失敗は既存のURL手動表示を維�
   await f.launch('console', ['--browser', '--foreground']);
   assert.equal(f.messages[0].launchReady, true); assert.equal(f.stats().closed, 0); assert.equal(f.stats().armed, 0);
   f.process.emit('SIGTERM'); await Promise.resolve(); assert.equal(f.stats().closed, 1);
+});
+
+
+test('CLI launch forwards the selected display name to Electron and clears inherited names for ordinary Console',async()=>{
+ for(const cli of [true,false]){
+  const f=fixture(true,false);f.process.env.AIDIY_DEVELOPMENT_CLI_NAME='inherited stale title';
+  await f.launch('console',[...(cli?['--cli','copilot']:[]),'--foreground']);
+  assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_CLI_NAME,cli?'GitHub Copilot CLI':'');
+  assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_CLI_WINDOW,cli?'1':'0');
+  assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_PROJECT,'/fixture');
+  f.process.emit('SIGTERM');await Promise.resolve();
+ }
 });

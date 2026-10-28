@@ -15,7 +15,7 @@ import ExplorerActionView from '../ファイル閲覧/エクスプローラー�
 import DraftHandoffDialog from '../下書き連携/下書き連携ダイアログ.vue';
 import { createExplorerActions, containsPath, renamedPath } from './エクスプローラー操作.js';
 import { latestFiles, createLatestUpdates, fileCountChanged } from '../ファイル閲覧/最新ファイル.js';
-import { localDateTimeInput, parseLocalDateTime, timeRangeError, inTimeRange } from './ファイル日時.js';
+import { localDateTimeInput, parseLocalDateTime, timeRangeError, inTimeRange, timeSearchPresets, timeSearchRange } from './ファイル日時.js';
 import { scanWarning } from '../ファイル閲覧/走査警告.js';
 import { searchRouteRecords } from '../開発スペース/経路記録.js';
 import { routeTreeRows, viewTreeRecords, routeNavigationSteps } from '../開発スペース/軌跡ツリー.js';
@@ -258,12 +258,11 @@ function expandSinceMatches() {
 }
 function choose(value) {
   preset.value=value;
-  if(value==='start')since.value=props.startedAt;
-  else if(value==='ten')since.value=Date.now()-600000;
-  else if(value==='hour')since.value=Date.now()-3600000;
-  else if(value==='today'){const d=new Date();d.setHours(0,0,0,0);since.value=d.getTime();}
-  else {since.value=null;until.value=null;endDateInput.value='';}
+  const range=timeSearchRange(value,props.startedAt);
+  since.value=range.since;until.value=range.until;
   dateInput.value=localDateTimeInput(since.value);
+  // 手入力の終了は秒単位で含むため、排他的上限の直前の秒を表示する。
+  endDateInput.value=until.value==null?'':localDateTimeInput(until.value-1000);
   updateSinceRoute();expandSinceMatches();
 }
 function updateSinceRoute(activate=true){
@@ -274,7 +273,7 @@ function updateSinceRoute(activate=true){
 function chooseDate(input, end=false) {
   const value=typeof input==='string'?input:input.value;
   const at=parseLocalDateTime(value,{end,invalid:!!input?.validity?.badInput});
-  if(end){endDateInput.value=value;until.value=at;}
+  if(end){endDateInput.value=value;until.value=at;preset.value='custom';}
   else{dateInput.value=value;since.value=at;preset.value='custom';}
   updateSinceRoute();expandSinceMatches();
 }
@@ -397,7 +396,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
       <p v-if="treeWarning" class="scan-warning" role="status">{{ treeWarning }}</p>
       <section class="explorer-search"><small>表示中: {{ current || tree?.n }}</small>
         <fieldset><legend class="sr-only">検索方法</legend><label><input v-model="mode" type="radio" value="since">時刻検索</label><label><input v-model="mode" type="radio" value="grep">grep検索</label><label><input v-model="mode" type="radio" value="ai">AiDiy検索</label></fieldset>
-        <div v-if="mode==='since'" class="time-search"><label>開始 <input type="datetime-local" step="1" :value="dateInput" :aria-invalid="!!dateError" :aria-describedby="dateError?'time-search-error':undefined" @change="chooseDate($event.target)"></label><label>終了 <input type="datetime-local" step="1" :value="endDateInput" :aria-invalid="!!dateError" aria-describedby="time-search-hint time-search-error" @change="chooseDate($event.target,true)"></label><small id="time-search-hint">終了は省略できます（開始以降）。</small><p id="time-search-error" v-show="dateError" role="alert">{{ dateError }}</p><div class="since-presets"><button v-for="[value,label] in [['start','起動'],['ten','10分'],['hour','1時間'],['today','今日'],['clear','解除']]" :key="value" :aria-pressed="preset===value" @click="choose(value)">{{ label }}</button></div></div>
+        <div v-if="mode==='since'" class="time-search"><label>開始 <input type="datetime-local" step="1" :value="dateInput" :aria-invalid="!!dateError" :aria-describedby="dateError?'time-search-error':undefined" @change="chooseDate($event.target)"></label><label>終了 <input type="datetime-local" step="1" :value="endDateInput" :aria-invalid="!!dateError" aria-describedby="time-search-hint time-search-error" @change="chooseDate($event.target,true)"></label><small id="time-search-hint">終了は省略できます（開始以降）。</small><p id="time-search-error" v-show="dateError" role="alert">{{ dateError }}</p><div class="since-presets"><button v-for="[value,label] in timeSearchPresets" :key="value" :aria-pressed="preset===value" @click="choose(value)">{{ label }}</button></div></div>
         <form v-else-if="mode==='grep'" @submit.prevent>
           <label class="grep-query">ファイル内容<input v-model="query" type="search" maxlength="256" placeholder="検索する文字列"></label>
           <label><input v-model="caseSensitive" type="checkbox">大文字・小文字を区別</label>

@@ -41,7 +41,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port]${['task','team'].includes(kind)?'':' [--provider 名前] [--model モデル]'}${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='console'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
  if(['task','team'].includes(kind)&&['provider','model','offline','connect'].some(name=>values[name]!==undefined))throw Error('Task / Team のモデル・接続設定は画面内で指定してください（--provider / --model / --offline / --connect は利用できません）。');
  validateCliOptions(kind,{cli:values.cli,cliAutoApprove:values['cli-auto-approve'],provider:values.provider,model:values.model});
- if(values.cli)await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']});
+ const cliLaunch=values.cli?await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']}):undefined;
  const requestedProject=projectFolder(positionals,values.project);
  const project=kind==='ide'?projectIdentity(requestedProject).path:requestedProject,port=values.port===undefined?0:Number(values.port);
  if(!Number.isInteger(port)||port<0||port>65535)throw Error('--port は0〜65535で指定してください。');
@@ -74,7 +74,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  let browser=values.browser||useBrowser();
  if(!browser){
   try{
-   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
+   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliLaunch?.name||'',AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
    let executable;try{executable=electronExecutable();}catch{executable=electronExecutable(new URL('./host/package.json',import.meta.url));}
    desktop=spawnDesktop(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,background:launcherChild});
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});

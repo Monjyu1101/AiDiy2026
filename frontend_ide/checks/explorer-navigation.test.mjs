@@ -203,3 +203,32 @@ test('手動Latest: 新しい深いフォルダを再走査して通常・高速
     }finally{h.dispose();}
   }
 });
+
+test('時刻プリセット: 境界のマーク・軌跡と終了入力を同期し、切替・解除で前の上限を残さない',async()=>{
+  const h=explorer();
+  try{
+    const expected=fileDates.timeSearchRange('morning',h.props.startedAt);
+    const {since:day,until:boundary}=expected;
+    h.props.tree={n:'project',d:[],f:[['before.txt',1,day-1],['morning.txt',1,boundary-0.5],['afternoon.txt',1,boundary],['tomorrow.txt',1,fileDates.nextLocalMidnight()]]};
+    await vue.nextTick();
+    h.state.choose('morning');await vue.nextTick();
+    assert.equal(h.state.since.value,day);assert.equal(h.state.until.value,boundary);
+    assert.equal(h.state.endDateInput.value,fileDates.localDateTimeInput(boundary-1000));
+    assert.deepEqual([...h.state.routePaths.value],['morning.txt']);
+    h.state.choose('afternoon');await vue.nextTick();
+    assert.deepEqual([...h.state.routePaths.value],['afternoon.txt']);
+    h.state.choose('today');await vue.nextTick();
+    assert.deepEqual([...h.state.routePaths.value],['morning.txt','afternoon.txt']);
+    h.state.chooseDate(h.state.endDateInput.value,true);await vue.nextTick();
+    assert.equal(h.state.preset.value,'custom');assert.equal(h.state.until.value,fileDates.nextLocalMidnight());
+    for(const preset of ['fifteen','hour','twoHours','start']){
+      h.state.choose('morning');h.state.choose(preset);await vue.nextTick();
+      assert.equal(h.state.until.value,null);assert.equal(h.state.endDateInput.value,'');assert.equal(h.state.dateError.value,'');
+    }
+    assert.equal(h.state.since.value,h.props.startedAt);
+    h.state.choose('morning');h.state.choose('clear');await vue.nextTick();
+    assert.equal(h.state.since.value,null);assert.equal(h.state.until.value,null);
+    assert.equal(h.state.dateInput.value,'');assert.equal(h.state.endDateInput.value,'');
+    assert.deepEqual([...h.state.routePaths.value],[]);
+  }finally{h.dispose();}
+});
