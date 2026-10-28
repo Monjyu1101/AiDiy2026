@@ -32,10 +32,10 @@ try{
  const press=async(key,code,keyCode,modifiers=0)=>{await evaluate(`document.querySelector('.xterm-helper-textarea').focus()`);for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key,code,windowsVirtualKeyCode:keyCode,modifiers,...(type==='keyDown'&&key.length===1&&!(modifiers&7)?{text:key}: {})});await sleep(40);};
  assert.equal(await evaluate(`document.querySelector('.auto-connect').textContent.trim()`),'Tools接続確認');
  assert.equal(await evaluate(`document.querySelector('.console-meta span:last-child').textContent.trim().startsWith('Tools ')`),true);
- await evaluate(`navigator.clipboard.writeText(${JSON.stringify('貼り付け日本語\nsecond line')})`);
- await press('v','KeyV',86,2);assert.deepEqual(await evaluate('inputs.splice(0)'),['貼り付け日本語\rsecond line']);
+ await evaluate(`navigator.clipboard.writeText(${JSON.stringify('貼り付け日本語 •・·\nsecond line')})`);
+ await press('v','KeyV',86,2);assert.deepEqual(await evaluate('inputs.splice(0)'),['貼り付け日本語 •・·\rsecond line']);
  await evaluate(`termSocket.receive({type:'data',data:'\\x1b[?2004h'})`);await sleep(60);
- await press('v','KeyV',86,2);assert.deepEqual(await evaluate('inputs.splice(0)'),['\x1b[200~貼り付け日本語\rsecond line\x1b[201~']);
+ await press('v','KeyV',86,2);assert.deepEqual(await evaluate('inputs.splice(0)'),['\x1b[200~貼り付け日本語 •・·\rsecond line\x1b[201~']);
  for(const [modifiers,expected] of [[0,'\r'],[1,'\x1b\r'],[8,'\x1b[13;2u'],[9,'\x1b[13;4u']]){await press('Enter','Enter',13,modifiers);assert.deepEqual(await evaluate('inputs.splice(0)'),[expected]);}
  await press('c','KeyC',67,2);assert.deepEqual(await evaluate('inputs.splice(0)'),[]);
  await press('d','KeyD',68,2);assert.deepEqual(await evaluate('inputs.splice(0)'),['\x04']);

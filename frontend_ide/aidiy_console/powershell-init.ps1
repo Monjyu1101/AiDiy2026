@@ -6,6 +6,12 @@
 param([Parameter(Mandatory=$true)][string]$CliOptionsJson)
 
 # Only this terminal session is changed; the user's profile is not written.
+# Align the console and native-command pipeline with the ConPTY UTF-8 stream.
+# Initialize before PSReadLine so completion errors do not leave the old encoding.
+$AiDiyUtf8 = New-Object System.Text.UTF8Encoding($false)
+[Console]::InputEncoding = $AiDiyUtf8
+[Console]::OutputEncoding = $AiDiyUtf8
+$global:OutputEncoding = $AiDiyUtf8
 Import-Module PSReadLine -ErrorAction Stop
 $global:AiDiyCliOptions = @{}
 ($CliOptionsJson | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $global:AiDiyCliOptions[$_.Name] = $_.Value }

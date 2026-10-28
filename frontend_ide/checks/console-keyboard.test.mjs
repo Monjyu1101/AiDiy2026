@@ -116,7 +116,7 @@ test('Console clipboard: 実xtermのcopy/paste経路は選択モデル・日本�
  assert.deepEqual(copied,[['text/plain','xtermの選択']]);assert.ok(prevented);
  for(const bracketedPasteMode of [false,true]){
   const sent=[],textarea={value:'old'};let stopped=false;
-  handlePasteEvent({stopPropagation(){stopped=true;},clipboardData:{getData:type=>{assert.equal(type,'text/plain');return '日本語\n2行目';}}},textarea,{decPrivateModes:{bracketedPasteMode},triggerDataEvent:(data,user)=>sent.push([data,user])},{rawOptions:{}});
-  assert.deepEqual(sent,[[bracketedPasteMode?'\x1b[200~日本語\r2行目\x1b[201~':'日本語\r2行目',true]]);assert.equal(textarea.value,'');assert.ok(stopped);
+  handlePasteEvent({stopPropagation(){stopped=true;},clipboardData:{getData:type=>{assert.equal(type,'text/plain');return '日本語 •・·\n2行目';}}},textarea,{decPrivateModes:{bracketedPasteMode},triggerDataEvent:(data,user)=>sent.push([data,user])},{rawOptions:{}});
+  assert.deepEqual(sent,[[bracketedPasteMode?'\x1b[200~日本語 •・·\r2行目\x1b[201~':'日本語 •・·\r2行目',true]]);assert.equal(textarea.value,'');assert.ok(stopped);
  }
 });

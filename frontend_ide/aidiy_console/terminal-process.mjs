@@ -6,6 +6,7 @@
 import { fork, execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
+import { terminalEnvironment } from './terminal-environment.mjs';
 
 // ネイティブPTYとその補助スレッドを端末ごとのプロセスに閉じ込める。
 // ElectronからもNodeモードで起動し、窓を閉じた時はプロセスツリーごと終了する。
@@ -28,7 +29,7 @@ export function spawnTerminal(shell, args, options) {
     if (message.type === 'error') events.emit('failure', message.message);
   });
   const send = value => { if (!ended && child.connected) { if (ready) child.send(value); else pending.push(value); } };
-  child.send({ type: 'start', shell, args, options });
+  child.send({ type: 'start', shell, args, options: { ...options, env: terminalEnvironment(options.env) } });
   const subscribe = (name, listener) => { events.on(name, listener); return { dispose: () => events.off(name, listener) }; };
   return {
     onData: fn => subscribe('data', fn), onExit: fn => subscribe('exit', fn), onError: fn => subscribe('failure', fn),
