@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,readdir,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,readdir,rm,stat} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createExplorerFiles} from '../ファイル機能/explorer-files.mjs';
+import {renderMarkdownPdf} from '../ファイル機能/MarkdownPDF.mjs';
 async function fixture(t){const root=await mkdtemp(join(tmpdir(),'aidiy-pdf-test-'));t.after(async()=>{assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep));await rm(root,{recursive:true,force:true});});await mkdir(join(root,'資料'));await writeFile(join(root,'資料','日本語.MD'),'# 日本語\n\n本文');return root;}
 const pdf=Buffer.from('%PDF-1.4\nfixture');
 test('PDF化は同じフォルダ・同名で作成し、元Markdownを保持して既存PDFを上書きする',async t=>{
@@ -42,4 +44,50 @@ test('生成失敗は既存PDFを保持し、同名フォルダは置換しな�
  await rm(target);await mkdir(target);
  await assert.rejects(createExplorerFiles(root,{pdfRenderer:async()=>pdf}).apply({action:'pdf',path:'資料/日本語.MD'}),{code:'not_file'});
  assert.deepEqual((await readdir(join(root,'資料'))).sort(),['日本語.MD','日本語.pdf'].sort());
+});
+
+// Electron本体だけを隔離Node子プロセスに置き換え、IPC・終了通知・プレビュー・清掃は本番処理を通す。
+for(const mode of ['signal','exit','error','pdf'])test(`PDF worker ${mode}: 終了を待ち直さず清掃し、次のExplorer操作を実行する`,async t=>{
+ const root=await fixture(t),target=join(root,'資料/日本語.pdf');await writeFile(target,'original PDF');
+ let child,observed,request,next;
+ const launchWorker=env=>{
+  child=spawn(process.execPath,['-e',`
+   process.once('message',async({url,profile})=>{
+    const response=await fetch(url);if(!response.ok)process.exit(9);
+    process.send({type:'observed',url,profile});
+    const mode=${JSON.stringify(mode)};
+    if(mode==='signal')process.send({type:'terminate'});
+    else if(mode==='exit')process.exit(7);
+    else process.send(mode==='error'?{type:'error'}:{type:'pdf',data:${JSON.stringify(pdf.toString('base64'))}});
+   });
+   process.send({type:'ready'});
+  `],{env,stdio:['ignore','ignore','ignore','ipc']});
+  child.on('message',message=>{if(message?.type==='observed')observed=message;else if(message?.type==='terminate')child.kill('SIGTERM');});
+  return child;
+ };
+ const service=createExplorerFiles(root,{pdfRenderer:input=>renderMarkdownPdf(input,{launchWorker})});
+ t.after(async()=>{
+  service.close();
+  if(child?.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
+  // 旧実装でassertionが失敗しても、待ち直したexitを解放しテスト用サーバーを残さない。
+  if(child?.exitCode!==null||child?.signalCode!==null)child?.emit('exit',child.exitCode,child.signalCode);
+  await Promise.allSettled([request,next]);
+ });
+ request=service.apply({action:'pdf',path:'資料/日本語.MD'});
+ const settled=request.then(value=>({value}),error=>({error}));
+ next=service.apply({action:'create-file',directory:'資料',name:'次の操作.txt'});
+ let timer;
+ const [result]=await Promise.race([
+  Promise.all([settled,next]),
+  new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('PDF終了後にExplorerの待ち行列が進みません。')),5000);}),
+ ]).finally(()=>clearTimeout(timer));
+ if(mode==='pdf'){assert.equal(result.value.path,'資料/日本語.pdf');assert.deepEqual(await readFile(target),pdf);}
+ else{assert.equal(result.error.code,'pdf_failed');assert.equal(result.error.status,503);assert.equal(await readFile(target,'utf8'),'original PDF');}
+ if(mode==='signal')assert.equal(child.signalCode,'SIGTERM');
+ assert.ok(child.exitCode!==null||child.signalCode!==null,'worker process exited');
+ assert.ok(observed,'worker received the preview URL and temporary profile');
+ await assert.rejects(stat(observed.profile),{code:'ENOENT'});
+ await assert.rejects(fetch(observed.url,{signal:AbortSignal.timeout(1000)}));
+ assert.equal(await readFile(join(root,'資料','次の操作.txt'),'utf8'),'');
+ assert.deepEqual((await readdir(join(root,'資料'))).sort(),['日本語.MD','日本語.pdf','次の操作.txt'].sort());
 });

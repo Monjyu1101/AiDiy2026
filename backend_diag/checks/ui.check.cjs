@@ -76,7 +76,7 @@ test('icon mode removes only the panel perimeter and restores it on unmount',()=
  assert.match(css,/html\.micro-mode #app\{border:0\}/);
  assert.match(source('style.css'),/#app\{box-sizing:border-box;border:1px solid #383838\}/);
  const launcher=source('アプリ起動/マイクロランチャー.vue');
- assert.match(launcher,/onMounted\(\(\)=>\{document\.documentElement\.classList\.add\('micro-mode'\)/);
+ assert.match(launcher,/onMounted\(\(\)=>\{[^\n]*document\.documentElement\.classList\.add\('micro-mode'\)/);
  assert.match(launcher,/onBeforeUnmount\(\(\)=>\{[^\n]*document\.documentElement\.classList\.remove\('micro-mode'\)/);
  const deployed=fs.readFileSync(path.join(__dirname,'../static/style.css'),'utf8');
  assert.match(deployed,/html\.micro-mode #app\{border:0\}/);

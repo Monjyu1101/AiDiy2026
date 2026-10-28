@@ -274,7 +274,8 @@ const draftReceiver = createDraftReceiver({
   draft: () => prompt.value, setDraft: value => { cancelPrediction(); prompt.value = value; history.value = false; },
   label: () => state.履歴.find(item => item.id === state.会話ID)?.題名 || 'Code',
   focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
-  api: props.desktop && props.linked ? window.aidiyWindow : undefined,
+  // 単独起動もBrowserの連携先。IDE所属かどうかで受信IPCを無効にしない。
+  api: props.desktop ? window.aidiyWindow : undefined,
 });
 defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
 watch(() => [state.作業フォルダ?.パス, state.会話ID, state.信頼済み, state.画面接続済み, pending.value, changingConversation.value, state.履歴], () => draftReceiver.publish());

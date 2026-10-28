@@ -36,7 +36,7 @@ function browserDraftRequest(projectRoot,url,capture,now=Date.now()){
  const image=capture&&age>=0&&age<=60000?resolve(projectRoot,capture.path):'';
  return{projectPath:projectRoot,path:url,text:url+(image?'\n画像: '+image:''),selection:false};
 }
-function createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive=()=>false,captureImage,trustedEvent,projectRoot,now=Date.now}){
+function createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive=()=>false,leaveVR,captureImage,trustedEvent,projectRoot,now=Date.now}){
  const entries=new Map(),headers=new Map(),blockedOrigins=new Set();
  const localFileAllowed=url=>{try{const path=relative(projectRoot,fileURLToPath(url)).split(sep).join('/');browserFileURL(projectRoot,path);return true;}catch{return false;}};
  const isolated=session.fromPartition('aidiy-browser');
@@ -58,7 +58,7 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   entry.snapshot=snapshot;entry.notify=notify;
   const toggleFullscreen=()=>record.window.setFullScreen(!record.window.isFullScreen());
   entry.toggleFullscreen=toggleFullscreen;
-  let pointerTimer,previousLock=false;
+  let pointerTimer;
   function pointer(){
    if(record.window.isDestroyed()||!record.window.isFullScreen())return;
    const point=screen.getCursorScreenPoint(),bounds=record.window.getContentBounds();
@@ -70,15 +70,18 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   }
   function fullscreenChanged(){
    clearInterval(pointerTimer);pointerTimer=undefined;entry.headerVisible=false;entry.headerSuppressed=false;entry.header?.show(false);
+   // 保存したVR状態ではなく現在の両方の理由から再計算し、利用者のピン選択は保持する。
+   windowPins?.setLocked(record.window,record.window.isFullScreen()||isVRActive(record));
    if(record.window.isFullScreen()){
-    previousLock=windowPins?.state(record.window).locked||false;
-    windowPins?.setLocked(record.window,true);
     pointerTimer=setInterval(pointer,80);pointerTimer.unref?.();
-   }else windowPins?.setLocked(record.window,previousLock);
+   }
    entry.layout?.();notify();
   }
   function fullscreenKey(event,key){
-   if(key.type!=='keyDown'||key.key!=='F11'||key.control||key.alt||key.shift||key.meta||isVRActive(record))return;
+   // ホスト側はVR解除の購読が先。同じF11で解除済みでも、消費した入力は再処理しない。
+   if(event.defaultPrevented||key.type!=='keyDown'||key.key!=='F11'||key.control||key.alt||key.shift||key.meta)return;
+   // 専用ヘッダーにはIDEのキー購読がないため、同じVR解除をmainへ委ねる。
+   if(isVRActive(record)){if(leaveVR){event.preventDefault();if(!key.isAutoRepeat)leaveVR(record);}return;}
    event.preventDefault();if(!key.isAutoRepeat)toggleFullscreen();
   }
   entry.header=createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscreenKey,headers});

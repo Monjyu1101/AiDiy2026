@@ -11,19 +11,23 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {createPreview} from '../viewer/preview.mjs';
 
+function launchMarkdownPdfWorker(env){
+ const executable=createRequire(new URL('../viewer/package.json',import.meta.url))('electron');
+ return spawn(executable,[fileURLToPath(new URL('./MarkdownPDF-worker.cjs',import.meta.url))],{env,windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
+}
+
 // Web版からも既存のElectronを使う。画面・保存ダイアログは開かない。
-export async function renderMarkdownPdf({root,path}){
+export async function renderMarkdownPdf({root,path},{launchWorker=launchMarkdownPdfWorker}={}){
  const preview=createPreview(root),profile=await mkdtemp(join(tmpdir(),'aidiy-md-pdf-'));
  let child;
  try{
   const url=await preview.url(path);
   if(!url)throw Error('このMarkdownはPDF化できません。');
-  const executable=createRequire(new URL('../viewer/package.json',import.meta.url))('electron');
   const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;delete env.NODE_PATH;
+  child=launchWorker(env);
   const pdf=await new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>reject(Error('PDF化がタイムアウトしました。')),60000);
    const finish=(error,value)=>{clearTimeout(timer);error?reject(error):resolve(value);};
-   child=spawn(executable,[fileURLToPath(new URL('./MarkdownPDF-worker.cjs',import.meta.url))],{env,windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
    child.on('message',message=>{
     if(message?.type==='ready')child.send({url,profile});
     else if(message?.type==='pdf'&&typeof message.data==='string'&&message.data.length<70*1024*1024)finish(null,Buffer.from(message.data,'base64'));
@@ -36,7 +40,8 @@ export async function renderMarkdownPdf({root,path}){
   return pdf;
  }catch(error){throw Object.assign(error,{status:503,code:'pdf_failed'});}
  finally{
-  if(child&&child.exitCode===null){const exited=new Promise(done=>child.once('exit',done));child.kill();await exited;}
+  // シグナル終了ではexitCodeはnullのまま。発生済みのexitを再待機しない。
+  if(child&&child.exitCode===null&&child.signalCode===null){const exited=new Promise(done=>child.once('exit',done));child.kill();await exited;}
   await preview.close();
   if(dirname(resolve(profile))!==resolve(tmpdir())||!basename(profile).startsWith('aidiy-md-pdf-'))throw Error('PDF用一時フォルダの場所を確認できません。');
   await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});

@@ -52,6 +52,9 @@ async function desktopFixture({platform='win32',kind='ide',active=true,response=
   './host/scripts/MacOS-Menu.cjs':macMenuModule,
   './デスクトップ/task-windows.cjs':taskWindowsModule,
   './デスクトップ/draft-router.cjs':routerModule,'./デスクトップ/desktop-session.cjs':{readDevelopmentState:async()=>structuredClone(state)},
+  // タイトル・寿命の試験から実共有サーバーや画像保存を起動しない。
+  './デスクトップ/下書き共有.cjs':{createSharedDraftBridge:()=>assert.fail('タイトル試験ではプロセス間の下書き共有を起動しない')},
+  './デスクトップ/ブラウザ撮影.cjs':{saveBrowserCapture:()=>assert.fail('タイトル試験ではBrowser撮影を実行しない')},
   './デスクトップ/native-preview-actions.cjs':{createNativePreviewActions:()=>({invalidate(){}})},
   './デスクトップ/panel-windows.cjs':panelModule,'./デスクトップ/code-drag.cjs':codeDragModule,
   './デスクトップ/ブラウザ.cjs':browserModule,

@@ -197,7 +197,8 @@ const draftReceiver = createDraftReceiver({
   ready: () => !disposed && !blocked.value && !modelLoading.value,
   draft: () => prompt.value, setDraft: value => { prompt.value = value; }, label: () => 'Live',
   focus: () => nextTick(() => { if (!disposed) { input.value?.focus(); input.value?.setSelectionRange(prompt.value.length, prompt.value.length); scroll(); } }),
-  api: props.desktop && props.linked ? window.aidiyWindow : undefined,
+  // 単独起動もBrowserの連携先。IDE所属かどうかで受信IPCを無効にしない。
+  api: props.desktop ? window.aidiyWindow : undefined,
 });
 defineExpose({ draftTarget: draftReceiver.target, insertDraft: draftReceiver.insert });
 watch(() => [project.value?.パス, draftGeneration.value, blocked.value, modelLoading.value], () => draftReceiver.publish());

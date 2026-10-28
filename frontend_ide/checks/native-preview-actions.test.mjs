@@ -33,7 +33,8 @@ async function fixture(t){
  };
  const owner=add('ide'),viewer=add('viewer',owner),code=add('code',owner),live=add('live',owner),consoleWindow=add('console',owner);
  // 本番trustedEventをそのまま使用し、Electron自体は起動しない。
- const trust={windows:records};vm.runInNewContext(desktop.slice(desktop.indexOf('function trustedEvent(event){'),desktop.indexOf('function audioAllowed('))+';globalThis.trusted=trustedEvent;',trust);
+ // Browser未起動時も不明なsenderを例外ではなく拒否する、本番の未初期化状態を再現する。
+ const trust={windows:records,browserViews:undefined};vm.runInNewContext(desktop.slice(desktop.indexOf('function trustedEvent(event){'),desktop.indexOf('function audioAllowed('))+';globalThis.trusted=trustedEvent;',trust);
  const event=record=>({sender:record.window.webContents,senderFrame:record.window.webContents.mainFrame});
  let readHook,dialogHook,openHook,copyHook,reads=0,quitting=false;
  const actions=createNativePreviewActions({records,trustedEvent:trust.trusted,readState:async record=>{assert.equal(record,owner);reads++;await readHook?.(reads);return structuredClone(state);},sessionKey:key,

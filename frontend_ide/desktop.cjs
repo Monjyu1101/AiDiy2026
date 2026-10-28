@@ -82,7 +82,8 @@ const vrPanelStacking=createVRPanelStacking({windows,isActive:owner=>allDisplays
 const vrPanels=createVRPanelPlacement({windows,screen,isActive:owner=>allDisplays.isActive(owner)});
 const allDisplays=createAllDisplays({screen,trustedEvent,panels:vrPanels,syncChildren:owner=>{
  const locked=allDisplays.isActive(owner);
- for(const record of windows.values())if(record===owner||record.owner===owner)windowPins.setLocked(record.window,locked);
+ // Browser全画面とIDEのVRは独立したロック理由。片方の解除で他方を消さない。
+ for(const record of windows.values())if((record===owner||record.owner===owner)&&!record.window.isDestroyed())windowPins.setLocked(record.window,locked||(record.kind==='browser'&&record.window.isFullScreen()));
  vrPanelStacking.refresh(owner);
 }});
 const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デスクトップ/ブラウザ.cjs');
@@ -236,7 +237,12 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  contents.on('did-create-window',(child,details)=>panelWindows.created(record,child,details));
  try{
   if(kind==='browser'){
-   browserViews??=createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive:record=>allDisplays.isActive(record.owner||record),captureImage:({png})=>saveBrowserCapture(process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd(),png),trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
+   browserViews??=createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive:record=>allDisplays.isActive(record.owner||record),
+    leaveVR:record=>{
+     const owner=record.owner||record;
+     try{allDisplays.leave(owner);}catch(error){owner.window.webContents.send('development:all-displays-changed',{...allDisplays.state(owner),error:error.message});}
+    },
+    captureImage:({png})=>saveBrowserCapture(process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd(),png),trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
    const bridge=await (owner?ensureBrowserBridge(owner):ensureStandaloneBrowserBridge());
    const current=await readState(owner||record);
    if(window.isDestroyed()||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current)))throw Error('tools接続中のみBrowserを起動できます。');

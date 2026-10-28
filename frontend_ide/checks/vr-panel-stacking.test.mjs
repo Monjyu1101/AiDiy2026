@@ -65,7 +65,7 @@ test('再入・終了・VR解除後の遅延処理を安全に扱い、購読を
 test('実mainはピン登録後の全窓登録とVRロック更新後の再配置を接続',()=>{
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  assert.match(source,/windowPins\.register\(record\.window,[^\n]+\n vrPanelStacking\.register\(record\);/);
- assert.match(source,/windowPins\.setLocked\(record\.window,locked\);\r?\n vrPanelStacking\.refresh\(owner\);/);
+ assert.match(source,/windowPins\.setLocked\(record\.window,locked\|\|\(record\.kind==='browser'&&record\.window\.isFullScreen\(\)\)\);\r?\n vrPanelStacking\.refresh\(owner\);/);
 });
 
 test('Windowsは同じ最前面層のmoveTopで本体選択後もパネルを維持する',()=>{
