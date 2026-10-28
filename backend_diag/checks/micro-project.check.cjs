@@ -58,7 +58,7 @@ test('名前は透明な同幅領域で日本語・空白なし英字も折り�
  assert.equal(d.width,'120px');assert.equal(d['min-height'],'18px');assert.equal(d['text-overflow'],undefined);
  assert.equal(d['pointer-events'],'auto');assert.equal(d['-webkit-app-region'],'no-drag');
  assert.equal(d.top,'calc(var(--core-y,64px) + 48px)');assert.ok(parseFloat(d.width)<閉じた幅);
- const unfolded={};css.walkRules(r=>{if(r.selector==='.micro-launcher.unfolded .micro-project')r.walkDecls(v=>unfolded[v.prop]=v.value);});
+ const unfolded={};css.walkRules(r=>{if(r.selector==='.micro-launcher.unfolded .micro-project-name')r.walkDecls(v=>unfolded[v.prop]=v.value);});
  assert.equal(unfolded['-webkit-line-clamp'],'2');assert.equal(unfolded.overflow,'hidden');
 });
 
@@ -82,8 +82,19 @@ test('切替中もラベル高さを通知し、main側で完成画像に反映�
  try{
   f.state.進捗表示.value={種別:'stop',状態:'running',通知:'Tools を停止しています。'};await flush();
   const notice=nodes(f.root).find(n=>n.props.class==='micro-batch-status');
-  assert.equal(notice.text,'停止中…');assert.equal(notice.props.title,'Tools を停止しています。');
+  assert.equal(notice.text,'強制停止中…');assert.equal(notice.props.title,'Tools を停止しています。');
   assert.equal(f.core().props.disabled,undefined);
+  for(const kind of ['start','stop']){
+   f.state.進捗表示.value={種別:kind,状態:'running',通知:'処理中'};await flush();
+   assert.match(nodes(f.root).find(n=>n.props.class==='micro-batch-status').text,kind==='stop'?/強制停止中/:/一括起動中/);
+   assert.ok(nodes(f.root).some(n=>n.props.class==='micro-batch-spinner'));
+   for(const terminal of ['done','cancelled']){
+    f.state.進捗表示.value={種別:kind,状態:terminal,通知:'完了'};await flush();assert.equal(nodes(f.root).some(n=>n.props.class==='micro-batch-status'),false);
+   }
+  }
+  f.state.進捗表示.value={種別:'stop',状態:'error',通知:'停止失敗'};await flush();
+  const error=nodes(f.root).find(n=>n.props.class==='micro-batch-status');assert.match(error.text,/要確認/);assert.match(error.props.title,/停止失敗/);
+  assert.ok(nodes(error).some(n=>n.tag==='button'),'エラー詳細を通常表示で確認できる');
   f.state.進捗表示.value=null;await flush();assert.equal(nodes(f.root).some(n=>n.props.class==='micro-batch-status'),false);
  }finally{f.app.unmount();}
 });

@@ -4,6 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
+import * as cliTitles from '../src/ターミナル/CLIタイトル.js';
 import * as keyboard from '../src/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,7 +41,7 @@ async function fixture(t,{desktop=false,linked=false,nativeTitle=''}={}){
  class ResizeObserver{
   constructor(callback){this.callback=callback;observers.add(this);} observe(target){this.target=target;} disconnect(){observers.delete(this);}
  }
- const modules={'./キー入力.js':keyboard,'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
+ const modules={'./CLIタイトル.js':cliTitles,'./キー入力.js':keyboard,'@xterm/xterm':{Terminal},'@xterm/addon-fit':fitModule.exports,'@xterm/xterm/css/xterm.css':{},'../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/コマンド補完.js':completion};
  const script=compileScript(descriptor,{id:'ConsolePanel',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
   module,URL,window,WebSocket:Socket,ResizeObserver,location:{href:'http://localhost/'},
@@ -169,4 +170,14 @@ test('desktop CLI Console does not append its native suffix twice; linked Consol
  assert.equal(cli.state.title.value,'AiDiy Console / Codex CLI');
  const linked=await fixture(t,{desktop:true,linked:true,nativeTitle:'AiDiy IDE / Console 2'});
  await flush();assert.equal(linked.titleCalls(),1);assert.equal(linked.state.title.value,'AiDiy IDE / Console 2');
+});
+
+
+test('Hermes Console title omits repeated AiDiy without changing CLI metadata or project',async t=>{
+ const f=await fixture(t,{desktop:true,nativeTitle:'AiDiy Console / Hermes'});
+ const cli={id:'aidiy_hermes',name:'AiDiy Hermes',mode:'YOLO'};
+ for(let i=0;i<2;i++)f.sockets[0].receive({type:'ready',project:'/日本語 プロジェクト',shell:'AiDiy Hermes',cli,state:'running'});
+ await flush();assert.equal(f.state.title.value,'AiDiy Console / Hermes');
+ assert.equal(f.state.cli.value.name,'AiDiy Hermes');assert.equal(f.state.cli.value.id,'aidiy_hermes');
+ assert.equal(f.state.projectName.value,'日本語 プロジェクト');assert.equal(f.titleCalls(),0);
 });

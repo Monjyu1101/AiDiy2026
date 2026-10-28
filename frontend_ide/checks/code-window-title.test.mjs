@@ -226,7 +226,7 @@ test('Mac Task: CmdW closes one peer but application/Dock Quit closes all peers 
 
 
 test('CLI Console: native title and title IPC retain the selected display name after page title changes',async()=>{
- for(const name of ['Claude Code','Codex CLI','GitHub Copilot CLI','Antigravity CLI','Grok Build','OpenCode','AiDiy Hermes']){
+ for(const name of ['Claude Code','Codex CLI','GitHub Copilot CLI','Antigravity CLI','Grok Build','OpenCode','Hermes']){
   const f=await desktopFixture({kind:'console',env:{AIDIY_DEVELOPMENT_CLI_WINDOW:'1',AIDIY_DEVELOPMENT_CLI_NAME:name}});
   const record=f.owner,title=`AiDiy Console / ${name}`;
   assert.equal(record.window.getTitle(),title);
@@ -243,6 +243,7 @@ test('CLI Console: native title and title IPC retain the selected display name a
 test('Console browser tab title uses launch metadata and leaves ordinary and linked titles unchanged',async()=>{
  const source=readFileSync(new URL('../src/main.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'');
  for(const [config,title] of [
+  [{kind:'console',cliName:'Hermes'},'AiDiy Console / Hermes'],
   [{kind:'console',cliName:'GitHub Copilot CLI'},'AiDiy Console / GitHub Copilot CLI'],
   [{kind:'console'},'AiDiy Console'],
   [{kind:'console',linked:true},'AiDiy IDE / Console'],

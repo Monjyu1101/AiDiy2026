@@ -7,15 +7,16 @@ https://github.com/monjyu1101/AiDiy2026 -->
 import RefreshButton from '../共通表示/再読込ボタン.vue';
 import {ref,onMounted,onBeforeUnmount} from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
+import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),error=ref('');
 let stop=()=>{},observer,disposed=false,editing=false;
-function update(value){if(disposed||!value)return;page.value=value;if(!editing)address.value=value.url||'';}
+function update(value){if(disposed||!value)return;page.value=value;if(!editing)address.value=displayBrowserURL(value.url);}
 async function action(name,value){
  const result=await window.aidiyWindow.browserAction(name,value).catch(e=>({ok:false,error:e.message}));
  if(disposed)return;if(!result?.ok){error.value=result?.error||'ブラウザを操作できません。';return;}
  error.value='';update(result);
 }
-function navigate(){editing=false;void action('navigate',address.value);}
+function navigate(){editing=false;void action('navigate',browserAddressTarget(address.value,page.value.url));}
 function resize(){const rect=surface.value?.getBoundingClientRect();if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height}).catch(()=>{});}
 onMounted(()=>{
  stop=window.aidiyWindow.onBrowserChanged(update);void action('state');

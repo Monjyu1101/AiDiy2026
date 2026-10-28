@@ -587,3 +587,9 @@ Windows実機では、すでに開いた両パネルでVRへ切り替え、本�
 ## 控えめなパネル外周
 
 Electron・Web・VS Code の共通画面は濃いグレー `#383838` の1px外周を表示します。`src/style.css` の`border-box` で外寸を変えず内側に1pxを確保し、操作やスクロールバーへ装飾を重ねません。固定ヘッダーとCanvasもその内側に合わせます。Web内の子パネルは既存の1px境界の色だけを変更し、Code / Live / Console自身へ枠を重ねません。透明な軌跡窓とVR全面には画面全体の四角枠を追加せず、実パネルの境界を使います。検証は `node --test checks/panel-perimeter.test.mjs`。実機のElectron境界や倍率別の描画は別途目視確認してください。
+
+## Browserの日本語URL表示
+
+`src/ブラウザ/URL表示.js` はURL欄のpath/query/hashに含まれる漢字・かな・日本語句読点だけを表示用に復号します。ホスト名（IDNを含む）やユーザー情報は変換せず、`%20`、ASCIIのエスケープ（`%2F`・`%3F`・`%23`・`%25`など）、不可視文字・方向制御文字・不正UTF-8は保持します。URL全体を `decodeURI` / `decodeURIComponent` に渡さないでください。
+
+`page.url` はElectronの生URLのままです。未編集のEnterは元URLを使い、編集時だけ既存のURL解決・権限検査へ入力を渡します。編集中の状態通知は下書きを上書きしません。確認は `node --test frontend_ide/checks/browser-address.test.mjs frontend_ide/checks/browser.test.mjs frontend_ide/checks/browser-cdp.test.mjs`。実画面では日本語ファイル名・検索語・フラグメント、空白、戻る／進む、再読込、URL編集後のEnterを確認します。

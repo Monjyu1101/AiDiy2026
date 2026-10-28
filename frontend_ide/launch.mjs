@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { startDevelopment } from './server.mjs';
+import { cliTitleName } from './src/ターミナル/CLIタイトル.js';
 import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch.mjs';
 import { createCliOwnerLifetime } from './aidiy_console/cli-session.mjs';
 import { projectFolder,useBrowser,electronExecutable } from './viewer/launch-options.mjs';
@@ -74,7 +75,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  let browser=values.browser||useBrowser();
  if(!browser){
   try{
-   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliLaunch?.name||'',AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
+   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliTitleName(cliLaunch),AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
    let executable;try{executable=electronExecutable();}catch{executable=electronExecutable(new URL('./host/package.json',import.meta.url));}
    desktop=spawnDesktop(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,background:launcherChild});
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});

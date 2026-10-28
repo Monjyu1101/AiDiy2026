@@ -4,7 +4,8 @@ export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearT
  const 項目=ref([]),選択=ref(''),読込中=ref(false),保存中=ref(false),処理中=ref(false),起動中=ref(false),通知=ref(''),保存表示=ref('');
  const 更新失敗=ref(false);
  const 一括進捗=ref(null),閉じた進捗=ref('');
- const 進捗表示=computed(()=>一括進捗.value?.実行ID!==閉じた進捗.value?一括進捗.value:null);
+ // 成功・取消の結果は残さない。失敗だけは確認できるまで表示する。
+ const 進捗表示=computed(()=>['running','error'].includes(一括進捗.value?.状態)&&一括進捗.value.実行ID!==閉じた進捗.value?一括進捗.value:null);
  let lifecycle=0,pendingBatch=false,localRun=0,lastServerRun='',requestPreviousRun='';
  function 進捗を閉じる(){if(一括進捗.value?.状態!=='running')閉じた進捗.value=一括進捗.value?.実行ID||'';}
  function 受付表示(種別){requestPreviousRun=lastServerRun;一括進捗.value={実行ID:`request-${++localRun}`,種別,状態:'running',通知:種別==='stop'?'強制停止を受け付けています…':'一括起動を受け付けています…'};}
@@ -21,26 +22,27 @@ export function 起動状態を作成({api,setTimer=setTimeout,clearTimer=clearT
  const 選択対象=computed(()=>項目.value.find(item=>item.id===選択.value));
  const コンソール=computed(()=>ログ.value[選択.value]||'コンソールのログは、起動後にここへ表示されます。\n');
  async function refresh(){
-  if(!visible)return;const revision=version;controller=new AbortController();
+  if(!visible)return;const revision=version,operation=localRun;controller=new AbortController();
   try{
-   const data=await api('api/起動','GET',controller.signal);if(revision!==version)return;
+   const data=await api('api/起動','GET',controller.signal);if(revision!==version||operation!==localRun)return;
    const incoming=data.一括進捗||null;
-   const requestFailed=一括進捗.value?.実行ID.startsWith('request-')&&一括進捗.value.状態==='error';
-   if(!pendingBatch&&(!requestFailed||(incoming&&incoming.実行ID!==requestPreviousRun)))一括進捗.value=incoming;
+   // POST 前の応答や直前の実行結果で、新しい受付表示を消さない。
+   const awaitingRun=一括進捗.value?.実行ID.startsWith('request-');
+   if(!pendingBatch&&(!awaitingRun||(incoming&&incoming.実行ID!==requestPreviousRun)))一括進捗.value=incoming;
    lastServerRun=incoming?.実行ID||'';
-   const ports=await api('api/起動/ポート','GET',controller.signal);if(revision!==version)return;更新失敗.value=false;
+   const ports=await api('api/起動/ポート','GET',controller.signal);if(revision!==version||operation!==localRun)return;更新失敗.value=false;
    if(ports)ポート項目.value=ports.対象||[];
    項目.value=data.対象.map(item=>保存中.value?{...item,設定:項目.value.find(old=>old.id===item.id)?.設定||item.設定}:item);
-   起動中.value=data.実行中;一括停止中.value=Boolean(data.一括停止中);if(data.通知)通知.value=data.通知;
+   起動中.value=data.実行中;一括停止中.value=Boolean(data.一括停止中);if(data.通知)通知.value=['done','cancelled'].includes(incoming?.状態)&&data.通知===incoming.通知?'':data.通知;
    const follow=data.起動表示;
    if(follow?.実行ID&&follow.実行ID!==最後の起動表示&&項目.value.some(item=>item.id===follow.対象)){
     最後の起動表示=follow.実行ID;選択.value=follow.対象;
    }
    if(!選択.value&&項目.value.length)選択.value=項目.value[0].id;
-   const id=選択.value;if(id&&logsVisible){const tail=await api('api/起動/ログ','POST',controller.signal,'json',{対象:id,位置:位置.get(id)||0});if(revision!==version)return;
+   const id=選択.value;if(id&&logsVisible){const tail=await api('api/起動/ログ','POST',controller.signal,'json',{対象:id,位置:位置.get(id)||0});if(revision!==version||operation!==localRun)return;
     ログ.value={...ログ.value,[id]:((tail.切替?'':ログ.value[id]||'')+tail.ログ).slice(-120000)};位置.set(id,tail.位置);
    }
-  }catch(error){if(error.name!=='AbortError'&&revision===version){通知.value=error.message;更新失敗.value=true;}}
+  }catch(error){if(error.name!=='AbortError'&&revision===version&&operation===localRun){通知.value=error.message;更新失敗.value=true;}}
   finally{if(revision===version){読込中.value=false;controller=undefined;if(visible)timer=setTimer(refresh,logsVisible||一括進捗.value?.状態==='running'?800:5000);}}
  }
  function 表示(value,logs=true){if(!value){lifecycle++;pendingBatch=false;処理中.value=false;一括進捗.value=null;ポート項目.value=[];}visible=value;logsVisible=logs;version++;clearTimer(timer);controller?.abort();if(value){読込中.value=!項目.value.length;void refresh();}}

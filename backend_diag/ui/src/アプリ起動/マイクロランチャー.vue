@@ -22,6 +22,7 @@ function startMove(event){if(!props.switching&&!busy.value)move.down(event);}
 const apps=computed(()=>[...props.appState.項目.value.map(item=>({...item,kind:'app',icon:アプリアイコン[item.id]})),...props.cliState.項目.value.map(item=>({...item,kind:'cli',icon:`CLI_${item.id}.svg`}))]);
 // OSに依存せず、末尾の区切りを除いたフォルダ名だけを表示する。
 const projectName=computed(()=>{const folder=String(props.appState.フォルダ.value||'');return folder.replace(/[\\/]+$/,'').split(/[\\/]/).pop()||folder;});
+const batchProgress=computed(()=>{const value=props.state?.進捗表示?.value;return props.online&&['running','error'].includes(value?.状態)?value:null;});
 const orbit=computed(()=>配置.円周配置(apps.value.length));
 watch(()=>apps.value.length,async count=>{if(expanded.value)await window.aidiyWindow?.expandMicro(true,count);});
 watch(()=>props.online,value=>{if(value){void props.appState.読込();void props.cliState.読込();}},{immediate:true});
@@ -49,6 +50,6 @@ onBeforeUnmount(()=>{disposed=true;labelObserver?.disconnect();move.finish();cle
  </div>
  <div data-micro-hit class="micro-move" title="ドラッグして移動" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish"></div>
  <button data-micro-hit class="micro-core" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish" @dragstart.prevent :aria-expanded="expanded" :aria-busy="busy" :title="(expanded?'メニューを閉じる':'ランチャーを開く')+' — '+appState.フォルダ.value+'（ドラッグで移動・ダブルクリックでランチャー表示・Escで戻る）'" aria-label="円形ランチャーを開閉" @click="coreClick" @dblclick.prevent="coreDouble"><span class="micro-mark"><img :src="expanded?'AiDiy_diag.png':'AiDiy.png'" alt="AiDiy" width="40" height="40"></span></button>
- <span ref="projectLabel" data-micro-hit class="micro-project" :title="projectName" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish">{{projectName}}<span v-if="online&&state?.進捗表示?.value" class="micro-batch-status" role="status" aria-live="polite" :title="state.進捗表示.value.通知">{{state.進捗表示.value.種別==='stop'?'停止':'一括起動'}}{{state.進捗表示.value.状態==='running'?'中…':state.進捗表示.value.状態==='error'?'要確認':'完了'}}</span></span>
+ <span ref="projectLabel" data-micro-hit class="micro-project" :title="projectName" @pointerdown="startMove" @pointermove="move.move" @pointerup="move.finish" @pointercancel="move.finish" @lostpointercapture="move.finish"><span class="micro-project-name">{{projectName}}</span><span v-if="batchProgress" class="micro-batch-status" :data-state="batchProgress.状態" :data-kind="batchProgress.種別" role="status" aria-live="polite" :title="batchProgress.通知"><span v-if="batchProgress.状態==='running'" class="micro-batch-spinner" aria-hidden="true"></span>{{batchProgress.種別==='stop'?'強制停止':'一括起動'}}{{batchProgress.状態==='running'?'中…':'要確認'}}<button v-if="batchProgress.状態==='error'" type="button" @pointerdown.stop @click.stop="emit('restore')" title="通常表示に戻ってエラー内容を確認">詳細を確認</button></span></span>
 </section>
 </template>

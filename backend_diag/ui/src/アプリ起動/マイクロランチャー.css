@@ -11,7 +11,7 @@ html.micro-mode #app{border:0}
 /* 名前幅は維持し、実測した折り返し高さだけ収納窓を縦へ広げる。展開中も中心アイコンの下に残す。 */
 .micro-project{position:absolute;left:50%;top:calc(var(--core-y,64px) + 48px);transform:translateX(-50%);box-sizing:border-box;width:120px;min-height:18px;padding:0 4px;background:transparent;color:#fff;font-size:11px;line-height:18px;text-align:center;white-space:normal;overflow-wrap:anywhere;text-shadow:0 1px 3px #000,0 0 3px #000;pointer-events:auto;touch-action:none;user-select:none;-webkit-app-region:no-drag;z-index:3;cursor:grab}
 /* 展開中は周回アイコンへ重ねないよう2行までにする。全文は title で確認できる。 */
-.micro-launcher.unfolded .micro-project{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.micro-launcher.unfolded .micro-project-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .micro-core:disabled{opacity:1;cursor:pointer}
 .micro-core::before,.micro-app::before{content:'';position:absolute;inset:4px;background:#09121fd9;filter:blur(8px);box-shadow:0 3px 9px #0008;pointer-events:none}
 /* Codeの開始表示と同じ二重四角・20秒の逆回転・12秒の色循環。
@@ -44,3 +44,12 @@ html.micro-mode #app{border:0}
 .launcher-selector button:disabled{cursor:not-allowed;opacity:.35}
 
 .micro-core:focus-visible{outline:none}.micro-core:focus-visible .micro-mark::before{border-color:#dfffff}
+
+/* 小さい表示でも完了通知は残さず、実行中と確認が必要な失敗だけを示す。 */
+.micro-project-name{display:block}
+.micro-batch-status{display:block;margin-top:3px;padding:2px 3px;border-radius:4px;background:#102d38;color:#a2fff0;font-size:11px;font-weight:700;line-height:18px;text-shadow:none}
+.micro-batch-status[data-kind=stop],.micro-batch-status[data-state=error]{background:#36291c;color:#ffcf91}
+.micro-batch-spinner{display:inline-block;width:9px;height:9px;margin-right:4px;border:2px solid #48616e;border-top-color:currentColor;border-radius:50%;vertical-align:-1px;animation:micro-batch-spin .9s linear infinite}
+.micro-batch-status button{display:block;margin:2px auto;padding:1px 5px;font-size:10px;line-height:16px}
+@keyframes micro-batch-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.micro-batch-spinner{animation:none}}

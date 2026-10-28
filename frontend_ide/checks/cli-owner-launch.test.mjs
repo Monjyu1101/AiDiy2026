@@ -3,6 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import * as cliTitles from '../src/ターミナル/CLIタイトル.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -20,10 +21,11 @@ function fixture(opened, browser = true) {
   Object.assign(process, { argv: [], env: { AIDIY_LAUNCHER_CHILD: '1' }, cwd: () => '/fixture', pid: 123, send: value => messages.push(value) });
   const app = { url: 'http://127.0.0.1:9999/', publicUrl: 'http://127.0.0.1:9999/', close: async () => { closed++; } };
   const modules = {
+    './src/ターミナル/CLIタイトル.js': cliTitles,
     'node:child_process': { spawn() { throw Error('process spawning is forbidden in fixture'); } },
     'node:fs': { existsSync: () => true }, 'node:path': path, 'node:url': url, 'node:util': { parseArgs },
     './server.mjs': { startDevelopment: async (_project, value) => { options = value; return app; } },
-    './aidiy_console/cli-launch.mjs': { validateCliOptions() {}, resolveCliLaunch: async () => ({name:'GitHub Copilot CLI'}) },
+    './aidiy_console/cli-launch.mjs': { validateCliOptions() {}, resolveCliLaunch: async id => ({id,name:id==='aidiy_hermes'?'AiDiy Hermes':'GitHub Copilot CLI'}) },
     './aidiy_console/cli-session.mjs': { createCliOwnerLifetime: () => ({ arm: () => armed++, dispose: () => disposed++, started() {} }) },
     './viewer/launch-options.mjs': { projectFolder: () => '/fixture', useBrowser: () => browser, electronExecutable: () => 'fixture-electron' },
     './host/scripts/launch-project.mjs': { ブラウザで開く: async () => { openCalls++; return opened; } },
@@ -69,4 +71,12 @@ test('CLI launch forwards the selected display name to Electron and clears inher
   assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_PROJECT,'/fixture');
   f.process.emit('SIGTERM');await Promise.resolve();
  }
+});
+
+
+test('Hermes launch sends only the shortened title to Electron, keeping the CLI ID',async()=>{
+ const f=fixture(true,false);await f.launch('console',['--cli','aidiy_hermes','--foreground']);
+ assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_CLI_NAME,'Hermes');
+ assert.equal(f.stats().options.cli,'aidiy_hermes');
+ f.process.emit('SIGTERM');await Promise.resolve();
 });

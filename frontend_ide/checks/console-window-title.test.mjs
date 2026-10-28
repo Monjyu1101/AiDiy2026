@@ -3,6 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import * as cliTitles from '../src/ターミナル/CLIタイトル.js';
 import test from 'node:test';
 import * as keyboard from '../src/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
@@ -23,7 +24,7 @@ function fixture({desktop=true,linked=true,title=()=>Promise.resolve('AiDiy IDE 
  const module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{
   module,console,URL,window:{aidiyWindow:{title:()=>{calls++;return title();}}},location:{href:'http://localhost/'},ResizeObserver:class{observe(){}disconnect(){}},WebSocket:class{close(){}},
-  require:id=>id==='./キー入力.js'?keyboard:id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../ターミナル/コマンド補完.js'?{cliCompletions:{}}:{},
+  require:id=>id==='./CLIタイトル.js'?cliTitles:id==='./キー入力.js'?keyboard:id==='vue'?{...vue,onMounted:fn=>mounted.push(fn),onBeforeUnmount:fn=>unmounted.push(fn)}:id==='@xterm/xterm'?{Terminal}:id==='@xterm/addon-fit'?{FitAddon:class{}}:id==='../ターミナル/コマンド補完.js'?{cliCompletions:{}}:{},
  });
  const scope=vue.effectScope(),component=module.exports,props={desktop,linked,visible:true,base:'/console/'};
  const state=scope.run(()=>component.setup(props,{expose(){}}));state.container.value={addEventListener:noop,removeEventListener:noop};
@@ -45,4 +46,14 @@ test('Console見出し: IPC失敗・不正応答は従来表示へ、破棄後�
   const f=fixture({title});try{await flush();assert.equal(f.heading(),'AiDiy IDE / Console');}finally{f.dispose();}
  }
  let resolve;const f=fixture({title:()=>new Promise(done=>{resolve=done;})});f.dispose();resolve('AiDiy IDE / Console 9');await flush();assert.equal(f.state.windowTitle.value,'');
+});
+
+
+test('Hermes見出し: 正式名とIDを保ったまま実テンプレートのタイトルだけ短縮する',async()=>{
+ const f=fixture({desktop:true,linked:false,title:()=>Promise.resolve('AiDiy Console / Hermes')});
+ try{
+  f.state.cli.value={id:'aidiy_hermes',name:'AiDiy Hermes'};await flush();
+  assert.equal(f.heading(),'AiDiy Console / Hermes');assert.equal(f.calls(),0);
+  assert.equal(f.state.cli.value.name,'AiDiy Hermes');
+ }finally{f.dispose();}
 });

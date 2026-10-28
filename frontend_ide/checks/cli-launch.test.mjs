@@ -171,10 +171,11 @@ for (const cli of ['copilot', 'aidiy_hermes']) test(`startDevelopmentからConso
   const app = await startDevelopment(project, { kind: 'console', cli, cliAutoApprove: true, env: { PATH: project } });
   try {
     const launchConfig = await fetch(app.url + 'development/config').then(response => response.json());
-    assert.equal(launchConfig.cliName, CLI_LAUNCHERS.find(item => item.id === cli).name);
+    assert.equal(launchConfig.cliName, cli === 'aidiy_hermes' ? 'Hermes' : CLI_LAUNCHERS.find(item => item.id === cli).name);
     const response = await fetch(app.url + 'api/panels/console', { method: 'POST' }); assert.equal(response.status, 200);
     const panel = await response.json(), config = await fetch(new URL(panel.url + 'config', app.url)).then(response => response.json());
     assert.equal(config.project, project); assert.equal(config.cli.id, cli); assert.equal(config.cli.autoApprove, true); assert.equal(config.cli.mode, 'YOLO');
+    assert.equal(config.cli.name, CLI_LAUNCHERS.find(item => item.id === cli).name);
     assert.equal(config.model, undefined); assert.equal(config.provider, undefined);
   } finally { await app.close(); }
 }));
