@@ -68,7 +68,8 @@ export function parseArgs(args) {
   if (options.headless && args.some(arg=>arg!=='--headless' && arg!=='--help' && arg!=='-h')) throw new Error('--headless は単独で指定してください。');
   return options;
 }
-export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher=createAppLauncher(),cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager,coreSettingsBridge=createCoreSettingsBridge()}) {
+export function createHandler({token, prefix='/', entries=[], coverage={}, scanFn=scan, probeFn=probe, toolsStatusFn=getToolsStatus, keyStatusFn=getKeyStatus, keyTestFn=testKey, publicCache=createPublicModelCache(), installWriteFn=writeInstallReport, modelsWriteFn=writeModelsInfo, integrationWriteFn=writeIntegrationInfo, modelTrials=createModelTrials(), previousResults, startManager=createStartManager(), appLauncher,cliLauncher=createCliLauncher(),vscodeLauncher=createVSCodeLauncher(),portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn}),installManagerFactory=createInstallManager,coreSettingsBridge=createCoreSettingsBridge()}) {
+  appLauncher ??= createAppLauncher({portStatusFn,webBrowserOpenFn});
   let results = [], busy = false, writing = false, scanStarted = null, scanFinished = null, modelResults = {}, modelWriting = false, progress = [], integrationResults = {}, integrationWriting = false;
   const individualProbes = new Set(), keyBusy = new Set(), keyProgress = new Map();
   const hasBody = req => req.headers['transfer-encoding'] || (req.headers['content-length'] && req.headers['content-length'] !== '0');
@@ -81,6 +82,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
   const management=installManagerFactory({entries,probeFn,onResult:recordInstallResult});
 
   const assets = new Map([['',['index.html','text/html; charset=utf-8']],['app.js',['app.js','text/javascript; charset=utf-8']],['style.css',['style.css','text/css; charset=utf-8']],['AiDiy_diag.png',['AiDiy_diag.png','image/png']]]);
+  assets.set('Chrome.svg',['Chrome.svg','image/svg+xml']);
   assets.set('AiDiy.png',['AiDiy.png','image/png']);
   for(const id of ['avatar','ide','console','code','live','discord'])assets.set(`AiDiy_${id}.png`,[`AiDiy_${id}.png`,'image/png']);
   for(const id of ['task','team'])assets.set(`AiDiy_${id}.svg`,[`AiDiy_${id}.svg`,'image/svg+xml']);

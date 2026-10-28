@@ -1043,7 +1043,7 @@ function flyTo(g) {
   updateSide();
   return travelTo([...trail],{target:g,transition:false,arrivalDistance:Math.max(120,g.R*2.8),after:()=>{focus=g;updateSide();}});
 }
-async function flyHome() {
+async function flyHome({ valid: parentValid = () => true } = {}) {
   if (disposed) return false;
   if (viewMode === '2d') { selectBody(null); return true; }
   selected = null;
@@ -1051,7 +1051,7 @@ async function flyHome() {
   tracking = null;
   touchIdle();
   updateSide();
-  const run=++navigationSequence, valid=()=>run===navigationSequence;
+  const run=++navigationSequence, valid=()=>run===navigationSequence&&parentValid();
   const eye=cameraPosition(cam), radius=Math.hypot(eye.x,eye.y,eye.z);
   const scale=overviewDistance()/Math.max(radius,1);
   const destination=radius>1?{x:eye.x*scale,y:eye.y*scale,z:eye.z*scale}:{x:0,y:0,z:-overviewDistance()};
@@ -1059,7 +1059,9 @@ async function flyHome() {
   if(Math.abs(radius-overviewDistance())>30 && !await travelTo([...trail],{target:destination,transition:false,arrivalDistance:1,valid}))return;
   if(!valid())return;
   await travelTo([...trail],{target:{x:0,y:0,z:0},transition:false,arrivalDistance:Infinity,valid});
-  if(valid())touchIdle();
+  if(!valid())return false;
+  touchIdle();
+  return true;
 }
 /** 星・惑星の選択を共通化する（一覧・検索・フォーカス操作も同じ）。 */
 function approach(body) {
@@ -1387,6 +1389,9 @@ async function goTo(entry, {automatic=false, valid=()=>true} = {}) {
     }
     return true;
   }
+  // ルート内の星へ接近中でも、ルートの再選択は解除だけでなく全景へ戻す。
+  // 深い階層からは下の通常ワープが全景を作るので、余分な航行を加えない。
+  if (!isFile && !parts.length && !trail.length) return flyHome({ valid });
   // 接近済みの同じファイルは飛び直さず、grepの行位置だけ更新する。
   if (!automatic && isFile && selected?.path === entry.path && tracking?.path === entry.path) {applyLocation(entry,run);return true;}
   holdProjection();

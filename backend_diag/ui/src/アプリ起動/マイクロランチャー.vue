@@ -26,7 +26,7 @@ const batchProgress=computed(()=>{const value=props.state?.進捗表示?.value;r
 const orbit=computed(()=>配置.円周配置(apps.value.length));
 watch(()=>apps.value.length,async count=>{if(expanded.value)await window.aidiyWindow?.expandMicro(true,count);});
 watch(()=>props.online,value=>{if(value){void props.appState.読込();void props.cliState.読込();}},{immediate:true});
-function disabled(item){return !props.online||(item.kind==='app'&&!props.appState.利用可能(item.id))||!props.appState.フォルダ.value||props.appState.選択中.value||Boolean(props.appState.処理中.value)&&!(item.kind==='cli'&&props.appState.処理中.value.startsWith('cli:'));}
+function disabled(item){return !props.online||(item.kind==='app'&&!props.appState.利用可能(item.id))||(item.kind!=='app'||item.id!=='chrome')&&!props.appState.フォルダ.value||props.appState.選択中.value||Boolean(props.appState.処理中.value)&&!(item.kind==='cli'&&props.appState.処理中.value.startsWith('cli:'));}
 function launch(item,event){if(disabled(item))return;const 開始時=起動モーション(event);if(item.kind==='cli')void props.cliState.起動(item.id,{確認省略:true,開始時});else void props.appState.起動(item.id,{開始時});}
 async function toggle(){
  if(busy.value||props.switching)return;busy.value=true;

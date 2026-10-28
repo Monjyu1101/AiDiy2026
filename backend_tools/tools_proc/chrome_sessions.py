@@ -205,7 +205,7 @@ class ChromeSessionRegistry:
         if is_ide_session(name) and name not in self._sessions:
             entry = read_ide_session(self._ide_directory, name)
             if entry is None:
-                raise RuntimeError('IDEをtoolsへ接続し、「＋ Browser」を開いてください。')
+                raise RuntimeError('aidiy_browserを起動するか、IDEをtoolsへ接続し「＋ Browser」を開いてください。')
             with self._lock:
                 inst = self._ide_instances.get(name)
                 if inst is None or inst[0].entry != entry:
@@ -258,7 +258,7 @@ class ChromeSessionRegistry:
                 "running": self._chrome_responding(entry["port"]),
                 "profile_dir": self._profile_dir(entry["key"]),
             })
-        for path in self._ide_directory.glob("aidiy_ide*.json"):
+        for path in self._ide_directory.glob("aidiy_*.json"):
             name = path.stem
             if name in self._sessions:
                 continue
@@ -266,7 +266,7 @@ class ChromeSessionRegistry:
             if entry:
                 result.append({"session": name, "key": name, "port": entry["port"],
                                "headless": False, "running": IDEBrowserManager(entry).is_running(),
-                               "profile_dir": "", "owner": "aidiy_ide"})
+                               "profile_dir": "", "owner": "aidiy_browser" if name.startswith("aidiy_browser") else "aidiy_ide"})
         return result
 
     def close(self, name: str) -> bool:

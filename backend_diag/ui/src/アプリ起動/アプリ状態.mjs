@@ -6,10 +6,11 @@ export function アプリ状態を作成({api,picker=()=>globalThis.aidiyWindow?
  let folderInitialized=false,configuredFolder=null,configuredLaunchFolder='';
  function 起動フォルダ(){return configuredFolder!==null&&フォルダ.value===configuredFolder?configuredLaunchFolder:フォルダ.value;}
  let folderVersion=0,catalogVersion=0,online=false,timer=null,loading=null;
- const backendApps=new Set(['task','team']);
+ const backendApps=new Set(['task','team','chrome']);
  function 利用可能(id){const item=項目.value.find(item=>item.id===id);return backendApps.has(id)?item?.利用可能===true:item?.利用可能!==false;}
- function 不可理由(id){return 利用可能(id)?'':項目.value.find(item=>item.id===id)?.無効理由||'TaskTeam バックエンド起動中のみ利用できます。';}
- function unavailable(){項目.value=項目.value.map(item=>backendApps.has(item.id)?{...item,利用可能:false,無効理由:'TaskTeam バックエンドの状態を確認できません。'}:item);}
+ function フォルダ必要(id){return id!=='chrome';}
+ function 不可理由(id){return 利用可能(id)?'':項目.value.find(item=>item.id===id)?.無効理由||(id==='chrome'?'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。':'TaskTeam バックエンド起動中のみ利用できます。');}
+ function unavailable(){項目.value=項目.value.map(item=>backendApps.has(item.id)?{...item,利用可能:false,無効理由:item.id==='chrome'?'Tools / MCP と Web の状態を確認できません。':'TaskTeam バックエンドの状態を確認できません。'}:item);}
  async function 読込(){
   if(loading)return loading;const version=catalogVersion;
   const request=(async()=>{try{const data=await api('api/アプリ起動');if(version===catalogVersion){
@@ -47,10 +48,10 @@ export function アプリ状態を作成({api,picker=()=>globalThis.aidiyWindow?
  function 取消(){folderVersion++;一覧.value=null;選択中.value=false;参照中.value=false;}
  function 解除(){if(処理中.value||選択中.value)return;folderInitialized=true;configuredFolder=null;フォルダ.value='';結果.value={};通知.value='';}
  async function 起動(id,{開始時}={}){
-  if(!フォルダ.value||処理中.value||選択中.value||!利用可能(id))return;処理中.value=id;通知.value='';
-  try{開始時?.();const data=await api('api/アプリ起動/開始','POST',undefined,'json',{対象:id,フォルダ:起動フォルダ()});結果.value={...結果.value,[id]:{通知:data.通知,種別:data.起動済み?'existing':'accepted',ログ:data.ログ}};}
+  if(フォルダ必要(id)&&!フォルダ.value||処理中.value||選択中.value||!利用可能(id))return;処理中.value=id;通知.value='';
+  try{開始時?.();const data=id==='chrome'?await api('api/起動/ブラウザ','POST',undefined,'json',{}):await api('api/アプリ起動/開始','POST',undefined,'json',{対象:id,フォルダ:起動フォルダ()});結果.value={...結果.value,[id]:{通知:data.通知||data.メッセージ,種別:data.起動済み?'existing':'accepted',ログ:data.ログ}};}
   catch(error){結果.value={...結果.value,[id]:{通知:error.message,種別:'error'}};}
   finally{処理中.value='';}
  }
- return {項目,フォルダ,起動フォルダ,処理中,通知,結果,選択中,参照中,一覧,パス入力,参照エラー,利用可能,不可理由,接続,終了,読込,参照,選択,決定,取消,解除,起動};
+ return {項目,フォルダ,起動フォルダ,処理中,通知,結果,選択中,参照中,一覧,パス入力,参照エラー,フォルダ必要,利用可能,不可理由,接続,終了,読込,参照,選択,決定,取消,解除,起動};
 }

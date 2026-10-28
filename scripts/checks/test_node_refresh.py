@@ -114,6 +114,7 @@ class NodeRefreshTests(unittest.TestCase):
             "frontend_ide/aidiy_console": SimpleNamespace(setup=Mock(return_value=True)),
             "frontend_ide/aidiy_task": SimpleNamespace(setup=Mock(return_value=True)),
             "frontend_ide/aidiy_team": SimpleNamespace(setup=Mock(return_value=True)),
+            "frontend_ide/aidiy_browser": SimpleNamespace(setup=Mock(return_value=True)),
             # setup()やconf_jsonは用意しない。設定補完経路へ入れば失敗する。
             "frontend_channels": SimpleNamespace(install_launcher=Mock(return_value=None)),
         }

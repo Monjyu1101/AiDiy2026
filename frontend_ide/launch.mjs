@@ -19,7 +19,7 @@ import projectProfiles from './デスクトップ/project-profile.cjs';
 const {projectIdentity}=projectProfiles;
 // サーバーとElectronは別のNodeプロセスに所有させ、表示完了後に呼出元へ戻る。
 async function launchDetached(defaultKind,args){
- const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='console'?'Console':defaultKind==='task'?'Task':defaultKind==='team'?'Team':'Code';
+ const label=defaultKind==='ide'?'IDE':defaultKind==='live'?'Live':defaultKind==='console'?'Console':defaultKind==='task'?'Task':defaultKind==='team'?'Team':defaultKind==='browser'?'Browser':'Code';
  const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--app',defaultKind,'--foreground',...args],{cwd:process.cwd(),env:{...process.env,AIDIY_LAUNCHER_CHILD:'1'},detached:true,windowsHide:true,stdio:['ignore','ignore','ignore','ipc']});
  try{
   const result=await new Promise((done,reject)=>{
@@ -38,8 +38,10 @@ async function launchDetached(defaultKind,args){
 export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},cli:{type:'string'},'cli-auto-approve':{type:'boolean'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
  const kind=values.app||defaultKind;
- if(!['code','live','ide','console','task','team'].includes(kind))throw Error('--app はcode / live / ide / console / task / teamから指定してください。');
+ if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('--app はcode / live / ide / console / task / team / browserから指定してください。');
+ if(values.help&&kind==='browser'){console.log('aidiy_browser [作業フォルダ | --project 作業フォルダ] [--port 番号] [--strict-port] [--new-window] [--foreground | --wait]');console.log('IDE共通のBrowserをElectronで単独起動します。tools接続時にchrome_devtoolsから操作できます。Web版への切り替えは行いません。');return;}
  if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port]${['task','team'].includes(kind)?'':' [--provider 名前] [--model モデル]'}${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='console'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
+ if(kind==='browser'&&['browser','no-open','serve','offline','connect','provider','model','cli','cli-auto-approve'].some(name=>values[name]!==undefined))throw Error('BrowserはElectron専用です。Web起動・AIモデル・CLIのオプションは利用できません。');
  if(['task','team'].includes(kind)&&['provider','model','offline','connect'].some(name=>values[name]!==undefined))throw Error('Task / Team のモデル・接続設定は画面内で指定してください（--provider / --model / --offline / --connect は利用できません）。');
  validateCliOptions(kind,{cli:values.cli,cliAutoApprove:values['cli-auto-approve'],provider:values.provider,model:values.model});
  const cliLaunch=values.cli?await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']}):undefined;
@@ -55,7 +57,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
   if(model&&!provider)throw Error('Liveの--modelには--providerも指定してください。');
  }
  if(!existsSync(fileURLToPath(new URL(['task','team'].includes(kind)?'./dist/taskteam.js':'./dist/app.js',import.meta.url))))throw Error('Vue画面を準備してください: python frontend_ide/_setup.py');
- if(!values.foreground&&!values.wait&&!values.serve&&!values['no-open']&&!values.browser&&!useBrowser())return launchDetached(kind,args);
+ if(!values.foreground&&!values.wait&&!values.serve&&!values['no-open']&&!values.browser&&(kind==='browser'||!useBrowser()))return launchDetached(kind,args);
  let app,desktop,lifetime,stopping=false;
  const stop=async()=>{if(stopping)return;stopping=true;lifetime?.dispose();if(desktop?.connected)desktop.disconnect();await app?.close();};
  if(values.cli)lifetime=createCliOwnerLifetime(stop);
@@ -72,7 +74,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
   if(browser&&kind!=='code')console.log(`プロジェクト: ${project}`);
  };
  if(values['no-open']||values.serve){await publishReady(true);return app;}
- let browser=values.browser||useBrowser();
+ let browser=kind!=='browser'&&(values.browser||useBrowser());
  if(!browser){
   try{
    const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliTitleName(cliLaunch),AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
@@ -81,7 +83,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});
    if(shown.existingWindow){await stop();notifyReady({existingWindow:true});console.log('起動済みの画面を前面に表示しました。');return;}
    desktop.once('exit',code=>{if(code)process.exitCode=code;void stop();});
-  }catch(error){if(launcherChild){await stop();throw error;}console.warn(error.message+' Web版へ切り替えます。');if(desktop?.connected)desktop.disconnect();desktop?.kill();desktop=undefined;browser=true;}
+  }catch(error){if(launcherChild||kind==='browser'){if(desktop?.connected)desktop.disconnect();desktop?.kill();await stop();throw error;}console.warn(error.message+' Web版へ切り替えます。');if(desktop?.connected)desktop.disconnect();desktop?.kill();desktop=undefined;browser=true;}
  }
  await publishReady(browser);
  if(browser){

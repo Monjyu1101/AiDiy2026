@@ -8,6 +8,7 @@ import RefreshButton from '../共通表示/再読込ボタン.vue';
 import {ref,onMounted,onBeforeUnmount} from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
 import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
+defineProps({standalone:Boolean});
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),error=ref('');
 let stop=()=>{},observer,disposed=false,editing=false;
 function update(value){if(disposed||!value)return;page.value=value;if(!editing)address.value=displayBrowserURL(value.url);}
@@ -26,7 +27,7 @@ onBeforeUnmount(()=>{disposed=true;stop();observer?.disconnect();});
 </script>
 <template>
  <main class="development-app browser-panel desktop-window" data-app="browser">
-  <StatusBar title="AiDiy IDE / Browser" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" />
+  <StatusBar :title="standalone?'AiDiy Browser':'AiDiy IDE / Browser'" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" />
   <form class="browser-toolbar" @submit.prevent="navigate">
    <button type="button" aria-label="戻る" title="戻る" :disabled="!page.available||!page.back" @click="action('back')">←</button>
    <button type="button" aria-label="進む" title="進む" :disabled="!page.available||!page.forward" @click="action('forward')">→</button>

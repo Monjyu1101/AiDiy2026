@@ -34,7 +34,7 @@ provide('openFileAnalysis',(file,root)=>{analysis.value={file:{path:file.path,na
 const { config }=defineProps({config:Object});
 // IDEのピン留めで開いた独立ウィンドウ（URLの #viewer=ファイル）。IDE本体の画面・接続監視は動かさない。
 const viewerPath=config.kind==='ide'&&location.hash.startsWith('#viewer=')?decodeURIComponent(location.hash.slice('#viewer='.length)):'';
-const browserPanel=config.kind==='ide'&&location.hash==='#browser'&&!!window.aidiyWindow;
+const browserPanel=(config.kind==='browser'||config.kind==='ide'&&location.hash==='#browser')&&!!window.aidiyWindow;
 const state=ref({active:false}),base=reactive({console:'',code:config.kind==='code'?(config.host?'host':config.base||''):'',live:config.kind==='live'?(config.host?'host':config.base||''):''});
 const statusError=ref('');
 const error=ref(''),pending=ref(false),panelOpen=ref(false),tab=ref('code'),liveOpen=ref(false),viewMode=ref('3d');
@@ -181,7 +181,7 @@ onBeforeUnmount(()=>{stopWindowMove();stopAllDisplays();disposed=true;revision++
   <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertFileDraft" :launch-target="launchDraftTarget" @close="draftRequest=null" />
   <FileAnalysisDialog v-if="analysis" :key="analysis.root+'|'+analysis.file.path" :file="analysis.file" :root="analysis.root" @close="analysis=null" />
   <FileHistoryDialog v-if="history" :key="history.root+'|'+history.file.path" :file="history.file" :root="history.root" @close="history=null" />
-  <BrowserPanel v-if="browserPanel" />
+  <BrowserPanel v-if="browserPanel" :standalone="config.kind==='browser'" />
   <ViewerWindow v-else-if="viewerPath" :path="viewerPath" :desktop="desktop" />
   <div v-else class="development-app" :class="[config.kind,{'vscode-host':config.host,'desktop-window':desktop,'all-displays':allDisplayState.active}]" :data-app="config.kind">
     <template v-if="config.kind==='ide'">

@@ -15,8 +15,8 @@ import vm from 'node:vm';
 import { transformSync } from 'esbuild';
 
 // 実launch関数を使い、ブラウザ・Electron・HTTPサーバー・CLIは全てmockする。
-function fixture(opened, browser = true) {
-  let closed = 0, armed = 0, disposed = 0, openCalls = 0, options, desktopEnv;
+function fixture(opened, browser = true, desktopFailure = false) {
+  let closed = 0, armed = 0, disposed = 0, openCalls = 0, options, desktopEnv, desktopArgs;
   const messages = [], process = new EventEmitter();
   Object.assign(process, { argv: [], env: { AIDIY_LAUNCHER_CHILD: '1' }, cwd: () => '/fixture', pid: 123, send: value => messages.push(value) });
   const app = { url: 'http://127.0.0.1:9999/', publicUrl: 'http://127.0.0.1:9999/', close: async () => { closed++; } };
@@ -29,7 +29,7 @@ function fixture(opened, browser = true) {
     './aidiy_console/cli-session.mjs': { createCliOwnerLifetime: () => ({ arm: () => armed++, dispose: () => disposed++, started() {} }) },
     './viewer/launch-options.mjs': { projectFolder: () => '/fixture', useBrowser: () => browser, electronExecutable: () => 'fixture-electron' },
     './host/scripts/launch-project.mjs': { ブラウザで開く: async () => { openCalls++; return opened; } },
-    './デスクトップ/desktop-process.mjs': { spawnDesktop(_executable,_args,{env}) { desktopEnv=env;const child=new EventEmitter();child.kill=()=>{};queueMicrotask(()=>child.emit('message',{windowShown:true}));return child; } },
+    './デスクトップ/desktop-process.mjs': { spawnDesktop(_executable,_args,{env}) { desktopEnv=env;desktopArgs=_args;const child=new EventEmitter();child.kill=()=>{};queueMicrotask(()=>desktopFailure?child.emit('error',Error('Electron unavailable')):child.emit('message',{windowShown:true}));return child; } },
     './デスクトップ/project-profile.cjs': { projectIdentity: value => ({ path: value }) },
   };
   let source = readFileSync(new URL('../launch.mjs', import.meta.url), 'utf8');
@@ -37,7 +37,7 @@ function fixture(opened, browser = true) {
   const module = { exports: {} };
   vm.runInNewContext(transformSync(source, { format: 'cjs', define: { 'import.meta.url': JSON.stringify(new URL('../launch.mjs', import.meta.url).href) } }).code,
     { module, exports: module.exports, process, URL, queueMicrotask, setTimeout, clearTimeout, console: { log() {}, warn() {} }, require: id => { if (!(id in modules)) throw Error(id); return modules[id]; } });
-  return { launch: module.exports.launch, messages, process, stats: () => ({ closed, armed, disposed, openCalls, options, desktopEnv }) };
+  return { launch: module.exports.launch, messages, process, stats: () => ({ closed, armed, disposed, openCalls, options, desktopEnv, desktopArgs }) };
 }
 
 test('CLIのブラウザ起動失敗: 所有サーバーを閉じ、launchReadyを返さない', async () => {
@@ -79,4 +79,21 @@ test('Hermes launch sends only the shortened title to Electron, keeping the CLI 
  assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_CLI_NAME,'Hermes');
  assert.equal(f.stats().options.cli,'aidiy_hermes');
  f.process.emit('SIGTERM');await Promise.resolve();
+});
+
+
+test('Standalone Browserは画面なし環境でもElectronへ正しい引数を渡し、終了でサーバーを停止する',async()=>{
+ const f=fixture(true,true);await f.launch('browser',['--foreground','--new-window']);
+ assert.equal(f.stats().openCalls,0);assert.equal(f.stats().options.kind,'browser');
+ assert.deepEqual(Array.from(f.stats().desktopArgs).slice(-2),['--app','browser']);
+ assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_KIND,'browser');
+ assert.equal(f.stats().desktopEnv.AIDIY_DEVELOPMENT_NEW_WINDOW,'1');
+ assert.equal(f.messages[0].launchReady,true);
+ f.process.emit('SIGTERM');await Promise.resolve();assert.equal(f.stats().closed,1);
+});
+
+test('Standalone BrowserのElectron失敗はWebへ切り替えず、サーバーを終了する',async()=>{
+ const f=fixture(true,true,true);
+ await assert.rejects(f.launch('browser',['--foreground']),/Electron unavailable/);
+ assert.equal(f.stats().openCalls,0);assert.equal(f.stats().closed,1);assert.equal(f.messages.length,0);
 });

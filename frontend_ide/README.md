@@ -1,6 +1,6 @@
 # AiDiy IDE（Vue）
 
-Console / Code / Live / IDE の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は4種類です。
+Console / Code / Live / IDE / Task / Team / Browser の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は7種類です。
 
 
 ## ソースの配置
@@ -41,6 +41,16 @@ VRモード中のファイルビューアー・ソース比較は中心星の右
 **＋ Browser** はtools接続中に使えます。Google検索から始まり、URL／検索欄、戻る・進む・再読み込みを備えます。HTML／HTMのビューアーには従来の「コード」「表示」に加えて「ブラウザ」があり、Electronでは選択したファイルの絶対パスを `file:///...` にして直接開きます。相対リンク・画像・CSSは元ファイルのフォルダを基準に読み込みます。例外として、AiDiyの `frontend_web/public` 内でルート登録されたHTMLは対応するWebページを開きます。Webサーバー停止中は起動を案内し、認証が必要な画面はログイン後に利用します。通常画面とVRの各画面メニューから起動でき、VRでは選んだ画面の中央へ配置します。tools切断中はページ操作を停止し、再接続で再開します。IDEの利用終了でBrowserも閉じます。Web起動時は新しいブラウザタブを開きます。
 
 Electron版Browserは `aidiy_chrome_devtools` の `session="aidiy_ide"` で操作できます。複数IDEでは `aidiy_ide-2` 以降を割り当て、パネル内にセッション名を表示します。`list_tabs` で対象の `tab_id` を選び、`navigate`・`click`・`type_text`・`screenshot` などを呼びます。`new_tab` はBrowserパネルを追加し、`close_session` はそのIDEのBrowserだけを閉じます。IDE本体・Code・Consoleは対象外です。Web起動で開いた通常タブはこのセッションには登録しません。
+
+## 単独Browser（aidiy_browser）
+
+`aidiy_browser [作業フォルダ]` または `node frontend_ide/launch.mjs --app browser --project <作業フォルダ>` で、IDEと同じBrowser画面を単独起動します。AiDiyアイコン・URL/検索欄・履歴操作を共有します。Electron専用で、未導入・起動失敗時に通常Webへ切り替えません。`--foreground` / `--wait` で終了待機できます。
+
+セットアップは既存の `python frontend_ide/_setup.py`、コマンドだけの登録修復は `python _setup.py --launchers-only` を使います。全体startの自動起動対象には追加しません。Diagの「アプリ起動」でプロジェクトを選び、`aidiy_browser` を押しても開けます。
+
+tools接続中は `aidiy_chrome_devtools` に `session="aidiy_browser"` を指定して操作します。複数起動では画面に表示される `aidiy_browser-2` 以降を指定します。IDEの `aidiy_ide` や通常Chromeの `default` セッションと分離し、起動ごとに一時プロファイルを使います。`new_tab` は同じBrowserプロセスの窓を追加し、最後の窓を閉じると専用ブリッジと配信サーバーも終了します。tools切断中は操作を止め、復帰を待ちます。
+
+Electron全体のデバッグポートは開きません。既存のloopback・起動単位トークン・Origin拒否付きCDPブリッジを再利用し、Browserページ以外のTargetやAI/Console/ファイル操作APIを公開しません。
 
 ElectronのIDE / Code / Live / Console / Browser / ファイルビューア・ソース比較 / エクスプローラー / 軌跡バーは、本文・入力欄・ボタン・リンク上で、左ボタンを同じ位置で0.5秒長押しすると、その窓をドラッグできます。短押しの選択はボタンを離してから行い、長押し移動後はクリックやリンク遷移を起こしません。0.5秒の判定中に少しでも動かした場合は長押しを取り消し、通常の文字選択・宇宙の旋回として使えます。標準の移動カーソルと四方向マーカーを表示し、矢印回転などの演出は行いません。最大化・OSの全画面中の窓は対象外です。VR中のIDE本体では巨大な窓を動かさず、ドラッグ量だけ宇宙の中心をずらします。マーカーはマウスに追従し、手動補正はファイル選択・ビューア開閉・VRの再移行でも維持します（IDE終了まで）。VR中に開いた別パネルは通常どおり窓を移動します。
 

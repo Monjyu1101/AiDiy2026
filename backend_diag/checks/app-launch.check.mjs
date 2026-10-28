@@ -18,10 +18,10 @@ async function fixture(t){
  }});
  return {root,project:await realpath(project),manager,calls};
 }
-test('8 fixed apps; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
+test('10 fixed apps; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
  const f=await fixture(t);let reads=0;
  const manager=createAppLauncher({tasks:async()=>{reads++;return [];}});
- assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord']);
+ assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord','chrome','browser']);
  for(const id of ['avatar','ide','console','code','live','discord'])for(const path of ['',undefined,'relative',join(f.root,'missing')])await assert.rejects(manager.launch(id,path),{status:400});
  await writeFile(join(f.root,'file'),'x');await assert.rejects(manager.launch('avatar',join(f.root,'file')),{status:400});
  await assert.rejects(manager.launch('arbitrary-command',f.project),{status:400});assert.equal(reads,0);

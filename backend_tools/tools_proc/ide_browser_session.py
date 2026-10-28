@@ -16,7 +16,7 @@ from tools_proc.chrome_devtools import CDPClient
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 def is_ide_session(name):
-    return bool(re.fullmatch(r"aidiy_ide(?:-[2-9][0-9]*|-1[0-9]+)?", name))
+    return bool(re.fullmatch(r"aidiy_(?:ide|browser)(?:-[2-9][0-9]*|-1[0-9]+)?", name))
 
 def read_ide_session(directory, name):
     if not is_ide_session(name):
@@ -79,7 +79,7 @@ class IDEBrowserManager:
     def ensure_running(self, show_automation_banner=None, url=None):
         if not self.is_running():
             self.mark_unreachable()
-            raise RuntimeError('IDEをtoolsへ接続し、「＋ Browser」を開いてください。')
+            raise RuntimeError('aidiy_browserを起動するか、IDEをtoolsへ接続し「＋ Browser」を開いてください。')
         self._verified_until = time.monotonic() + 2
         if url:
             self.request("/json/new?url=" + urllib.parse.quote(url if url != "about:blank" else "https://www.google.com/", safe=""))

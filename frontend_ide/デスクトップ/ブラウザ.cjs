@@ -40,10 +40,10 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
   callback({cancel:blocked});
  });
  const allowed=url=>{if(url==='about:blank')return true;try{const parsed=new URL(url);if(parsed.protocol==='file:')return localFileAllowed(parsed);return ['http:','https:'].includes(parsed.protocol)&&!parsed.username&&!parsed.password&&!blockedOrigins.has(parsed.origin);}catch{return false;}};
- function attach(record,target=HOME){
+ function attach(record,target=HOME,available=true){
   blockedOrigins.add(new URL(record.url).origin);
   const view=new WebContentsView({webPreferences:{session:isolated,sandbox:true,contextIsolation:true,nodeIntegration:false,nodeIntegrationInSubFrames:false,webSecurity:true}});
-  const contents=view.webContents,entry={view,error:'',rect:null,run:0,available:true};entries.set(record,entry);
+  const contents=view.webContents,entry={view,error:'',rect:null,run:0,available,pendingTarget:available?null:target};entries.set(record,entry);
   record.window.contentView.addChildView(view);view.setVisible(false);
   const snapshot=()=>({url:contents.getURL()||target,title:contents.getTitle(),session:record.browserSession,available:entry.available,loading:contents.isLoading(),back:contents.navigationHistory.canGoBack(),forward:contents.navigationHistory.canGoForward(),error:entry.available?entry.error:'toolsとの接続が切れています。再接続後に操作できます。'});
   const notify=()=>{if(!record.window.isDestroyed()&&!contents.isDestroyed())record.window.webContents.send('development:browser-changed',snapshot());};
@@ -70,7 +70,7 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
   }
   entry.layout=layout;record.window.on('resize',layout);
   record.window.once('closed',()=>{entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
-  void entry.navigate(target).catch(error=>{entry.error=error.message;notify();});
+  if(available)void entry.navigate(target).catch(error=>{entry.error=error.message;notify();});
   return contents;
  }
  async function action(event,name,value){
@@ -91,7 +91,7 @@ function createBrowserViews({WebContentsView,session,trustedEvent,projectRoot}){
    return{ok:true,...entry.snapshot()};
   }catch(error){return{ok:false,error:error.message};}
  }
- function setAvailable(owner,available){for(const [record,entry]of entries)if(record.owner===owner&&entry.available!==available){entry.available=available;if(!available)entry.view.webContents.stop();entry.layout();entry.notify();}}
+ function setAvailable(owner,available){for(const [record,entry]of entries)if((record===owner||record.owner===owner)&&entry.available!==available){entry.available=available;if(!available)entry.view.webContents.stop();else if(entry.pendingTarget!==null){const target=entry.pendingTarget;entry.pendingTarget=null;void entry.navigate(target).catch(error=>{entry.error=error.message;entry.notify();});}entry.layout();entry.notify();}}
  return{attach,action,setAvailable,allowedURL:allowed};
 }
 module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews};

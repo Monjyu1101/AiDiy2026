@@ -232,3 +232,21 @@ test('VS Code は通常とミニで編集用ラベルを表示し同じフォル
   try{await flush();const button=ui.button('VS Code でフォルダを開く');assert.ok(button);assert.doesNotMatch(button.props.title,/モデル指定なし|自動承認/);button.props.onClick();await flush();assert.deepEqual(launches.at(-1),{route:'api/VSCode起動/開始',body:{フォルダ:state.フォルダ.value}});assert.ok(ui.nodes().some(node=>node.tag==='img'&&node.props.src==='CLI_vscode.svg'));}finally{ui.app.unmount();}
  }
 });
+
+
+test('Chrome / Browser icons render in full and mini launchers; Chrome works without project and Browser stays gated',async()=>{
+ const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs');
+ const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ for(const name of ['アプリ起動/アプリ起動パネル.vue','アプリ起動/ミニアプリ起動.vue']){
+  const calls=[];const state=アプリ状態を作成({api:async(route,_method,_signal,_format,body)=>{calls.push({route,body});return route==='api/アプリ起動'?{対象:[{id:'chrome',名前:'Chrome',利用可能:true},{id:'browser',名前:'aidiy_browser'}],フォルダ:''}:{メッセージ:'opened'};}});
+  await state.読込();const cliState={項目:vue.ref([]),全項目:vue.ref([]),読込(){},失敗:vue.ref(false)};
+  const ui=mount(compile(name,{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
+  try{
+   await flush();assert.equal(ui.button('Chrome を起動').props.disabled,false);assert.equal(ui.button('aidiy_browser を起動').props.disabled,true);
+   assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy.png'));
+   ui.button('Chrome を起動').props.onClick({});await flush();assert.deepEqual(calls.at(-1),{route:'api/起動/ブラウザ',body:{}});
+   state.フォルダ.value='/project';await flush();assert.equal(ui.button('aidiy_browser を起動').props.disabled,false);
+   state.項目.value[0].利用可能=false;await flush();assert.equal(ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動')).props.disabled,true);
+  }finally{ui.app.unmount();state.終了();}
+ }
+});

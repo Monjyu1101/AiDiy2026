@@ -10,7 +10,8 @@ const {randomUUID}=require('node:crypto');
 const {WebSocketServer}=require('ws');
 
 // Electron全体のデバッグポートは開かず、Browserの非特権WebContentsだけを公開する。
-async function createBrowserCDP({directory,canUse,openPanel,allowedURL,version=process.versions.chrome}){
+async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPrefix='aidiy_ide',version=process.versions.chrome}){
+ if(!['aidiy_ide','aidiy_browser'].includes(sessionPrefix))throw Error('不正なBrowserセッション名です。');
  const token=randomUUID(),pages=new Map(),sockets=new Set();let port,file,name,closed=false;
  const server=createServer(async(req,res)=>{
   const json=(value,status=200)=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));};
@@ -64,7 +65,7 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,version=p
   mkdirSync(directory,{recursive:true});
   let assigned={};try{assigned=JSON.parse(readFileSync(join(directory,'../_chrome_sessions.json'),'utf8')).sessions||{};}catch{}
   for(let i=1;i<=100;i++){
-   name=i===1?'aidiy_ide':`aidiy_ide-${i}`;file=join(directory,name+'.json');
+   name=i===1?sessionPrefix:`${sessionPrefix}-${i}`;file=join(directory,name+'.json');
    if(Object.hasOwn(assigned,name))continue;
    try{
     const previous=JSON.parse(readFileSync(file,'utf8'));

@@ -791,6 +791,7 @@ def setup_node_refresh() -> list[str]:
         ("Console: aidiy_console", lambda: _load_folder_module("frontend_ide/aidiy_console").setup()),
         ("Task: aidiy_task", lambda: _load_folder_module("frontend_ide/aidiy_task").setup()),
         ("Team: aidiy_team", lambda: _load_folder_module("frontend_ide/aidiy_team").setup()),
+        ("Browser: aidiy_browser", lambda: _load_folder_module("frontend_ide/aidiy_browser").setup()),
         ("Discord: 依存", lambda: dependencies("frontend_channels", electron=True)),
         ("Discord: ビルド", lambda: build("frontend_channels", "build:panel")),
         ("Discord: aidiy_discord", lambda: _load_folder_module("frontend_channels").install_launcher(BASE_DIR / "frontend_channels")),
@@ -811,7 +812,7 @@ def setup_node_refresh() -> list[str]:
 # メイン
 # ============================================================
 def setup_launchers_only() -> list[str]:
-    """全10コマンドの登録を修復する。依存導入・ビルド・サービス起動は行わない。"""
+    """全11コマンドの登録を修復する。依存導入・ビルド・サービス起動は行わない。"""
     steps = [
         ('Diag', lambda: _load_folder_module('backend_diag').setup(desktop=False)),
         ('Avatar', lambda: _load_folder_module('frontend_avatar').install_standalone_launcher()),
@@ -821,6 +822,7 @@ def setup_launchers_only() -> list[str]:
         ('IDE', lambda: _load_folder_module('frontend_ide/viewer').install_launcher(BASE_DIR / 'frontend_ide/viewer')),
         ('Task', lambda: _load_folder_module('frontend_ide/aidiy_task').setup()),
         ('Team', lambda: _load_folder_module('frontend_ide/aidiy_team').setup()),
+        ('Browser', lambda: _load_folder_module('frontend_ide/aidiy_browser').setup()),
         ('Discord', lambda: _load_folder_module('frontend_channels').install_launcher(BASE_DIR / 'frontend_channels')),
     ]
     errors = []
@@ -843,6 +845,7 @@ def print_app_launch_commands():
         ('Console', 'aidiy_console'),
         ('Task', 'aidiy_task'),
         ('Team', 'aidiy_team'),
+        ('Browser', 'aidiy_browser'),
         ('Code', 'aidiy_code'),
         ('Live', 'aidiy_live'),
         ('IDE', 'aidiy_ide'),

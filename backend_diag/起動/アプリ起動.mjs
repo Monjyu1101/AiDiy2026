@@ -7,11 +7,13 @@ import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {readConfig} from '../runtime/model_probe.mjs';
+import {createPortStatusChecker} from './ポート状態.mjs';
+import {createWebBrowserOpener} from './Webブラウザ.mjs';
 import {createTaskTeamStatus} from './TaskTeam接続.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-export const アプリ一覧=Object.freeze(['avatar','task','team','ide','console','code','live','discord'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',console:'Console',code:'Code',live:'Live',discord:'Discord'})[id],単一起動:['avatar','live','discord'].includes(id)})));
+export const アプリ一覧=Object.freeze(['avatar','task','team','ide','console','code','live','discord','chrome','browser'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',console:'Console',code:'Code',live:'Live',discord:'Discord',chrome:'Chrome',browser:'aidiy_browser'})[id],単一起動:['avatar','live','discord'].includes(id)})));
 const execute=(command,args,options={})=>new Promise((resolve,reject)=>execFile(command,args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:8*1024*1024,...options},(error,stdout)=>error?reject(error):resolve(stdout)));
 
 // 明示起動時だけ取得する。タスクのコマンドラインや一覧を画面・ログへ返さない。
@@ -34,13 +36,15 @@ export function アプリタスク(id,{command=''}){
  if(id==='discord')return entry('frontend_channels/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
  return false;
 }
-export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus}={}){
+export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus,portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}={}){
  const pending=new Set();
  const checkTaskTeam=taskTeamStatus||createTaskTeamStatus({root});
  const taskTeam=id=>id==='task'||id==='team';
  const availability=async()=>{try{return await checkTaskTeam();}catch{return {利用可能:false,無効理由:'Task / Team バックエンドを確認できません。'};}};
  async function catalog(){
   const state=await availability();
+  let chromeState={利用可能:false,無効理由:'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。'};
+  try{const ports=await portStatusFn();if(['tools','web'].every(id=>ports.対象.some(item=>item.id===id&&item.開放===true)))chromeState={利用可能:true,無効理由:''};}catch{}
   const [,config]=await readConfig(()=>readFile(join(root,'_config','AiDiy_key.json'),'utf8'));
   const project=config.CODE_BASE_PATH;
   // 設定全体やキーは公開せず、明示されたプロジェクトだけを初期値として渡す。
@@ -49,7 +53,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   // 表示は設定値そのまま。起動引数だけAIコアと同じbackend_server基準で解決する。
   // 空欄・制御文字・ドライブ相対値から別のフォルダを補完しない。
   const 起動フォルダ=!normalized||フォルダ.length>4096||/[\u0000-\u001f\u007f]/.test(フォルダ)||(/^[a-z]:/i.test(normalized)&&!isAbsolute(normalized))?'':resolve(root,'backend_server',normalized);
-  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app),フォルダ,起動フォルダ};
+  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='chrome'?{...app,...chromeState}:app),フォルダ,起動フォルダ};
  }
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
@@ -68,6 +72,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
  }
  async function launch(id,project){
   const app=アプリ一覧.find(item=>item.id===id);if(!app)throw fail('起動対象が不正です。');
+  if(id==='chrome'){const result=await webBrowserOpenFn();return {受付:true,通知:result.メッセージ,URL:result.URL};}
   const path=await folder(project); // Avatarも未選択では起動不可。
   if(pending.has(id))throw fail('このアプリの起動処理中です。',409);
   pending.add(id);

@@ -674,3 +674,85 @@ test('共通検索一覧DOM: ツリーより上、初期折畳み、手動開閉
     assert.equal(explorer.searchResultsOpen.value,true,'明示的に開いた状態は結果更新で維持');
   }finally{h.dispose();}
 });
+
+for(const mode of ['2d','3d'])test(`${mode}ルート行: 深い階層から戻り、展開ボタンでは移動せず、繰り返し選択も届く`,async t=>{
+  const h=await workspace(t,{mode});
+  const finish=()=>finishFollow(h,()=>h.states.get('SpaceView').explorerNavigation.value===null);
+  try{
+    await h.click(node=>node.props?.['data-path']==='src');await finish();
+    await h.click(node=>node.props?.['data-path']==='src/nested');await finish();
+    await h.click(node=>node.props?.['data-path']==='src/nested/deep.js');await finish();
+    const calls=h.navigation.mock.calls.length;
+    await h.click(node=>node.props?.['aria-label']==='ルートフォルダを折りたたむ');
+    assert.equal(h.navigation.mock.calls.length,calls);assert.equal(h.engine.trail.join('/'),'src/nested');
+    await h.click(node=>hasClass(node,'explorer-root-name'));await finish();
+    assert.equal(h.engine.trail.join('/'),'');assert.equal(h.engine.selected,null);
+    assert.equal(h.props.get('FileExplorer').current,'');assert.equal(h.states.get('FileExplorer').rootExpanded.value,true);
+    await h.click(node=>hasClass(node,'explorer-root-name'));await finish();
+    assert.equal(h.navigation.mock.calls.length,calls+2);assert.equal(h.engine.trail.join('/'),'');
+    await h.click(node=>node.props?.['data-path']==='root.js');await finish();
+    if(mode==='3d')assert.notEqual(h.engine.cam.tx,0,'ファイルへ接近した視点');
+    await h.click(node=>hasClass(node,'explorer-root-name'));await finish();
+    assert.equal(h.engine.selected,null);
+    if(mode==='3d'){
+      assert.equal(h.engine.goal.tx,0,'ルート内の接近からも全景の中心へ戻す');
+      assert.equal(h.engine.goal.ty,0);assert.equal(h.engine.goal.tz,0);
+    }
+  }finally{h.dispose();}
+});
+
+for(const mode of ['2d','3d'])test(`${mode}ルート選択: 遅いファイル走査を失効させ、ルート連打後も最後の移動だけ反映する`,async t=>{
+  let pending;
+  const h=await workspace(t,{mode,fetcher:url=>url.startsWith('/api/galaxy')&&pending?pending.promise:undefined});
+  const finish=()=>finishFollow(h,()=>h.states.get('SpaceView').explorerNavigation.value===null);
+  try{
+    await h.click(node=>node.props?.['data-path']==='src');await finish();
+    h.states.get('FileExplorer').acceptUpdates([{path:'new/late.js',name:'late.js',mtime:5000}]);await flush();
+    pending=deferred();
+    await h.click(node=>node.props?.['data-latest-path']==='new/late.js');
+    await h.click(node=>hasClass(node,'explorer-root-name'));
+    await h.frame();
+    await h.click(node=>hasClass(node,'explorer-root-name'));
+    const data=snapshot();data.tree.d.push(directory('new',['late.js']));
+    const response=pending;pending=null;response.resolve(reply(data));await flush();await finish();
+    assert.equal(h.engine.trail.join('/'),'');assert.equal(h.engine.selected,null);
+    assert.equal(h.props.get('FileExplorer').current,'');
+    await h.click(node=>node.props?.['data-path']==='root.js');await finish();
+    await h.click(node=>hasClass(node,'explorer-root-name'));
+    await h.frame();
+    await h.click(node=>node.props?.['data-path']==='other');await finish();
+    for(let n=0;n<30;n++)await h.frame();
+    assert.equal(h.engine.trail.join('/'),'other','新しいフォルダ選択を古いルート航行で上書きしない');
+    assert.equal(h.props.get('FileExplorer').current,'other');
+  }finally{pending?.resolve(reply(snapshot()));await flush();h.dispose();}
+});
+
+test('3Dルート航行: セッション変更で旧航行を止め、新しいプロジェクトの選択を保つ',async t=>{
+  let data=snapshot();
+  const h=await workspace(t,{mode:'3d',fetcher:url=>url.startsWith('/api/galaxy')?reply(data):undefined});
+  const finish=()=>finishFollow(h,()=>h.states.get('SpaceView').explorerNavigation.value===null);
+  try{
+    await h.click(node=>node.props?.['data-path']==='root.js');await finish();
+    await h.click(node=>hasClass(node,'explorer-root-name'));await h.frame();
+    data={root:'/second',tree:directory('second',['next.js']),truncated:false};
+    h.viewProps.startedAt=2;await flush();
+    await h.click(node=>node.props?.['data-path']==='next.js');await finish();
+    for(let n=0;n<30;n++)await h.frame();
+    assert.equal(h.engine.selected?.path,'next.js');assert.equal(h.props.get('FileExplorer').root,'/second');
+    assert.equal(h.states.get('SpaceView').explorerNavigation.value,null);
+  }finally{h.dispose();}
+});
+
+test('3Dルート航行: 呼び出し元の有効期限も全景への移動中に維持する',async t=>{
+  const h=await workspace(t,{mode:'3d'});
+  try{
+    await h.click(node=>node.props?.['data-path']==='root.js');
+    await finishFollow(h,()=>h.states.get('SpaceView').explorerNavigation.value===null);
+    let valid=true,done=false,result;
+    const navigation=h.engine.goTo({type:'dir',path:''},{valid:()=>valid});
+    navigation.then(value=>{done=true;result=value;});
+    await h.frame();valid=false;
+    await finishFollow(h,()=>done);await navigation;
+    assert.notEqual(result,true,'失効した全景移動を完了扱いにしない');
+  }finally{h.dispose();}
+});

@@ -176,3 +176,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Chrome ランチャー
+
+`../アプリアイコン/chrome.svg`（配布名 `Chrome.svg`）は識別用のコード作成図形です。Chrome は Google LLC の商標です。公式配布画像ではなく、Google による承認・提携を意味しません。

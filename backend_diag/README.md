@@ -522,3 +522,11 @@ node --test backend_diag/checks/ai-settings-*.check.*
 npm --prefix backend_diag/ui run build
 npm --prefix backend_diag/ui run check
 ```
+
+### Chrome / aidiy_browser ランチャー
+
+通常・ミニ・アイコン化のアプリ一覧に Chrome と `aidiy_browser` を表示します。Chrome はシステム起動 Web タブの「手動で開く」と同じ認証付き API を使い、Tools / MCP と Web が稼働中の場合だけ `http://localhost:8090/` を開きます。プロジェクト選択は不要で、起動対象設定・サービスは変更しません。連打は既存の手動操作と共通の排他で防ぎます。
+
+`aidiy_browser` は他の単独アプリと同じ実在プロジェクトを指定し、`frontend_ide/launch.mjs --app browser --project <folder> --new-window` で IDE 内 Browser の単独窓を開きます。AiDiy アイコンを使用します。Chrome 用の新規 remote-debugging 設定や MCP 設定は追加せず、既存の chrome_devtools 接続を利用します。全体一括起動の対象には追加しません。
+
+検証: `node --test backend_diag/checks/browser-launcher.check.mjs backend_diag/checks/web-browser.check.mjs backend_diag/checks/app-launch*.check.mjs`。配布 UI は `npm --prefix backend_diag/ui run build` と `npm --prefix backend_diag/ui run check` で同期します。

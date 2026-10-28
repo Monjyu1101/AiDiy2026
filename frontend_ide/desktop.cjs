@@ -8,16 +8,16 @@ const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
-if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','console','task','team'].includes(kind))throw Error('起動元が不正です。');
+if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('起動元が不正です。');
 const cliConsoleWindow=kind==='console'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
-const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':'Console'}`;
+const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':kind==='browser'?'Browser':'Console'}`;
 app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
 const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
 if(kind==='ide')mkdirSync(profile,{recursive:true});
 app.setPath('userData',profile);
 if(kind==='ide')app.setPath('sessionData',profile);
-const independent=kind==='console'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
+const independent=kind==='console'||kind==='browser'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
 if(independent){
  const temporaryProfile=mkdtempSync(join(app.getPath('temp'),`aidiy-${kind}-profile-`));
  app.setPath('userData',temporaryProfile);
@@ -85,6 +85,30 @@ const {createBrowserViews,browserFileTarget,browserOpenable,HOME}=require('./デ
 const {validPreviewPath}=require('./デスクトップ/native-preview-actions.cjs');
 let browserViews;
 const browserBridges=new WeakMap();
+let standaloneBrowserBridge;
+const standaloneBrowsers=()=>[...windows.values()].filter(record=>record.kind==='browser'&&!record.owner&&!record.window.isDestroyed());
+async function ensureStandaloneBrowserBridge(){
+ if(standaloneBrowserBridge)return standaloneBrowserBridge;
+ standaloneBrowserBridge=(async()=>{
+  const {createBrowserCDP}=require('./デスクトップ/ブラウザCDP.cjs');
+  const bridge=await createBrowserCDP({directory:process.env.AIDIY_BROWSER_SESSIONS_DIR||join(__dirname,'../backend_tools/temp/_ide_browser_sessions'),sessionPrefix:'aidiy_browser',
+   canUse:async()=>{const record=standaloneBrowsers()[0];return !quitting&&!!record&&browserConnected(await readState(record));},
+   allowedURL:target=>browserViews.allowedURL(target),
+   openPanel:async target=>{
+    const source=standaloneBrowsers()[0];if(quitting||!source||!browserConnected(await readState(source)))throw Error('tools接続中のみ起動できます。');
+    const window=await createWindow('browser',url+'#browser',undefined,undefined,undefined,undefined,undefined,target);return windows.get(window.webContents);
+   }});
+  if(quitting||!standaloneBrowsers().length){bridge.close();throw Error('Browserの利用が終了しました。');}
+  return bridge;
+ })();
+ try{return await standaloneBrowserBridge;}catch(error){standaloneBrowserBridge=undefined;throw error;}
+}
+async function checkStandaloneBrowser(record){
+ if(record.checking||record.window.isDestroyed())return;record.checking=true;
+ try{browserViews?.setAvailable(record,browserConnected(await readState(record)));}
+ catch{browserViews?.setAvailable(record,false);}
+ finally{record.checking=false;}
+}
 const browserConnected=state=>state.active&&state.mode==='online'&&state.connected===true;
 async function ensureBrowserBridge(owner){
  if(browserBridges.has(owner))return browserBridges.get(owner);
@@ -156,7 +180,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  const ownerRevision=owner?.revision;
  const placement=kind==='console'?await reserveConsoleSlot():null;
  if(quitting||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision)){placement?.close();throw Error('起動元の利用が終了しました。');}
- let slot=placement?.slot||0;if(owner&&['code','viewer','browser'].includes(kind))while(used.has(slot))slot++;
+ let slot=placement?.slot||0;if((owner||kind==='browser')&&['code','viewer','browser'].includes(kind))while(used.has(slot))slot++;
  let bounds,displaySlot;
  try{
   const display=selectedAllDisplay(owner,displayId);
@@ -164,10 +188,10 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliConsoleWindow&&!owner);
  }catch(error){placement?.close();throw error;}
  if(kind==='task')bounds=taskWindowBounds(taskView,area);
- const baseTitle=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy IDE / Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
+ const baseTitle=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy ${owner?'IDE / ':''}Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
  let window;
  const title=baseTitle+(kind==='console'&&!owner&&cliConsoleWindow&&process.env.AIDIY_DEVELOPMENT_CLI_NAME?' / '+process.env.AIDIY_DEVELOPMENT_CLI_NAME:'');
- try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:join(__dirname,'public',`AiDiy_${['code','live','console','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
+ try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,backgroundColor:'#000',autoHideMenuBar:true,icon:kind==='browser'&&!owner?join(__dirname,'public','AiDiy.png'):join(__dirname,'public',`AiDiy_${['code','live','console','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
  // Windowsのフレームレス窓も、外枠の論理座標を明示してDPI差を補正する。
@@ -197,8 +221,8 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
    })().catch(error=>console.error(error)).finally(()=>{confirming=false;});
   });
  }
- const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{if(kind==='task')taskWindows.closed(record);clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
+ const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):kind==='browser'&&!owner?setInterval(()=>void checkStandaloneBrowser(record),400):undefined;monitor?.unref();
+ window.once('closed',()=>{if(kind==='task')taskWindows.closed(record);clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);if(kind==='browser'&&!owner&&!standaloneBrowsers().length){const pending=standaloneBrowserBridge;standaloneBrowserBridge=undefined;void pending?.then(bridge=>bridge.close(),()=>{});}closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
  contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame){nativePreviewActions.invalidate(record);if(!isInPlace)draftRouter.invalidate(record);}});
  contents.on('render-process-gone',()=>{draftRouter.invalidate(record);nativePreviewActions.invalidate(record);});
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
@@ -208,10 +232,10 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  try{
   if(kind==='browser'){
    browserViews??=createBrowserViews({WebContentsView,session,trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
-   const bridge=await ensureBrowserBridge(owner);
-   const current=await readState(owner);
-   if(window.isDestroyed()||owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current))throw Error('tools接続中のみBrowserを起動できます。');
-   record.browserSession=bridge.name;const page=browserViews.attach(record,browserTarget);attachWindowMove(record,page);bridge.add(record,page);
+   const bridge=await (owner?ensureBrowserBridge(owner):ensureStandaloneBrowserBridge());
+   const current=await readState(owner||record);
+   if(window.isDestroyed()||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current)))throw Error('tools接続中のみBrowserを起動できます。');
+   record.browserSession=bridge.name;const page=browserViews.attach(record,browserTarget,browserConnected(current));attachWindowMove(record,page);bridge.add(record,page);if(!owner)browserViews.setAvailable(record,browserConnected(current));
   }
   await window.loadURL(url);
   if(!window.isDestroyed()){
@@ -235,7 +259,7 @@ app.on('before-quit',event=>{
  void Promise.allSettled([...closing]).finally(()=>app.quit());
 });
 app.whenReady().then(async()=>{
- if(process.platform==='darwin')require('./host/scripts/MacOS-Menu.cjs').Macメニューを設定({app,Menu,名前:appName,閉じる:closeApplication,icon:join(__dirname,'public',`AiDiy_${kind}.png`),platform:process.platform});
+ if(process.platform==='darwin')require('./host/scripts/MacOS-Menu.cjs').Macメニューを設定({app,Menu,名前:appName,閉じる:closeApplication,icon:join(__dirname,'public',kind==='browser'?'AiDiy.png':`AiDiy_${kind}.png`),platform:process.platform});
  // 同一Electronプロセスの複数窓を識別し、Liveのメインフレームだけ音声入力を許可する。
  session.defaultSession.setPermissionCheckHandler((contents,permission,origin,details)=>{
   const record=windows.get(contents);if(!record)return false;
@@ -259,7 +283,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:browser-action',async(event,action,value)=>{
   const record=trustedEvent(event);
   if(record?.kind==='browser'&&!['bounds','state'].includes(action)){
-   try{if(!browserConnected(await readState(record.owner)))return{ok:false,error:'tools接続中のみBrowserを操作できます。'};}catch{return{ok:false,error:'toolsの接続を確認できません。'};}
+   try{if(!browserConnected(await readState(record.owner||record)))return{ok:false,error:'tools接続中のみBrowserを操作できます。'};}catch{return{ok:false,error:'toolsの接続を確認できません。'};}
   }
   return browserViews?.action(event,action,value)||{ok:false,error:'ブラウザが起動していません。'};
  });
@@ -360,5 +384,5 @@ app.whenReady().then(async()=>{
   record.pending.set(pendingKey,opening);
   try{return await opening;}finally{if(record.pending.get(pendingKey)===opening)record.pending.delete(pendingKey);}
  });
- await createWindow(kind,kind==='task'?url+'#task-view=request':url);if(kind==='task')await taskWindows.start();process.send?.({windowShown:true});
+ await createWindow(kind,kind==='task'?url+'#task-view=request':kind==='browser'?url+'#browser':url);if(kind==='task')await taskWindows.start();process.send?.({windowShown:true});
 }).catch(error=>{console.error(error);app.quit();});

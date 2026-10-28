@@ -20,14 +20,15 @@ import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
- if(!['code','live','ide','console','task','team'].includes(kind))throw Error('アプリはcode / live / ide / console / task / teamから指定してください。');
+ if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('アプリはcode / live / ide / console / task / team / browserから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  const cliLaunch=cli?await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env}):undefined;
  const taskTeam=['task','team'].includes(kind);
  const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project):undefined;
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
- connection??=kind==='ide'?createCoreConnection(project):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
+ connection??=['ide','browser'].includes(kind)?createCoreConnection(project,{keepActive:kind==='browser'}):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
+ if(kind==='browser')void connection.connect();
  const files={'/':[taskTeam?'taskteam.html':'index.html','text/html; charset=utf-8'],'/development/app.js':['app.js','text/javascript; charset=utf-8'],'/development/app.css':['app.css','text/css; charset=utf-8'],'/development/AiDiy.png':['AiDiy.png','image/png'],'/development/sending.png':['sending.png','image/png'],'/development/abort.png':['abort.png','image/png'],'/development/speaker.png':['speaker.png','image/png'],'/development/microphone.png':['microphone.png','image/png'],'/development/THIRD_PARTY_NOTICES.txt':['THIRD_PARTY_NOTICES.txt','text/plain; charset=utf-8'],'/development/LICENSE':['LICENSE','text/plain; charset=utf-8']};
  files['/development/taskteam.js']=['taskteam.js','text/javascript; charset=utf-8'];
  files['/development/taskteam.css']=['taskteam.css','text/css; charset=utf-8'];
@@ -36,6 +37,8 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
  const fileHistory=createFileHistory(project,{state:connection.state});
  const app=await startServer(project,port,{strict,env,connection,explorerOptions,
   requestHandler:async(req,res,url)=>{
+   // Browser単独画面にはプロジェクト操作・Console/AI起動APIを公開しない。
+   if(kind==='browser'&&url.pathname.startsWith('/api/')&&url.pathname!=='/api/connection'){res.writeHead(url.pathname.startsWith('/api/connection/')?405:404).end();return true;}
    if(taskTeamProxy && await taskTeamProxy.handle(req,res,url))return true;
    if(kind==='ide'&&await aiSearch.handle(req,res,url))return true;
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;

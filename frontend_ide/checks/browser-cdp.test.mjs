@@ -37,3 +37,17 @@ test('Browser CDP: 専用ページだけ公開、tools切断・別ドメイン�
  assert.equal(closed,1);assert.equal(debuggerAPI.listenerCount('message'),0);
  bridge.close();assert.deepEqual(await readdir(directory),[]);
 });
+
+test('Standalone Browser CDP: IDEと別名、同時起動の衝突回避、登録解除、名前の限定',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'aidiy-browser-cdp-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const options={directory,canUse:async()=>true,openPanel:async()=>{},allowedURL:()=>true};
+ const bridges=[];t.after(()=>bridges.forEach(bridge=>bridge.close()));
+ for(const sessionPrefix of ['aidiy_ide','aidiy_browser','aidiy_browser'])bridges.push(await bridgeModule.createBrowserCDP({...options,sessionPrefix}));
+ assert.deepEqual(bridges.map(bridge=>bridge.name),['aidiy_ide','aidiy_browser','aidiy_browser-2']);
+ const manifests=await Promise.all(bridges.map(async bridge=>JSON.parse(await readFile(join(directory,bridge.name+'.json'),'utf8'))));
+ assert.equal(new Set(manifests.map(value=>value.port)).size,3);assert.equal(new Set(manifests.map(value=>value.token)).size,3);
+ assert.equal((await fetch(`http://127.0.0.1:${manifests[0].port}/${manifests[1].token}/json`)).status,404);
+ for(const manifest of manifests){const response=await fetch(`http://127.0.0.1:${manifest.port}/${manifest.token}/json/version`);assert.equal((await response.json())['AiDiy-Session'],manifest.name);}
+ await assert.rejects(bridgeModule.createBrowserCDP({...options,sessionPrefix:'../../bad'}),/セッション名/);
+ bridges[1].close();assert.deepEqual((await readdir(directory)).sort(),['aidiy_browser-2.json','aidiy_ide.json']);
+});

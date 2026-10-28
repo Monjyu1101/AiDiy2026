@@ -34,13 +34,13 @@ export function coreTarget(...folders) {
   return 'http://127.0.0.1:8091';
 }
 
-export function createCoreConnection(project, { target, fetcher = fetch, interval = 10000, timeout = 1500 } = {}) {
+export function createCoreConnection(project, { target, fetcher = fetch, interval = 10000, timeout = 1500, keepActive = false } = {}) {
   let backend, configError;
   // backend は Code / Live 子パネルの接続先。IDE の疎通確認先とは分ける。
   try { backend = target || coreTarget(fileURLToPath(new URL('.', import.meta.url)), project); }
   catch (error) { configError = error.message; }
-  let startedAt = null;
-  let mode = 'initial', connected = false, wanted = false, message = configError || '', pending, controller, timer, generation = 0, disposed = false;
+  let startedAt = keepActive ? Date.now() : null;
+  let mode = keepActive ? 'online' : 'initial', connected = false, wanted = false, message = configError || '', pending, controller, timer, generation = 0, disposed = false;
   // 接続済みの定期確認は表示を維持し、初回接続・切断後の再接続だけを接続中にする。
   const state = () => ({ mode, startedAt, active: startedAt !== null, connected, connecting: !!pending && !connected, wanted, message, backend: backend || '',
     project: { name: basename(project), path: project } });

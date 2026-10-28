@@ -41,13 +41,16 @@ test('Browser: ページを権限なしで分離し、IDEへの要求と別画�
  let view,filter;const sent=[];
  const isolated={setPermissionRequestHandler(fn){this.request=fn;},setPermissionCheckHandler(fn){this.check=fn;},webRequest:{onBeforeRequest(fn){filter=fn;}}};
  class View{
-  constructor(options){view=this;this.options=options;this.webContents=new EventEmitter();Object.assign(this.webContents,{url:'',getURL(){return this.url;},getTitle:()=>'',isLoading:()=>false,isDestroyed:()=>false,navigationHistory:{canGoBack:()=>false,canGoForward:()=>false},loadURL:async function(url){this.url=url;},setWindowOpenHandler(fn){this.popup=fn;},close(options){this.closed=options;}});}
+  constructor(options){view=this;this.options=options;this.webContents=new EventEmitter();Object.assign(this.webContents,{url:'',getURL(){return this.url;},getTitle:()=>'',isLoading:()=>false,isDestroyed:()=>false,navigationHistory:{canGoBack:()=>false,canGoForward:()=>false},loadURL:async function(url){this.url=url;},setWindowOpenHandler(fn){this.popup=fn;},stop(){this.stops=(this.stops||0)+1;},close(options){this.closed=options;}});}
   setVisible(value){this.visible=value;}setBounds(value){this.bounds=value;}
  }
  const window=new EventEmitter();Object.assign(window,{isDestroyed:()=>false,contentView:{addChildView(){}},getContentBounds:()=>({width:1000,height:700}),webContents:{getZoomFactor:()=>1.25,send:(...args)=>sent.push(args)}});
  const record={kind:'browser',window,url:'http://127.0.0.1:1234/'},event={record};
  const control=createBrowserViews({WebContentsView:View,session:{fromPartition:name=>{assert.equal(name,'aidiy-browser');return isolated;}},trustedEvent:event=>event.record});
- control.attach(record);assert.equal(view.webContents.url,HOME);
+ control.attach(record,HOME,false);assert.equal(view.webContents.url,'');
+ assert.equal((await control.action(event,'state')).available,false);
+ control.setAvailable(record,true);assert.equal(view.webContents.url,HOME);
+ control.setAvailable(record,false);assert.equal(view.webContents.stops,1);control.setAvailable(record,true);assert.equal(view.webContents.url,HOME);
  assert.equal(view.options.webPreferences.sandbox,true);assert.equal(view.options.webPreferences.nodeIntegration,false);assert.equal(view.options.webPreferences.preload,undefined);
  assert.equal(isolated.check(),false);isolated.request(null,'media',allowed=>assert.equal(allowed,false));
  filter({url:record.url+'api/connection'},result=>assert.equal(result.cancel,true));

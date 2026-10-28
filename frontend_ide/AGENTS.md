@@ -1,6 +1,6 @@
 # frontend_ide 実装概要
 
-Console / Code / Live / IDE / Task / Team は AiDiy の正式なサブシステムであり、本フォルダが6種類のVue 3画面を所有する。VS Code拡張はCode / Liveだけ、単独起動は6種類。Task / Team は利用者の指定によるAvatar画面のコピー版で、元Avatarの機能を残し、専用bundleと独立した認証・ウィンドウを使う。
+Console / Code / Live / IDE / Task / Team / Browser は AiDiy の正式なサブシステムであり、本フォルダが7種類のVue 3画面を所有する。VS Code拡張はCode / Liveだけ、単独起動は7種類。Task / Team は利用者の指定によるAvatar画面のコピー版で、元Avatarの機能を残し、専用bundleと独立した認証・ウィンドウを使う。
 
 全体のコンセプトは **開発スペース（宇宙をテーマにした IDE 開発環境）**。プロジェクトを宇宙（フォルダ＝銀河、ファイル＝星・惑星）として見せ、人はソースをほぼ触らずに「眺める・辿る・読む・頼む」で開発する。本文の編集は Code / Live を通じて AI に任せ、ビューアは読み取り専用を保つ。エクスプローラーでは明示操作によるコピー・名前変更・新規作成・確認付きのゴミ箱移動を提供する。Code / Live は単独起動・VS Code 拡張を維持したまま、開発スペースの部品としても動作させる（3つの使い方を壊さない）。説明文では見た目を宇宙、画面の文字は「フォルダ」「ファイル」など一般名で書く。
 
@@ -15,4 +15,4 @@ Console / Code / Live / IDE / Task / Team は AiDiy の正式なサブシステ�
 - 実装変更は画面を撮影して確認する。手順はREADMEと `_AIDIY/knowledge/` に記載する。
 
 - Consoleは `ターミナルパネル.vue`（xterm.js）と `aidiy_console/terminal.mjs`（WebSocket）を使い、`aidiy_console/terminal-process.mjs` / `aidiy_console/terminal-worker.mjs` が端末ごとのPTYとプロセス終了を管理する。端末は通常のシェル権限を持ち、ファイルビューアだけが読み取り専用。ConsoleにはVS Code拡張を作らない。
-- setup / cleanup の表示・処理順は Console → Code → Live → IDE → Task → Team。全体startの自動起動対象は従来どおりで、Task / Team は独立コマンドから手動起動する。共有依存物は各アプリの停止・解除後に片付ける。
+- setup / cleanup の表示・処理順は Console → Code → Live → IDE → Task → Team → Browser。全体startの自動起動対象は従来どおりで、Task / Team / Browser は独立コマンドから手動起動する。共有依存物は各アプリの停止・解除後に片付ける。
