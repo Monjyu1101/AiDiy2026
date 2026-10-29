@@ -16,10 +16,10 @@ test('Browser全画面ヘッダー: 角丸なし・背景だけを透過し文�
  const values=selector=>Object.fromEntries(rules.find(rule=>rule.selector.startsWith(selector)).nodes.filter(node=>node.type==='decl').map(node=>[node.prop,node.value]));
  const header=values('.browser-header-only .browser-chrome');
  assert.equal(header['border-radius'],'0');
- assert.equal(header.background,'linear-gradient(135deg,#17243f66,#2530524d)');
+ assert.equal(header.background,'linear-gradient(135deg,#17243f3d,#25305229)');
  assert.equal(header.opacity,undefined,'内容全体のopacityは下げない');
  assert.equal(header['text-shadow'],'0 1px 2px #000c','透けた明るいページ上でも文字の輪郭を残す');
- assert.equal(header['backdrop-filter'],'blur(24px) saturate(145%)');
+ assert.equal(header['backdrop-filter'],'blur(12px) saturate(145%)');
  assert.equal(values('.browser-chrome').background,'#080c1a','通常表示の背景は変えない');
  assert.equal(values('.browser-header-only .browser-toolbar input').background,'#07132266','URL入力の背景は維持する');
 });

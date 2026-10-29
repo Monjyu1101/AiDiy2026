@@ -7,14 +7,36 @@ const {setWindowBounds}=require('./全画面横断.cjs');
 const PRESETS={fhd:{width:1920,height:945},portrait:{width:1080,height:1785}};
 
 // 本文の寸法と外窓の寸法を分離する。Electronの窓/ViewはDIP、hostの測定値はCSS px。
-function createBrowserSizing({window,view,screen}){
- let insets,request,expected,applying=false,fullscreenTransition,fullscreenTarget,waitingRestore=false,waitingMaximize=false,pendingMaximize,disposed=false,latestMeasurement=-Infinity;
- const actual=()=>{request=undefined;expected=undefined;pendingMaximize=undefined;};
+function createBrowserSizing({window,view,screen,now=()=>performance.now(),setTimer=setTimeout,clearTimer=clearTimeout,duration=220}){
+ let insets,request,expected,applying=false,fullscreenTransition,fullscreenTarget,waitingRestore=false,waitingMaximize=false,pendingMaximize,disposed=false,latestMeasurement=-Infinity,flight;
+ function stop(){if(flight){clearTimer(flight.timer);flight=undefined;}}
+ function complete(error){const pending=request?.completion;if(request)request.completion=undefined;if(pending){if(error)pending.reject(error);else pending.resolve();}}
+ const actual=()=>{stop();complete();request=undefined;expected=undefined;pendingMaximize=undefined;};
  function layout(){
   if(disposed||window.isDestroyed())return;
   const b=window.getContentBounds();
   if(window.isFullScreen())view.setBounds({x:0,y:0,width:b.width,height:b.height});
   else if(insets)view.setBounds({x:insets.left,y:insets.top,width:Math.max(0,b.width-insets.left-insets.right),height:Math.max(0,b.height-insets.top-insets.bottom)});
+ }
+ function place(bounds){
+  expected={width:bounds.width,height:bounds.height};applying=true;
+  try{setWindowBounds(window,bounds);}finally{applying=false;}
+  layout();
+ }
+ function animate(bounds){
+  if(flight&&Object.keys(bounds).every(key=>bounds[key]===flight.end[key]))return;
+  stop();const current=flight={start:window.getBounds(),end:bounds,started:now(),request};
+  function step(){
+   if(flight!==current||disposed||window.isDestroyed()||request!==current.request)return;
+   try{
+    const t=Math.min(1,(now()-current.started)/duration),ease=1-Math.pow(1-t,3);
+    const next=Object.fromEntries(['x','y','width','height'].map(key=>[key,Math.round(current.start[key]+(current.end[key]-current.start[key])*ease)]));
+    place(t===1?current.end:next);
+    if(t===1){flight=undefined;request.animate=false;complete();}
+    else current.timer=setTimer(step,16);
+   }catch(error){stop();complete(error);request=undefined;}
+  }
+  current.timer=setTimer(step,16);
  }
  function apply(){
   if(disposed||!request||!insets||fullscreenTransition||waitingRestore||waitingMaximize||window.isDestroyed()||window.isFullScreen()||window.isMaximized())return;
@@ -22,13 +44,14 @@ function createBrowserSizing({window,view,screen}){
   const width=request.width+insets.left+insets.right+Math.max(0,outer.width-content.width);
   const height=request.height+insets.top+insets.bottom+Math.max(0,outer.height-content.height);
   // 入るときは中央へ。入らない場合も本文を縮めず、操作欄の左上だけ画面内へ残す。
-  const area=request.area,bounds={x:request.placed?outer.x:area.x+Math.max(0,Math.floor((area.width-width)/2)),y:request.placed?outer.y:area.y+Math.max(0,Math.floor((area.height-height)/2)),width,height};
+  const area=request.area,position=flight?.end||outer,bounds={x:request.placed?position.x:area.x+Math.max(0,Math.floor((area.width-width)/2)),y:request.placed?position.y:area.y+Math.max(0,Math.floor((area.height-height)/2)),width,height};
   request.placed=true;
-  expected={width,height};
   if(Object.keys(bounds).some(key=>outer[key]!==bounds[key])){
-   applying=true;try{setWindowBounds(window,bounds);}finally{applying=false;}
-  }
-  layout();
+   // 起動画像ではなく生きたパネル自体を変形。🔲/F11はCode同様にOSの処理へ任せる。
+   if(request.animate&&duration>0){animate(bounds);return;}
+   place(bounds);
+  }else layout();
+  stop();request.animate=false;complete();
  }
  function normal(){
   if(!request||fullscreenTransition||waitingMaximize)return;
@@ -64,10 +87,10 @@ function createBrowserSizing({window,view,screen}){
  function toggleFullscreen(){const value=!(fullscreenTarget??window.isFullScreen());actual();setFullscreen(value);}
  function preset(name){
   const size=PRESETS[name];if(!size)throw Error('対応していないウィンドウサイズです。');
-  actual();request={...size,area:screen.getDisplayMatching(window.getBounds()).workArea};
+  actual();let resolve,reject;const result=new Promise((a,b)=>{resolve=a;reject=b;});request={...size,animate:true,completion:{resolve,reject},area:screen.getDisplayMatching(window.getBounds()).workArea};
   // プリセットは本文のCSS viewportを等倍にする。DPR・UA・touchは変更しない。
-  view.webContents.setZoomFactor?.(1);
-  if(window.isFullScreen()||fullscreenTransition)setFullscreen(false);else normal();
+  try{view.webContents.setZoomFactor?.(1);if(window.isFullScreen()||fullscreenTransition)setFullscreen(false);else normal();}catch(error){complete(error);request=undefined;}
+  return result;
  }
  function restore(){waitingRestore=true;window.unmaximize();}
  function expand(){waitingMaximize=true;window.maximize();}
@@ -99,9 +122,9 @@ function createBrowserSizing({window,view,screen}){
   if(fullscreenTarget===true){setFullscreen(true);return;}
   fullscreenTarget=undefined;finishNormal();
  }
- const listeners={resize:resized,'will-resize':actual,maximize:expanded,unmaximize:restored,'enter-full-screen':entered,'leave-full-screen':left};
+ const listeners={resize:resized,'will-resize':actual,'will-move':actual,close:actual,maximize:expanded,unmaximize:restored,'enter-full-screen':entered,'leave-full-screen':left};
  for(const [event,fn]of Object.entries(listeners))window.on(event,fn);
  function dispose(){disposed=true;actual();for(const [event,fn]of Object.entries(listeners))window.removeListener(event,fn);}
- return{measure,preset,maximize,toggleFullscreen,actual,layout,dispose,isSettled:()=>!fullscreenTransition&&!waitingRestore&&!waitingMaximize&&(!request||!!expected)};
+ return{measure,preset,maximize,toggleFullscreen,actual,layout,dispose,isSettled:()=>!flight&&!fullscreenTransition&&!waitingRestore&&!waitingMaximize&&!request?.completion};
 }
 module.exports={createBrowserSizing};

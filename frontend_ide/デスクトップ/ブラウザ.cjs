@@ -8,7 +8,6 @@ const {pathToFileURL,fileURLToPath}=require('node:url');
 const {relative,isAbsolute,sep,resolve}=require('node:path');
 const {previewFile}=require('./native-preview-actions.cjs');
 const {createBrowserSizing}=require('./ブラウザ表示領域.cjs');
-const {createBrowserResizeMotion}=require('./ブラウザサイズ演出.cjs');
 const {createBrowserHeader}=require('./ブラウザ全画面パネル.cjs');
 function browserFileURL(root,path){return pathToFileURL(previewFile(root,path).full).href;}
 // Browser で開けるのは HTML と音声・動画。
@@ -60,8 +59,7 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   const notify=()=>{if(!record.window.isDestroyed()&&!contents.isDestroyed()){const value=snapshot();hostContents.send('development:browser-changed',value);entry.header?.send('development:browser-changed',value);}};
   entry.snapshot=snapshot;entry.notify=notify;
   const sizing=createBrowserSizing({window:record.window,view,screen});entry.sizing=sizing;
-  const motion=createBrowserResizeMotion({BrowserWindow,window:record.window,view,isSettled:sizing.isSettled,fullscreenKey});entry.motion=motion;
-  const toggleFullscreen=()=>motion.run(()=>sizing.toggleFullscreen());
+  const toggleFullscreen=()=>sizing.toggleFullscreen();
   entry.toggleFullscreen=toggleFullscreen;
   let pointerTimer;
   function pointer(){
@@ -89,7 +87,7 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
    if(event.defaultPrevented||key.type!=='keyDown'||key.key!=='F11'||key.control||key.alt||key.shift||key.meta)return;
    // 専用ヘッダーにはIDEのキー購読がないため、同じVR解除をmainへ委ねる。
    if(isVRActive(record)){if(leaveVR){event.preventDefault();if(!key.isAutoRepeat)leaveVR(record);}return;}
-   event.preventDefault();if(!key.isAutoRepeat)void toggleFullscreen().catch(error=>{entry.error=error.message;notify();});
+   event.preventDefault();if(!key.isAutoRepeat)toggleFullscreen();
   }
   entry.header=createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscreenKey,headers});
   entry.pointer=pointer;
@@ -112,7 +110,7 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   }
   entry.layout=layout;
   record.window.on('enter-full-screen',fullscreenChanged);record.window.on('leave-full-screen',fullscreenChanged);
-  record.window.once('closed',()=>{motion.dispose();sizing.dispose();clearInterval(pointerTimer);entry.header.close();for(const page of [hostContents,contents])page.removeListener('before-input-event',fullscreenKey);entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
+  record.window.once('closed',()=>{sizing.dispose();clearInterval(pointerTimer);entry.header.close();for(const page of [hostContents,contents])page.removeListener('before-input-event',fullscreenKey);entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
   if(available)void entry.navigate(target).catch(error=>{entry.error=error.message;notify();});
   return contents;
  }
@@ -152,8 +150,8 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
      return{ok:true,...entry.snapshot(),...result};
     }finally{entry.capturing=false;}
    }
-   else if(name==='fullscreen')await entry.toggleFullscreen();
-   else if(name==='size')await entry.motion.run(()=>entry.sizing.preset(value));
+   else if(name==='fullscreen')entry.toggleFullscreen();
+   else if(name==='size')await entry.sizing.preset(value);
    else if(name==='bounds'){
     entry.sizing.measure(value);entry.layout();
    }else if(name!=='state')throw Error('対応していない操作です。');
@@ -165,6 +163,6 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   const record=headers.get(event.sender),frame=event.senderFrame;
   return record&&!record.window.isDestroyed()&&frame===event.sender.mainFrame&&frame?.url===record.url+'#browser-header'?record:null;
  }
- return{attach,action,setAvailable,trustedHeader,allowedURL:allowed,maximize:record=>{const entry=entries.get(record);return entry?.motion.run(()=>entry.sizing.maximize()).then(()=>record.window.isDestroyed()?false:record.window.isMaximized());}};
+ return{attach,action,setAvailable,trustedHeader,allowedURL:allowed,maximize:record=>entries.get(record)?.sizing.maximize()};
 }
 module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews,browserDraftRequest};

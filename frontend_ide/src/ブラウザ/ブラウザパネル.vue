@@ -97,7 +97,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
 .development-app.browser-header-only{height:auto;min-height:0;background:transparent;border:0;overflow:visible}
-.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#17243f66,#2530524d);backdrop-filter:blur(24px) saturate(145%);text-shadow:0 1px 2px #000c}
+.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#17243f3d,#25305229);backdrop-filter:blur(12px) saturate(145%);text-shadow:0 1px 2px #000c}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
 .browser-header-only .browser-toolbar input{background:#07132266}
 .browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}

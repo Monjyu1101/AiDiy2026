@@ -22,7 +22,7 @@ function fixture({zoom=1,frame={width:8,height:10},area={x:-800,y:20,width:800,h
   unmaximize(){const run=()=>{this.maximized=false;this.bounds=normal||this.bounds;this.emit('unmaximize');this.emit('resize');};if(deferred)pending.push(run);else run();},
  });
  const view={webContents:{setZoomFactor(value){this.zoom=value;}},setBounds(value){this.bounds={...value};}};
- const control=sizing.createBrowserSizing({window,view,screen:{getDisplayMatching:()=>({workArea:area})}});
+ const control=sizing.createBrowserSizing({window,view,screen:{getDisplayMatching:()=>({workArea:area})},duration:0});
  const rect=({top=101,left=1,right=1,bottom=1,fullscreen=window.fullscreen}={})=>{
   const b=window.getContentBounds(),viewportWidth=b.width/zoom,viewportHeight=b.height/zoom;
   return {left,top,width:viewportWidth-left-right,height:viewportHeight-top-bottom,viewportWidth,viewportHeight,fullscreen};
