@@ -91,7 +91,7 @@ test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り�
  for(const selector of ['.connection-label','.window-actions button'])assert.equal(declarations(normal,selector).color,'var(--aidiy-titlebar-secondary)');
  assert.equal(declarations(normal,'.panel-brand.desktop').background,undefined,'Web表示にも同じ地色を使う');
  assert.ok(contrast(title.color,title.background)>=7);assert.ok(contrast(declarations(normal,'.window-actions button').color,title.background)>=7);
- assert.equal(titleColor(title.background),'#24282e');
+ assert.equal(titleColor(title.background),'#30343a');
  for(const selector of [':root','body','aside'])assert.equal(declarations(normal,selector).background,'#000');assert.equal(declarations(normal,'.connection-bar').background,'#000');
  assert.equal(declarations(normal,'.connection-bar.online').background,'cyan');
  assert.equal(declarations(normal,'.window-actions .window-pin').color,'#778394');assert.equal(declarations(normal,'.window-actions .window-pin.pinned').color,'#c3f7ff');

@@ -24,10 +24,10 @@ test('Discord のタイトル配色は共通原本のコピーだけを読み、
     for (const browser of [false, true]) for (const live of [false, true]) {
       window.document.documentElement.classList.toggle('browser-mode', browser);
       window.document.body.classList.toggle('live-view', live);
-      assert.equal(computed('header').backgroundColor, '#24282e');
+      assert.equal(computed('header').backgroundColor, '#30343a');
       assert.equal(computed('html').backgroundColor, '#000');
       assert.equal(computed('body').backgroundColor, '#000');
-      assert.notEqual(computed('main').backgroundColor, '#24282e', '本文へタイトル背景を転用しない');
+      assert.notEqual(computed('main').backgroundColor, '#30343a', '本文へタイトル背景を転用しない');
       assert.equal(computed('#settings-input').backgroundColor, '#1b202c', '入力の階層色は維持する');
       assert.equal(computed('.brand strong').color, '#f3f5f7');
       assert.equal(computed('#status').color, '#e1e6ed');

@@ -16,9 +16,9 @@ function luminance(hex){const [r,g,b]=hex.slice(1).match(/../g).map(value=>parse
 
 test('通常タイトル行: 共通tokenは黒に近いグレーと白寄りの文字で本文色を変更しない',()=>{
  const theme=values(tokens,':root');
- assert.deepEqual(theme,{'--aidiy-titlebar-background':'#24282e','--aidiy-titlebar-foreground':'#f3f5f7','--aidiy-titlebar-secondary':'#e1e6ed'});
+ assert.deepEqual(theme,{'--aidiy-titlebar-background':'#30343a','--aidiy-titlebar-foreground':'#f3f5f7','--aidiy-titlebar-secondary':'#e1e6ed'});
  assert.equal(rules(tokens).length,1,'配色tokenだけを共有し本文へスタイルを追加しない');
- for(const color of [theme['--aidiy-titlebar-foreground'],theme['--aidiy-titlebar-secondary']])assert.ok((luminance(color)+.05)/(luminance(theme['--aidiy-titlebar-background'])+.05)>11,'通常タイトル行の文字コントラストを確保する');
+ for(const color of [theme['--aidiy-titlebar-foreground'],theme['--aidiy-titlebar-secondary']])assert.ok((luminance(color)+.05)/(luminance(theme['--aidiy-titlebar-background'])+.05)>=7,'通常タイトル行は小さい文字でも7:1以上のコントラストを確保する');
 });
 
 test('通常タイトル行: desktop条件なしの共通ルールで単独窓とIDE内Webを同じ配色にする',()=>{

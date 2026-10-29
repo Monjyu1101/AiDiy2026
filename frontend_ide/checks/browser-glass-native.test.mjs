@@ -6,117 +6,81 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
-import native from '../デスクトップ/ブラウザ縁屈折.cjs';
-import headerNative from '../デスクトップ/ブラウザ全画面パネル.cjs';
-const {browserGlassGeometry,createBrowserGlass}=native;
-const png='data:image/png;base64,iVBORw0KGgo=';
+import {readFileSync,existsSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import vm from 'node:vm';
+const require=createRequire(import.meta.url);
+const source=readFileSync(new URL('../デスクトップ/ブラウザ全画面パネル.cjs',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
 
-function fixture(){
- const timers=new Map(),calls=[],sent=[],normalized=[];let clock=0,next=0;
- const state={header:{x:-1500,y:90,width:1200,height:100},owner:{x:-1600,y:40,width:1600,height:900},view:{x:0,y:0,width:1600,height:900},shown:true,fullscreen:true,minimized:false,destroyed:false,pageDestroyed:false,url:'https://example.test/page'};
- const source=Object.assign(new EventEmitter(),{isDestroyed:()=>state.pageDestroyed,getURL:()=>state.url,
-  capturePage(rect,options){return new Promise((resolve,reject)=>calls.push({rect,options,resolve,reject}));},
-  getZoomFactor(){throw Error('DIPに倍率を二重適用しない');},
+function fixture({platform='linux',release='6.12.0',zoom=1,area={x:-1600,y:40,width:1600,height:900},deferLoad=false}={}){
+ const timers=new Map(),headers=new Map();let clock=0,next=0,nativeWindow,captures=0,finishLoad,stopped=0;
+ const state={area:{...area}};
+ class Window extends EventEmitter{
+  constructor(options){super();nativeWindow=this;this.options=options;this.bounds={x:options.x,y:options.y,width:options.width,height:options.height};this.webContents=Object.assign(new EventEmitter(),{sent:[],send(channel,value){this.sent.push([channel,value]);},setZoomFactor(value){this.zoom=value;},setWindowOpenHandler(){},isDestroyed:()=>!!this.destroyed});}
+  isDestroyed(){return!!this.destroyed;}getBounds(){return{...this.bounds};}setBounds(value){this.bounds={...value};}setAlwaysOnTop(value,level){this.top={value,level};}showInactive(){this.visible=true;}moveTop(){}hide(){this.visible=false;}
+  async loadURL(){if(deferLoad)await new Promise(resolve=>{finishLoad=resolve;});}destroy(){this.destroyed=true;this.emit('closed');this.webContents.emit('destroyed');}
+ }
+ const module={exports:{}};
+ vm.runInNewContext(source,{module,__dirname:'/app/デスクトップ',process:{platform},Date:{now:()=>clock},
+  setInterval(fn,delay){const token={id:++next,unref(){}};timers.set(token,{fn,delay});return token;},clearInterval:token=>timers.delete(token),
+  require:id=>id==='node:os'?{release:()=>release}:id==='./長押し窓移動.cjs'?{attachNativeWindowMove:()=>()=>{stopped++;}}:require(id),
  });
- const window=Object.assign(new EventEmitter(),{isDestroyed:()=>state.destroyed,isFullScreen:()=>state.fullscreen,isMinimized:()=>state.minimized,getContentBounds:()=>({...state.owner}),webContents:{getZoomFactor(){throw Error('DIPに倍率を二重適用しない');}}});
- const entry={run:1,available:true,dialogOpen:false,view:{webContents:source,getBounds:()=>({...state.view})}};
- const glass=createBrowserGlass({record:{window},entry,getFrame:()=>state.shown?{...state.header}:null,send:value=>sent.push(value),now:()=>clock,
-  setTimer:(fn,interval)=>{assert.equal(interval,250);const id=++next;timers.set(id,fn);return id;},clearTimer:id=>timers.delete(id),
- });
- const image=(value=png)=>({isEmpty:()=>false,resize(options){normalized.push(options);return{toDataURL(options){assert.equal(options.scaleFactor,1);return value;}};}});
- return{glass,state,entry,window,source,calls,sent,timers,normalized,image,tick(ms=250){clock+=ms;for(const fn of [...timers.values()])fn();},resolve(index=calls.length-1,value=image()){calls[index].resolve(value);},close(){glass.dispose();}};
+ const owner={getContentBounds:()=>({...state.area}),webContents:{getZoomFactor:()=>zoom}};
+ const entry={view:{webContents:{capturePage(){captures++;throw Error('屈折用撮影を再導入しない');}}}};
+ const header=module.exports.createBrowserHeader({BrowserWindow:Window,screen:{},record:{window:owner,url:'http://127.0.0.1:1234'},entry,notify(){},fullscreenKey(){},headers});
+ return{header,state,timers,headers,get window(){return nativeWindow;},get captures(){return captures;},get stopped(){return stopped;},finishLoad:()=>finishLoad?.(),tick(ms=240){clock+=ms;for(const {fn}of [...timers.values()])fn();},close(){header.close();}};
 }
 
-test('Browser縁屈折: 負原点・本文オフセットはDIPのまま切り出す',()=>{
- assert.deepEqual(browserGlassGeometry({x:-1500,y:90,width:1200,height:100},{x:-1600,y:40,width:1600,height:900},{x:10,y:20,width:1500,height:800}),{
-  rect:{x:90,y:30,width:1200,height:100},width:1200,height:100,x:0,y:0,captureWidth:1200,captureHeight:100,
- });
-});
-test('Browser縁屈折: 画面外との交差だけを取得し、板の中の配置オフセットを保つ',()=>{
- assert.deepEqual(browserGlassGeometry({x:-1610,y:30,width:100,height:80},{x:-1600,y:40,width:1600,height:900},{x:0,y:0,width:1600,height:900}),{
-  rect:{x:0,y:0,width:90,height:70},width:100,height:80,x:10,y:10,captureWidth:90,captureHeight:70,
- });
- assert.deepEqual(browserGlassGeometry({x:90,y:90,width:100,height:80},{x:0,y:0,width:100,height:100},{x:0,y:0,width:100,height:100}),{
-  rect:{x:90,y:90,width:10,height:10},width:100,height:80,x:0,y:0,captureWidth:10,captureHeight:10,
- });
-});
-test('Browser縁屈折: 無交差・不正値・過大な画像は取得しない',()=>{
- const owner={x:0,y:0,width:100,height:100};
- for(const header of [{x:200,y:0,width:100,height:100},{x:0,y:200,width:100,height:100},{x:0,y:0,width:0,height:100},{x:NaN,y:0,width:100,height:100},{x:0,y:0,width:1201,height:100},{x:0,y:0,width:100,height:1001}])assert.equal(browserGlassGeometry(header,owner,owner),null);
-});
-test('Browser縁屈折: 最大4fps・同時1枚、DIPへ正規化し非表示で標本とtimerを破棄する',async()=>{
- const f=fixture();try{
-  f.glass.start();for(let i=0;i<5;i++)f.glass.start();assert.equal(f.calls.length,1);assert.equal(f.timers.size,1);
-  f.tick(100);assert.equal(f.calls.length,1);
-  f.resolve();await flush();assert.deepEqual(f.calls[0].rect,{x:100,y:50,width:1200,height:100});
-  assert.deepEqual(f.calls[0].options,{stayHidden:true,stayAwake:false});
-  assert.deepEqual(f.normalized[0],{width:1200,height:100,quality:'good'});
-  assert.deepEqual(f.sent[0],{src:png,width:1200,height:100,x:0,y:0,captureWidth:1200,captureHeight:100});
-  f.tick(150);assert.equal(f.calls.length,2);f.tick(250);assert.equal(f.calls.length,2,'前の非同期取得中は新しく開始しない');
-  f.glass.pause();assert.equal(f.sent.at(-1),null);assert.equal(f.timers.size,0);
-  f.resolve();await flush();assert.equal(f.sent.length,2,'非表示後の取得結果を復活させない');
-  f.tick(1000);assert.equal(f.calls.length,2);
+for(const [platform,release,material,vibrancy]of [
+ ['win32','10.0.22621','acrylic',undefined],['win32','10.0.26100','acrylic',undefined],
+ ['win32','10.0.22000',undefined,undefined],['win32','10.0.19045',undefined,undefined],
+ ['darwin','23.0.0',undefined,'menu'],['linux','6.12.0',undefined,undefined],
+])test(`Browserすりガラス: ${platform}/${release}の対応材質だけを設定する`,async()=>{
+ const f=fixture({platform,release});try{
+  f.header.show(true);await flush();f.tick();const options=f.window.options;
+  assert.equal(options.backgroundMaterial,material);assert.equal(options.vibrancy,vibrancy);assert.equal(options.visualEffectState,vibrancy?'active':undefined);
+  assert.equal(options.roundedCorners,false);assert.equal(options.transparent,true);assert.equal(options.backgroundColor,'#00000000');
+  assert.equal(options.webPreferences.sandbox,true);assert.equal(options.webPreferences.contextIsolation,true);assert.equal(options.webPreferences.nodeIntegration,false);
+  assert.equal(f.captures,0);assert.equal(f.timers.size,0,'表示完了後は定期画像取得用timerを残さない');
+  f.tick(10000);assert.equal(f.captures,0);assert.ok(f.window.webContents.sent.every(([channel])=>channel!=='development:browser-header-glass'));
  }finally{f.close();}
 });
 
-for(const change of ['move','resize','navigation','run','url','unavailable','dialog','fullscreen','minimize','hide','close'])test(`Browser縁屈折: ${change}後に届いた画素は使わない`,async()=>{
- const f=fixture();try{
-  f.glass.start();f.resolve();await flush();f.tick();assert.equal(f.calls.length,2);
-  if(change==='move'){f.state.header.x+=20;f.glass.invalidate();}
-  if(change==='resize'){f.state.header.width=1100;f.glass.invalidate();}
-  if(change==='navigation')f.source.emit('did-start-navigation');
-  if(change==='run')f.entry.run++;
-  if(change==='url')f.state.url='https://example.test/other';
-  if(change==='unavailable')f.entry.available=false;
-  if(change==='dialog')f.entry.dialogOpen=true;
-  if(change==='fullscreen'){f.state.fullscreen=false;f.window.emit('leave-full-screen');}
-  if(change==='minimize'){f.state.minimized=true;f.window.emit('minimize');}
-  if(change==='hide'){f.state.shown=false;f.glass.pause();}
-  if(change==='close'){f.state.destroyed=true;f.window.emit('closed');}
-  f.resolve();await flush();assert.equal(f.sent.at(-1),null);assert.equal(f.sent.filter(Boolean).length,1);
+for(const zoom of [1,1.5,2])test(`Browser繰り出し幅: 倍率${zoom}でも幅800DIP、収納後は上端中央へ戻す`,async()=>{
+ const f=fixture({zoom});try{
+  f.header.show(true);await flush();f.tick();assert.deepEqual(f.window.getBounds(),{x:-1200,y:40,width:800,height:100});assert.equal(f.window.webContents.zoom,zoom);
+  f.header.measure(100);assert.equal(f.window.getBounds().height,100*zoom);assert.equal(f.window.getBounds().width,800);
+  f.window.setBounds({x:-900,y:300,width:800,height:100*zoom});f.window.emit('move');
+  f.header.show(true);assert.equal(f.window.getBounds().x,-900,'表示中の重複show(true)では移動位置を変えない');
+  f.header.show(false);f.tick();assert.equal(f.window.visible,false);f.header.show(true);f.tick();assert.equal(f.window.visible,true);
+  assert.deepEqual(f.window.getBounds(),{x:-1200,y:40,width:800,height:100*zoom},'収納後は同じ全画面中でも上端中央から出す');
+  f.window.setBounds({x:-1100,y:260,width:800,height:100*zoom});f.window.emit('move');f.header.show(false);f.tick(32);f.header.show(true);f.tick();
+  assert.deepEqual(f.window.getBounds(),{x:-1200,y:40,width:800,height:100*zoom},'収納途中の再表示でも上端中央へ戻す');
+  f.header.show(false);f.tick();f.state.area={x:-2400,y:-200,width:1200,height:800};f.header.resetPosition();f.header.show(true);f.tick();
+  assert.deepEqual(f.window.getBounds(),{x:-2200,y:-200,width:800,height:100*zoom},'F11再入場も現在の画面上端へ戻す');
+  assert.equal(f.captures,0);assert.equal(f.timers.size,0);const contents=f.window.webContents;
+  f.close();assert.equal(f.headers.size,0);assert.equal(contents.listenerCount('before-input-event'),0);assert.ok(f.stopped>0);
  }finally{f.close();}
 });
-test('Browser縁屈折: 失敗・空画像は装飾だけを取り消し、次の取得で回復する',async()=>{
- const f=fixture();try{
-  f.glass.start();f.resolve();await flush();
-  f.tick();f.calls.at(-1).reject(Error('capture unavailable'));await flush();assert.equal(f.sent.at(-1),null);
-  f.tick();f.resolve(undefined,{isEmpty:()=>true});await flush();assert.equal(f.sent.filter(Boolean).length,1);
-  f.tick();f.resolve();await flush();assert.equal(f.sent.filter(Boolean).length,2);
-  f.tick();f.resolve(undefined,f.image('https://example.test/image.png'));await flush();assert.equal(f.sent.at(-1),null);
+for(const width of [800,640,320,10])test(`Browser繰り出し幅: 狭い画面${width}DIPでは余白付きで収める`,async()=>{
+ const f=fixture({area:{x:-640,y:-300,width,height:700}});try{
+  f.header.show(true);await flush();f.tick();const bounds=f.window.getBounds();
+  assert.equal(bounds.width,Math.max(1,Math.min(800,width-16)));assert.ok(bounds.x>=-640&&bounds.x+bounds.width<=-640+width);
+  f.window.setBounds({...bounds,x:-5000,y:9000});f.window.emit('move');f.header.measure(110);
+  const moved=f.window.getBounds();assert.ok(moved.x>=-640&&moved.x+moved.width<=-640+width);assert.ok(moved.y>=-300&&moved.y+moved.height<=400);
  }finally{f.close();}
 });
-test('Browser縁屈折: 復元で再開し、破棄時はページ・所有窓の購読も解除する',async()=>{
- const f=fixture();f.glass.start();f.resolve();await flush();
- f.state.minimized=true;f.window.emit('minimize');assert.equal(f.timers.size,0);
- f.state.minimized=false;f.tick();f.window.emit('restore');assert.equal(f.timers.size,1);assert.equal(f.calls.length,2);
- f.state.pageDestroyed=true;f.source.emit('destroyed');assert.equal(f.timers.size,0);
- assert.deepEqual(f.source.eventNames(),[]);assert.deepEqual(f.window.eventNames(),[]);
- f.resolve();await flush();assert.equal(f.sent.at(-1),null);f.glass.start();assert.equal(f.timers.size,0);
+test('Browser繰り出し: 読込中の収納・表示途中の反転・終了後のcallbackを維持する',async()=>{
+ const f=fixture({deferLoad:true});try{
+  f.header.show(true);f.header.show(false);f.finishLoad();await flush();f.tick();assert.equal(!!f.window.visible,false);
+  f.header.show(true);f.tick(32);f.header.show(false);f.tick(32);f.header.show(true);f.tick();assert.equal(f.window.visible,true);
+  f.header.show(false);f.tick(32);f.close();f.tick(1000);assert.equal(f.timers.size,0);assert.equal(f.captures,0);
+ }finally{f.close();}
 });
-
-test('Browser実ヘッダー: frosted材質なし・表示完了後のみ屈折標本を送り、収納/サイズ変更/終了で消す',async t=>{
- t.mock.timers.enable({apis:['setInterval','Date']});
- const f=fixture(),headers=new Map();let nativeWindow;
- class Window extends EventEmitter{
-  constructor(options){super();nativeWindow=this;this.options=options;this.bounds={x:options.x,y:options.y,width:options.width,height:options.height};this.webContents=Object.assign(new EventEmitter(),{sent:[],send(channel,value){this.sent.push([channel,value]);},setZoomFactor(){},setWindowOpenHandler(){},getZoomFactor:()=>1,isDestroyed:()=>this.destroyed,executeJavaScriptInIsolatedWorld:async()=>false});}
-  isDestroyed(){return!!this.destroyed;}getBounds(){return{...this.bounds};}setBounds(value){this.bounds={...value};}setAlwaysOnTop(){}showInactive(){}moveTop(){}hide(){}
-  async loadURL(){}destroy(){this.destroyed=true;this.emit('closed');this.webContents.emit('destroyed');}
- }
- // 上の単体fixtureに付いている標本取得部品とは独立して、実ヘッダーから作成する。
- f.glass.dispose();f.window.webContents.getZoomFactor=()=>1.5;
- const header=headerNative.createBrowserHeader({BrowserWindow:Window,screen:{getCursorScreenPoint:()=>({x:0,y:0})},record:{window:f.window,url:'http://127.0.0.1:1234'},entry:f.entry,notify(){},fullscreenKey(){},headers});
- try{
-  header.show(true);await flush();assert.equal(f.calls.length,0,'スライド中は標本を取得しない');
-  assert.equal(nativeWindow.options.backgroundMaterial,undefined);assert.equal(nativeWindow.options.vibrancy,undefined);
-  assert.equal(nativeWindow.options.transparent,true);assert.equal(nativeWindow.options.roundedCorners,false,'OS側にも角丸を付けない');
-  t.mock.timers.tick(240);assert.equal(f.calls.length,1);f.resolve();await flush();
-  const messages=()=>nativeWindow.webContents.sent.filter(([channel])=>channel==='development:browser-header-glass').map(([,value])=>value);
-  assert.equal(messages().at(-1).src,png);assert.equal(messages().at(-1).width,1200);assert.equal(messages().at(-1).zoom,1.5,'CSS縁幅用の倍率はメタデータだけに付け、取得矩形を拡大しない');
-  header.measure(120);assert.equal(messages().at(-1),null);t.mock.timers.tick(250);assert.equal(f.calls.length,2);
-  header.show(false);f.resolve();await flush();assert.equal(messages().filter(Boolean).length,1,'収納開始後の古い取得結果は送らない');
-  t.mock.timers.tick(300);assert.equal(f.calls.length,2);header.show(true);await flush();t.mock.timers.tick(240);
-  assert.equal(f.calls.length,3);header.close();f.resolve();await flush();
-  assert.equal(messages().filter(Boolean).length,1);assert.deepEqual(f.source.eventNames(),[]);assert.deepEqual(f.window.eventNames(),[]);
- }finally{header.close();f.close();}
+test('Browserすりガラス: 旧キャプチャ部品と専用preload購読APIを残さない',()=>{
+ assert.equal(existsSync(new URL('../デスクトップ/ブラウザ縁屈折.cjs',import.meta.url)),false);
+ assert.doesNotMatch(source,/createBrowserGlass|capturePage|browser-header-glass/);
+ const preload=readFileSync(new URL('../デスクトップ/preload.cjs',import.meta.url),'utf8');assert.doesNotMatch(preload,/onBrowserHeaderGlass|browser-header-glass/);
+ assert.match(preload,/onBrowserHeaderFrame/,'繰り出しの既存frame購読は維持する');
 });

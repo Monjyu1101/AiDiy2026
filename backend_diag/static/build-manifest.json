@@ -1,7 +1,7 @@
 {
   "../../_icons/AiDiy.png": "3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042",
   "../../frontend_ide/src/共通表示/シアンバー.css": "677089cefa08ce677081690ef3360dfa11acde5f0c10ae6d823ea94e100ed6e6",
-  "../../frontend_ide/src/共通表示/タイトルバー配色.css": "9958c5d5313752f2d237301c7745853673bc64475d98806f5ba5b6062f2297c0",
+  "../../frontend_ide/src/共通表示/タイトルバー配色.css": "3eb9c14a76b1caa8ea6ccc79943dd03de1e8837ba779d9784b3e9a08f71fa423",
   "../runtime/environment_proxy.mjs": "03b36dccca6a6dc869c46e790bb222099458670a37584049a94f6c46132867b8",
   "../runtime/environment_proxy.ts": "9847d7aef9eb1a680cd6c050cd89cddbb1bc22393867f68e26d01e8719f6cc50",
   "../runtime/model_catalog.mjs": "6bd81187b49d88e0073f17395e7a33179551bb326c1b7eb2a8dd655922783126",
@@ -44,7 +44,7 @@
   "../static/LICENSE_ICONS.md": "f2697c8209bd0f3ec72b61d7e71dcf5b6c8cbf64633ce05a309181a4f0e06358",
   "../static/app.js": "cf2174c5ceddd664d2c30f3f2e7dadc780707c5e8ca7474b0c639530a95cf2fe",
   "../static/index.html": "e240412e63ee6873463a5661cb16390604fa07439d677b542280d29152d8a0d0",
-  "../static/style.css": "7abf06f328c1edfee913de7eb7956002e9557fbe41e2e78a19a0412295296815",
+  "../static/style.css": "a795ae1ca63296c423cb05d4917bd43e61e1b10eb2390131ae731050b95f76e0",
   "../モデル試行/defaults.mjs": "c29900078c5fcfbe685ca6a4a8bacb035217e11e4399e4894ca70601b53b23c3",
   "build.mjs": "6310fa5ec73d8ae93ea35990e496e7e3cef493401bab4e4a9dcc9e037d16b852",
   "package-lock.json": "5c59c0e766401338d8aa43b32b732100653c5225c4e2e90347737657b67245c3",

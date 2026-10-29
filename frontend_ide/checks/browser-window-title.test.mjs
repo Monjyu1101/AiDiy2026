@@ -62,5 +62,5 @@ test('Browser見出し: 共有の長文省略規則を再利用し、全画面�
  assert.match(css,/\.panel-window-title \.panel-brand\{grid-template-columns:auto minmax\(0,1fr\) auto\}/);
  assert.match(css,/\.panel-window-title \.panel-brand strong\{[^}]*min-width:0;overflow:hidden;text-overflow:ellipsis/);
  const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
- assert.match(source,/\.browser-header-only \.browser-chrome\{[^}]*background:linear-gradient\(135deg,#b9f7fa1f,#dafeff0f\)/);
+ assert.match(source,/\.browser-header-only \.browser-chrome\{[^}]*background:rgba\(221,247,250,\.72\)/);
 });

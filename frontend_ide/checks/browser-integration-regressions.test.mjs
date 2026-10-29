@@ -159,28 +159,33 @@ for(const standalone of [false,true])for(const focus of ['host','page','header']
   }
  }finally{f.close();}
 });
-for(const standalone of [false,true])test(`Browser全画面ヘッダー: ${standalone?'単独':'IDE所属'}の移動位置はホバー中だけ維持し、F11再入場で上端中央へ戻す`,async t=>{
+for(const standalone of [false,true])test(`Browser全画面ヘッダー: ${standalone?'単独':'IDE所属'}は幅800で収納・ピン解除・F11再入場後に上端中央へ戻す`,async t=>{
  t.mock.timers.enable({apis:['setInterval','Date']});
  const f=browserVR({standalone});
  try{
   const tick=()=>t.mock.timers.tick(240);
   f.press(f.host);f.movePointer({x:500,y:1});tick();await Promise.resolve();tick();
-  assert.equal(f.header.visible,true);assert.equal(f.header.options.roundedCorners,false,'丸い板ガラスの形状はCSSで制御し、OSの角丸で切り取らない');
-  assert.deepEqual(f.header.getBounds(),{x:8,y:0,width:984,height:100});
+  assert.equal(f.header.visible,true);assert.equal(f.header.options.roundedCorners,false,'OS側にも角丸を付けない');
+  assert.deepEqual(f.header.getBounds(),{x:100,y:0,width:800,height:100});
   for(let cycle=0;cycle<3;cycle++){
    const base=f.record.window.getContentBounds();
-   f.header.setBounds({x:base.x+12,y:base.y+130,width:984,height:100});f.header.emit('move');
-   const moved=f.header.getBounds();
+   f.header.setBounds({x:base.x+12,y:base.y+130,width:800,height:100});f.header.emit('move');
    f.movePointer({x:base.x+500,y:base.y+500});tick();tick();assert.equal(f.header.visible,false);
    f.movePointer({x:base.x+500,y:base.y+1});tick();tick();
-   assert.equal(f.header.visible,true);assert.deepEqual(f.header.getBounds(),moved,'単なるホバー再表示では移動位置を保つ');
+   assert.equal(f.header.visible,true);assert.deepEqual(f.header.getBounds(),{x:base.x+100,y:base.y,width:800,height:100},'収納後のホバー再表示は上端中央へ戻す');
+   await f.browser.action({record:f.record},'header-toggle-pin');
+   f.header.setBounds({x:base.x+24,y:base.y+180,width:800,height:100});f.header.emit('move');
+   f.movePointer({x:base.x+50,y:base.y+200});
+   await f.browser.action({record:f.record},'header-toggle-pin');tick();assert.equal(f.header.visible,false,'移動先でピン解除すると収納する');
+   f.movePointer({x:base.x+500,y:base.y+500});tick();f.movePointer({x:base.x+500,y:base.y+1});tick();tick();
+   assert.deepEqual(f.header.getBounds(),{x:base.x+100,y:base.y,width:800,height:100},'ピン解除・収納後も移動先でなく上端中央から出す');
    await f.browser.action({record:f.record},'header-toggle-pin');
    f.press(f.header.webContents);tick();assert.equal(f.record.window.isFullScreen(),false);
    f.record.window.setBounds({x:-1200-cycle*20,y:80+cycle*10,width:1000,height:700});
    const current=f.record.window.getContentBounds();f.movePointer({x:current.x+500,y:current.y+500});
    f.press(f.host);tick();tick();
    assert.equal(f.header.visible,true,'ピン留めはF11を跨いでも保持する');
-   assert.deepEqual(f.header.getBounds(),{x:current.x+8,y:current.y,width:984,height:100},'前回位置でなく現在の画面上端中央に表示する');
+   assert.deepEqual(f.header.getBounds(),{x:current.x+100,y:current.y,width:800,height:100},'前回位置でなく現在の画面上端中央に表示する');
    assert.deepEqual(f.record.window.getContentBounds(),current,'本文側の窓位置は変更しない');
    await f.browser.action({record:f.record},'header-toggle-pin');tick();
    f.movePointer({x:current.x+500,y:current.y+1});tick();tick();
