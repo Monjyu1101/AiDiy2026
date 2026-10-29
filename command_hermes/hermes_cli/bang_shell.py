@@ -101,7 +101,7 @@ def resolve_bang_cwd(session_key: Optional[str] = None) -> Optional[str]:
     return None
 
 
-def check_bang_approval(command: str) -> dict:
+def check_bang_approval(command: str, *, session_key: Optional[str] = None) -> dict:
     """Run *command* through the terminal tool's approval gate.
 
     Reuses ``tools.terminal_tool._check_all_guards`` — the exact function
@@ -120,9 +120,19 @@ def check_bang_approval(command: str) -> dict:
     except Exception:
         return {"approved": True, "message": None}
 
-    # env_type mirrors the terminal tool: bang commands always run locally in
-    # the CLI process, never inside a remote/sandbox backend.
-    return _check_all_guards(command, "local", has_host_access=False)
+    # Bang commands run outside the agent-turn worker. Bind the same session
+    # that /yolo toggles, rather than silently checking the default session.
+    # Restore the caller context even when a guard raises; another CLI session
+    # must not inherit this one's approval state.
+    from tools.approval import reset_current_session_key, set_current_session_key
+
+    token = set_current_session_key(session_key) if session_key is not None else None
+    try:
+        # Bang commands always run locally, never inside a remote/sandbox backend.
+        return _check_all_guards(command, "local", has_host_access=False)
+    finally:
+        if token is not None:
+            reset_current_session_key(token)
 
 
 def _bang_env() -> dict:

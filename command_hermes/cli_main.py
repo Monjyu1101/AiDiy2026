@@ -13899,7 +13899,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             self._console_print(f"[dim]{USAGE_HINT}[/]")
             return True
 
-        approval = check_bang_approval(command)
+        approval = check_bang_approval(
+            command, session_key=getattr(self, "session_id", None) or "default"
+        )
         if not approval.get("approved"):
             message = approval.get("message") or (
                 f"Command denied: {approval.get('description', 'flagged as dangerous')}"

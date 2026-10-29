@@ -253,10 +253,11 @@ def _classify_oauth_failure(*parts: str) -> Optional[str]:
 
 @dataclass
 class _ServerRequestRouting:
-    """Default policies for codex-side approval requests when no interactive
-    callback is wired in. These are only used by tests + cron / non-interactive
-    contexts; the live CLI path passes an approval_callback that defers to
-    tools.approval.prompt_dangerous_approval()."""
+    """Static approval defaults for callers without a live policy resolver.
+
+    Hermes runtime injects an approval_bypass_callback instead, so changing
+    /yolo is honored even while this Codex session is being reused.
+    """
 
     auto_approve_exec: bool = False
     auto_approve_apply_patch: bool = False
@@ -279,6 +280,7 @@ class CodexAppServerSession:
         codex_home: Optional[str] = None,
         permission_profile: Optional[str] = None,
         approval_callback: Optional[Callable[..., str]] = None,
+        approval_bypass_callback: Optional[Callable[[], bool]] = None,
         on_event: Optional[Callable[[dict], None]] = None,
         request_routing: Optional[_ServerRequestRouting] = None,
         client_factory: Optional[Callable[..., CodexAppServerClient]] = None,
@@ -293,6 +295,7 @@ class CodexAppServerSession:
             )
         )
         self._approval_callback = approval_callback
+        self._approval_bypass_callback = approval_bypass_callback
         self._on_event = on_event  # Display hook (kawaii spinner ticks etc.)
         self._routing = request_routing or _ServerRequestRouting()
         self._client_factory = client_factory or CodexAppServerClient
@@ -1053,20 +1056,32 @@ class CodexAppServerSession:
                 rid, code=-32601, message=f"Unsupported method: {method}"
             )
 
+    def _auto_approval_allowed(self, default: bool) -> bool:
+        """Resolve the caller's current policy for this exact request.
+
+        A live resolver is authoritative over static defaults. Failure must
+        restore normal confirmation, never revive an earlier YOLO grant.
+        This does not change the Codex sandbox or permission profile.
+        """
+        if self._approval_bypass_callback is None:
+            return default
+        try:
+            return self._approval_bypass_callback() is True
+        except Exception:
+            logger.debug("approval-bypass lookup failed; requiring approval", exc_info=True)
+            return False
+
     def _decide_exec_approval(self, params: dict) -> str:
         """Decide a Codex exec approval request.
 
         This is protocol-level routing only — it carries NO Hermes
         approval-mode/timeout logic. The Hermes-side resolution happens
-        upstream: ``agent/codex_runtime.py`` derives
-        ``auto_approve_exec`` from the canonical
-        ``tools.approval.is_approval_bypass_active()`` (which reads
-        ``approvals.mode`` via ``tools.approval._get_approval_mode``),
-        and ``self._approval_callback`` itself runs the shared approval
-        gate (mode + ``approvals.timeout``) in ``tools/approval.py``.
-        Keep it that way — do not re-read approval config here.
+        upstream: ``agent/codex_runtime.py`` supplies the canonical
+        ``tools.approval.is_approval_bypass_active`` resolver. Otherwise
+        ``self._approval_callback`` presents the normal confirmation UI.
+        Keep policy in the shared core — do not re-read config here.
         """
-        if self._routing.auto_approve_exec:
+        if self._auto_approval_allowed(self._routing.auto_approve_exec):
             return "accept"
         command = params.get("command") or ""
         # Codex's CommandExecutionRequestApprovalParams has cwd as Optional —
@@ -1095,7 +1110,7 @@ class CodexAppServerSession:
         resolution is delegated to ``tools/approval.py`` upstream — see
         the docstring on ``_decide_exec_approval``.
         """
-        if self._routing.auto_approve_apply_patch:
+        if self._auto_approval_allowed(self._routing.auto_approve_apply_patch):
             return "accept"
         if self._approval_callback is not None:
             # FileChangeRequestApprovalParams gives us reason + grantRoot.

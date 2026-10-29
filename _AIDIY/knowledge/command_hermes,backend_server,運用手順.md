@@ -117,6 +117,21 @@ AiDiy の Code AI 連携では、Windows のコマンドライン長制限を避
 | `--version` | バージョン表示 |
 | `--no-tools` | ツール無効化 |
 
+## YOLO とファイル削除
+
+- `aidiy_hermes --yolo`、または対話中の `/yolo` で YOLO を有効にすると、通常のファイル削除を含むコマンドの承認確認を省略する。削除専用の追加許可設定は不要。
+- 引数を省略した起動は通常モードのまま。`/yolo` を OFF にすると通常の確認へ戻る。起動時の `--yolo` はプロセス全体に固定されるため、解除はフラグなしで再起動する。
+- `!` シェル実行も現在のセッションの YOLO を使う。Codex app-server を選んだ場合も、再利用中のセッションで各承認要求に最新の状態を反映する。
+- YOLO は OS 権限や Codex の sandbox を変更しない。システム全体の破壊操作、明示した deny、認証情報・設定・エージェント指示ファイルの保護は別途維持される。拒否時は対象パス、エラー文、provider/runtime を確認し、別経路で保護を迂回しない。
+
+一時ファイルだけで ON / OFF / 既定値、通常確認、セッション分離を検証する（外部 LLM / Codex 起動なし）:
+
+```powershell
+command_hermes\.venv\Scripts\python.exe -m unittest discover -s command_hermes/checks -p test_yolo_deletion.py -v
+```
+
+Linux / macOS は `command_hermes/.venv/bin/python` を使う。
+
 ## 対応 provider
 
 - API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`, `openai_oauth`, `xai-oauth`

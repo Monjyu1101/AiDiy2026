@@ -712,7 +712,6 @@ def run_codex_app_server_turn(
 
     from agent.transports.codex_app_server_session import (
         CodexAppServerSession,
-        _ServerRequestRouting,
     )
 
     # Lazy session: one CodexAppServerSession per AIAgent instance.
@@ -740,11 +739,14 @@ def run_codex_app_server_turn(
         # (~/.codex/config.toml) be the policy gate instead of double-gating
         # with a missing Hermes UI. Defaults (manual/smart/unset) preserve the
         # current fail-closed behavior — this is a no-op for those users.
-        auto_approve_requests = False
+        # Resolve on every approval request, not only when the reusable
+        # session is created: /yolo ON must take effect immediately, and OFF
+        # must revoke the bypass rather than retaining a stale True value.
+        approval_bypass_callback = None
         try:
             from tools.approval import is_approval_bypass_active
 
-            auto_approve_requests = is_approval_bypass_active()
+            approval_bypass_callback = is_approval_bypass_active
         except Exception:
             logger.debug(
                 "codex app-server: approval-bypass lookup failed; "
@@ -762,10 +764,7 @@ def run_codex_app_server_turn(
         agent._codex_session = CodexAppServerSession(
             cwd=cwd,
             approval_callback=approval_callback,
-            request_routing=_ServerRequestRouting(
-                auto_approve_exec=auto_approve_requests,
-                auto_approve_apply_patch=auto_approve_requests,
-            ),
+            approval_bypass_callback=approval_bypass_callback,
             on_event=make_codex_app_server_event_bridge(agent),
         )
 
