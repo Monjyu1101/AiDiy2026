@@ -42,3 +42,17 @@ test('Diag の新しいピン通知を遅い初期応答で戻さず、切替連
  f.emit({pinned:false,locked:false});const pending=s.togglePin();assert.equal(s.pinBusy.value,true);await s.togglePin();f.unmount();toggle({pinned:true,locked:false});await pending;
  assert.equal(s.pin.value.pinned,false);assert.equal(s.pinBusy.value,false);
 });
+
+
+test('実際の左上launcher-selectorは未接続・切替中・フォルダ未選択でnative disabledを維持する',async()=>{
+ for(const props of [{connected:false},{connected:true,switching:true},{connected:true,microAvailable:false},{connected:true,microAvailable:true}]){
+  for(const compact of [false,true]){
+   const html=await render('ウィンドウ/ステータスバー.vue',{...props,compact});
+   const selector=html.match(/<div class="launcher-selector">([\s\S]*?)<\/div>/)?.[1];assert.ok(selector);
+   for(const [name,disabled]of [['title-mini-switch',!props.connected||!!props.switching],['title-micro-switch',!props.connected||!!props.switching||!props.microAvailable]]){
+    if(compact&&name==='title-mini-switch')continue;
+    const button=selector.match(new RegExp(`<button class="${name}"([^>]*)>`));assert.ok(button);assert.equal(/\bdisabled(?:=""|\s|$)/.test(button[1]),disabled,JSON.stringify({name,...props,compact}));
+   }
+  }
+ }
+});

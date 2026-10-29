@@ -40,8 +40,11 @@ html.micro-mode #app{border:0}
 @keyframes micro-orbit{to{transform:rotate(360deg)}}
 .launcher-selector{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0}
 .launcher-selector>span{font-size:10px;color:#8caaba}
-.launcher-selector button{font-size:10px;padding:2px 7px;border-radius:4px;background:transparent;line-height:1.6}
-.launcher-selector button:disabled{cursor:not-allowed;opacity:.35}
+.launcher-selector button{font-size:10px;padding:2px 7px;border-radius:4px;background:transparent;color:var(--aidiy-titlebar-foreground);line-height:1.6}
+/* 無効操作も白文字を薄めず、暗い面と破線で実行不可を示す。 */
+.launcher-selector button:disabled{cursor:not-allowed;opacity:1;background:#20242a;border-style:dashed;border-color:#64717f}
+.launcher-selector button:hover:not(:disabled){background:#294453}
+.launcher-selector button:focus-visible{outline:2px solid var(--aidiy-titlebar-foreground);outline-offset:1px}
 
 .micro-core:focus-visible{outline:none}.micro-core:focus-visible .micro-mark::before{border-color:#dfffff}
 

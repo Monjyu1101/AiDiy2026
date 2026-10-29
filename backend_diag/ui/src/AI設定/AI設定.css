@@ -4,15 +4,15 @@
 .config-panel-embedded .config-model-note p,
 .config-panel-embedded .config-decision-note p { margin: 6px 0; }
 .config-panel-embedded { min-height: 0; height: 100%; display: flex; flex-direction: column; }
-.config-panel-embedded .config-panel { width: 100%; min-height: 0; height: 100%; box-sizing: border-box; background: #fff; color: #0f172a; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e2e8f0; }
+.config-panel-embedded .config-panel { width: 100%; min-height: 0; height: 100%; box-sizing: border-box; background: #000; color: #e5edf7; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e2e8f0; }
 .config-panel-embedded .config-panel-content { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 .config-panel-embedded .config-panel-header {
   padding: 8px 12px;
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
-  background: #f8fafc;
+  color: #f3f5f7;
+  background: #000;
   border-bottom: 1px solid #e2e8f0;
   letter-spacing: 0.02em;
   display: grid;
@@ -47,7 +47,7 @@
 
 .config-panel-embedded .config-panel-body {
   padding: 8px 12px;
-  background: #ffffff;
+  background: #000;
   overflow-y: auto;
   flex: 1;
 }
@@ -65,7 +65,7 @@
 
 .config-panel-embedded .config-panel-description {
   margin: 0 0 4px 0;
-  color: #475569;
+  color: #b8c7d5;
   font-size: 11px;
 }
 
@@ -83,13 +83,13 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: #eef2f7;
+  background: #000;
   min-width: 0;
 }
 
 .config-panel-embedded .config-panel-section-header {
   font-weight: 700;
-  color: #0f172a;
+  color: #f3f5f7;
   margin: 0 0 2px 0;
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -125,7 +125,7 @@
 
 .config-panel-embedded .config-panel-label {
   font-size: 11px;
-  color: #334155;
+  color: #d8e3ed;
   text-align: right;
   margin: 0;
   padding: 0;
@@ -229,7 +229,7 @@
   gap: 6px;
   align-items: center;
   border-top: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: #000;
 }
 
 .config-panel-embedded .config-panel-actions-edge {

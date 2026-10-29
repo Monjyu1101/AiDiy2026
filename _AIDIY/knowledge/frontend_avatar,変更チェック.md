@@ -42,6 +42,12 @@ Avatarの設定済アイコンは `public/icons/AiDiy_avatar.png` です。通�
 
 Mac のアプリ名と最小メニューは `electron/main.ts` から `frontend_ide/host/scripts/MacOS-Menu.cjs` を共用する。表示名は `AiDiy Avatar`。メニューの閉じる・⌘Q は `app.quit()` で主窓と子窓を閉じ、⌘W はフォーカス中の窓だけを閉じる。コピー等は非表示の native role を維持し、キー入力を横取りしない。変更後は `npm run build:electron` で `dist-electron` を同期し、`node --test checks/macos-menu.test.cjs` で実行出力を確認する。Mac 実機の描画確認は別途行う。
 
+## パネル外枠とタイトル配色
+
+Avatar は他の単独アプリのグレー配色へ統一せず、`src/style.css` の Avatar 専用タイトル変数を使います。ログイン・本体・Chat / File / Image / Code1〜6・別窓設定・Web左右ペインの外枠は1pxで、既存の紫グラデーションをタイトルと共有します。`border-image` は中央を塗る `fill` を指定しません。`_WindowShell` の light テーマとWeb内の設定ダイアログは、それぞれ既存の淡色タイトル背景を枠へ使います。
+
+キャラクター単体表示の `chrome-hidden` とWeb右ペイン内の二重枠抑止では、`border-color: transparent` だけでなく `border-image: none` も必要です。背景透過、外寸、リサイズ操作域は変更しません。`node --test checks/panel-border.test.cjs` で色・1px・透明状態と反復切替を検査し、CSS出力を確認する場合は `npm run build:renderer` を使います。実OSの透明窓描画はモック試験とは別に確認します。
+
 ## WindowRole / PanelKey を増やす場合
 
 連動修正:

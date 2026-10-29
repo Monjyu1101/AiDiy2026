@@ -93,7 +93,8 @@ function closeWindow() {
   width: min(100%, 212px);
   padding: 0 4px 4px;
   border-radius: 0;
-  border: 1px solid #383838;
+  border: 1px solid var(--avatar-title-edge);
+  border-image: var(--avatar-title-background) 1;
   background: rgba(2, 2, 4, 0.46);
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.24),
@@ -106,7 +107,7 @@ function closeWindow() {
   margin: 0 -4px 4px;
   padding: 0 8px;
   border-bottom: 1px solid rgba(93, 68, 168, 0.95);
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  background: var(--avatar-title-background);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -213,7 +214,7 @@ function closeWindow() {
   padding: 7px 8px;
   border: 1px solid rgba(141, 110, 230, 0.92);
   border-radius: 0;
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  background: var(--avatar-title-background);
   color: #f8f5ff;
   font: inherit;
   font-weight: 700;

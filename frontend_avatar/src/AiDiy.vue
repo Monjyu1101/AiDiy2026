@@ -1804,11 +1804,13 @@ onBeforeUnmount(() => {
 .web-left-pane,
 .web-right-pane {
   box-sizing: border-box;
-  border: 1px solid #383838;
+  border: 1px solid var(--avatar-title-edge);
+  border-image: var(--avatar-title-background) 1;
 }
 /* 外側ペインが枠を所有。内部の同じ枠を二重表示しない。 */
 .web-right-content :deep(.window-shell) {
   border-color: transparent;
+  border-image: none;
 }
 
 /* ===== Web版 左右分割レイアウト ===== */
@@ -1991,7 +1993,7 @@ onBeforeUnmount(() => {
   min-height: 28px;
   padding: 0 8px;
   border-bottom: 1px solid rgba(93, 68, 168, 0.95);
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  background: var(--avatar-title-background);
   color: #fff;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),

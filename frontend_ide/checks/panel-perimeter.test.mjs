@@ -8,12 +8,12 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const css=readFileSync(new URL('../src/style.css',import.meta.url),'utf8');
 test('shared host perimeter reserves one pixel inside the existing dimensions',()=>{
- const rule=css.match(/\.development-app:not\(\.routes-window\):not\(\.all-displays\)\{([^}]+)\}/)?.[1];
- assert.ok(rule);assert.match(rule,/border:1px solid #383838/);assert.match(rule,/box-sizing:border-box/);
+ const rule=css.match(/\.development-app:not\(\.routes-window\):not\(\.all-displays\):not\(\.browser-header-only\)\{([^}]+)\}/)?.[1];
+ assert.ok(rule);assert.match(rule,/border:1px solid var\(--aidiy-panel-border\)/);assert.match(rule,/box-sizing:border-box/);
  assert.doesNotMatch(rule,/padding|margin|width|height|app-region|z-index/);
  assert.match(css,/\.ide-heading\{top:1px;left:1px;right:1px\}/);
 });
 test('embedded panels retain their existing border widths and no child frame is added',()=>{
- assert.match(css,/\.development-app :is\(\.ai-popup,\.explorer-panel,\.explorer-routes,\.viewer-popup,\.viewer-pinned\)\{border-color:#383838\}/);
+ assert.match(css,/\.development-app :is\(\.ai-popup,\.explorer-panel,\.explorer-routes,\.viewer-popup,\.viewer-pinned\)\{border-color:var\(--aidiy-panel-border\)\}/);
  assert.doesNotMatch(css,/\.ai-component::after/);
 });

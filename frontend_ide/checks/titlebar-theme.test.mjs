@@ -12,11 +12,11 @@ const tokens=read('../src/共通表示/タイトルバー配色.css');
 const shared=read('../src/共通表示/会話表示.css');
 function rules(css){const result=compileStyle({source:css,id:'titlebar-check',scoped:false});assert.deepEqual(result.errors,[]);return result.rawResult.root.nodes.filter(node=>node.type==='rule');}
 function values(css,selector){const rule=rules(css).find(rule=>rule.selector===selector);assert.ok(rule,selector);return Object.fromEntries(rule.nodes.filter(node=>node.type==='decl').map(node=>[node.prop,node.value]));}
-function luminance(hex){const [r,g,b]=hex.slice(1).match(/../g).map(value=>parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);return .2126*r+.7152*g+.0722*b;}
+function luminance(hex){const [r,g,b]=(hex.length===4?hex.slice(1).split('').map(value=>value+value).join(''):hex.slice(1)).match(/../g).map(value=>parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);return .2126*r+.7152*g+.0722*b;}
 
-test('通常タイトル行: 共通tokenは黒に近いグレーと白寄りの文字で本文色を変更しない',()=>{
+test('通常タイトル行: 共通tokenはグレーと純白の文字で本文色を変更しない',()=>{
  const theme=values(tokens,':root');
- assert.deepEqual(theme,{'--aidiy-titlebar-background':'#30343a','--aidiy-titlebar-foreground':'#f3f5f7','--aidiy-titlebar-secondary':'#e1e6ed'});
+ assert.deepEqual(theme,{'--aidiy-titlebar-background':'#30343a','--aidiy-titlebar-foreground':'#fff','--aidiy-titlebar-secondary':'#fff','--aidiy-panel-border':'var(--aidiy-titlebar-background)'});
  assert.equal(rules(tokens).length,1,'配色tokenだけを共有し本文へスタイルを追加しない');
  for(const color of [theme['--aidiy-titlebar-foreground'],theme['--aidiy-titlebar-secondary']])assert.ok((luminance(color)+.05)/(luminance(theme['--aidiy-titlebar-background'])+.05)>=7,'通常タイトル行は小さい文字でも7:1以上のコントラストを確保する');
 });
@@ -80,4 +80,20 @@ test('本文の黒基準: Webページ・文書・画像・2Dページと選択�
  assert.equal(values(layout,'.explorer-panel li.selected,.explorer-panel li.cursor').background,'#18293c');
  const browser=parse(read('../src/ブラウザ/ブラウザパネル.vue')).descriptor;
  assert.equal(values(browser.styles[0].content,'.browser-surface').background,undefined,'WebContentsViewの中身へ背景を注入しない');
+});
+
+
+test('本文の黒基準: 通常の見出し・履歴・フォルダ空白とTask内部面も真黒にする',()=>{
+ const layout=read('../src/style.css');
+ for(const selector of ['.model-dialog','.folder-pages','.folder-page-body','.file-history-dialog','.file-history-headings','.file-history-message','.file-analysis-dialog','.viewer-pin-error'])assert.equal(values(layout,selector).background,'#000',selector);
+ const task=parse(read('../src/タスクチーム/タスクチームパネル.vue')).descriptor.styles[0].content;
+ for(const selector of ['.taskteam-login','.taskteam-content :deep(.task-panel)','.taskteam-shell .taskteam-content :deep(.panel-header)','.taskteam-shell .taskteam-content :deep(.team-page)'])assert.equal(values(task,selector).background,'#000',selector);
+ for(const selector of ['.task-window-body','.task-editor-window','.common-table','.table-footer','tbody tr:has(td.empty)','th','thead tr:nth-child(2) th','.task-editor-window .dialog-content','.task-editor-window .dialog-header','.task-editor-window .dialog-body','.task-editor-window .dialog-footer']){
+  const rule=rules(task).find(rule=>rule.selector.split(',').includes(`.taskteam-shell .taskteam-content :deep(${selector})`));
+  assert.ok(rule,selector);assert.equal(rule.nodes.find(node=>node.prop==='background')?.value,'#000',selector);
+ }
+ assert.equal(values(task,'.taskteam-shell .taskteam-content :deep(td.empty)').color,'#94a3b8','データ行の黒文字指定が空行の黒地に継承されない');
+ assert.match(values(task,'.taskteam-login input').background,/#080c1a99/,'入力枠は本文から識別できる地色を保つ');
+ const explorer=parse(read('../src/ファイル閲覧/エクスプローラー操作表示.vue')).descriptor.styles[0].content;
+ for(const selector of ['.explorer-context-menu','.explorer-action-dialog'])assert.equal(values(explorer,selector).background,'#000',selector);
 });

@@ -19,7 +19,7 @@ test('Discord のタイトル配色は共通原本のコピーだけを読み、
     // 外部読込を使わず、先頭の import を同じ配布CSSで解決する。
     style.textContent = css.replace('@import "./titlebar.css";', palette);
     window.document.head.append(style);
-    window.document.body.innerHTML = '<header><div id="status">未接続</div><div class="brand"><strong>AiDiy Discord</strong></div><div class="window-actions"><button id="minimize">－</button><button class="window-pin"><span>📌</span></button><button class="window-pin pinned"><span>📌</span></button></div></header><div id="activity-bar"></div><div class="conversation-toolbar">プロジェクト</div><main>本文<input id="settings-input"></main>';
+    window.document.body.innerHTML = '<header><div id="status">未接続</div><div class="brand"><strong>AiDiy Discord</strong></div><div class="window-actions"><button id="minimize">－</button><button class="window-pin"><span>📌</span></button><button class="window-pin pinned"><span>📌</span></button></div></header><div id="activity-bar"></div><div class="conversation-toolbar">プロジェクト</div><main>本文<input id="settings-input"><div id="stage-idle"><div class="stage-text">案内</div></div><div id="stage-message" data-role="user"><div id="stage-text" class="stage-text">応答</div></div></main>';
     const computed = (selector: string) => window.getComputedStyle(window.document.querySelector(selector)!);
     for (const browser of [false, true]) for (const live of [false, true]) {
       window.document.documentElement.classList.toggle('browser-mode', browser);
@@ -27,11 +27,16 @@ test('Discord のタイトル配色は共通原本のコピーだけを読み、
       assert.equal(computed('header').backgroundColor, '#30343a');
       assert.equal(computed('html').backgroundColor, '#000');
       assert.equal(computed('body').backgroundColor, '#000');
+      assert.equal(computed('body').borderTopColor, '#30343a');
+      assert.equal(computed('body').borderTopWidth, '1px');
+      assert.equal(computed('body').boxSizing, 'border-box');
+      assert.equal(computed('#stage-idle .stage-text').backgroundColor, '#000');
+      assert.equal(computed('#stage-text').backgroundColor, '#000');
       assert.notEqual(computed('main').backgroundColor, '#30343a', '本文へタイトル背景を転用しない');
       assert.equal(computed('#settings-input').backgroundColor, '#1b202c', '入力の階層色は維持する');
-      assert.equal(computed('.brand strong').color, '#f3f5f7');
-      assert.equal(computed('#status').color, '#e1e6ed');
-      assert.equal(computed('#minimize').color, '#e1e6ed');
+      assert.equal(computed('.brand strong').color, '#fff');
+      assert.equal(computed('#status').color, '#fff');
+      assert.equal(computed('#minimize').color, '#fff');
       assert.equal(computed('.window-pin').color, '#778394');
       assert.equal(computed('.window-pin.pinned').color, '#c3f7ff');
       assert.equal(computed('#activity-bar').backgroundColor, '#000');

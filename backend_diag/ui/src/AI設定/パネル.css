@@ -5,6 +5,6 @@
 .ai-settings-tab .config-panel-embedded,
 .ai-settings-tab .config-panel { height: auto; }
 .ai-settings-tab .config-panel-body { overflow: visible; flex: none; }
-.ai-settings-tab .config-panel-body p { color: #475569; }
+.ai-settings-tab .config-panel-body p { color: #b8c7d5; }
 .ai-settings-tab .config-panel-body .config-panel-error { color: #b91c1c; }
 .ai-settings-tab .config-panel-header button { background: #fff; color: #0f172a; }

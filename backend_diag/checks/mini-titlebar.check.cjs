@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {createRequire}=require('node:module'),req=createRequire(path.join(__dirname,'../ui/package.json'));
 const {parse}=req('postcss'),{source}=require('./ui-components.cjs');
-const normal=parse(source('style.css')),mini=parse(source('起動/起動ミニ.css'));
+const normal=parse(source('style.css')),mini=parse(source('起動/起動ミニ.css')),launcher=parse(source('アプリ起動/マイクロランチャー.css'));
 const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../../frontend_ide/src/共通表示/タイトルバー配色.css'),'utf8'));
 const titleColor=value=>value.replace(/var\((--[\w-]+)\)/g,(_match,name)=>declarations(palette,':root')[name]);
 function declarations(css,selector){
@@ -12,7 +12,7 @@ const px=value=>{assert.match(value,/^\d+(?:\.\d+)?px$/);return Number.parseFloa
 const verticalPadding=value=>{const sides=value.split(/\s+/).map(px);return sides.length<3?sides[0]*2:sides[0]+sides[2];};
 const border=value=>px(value.split(/\s+/)[0]);
 function contrast(a,b){
- const luminance=hex=>hex.slice(1).match(/../g).map(value=>Number.parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
+ const luminance=hex=>(hex.length===4?hex.slice(1).split('').map(value=>value+value).join(''):hex.slice(1)).match(/../g).map(value=>Number.parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
  const values=[luminance(titleColor(a)),luminance(titleColor(b))].sort((a,b)=>b-a);return(values[0]+.05)/(values[1]+.05);
 }
 
@@ -33,15 +33,15 @@ test('通常・ミニのタイトル31px、接続線3px、タイトル文字13px
  assert.equal(declarations(normal,'.panel-brand button,.window-actions')['-webkit-app-region'],'no-drag');
 });
 
-test('通常タイトルのミニ表示ボタンは高コントラスト・枠・キーボードfocusを持ち、高さを上書きしない',()=>{
- const button=declarations(normal,'.window-actions .title-mini-switch'),hover=declarations(normal,'.window-actions .title-mini-switch:hover:not(:disabled)'),focus=declarations(normal,'.window-actions .title-mini-switch:focus-visible');
- assert.ok(contrast(button.color,button.background)>=7);assert.ok(contrast(hover.color,hover.background)>=7);
- assert.equal(button['font-weight'],'700');assert.equal(button.height,undefined);assert.equal(button['font-size'],'11px');assert.match(button.border,/^1px solid /);
- assert.ok(contrast(button.border.split(' ')[2],declarations(normal,'.panel-brand').background)>=3);
- assert.ok(contrast(focus.outline.split(' ')[2],button.background)>=3);assert.equal(focus['outline-offset'],'-3px');
+test('実際の左上タイトル操作は通常・無効とも白文字で、無効は暗い面と破線で区別する',()=>{
+ const button=declarations(launcher,'.launcher-selector button'),disabled=declarations(launcher,'.launcher-selector button:disabled'),hover=declarations(launcher,'.launcher-selector button:hover:not(:disabled)'),focus=declarations(launcher,'.launcher-selector button:focus-visible');
+ assert.equal(titleColor(button.color),'#fff');assert.equal(button['font-size'],'10px');assert.equal(button.padding,'2px 7px');
+ assert.equal(disabled.opacity,'1');assert.equal(disabled.cursor,'not-allowed');assert.equal(disabled['border-style'],'dashed');assert.equal(disabled.background,'#20242a');
+ for(const background of [declarations(normal,'.panel-brand').background,disabled.background,hover.background])assert.ok(contrast(button.color,background)>=7);
+ assert.match(focus.outline,/^2px solid var\(--aidiy-titlebar-foreground\)$/);assert.equal(focus['outline-offset'],'1px');
+ assert.deepEqual(declarations(normal,'.window-actions .title-mini-switch'),{},'実DOMに当たらない旧配置の装飾を残さない');
  const link=declarations(mini,'.mini-project-link');assert.equal(link['-webkit-app-region'],'no-drag');assert.equal(link.padding,'0');assert.equal(link.border,'0');
- assert.equal(declarations(mini,'.mini-app-message.required::after')['pointer-events'],'none');
- assert.ok(declarations(mini,'.start-mini .mini-project-link:focus-visible').outline);
+ assert.equal(declarations(mini,'.mini-app-message.required::after')['pointer-events'],'none');assert.ok(declarations(mini,'.start-mini .mini-project-link:focus-visible').outline);
 });
 
 test('ミニの内容を自然な高さで計測し、2段アイコン・案内を上限360px内に収め、CLI通知行を持たない',()=>{
@@ -105,7 +105,7 @@ test('起動・ミニの主面は黒を基準にし、操作階層・選択色�
  for(const selector of ['.start-panel','.start-panel .start-console'])assert.equal(declarations(startup,selector).background,'#000');
  for(const selector of ['#app:has(>.start-mini)','#app>.panel.start-mini'])assert.equal(declarations(mini,selector).background,'#000');
  assert.equal(declarations(normal,'button,input,select').background,'#1a2c3a');
- assert.equal(declarations(normal,'.panel-heading').background,'#15212d');
+ assert.equal(declarations(normal,'.panel-heading').background,'#000');
  assert.equal(declarations(startup,'.start-targets button.active').background,'#1b2d3d');
  assert.equal(declarations(mini,'.mini-service[data-tone=running]').background,'#0d2523');
  assert.equal(declarations(micro,'html.micro-mode,html.micro-mode body,html.micro-mode #app').background,'transparent');

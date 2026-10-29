@@ -140,9 +140,9 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
   </main>
 </template>
 <style scoped>
-.taskteam-shell{width:100%;height:100%;box-sizing:border-box;border:1px solid #383838;background:#000;display:flex;flex-direction:column;overflow:hidden;color:#d9e0f2}
+.taskteam-shell{width:100%;height:100%;box-sizing:border-box;border:1px solid var(--aidiy-panel-border);background:#000;display:flex;flex-direction:column;overflow:hidden;color:#d9e0f2}
 .taskteam-content{flex:1;min-height:0;overflow:auto;position:relative}
-.taskteam-login{box-sizing:border-box;width:min(408px,calc(100% - 32px));margin:auto;display:grid;gap:16px;background:linear-gradient(145deg,rgba(70,104,205,.19),rgba(108,78,196,.17) 60%,rgba(143,104,221,.12)),#080a10;border:1px solid rgba(143,104,221,.5);border-radius:12px;padding:32px 28px 24px;box-shadow:0 16px 48px #0005,inset 0 1px 0 #c4b5fd14}
+.taskteam-login{box-sizing:border-box;width:min(408px,calc(100% - 32px));margin:auto;display:grid;gap:16px;background:#000;border:1px solid rgba(143,104,221,.5);border-radius:12px;padding:32px 28px 24px;box-shadow:0 16px 48px #0005,inset 0 1px 0 #c4b5fd14}
 .taskteam-login-screen{box-sizing:border-box;flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:36px 0 24px;gap:32px}
 .taskteam-login-screen .welcome-mark{margin:0;flex-shrink:0}
 .taskteam-login-screen .taskteam-login{margin:0;flex-shrink:0;padding-top:24px}
@@ -155,12 +155,18 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
 .taskteam-login p{margin:0;font-size:11px;line-height:1.6;color:#a8accb}.taskteam-login .error{color:#ffb7b7}.taskteam-message{padding:12px}
 @media(max-height:560px){.taskteam-login-screen{padding:24px 0 16px;gap:24px}.taskteam-login{gap:12px;padding:20px 24px}.taskteam-login-screen .welcome-mark{width:64px;height:64px}.taskteam-login-screen .welcome-mark img{width:42px;height:42px}}
 /* コピー元の機能は維持し、外側の操作面は Code と同じ黒・細枠へ揃える。 */
-.taskteam-content :deep(.ai-task-view){background:#000}.taskteam-content :deep(.task-grid){gap:4px;padding:4px}.taskteam-content :deep(.task-panel){border:1px solid #343943;background:#080a10;border-radius:0;box-shadow:none}.taskteam-content :deep(.task-panel:hover){border-color:#56606e;box-shadow:none}
-.taskteam-shell .taskteam-content :deep(.panel-header){background:#080a10;border-bottom:1px solid #242424;box-shadow:none}
+.taskteam-content :deep(.ai-task-view){background:#000}.taskteam-content :deep(.task-grid){gap:4px;padding:4px}.taskteam-content :deep(.task-panel){border:1px solid #343943;background:#000;border-radius:0;box-shadow:none}.taskteam-content :deep(.task-panel:hover){border-color:#56606e;box-shadow:none}
+.taskteam-shell .taskteam-content :deep(.panel-header){background:#000;border-bottom:1px solid #242424;box-shadow:none}
 .taskteam-shell .taskteam-content :deep(.panel-title){color:#d9e0f2;font-size:12px;letter-spacing:normal;font-weight:600}
 .taskteam-shell .taskteam-content :deep(.scope-toggle){background:#080a10;border:1px solid #343943;border-radius:0;color:#d9e0f2}
 .taskteam-shell .taskteam-content :deep(.scope-toggle:hover:not(:disabled)){background:#202737}
 .taskteam-shell .taskteam-content :deep(.team-page){background:#000}
-.taskteam-shell .taskteam-content :deep(.agent-panel),.taskteam-shell .taskteam-content :deep(.exp-panel),.taskteam-shell .taskteam-content :deep(.pdca-panel),.taskteam-shell .taskteam-content :deep(.talk-panel){background:#080a10;border:1px solid #343943;border-radius:0;box-shadow:none}
+.taskteam-shell .taskteam-content :deep(.agent-panel),.taskteam-shell .taskteam-content :deep(.exp-panel),.taskteam-shell .taskteam-content :deep(.pdca-panel),.taskteam-shell .taskteam-content :deep(.talk-panel){background:#000;border:1px solid #343943;border-radius:0;box-shadow:none}
 .taskteam-shell .taskteam-content :deep(.agent-panel:hover),.taskteam-shell .taskteam-content :deep(.exp-panel:hover),.taskteam-shell .taskteam-content :deep(.pdca-panel:hover),.taskteam-shell .taskteam-content :deep(.talk-panel:hover){border-color:#56606e;box-shadow:none}
+/* 独立Task窓・表の見出し/空白も黒へ揃える。入力欄、選択行、データ行の配色は維持する。 */
+.taskteam-shell .taskteam-content :deep(.task-window-body),.taskteam-shell .taskteam-content :deep(.task-editor-window),.taskteam-shell .taskteam-content :deep(.common-table),.taskteam-shell .taskteam-content :deep(.table-footer){background:#000}
+.taskteam-shell .taskteam-content :deep(tbody tr:has(td.empty)){background:#000}
+.taskteam-shell .taskteam-content :deep(td.empty){color:#94a3b8}
+.taskteam-shell .taskteam-content :deep(th),.taskteam-shell .taskteam-content :deep(thead tr:nth-child(2) th){background:#000}
+.taskteam-shell .taskteam-content :deep(.task-editor-window .dialog-content),.taskteam-shell .taskteam-content :deep(.task-editor-window .dialog-header),.taskteam-shell .taskteam-content :deep(.task-editor-window .dialog-body),.taskteam-shell .taskteam-content :deep(.task-editor-window .dialog-footer){background:#000}
 </style>

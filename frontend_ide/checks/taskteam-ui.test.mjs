@@ -41,7 +41,7 @@ test('dedicated root uses Task / Team health, shared Code header and lifecycle c
   assert.match(source, /共通表示\/状態バー.vue/); assert.match(source, /taskTeamBase \+ '\/status'/);
   assert.match(source, /connected.value = result.connected === true/); assert.match(source, /:clock-pulse="true"/);
   assert.match(source, /clearTimeout\(timer\);.*lifetime.abort\(\)/); assert.doesNotMatch(source, /\/api\/connection|tools.*ping/);
-  assert.match(source, /border:1px solid #383838/); assert.match(source, /flex:1;min-height:0/);
+  assert.match(source, /border:1px solid var\(--aidiy-panel-border\)/); assert.match(source, /flex:1;min-height:0/);
 });
 test('copied Task dialogs use independent IDE windows and keep inline Web dialogs', async () => {
   for (const file of ['AIタスク_要求一覧.vue', 'AIタスク_明細一覧.vue']) {
@@ -68,7 +68,7 @@ test('Task / Team build is separate and all copied imports stay within IDE', asy
 
 test('Code-style header and toolbar overrides stay inside Task / Team without changing the 3D scene', async () => {
   const source = await read('src/タスクチーム/タスクチームパネル.vue');
-  assert.match(source, /\.taskteam-shell \.taskteam-content :deep\(\.panel-header\)\{background:#080a10;border-bottom:1px solid #242424;box-shadow:none\}/);
+  assert.match(source, /\.taskteam-shell \.taskteam-content :deep\(\.panel-header\)\{background:#000;border-bottom:1px solid #242424;box-shadow:none\}/);
   assert.match(source, /:deep\(\.scope-toggle\)\{background:#080a10;border:1px solid #343943;border-radius:0/);
   assert.match(source, /:deep\(\.talk-panel:hover\)\{border-color:#56606e;box-shadow:none\}/);
   assert.doesNotMatch(source, /:deep\([^)]*(?:canvas|scene|agent-color)/);

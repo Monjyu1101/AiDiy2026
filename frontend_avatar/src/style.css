@@ -1,4 +1,8 @@
 :root {
+  /* Avatar固有のタイトル配色を、1pxのパネル枠にも共有する。 */
+  --avatar-title-background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  --avatar-title-edge: rgba(108, 78, 196, 0.94);
+  --avatar-light-title-background: rgba(200, 200, 200, 0.92);
   color-scheme: dark;
   font-family: "BIZ UDPGothic", "Yu Gothic UI", "Segoe UI Variable", sans-serif;
   line-height: 1.5;

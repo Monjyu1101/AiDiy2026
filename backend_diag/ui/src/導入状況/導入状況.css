@@ -26,7 +26,7 @@
 .install-detail-tabs button[aria-pressed="true"]{background:#25403d;border-color:#5da99b;color:#b0eee2}
 .install-console-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .install-console-heading #install-cancel{margin-left:auto;border-color:#925064}
-.install-console{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:#060b10;border:1px solid #304253;border-radius:5px;color:#cde5dd;padding:14px;min-height:220px;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}
+.install-console{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:#000;border:1px solid #304253;border-radius:5px;color:#cde5dd;padding:14px;min-height:220px;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}
 .install-recheck{margin-top:18px;border-top:1px solid #304253;padding-top:15px}
 .install-recheck>strong{margin-right:10px}
 .install-recheck p,.install-capability-note{font-size:12px}

@@ -959,6 +959,7 @@ onMounted(() => {
 }
 
 .config-panel {
+  --config-title-background: #f8fafc;
   width: min(720px, 92vw);
   max-height: 90vh;
   background: #ffffff;
@@ -967,7 +968,7 @@ onMounted(() => {
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
   display: flex;
   flex-direction: column;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--config-title-background);
   min-width: 0;
 }
 
@@ -976,7 +977,7 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 700;
   color: #0f172a;
-  background: #f8fafc;
+  background: var(--config-title-background);
   border-bottom: 1px solid #e2e8f0;
   letter-spacing: 0.02em;
   display: grid;

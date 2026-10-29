@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  border: 1px solid #383838;
+  border: 1px solid var(--avatar-light-title-background);
   background: rgba(12, 12, 12, 0.72);
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -209,6 +209,7 @@ onBeforeUnmount(() => {
 
 .window-shell.chrome-hidden {
   border-color: transparent;
+  border-image: none;
   background: transparent;
   box-shadow: none;
 }
@@ -353,13 +354,14 @@ onBeforeUnmount(() => {
 }
 
 .theme-purple {
-  border-color: #383838;
+  border-color: var(--avatar-title-edge);
+  border-image: var(--avatar-title-background) 1;
   background: rgba(6, 8, 14, 0.18);
 }
 
 .theme-purple .window-titlebar {
   border-bottom: 1px solid rgba(93, 68, 168, 0.95);
-  background: linear-gradient(135deg, rgba(108, 78, 196, 0.94), rgba(143, 104, 221, 0.9));
+  background: var(--avatar-title-background);
   color: #fff;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
@@ -372,7 +374,7 @@ onBeforeUnmount(() => {
 
 .theme-light .window-titlebar {
   border-bottom: 1px solid rgba(120, 120, 120, 0.9);
-  background: rgba(200, 200, 200, 0.92);
+  background: var(--avatar-light-title-background);
   color: #222;
 }
 

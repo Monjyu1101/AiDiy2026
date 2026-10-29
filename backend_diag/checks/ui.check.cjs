@@ -68,14 +68,14 @@ test('AI model trial guidance precedes the family tabs',()=>{
 });
 test('panel perimeter reserves one pixel inside the unchanged viewport box',()=>{
  const css=source('style.css');
- assert.match(css,/#app\{box-sizing:border-box;border:1px solid #383838\}/);
+ assert.match(css,/#app\{box-sizing:border-box;border:1px solid var\(--aidiy-panel-border\)\}/);
  assert.match(css,/#app\{height:100vh;height:100dvh/);
 });
 
 test('icon mode removes only the panel perimeter and restores it on unmount',()=>{
  const css=source('アプリ起動/マイクロランチャー.css');
  assert.match(css,/html\.micro-mode #app\{border:0\}/);
- assert.match(source('style.css'),/#app\{box-sizing:border-box;border:1px solid #383838\}/);
+ assert.match(source('style.css'),/#app\{box-sizing:border-box;border:1px solid var\(--aidiy-panel-border\)\}/);
  const launcher=source('アプリ起動/マイクロランチャー.vue');
  assert.match(launcher,/onMounted\(\(\)=>\{[^\n]*document\.documentElement\.classList\.add\('micro-mode'\)/);
  assert.match(launcher,/onBeforeUnmount\(\(\)=>\{[^\n]*document\.documentElement\.classList\.remove\('micro-mode'\)/);
