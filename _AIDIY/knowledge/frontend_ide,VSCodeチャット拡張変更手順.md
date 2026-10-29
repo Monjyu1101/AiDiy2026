@@ -218,6 +218,19 @@ node --test checks/runner.test.cjs checks/code-connection.test.cjs checks/code-e
 - バックアップとの内容差分、生成元との一致、対象テストの結果を合わせて追加修正の要否を判断する。一致して対象テストも成功した場合、変更通知だけを理由に追加修正しない。
 - 知見整理だけの依頼では、上記は次回の手順として記録する。本体の再生成、再テスト、VSIX配置、バックアップ名変更、再起動は実施しない。システム再起動は利用者の判断に委ねる。
 
+## Code / Live のファイル添付と返却画像
+
+- 共通Vueの `src/添付ファイル/` と `host/src/file-attachments.ts` を使う。単独起動・IDE・VS Code拡張とも、Core接続中の現在の会話へファイルをドロップする。Codeは「＋ ファイル」でも選べる。オフラインHermesへファイルを自動転送しない。
+- 1件は空でない4 MiB以下、1回は10件まで。全件の名前・サイズを先に検証し、読込後もsession・会話・プロジェクトと接続世代を照合する。切断・会話変更・送信失敗時は残りを中止し、自動再送しない。本文の下書きは保持する。
+- Avatarと同じ `input_file` packetを既存input WebSocketへ渡す。Codeはchannel 1、Liveはchannel 0。既存のHost / Origin / ランダムURL / ワークスペース信頼境界を維持し、ファイル取得用の新規REST中継は追加しない。`/core/files` のJWT認証を迂回しない。
+- ローカル送信の成功とCore保存完了は別。会話欄への追加はCoreの `input_file` echo（ブーメラン）のみを使い、session・channel・保存パスをキーに重複echoを除く。失敗時はエラーと会話欄を確認してから必要なファイルだけ選び直す。Coreの `FILE_UPLOAD_FAILED` を受けた場合、成功表示にしない。
+- Coreの入力保存は `AIコア/AI入力ファイル.py` が時刻＋UUID＋安全化した元名を排他的に作成する。同名・同秒・別session並行でも既存ファイルを上書きしない。返却packetの `ファイル名` は従来どおり `temp/input/...`、表示用の `元ファイル名` は元名を維持する。履歴と下流の添付登録は実際の保存パスを使い、既存ファイルは移動・削除しない。
+- `input_file` とAI生成物の `output_file` は共通添付UIで表示する。Coreが返すPNGサムネイルだけを検証してインライン表示し、クリックでそのプレビューを拡大する。Core側も `AIコア/AIファイルプレビュー.py` で変換前に画素数を制限し、縦横320以内・拡大なしの静止PNGへ縮小する。非画像は名前とCore上のパスを文字で表示する。元ファイルのダウンロード・フル解像度取得・外部URL画像・HTML/SVG表示は行わない。CSPの `data:` 許可は `img-src` だけに限定する。
+- Code生成画像は実行projectの `output` / `temp/output` / `images` / `assets` で要求前後の差分を確認し、自己channelへ返す。Liveからの `input_request` は同sessionのchannel 0にも返す。外部へのsymlink・過大走査を除外し、既存の未変更画像は通知しない。同じ保存パスの更新はSHA-256版で区別し、版のないCore履歴replayは同じPNGの重複を除く。
+- Codeではサムネイルを会話履歴のサイズ予算に含める。履歴読込時も添付を再検証する。Coreのファイル登録は従来どおり同channelの直近1分以内が対象なので、受信表示を確認した後に本文の依頼を送る。Live画像は既存Coreの画像送信経路へ渡るが、任意のPDF等の内容理解をLiveへ追加するものではない。
+
+検証は `frontend_ide/checks/chat-attachments.test.mjs`、`code-file-attachments.test.mjs`、`live-file-attachments.test.mjs`、hostのCode / Live試験、`backend_server/checks/test_input_file_storage.py` を使う。実Vueの合成イベント、模擬Coreとloopback、実input_file分岐のPNG・非画像fixtureで、往復・生成画像・サイズ制限・重複・古い接続・保存失敗・並行保存を確かめる。実AI・ユーザーの入力データを使う必要はない。実OSのD&Dや画像合成を目視した場合は、これらの非GUI試験と区別して記録する。
+
 ## 変更後の検証
 
 Code の停止・接続切替は、通常回答・検証途中・知見整理中・停止後のAI再開待ちを分けて確認する。`src/code-connection.ts` は要求に `実行状態通知: true` を付け、`backend_server/AIコア/AIコード.py` が要求全体の開始に `実行中: true`、後始末完了に `output_end` / `実行中: false` を通知する。途中の `output_text`、`cancel_run`、CANだけでは操作を再開しない。通知に未対応の旧AIコアは従来動作へ戻るため、この変更の反映にはAIコアも再起動する。

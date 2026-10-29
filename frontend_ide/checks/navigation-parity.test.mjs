@@ -846,3 +846,70 @@ test('軌跡の外部Explorer配置は本体の左余白16pxで縦横共通、�
   assert.ok(rule.index > css.lastIndexOf('@media (orientation:portrait)'), '縦画面の右寄せよりも外部化の左端を優先');
   assert.match(css, /\.routes-window \.explorer-routes[^}]+position:relative;inset:auto;/);
 });
+
+
+test('Explorer日時と開閉印: 中央揃え・縮小しない日時欄・共通SVG寸法をscoped CSSで保持', () => {
+  const { descriptor } = parse(readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8'));
+  const result = require('@vue/compiler-sfc').compileStyle({ source: descriptor.styles[0].content, filename: 'FileExplorer.vue', id: 'data-v-explorer-ui', scoped: true });
+  assert.deepEqual(result.errors, []);
+  const css = result.code;
+  assert.match(css, /\.time-search\[data-v-explorer-ui\]\{overflow-x:auto\}/);
+  assert.match(css, /flex-wrap:wrap;justify-content:safe center/);
+  assert.match(css, /input\[type=datetime-local\]\[data-v-explorer-ui\]\{flex:1 0 auto;min-width:max-content;max-width:none;box-sizing:border-box;text-align:center/);
+  assert.match(css, /::-webkit-datetime-edit\{[^}]*justify-content:safe center/);
+  assert.match(css, /\.chevron\[data-v-explorer-ui\]\{[^}]*width:20px;min-width:20px;height:24px;padding:0/);
+  assert.match(css, /svg\[data-v-explorer-ui\]\{width:16px;height:16px;[^}]*pointer-events:none/);
+  assert.match(css, /svg\.expanded\[data-v-explorer-ui\]\{transform:rotate\(90deg\)\}/);
+  assert.doesNotMatch(css, /\.space-view/, '本体の祖先に依存せず別窓にも同じscoped CSSを使う');
+});
+test('Explorer大きい開閉印: root/階層の連打・キーボード・外部化でも選択移動と分離', async t => {
+  const windows = layoutPanelWindows(), h = await workspace(t, { panelWindowFactory: windows.create });
+  try {
+    await h.click(node => hasClass(node, 'explorer-toggle'));
+    const explorer = h.states.get('FileExplorer'), calls = h.navigation.mock.calls.length;
+    const row = () => h.find(node => node.props?.['data-path'] === 'src');
+    const button = () => walk(row(), node => node.type === 'button' && hasClass(node, 'chevron'));
+    const icon = () => walk(button(), node => node.type === 'svg');
+    for (const away of [false, true, false]) {
+      if (away) await h.click(node => hasClass(node, 'explorer-detach')); else windows.panels.get('explorer')?.restore();
+      await flush();
+      for (let n = 0; n < 3; n++) {
+        const wasOpen = row().props['aria-expanded'];
+        assert.equal(icon().props.viewBox, '0 0 16 16'); assert.equal(icon().props['aria-hidden'], 'true');
+        let stopped = false; button().props.onClick({ stopPropagation() { stopped = true; } }); await flush();
+        assert.equal(stopped, true, '三角クリックは行選択へ伝播しない');
+        assert.equal(row().props['aria-expanded'], !wasOpen); assert.equal(button().props['aria-expanded'], !wasOpen);
+        assert.equal(hasClass(icon(), 'expanded'), !wasOpen);
+      }
+      explorer.cursor.value = 'src'; await flush();
+      const key = async key => { h.find(node => node.props?.role === 'tree').props.onKeydown({ key, preventDefault() {}, stopPropagation() {} }); await flush(); };
+      await key('ArrowRight'); assert.equal(row().props['aria-expanded'], true);
+      await key('ArrowLeft'); assert.equal(row().props['aria-expanded'], false);
+      const rootButton = h.find(node => node.props?.['aria-label'] === 'ルートフォルダを折りたたむ');
+      assert.ok(walk(rootButton, node => node.type === 'svg'));
+      await h.click(node => node === rootButton);
+      await h.click(node => node.props?.['aria-label'] === 'ルートフォルダを展開する');
+      const placeholder = walk(h.find(node => node.props?.['data-path'] === 'root.js'), node => node.type === 'span' && hasClass(node, 'chevron'));
+      assert.ok(placeholder, 'ファイルも同じ幅の空枠を残し階層列をそろえる');
+    }
+    assert.equal(h.navigation.mock.calls.length, calls, '開閉はファイル/フォルダへ移動しない');
+  } finally { h.dispose(); }
+});
+test('Explorer中央日時: 秒・終了省略・入力エラーのbindingを本体と別窓で保持', async t => {
+  const windows = layoutPanelWindows(), h = await workspace(t, { panelWindowFactory: windows.create });
+  try {
+    await h.click(node => hasClass(node, 'explorer-toggle'));
+    const dates = () => { const labels = h.find(node => hasClass(node, 'time-search')).children.filter(node => node.type === 'label'); return labels.map(label => walk(label, node => node.type === 'input')); };
+    for (const away of [false, true]) {
+      if (away) await h.click(node => hasClass(node, 'explorer-detach'));
+      const [start, end] = dates();
+      for (const field of [start, end]) { assert.equal(field.props.type, 'datetime-local'); assert.equal(field.props.step, '1'); }
+      start.props.onChange({ target: { value: '2026-10-29T10:20:30' } }); await flush();
+      end.props.onChange({ target: { value: '2026-10-29T11:22:33' } }); await flush();
+      assert.equal(dates()[0].props.value, '2026-10-29T10:20:30'); assert.equal(dates()[1].props.value, '2026-10-29T11:22:33');
+      end.props.onChange({ target: { value: '' } }); await flush(); assert.equal(dates()[1].props.value, '');
+      end.props.onChange({ target: { value: '2026-10-28T11:22:33' } }); await flush(); assert.equal(dates()[1].props['aria-invalid'], true);
+      end.props.onChange({ target: { value: '' } }); await flush(); assert.equal(dates()[1].props['aria-invalid'], false);
+    }
+  } finally { h.dispose(); }
+});

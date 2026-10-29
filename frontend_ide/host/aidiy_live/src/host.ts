@@ -14,6 +14,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { 接続エラー詳細 } from './connection-error';
+import { MAX_FILE_PACKET_CHARS, validateFileUpload } from '../../src/file-attachments';
 
 type Message = { type?: string; id?: number; path?: string; body?: unknown; data?: string };
 type Mic = { id: number; process: ChildProcessWithoutNullStreams; stop: () => void };
@@ -31,7 +32,7 @@ export class LiveHost {
   private mic?: Mic;
   private disposed = false;
   private visible = true;
-  private input?: { id: number; session: string; speaker: boolean };
+  private input?: { id: number; session: string; speaker: boolean; projectPath: string | null };
   private heartbeat?: ReturnType<typeof setInterval>;
   private target: URL;
   constructor(backend: string, private post: (message: unknown) => void, private python: () => string, private microphoneFile: string) {
@@ -68,22 +69,33 @@ export class LiveHost {
         if (!this.disposed) this.post({ type: 'socket-closed', id });
       };
     } else if (message.type === 'socket-send') {
-      const socket = this.sockets.get(id);
-      if (socket?.readyState === 1 && socket.bufferedAmount < 128000 && typeof message.data === 'string' && message.data.length <= 128000) {
+      const socket = this.sockets.get(id), data = message.data;
+      const failed = (error: string) => this.post({ type: 'socket-send-error', id, error });
+      if (typeof data !== 'string') return;
+      if (data.length > MAX_FILE_PACKET_CHARS) { failed('ファイルが送信上限（4 MiB）を超えています。'); return; }
+      let packet: any;
+      try { packet = JSON.parse(data); } catch { /* 既存の非JSON音声中継は小さなメッセージに限る */ }
+      const file = packet?.メッセージ識別 === 'input_file';
+      if (!file && data.length > 128000) { failed('要求が送信上限を超えています。'); return; }
+      if (file) {
         try {
-          const packet = JSON.parse(message.data);
-          if (packet.type === 'connect' && packet.ソケット番号 === 'input') this.input = { id, session: '', speaker: true };
-          if (this.input?.id === id && packet.メッセージ識別 === 'operations') {
-            this.input.speaker = !!packet.メッセージ内容?.ボタン?.スピーカー;
-            if (!this.visible) {
-              this.sendInput({ チャンネル: 'input', メッセージ識別: 'operations', メッセージ内容: { ボタン: { マイク: false, スピーカー: this.input.speaker } } });
-              return;
-            }
-          }
-          if (!this.visible && packet.メッセージ識別 === 'input_audio') return;
-        } catch { /* パケット検証は既存バックエンドへ委ねる */ }
-        socket.send(message.data);
+          validateFileUpload({ name: packet.ファイル名, base64: packet.メッセージ内容 });
+          if (this.input?.id !== id || !this.input.session || packet.セッションID !== this.input.session
+            || packet.チャンネル !== '0' || packet.出力先チャンネル !== '0'
+            || !this.input.projectPath || packet.プロジェクトパス !== this.input.projectPath) throw new Error('接続中の会話・プロジェクトへ送信してください。');
+        } catch (error) { failed(error instanceof Error ? error.message : 'ファイルを送信できません。'); return; }
       }
+      if (socket?.readyState !== 1 || socket.bufferedAmount >= 128000) { if (file) failed('送信できませんでした。接続または送信待ちを確認してください。'); return; }
+      if (packet?.type === 'connect' && packet.ソケット番号 === 'input') this.input = { id, session: '', speaker: true, projectPath: typeof packet.CODE_BASE_PATH === 'string' ? packet.CODE_BASE_PATH : null };
+      if (this.input?.id === id && packet?.メッセージ識別 === 'operations') {
+        this.input.speaker = !!packet.メッセージ内容?.ボタン?.スピーカー;
+        if (!this.visible) {
+          this.sendInput({ チャンネル: 'input', メッセージ識別: 'operations', メッセージ内容: { ボタン: { マイク: false, スピーカー: this.input.speaker } } });
+          return;
+        }
+      }
+      if (!this.visible && packet?.メッセージ識別 === 'input_audio') return;
+      try { socket.send(data); } catch { failed('送信できませんでした。接続を確認してください。'); }
     } else if (message.type === 'socket-close') {
       this.sockets.get(id)?.close();
     } else if (message.type === 'api') {

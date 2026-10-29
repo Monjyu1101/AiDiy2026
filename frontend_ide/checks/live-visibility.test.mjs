@@ -80,6 +80,9 @@ async function livePanel(t, { visible = true, host = true, ...options } = {}) {
     send(...args) { packets.push(args); return true; }
   }
   const modules = {
+    '../../host/src/file-attachments': { fileAttachment: () => undefined },
+    '../添付ファイル/ファイル送信.js': { readDroppedFiles: async () => 0 },
+    '../添付ファイル/チャット添付.vue': {},
     '../ライブ/ライブ通信': { LiveEnvironment: Environment },
     '../../host/aidiy_live/src/protocol': { LiveConnection: Connection, 入力レート: () => 16000, 音声入力: value => value, 音声操作: (mic, speaker) => ({ mic, speaker }) },
     '../../host/aidiy_live/src/audio': { LiveAudio: class { async unlock() {} mute() {} stop() {} close() { resources.audioCloses++; } } },

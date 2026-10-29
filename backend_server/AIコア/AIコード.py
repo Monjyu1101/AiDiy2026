@@ -20,18 +20,25 @@ import json
 import os
 import shutil
 import random
+import stat
+import hashlib
 from typing import Optional, Any
 from types import ModuleType
 from AIコア.AIバックアップ import コードベース絶対パス取得
 from AIコア.AIバックアップ実行 import バックアップ完了待機
 from AIコア.AIストリーム制御 import AIストリーム開始, AIストリーム終了, AIストリーム中断
 
+from AIコア.AIファイルプレビュー import 画像プレビュー生成
 from AIコア.AI応答 import 応答正規化, エラー応答, エラー応答判定
 from AIコア.AI履歴コンテキスト import 履歴要求コピー, 履歴要求コンテキスト, セッション履歴パス
 from AIコア.AI実行オプション import AI実行オプション, 既定実行オプション, 接続適用, 保存関数適用
 from log_config import get_logger
 
 logger = get_logger(__name__)
+
+_生成画像走査上限 = 2000
+_生成画像通知上限 = 20
+_生成画像読込上限 = 16 * 1024 * 1024
 
 _CODE_CONTEXT_JSON_PATH = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_config", "AiDiy_code__context.json")
@@ -833,6 +840,9 @@ class CodeAgent:
         """
         出力メッセージ内容 = ""
         受信種別 = ""
+        # 同じプロジェクトで並行する別要求との厳密な生成者識別ではなく、要求前後の変更だけを見る。
+        生成画像開始時 = self._生成画像一覧取得()
+        ai_instance = None
         try:
             メッセージ内容 = 受信データ.get("メッセージ内容", "")
             受信種別 = 受信データ.get("メッセージ識別", "")
@@ -934,9 +944,12 @@ class CodeAgent:
             except Exception as e:
                 logger.error(f"[CodeAgent] バックアップ検証ループエラー: {e}")
 
-            # 生成されたファイルをチェックしてinputチャンネルに通知
+            # この要求中に実行プロジェクトで作成・更新された画像を自チャンネルに通知
             try:
-                await self._生成ファイル通知()
+                通知先 = [self.チャンネル]
+                if 受信種別 == "input_request" and self.チャンネル != "0":
+                    通知先.append("0")
+                await self._生成ファイル通知(生成画像開始時, ai_instance, 通知先)
             except Exception as e:
                 logger.error(f"[CodeAgent] 生成ファイル通知エラー: {e}")
 
@@ -1088,58 +1101,125 @@ class CodeAgent:
 
         return 今回更新あり
 
-    async def _生成ファイル通知(self) -> None:
-        """生成された画像などのファイルをチェックしてinputチャンネルに通知"""
-        import glob
-        import time
+    @staticmethod
+    def _生成画像属性(info) -> tuple:
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
-        # チェック対象ディレクトリと画像拡張子
-        チェックディレクトリ = ["output", "temp/output", "images", "assets"]
-        画像拡張子 = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"]
+    @staticmethod
+    def _生成画像安全パス(root: str, relative: str) -> Optional[str]:
+        """現在のプロジェクトから外へ出るパス・途中のリンクを使わない。"""
+        path = os.path.abspath(os.path.join(root, relative))
+        try:
+            if os.path.commonpath([root, path]) != root:
+                return None
+            current = root
+            for part in os.path.relpath(path, root).split(os.sep):
+                current = os.path.join(current, part)
+                if os.path.islink(current):
+                    return None
+            if os.path.commonpath([root, os.path.realpath(path)]) != root:
+                return None
+        except (OSError, ValueError):
+            return None
+        return path
 
-        # 現在時刻から1分以内に作成されたファイルを検出
-        現在時刻 = time.time()
-        検出時間範囲秒 = 60  # 1分
+    def _生成画像一覧取得(self) -> Optional[tuple]:
+        """生成対象4フォルダの限定走査。上限・読取失敗時は差分全体を無効にする。"""
+        if not self.絶対パス or not os.path.isabs(self.絶対パス):
+            return None
+        root = os.path.realpath(self.絶対パス)
+        images = {}
+        count = 0
+        try:
+            if not os.path.isdir(root):
+                return None
+            pending = []
+            for relative in ("output", "temp/output", "images", "assets"):
+                path = self._生成画像安全パス(root, relative)
+                if path and os.path.isdir(path):
+                    pending.append(path)
+            while pending:
+                folder = pending.pop()
+                if not self._生成画像安全パス(root, os.path.relpath(folder, root)):
+                    continue
+                with os.scandir(folder) as entries:
+                    for entry in entries:
+                        count += 1
+                        if count > _生成画像走査上限:
+                            logger.warning("[CodeAgent] 生成画像の走査上限を超えたため通知を省略")
+                            return None
+                        if entry.is_symlink():
+                            continue
+                        relative = os.path.relpath(entry.path, root)
+                        if not self._生成画像安全パス(root, relative):
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            pending.append(entry.path)
+                        elif os.path.splitext(entry.name)[1].lower() in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"):
+                            info = entry.stat(follow_symlinks=False)
+                            if stat.S_ISREG(info.st_mode):
+                                images[relative.replace(os.sep, "/")] = self._生成画像属性(info)
+            return root, images
+        except OSError as error:
+            logger.warning(f"[CodeAgent] 生成画像の走査を省略: {error}")
+            return None
 
-        検出ファイル一覧 = []
-
-        for ディレクトリ in チェックディレクトリ:
-            if not os.path.exists(ディレクトリ):
-                continue
-
-            for 拡張子 in 画像拡張子:
-                パターン = os.path.join(ディレクトリ, "**", 拡張子)
-                for ファイルパス in glob.glob(パターン, recursive=True):
-                    try:
-                        # ファイルの作成時刻を確認
-                        ファイル作成時刻 = os.path.getctime(ファイルパス)
-                        if 現在時刻 - ファイル作成時刻 <= 検出時間範囲秒:
-                            検出ファイル一覧.append(ファイルパス)
-                    except Exception as e:
-                        logger.warning(f"[CodeAgent] ファイル時刻チェックエラー: {ファイルパス}, {e}")
-
-        # 検出されたファイルをinputチャンネルに通知
-        for ファイルパス in 検出ファイル一覧:
+    async def _生成ファイル通知(self, 開始時: Optional[tuple], ai_instance=None, 通知チャンネル一覧=None) -> None:
+        """要求前後の変更画像を現session/channelへ通知する（cwdや直近時刻は使わない）。"""
+        if 開始時 is None:
+            return
+        終了時 = self._生成画像一覧取得()
+        if 終了時 is None or 終了時[0] != 開始時[0]:
+            return
+        root, images = 終了時
+        candidates = [path for path, info in images.items() if 開始時[1].get(path) != info]
+        explicit = getattr(ai_instance, "last_output_files", None)
+        if isinstance(explicit, list) and explicit:
+            if len(explicit) > _生成画像通知上限:
+                return
+            selected = set()
+            for path in explicit:
+                if not isinstance(path, str):
+                    continue
+                safe = self._生成画像安全パス(root, path)
+                if safe:
+                    selected.add(os.path.relpath(safe, root).replace(os.sep, "/"))
+            candidates = [path for path in candidates if path in selected]
+        if len(candidates) > _生成画像通知上限:
+            logger.warning("[CodeAgent] 生成画像の通知上限を超えたため通知を省略")
+            return
+        for relative in sorted(candidates):
             try:
-                # サムネイル生成（オプション：ここでは省略し、Noneを送信）
-                サムネイル = None
-
-                通知メッセージ = f"ファイルが生成されました: {ファイルパス}"
-
-                # inputチャンネルにoutput_file送信
-                await self.接続.send_to_channel("input", {
-                    "セッションID": self.セッションID,
-                    "チャンネル": "input",
+                path = self._生成画像安全パス(root, relative)
+                expected = images[relative]
+                if not path or not 0 < expected[2] <= _生成画像読込上限:
+                    continue
+                # 走査後のリンクへの置換・並行更新を検出して、別ファイルを読み込まない。
+                descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+                with os.fdopen(descriptor, "rb") as source:
+                    if self._生成画像属性(os.fstat(source.fileno())) != expected:
+                        continue
+                    if not self._生成画像安全パス(root, relative):
+                        continue
+                    data = source.read(_生成画像読込上限 + 1)
+                    if len(data) != expected[2] or self._生成画像属性(os.fstat(source.fileno())) != expected:
+                        continue
+                preview = 画像プレビュー生成(data)
+                packet = {
+                    "セッションID": self.セッションID, "チャンネル": self.チャンネル,
+                    "プロジェクトパス": self.絶対パス,
                     "メッセージ識別": "output_file",
-                    "メッセージ内容": 通知メッセージ,
-                    "ファイル名": ファイルパス,
-                    "サムネイル画像": サムネイル
-                })
-
-                logger.info(f"[CodeAgent] ファイル生成通知送信: {ファイルパス}")
-
-            except Exception as e:
-                logger.error(f"[CodeAgent] ファイル通知送信エラー: {ファイルパス}, {e}")
+                    "メッセージ内容": f"ファイル出力: {os.path.basename(relative)}",
+                    "ファイル名": relative, "サムネイル画像": preview,
+                    "ファイル版": hashlib.sha256(data).hexdigest(),
+                }
+                for channel in dict.fromkeys(通知チャンネル一覧 or [self.チャンネル]):
+                    outgoing = {**packet, "チャンネル": channel}
+                    await self.接続.send_to_channel(channel, outgoing)
+                    if self.保存関数:
+                        self.保存関数(**{key: value for key, value in outgoing.items() if key != "ファイル版"})
+            except (OSError, ValueError) as error:
+                logger.warning(f"[CodeAgent] 生成画像通知を省略: {relative}, {error}")
 
     async def _update_info送信(self, 通知チャンネル一覧=None) -> None:
         """累積変更ファイルがある場合、update_infoメッセージを送信"""

@@ -116,7 +116,7 @@ for (const field of ['projectPath', 'sessionId', 'conversationId']) for (const s
 // ホスト全体もソースから読み、ファイル・設定・HTTP・接続をすべて試験用に置き換える。
 function hostMocks() {
   let connection, prediction, handler;
-  const noop = () => {}, store = { 会話保存先: noop, 会話一覧: () => [], 会話書込: noop, 会話本文上限: 100000 };
+  const noop = () => {}, store = { 会話保存先: noop, 会話一覧: () => [], 会話書込: noop, 会話本文上限: 100000, 履歴メッセージ長さ: item => item.本文.length };
   class Connection {
     connected = false; session = ''; projectPath = ''; model = { provider: 'codex_cli', model: 'auto' };
     constructor(_url, _packet, state) { connection = this; this.notify = state; }
@@ -127,7 +127,7 @@ function hostMocks() {
   class Prediction { constructor(_root, context) { prediction = this; this.context = context; } sync() {} clear() {} }
   const models = { コードモデル読込: noop, コードモデル保存: value => value, モデル保存先: () => 'mock-model', コード設定保存先: () => 'mock-options', 検証回数読込: noop };
   const offline = { Hermes既定モデル: () => 'same', オフラインモデル候補: () => [{ id: 'same' }], オフラインモデル保存先: () => 'mock-offline' };
-  const common = { 'code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider, model: value.model }) }, 'input-prediction': { InputPrediction: Prediction },
+  const common = { 'file-attachments': require('../out/file-attachments.cjs'), 'code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider, model: value.model }) }, 'input-prediction': { InputPrediction: Prediction },
     'model-preferences': models, 'conversation-store': store, 'local-backend.cjs': { ローカル接続先: () => 'http://127.0.0.1:18091' }, protocol: {}, offline };
   const deps = {};
   for (const prefix of ['./', '../../src/']) for (const [name, value] of Object.entries(common)) deps[prefix + name] = value;

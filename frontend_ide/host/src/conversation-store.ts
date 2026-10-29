@@ -13,11 +13,28 @@
 import { mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fileAttachment, type ChatAttachment } from './file-attachments';
 
 // aidiy_code の会話履歴はプロジェクトごとに `_AIDIY/aidiy_code/histories/<会話ID>.json` へ1会話1ファイルで保存する。
 // VS Code 拡張・単独起動版・開発スペースの部品のどれで開いても、同じプロジェクトなら同じ履歴を使う。
 
-export interface 履歴メッセージ { 種別: string; 本文: string }
+export interface 履歴メッセージ { 種別: string; 本文: string; 添付?: ChatAttachment }
+function 履歴添付(value: unknown): ChatAttachment | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const item = value as Record<string, unknown>;
+  if (typeof item.session !== 'string' || !item.session || item.session.length > 256 || /[\x00-\x1f\x7f]/.test(item.session) || item.channel !== '1') return;
+  // 保存ファイルを信用せず、受信時と同じ境界でキー・表示名・安全なPNGだけを再構築する。
+  return fileAttachment({ セッションID: item.session, チャンネル: item.channel, メッセージ識別: item.kind,
+    ファイル名: item.path, 元ファイル名: item.name, サムネイル画像: item.thumbnail, ファイル版: item.revision }, item.session, '1');
+}
+function 履歴メッセージ整形(message: 履歴メッセージ): 履歴メッセージ {
+  const attachment = 履歴添付(message.添付);
+  return { 種別: message.種別, 本文: message.本文, ...(attachment ? { 添付: attachment } : {}) };
+}
+export const 履歴メッセージ長さ = (message: 履歴メッセージ): number => {
+  const attachment = 履歴添付(message.添付);
+  return message.本文.length + (attachment ? JSON.stringify(attachment).length : 0);
+};
 /** 保存形式（拡張と単独起動版の共通形）。 */
 export interface 保存履歴 {
   id: string; 更新日時: number; 初回依頼?: string; メッセージ: 履歴メッセージ[];
@@ -51,7 +68,7 @@ function 形式確認(value: unknown): 保存履歴 | undefined {
   if (!item || !validId(item.id) || !Number.isFinite(item.更新日時) || !Array.isArray(item.メッセージ)) return undefined;
   if (!item.メッセージ.every(message => message && typeof message.種別 === 'string' && typeof message.本文 === 'string')) return undefined;
   if (typeof item.provider !== 'string' || typeof item.model !== 'string') return undefined;
-  return item;
+  return { ...item, メッセージ: item.メッセージ.map(履歴メッセージ整形) };
 }
 
 /** 新しい順の一覧。壊れた・大きすぎるファイルは読み飛ばす。 */
@@ -74,7 +91,7 @@ export function 会話一覧(folder: string | undefined): 保存履歴[] {
 /** 一時ファイルへ書いてから置き換える（途中で止まっても前の記録が残る）。 */
 export function 会話書込(folder: string, entry: 保存履歴): void {
   if (!validId(entry.id)) throw new Error('会話IDが不正です。');
-  const json = JSON.stringify(entry);
+  const json = JSON.stringify({ ...entry, メッセージ: entry.メッセージ.map(履歴メッセージ整形) });
   // 読込と同じバイト上限を置き、読めないファイルで既存履歴を置き換えない。
   if (Buffer.byteLength(json, 'utf8') > 会話ファイル上限) throw new Error('会話履歴の保存サイズが上限を超えています。');
   mkdirSync(folder, { recursive: true });

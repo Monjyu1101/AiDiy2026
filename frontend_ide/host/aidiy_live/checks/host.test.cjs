@@ -87,3 +87,41 @@ test('Live ホスト: APIの35秒期限と停止による中断を区別する',
     assert.doesNotMatch(message, /通信に失敗|タイムアウト|20:/);
   } finally { host.dispose(); global.fetch = originalFetch; t.mock.timers.reset(); }
 });
+
+test('Live ホスト添付: 128k超の有効ファイルだけを現session/project/inputへ送り、拒否理由を返す', async () => {
+  const original = global.WebSocket, sockets = [], replies = [];
+  class Socket {
+    readyState = 1; bufferedAmount = 0; sent = [];
+    constructor() { sockets.push(this); }
+    send(data) { if (this.fail) throw Error('closed'); this.sent.push(data); }
+    close() { this.readyState = 3; this.onclose?.(); }
+    emit(packet) { this.onmessage?.({ data: JSON.stringify(packet) }); }
+  }
+  global.WebSocket = Socket;
+  const host = new LiveHost('http://localhost:8091', packet => replies.push(packet), () => 'python', '/microphone.py');
+  const send = (packet, id = 1) => host.receive({ type: 'socket-send', id, data: JSON.stringify(packet) });
+  const upload = { メッセージ識別: 'input_file', メッセージ内容: Buffer.alloc(200000, 1).toString('base64'), ファイル名: '画像.png', セッションID: 'session', チャンネル: '0', 出力先チャンネル: '0', プロジェクトパス: '/project' };
+  try {
+    for (const id of [1, 2]) await host.receive({ type: 'socket-open', id });
+    await send({ type: 'connect', ソケット番号: 'input', CODE_BASE_PATH: '/project' });
+    sockets[0].emit({ メッセージ識別: 'init', セッションID: 'session' });
+    await send(upload); assert.equal(sockets[0].sent.length, 2); assert.deepEqual(JSON.parse(sockets[0].sent.at(-1)), upload);
+    for (const patch of [{ セッションID: 'stale' }, { プロジェクトパス: '/other' }, { チャンネル: '1' }, { 出力先チャンネル: '1' }, { ファイル名: '../bad' }, { メッセージ内容: 'not base64' }, { メッセージ内容: Buffer.alloc(4 * 1024 * 1024 + 1).toString('base64') }]) {
+      const before = sockets[0].sent.length; await send({ ...upload, ...patch });
+      assert.equal(sockets[0].sent.length, before); assert.equal(replies.at(-1).type, 'socket-send-error'); assert.ok(replies.at(-1).error);
+    }
+    await send(upload, 2); assert.equal(sockets[1].sent.length, 0); assert.equal(replies.at(-1).id, 2);
+    await host.receive({ type: 'socket-send', id: 1, data: 'x'.repeat(6 * 1024 * 1024) }); assert.match(replies.at(-1).error, /上限/);
+    await send({ メッセージ識別: 'input_text', メッセージ内容: 'x'.repeat(128000) }); assert.match(replies.at(-1).error, /上限/);
+    for (const [key, value] of [['bufferedAmount', 128000], ['readyState', 3], ['fail', true]]) {
+      sockets[0][key] = value; const before = sockets[0].sent.length; await send(upload);
+      assert.equal(sockets[0].sent.length, before); assert.match(replies.at(-1).error, /送信できません/);
+      sockets[0][key] = key === 'readyState' ? 1 : key === 'fail' ? false : 0;
+    }
+    await send({ メッセージ識別: 'input_text', メッセージ内容: '後続の本文' }); assert.match(sockets[0].sent.at(-1), /後続の本文/);
+    await send({ ...upload, メッセージ内容: Buffer.alloc(4 * 1024 * 1024).toString('base64') });
+    assert.equal(JSON.parse(sockets[0].sent.at(-1)).メッセージ内容.length, Math.ceil(4 * 1024 * 1024 / 3) * 4, '4 MiB境界は許可');
+    await host.receive({ type: 'socket-close', id: 1 }); const count = sockets[0].sent.length; await send(upload);
+    assert.equal(sockets[0].sent.length, count); assert.equal(replies.at(-1).type, 'socket-send-error');
+  } finally { host.dispose(); global.WebSocket = original; }
+});

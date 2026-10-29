@@ -44,6 +44,7 @@ test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存�
   runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
     module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console,
     require(name) {
+      if (name === './file-attachments') return require('../out/file-attachments.cjs');
       if (name === 'vscode') return vscode;
       if (name === './conversation-store') return store;
       if (name === './input-prediction') return require('../out/input-prediction.cjs');
@@ -91,6 +92,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
   runInNewContext(transformSync(readFileSync('src/extension.ts','utf8'),{loader:'ts',format:'cjs'}).code,{
     exports:loaded.exports,module:loaded,require(name){
       if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../src/vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
+      if(name==='./file-attachments') return require('../out/file-attachments.cjs');
       if(name==='vscode') return vscode;
       if(name==='./code-connection') return require('../out/code-connection.cjs');
       if(name==='./input-prediction') return require('../out/input-prediction.cjs');
@@ -259,5 +261,61 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     receive({メッセージ識別:'input_text',メッセージ内容:'破棄前'});await flush();
     disposed();assert.ok(backend.sockets.every(s=>s.readyState===3));
     assert.equal(runs[2].stops,1);runs[2].finish();await flush();
+  } finally { provider.dispose(); }
+});
+
+test('Code 拡張添付: 信頼済みonlineの現scopeだけ送信、echo画像保存・拒否応答・stale防止', async () => {
+  const posts = [], sent = [], subscription = { dispose() {} }; let provider, connection;
+  const uri = { scheme: 'file', fsPath: '/project', toString: () => 'file:///project' }, folder = { uri, name: 'project' };
+  const vscode = { workspace: { isTrusted: true, workspaceFolders: [folder], getConfiguration: () => ({ get: (_key, fallback) => fallback }),
+    getWorkspaceFolder: () => folder, onDidChangeWorkspaceFolders: () => subscription },
+    window: { onDidChangeActiveTextEditor: () => subscription, createOutputChannel: () => ({ appendLine() {}, dispose() {} }), registerWebviewViewProvider: (_id, value) => { provider = value; return subscription; } },
+    Uri: { joinPath: (_root, value) => value }, commands: { registerCommand: () => subscription } };
+  class Connection {
+    connected = true; epoch = 1; session = 'session'; projectPath = '/project'; model = { provider: 'codex_cli', model: 'auto' };
+    constructor(_backend, receive, notify) { connection = this; this.receive = receive; this.notify = notify; }
+    start() { this.notify(); } disconnect() { this.connected = false; } dispose() {} send(packet) { sent.push(packet); return true; }
+  }
+  const dependencies = { vscode, './vscode-html': { developmentHtml: () => '' }, './file-attachments': require('../out/file-attachments.cjs'),
+    './code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider || '', model: value.model || '' }) },
+    './input-prediction': { InputPrediction: class { sync() {} clear() {} } }, './protocol': require('../out/protocol.cjs'),
+    './model-preferences': { モデル保存先: () => 'model', コードモデル読込() {}, コード設定保存先: () => 'options', 検証回数読込() {} },
+    './conversation-store': { ...require('../out/conversation-store.cjs'), 会話保存先() {}, 会話一覧: () => [], 会話書込() {} },
+    '../aidiy_code/src/offline': { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline' },
+    '../aidiy_live/local-backend.cjs': { ローカル接続先: () => 'http://127.0.0.1:18091' }, './runner': {},
+  };
+  const loaded = { exports: {} };
+  runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
+    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console, require: name => dependencies[name] || require(name),
+  });
+  loaded.exports.activate({ extensionPath: '/fixture', extensionUri: uri, subscriptions: [], workspaceState: { get() {}, update: async () => {} }, globalState: { get() {} } });
+  provider.resolveWebviewView({ webview: { asWebviewUri: value => value, onDidReceiveMessage() {}, postMessage: packet => posts.push(packet) }, onDidDispose() {}, onDidChangeVisibility() {} });
+  try {
+    await provider.受信({ type: 'ready' });
+    const upload = { type: 'sendFile', requestId: 'file-1', name: '画像.png', base64: 'aGk=', conversationId: provider.会話ID, sessionId: connection.session, projectPath: connection.projectPath, connectionEpoch: connection.epoch };
+    for (const field of ['conversationId', 'sessionId', 'projectPath', 'connectionEpoch']) {
+      await provider.受信({ ...upload, [field]: 'wrong' }); assert.equal(posts.at(-1).ok, false);
+    }
+    vscode.workspace.isTrusted = false; await provider.受信(upload); assert.equal(posts.at(-1).ok, false);
+    vscode.workspace.isTrusted = true; connection.connected = false; await provider.受信(upload); assert.equal(posts.at(-1).ok, false);
+    connection.connected = true; provider.実行中 = true; await provider.受信(upload); assert.equal(posts.at(-1).ok, false);
+    provider.実行中 = false; await provider.受信({ ...upload, name: '../bad' }); assert.equal(posts.at(-1).ok, false);
+    assert.equal(sent.length, 0);
+    connection.epoch++; // 同じsession/projectへ再接続したホストを模擬する。
+    await provider.受信(upload); assert.equal(posts.at(-1).ok, false); assert.equal(sent.length, 0);
+    await provider.受信({ ...upload, connectionEpoch: undefined }); assert.equal(posts.at(-1).ok, false);
+    upload.connectionEpoch = connection.epoch; provider.通知();
+    assert.equal(posts.at(-1).接続世代, connection.epoch);
+    await provider.受信(upload); assert.equal(posts.at(-1).ok, true); assert.equal(sent.length, 1);
+    assert.equal(provider.会話.メッセージ.length, 0, 'host受理はCore保存完了ではない');
+    const thumbnail = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=';
+    const packet = { セッションID: 'session', チャンネル: '1', メッセージ識別: 'output_file', ファイル名: 'temp/output/画像.png', サムネイル画像: thumbnail };
+    connection.receive({ ...packet, セッションID: 'wrong' }); assert.equal(provider.会話.メッセージ.length, 0);
+    connection.receive(packet); connection.receive(packet); assert.equal(provider.会話.メッセージ.length, 1);
+    assert.equal(provider.会話.メッセージ[0].添付.thumbnail, 'data:image/png;base64,' + thumbnail);
+    connection.receive({ ...packet, メッセージ識別: 'input_file', ファイル名: 'temp/input/画像.png' });
+    assert.equal(provider.会話.メッセージ[1].種別, 'user');
+    connection.receive({ メッセージ識別: 'error', メッセージ内容: 'ファイル保存に失敗しました' });
+    assert.equal(provider.会話.メッセージ.at(-1).種別, 'error');
   } finally { provider.dispose(); }
 });

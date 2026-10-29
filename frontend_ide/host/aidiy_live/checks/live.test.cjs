@@ -110,7 +110,12 @@ test('Live の配布ディレクトリだけで専用画面の全リソースを
     assert.ok((await response.arrayBuffer()).byteLength > 0, path);
   }
   // 画面は Vue 画面だけを返し、Vue 移行前の画面は配信しない。
-  assert.match(await (await fetch(live.url)).text(), /<script src="development\/app\.js" defer><\/script>/);
+  const html = await fetch(live.url), policy = html.headers.get('content-security-policy');
+  assert.match(policy, /(?:^|; )img-src 'self' data:(?:;|$)/);
+  assert.match(policy, /script-src 'self';/); assert.match(policy, /default-src 'none';/);
+  assert.doesNotMatch(policy, /(?:https?:|\*)/);
+  assert.match(await html.text(), /<script src="development\/app\.js" defer><\/script>/);
+  assert.doesNotMatch((await fetch(new URL('development/app.js', live.url))).headers.get('content-security-policy'), /data:/);
   for (const path of ['view.js', 'style.css']) assert.equal((await fetch(new URL(path, live.url))).status, 404, path);
   assert.equal((await (await fetch(new URL('config', live.url))).json()).backend, 'http://127.0.0.1:8091');
 });
@@ -141,11 +146,12 @@ test('画面の接続監視: Codespaces は初回接続まで終了せず、閉�
 });
 
 function frame(text, mask = false) {
-  const body = Buffer.from(text), extended = body.length >= 126;
-  const head = Buffer.alloc(2 + (extended ? 2 : 0) + (mask ? 4 : 0));
-  head[0] = 0x81; head[1] = (mask ? 128 : 0) | (extended ? 126 : body.length);
-  if (extended) head.writeUInt16BE(body.length, 2);
-  const offset = extended ? 4 : 2;
+  const body = Buffer.from(text), extended = body.length >= 126, large = body.length > 65535;
+  const head = Buffer.alloc(2 + (large ? 8 : extended ? 2 : 0) + (mask ? 4 : 0));
+  head[0] = 0x81; head[1] = (mask ? 128 : 0) | (large ? 127 : extended ? 126 : body.length);
+  if (large) head.writeBigUInt64BE(BigInt(body.length), 2);
+  else if (extended) head.writeUInt16BE(body.length, 2);
+  const offset = large ? 10 : extended ? 4 : 2;
   if (mask) {
     const key = Buffer.from([9, 17, 25, 33]); key.copy(head, offset);
     for (let i = 0; i < body.length; i++) body[i] ^= key[i % 4];
@@ -158,9 +164,9 @@ function frames(socket, receive, initial = Buffer.alloc(0)) {
     pending = Buffer.concat([pending, data]);
     while (pending.length >= 2) {
       const masked = !!(pending[1] & 128), size = pending[1] & 127;
-      if (size === 126 && pending.length < 4) return;
-      const length = size === 126 ? pending.readUInt16BE(2) : size;
-      let offset = size === 126 ? 4 : 2;
+      if (size === 126 && pending.length < 4 || size === 127 && pending.length < 10) return;
+      const length = size === 127 ? Number(pending.readBigUInt64BE(2)) : size === 126 ? pending.readUInt16BE(2) : size;
+      let offset = size === 127 ? 10 : size === 126 ? 4 : 2;
       if (pending.length < offset + (masked ? 4 : 0) + length) return;
       const key = masked ? pending.subarray(offset, offset + 4) : null;
       if (masked) offset += 4;
@@ -383,4 +389,41 @@ test('音声キューと実測レベル: マイクへの減衰通知、停止・
     audio.play(packet); await new Promise(resolve => setImmediate(resolve)); assert.equal(nodes.length, 3);
     audio.close();
   } finally { global.AudioContext = original; global.requestAnimationFrame = originalRequest; global.cancelAnimationFrame = originalCancel; }
+});
+
+
+test('Live添付: 単独の実loopback中継で128k超のinput_fileとCore echo・生成画像を往復する', { timeout: 8000 }, async t => {
+  const active = new Set(), channels = new Map(), received = [];
+  const backend = createServer();
+  backend.on('connection', socket => { active.add(socket); socket.on('close', () => active.delete(socket)); });
+  backend.on('upgrade', (req, socket, head) => {
+    const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    frames(socket, text => {
+      const packet = JSON.parse(text);
+      if (packet.type === 'connect') {
+        channels.set(packet.ソケット番号, socket);
+        socket.write(frame(JSON.stringify({ メッセージ識別: 'init', セッションID: 'files-session', ソケット番号: packet.ソケット番号 })));
+      } else {
+        received.push(packet);
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp1kAAAAASUVORK5CYII=';
+        for (const kind of ['input_file', 'output_file']) channels.get('0').write(frame(JSON.stringify({ セッションID: packet.セッションID, チャンネル: '0', メッセージ識別: kind, ファイル名: `temp/${kind}/画像.png`, 元ファイル名: packet.ファイル名, サムネイル画像: png })));
+      }
+    }, head);
+  });
+  await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
+  const live = await ライブ起動(root, `http://127.0.0.1:${backend.address().port}`), clients = [];
+  t.after(async () => { for (const client of clients) client.socket.destroy(); for (const socket of active) socket.destroy(); await live.close(); await new Promise(resolve => backend.close(resolve)); });
+  for (const channel of ['input', '0']) {
+    const client = await rawWebSocket(new URL('socket', live.url), new URL(live.url).origin); clients.push(client);
+    assert.match(client.response, /101/);
+    client.send(JSON.stringify({ type: 'connect', ソケット番号: channel, セッションID: channel === 'input' ? null : 'files-session', CODE_BASE_PATH: '/project' }));
+    assert.equal(JSON.parse(await client.next()).セッションID, 'files-session');
+  }
+  const body = Buffer.alloc(200000, 42), packet = { メッセージ識別: 'input_file', セッションID: 'files-session', チャンネル: '0', 出力先チャンネル: '0', 送信モード: 'Live', プロジェクトパス: '/project', メッセージ内容: body.toString('base64'), ファイル名: '画像.png', サムネイル画像: null };
+  clients[0].send(JSON.stringify(packet));
+  const echo = JSON.parse(await clients[1].next()), generated = JSON.parse(await clients[1].next());
+  assert.deepEqual(received, [packet]); assert.deepEqual(Buffer.from(received[0].メッセージ内容, 'base64'), body);
+  assert.equal(echo.メッセージ識別, 'input_file'); assert.equal(generated.メッセージ識別, 'output_file');
+  for (const item of [echo, generated]) { assert.equal(item.セッションID, 'files-session'); assert.equal(item.チャンネル, '0'); assert.match(item.サムネイル画像, /^iVBOR/); }
 });

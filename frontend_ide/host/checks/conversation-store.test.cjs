@@ -92,3 +92,40 @@ test('Code 会話履歴: UTF-8のファイル上限と同値は読み書きし�
   assert.equal(statSync(path).size, 会話ファイル上限 + 1);
   assert.deepEqual(会話一覧(folder), []);
 });
+
+test('Code 添付履歴: 画像プレビューも予算へ数え、ファイルから同じmetadataで復元する', t => {
+  const project = mkdtempSync(join(tmpdir(), 'aidiy-code-file-history-'));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const { 履歴メッセージ長さ } = require('../out/conversation-store.cjs');
+  const { fileAttachment } = require('../out/file-attachments.cjs');
+  const thumbnail = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=';
+  const attachment = fileAttachment({ セッションID: 'session', チャンネル: '1', メッセージ識別: 'output_file', ファイル名: 'temp/output/result.png', サムネイル画像: thumbnail, ファイル版: 'a'.repeat(64) }, 'session', '1');
+  const message = { 種別: 'assistant', 本文: attachment.name, 添付: attachment };
+  assert.equal(履歴メッセージ長さ(message), message.本文.length + JSON.stringify(attachment).length);
+  const folder = 会話保存先(project, true), record = { ...entry('files-1', 100), メッセージ: [message] };
+  会話書込(folder, record);
+  assert.deepEqual(会話一覧(folder)[0].メッセージ, [message]);
+  assert.equal(会話一覧(folder)[0].メッセージ[0].添付.thumbnail, 'data:image/png;base64,' + thumbnail);
+  assert.equal(会話一覧(folder)[0].メッセージ[0].添付.revision, 'a'.repeat(64));
+});
+
+test('Code 添付履歴: 壊れた添付を捨てても本文は残し、キー/画像を受信境界で再検証する', t => {
+  const project = mkdtempSync(join(tmpdir(), 'aidiy-code-invalid-file-history-'));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
+  const { 履歴メッセージ長さ } = require('../out/conversation-store.cjs');
+  const folder = 会話保存先(project, true);
+  const valid = { kind: 'output_file', session: 'session', channel: '1', path: 'temp/output/result.png', name: 'result.png', thumbnail: '', key: 'forged' };
+  const invalid = [true, 'bad', [], {}, { ...valid, session: '' }, { ...valid, channel: '0' }, { ...valid, path: '../outside.png' }, { ...valid, path: 'https://external.invalid/image.png' }];
+  const record = { ...entry('invalid-files', 100), メッセージ: invalid.map(添付 => ({ 種別: 'assistant', 本文: '本文を維持', 添付 })) };
+  // 外から壊された既存JSONの読込と、新しく保存する場合の両方を確認する。
+  writeFileSync(join(folder, 'invalid-files.json'), JSON.stringify(record));
+  assert.ok(会話一覧(folder)[0].メッセージ.every(message => message.本文 === '本文を維持' && !('添付' in message)));
+  会話書込(folder, record);
+  assert.ok(JSON.parse(readFileSync(join(folder, 'invalid-files.json'), 'utf8')).メッセージ.every(message => !('添付' in message)));
+  const cycle = { ...valid }; cycle.thumbnail = cycle;
+  assert.doesNotThrow(() => 履歴メッセージ長さ({ 種別: 'assistant', 本文: '安全', 添付: cycle }));
+  const safeRecord = { ...entry('valid-files', 200), メッセージ: [{ 種別: 'assistant', 本文: '本文', 添付: { ...valid, thumbnail: 'data:image/svg+xml;base64,PHN2Zz4=' } }] };
+  会話書込(folder, safeRecord);
+  const safe = 会話一覧(folder)[0].メッセージ[0].添付;
+  assert.equal(safe.thumbnail, ''); assert.notEqual(safe.key, 'forged'); assert.equal(safe.path, valid.path);
+});

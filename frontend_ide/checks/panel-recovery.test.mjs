@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
 const require=createRequire(import.meta.url);
-const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
+const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync,buildSync}=require('esbuild');
 const MarkdownIt=require('markdown-it');
 
 function setupComponent(name,{props={},modules={},globals={}}={}) {
@@ -33,6 +33,9 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
     require(id){
       if(id==='vue')return {...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};
       if(id==='markdown-it')return MarkdownIt;
+      if(id==='../../host/src/file-attachments')return {fileAttachment:()=>undefined};
+      if(id==='../添付ファイル/ファイル送信.js')return {readDroppedFiles:async()=>0};
+      if(id==='../添付ファイル/チャット添付.vue')return {};
       if(id==='../下書き連携/下書き受け渡し.js')return draftHandoff;
       if(Object.hasOwn(modules,id))return modules[id];
       throw Error(`予期しない依存: ${id}`);
@@ -46,8 +49,8 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
 
 function liveProtocol() {
   const module={exports:{}};
-  const source=readFileSync(new URL('../host/aidiy_live/src/protocol.ts',import.meta.url),'utf8');
-  vm.runInNewContext(transformSync(source,{loader:'ts',format:'cjs'}).code,{module,exports:module.exports,setTimeout,clearTimeout});
+  const code=buildSync({entryPoints:[new URL('../host/aidiy_live/src/protocol.ts',import.meta.url).pathname],bundle:true,write:false,format:'cjs'}).outputFiles[0].text;
+  vm.runInNewContext(code,{module,exports:module.exports,setTimeout,clearTimeout});
   return module.exports;
 }
 

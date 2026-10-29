@@ -196,6 +196,8 @@ try:
     from AIコア.AIチャット import Chat
     from AIコア.AIコード import CodeAgent
     from AIコア.AIライブ import Live
+    from AIコア.AI入力ファイル import 入力ファイル保存
+    from AIコア.AIファイルプレビュー import 画像プレビュー生成
     logger.info("WebSocketマネージャーをインポートしました")
 except Exception as e:
     logger.exception("WebSocketマネージャーのインポートエラー: %s", e)
@@ -1728,31 +1730,17 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         try:
                             デコードデータ = base64.b64decode(Base64ペイロード)
                             保存ディレクトリ = os.path.join(バックエンドディレクトリ, "temp", "input")
-                            os.makedirs(保存ディレクトリ, exist_ok=True)
-                            タイムスタンプ = datetime.now().strftime("%Y%m%d.%H%M%S")
-                            安全ファイル名 = os.path.basename(ファイル名) if ファイル名 else "file.bin"
-                            保存ファイル名 = f"{タイムスタンプ}.{安全ファイル名}"
-                            保存パス = os.path.join(保存ディレクトリ, 保存ファイル名)
-                            with open(保存パス, "wb") as f:
-                                f.write(デコードデータ)
+                            保存ファイル名 = 入力ファイル保存(保存ディレクトリ, ファイル名, デコードデータ)
 
-                            try:
-                                from PIL import Image
-                                from io import BytesIO
-                                image = Image.open(BytesIO(デコードデータ))
-                                image = image.convert("RGBA")
-                                width, height = image.size
-                                if width > 0 and height > 0:
-                                    new_width = 320
-                                    new_height = int(height * (new_width / width))
-                                    thumbnail = image.resize((new_width, new_height), Image.LANCZOS)
-                                    buf = BytesIO()
-                                    thumbnail.save(buf, format="PNG")
-                                    サムネイル_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
-                            except Exception as e:
-                                logger.info(f"画像ではありません: {e}")
+                            サムネイル_base64 = 画像プレビュー生成(デコードデータ)
                         except Exception as e:
                             logger.exception(f"ファイル保存エラー: {e}")
+                            await セッション.send_to_channel(出力先チャンネル, {
+                                "セッションID": セッションID, "チャンネル": 出力先チャンネル,
+                                "メッセージ識別": "error", "エラーコード": "FILE_UPLOAD_FAILED",
+                                "メッセージ内容": "ファイルを保存できませんでした。もう一度送信してください。",
+                            })
+                            continue
 
                     await セッション.send_to_channel(出力先チャンネル, {
                         "セッションID": セッションID,
@@ -1760,6 +1748,7 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                         "メッセージ識別": "input_file",
                         "メッセージ内容": f"ファイル受信: {ファイル名}" if ファイル名 else "ファイル受信",
                         "ファイル名": f"temp/input/{保存ファイル名}" if 保存ファイル名 else None,
+                        "元ファイル名": ファイル名,
                         "サムネイル画像": サムネイル_base64
                     })
 

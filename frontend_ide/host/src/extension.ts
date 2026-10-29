@@ -20,12 +20,13 @@ import { Hermes既定モデル, オフラインモデル候補, オフライン�
 import { 起動解決 } from './runner';
 import { CodeConnection, コード選択 } from './code-connection';
 import { InputPrediction } from './input-prediction';
+import { validateFileUpload, fileAttachment, isDuplicateAttachment, type ChatAttachment } from './file-attachments';
 import { ローカル接続先 } from '../aidiy_live/local-backend.cjs';
 import type { Packet } from '../aidiy_live/src/protocol';
 import { streamControlOf, visibleStreamContent, type コードパケット } from './protocol';
-import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限, type 保存履歴 } from './conversation-store';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限, 履歴メッセージ長さ, type 保存履歴 } from './conversation-store';
 
-interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string }
+interface メッセージ { 種別: 'user' | 'assistant' | 'error'; 本文: string; 添付?: ChatAttachment }
 interface 会話 { メッセージ: メッセージ[]; 作業URI: string; コアセッションID?: string; HermesセッションID?: string; provider: string; model: string; モデル選択済み?: boolean }
 interface 保存会話 extends 会話 { id: string; 更新日時: number; 初回依頼?: string }
 interface 会話履歴 { 現在ID: string; 一覧: 保存会話[] }
@@ -166,7 +167,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         .sort((a, b) => b.更新日時 - a.更新日時)
         .map(item => ({ id: item.id, 題名: this.題名(item), 更新日時: item.更新日時 })),
       作業フォルダ: folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null,
-      接続プロジェクトパス: this.connection?.projectPath || '',
+      接続プロジェクトパス: this.connection?.projectPath || '', 接続世代: this.connection?.epoch ?? 0,
       新規可能: Boolean(this.選択フォルダ()), 信頼済み: vscode.workspace.isTrusted,
       モデル変更中: this.モデル変更中(), 接続済み: this.connection?.connected === true, 接続中: this.connection?.接続中 === true, 接続エラー: this.connection?.error || ''
     });
@@ -207,7 +208,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private 保存(更新日時を変更 = true): void {
     // 大量の会話による workspaceState 肥大化を防ぐ。AIコアの履歴はコアセッションIDで継続する。
     let サイズ = 0;
-    const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += item.本文.length) <= 会話本文上限).reverse();
+    const messages = this.会話.メッセージ.slice(-60).reverse().filter(item => (サイズ += 履歴メッセージ長さ(item)) <= 会話本文上限).reverse();
+    this.会話.メッセージ = messages;
     if (this.会話.作業URI && (messages.length || this.会話.コアセッションID)) {
       const previous = this.履歴.find(item => item.id === this.会話ID);
       const snapshot = JSON.parse(JSON.stringify({ ...this.会話, メッセージ: messages, id: this.会話ID,
@@ -273,6 +275,23 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
         break;
       }
       case 'cancelPrediction': this.prediction.cancel(data.requestId); break;
+      case 'sendFile': {
+        if (typeof data.requestId !== 'string' || !data.requestId || data.requestId.length > 128) return;
+        try {
+          this.信頼確認(); this.作業フォルダ();
+          if (this.実行中 || this.モデル変更中()) throw new Error('実行中またはモデル変更中はファイルを添付できません。');
+          if (this.オフライン使用() || !this.connection?.connected) throw new Error('ファイル添付はAIコア接続中に使用できます。');
+          if (!Number.isSafeInteger(data.connectionEpoch) || data.connectionEpoch !== this.connection.epoch
+              || data.conversationId !== this.会話ID || data.sessionId !== this.connection.session || data.projectPath !== this.connection.projectPath || !this.connection.projectPath)
+            throw new Error('会話または接続が変わりました。ファイルを選び直してください。');
+          const file = validateFileUpload({name: data.name, base64: data.base64});
+          if (!this.connection.send({ メッセージ識別: 'input_file', メッセージ内容: file.base64, ファイル名: file.name })) throw new Error('AIコアへファイルを送信できません。');
+          void this.view?.webview.postMessage({ type: 'fileUploadResult', requestId: data.requestId, ok: true });
+        } catch (error) {
+          void this.view?.webview.postMessage({ type: 'fileUploadResult', requestId: data.requestId, ok: false, message: error instanceof Error ? error.message : 'ファイルを送信できません。' });
+        }
+        break;
+      }
       case 'autoConnect':
         if (typeof data.enabled !== 'boolean') throw new Error('自動接続の指定が不正です。');
         if (this.実行中 || this.オフラインジョブ || this.モデル変更中()) throw new Error('実行中またはモデル変更中は自動接続を変更できません。');
@@ -339,7 +358,11 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     if (this.破棄済み) return;
     void this.view?.webview.postMessage(packet);
     const text = typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : '';
-    if (packet.メッセージ識別 === 'output_stream') {
+    if (['input_file', 'output_file'].includes(packet.メッセージ識別 || '')) {
+      const attachment = fileAttachment(packet, this.connection?.session || '', '1');
+      if (!attachment || this.会話.メッセージ.some(item => isDuplicateAttachment(item.添付, attachment))) return;
+      this.会話.メッセージ.push({ 種別: attachment.kind === 'input_file' ? 'user' : 'assistant', 本文: attachment.name, 添付: attachment });
+    } else if (packet.メッセージ識別 === 'output_stream') {
       const control = streamControlOf(text);
       if (control === 'start') this.実行中 = true;
       else if (control === 'cancel' && !this.オフラインジョブ) this.実行中 = false;

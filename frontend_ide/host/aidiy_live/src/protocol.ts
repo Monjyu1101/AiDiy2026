@@ -10,6 +10,8 @@
  * -------------------------------------------------------------------------
  */
 
+import { MAX_FILE_PACKET_CHARS, validateFileUpload } from '../../src/file-attachments';
+
 export type Packet = {
   メッセージ識別?: string; セッションID?: string; チャンネル?: string; プロジェクトパス?: string | null;
   メッセージ内容?: unknown; ファイル名?: string; [key: string]: unknown;
@@ -36,11 +38,13 @@ export class LiveConnection {
   private sockets = new Map<string, LiveSocket>();
   private generation = 0;
   session = '';
+  private projectPath: string | null = null;
   constructor(private url: string, private onPacket: (packet: Packet) => void, private onLost: () => void,
     private createSocket: (url: string) => LiveSocket = url => new WebSocket(url)) {}
 
   async connect(options: LiveConnectOptions = {}) {
     this.disconnect();
+    this.projectPath = options.codeBasePath || null;
     const generation = this.generation;
     try {
       const session = await this.open('input', '', generation, options);
@@ -81,6 +85,11 @@ export class LiveConnection {
         if (waitForLive && initialized && packet.メッセージ識別 === 'live_ready' && packet.セッションID === session) {
           ready = true; clearTimeout(timer); resolve(session);
         }
+        if (['input_file', 'output_file'].includes(packet.メッセージ識別 || '')) {
+          // ファイルは会話用socketの現セッションだけ。欠落channelは実際のsocketで補う。
+          if (channel !== '0' || packet.セッションID !== this.session || (packet.チャンネル != null && packet.チャンネル !== '0')) return;
+          packet = { ...packet, チャンネル: '0' };
+        }
         this.onPacket(packet);
       };
       socket.onerror = () => { clearTimeout(timer); if (!ready) reject(new Error('バックエンドに接続できません。')); };
@@ -94,11 +103,21 @@ export class LiveConnection {
   send(channel: string, packet: Packet): boolean {
     const socket = this.sockets.get(channel);
     if (!socket || socket.readyState !== 1 || socket.bufferedAmount > 128000) return false;
-    socket.send(JSON.stringify({ ...packet, セッションID: this.session })); return true;
+    try {
+      const file = packet.メッセージ識別 === 'input_file';
+      if (file) {
+        if (channel !== 'input' || !this.session || !this.projectPath || packet.チャンネル !== '0' || packet.出力先チャンネル !== '0') return false;
+        const upload = validateFileUpload({ name: packet.ファイル名, base64: packet.メッセージ内容 });
+        packet = { ...packet, ファイル名: upload.name, メッセージ内容: upload.base64, プロジェクトパス: this.projectPath };
+      }
+      const data = JSON.stringify({ ...packet, セッションID: this.session });
+      if (file && data.length > MAX_FILE_PACKET_CHARS) return false;
+      socket.send(data); return true;
+    } catch { return false; }
   }
   disconnect() {
     ++this.generation;
     for (const socket of this.sockets.values()) socket.close();
-    this.sockets.clear(); this.session = '';
+    this.sockets.clear(); this.session = ''; this.projectPath = null;
   }
 }

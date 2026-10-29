@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('aidiyWindow',{
  browserAction:(action,value)=>ipcRenderer.invoke('development:browser-action',action,value),
  onBrowserChanged:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('development:browser-changed',listener);return()=>ipcRenderer.removeListener('development:browser-changed',listener);},
  onBrowserHeaderFrame:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('development:browser-header-frame',listener);return()=>ipcRenderer.removeListener('development:browser-header-frame',listener);},
+ onBrowserHeaderGlass:callback=>{if(typeof callback!=='function')return()=>{};const listener=(_event,value)=>callback(value);ipcRenderer.on('development:browser-header-glass',listener);return()=>ipcRenderer.removeListener('development:browser-header-glass',listener);},
  onBrowserOpenDraft:callback=>{const listener=()=>callback();ipcRenderer.on('development:browser-open-draft',listener);return()=>ipcRenderer.removeListener('development:browser-open-draft',listener);},
  beginWindowMove:name=>ipcRenderer.invoke('development:window-move-begin',name),
  moveWindow:(token,name)=>ipcRenderer.invoke('development:window-move',token,name),

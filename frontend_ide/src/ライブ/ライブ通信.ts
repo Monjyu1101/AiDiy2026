@@ -29,6 +29,7 @@ class HostSocket implements LiveSocket {
   receive(reply: Reply) {
     if (reply.type === 'socket-opened') { this.readyState = 1; this.onopen?.(); }
     else if (reply.type === 'socket-data') this.onmessage?.({ data: reply.data || '' });
+    else if (reply.type === 'socket-send-error') this.onmessage?.({ data: JSON.stringify({ メッセージ識別: 'error', エラーコード: 'SOCKET_SEND_FAILED', メッセージ内容: reply.error || 'ファイルを送信できませんでした。' }) });
     else if (reply.type === 'socket-error') this.onerror?.();
     else if (reply.type === 'socket-closed') { this.readyState = 3; this.onclose?.(); }
   }

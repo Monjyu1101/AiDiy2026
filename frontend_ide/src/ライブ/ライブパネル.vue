@@ -16,13 +16,16 @@ import TerminalWelcome from '../ターミナル/開始表示.vue';
 import ModalDialog from '../共通表示/共通ダイアログ.vue';
 import { chatArrival } from '../コード/会話到着演出';
 import { createDraftReceiver } from '../下書き連携/下書き受け渡し.js';
+import { fileAttachment, isDuplicateAttachment } from '../../host/src/file-attachments';
+import { readDroppedFiles } from '../添付ファイル/ファイル送信.js';
+import ChatAttachment from '../添付ファイル/チャット添付.vue';
 const props = defineProps({ base: String, config: { default: () => ({}) }, icon: String, linked: Boolean, desktop: Boolean, visible: { type: Boolean, default: true } });
 const connected = ref(false), busy = ref(false), mic = ref(false), micBusy = ref(false), speaker = ref(true), error = ref(''), prompt = ref('');
 const messages = ref([]), project = ref(null), settings = ref({}), preferred = ref({}), models = ref({}), voices = ref({});
 const picker = ref(false), provider = ref(''), model = ref(''), voice = ref('');
 const modelLoading = ref(true), modelSaving = ref(false);
 const changing = ref(false), welcomeVisible = ref(true);
-const draftGeneration = ref(0);
+const draftGeneration = ref(0), draggingFiles = ref(false), uploadingFiles = ref(false), fileStatus = ref('');
 const canvas = ref(), conversation = ref(), input = ref(), sendButton = ref();
 const rows = new Map(), welcomeKey = ref(0);
 const sendIcon = computed(() => new URL('sending.png', new URL(props.icon || '/development/AiDiy.png', location.href)).href);
@@ -36,7 +39,7 @@ function scroll() {
   if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; if (!disposed && conversation.value) conversation.value.scrollTop = conversation.value.scrollHeight; });
 }
 const environment = new LiveEnvironment(props.config, new URL(props.base || './', location.href).href);
-let cloud, audio, connection, heartbeat, generation = 0, micGeneration = 0, disposed = false;
+let cloud, audio, connection, heartbeat, generation = 0, micGeneration = 0, disposed = false, cancelFileBatch;
 // 初期化済みソケットの切断はconnectのcatchより先に通知されるため、再接続中の保持方針を共有する。
 let preserveOnConnectionLost = false;
 const keys = (name = provider.value) => { const vendor = name === 'openai_live' ? 'OPENAI' : name === 'freeai_live' ? 'FREEAI' : 'GEMINI'; return { model: `LIVE_${vendor}_MODEL`, voice: `LIVE_${vendor}_VOICE` }; };
@@ -54,16 +57,66 @@ function append(role, text, type = '') {
   if (messages.value.length > 100) messages.value.shift();
   nextTick(() => { if (disposed || run !== generation) return; arrivals.show(rows.get(item.id), role, item.text, type); scroll(); });
 }
+function appendFile(packet) {
+  if (!connection?.session || (packet.プロジェクトパス != null && packet.プロジェクトパス !== project.value?.パス)) return;
+  const attachment = fileAttachment(packet, connection.session, '0');
+  if (!attachment) {
+    if (packet.メッセージ識別 === 'input_file' && packet.セッションID === connection.session && !packet.ファイル名) { cancelFileBatch?.(); fileStatus.value = ''; error.value = 'ファイルを保存できませんでした。もう一度送信してください。'; }
+    return;
+  }
+  if (messages.value.some(item => isDuplicateAttachment(item.attachment, attachment))) return;
+  welcomeVisible.value = false;
+  messages.value.push({ role: attachment.kind === 'input_file' ? 'user' : 'assistant', text: '', type: attachment.kind, id: crypto.randomUUID(), attachment });
+  if (messages.value.length > 100) messages.value.shift();
+  if (attachment.kind === 'input_file') fileStatus.value = `受信済み: ${attachment.name}`;
+  nextTick(scroll);
+}
+function dragFiles(event) {
+  if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+  event.preventDefault();
+  const available = connected.value && !blocked.value && !uploadingFiles.value && !!project.value?.パス;
+  event.dataTransfer.dropEffect = available ? 'copy' : 'none'; draggingFiles.value = available;
+}
+function leaveFiles(event) { if (event.currentTarget === event.target || !event.currentTarget?.contains?.(event.relatedTarget)) draggingFiles.value = false; }
+async function dropFiles(event) {
+  const files = event.dataTransfer?.files;
+  if (!files?.length && !Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+  event.preventDefault(); event.stopPropagation?.(); draggingFiles.value = false;
+  if (uploadingFiles.value) return;
+  if (!connected.value || blocked.value || !project.value?.パス) { error.value = 'ファイルはプロジェクトの会話へ接続してから送信してください。'; return; }
+  const run = generation, session = connection.session, root = project.value.パス;
+  let cancelled = false; cancelFileBatch = () => { cancelled = true; };
+  const current = () => !cancelled && !disposed && run === generation && connected.value && !blocked.value && connection.session === session && project.value?.パス === root;
+  uploadingFiles.value = true; error.value = ''; fileStatus.value = 'ファイルを読み込んでいます…';
+  let sent = 0;
+  try {
+    await readDroppedFiles(files, { isCurrent: current, onFile: async ({ name, base64 }) => {
+      if (!current()) return;
+      if (!connection.send('input', { チャンネル: '0', 出力先チャンネル: '0', 送信モード: 'Live', プロジェクトパス: root,
+        メッセージ識別: 'input_file', メッセージ内容: base64, ファイル名: name, サムネイル画像: null })) throw new Error('ファイルを送信できませんでした。接続または送信待ちを確認してください。');
+      sent++;
+    } });
+    if (current()) fileStatus.value = sent ? `${sent}件を送信しました。Coreの受信表示を確認してください。` : '';
+  } catch (e) { if (current()) { error.value = (sent ? `${sent}件送信後に停止: ` : '') + e.message; fileStatus.value = ''; } }
+  finally { if (run === generation && !disposed) { uploadingFiles.value = false; cancelFileBatch = undefined; if (!current()) fileStatus.value = ''; } }
+}
 function receive(packet) {
   if (disposed) return;
   const type = packet.メッセージ識別, text = String(packet.メッセージ内容 || '');
-  if (type === 'output_audio') { if (props.visible !== false) audio.play(packet); }
+  if (['input_file', 'output_file'].includes(type)) appendFile(packet);
+  else if (type === 'output_audio') { if (props.visible !== false) audio.play(packet); }
   else if (type === 'cancel_audio') audio.cancel();
   else if (['input_text','output_text','output_request','output','recognition_input','recognition_output'].includes(type) && packet.チャンネル === '0') {
     if (type === 'output_text' && text.trim() === '!') { error.value = 'LiveAIに送信できませんでした。再接続してください。'; return; }
     append(['input_text','recognition_input'].includes(type) ? 'user' : 'assistant', text, type);
   } else if (type === 'welcome_text') append('system', text);
-  else if (type === 'error') error.value = text || packet.error || '会話エラー';
+  else if (type === 'error') {
+    if (['FILE_UPLOAD_FAILED', 'SOCKET_SEND_FAILED'].includes(packet.エラーコード)) {
+      if (packet.セッションID && packet.セッションID !== connection?.session) return;
+      cancelFileBatch?.(); fileStatus.value = '';
+    }
+    error.value = text || packet.error || '会話エラー';
+  }
 }
 async function loadModels(session = '') {
   const run = generation;
@@ -76,8 +129,8 @@ async function loadModels(session = '') {
 }
 function disconnect(clear = true) {
   preserveOnConnectionLost = false;
-  arrivals.reset();
-  generation++; draftGeneration.value++; micGeneration++; connected.value = false; busy.value = false; changing.value = false; mic.value = false; micBusy.value = false;
+  arrivals.reset(); cancelFileBatch?.(); cancelFileBatch = undefined;
+  generation++; draftGeneration.value++; draggingFiles.value = false; uploadingFiles.value = false; fileStatus.value = ''; micGeneration++; connected.value = false; busy.value = false; changing.value = false; mic.value = false; micBusy.value = false;
   clearInterval(heartbeat); heartbeat = undefined;
   connection?.send('input', 音声操作(false, false)); audio?.close(); connection?.disconnect();
   audio?.mute(true); speaker.value = true;
@@ -130,7 +183,7 @@ async function sound() {
   catch (e) { if (run === generation && !disposed) error.value = e.message; }
 }
 function submit() {
-  if (!connected.value || blocked.value || !prompt.value.trim()) return;
+  if (!connected.value || blocked.value || uploadingFiles.value || !prompt.value.trim()) return;
   error.value = ''; const run = generation;
   void audio.unlock().catch(e => { if (run === generation && !disposed) error.value = e.message; });
   arrivals.reserve(input.value, prompt.value);
@@ -183,7 +236,7 @@ async function newChat() {
     if(run === generation && connected.value && wasMic && !disposed) await microphone();
   }
 }
-function copyInput(item) { if (item.role !== 'user' && !item.type.startsWith('recognition_')) return; prompt.value = item.text; nextTick(() => { input.value.focus(); input.value.setSelectionRange(item.text.length, item.text.length); scroll(); }); }
+function copyInput(item) { if (item.attachment) return; if (item.role !== 'user' && !item.type.startsWith('recognition_')) return; prompt.value = item.text; nextTick(() => { input.value.focus(); input.value.setSelectionRange(item.text.length, item.text.length); scroll(); }); }
 watch(prompt, () => nextTick(scroll));
 // Webの別タブでも会話と下書きを保持する。非表示中は描画と音声入出力を止め、マイクは自動再開しない。
 watch(() => props.visible, visible => {
@@ -226,18 +279,18 @@ onMounted(async () => {
 onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); arrivals.dispose(); cancelAnimationFrame(scrollFrame); resizeObserver?.disconnect(); cloud?.dispose(); environment.dispose(); });
 </script>
 <template>
-  <section class="ai-component live-component" :class="{ 'desktop-window': desktop, connected }" data-component="LivePanel">
+  <section class="ai-component live-component" :class="{ 'desktop-window': desktop, connected, 'file-drop-active': draggingFiles }" data-component="LivePanel" @dragover="dragFiles" @dragleave="leaveFiles" @drop="dropFiles">
     <StatusBar :title="linked ? 'AiDiy IDE / Live' : 'AiDiy Live'" :connected="connected" :busy="busy" :active="mic" :status="changing ? '再接続中' : connected && mic ? '会話中' : undefined" :desktop="desktop" :clock-pulse="visible !== false" />
     <div class="component-toolbar"><span :title="project?.パス">プロジェクト: {{ project?.名前 || '未選択' }}</span><nav><button :disabled="blocked || modelLoading" @click="newChat">新しい会話</button><button class="live-connect" :class="{ awaiting: !connected && !busy }" :disabled="blocked || modelLoading" @click="connected ? disconnect() : connect()">{{ busy ? '接続中…' : connected ? '切断' : '接続' }}</button></nav></div>
     <canvas ref="canvas" class="audio-cloud"></canvas>
     <div class="audio-actions"><button class="audio-button" :disabled="!connected || blocked" :aria-pressed="connected && speaker" :aria-label="`スピーカー ${connected && speaker ? 'ON' : 'OFF'}`" @click="sound"><span class="symbol speaker-symbol" :style="{ '--symbol-image': `url('${speakerIcon}')` }"></span><strong>{{ connected && speaker ? 'ON' : 'OFF' }}</strong></button><button class="audio-button microphone" :disabled="!connected || blocked || micBusy" :aria-pressed="mic" :aria-busy="micBusy" :aria-label="micBusy ? 'マイク準備中' : `マイク ${mic ? 'ON' : 'OFF'}`" @click="microphone"><span class="symbol" :style="{ '--symbol-image': `url('${microphoneIcon}')` }"></span><strong>{{ mic ? 'ON' : 'OFF' }}</strong></button></div>
     <main ref="conversation" class="conversation live-conversation" aria-label="会話の記録" role="log" aria-live="polite">
       <TerminalWelcome v-if="welcomeVisible" :key="welcomeKey" kind="live" :icon="icon" :started="!!prompt" />
-      <article v-for="item in messages" :ref="el => el ? rows.set(item.id, el) : rows.delete(item.id)" :key="item.id" :class="['message',item.role,item.type, { recognition: item.type.startsWith('recognition_') }]" :title="item.role === 'user' || item.type.startsWith('recognition_') ? 'クリックして入力欄へ戻す' : undefined" @click="copyInput(item)">{{ item.text }}</article>
+      <article v-for="item in messages" :ref="el => el ? rows.set(item.id, el) : rows.delete(item.id)" :key="item.id" :class="['message',item.role,item.type, { recognition: item.type.startsWith('recognition_') }]" :title="!item.attachment && (item.role === 'user' || item.type.startsWith('recognition_')) ? 'クリックして入力欄へ戻す' : undefined" @click="copyInput(item)"><ChatAttachment v-if="item.attachment" :attachment="item.attachment" /><template v-else>{{ item.text }}</template></article>
     </main>
-    <footer class="composer"><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form @submit.prevent="submit"><textarea ref="input" v-model="prompt" rows="3" maxlength="20000" placeholder="AiDiyに話しかける…" aria-label="Liveへのメッセージ" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && event.keyCode !== 229 && connected && !blocked && prompt.trim()) { event.preventDefault(); sendButton.focus(); } }"></textarea>
-        <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="blocked || modelLoading" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label">{{ modelLabel }}</span></div><button ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !connected }" :disabled="!connected || blocked || !prompt.trim()" aria-label="送信"><img :src="sendIcon" alt=""></button></div>
+    <footer class="composer"><p class="file-drop-hint" :class="{ active: draggingFiles }">{{ draggingFiles ? 'ここにドロップして送信' : 'ファイルをドロップして送信（1件4 MiBまで・最大10件）' }}</p><p v-if="fileStatus" class="file-transfer-status" role="status">{{ fileStatus }}</p><p v-if="error" role="alert" class="error">{{ error }}</p>
+      <form @submit.prevent="submit"><textarea ref="input" v-model="prompt" rows="3" maxlength="20000" placeholder="AiDiyに話しかける…" aria-label="Liveへのメッセージ" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && event.keyCode !== 229 && connected && !blocked && !uploadingFiles && prompt.trim()) { event.preventDefault(); sendButton.focus(); } }"></textarea>
+        <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="blocked || modelLoading" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label">{{ modelLabel }}</span></div><button ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !connected }" :disabled="!connected || blocked || uploadingFiles || !prompt.trim()" aria-label="送信"><img :src="sendIcon" alt=""></button></div>
       </form>
     </footer>
     <ModalDialog v-if="picker" class="live-model-dialog" label="音声モデル選択" :locked="blocked" @close="picker = false"><div class="settings-content"><div class="picker-header"><div><h2>ライブモデル・音声</h2><p class="muted">この会話で使用するモデルと音声を選択します。</p></div><button type="button" class="picker-close" :disabled="blocked" aria-label="閉じる" @click="picker = false"><span class="close-icon" aria-hidden="true"></span></button></div>
@@ -250,3 +303,9 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
     </ModalDialog>
   </section>
 </template>
+
+<style scoped>
+.file-drop-active .live-conversation{outline:2px dashed #8ecbff;outline-offset:-3px}
+.file-drop-hint,.file-transfer-status{margin:4px 0;font-size:11px;color:#a9b8cc}
+.file-drop-hint.active{color:#9edfff}
+</style>

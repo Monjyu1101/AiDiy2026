@@ -16,11 +16,12 @@ import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
 import { InputPrediction } from '../../src/input-prediction';
+import { MAX_FILE_PACKET_CHARS, validateFileUpload, fileAttachment, isDuplicateAttachment } from '../../src/file-attachments';
 import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
 import { 接続元許可 } from '../../src/forwarded-origin';
-import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限 } from '../../src/conversation-store';
+import { 会話保存先, 会話一覧, 会話書込, 会話削除, 会話本文上限, 履歴メッセージ長さ, type 履歴メッセージ } from '../../src/conversation-store';
 import { オフライン実行, オフラインモデル候補, オフラインモデル保存先, Hermes既定モデル } from './offline';
 import type { Packet } from '../../aidiy_live/src/protocol';
 
@@ -60,8 +61,8 @@ export async function 単独起動(project: string, backend?: string, initialMod
     オフライン対応: true, 実行モード: (initialModel.offline ? 'offline' : 'online') as 'online' | 'offline',
     自動接続: !initialModel.offline, 接続済み: false, 接続中: false, 接続エラー: '', モデル変更中: false,
     検証回数: 検証回数読込(optionsFile) ?? 0,
-    メッセージ: [] as { 種別: string; 本文: string }[], 進捗: [] as string[], 実行中: false, 停止中: false,
-    セッションID: undefined as string | undefined, 接続プロジェクトパス: '',
+    メッセージ: [] as 履歴メッセージ[], 進捗: [] as string[], 実行中: false, 停止中: false,
+    セッションID: undefined as string | undefined, 接続プロジェクトパス: '', 接続世代: 0,
     HermesセッションID: undefined as string | undefined,
     履歴: [] as { id: string; 題名: string; 更新日時: number }[]
   };
@@ -114,13 +115,18 @@ export async function 単独起動(project: string, backend?: string, initialMod
   };
   const trimHistory = () => {
     let size = 0;
-    state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += item.本文.length) <= 会話本文上限).reverse();
+    state.メッセージ = state.メッセージ.slice(-60).reverse().filter(item => (size += 履歴メッセージ長さ(item)) <= 会話本文上限).reverse();
   };
   const receive = (packet: Packet | コードパケット) => {
     if (closed) return;
     broadcast(packet);
     const text = typeof packet.メッセージ内容 === 'string' ? packet.メッセージ内容 : '';
-    if (packet.メッセージ識別 === 'output_stream') {
+    if (['input_file', 'output_file'].includes(packet.メッセージ識別 || '')) {
+      const attachment = fileAttachment(packet, connection.session, '1');
+      if (!attachment) return;
+      if (state.メッセージ.some(item => isDuplicateAttachment(item.添付, attachment))) return;
+      state.メッセージ.push({ 種別: attachment.kind === 'input_file' ? 'user' : 'assistant', 本文: attachment.name, 添付: attachment });
+    } else if (packet.メッセージ識別 === 'output_stream') {
       const control = streamControlOf(text);
       if (control === 'start') state.実行中 = true;
       else if (control === 'cancel') state.実行中 = false;
@@ -143,7 +149,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
     if (state.実行モード !== 'online' || closed) return;
     state.モデル変更中 = connection.modelChanging;
     state.接続済み = connection.connected; state.接続中 = connection.接続中; state.接続エラー = connection.error;
-    state.接続プロジェクトパス = connection.projectPath;
+    state.接続プロジェクトパス = connection.projectPath; state.接続世代 = connection.epoch;
     if (connection.connected) {
       state.セッションID = connection.session;
       state.provider = connection.model.provider; state.model = connection.model.model;
@@ -227,11 +233,13 @@ export async function 単独起動(project: string, backend?: string, initialMod
       }
       if (req.method === 'POST' && route === 'message') {
         if (!allowed.origin(req.headers.origin) || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
+        const requestEpoch = connection.epoch;
         req.setEncoding('utf8');
         let body = '';
-        for await (const chunk of req) { body += chunk.toString(); if (body.length > 1_000_000) { reply(413, {error:'Message too long'}); return; } }
+        for await (const chunk of req) { body += chunk.toString(); if (body.length > MAX_FILE_PACKET_CHARS) { reply(413, {error:'Message too long'}); return; } }
         const data = JSON.parse(body);
         const type = data.メッセージ識別 ?? data.type;
+        if (type !== 'sendFile' && body.length > 1_000_000) { reply(413, {error:'Message too long'}); return; }
         // IDE埋め込み時は、親画面で選んだ利用モードを維持する。
         if (initialModel.lockedMode && ['autoConnect', 'executionMode', 'connect', 'disconnect'].includes(type)) {
           reply(409, {error:'接続モードはAiDiy IDEの利用開始画面で変更してください。'}); return;
@@ -277,7 +285,19 @@ export async function 単独起動(project: string, backend?: string, initialMod
             state.自動接続 = data.mode === 'online'; state.実行モード = data.mode; newConversation();
           }
         }
-        else if (type === 'input_text') {
+        else if (type === 'sendFile') {
+          if (オフライン使用()) { reply(409, {error:'ファイル添付はAIコア接続中に使用できます。'}); return; }
+          if (!Number.isSafeInteger(data.connectionEpoch) || data.connectionEpoch !== connection.epoch || requestEpoch !== connection.epoch
+              || data.conversationId !== state.会話ID || data.sessionId !== connection.session || data.projectPath !== connection.projectPath || !connection.projectPath) {
+            reply(409, {error:'会話または接続が変わりました。ファイルを選び直してください。'}); return;
+          }
+          let file;
+          try { file = validateFileUpload({name: data.name, base64: data.base64}); }
+          catch (error) { reply(400, {error: error instanceof Error ? error.message : 'ファイルが不正です。'}); return; }
+          if (!connection.send({ メッセージ識別: 'input_file', メッセージ内容: file.base64, ファイル名: file.name })) {
+            reply(409, {error:'AIコアへファイルを送信できません。'}); return;
+          }
+        } else if (type === 'input_text') {
           if (typeof data.メッセージ内容 !== 'string' || !data.メッセージ内容.trim() || data.メッセージ内容.length > 200000) { reply(400, {error:'入力が空か長すぎます。'}); return; }
           execute(data.メッセージ内容, data.self_check_loop);
         } else if (type === 'new') {

@@ -9,10 +9,11 @@ import {ref,onMounted,onBeforeUnmount} from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
 import DraftHandoffDialog from '../下書き連携/下書き連携ダイアログ.vue';
 import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
+import BrowserGlassEdge from './ガラス縁.vue';
 const props=defineProps({standalone:Boolean,headerOnly:Boolean});
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),chrome=ref(),chromeHeight=ref(100),error=ref(''),capturing=ref(false),captureMessage=ref('');
-let stop=()=>{},stopFrame=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame,stateRevision=-1;
-const headerOffset=ref(0),windowTitle=ref('');
+let stop=()=>{},stopFrame=()=>{},stopGlass=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame,stateRevision=-1;
+const headerOffset=ref(0),windowTitle=ref(''),headerGlass=ref(null);
 const headerWindowApi=props.headerOnly?{
  ...window.aidiyWindow,
  pinState:()=>window.aidiyWindow.browserAction('header-pin-state'),
@@ -55,11 +56,11 @@ onMounted(()=>{
  // Codeと同じ限定IPCを使う。全画面ヘッダーもmainが解決した元Browser窓のタイトルを表示する。
  void Promise.resolve().then(()=>window.aidiyWindow?.title?.()).then(title=>{if(!disposed&&typeof title==='string'&&title.trim())windowTitle.value=title;}).catch(()=>{});
  stop=window.aidiyWindow.onBrowserChanged(update);void action('state');
- if(props.headerOnly){document.documentElement.classList.add('browser-header-document');stopFrame=window.aidiyWindow.onBrowserHeaderFrame?.(value=>{headerOffset.value=value;})||(()=>{});}
+ if(props.headerOnly){document.documentElement.classList.add('browser-header-document');stopFrame=window.aidiyWindow.onBrowserHeaderFrame?.(value=>{headerOffset.value=value;})||(()=>{});stopGlass=window.aidiyWindow.onBrowserHeaderGlass?.(value=>{if(!disposed)headerGlass.value=value;})||(()=>{});}
  else stopDraft=window.aidiyWindow.onBrowserOpenDraft?.(()=>{void handoff();})||(()=>{});
  observer=new ResizeObserver(resize);if(surface.value)observer.observe(surface.value);if(chrome.value)observer.observe(chrome.value);resize();
 });
-onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.headerOnly)document.documentElement.classList.remove('browser-header-document');observer?.disconnect();cancelAnimationFrame(frame);});
+onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopGlass();stopDraft();headerGlass.value=null;if(props.headerOnly)document.documentElement.classList.remove('browser-header-document');observer?.disconnect();cancelAnimationFrame(frame);});
 </script>
 <template>
  <main class="development-app browser-panel desktop-window" :class="{'browser-fullscreen':page.fullscreen,'browser-header-only':headerOnly}" :style="{'--header-offset':headerOffset+'px'}" data-app="browser" @transitionrun.self="transition">
@@ -84,6 +85,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
   </form>
   <p class="browser-page-title" :title="page.title">{{ page.loading?'読み込み中…':page.title||'Browser' }}<span v-if="page.session"> · session={{ page.session }}</span></p>
   <p v-if="error||page.error" class="error browser-error" role="status">{{ error||page.error }}</p>
+  <BrowserGlassEdge v-if="headerOnly" :frame="headerGlass"/>
   </div>
   <div v-if="!headerOnly" ref="surface" class="browser-surface"></div>
   <DraftHandoffDialog v-if="draftRequest" :request="draftRequest" :load-targets="loadDraftTargets" :insert-draft="insertDraft" empty-hint="同じプロジェクトで aidiy_code または aidiy_live を起動してください。" @close="closeDraft" />
@@ -97,9 +99,18 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
 .development-app.browser-header-only{height:auto;min-height:0;background:transparent;border:0;overflow:visible}
-.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#17243f3d,#25305229);backdrop-filter:blur(12px) saturate(145%);text-shadow:0 1px 2px #000c}
+.browser-header-only .browser-chrome{position:relative;isolation:isolate;transform:translateY(var(--header-offset));border:1px solid #80cbd666;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,#b9f7fa1f,#dafeff0f);backdrop-filter:none;color:#102c32;text-shadow:0 1px 1px #efffffe6,0 0 3px #efffffc2;box-shadow:inset 0 1px 1px #ffffffb3,inset 0 -1px 2px #238a9166,inset 1px 0 1px #f3ffff80,inset -1px 0 2px #2896a144}
+.browser-header-only .browser-chrome::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:5px solid transparent;border-radius:inherit;background:linear-gradient(150deg,#f4ffffaa,#86d5e31a 32%,#357b8926 68%,#d7ffff88) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
-.browser-header-only .browser-toolbar input{background:#07132266}
+.browser-header-only :deep(.panel-brand),.browser-header-only :deep(.connection-bar),.browser-header-only .browser-toolbar,.browser-header-only .browser-page-title,.browser-header-only .browser-error{position:relative;z-index:1}
+.browser-header-only :deep(.panel-brand strong),.browser-header-only :deep(.connection-label),.browser-header-only .browser-page-title,.browser-header-only .browser-capture-status{color:#102c32}
+.browser-header-only :deep(button),.browser-header-only :deep(.reload-control.refresh-button[type=button]){color:#123138;background:#e5fcffd9;border-color:#3b7a8566;border-radius:5px;box-shadow:inset 0 1px 0 #fff9;text-shadow:none}
+.browser-header-only :deep(button:hover:not(:disabled)),.browser-header-only :deep(.reload-control.refresh-button[type=button]:hover:not(:disabled)){background:#c3f2f6eb;color:#072a32}
+.browser-header-only :deep(button:focus-visible),.browser-header-only .browser-toolbar input:focus-visible{outline:2px solid #087c8c;outline-offset:1px}
+.browser-header-only .browser-toolbar{border-bottom-color:#3b7a8533}
+.browser-header-only .browser-toolbar input{background:#efffffcc;color:#10282d;border-color:#4c89946b;border-radius:6px;box-shadow:inset 0 1px 2px #46828c22;text-shadow:none;color-scheme:light}
+.browser-header-only .browser-toolbar input::placeholder{color:#4a6269}
+.browser-header-only .browser-error{color:#631d28;background:#ffe9efcf;text-shadow:none}
 .browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}
 .browser-window-sizes button{width:auto;min-width:42px;height:24px;padding:0 7px;font-size:11px;white-space:nowrap}
 .browser-toolbar{display:flex;align-items:center;gap:5px;padding:7px 9px;border-bottom:1px solid #2c4055;flex:none}

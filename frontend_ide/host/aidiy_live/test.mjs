@@ -18,8 +18,8 @@ import './build.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 await mkdir(new URL('../out/aidiy_live/', import.meta.url), { recursive: true });
 for (const name of ['protocol', 'audio', 'host', 'model-catalog']) {
-  if (name === 'host') {
-    await build({ entryPoints: [fileURLToPath(new URL('src/host.ts', import.meta.url))], outfile: fileURLToPath(new URL('../out/aidiy_live/host.cjs', import.meta.url)), bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
+  if (name === 'host' || name === 'protocol') {
+    await build({ entryPoints: [fileURLToPath(new URL(`src/${name}.ts`, import.meta.url))], outfile: fileURLToPath(new URL(`../out/aidiy_live/${name}.cjs`, import.meta.url)), bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
     continue;
   }
   const result = await transform(await readFile(new URL(`src/${name}.ts`, import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs', target: 'node22' });

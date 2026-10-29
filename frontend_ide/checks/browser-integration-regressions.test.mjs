@@ -165,7 +165,7 @@ for(const standalone of [false,true])test(`Browser全画面ヘッダー: ${stand
  try{
   const tick=()=>t.mock.timers.tick(240);
   f.press(f.host);f.movePointer({x:500,y:1});tick();await Promise.resolve();tick();
-  assert.equal(f.header.visible,true);assert.equal(f.header.options.roundedCorners,false,'ネイティブ窓の角丸も無効にする');
+  assert.equal(f.header.visible,true);assert.equal(f.header.options.roundedCorners,false,'丸い板ガラスの形状はCSSで制御し、OSの角丸で切り取らない');
   assert.deepEqual(f.header.getBounds(),{x:8,y:0,width:984,height:100});
   for(let cycle=0;cycle<3;cycle++){
    const base=f.record.window.getContentBounds();

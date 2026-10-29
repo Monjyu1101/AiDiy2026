@@ -52,7 +52,7 @@ test('Code 接続: 切断から10秒後に再接続し、同じセッション�
   const backend = core(), {client, packets, states} = connection(backend);
   try {
     client.start('/project',{provider:'copilot_cli',model:'gpt-6-sol'}); await flush();
-    const session = client.session;
+    const session = client.session, epoch = client.epoch;
     client.send({メッセージ識別:'input_text',メッセージ内容:'依頼'}); await flush();
     const old = backend.sockets[1], count = packets.filter(p=>p.メッセージ識別==='output_text').length;
     const settings = backend.requests.filter(r=>r.path.endsWith('設定')).length;
@@ -63,6 +63,7 @@ test('Code 接続: 切断から10秒後に再接続し、同じセッション�
     t.mock.timers.tick(1); await flush();
     assert.deepEqual(states.slice(-2),[{connected:false,connecting:true},{connected:true,connecting:false}]);
     assert.equal(client.connected,true); assert.equal(client.session,session);
+    assert.ok(client.epoch > epoch, '同sessionの自動再接続でもepochを更新する');
     assert.equal(backend.sockets.length,4);
     for (const socket of backend.sockets.slice(2)) {
       assert.equal(socket.sent[0].voice,false,'再接続でも音声を有効にしない');
@@ -188,4 +189,17 @@ test('Code 接続: モデル取得の30秒期限と接続切替の中断を区�
     });
     client.disconnect(); await cancelled;
   } finally { client.dispose(); t.mock.timers.reset(); }
+});
+
+test('Code 添付: ファイルを現在のinput/session/channel1/projectへ固定し、要求実行や自動再送を開始しない', async () => {
+  const backend = core({ CODE_BASE_PATH: '/session-project' }), { client, packets } = connection(backend);
+  try {
+    client.start('/project', { provider: '', model: '' }); await flush();
+    assert.equal(client.send({ メッセージ識別: 'input_file', メッセージ内容: 'aGk=', ファイル名: 'test.txt', セッションID: 'wrong', チャンネル: '0', 出力先チャンネル: '0', プロジェクトパス: '/wrong' }), true);
+    assert.deepEqual(backend.sockets[0].sent.at(-1), { メッセージ識別: 'input_file', メッセージ内容: 'aGk=', ファイル名: 'test.txt', セッションID: client.session, チャンネル: '1', 出力先チャンネル: '1', プロジェクトパス: '/session-project' });
+    assert.equal(packets.some(packet => packet.メッセージ識別 === 'output_stream'), false);
+    backend.sockets[0].bufferedAmount = 128001;
+    assert.equal(client.send({ メッセージ識別: 'input_file' }), false);
+    client.disconnect(); assert.equal(client.send({ メッセージ識別: 'input_file' }), false);
+  } finally { client.dispose(); }
 });

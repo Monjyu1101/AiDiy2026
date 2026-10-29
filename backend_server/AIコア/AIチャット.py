@@ -336,24 +336,9 @@ class Chat:
                 await asyncio.sleep(0.2)
 
     def _サムネイル生成(self, ファイルパス: str) -> str | None:
-        """画像ファイルからサムネイルを生成してbase64で返す"""
-        try:
-            import base64
-            from io import BytesIO
-            from PIL import Image
-            image = Image.open(ファイルパス)
-            image = image.convert("RGBA")
-            width, height = image.size
-            if width > 0 and height > 0:
-                new_width = 320
-                new_height = int(height * (new_width / width))
-                thumbnail = image.resize((new_width, new_height), Image.LANCZOS)
-                buf = BytesIO()
-                thumbnail.save(buf, format="PNG")
-                return base64.b64encode(buf.getvalue()).decode("ascii")
-        except Exception as e:
-            logger.debug(f"[Chat] サムネイル生成スキップ: {e}")
-        return None
+        """入力と生成画像で同じ安全なPNGプレビューを使用する。"""
+        from AIコア.AIファイルプレビュー import 画像プレビュー生成
+        return 画像プレビュー生成(ファイルパス)
 
     async def _AI実行と応答送信(self, 受信データ: dict, file_path: str = None):
         """AI実行 → output_text送信 + 出力ファイルがあればoutput_fileをinputチャンネルに送信"""

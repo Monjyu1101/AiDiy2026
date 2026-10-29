@@ -59,6 +59,8 @@ export class CodeConnection {
   model: CodeModel = { provider: '', model: '' };
   error = '';
   get 接続中() { return this.connecting; }
+  // 同じセッションIDへ再接続しても、前の接続で開始した添付要求を受理しない。
+  get epoch() { return this.generation; }
   // 起動引数や選択フォルダではなく、接続したセッションから取得できたパスだけを公開する。
   private sessionProject = '';
   get projectPath() { return this.connected ? this.sessionProject : ''; }
@@ -67,10 +69,10 @@ export class CodeConnection {
     this.target = backendUrl(backend);
   }
   private project = '';
-  start(project: string, model: CodeModel, session = '', messages: { 種別: string; 本文: string }[] = []) {
+  start(project: string, model: CodeModel, session = '', messages: { 種別: string; 本文: string; 添付?: unknown }[] = []) {
     this.disconnect();
     this.project = project; this.model = コード選択(model); this.session = session;
-    this.outputHistory = messages.filter(item => item.種別 === 'assistant').map(item => item.本文).slice(-60);
+    this.outputHistory = messages.filter(item => item.種別 === 'assistant' && !item.添付).map(item => item.本文).slice(-60);
     this.enabled = true; void this.connect();
   }
   private async api(path: '取得' | '設定', body: { セッションID?: string; [key: string]: unknown }): Promise<Info> {
@@ -208,7 +210,12 @@ export class CodeConnection {
     if (!this.connected || this.modelChanging || socket?.readyState !== 1 || socket.bufferedAmount > 128000) return false;
     try {
       const request = packet.メッセージ識別 === 'input_text' || packet.メッセージ識別 === 'input_request';
-      socket.send(JSON.stringify({ ...packet, ...(request ? { 実行状態通知: true, プロジェクトパス: this.project || null } : {}), セッションID: this.session, チャンネル: '1' }));
+      const file = packet.メッセージ識別 === 'input_file';
+      if (file && !this.sessionProject) return false;
+      const scoped = request || file;
+      socket.send(JSON.stringify({ ...packet, ...(request ? { 実行状態通知: true } : {}),
+        ...(scoped ? { プロジェクトパス: (file ? this.sessionProject : this.project) || null } : {}),
+        ...(file ? { 出力先チャンネル: '1' } : {}), セッションID: this.session, チャンネル: '1' }));
       if (request) { this.replay.clear(); this.実行継続中 = true; }
       return true;
     }

@@ -75,7 +75,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     // 画面は拡張の単独起動・IDE とも Vue 画面だけを返す。
     if (path === '' && req.method === 'GET') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'");
+      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'");
       res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="development/app.css"><script id="development-config" type="application/json">{"kind":"live","host":false,"base":"./","icon":"AiDiy.png","iconAssets":"development/assets/catppuccin_icons/"}</script><div id="app"></div><script src="development/app.js" defer></script></html>');
       return;
     }

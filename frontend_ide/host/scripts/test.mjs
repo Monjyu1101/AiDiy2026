@@ -12,6 +12,7 @@
 
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
+await build({ entryPoints: ['src/file-attachments.ts'], outfile: 'out/file-attachments.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
 await build({ entryPoints: ['src/input-prediction.ts'], outfile: 'out/input-prediction.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
 await build({ entryPoints: ['src/runner.ts'], outfile: 'out/runner.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });
 await build({ entryPoints: ['src/protocol.ts'], outfile: 'out/protocol.cjs', bundle: true, platform: 'node', target: 'node22', format: 'cjs' });

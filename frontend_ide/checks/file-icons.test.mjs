@@ -125,14 +125,16 @@ test('Live拡張の単独画面: token配下の相対URLでも同じSVGを配信
   } finally { await app.close(); }
 });
 
-test('VS Code: webview URIを起動設定へ渡し、img-srcは既存CSPだけを使う', () => {
+test('VS Code: webview URIを起動設定へ渡し、img-srcだけ安全な添付data画像を許可する', () => {
   const module = { exports: {} };
   vm.runInNewContext(transformSync(readFileSync(new URL('host/src/vscode-html.ts', root), 'utf8'), { loader: 'ts', format: 'cjs' }).code, { module });
   const html = module.exports.developmentHtml(path => 'https://resource.test/' + path, 'https://resource.test', 'nonce', { kind: 'code' });
   const config = JSON.parse(html.match(/id="development-config"[^>]*>([^<]+)/)[1]);
   assert.equal(config.iconAssets, 'https://resource.test/dist/development/' + CATPPUCCIN_ROOT);
-  assert.match(html, /img-src https:\/\/resource.test;/);
-  assert.doesNotMatch(html, /img-src[^;]*(?:data:|https:;|\*)/);
+  assert.match(html, /img-src https:\/\/resource.test data:;/);
+  assert.doesNotMatch(html, /img-src[^;]*(?:https:;|\*)/);
+  assert.doesNotMatch(html, /(?:script-src|connect-src|frame-src)[^;]*data:/);
+  assert.match(html, /frame-src 'none';/);
 });
 
 test('実Vue部品: 名前の変更・フォルダ開閉だけで安全な16px imgを再利用する', async () => {

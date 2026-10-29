@@ -88,6 +88,9 @@ async function fixture(t, { host = false, settings = initialSettings } = {}) {
     send(...packet) { calls.packets.push(clone(packet)); return true; }
   }
   const modules = {
+    '../../host/src/file-attachments': { fileAttachment: () => undefined },
+    '../添付ファイル/ファイル送信.js': { readDroppedFiles: async () => 0 },
+    '../添付ファイル/チャット添付.vue': {},
     '../ライブ/ライブ通信': { LiveEnvironment: Environment },
     '../../host/aidiy_live/src/protocol': { LiveConnection: Connection, 入力レート: () => 16000, 音声入力: value => value, 音声操作: (mic, speaker) => ({ mic, speaker }) },
     '../../host/aidiy_live/src/audio': { LiveAudio: class {

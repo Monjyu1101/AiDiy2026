@@ -44,6 +44,7 @@ async function panel(t, { host = false, desktop = false } = {}) {
   vm.runInNewContext(transformSync(readFileSync(new URL('../src/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, { ...globals, module: transport });
   const progress = { setup(_props, { expose }) { expose({ sync() {}, reset() {}, packet() {} }); return () => null; } };
   const modules = {
+    '../添付ファイル/ファイル送信.js': {},
     '../コード/コード通信.js': transport.exports, '../下書き連携/下書き受け渡し.js': draftHandoff,
     '../../host/src/stream-control': { visibleStreamContent: value => value },
     '../コード/会話到着演出': { chatArrival: () => ({ reset() {}, dispose() {}, show() {}, reserve() {}, cancelReservation() {} }) },
@@ -105,13 +106,13 @@ async function extensionPanel(t) {
       onDidChangeActiveTextEditor(callback) { editorChanged = callback; return subscription; },
       createOutputChannel: () => ({ appendLine() {}, clear() {}, dispose() {} }), registerWebviewViewProvider(_id, value) { provider = value; return subscription; } },
     Uri: { joinPath: (_root, path) => uri(path) }, commands: { registerCommand: () => subscription } };
-  const modules = { vscode,
+  const modules = { vscode, './file-attachments': {},
     './input-prediction': predictionModule.exports,
     './vscode-html': { developmentHtml: () => '' },
     './code-connection': { コード選択: value => ({ provider: value.provider || '', model: value.model || '' }), CodeConnection: class { constructor() { assert.fail('外部接続は禁止'); } } },
     './model-preferences': { モデル保存先: () => 'model.json', オフラインモデル保存先: () => 'offline.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込: () => 0 },
     '../aidiy_code/src/offline': { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline.json' },
-    './conversation-store': { 会話保存先: path => path, 会話一覧: path => path === '/project' ? ['first', 'second'].map((id, i) => ({ id, 更新日時: i + 1, 初回依頼: i ? '次の会話' : '最初の会話', メッセージ: [], provider: '', model: '', 実行モード: 'online' })) : [], 会話書込() {}, 会話削除() {}, 会話本文上限: 4e6 },
+    './conversation-store': { 会話保存先: path => path, 会話一覧: path => path === '/project' ? ['first', 'second'].map((id, i) => ({ id, 更新日時: i + 1, 初回依頼: i ? '次の会話' : '最初の会話', メッセージ: [], provider: '', model: '', 実行モード: 'online' })) : [], 会話書込() {}, 会話削除() {}, 会話本文上限: 4e6, 履歴メッセージ長さ: item => item.本文.length },
     './runner': {}, './protocol': {}, '../aidiy_live/local-backend.cjs': {},
   };
   const module = { exports: {} };

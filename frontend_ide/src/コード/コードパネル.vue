@@ -14,11 +14,15 @@ import TerminalProgress from '../ターミナル/進捗表示.vue';
 import ModalDialog from '../共通表示/共通ダイアログ.vue';
 import { chatArrival } from '../コード/会話到着演出';
 import { createDraftReceiver } from '../下書き連携/下書き受け渡し.js';
+import ChatAttachment from '../添付ファイル/チャット添付.vue';
+import { readDroppedFiles } from '../添付ファイル/ファイル送信.js';
 const props = defineProps({ base: String, host: Boolean, icon: String, embedded: Boolean, linked: Boolean, desktop: Boolean });
 const windowTitle = ref('');
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
+const uploading = ref(false), fileInput = ref(), fileNotice = ref('');
+let fileGeneration = 0;
 // 下書きやホスト設定から復元しない。画面を開くたびに予測はOFFで開始する。
 const autoSuggest = ref(false), predicting = ref(false), predictionNotice = ref('');
 let prediction, predictionReply = false, predictionFailed = false;
@@ -39,7 +43,7 @@ function scroll() { if (conversation.value) conversation.value.scrollTop = conve
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index].content);
 const offline = computed(() => state.実行モード === 'offline' || (state.オフライン対応 && !state.接続済み));
-const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value || changingConversation.value);
+const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || pending.value || changingConversation.value || uploading.value);
 // 一度本文が届いた依頼では、進捗100件の窓から本文が消えても待機演出へ戻さない。
 // ストリーム枠が開いている間は、光をストリーム枠側（共通表示/会話表示.css）で流す。
 const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value && !stream.value?.visible);
@@ -54,6 +58,33 @@ const canApplyModel = computed(() => catalogReady.value && !catalogBusy.value &&
 const transport = codeTransport(props, receive);
 let disposed = false;
 const predictionScope = () => JSON.stringify([state.作業フォルダ?.パス, state.接続プロジェクトパス, state.会話ID, state.セッションID || state.コアセッションID]);
+const fileScope = () => JSON.stringify([predictionScope(), state.接続世代]);
+function invalidateFiles() { fileGeneration++; fileNotice.value = ''; transport.cancelFiles?.(); }
+const fileAllowed = () => allowed.value && !offline.value && !!state.接続プロジェクトパス && !!(state.セッションID || state.コアセッションID)
+  && Number.isSafeInteger(state.接続世代) && !state.実行中 && !state.モデル変更中 && !pending.value && !changingConversation.value;
+const canAttach = computed(() => fileAllowed() && !uploading.value);
+function dragFiles(event) { if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault(); }
+function dropFiles(event) {
+  if (!event.dataTransfer?.files?.length) return;
+  event.preventDefault(); event.stopPropagation();
+  void attachFiles(event.dataTransfer.files);
+}
+async function attachFiles(files) {
+  if (!files?.length || disposed || uploading.value) return;
+  if (!canAttach.value) { error.value = 'ファイル添付はAIコア接続中・待機中に使用できます。'; return; }
+  const generation = ++fileGeneration, scope = fileScope();
+  const identity = { conversationId: state.会話ID, sessionId: state.セッションID || state.コアセッションID, projectPath: state.接続プロジェクトパス, connectionEpoch: state.接続世代 };
+  const current = () => !disposed && generation === fileGeneration && scope === fileScope() && fileAllowed();
+  uploading.value = true; error.value = ''; fileNotice.value = ''; cancelPrediction();
+  try {
+    const count = await readDroppedFiles(files, { isCurrent: current, onFile: async file => {
+      if (!current()) throw new Error('会話または接続が変わりました。ファイルを選び直してください。');
+      await transport.send({ type: 'sendFile', ...identity, ...file });
+    } });
+    if (current() && count) fileNotice.value = `${count}件を送信しました。受信結果を会話欄で確認し、1分以内に依頼を送信してください。`;
+  } catch (failure) { if (!disposed && generation === fileGeneration) error.value = failure.message || 'ファイルを送信できません。'; }
+  finally { if (!disposed) { uploading.value = false; if (fileInput.value) fileInput.value.value = ''; } }
+}
 const predictionAllowed = () => autoSuggest.value && operable.value && state.自動接続 && state.接続済み
   && !!state.接続プロジェクトパス && !!(state.セッションID || state.コアセッションID) && !offline.value && !busy.value;
 function cancelPrediction(notify = true) {
@@ -102,6 +133,7 @@ function confirmsConversationChange(packet) {
 }
 function receive(packet) {
   if (disposed) return;
+  if (packet.エラーコード === 'FILE_UPLOAD_FAILED') invalidateFiles();
   if (packet.type === 'state') {
     const first = !state.会話ID;
     const changed = !!state.会話ID && state.会話ID !== packet.会話ID;
@@ -111,7 +143,9 @@ function receive(packet) {
     const completedReply = !first && !changed && !scopeChanged && state.実行中 && !packet.実行中 && predictionReply && !predictionFailed && !state.停止中 && !packet.停止中;
     if (first || changed || scopeChanged || !packet.接続済み || packet.画面接続済み === false || packet.停止中) {
       predictionReply = false; cancelPrediction();
+      invalidateFiles();
     }
+    if (!packet.信頼済み || packet.実行中 || packet.モデル変更中 || state.接続世代 !== packet.接続世代) invalidateFiles();
     if (packet.実行中 && !state.実行中) { predictionReply = false; predictionFailed = false; cancelPrediction(); }
     const confirmed = confirmsConversationChange(packet);
     const previous = state.メッセージ.map(item => `${item.種別}:${item.本文}`);
@@ -142,7 +176,7 @@ function receive(packet) {
       stream.value?.sync(progress.value, first || changed);
       if (!first && !changed) {
         messages.forEach((item, i) => {
-          if (previous[i] !== `${item.種別}:${item.本文}` && ['user', 'assistant'].includes(item.種別)) arrivals.show(rows.get(i), item.種別, item.本文, '', i);
+          if (!item.添付 && previous[i] !== `${item.種別}:${item.本文}` && ['user', 'assistant'].includes(item.種別)) arrivals.show(rows.get(i), item.種別, item.本文, '', i);
         });
       }
       scroll();
@@ -182,7 +216,7 @@ function receive(packet) {
     stopPending.value = false; autoPending.value = false;
     if (packet.type === 'modelCatalogError') catalogReady.value = false;
     arrivals.cancelReservation();
-    if (packet.type === 'transportError') { revision++; state.画面接続済み = false; arrivals.reset(); stream.value?.reset(); }
+    if (packet.type === 'transportError') { revision++; invalidateFiles(); state.画面接続済み = false; arrivals.reset(); stream.value?.reset(); }
   } else if (packet.メッセージ識別 === 'output_stream') {
     const control = streamControlOf(String(packet.メッセージ内容 || ''));
     if (control === 'cancel') { predictionReply = false; predictionFailed = true; cancelPrediction(); }
@@ -213,6 +247,7 @@ async function send(type, data = {}) {
   if (type === 'selectHistory' && data.id === state.会話ID) return true;
   let change;
   if (changesConversation) {
+    invalidateFiles();
     change = { type, id: data.id, previousId: state.会話ID, projectPath: state.作業フォルダ?.パス, requestId: props.host ? crypto.randomUUID() : undefined };
     conversationChange = change; changingConversation.value = true;
     // Vueの次の描画やHTTP応答より前に、Webの公開APIとElectronの登録を失効させる。
@@ -284,10 +319,10 @@ watch(offline, () => { picker.value = false; });
 onMounted(() => {
   if (props.desktop && props.linked) void window.aidiyWindow?.title?.().then(title => { if (!disposed && typeof title === 'string') windowTitle.value = title; }).catch(() => {});
   prompt.value = transport.draft(); draftReceiver.mount(); resizeObserver = new ResizeObserver(scroll); resizeObserver.observe(conversation.value); void transport.start(); });
-onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = true; revision++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
+onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = true; revision++; fileGeneration++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
 </script>
 <template>
-  <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel">
+  <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel" @dragover="dragFiles" @drop="dropFiles">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
@@ -304,7 +339,8 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
     <main v-show="!history" ref="conversation" class="conversation" @click="link">
       <TerminalWelcome v-if="!state.メッセージ.length" :key="state.会話ID" :icon="icon" :started="!!prompt" />
       <article v-for="(item, i) in state.メッセージ" :ref="el => el ? rows.set(i, el) : rows.delete(i)" :key="`${state.会話ID}:${i}`" :class="['message', item.種別]">
-        <div v-if="item.種別 === 'user'" class="content user-text" title="クリックして入力欄へ戻す" @click="copyInput(item.本文)">{{ item.本文 }}</div>
+        <ChatAttachment v-if="item.添付" :attachment="item.添付" />
+        <div v-else-if="item.種別 === 'user'" class="content user-text" title="クリックして入力欄へ戻す" @click="copyInput(item.本文)">{{ item.本文 }}</div>
         <div v-else-if="item.種別 === 'assistant'" class="content" v-html="markdown.render(item.本文 || '')"></div>
         <div v-else class="content">{{ item.本文 }}</div>
       </article>
@@ -313,6 +349,7 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
     <footer v-show="!history" class="composer">
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
+      <div class="code-file-picker"><input ref="fileInput" type="file" multiple hidden @change="attachFiles($event.target.files)"><button type="button" :disabled="!canAttach" @click="fileInput.click()">{{ uploading ? 'ファイル送信中…' : '＋ ファイル' }}</button><span role="status">{{ fileNotice || 'ファイルをドロップ（1件4MiB・10件まで、AIコア接続中）' }}</span></div>
       <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '予測中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">予測中、、、</span></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
           <div class="prediction-options"><label class="prediction-caption">予測</label><button type="button" class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" aria-label="予測" :title="`予測 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span><span>{{ autoSuggest ? 'ON' : 'OFF' }}</span></button></div>
@@ -333,3 +370,7 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
     <ModalDialog v-if="deleteTarget" label="会話の削除" :locked="deleting" @close="deleteTarget = null"><h3>この会話を削除しますか？</h3><p>{{ deleteTarget.題名 }}</p><p>削除した会話は元に戻せません。</p><p v-if="error" class="error">{{ error }}</p><button :disabled="busy || deleting || !operable" @click="deleteHistory">削除する</button><button :disabled="deleting" @click="deleteTarget = null">キャンセル</button></ModalDialog>
   </section>
 </template>
+<style scoped>
+.code-file-picker{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:6px;font-size:12px;line-height:1.4}
+.code-file-picker button{flex-shrink:0;white-space:nowrap}.code-file-picker span{min-width:0;overflow-wrap:anywhere}
+</style>

@@ -15,6 +15,7 @@ const assert = require('node:assert/strict');
 const { resolve, join } = require('node:path');
 const { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
+const Module = require('node:module');
 const { 単独起動: startServer } = require('../out/aidiy_code/server.cjs');
 const { オフライン実行, オフラインモデル保存先, オフラインモデル候補, Hermes既定モデル } = require('../out/offline.cjs');
 const { 会話本文上限, 会話ファイル上限 } = require('../out/conversation-store.cjs');
@@ -23,9 +24,25 @@ after(() => rmSync(preferences, { recursive: true, force: true }));
 let fileNumber = 0;
 // 会話履歴はテストごとの一時フォルダへ（作業フォルダの _AIDIY には書かない）
 let historyNumber = 0;
-const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => startServer(project, launch, initial, file, run, history);
+const fixtureServers = new Map();
+const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => (fixtureServers.get(project) || startServer)(project, launch, initial, file, run, history);
 const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function offlineFixture() {
+  const project = mkdtempSync(join(preferences, 'offline-project-'));
+  const directory = join(project, '_AIDIY/aidiy_diag'); mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, 'code_models_info.json'), JSON.stringify({ aidiy_hermes: { models: {
+    'openai_oauth/gpt-6.1-sol': 'OpenAI', 'copilot_cli/auto': 'Copilot', 'codex_cli/auto': 'Codex',
+  } } }));
+  // 配布先も一時ディレクトリに置き、ローカル診断の候補を優先して読まない。
+  const filename = join(project, 'installation/out/aidiy_code/server.cjs');
+  const loaded = new Module(filename, module); loaded.filename = filename; loaded.paths = module.paths;
+  loaded._compile(readFileSync(resolve('out/aidiy_code/server.cjs'), 'utf8'), filename);
+  fixtureServers.set(project, loaded.exports.単独起動);
+  return project;
+}
+
 test('Code: 未生成時はsameだけ、生成済みなら診断のHermes候補を読む', () => {
   const root = join(preferences, 'configured');
   mkdirSync(join(root, '_config'), {recursive:true});
@@ -237,6 +254,7 @@ test('Code: 最終選択を復元し、旧Hermes Providerを組み合わせモ�
 });
 
 test('Code: 古い履歴からのモード切替で最終手動モデルを上書きしない', async t => {
+  const project = offlineFixture();
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   for (const mode of ['online', 'offline']) {
     const file = join(preferences, `history-last-${mode}.json`);
@@ -247,7 +265,7 @@ test('Code: 古い履歴からのモード切替で最終手動モデルを上�
     writeFileSync(file, JSON.stringify(online));
     writeFileSync(オフラインモデル保存先(file), JSON.stringify(offline));
     const run = () => ({完了:Promise.resolve({終了コード:0}),停止(){}});
-    const app = await start(process.cwd(),'http://127.0.0.1:18091',{offline:mode==='offline'},file,run);
+    const app = await start(project,'http://127.0.0.1:18091',{offline:mode==='offline'},file,run);
     const stream = await connect(app);
     const waitState = async (data, predicate) => {
       const offset = stream.packets.length;
@@ -280,6 +298,7 @@ test('Code: 古い履歴からのモード切替で最終手動モデルを上�
 });
 
 test('Code offline: コアなしでHermesを直接実行し、モデル保存・継続・新規をオンラインから分離する', async t => {
+  const project = offlineFixture();
   const backend = require('./fake-core.cjs').core(); backend.install(t); backend.unavailable = true;
   const file = join(preferences,'offline-models.json');
   const online = {provider:'copilot_cli',model:'gpt-6-sol'};
@@ -290,15 +309,15 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     return オフライン実行(...args,{実行ファイル:process.execPath,引数:[resolve('checks/fake-cli.cjs'),'echo']});
   };
   const history = join(preferences, 'history-reopen');
-  const app = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run,history), stream = await connect(app);
+  const app = await start(project,'http://127.0.0.1:18091',{offline:true},file,run,history), stream = await connect(app);
   let initial;
   try {
     initial = await stream.wait(p=>p.type==='state' && p.実行モード==='offline');
-    assert.equal(initial.provider,'aidiy_hermes'); assert.equal(initial.model,Hermes既定モデル(process.cwd()).replace(/^auto$/, 'same'));
+    assert.equal(initial.provider,'aidiy_hermes'); assert.equal(initial.model,Hermes既定モデル(project).replace(/^auto$/, 'same'));
     assert.equal(backend.sockets.length,0); assert.equal(backend.requests.length,0);
     assert.deepEqual((await (await fetch(app.url+'catalog')).json()).providers.map(p=>p.id),['aidiy_hermes']);
     const catalog = await (await fetch(app.url+'catalog?provider=aidiy_hermes')).json();
-    const expected=オフラインモデル候補(process.cwd()).map(item=>item.id);
+    const expected=オフラインモデル候補(project).map(item=>item.id);
     assert.deepEqual(catalog.models.map(p=>p.id),expected);
     assert.equal((await post(app,{type:'model',provider:'copilot_cli',model:'auto'})).status,400);
     assert.equal((await post(app,{type:'model',provider:'aidiy_hermes',model:'openai_oauth/unlisted'})).status,400);
@@ -309,7 +328,7 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
       assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:text,self_check_loop:3})).status,200);
       const done = await stream.wait(p=>p.type==='state' && !p.実行中 && p.セッションID==='test-session-001' && p.メッセージ.some(m=>m.種別==='assistant' && JSON.parse(m.本文).input===text));
       const answer = JSON.parse(done.メッセージ.at(-1).本文);
-      assert.ok(answer.args.includes('openai_oauth/gpt-6.1-sol')); assert.equal(answer.cwd,process.cwd());
+      assert.ok(answer.args.includes('openai_oauth/gpt-6.1-sol')); assert.equal(answer.cwd,project);
       assert.ok(!answer.args.includes('--yolo'));
     }
     assert.equal(calls.length,2); assert.equal(calls[0].session,undefined); assert.equal(calls[1].session,'test-session-001');
@@ -330,7 +349,7 @@ test('Code offline: コアなしでHermesを直接実行し、モデル保存・
     const restored = await stream.wait(p=>p.type==='state' && p.会話ID===initial.会話ID && p.セッションID==='test-session-001' && !p.実行中);
     assert.equal(restored.実行モード,'offline');
   } finally { await stream.close(); await app.close(); }
-  const reopened = await start(process.cwd(),'http://127.0.0.1:18091',{offline:true},file,run,history), second = await connect(reopened);
+  const reopened = await start(project,'http://127.0.0.1:18091',{offline:true},file,run,history), second = await connect(reopened);
   try {
     const restored = await second.wait(p=>p.type==='state' && p.実行モード==='offline');
     assert.equal(restored.model,'openai_oauth/gpt-6.1-sol');
@@ -491,6 +510,7 @@ test('Code offline: CLI起動失敗を表示し、再入力可能にする', asy
 });
 
 test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変更を拒否する', async t => {
+  const project = offlineFixture();
   const backend = require('./fake-core.cjs').core(); backend.install(t);
   backend.hold=true; backend.holdCancel=true;
   for (const mode of ['online','offline']) {
@@ -503,7 +523,7 @@ test('Code: 停止完了までOFF/ON・旧接続操作・新規・モデル変�
       完了:new Promise(resolve=>{finish=()=>resolve({終了コード:0,停止理由:'停止しました'});}),
       停止(){stops++;receive({メッセージ識別:'output_stream',メッセージ内容:'\x18'});receive({メッセージ識別:'output_text',メッセージ内容:'途中の中断通知'});}
     });
-    const app=await start(process.cwd(),'http://127.0.0.1:18091',{offline:mode==='offline'},file,run), stream=await connect(app);
+    const app=await start(project,'http://127.0.0.1:18091',{offline:mode==='offline'},file,run), stream=await connect(app);
     try {
       const initial=await stream.wait(p=>p.type==='state' && p.実行モード===mode && (mode==='offline'||p.接続済み));
       assert.equal((await post(app,{メッセージ識別:'input_text',メッセージ内容:'停止と切替の確認'})).status,200);
@@ -565,4 +585,84 @@ test('Code offline: 保存済みsameを復元し、モデル・provider指定な
     assert.ok(!args.includes('--model'));
     assert.ok(!args.includes('--provider'));
   } finally { await stream.close(); await app.close(); }
+});
+
+test('Code 添付API: scope/Origin/サイズを検証し、Core echoだけを保存・復元し失敗を表示する', async t => {
+  const backend = require('./fake-core.cjs').core({ CODE_BASE_PATH: process.cwd() }); backend.install(t);
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091'); const stream = await connect(app);
+  try {
+    const ready = await stream.wait(packet => packet.type === 'state' && packet.接続済み);
+    const upload = { type: 'sendFile', name: '日本語.txt', base64: 'aGk=', conversationId: ready.会話ID, sessionId: ready.セッションID, projectPath: ready.接続プロジェクトパス, connectionEpoch: ready.接続世代 };
+    assert.equal((await post(app, upload, 'https://untrusted.invalid')).status, 403);
+    for (const field of ['conversationId', 'sessionId', 'projectPath', 'connectionEpoch']) assert.equal((await post(app, { ...upload, [field]: 'stale' })).status, 409);
+    assert.equal((await post(app, { ...upload, name: '../bad.txt' })).status, 400);
+    assert.equal((await post(app, { ...upload, base64: 'invalid' })).status, 400);
+    assert.equal((await post(app, { ...upload, base64: Buffer.alloc(4 * 1024 * 1024 + 1).toString('base64') })).status, 400);
+    assert.equal((await post(app, { type: 'input_text', メッセージ内容: 'a'.repeat(1_000_001) })).status, 413, '通常本文の元の上限は緩めない');
+    assert.equal(backend.sockets.flatMap(socket => socket.sent).filter(packet => packet.メッセージ識別 === 'input_file').length, 0);
+    assert.equal((await post(app, upload)).status, 200);
+    const input = backend.sockets.find(socket => socket.channel === 'input');
+    const output = backend.sockets.find(socket => socket.channel === '1');
+    assert.equal(input.sent.at(-1).ファイル名, upload.name); assert.equal(input.sent.at(-1).メッセージ内容, upload.base64);
+    assert.equal(stream.packets.findLast(packet => packet.type === 'state').メッセージ.length, 0, '送信受理だけでは受信済み表示を作らない');
+    const thumb = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=';
+    const echo = { メッセージ識別: 'input_file', メッセージ内容: 'ファイル受信: 日本語.txt', ファイル名: 'temp/input/unique-日本語.txt', 元ファイル名: '日本語.txt', サムネイル画像: thumb };
+    output.emit(echo); output.emit(echo);
+    output.emit({ ...echo, メッセージ識別: 'output_file', ファイル名: 'temp/output/answer.png', 元ファイル名: 'answer.png' });
+    const shown = await stream.wait(packet => packet.type === 'state' && packet.メッセージ.length === 2);
+    assert.equal(shown.メッセージ[0].添付.thumbnail, 'data:image/png;base64,' + thumb);
+    assert.equal(shown.メッセージ[0].添付.kind, 'input_file'); assert.equal(shown.メッセージ[1].添付.kind, 'output_file');
+    assert.equal(shown.実行中, false);
+    assert.equal((await post(app, { type: 'new' })).status, 200);
+    await stream.wait(packet => packet.type === 'state' && packet.会話ID !== ready.会話ID && packet.接続済み);
+    assert.equal((await post(app, upload)).status, 409, '古い画面から新しい会話へ添付しない');
+    assert.equal((await post(app, { type: 'selectHistory', id: ready.会話ID })).status, 200);
+    const restored = await stream.wait(packet => packet.type === 'state' && packet.会話ID === ready.会話ID && packet.メッセージ.length === 2);
+    assert.equal(restored.メッセージ[1].添付.thumbnail, 'data:image/png;base64,' + thumb);
+    const active = backend.sockets.findLast(socket => socket.channel === '1');
+    active.emit({ メッセージ識別: 'error', エラーコード: 'FILE_UPLOAD_FAILED', メッセージ内容: 'ファイル保存に失敗しました' });
+    await stream.wait(packet => packet.type === 'state' && packet.メッセージ.some(message => message.種別 === 'error' && message.本文.includes('ファイル保存')));
+    assert.equal((await post(app, { type: 'autoConnect', enabled: false })).status, 200);
+    assert.equal((await post(app, upload)).status, 409);
+  } finally { await stream.close(); await app.close(); }
+});
+
+test('Code 添付API: body受信中に同sessionへ再接続した旧HTTP要求を拒否する', async t => {
+  const backend = require('./fake-core.cjs').core({ CODE_BASE_PATH: process.cwd() }); backend.install(t);
+  const app = await 単独起動(process.cwd(), 'http://127.0.0.1:18091'); const stream = await connect(app);
+  const { request } = require('node:http');
+  const pending = new Set();
+  try {
+    let ready = await stream.wait(packet => packet.type === 'state' && packet.接続済み);
+    for (const updateEmbeddedEpoch of [false, true]) {
+      let continueRequest, resolveResponse, rejectResponse;
+      const continued = new Promise(resolve => { continueRequest = resolve; });
+      const result = new Promise((resolve, reject) => { resolveResponse = resolve; rejectResponse = reject; });
+      const slow = request(app.url + 'message', { method: 'POST', headers: {
+        Origin: new URL(app.url).origin, 'Content-Type': 'application/json', Expect: '100-continue', 'Transfer-Encoding': 'chunked',
+      } }, response => {
+        response.resume(); response.on('end', () => resolveResponse(response.statusCode));
+      });
+      pending.add(slow); slow.on('error', rejectResponse); slow.once('continue', continueRequest); slow.flushHeaders();
+      // 100 Continueはサーバーがheadersを受け付けた証拠。bodyの完了だけを意図的に遅らせる。
+      await continued;
+      slow.write('{"type":"sendFile","name":"slow.txt","base64":"aGk=",');
+      const before = ready, offset = stream.packets.length;
+      assert.equal((await post(app, { type: 'disconnect' })).status, 200);
+      assert.equal((await post(app, { type: 'connect' })).status, 200);
+      ready = await stream.wait(packet => stream.packets.indexOf(packet) >= offset && packet.type === 'state' && packet.接続済み);
+      assert.equal(ready.セッションID, before.セッションID); assert.equal(ready.接続プロジェクトパス, before.接続プロジェクトパス);
+      assert.notEqual(ready.接続世代, before.接続世代);
+      const scope = { conversationId: before.会話ID, sessionId: before.セッションID, projectPath: before.接続プロジェクトパス,
+        connectionEpoch: updateEmbeddedEpoch ? ready.接続世代 : before.接続世代 };
+      slow.end(JSON.stringify(scope).slice(1));
+      assert.equal(await result, 409, updateEmbeddedEpoch ? 'body内epochを新しくしてもHTTP受付時epochが古ければ拒否する' : '同じsessionでも旧epochを拒否する');
+      pending.delete(slow);
+    }
+    assert.equal(backend.sockets.flatMap(socket => socket.sent).filter(packet => packet.メッセージ識別 === 'input_file').length, 0);
+    const scope = { conversationId: ready.会話ID, sessionId: ready.セッションID, projectPath: ready.接続プロジェクトパス, connectionEpoch: ready.接続世代 };
+    assert.equal((await post(app, { type: 'sendFile', name: 'fresh.txt', base64: 'aGk=', ...scope })).status, 200);
+    assert.equal((await post(app, { type: 'sendFile', name: 'missing.txt', base64: 'aGk=', ...scope, connectionEpoch: undefined })).status, 409);
+    assert.equal(backend.sockets.flatMap(socket => socket.sent).filter(packet => packet.メッセージ識別 === 'input_file').length, 1);
+  } finally { for (const request of pending) request.destroy(); await stream.close(); await app.close(); }
 });
