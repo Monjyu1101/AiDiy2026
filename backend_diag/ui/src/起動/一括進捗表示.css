@@ -1,3 +1,8 @@
+/* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026 */
 /* 非モーダル。通常フロー内で領域を確保し、タブ・タイトル・他パネルの操作を覆わない。 */
 .batch-progress{--batch-accent:#79e9d7;display:flex;align-items:center;gap:14px;margin:8px 16px;padding:13px 16px;border:1px solid #48616e;border-left:5px solid var(--batch-accent);border-radius:8px;background:#17333c;color:#e5f4fa;min-width:0;max-height:26vh;overflow:auto;-webkit-app-region:no-drag}
 .batch-progress[data-kind=stop]{--batch-accent:#ffd18c;background:#352b20}

@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// AiDiy 公開利用ライセンス v1.1。詳細はリポジトリの LICENSE を参照。
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // backend_server/conf/conf_model.py (blob 7b70e037c3c9e5624509a6a7678f6d104c188f9a)
 // 由来の診断専用移植。I/O・OAuth・静的候補の補充なし。日付は元実装と同じローカル時刻。
 export type Model = {model_id:string; トークン数:unknown; モダリティ:unknown; 作成日:string|null};

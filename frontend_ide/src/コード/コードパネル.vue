@@ -21,7 +21,7 @@ const windowTitle = ref('');
 const state = reactive({ メッセージ: [], 履歴: [], 進捗: [], 信頼済み: false, 自動接続: true });
 const prompt = ref(''), error = ref(''), pending = ref(false), history = ref(false), picker = ref(false), catalogBusy = ref(false);
 const stopPending = ref(false);
-const uploading = ref(false), fileInput = ref(), fileNotice = ref('');
+const uploading = ref(false), fileNotice = ref(''), draggingFiles = ref(false);
 let fileGeneration = 0;
 // 下書きやホスト設定から復元しない。画面を開くたびに予測はOFFで開始する。
 const autoSuggest = ref(false), predicting = ref(false), predictionNotice = ref('');
@@ -63,8 +63,15 @@ function invalidateFiles() { fileGeneration++; fileNotice.value = ''; transport.
 const fileAllowed = () => allowed.value && !offline.value && !!state.接続プロジェクトパス && !!(state.セッションID || state.コアセッションID)
   && Number.isSafeInteger(state.接続世代) && !state.実行中 && !state.モデル変更中 && !pending.value && !changingConversation.value;
 const canAttach = computed(() => fileAllowed() && !uploading.value);
-function dragFiles(event) { if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault(); }
+// 添付はドロップだけで受け付ける。ドラッグ中は入力欄の外側の欄全体を受け口として表示する。
+function dragFiles(event) {
+  if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = canAttach.value ? 'copy' : 'none'; draggingFiles.value = canAttach.value;
+}
+function leaveFiles(event) { if (event.currentTarget === event.target || !event.currentTarget?.contains?.(event.relatedTarget)) draggingFiles.value = false; }
 function dropFiles(event) {
+  draggingFiles.value = false;
   if (!event.dataTransfer?.files?.length) return;
   event.preventDefault(); event.stopPropagation();
   void attachFiles(event.dataTransfer.files);
@@ -83,7 +90,7 @@ async function attachFiles(files) {
     } });
     if (current() && count) fileNotice.value = `${count}件を送信しました。受信結果を会話欄で確認し、1分以内に依頼を送信してください。`;
   } catch (failure) { if (!disposed && generation === fileGeneration) error.value = failure.message || 'ファイルを送信できません。'; }
-  finally { if (!disposed) { uploading.value = false; if (fileInput.value) fileInput.value.value = ''; } }
+  finally { if (!disposed) uploading.value = false; }
 }
 const predictionAllowed = () => autoSuggest.value && operable.value && state.自動接続 && state.接続済み
   && !!state.接続プロジェクトパス && !!(state.セッションID || state.コアセッションID) && !offline.value && !busy.value;
@@ -322,7 +329,7 @@ onMounted(() => {
 onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = true; revision++; fileGeneration++; arrivals.dispose(); resizeObserver?.disconnect(); transport.dispose(); });
 </script>
 <template>
-  <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel" @dragover="dragFiles" @drop="dropFiles">
+  <section class="ai-component code-component" :class="{ running: busy, 'desktop-window': desktop }" data-component="CodePanel" @dragover="dragFiles" @dragleave="leaveFiles" @drop="dropFiles">
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
@@ -346,10 +353,10 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
       </article>
     </main>
     <TerminalProgress :hidden="history" ref="stream" :running="!!state.実行中" @resize="scroll" />
-    <footer v-show="!history" class="composer">
+    <footer v-show="!history" class="composer" :class="{ 'file-drop-active': draggingFiles }">
+      <p v-if="draggingFiles" class="file-drop-hint">ここにドロップして送信（1件4MiB・10件まで）</p><p v-else-if="uploading || fileNotice" class="file-transfer-status" role="status">{{ uploading ? 'ファイル送信中…' : fileNotice }}</p>
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <div class="code-file-picker"><input ref="fileInput" type="file" multiple hidden @change="attachFiles($event.target.files)"><button type="button" :disabled="!canAttach" @click="fileInput.click()">{{ uploading ? 'ファイル送信中…' : '＋ ファイル' }}</button><span role="status">{{ fileNotice || 'ファイルをドロップ（1件4MiB・10件まで、AIコア接続中）' }}</span></div>
       <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '予測中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">予測中、、、</span></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
           <div class="prediction-options"><label class="prediction-caption">予測</label><button type="button" class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" aria-label="予測" :title="`予測 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span><span>{{ autoSuggest ? 'ON' : 'OFF' }}</span></button></div>
@@ -371,6 +378,7 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
   </section>
 </template>
 <style scoped>
-.code-file-picker{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:6px;font-size:12px;line-height:1.4}
-.code-file-picker button{flex-shrink:0;white-space:nowrap}.code-file-picker span{min-width:0;overflow-wrap:anywhere}
+.composer.file-drop-active{outline:2px dashed #8ecbff;outline-offset:-2px;border-radius:6px;background:rgba(102,126,234,.18)}
+.file-drop-hint,.file-transfer-status{margin:4px 0;font-size:12px;line-height:1.4;color:#a9b8cc;overflow-wrap:anywhere}
+.file-drop-hint{color:#9edfff;font-weight:600}
 </style>

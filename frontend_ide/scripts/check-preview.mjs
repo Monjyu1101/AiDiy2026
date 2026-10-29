@@ -84,6 +84,10 @@ try {
     writeFileSync(name, Buffer.from(shot.result.data, 'base64'));
     console.log(name);
   }
+  async function wheelPreview() {
+    const point=await evaluate(`(()=>{const r=document.querySelector('.viewer-preview').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+Math.min(80,r.height/2)};})()`);
+    await send('Input.dispatchMouseEvent',{type:'mouseWheel',...point,deltaX:0,deltaY:100});
+  }
   await fetch(new URL('/api/connection/offline',url),{method:'POST'});
   async function until(check,message){for(let i=0;i<150;i++){if(await check())return;await sleep(100);}assert.fail(message);}
   async function openFile(path){
@@ -118,7 +122,7 @@ try {
   assert.ok(externalRequests.some(request=>request.path==='/external.png'));
   assert.ok(externalRequests.every(request=>!request.referer),'外部画像にtokenやプロジェクト内パスを送らない');
   await evaluate(`window.previewActivity=0;addEventListener('message',e=>{if(e.source===document.querySelector('.viewer-preview')?.contentWindow&&e.data?.type==='aidiy-ide-viewer-activity')window.previewActivity++;});`);
-  await child(`dispatchEvent(new WheelEvent('wheel',{deltaY:100}));true`);
+  await wheelPreview();
   await until(()=>evaluate('window.previewActivity>0'),'HTML内の操作を親へ通知');
   await until(()=>child(`document.querySelector('#symbol')?.getBBox().width>0`),'HTML内の外部SVG参照');
   assert.match(await child(`getComputedStyle(document.querySelector('.css-image')).backgroundImage`),/shared\/logo.png/);
@@ -128,7 +132,7 @@ try {
   await until(()=>child(`document.querySelector('#symbol')?.getBBox().width>0`),'SVG内の外部SVG参照');
   assert.equal(await evaluate(`document.querySelector('.viewer-content>img')===null`),true);
   await evaluate(`window.previewActivity=0;addEventListener('message',e=>{if(e.source===document.querySelector('.viewer-preview')?.contentWindow&&e.data?.type==='aidiy-ide-viewer-activity')window.previewActivity++;});`);
-  await child(`dispatchEvent(new WheelEvent('wheel',{deltaY:100}));true`);
+  await wheelPreview();
   await until(()=>evaluate('window.previewActivity>0'),'SVG内の操作を親へ通知');
   await capture('nn-preview-svg-relative.png');
   await evaluate(`Array.from(document.querySelectorAll('.viewer-mode button')).find(b=>b.textContent==='コード').click()`);

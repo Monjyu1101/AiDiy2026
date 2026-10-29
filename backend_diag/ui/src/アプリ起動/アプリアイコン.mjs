@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 export const アプリアイコン=Object.freeze({chrome:'Chrome.svg',browser:'AiDiy_browser.svg',...Object.fromEntries(['avatar','task','team','ide','console','code','live','discord'].map(id=>[id,`AiDiy_${id}.${['task','team'].includes(id)?'svg':'png'}`])),});
 
 // 通常・円形で同じ順序を使う。Browserの直後をHermes、Chromeは最後にする。

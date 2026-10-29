@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <html lang="ja">
 <head>
  <meta charset="UTF-8" />
@@ -37,15 +42,15 @@
  <div>
  <strong>重要なポイント</strong>
  <p>
- <strong>自動テストは <code>backend_server/tests/</code> の設定管理テストだけです。</strong><br>
+ <strong>backend_server の自動テストは <code>backend_server/checks/</code> にあります（AIコア・バックアップ・予測まわり）。</strong><br>
  業務APIはSwagger UIを使った手動テストも行います。
  </p>
  </div>
 
  <h3>unittest の実行</h3>
  <pre><code>cd backend_server
-.venv\Scripts\python.exe -m unittest discover -s tests -v</code></pre>
- <p>現行テストは <code>test_conf_init.py</code> と <code>test_conf_json_ports.py</code> です。<code>backend_tools/tests/</code> やpytestスイートはありません。</p>
+.venv\Scripts\python.exe -X utf8 -m unittest discover -s checks -v</code></pre>
+ <p>テストは各コンポーネントの <code>checks/</code> に置きます。<code>tests/</code> ディレクトリ、<code>backend_tools</code> の自動テスト、pytestスイートはありません。</p>
 
  <h3>Swagger UI での手動テスト</h3>
  <p>バックエンドAPIのテストにはSwagger UI を使用します。</p>
@@ -78,7 +83,7 @@
  <strong>補足情報</strong>
  <p>
   pytestは導入されていません。現行の自動テストはPython標準の <code>unittest</code> です。<br>
-  テスト対象や実行コマンドは <code>backend_server/tests/</code> の実在ファイルを基準にしてください。
+  テスト対象や実行コマンドは <code>backend_server/checks/</code> の実在ファイルを基準にしてください。
  </p>
  </div>
  </section>

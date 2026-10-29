@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -5,7 +10,7 @@ const path=require('node:path');
 const source=name=>fs.readFileSync(path.join(__dirname,'../ui/src',name),'utf8');
 test('Vue component source and precompiled runtime use no remote scripts or unsafe eval',()=>{
  const app=source('App.vue');assert.match(app,/導入状況\/導入状況パネル\.vue/);assert.match(app,/モデル一覧パネル/);
- const html=fs.readFileSync(path.join(__dirname,'../static/index.html'),'utf8');assert.match(html,/src="app.js"/);assert.doesNotMatch(html,/https?:|unpkg|cdn/);
+ const html=fs.readFileSync(path.join(__dirname,'../static/index.html'),'utf8').replace(/^(<!doctype html>\r?\n)?<!-- COPYRIGHT \(C\)[\s\S]*?-->\r?\n/i,'$1');assert.match(html,/src="app.js"/);assert.doesNotMatch(html,/https?:|unpkg|cdn/);
  const js=fs.readFileSync(path.join(__dirname,'../static/app.js'),'utf8');assert.doesNotMatch(js,/new Function\(|eval\(/);
 });
 test('all-tests and install panel share only installation action, key tests require explicit row action',()=>{

@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 本番のmain/preload/Vueをメモリ上で読み、合成Electronだけで検証する。実サービスは起動しない。
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -126,7 +129,9 @@ test('AvatarのOS閉じるでも非表示のログイン窓だけを残さない
   assert.equal(f.app.quitCalls, 1);
 });
 
-test('ログイン窓だけON・他の11窓はOFF起動し、本人だけ切替・通知、同じfloating層で選択された窓だけを前へ出す', async () => {
+test('ログイン窓だけON・他の11窓はOFF起動し、本人だけ切替・通知、同じ最前面層で選択された窓だけを前へ出す', async () => {
+  // 共通の最前面ピンは、Windows では floating で最前面にならないため normal 層を使う。
+  const pinLevel = process.platform === 'win32' ? 'normal' : 'floating';
   const f = mainFixture();
   f.createCoreWindow(false);
   for (const role of ['chat', 'file', 'image', 'code1', 'code2', 'code3', 'code4', 'code5', 'code6']) f.createPanelWindow(role);
@@ -135,11 +140,11 @@ test('ログイン窓だけON・他の11窓はOFF起動し、本人だけ切替�
   assert.equal(f.windows.length, 12);
   for (const window of f.windows) {
     const initial = window.role === 'login';
-    assert.deepEqual(window.topCalls, [initial ? [true, 'floating'] : [false]], window.role);
+    assert.deepEqual(window.topCalls, [initial ? [true, pinLevel] : [false]], window.role);
     assert.deepEqual(copy(f.invoke('window:get-pin', window)), { pinned: initial, locked: false });
     const otherMessages = f.windows.filter(other => other !== window).map(other => other.webContents.messages.length);
     assert.deepEqual(copy(f.invoke('window:toggle-pin', window, 'another-window')), { pinned: !initial, locked: false });
-    assert.deepEqual(window.topCalls.at(-1), initial ? [false] : [true, 'floating']);
+    assert.deepEqual(window.topCalls.at(-1), initial ? [false] : [true, pinLevel]);
     assert.deepEqual(f.windows.filter(other => other !== window).map(other => other.webContents.messages.length), otherMessages);
   }
   const [login, core, chat] = f.windows;

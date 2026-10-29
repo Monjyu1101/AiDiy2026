@@ -1,8 +1,11 @@
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import {起動モーション} from './起動モーション.mjs';
 import './起動モーション.css';
-// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
 import {computed,ref,watch,onMounted,onBeforeUnmount,nextTick} from 'vue';
 import {アプリアイコン,起動項目を整列} from './アプリアイコン.mjs';
 import {アイコン移動} from './アイコン移動.mjs';

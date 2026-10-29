@@ -308,9 +308,9 @@
 .space-view .explorer-panel header .explorer-detach,.space-view .explorer-routes .route-detach,.space-view .viewer-popup header .viewer-pin{font-size:14px;line-height:14px}
 
 /* 画面内はOFF、切り離し後はON。独立窓の最前面ピンと同じ色・沈み込みで示す。 */
-.panel-detach-pin{color:#748091;background:#06080c;box-shadow:inset 0 1px 4px #000c,inset 0 -1px 0 #ffffff0a}
-.panel-detach-pin span{display:inline-block;filter:grayscale(1);opacity:.55;transform:translateY(1px)}
-.panel-detach-pin.pin-active{color:#a7f6ff;background:#12343d;box-shadow:inset 0 0 0 1px #5bafb8,0 0 5px #55e8ff24}
+.development-app .panel-detach-pin{color:#748091;background:transparent;box-shadow:none}
+.panel-detach-pin span{display:inline-block;filter:grayscale(1) brightness(2);opacity:.9;transform:translateY(1px)}
+.development-app .panel-detach-pin.pin-active{color:#a7f6ff;background:transparent;box-shadow:inset 0 0 0 1px #5bafb8,0 0 5px #55e8ff24}
 .panel-detach-pin.pin-active span{filter:none;opacity:1;transform:none}
 
 /* 外寸を維持して枠の1pxを確保し、端の操作・スクロールバーに重ねない。 */
@@ -320,3 +320,13 @@
 /* 埋込は既存1px境界の色だけ変更し、内側のCode/Live/Consoleへ二重枠を足さない。 */
 .development-app :is(.ai-popup,.explorer-panel,.explorer-routes,.viewer-popup,.viewer-pinned){border-color:var(--aidiy-panel-border)}
 .native-panel-window>.explorer-panel,.native-panel-window>.viewer-session .viewer-pinned{border-left:0;border-right:0;border-bottom:0}
+/* 見出しを本文の余白から独立させ、グレーの外枠までタイトル帯をつなぐ。 */
+.viewer-popup>header{flex-shrink:0;margin:-12px -12px 8px;padding:6px 12px}
+.viewer-pinned>header{flex-shrink:0;margin:-10px -12px 8px;padding:6px 12px}
+
+/* 別窓操作のピンは親のタイトル帯を透かし、状態はアイコンと枠で示す。 */
+.development-app .panel-detach-pin:hover{background:transparent}
+.development-app .route-controls{background:var(--aidiy-titlebar-background)}
+.development-app .route-window-actions{background:transparent}
+.development-app .viewer-close,.development-app .viewer-close:hover{background:transparent;border-color:transparent}
+.development-app .viewer-close:hover{color:#ff8e9e}

@@ -66,7 +66,7 @@ async function replaceManifest(manifest, records) {
 }
 
 // 参照元Markdownの名前で保存先を決め、画像名は内容を先頭にする。
-// 実施IDと作業JSONはGit対象外のキャッシュへ置き、同じ場面の再撮影は確認番号で区別する。
+// 実施IDと作業JSONはキャッシュへ置く。再撮影は evidenceNumber で掲載番号を指定する。
 // 例: createEvidenceRecorder('20261019-1039-computer-use', 'environment', { toPng })
 export async function createEvidenceRecorder(runId, book = 'environment', { toPng, lockTimeoutMs = 10000 } = {}) {
   const prefix = BOOK_NAMES[book];
@@ -80,8 +80,9 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
   await fs.mkdir(work, { recursive: true });
   const manifest = path.join(work, `${runId}__evidence.json`);
   await readRecords(manifest);
-  return async function record({ paragraph, title, state, status, note, screenshot = 0 }) {
+  return async function record({ paragraph, title, state, status, note, screenshot = 0, evidenceNumber }) {
     if (!Number.isInteger(paragraph) || paragraph < 0 || paragraph > 9) throw new Error('段落番号は0〜9');
+    if (evidenceNumber !== undefined && (!Number.isInteger(evidenceNumber) || Math.floor(evidenceNumber / 100) !== paragraph || evidenceNumber % 100 === 0)) throw new Error('掲載番号は段落番号×100＋1〜99を指定してください');
     if (!['✅ OK', '❌ NG', '⏸ 未実施', '観測'].includes(status)) throw new Error('判定を明示してください');
     if (!title || [...title].some(c => '<>:"/\\|?*'.includes(c) || c.charCodeAt(0) < 32)) throw new Error('画面名に使用できない文字があります');
     if (!note?.trim()) throw new Error('確認した事実または未実施理由が必要です');
@@ -92,22 +93,29 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
     if (!bytes || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('JPEG画面には toPng エンコーダーを渡してください');
     return withManifestLock(manifest, lockTimeoutMs, async () => {
       const records = await readRecords(manifest);
-      const sequence = 1 + Math.max(0, ...records.filter(r => r.paragraph === paragraph).map(r => r.sequence));
+      const sequence = evidenceNumber === undefined ? 1 + Math.max(0, ...records.filter(r => r.paragraph === paragraph).map(r => r.sequence)) : evidenceNumber % 100;
       if (sequence > 99) throw new Error('段落内の証跡は99件まで');
       const id = String(paragraph) + String(sequence).padStart(2, '0');
       const stem = prefix + '_' + id + '_' + title.replace(/画面$/u, '') + '画面';
-      let file = stem + '.png';
-      for (let confirmation = 2; ; confirmation++) {
-        try {
-          await fs.writeFile(path.join(root, file), bytes, { flag: 'wx' });
-          break;
-        } catch (error) {
+      const file = stem + '.png';
+      const destination = path.join(root, file);
+      if (evidenceNumber === undefined) {
+        try { await fs.writeFile(destination, bytes, { flag: 'wx' }); }
+        catch (error) {
           if (error.code !== 'EEXIST') throw error;
-          file = stem + '_確認' + String(confirmation).padStart(2, '0') + '.png';
+          throw new Error('同じ画像名が存在します。再撮影は本文の番号を evidenceNumber に指定してください');
         }
+      } else {
+        const temporary = destination + '.' + randomUUID() + '.new';
+        try {
+          await fs.writeFile(temporary, bytes, { flag: 'wx' });
+          await fs.rename(temporary, destination);
+        } finally { await fs.rm(temporary, { force: true }); }
       }
       const row = { book, id, paragraph, sequence, file, title, status, note, time: new Date().toISOString(), window: state.window, width: shot.width, height: shot.height, sha256: createHash('sha256').update(bytes).digest('hex'), accessibility: state.accessibility };
-      records.push(row);
+      const previous = records.findIndex(record => record.id === id);
+      if (previous >= 0) records[previous] = row;
+      else records.push(row);
       await replaceManifest(manifest, records);
       return row;
     });

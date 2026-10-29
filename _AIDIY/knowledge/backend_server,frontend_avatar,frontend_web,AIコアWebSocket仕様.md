@@ -47,10 +47,11 @@ Avatar / Web の音声接続は、core ソケットの `init` に含まれるモ
 ローカル回帰確認（外部AIへの接続なし）:
 
 ```bash
-backend_server/.venv/bin/python -m unittest discover -s backend_server/tests -p 'test_*voice*.py'
-backend_server/.venv/bin/python -m unittest discover -s backend_server/tests -p 'test_live_project_connection.py'
+backend_server/.venv/bin/python -X utf8 -m unittest discover -s backend_server/checks -p 'test_live_*.py'
 node --test frontend_ide/host/checks/code-connection.test.cjs
 ```
+
+Python 側は Live の終了・受信待ち・送受信を検証する。モデル設定APIによる再開始条件と音声タスクの再作成には専用の自動テストがないため、実画面で設定変更・保存・適用・切断と再接続を確認する。
 
 ## 主要メッセージ形式
 
@@ -69,7 +70,7 @@ node --test frontend_ide/host/checks/code-connection.test.cjs
 
 WebSocketの`output_text`とMCPの`result`／`content`で同じ本文を返します。MCPではエラー応答の`status`も`NG`とし、Diagも空文字・`!`始まりを成功扱いしません。Code CLIは途中の回答があっても終了コードが0以外ならエラーとし、失敗後の検証・自己改善へ進みません。標準Chat Completionsの`tool_calls`だけの中間応答は、有効なツール要求なので空の`content`を許可します。
 
-確認は外部AIへ接続せず、`backend_server/tests/test_ai_response_errors.py`、`test_code_cli_output_routing.py`、`test_claude_sdk_auto_model.py`と`backend_diag/checks/model-trials.check.mjs`で行います。Pythonの試験は`backend_server`を作業ディレクトリにし、Windowsでは子Pythonの出力もUTF-8になるよう`PYTHONUTF8=1`を指定します。変更の反映にはCoreとTools、Diagの再起動が必要です。
+確認は外部AIへ接続せず、`backend_diag/checks/model-trials.check.mjs`で行います。Python 側の応答エラー整形・CLI出力振り分けには専用の自動テストがありません。変更の反映にはCoreとTools、Diagの再起動が必要です。
 
 ```typescript
 // テキスト入力
@@ -108,7 +109,7 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 
 音声は `audio` チャンネル専用に扱う。
 
-接続維持用の `{ type: "ping" }` は、通常の `メッセージ識別` を持つパケットより先に処理する。バックエンドは受信したソケットへ `{ type: "pong", セッションID: "<確定ID>" }` を返し、AI処理や会話履歴へ渡さない。VS Code Live / Web / Avatar はJSON形式、現行DiscordはWebSocket制御フレームのpingを使うため、両者を区別する。`不明なメッセージ識別: None data={"type":"ping", ...}` はバックエンドのJSON heartbeat受け口を確認する。`backend_server/tests/test_live_project_connection.py` でpong応答後も音声処理を続けることを検証する。
+接続維持用の `{ type: "ping" }` は、通常の `メッセージ識別` を持つパケットより先に処理する。バックエンドは受信したソケットへ `{ type: "pong", セッションID: "<確定ID>" }` を返し、AI処理や会話履歴へ渡さない。VS Code Live / Web / Avatar はJSON形式、現行DiscordはWebSocket制御フレームのpingを使うため、両者を区別する。`不明なメッセージ識別: None data={"type":"ping", ...}` はバックエンドのJSON heartbeat受け口を確認する。pong応答後も音声処理が続くことは、専用の自動テストがないため実接続で確認する。
 
 ```typescript
 // マイクPCM送信
@@ -181,7 +182,7 @@ Code AI の `output_stream` は、本文と同じパケットの `メッセー�
 
 Discordのaudio接続は `connect.Live準備確認: true` を指定し、ソケット登録の `init` に加えて `{ メッセージ識別: "live_ready", セッションID: "<確定ID>" }` を待つ。backendの `Live.待受準備確認()` がProviderの準備完了を確認してから同じaudioソケットへ返す。開始拒否・未設定キー・準備タイムアウトは `error` を返す。`Live準備確認` を指定しない接続は従来のinit方式を維持する。共有クライアントでは `waitForLiveReady: true` を指定した場合のみこの確認を使う。
 
-確認: `backend_server/tests/test_live_project_connection.py` で、初期化通知前の反映、音声への引継ぎ、フォルダ不一致・存在しないフォルダの拒否、旧クライアント互換を検証できます。
+確認: 専用の自動テストはありません。初期化通知前の反映、音声への引継ぎ、フォルダ不一致・存在しないフォルダの拒否、旧クライアント互換を実接続で確認します。
 
 ## 接続時の Live モデル指定
 
@@ -189,4 +190,4 @@ Discordのaudio接続は `connect.Live準備確認: true` を指定し、ソケ�
 
 Live のモデル選択では、接続前に `/core/AIコア/モデル情報/取得` へ空の `セッションID` を指定し、既定設定と候補を取得できます。セッションは作成せず、実際の接続時にフォルダと選択したモデルを渡します。接続中の変更時もこの同じ接続方式を使います。
 
-`backend_server/tests/test_live_project_connection.py` で初期モデル・音声の反映、未指定時の既定値、既存セッションのモデル不一致、接続前の候補取得を検証できます。
+初期モデル・音声の反映、未指定時の既定値、既存セッションのモデル不一致、接続前の候補取得は、専用の自動テストがないため実接続で確認します。

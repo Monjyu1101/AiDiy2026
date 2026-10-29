@@ -51,11 +51,11 @@
 ## 確認方法
 
 パスワード専用の自動テストは未整備なので、現状は手動確認です。
-`backend_server/tests/` にある既存 `unittest`（AIコア・Code CLI 連携・設定管理まわり）は次で流せます。追加する場合も同じ場所へ置きます。
+`backend_server/checks/` にある既存 `unittest`（AIコア・バックアップ・予測まわり）は次で流せます。追加する場合も同じ場所へ置きます。
 
 ```powershell
 cd backend_server
-.venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe -X utf8 -m unittest discover -s checks -v
 ```
 
 手動確認は Swagger（`http://127.0.0.1:8091/docs`）の `C利用者` 登録・変更・`auth` ログインで行います。

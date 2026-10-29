@@ -117,10 +117,10 @@ OAuth側は Responses の `text.format.type=json_schema`, `strict=true` を使�
 ## 確認方法
 
 ```powershell
-backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_server/tests -p test_decisions.py -v
-backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_tools/tests -p test_decisions_check.py -v
-backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_tools/tests -p test_platform_registration.py -v
+backend_tools/.venv/Scripts/python.exe -X utf8 -m unittest discover -s scripts/checks -p test_decision_provider_routes.py -v
 ```
+
+合成HTTPで各方式の実アダプターを検証する（キー・外部AIへは接続しない）。MCP 登録の自動テストはないため、方式を追加したら Tools を再起動して `aidiy_decisions_check` のツール一覧と応答を確認する。
 
 実接続では同一入力と3種の質問を両方式に送り、名前・型・候補が一致することを確認する。数値の完全一致は要件にしない。APIキー・OAuthトークンを出力に残さず、認証エラーと入力不正を区別して確認する。
 

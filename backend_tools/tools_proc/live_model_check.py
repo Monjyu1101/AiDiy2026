@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """Diag 専用の非公開 Live 試行。MCP 登録・設定書き込み・会話文脈は持たない。"""
 import asyncio
 import base64

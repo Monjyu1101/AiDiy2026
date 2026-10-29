@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 import {ref} from 'vue';
 export function アプリ状態を作成({api,picker=()=>globalThis.aidiyWindow?.selectProject?.(),schedule=setTimeout,unschedule=clearTimeout}){
  const 項目=ref([]),フォルダ=ref(''),処理中=ref(''),通知=ref(''),結果=ref({}),選択中=ref(false),参照中=ref(false),一覧=ref(null),パス入力=ref(''),参照エラー=ref('');

@@ -1,4 +1,11 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """Diag 専用プロセスのコンソールと Ctrl+C。通常の起動経路には適用しない。"""
+import ctypes
 import os
 import signal
 import subprocess
@@ -29,6 +36,9 @@ class ConsoleSubprocess(HiddenSubprocess):
         # NEW_PROCESS_GROUP は Ctrl+C を無効にするため、専用コンソールでは外す。
         flags = kwargs.get('creationflags', 0) & ~subprocess.CREATE_NEW_PROCESS_GROUP
         kwargs.update(creationflags=flags | subprocess.CREATE_NEW_CONSOLE, startupinfo=startup)
+        # Ctrl+C 無視の属性は子へ継承される。Diag 本体が NEW_PROCESS_GROUP で起動されると
+        # 専用コンソールの子も Ctrl+C を受け取れないため、起動前に自分の無視属性を解除する。
+        ctypes.WinDLL('kernel32', use_last_error=True).SetConsoleCtrlHandler(None, False)
         process = self.original.Popen(*args, **kwargs)
         process._aidiy_private_console = True
         return process

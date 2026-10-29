@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // NPCうさぎの造形と跳躍動作。
 // 雑談エリアと休憩エリアの2つを遊び場にして、黒うさぎ（オス）と白うさぎ（メス）がぴょんぴょん跳ねる。
 //

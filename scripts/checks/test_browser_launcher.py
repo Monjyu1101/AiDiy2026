@@ -1,6 +1,13 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """BrowserのPATH登録・解除・起動委譲を一時環境とモックだけで確認する。"""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -61,7 +68,8 @@ class BrowserLauncherTests(unittest.TestCase):
             self.assertTrue(start.is_dev_process(proc, ROOT / 'frontend_ide/viewer', False, 'browser'))
             self.assertFalse(start.is_dev_process(proc, ROOT / 'frontend_ide/viewer', False, 'ide'))
             self.assertFalse(start.is_dev_process(proc, ROOT / 'other/frontend_ide/viewer', False, 'browser'))
-            self.assertEqual(scope.process_role(proc, ROOT, False), 'browser')
+            # ROOT は実行環境のパス表記なので、Windows ではその規則で照合する。
+            self.assertEqual(scope.process_role(proc, ROOT, os.name == 'nt'), 'browser')
 
     def test_public_commands_and_no_automatic_service(self):
         package = json.loads((ROOT / 'frontend_ide/package.json').read_text())

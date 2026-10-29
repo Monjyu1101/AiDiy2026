@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Console と同じ ping のみ。無効化・切断・画面破棄時は古い応答を反映しない。
 export function Tools接続を作成({api,反映,間隔=10000,setTimer=setTimeout,clearTimer=clearTimeout}) {
  let enabled=true,connected=false,disposed=false,online=false,generation=0,timer,controller;

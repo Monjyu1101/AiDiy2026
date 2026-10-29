@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """この作業コピーのDiag本体・残留Electronを照合して停止する。"""
 import importlib.util
 from pathlib import Path
@@ -15,7 +21,11 @@ def is_diag(process, root, windows):
         return value.casefold() if windows else value
 
     root = Path(root).resolve()
-    args = common.process_arguments(process.get('CommandLine') or '', windows)
+    try:
+        args = common.process_arguments(process.get('CommandLine') or '', windows)
+    except ValueError:
+        # 解析できない無関係なプロセスで、Diag の停止全体を中断しない。
+        args = []
     executable = process.get('ExecutablePath') or (args[0] if args else '')
     binary = normalize(executable)
     distribution = normalize(root / 'node_modules' / 'electron' / 'dist') + '/'

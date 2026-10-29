@@ -207,11 +207,7 @@ uv sync --project backend_tools --locked --no-install-project
 
 更新後はバックエンドと、MCP を起動する Code CLI / VS Code / Discord を再起動する。既に残っている旧プロセスには新しい監視処理は付かない。
 
-API キーや実際の AI 呼び出しを使わずに、子孫の終了と別セッションの独立性を確認できる:
-
-```sh
-python -m unittest discover -s backend_server/tests -p test_process_lifetime.py -v
-```
+子孫の終了と別セッションの独立性を確認する専用の自動テストは現在ない。Code CLI / VS Code / Discord を終了した後に、監視ラッパーと stdio MCP のプロセスが残らないこと、並行する別セッションが止まらないことをプロセス一覧で確認する。
 
 ## MCP ツールが応答しない場合の切り分け（HTTP フォールバック）
 

@@ -44,7 +44,7 @@ Mac のアプリ名と最小メニューは `electron/main.ts` から `frontend_
 
 ## パネル外枠とタイトル配色
 
-Avatar は他の単独アプリのグレー配色へ統一せず、`src/style.css` の Avatar 専用タイトル変数を使います。ログイン・本体・Chat / File / Image / Code1〜6・別窓設定・Web左右ペインの外枠は1pxで、既存の紫グラデーションをタイトルと共有します。`border-image` は中央を塗る `fill` を指定しません。`_WindowShell` の light テーマとWeb内の設定ダイアログは、それぞれ既存の淡色タイトル背景を枠へ使います。
+Avatar は他の単独アプリのグレー配色へ統一せず、`src/style.css` の Avatar 専用タイトル変数を使います。ログイン・本体・Chat / File / Image / Code1〜6・別窓設定・Web左右ペインの外枠は1pxの実線で、タイトルの紫グラデーションの基準色（`--avatar-title-edge`）を共有します。透明Electron窓でも四辺を判別できるよう、`border-image` は使いません。`_WindowShell` の light テーマとWeb内の設定ダイアログは、それぞれ既存の淡色タイトル背景を枠へ使います。`_WindowShell` は子パネルに線が隠れないよう、`::after` の1px線を前面に描画します。枠は `pointer-events: none` とし、通常のborderは透明で領域だけ確保します。キャラクター単体表示とWeb右ペイン内では `::after` も非表示にします。最小化・最大化・ピン・閉じるの背景は通常時・ホバー時とも透明とし、ピンONも背景や影を追加しません。
 
 キャラクター単体表示の `chrome-hidden` とWeb右ペイン内の二重枠抑止では、`border-color: transparent` だけでなく `border-image: none` も必要です。背景透過、外寸、リサイズ操作域は変更しません。`node --test checks/panel-border.test.cjs` で色・1px・透明状態と反復切替を検査し、CSS出力を確認する場合は `npm run build:renderer` を使います。実OSの透明窓描画はモック試験とは別に確認します。
 

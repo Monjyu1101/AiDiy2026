@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // NPC飛行船の動作制御。
 // 4エリアの上空をゆっくり旋回し、船底から「吊り下げ物」（チーム作業の掲示板）を下げて運ぶ。
 // 旋回半径・高度・速さ・船体の大きさ・吊り下げ距離はここだけで調整する。

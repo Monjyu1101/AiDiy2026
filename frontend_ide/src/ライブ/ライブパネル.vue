@@ -288,7 +288,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
       <TerminalWelcome v-if="welcomeVisible" :key="welcomeKey" kind="live" :icon="icon" :started="!!prompt" />
       <article v-for="item in messages" :ref="el => el ? rows.set(item.id, el) : rows.delete(item.id)" :key="item.id" :class="['message',item.role,item.type, { recognition: item.type.startsWith('recognition_') }]" :title="!item.attachment && (item.role === 'user' || item.type.startsWith('recognition_')) ? 'クリックして入力欄へ戻す' : undefined" @click="copyInput(item)"><ChatAttachment v-if="item.attachment" :attachment="item.attachment" /><template v-else>{{ item.text }}</template></article>
     </main>
-    <footer class="composer"><p class="file-drop-hint" :class="{ active: draggingFiles }">{{ draggingFiles ? 'ここにドロップして送信' : 'ファイルをドロップして送信（1件4 MiBまで・最大10件）' }}</p><p v-if="fileStatus" class="file-transfer-status" role="status">{{ fileStatus }}</p><p v-if="error" role="alert" class="error">{{ error }}</p>
+    <footer class="composer" :class="{ 'file-drop-active': draggingFiles }"><p v-if="draggingFiles" class="file-drop-hint">ここにドロップして送信（1件4MiB・10件まで）</p><p v-else-if="fileStatus" class="file-transfer-status" role="status">{{ fileStatus }}</p><p v-if="error" role="alert" class="error">{{ error }}</p>
       <form @submit.prevent="submit"><textarea ref="input" v-model="prompt" rows="3" maxlength="20000" placeholder="AiDiyに話しかける…" aria-label="Liveへのメッセージ" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && event.keyCode !== 229 && connected && !blocked && !uploadingFiles && prompt.trim()) { event.preventDefault(); sendButton.focus(); } }"></textarea>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="blocked || modelLoading" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label">{{ modelLabel }}</span></div><button ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !connected }" :disabled="!connected || blocked || uploadingFiles || !prompt.trim()" aria-label="送信"><img :src="sendIcon" alt=""></button></div>
       </form>
@@ -305,7 +305,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
 </template>
 
 <style scoped>
-.file-drop-active .live-conversation{outline:2px dashed #8ecbff;outline-offset:-3px}
-.file-drop-hint,.file-transfer-status{margin:4px 0;font-size:11px;color:#a9b8cc}
-.file-drop-hint.active{color:#9edfff}
+.composer.file-drop-active{outline:2px dashed #8ecbff;outline-offset:-2px;border-radius:6px;background:rgba(102,126,234,.18)}
+.file-drop-hint,.file-transfer-status{margin:4px 0;font-size:12px;line-height:1.4;color:#a9b8cc;overflow-wrap:anywhere}
+.file-drop-hint{color:#9edfff;font-weight:600}
 </style>

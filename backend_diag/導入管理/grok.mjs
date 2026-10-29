@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Windows の公式 Grok Build CLI だけを扱う。認証・設定・履歴・セッションは削除しない。
 // 公式スクリプト: https://x.ai/cli/install.ps1（削除用のサブコマンドは提供されていない）
 import {mkdtemp,readdir,rename,unlink,rm} from 'node:fs/promises';

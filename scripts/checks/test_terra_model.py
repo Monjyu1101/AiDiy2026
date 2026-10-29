@@ -1,5 +1,9 @@
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-# Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """Terra改名後のHermes経路を、通信せず検証する。
 
 実行: command_hermes/.venv/bin/python scripts/checks/test_terra_model.py
@@ -10,6 +14,10 @@ from pathlib import Path
 
 HERMES = Path(__file__).resolve().parents[2] / "command_hermes"
 sys.path[:0] = [str(HERMES / "base"), str(HERMES)]
+try:
+    import yaml  # noqa: F401  Hermes の依存。ルートの Python には無い。
+except ImportError:
+    raise unittest.SkipTest('Hermes の依存が無い環境（command_hermes/.venv の Python で実行）')
 import core
 sys.modules.setdefault("agent", core)
 from core.model_metadata import is_codex_900k_base, strip_codex_context_variant_suffix

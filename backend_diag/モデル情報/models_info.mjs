@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // プロバイダ別のモデル情報を _AIDIY/aidiy_diag/<id>_models_info.json へ保存する。
 // 用途の分け方は本体（backend_server/conf/conf_model.py の get_chat_models / get_live_models / get_code_models）に合わせる。
 // 取得結果を優先し、Chat が空または local のみなら設定モデルを未検証の候補として補う。

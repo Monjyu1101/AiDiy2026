@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """ローカル Git 管理情報を走査・クリーンアップから保護する回帰試験。"""
 import ast
 import importlib.util
@@ -23,10 +29,11 @@ class LocalGitExclusionTests(unittest.TestCase):
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('fixture\n', encoding='utf-8')
+            # text=True は Windows で入力の改行を CRLF に変えるため、バイト列で渡す。
             result = subprocess.run(['git', '-C', str(root), 'check-ignore', '--stdin'],
-                                    input='\n'.join(paths) + '\n', text=True,
+                                    input=('\n'.join(paths) + '\n').encode('utf-8'),
                                     capture_output=True, check=True)
-            self.assertEqual(result.stdout.splitlines(), paths)
+            self.assertEqual(result.stdout.decode('utf-8').splitlines(), paths)
             subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
             tracked = subprocess.check_output(['git', '-C', str(root), 'ls-files'], text=True)
             self.assertIn('nested/project/source.py', tracked.splitlines())
@@ -38,8 +45,9 @@ class LocalGitExclusionTests(unittest.TestCase):
         spec.loader.exec_module(module)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            # 大文字小文字を区別しないファイルシステムでは .GIT_LOCAL は .git_local と同じ実体になる。
             for name in ('.git', '.git_local', '.GIT_LOCAL', 'source'):
-                (root / name / 'temp').mkdir(parents=True)
+                (root / name / 'temp').mkdir(parents=True, exist_ok=True)
             self.assertEqual(module.find_temp_directories(root), [root / 'source' / 'temp'])
             self.assertTrue((root / '.git_local' / 'temp').is_dir())
 

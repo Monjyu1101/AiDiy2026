@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 公開 OpenRouter 一覧を取得できない場合の同梱キャッシュ。ZIP を一時フォルダへ展開して読む。
 // 外部コマンドは使わず、Node 標準の zlib だけで固定の 1 ファイルを取り出す。
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';

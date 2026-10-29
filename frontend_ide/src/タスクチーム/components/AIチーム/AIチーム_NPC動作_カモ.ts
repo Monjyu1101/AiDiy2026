@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // NPCカモの造形と動作。親カモ（カモ大）1羽と子カモ（カモ小）5羽が水場のまわりで暮らす。
 //
 // 親カモは水場の岸を散歩し、ときどき水へ入って泳ぐ。陸か水かは「水場の中心からの距離」だけで

@@ -1,3 +1,8 @@
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
 // AIチーム_応答内容: 依頼一覧・経験一覧の行ダブルクリックで開く読み取り専用ダイアログ
 // 渡された 要求内容 / 応答内容 / まとめ内容 のうち、中身のあるものだけをセクション表示する

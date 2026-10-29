@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 実IDE画面のズーム途中を静止し、Computer UseでWindowsの合成結果を撮影する。
 // 表示処理は本番共通モジュール。試験用に完了待ちの上限だけ延長する。
 const {app,BrowserWindow}=require('electron');

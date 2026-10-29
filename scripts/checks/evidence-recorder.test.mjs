@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs, {mkdtemp, mkdir, copyFile, readFile, rm, readdir, writeFile, stat, utimes, rmdir} from 'node:fs/promises';
@@ -6,7 +11,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 
-test('証跡画像は内容順の名前を使い、再撮影でも旧画像を上書きしない', async t => {
+test('証跡画像は内容順の名前を使い、再撮影は掲載番号を指定して同名へ更新する', async t => {
   const root = await mkdtemp(join(tmpdir(), 'aidiy-evidence-name-'));
   t.after(() => rm(root, {recursive: true, force: true}));
   const script = join(root, 'scripts/checks/実画面試験記録.mjs');
@@ -17,14 +22,15 @@ test('証跡画像は内容順の名前を使い、再撮影でも旧画像を�
   const entry = {paragraph: 1, title: '起動直後画面', status: '観測', note: '命名の合成試験',
     state: {screenshots: [{url: 'data:image/png;base64,' + bytes.toString('base64')}]} };
   const first = await (await createEvidenceRecorder('20261023-first', 'system'))(entry);
-  const second = await (await createEvidenceRecorder('20261024-second', 'system'))(entry);
-  const third = await (await createEvidenceRecorder('20261024-third', 'system'))(entry);
+  const second = await (await createEvidenceRecorder('20261024-second', 'system'))({...entry, evidenceNumber: 101});
+  const third = await (await createEvidenceRecorder('20261024-third', 'system'))({...entry, evidenceNumber: 101});
   assert.equal(first.file, 'Diag-システム起動_101_起動直後画面.png');
-  assert.equal(second.file, 'Diag-システム起動_101_起動直後画面_確認02.png');
-  assert.equal(third.file, 'Diag-システム起動_101_起動直後画面_確認03.png');
+  assert.equal(second.file, 'Diag-システム起動_101_起動直後画面.png');
+  assert.equal(third.file, 'Diag-システム起動_101_起動直後画面.png');
   const folder = join(root, '_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編');
   for (const row of [first, second, third]) assert.deepEqual(await readFile(join(folder, row.file)), bytes);
-  assert.ok((await readdir(folder)).every(name => name.endsWith('.png')));
+  assert.deepEqual(await readdir(folder), [first.file]);
+  await assert.rejects((await createEvidenceRecorder('collision', 'system'))(entry), /evidenceNumber/);
   const cache = join(root, '.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
   assert.equal((await readdir(cache)).filter(name => name.endsWith('__evidence.json')).length, 3);
   const next = await (await createEvidenceRecorder('20261023-first', 'system'))(entry);
@@ -125,9 +131,9 @@ test('manifest置換失敗後も既存JSON・画像を保持し、次の保存�
   const failedImage = 'Diag-システム起動_102_並行記録画面.png';
   assert.deepEqual(await readFile(join(f.folder, failedImage)), f.bytes);
   assert.deepEqual((await readdir(f.work)).filter(name => /\.(new|lock)$/.test(name)), []);
-  const retry = await record({...f.entry, note: 'retry'});
+  const retry = await record({...f.entry, note: 'retry', evidenceNumber: 102});
   assert.equal(retry.id, '102');
-  assert.match(retry.file, /_確認02\.png$/);
+  assert.equal(retry.file, failedImage);
   assert.deepEqual((await assertSaved(f, 2)).map(row => row.note), ['合成試験', 'retry']);
   assert.deepEqual(await readFile(join(f.folder, failedImage)), f.bytes);
 });
@@ -209,7 +215,7 @@ test('writer異常終了後のロック・一時ファイル・画像は自動�
   assert.deepEqual(await readFile(f.manifest), before);
   assert.deepEqual(await readdir(f.work), names);
   await rmdir(f.manifest + '.lock');
-  await record(f.entry);
+  await record({...f.entry, evidenceNumber: 102});
   await assertSaved(f, 2);
   assert.deepEqual(await readFile(join(f.work, temporary)), tempBefore);
 });

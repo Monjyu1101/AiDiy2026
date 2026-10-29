@@ -19,6 +19,10 @@ capture = types.ModuleType('tools_proc.desktop_capture')
 capture.DesktopCapture = object
 log = types.ModuleType('log_config')
 log.get_logger = logging.getLogger
+try:
+    import PIL  # noqa: F401  Tools のブラウザ処理の依存。ルートの Python には無い。
+except ImportError:
+    raise unittest.SkipTest('Pillow が無い環境（backend_tools/.venv の Python で実行）')
 with patch.dict(sys.modules, {'tools_proc.desktop_capture': capture, 'log_config': log}):
     from tools_proc.ide_browser_session import is_ide_session, is_reserved_browser_session, read_ide_session, IDEBrowserManager, IDEBrowserClient
     import tools_proc.chrome_sessions as sessions

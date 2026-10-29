@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 import {ref,nextTick} from 'vue';
 
 export function 起動ミニ表示を作成({利用可能,初期表示=false,切替=enabled=>globalThis.window?.aidiyWindow?.startMini?.(enabled)??true,反映=()=>globalThis.window?.aidiyWindow?.finishMini?.()??true}){

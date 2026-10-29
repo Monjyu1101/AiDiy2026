@@ -90,16 +90,26 @@ function closeWindow() {
 }
 
 .login-card {
+  position: relative;
   width: min(100%, 212px);
   padding: 0 4px 4px;
   border-radius: 0;
-  border: 1px solid var(--avatar-title-edge);
-  border-image: var(--avatar-title-background) 1;
+  border: 1px solid transparent;
+  border-image: none;
   background: rgba(2, 2, 4, 0.46);
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.24),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
+}
+
+.login-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--avatar-title-edge);
+  pointer-events: none;
+  z-index: 30;
 }
 
 .title-bar {

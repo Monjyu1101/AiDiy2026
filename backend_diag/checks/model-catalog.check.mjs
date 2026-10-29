@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 旧 tests/test_model_probe.py の CatalogParityTests を移植。日付はローカル暦（元実装の naive datetime と同じ）。
 import test from 'node:test';
 import assert from 'node:assert/strict';

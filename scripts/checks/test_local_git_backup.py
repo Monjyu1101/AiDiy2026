@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 import os
 import importlib.util
 import logging
@@ -65,8 +71,17 @@ class LocalBackupTests(unittest.TestCase):
                 (self.root / ".git").write_text(pointer)
                 self.assert_protected()
 
+    def symlink_or_skip(self, link, target, directory=False):
+        # Windows は開発者モード等のシンボリックリンク権限が無いと作成できない。
+        try:
+            link.symlink_to(target, target_is_directory=directory)
+        except OSError as error:
+            if getattr(error, 'winerror', None) == 1314:
+                self.skipTest('シンボリックリンクを作成できない環境')
+            raise
+
     def test_broken_git_symlink_is_preserved(self):
-        (self.root / ".git").symlink_to(self.root / "absent")
+        self.symlink_or_skip(self.root / ".git", self.root / "absent")
         self.assert_protected()
         self.assertTrue((self.root / ".git").is_symlink())
 
@@ -86,7 +101,7 @@ class LocalBackupTests(unittest.TestCase):
     def test_git_local_symlink_is_not_followed(self):
         target = self.root.parent / "metadata"
         self.meta.rename(target)
-        self.meta.symlink_to(target, target_is_directory=True)
+        self.symlink_or_skip(self.meta, target, directory=True)
         before = {p.relative_to(target): p.read_bytes() for p in target.rglob("*") if p.is_file()}
         self.assertEqual(self.snapshot()[0], "error")
         self.assertEqual(before, {p.relative_to(target): p.read_bytes() for p in target.rglob("*") if p.is_file()})

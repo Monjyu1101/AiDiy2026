@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 合成プロセスと一時フォルダだけで検証する。実際の npm・導入・削除は実行しない。
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,6 +11,8 @@ import {mkdtemp,mkdir,readFile,writeFile,rm,stat,symlink,readdir} from 'node:fs/
 import path from 'node:path';
 import os from 'node:os';
 import {NPM_PACKAGES,LOG_LIMIT,acquireInstallLock,installEnvironment,safeInstallLog,runInstallCommand as actualRunInstallCommand,findNpm,npmCapability,npmCommands,createInstallManager} from '../導入管理/導入管理.mjs';
+// Windows はシンボリックリンク権限（開発者モード等）が無いと作成できないため、リンク前提の確認だけ省略する。
+const symlinkSkip=await (async()=>{const temp=await mkdtemp(path.join(os.tmpdir(),'aidiy-diag-link-'));try{await writeFile(path.join(temp,'a'),'');await symlink(path.join(temp,'a'),path.join(temp,'b'));return false;}catch(error){if(error.code==='EPERM')return 'シンボリックリンクを作成できない環境';throw error;}finally{await rm(temp,{recursive:true,force:true});}})();
 
 const entries=[...Object.keys(NPM_PACKAGES).map(id=>({id,name:id,commands:[id]})),{id:'python',name:'Python'}];
 const npm={executable:'/fixture/node',cli:'/fixture/npm-cli.js',prefix:'/fixture/global prefix;not-a-shell',root:'/fixture/global/lib/node_modules'};
@@ -193,7 +200,7 @@ test('能力判定は未導入・npm 管理・別導入元・所有情報不正�
   await writeFile(path.join(owned.directory,'package.json'),JSON.stringify({name:'wrong-owner'}));assert.deepEqual((await npmCapability(entry,owned,{resolve:async()=>owned.target})).操作,[]);
 });
 
-test('POSIX symlink と Windows npm shim の所有元を照合する',async t=>{
+test('POSIX symlink と Windows npm shim の所有元を照合する',{skip:symlinkSkip},async t=>{
   const tree=await packageTree(t),entry=entries.find(item=>item.id==='codex');
   const linked=path.join(tree.prefix,'codex');await symlink(tree.target,linked);assert.deepEqual((await npmCapability(entry,tree,{platform:'linux',resolve:async()=>linked})).操作,['再導入','削除']);
   const win=await packageTree(t,{platform:'win32'});
@@ -223,7 +230,7 @@ test('不正 bin・パッケージ外参照・別所有者では再導入も削�
   }
 });
 
-test('npm link と package 内の bin symlink から外部配置を所有扱いしない',async t=>{
+test('npm link と package 内の bin symlink から外部配置を所有扱いしない',{skip:symlinkSkip},async t=>{
   const tree=await npmTree(t),entry=entries.find(item=>item.id==='codex'),external=path.join(tree.directory,'external-package');
   await mkdir(path.join(external,'bin'),{recursive:true});await writeFile(path.join(external,'package.json'),JSON.stringify({name:NPM_PACKAGES.codex,bin:{codex:'bin/cli.js'}}));await writeFile(path.join(external,'bin','cli.js'),'// 外部配置');
   const directory=path.join(tree.root,'@openai','codex');await mkdir(path.dirname(directory),{recursive:true});await symlink(external,directory,'dir');
@@ -344,7 +351,7 @@ test('manager 自体も固定4 ID と固定操作以外を拒否する',async t=
   await assert.rejects(()=>manager.start('codex','任意コマンド'),{status:404});assert.equal(calls.length,0);assert.equal(probes.length,0);
 });
 
-test('prefix ロックは同じ実体・Windows 大小文字違いを拒否し、別導入先と解除後を許可する',async t=>{
+test('prefix ロックは同じ実体・Windows 大小文字違いを拒否し、別導入先と解除後を許可する',{skip:symlinkSkip},async t=>{
   const directory=await temp(t),prefix=path.join(directory,'prefix');await mkdir(prefix);
   const alias=path.join(directory,'alias');await symlink(prefix,alias,'dir');
   const release=await acquireInstallLock(prefix,{directory});t.after(release);

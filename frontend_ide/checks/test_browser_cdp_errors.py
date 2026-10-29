@@ -15,8 +15,11 @@ import types
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-import websockets
-from websockets.exceptions import WebSocketException
+try:
+    import websockets
+    from websockets.exceptions import WebSocketException
+except ImportError:
+    raise unittest.SkipTest('websockets が無い環境（backend_tools/.venv の Python で実行）')
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend_tools'))

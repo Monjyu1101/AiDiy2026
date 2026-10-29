@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // cleanup がこの作業コピーだけに出す停止通知。PID や認証キーは保存しない。
 import {readFile,stat} from 'node:fs/promises';
 export const STOP_FILE = new URL('../.stop-request',import.meta.url);

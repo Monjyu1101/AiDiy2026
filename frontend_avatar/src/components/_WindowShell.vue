@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  border: 1px solid var(--avatar-light-title-background);
+  border: 1px solid transparent;
   background: rgba(12, 12, 12, 0.72);
   box-shadow: 0 20px 42px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -205,6 +205,24 @@ onBeforeUnmount(() => {
 
 .window-shell.resizing {
   user-select: none;
+}
+
+/* 子パネルの不透明な描画より前面に、操作を遮らない1px枠を描く。 */
+.window-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--avatar-light-title-background);
+  pointer-events: none;
+  z-index: 30;
+}
+
+.window-shell.theme-purple::after {
+  border-color: var(--avatar-title-edge);
+}
+
+.window-shell.chrome-hidden::after {
+  display: none;
 }
 
 .window-shell.chrome-hidden {
@@ -262,7 +280,7 @@ onBeforeUnmount(() => {
   width: 20px;
   height: 20px;
   border: none;
-  background: rgba(0, 0, 0, 0.72);
+  background: transparent;
   color: #fff;
   cursor: pointer;
   display: inline-flex;
@@ -354,8 +372,8 @@ onBeforeUnmount(() => {
 }
 
 .theme-purple {
-  border-color: var(--avatar-title-edge);
-  border-image: var(--avatar-title-background) 1;
+  border-color: transparent;
+  border-image: none;
   background: rgba(6, 8, 14, 0.18);
 }
 

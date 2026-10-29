@@ -14,6 +14,8 @@ import actionsModule from '../デスクトップ/native-preview-actions.cjs';
 const {createNativePreviewActions,validPreviewPath}=actionsModule;
 const desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+// Windows はシンボリックリンク権限（開発者モード等）が無いと作成できないため、リンク前提の確認だけ省略する。
+const symlinkSkip=await (async()=>{const temp=await mkdtemp(join(tmpdir(),'aidiy-native-preview-link-'));try{await writeFile(join(temp,'a'),'');await symlink(join(temp,'a'),join(temp,'b'));return false;}catch(error){if(error.code==='EPERM')return 'シンボリックリンクを作成できない環境';throw error;}finally{await rm(temp,{recursive:true,force:true});}})();
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};};
 
 async function fixture(t,options={}){
@@ -117,7 +119,7 @@ test('ネイティブプレビュー: 終了・古いセッション・親なし
  assert.deepEqual(f.copies,[]);assert.deepEqual(f.opens,[]);
 });
 
-test('ネイティブプレビュー: 見つからないファイル・フォルダ・外部リンクを拒否し内部リンクだけ許可',async t=>{
+test('ネイティブプレビュー: 見つからないファイル・フォルダ・外部リンクを拒否し内部リンクだけ許可',{skip:symlinkSkip},async t=>{
  const f=await fixture(t);await writeFile(join(f.temp,'outside.txt'),'outside');
  await symlink(join(f.temp,'outside.txt'),join(f.root,'outside-link.txt'));
  await symlink(join(f.root,'readme.txt'),join(f.root,'inside-link.txt'));
@@ -145,7 +147,7 @@ test('ネイティブプレビュー: 実行形式・スクリプト・ショー
  const before=f.dialogs.length;assert.deepEqual(await f.actions.copyFilePath(f.event(f.owner),'run.cmd'),{ok:true});assert.equal(f.dialogs.length,before);
 });
 
-test('ネイティブプレビュー: 実行ビットとリンク先の拡張子にも確認を適用',async t=>{
+test('ネイティブプレビュー: 実行ビットとリンク先の拡張子にも確認を適用',{skip:symlinkSkip},async t=>{
  const f=await fixture(t);await symlink(join(f.root,'run.cmd'),join(f.root,'harmless.txt'));
  assert.equal((await f.actions.openFile(f.event(f.owner),'harmless.txt')).ok,false);assert.equal(f.dialogs.length,1);
  if(process.platform!=='win32'){
@@ -179,7 +181,7 @@ test('ネイティブプレビュー: 確認ダイアログ待ち中の親/子�
  }
 });
 
-test('ネイティブプレビュー: 確認中のファイル差し替え・削除・外部リンク化を拒否',async t=>{
+test('ネイティブプレビュー: 確認中のファイル差し替え・削除・外部リンク化を拒否',{skip:symlinkSkip},async t=>{
  for(const mutate of [f=>writeFile(join(f.root,'run.cmd'),'changed script'),f=>unlink(join(f.root,'run.cmd')),async f=>{await unlink(join(f.root,'run.cmd'));await symlink(join(f.temp,'outside.cmd'),join(f.root,'run.cmd'));}]){
   const f=await fixture(t),wait=deferred();await writeFile(join(f.temp,'outside.cmd'),'outside');f.dialogHook(()=>wait.promise);
   const pending=f.actions.openFile(f.event(f.owner),'run.cmd');await tick();await mutate(f);wait.resolve({response:0});
@@ -187,7 +189,7 @@ test('ネイティブプレビュー: 確認中のファイル差し替え・削
  }
 });
 
-test('ネイティブプレビュー: プロジェクト自身がリンクでもコピー名を保ち、確認中のルート差し替えを拒否',async t=>{
+test('ネイティブプレビュー: プロジェクト自身がリンクでもコピー名を保ち、確認中のルート差し替えを拒否',{skip:symlinkSkip},async t=>{
  const f=await fixture(t),alias=join(f.temp,'project-link');await symlink(f.root,alias,'dir');f.state.project.path=alias;
  assert.deepEqual(await f.actions.copyFilePath(f.event(f.owner),'日本語 の資料/説明.txt'),{ok:true});
  assert.deepEqual(f.copies,[join(alias,'日本語 の資料','説明.txt')]);
@@ -212,7 +214,7 @@ test('フォルダを開く: ファイルは所在フォルダ、フォルダと
  assert.deepEqual(f.opens,[join(f.root,'日本語 の資料'),join(f.root,'日本語 の資料'),f.root,f.root,f.root].map(path=>realpathSync(path)));
  assert.deepEqual(f.dialogs,[]);assert.deepEqual(f.copies,[]);
 });
-test('フォルダを開く: 不正パス・欠落・外部リンクを拒否し、内部リンクの所在を守る',async t=>{
+test('フォルダを開く: 不正パス・欠落・外部リンクを拒否し、内部リンクの所在を守る',{skip:symlinkSkip},async t=>{
  const f=await fixture(t),event=f.event(f.owner);
  await mkdir(join(f.temp,'outside'));await writeFile(join(f.temp,'outside','file.txt'),'outside');
  await symlink(join(f.temp,'outside'),join(f.root,'outside-dir'),'dir');

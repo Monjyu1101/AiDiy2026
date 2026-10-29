@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 起動キーはタブ・origin・公開パスごとの一時領域だけに保持する。
 // Electronの非永続sessionも同じ経路を使い、永続ストレージへは書き込まない。
 export function 認証セッションを作成({location,storage=()=>globalThis.sessionStorage}){

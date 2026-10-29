@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """準備中止と遅延投入の順序、自動会話入力の実呼出しを隔離検証。"""
 import ast, importlib.util, json, sys, tempfile, unittest
 from pathlib import Path

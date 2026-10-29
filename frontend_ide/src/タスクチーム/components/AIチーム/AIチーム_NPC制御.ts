@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // NPC制御。種別ごとの動作モジュールを登録し、配置と毎フレーム更新の入口をまとめる。
 //
 // 画面（AIチーム_空間表示.vue）はこのファイルだけを使い、

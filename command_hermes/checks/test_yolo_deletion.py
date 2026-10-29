@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 from pathlib import Path
 import subprocess
 import sys
@@ -39,6 +40,8 @@ from tools import approval, terminal_tool
 
 def tearDownModule():
     _env.stop()
+    # Windows は開いたままのログ（.__agent.lock）を削除できないため、先にハンドラーを閉じる。
+    logging.shutdown()
     _home.cleanup()
 
 

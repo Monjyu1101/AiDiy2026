@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """AI判断の実アダプターを合成HTTPで検証。キー・外部AIへは接続しない。"""
 import importlib
 import json
@@ -8,7 +14,10 @@ import unittest
 import types
 from unittest.mock import patch
 
-import httpx
+try:
+    import httpx
+except ImportError:  # backend_tools / backend_server の Python で実行する。
+    raise unittest.SkipTest('httpx が無い環境（backend_tools/.venv の Python で実行）')
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend_server'))
 # アダプターの間接importで実運用ログを作らない。

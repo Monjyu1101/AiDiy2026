@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 期限・同時実行・キャンセルをすべてのモデル処理に適用。子プロセスやPython不要。
 import {status,probe,publicCatalog,KEY_PROVIDERS,RESPONSE_LIMIT,type Reader,type Fetch} from './model_probe';
 export type RunOptions={reader?:Reader;fetch?:Fetch;input?:unknown;now?:Date;timeout?:number;signal?:AbortSignal;onState?:(state:'待機中'|'確認中')=>void};

@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 const test=require('node:test');const assert=require('node:assert/strict');const {render,source}=require('./ui-components.cjs');
 test('Console-like status bar distinguishes Tools and diagnostic connection without browser window controls',async()=>{
  for(const [props,text,bar] of [[{connected:true,enabled:true,online:true},'Tools 接続中','online'],[{connected:true,enabled:true},'Tools 未接続',''],[{connected:true,enabled:false},'Tools 確認OFF','offline'],[{connected:false,enabled:true,online:true},'診断 未接続','']]){

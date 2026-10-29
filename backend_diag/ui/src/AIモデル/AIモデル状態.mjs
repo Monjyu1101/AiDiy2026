@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 import {ref,reactive,computed,nextTick} from 'vue';
 import {設定モデル音声を作成} from '../設定モデル/設定モデル音声.mjs';
 import {TRIAL_PROMPT,decisionQuestions,TRIAL_FAMILIES} from '../../../モデル試行/defaults.mjs';

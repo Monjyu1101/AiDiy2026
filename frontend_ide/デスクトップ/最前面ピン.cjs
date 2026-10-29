@@ -13,6 +13,15 @@ const pinLevel=process.platform==='win32'?'normal':'floating';
 function createWindowPins({onChanged=()=>{}}={}) {
  const entries=new WeakMap();
  const alive=window=>window&&!window.isDestroyed();
+ function enableTopmost(window) {
+  window.setAlwaysOnTop(true,pinLevel);
+  // Windowsの最大化・全画面遷移後は内部の層指定だけ残り、ONの再指定が無視される場合がある。
+  // 実状態がOFFの時だけ一度解除して再設定する。選択・focusや定期処理は追加しない。
+  if(process.platform==='win32'&&window.isAlwaysOnTop?.()===false){
+   window.setAlwaysOnTop(false);
+   window.setAlwaysOnTop(true,pinLevel);
+  }
+ }
  function state(window) {
   const entry=alive(window)&&entries.get(window);
   return {pinned:!!entry&&(entry.requested||entry.locked),locked:!!entry?.locked};
@@ -29,7 +38,7 @@ function createWindowPins({onChanged=()=>{}}={}) {
   const value=state(window);
   if(entry.applied!==value.pinned){
    // pop-up-menu / screen-saver 等の上位層を使わず、全アプリを同じ標準の層に揃える。
-   if(value.pinned)window.setAlwaysOnTop(true,pinLevel);
+   if(value.pinned)enableTopmost(window);
    else window.setAlwaysOnTop(false);
    entry.applied=value.pinned;
   }
@@ -49,7 +58,7 @@ function createWindowPins({onChanged=()=>{}}={}) {
   // Windowsでは非表示中に付けた最前面が表示時に外れるため、ONの窓は表示のたびに付け直す。
   const entry={requested:pinned===true,locked:locked===true,applied:undefined,raising:false,
    focus:()=>raiseSelected(window),closed:()=>unregister(window),
-   show:()=>{if(alive(window)&&state(window).pinned)window.setAlwaysOnTop(true,pinLevel);}};
+   show:()=>{if(alive(window)&&state(window).pinned)enableTopmost(window);}};
   entries.set(window,entry);
   window.on('focus',entry.focus);window.on('show',entry.show);window.once('closed',entry.closed);
   return apply(window);

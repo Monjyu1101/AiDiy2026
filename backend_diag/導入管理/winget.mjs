@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Windows の固定 WinGet パッケージ。list の掲載だけを所有元の証明にしません。
 // 所有登録: microsoft/winget-cli src/AppInstallerCLICore/PortableInstaller.cpp, AppInstallerCommonCore/PortableARPEntry.cpp
 // OBS は https://github.com/obsproject/bouf/blob/master/extra/nsis/mp-installer.nsi の通常 /S（任意の設定削除を選択しない）。

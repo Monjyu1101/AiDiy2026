@@ -1103,6 +1103,9 @@ class CodeAgent:
 
     @staticmethod
     def _生成画像属性(info) -> tuple:
+        # Windows の st_ctime_ns は lstat と fstat で意味が異なるため照合に使わない。
+        if os.name == "nt":
+            return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
         return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
     @staticmethod
@@ -1156,7 +1159,8 @@ class CodeAgent:
                         if entry.is_dir(follow_symlinks=False):
                             pending.append(entry.path)
                         elif os.path.splitext(entry.name)[1].lower() in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"):
-                            info = entry.stat(follow_symlinks=False)
+                            # Windows の DirEntry.stat は st_dev / st_ino が 0 のため、fstat と照合できる lstat を使う。
+                            info = os.lstat(entry.path)
                             if stat.S_ISREG(info.st_mode):
                                 images[relative.replace(os.sep, "/")] = self._生成画像属性(info)
             return root, images

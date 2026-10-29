@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Copilot の既存定義を共有し、OAuth の仮候補を別のモデル名で複製しない。
 export const COPILOT_FALLBACK_MODELS = Object.freeze({
   'claude-fable-5.1':'2026/08/28 - claude-fable-5.1',

@@ -28,8 +28,8 @@
 - 検証指示へはプロジェクトルート・保存済みバックアップ・その親フォルダの絶対パスを渡す。時刻フォルダ名だけでリネームを依頼しない。コメント追記のリネームは同じ日付フォルダ内に限定し、`HHMMSS` と初回の `.all` を維持する。`_AIDIY/.aidiy_backup` や旧 `_AIDIY/backup` などへの移動・複製・再作成を依頼しない。ログの `バックアップ保存先:`（保存直後）と `検証後バックアップ保存先:` を照合する。検証後に同じ親内の元名・コメント付きの保存版がなければ警告を出す。共通ルーチンの保存と、その後のAIによるファイル操作を分けて切り分け、警告だけで移動先を断定しない。
 - 別環境だけ保存先が違う場合は、IDE画面のプロジェクトパス、実際に呼ばれたPATHランチャー（Windows: `where aidiy_ide`、Linux / macOS: `command -v aidiy_ide`）、バックエンドログの `バックアップ開始(対象パス)` を照合する。ランチャー・Code配布物・稼働中バックエンドが同じ更新済み配置先を使っているか確認し、配布物更新後はIDEとバックエンドを再起動する。
 - `python -m unittest discover -s backend_server/checks -p 'test_backup_local.py'` は新保存先 `.aidiy_backup/` と旧 `backup/` の扱いを一時プロジェクトで検証する。実プロジェクトのバックアップを読まず、新保存先で保存・差分確認できることと、旧保存先へフォールバックしないことを確認する。
-- `python -m unittest discover -s backend_server/tests -p 'test_backup*.py'` は外部プロジェクトの保存・差分確認・参照の一致とファイル数上限を検証する。IDE起動経路の確認には一時プロジェクトを用意し、起動だけの状態とCodeオンライン接続後の状態を分けて保存先を調べる。
-- `backend_server/.venv/bin/python -m unittest discover -s backend_server/tests -p 'test_code_verification.py'` は、模擬AIと実バックアップ処理で各CLI / SDKの共通検証ループの初回・差分保存先、設定不一致時の実行先優先、同じ親内のコメント追記と再保存判定を確認する。外部CLI / SDKへの実接続は含まない。WindowsではPythonを `backend_server\.venv\Scripts\python.exe` に置き換える。
+- `python -m unittest discover -s backend_server/checks -p 'test_backup*.py'` は一時プロジェクトでの保存・参照・除外と、バックアップの非阻塞・二重起動・結果反映を検証する。IDE起動経路の確認には一時プロジェクトを用意し、起動だけの状態とCodeオンライン接続後の状態を分けて保存先を調べる。
+- 各CLI / SDKの共通検証ループ（初回・差分保存先、設定不一致時の実行先優先、同じ親内のコメント追記と再保存判定）には専用の自動テストがない。変更時は一時プロジェクトで Code 要求を実行し、保存先とフォルダ名のコメント追記を確認する。
 
 ### 旧保存先からの移行に関する注意
 

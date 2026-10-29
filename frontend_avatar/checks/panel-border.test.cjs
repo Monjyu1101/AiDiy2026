@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 実CSSとVueのrenderを検査。実GUI・API・音声は起動しない。
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -27,13 +30,18 @@ test('Avatar固有の紫グラデーションと淡色を維持し、他アプ�
   assert.equal(root['--avatar-light-title-background'], 'rgba(200, 200, 200, 0.92)');
   assert.match(source('main.ts'), /import '.\/style.css'/);
 });
-test('shellは外寸と1pxを維持し、紫はタイトルと同じ画像、淡色は同じ背景色を枠に使う', () => {
+test('shellは外寸と1pxを維持し、紫はタイトルの基準色、淡色は同じ背景色を枠に使う', () => {
   const shell = rule('components/_WindowShell.vue', '.window-shell');
   assert.equal(shell.width, '100vw');assert.equal(shell.height, '100vh');
-  assert.equal(shell.border, '1px solid var(--avatar-light-title-background)');
+  assert.equal(shell.border, '1px solid transparent');
+  const frame = rule('components/_WindowShell.vue', '.window-shell::after');
+  assert.equal(frame.border, '1px solid var(--avatar-light-title-background)');
+  assert.equal(frame['pointer-events'], 'none');
+  assert.equal(frame.inset, '0');
+  assert.equal(rule('components/_WindowShell.vue', '.window-shell.theme-purple::after')['border-color'], 'var(--avatar-title-edge)');
   const purple = rule('components/_WindowShell.vue', '.theme-purple');
-  assert.equal(purple['border-color'], 'var(--avatar-title-edge)');
-  assert.equal(purple['border-image'], 'var(--avatar-title-background) 1');
+  assert.equal(purple['border-color'], 'transparent');
+  assert.equal(purple['border-image'], 'none');
   assert.equal(purple.background, 'rgba(6, 8, 14, 0.18)');
   assert.equal(rule('components/_WindowShell.vue', '.theme-purple .window-titlebar').background, 'var(--avatar-title-background)');
   assert.equal(rule('components/_WindowShell.vue', '.theme-light .window-titlebar').background, 'var(--avatar-light-title-background)');
@@ -43,6 +51,7 @@ test('キャラクター単体表示では画像枠も消し、透明背景と�
   const hidden = rule('components/_WindowShell.vue', '.window-shell.chrome-hidden');
   assert.equal(hidden['border-color'], 'transparent');assert.equal(hidden['border-image'], 'none');
   assert.equal(hidden.background, 'transparent');assert.equal(hidden['box-shadow'], 'none');
+  assert.equal(rule('components/_WindowShell.vue', '.window-shell.chrome-hidden::after').display, 'none');
   assert.equal(rule('components/_WindowShell.vue', '.window-shell.chrome-hidden .resize-handle')['pointer-events'], 'none');
   assert.equal(rule('style.css', 'body').background, 'transparent');
   assert.equal(rule('style.css', '.app-root').background, 'transparent');
@@ -51,15 +60,19 @@ test('キャラクター単体表示では画像枠も消し、透明背景と�
 test('Web左右ペインは1px枠を所有し、内部shellの画像枠を二重表示しない', () => {
   const outer = rule('AiDiy.vue', '.web-left-pane,\n.web-right-pane');
   assert.equal(outer['box-sizing'], 'border-box');assert.equal(outer.border, '1px solid var(--avatar-title-edge)');
-  assert.equal(outer['border-image'], 'var(--avatar-title-background) 1');
+  assert.equal(outer['border-image'], 'none');
   assert.equal(rule('AiDiy.vue', '.web-tab-title').background, 'var(--avatar-title-background)');
   const inner = rule('AiDiy.vue', '.web-right-content :deep(.window-shell)');
   assert.equal(inner['border-color'], 'transparent');assert.equal(inner['border-image'], 'none');
+  assert.equal(rule('AiDiy.vue', '.web-right-content :deep(.window-shell::after)').display, 'none');
 });
 test('loginは既存の1px枠だけをタイトル背景に合わせ、透明な本文・余白を維持', () => {
   const card = rule('components/ログイン.vue', '.login-card');
-  assert.equal(card.border, '1px solid var(--avatar-title-edge)');
-  assert.equal(card['border-image'], 'var(--avatar-title-background) 1');
+  assert.equal(card.border, '1px solid transparent');
+  const frame = rule('components/ログイン.vue', '.login-card::after');
+  assert.equal(frame.border, '1px solid var(--avatar-title-edge)');
+  assert.equal(frame['pointer-events'], 'none');
+  assert.equal(card['border-image'], 'none');
   assert.equal(rule('components/ログイン.vue', '.title-bar').background, 'var(--avatar-title-background)');
   assert.equal(rule('components/ログイン.vue', '.login-shell').background, 'transparent');
   assert.equal(card.background, 'rgba(2, 2, 4, 0.46)');

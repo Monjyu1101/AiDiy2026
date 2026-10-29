@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 座標は移動開始の判定にだけ使用。実際の窓位置はmainがOSカーソルから計算する。
 export function アイコン移動(api,{開始=()=>{},終了=()=>{}}={}){
  let current,suppress=false,lastDrag=0;

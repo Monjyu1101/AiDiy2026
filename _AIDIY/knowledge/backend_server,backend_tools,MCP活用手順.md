@@ -18,7 +18,7 @@
 
 `aidiy_code_agents` の `ai_name` が `auto` / `same` の場合は `aidiy_hermes` を選ぶ。`auto/auto` は Hermes でモデルを自動選択し、`auto/same` と `same/same` は Hermes の前回手動選択（provider / モデル）を復元する。Hermes が利用不可ならエラーを返す。`codex_cli` などを明示指定した場合はそのエージェントを使う。起動時の利用可否確認には、Code パネル登録の有無にかかわらず Hermes を含める。
 
-前回値の保存先と指定方法は [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) を参照する。検証は `backend_tools/.venv` の Python で `python -m unittest discover -s backend_tools/tests -p test_code_agents_auto_model.py`、`backend_server/.venv` の Python で `python -m unittest discover -s backend_server/tests -p test_code_auto_model.py` を実行する。
+前回値の保存先と指定方法は [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) を参照する。専用の自動テストはないため、Tools を再起動して `aidiy_code_agents` をモデル未指定と明示指定で呼び、実行ログのモデル指定を確認する。
 
 | サーバー名 | SSE URL | 主な用途 |
 |-----------|---------|---------|

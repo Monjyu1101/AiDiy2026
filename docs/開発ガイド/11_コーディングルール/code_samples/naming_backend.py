@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 # ■ バックエンド（Python）の命名例
 
 # 正解：ビジネスドメインは日本語（Column 型は Text を使用、String は使わない）

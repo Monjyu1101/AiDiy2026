@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-# Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE for full terms.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
+
 
 """Diag / Avatar / IDE / Discord 共通の Electron 事前セットアップと ZIP キャッシュ。"""
 
@@ -257,7 +261,11 @@ def _runtime_in_use(frontend_dir: Path) -> bool:
                 return True
         executable = process.get("ExecutablePath") or ""
         if not executable:
-            args = process_arguments(process.get("CommandLine") or "", True)
+            try:
+                args = process_arguments(process.get("CommandLine") or "", True)
+            except ValueError:
+                # 解析できない場合も、Electron 名なら下の判定で所属不明として止める。
+                args = []
             executable = args[0] if args else ""
         if ntpath.normcase(executable) in executables:
             return True

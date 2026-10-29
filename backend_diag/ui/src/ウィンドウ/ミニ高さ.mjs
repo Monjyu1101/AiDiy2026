@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 内容の自然な高さだけを測る。窓の高さを測らないので、縮小後も余白やresize循環が残らない。
 export function ミニ高さを合わせる(content,{api=globalThis.window?.aidiyWindow,Observer=globalThis.ResizeObserver,style=globalThis.getComputedStyle}={}){
  if(!content?.getBoundingClientRect||typeof api?.resizeMini!=='function')return()=>{};

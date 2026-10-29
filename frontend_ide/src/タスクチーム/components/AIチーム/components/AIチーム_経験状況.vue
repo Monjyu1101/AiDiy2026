@@ -1,3 +1,8 @@
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
 // AIチーム_経験状況: 掲示板に出ているプロジェクトの経験だけを一覧表示する
 // 開いている間は5秒、折り畳み中は10秒ごとに更新確認し、非表示中は停止する

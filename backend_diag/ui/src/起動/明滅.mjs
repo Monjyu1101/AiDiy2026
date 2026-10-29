@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 稼働中表示の明滅（ミニ・通常画面で共用）。周期は約4.5秒。
 // 開始位置を0〜周期の乱数でずらすだけでは位相差が固定され、同じ模様が4.5秒ごとに繰り返すため、
 // 周期も4.5秒を中心に項目ごとにわずかにずらし（4.32〜4.68秒）、さらに表示のたびに ±0.025秒の揺らぎを加えて、位相差が少しずつ変わり続けるようにする。

@@ -29,6 +29,16 @@ test('通常起動OFF、IDE由来ON、登録は一度だけで明示選択を消
  pins.toggle(child);pins.register(child,{pinned:true});assert.equal(child.top,false);
  assert.equal(child.listenerCount('focus'),1);assert.equal(changed.length,3);
 });
+test('Windowsの層キャッシュが残ってON指定が無視された場合だけ解除して再設定する',{skip:process.platform!=='win32'},()=>{
+ const pins=createWindowPins(),window=windowFixture();pins.register(window);
+ let stale=true;const native=window.setAlwaysOnTop.bind(window);
+ window.setAlwaysOnTop=(value,level)=>{if(value&&stale){window.calls.push([value,level]);return;}if(!value)stale=false;native(value,level);};
+ pins.setLocked(window,true);
+ assert.equal(window.isAlwaysOnTop(),true);
+ assert.deepEqual(window.calls.slice(-3),[[true,'normal'],[false,undefined],[true,'normal']]);
+ const calls=window.calls.length;pins.setLocked(window,true);assert.equal(window.calls.length,calls);
+ pins.setLocked(window,false);assert.equal(window.isAlwaysOnTop(),false);
+});
 test('VRはユーザー選択を変更せず強制ON、ロック中の連打を拒否、終了で元状態へ復元',()=>{
  for(const initial of [false,true]){
   const pins=createWindowPins(),window=windowFixture();pins.register(window,{pinned:initial});

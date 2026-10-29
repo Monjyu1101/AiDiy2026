@@ -1,4 +1,10 @@
-// backend_diag/runtime/model_catalog.ts
+/*! COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026 */
+
+// ../runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {

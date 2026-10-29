@@ -1,7 +1,8 @@
-<!--
-  COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-  Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
--->
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -104,7 +105,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: none;
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.72);
+  background: transparent;
   color: #fff;
   font-size: 14px;
   line-height: 1;
@@ -113,7 +114,7 @@ onBeforeUnmount(() => {
 }
 
 .window-control:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.9);
+  background: transparent;
 }
 
 .window-control:focus-visible {
@@ -122,17 +123,22 @@ onBeforeUnmount(() => {
 }
 
 .pin-button {
+  background: transparent;
   font-size: 12px;
-  filter: grayscale(1);
-  opacity: 0.56;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+  filter: grayscale(1) brightness(2);
+  opacity: 0.9;
+  box-shadow: none;
 }
 
 .pin-button.pinned {
-  background: #6d4eaf;
+  background: transparent;
   filter: none;
   opacity: 1;
-  box-shadow: inset 0 0 0 1px rgba(222, 206, 255, 0.65);
+  box-shadow: none;
+}
+
+.window-control.pin-button:hover:not(:disabled) {
+  background: transparent;
 }
 
 .window-control:disabled {
@@ -140,6 +146,7 @@ onBeforeUnmount(() => {
 }
 
 .close-button:hover {
-  background: #b33b48;
+  background: transparent;
+  color: #ff8b98;
 }
 </style>

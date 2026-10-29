@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Live の試行音声だけを短時間保持する。外部指定のファイル名・パスは受け取らない。
 import {mkdir,mkdtemp,lstat,chmod,open,unlink,rmdir} from 'node:fs/promises';
 import {constants} from 'node:fs';

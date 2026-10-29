@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 判断用候補は認証付き取得一覧だけから合成する。生成・課金APIは呼ばない。
 import {readConfig,configured,currentDecisionModels} from '../runtime/model_probe.mjs';
 

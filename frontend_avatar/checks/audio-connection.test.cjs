@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 実際の Vue watcher と接続関数を使い、init が遅れる場合の音声接続を検証する。
 // node --test frontend_avatar/checks/audio-connection.test.cjs
 const assert = require('node:assert/strict');

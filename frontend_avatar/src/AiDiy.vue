@@ -1805,12 +1805,16 @@ onBeforeUnmount(() => {
 .web-right-pane {
   box-sizing: border-box;
   border: 1px solid var(--avatar-title-edge);
-  border-image: var(--avatar-title-background) 1;
+  border-image: none;
 }
 /* 外側ペインが枠を所有。内部の同じ枠を二重表示しない。 */
 .web-right-content :deep(.window-shell) {
   border-color: transparent;
   border-image: none;
+}
+
+.web-right-content :deep(.window-shell::after) {
+  display: none;
 }
 
 /* ===== Web版 左右分割レイアウト ===== */

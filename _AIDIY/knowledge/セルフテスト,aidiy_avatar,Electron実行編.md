@@ -6,6 +6,9 @@
 
 ## 総合評価
 
+再試験の実施順・変更後に確認する範囲は[共通の再試験準備](./セルフテスト,共通,確認結果.md#本日6時以降の更新に対する再試験準備)を参照します。以下の総合評価は記載した実施条件での結果です。画像番号は章と掲載順を表し、試験ケースIDとは区別します。
+
+
 実画面の最終確認は2026年10月28日です。ログイン、VRM描画、Chat／Liveの選択、Code1表示と終了、Task／Team入口がない構成を確認しました。文字応答・再接続は10月24日の結果です。
 
 **総合評価：✅ OK。2026年10月24日・Windowsで実画面で確認しました。ログイン、Chat・Code1・Code6・Liveの文字応答、Core再起動後の自動再接続は✅ OKです。** 
@@ -22,11 +25,11 @@ Web／Avatarのcleanup・依存復元、型チェック、起動制御、全終�
 
 移設後もChat／Liveの選択と接続表示を維持しています。
 
-![AvatarのChat表示](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_801_Chat表示.png)
+![AvatarのChat表示](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_001_Chat表示.png)
 
 Code1を開いた画面です。入力欄と接続状態を確認し、この窓だけを閉じてもコア・Chat窓は残りました。
 
-![AvatarのCode表示](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_802_Code表示.png)
+![AvatarのCode表示](./images/セルフテスト,aidiy_avatar,Electron実行編/Avatar-Electron_002_Code表示.png)
 
 [システム起動編](./セルフテスト,aidiy_diag,システム起動編.md)に従って必要なシステムを起動し、Diagの「アプリ起動」でAvatarを起動します。試験用アカウントは[アプリ起動編](./セルフテスト,aidiy_diag,アプリ起動編.md#ローカル試験用の利用者)を参照します。
 

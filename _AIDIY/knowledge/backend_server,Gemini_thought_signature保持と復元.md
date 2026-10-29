@@ -1,6 +1,6 @@
 # Gemini thought_signature の保持と復元
 
-> 文書: `backend_server,Gemini_thought_signature保持と復元.md` | 実装: `backend_server/AIコア/AIチャット_gemini.py`, `backend_server/tests/test_gemini_thought_signature.py`
+> 文書: `backend_server,Gemini_thought_signature保持と復元.md` | 実装: `backend_server/AIコア/AIチャット_gemini.py`
 
 ## このメモを使う場面
 
@@ -77,21 +77,21 @@ if signature:
 `AIチャット_gemini.py` ではトップレベル（20行目）で `import base64` 済み。
 別の場所に局所インポートを追加しない。
 
-## テスト（test_gemini_thought_signature.py）
+## 確認観点
 
-3ケースを検証する:
+専用の自動テストは現在ない。変更時は次の3点を確認する:
 
-| テスト名 | 確認内容 |
+| 観点 | 確認内容 |
 |---------|---------|
-| `test_function_call_signature_survives_openai_message_round_trip` | bytes → base64 → bytes のラウンドトリップ後、`function_call.name`・`args`・`thought_signature` が一致する |
-| `test_unsigned_tool_call_remains_supported` | `thought_signature` なしの旧来 tool_call でも `thought_signature` が `None` になりエラーが起きない |
-| `test_invalid_signature_is_ignored_without_breaking_history` | 不正 base64 文字列を渡した場合も `thought_signature` が `None` になり履歴が壊れない |
+| 署名の往復 | bytes → base64 → bytes のラウンドトリップ後、`function_call.name`・`args`・`thought_signature` が一致する |
+| 署名なしの旧形式 | `thought_signature` なしの旧来 tool_call でも `thought_signature` が `None` になりエラーが起きない |
+| 不正な署名 | 不正 base64 文字列を渡した場合も `thought_signature` が `None` になり履歴が壊れない |
 
-テストは `importlib` でモジュールを直接ロードし、`log_config` をスタブ化する。
+テストを追加する場合は `backend_server/checks/` に置き、`importlib` でモジュールを直接ロードして `log_config` をスタブ化する。
 `google.genai` の実パッケージが必要なため、依存関係をインストール済みの venv で実行する。
 
 ## 次回の注意点
 
 - `thought_signature` は Gemini SDK の opaque フィールドで、今後の SDK 更新で型や有無が変わる可能性がある。修正時は `getattr(part, "thought_signature", None)` で安全にアクセスすること。
 - `_messages_to_gemini_contents` の `tool` ロール処理は署名を持たない（FunctionResponse に署名は不要）。
-- テストを追加する場合は `_load_gemini_chat_module()` のスタブ方式を踏襲し、副作用なしで `ChatAI` を初期化する。
+- テストを追加する場合は副作用なしで `ChatAI` を初期化できるよう、モジュールを直接ロードしてスタブ化する。

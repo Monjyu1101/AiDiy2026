@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 全コマンドを mock する。実際の導入・削除・認証・ネットワーク通信は行わない。
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +13,8 @@ import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {gunzipSync} from 'node:zlib';
 import {inspectAntigravity,executeAntigravity,ANTIGRAVITY_INSTALLER_URL,ANTIGRAVITY_INSTALLER_SHA256} from '../導入管理/antigravity.mjs';
+// Windows はシンボリックリンク権限（開発者モード等）が無いと作成できないため、リンク前提の確認だけ省略する。
+const symlinkSkip=await (async()=>{const temp=await mkdtemp(path.join(os.tmpdir(),'aidiy-diag-link-'));try{await writeFile(path.join(temp,'a'),'');await symlink(path.join(temp,'a'),path.join(temp,'b'));return false;}catch(error){if(error.code==='EPERM')return 'シンボリックリンクを作成できない環境';throw error;}finally{await rm(temp,{recursive:true,force:true});}})();
 
 // レビュー済み公式 cmd の凍結 fixture。mock curl がファイルへ書くだけで、実行しない。
 const INSTALLER=gunzipSync(Buffer.from('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','base64'));
@@ -102,7 +109,7 @@ test('破損・別所有者・hash 不一致・欠損バイナリの導入記録
   await writeFile(f.record,receipt(OLD));await rm(f.target);assert.deepEqual((await f.inspect()).item.操作,[]);
 });
 
-test('外部配置・リンク・hardlink・staging 残存・前回復旧残存を拒否する',async t=>{
+test('外部配置・リンク・hardlink・staging 残存・前回復旧残存を拒否する',{skip:symlinkSkip},async t=>{
   const foreign=await fixture(t);assert.deepEqual((await inspectAntigravity(entry,{...foreign.options,resolve:async()=>'/other/agy.exe'})).item.操作,[]);
   for(const kind of ['binary-link','directory-link','hardlink','staging','backup']){
     const f=await fixture(t,{binary:OLD,owned:true});
@@ -186,7 +193,7 @@ test('退避前の起動・バイナリ差替・記録差替は古い所有判�
   await assert.rejects(()=>executeAntigravity(entry,'削除',cap.context,f.options));assert.deepEqual(await readFile(f.target),NEW);
 });
 
-test('任意 ID・操作を受け付けず、削除失敗時のリンクにも触れない',async t=>{
+test('任意 ID・操作を受け付けず、削除失敗時のリンクにも触れない',{skip:symlinkSkip},async t=>{
   const f=await fixture(t,{binary:OLD,owned:true}),cap=await f.inspect();
   for(const action of ['install','導入 & injected',''])await assert.rejects(()=>executeAntigravity(entry,action,cap.context,f.options),{status:400});
   await assert.rejects(()=>executeAntigravity({id:'other'},'導入',cap.context,f.options),{status:400});

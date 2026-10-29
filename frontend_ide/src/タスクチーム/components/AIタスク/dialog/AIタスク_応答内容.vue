@@ -1,3 +1,8 @@
+<!-- COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+Licensed under "AiDiy 公開利用ライセンス v1.1".
+Commercial use requires prior written consent from all copyright holders.
+See LICENSE for full terms. Thank you for keeping the rules.
+https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
 // AIタスク_応答内容: 要求一覧/明細一覧の「応答内容」欄クリック・行ダブルクリックで開く読み取り専用ダイアログ
 // 要求内容が渡されたときは 要求内容 / 応答内容 の2セクションで表示する

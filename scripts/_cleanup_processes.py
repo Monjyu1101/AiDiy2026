@@ -1,3 +1,9 @@
+# COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """クリーンアップ用のプロセス照合・強制終了・終了確認（標準ライブラリのみ）。"""
 
 import json
@@ -13,6 +19,9 @@ import time
 
 def process_arguments(command: str, windows: bool) -> list[str]:
     if windows:
+        # 閉じていない引用符は POSIX の shlex と同じく解析不能として扱い、所属判定を安全側に倒す。
+        if command.count('"') % 2:
+            raise ValueError('引用符が閉じていないコマンドラインです')
         return [part.replace('"', '') for part in re.findall(r'(?:[^\s"]|"[^"]*")+', command)]
     return shlex.split(command)
 

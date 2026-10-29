@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // Read-only external-command reference scan. Never imports target code or executes commands.
 // Usage: node source_scan.ts REPOSITORY OUTPUT_JSON [PINNED_COMMIT] [SOURCE_MANIFEST_JSON]
 // Node.js 22.18+ / 23.6+ の型除去で直接実行する。依存パッケージなし。

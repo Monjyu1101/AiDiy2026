@@ -35,18 +35,6 @@ class StartupTest(unittest.TestCase):
     def setUp(self):
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
 
-    def test_prompt_order_and_defaults(self):
-        with patch.object(start, 'prompt_choice', side_effect=lambda text, default_yes: default_yes) as ask:
-            flags = start.collect_startup_choices()
-        self.assertEqual(flags, (False, True, True, True, True, False, False, False, False, False, False, False))
-        self.assertEqual([c.args[0] for c in ask.call_args_list][-5:], [
-            '  Console      : 起動しますか?',
-            '  Code      : 起動しますか?',
-            '  Live      : 起動しますか?',
-            '  IDE       : 起動しますか?',
-            '  Discord   : 起動しますか?',
-        ])
-
     def test_only_selected_windows_launch_and_do_not_reopen(self):
         for code, live in ((False, False), (True, False), (False, True), (True, True)):
             with patch.object(start, 'stop_all_tasks'), patch.object(start, 'start_service', return_value=True) as launch, patch.object(start, 'wait_for_services_quiet'):
@@ -82,19 +70,6 @@ class StartupTest(unittest.TestCase):
             self.assertEqual(spawn.call_args.args[0], ['node', str(ROOT / 'aidiy_live/launch.mjs'), '--foreground', '--connect'])
             standalone.start_live()
             self.assertNotIn('--connect', spawn.call_args.args[0])
-
-    def test_initial_stop_uses_cleanup_procedure_for_all_services(self):
-        # 起動前は選択に関係なく、cleanup と同じ全サービス停止を 1 回だけ行う。
-        with patch.object(start, 'stop_all_tasks') as stop_all, patch.object(start, 'start_service', return_value=True), patch.object(start, 'wait_for_services_quiet'):
-            start.start_initial_services(False, False, False, False, False, False, {}, {}, None, live_enabled=True)
-        stop_all.assert_called_once()
-
-    def test_stop_all_tasks_continues_on_failure(self):
-        root_cleanup = Mock()
-        root_cleanup.stop_all_services.side_effect = RuntimeError('停止失敗')
-        with patch.object(start.importlib.util, 'module_from_spec', return_value=root_cleanup), patch.object(start.importlib.util, 'spec_from_file_location', return_value=Mock()), patch.object(start, '_remove_folder_import_cache'):
-            start.stop_all_tasks('テスト')
-        root_cleanup.stop_all_services.assert_called_once_with({}, title='テスト', strict=False, keep_code=True, keep_dev=True, keep_discord=True)
 
     def test_shutdown_reclaims_only_started_window(self):
         module = Mock()

@@ -85,7 +85,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 768, height: 1000, deviceScaleFactor: 1, mobile: false });
   await sleep(200); await capture(browser, 'markdown-portrait');
   await evaluate(`document.querySelector('.viewer-pin').click()`);
-  let pinned; await until(async () => { pinned = (await targets()).find(page => page.type === 'page' && page.url.includes('#viewer=')); return !!pinned; }, 'ピン留め');
+  let pinned; await until(async () => { pinned = (await targets()).find(page => page.type === 'page' && page.title.startsWith('AiDiy IDE / Viewer - ')); return !!pinned; }, 'ピン留め');
   const pin = await client(pinned);
   await until(() => pin.child(`document.querySelector('h1')?.textContent==='更新されたMarkdown'`), '独立ビューア');
   assert.equal(await pin.evaluate(`!!document.querySelector('.viewer-pinned')`), true);

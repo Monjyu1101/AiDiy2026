@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 'use strict';
 const {pinLevel}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
 // 名前上端: 中央アイコン中心(64px)+回転枠の外側(48px)。CSS の .micro-project と合わせる。

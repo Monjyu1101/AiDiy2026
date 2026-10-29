@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 外部連携（Hugging Face / Discord）の認証確認結果を _AIDIY/aidiy_diag/ へ保存する。キー値・応答本文は含めない。
 import path from 'node:path';
 import { OUTPUT_DIRECTORY, writeResult } from '../診断/headless.mjs';

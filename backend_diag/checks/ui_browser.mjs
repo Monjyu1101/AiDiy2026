@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // 合成データのみの実ブラウザ回帰（任意）。実キー読取・外部モデル API 呼出は行わない。
 // Playwright（playwright-core / playwright）は依存に含めない。実行ディレクトリか backend_diag から解決する。
 // 例: npm i --no-save playwright-core && node backend_diag/checks/ui_browser.mjs   （CHROMIUM_PATH で既存ブラウザを指定可）

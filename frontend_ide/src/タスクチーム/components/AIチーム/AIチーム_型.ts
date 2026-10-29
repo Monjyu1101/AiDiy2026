@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 export type エージェント状態 = '作業中' | '相談中' | '雑談中' | '瞑想中' | '移動中' | '休憩中' | '召喚中';
 
 export type エージェント = {

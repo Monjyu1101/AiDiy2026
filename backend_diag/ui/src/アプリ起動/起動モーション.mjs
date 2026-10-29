@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 const motions=new WeakMap();
 // click の currentTarget はイベント終了後に消えるため、受付コールバック作成時に保持する。
 // 光の二周は起動要求の受付を示すだけで、起動成功や完了を表さない。

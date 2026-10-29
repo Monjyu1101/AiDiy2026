@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
 const require=createRequire(import.meta.url);
@@ -49,7 +50,7 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
 
 function liveProtocol() {
   const module={exports:{}};
-  const code=buildSync({entryPoints:[new URL('../host/aidiy_live/src/protocol.ts',import.meta.url).pathname],bundle:true,write:false,format:'cjs'}).outputFiles[0].text;
+  const code=buildSync({entryPoints:[fileURLToPath(new URL('../host/aidiy_live/src/protocol.ts',import.meta.url))],bundle:true,write:false,format:'cjs'}).outputFiles[0].text;
   vm.runInNewContext(code,{module,exports:module.exports,setTimeout,clearTimeout});
   return module.exports;
 }

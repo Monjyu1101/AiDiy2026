@@ -44,11 +44,11 @@ docs と実装が食い違う場合は、実装を確認したうえで「現行
   - `frontend_web` のビルドは `docker/Dockerfile` の `frontend-builder` ステージがイメージ内で行う。ホストの `npm run build` や `frontend_web/dist/` のマウントを前提にしない。
   - ホストへ公開するポートは `8091` / `8098` / `80` / `443` だけ。`8090` はコンテナ内部のみ。
 - [ ] 自動テストは現存するディレクトリと実行方法に合わせて書く。
-  - Python: `backend_server/tests/`、`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/`。各プロジェクトで `python -m unittest discover -s tests -v`。
+  - Python: `backend_server/checks/`、`command_hermes/checks/`、`scripts/checks/`。`backend_server` で `python -X utf8 -m unittest discover -s checks -v`、ルートで `discover -s command_hermes/checks` / `discover -s scripts/checks`。`tests/` ディレクトリは存在せず、`backend_tools` / `backend_taskteam` に Python の自動テストはない。存在しないテストファイル名を確認手順に書かない。
   - VS Code: `frontend_ide/host/checks/`（Code の Node.js / Python）、`frontend_ide/host/aidiy_live/checks/`（Live の Node.js）。実行は `frontend_ide/host` で `npm test` / `npm run live:test` / `python -m unittest discover -s checks -p "test_*.py"`。
   - Discord: `frontend_channels/checks/`（Node.js / Python）。`frontend_channels` で `npm run check` / `npm test`、ルートで `python -X utf8 -m unittest discover -s frontend_channels/checks -p "test_*.py"`。
   - Avatar / Web の接続: `frontend_avatar/checks/` の Node.js テスト。ルートで `node --test frontend_avatar/checks/*.test.cjs`。
-  - ルート起動: `scripts/test_start_output.py`。ルートで `python -m unittest discover -s scripts -p test_start_output.py`。
+  - ルート起動: `scripts/checks/test_start_*.py`。ルートで `python -X utf8 -m unittest discover -s scripts/checks -p "test_start_*.py"`。
   - X系にも個別テストがある。実行条件は各画面の README を確認し、存在しないテスト名を案内しない。
 - [ ] `C利用者` のパスワードは bcrypt ハッシュ保存として書く。
   - 旧表現: 「平文比較」。認証はプレーン一致 → bcrypt 照合の順で既存 DB 互換を保つ。

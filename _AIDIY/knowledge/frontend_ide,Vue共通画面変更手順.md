@@ -6,7 +6,7 @@
 
 `src/App.vue` は画面の組み合わせ、`src/main.js` は起動、`src/style.css` は共通レイアウトを担当します。Console・Code・Live・IDEはいずれも同じ Vue 3 基盤です。Code / Live の VS Code 版も同じ配布画面を読み込みます。
 
-シアン接続バー上の通常タイトル行は `共通表示/タイトルバー配色.css` のトークン（背景 `#30343a`、主文字・補助文字 `#fff`）を使います。`.panel-brand` の共通ルールにまとめ、単独窓・IDE内のWebパネル・Task / Team・Viewer / Explorer別窓でdesktop条件による色の差を付けません。Diag / Discordも同じトークンを配布へ取り込みます。シアンバー下の通常本文・タブ土台・見出し・空白領域は `#000` に揃え、タイトル用トークンは本文へ転用しません。Task / Teamのログインカード・内側パネル・独立Task窓・表の見出しと空行・編集窓の地色も黒にし、表のデータ行や入力・選択の配色は残します。Consoleのxterm描画面と補完下地も同じ黒へ揃えます。入力・選択・状態色、閲覧するWebページ・画像、2Dページの内容色、接続バーの明滅・ピンの状態色は維持します。Browserの全画面ガラスだけは透明背景と黒文字の専用トークンで上書きし、通常タイトル行へ揃えないでください。`checks/titlebar-theme.test.mjs` で共有経路と例外を確認します。
+シアン接続バー上の通常タイトル行は `共通表示/タイトルバー配色.css` のトークン（背景 `#30343a`、主文字・補助文字 `#fff`）を使います。`.panel-brand` の共通ルールにまとめ、単独窓・IDE内のWebパネル・Task / Team・Viewer / Explorer別窓でdesktop条件による色の差を付けません。Diag / Discordも同じトークンを配布へ取り込みます。シアンバー下の通常本文・タブ土台・見出し・空白領域は `#000` に揃え、タイトル用トークンは本文へ転用しません。Task / Teamのログインカード・内側パネル・独立Task窓・表の見出しと空行・編集窓の地色も黒にし、表のデータ行や入力・選択の配色は残します。Consoleのxterm描画面と補完下地も同じ黒へ揃えます。入力・選択・状態色、閲覧するWebページ・画像、2Dページの内容色、接続バーの明滅は維持します。ピン留めボタンは通常・固定・hoverとも背景を透明にし、親のタイトル帯を透かします。固定状態はアイコンと枠で区別し、黒い内側影は付けません。Browserの全画面ガラスだけは透明背景と黒文字の専用トークンで上書きし、通常タイトル行へ揃えないでください。`checks/titlebar-theme.test.mjs` で共有経路と例外を確認します。
 
 - `コード/`: コードパネル・通信・会話到着演出（Liveも共有）
 - `ライブ/`: ライブパネル・通信
@@ -438,7 +438,7 @@ IDEから開いたConsoleは、既存の `reserveTermSlot()` が確保した配�
 
 バックエンド共用APIは認証付き `POST /core/files/フォルダ状態` です。bodyは `{"フォルダ":"src","フィルター":"backup"}`（OFFは空文字）です。サーバー設定のCODE_BASE_PATH内だけを許可し、絶対パス・親脱出・リンク・除外フォルダへの直接指定を拒否します。`data` に `ファイル数`、`最終更新日時`、`ファイル一覧`（パス/名前/サイズ/更新日時）、`変更識別子`、`不完全`、`制限理由` を返します。IDE独立サーバーでは既存のHost/Origin/利用開始とプロジェクトルート境界を使う同等APIを使い、オフライン利用を保ちます。Python側も同じ上限と2秒キャッシュ、同時走査1本を使い、混雑時は429を返します。
 
-検証は `node --test frontend_ide/checks/folder*.test.mjs frontend_ide/checks/file-dates.test.mjs frontend_ide/checks/space-mode.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/viewer/checks/file-scan.test.mjs frontend_ide/viewer/checks/folder-state.test.mjs`、`python -m unittest discover -s backend_server/tests -p test_folder_state.py` を使います。ビルド成果物が必要な実画面確認は `node frontend_ide/scripts/build.mjs` の後、`node frontend_ide/scripts/check-folder-monitor.mjs` を使い、一時フォルダとテスト用ブラウザだけで確認します。
+検証は `node --test frontend_ide/checks/folder*.test.mjs frontend_ide/checks/file-dates.test.mjs frontend_ide/checks/space-mode.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/viewer/checks/file-scan.test.mjs frontend_ide/viewer/checks/folder-state.test.mjs` を使います。ビルド成果物が必要な実画面確認は `node frontend_ide/scripts/build.mjs` の後、`node frontend_ide/scripts/check-folder-monitor.mjs` を使い、一時フォルダとテスト用ブラウザだけで確認します。
 
 エクスプローラーの起点・grepでは、フォルダ行に `plain-folder` を付けてフォルダ名とアイコンの通常色を維持します。右側の対象件数・丸印と一致ファイルの着色は従来どおりです。AI検索の配色、2Dフォルダカードの濃淡には転用しません。
 
@@ -625,3 +625,7 @@ rendererの本文矩形には同時に測定した小数のroot幅・高さ、fu
 
 `page.url` はElectronの生URLのままです。未編集のEnterは元URLを使い、編集時だけ既存のURL解決・権限検査へ入力を渡します。編集中の状態通知は下書きを上書きしません。確認は `node --test frontend_ide/checks/browser-address.test.mjs frontend_ide/checks/browser.test.mjs frontend_ide/checks/browser-cdp.test.mjs`。実画面では日本語ファイル名・検索語・フラグメント、空白、戻る／進む、再読込、URL編集後のEnterを確認します。
 
+
+### Windowsの最前面ONが実窓へ反映されない場合
+
+最大化・全画面遷移などの後、ElectronへONを再指定しても実状態がOFFのままになる場合があります。共有の `デスクトップ/最前面ピン.cjs` はON指定直後の `isAlwaysOnTop()` がfalseの時だけ、一度OFFにして同じ層でONへ戻します。定期タイマーやフォーカス奪取は追加しません。`checks/window-pin.test.mjs` の状態回帰に加え、`scripts/check-browser-window.mjs` で最大化から全画面への実遷移、`scripts/check-ide-pin-order.mjs` でWin32の最前面属性と重なり順を確認します。

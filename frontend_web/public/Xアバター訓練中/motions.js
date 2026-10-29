@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 window.MOTION_SCENES = [
   { id: "000", number: "00", title: "いまのまま", description: "現在の標準 VRMA_01 を基準として確認します。", file: "vrma/VRMA_00_現行.vrma" },
   { id: "001", number: "01", title: "右手を頬に添える", description: "右肘を外へ上げ、右手を頬の近くに置く候補です。", file: "vrma/VRMA_01_右手を頬に添える.vrma" },

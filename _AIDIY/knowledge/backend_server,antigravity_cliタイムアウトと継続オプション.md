@@ -68,7 +68,7 @@ elif self.code_ai == "antigravity_cli":
 - stdout は `output_stream` へ送らない。途中表示と最終回答の二重表示を防ぐため
 - stdout が空でも stderr を正式回答へ転用しない。stderr の内容はストリームと `last_stderr_output` に残る
 - `antigravity_cli` の `_antigravity実行()` は共通の非表示起動を使う。Windowsでは監視プロセス・CLIとも `CREATE_NO_WINDOW` で起動する。`DETACHED_PROCESS` は子コマンドに表示コンソールが作られるため使わない。出力の役割は `copilot_cli` / `opencode_cli` と同じ
-- 非表示実行と出力分離は `backend_server/tests/test_code_cli_output_routing.py` で確認する。WindowsではCLIが通常起動した子コマンドの `GetConsoleWindow` / `IsWindowVisible` も検査する
+- 非表示実行と出力分離の専用自動テストは現在ない。WindowsではCLI実行中にコンソール窓が表示されないこと、CLIが通常起動した子コマンドでも窓が出ないこと、stderr が正式回答へ混ざらないことを実機で確認する
 
 ## 注意点
 

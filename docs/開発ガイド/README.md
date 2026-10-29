@@ -279,11 +279,11 @@ echo. > backend_server/temp/reboot_apps.txt
 
 ## 10. テスト方針
 
-自動テストは `backend_server/tests/` の `unittest`（AIコア・Code CLI 連携・設定管理まわり）と、`frontend_ide/host/checks/`（Code）・`frontend_ide/host/aidiy_live/checks/`（Live）の Node.js テスト、`frontend_ide/host/checks/` の Python テスト、`frontend_channels/checks/` の Node.js / Python テストがあります。`backend_tools/tests/`、`backend_taskteam/tests/`、`command_hermes/tests/` にも `unittest` があります。`frontend_avatar/checks/` の Web / Avatar 接続テストと `scripts/test_start_output.py` の起動ログテストもあります。実行方法は [開発環境運用手順](../../_AIDIY/knowledge/共通,開発環境運用手順.md) の「自動テスト」を参照してください。画面操作は手動でも確認します。
+自動テストは `backend_server/checks/` の `unittest`（AIコア・バックアップ・予測まわり）と、`frontend_ide/host/checks/`（Code）・`frontend_ide/host/aidiy_live/checks/`（Live）の Node.js テスト、`frontend_ide/host/checks/` の Python テスト、`frontend_channels/checks/` の Node.js / Python テストがあります。`command_hermes/checks/`、`scripts/checks/`（セットアップ・起動・停止・Task / Team）にも `unittest` があります。`frontend_avatar/checks/` の Web / Avatar 接続テストもあります。実行方法は [開発環境運用手順](../../_AIDIY/knowledge/共通,開発環境運用手順.md) の「自動テスト」を参照してください。画面操作は手動でも確認します。
 
 ```powershell
 cd backend_server
-.venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe -X utf8 -m unittest discover -s checks -v
 
 cd ../frontend_ide/host
 npm run check

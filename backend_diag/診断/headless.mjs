@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 // --headless: 画面を開かず全診断をコマンドラインで最速実行し、結果を _AIDIY/aidiy_diag/ へ保存する。
 // 画面の「書込」も同じ形式・同じ保存処理を使う。
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';

@@ -26,7 +26,7 @@
 
 引数なしの対話起動（`aidiy_hermes`）は `same/same` として前回選択を復元します。`--compact` などの表示設定を付けても同じです。セッション再開（`--resume`）や接続先・キーの明示指定時は、その指定を優先して通常の解決を使います。`--provider auto --model auto`（または `--model auto/auto`）を明示した場合と、非対話実行のモデル未指定も従来の自動解決を使います。AI検索や Code の非対話実行（`-Q` / ワンショット）は手動選択を上書きしません。外部 CLI の `<provider>/same` は従来どおり、その CLI へのモデル指定を省略する意味です。
 
-確認: `command_hermes/.venv` の Python で `python -m unittest discover -s command_hermes/tests -p test_model_preferences.py` を実行し、起動選択・picker 保存・次回復元・キー再読込・非対話実行・初期描画を確認します。
+確認: 専用の自動テストはないため、`aidiy_hermes` を起動して起動選択・picker 保存・次回復元・キー再読込・非対話実行・初期描画を確認します。
 
 AiDiy の `aidiy_hermes` エントリでは、この解決より前に `_load_aidiy_hermes_defaults()` が共通設定を読みます。`CODE_AIDIY_HERMES_MODEL` は `openai_oauth/gpt-6.1-sol` に加えて `xai-oauth/grok-4.6` を受理します。対応する OAuth が認証済みなら指定 provider を使い、非対話の Code AI 起動時に未認証または認証切れなら `freeai/gemini-3.8-flash` へ退避します。`--provider openai_oauth` / `--provider xai-oauth` を明示指定した場合は OAuth 経路を維持します。CLI の `--model` / `--provider` は初期値より優先されます。
 
@@ -42,7 +42,7 @@ API キーが無い場合は設定を案内して停止し、`ANTHROPIC_TOKEN`�
 既存の OAuth ファイルやセッション履歴は削除・移行しません。Anthropic の setup / auth add は API キー方式のみで、外部 `claude-code` CLI bridge、OpenAI / xAI など他 provider の認証方式は別扱いです。
 
 実装入口は `core/anthropic_credentials.py`、`core/credential_pool.py`、`hermes_cli/runtime_provider.py`、`base/run_agent.py`。
-オフライン確認は `python -m unittest discover -s command_hermes/tests -p 'test_anthropic_*.py'`。偽キーで初期化・通常要求・認証失敗・モデル切替・直接 CLI の設定経路を確認します。実 API 接続は別途行います。
+オフラインの自動テストはありません。偽キーでの初期化・認証失敗と、実キーでの通常要求・モデル切替・直接 CLI の設定経路を手動で確認します。
 
 ## Provider Overlay 一覧
 
@@ -99,7 +99,7 @@ Hermesの `/model` は `_AIDIY/aidiy_diag/code_models_info.json` の各CLI区分
 
 OpenAI OAuthは同じファイルの `aidiy_hermes.models` から `openai_oauth/` の候補だけを読み、Hermes内部へ渡す際はその接頭辞を外します。他のAPI providerは既存の取得経路を使います。ファイルは候補を開くたびに読み、実行中に更新された一覧も再表示時に反映します。Diagが生成するHermesのCLI経路も `xx/same` に統一し、バックエンドからHermesを呼ぶ際はモデル引数を省略します。
 
-検証は `test_code_model_catalog.py`、`test_cli_stdin.py`、`test_model_preferences.py`（command_hermes/tests）、`test_hermes_cli_model_routes.py`（backend_server/tests）、`models-info.check.mjs`（backend_diag/checks）で行います。
+検証は `models-info.check.mjs`（backend_diag/checks）で行います。Hermes 側のモデル候補・標準入力・設定保存には専用の自動テストがないため、`aidiy_hermes` の実起動で確認します。
 
 `antigravity-cli` は本体の `antigravity_cli` と同じ引数規則を使います。初回は `-p <prompt>`、継続時はその後ろに `-c` を付け、`--add-dir <cwd>` と `--print-timeout 20m` を指定します。`CODE_PERMISSIONS` が `none` 以外なら `--dangerously-skip-permissions` も指定します。Windowsでは `%USERPROFILE%\AppData\Local\agy\bin\agy.exe` を優先し、`DETACHED_PROCESS` で親コンソールから切り離します。
 

@@ -1,5 +1,8 @@
 // COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-// Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 import {computed,ref} from 'vue';
 export function CLI状態を作成({api,アプリ,接続可能=()=>true,確認=message=>globalThis.confirm(message)}){
  const 項目=ref([]),全項目=ref([]),読込中=ref(false),処理中=ref(''),読込エラー=ref(null),起動エラー=ref(null);let revision=0;

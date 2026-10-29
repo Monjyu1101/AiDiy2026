@@ -1,3 +1,8 @@
+// COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+// Licensed under "AiDiy 公開利用ライセンス v1.1".
+// Commercial use requires prior written consent from all copyright holders.
+// See LICENSE for full terms. Thank you for keeping the rules.
+// https://github.com/monjyu1101/AiDiy2026
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { render, source } = require('./ui-components.cjs');
@@ -50,7 +55,8 @@ test('vivid badge palette keeps readable contrast and unconfirmed black', () => 
   for(const [, , bg] of palettes.slice(1))assert.ok((luminance(bg)+.05)/(luminance('121d28')+.05)>=3,`badge on dark panel: ${bg}`);
   assert.doesNotMatch(css, /badge-icon|badge-neutral-dot/);
   assert.doesNotMatch(css, /\.badge::before|\.status::before/);
-  assert.doesNotMatch(source('共通表示/状態バッジ.vue'), /v-html|innerHTML|https?:/);
+  // 先頭の著作表示（GitHub URL）だけを除き、外部URLの混入を検査する。
+  assert.doesNotMatch(source('共通表示/状態バッジ.vue').replace(/^<!-- COPYRIGHT \(C\)[\s\S]*?-->\r?\n/,''), /v-html|innerHTML|https?:/);
 });
 
 

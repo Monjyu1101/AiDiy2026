@@ -16,7 +16,10 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import quote
 
-import httpx
+try:
+    import httpx
+except ImportError:
+    raise unittest.SkipTest('httpx が無い環境（backend_tools/.venv の Python で実行）')
 from fastapi import FastAPI
 
 ROOT = Path(__file__).resolve().parents[2]

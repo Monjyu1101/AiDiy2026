@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 # COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
-# Licensed under "AiDiy 公開利用ライセンス v1.1". See LICENSE.
+# Licensed under "AiDiy 公開利用ライセンス v1.1".
+# Commercial use requires prior written consent from all copyright holders.
+# See LICENSE for full terms. Thank you for keeping the rules.
+# https://github.com/monjyu1101/AiDiy2026
+
 """Hermes 予測 adapter のみを検証。実 API / CLI / 認証 / DB は起動しない。"""
 
 import ast
@@ -237,8 +241,10 @@ class HermesReadonlyAdapterTest(unittest.TestCase):
 
     def test_entry_uses_real_cwd_and_safe_environment_before_import(self):
         original_cwd = Path.cwd()
+        # Windows は使用中の cwd を削除できないため、一時フォルダより先に cwd を戻す（後始末は登録の逆順）。
+        directory = self.enterContext(TemporaryDirectory())
         self.addCleanup(os.chdir, original_cwd)
-        with TemporaryDirectory() as directory, patch.dict(os.environ, {
+        with patch.dict(os.environ, {
             "HERMES_SAFE_MODE": "0", "HERMES_KANBAN_TASK": "parent-worker",
             "HERMES_KANBAN_GOAL_MODE": "1", "HERMES_YOLO_MODE": "1", "TERMINAL_ENV": "docker",
             "HERMES_DISABLE_LAZY_INSTALLS": "0", "HERMES_LAZY_INSTALL_TARGET": "/fixture/install-target",
