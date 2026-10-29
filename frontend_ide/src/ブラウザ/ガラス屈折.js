@@ -16,7 +16,7 @@ export function browserGlassFrame(value){
 
 // 縁から内側へ滑らかに屈折する方向場。ノイズやぼかしは加えない。
 // R=横、G=縦、B=中立。中央の画像は別途マスクで完全に取り除く。
-export function browserGlassMap(length,axis,edge=8){
+export function browserGlassMap(length,axis,edge=12){
  const stop=Math.min(.49,edge/Math.max(1,length))*100;
  const colors=axis==='x'?['#ff8080','#808080','#008080']:['#80ff80','#808080','#800080'];
  const direction=axis==='x'?'x2="1" y2="0"':'x2="0" y2="1"';

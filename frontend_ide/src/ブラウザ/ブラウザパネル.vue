@@ -92,23 +92,23 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopGlass();stopDraft();he
  </main>
 </template>
 <style scoped>
-.browser-panel{height:100vh;display:flex;flex-direction:column;background:#080c1a;color:#dce6f4}
-.browser-chrome{flex:none;background:#080c1a;z-index:1}
+.browser-panel{height:100vh;display:flex;flex-direction:column;background:#000;color:#dce6f4}
+.browser-chrome{flex:none;background:#000;z-index:1}
 .browser-capture,.browser-handoff{margin-left:7px;padding:0 6px;height:24px;font-size:11px;white-space:nowrap;-webkit-app-region:no-drag}
 .browser-capture-status{margin-left:5px;white-space:nowrap;font-size:10px;color:#9edfff}
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
 .development-app.browser-header-only{--aidiy-titlebar-background:transparent;--aidiy-titlebar-foreground:#102c32;--aidiy-titlebar-secondary:#102c32;height:auto;min-height:0;background:transparent;border:0;overflow:visible}
-.browser-header-only .browser-chrome{position:relative;isolation:isolate;transform:translateY(var(--header-offset));border:1px solid #80cbd666;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,#b9f7fa1f,#dafeff0f);backdrop-filter:none;color:#102c32;text-shadow:0 1px 1px #efffffe6,0 0 3px #efffffc2;box-shadow:inset 0 1px 1px #ffffffb3,inset 0 -1px 2px #238a9166,inset 1px 0 1px #f3ffff80,inset -1px 0 2px #2896a144}
-.browser-header-only .browser-chrome::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:5px solid transparent;border-radius:inherit;background:linear-gradient(150deg,#f4ffffaa,#86d5e31a 32%,#357b8926 68%,#d7ffff88) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude}
+.browser-header-only .browser-chrome{position:relative;isolation:isolate;transform:translateY(var(--header-offset));border:1px solid #92e7f0b3;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#b9f7fa1f,#dafeff0f);backdrop-filter:none;color:#102c32;text-shadow:0 1px 1px #efffffe6,0 0 3px #efffffc2}
+.browser-header-only .browser-chrome::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;padding:8px;border:0;border-radius:0;box-shadow:inset 0 1px 0 #ffffffed,inset 1px 0 0 #eaffffbf,inset 0 3px 2px #ffffff40,inset 0 -3px 1px #14505b99,inset -2px 0 1px #24738380,inset 0 -7px 5px #4bcddd26;background:linear-gradient(135deg,#f4ffffeb,#b8f5ff73 18%,#88dae32e 35%,#10404a66 70%,#a6f6ffb3) border-box;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
 .browser-header-only :deep(.panel-brand),.browser-header-only :deep(.connection-bar),.browser-header-only .browser-toolbar,.browser-header-only .browser-page-title,.browser-header-only .browser-error{position:relative;z-index:1}
 .browser-header-only :deep(.panel-brand strong),.browser-header-only :deep(.connection-label),.browser-header-only .browser-page-title,.browser-header-only .browser-capture-status{color:#102c32}
-.browser-header-only :deep(button),.browser-header-only :deep(.reload-control.refresh-button[type=button]){color:#123138;background:#e5fcffd9;border-color:#3b7a8566;border-radius:5px;box-shadow:inset 0 1px 0 #fff9;text-shadow:none}
+.browser-header-only :deep(button),.browser-header-only :deep(.reload-control.refresh-button[type=button]){color:#123138;background:#e5fcffd9;border-color:#3b7a8566;border-radius:0;box-shadow:inset 0 1px 0 #fff9;text-shadow:none}
 .browser-header-only :deep(button:hover:not(:disabled)),.browser-header-only :deep(.reload-control.refresh-button[type=button]:hover:not(:disabled)){background:#c3f2f6eb;color:#072a32}
 .browser-header-only :deep(button:focus-visible),.browser-header-only .browser-toolbar input:focus-visible{outline:2px solid #087c8c;outline-offset:1px}
 .browser-header-only .browser-toolbar{border-bottom-color:#3b7a8533}
-.browser-header-only .browser-toolbar input{background:#efffffcc;color:#10282d;border-color:#4c89946b;border-radius:6px;box-shadow:inset 0 1px 2px #46828c22;text-shadow:none;color-scheme:light}
+.browser-header-only .browser-toolbar input{background:#efffffcc;color:#10282d;border-color:#4c89946b;border-radius:0;box-shadow:inset 0 1px 2px #46828c22;text-shadow:none;color-scheme:light}
 .browser-header-only .browser-toolbar input::placeholder{color:#4a6269}
 .browser-header-only .browser-error{color:#631d28;background:#ffe9efcf;text-shadow:none}
 .browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}

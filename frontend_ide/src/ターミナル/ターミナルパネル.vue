@@ -100,7 +100,7 @@ watch(() => props.visible, async visible => { if (visible) { await nextTick(); f
 onMounted(() => {
   if (props.desktop && props.linked) void window.aidiyWindow?.title?.().then(title => { if (!disposed && typeof title === 'string') windowTitle.value = title; }).catch(() => {});
   terminal = new Terminal({ cursorBlink: true, fontSize: 14, fontFamily: 'Consolas, "Noto Sans Mono", monospace', scrollback: 5000,
-    theme: { background: '#080b10', foreground: '#dce6f2', cursor: '#81e4e8', selectionBackground: '#365b78' } });
+    theme: { background: '#000', foreground: '#dce6f2', cursor: '#81e4e8', selectionBackground: '#365b78' } });
   fit = new FitAddon(); terminal.loadAddon(fit); terminal.open(container.value); fitTerminal();
   terminal.attachCustomKeyEventHandler(terminalKeyHandler(data => { startInput(); sendInput(data); }));
   input = terminal.onData(sendInput);
@@ -127,7 +127,7 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
   </section>
 </template>
 <style scoped>
-.console-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#080b10;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif);container:console-panel / size}
+.console-component{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:#000;color:var(--foreground);font:var(--vscode-font-size,13px)/1.65 var(--vscode-font-family,"Segoe UI","Yu Gothic UI",sans-serif);container:console-panel / size}
 .component-toolbar button{padding:2px 7px;border-color:var(--border);font-size:11px;line-height:1.4;background:transparent}
 .console-welcome{flex:1;min-height:0;overflow:auto;background:var(--surface);container-type:size}
 .console-waiting .console-screen{flex:none;height:84px;max-height:30%;border-top:1px solid var(--border)}
@@ -136,7 +136,7 @@ onBeforeUnmount(() => { disposed = true; socket?.close(); observer?.disconnect()
 .console-screen{position:relative;flex:1;min-height:0;min-width:0;padding:8px;overflow:hidden}.console-error{color:#ffbac3;margin:6px 10px;font-size:12px}
 /* FitAddonには余白を除いた領域を渡し、小さな画面でも最後の入力行を切らない。 */
 .console-viewport{position:relative;width:100%;height:100%;min-width:0;min-height:0}
-.console-completion{pointer-events:none}.console-ghost-row{position:absolute;z-index:4;white-space:pre;overflow:hidden;font:14px Consolas,"Noto Sans Mono",monospace;color:#77818f;background:#080b10}
+.console-completion{pointer-events:none}.console-ghost-row{position:absolute;z-index:4;white-space:pre;overflow:hidden;font:14px Consolas,"Noto Sans Mono",monospace;color:#77818f;background:#000}
 /* 単独窓・IDE内タブとも、低い時は起動案内より端末の数行を優先する。 */
 @container console-panel (max-height:240px){
  .console-welcome{display:none}

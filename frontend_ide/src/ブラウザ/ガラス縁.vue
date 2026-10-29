@@ -9,22 +9,22 @@ import {browserGlassFrame,browserGlassMap} from './ガラス屈折.js';
 const props=defineProps({frame:Object});
 const frame=computed(()=>browserGlassFrame(props.frame));
 const id='browser-glass-'+useId();
-const horizontal=computed(()=>frame.value?browserGlassMap(frame.value.width,'x',8*frame.value.zoom):'');
-const vertical=computed(()=>frame.value?browserGlassMap(frame.value.height,'y',8*frame.value.zoom):'');
+const horizontal=computed(()=>frame.value?browserGlassMap(frame.value.width,'x',12*frame.value.zoom):'');
+const vertical=computed(()=>frame.value?browserGlassMap(frame.value.height,'y',12*frame.value.zoom):'');
 </script>
 <template>
  <!-- 別Electron窓を跨ぐbackdropではなく、本文から取得した実ピクセルの縁だけを変位する。 -->
  <svg v-if="frame" class="browser-glass-edge" :viewBox="`0 0 ${frame.width} ${frame.height}`" preserveAspectRatio="none" aria-hidden="true" focusable="false">
   <defs>
    <mask :id="id+'-rim'" maskUnits="userSpaceOnUse" x="0" y="0" :width="frame.width" :height="frame.height">
-    <rect :width="frame.width" :height="frame.height" :rx="18*frame.zoom" fill="white"/>
-    <rect :x="8*frame.zoom" :y="8*frame.zoom" :width="Math.max(0,frame.width-16*frame.zoom)" :height="Math.max(0,frame.height-16*frame.zoom)" :rx="10*frame.zoom" fill="black"/>
+    <rect :width="frame.width" :height="frame.height" fill="white"/>
+    <rect :x="12*frame.zoom" :y="12*frame.zoom" :width="Math.max(0,frame.width-24*frame.zoom)" :height="Math.max(0,frame.height-24*frame.zoom)" fill="black"/>
    </mask>
    <filter :id="id+'-bend'" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" x="0" y="0" :width="frame.width" :height="frame.height" color-interpolation-filters="sRGB">
     <feImage :href="horizontal" x="0" y="0" :width="frame.width" :height="frame.height" preserveAspectRatio="none" result="horizontal"/>
-    <feDisplacementMap in="SourceGraphic" in2="horizontal" :scale="10*frame.zoom" xChannelSelector="R" yChannelSelector="B" result="bend-x"/>
+    <feDisplacementMap in="SourceGraphic" in2="horizontal" :scale="20*frame.zoom" xChannelSelector="R" yChannelSelector="B" result="bend-x"/>
     <feImage :href="vertical" x="0" y="0" :width="frame.width" :height="frame.height" preserveAspectRatio="none" result="vertical"/>
-    <feDisplacementMap in="bend-x" in2="vertical" :scale="10*frame.zoom" xChannelSelector="B" yChannelSelector="G"/>
+    <feDisplacementMap in="bend-x" in2="vertical" :scale="20*frame.zoom" xChannelSelector="B" yChannelSelector="G"/>
    </filter>
   </defs>
   <g :mask="`url(#${id}-rim)`">

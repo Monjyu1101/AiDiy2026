@@ -85,15 +85,28 @@ test('標準・ミニのタイトル文字と左側余白はdrag、操作ボタ�
 });
 
 
-test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り文字を使い、本文・状態色は維持する',()=>{
+test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り文字を使い、本文の黒と状態色を分離する',()=>{
  const title=declarations(normal,'.panel-brand');
  assert.equal(title.background,'var(--aidiy-titlebar-background)');assert.equal(title.color,'var(--aidiy-titlebar-foreground)');
  for(const selector of ['.connection-label','.window-actions button'])assert.equal(declarations(normal,selector).color,'var(--aidiy-titlebar-secondary)');
  assert.equal(declarations(normal,'.panel-brand.desktop').background,undefined,'Web表示にも同じ地色を使う');
  assert.ok(contrast(title.color,title.background)>=7);assert.ok(contrast(declarations(normal,'.window-actions button').color,title.background)>=7);
- assert.equal(declarations(normal,'body').background,'#080b10');assert.equal(declarations(normal,'.connection-bar').background,'#000');
+ assert.equal(titleColor(title.background),'#24282e');
+ for(const selector of [':root','body','aside'])assert.equal(declarations(normal,selector).background,'#000');assert.equal(declarations(normal,'.connection-bar').background,'#000');
  assert.equal(declarations(normal,'.connection-bar.online').background,'cyan');
  assert.equal(declarations(normal,'.window-actions .window-pin').color,'#778394');assert.equal(declarations(normal,'.window-actions .window-pin.pinned').color,'#c3f7ff');
  assert.match(declarations(normal,'.window-maximized .window-maximize')['box-shadow'],/var\(--aidiy-titlebar-background\)/);
  const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"../../../frontend_ide/src/共通表示/タイトルバー配色.css"'));
+});
+
+
+test('起動・ミニの主面は黒を基準にし、操作階層・選択色・透明アイコン窓は維持する',()=>{
+ const startup=parse(source('起動/起動.css')),micro=parse(source('アプリ起動/マイクロランチャー.css'));
+ for(const selector of ['.start-panel','.start-panel .start-console'])assert.equal(declarations(startup,selector).background,'#000');
+ for(const selector of ['#app:has(>.start-mini)','#app>.panel.start-mini'])assert.equal(declarations(mini,selector).background,'#000');
+ assert.equal(declarations(normal,'button,input,select').background,'#1a2c3a');
+ assert.equal(declarations(normal,'.panel-heading').background,'#15212d');
+ assert.equal(declarations(startup,'.start-targets button.active').background,'#1b2d3d');
+ assert.equal(declarations(mini,'.mini-service[data-tone=running]').background,'#0d2523');
+ assert.equal(declarations(micro,'html.micro-mode,html.micro-mode body,html.micro-mode #app').background,'transparent');
 });

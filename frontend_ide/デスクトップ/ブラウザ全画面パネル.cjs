@@ -37,7 +37,7 @@ function createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscree
  }
  function ensure(){
   if(window||disposed||!BrowserWindow)return;
-  // 透明な板ガラス。OSのacrylic/vibrancyは中央までぼかすため使わず、丸みはCSSで描く。
+  // 透明な板ガラス。OSのacrylic/vibrancyは中央までぼかすため使わず、OS/CSSとも角丸を付けない。
   window=new BrowserWindow({parent:record.window,show:false,frame:false,roundedCorners:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,...bounds(),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   contents=window.webContents;headers.set(contents,record);
   window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');

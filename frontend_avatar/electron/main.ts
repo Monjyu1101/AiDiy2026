@@ -7,6 +7,8 @@ import { pathToFileURL } from 'node:url'
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
 const shouldOpenDevTools = process.env.VITE_OPEN_DEVTOOLS === '1'
 const APP_USER_MODEL_ID = 'AiDiy.frontend_avatar'
+// main.js直接起動時のapp.getAppPath()はdist-electron。配置が固定の実行ファイルから解決する。
+const AVATAR_ICON_PATH = path.resolve(__dirname, '../public/icons/AiDiy_avatar.png')
 if (process.platform === 'darwin') app.setName('AiDiy Avatar')
 // aidiy_code / aidiy_live / aidiy_discord と共通の初回演出（透明キャンバスの中で中央から拡大してから表示する）。
 // ウィンドウを毎フレーム広げると Windows で未描画の縁が白くちらつくため、共通実装を使う。
@@ -253,8 +255,6 @@ function getRendererUrl(role: WindowRole): string {
 }
 
 function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): BrowserWindow {
-  const appPath = app.getAppPath()
-  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
   const window = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
@@ -268,7 +268,7 @@ function createBaseWindow(bounds: BoundsPreset, role: WindowRole, show = true): 
     resizable: true,
     autoHideMenuBar: true,
     title: 'AiDiy Avatar',
-    icon: iconPath,
+    icon: AVATAR_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -579,9 +579,6 @@ function openSettingsWindow(sessionId: string) {
     return
   }
 
-  const appPath = app.getAppPath()
-  const iconPath = path.join(appPath, 'public', 'icons', 'AiDiy_avatar.png')
-
   settingsWindow = new BrowserWindow({
     width: SETTINGS_BOUNDS.width,
     height: SETTINGS_BOUNDS.height,
@@ -594,7 +591,7 @@ function openSettingsWindow(sessionId: string) {
     resizable: true,
     autoHideMenuBar: true,
     title: 'AiDiy Avatar',
-    icon: iconPath,
+    icon: AVATAR_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -662,7 +659,7 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   if (process.platform === 'darwin') {
     const { Macメニューを設定 } = require(path.join(__dirname, '../../frontend_ide/host/scripts/MacOS-Menu.cjs'))
-    Macメニューを設定({ app, Menu, 名前: 'AiDiy Avatar', 閉じる: () => app.quit(), icon: path.join(app.getAppPath(), 'public/icons/AiDiy_avatar.png'), platform: process.platform })
+    Macメニューを設定({ app, Menu, 名前: 'AiDiy Avatar', 閉じる: () => app.quit(), icon: AVATAR_ICON_PATH, platform: process.platform })
   }
   if (process.platform === 'win32') {
     app.setAppUserModelId(APP_USER_MODEL_ID)

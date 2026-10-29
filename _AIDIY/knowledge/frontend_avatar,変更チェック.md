@@ -38,6 +38,8 @@ Electron の全12種類の窓（ログイン、AIコア、Chat / File / Image / 
 
 変更後は `npm run build:electron` で実行出力を同期する。リポジトリルートで `node frontend_avatar/checks/window-move-desktop.mjs` を実行すると、導入済みDiag Electronの隔離プロファイルで全12種類の本番生成関数・移動処理を検査する。本文だけ無害な合成ボタン・入力欄に置換し、AI・音声・実サービスへ接続しない。カーソル位置とフォーカス判定だけを模擬し、Electron入力、0.5秒の判定、実OSの位置・サイズ、移動後の誤クリック防止、短押し、窓破棄時の購読解除を確認する。結果は `temp/window-move-check/avatar-result.json` とマーカー画像へ保存する。Mac / Linux 実機での確認は別途行う。
 
+Avatarの設定済アイコンは `public/icons/AiDiy_avatar.png` です。通常窓・設定窓・Mac Dockは `electron/main.ts` の `AVATAR_ICON_PATH` を共有します。`aidiy_avatar`、`npm start`、開発起動は `dist-electron/main.js` を直接Electronへ渡すため、`app.getAppPath()` は `dist-electron` になります。画像は `__dirname` から `../public/icons/AiDiy_avatar.png` として解決し、作業ディレクトリやパッケージ起動方式に依存させません。Windowsの `AiDiy.frontend_avatar` AppUserModelIdは窓生成前に維持します。`npm run build:electron` 後に `node --test checks/window-opening.test.cjs checks/macos-menu.test.cjs` で全12窓・再作成・直接/パッケージ起動の画像パスと存在を確認します。移設fixtureは実行出力とPNGだけを別の `frontend_avatar` 配下へコピーし、異なる作業ディレクトリでもアイコンが同フォルダ内で解決することを検査します（共通UI依存は試験用に差し替え、アプリ全体の単独配布可否は対象外です）。実際のWindowsタスクバー表示と既にピン留めされたショートカットの表示は、モックとは別に確認してください。
+
 Mac のアプリ名と最小メニューは `electron/main.ts` から `frontend_ide/host/scripts/MacOS-Menu.cjs` を共用する。表示名は `AiDiy Avatar`。メニューの閉じる・⌘Q は `app.quit()` で主窓と子窓を閉じ、⌘W はフォーカス中の窓だけを閉じる。コピー等は非表示の native role を維持し、キー入力を横取りしない。変更後は `npm run build:electron` で `dist-electron` を同期し、`node --test checks/macos-menu.test.cjs` で実行出力を確認する。Mac 実機の描画確認は別途行う。
 
 ## WindowRole / PanelKey を増やす場合

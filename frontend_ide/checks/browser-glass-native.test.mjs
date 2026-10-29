@@ -109,7 +109,7 @@ test('Browser実ヘッダー: frosted材質なし・表示完了後のみ屈折�
  try{
   header.show(true);await flush();assert.equal(f.calls.length,0,'スライド中は標本を取得しない');
   assert.equal(nativeWindow.options.backgroundMaterial,undefined);assert.equal(nativeWindow.options.vibrancy,undefined);
-  assert.equal(nativeWindow.options.transparent,true);assert.equal(nativeWindow.options.roundedCorners,false,'形状の丸みはCSS側だけで定義する');
+  assert.equal(nativeWindow.options.transparent,true);assert.equal(nativeWindow.options.roundedCorners,false,'OS側にも角丸を付けない');
   t.mock.timers.tick(240);assert.equal(f.calls.length,1);f.resolve();await flush();
   const messages=()=>nativeWindow.webContents.sent.filter(([channel])=>channel==='development:browser-header-glass').map(([,value])=>value);
   assert.equal(messages().at(-1).src,png);assert.equal(messages().at(-1).width,1200);assert.equal(messages().at(-1).zoom,1.5,'CSS縁幅用の倍率はメタデータだけに付け、取得矩形を拡大しない');
