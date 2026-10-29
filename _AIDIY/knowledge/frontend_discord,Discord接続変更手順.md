@@ -81,6 +81,7 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 
 - `panel/画面/接続パネル.vue` と `機能切替.vue` が描画、`panel/接続/パネル状態.js` が状態管理、`panel/ライブ/音声表示.js` が音声インジケーター。内部状態名は「接続状態」「コードAI」「ライブAI」「ライブモデル」「音声」「ウィンドウ操作」に揃える。IPC と `LIVE_*` 設定キーは外部互換のため維持する。
 - `panel/view.js` は SFC を事前コンパイルした配布物。Electron の file:// とブラウザの token 配下で同じ静的 URL を使い、CSP に unsafe-eval や CDN を追加しない。`panel/visualizer.js` は旧 URL の互換入口として残す。
+- シアン接続バー上のタイトル行は `frontend_ide/src/共通表示/タイトルバー配色.css` の共通変数を使います。`build:panel` が原本を `panel/titlebar.css` へコピーし、`style.css` から import します。Web は固定 allowlist にあるコピーだけを配信し、原本フォルダは公開しません。配色変更後は `build:panel` と `check:panel` で原本・コピーの manifest を同期します。本文、接続バー、ピンの状態色は変えません。
 - `checks/panel-vue.test.ts` は実バンドルを模擬 DOM・IPC・音声で検証する。保存中の連打、開始応答待ち中の停止、再接続、候補欠落、Live OFF、音声モニターの初期 OFF、終了時の購読・タイマー・AudioContext の回収も確認する。OS の実描画と Discord の実通話は別途検証する。
 
 ## 音声変更時の注意

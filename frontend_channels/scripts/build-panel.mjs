@@ -10,7 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, copyFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -36,5 +36,7 @@ await build({
     });
   } }],
 });
+// 共通配色の原本をコピーし、file:// と token 配下の Web で同じ CSS import を使う。
+await copyFile(resolve(root, '../frontend_ide/src/共通表示/タイトルバー配色.css'), resolve(root, 'panel/titlebar.css'));
 await writeFile(resolve(root, 'panel/build-manifest.json'), JSON.stringify(await 配布物一覧(), null, 2) + '\n');
 console.log('Discord 接続パネルの配布用 Vue バンドルを更新しました。');

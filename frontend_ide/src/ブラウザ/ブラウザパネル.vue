@@ -98,7 +98,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopGlass();stopDraft();he
 .browser-capture-status{margin-left:5px;white-space:nowrap;font-size:10px;color:#9edfff}
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
-.development-app.browser-header-only{height:auto;min-height:0;background:transparent;border:0;overflow:visible}
+.development-app.browser-header-only{--aidiy-titlebar-background:transparent;--aidiy-titlebar-foreground:#102c32;--aidiy-titlebar-secondary:#102c32;height:auto;min-height:0;background:transparent;border:0;overflow:visible}
 .browser-header-only .browser-chrome{position:relative;isolation:isolate;transform:translateY(var(--header-offset));border:1px solid #80cbd666;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,#b9f7fa1f,#dafeff0f);backdrop-filter:none;color:#102c32;text-shadow:0 1px 1px #efffffe6,0 0 3px #efffffc2;box-shadow:inset 0 1px 1px #ffffffb3,inset 0 -1px 2px #238a9166,inset 1px 0 1px #f3ffff80,inset -1px 0 2px #2896a144}
 .browser-header-only .browser-chrome::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:5px solid transparent;border-radius:inherit;background:linear-gradient(150deg,#f4ffffaa,#86d5e31a 32%,#357b8926 68%,#d7ffff88) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}

@@ -1,0 +1,11 @@
+/* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
+ * Licensed under "AiDiy 公開利用ライセンス v1.1".
+ * Commercial use requires prior written consent from all copyright holders.
+ * See LICENSE for full terms. Thank you for keeping the rules.
+ * https://github.com/monjyu1101/AiDiy2026 */
+/* シアン接続バー上の通常タイトル行。本文と全画面ガラスの色には転用しない。 */
+:root {
+  --aidiy-titlebar-background: #181b20;
+  --aidiy-titlebar-foreground: #f3f5f7;
+  --aidiy-titlebar-secondary: #e1e6ed;
+}

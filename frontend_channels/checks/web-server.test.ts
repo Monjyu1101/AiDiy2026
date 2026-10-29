@@ -48,7 +48,12 @@ test('ブラウザ版サーバー: 許可した接続元の要求だけを中継
     const origin = new URL(app.url).origin;
     assert.equal(app.publicUrl, app.url, 'Codespaces 以外ではローカルURLを開く');
     assert.equal((await fetch(app.url)).status, 200);
-    assert.equal((await fetch(new URL('style.css', app.url))).status, 200);
+    const style = await fetch(new URL('style.css', app.url));
+    assert.equal(style.status, 200);assert.match(await style.text(), /@import "\.\/titlebar\.css"/);
+    const palette = await fetch(new URL('titlebar.css', app.url));
+    assert.equal(palette.status, 200);assert.match(palette.headers.get('content-type') ?? '', /text\/css/);
+    assert.equal(await palette.text(), readFileSync(new URL('../../frontend_ide/src/共通表示/タイトルバー配色.css', import.meta.url), 'utf8'));
+    assert.equal((await fetch(new URL('/frontend_ide/src/共通表示/タイトルバー配色.css', app.url))).status, 404, '原本フォルダの配信を開放しない');
     assert.equal((await fetch(app.url, { headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal((await fetch(new URL('/wrong/', app.url))).status, 404);
     assert.equal((await fetch(new URL('../src/接続/接続設定.ts', app.url))).status, 404);

@@ -3,6 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const {createRequire}=require('node:module'),req=createRequire(path.join(__dirname,'../ui/package.json'));
 const {parse}=req('postcss'),{source}=require('./ui-components.cjs');
 const normal=parse(source('style.css')),mini=parse(source('起動/起動ミニ.css'));
+const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../../frontend_ide/src/共通表示/タイトルバー配色.css'),'utf8'));
+const titleColor=value=>value.replace(/var\((--[\w-]+)\)/g,(_match,name)=>declarations(palette,':root')[name]);
 function declarations(css,selector){
  const values={};css.walkRules(rule=>{if(rule.selector===selector)rule.walkDecls(({prop,value})=>values[prop]=value);});return values;
 }
@@ -11,7 +13,7 @@ const verticalPadding=value=>{const sides=value.split(/\s+/).map(px);return side
 const border=value=>px(value.split(/\s+/)[0]);
 function contrast(a,b){
  const luminance=hex=>hex.slice(1).match(/../g).map(value=>Number.parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
- const values=[luminance(a),luminance(b)].sort((a,b)=>b-a);return(values[0]+.05)/(values[1]+.05);
+ const values=[luminance(titleColor(a)),luminance(titleColor(b))].sort((a,b)=>b-a);return(values[0]+.05)/(values[1]+.05);
 }
 
 test('通常・ミニのタイトル31px、接続線3px、タイトル文字13pxと操作寸法を共有する',()=>{
@@ -80,4 +82,18 @@ test('標準・ミニのタイトル文字と左側余白はdrag、操作ボタ�
   if(!rule.selector.includes('compact'))return;
   rule.walkDecls(({prop,value})=>{if(prop.endsWith('app-region'))assert.notEqual(value,'no-drag','compact全域を除外しない');});
  });
+});
+
+
+test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り文字を使い、本文・状態色は維持する',()=>{
+ const title=declarations(normal,'.panel-brand');
+ assert.equal(title.background,'var(--aidiy-titlebar-background)');assert.equal(title.color,'var(--aidiy-titlebar-foreground)');
+ for(const selector of ['.connection-label','.window-actions button'])assert.equal(declarations(normal,selector).color,'var(--aidiy-titlebar-secondary)');
+ assert.equal(declarations(normal,'.panel-brand.desktop').background,undefined,'Web表示にも同じ地色を使う');
+ assert.ok(contrast(title.color,title.background)>=7);assert.ok(contrast(declarations(normal,'.window-actions button').color,title.background)>=7);
+ assert.equal(declarations(normal,'body').background,'#080b10');assert.equal(declarations(normal,'.connection-bar').background,'#000');
+ assert.equal(declarations(normal,'.connection-bar.online').background,'cyan');
+ assert.equal(declarations(normal,'.window-actions .window-pin').color,'#778394');assert.equal(declarations(normal,'.window-actions .window-pin.pinned').color,'#c3f7ff');
+ assert.match(declarations(normal,'.window-maximized .window-maximize')['box-shadow'],/var\(--aidiy-titlebar-background\)/);
+ const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"../../../frontend_ide/src/共通表示/タイトルバー配色.css"'));
 });

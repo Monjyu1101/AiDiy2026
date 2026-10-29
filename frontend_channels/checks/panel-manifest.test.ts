@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, readFile, writeFile, symlink, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,8 +21,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('依存更新後は実ビルドで manifest を揃え、ソースと配布物の改変検出を保つ', async () => {
-  const folder = await mkdtemp(join(tmpdir(), 'aidiy-discord-manifest-'));
+  const repository = await mkdtemp(join(tmpdir(), 'aidiy-discord-manifest-'));
+  const folder = join(repository, 'frontend_channels');
+  const shared = '../frontend_ide/src/共通表示/タイトルバー配色.css';
   try {
+    await mkdir(folder);
+    await mkdir(join(repository, 'frontend_ide/src/共通表示'), { recursive: true });
+    await cp(join(root, shared), join(folder, shared));
     for (const entry of ['package.json', 'package-lock.json', 'scripts', 'panel']) {
       await cp(join(root, entry), join(folder, entry), { recursive: true });
     }
@@ -38,7 +43,7 @@ test('依存更新後は実ビルドで manifest を揃え、ソースと配布�
     assert.equal(built.status, 0, built.stderr);
     assert.equal(run('verify-panel.mjs').status, 0);
     // 配布物と元ソースのどちらの変更も、再ビルド前には拒否する。
-    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue']) {
+    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue', 'panel/titlebar.css', shared]) {
       const path = join(folder, entry);
       const original = await readFile(path, 'utf8');
       await writeFile(path, original + '\n// changed fixture\n');
@@ -57,6 +62,6 @@ test('依存更新後は実ビルドで manifest を揃え、ソースと配布�
     assert.equal(rehash.status, 0, rehash.stderr);
     assert.equal(run('verify-panel.mjs').status, 1, 'hash の再承認で依存欠落を隠せない');
   } finally {
-    await rm(folder, { recursive: true, force: true });
+    await rm(repository, { recursive: true, force: true });
   }
 });

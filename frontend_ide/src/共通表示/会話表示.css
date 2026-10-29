@@ -1,4 +1,5 @@
 @import "./シアンバー.css";
+@import "./タイトルバー配色.css";
 /* COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors.
  * Licensed under "AiDiy 公開利用ライセンス v1.1".
  * Commercial use requires prior written consent from all copyright holders.
@@ -231,7 +232,8 @@
 .live-component .component-toolbar .live-connect { color: #000; background: #fff; border-color: var(--voice); }
 .live-component .live-connect.awaiting:enabled { animation: connect-breathe 4.5s ease-in-out infinite; }
 @keyframes connect-breathe { 0%, 100% { background-color: #fff; } 50% { background-color: var(--voice); } }
-.panel-brand { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); min-height: 34px; height: auto; padding: 2px; background: linear-gradient(110deg, var(--accent-soft), transparent 65%); }
+.panel-brand { --surface: var(--aidiy-titlebar-background); --muted: var(--aidiy-titlebar-secondary); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); min-height: 34px; height: auto; padding: 2px; background: var(--aidiy-titlebar-background); color: var(--aidiy-titlebar-foreground); }
+.panel-brand .connection-label { color: var(--aidiy-titlebar-secondary); }
 .panel-brand strong { font-size: 16px; letter-spacing: -.5px; white-space: nowrap; }
 .code-component .panel-brand { min-height: 31px; padding: 1px 2px; }
 .code-component .panel-brand strong { font-size: 14px; }

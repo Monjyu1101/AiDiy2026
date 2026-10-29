@@ -26,7 +26,7 @@ import instanceLock from '../../frontend_ide/host/scripts/single-instance.cjs';
 // IPC の代わりに WebSocket で panel-service.ts へ中継する。接続元の確認は aidiy_code / aidiy_live と共通。
 const panelRoot = fileURLToPath(new URL('../panel', import.meta.url));
 const assets: Record<string, string> = {
-  'style.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
+  'style.css': 'text/css', 'titlebar.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
 };
 // index.html は ../../frontend_ide/host/media/AiDiy.png を参照する。/<token>/ から辿るとこのパスになる。
 const iconPath = '/frontend_ide/host/media/AiDiy.png';

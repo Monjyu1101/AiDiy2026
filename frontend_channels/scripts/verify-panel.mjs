@@ -22,7 +22,7 @@ async function files(folder) {
   return (await Promise.all(entries.map(entry => entry.isDirectory() ? files(resolve(folder, entry.name)) : resolve(folder, entry.name)))).flat();
 }
 export async function 配布物一覧() {
-  const paths = ['package.json', 'package-lock.json', 'scripts/build-panel.mjs', 'scripts/verify-panel.mjs', 'scripts/verify-lock.mjs', 'panel/main.js', 'panel/view.js', 'panel/index.html', 'panel/style.css', 'panel/visualizer.js', 'panel/THIRD_PARTY_NOTICES.txt'];
+  const paths = ['package.json', 'package-lock.json', 'scripts/build-panel.mjs', 'scripts/verify-panel.mjs', 'scripts/verify-lock.mjs', 'panel/main.js', 'panel/view.js', 'panel/index.html', 'panel/style.css', 'panel/titlebar.css', '../frontend_ide/src/共通表示/タイトルバー配色.css', 'panel/visualizer.js', 'panel/THIRD_PARTY_NOTICES.txt'];
   for (const folder of ['画面', '接続', 'ライブ']) paths.push(...(await files(resolve(root, 'panel', folder))).map(path => relative(root, path).replaceAll('\\', '/')));
   const entries = await Promise.all(paths.sort().map(async path => [path, createHash('sha256').update((await readFile(resolve(root, path), 'utf8')).replace(/\r\n/g, '\n')).digest('hex')]));
   return Object.fromEntries(entries);
