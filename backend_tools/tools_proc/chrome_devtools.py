@@ -32,6 +32,7 @@ from typing import Any, Optional
 
 from PIL import Image as _PILImage
 import websockets
+from websockets.exceptions import WebSocketException
 
 from tools_proc.desktop_capture import DesktopCapture
 
@@ -153,7 +154,7 @@ class CDPClient:
                     try:
                         await ws.send(payload)
                         break
-                    except (websockets.exceptions.WebSocketException, OSError):
+                    except (WebSocketException, OSError):
                         await self._discard_connection(ws_url, ws)
                         ws = None
                         if send_attempt >= 1:
@@ -189,7 +190,7 @@ class CDPClient:
                 raise ChromeDevToolsTimeoutError(
                     f"CDP コマンド '{method}' がタイムアウトしました ({timeout:g}秒)"
                 ) from e
-            except (websockets.exceptions.WebSocketException, OSError) as e:
+            except (WebSocketException, OSError) as e:
                 await self._discard_connection(ws_url, ws)
                 # 自動解決タブがこの接続先だった場合、タブが閉じられた等で無効に
                 # なった可能性がある。次回呼び出しで再解決させるためキャッシュを破棄。
@@ -1142,7 +1143,7 @@ class CDPClient:
                         result["_dialog"] = dialog_info
                         return json.dumps(result, ensure_ascii=False)
 
-        except websockets.exceptions.WebSocketException as e:
+        except WebSocketException as e:
             raise ChromeDevToolsError(f"WebSocket 接続エラー: {e}")
 
     async def install_dialog_override(self, tab_id: Optional[str] = None) -> str:
