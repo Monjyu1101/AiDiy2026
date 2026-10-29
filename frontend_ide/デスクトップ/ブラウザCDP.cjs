@@ -65,7 +65,8 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
   mkdirSync(directory,{recursive:true});
   let assigned={};try{assigned=JSON.parse(readFileSync(join(directory,'../_chrome_sessions.json'),'utf8')).sessions||{};}catch{}
   for(let i=1;i<=100;i++){
-   name=i===1?sessionPrefix:`${sessionPrefix}-${i}`;file=join(directory,name+'.json');
+   // IDE番号は起動インスタンス単位。単独起動のUUIDはbridgeの生存中ずっと同じ名前を使う。
+   name=sessionPrefix==='aidiy_browser'?`${sessionPrefix} ${randomUUID()}`:`${sessionPrefix} ${i}`;file=join(directory,name+'.json');
    if(Object.hasOwn(assigned,name))continue;
    try{
     const previous=JSON.parse(readFileSync(file,'utf8'));
@@ -77,6 +78,6 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
   if(!file||JSON.parse(readFileSync(file,'utf8')).token!==token)throw Error('IDEブラウザのセッションを確保できません。');
  }catch(error){server.close();ws.close();throw error;}
  function close(){if(closed)return;closed=true;for(const client of sockets)client.terminate();ws.close();server.close();try{if(JSON.parse(readFileSync(file,'utf8')).token===token)unlinkSync(file);}catch{}}
- return{name,add(record,contents){const id=randomUUID();pages.set(id,{id,record,contents});record.browserSession=name;contents.once('destroyed',()=>pages.delete(id));},close};
+ return{name,add(record,contents){const id=randomUUID();pages.set(id,{id,record,contents});record.browserSession=name;record.browserTabId=id;contents.once('destroyed',()=>pages.delete(id));},close};
 }
 module.exports={createBrowserCDP};

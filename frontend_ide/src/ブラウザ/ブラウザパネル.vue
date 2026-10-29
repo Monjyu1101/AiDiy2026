@@ -11,7 +11,7 @@ import DraftHandoffDialog from '../下書き連携/下書き連携ダイアロ�
 import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
 const props=defineProps({standalone:Boolean,headerOnly:Boolean});
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),chrome=ref(),chromeHeight=ref(100),error=ref(''),capturing=ref(false),captureMessage=ref('');
-let stop=()=>{},stopFrame=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame;
+let stop=()=>{},stopFrame=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame,stateRevision=-1;
 const headerOffset=ref(0);
 const headerWindowApi=props.headerOnly?{
  ...window.aidiyWindow,
@@ -29,7 +29,12 @@ async function handoff(){
 function closeDraft(){draftRequest.value=null;void window.aidiyWindow.browserAction('draft-dialog',false);}
 const loadDraftTargets=()=>window.aidiyWindow.draftTargets();
 const insertDraft=request=>window.aidiyWindow.insertDraft(request);
-function update(value){if(disposed||!value)return;page.value=value;if(value.capturePath)captureMessage.value=value.capturePath;if(!editing)address.value=displayBrowserURL(value.url);}
+function update(value){
+ if(disposed||!value)return;
+ // F11の通知より遅く届いた操作応答で、通常表示を古い全画面状態へ戻さない。
+ if(Number.isFinite(value.stateRevision)){if(value.stateRevision<stateRevision)return;stateRevision=value.stateRevision;}
+ page.value=value;if(value.capturePath)captureMessage.value=value.capturePath;if(!editing)address.value=displayBrowserURL(value.url);
+}
 async function action(name,value){
  const result=await window.aidiyWindow.browserAction(name,value).catch(e=>({ok:false,error:e.message}));
  if(disposed)return;if(!result?.ok){error.value=result?.error||'ブラウザを操作できません。';return;}
@@ -44,7 +49,7 @@ async function capture(){
   captureMessage.value=result.message||'撮影しました。';error.value='';
  }catch(e){error.value=e.message;}finally{capturing.value=false;}
 }
-function resize(){const rect=surface.value?.getBoundingClientRect();chromeHeight.value=chrome.value?.getBoundingClientRect().height||100;if(props.headerOnly)void window.aidiyWindow.browserAction('header-size',chromeHeight.value).catch(()=>{});else if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height,chromeHeight:chromeHeight.value}).catch(()=>{});}
+function resize(){const rect=surface.value?.getBoundingClientRect(),viewport=rect?document.documentElement.getBoundingClientRect():null;chromeHeight.value=chrome.value?.getBoundingClientRect().height||100;if(props.headerOnly)void window.aidiyWindow.browserAction('header-size',chromeHeight.value).catch(()=>{});else if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height,chromeHeight:chromeHeight.value,viewportWidth:viewport.width,viewportHeight:viewport.height,fullscreen:!!page.value.fullscreen,measuredAt:performance.timeOrigin+performance.now()}).catch(()=>{});}
 function transition(){cancelAnimationFrame(frame);const end=performance.now()+260;function step(){resize();if(!disposed&&performance.now()<end)frame=requestAnimationFrame(step);}step();}
 onMounted(()=>{
  stop=window.aidiyWindow.onBrowserChanged(update);void action('state');
@@ -58,11 +63,11 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
  <main class="development-app browser-panel desktop-window" :class="{'browser-fullscreen':page.fullscreen,'browser-header-only':headerOnly}" :style="{'--header-offset':headerOffset+'px'}" data-app="browser" @transitionrun.self="transition">
   <div ref="chrome" class="browser-chrome" data-aidiy-window-move-handle @transitionrun="transition">
   <StatusBar :title="standalone?'AiDiy Browser':'AiDiy IDE / Browser'" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" :window-api="headerWindowApi" :pin-title="headerOnly?(page.headerPinned?'ヘッダーの常時表示を解除':'ヘッダーを常時表示'):undefined">
-   <template #connection-tools><button type="button" class="browser-capture" :disabled="capturing||!page.available" :title="captureMessage||'表示中のWeb画面をtemp/inputに保存'" aria-label="Web画面を撮影" @click="capture">{{capturing?'撮影中…':'📷 撮影'}}</button><button type="button" class="browser-handoff" :disabled="handing||capturing||!page.available" title="URLと1分以内の撮影画像パスを下書きへ追加" @click="handoff">Code / Liveへ</button><span v-if="captureMessage" class="browser-capture-status" :title="captureMessage" role="status">保存済み</span></template>
+   <template #connection-tools><button type="button" class="browser-capture" :disabled="capturing||!page.available" :title="captureMessage||'表示中のWeb画面をtemp/inputに保存'" aria-label="Web画面を撮影" @click="capture">{{capturing?'撮影中…':'📷 撮影'}}</button><button type="button" class="browser-handoff" :disabled="handing||capturing||!page.available" title="session・tab_id・URLと1分以内の撮影画像パスを下書きへ追加" @click="handoff">Code / Liveへ</button><span v-if="captureMessage" class="browser-capture-status" :title="captureMessage" role="status">保存済み</span></template>
    <template #window-tools>
     <span class="browser-window-sizes">
-     <button type="button" title="1920×945を上限に現在の画面内へ配置" @click="action('size','fhd')">FHD</button>
-     <button type="button" title="1080×1785を上限に現在の画面内へ配置" @click="action('size','portrait')">縦表示</button>
+     <button type="button" title="Web表示領域を1920×945にしてパネルを拡大（画面外へはみ出しても縮小しません）" @click="action('size','fhd')">FHD</button>
+     <button type="button" title="Web表示領域を1080×1785にしてパネルを拡大（画面外へはみ出しても縮小しません）" @click="action('size','portrait')">縦表示</button>
      <button type="button" :title="page.fullscreen?'全画面表示を終了':'現在の画面全体に表示'" :aria-pressed="!!page.fullscreen" @click="action('fullscreen')">F11</button>
     </span>
    </template>
@@ -90,7 +95,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
 .development-app.browser-header-only{height:auto;min-height:0;background:transparent;border:0;overflow:visible}
-.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0 0 12px 12px;overflow:hidden;background:linear-gradient(135deg,#17243fa8,#25305288);backdrop-filter:blur(24px) saturate(145%)}
+.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #b3c8ef55;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#17243f66,#2530524d);backdrop-filter:blur(24px) saturate(145%);text-shadow:0 1px 2px #000c}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
 .browser-header-only .browser-toolbar input{background:#07132266}
 .browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}

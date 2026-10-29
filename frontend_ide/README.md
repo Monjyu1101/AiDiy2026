@@ -40,7 +40,7 @@ VRモード中のファイルビューアー・ソース比較は中心星の右
 
 **＋ Browser** はtools接続中に使えます。Google検索から始まり、URL／検索欄、戻る・進む・再読み込みを備えます。HTML／HTMのビューアーには従来の「コード」「表示」に加えて「ブラウザ」があり、Electronでは選択したファイルの絶対パスを `file:///...` にして直接開きます。相対リンク・画像・CSSは元ファイルのフォルダを基準に読み込みます。例外として、AiDiyの `frontend_web/public` 内でルート登録されたHTMLは対応するWebページを開きます。Webサーバー停止中は起動を案内し、認証が必要な画面はログイン後に利用します。通常画面とVRの各画面メニューから起動でき、VRでは選んだ画面の中央へ配置します。tools切断中はページ操作を停止し、再接続で再開します。IDEの利用終了でBrowserも閉じます。Web起動時は新しいブラウザタブを開きます。
 
-Electron版Browserは `aidiy_chrome_devtools` の `session="aidiy_ide"` で操作できます。複数IDEでは `aidiy_ide-2` 以降を割り当て、パネル内にセッション名を表示します。`list_tabs` で対象の `tab_id` を選び、`navigate`・`click`・`type_text`・`screenshot` などを呼びます。`new_tab` はBrowserパネルを追加し、`close_session` はそのIDEのBrowserだけを閉じます。IDE本体・Code・Consoleは対象外です。Web起動で開いた通常タブはこのセッションには登録しません。
+Electron版Browserは `aidiy_chrome_devtools` の `session="aidiy_ide 1"` で操作できます。複数IDEでは `aidiy_ide 2` 以降の空き番号を割り当て、パネル内にセッション名を表示します。番号はIDEの起動インスタンス単位で、Browser窓番号ではありません。`list_tabs` で対象の `tab_id` を選び、`navigate`・`click`・`type_text`・`screenshot` などを呼びます。`new_tab` はBrowserパネルを追加し、`close_session` はそのIDEのBrowserだけを閉じます。IDE本体・Code・Consoleは対象外です。Web起動で開いた通常タブはこのセッションには登録しません。
 
 ## 単独Browser（aidiy_browser）
 
@@ -48,7 +48,9 @@ Electron版Browserは `aidiy_chrome_devtools` の `session="aidiy_ide"` で操�
 
 セットアップは既存の `python frontend_ide/_setup.py`、コマンドだけの登録修復は `python _setup.py --launchers-only` を使います。全体startの自動起動対象には追加しません。Diagの「アプリ起動」でプロジェクトを選び、`aidiy_browser` を押しても開けます。
 
-tools接続中は `aidiy_chrome_devtools` に `session="aidiy_browser"` を指定して操作します。複数起動では画面に表示される `aidiy_browser-2` 以降を指定します。IDEの `aidiy_ide` や通常Chromeの `default` セッションと分離し、起動ごとに一時プロファイルを使います。`new_tab` は同じBrowserプロセスの窓を追加し、最後の窓を閉じると専用ブリッジと配信サーバーも終了します。tools切断中は操作を止め、復帰を待ちます。
+tools接続中は `aidiy_chrome_devtools` に `session="aidiy_browser <UUID>"` を指定して操作します。UUIDは起動ごとのランダム値で、同じ起動中は窓の追加や繰り返しの連携でも変わりません。画面に表示される空白を含めた名前をそのまま指定します。IDEの `aidiy_ide N` や通常Chromeの `default` セッションと分離し、起動ごとに一時プロファイルを使います。`new_tab` は同じBrowserプロセスの窓を追加し、最後の窓を閉じると専用ブリッジと配信サーバーも終了します。tools切断中は操作を止め、復帰を待ちます。
+
+「Code / Liveへ」の下書き先頭には実際の `session` と送信元の `tab_id` を付け、その後にURLと撮影後60秒以内の画像パスを渡します。同じsession内の別Browser窓や、別の起動インスタンスと取り違えないため、操作時には両方を指定します。起動中の旧形式名は互換性のため引き続き接続できます。
 
 Electron全体のデバッグポートは開きません。既存のloopback・起動単位トークン・Origin拒否付きCDPブリッジを再利用し、Browserページ以外のTargetやAI/Console/ファイル操作APIを公開しません。
 

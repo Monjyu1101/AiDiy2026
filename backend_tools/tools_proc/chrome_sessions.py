@@ -35,7 +35,7 @@ from log_config import get_logger
 
 from tools_proc.chrome_manager import ChromeManager
 from tools_proc.chrome_devtools import CDPClient
-from tools_proc.ide_browser_session import is_ide_session, read_ide_session, IDEBrowserManager, IDEBrowserClient
+from tools_proc.ide_browser_session import is_ide_session, is_reserved_browser_session, read_ide_session, IDEBrowserManager, IDEBrowserClient
 
 logger = get_logger(__name__)
 
@@ -202,7 +202,7 @@ class ChromeSessionRegistry:
                       （稼働中の Chrome には次回起動から反映）
         """
         name = name or DEFAULT_SESSION
-        if is_ide_session(name) and name not in self._sessions:
+        if is_reserved_browser_session(name) or (is_ide_session(name) and name not in self._sessions):
             entry = read_ide_session(self._ide_directory, name)
             if entry is None:
                 raise RuntimeError('aidiy_browserを起動するか、IDEをtoolsへ接続し「＋ Browser」を開いてください。')
@@ -236,7 +236,7 @@ class ChromeSessionRegistry:
         未起動の場合は None を返すので、その場合は get() を使うこと。
         """
         name = name or DEFAULT_SESSION
-        if is_ide_session(name) and name not in self._sessions:
+        if is_reserved_browser_session(name) or (is_ide_session(name) and name not in self._sessions):
             try:
                 return self.get(name)
             except RuntimeError:
@@ -250,6 +250,8 @@ class ChromeSessionRegistry:
             items = list(self._sessions.items())
         result = []
         for name, entry in items:
+            if is_reserved_browser_session(name):
+                continue
             result.append({
                 "session": name,
                 "key": entry["key"],
@@ -260,7 +262,7 @@ class ChromeSessionRegistry:
             })
         for path in self._ide_directory.glob("aidiy_*.json"):
             name = path.stem
-            if name in self._sessions:
+            if name in self._sessions and not is_reserved_browser_session(name):
                 continue
             entry = read_ide_session(self._ide_directory, name)
             if entry:
@@ -279,7 +281,7 @@ class ChromeSessionRegistry:
             True = 停止した / False = 稼働していなかった
         """
         name = name or DEFAULT_SESSION
-        if is_ide_session(name) and name not in self._sessions:
+        if is_reserved_browser_session(name) or (is_ide_session(name) and name not in self._sessions):
             try:
                 manager, _ = self.get(name)
                 return manager.close()
@@ -312,7 +314,7 @@ class ChromeSessionRegistry:
         プロファイルディレクトリは残す（必要なら手動削除）。
         """
         name = name or DEFAULT_SESSION
-        if is_ide_session(name) and name not in self._sessions:
+        if is_reserved_browser_session(name) or (is_ide_session(name) and name not in self._sessions):
             # 登録ファイルはIDEが所有する。削除要求もBrowserパネルだけを閉じる。
             return self.close(name)
         self.close(name)

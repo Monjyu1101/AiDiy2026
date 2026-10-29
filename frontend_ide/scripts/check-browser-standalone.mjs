@@ -28,7 +28,7 @@ try{
   for(const name of await readdir(directory)){if(!name.endsWith('.json'))continue;try{const value=JSON.parse(await readFile(join(directory,name),'utf8'));if(value.pid===child.pid)manifest=value;}catch{}}
   if(!manifest)await delay(100);
  }
- assert.ok(manifest);assert.match(manifest.name,/^aidiy_browser(?:-\d+)?$/);
+ assert.ok(manifest);assert.match(manifest.name,/^aidiy_browser [a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/);
  const call=async(method,params={})=>{const response=await fetch(tools+'/aidiy_chrome_devtools/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session:manifest.name,...params}),signal:AbortSignal.timeout(20000)});const value=await response.json();assert.equal(response.ok,true);assert.equal(value.error,undefined,JSON.stringify(value));return value;};
  const url=pathToFileURL(join(project,'index.html')).href;
  await call('navigate',{url,show_automation_banner:false});await call('type_text',{selector:'#probe',text:'単独Browserの入力を確認'});

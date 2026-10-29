@@ -15,15 +15,25 @@ from tools_proc.chrome_devtools import CDPClient
 
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+def is_reserved_browser_session(name):
+    # 新しい空白付き名は接続専用。誤記・古い通常Chrome登録でも別Chromeへ退避しない。
+    return isinstance(name, str) and name.startswith(("aidiy_ide ", "aidiy_browser "))
+
+
 def is_ide_session(name):
-    return bool(re.fullmatch(r"aidiy_(?:ide|browser)(?:-[2-9][0-9]*|-1[0-9]+)?", name))
+    if not isinstance(name, str):
+        return False
+    return bool(re.fullmatch(
+        r"aidiy_ide [1-9][0-9]*|"
+        r"aidiy_browser [a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}|"
+        r"aidiy_(?:ide|browser)(?:-[2-9][0-9]*|-1[0-9]+)?", name))
 
 def read_ide_session(directory, name):
     if not is_ide_session(name):
         return None
     try:
         value = json.loads((directory / (name + ".json")).read_text(encoding="utf-8"))
-        if value.get("name") != name or type(value.get("port")) is not int or not 1 <= value["port"] <= 65535:
+        if not isinstance(value, dict) or value.get("name") != name or type(value.get("port")) is not int or not 1 <= value["port"] <= 65535:
             return None
         if not re.fullmatch(r"[a-f0-9-]{36}", value.get("token", "")):
             return None
@@ -66,7 +76,8 @@ class IDEBrowserManager:
 
     def is_running(self):
         try:
-            return self.request("/json/version").get("AiDiy-Owner") == self.entry["token"]
+            version = self.request("/json/version")
+            return version.get("AiDiy-Owner") == self.entry["token"] and version.get("AiDiy-Session") == self.entry["name"]
         except Exception:
             return False
 

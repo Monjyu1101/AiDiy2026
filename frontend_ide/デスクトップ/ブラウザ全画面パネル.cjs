@@ -34,7 +34,7 @@ function createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscree
  function ensure(){
   if(window||disposed||!BrowserWindow)return;
   const glass=process.platform==='win32'&&Number(release().split('.')[2])>=22621;
-  window=new BrowserWindow({parent:record.window,show:false,frame:false,transparent:true,backgroundColor:'#00000000',...(glass?{backgroundMaterial:'acrylic'}:process.platform==='darwin'?{vibrancy:'menu',visualEffectState:'active'}:{}),hasShadow:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,...bounds(),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  window=new BrowserWindow({parent:record.window,show:false,frame:false,roundedCorners:false,transparent:true,backgroundColor:'#00000000',...(glass?{backgroundMaterial:'acrylic'}:process.platform==='darwin'?{vibrancy:'menu',visualEffectState:'active'}:{}),hasShadow:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,...bounds(),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   contents=window.webContents;headers.set(contents,record);
   window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
   contents.setZoomFactor(zoom());contents.on('before-input-event',fullscreenKey);
@@ -49,6 +49,7 @@ function createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscree
  }
  return{
   get window(){return window;},
+  resetPosition(){position=undefined;},
   send(channel,value){if(ready&&!contents.isDestroyed())contents.send(channel,value);},
   contains(point,includeHidden=false){if((!shown&&!includeHidden)||!window||window.isDestroyed())return false;const b=includeHidden?bounds():window.getBounds();return point.x>=b.x&&point.x<b.x+b.width&&point.y>=b.y&&point.y<=b.y+b.height+12;},
   show(value){if(disposed)return;if(value)ensure();if(shown===value)return;shown=value;animate(value);},

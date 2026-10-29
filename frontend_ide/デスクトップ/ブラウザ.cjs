@@ -7,7 +7,7 @@ const HOME='https://www.google.com/';
 const {pathToFileURL,fileURLToPath}=require('node:url');
 const {relative,isAbsolute,sep,resolve}=require('node:path');
 const {previewFile}=require('./native-preview-actions.cjs');
-const {setWindowBounds}=require('./全画面横断.cjs');
+const {createBrowserSizing}=require('./ブラウザ表示領域.cjs');
 const {createBrowserHeader}=require('./ブラウザ全画面パネル.cjs');
 function browserFileURL(root,path){return pathToFileURL(previewFile(root,path).full).href;}
 // Browser で開けるのは HTML と音声・動画。
@@ -31,10 +31,11 @@ function browserURL(value){
  const address=/^https?:\/\//i.test(text)?text:/^(localhost(?::\d+)?|\[[\da-f:]+\]|[\w-]+(?:\.[\w-]+)+)(?::\d+)?(?:[/?#]|$)/i.test(text)&&! /\s/.test(text)?(/^(localhost|127\.)/i.test(text)?'http://':'https://')+text:HOME+'search?q='+encodeURIComponent(text);
  const url=new URL(address);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('このURLは開けません。');return url.href;
 }
-function browserDraftRequest(projectRoot,url,capture,now=Date.now()){
+function browserDraftRequest(projectRoot,url,capture,now=Date.now(),source){
+ if(!source?.session||!source?.tabId)throw Error('Browserの接続先を確認できません。もう一度開いてください。');
  const age=capture?now-capture.at:Infinity;
  const image=capture&&age>=0&&age<=60000?resolve(projectRoot,capture.path):'';
- return{projectPath:projectRoot,path:url,text:url+(image?'\n画像: '+image:''),selection:false};
+ return{projectPath:projectRoot,path:url,text:`session: ${source.session}\ntab_id: ${source.tabId}\n`+url+(image?'\n画像: '+image:''),selection:false};
 }
 function createBrowserViews({BrowserWindow,WebContentsView,session,screen,windowPins,isVRActive=()=>false,leaveVR,captureImage,trustedEvent,projectRoot,now=Date.now}){
  const entries=new Map(),headers=new Map(),blockedOrigins=new Set();
@@ -53,10 +54,12 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   const view=new WebContentsView({webPreferences:{session:isolated,sandbox:true,contextIsolation:true,nodeIntegration:false,nodeIntegrationInSubFrames:false,webSecurity:true}});
   const contents=view.webContents,entry={view,error:'',rect:null,run:0,available,pendingTarget:available?null:target};entries.set(record,entry);
   record.window.contentView.addChildView(view);view.setVisible(false);
-  const snapshot=()=>({url:contents.getURL()||target,title:contents.getTitle(),session:record.browserSession,available:entry.available,fullscreen:record.window.isFullScreen(),headerVisible:!!entry.headerVisible,headerPinned:!!entry.headerPinned,capturePath:entry.capture?.path||'',loading:contents.isLoading(),back:contents.navigationHistory.canGoBack(),forward:contents.navigationHistory.canGoForward(),error:entry.available?entry.error:'toolsとの接続が切れています。再接続後に操作できます。'});
+  let stateRevision=0;
+  const snapshot=()=>({stateRevision:++stateRevision,url:contents.getURL()||target,title:contents.getTitle(),session:record.browserSession,available:entry.available,fullscreen:record.window.isFullScreen(),headerVisible:!!entry.headerVisible,headerPinned:!!entry.headerPinned,capturePath:entry.capture?.path||'',loading:contents.isLoading(),back:contents.navigationHistory.canGoBack(),forward:contents.navigationHistory.canGoForward(),error:entry.available?entry.error:'toolsとの接続が切れています。再接続後に操作できます。'});
   const notify=()=>{if(!record.window.isDestroyed()&&!contents.isDestroyed()){const value=snapshot();hostContents.send('development:browser-changed',value);entry.header?.send('development:browser-changed',value);}};
   entry.snapshot=snapshot;entry.notify=notify;
-  const toggleFullscreen=()=>record.window.setFullScreen(!record.window.isFullScreen());
+  const sizing=createBrowserSizing({window:record.window,view,screen});entry.sizing=sizing;
+  const toggleFullscreen=()=>sizing.toggleFullscreen();
   entry.toggleFullscreen=toggleFullscreen;
   let pointerTimer;
   function pointer(){
@@ -73,6 +76,8 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
    // 保存したVR状態ではなく現在の両方の理由から再計算し、利用者のピン選択は保持する。
    windowPins?.setLocked(record.window,record.window.isFullScreen()||isVRActive(record));
    if(record.window.isFullScreen()){
+    // F11で入り直したときは、前回移動したヘッダー位置を引き継がず上端中央へ戻す。
+    entry.header?.resetPosition();
     pointerTimer=setInterval(pointer,80);pointerTimer.unref?.();
    }
    entry.layout?.();notify();
@@ -101,15 +106,11 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   for(const name of ['did-navigate','did-navigate-in-page','did-start-loading','did-stop-loading','page-title-updated'])contents.on(name,notify);
   contents.on('render-process-gone',()=>{entry.error='ページの表示が停止しました。再読み込みしてください。';notify();});
   function layout(){
-   if(!entry.rect||record.window.isDestroyed())return;
-   const zoom=record.window.webContents.getZoomFactor(),bounds=record.window.getContentBounds(),r=entry.rect;
-   const x=Math.max(0,Math.round(r.left*zoom)),y=Math.max(0,Math.round(r.top*zoom));
-   view.setBounds(record.window.isFullScreen()?{x:0,y:0,width:bounds.width,height:bounds.height}:{x,y,width:Math.max(0,Math.min(Math.round(r.width*zoom),bounds.width-x)),height:Math.max(0,Math.min(Math.round(r.height*zoom),bounds.height-y))});
-   view.setVisible(entry.available&&!entry.dialogOpen);
+   sizing.layout();view.setVisible(entry.available&&!entry.dialogOpen);
   }
-  entry.layout=layout;record.window.on('resize',layout);
+  entry.layout=layout;
   record.window.on('enter-full-screen',fullscreenChanged);record.window.on('leave-full-screen',fullscreenChanged);
-  record.window.once('closed',()=>{clearInterval(pointerTimer);entry.header.close();for(const page of [hostContents,contents])page.removeListener('before-input-event',fullscreenKey);entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
+  record.window.once('closed',()=>{sizing.dispose();clearInterval(pointerTimer);entry.header.close();for(const page of [hostContents,contents])page.removeListener('before-input-event',fullscreenKey);entries.delete(record);if(!contents.isDestroyed())contents.close({waitForBeforeUnload:false});});
   if(available)void entry.navigate(target).catch(error=>{entry.error=error.message;notify();});
   return contents;
  }
@@ -124,7 +125,7 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
    else if(name==='forward'){if(contents.navigationHistory.canGoForward())contents.navigationHistory.goForward();}
    else if(name==='reload'){entry.error='';contents.reload();}
    else if(name==='stop')contents.stop();
-   else if(name==='draft')return{ok:true,request:browserDraftRequest(projectRoot,contents.getURL(),entry.capture,now())};
+   else if(name==='draft')return{ok:true,request:browserDraftRequest(projectRoot,contents.getURL(),entry.capture,now(),{session:record.browserSession,tabId:record.browserTabId})};
    else if(name==='draft-dialog'){entry.dialogOpen=value===true;entry.layout();entry.pointer();}
    else if(name==='open-draft'){record.window.webContents.send('development:browser-open-draft');}
    else if(name==='header-size'){
@@ -150,19 +151,9 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
     }finally{entry.capturing=false;}
    }
    else if(name==='fullscreen')entry.toggleFullscreen();
-   else if(name==='size'){
-    const size={fhd:[1920,945],portrait:[1080,1920-(1080-945)]}[value];
-    if(!Array.isArray(size))throw Error('対応していないウィンドウサイズです。');
-    const area=screen.getDisplayMatching(record.window.getBounds()).workArea;
-    if(record.window.isFullScreen())record.window.setFullScreen(false);
-    if(record.window.isMaximized())record.window.unmaximize();
-    const width=Math.min(size[0],area.width),height=Math.min(size[1],area.height);
-    setWindowBounds(record.window,{x:area.x+Math.floor((area.width-width)/2),y:area.y+Math.floor((area.height-height)/2),width,height});
-   }
+   else if(name==='size')entry.sizing.preset(value);
    else if(name==='bounds'){
-    if(!value||!['left','top','width','height'].every(key=>Number.isFinite(value[key])&&value[key]>=0&&value[key]<100000))throw Error('表示領域が不正です。');
-    if(Number.isFinite(value.chromeHeight)&&value.chromeHeight>=0&&value.chromeHeight<1000)entry.chromeHeight=value.chromeHeight*record.window.webContents.getZoomFactor();
-    entry.rect=value;entry.layout();
+    entry.sizing.measure(value);entry.layout();
    }else if(name!=='state')throw Error('対応していない操作です。');
    return{ok:true,...entry.snapshot()};
   }catch(error){return{ok:false,error:error.message};}
@@ -172,6 +163,6 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
   const record=headers.get(event.sender),frame=event.senderFrame;
   return record&&!record.window.isDestroyed()&&frame===event.sender.mainFrame&&frame?.url===record.url+'#browser-header'?record:null;
  }
- return{attach,action,setAvailable,trustedHeader,allowedURL:allowed};
+ return{attach,action,setAvailable,trustedHeader,allowedURL:allowed,maximize:record=>entries.get(record)?.sizing.maximize()};
 }
 module.exports={HOME,browserURL,browserFileURL,browserFileTarget,browserOpenable,createBrowserViews,browserDraftRequest};

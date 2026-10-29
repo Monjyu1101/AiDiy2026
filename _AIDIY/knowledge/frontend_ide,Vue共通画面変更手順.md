@@ -193,6 +193,8 @@ Electronで選択HTMLをBrowserへ渡すときの例外は `viewer/登録HTMLル
 
 Browserの画面は `src/ブラウザ/ブラウザパネル.vue`、WebContentsViewは `デスクトップ/ブラウザ.cjs`、CDP中継は `デスクトップ/ブラウザCDP.cjs` が所有します。通常画面・VRの「＋ Browser」とHTML/HTMの「ブラウザ」ボタンから起動します。既存のコード・表示プレビューは維持します。Web起動では新しいタブを開くため、クリック内で空タブを予約してからtools接続とプレビューURLを確認します。
 
+全画面の上端ホバーパネルは単独BrowserとIDE所属Browserで共用します。外周はCSSと専用Electron窓の両方で角丸をなくし、背景グラデーションだけを透過します。文字・アイコン全体のopacityは下げません。移動位置は同じ全画面中のホバー再表示では維持し、F11で入り直すと現在の画面上端中央へ戻します。通常窓の復帰位置やWeb本文のスクロールは変更しません。mainの状態スナップショットには取得順の `stateRevision` を付け、Vueは古い操作応答・通知を無視します。全画面終了の通知を遅い応答で上書きすると通常の操作欄が隠れるため、この順序判定を外さないでください。`checks/browser-fullscreen-state.test.mjs`、`checks/browser-header-style.test.mjs`、`checks/browser-integration-regressions.test.mjs` で遅延応答・F11連打・ヘッダー読込中の終了・移動位置を確認します。ネイティブの透過合成と実際のキー操作は実機で別途確認します。
+
 BrowserはIDEの `active && mode==='online' && connected` を起動前・非同期準備後に照合します。tools切断時は既存ページを保持したまま非表示にして操作を停止し、再接続時に戻します。接続判定の取得元は既存のIDE接続状態です。Electronのファイル選択では `previewFile()` で実パスとプロジェクト境界を確認し、`pathToFileURL()` による絶対パスのfile URLをBrowserへ渡します。アドレス欄・履歴・MCPのURLもfile URLです。日本語・空白・`#`・`%`を含む名前を手動連結せず、相対画像・CSS・リンクはファイル位置を基準に読み込みます。Browserのfile要求とMCPの遷移先はプロジェクト内の実ファイルに限定します。通常Web起動と既存の「表示」プレビューは `/api/preview` の専用配信URLを引き続き使います。外部ページはpreloadなし・Nodeなし・sandbox有効の別WebContentsで、IDEのAPIオリジンへの要求は拒否します。
 
 MCPは `session="aidiy_ide"`、複数IDEでは `aidiy_ide-2` 以降です。`backend_tools/temp/_ide_browser_sessions/` にIDEがloopbackポート・ランダムトークン・PIDの登録を置き、`tools_proc/ide_browser_session.py` が既存のChromeレジストリへ接続専用セッションとして組み込みます。トークンやポートを画面へ公開せず、パネルにセッション名だけを表示します。IDE終了で登録と中継を解除します。MCPの `close_session` / `delete_session` はBrowserだけを閉じ、IDEプロセスをkillしません。未起動のセッションへ別Chromeを自動起動しません。
@@ -593,11 +595,15 @@ Electron・Web・VS Code の共通画面は濃いグレー `#383838` の1px外�
 
 ## Browserの日本語URL表示
 
-「Code / Liveへ」は、表示中URLを同じプロジェクトの下書きへ追加します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
+「Code / Liveへ」は、実際の `session` と送信元の `tab_id` を先頭に付け、表示中URLを同じプロジェクトの下書きへ追加します。IDEは起動インスタンス単位の `aidiy_ide N`、単独Browserは起動中固定の `aidiy_browser <UUID>` を使います。空白を含む名前をそのままMCPへ渡し、同じIDE内の複数Browser窓は `tab_id` で指定します。Browser窓の表示番号とsessionの番号は別です。名前の割当とtab IDは `ブラウザCDP.cjs` が所有し、下書きはフォーカス中の窓ではなく送信元レコードから作成します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
 
 Browserの接続表示の右には「撮影」を置きます。表示中のWebContentsViewだけを`capturePage()`でPNG化し、選択プロジェクトの`temp/input/browser-<UUID>.png`へ保存します。タイトルバー・URL欄・デスクトップ全体・スクロール外のページは含めません。任意の保存パスはrendererから受け取らず、撮影中の連打・切断・ページ遷移は拒否します。保存後は画面に保存先を示します。Avatarの`input_image`はAIコアの`backend_server/temp/input`への保存とLive送信であり、このBrowserのプロジェクト内保存とは別の経路です。Browserの撮影だけではLiveやAI推論を起動しません。
 
-Browserのタイトルバーには「FHD」（1920×945上限）、「縦表示」（1080×1785上限）、「F11」を置きます。縦の高さは `1920-(1080-945)=1785` です。サイズボタンはBrowserがあるディスプレイの作業領域を取得し、その中央にウィンドウ全体を配置します。画面より大きい寸法は作業領域まで縮め、負座標の画面にも対応します。最大化・全画面中は通常表示へ戻してから配置します。「F11」ボタンとF11キーは現在のディスプレイのネイティブ全画面表示を切り替え、再押下で戻します。全画面中は最前面を維持し、通常のヘッダー・外周枠を隠して本文を全面に広げます。FHD／縦表示は窓全体の寸法、F11は実ディスプレイの寸法です。
+Browserのタイトルバーの「FHD」はWeb本文の表示領域を1920×945、「縦表示」は1080×1785にします。`デスクトップ/ブラウザ表示領域.cjs` が実測した操作欄・CSS外周枠・OS枠を加えて外窓を拡大します。画面の作業領域より大きくても本文を縮めません。画面内に収まる場合は中央、収まらない場合は操作欄の左上を作業領域内に置いて右・下へはみ出します。macOSではBrowserだけ `enableLargerThanScreen` を有効にします。本文のzoomはプリセット時に1へ戻し、OSのDPR・UA・タッチは変更しません。スマホエミュレーションの機能ではありません。
+
+「F11」ボタンとF11キーは現在のディスプレイのネイティブ全画面表示を切り替え、本文は実際のcontent領域いっぱいになります。全画面中は最前面を維持し、通常のヘッダー・外周枠を隠します。「🔲」は最大化／通常復帰です。F11、🔲、手動リサイズではプリセットの固定を解除し、その時の本文領域に追従します。プリセットへ切り替える際は非同期の全画面解除・最大化解除完了を待ち、後から押した操作を優先します。
+
+rendererの本文矩形には同時に測定した小数のroot幅・高さ、fullscreen状態と測定時刻を添えます。mainは古い寸法・表示モード・順序の通知を捨て、hostのCSS寸法をzoomでDIPへ換算します。現在の外窓寸法と古い本文矩形を混ぜて余白を計算しないでください。単体確認は `node --test frontend_ide/checks/browser-viewport.test.mjs`。`scripts/check-browser-window.mjs` は実Electronで本文Viewとページの `innerWidth/innerHeight` の両方を確認します。単体モックの合格を実ページ・OS描画の実測と同一視しないでください。
 
 全画面専用パネルは `デスクトップ/ブラウザ全画面パネル.cjs` が透明な子BrowserWindowとして管理し、同じVueの `#browser-header` を読みます。上端4pxへのマウスオーバーで約0.22秒かけて展開します。Windows 11ではacrylic、他環境では対応する半透明背景を使います。WebContentsViewは全画面の同じ矩形を維持し、パネルを重ねても本文を縮めません。専用パネルの📌は表示の継続です。オンで常時表示、オフで即収納し、マウスが離れてから次の上端オーバーで再表示します。背景・タイトルの0.5秒長押しは共通の `長押し窓移動.cjs` を使い、移動開始時に自動で常時表示をオンにします。位置の固定ではなく、オンのまま何度でも移動できます。通常時の📌（窓の最前面維持）とは状態を分けます。
 

@@ -9,6 +9,7 @@ const {mkdtempSync,mkdirSync,writeFileSync,readFileSync}=require('node:fs');
 const {tmpdir}=require('node:os');
 const assert=require('node:assert/strict');
 const {createBrowserViews}=require('../デスクトップ/ブラウザ.cjs');
+const {createBrowserCDP}=require('../デスクトップ/ブラウザCDP.cjs');
 const {createWindowPins}=require('../デスクトップ/最前面ピン.cjs');
 const {saveBrowserCapture}=require('../デスクトップ/ブラウザ撮影.cjs');
 const {pathToFileURL}=require('node:url');
@@ -30,14 +31,17 @@ app.whenReady().then(async()=>{
   const {startDevelopment}=await import('../server.mjs');
   const state={active:true,mode:'online',connected:true,startedAt:1,project:{path:captureRoot,name:'Browser試験'}};
   server=await startDevelopment(captureRoot,{kind:'browser',connection:{state:()=>state,connect:async()=>state,close(){}}});
-  const win=new BrowserWindow({show:false,frame:false,width:1000,height:700,webPreferences:{backgroundThrottling:false,preload:resolve('frontend_ide/デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  const win=new BrowserWindow({show:false,frame:false,enableLargerThanScreen:true,width:1000,height:700,webPreferences:{backgroundThrottling:false,preload:resolve('frontend_ide/デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   const record={kind:'browser',window:win,url:server.url};
   const windowPins=createWindowPins();windowPins.register(win);
   let pointer={x:-9999,y:-9999};
   const control=createBrowserViews({BrowserWindow,WebContentsView,session,screen:{getDisplayMatching:r=>screen.getDisplayMatching(r),getCursorScreenPoint:()=>pointer},windowPins,captureImage:async({png})=>{captureResult=await saveBrowserCapture(captureRoot,png);return captureResult;},trustedEvent:event=>event.sender===win.webContents?record:control.trustedHeader(event),projectRoot:captureRoot,now:()=>clock});
-  const page=control.attach(record,pathToFileURL(join(captureRoot,'index.html')).href,true);
+  const cdp=await createBrowserCDP({directory:join(captureRoot,'cdp-registry'),sessionPrefix:process.env.AIDIY_BROWSER_SESSION_KIND==='ide'?'aidiy_ide':'aidiy_browser',canUse:async()=>true,allowedURL:control.allowedURL,openPanel:async()=>{throw Error('試験では追加窓を開きません。');}});
+  record.browserSession=cdp.name;
+  const page=control.attach(record,pathToFileURL(join(captureRoot,'index.html')).href,true);cdp.add(record,page);
+  app.once('will-quit',()=>cdp.close());
   ipcMain.handle('development:browser-action',(event,name,value)=>control.action(event,name,value));
-  ipcMain.handle('development:window',(_event,name)=>name==='title'?'AiDiy Browser':name==='pin-state'?{pinned:false,ready:true}:name==='isMaximized'?win.isMaximized():false);
+  ipcMain.handle('development:window',(_event,name)=>name==='title'?'AiDiy Browser':name==='pin-state'?{pinned:false,ready:true}:name==='isMaximized'?win.isMaximized():name==='maximize'?control.maximize(record):false);
   let bridge,router;const records=new Map(),targets=[];
   if(selftest||process.env.AIDIY_HANDOFF_ONLY==='1'){
    const current={active:true,mode:'online',startedAt:1,project:{path:captureRoot}},key=s=>s.mode+':'+s.startedAt;
@@ -68,20 +72,27 @@ app.whenReady().then(async()=>{
    finally{win.setAlwaysOnTop(top);}
   }
   const evaluate=code=>win.webContents.executeJavaScript(code,true);
+  const pageMetrics=()=>page.executeJavaScript(`({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})`);
   async function until(check){for(let i=0;i<60;i++){if(await check())return;await delay(50);}throw Error('画面遷移が完了しません。');}
   for(let i=0;i<100;i++){if(await evaluate(`document.querySelectorAll('.browser-window-sizes button').length===3`))break;await delay(100);}
   assert.deepEqual(await evaluate(`[...document.querySelectorAll('.browser-window-sizes button')].map(b=>b.textContent)`),['FHD','縦表示','F11']);
   for(const [index,width,height,label] of [[0,1920,945,'fhd'],[1,1080,1785,'portrait']]){
    const area=screen.getDisplayMatching(win.getBounds()).workArea;
    await evaluate(`document.querySelectorAll('.browser-window-sizes button')[${index}].click()`);await delay(500);
-   const b=win.getBounds();assert.equal(b.width,Math.min(width,area.width));assert.equal(b.height,Math.min(height,area.height));
-   assert.ok(b.x>=area.x&&b.y>=area.y&&b.x+b.width<=area.x+area.width&&b.y+b.height<=area.y+area.height);
+   await until(async()=>{const p=await pageMetrics();return p.width===width&&p.height===height;});
+   const b=win.getBounds(),pageBounds=win.contentView.children.find(v=>v.webContents===page).getBounds();
+   assert.equal(pageBounds.width,width);assert.equal(pageBounds.height,height);
+   assert.ok(b.width>=width&&b.height>height);assert.ok(b.x>=area.x&&b.y>=area.y);
    const geometry=await evaluate(`[...document.querySelectorAll('.browser-window-sizes button')].map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent,x:r.x,y:r.y,right:r.right,bottom:r.bottom,drag:getComputedStyle(b.parentElement).webkitAppRegion,fits:b.scrollWidth<=b.clientWidth}})`);
    assert.ok(geometry.every(r=>r.x>=0&&r.right<=width&&r.y>=0&&r.bottom<50&&r.drag==='no-drag'&&r.fits));
    writeFileSync(resolve('temp/browser-size-'+label+'.png'),(await win.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
-   console.log(JSON.stringify({preset:label,bounds:b,buttons:geometry}));
+   console.log(JSON.stringify({preset:label,bounds:b,pageBounds,pageViewport:await pageMetrics(),buttons:geometry}));
    await shot(index===0?'Browser_102_FHD':'Browser_103_縦表示');
   }
+  control.maximize(record);await until(()=>win.isMaximized());await delay(250);
+  let pageSize=await pageMetrics(),v=win.contentView.children.find(v=>v.webContents===page).getBounds();assert.equal(pageSize.width,v.width);assert.equal(pageSize.height,v.height);
+  control.maximize(record);await until(()=>!win.isMaximized());await delay(250);
+  pageSize=await pageMetrics();v=win.contentView.children.find(v=>v.webContents===page).getBounds();assert.equal(pageSize.width,v.width);assert.equal(pageSize.height,v.height);
   const before=win.getBounds();
   await evaluate(`document.querySelector('.browser-capture').click()`);await until(()=>!!captureResult);
   await until(()=>evaluate(`!!document.querySelector('.browser-capture-status')`));
@@ -100,7 +111,7 @@ app.whenReady().then(async()=>{
     await delay(50);if(kind==='code')await shot('Browser_401_連携先選択');await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='下書きへ追加').click()`);
     await until(()=>evaluate(`!document.querySelector('.draft-target-row')`));
     const text=await targets.find(t=>t.kind===kind).window.webContents.executeJavaScript(`document.querySelector('textarea').value`);
-    assert.ok(text.startsWith('既存の下書き\n\nfile:'));assert.equal(text.includes(captureResult.path.split('/').at(-1)),kind==='code');
+    assert.ok(text.startsWith(`既存の下書き\n\nsession: ${record.browserSession}\ntab_id: ${record.browserTabId}\nfile:`));assert.equal(text.includes(captureResult.path.split('/').at(-1)),kind==='code');
     console.log(JSON.stringify({handoff:kind,imageAttached:kind==='code',draft:text}));
    }
    writeFileSync(resolve('temp/browser-handoff-button.png'),(await win.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());

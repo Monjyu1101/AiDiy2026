@@ -46,18 +46,20 @@ test('Browser: ページを権限なしで分離し、IDEへの要求と別画�
   constructor(options){view=this;this.options=options;this.webContents=new EventEmitter();Object.assign(this.webContents,{url:'',getURL(){return this.url;},getTitle:()=>'',isLoading:()=>false,isDestroyed:()=>false,navigationHistory:{canGoBack:()=>false,canGoForward:()=>false},loadURL:async function(url){this.url=url;},setWindowOpenHandler(fn){this.popup=fn;},stop(){this.stops=(this.stops||0)+1;},close(options){this.closed=options;}});}
   setVisible(value){this.visible=value;}setBounds(value){this.bounds=value;}
  }
- const window=new EventEmitter();Object.assign(window,{bounds:{x:0,y:0,width:1000,height:700},isDestroyed:()=>false,isMaximized:()=>!!window.maximized,unmaximize(){this.maximized=false;},getBounds(){return this.bounds;},setBounds(bounds){this.bounds=bounds;this.size=[bounds.width,bounds.height];this.emit('resize');},contentView:{addChildView(){}},getContentBounds:()=>({width:1000,height:700}),webContents:{getZoomFactor:()=>1.25,send:(...args)=>sent.push(args)}});
- const record={kind:'browser',window,url:'http://127.0.0.1:1234/'},event={record};
+ const window=new EventEmitter();Object.assign(window,{bounds:{x:0,y:0,width:1000,height:700},isDestroyed:()=>false,isMaximized:()=>!!window.maximized,unmaximize(){this.maximized=false;this.emit('unmaximize');},getBounds(){return this.bounds;},setBounds(bounds){this.bounds=bounds;this.size=[bounds.width,bounds.height];this.emit('resize');},contentView:{addChildView(){}},getContentBounds:()=>window.bounds,webContents:{getZoomFactor:()=>1.25,send:(...args)=>sent.push(args)}});
+ const record={kind:'browser',window,url:'http://127.0.0.1:1234/',browserSession:'aidiy_ide 2',browserTabId:'sender-tab'},event={record};
  window.webContents=Object.assign(new EventEmitter(),window.webContents);
  window.setAlwaysOnTop=value=>{window.top=value;};
  const windowPins=pins.createWindowPins();windowPins.register(window);
  window.isFullScreen=()=>!!window.fullscreen;window.setFullScreen=value=>{window.fullscreen=value;window.emit(value?'enter-full-screen':'leave-full-screen');};
  let area={x:0,y:0,width:1920,height:2000};
  const captures=[];let release;
- const control=createBrowserViews({WebContentsView:View,session:{fromPartition:name=>{assert.equal(name,'aidiy-browser');return isolated;}},screen:{getDisplayMatching:()=>({workArea:area}),getCursorScreenPoint:()=>({x:-100,y:-100})},windowPins,captureImage:async value=>{captures.push(value);return{path:'temp/input/browser.png'};},trustedEvent:event=>event.record});
+ const control=createBrowserViews({projectRoot:resolve('.'),WebContentsView:View,session:{fromPartition:name=>{assert.equal(name,'aidiy-browser');return isolated;}},screen:{getDisplayMatching:()=>({workArea:area}),getCursorScreenPoint:()=>({x:-100,y:-100})},windowPins,captureImage:async value=>{captures.push(value);return{path:'temp/input/browser.png'};},trustedEvent:event=>event.record});
  control.attach(record,HOME,false);assert.equal(view.webContents.url,'');
  assert.equal((await control.action(event,'state')).available,false);
  control.setAvailable(record,true);assert.equal(view.webContents.url,HOME);
+ assert.equal((await control.action(event,'draft')).request.text,'session: aidiy_ide 2\ntab_id: sender-tab\n'+HOME);
+ assert.equal((await control.action({record:{...record}},'draft')).ok,false,'他レコードでは送信元を解決しない');
  control.setAvailable(record,false);assert.equal(view.webContents.stops,1);control.setAvailable(record,true);assert.equal(view.webContents.url,HOME);
  assert.equal(view.options.webPreferences.sandbox,true);assert.equal(view.options.webPreferences.nodeIntegration,false);assert.equal(view.options.webPreferences.preload,undefined);
  assert.equal(isolated.check(),false);isolated.request(null,'media',allowed=>assert.equal(allowed,false));
@@ -67,9 +69,9 @@ test('Browser: ページを権限なしで分離し、IDEへの要求と別画�
  assert.equal((await control.action(event,'navigate','file:///tmp/a.html')).ok,false);
  await control.action(event,'bounds',{left:0,top:90,width:800,height:470});assert.equal(view.visible,true);assert.equal(view.bounds.y,113);assert.ok(view.bounds.height+view.bounds.y<=700);
  window.maximized=true;
- assert.equal((await control.action(event,'size','portrait')).ok,true);assert.equal(window.maximized,false);assert.deepEqual(window.size,[1080,1785]);
- assert.equal((await control.action(event,'size','fhd')).ok,true);assert.deepEqual(window.size,[1920,945]);
- assert.equal((await control.action(event,'size','unknown')).ok,false);assert.deepEqual(window.size,[1920,945]);
+ assert.equal((await control.action(event,'size','portrait')).ok,true);assert.equal(window.maximized,false);assert.deepEqual(window.size,[1080,1898]);
+ assert.equal((await control.action(event,'size','fhd')).ok,true);assert.deepEqual(window.size,[1920,1058]);
+ assert.equal((await control.action(event,'size','unknown')).ok,false);assert.deepEqual(window.size,[1920,1058]);
  assert.equal((await control.action({record:{kind:'ide'}},'size','portrait')).ok,false);
  control.setAvailable(record,false);
  assert.equal((await control.action(event,'fullscreen')).fullscreen,true);
@@ -87,7 +89,7 @@ test('Browser: ページを権限なしで分離し、IDEへの要求と別画�
  for(area of [{x:-1920,y:32,width:1920,height:1048},{x:0,y:-1920,width:1080,height:1880},{x:1500,y:0,width:800,height:600}]){
   for(const name of ['fhd','portrait']){
    window.setFullScreen(true);assert.equal((await control.action(event,'size',name)).ok,true);assert.equal(window.isFullScreen(),false);
-   const b=window.getBounds();assert.ok(b.x>=area.x&&b.y>=area.y&&b.x+b.width<=area.x+area.width&&b.y+b.height<=area.y+area.height);
+   const b=window.getBounds();assert.ok(b.x>=area.x&&b.y>=area.y);assert.equal(view.bounds.width,name==='fhd'?1920:1080);assert.equal(view.bounds.height,name==='fhd'?945:1785);
   }
  }
  control.setAvailable(record,true);

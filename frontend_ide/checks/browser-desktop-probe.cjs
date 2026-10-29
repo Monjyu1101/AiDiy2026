@@ -78,7 +78,7 @@ app.on('browser-window-created',(_,owner)=>{
    await clickPage(page,'a');await until(()=>page.getTitle()==='宇宙ブラウザ検証','target blankも同パネルで表示');assert.equal(browsers().length,2);
    await evaluate(html,`aidiyWindow.browserAction('reload')`);await until(()=>!page.isLoading(),'再読み込み');await capture(html,'html');
    const session=(await evaluate(html,`aidiyWindow.browserAction('state')`)).session;
-   assert.match(session,/^aidiy_ide(?:-\d+)?$/);
+   assert.match(session,/^aidiy_ide [1-9]\d*$/);
    const mcp=async(method,params={})=>{
     const response=await fetch(process.env.AIDIY_TOOLS_ORIGIN+'/aidiy_chrome_devtools/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session,...params}),signal:AbortSignal.timeout(30000)});
     const result=await response.json();assert.equal(response.ok,true,JSON.stringify(result));assert.equal(result.error,undefined,JSON.stringify(result));return result;

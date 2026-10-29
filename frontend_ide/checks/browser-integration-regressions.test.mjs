@@ -96,24 +96,24 @@ for(const kind of ['code','live'])test(`Browser下書き: Webの${kind}はElectr
  finally{f.close();}
 });
 
-function browserVR({initialPin=false,standalone=false}={}){
- let header;
+function browserVR({initialPin=false,standalone=false,deferHeaderLoad=false}={}){
+ let header,finishHeaderLoad,pointer={x:-1,y:-1};
  class Window extends EventEmitter{
-  constructor(options={}){super();if(options.parent)header=this;this.bounds={x:0,y:0,width:1000,height:700,...options};this.fullscreen=false;this.movable=true;this.resizable=true;this.webContents=Object.assign(new EventEmitter(),{send(){},getZoomFactor:()=>1,setZoomFactor(){},setWindowOpenHandler(){},isDestroyed:()=>this.isDestroyed(),executeJavaScriptInIsolatedWorld:async()=>false});this.contentView={addChildView(){}};}
+  constructor(options={}){super();if(options.parent)header=this;this.options=options;this.bounds={x:0,y:0,width:1000,height:700,...options};this.fullscreen=false;this.movable=true;this.resizable=true;this.webContents=Object.assign(new EventEmitter(),{sent:[],send(channel,value){this.sent.push([channel,value]);},getZoomFactor:()=>1,setZoomFactor(){},setWindowOpenHandler(){},isDestroyed:()=>this.isDestroyed(),executeJavaScriptInIsolatedWorld:async()=>false});this.contentView={addChildView(){}};}
   isDestroyed(){return !!this.destroyed;}getBounds(){return{...this.bounds};}getContentBounds(){return{...this.bounds};}setBounds(value){this.bounds={...value};}getNormalBounds(){return{...this.bounds};}
   isMaximized(){return false;}isMinimized(){return false;}isFullScreen(){return this.fullscreen;}setFullScreen(value){this.fullscreen=value;this.emit(value?'enter-full-screen':'leave-full-screen');}
   isMovable(){return this.movable;}isResizable(){return this.resizable;}setMovable(value){this.movable=value;}setResizable(value){this.resizable=value;}
-  setAlwaysOnTop(value){this.alwaysOnTop=value;}isAlwaysOnTop(){return!!this.alwaysOnTop;}showInactive(){}moveTop(){}hide(){}
-  async loadURL(url){this.webContents.mainFrame={url};}
+  setAlwaysOnTop(value){this.alwaysOnTop=value;}isAlwaysOnTop(){return!!this.alwaysOnTop;}showInactive(){this.visible=true;}moveTop(){}hide(){this.visible=false;}
+  async loadURL(url){this.webContents.mainFrame={url};if(this.options.parent&&deferHeaderLoad)await new Promise(resolve=>{finishHeaderLoad=resolve;});}
   destroy(){this.destroyed=true;this.emit('closed');this.webContents.emit('destroyed');}
  }
- let page;
+ let page,view;
  class View{
-  constructor(){page=this.webContents=Object.assign(new EventEmitter(),{getURL:()=>'',getTitle:()=>'',isLoading:()=>false,isDestroyed:()=>false,stop(){},close(){},setWindowOpenHandler(){},navigationHistory:{canGoBack:()=>false,canGoForward:()=>false}});}
-  setVisible(){}setBounds(){}
+  constructor(){view=this;page=this.webContents=Object.assign(new EventEmitter(),{getURL:()=>'',getTitle:()=>'',isLoading:()=>false,isDestroyed:()=>false,stop(){},close(){},setWindowOpenHandler(){},navigationHistory:{canGoBack:()=>false,canGoForward:()=>false}});}
+  setVisible(value){this.visible=value;}setBounds(value){this.bounds=value;}
  }
  const display={bounds:{x:0,y:0,width:1920,height:1080},workArea:{x:0,y:0,width:1920,height:1040}};
- const screen=Object.assign(new EventEmitter(),{getAllDisplays:()=>[display],getPrimaryDisplay:()=>display,getDisplayMatching:()=>display,getCursorScreenPoint:()=>({x:-1,y:-1})});
+ const screen=Object.assign(new EventEmitter(),{getAllDisplays:()=>[display],getPrimaryDisplay:()=>display,getDisplayMatching:()=>display,getCursorScreenPoint:()=>pointer});
  const owner={kind:'ide',window:new Window()},record={kind:'browser',owner:standalone?undefined:owner,window:new Window(),url:'http://127.0.0.1:12345/'};
  const windows=new Map([[owner.window.webContents,owner],[record.window.webContents,record]]);
  const windowPins=pinsModule.createWindowPins();windowPins.register(owner.window);windowPins.register(record.window,{pinned:initialPin});
@@ -128,12 +128,65 @@ function browserVR({initialPin=false,standalone=false}={}){
  const browser=browserModule.createBrowserViews({BrowserWindow:Window,WebContentsView:View,screen,windowPins,session:{fromPartition:()=>({setPermissionRequestHandler(){},setPermissionCheckHandler(){},webRequest:{onBeforeRequest(){}}})},trustedEvent:event=>event.record,isVRActive:item=>displays.isActive(item.owner||item),leaveVR:item=>displays.leave(item.owner||item)});
  browser.attach(record,'about:blank',false);
  const stopPage=displays.attachExitKey(record,page);
- return{owner,record,displays,browser,windowPins,windows,host:record.window.webContents,page,get header(){return header;},
+ return{owner,record,displays,browser,windowPins,windows,view,host:record.window.webContents,page,get header(){return header;},
   enterVR:()=>displays.handle({record:owner},'toggle'),
+  finishHeaderLoad:()=>finishHeaderLoad?.(),
+  movePointer:value=>{pointer=value;},
   press(contents,input={},prevented=false){const event={defaultPrevented:prevented,count:0,preventDefault(){this.defaultPrevented=true;this.count++;}};contents.emit('before-input-event',event,{type:'keyDown',key:'F11',...input});return event;},
   close(){record.window.emit('closed');stopHost();stopPage();owner.window.emit('closed');},
  };
 }
+for(const standalone of [false,true])for(const focus of ['host','page','header'])test(`Browser F11連打: ${standalone?'単独':'IDE所属'}/${focus}は遅いヘッダー読込・表示途中でも最後の通常状態へ戻る`,async t=>{
+ t.mock.timers.enable({apis:['setInterval','Date']});
+ const f=browserVR({standalone,deferHeaderLoad:true});
+ try{
+  const bounds={left:0,top:96,width:1000,height:604,chromeHeight:96};
+  await f.browser.action({record:f.record},'bounds',bounds);
+  f.movePointer({x:500,y:1});f.press(f.host);t.mock.timers.tick(80);
+  assert.ok(f.header);f.press(f.host);f.finishHeaderLoad();await Promise.resolve();await Promise.resolve();t.mock.timers.tick(240);
+  assert.equal(!!f.header.visible,false,'全画面終了後に初期読込が完了してもヘッダーを出さない');
+  for(let cycle=0;cycle<3;cycle++){
+   const source=focus==='header'?f.header.webContents:f[focus];
+   f.press(source);t.mock.timers.tick(80);t.mock.timers.tick(32);
+   f.press(source);f.press(source);f.press(source);t.mock.timers.tick(240);
+   const updates=f.host.sent.filter(([channel])=>channel==='development:browser-changed').map(([,value])=>value);
+   assert.equal(updates.at(-1).fullscreen,false);
+   assert.ok(updates.every((value,i)=>i===0||value.stateRevision>updates[i-1].stateRevision),'状態通知の順序が単調増加する');
+   assert.equal(f.record.window.isFullScreen(),false);assert.equal(f.header.visible,false);
+   const result=await f.browser.action({record:f.record},'bounds',bounds);
+   assert.equal(result.fullscreen,false);assert.ok(result.stateRevision>updates.at(-1).stateRevision);
+   assert.deepEqual(f.view.bounds,{x:0,y:96,width:1000,height:604},'通常操作欄の領域を本文で覆わない');
+  }
+ }finally{f.close();}
+});
+for(const standalone of [false,true])test(`Browser全画面ヘッダー: ${standalone?'単独':'IDE所属'}の移動位置はホバー中だけ維持し、F11再入場で上端中央へ戻す`,async t=>{
+ t.mock.timers.enable({apis:['setInterval','Date']});
+ const f=browserVR({standalone});
+ try{
+  const tick=()=>t.mock.timers.tick(240);
+  f.press(f.host);f.movePointer({x:500,y:1});tick();await Promise.resolve();tick();
+  assert.equal(f.header.visible,true);assert.equal(f.header.options.roundedCorners,false,'ネイティブ窓の角丸も無効にする');
+  assert.deepEqual(f.header.getBounds(),{x:8,y:0,width:984,height:100});
+  for(let cycle=0;cycle<3;cycle++){
+   const base=f.record.window.getContentBounds();
+   f.header.setBounds({x:base.x+12,y:base.y+130,width:984,height:100});f.header.emit('move');
+   const moved=f.header.getBounds();
+   f.movePointer({x:base.x+500,y:base.y+500});tick();tick();assert.equal(f.header.visible,false);
+   f.movePointer({x:base.x+500,y:base.y+1});tick();tick();
+   assert.equal(f.header.visible,true);assert.deepEqual(f.header.getBounds(),moved,'単なるホバー再表示では移動位置を保つ');
+   await f.browser.action({record:f.record},'header-toggle-pin');
+   f.press(f.header.webContents);tick();assert.equal(f.record.window.isFullScreen(),false);
+   f.record.window.setBounds({x:-1200-cycle*20,y:80+cycle*10,width:1000,height:700});
+   const current=f.record.window.getContentBounds();f.movePointer({x:current.x+500,y:current.y+500});
+   f.press(f.host);tick();tick();
+   assert.equal(f.header.visible,true,'ピン留めはF11を跨いでも保持する');
+   assert.deepEqual(f.header.getBounds(),{x:current.x+8,y:current.y,width:984,height:100},'前回位置でなく現在の画面上端中央に表示する');
+   assert.deepEqual(f.record.window.getContentBounds(),current,'本文側の窓位置は変更しない');
+   await f.browser.action({record:f.record},'header-toggle-pin');tick();
+   f.movePointer({x:current.x+500,y:current.y+1});tick();tick();
+  }
+ }finally{f.close();}
+});
 for(const focus of ['host','page'])test(`Browser F11: ${focus==='host'?'URL欄':'本文'}のVR解除を二重処理せず反復・次の押下を区別する`,()=>{
  const f=browserVR();
  try{

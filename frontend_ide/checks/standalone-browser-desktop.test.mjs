@@ -46,7 +46,7 @@ function desktop({project,cwd=project,kind='ide',url='http://127.0.0.1:12345/',a
  const area={x:0,y:0,width:1920,height:1080};
  const electron={app,BrowserWindow:Window,ipcMain,shell:{},dialog:{},session:{defaultSession:{setPermissionCheckHandler(){},setPermissionRequestHandler(){}}},screen:Object.assign(new EventEmitter(),{getCursorScreenPoint:()=>({x:0,y:0}),getDisplayNearestPoint:()=>({workArea:area}),getDisplayMatching:()=>({workArea:area})})};
  const load=name=>name==='electron'?electron:name==='./host/scripts/window-opening.cjs'?{拡大表示:async(_type,window)=>{window.show();window.focus();return true;}}
-  :name==='./デスクトップ/desktop-session.cjs'?{readDevelopmentState:async()=>({active:true,mode:'online',connected,startedAt:1,project:{path:project}})}:name==='./デスクトップ/ブラウザCDP.cjs'?{createBrowserCDP:async options=>{bridgeOptions=options;return bridge;}}:name==='./デスクトップ/ブラウザ.cjs'?{HOME:'https://www.google.com/',createBrowserViews:()=>({allowedURL:()=>true,attach:()=>new EventEmitter(),setAvailable:(record,value)=>availability.push({record,value}),action:async()=>({ok:true})})}:desktopRequire(name);
+  :name==='./デスクトップ/desktop-session.cjs'?{readDevelopmentState:async()=>({active:true,mode:'online',connected,startedAt:1,project:{path:project}})}:name==='./デスクトップ/ブラウザCDP.cjs'?{createBrowserCDP:async options=>{bridgeOptions=options;return bridge;}}:name==='./デスクトップ/ブラウザ.cjs'?{HOME:'https://www.google.com/',createBrowserViews:()=>({allowedURL:()=>true,attach:()=>new EventEmitter(),setAvailable:(record,value)=>availability.push({record,value}),action:async()=>({ok:true}),maximize:record=>{record.window.browserMaximized=true;return true;}})}:desktopRequire(name);
  vm.runInNewContext(`(function(require,__dirname,process){${desktopSource}\n})`,{console,setInterval,clearInterval,URL})(load,dirname(desktopPath),process);
  return{app,process,windows,messages,paths,order,pages,availability,setConnected(value){connected=value;},get bridgeOptions(){return bridgeOptions;},get bridgeClosed(){return bridgeClosed;},ready:()=>ready,request:(name,window,...args)=>handlers.get(name)({sender:window.webContents,senderFrame:window.webContents.mainFrame},...args)};
 }
@@ -58,6 +58,7 @@ test('Standalone Browser: 専用プロファイル、共有CDP、最終窓終了
  t.after(()=>{a.app.quit();b.app.quit();});
  assert.equal(a.windows.length,1);assert.equal(a.windows[0].url,'http://127.0.0.1:12345/#browser');
  assert.match(a.windows[0].options.icon,/AiDiy\.png$/);assert.match(a.windows[0].options.title,/AiDiy Browser/);
+ assert.equal(a.windows[0].options.enableLargerThanScreen,true);assert.equal(await a.request('development:window',a.windows[0],'maximize'),true);assert.equal(a.windows[0].browserMaximized,true);
  assert.notEqual(a.paths.userData,b.paths.userData);assert.equal(a.paths.userData,a.paths.sessionData);assert.ok(!a.order.includes('lock'));
  assert.equal(a.bridgeOptions.sessionPrefix,'aidiy_browser');assert.equal(await a.bridgeOptions.canUse(),true);
  const second=await a.bridgeOptions.openPanel('https://example.com/');assert.equal(a.windows.length,2);assert.equal(second.owner,undefined);
