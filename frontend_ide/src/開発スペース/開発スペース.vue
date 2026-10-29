@@ -143,7 +143,8 @@ function layout({preview:plannedPreview}={}){
     if(preview){
       lower=innerHeight/2-8;
       if(explorer)left=explorer.right+8;
-      if(list)right=list.left-8;
+      // Explorer外部表示中は軌跡も左端へ寄せるため、左側の占有領域として扱う。
+      if(list){if(element?.querySelector('.explorer-routes.explorer-detached'))left=Math.max(left,list.right+8);else right=list.left-8;}
     }else{
       // ビューア非表示では一覧の開閉によらず画面そのものの中央を使う。
       upper=0;lower=innerHeight;

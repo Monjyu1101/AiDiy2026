@@ -77,3 +77,48 @@ test('Explorer PDF化: .mdのみを要求し、成功後に作成先を一覧へ
  await f.actions.action('pdf',{type:'file',path:'docs/日本語.MD',name:'日本語.MD'});
  assert.deepEqual(f.requests[0].payload,{action:'pdf',path:'docs/日本語.MD'});assert.equal(f.changes.length,1);assert.match(f.state.notice,/日本語.pdf.*作成/);f.actions.dispose();
 });
+
+test('Explorerフォルダを開く: 本体/別窓で同じ限定APIへ選択パスを渡し、rootも扱う',async()=>{
+ const calls=[];let document={name:'embedded'};
+ const actions=createExplorerActions({root:()=>'/project',document:()=>document,openFolder:async path=>{calls.push(path);return{ok:true};},request:()=>assert.fail('OS表示をHTTPへ送らない')});
+ try{
+  for(const name of ['embedded','detached']){
+   document={name};
+   for(const row of [file,folder,{type:'dir',path:'',name:'project'}]){await actions.action('open-folder',row);assert.equal(actions.state.error,'');assert.match(actions.state.notice,/開きました/);}
+  }
+  assert.deepEqual(calls,[file.path,folder.path,'',file.path,folder.path,'']);
+ }finally{actions.dispose();}
+});
+test('Explorerフォルダを開く: Webは無効、失敗・連打・reset後の遅い結果を処理する',async()=>{
+ const web=createExplorerActions({root:()=>'/project',document:()=>null});
+ await web.action('open-folder',folder);assert.equal(web.canOpenFolder,false);assert.match(web.state.error,/デスクトップ版/);web.dispose();
+ let resolve,calls=0;
+ const actions=createExplorerActions({root:()=>'/project',document:()=>null,openFolder:()=>{calls++;return new Promise(done=>{resolve=done;});}});
+ try{
+  const first=actions.action('open-folder',file);await actions.action('open-folder',folder);assert.equal(calls,1);
+  actions.reset();resolve({ok:false,error:'late'});await first;assert.equal(actions.state.error,'');assert.equal(actions.state.notice,'');assert.equal(actions.state.busy,false);
+  const second=actions.action('open-folder',folder);resolve({ok:false,error:'フォルダを表示できません'});await second;assert.match(actions.state.error,/表示できません/);
+ }finally{actions.dispose();}
+});
+test('Explorer右クリック: 実Vueテンプレートでアプリで開くの直後にフォルダを開くを表示',async()=>{
+ const {createRequire}=await import('node:module'),{readFileSync}=await import('node:fs'),{default:vm}=await import('node:vm');
+ const require=createRequire(import.meta.url),vue=require('vue'),{parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
+ const {descriptor}=parse(readFileSync(new URL('../src/ファイル閲覧/エクスプローラー操作表示.vue',import.meta.url),'utf8'));
+ const script=compileScript(descriptor,{id:'explorer-menu',genDefaultAs:'component'});
+ const template=compileTemplate({source:descriptor.template.content,filename:'ExplorerActions.vue',id:'explorer-menu',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
+ const module={exports:{}};
+ vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{module,require:id=>id==='vue'?vue:{containsPath}});
+ const component=module.exports;
+ const buttons=node=>Array.isArray(node)?node.flatMap(buttons):node&&typeof node==='object'?[(node.props?.role==='menuitem'?node:null),...buttons(node.children)].filter(Boolean):[];
+ for(const desktop of [false,true])for(const row of [file,folder,{type:'dir',path:'',name:'project'},{type:'file',path:'docs/test.md'}]){
+  const calls=[],actions=createExplorerActions({root:()=>'/project',document:()=>null,openFile:desktop?async()=>({ok:true}):null,openFolder:desktop?async path=>{calls.push(path);return{ok:true};}:null});
+  actions.state.menu={target:row,directory:parentPath(row.path),x:0,y:0};
+  const props={actions},state=component.setup(props,{expose(){}}),items=buttons(component.render({},[],props,vue.proxyRefs(state),{},{}));
+  const index=items.findIndex(button=>button.props['data-action']==='open-app'),next=items[index+1];
+  assert.equal(next.props['data-action'],'open-folder');assert.equal(next.props.disabled,!desktop);assert.equal(next.children[0].children,'フォルダを開く');
+  if(desktop){await next.props.onClick();assert.deepEqual(calls,[row.path]);}
+  actions.dispose();
+ }
+ const explorer=readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),'utf8');
+ assert.match(explorer,/openFolder:typeof window\.aidiyWindow\?\.openFolder==='function'\?path=>window\.aidiyWindow\.openFolder\(path\):null/);
+});

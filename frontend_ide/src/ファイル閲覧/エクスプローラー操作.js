@@ -18,9 +18,10 @@ export function explorerNameError(name) {
 }
 
 // OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
-export function createExplorerActions({ root, document: ownerDocument, openFile = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
+export function createExplorerActions({ root, document: ownerDocument, openFile = null, openFolder = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
   const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, refreshing: false, error: '', notice: '' });
   const canOpenFile = typeof openFile === 'function';
+  const canOpenFolder = typeof openFolder === 'function';
   const canOpenDraft = () => typeof openDraft === 'function' && !!root();
   let cleanup = () => {}, disposed = false, epoch = 0;
   const doc = () => ownerDocument() || globalThis.document;
@@ -120,6 +121,19 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
       } catch (error) { if (current()) state.error = error.message || '関連付けられたアプリで開けませんでした。'; }
       finally { if (current()) { state.busy = false; focus(); } }
       return;
+    } else if (action === 'open-folder') {
+      if (!['file','dir'].includes(row.type) || typeof path !== 'string' || (row.type === 'file' && !path)) { state.error = 'ファイルまたはフォルダを選択してください。'; return; }
+      if (!canOpenFolder) { state.error = '「フォルダを開く」はデスクトップ版で利用できます。'; return; }
+      state.busy = true;
+      try {
+        // ファイル/フォルダの判別と親の解決はmainで行い、rendererから絶対パスを渡さない。
+        const result = await openFolder(path);
+        if (!current()) return;
+        if (!result?.ok) throw Error(result?.error || 'フォルダを開けませんでした。');
+        state.notice = row.type === 'file' ? `「${row.name || path}」の保存フォルダを開きました。` : `「${row.name || path || 'ルート'}」を開きました。`;
+      } catch (error) { if (current()) state.error = error.message || 'フォルダを開けませんでした。'; }
+      finally { if (current()) { state.busy = false; focus(); } }
+      return;
     } else if (action === 'copy-path' || action === 'copy-relative') {
       const text = action === 'copy-path' ? (path ? fullFilePath(root(), path) : root()) : path || '.';
       try { const document = doc(); await copyBrowserText(text, { document, clipboard: document?.defaultView?.navigator?.clipboard, isCurrent: current }); if(current()) state.notice = 'パスをコピーしました。'; }
@@ -156,5 +170,5 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
   }
   function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = state.refreshing = false; clearMessage(); }
   function dispose() { disposed = true; reset(); }
-  return { state, canOpenFile, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
+  return { state, canOpenFile, canOpenFolder, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
 }

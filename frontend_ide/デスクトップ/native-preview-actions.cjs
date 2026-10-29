@@ -4,7 +4,8 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 const {realpathSync,statSync,fstatSync,openSync,readSync,closeSync,constants}=require('node:fs');
-const {resolve,relative,isAbsolute,sep,extname,win32}=require('node:path');
+const {resolve,relative,isAbsolute,sep,extname,dirname,win32}=require('node:path');
+const {execFile}=require('node:child_process');
 
 const fail=error=>({ok:false,error});
 const changed='IDEの利用状態や表示が変わりました。もう一度操作してください。';
@@ -25,15 +26,22 @@ function riskyFile(path,info,head){
 
 // viewer/server.mjs の insideRoot と同じ realpath / relative 境界を使う。
 // ファイルAPIで閲覧できるファイルが対象。HTML配信専用の拡張子・設定除外とは別の境界。
-function previewFile(root,path,inspect=false){
- if(!validPreviewPath(path)||typeof root!=='string'||!isAbsolute(root)||root.length>4096||root.includes('\0'))throw Error('ファイルのパスが不正です。');
- let full,realRoot,info,head=Buffer.alloc(0);
+function previewTarget(root,path,{inspect=false,folder=false}={}){
+ if(!((folder&&path==='')||validPreviewPath(path))||typeof root!=='string'||!isAbsolute(root)||root.length>4096||root.includes('\0'))throw Error('ファイルのパスが不正です。');
+ let full,realRoot,info,folderPath,folderIdentity,head=Buffer.alloc(0);
  try{
   realRoot=realpathSync(root);full=realpathSync(resolve(realRoot,...path.split('/')));
   const back=relative(realRoot,full);
-  if(!back||back==='..'||back.startsWith(`..${sep}`)||isAbsolute(back))throw Error('outside');
+  if((!back&&!folder)||back==='..'||back.startsWith(`..${sep}`)||isAbsolute(back))throw Error('outside');
   info=statSync(full);
-  if(!info.isFile())throw Error('not a file');
+  if(!info.isFile()&&!(folder&&info.isDirectory()))throw Error('not a file or folder');
+  if(folder){
+   // 内部リンクのファイルでも、一覧に表示された項目の所在フォルダを開く。
+   folderPath=info.isDirectory()?full:realpathSync(dirname(resolve(realRoot,...path.split('/'))));
+   const back=relative(realRoot,folderPath),directory=statSync(folderPath);
+   if(back==='..'||back.startsWith(`..${sep}`)||isAbsolute(back)||!directory.isDirectory())throw Error('outside folder');
+   folderIdentity=[directory.dev,directory.ino,directory.mode].join(':');
+  }
   if(inspect){
    let handle;
    try{
@@ -46,12 +54,14 @@ function previewFile(root,path,inspect=false){
   }
  }catch{throw Error('プロジェクト内のファイルを確認できません。削除・移動やアクセス権を確認してください。');}
  return{full,realRoot,lexical:resolve(root,...path.split('/')),identity:[info.dev,info.ino,info.mode,info.size,info.mtimeMs,info.ctimeMs].join(':'),
+  folderPath,folderIdentity,
   risky:inspect&&(riskyFile(path,info,head)||riskyFile(full,info,head))};
 }
-const sameFile=(left,right)=>left.full===right.full&&left.realRoot===right.realRoot&&left.identity===right.identity&&left.risky===right.risky;
+function previewFile(root,path,inspect=false){return previewTarget(root,path,{inspect});}
+const sameFile=(left,right)=>left.full===right.full&&left.realRoot===right.realRoot&&left.identity===right.identity&&left.risky===right.risky&&left.folderPath===right.folderPath&&left.folderIdentity===right.folderIdentity;
 
-// Rendererへ公開するのはコピーと既定アプリで開く操作だけ。任意のコマンド・URLは扱わない。
-function createNativePreviewActions({records,trustedEvent,readState,sessionKey,clipboard,shell,dialog,isQuitting=()=>false}){
+// Rendererへ公開するのはコピー・既定アプリ・所在フォルダの操作だけ。任意のコマンド・URLは扱わない。
+function createNativePreviewActions({records,trustedEvent,readState,sessionKey,clipboard,shell,dialog,isQuitting=()=>false,platform=process.platform,run=execFile}){
  const pending=new WeakSet(),epochs=new WeakMap();
  const alive=record=>!!record&&!record.window.isDestroyed()&&[...records.values()].includes(record);
  const ownerOf=source=>source?.kind==='ide'&&!source.owner?source:source?.kind==='viewer'?source.owner:null;
@@ -59,7 +69,7 @@ function createNativePreviewActions({records,trustedEvent,readState,sessionKey,c
  function invalidate(record){if(record)epochs.set(record,epoch(record)+1);}
  async function perform(event,path,action){
   const source=trustedEvent(event),owner=ownerOf(source);
-  if(!validPreviewPath(path))return fail('ファイルのパスが不正です。');
+  if(!((action==='folder'&&path==='')||validPreviewPath(path)))return fail('ファイルのパスが不正です。');
   if(!alive(source)||!alive(owner)||owner.kind!=='ide'||owner.owner||(source.kind==='viewer'&&source.viewerPath!==path))return fail('この画面からはファイルを操作できません。');
   if(pending.has(source))return fail('前のファイル操作を確認中です。しばらくお待ちください。');
   const revision=owner.revision,sourceEpoch=epoch(source),ownerEpoch=epoch(owner);
@@ -72,13 +82,13 @@ function createNativePreviewActions({records,trustedEvent,readState,sessionKey,c
   try{
    const state=await readState(owner);
    if(!active(state))throw Error(changed);
-   const root=state.project.path,key=sessionKey(state),target=previewFile(root,path,action==='open');
+   const root=state.project.path,key=sessionKey(state),lookup=()=>previewTarget(root,path,{inspect:action==='open',folder:action==='folder'}),target=lookup();
    async function recheck(){
     const latest=await readState(owner);
     if(!active(latest)||latest.project.path!==root||sessionKey(latest)!==key)throw Error(changed);
     // 状態取得・確認ダイアログの待ち時間にリンク先やファイルが変わったら開かない。
     // この同期確認からネイティブ操作までに別のIPCを挟まない。
-    if(!sameFile(target,previewFile(root,path,action==='open')))throw Error('ファイルが変更されました。もう一度操作してください。');
+    if(!sameFile(target,lookup()))throw Error('ファイルが変更されました。もう一度操作してください。');
    }
    await recheck();
    if(action==='open'&&target.risky){
@@ -90,6 +100,13 @@ function createNativePreviewActions({records,trustedEvent,readState,sessionKey,c
    }
    if(!current())throw Error(changed);
    if(action==='copy')clipboard.writeText(target.lexical);
+   else if(action==='folder'){
+    // macOSは.app等のディレクトリを実行せず、Finderに明示してフォルダとして表示する。
+    const error=platform==='darwin'
+     ? await new Promise((resolve,reject)=>run('/usr/bin/open',['-a','Finder','--',target.folderPath],{windowsHide:true,timeout:10000},error=>error?reject(error):resolve('')))
+     : await shell.openPath(target.folderPath);
+    if(error)return fail(`フォルダを開けませんでした。${String(error).slice(0,300)}`);
+   }
    else{
     const error=await shell.openPath(target.full);
     if(error)return fail(`アプリで開けませんでした。${String(error).slice(0,300)}`);
@@ -98,6 +115,6 @@ function createNativePreviewActions({records,trustedEvent,readState,sessionKey,c
   }catch(error){return fail(error?.message||'ファイルを操作できませんでした。');}
   finally{pending.delete(source);}
  }
- return{copyFilePath:(event,path)=>perform(event,path,'copy'),openFile:(event,path)=>perform(event,path,'open'),invalidate};
+ return{copyFilePath:(event,path)=>perform(event,path,'copy'),openFile:(event,path)=>perform(event,path,'open'),openFolder:(event,path)=>perform(event,path,'folder'),invalidate};
 }
 module.exports={createNativePreviewActions,validPreviewPath,previewFile};

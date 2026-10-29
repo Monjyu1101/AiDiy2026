@@ -46,7 +46,7 @@ const textOf = node => [node.text || '', ...(node.children || []).map(textOf)].j
 
 // 実際のSFCテンプレートのイベント/propsで全体を接続する。エンジンや選択処理は置き換えない。
 // 描画先だけをメモリ内にし、AI結果は確定済みの通知、Monacoは簡易表示へ置き換える。
-async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', actualAI = false } = {}) {
+async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', actualAI = false, panelWindowFactory } = {}) {
   const old = new Map(), frames = new Map(), timers = new Map(), intervals = new Map(), storage = new Map();
   const requests = [], warnings = [], states = new Map(), props = new Map(), components = new Map();
   const window = new EventTarget(), document = new EventTarget(), location = { hash, origin: 'http://localhost' };
@@ -104,7 +104,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
     '../ブラウザ/起動.js': browserLaunch,
     '../../viewer/media-types.mjs': mediaTypes,
     '../ファイル閲覧/閲覧待機.js':viewerIdle,
-    '../ファイル閲覧/軌跡パネル展開.js':routeExpansion,'../ファイル閲覧/パネル別窓.js':panelWindows,
+    '../ファイル閲覧/軌跡パネル展開.js':routeExpansion,'../ファイル閲覧/パネル別窓.js':panelWindowFactory?{...panelWindows,createPanelWindow:panelWindowFactory}:panelWindows,
     './ファイル日時.js': fileDates,
     '../開発スペース/軌跡ツリー.js':routeTree,'../開発スペース/経路記録.js':routeRecords,
     '../ファイル閲覧/フォルダ監視.js': { createFolderMonitor },
@@ -755,4 +755,94 @@ test('3Dルート航行: 呼び出し元の有効期限も全景への移動中�
     await finishFollow(h,()=>done);await navigation;
     assert.notEqual(result,true,'失効した全景移動を完了扱いにしない');
   }finally{h.dispose();}
+});
+
+
+// 別窓のOS境界だけを置き換え、実Vueのピン操作・通知・class更新を通す。
+function layoutPanelWindows() {
+  const panels = new Map();
+  return { panels, create(options) {
+    const kind = options.kind || 'explorer'; let detached = false, disposed = false;
+    const manager = {
+      async pin() { if (disposed) return false; if (!detached) { detached = true; options.changed(true); } return true; },
+      restore() { if (detached) { detached = false; options.changed(false); } },
+      dismiss() { this.restore(); options.closed(); },
+      close() { this.restore(); disposed = true; },
+      focus() { return detached; },
+      // 子窓reloadはDOMの一時回収であり、別窓表示状態を解除しない。
+      reload() { options.moved?.(); },
+    };
+    panels.set(kind, manager); return manager;
+  } };
+}
+const routeNode = h => h.find(node => hasClass(node, 'explorer-routes'));
+const restoreNode = h => h.find(node => hasClass(node, 'route-restore-toggle'));
+function routeLayout(h, expected) {
+  const routes = routeNode(h), restore = restoreNode(h);
+  assert.ok(routes);
+  assert.equal(hasClass(routes, 'explorer-detached'), expected === 'detached', '軌跡バーはExplorer外部表示と折畳みを区別する');
+  assert.equal(hasClass(routes, 'explorer-collapsed'), expected !== 'open');
+  if (restore) {
+    assert.equal(hasClass(restore, 'explorer-detached'), expected === 'detached', '再表示ボタンも軌跡バーと同じ位置');
+    assert.equal(hasClass(restore, 'explorer-open'), expected === 'open');
+  }
+  assert.equal(hasClass(h.find(node => hasClass(node, 'space-view')), 'explorer-open'), expected === 'open');
+}
+for (const mode of ['2d', '3d']) test(`${mode}: Explorer外部化・本体復帰・閉じる・再表示で軌跡の左余白を切替`, async t => {
+  const windows = layoutPanelWindows(), h = await workspace(t, { mode, panelWindowFactory: windows.create });
+  try {
+    routeLayout(h, 'collapsed');
+    for (let cycle = 0; cycle < 3; cycle++) {
+      await h.click(node => hasClass(node, 'explorer-toggle')); routeLayout(h, 'open');
+      await h.click(node => hasClass(node, 'explorer-detach')); routeLayout(h, 'detached');
+      assert.equal(h.find(node => hasClass(node, 'explorer-toggle')), undefined, '外部表示中は左端にExplorer再表示ボタンがない');
+      await h.click(node => hasClass(node, 'route-restore-toggle')); routeLayout(h, 'detached');
+      h.viewProps.viewMode = mode === '2d' ? '3d' : '2d'; await flush(); routeLayout(h, 'detached');
+      h.viewProps.viewMode = mode; await flush();
+      windows.panels.get('explorer').reload(); await flush(); routeLayout(h, 'detached');
+      await h.click(node => hasClass(node, 'route-burger')); routeLayout(h, 'detached');
+      windows.panels.get('explorer').restore(); await flush(); routeLayout(h, 'open');
+      await h.click(node => hasClass(node, 'explorer-burger')); routeLayout(h, 'collapsed');
+    }
+    await h.click(node => hasClass(node, 'explorer-toggle'));
+    await h.click(node => hasClass(node, 'explorer-detach'));
+    windows.panels.get('explorer').dismiss(); await flush(); routeLayout(h, 'collapsed');
+  } finally { h.dispose(); }
+});
+test('軌跡外部化の本体復帰はExplorerの現状態に従い、VR準備中の元位置を維持する', async t => {
+  const windows = layoutPanelWindows(), h = await workspace(t, { panelWindowFactory: windows.create });
+  try {
+    await h.click(node => hasClass(node, 'explorer-toggle'));
+    await h.click(node => hasClass(node, 'explorer-detach'));
+    await h.click(node => hasClass(node, 'route-restore-toggle'));
+    await h.click(node => hasClass(node, 'route-detach'));
+    assert.equal(restoreNode(h), undefined);
+    windows.panels.get('panel-routes').restore(); await flush(); routeLayout(h, 'detached');
+    const explorer = h.states.get('FileExplorer');
+    explorer.preparingAll.value = true; await flush();
+    assert.equal(hasClass(routeNode(h), 'explorer-detached'), false, 'VR移行時の矩形採取はExplorer右隣を維持');
+    assert.equal(hasClass(routeNode(h), 'explorer-collapsed'), false);
+    explorer.preparingAll.value = false; await flush(); routeLayout(h, 'detached');
+    h.viewProps.allDisplays = true; await flush();
+    h.viewProps.allDisplays = false; await flush(); routeLayout(h, 'collapsed');
+    assert.ok(restoreNode(h));
+  } finally { h.dispose(); }
+});
+test('IDE再マウントでExplorer外部化の位置状態を持ち越さず、再度外部化できる', async t => {
+  for (let boot = 0; boot < 2; boot++) {
+    const windows = layoutPanelWindows(), h = await workspace(t, { panelWindowFactory: windows.create });
+    try {
+      routeLayout(h, 'collapsed'); assert.ok(restoreNode(h));
+      await h.click(node => hasClass(node, 'explorer-toggle'));
+      await h.click(node => hasClass(node, 'explorer-detach')); routeLayout(h, 'detached');
+    } finally { h.dispose(); }
+  }
+});
+test('軌跡の外部Explorer配置は本体の左余白16pxで縦横共通、独立軌跡窓へ適用しない', () => {
+  const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const rule = css.match(/\.space-view \.explorer-routes\.explorer-detached,\.space-view \.route-restore-toggle\.explorer-detached\{([^}]+)\}/);
+  assert.ok(rule, '本体内の軌跡バーと再表示ボタンだけが対象');
+  assert.match(rule[1], /left:16px/); assert.match(rule[1], /right:auto/);
+  assert.ok(rule.index > css.lastIndexOf('@media (orientation:portrait)'), '縦画面の右寄せよりも外部化の左端を優先');
+  assert.match(css, /\.routes-window \.explorer-routes[^}]+position:relative;inset:auto;/);
 });

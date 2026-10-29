@@ -285,6 +285,8 @@
 /* 軌跡バーを閉じた時の縦三本は、軌跡バーと同じ場所（エクスプローラーを開いていればその右隣、縦長画面は右端）に出す。 */
 .route-restore-toggle.explorer-open{left:calc(24px + var(--explorer-width))}
 @media (orientation:portrait){.route-restore-toggle,.route-restore-toggle.explorer-open{left:auto;right:16px}}
+/* Explorer別窓表示中は本体の開くボタンもないため、その幅を予約しない。独立軌跡窓には適用しない。 */
+.space-view .explorer-routes.explorer-detached,.space-view .route-restore-toggle.explorer-detached{left:16px;right:auto}
 
 
 /* 本体・別窓とも幅360pxに同じ部品寸法・間隔で収める。 */

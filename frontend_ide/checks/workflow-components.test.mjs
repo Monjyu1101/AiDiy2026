@@ -160,3 +160,30 @@ test('Explorer変更: 更新中の新しい操作・利用セッション切替�
   }finally{f.dispose();}
  }
 });
+
+
+test('外部Explorer時の左寄せ軌跡: 縦表示のビューア中心は軌跡一覧の右側、通常配置とVRは維持', () => {
+  for (const [width, height] of [[768, 1000], [1280, 800]]) {
+    const f = component('SpaceView', { props: { startedAt: 1, viewMode: '3d', allDisplays: false }, globals: { innerWidth: width, innerHeight: height, document: new EventTarget() } });
+    let list = null, routesLeft = false;
+    f.state.root.value = { style: { setProperty() {} }, querySelector: selector => selector === '.explorer-routes.explorer-detached' ? (routesLeft ? {} : null) : selector === '.route-file-list' && list ? { getBoundingClientRect: () => list } : null };
+    try {
+      for (let cycle = 0; cycle < 2; cycle++) {
+        f.state.explorerDetached.value = true; routesLeft = true;
+        list = { left: 16, right: 376 };
+        const right = height >= width ? width - 16 : width * .67 - 24;
+        assert.equal(f.state.layout({ preview: true }).centerX, (384 + right) / 2);
+        if (height >= width) assert.equal(f.state.layout({ preview: false }).centerX, width / 2, 'ビューアなしは画面中央を維持');
+        list = null;
+        assert.equal(f.state.layout({ preview: true }).centerX, (16 + right) / 2, '軌跡一覧を閉じた余白を解放');
+        routesLeft = false;
+        list = { left: width - 376, right: width - 16 };
+        if (height >= width) assert.equal(f.state.layout({ preview: true }).centerX, (16 + list.left - 8) / 2, 'VR準備中はExplorerが外部化済みでも軌跡の実配置は右側');
+        f.state.explorerDetached.value = false;
+        if (height >= width) assert.equal(f.state.layout({ preview: true }).centerX, (16 + list.left - 8) / 2, '本体復帰後の縦画面では右側一覧へ戻る');
+      }
+      f.props.allDisplays = true;
+      assert.equal(f.state.layout({ preview: true }).centerX, width / 2, 'VR固定中心は配置から独立');
+    } finally { f.dispose(); }
+  }
+});

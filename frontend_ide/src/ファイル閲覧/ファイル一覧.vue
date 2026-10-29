@@ -325,6 +325,7 @@ let fileNavigationVersion=0;
 const fileActions=createExplorerActions({root:()=>props.root||'',document:()=>panel.value?.ownerDocument,
   // 別窓へDOMを移しても、元のIDEの限定IPCとセッション検証を通す。
   openFile:typeof window.aidiyWindow?.openFile==='function'?path=>window.aidiyWindow.openFile(path):null,
+  openFolder:typeof window.aidiyWindow?.openFolder==='function'?path=>window.aidiyWindow.openFolder(path):null,
   openDraft:draftActions?request=>{draftRequest.value=request;}:null,
   focus:()=>treeElement.value?.focus(),edit:row=>{cursor.value=row.path;reveal(row.path);},
   refresh:async()=>{if(props.reload)await props.reload();},
@@ -389,8 +390,8 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
   <div class="explorer-component" data-component="FileExplorer">
     <button v-if="!open&&!detached" class="explorer-toggle burger-button" aria-label="エクスプローラーを開く" title="エクスプローラー" :aria-expanded="false" @click="emit('update:open',true)"><span class="burger burger-h" aria-hidden="true"><i></i><i></i><i></i></span></button>
     <!-- 軌跡バーはエクスプローラーと同じ扱い。閉じている時は縦三本の正方形ボタン、開くと同じ場所から横に開き、先頭の縦三本で閉じる。 -->
-    <button v-if="routeClosed&&!routeDetached" class="route-restore-toggle burger-button" :class="{'explorer-open':open&&!detached}" aria-label="軌跡バーを開く" title="軌跡バー" :aria-expanded="false" @click="openRoutes"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button>
-    <div ref="routeElement" v-show="!routeClosed" class="explorer-routes" :class="{'explorer-collapsed':!open||(detached&&!preparingAll)}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
+    <button v-if="routeClosed&&!routeDetached" class="route-restore-toggle burger-button" :class="{'explorer-open':open&&!detached,'explorer-detached':detached&&!preparingAll}" aria-label="軌跡バーを開く" title="軌跡バー" :aria-expanded="false" @click="openRoutes"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button>
+    <div ref="routeElement" v-show="!routeClosed" class="explorer-routes" :class="{'explorer-collapsed':!open||(detached&&!preparingAll),'explorer-detached':detached&&!preparingAll}" role="group" aria-label="軌跡表示" @keydown.esc.stop.prevent="routeListOpen=false">
       <div class="route-controls" :data-aidiy-window-move-handle="routeDetached&&nativePanels?'':undefined"><button v-if="!allDisplays||routeDetached" class="burger-button route-burger" :aria-label="routeDetached&&nativePanels?'軌跡ウィンドウを移動':'軌跡バーを閉じる'" :title="routeDetached&&nativePanels?'ドラッグして移動':'軌跡バーを閉じる'" @click="routeDetached&&nativePanels?undefined:closeRoutes()"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button>
       <button v-for="[value,label] in [['view','閲覧軌跡'],['search',searchRouteLabel],['ai','AiDiy検索軌跡']]" :key="value" class="route-choice" :title="label" :aria-pressed="routeMode===value" :aria-expanded="routeMode===value&&routeListOpen" aria-controls="route-file-list" @click="chooseRoute(value)">{{ label }}</button>
       <button title="プロジェクトルートへ" @click="select({type:'dir',path:''})">ルート</button><button :aria-label="routeMode==='ai'?'前の関連ファイル':routeMode==='search'?'前の検索ファイル':'前の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===0" @click="stepRoute(-1)">&lt;</button><button :aria-label="routeMode==='ai'?'次の関連ファイル':routeMode==='search'?'次の検索ファイル':'次の閲覧ファイル'" :disabled="!routeSteps.length||routeIndex===routeSteps.length-1" @click="stepRoute(1)">&gt;</button>

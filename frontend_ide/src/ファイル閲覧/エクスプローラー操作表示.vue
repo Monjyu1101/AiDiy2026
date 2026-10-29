@@ -15,6 +15,8 @@ const menuItems = computed(() => {
     ...(item && menu.target.type === 'file' && /\.md$/i.test(menu.target.path) ? [['pdf','PDF化','',true,'同じフォルダに同名のPDFを作成します。']] : []),
     ['open-app','アプリで開く','',item && menu.target.type === 'file' && props.actions.canOpenFile,
       !props.actions.canOpenFile ? 'デスクトップ版で利用できます。' : menu?.target.type !== 'file' ? 'ファイルを選択してください。' : 'OSに関連付けられた既定のアプリで開きます。'],
+    ['open-folder','フォルダを開く','',props.actions.canOpenFolder,
+      !props.actions.canOpenFolder ? 'デスクトップ版で利用できます。' : menu?.target.type === 'file' ? 'このファイルの保存フォルダをOSで開きます。' : 'このフォルダをOSで開きます。'],
     ['handoff','Code / Liveへ','',item && menu.target.type === 'file' && props.actions.canOpenDraft(),
       menu?.target.type !== 'file' ? 'ファイルを選択してください。' : !props.actions.canOpenDraft() ? '下書き連携を利用できません。' : 'このファイルの参照をCode / Liveの下書きへ追加します。AIへの送信はしません。'],
     ['copy-path','パスのコピー','Ctrl+Shift+C',true],['copy-relative','相対パスのコピー','',true],

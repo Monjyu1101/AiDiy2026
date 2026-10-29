@@ -61,7 +61,7 @@ app.whenReady().then(async()=>{
   await win.loadURL(server.url+'#browser');
   win.setSkipTaskbar(true);win.setIgnoreMouseEvents(true);win.showInactive();
   async function shot(name){
-   if(!selftest)return;
+   if(!selftest)return;await motionFinished();
    if(name==='Browser_401_連携先選択'){
     const r=await win.webContents.executeJavaScript(`(()=>{const r=document.querySelector('dialog').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}})()`),zoom=win.webContents.getZoomFactor();
     const image=await win.webContents.capturePage({x:Math.floor(r.x*zoom),y:Math.floor(r.y*zoom),width:Math.ceil(r.width*zoom),height:Math.ceil(r.height*zoom)},{stayHidden:true,stayAwake:true});
@@ -74,12 +74,13 @@ app.whenReady().then(async()=>{
   const evaluate=code=>win.webContents.executeJavaScript(code,true);
   const pageMetrics=()=>page.executeJavaScript(`({width:innerWidth,height:innerHeight,dpr:devicePixelRatio})`);
   async function until(check){for(let i=0;i<60;i++){if(await check())return;await delay(50);}throw Error('画面遷移が完了しません。');}
+  const motionFinished=()=>until(()=>!BrowserWindow.getAllWindows().some(w=>w.isAiDiyOpeningCanvas));
   for(let i=0;i<100;i++){if(await evaluate(`document.querySelectorAll('.browser-window-sizes button').length===3`))break;await delay(100);}
   assert.deepEqual(await evaluate(`[...document.querySelectorAll('.browser-window-sizes button')].map(b=>b.textContent)`),['FHD','縦表示','F11']);
   for(const [index,width,height,label] of [[0,1920,945,'fhd'],[1,1080,1785,'portrait']]){
    const area=screen.getDisplayMatching(win.getBounds()).workArea;
    await evaluate(`document.querySelectorAll('.browser-window-sizes button')[${index}].click()`);await delay(500);
-   await until(async()=>{const p=await pageMetrics();return p.width===width&&p.height===height;});
+   await until(async()=>{const p=await pageMetrics();return p.width===width&&p.height===height;});await motionFinished();assert.equal(win.getOpacity(),1);
    const b=win.getBounds(),pageBounds=win.contentView.children.find(v=>v.webContents===page).getBounds();
    assert.equal(pageBounds.width,width);assert.equal(pageBounds.height,height);
    assert.ok(b.width>=width&&b.height>height);assert.ok(b.x>=area.x&&b.y>=area.y);
@@ -89,9 +90,9 @@ app.whenReady().then(async()=>{
    console.log(JSON.stringify({preset:label,bounds:b,pageBounds,pageViewport:await pageMetrics(),buttons:geometry}));
    await shot(index===0?'Browser_102_FHD':'Browser_103_縦表示');
   }
-  control.maximize(record);await until(()=>win.isMaximized());await delay(250);
+  await control.maximize(record);await until(()=>win.isMaximized());await motionFinished();await delay(250);
   let pageSize=await pageMetrics(),v=win.contentView.children.find(v=>v.webContents===page).getBounds();assert.equal(pageSize.width,v.width);assert.equal(pageSize.height,v.height);
-  control.maximize(record);await until(()=>!win.isMaximized());await delay(250);
+  await control.maximize(record);await until(()=>!win.isMaximized());await motionFinished();await delay(250);
   pageSize=await pageMetrics();v=win.contentView.children.find(v=>v.webContents===page).getBounds();assert.equal(pageSize.width,v.width);assert.equal(pageSize.height,v.height);
   const before=win.getBounds();
   await evaluate(`document.querySelector('.browser-capture').click()`);await until(()=>!!captureResult);

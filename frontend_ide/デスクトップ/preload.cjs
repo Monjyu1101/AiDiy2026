@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('aidiyWindow',{
  title:()=>ipcRenderer.invoke('development:window','title'),
  copyFilePath:path=>ipcRenderer.invoke('development:copy-file-path',path),
  openFile:path=>ipcRenderer.invoke('development:open-file',path),
+ openFolder:path=>ipcRenderer.invoke('development:open-folder',path),
  draftTargets:()=>ipcRenderer.invoke('development:draft-targets'),
  insertDraft:value=>ipcRenderer.invoke('development:draft-insert',value),
  registerDraftTarget:value=>ipcRenderer.invoke('development:draft-target-register',value),

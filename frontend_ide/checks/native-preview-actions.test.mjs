@@ -16,7 +16,7 @@ const desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};};
 
-async function fixture(t){
+async function fixture(t,options={}){
  const temp=await mkdtemp(join(tmpdir(),'aidiy-native-preview-')),root=join(temp,'project');
  await mkdir(root);await writeFile(join(root,'readme.txt'),'読むだけ');await mkdir(join(root,'日本語 の資料'));
  await writeFile(join(root,'日本語 の資料','説明.txt'),'本文');await writeFile(join(root,'run.cmd'),'echo example');
@@ -39,7 +39,7 @@ async function fixture(t){
  let readHook,dialogHook,openHook,copyHook,reads=0,quitting=false;
  const actions=createNativePreviewActions({records,trustedEvent:trust.trusted,readState:async record=>{assert.equal(record,owner);reads++;await readHook?.(reads);return structuredClone(state);},sessionKey:key,
   clipboard:{writeText:path=>{copyHook?.();copies.push(path);}},shell:{openPath:async path=>{opens.push(path);return await openHook?.()||'';}},
-  dialog:{showMessageBox:async(window,options)=>{dialogs.push({window,options});return await dialogHook?.()||{response:1};}},isQuitting:()=>quitting});
+  dialog:{showMessageBox:async(window,options)=>{dialogs.push({window,options});return await dialogHook?.()||{response:1};}},isQuitting:()=>quitting,platform:"linux",...options});
  return{temp,root,records,state,owner,viewer,code,live,consoleWindow,add,event,actions,copies,opens,dialogs,
   readHook:hook=>{readHook=hook;},dialogHook:hook=>{dialogHook=hook;},openHook:hook=>{openHook=hook;},copyHook:hook=>{copyHook=hook;},quit:()=>{quitting=true;}};
 }
@@ -51,12 +51,13 @@ test('ネイティブプレビュー: preloadは専用IPCとパスだけを公�
   return{contextBridge:{exposeInMainWorld:(name,value)=>{assert.equal(name,'aidiyWindow');api=value;}},
    ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve({ok:true});}}};
  }});
- await api.copyFilePath('folder/a.txt');await api.openFile('folder/a.txt');
- assert.deepEqual(calls,[['development:copy-file-path','folder/a.txt'],['development:open-file','folder/a.txt']]);
+ await api.copyFilePath('folder/a.txt');await api.openFile('folder/a.txt');await api.openFolder('folder/a.txt');await api.openFolder('');
+ assert.deepEqual(calls,[['development:copy-file-path','folder/a.txt'],['development:open-file','folder/a.txt'],['development:open-folder','folder/a.txt'],['development:open-folder','']]);
  assert.equal(api.shell,undefined);assert.equal(api.clipboard,undefined);assert.equal(api.invoke,undefined);
  assert.match(desktop,/sandbox:true,contextIsolation:true,nodeIntegration:false/);
  assert.match(desktop,/ipcMain\.handle\('development:copy-file-path',\(event,path\)=>nativePreviewActions\.copyFilePath\(event,path\)\)/);
  assert.match(desktop,/ipcMain\.handle\('development:open-file',\(event,path\)=>nativePreviewActions\.openFile\(event,path\)\)/);
+ assert.match(desktop,/ipcMain\.handle\('development:open-folder',\(event,path\)=>nativePreviewActions\.openFolder\(event,path\)\)/);
  assert.match(desktop,/did-start-navigation'.*if\(isMainFrame\)\{nativePreviewActions\.invalidate\(record\)/);
  assert.match(desktop,/render-process-gone'.*nativePreviewActions\.invalidate\(record\)/);
 });
@@ -75,14 +76,16 @@ test('ネイティブプレビュー: 通常ファイルと日本語・空白の
 
 test('ネイティブプレビュー: 本番IPCハンドラを通しても主フレームと限定APIの境界を維持',async t=>{
  const f=await fixture(t),handlers=new Map();
- const registrations=desktop.split('\n').filter(line=>/ipcMain\.handle\('development:(copy-file-path|open-file)'/.test(line)).join('\n');
+ const registrations=desktop.split('\n').filter(line=>/ipcMain\.handle\('development:(copy-file-path|open-file|open-folder)'/.test(line)).join('\n');
  vm.runInNewContext(registrations,{ipcMain:{handle:(name,handler)=>handlers.set(name,handler)},nativePreviewActions:f.actions});
- assert.equal(handlers.size,2);const source=f.event(f.owner),iframe={...source,senderFrame:{url:f.owner.url}};
+ assert.equal(handlers.size,3);const source=f.event(f.owner),iframe={...source,senderFrame:{url:f.owner.url}};
  for(const handler of handlers.values())assert.equal((await handler(iframe,'readme.txt')).ok,false);
  assert.deepEqual(f.opens,[]);assert.deepEqual(f.copies,[]);
  assert.deepEqual(await handlers.get('development:copy-file-path')(source,'readme.txt'),{ok:true});
  assert.deepEqual(await handlers.get('development:open-file')(source,'readme.txt'),{ok:true});
- assert.deepEqual(f.copies,[join(f.root,'readme.txt')]);assert.deepEqual(f.opens,[realpathSync(join(f.root,'readme.txt'))]);
+ assert.deepEqual(await handlers.get('development:open-folder')(source,'readme.txt'),{ok:true});
+ assert.deepEqual(await handlers.get('development:open-folder')(source,''),{ok:true});
+ assert.deepEqual(f.copies,[join(f.root,'readme.txt')]);assert.deepEqual(f.opens,[realpathSync(join(f.root,'readme.txt')),realpathSync(f.root),realpathSync(f.root)]);
 });
 
 test('ネイティブプレビュー: 不正型・長すぎる値・URL・絶対パス・別ドライブ・ADS・親参照を拒否',async t=>{
@@ -201,4 +204,45 @@ test('ネイティブプレビュー: コピー・既定アプリ・状態取得
  f.openHook(()=> '関連付けがありません');assert.match((await f.actions.openFile(event,'readme.txt')).error,/関連付け/);f.openHook(null);assert.deepEqual(await f.actions.openFile(event,'readme.txt'),{ok:true});
  f.readHook(()=>{throw Error('offline');});assert.equal((await f.actions.openFile(event,'readme.txt')).ok,false);f.readHook(null);
  f.dialogHook(()=>{throw Error('dialog closed');});assert.equal((await f.actions.openFile(event,'run.cmd')).ok,false);f.dialogHook(()=>({response:0}));assert.deepEqual(await f.actions.openFile(event,'run.cmd'),{ok:true});
+});
+
+test('フォルダを開く: ファイルは所在フォルダ、フォルダとルートは自身を開き本文を実行しない',async t=>{
+ const f=await fixture(t),event=f.event(f.owner);
+ for(const path of ['日本語 の資料/説明.txt','日本語 の資料','readme.txt','run.cmd',''])assert.deepEqual(await f.actions.openFolder(event,path),{ok:true});
+ assert.deepEqual(f.opens,[join(f.root,'日本語 の資料'),join(f.root,'日本語 の資料'),f.root,f.root,f.root].map(path=>realpathSync(path)));
+ assert.deepEqual(f.dialogs,[]);assert.deepEqual(f.copies,[]);
+});
+test('フォルダを開く: 不正パス・欠落・外部リンクを拒否し、内部リンクの所在を守る',async t=>{
+ const f=await fixture(t),event=f.event(f.owner);
+ await mkdir(join(f.temp,'outside'));await writeFile(join(f.temp,'outside','file.txt'),'outside');
+ await symlink(join(f.temp,'outside'),join(f.root,'outside-dir'),'dir');
+ await symlink(join(f.temp,'outside/file.txt'),join(f.root,'outside-file'));
+ await symlink(join(f.root,'日本語 の資料/説明.txt'),join(f.root,'inside-file'));
+ await symlink(join(f.root,'日本語 の資料'),join(f.root,'inside-dir'),'dir');
+ for(const path of [null,{},'../outside',f.temp,'C:/outside','a\\b','https://example.test','missing','missing/file.txt','outside-dir','outside-dir/file.txt','outside-file'])assert.equal((await f.actions.openFolder(event,path)).ok,false,String(path));
+ assert.deepEqual(f.opens,[]);
+ assert.deepEqual(await f.actions.openFolder(event,'inside-file'),{ok:true});
+ assert.deepEqual(await f.actions.openFolder(event,'inside-dir'),{ok:true});
+ assert.deepEqual(f.opens,[realpathSync(f.root),realpathSync(join(f.root,'日本語 の資料'))]);
+});
+test('フォルダを開く: 不明窓・iframe・利用終了・再検査中の削除を拒否する',async t=>{
+ const f=await fixture(t),event=f.event(f.owner),unknown={mainFrame:{url:f.owner.url}};
+ for(const source of [f.event(f.code),{sender:unknown,senderFrame:unknown.mainFrame},{...event,senderFrame:{url:f.owner.url}}])assert.equal((await f.actions.openFolder(source,'')).ok,false);
+ f.state.active=false;assert.equal((await f.actions.openFolder(event,'readme.txt')).ok,false);f.state.active=true;
+ f.readHook(async count=>{if(count===3)await unlink(join(f.root,'readme.txt'));});
+ assert.equal((await f.actions.openFolder(event,'readme.txt')).ok,false);assert.deepEqual(f.opens,[]);
+});
+test('フォルダを開く: OSエラーと連打・無効化を安全に処理し再試行できる',async t=>{
+ const f=await fixture(t),event=f.event(f.owner),wait=deferred();
+ f.readHook(()=>wait.promise);const pending=f.actions.openFolder(event,'');await tick();
+ assert.equal((await f.actions.openFolder(event,'')).ok,false);f.actions.invalidate(f.owner);wait.resolve();assert.equal((await pending).ok,false);assert.deepEqual(f.opens,[]);
+ f.readHook(null);f.openHook(()=> 'フォルダの表示に失敗');assert.match((await f.actions.openFolder(event,'')).error,/フォルダの表示に失敗/);
+ f.openHook(null);assert.deepEqual(await f.actions.openFolder(event,''),{ok:true});
+});
+test('フォルダを開く: macOSは.appと特殊文字も固定argvでFinderへ渡しアプリ起動しない',async t=>{
+ const calls=[];const f=await fixture(t,{platform:'darwin',run:(...args)=>{calls.push(args.slice(0,3));args[3](null);}});
+ const name='日本語 $ & ;.app';await mkdir(join(f.root,name));
+ assert.deepEqual(await f.actions.openFolder(f.event(f.owner),name),{ok:true});
+ assert.deepEqual(calls,[[ '/usr/bin/open',['-a','Finder','--',realpathSync(join(f.root,name))],{windowsHide:true,timeout:10000} ]]);
+ assert.deepEqual(f.opens,[]);assert.deepEqual(f.dialogs,[]);
 });

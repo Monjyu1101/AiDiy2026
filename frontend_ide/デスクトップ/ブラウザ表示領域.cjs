@@ -102,6 +102,6 @@ function createBrowserSizing({window,view,screen}){
  const listeners={resize:resized,'will-resize':actual,maximize:expanded,unmaximize:restored,'enter-full-screen':entered,'leave-full-screen':left};
  for(const [event,fn]of Object.entries(listeners))window.on(event,fn);
  function dispose(){disposed=true;actual();for(const [event,fn]of Object.entries(listeners))window.removeListener(event,fn);}
- return{measure,preset,maximize,toggleFullscreen,actual,layout,dispose};
+ return{measure,preset,maximize,toggleFullscreen,actual,layout,dispose,isSettled:()=>!fullscreenTransition&&!waitingRestore&&!waitingMaximize&&(!request||!!expected)};
 }
 module.exports={createBrowserSizing};

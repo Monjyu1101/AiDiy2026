@@ -329,6 +329,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:draft-target-register',async(event,value)=>{const result=draftRouter.register(trustedEvent(event),value);if(result.ok&&value)await sharedDrafts();return result;});
  ipcMain.handle('development:copy-file-path',(event,path)=>nativePreviewActions.copyFilePath(event,path));
  ipcMain.handle('development:open-file',(event,path)=>nativePreviewActions.openFile(event,path));
+ ipcMain.handle('development:open-folder',(event,path)=>nativePreviewActions.openFolder(event,path));
  ipcMain.handle('development:draft-targets',async event=>{const source=trustedEvent(event);try{return source?.kind==='browser'?await(await sharedDrafts()).list(source):await draftRouter.list(source);}catch(error){return{ok:false,error:error.message};}});
  ipcMain.handle('development:draft-insert',async(event,value)=>{
   const source=trustedEvent(event);if(source?.kind!=='browser')return draftRouter.insert(source,value);
