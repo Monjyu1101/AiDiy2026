@@ -6,9 +6,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 import native from '../デスクトップ/最前面ピン.cjs';
 import allNative from '../デスクトップ/全画面横断.cjs';
 const {createWindowPins}=native;
+// 実Electronを起動せず、Windows固有の回復分岐をLinux/macOSのCIでも検査する。
+function windowsPins(options){
+ const module={exports:{}};
+ vm.runInNewContext(readFileSync(new URL('../デスクトップ/最前面ピン.cjs',import.meta.url),'utf8'),{module,process:{platform:'win32'}});
+ return module.exports.createWindowPins(options);
+}
 function windowFixture(name='window',order=[]){
  const window=new EventEmitter();
  Object.assign(window,{
@@ -29,8 +37,8 @@ test('通常起動OFF、IDE由来ON、登録は一度だけで明示選択を消
  pins.toggle(child);pins.register(child,{pinned:true});assert.equal(child.top,false);
  assert.equal(child.listenerCount('focus'),1);assert.equal(changed.length,3);
 });
-test('Windowsの層キャッシュが残ってON指定が無視された場合だけ解除して再設定する',{skip:process.platform!=='win32'},()=>{
- const pins=createWindowPins(),window=windowFixture();pins.register(window);
+test('Windowsの層キャッシュが残ってON指定が無視された場合だけ解除して再設定する',()=>{
+ const pins=windowsPins(),window=windowFixture();pins.register(window);
  let stale=true;const native=window.setAlwaysOnTop.bind(window);
  window.setAlwaysOnTop=(value,level)=>{if(value&&stale){window.calls.push([value,level]);return;}if(!value)stale=false;native(value,level);};
  pins.setLocked(window,true);
@@ -38,6 +46,18 @@ test('Windowsの層キャッシュが残ってON指定が無視された場合�
  assert.deepEqual(window.calls.slice(-3),[[true,'normal'],[false,undefined],[true,'normal']]);
  const calls=window.calls.length;pins.setLocked(window,true);assert.equal(window.calls.length,calls);
  pins.setLocked(window,false);assert.equal(window.isAlwaysOnTop(),false);
+});
+test('Windowsの通常ONでは解除せず、再表示で層が失われた時だけ回復してOFF選択を維持する',()=>{
+ const pins=windowsPins(),window=windowFixture();pins.register(window,{pinned:true});
+ assert.deepEqual(window.calls,[[true,'normal']]);
+ window.emit('show');assert.deepEqual(window.calls.slice(-1),[[true,'normal']]);
+ let stale=true;window.top=false;const native=window.setAlwaysOnTop.bind(window);
+ window.setAlwaysOnTop=(value,level)=>{if(value&&stale){window.calls.push([value,level]);return;}if(!value)stale=false;native(value,level);};
+ window.emit('show');assert.equal(window.isAlwaysOnTop(),true);
+ assert.deepEqual(window.calls.slice(-3),[[true,'normal'],[false,undefined],[true,'normal']]);
+ pins.toggle(window);const calls=window.calls.length;window.emit('show');
+ assert.equal(window.isAlwaysOnTop(),false);assert.equal(window.calls.length,calls);
+ window.destroy();assert.equal(window.listenerCount('show'),0);window.emit('show');assert.equal(window.calls.length,calls);
 });
 test('VRはユーザー選択を変更せず強制ON、ロック中の連打を拒否、終了で元状態へ復元',()=>{
  for(const initial of [false,true]){

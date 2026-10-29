@@ -55,6 +55,8 @@ class SpeechToText:
     # AiDiy_key.json へのパス（backend_tools 起点）
     _KEY_CONFIG_REL = "../_config/AiDiy_key.json"
 
+    auto_provider = "google"
+
     DEFAULT_OPENAI_MODEL = "whisper-1"
 
     # ------------------------------------------------------------------ #
@@ -144,9 +146,9 @@ class SpeechToText:
             )
 
         provider = provider.strip().lower()
-        if provider not in ("auto", "openai"):
+        if provider not in ("auto", "google", "openai"):
             raise SpeechToTextError(
-                f"未対応の provider です: '{provider}'（auto / openai のみ）"
+                f"未対応の provider です: '{provider}'（auto / google / openai のみ）"
             )
 
         model = model.strip().lower()
@@ -158,6 +160,9 @@ class SpeechToText:
         engine_note = ""
 
         if provider == "auto":
+            provider = self.auto_provider
+
+        if provider == "google":
             recognition_text = self._認識_auto(audio_bytes)
             resolved_model = "google_default"
             used_provider = "google"

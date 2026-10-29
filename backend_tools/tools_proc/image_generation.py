@@ -48,6 +48,8 @@ class ImageGeneration:
         "grok"   — Grok CLI（model は無視。codex → antigravity → openai → freeai → gemini にフォールバック）
     """
 
+    auto_provider = "codex"
+
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
     CODEX_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_CODEX_TIMEOUT", "1200"))
     ANTIGRAVITY_TIMEOUT_SECONDS = int(os.environ.get("AIDIY_IMAGE_ANTIGRAVITY_TIMEOUT", "1200"))
@@ -856,7 +858,7 @@ class ImageGeneration:
         if original_path and not os.path.isfile(original_path):
             raise ImageGenerationError(f"参照画像が見つかりません: '{original_path}'")
 
-        chain = self._FALLBACK_CHAINS[provider]
+        chain = self._FALLBACK_CHAINS[self.auto_provider if provider == "auto" else provider]
         effective_model = "auto" if provider in ("auto", *self._CLI_PROVIDERS) else model
         errors: list[str] = []
         for index, candidate in enumerate(chain):

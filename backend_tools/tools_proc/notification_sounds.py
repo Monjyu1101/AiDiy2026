@@ -150,6 +150,9 @@ class NotificationSounds:
         actual_type = self.resolve_notification_type(notification_type)
 
         if actual_scene == "tts":
+            if not getattr(self, "tts_available", lambda: True)():
+                from tools_proc.tools_management import unavailable
+                return unavailable("aidiy_text_to_speech")
             return self._play_tts(actual_type, notification_type)
 
         path = self.resolve_sound_path(notification_type, scene)

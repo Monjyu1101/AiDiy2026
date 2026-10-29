@@ -70,6 +70,9 @@ class TextToSpeech:
         "freeai": ["freeai", "gemini", "edge"],
     }
 
+    auto_provider = "edge"
+    auto_voice = "female"
+
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
 
     # デフォルト音声（provider 別）
@@ -738,11 +741,11 @@ class TextToSpeech:
             )
 
         normalized_text, replacements = self.normalize_for_speech(speech_text, language)
-        voice_input = voice
+        voice_input = self.auto_voice if voice.strip().lower() == "auto" else voice
 
         # FALLBACK_CHAIN に沿って候補を順に試す。
         # キー無効はスキップ、合成例外は次の候補へ、最終候補で失敗したら raise。
-        chain = self.FALLBACK_CHAIN[requested]
+        chain = self.FALLBACK_CHAIN[self.auto_provider if requested == "auto" else requested]
         used: Optional[str] = None
         used_voice: Optional[str] = None
         audio_bytes: Optional[bytes] = None

@@ -63,6 +63,10 @@ from tools_proc.image_generation import ImageGeneration
 from tools_proc.movie_generation import MovieGeneration
 from tools_proc.speech_to_text import SpeechToText
 from tools_proc.text_to_speech import TextToSpeech
+from tools_proc.tools_settings import load_tools_settings
+from tools_proc.tools_management import ToolsManagement, ToolsGateMiddleware, register_management
+
+tools_management = ToolsManagement()
 from tools_proc.obs_studio_control import ObsStudioControl
 from tools_proc.ffmpeg_control import FfmpegControl
 from tools_proc.notification_sounds import NotificationSounds
@@ -187,6 +191,7 @@ tts         = TextToSpeech()
 obs         = ObsStudioControl()
 ffmpeg_c    = FfmpegControl()
 ns          = NotificationSounds(tts=tts)
+ns.tts_available = lambda: tools_management.active("aidiy_text_to_speech")
 code_agents = CodeAgents()
 code_agents.version_info = code_agents._check_ai_versions()
 chat_llm    = ChatLLM()
@@ -246,11 +251,12 @@ _setup_reboot_watcher()
 # ------------------------------------------------------------------ #
 
 def _make_mcp(name: str) -> MCPServer:
-    return MCPServer(
-        name,
-        version="1.0.0",
-        warn_on_duplicate_tools=False,
-    )
+    instance = MCPServer(name, version="1.0.0", warn_on_duplicate_tools=False)
+    original_tool = instance.tool
+    def guarded_tool(*args, **kwargs):
+        return tools_management.decorate(name, original_tool(*args, **kwargs))
+    instance.tool = guarded_tool
+    return instance
 
 mcp    = _make_mcp("aidiy_chrome_devtools")
 mcp_dc = _make_mcp("aidiy_desktop_capture")
@@ -393,6 +399,13 @@ class _ClientDisconnectMiddleware:
 
 @asynccontextmanager
 async def _mcp_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    settings = load_tools_settings()
+    for name, instance in (("text_to_speech", tts), ("speech_to_text", stt),
+                           ("image_generation", ig), ("movie_generation", mg)):
+        for field, value in settings[name].items():
+            setattr(instance, field, value)
+    tools_management.initialize({"text_to_speech": tts, "speech_to_text": stt,
+                                 "image_generation": ig, "movie_generation": mg})
     await tools_decisions.check_startup(decisions)
     tools_decisions.register_tools(mcp_dj, decisions)
     async with AsyncExitStack() as stack:
@@ -523,6 +536,17 @@ MCP_MAP.update({
 })
 if sys.platform == "win32":
     MCP_MAP["aidiy_windows_control"] = mcp_wc
+from tools_proc.chrome_manager import ChromeManager
+for _name in MCP_MAP:
+    tools_management.availability[_name] = lambda: True
+tools_management.availability["aidiy_chrome_devtools"] = lambda: bool(ChromeManager().find_chrome())
+tools_management.availability["aidiy_ffmpeg_control"] = lambda: bool(ffmpeg_c.version_info.get("ffmpeg", {}).get("ok"))
+# OBS is a registered client; startup connection snapshots are not an installation gate.
+tools_management.availability["aidiy_postgres"] = lambda: _pg_q is not None
+tools_management.availability["aidiy_desktop_capture"] = lambda: sys.platform in ("win32", "darwin") or bool(os.environ.get("DISPLAY"))
+register_management(app, tools_management)
+app.add_middleware(ToolsGateMiddleware, manager=tools_management)
+
 for _mcp_name, _mcp_instance in MCP_MAP.items():
     _register_mcp_http_meta(_mcp_name, _mcp_instance)
 

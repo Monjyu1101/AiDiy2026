@@ -65,9 +65,10 @@ class CleanupProcessesTest(unittest.TestCase):
                       CommandLine=f'chrome.exe --user-data-dir="{ROOT / "out/aidiy_live/browser-profile"}"')
         with patch.object(processes.sys, 'platform', 'win32'), patch.object(
             common, 'list_processes', side_effect=[[record], [record], []]
-        ), patch.object(common.subprocess, 'run') as run:
+        ), patch.object(common.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), patch.object(common.subprocess, 'run') as run:
             self.assertTrue(processes.stop_standalone(ROOT, Mock(), Mock()))
         self.assertEqual(run.call_args.args[0], ['taskkill', '/F', '/T', '/PID', '123456'])
+        self.assertEqual(run.call_args.kwargs['creationflags'], 0x08000000)
 
     def test_reused_pid_is_not_terminated(self):
         record = dict(ProcessId=123456, ParentProcessId=0, Name='chrome.exe',

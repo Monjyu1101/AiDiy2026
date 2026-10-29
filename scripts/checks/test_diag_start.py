@@ -119,6 +119,7 @@ class StartTests(unittest.TestCase):
             with self.subTest(name=name):
                 module = load(ROOT / name)
                 with patch.object(module.sys, 'platform', 'win32'), \
+                        patch.object(module.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), \
                         patch.object(module, 'print_warning') as warning, \
                         patch.object(module.subprocess, 'run', side_effect=[
                             subprocess.TimeoutExpired('npm.cmd', 15), Mock(returncode=0)]):

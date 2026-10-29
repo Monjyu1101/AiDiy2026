@@ -215,7 +215,90 @@ test('writer異常終了後のロック・一時ファイル・画像は自動�
   assert.deepEqual(await readFile(f.manifest), before);
   assert.deepEqual(await readdir(f.work), names);
   await rmdir(f.manifest + '.lock');
+  // 全writer停止後、画像単位のロックも手動回復する。古いロックの自動奪取はしない。
+  for (const name of names.filter(name => name.startsWith('.image-') && name.endsWith('.lock'))) await rmdir(join(f.work, name));
   await record({...f.entry, evidenceNumber: 102});
   await assertSaved(f, 2);
   assert.deepEqual(await readFile(join(f.work, temporary)), tempBefore);
+});
+
+test('同名再撮影のmanifest保存に失敗したら元の画像とJSONを保持し再試行できる', async t => {
+  const f = await fixture(t);
+  const record = await f.recorder();
+  const first = await record(f.entry);
+  const previous = await readFile(f.manifest);
+  const bytes = Buffer.concat([f.bytes, Buffer.from('replacement')]);
+  const updated = {...f.entry, evidenceNumber: 101, note: 'new capture',
+    state: {screenshots: [{url: 'data:image/png;base64,' + bytes.toString('base64')}]}};
+  const rename = fs.rename;
+  t.mock.method(fs, 'rename', async (source, destination) => {
+    if (destination === f.manifest) throw Object.assign(new Error('合成manifest更新失敗'), {code: 'EIO'});
+    return rename(source, destination);
+  });
+  await assert.rejects(record(updated), /合成manifest更新失敗/);
+  t.mock.restoreAll();
+  assert.deepEqual(await readFile(f.manifest), previous);
+  assert.deepEqual(await readFile(join(f.folder, first.file)), f.bytes);
+  assert.deepEqual((await readdir(f.folder)).filter(name => !name.endsWith('.png')), []);
+  assert.deepEqual((await readdir(f.work)).filter(name => /\.(new|lock)$/.test(name)), []);
+  const saved = await record(updated);
+  assert.equal(saved.id, first.id);
+  assert.deepEqual(await readFile(join(f.folder, first.file)), bytes);
+  assert.equal((await f.rows()).length, 1);
+  assert.equal((await f.rows())[0].note, updated.note);
+});
+
+test('別実施IDの同名画像は排他し、失敗したwriterの復元が別writerの確定画像を消さない', async t => {
+  const f = await fixture(t), record = await f.recorder();
+  const first = await record(f.entry);
+  const {createEvidenceRecorder} = await import(pathToFileURL(f.script).href);
+  const other = await createEvidenceRecorder('other', 'system', {lockTimeoutMs: 0});
+  const changed = suffix => ({...f.entry, evidenceNumber: 101, note: suffix,
+    state: {screenshots: [{url: 'data:image/png;base64,' + Buffer.concat([f.bytes, Buffer.from(suffix)]).toString('base64')}]}});
+  let announce, release;
+  const reached = new Promise(resolve => { announce = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const rename = fs.rename;
+  t.mock.method(fs, 'rename', async (source, destination) => {
+    if (destination === f.manifest) { announce(); await gate; throw new Error('合成manifest更新失敗'); }
+    return rename(source, destination);
+  });
+  const failed = assert.rejects(record(changed('first')), /合成manifest更新失敗/);
+  await reached;
+  try { await assert.rejects(other(changed('second')), /ロック待機がタイムアウト/); }
+  finally { release(); }
+  await failed;
+  t.mock.restoreAll();
+  assert.deepEqual(await readFile(join(f.folder, first.file)), f.bytes);
+  await other(changed('second'));
+  assert.deepEqual(await readFile(join(f.folder, first.file)), Buffer.concat([f.bytes, Buffer.from('second')]));
+  assert.deepEqual((await readdir(f.work)).filter(name => name.endsWith('.lock')), []);
+});
+
+test('画像の復元にも失敗したら旧画像の退避先を削除せずエラーへ明示する', async t => {
+  const f = await fixture(t), record = await f.recorder();
+  await record(f.entry);
+  const before = await readFile(f.manifest), rename = fs.rename;
+  t.mock.method(fs, 'rename', async (source, destination) => {
+    if (destination === f.manifest || source.endsWith('.previous')) throw new Error('合成rename失敗');
+    return rename(source, destination);
+  });
+  await assert.rejects(record({...f.entry, evidenceNumber: 101}), error => error instanceof AggregateError && /元画像を保持しています:/.test(error.message));
+  t.mock.restoreAll();
+  assert.deepEqual(await readFile(f.manifest), before);
+  const backups = (await readdir(f.folder)).filter(name => name.endsWith('.previous'));
+  assert.equal(backups.length, 1);assert.deepEqual(await readFile(join(f.folder, backups[0])), f.bytes);
+  assert.deepEqual((await readdir(f.work)).filter(name => name.endsWith('.lock')), []);
+});
+
+test('JSON確定後は消滅済みの一時名をcleanupせず画像を巻き戻さない', async t => {
+  const f = await fixture(t), record = await f.recorder();
+  await record(f.entry);
+  const remove = fs.rm;
+  t.mock.method(fs, 'rm', async (filename, options) => {
+    if (filename.startsWith(f.manifest + '.') && filename.endsWith('.new')) throw new Error('消滅済みmanifestへの不要なcleanup');
+    return remove(filename, options);
+  });
+  const row = await record({...f.entry, evidenceNumber: 101, note: 'committed'});
+  assert.equal(row.note, 'committed');assert.equal((await f.rows())[0].note, 'committed');
 });

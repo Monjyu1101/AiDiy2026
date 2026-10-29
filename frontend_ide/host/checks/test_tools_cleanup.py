@@ -77,7 +77,7 @@ class ToolsCleanupTest(unittest.TestCase):
         record = dict(ProcessId=123456, ParentProcessId=0, Name='python.exe')
         with patch.object(processes.sys, 'platform', 'win32'), patch.object(
             processes, 'list_processes', return_value=[record]
-        ), patch.object(processes.subprocess, 'run'), patch.object(processes.time, 'monotonic', side_effect=[0, 6]):
+        ), patch.object(processes.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), patch.object(processes.subprocess, 'run'), patch.object(processes.time, 'monotonic', side_effect=[0, 6]):
             self.assertFalse(processes.stop_matching(lambda _: True, Mock(), Mock(), 'tools'))
 
     def test_excluded_pids_are_not_stopped(self):

@@ -139,9 +139,9 @@ _TTS_METHODS = [
         "parameters": {
             "speech_text": {"type": "string", "required": True, "description": "読み上げテキスト。JSONの空文字列を指定すると1秒の無音音声を生成"},
             "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
-            "provider": {"type": "string", "required": False, "default": "edge", "description": "edge / openai / gemini / freeai"},
+            "provider": {"type": "string", "required": False, "default": "edge", "description": "auto（aidiy_tools.json） / edge / openai / gemini / freeai"},
             "model": {"type": "string", "required": False, "default": "auto"},
-            "voice": {"type": "string", "required": False, "default": "female", "description": "female / male またはプロバイダ固有の音声名"},
+            "voice": {"type": "string", "required": False, "default": "female", "description": "auto（aidiy_tools.json） / female / male またはプロバイダ固有の音声名"},
             "ratio": {"type": "number|string", "required": False, "description": "読み上げ速度倍率。0 / auto は provider ごとの既定値"},
             "save_path": {"type": "string", "required": False, "description": "保存先パス（省略時は temp/output/ に自動保存）"},
             "local_play": {"type": "boolean", "required": False, "default": False, "description": "サーバー側でローカル再生する"},
@@ -173,7 +173,7 @@ def register_image_gen_tools(mcp_ig, ig):
 
         Args:
             prompt: 生成プロンプト（例: "かわいい猫の画像"）
-            provider: "auto"=codex→antigravity→openai→freeai→gemini /
+            provider: "auto"=aidiy_tools.json（初期値codex→antigravity→openai→freeai→gemini） /
                       "gemini"（gemini_key_id が必要） /
                       "freeai"（freeai_key_id が必要） / "openai" / "codex" / "antigravity" /
                       "grok"=grok→codex→antigravity→openai→freeai→gemini
@@ -252,15 +252,15 @@ def register_movie_gen_tools(mcp_mg, mg):
 
         Args:
             prompt: 生成プロンプト（英語推奨。例: "A cat walking in a sunny park"）
-            provider: "auto"=freeai / "gemini"（gemini_key_id が必要） / "freeai"（freeai_key_id が必要）
+            provider: "auto"=aidiy_tools.json（初期値freeai） / "gemini"（gemini_key_id が必要） / "freeai"（freeai_key_id が必要）
             model:
-              "auto"=veo-3.1-generate-preview /
+              "auto"=aidiy_tools.json（初期値veo-3.1-generate-preview） /
               "veo-3.1-generate-preview"（最新） /
               "veo-2.0-generate-001"（安定版） /
               "veo-2.0-generate-exp"（実験版）
             duration_seconds: 動画の長さ（4〜8秒、デフォルト 8）
-            aspect_ratio: "auto"=16:9 / "16:9"（横） / "9:16"（縦）
-            resolution: "auto" / "720p" / "1080p"
+            aspect_ratio: "auto"=aidiy_tools.json（初期値16:9） / "16:9"（横） / "9:16"（縦）
+            resolution: "auto"=aidiy_tools.json（初期値モデル任せ） / "720p" / "1080p"
             negative_prompt: 含めたくない要素（省略可）
             enhance_prompt: True でプロンプトを自動改善（デフォルト False）
             reference_image_path: 参照画像のパス（image-to-video、省略可）
@@ -314,7 +314,7 @@ def register_stt_tools(mcp_st, stt):
         Args:
             base64_wav16k: 16kHz モノラル WAV の base64 文字列（file_path と排他）
             file_path: WAV ファイルのパス（base64_wav16k と排他）
-            provider: "auto"（speech_recognition、デフォルト） /
+            provider: "auto"（aidiy_tools.json、初期値google） / "google" /
                       "openai"（AiDiy_key.json の openai_key_id が必要）
             model: "auto" のみ（デフォルト、openai 時は whisper-1）
         """
@@ -360,11 +360,11 @@ def register_tts_tools(mcp_ts, tts):
             speech_text: 合成するテキスト。JSONの空文字列なら1秒の無音音声を生成する
             language: 言語コード（デフォルト "ja"）。Edge の female/male 自動解決は
                       en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja に対応
-            provider: "auto"=edge→freeai /
+            provider: "auto"=aidiy_tools.json（初期値edge→freeai） /
                       "edge"（無料） / "gemini"（GEMINI_API_KEY） /
                       "freeai"（FREEAI_API_KEY） / "openai"（OPENAI_API_KEY）
             model: "auto"（自動選択、デフォルト）
-            voice: "auto"（= "female" として扱う）。"female" / "male" の指定も可。
+            voice: "auto"（aidiy_tools.json、初期値female）。"female" / "male" の指定も可。
             ratio: 話速倍率。None / 0 / "auto" は provider ごとの既定値。
                    edge/openai は 1.2、gemini/freeai は 1.1。1 は速度調整なし。
             save_path: 保存先。省略時は backend_server/temp/output/ に保存。
@@ -436,7 +436,7 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "description": "プロンプトから画像を生成して base64 PNG で返す。auto/codex/antigravity/grok は backend_server/temp/output/yyyymmdd.hhmmss.png を必ず残し、save_path 指定時は同じ PNG を追加コピーする。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "生成プロンプト（例: 'かわいい猫の画像'）"},
-                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai", "codex", "antigravity", "grok"], "description": "画像生成プロバイダ。auto=codex→antigravity→openai→freeai→gemini。codex=codex→antigravity→openai→freeai→gemini。openai=openai→freeai→gemini。freeai=freeai→gemini。gemini=gemini→openai。antigravity=antigravity→codex→freeai→gemini。grok=grok→codex→antigravity→openai→freeai→gemini"},
+                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai", "gemini", "freeai", "codex", "antigravity", "grok"], "description": "画像生成プロバイダ。auto=aidiy_tools.json（初期値codex→antigravity→openai→freeai→gemini）。codex=codex→antigravity→openai→freeai→gemini。openai=openai→freeai→gemini。freeai=freeai→gemini。gemini=gemini→openai。antigravity=antigravity→codex→freeai→gemini。grok=grok→codex→antigravity→openai→freeai→gemini"},
                         "model": {"type": "string", "required": False, "default": "auto", "description": "OpenAI: gpt-image-2.5-sunburst（既定・高精度） / gpt-image-2.5-flare（高速） / gpt-image-2 / dall-e-3。Gemini/FreeAI: gemini-nano-banana-2.1（既定） / gemini-3.1-flash-lite-image / gemini-3-pro-image など。auto / codex / antigravity / grok では無視"},
                         "size": {"type": "string", "required": False, "default": "auto", "description": "解像度。例: '1024x1024' / '1920x1080' / '1080x1920'"},
                         "quality": {"type": "string", "required": False, "default": "auto", "description": "OpenAI only: low / medium / high / standard / hd"},
@@ -507,7 +507,7 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "description": "プロンプトから動画を生成して MP4 として保存する。ポーリング最大 10 分。base64 は返さず save_path を返す。",
                     "parameters": {
                         "prompt": {"type": "string", "required": True, "description": "生成プロンプト（英語推奨。例: 'A cat walking in a sunny park'）"},
-                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "gemini", "freeai"], "description": "動画生成プロバイダ"},
+                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "gemini", "freeai"], "description": "動画生成プロバイダ。auto=aidiy_tools.json（初期値freeai）"},
                         "model": {"type": "string", "required": False, "default": "auto", "values": ["auto", "veo-3.1-generate-preview", "veo-2.0-generate-001", "veo-2.0-generate-exp"]},
                         "duration_seconds": {"type": "integer", "required": False, "default": 8, "description": "動画の長さ（4〜8秒）"},
                         "aspect_ratio": {"type": "string", "required": False, "default": "auto", "values": ["auto", "16:9", "9:16"], "description": "アスペクト比"},
@@ -569,7 +569,7 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "parameters": {
                         "base64_wav16k": {"type": "string", "required": False, "description": "16kHz モノラル WAV の base64 文字列（file_path と排他）"},
                         "file_path": {"type": "string", "required": False, "description": "WAV ファイルのパス（base64_wav16k と排他）"},
-                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "openai"], "description": "auto=speech_recognition / openai=whisper-1"},
+                        "provider": {"type": "string", "required": False, "default": "auto", "values": ["auto", "google", "openai"], "description": "auto=aidiy_tools.json / google=speech_recognition / openai=whisper-1"},
                         "model": {"type": "string", "required": False, "default": "auto"},
                     },
                     "example_request": {"file_path": "D:/path/to/audio.wav", "provider": "auto"},
@@ -617,9 +617,9 @@ def create_router(ig, mg, stt, tts) -> APIRouter:
                     "parameters": {
                         "speech_text": {"type": "string", "required": True, "description": "読み上げるテキスト。JSONの空文字列なら1秒の無音音声を生成"},
                         "language": {"type": "string", "required": False, "default": "ja", "description": "言語コード（Edge の female/male 自動解決: en / fr / de / es / pt / it / ru / nl / zh / ko / ar / ja）"},
-                        "provider": {"type": "string", "required": False, "default": "edge", "values": ["edge", "gemini", "freeai", "openai"], "description": "音声合成プロバイダ。edge は無料・高速"},
+                        "provider": {"type": "string", "required": False, "default": "edge", "values": ["auto", "edge", "gemini", "freeai", "openai"], "description": "auto=aidiy_tools.json。省略時edge（無料・高速）"},
                         "model": {"type": "string", "required": False, "default": "auto", "description": "モデル名。auto でプロバイダ既定値"},
-                        "voice": {"type": "string", "required": False, "default": "female", "description": "'female' / 'male' またはプロバイダ固有音声名（例: ja-JP-NanamiNeural, Zephyr）"},
+                        "voice": {"type": "string", "required": False, "default": "female", "description": "auto（aidiy_tools.json） / 'female' / 'male' またはプロバイダ固有音声名（例: ja-JP-NanamiNeural, Zephyr）"},
                         "ratio": {"type": "number|string", "required": False, "default": 0, "description": "話速倍率（0.5〜2.0）。None / 0 / 'auto' は provider ごとの既定値。edge/openai は 1.2、gemini/freeai は 1.1。1 は速度調整なし"},
                         "save_path": {"type": "string", "required": False, "description": "保存先。省略時は temp/output/ に yyyymmdd.HHMMSS.mp3 で自動保存"},
                         "local_play": {"type": "boolean", "required": False, "default": False, "description": "True でサーバー側スピーカーから即時再生"},

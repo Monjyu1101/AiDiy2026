@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 /** Computer Use が返した実画面を保存する。UI操作・認証・シェル実行は行わない。 */
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -56,12 +57,43 @@ async function replaceManifest(manifest, records) {
   // 他の呼び出し・前回の異常終了が残した一時ファイルには触れない。
   const temporary = manifest + '.' + randomUUID() + '.new';
   const handle = await fs.open(temporary, 'wx');
+  let committed = false;
   try {
     try { await handle.writeFile(JSON.stringify(records, null, 2) + '\n', 'utf8'); }
     finally { await handle.close(); }
     await fs.rename(temporary, manifest);
+    committed = true;
+  } finally {
+    // rename成功後の一時名は消滅済み。不要なcleanupの失敗をcommit失敗に見せない。
+    if (!committed) await fs.rm(temporary, { force: true });
+  }
+}
+
+// 同名画像はJSONの確定まで旧版を保持する。復元にも失敗した場合は退避先を残して通知する。
+async function replaceImageAndManifest(destination, bytes, commit) {
+  const temporary = destination + '.' + randomUUID() + '.new';
+  const backup = destination + '.' + randomUUID() + '.previous';
+  let hasBackup = false;
+  let preserveBackup = false;
+  try {
+    await fs.writeFile(temporary, bytes, { flag: 'wx' });
+    try { await fs.copyFile(destination, backup, constants.COPYFILE_EXCL); hasBackup = true; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await fs.rename(temporary, destination);
+    try { await commit(); }
+    catch (error) {
+      if (hasBackup) {
+        try { await fs.rename(backup, destination); }
+        catch (restoreError) {
+          preserveBackup = true;
+          throw new AggregateError([error, restoreError], `証跡の更新と画像復元に失敗しました。元画像を保持しています: ${backup}`);
+        }
+      }
+      throw error;
+    }
   } finally {
     await fs.rm(temporary, { force: true });
+    if (!preserveBackup) await fs.rm(backup, { force: true });
   }
 }
 
@@ -99,24 +131,24 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
       const stem = prefix + '_' + id + '_' + title.replace(/画面$/u, '') + '画面';
       const file = stem + '.png';
       const destination = path.join(root, file);
-      if (evidenceNumber === undefined) {
-        try { await fs.writeFile(destination, bytes, { flag: 'wx' }); }
-        catch (error) {
-          if (error.code !== 'EEXIST') throw error;
-          throw new Error('同じ画像名が存在します。再撮影は本文の番号を evidenceNumber に指定してください');
-        }
-      } else {
-        const temporary = destination + '.' + randomUUID() + '.new';
-        try {
-          await fs.writeFile(temporary, bytes, { flag: 'wx' });
-          await fs.rename(temporary, destination);
-        } finally { await fs.rm(temporary, { force: true }); }
-      }
       const row = { book, id, paragraph, sequence, file, title, status, note, time: new Date().toISOString(), window: state.window, width: shot.width, height: shot.height, sha256: createHash('sha256').update(bytes).digest('hex'), accessibility: state.accessibility };
       const previous = records.findIndex(record => record.id === id);
       if (previous >= 0) records[previous] = row;
       else records.push(row);
-      await replaceManifest(manifest, records);
+      // 実施IDが違っても同じ掲載画像を更新するため、画像単位でも排他する。
+      const imageLock = path.join(work, '.image-' + createHash('sha256').update(file).digest('hex'));
+      await withManifestLock(imageLock, lockTimeoutMs, async () => {
+        if (evidenceNumber === undefined) {
+          try { await fs.writeFile(destination, bytes, { flag: 'wx' }); }
+          catch (error) {
+            if (error.code !== 'EEXIST') throw error;
+            throw new Error('同じ画像名が存在します。再撮影は本文の番号を evidenceNumber に指定してください');
+          }
+          await replaceManifest(manifest, records);
+        } else {
+          await replaceImageAndManifest(destination, bytes, () => replaceManifest(manifest, records));
+        }
+      });
       return row;
     });
   };

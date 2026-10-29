@@ -38,6 +38,11 @@ class MovieGeneration:
         "freeai" — FreeAI API（freeai_key_id が必要、実装は Gemini 共通）
     """
 
+    auto_provider = "freeai"
+    auto_model = "veo-3.1-generate-preview"
+    auto_aspect_ratio = "16:9"
+    auto_resolution = "auto"
+
     DEFAULT_OUTPUT_DIR = "backend_server/temp/output"
 
     # ================================================================== #
@@ -285,10 +290,14 @@ class MovieGeneration:
 
         # auto → freeai にフォールバック
         if provider == "auto":
-            provider = "freeai"
+            provider = self.auto_provider
+        if model == "auto":
+            model = self.auto_model
+        if resolution == "auto":
+            resolution = self.auto_resolution
 
         # aspect_ratio の正規化
-        resolved_aspect = aspect_ratio if aspect_ratio != "auto" else self.DEFAULT_ASPECT_RATIO
+        resolved_aspect = aspect_ratio if aspect_ratio != "auto" else self.auto_aspect_ratio
 
         # resolution の正規化（"auto" は指定なし = モデルのデフォルト）
         resolved_resolution = resolution if resolution in ("720p", "1080p") else None

@@ -35,10 +35,13 @@ def load_setup(name):
 vscode = load_setup('frontend_ide/host')
 avatar = load_setup('frontend_avatar')
 import _setup_electron as common
+import _cleanup_processes as processes
 
 
 class ElectronSetupTest(unittest.TestCase):
     def setUp(self):
+        # 一時コピーの配布物試験。模擬Windowsでも実OSのPowerShell/プロセス一覧へ触れない。
+        self.enterContext(patch.object(processes, 'list_processes', return_value=[]))
         self.enterContext(patch.object(vscode, 'ensure_launcher_path', return_value=True))
         self.enterContext(patch.object(avatar, 'ensure_launcher_path', return_value=True))
         temporary = tempfile.TemporaryDirectory()

@@ -79,7 +79,7 @@ class RootIntegrationTests(unittest.TestCase):
             '3. Tools','4. Core / Apps',
             '5. Task / Team','6. Web',
             '7. Avatar','8. Hermes',
-            '9. Console / Code / Live / IDE','10. Discord',
+            '9. Console / Code / Live / IDE / Task / Team','10. Discord',
         ])
     def test_cleanup_auto_includes_diag_first(self):
         module=self.root_module('_cleanup');calls=[];original=module.ask_yes_no
@@ -103,16 +103,19 @@ class RootIntegrationTests(unittest.TestCase):
                     return selected if 'Diag' in prompt else default_yes
                 with patch.object(module,'prompt_choice',side_effect=choice),patch('builtins.print'):
                     values=module.collect_startup_choices()
-                self.assertEqual(len(values),12)
+                self.assertEqual(len(values),14)
                 self.assertEqual(values[6],selected)
                 self.assertIn('Diag',calls[0][0]);self.assertTrue(calls[0][1])
                 if selected:
                     self.assertEqual(len(calls),1)
-                    self.assertEqual(values,(False,)*6+(True,)+(False,)*5)
+                    self.assertEqual(values,(False,)*6+(True,)+(False,)*7)
                 else:
-                    self.assertEqual(len(calls),12)
-                    self.assertIn('Console',calls[7][0])
-                    self.assertEqual(values[:6]+values[7:],tuple(default for _,default in calls[1:]))
+                    self.assertEqual(len(calls),14)
+                    self.assertIn('aidiy_task',calls[7][0]);self.assertFalse(calls[7][1])
+                    self.assertIn('aidiy_team',calls[8][0]);self.assertFalse(calls[8][1])
+                    self.assertIn('Console',calls[9][0])
+                    # Task / Team の質問はAvatar直後だが、返却タプルは既存要素を保持して末尾へ追加する。
+                    self.assertEqual(values[:6]+values[12:]+values[7:12],tuple(default for _,default in calls[1:]))
 
     def test_start_choices_do_not_run_headless(self):
         from types import SimpleNamespace
@@ -187,7 +190,7 @@ class RootIntegrationTests(unittest.TestCase):
         for error in (RuntimeError('failed'),OSError('failed')):
             with self.subTest(error=type(error)):
                 module=self.root_module('_start');tools=SimpleNamespace(start=Mock());local_process=object()
-                with patch.object(module,'_init_modules'),patch.object(module,'DIAG',SimpleNamespace(run_headless=Mock(side_effect=error))),patch.object(module,'TOOLS',tools),patch.object(module,'LOCAL',SimpleNamespace(start=lambda:local_process)),patch.object(module,'collect_startup_choices',return_value=(True,True)+(False,)*10),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes') as stop,patch.object(module,'monitor_and_restart') as monitor,patch('builtins.print'):
+                with patch.object(module,'_init_modules'),patch.object(module,'DIAG',SimpleNamespace(run_headless=Mock(side_effect=error))),patch.object(module,'TOOLS',tools),patch.object(module,'LOCAL',SimpleNamespace(start=lambda:local_process)),patch.object(module,'collect_startup_choices',return_value=(True,True)+(False,)*12),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes') as stop,patch.object(module,'monitor_and_restart') as monitor,patch('builtins.print'):
                     with self.assertRaises(SystemExit) as result:module.main()
                 self.assertEqual(result.exception.code,1);tools.start.assert_not_called();monitor.assert_not_called()
                 stop.assert_called_once_with({'バックエンド(local)':local_process})
@@ -197,7 +200,7 @@ class RootIntegrationTests(unittest.TestCase):
         from unittest.mock import Mock
         for enabled in (False,True):
             module=self.root_module('_start');diag=SimpleNamespace(run_headless=Mock())
-            with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag),patch.object(module,'TOOLS',SimpleNamespace(start=Mock(return_value=object()),PORT_TOOLS=8095)),patch.object(module,'collect_startup_choices',return_value=(False,enabled)+(False,)*10),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes'),patch.object(module,'monitor_and_restart'),patch.object(module.time,'sleep'),patch('builtins.print'):
+            with patch.object(module,'_init_modules'),patch.object(module,'DIAG',diag),patch.object(module,'TOOLS',SimpleNamespace(start=Mock(return_value=object()),PORT_TOOLS=8095)),patch.object(module,'collect_startup_choices',return_value=(False,enabled)+(False,)*12),patch.object(module,'validate_initial_environment',return_value=(True,None)),patch.object(module,'stop_all_tasks'),patch.object(module,'cleanup_stop_requested_services',return_value=set()),patch.object(module,'attach_output_thread'),patch.object(module,'wait_for_services_quiet'),patch.object(module,'stop_processes'),patch.object(module,'monitor_and_restart'),patch.object(module.time,'sleep'),patch('builtins.print'):
                 module.main()
             self.assertEqual(diag.run_headless.call_count,int(enabled))
 

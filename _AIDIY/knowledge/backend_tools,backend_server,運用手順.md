@@ -263,3 +263,115 @@ curl -s -X POST http://127.0.0.1:8095/aidiy_chrome_devtools/screenshot \
 
 MCP の選択基準は `backend_server,backend_tools,MCP活用手順.md` を使う。
 サーバー構成や新規 MCP 追加は `backend_tools,構成.md` を使う。
+
+## auto 時の既定設定（aidiy_tools.json）
+
+`backend_tools` の起動時（FastAPI lifespan）に、プロジェクトルートの
+`_config/aidiy_tools.json` が無ければ次を初期生成する。起動ディレクトリには依存しない。
+APIキーは書かず、従来の `AiDiy_key.json` を利用する。
+
+```json
+{
+  "text_to_speech": {"auto_provider": "edge", "auto_voice": "female"},
+  "speech_to_text": {"auto_provider": "google"},
+  "image_generation": {"auto_provider": "codex"},
+  "movie_generation": {
+    "auto_provider": "freeai",
+    "auto_model": "veo-3.1-generate-preview",
+    "auto_aspect_ratio": "16:9",
+    "auto_resolution": "auto"
+  }
+}
+```
+
+編集後は **backend_tools を再起動**する。既存ファイルへの追記・上書きはしない。
+不足項目は初期値、空文字/null/未知値/型違いは警告して当該項目の初期値を使用する。
+不正JSONや読込・生成失敗でも起動を続け、初期値を使用する。ログには設定値や秘密を出さない。
+同時起動は完成した一時JSONを排他的に公開するため、既存設定を上書きしない。
+ハードリンク非対応のファイルシステム等で生成できない場合は、上記JSONを手動作成する。
+
+| 項目 | 設定可能値・挙動 |
+|------|----------------|
+| TTS auto_provider | edge / openai / gemini / freeai。選んだproviderの既存フォールバック順を使用。初期値はedge→freeai |
+| TTS auto_voice | female / male。実際のproviderと言語に応じた音声名へ解決。明示voiceは優先 |
+| STT auto_provider | google / openai。初期値googleはGoogle Web Speech。openaiはWhisper（既存の無音事前チェックあり） |
+| 画像 auto_provider | codex / antigravity / openai / freeai / gemini / grok。既存のprovider別フォールバック順を使用 |
+| 動画 auto_provider | freeai / gemini |
+| 動画 auto_model | veo-3.1-generate-preview / veo-2.0-generate-001 / veo-2.0-generate-exp |
+| 動画 auto_aspect_ratio | 16:9 / 9:16 |
+| 動画 auto_resolution | auto（モデル任せ、従来動作） / 720p / 1080p。モデル側の制約は従来どおり適用 |
+
+**各引数が `auto` の場合だけ**設定を適用し、明示引数は従来どおり優先する。
+TTSのREST APIは互換のためprovider省略時はedgeのままなので、設定を使う場合は
+`{"speech_text":"こんにちは", "provider":"auto", "voice":"auto"}` のように指定する（RESTのvoice省略時も従来のfemaleを維持）。MCPは省略時auto。
+STTはproviderにgoogleを明示すれば、設定がopenaiでもGoogle側を選択できる。
+
+画像のmodelは従来どおりproviderがauto/CLIならCLI側・各provider側の既定へ委譲する
+（この場合はmodel明示も従来から無視）。provider別にモデル体系が異なるため共通auto_modelは設けない。
+chatのautoは既存 `AiDiy_key.json`、CodeAIのautoはHermes/履歴へ委譲し、設定を重複させない。
+APIを使うproviderへの変更やフォールバックには利用料金が発生しうる。
+
+ネットワーク・有料APIを使わない回帰試験:
+
+```sh
+backend_tools/.venv/bin/python -m unittest discover -s backend_tools/checks -v
+```
+
+Windowsでは実行ファイルを `backend_tools/.venv/Scripts/python.exe` に置き換える。
+
+### Diag Tools 管理（認証付き・管理APIは2つ）
+
+DiagのToolsパネルはConfigと同じCore利用者ログインを使う。Diag起動認証に加え、
+管理要求ごとにCoreの現在利用者APIでJWTを再検証する。Coreに接続できない場合も拒否する。
+APIキー・JWT秘密・OBS接続秘密は管理応答に含めない。
+
+| Diag（同一origin） | Tools側 | 用途 |
+|---|---|---|
+| `POST /api/Tools/enabled` | `POST /management/enabled` | enabled状態取得・切替 |
+| `POST /api/Tools/defaults` | `POST /management/defaults` | 既定値・選択肢取得・変更 |
+
+Diagには `{ "token": "Core JWT", "data": {...} }` を送る。
+Tools側は `Authorization: Bearer <Core JWT>` とdata本体を受ける。
+各APIで `{}` は読取のみ。`write`省略/falseで値を指定すると**現在のToolsプロセスへ即時適用**し、
+ファイルは変更しない。`write:true`で値を指定した場合だけ保存し、成功後に実行時設定へ反映する。
+失敗時は実行時設定も変えない。保存対象を指定しない`write:true`は書き込まない。
+
+```json
+{"enabled":{"aidiy_text_to_speech":false},"write":true}
+```
+
+```json
+{"defaults":{"text_to_speech":{"auto_provider":"edge","auto_voice":"male"}},"write":true}
+```
+
+既存 `_config/aidiy_tools.json` の4媒体既定値に加え、`enabled` objectへツールID別booleanを保存する。
+未指定enabledはtrue。falseは明示的に優先する。既存の未知項目は保存時にも維持する。
+保存は同じディレクトリの一時ファイルから置換し、`.json.lock`ディレクトリでプロセス間を排他する。
+競合は409で再試行を促す。異常終了でlockが残った場合は、保存処理が動いていないことを確認してから
+`_config/aidiy_tools.json.lock`空ディレクトリを削除する（自動的に他プロセスのlockを奪わない）。
+複数Toolsプロセスを個別に動かす場合、実行時設定は要求を受けたプロセスだけへ適用される。
+保存後に他プロセスへ反映するには再起動する。
+
+`enabled`（利用者の選択）と`available`（依存の利用可否）は別に返す。
+Chrome実行体、ffmpeg起動結果、PostgreSQL初期化、デスクトップ表示環境を確認する。
+OBSを含むその他は登録済みクライアント・組込み機能として表示するため、API認証・接続・個別CLI等の全機能が正常とは限らない。OBSの起動時未接続は未導入と区別し、後起動・明示host/port指定を妨げない。実際のOBS疎通・認証は既存の機能呼出し時に判定する。
+未導入/利用不可の行は有効化・テスト不可。OBS接続設定自体の変更や他プログラム導入後はToolsを再起動して設定・起動チェックを更新する。
+
+offでもMCP定義・list/ping・transport sessionは削除しない。呼出しは実処理に進まず、
+HTTP 200/MCP非エラーのJSONとして `status:"NG", available:false, service_status:"out_of_service"`
+と案内messageを返す。既に開始された処理は切替では取り消さない。
+Chat Completions互換HTTPもchat_llmsのenabledに従う。
+
+代表テストは別の管理設定を作らず、既存Chrome DevTools `open_session` / `close_session`を
+Diagの固定allowlist bridge `POST /api/Tools/representative`から呼ぶ。
+`data:{operation:"open",headless:false}` または `{operation:"close"}` のみ許可する。
+セッション名は `diag-tools-test` 固定、任意URL/パス/コマンドは受けない。利用者ログインを毎回確認し、
+enabled/availableを確認してから実行する。起動時・一覧表示時に自動テストはしない。
+初版の代表テストはChromeのみ。他のツールは未対応理由を表示する。
+
+隔離試験（ブラウザ/有料API実行なし）:
+
+```sh
+backend_tools/.venv/bin/python -m unittest discover -s backend_tools/checks -v
+node --test backend_diag/checks/tools-settings-api.check.mjs
+```

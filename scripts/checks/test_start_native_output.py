@@ -80,6 +80,7 @@ class NativeOutputTests(unittest.TestCase):
                         return SimpleNamespace(returncode=0, stdout=NETSTAT.decode(encoding, errors=kwargs.get('errors', 'strict')), stderr='')
                     return SimpleNamespace(returncode=1, stdout='', stderr=FAILURE.decode(encoding, errors=kwargs.get('errors', 'strict')))
                 with patch.object(module.sys, 'platform', 'win32'), patch.object(module.subprocess, 'run', side_effect=native), \
+                        patch.object(module.subprocess, 'CREATE_NO_WINDOW', 0x08000000, create=True), \
                         patch.object(module.time, 'sleep'), patch('builtins.print') as messages:
                     self.assertFalse(module.kill_process_on_port(8095))
                 self.assertTrue(any(command[0] == 'taskkill' for command in calls))
