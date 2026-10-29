@@ -83,7 +83,7 @@ _CHROME_DEVTOOLS_METHODS = [
     {"name": "find_elements", "description": "CSS セレクターで要素を検索してプロパティ一覧を返す",
      "parameters": {"selector": {"type": "string", "required": True}, "tab_id": {"type": "string", "required": False}, "limit": {"type": "integer", "required": False, "default": 50}}},
     {"name": "list_tabs", "description": "開いているタブ一覧を取得する", "aliases": ["list_pages"], "parameters": {}},
-    {"name": "new_tab", "description": "新規タブを開く", "aliases": ["new_page"],
+    {"name": "new_tab", "description": "新規タブを開く。Browserでは返却されたsessionとidを次の操作のsessionとtab_idに使う", "aliases": ["new_page"],
      "parameters": {"url": {"type": "string", "required": False, "default": "about:blank"}, "show_automation_banner": {"type": "boolean", "required": False, "default": True}}},
     {"name": "close_tab", "description": "指定タブを閉じる", "aliases": ["close_page"], "parameters": {"tab_id": {"type": "string", "required": True}}},
     {"name": "activate_tab", "description": "指定タブをアクティブにする", "parameters": {"tab_id": {"type": "string", "required": True}}},
@@ -142,6 +142,15 @@ _CHROME_DEVTOOLS_METHODS += [
 # ------------------------------------------------------------------ #
 # MCP ツール登録
 # ------------------------------------------------------------------ #
+
+def _new_tab_response(result, url):
+    """通常Chromeの応答を維持し、Browserブリッジが返した接続先だけを追加する。"""
+    result = result if isinstance(result, dict) else {}
+    response = {"id": result.get("targetId", ""), "url": url}
+    if isinstance(result.get("session"), str) and result["session"]:
+        response["session"] = result["session"]
+    return response
+
 
 def register_tools(mcp, registry):
     """aidiy_chrome_devtools MCP ツールを mcp インスタンスに登録する。
@@ -365,7 +374,7 @@ def register_tools(mcp, registry):
         show_automation_banner: bool = True,
     ) -> str:
         """
-        新規タブを開く。
+        新規タブを開く。Browserでは応答のsessionとidを次の操作のsessionとtab_idに使う。
 
         Args:
             show_automation_banner: Chrome 未起動時の自動起動で「自動操作中」の帯を表示する。
@@ -374,8 +383,7 @@ def register_tools(mcp, registry):
         cdp = await _ensure_chrome(show_automation_banner=show_automation_banner, session=session)
         browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
         result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": url})
-        target_id = result.get("targetId", "")
-        return json.dumps({"id": target_id, "url": url}, ensure_ascii=False)
+        return json.dumps(_new_tab_response(result, url), ensure_ascii=False)
 
     @mcp.tool()
     async def close_tab(session: str = "default", *, tab_id: str) -> str:
@@ -671,7 +679,7 @@ def register_tools(mcp, registry):
 
     @mcp.tool()
     async def new_page(session: str = "default", url: str = "about:blank", show_automation_banner: bool = True) -> str:
-        """新規タブを開く（new_tab の別名）"""
+        """新規タブを開く（new_tab の別名）。Browserでは応答のsessionとidを次の操作のsessionとtab_idに使う。"""
         return await new_tab(session=session, url=url, show_automation_banner=show_automation_banner)
 
     @mcp.tool()
@@ -808,7 +816,7 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
                 "find_elements": {"elements": "配列 [{tag, id, class, text, selector, ...}, ...]"},
                 "set_viewport / wait_for_load": {"result": "成功メッセージ"},
                 "list_tabs / list_pages": {"tabs": "配列 [{id, url, title, webSocketDebuggerUrl}, ...]"},
-                "new_tab / new_page": {"id": "新しいタブの targetId", "url": "開いた URL"},
+                "new_tab / new_page": {"id": "新しいタブの targetId（次の操作の tab_id）", "url": "開いた URL", "session（Browserのみ）": "新しいタブの接続先。次の操作に指定する。元のsessionは切り替わらない"},
                 "close_tab / activate_tab": {"result": "成功メッセージ"},
                 "install_console_capture / install_network_capture": {"result": "成功メッセージ"},
                 "get_console_logs": {"logs": "配列 [{level, message, timestamp}, ...]"},
@@ -915,8 +923,7 @@ def create_router(registry, _ensure_chrome) -> APIRouter:
             elif method_name in ("new_tab", "new_page"):
                 browser_ws = await asyncio.to_thread(cdp.get_browser_ws_url)
                 result = await cdp.send_command(browser_ws, "Target.createTarget", {"url": req.url or "about:blank"})
-                target_id = result.get("targetId", "") if isinstance(result, dict) else ""
-                return {"id": target_id, "url": req.url or "about:blank"}
+                return _new_tab_response(result, req.url or "about:blank")
             elif method_name in ("close_tab", "close_page"):
                 ok = await cdp.close_tab(req.tab_id or "")
                 return {"result": "閉じました" if ok else "失敗しました"}

@@ -60,7 +60,11 @@ class IDEBrowserClient(CDPClient):
             raise RuntimeError("IDE本体のCDP操作は公開していません。")
         url = (params or {}).get("url", "https://www.google.com/")
         result = await asyncio.to_thread(self._http_get, "/json/new?url=" + urllib.parse.quote(url, safe=""))
-        return {"targetId": result["id"]}
+        response = {"targetId": result["id"]}
+        # IDEの新しいBrowserは別session。元clientは切り替えず、呼出元へ接続先を返す。
+        if isinstance(result.get("session"), str) and result["session"]:
+            response["session"] = result["session"]
+        return response
 
 class IDEBrowserManager:
     def __init__(self, entry):

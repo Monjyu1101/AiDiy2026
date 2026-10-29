@@ -12,7 +12,7 @@ import {displayBrowserURL,browserAddressTarget} from './URL表示.js';
 const props=defineProps({standalone:Boolean,headerOnly:Boolean});
 const page=ref({url:'',title:'',loading:false,back:false,forward:false,error:''}),address=ref(''),surface=ref(),chrome=ref(),chromeHeight=ref(100),error=ref(''),capturing=ref(false),captureMessage=ref('');
 let stop=()=>{},stopFrame=()=>{},stopDraft=()=>{},observer,disposed=false,editing=false,frame,stateRevision=-1;
-const headerOffset=ref(0);
+const headerOffset=ref(0),windowTitle=ref('');
 const headerWindowApi=props.headerOnly?{
  ...window.aidiyWindow,
  pinState:()=>window.aidiyWindow.browserAction('header-pin-state'),
@@ -52,6 +52,8 @@ async function capture(){
 function resize(){const rect=surface.value?.getBoundingClientRect(),viewport=rect?document.documentElement.getBoundingClientRect():null;chromeHeight.value=chrome.value?.getBoundingClientRect().height||100;if(props.headerOnly)void window.aidiyWindow.browserAction('header-size',chromeHeight.value).catch(()=>{});else if(rect)void window.aidiyWindow.browserAction('bounds',{left:rect.left,top:rect.top,width:rect.width,height:rect.height,chromeHeight:chromeHeight.value,viewportWidth:viewport.width,viewportHeight:viewport.height,fullscreen:!!page.value.fullscreen,measuredAt:performance.timeOrigin+performance.now()}).catch(()=>{});}
 function transition(){cancelAnimationFrame(frame);const end=performance.now()+260;function step(){resize();if(!disposed&&performance.now()<end)frame=requestAnimationFrame(step);}step();}
 onMounted(()=>{
+ // Codeと同じ限定IPCを使う。全画面ヘッダーもmainが解決した元Browser窓のタイトルを表示する。
+ void Promise.resolve().then(()=>window.aidiyWindow?.title?.()).then(title=>{if(!disposed&&typeof title==='string'&&title.trim())windowTitle.value=title;}).catch(()=>{});
  stop=window.aidiyWindow.onBrowserChanged(update);void action('state');
  if(props.headerOnly){document.documentElement.classList.add('browser-header-document');stopFrame=window.aidiyWindow.onBrowserHeaderFrame?.(value=>{headerOffset.value=value;})||(()=>{});}
  else stopDraft=window.aidiyWindow.onBrowserOpenDraft?.(()=>{void handoff();})||(()=>{});
@@ -61,8 +63,8 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 </script>
 <template>
  <main class="development-app browser-panel desktop-window" :class="{'browser-fullscreen':page.fullscreen,'browser-header-only':headerOnly}" :style="{'--header-offset':headerOffset+'px'}" data-app="browser" @transitionrun.self="transition">
-  <div ref="chrome" class="browser-chrome" data-aidiy-window-move-handle @transitionrun="transition">
-  <StatusBar :title="standalone?'AiDiy Browser':'AiDiy IDE / Browser'" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" :window-api="headerWindowApi" :pin-title="headerOnly?(page.headerPinned?'ヘッダーの常時表示を解除':'ヘッダーを常時表示'):undefined">
+  <div ref="chrome" class="browser-chrome panel-window-title" data-aidiy-window-move-handle @transitionrun="transition">
+  <StatusBar :title="windowTitle||(standalone?'AiDiy Browser':'AiDiy IDE / Browser')" :connected="page.available===true" :status="page.available===false?'tools未接続':page.loading?'読み込み中':'ブラウザ'" desktop :clock-pulse="false" :window-api="headerWindowApi" :pin-title="headerOnly?(page.headerPinned?'ヘッダーの常時表示を解除':'ヘッダーを常時表示'):undefined">
    <template #connection-tools><button type="button" class="browser-capture" :disabled="capturing||!page.available" :title="captureMessage||'表示中のWeb画面をtemp/inputに保存'" aria-label="Web画面を撮影" @click="capture">{{capturing?'撮影中…':'📷 撮影'}}</button><button type="button" class="browser-handoff" :disabled="handing||capturing||!page.available" title="session・tab_id・URLと1分以内の撮影画像パスを下書きへ追加" @click="handoff">Code / Liveへ</button><span v-if="captureMessage" class="browser-capture-status" :title="captureMessage" role="status">保存済み</span></template>
    <template #window-tools>
     <span class="browser-window-sizes">

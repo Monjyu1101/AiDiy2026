@@ -197,11 +197,17 @@ Browserの画面は `src/ブラウザ/ブラウザパネル.vue`、WebContentsVi
 
 BrowserはIDEの `active && mode==='online' && connected` を起動前・非同期準備後に照合します。tools切断時は既存ページを保持したまま非表示にして操作を停止し、再接続時に戻します。接続判定の取得元は既存のIDE接続状態です。Electronのファイル選択では `previewFile()` で実パスとプロジェクト境界を確認し、`pathToFileURL()` による絶対パスのfile URLをBrowserへ渡します。アドレス欄・履歴・MCPのURLもfile URLです。日本語・空白・`#`・`%`を含む名前を手動連結せず、相対画像・CSS・リンクはファイル位置を基準に読み込みます。Browserのfile要求とMCPの遷移先はプロジェクト内の実ファイルに限定します。通常Web起動と既存の「表示」プレビューは `/api/preview` の専用配信URLを引き続き使います。外部ページはpreloadなし・Nodeなし・sandbox有効の別WebContentsで、IDEのAPIオリジンへの要求は拒否します。
 
-MCPは `session="aidiy_ide"`、複数IDEでは `aidiy_ide-2` 以降です。`backend_tools/temp/_ide_browser_sessions/` にIDEがloopbackポート・ランダムトークン・PIDの登録を置き、`tools_proc/ide_browser_session.py` が既存のChromeレジストリへ接続専用セッションとして組み込みます。トークンやポートを画面へ公開せず、パネルにセッション名だけを表示します。IDE終了で登録と中継を解除します。MCPの `close_session` / `delete_session` はBrowserだけを閉じ、IDEプロセスをkillしません。未起動のセッションへ別Chromeを自動起動しません。
+IDE配下のMCP sessionはBrowser窓ごとの `aidiy_ide N` です。`backend_tools/temp/_ide_browser_sessions/` の排他的な登録で全IDEから見た最小の空き正整数を確保し、窓の終了で解放します。1・2・3から2を閉じて追加すれば2を再利用します。`record.slot=N-1` とタイトル **AiDiy IDE / Browser N** を同じ番号へ揃え、別の表示用番号を採番しません。Codeの番号はIDEごとですが、MCP session名は全IDE共通なのでBrowserの採番だけはIDEをまたいで一意にします。起動元・作業セッション・寿命はCodeと同様に `record.owner` / `linkKey` で管理し、IDEの利用終了・所有IDE終了では所属Browser全窓を回収します。MCPの `close_session` / `delete_session` は指定したBrowserだけを閉じ、他BrowserやIDEプロセスを終了しません。
 
-Electron全体のremote-debugging-portは使わず、専用ページのCDPだけを中継します。HTTP・WebSocketはloopbackとトークンで限定し、WebページからのOrigin付き要求を拒否します。IDE本体やCode/ConsoleのTargetへアクセスするBrowser/Targetドメインは転送しません。`new_tab` だけは専用アダプターから所有IDEへ新しいBrowserパネルを要求します。Web起動の通常タブは登録しません。
+単独Browserは起動ごとの固定UUIDを持つ `aidiy_browser <UUID>` で、タイトルは番号・UUIDなしの **AiDiy Browser** です。同じ起動プロセス内で窓を増やしてもUUIDは変更せず、最終窓の終了で登録と中継を解除します。単独版の `close_session` はその起動のBrowser全窓を閉じ、別起動・IDE・通常Chromeは対象にしません。session表示と下書き連携には両方式とも実際の空白付き名をそのまま使います。
 
-確認は `node --test frontend_ide/checks/browser*.test.mjs` と `backend_tools/.venv/Scripts/python.exe -m unittest discover -s frontend_ide/checks -p test_browser_sessions.py`。実画面確認は共通Vueの配布物生成と変更済みtoolsの起動後、`node frontend_ide/scripts/check-browser.mjs` を実行します。Googleへの実接続、HTML/HTMと相対CSS・リンク、履歴、MCPからの一覧・クリック・入力・移動・撮影・新規パネル・終了、各ディスプレイのVR起動配置、利用終了連携を確認し、`temp/browser-check/` に画像と結果を保存します。テスト用プロジェクトとElectronプロファイルを使い、有料AIや音声は起動しません。
+登録にはloopbackポート・ランダムトークン・PIDを保存し、`tools_proc/ide_browser_session.py` がChromeレジストリへ接続専用sessionとして組み込みます。トークンやポートは画面へ公開しません。未起動・不正な予約名を通常Chromeや `default` へ退避させず、接続失敗として扱います。旧形式名の稼働中プロセスへの互換接続は維持します。
+
+Vueの通常タイトル・F11上端ヘッダーは `window.aidiyWindow.title()` の限定IPCから同じOSタイトルを取得します。ページ題名・フォーカス中の別窓から組み立てません。取得失敗や不正値では従来の種別名を表示し、破棄後に届いた応答は捨てます。`panel-window-title` の既存の縮小・省略規則を再利用し、全画面パネルの半透明背景は維持します。
+
+Electron全体のremote-debugging-portは使わず、専用ページのCDPだけを中継します。HTTP・WebSocketはloopbackとトークンで限定し、WebページからのOrigin付き要求を拒否します。IDE本体やCode/ConsoleのTargetへアクセスするBrowser/Targetドメインは転送しません。`new_tab` だけは専用アダプターから新しいBrowserパネルを要求します。IDE版では同じ所有IDEに別の `aidiy_ide N` を作り、応答の `session` と `id` を組にして以後の操作へ渡します。新tabを元sessionへ登録した扱いにしません。単独版では同じ起動UUIDのsessionへ追加します。Web起動の通常タブは登録しません。
+
+確認は `node --test frontend_ide/checks/browser*.test.mjs frontend_ide/checks/standalone-browser-desktop.test.mjs` と `backend_tools/.venv/Scripts/python.exe -m unittest discover -s frontend_ide/checks -p 'test_browser_*.py'`。番号の同時確保・閉鎖後再利用、IDE所属と利用終了、new_tab応答session、close_sessionの対象分離、単独UUIDの維持、通常/F11タイトルの一致・失敗・破棄後応答も対象にします。実画面確認は共通Vueの配布物生成と変更済みtoolsの起動後、`node frontend_ide/scripts/check-browser.mjs` を実行します。Googleへの実接続、HTML/HTMと相対CSS・リンク、履歴、MCPからの一覧・クリック・入力・移動・撮影・新規パネル・終了、各ディスプレイのVR起動配置、利用終了連携を確認し、`temp/browser-check/` に画像と結果を保存します。テスト用プロジェクトとElectronプロファイルを使い、有料AIや音声は起動しません。
 
 ## VRボタンの表示と切り替え
 
@@ -595,7 +601,7 @@ Electron・Web・VS Code の共通画面は濃いグレー `#383838` の1px外�
 
 ## Browserの日本語URL表示
 
-「Code / Liveへ」は、実際の `session` と送信元の `tab_id` を先頭に付け、表示中URLを同じプロジェクトの下書きへ追加します。IDEは起動インスタンス単位の `aidiy_ide N`、単独Browserは起動中固定の `aidiy_browser <UUID>` を使います。空白を含む名前をそのままMCPへ渡し、同じIDE内の複数Browser窓は `tab_id` で指定します。Browser窓の表示番号とsessionの番号は別です。名前の割当とtab IDは `ブラウザCDP.cjs` が所有し、下書きはフォーカス中の窓ではなく送信元レコードから作成します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
+「Code / Liveへ」は、実際の `session` と送信元の `tab_id` を先頭に付け、表示中URLを同じプロジェクトの下書きへ追加します。IDE配下はBrowser窓ごとの `aidiy_ide N` と同じNのタイトル、単独Browserは起動中固定の `aidiy_browser <UUID>` とタイトル `AiDiy Browser` を使います。空白を含むsession名をそのままMCPへ渡します。単独版の複数窓とIDE番号再利用後の誤操作を避けるため、`tab_id` も併記します。名前の割当とtab IDは `ブラウザCDP.cjs` が所有し、下書きはフォーカス中の窓ではなく送信元レコードから作成します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
 
 Browserの接続表示の右には「撮影」を置きます。表示中のWebContentsViewだけを`capturePage()`でPNG化し、選択プロジェクトの`temp/input/browser-<UUID>.png`へ保存します。タイトルバー・URL欄・デスクトップ全体・スクロール外のページは含めません。任意の保存パスはrendererから受け取らず、撮影中の連打・切断・ページ遷移は拒否します。保存後は画面に保存先を示します。Avatarの`input_image`はAIコアの`backend_server/temp/input`への保存とLive送信であり、このBrowserのプロジェクト内保存とは別の経路です。Browserの撮影だけではLiveやAI推論を起動しません。
 

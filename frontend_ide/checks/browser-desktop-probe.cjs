@@ -83,7 +83,9 @@ app.on('browser-window-created',(_,owner)=>{
     const response=await fetch(process.env.AIDIY_TOOLS_ORIGIN+'/aidiy_chrome_devtools/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session,...params}),signal:AbortSignal.timeout(30000)});
     const result=await response.json();assert.equal(response.ok,true,JSON.stringify(result));assert.equal(result.error,undefined,JSON.stringify(result));return result;
    };
-   const tabs=(await mcp('list_tabs')).tabs;assert.equal(tabs.length,2);assert.ok(tabs.every(t=>!t.url.startsWith(process.env.AIDIY_DEVELOPMENT_URL)),'IDE本体は制御対象に公開しない');
+   assert.equal(html.getTitle(),`AiDiy IDE / Browser ${session.slice('aidiy_ide '.length)}`);
+   assert.equal(await evaluate(html,`document.querySelector('.panel-brand strong').textContent`),html.getTitle());
+   const tabs=(await mcp('list_tabs')).tabs;assert.equal(tabs.length,1);assert.ok(tabs.every(t=>!t.url.startsWith(process.env.AIDIY_DEVELOPMENT_URL)),'IDE本体は制御対象に公開しない');
    const tab=tabs.find(t=>t.url===original);assert.ok(tab);
    const nativeCheck=await mcp('eval_js',{tab_id:tab.id,expression:'({bridge:typeof aidiyWindow,node:typeof process})'});
    assert.ok(JSON.stringify(nativeCheck).includes('undefined'));
@@ -92,8 +94,9 @@ app.on('browser-window-created',(_,owner)=>{
    await mcp('eval_js',{tab_id:tab.id,expression:"document.body.insertAdjacentHTML('beforeend','<input id=probe aria-label=検証入力>')"});
    await mcp('type_text',{tab_id:tab.id,selector:'#probe',text:'MCPから入力しました'});assert.equal(await page.executeJavaScript(`document.querySelector('#probe').value`),'MCPから入力しました');
    const mcpShot=join(output,`${stamp}_mcp.png`);await mcp('screenshot',{tab_id:tab.id,save_path:mcpShot,shutter_sounds:'none'});shots.push(mcpShot);
-   const created=await mcp('new_tab',{url:original,show_automation_banner:false});assert.ok(created.id);await until(()=>browsers().length===3,'MCPのnew_tabで新しいBrowserパネル');
-   await mcp('close_tab',{tab_id:created.id});await until(()=>browsers().length===2,'MCPのclose_tab');
+   const created=await mcp('new_tab',{url:original,show_automation_banner:false});assert.ok(created.id);assert.match(created.session,/^aidiy_ide [1-9]\d*$/);assert.notEqual(created.session,session);await until(()=>browsers().length===3,'MCPのnew_tabで新しいBrowserパネル');
+   assert.equal((await mcp('list_tabs',{session:created.session})).tabs[0].id,created.id);
+   await mcp('close_session',{session:created.session});await until(()=>browsers().length===2,'MCPのclose_sessionは作成したBrowserだけ終了');
    await evaluate(owner,`aidiyIDE.goTo({type:'file',path:'next.htm'})`);await until(()=>evaluate(owner,`document.querySelector('.viewer-path').textContent.includes('next.htm')&&!!document.querySelector('.viewer-browser')`),'HTMにもブラウザボタン');
    assert.equal((await evaluate(owner,`aidiyWindow.openBrowser('宇宙 # 100%.html')`)).ok,true);
    let special;await until(()=>{special=browsers().find(w=>w!==google&&w!==html);return special&&!guest(special).isLoading()&&guest(special).getTitle()==='特殊名HTML';},'日本語・空白・記号のファイル');

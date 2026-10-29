@@ -35,8 +35,9 @@ try{
  const result=await call('eval_js',{expression:'document.querySelector("#probe").value'});assert.ok(JSON.stringify(result).includes('単独Browserの入力を確認'));
  await call('screenshot',{save_path:join(output,'Browser_101_単独Web画面.png'),shutter_sounds:'none'});
  const windows=await fetch(tools+'/aidiy_desktop_capture/list_windows',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(r=>r.json());
- const window=windows.windows.find(w=>/^AiDiy Browser \d+$/.test(w.title));
- assert.ok(window,JSON.stringify(windows.windows.map(w=>w.title)));
+ const candidates=windows.windows.filter(w=>w.title==='AiDiy Browser');
+ assert.equal(candidates.length,1,'同名タイトルの別Browserを撮影しないため、単独Browserがこの試験の1窓だけの状態で確認してください。');
+ const window=candidates[0];
  const shot=await fetch(tools+'/aidiy_desktop_capture/screenshot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({window_title:window.title,save_path:join(output,'Browser_101_単独起動.png'),shutter_sounds:'none'})}).then(r=>r.json());assert.equal(shot.error,undefined,JSON.stringify(shot));
  await call('close_session');const [code]=await exit;assert.equal(code,0);
  const summary={testPassed:true,session:manifest.name,japaneseInput:true,capture:true,closed:true};await writeFile(join(output,'standalone-result.json'),JSON.stringify(summary));console.log(JSON.stringify(summary));

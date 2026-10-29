@@ -116,22 +116,23 @@ async function checkStandaloneBrowser(record){
  finally{record.checking=false;}
 }
 const browserConnected=state=>state.active&&state.mode==='online'&&state.connected===true;
-async function ensureBrowserBridge(owner){
- if(browserBridges.has(owner))return browserBridges.get(owner);
+async function ensureBrowserBridge(record){
+ if(browserBridges.has(record))return browserBridges.get(record);
+ const owner=record.owner,revision=owner.revision;
  const pending=(async()=>{
   const {createBrowserCDP}=require('./デスクトップ/ブラウザCDP.cjs');
   const bridge=await createBrowserCDP({directory:process.env.AIDIY_BROWSER_SESSIONS_DIR||join(__dirname,'../backend_tools/temp/_ide_browser_sessions'),
-   canUse:async()=>!quitting&&!owner.window.isDestroyed()&&browserConnected(await readState(owner)),
+   canUse:async()=>{const state=await readState(owner);return !quitting&&!record.window.isDestroyed()&&!owner.window.isDestroyed()&&owner.revision===revision&&record.linkKey===sessionKey(state)&&browserConnected(state);},
    allowedURL:url=>browserViews.allowedURL(url),
    openPanel:async target=>{
-    const state=await readState(owner);if(!browserConnected(state)||owner.window.isDestroyed())throw Error('tools接続中のみ起動できます。');
+    const state=await readState(owner);if(!browserConnected(state)||record.window.isDestroyed()||owner.window.isDestroyed()||owner.revision!==revision||record.linkKey!==sessionKey(state))throw Error('tools接続中のみ起動できます。');
     const window=await createWindow('browser',owner.url+'#browser',undefined,owner,sessionKey(state),undefined,undefined,target);return windows.get(window.webContents);
    }});
-  if(owner.window.isDestroyed()){bridge.close();throw Error('IDEの利用が終了しました。');}
-  owner.window.once('closed',()=>bridge.close());return bridge;
+  if(record.window.isDestroyed()||owner.window.isDestroyed()||owner.revision!==revision){bridge.close();throw Error('IDEの利用が終了しました。');}
+  record.window.once('closed',()=>bridge.close());return bridge;
  })();
- browserBridges.set(owner,pending);
- try{return await pending;}catch(error){browserBridges.delete(owner);throw error;}
+ browserBridges.set(record,pending);
+ try{return await pending;}catch(error){browserBridges.delete(record);throw error;}
 }
 function focusWindow(window){
  if(!window||window.isDestroyed())return;
@@ -194,9 +195,9 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliConsoleWindow&&!owner);
  }catch(error){placement?.close();throw error;}
  if(kind==='task')bounds=taskWindowBounds(taskView,area);
- const baseTitle=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?`AiDiy ${owner?'IDE / ':''}Browser ${slot+1}`:kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
+ const baseTitle=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?(owner?`AiDiy IDE / Browser ${slot+1}`:'AiDiy Browser'):kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
  let window;
- const title=baseTitle+(kind==='console'&&!owner&&cliConsoleWindow&&process.env.AIDIY_DEVELOPMENT_CLI_NAME?' / '+process.env.AIDIY_DEVELOPMENT_CLI_NAME:'');
+ let title=baseTitle+(kind==='console'&&!owner&&cliConsoleWindow&&process.env.AIDIY_DEVELOPMENT_CLI_NAME?' / '+process.env.AIDIY_DEVELOPMENT_CLI_NAME:'');
  try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,...(kind==='browser'?{enableLargerThanScreen:true}:{}),backgroundColor:'#000',autoHideMenuBar:true,icon:kind==='browser'&&!owner?join(__dirname,'public','AiDiy.png'):join(__dirname,'public',`AiDiy_${['code','live','console','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
  window.once('closed',()=>placement?.close());
  // autoplayPolicy: ビューアの「表示」で開いた HTML（ナレーション付きの動画ページなど）の音声を、クリックなしで再生できるようにする。
@@ -243,9 +244,14 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
      try{allDisplays.leave(owner);}catch(error){owner.window.webContents.send('development:all-displays-changed',{...allDisplays.state(owner),error:error.message});}
     },
     captureImage:({png})=>saveBrowserCapture(process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd(),png),trustedEvent,projectRoot:process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()});
-   const bridge=await (owner?ensureBrowserBridge(owner):ensureStandaloneBrowserBridge());
+   const bridge=await (owner?ensureBrowserBridge(record):ensureStandaloneBrowserBridge());
    const current=await readState(owner||record);
    if(window.isDestroyed()||owner&&(owner.window.isDestroyed()||owner.revision!==ownerRevision||sessionKey(current)!==linkKey||!browserConnected(current)))throw Error('tools接続中のみBrowserを起動できます。');
+   // Browser番号はCDPの排他レジストリと共通。複数IDEでも衝突せず、閉じた最小番号を再利用する。
+   if(owner){
+    record.slot=Number(bridge.name.slice('aidiy_ide '.length))-1;title=`AiDiy IDE / Browser ${record.slot+1}`;window.setTitle(title);
+    if(displayId===undefined&&!anchor)window.setBounds(windowBounds(kind,area,ownerBounds,record.slot));
+   }
    record.browserSession=bridge.name;const page=browserViews.attach(record,browserTarget,browserConnected(current));attachWindowMove(record,page);bridge.add(record,page);if(!owner)browserViews.setAvailable(record,browserConnected(current));
   }
   await window.loadURL(url);

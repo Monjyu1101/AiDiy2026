@@ -8,6 +8,8 @@ const {mkdirSync,readFileSync,writeFileSync,unlinkSync}=require('node:fs');
 const {join}=require('node:path');
 const {randomUUID}=require('node:crypto');
 const {WebSocketServer}=require('ws');
+// 同じmainで明示的に開いた窓だけを参照。別sessionのnew_tabもその窓の実接続先を返す。
+const publishedPages=new WeakMap();
 
 // Electron全体のデバッグポートは開かず、Browserの非特権WebContentsだけを公開する。
 async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPrefix='aidiy_ide',version=process.versions.chrome}){
@@ -19,13 +21,14 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
   const url=new URL(req.url,`http://127.0.0.1:${port}`);
   if(!url.pathname.startsWith('/'+token+'/')){json({error:'Not found'},404);return;}
   try{
+   if(closed)throw Error('Browserの利用が終了しました。');
    if(!await canUse())throw Error('tools接続中のみBrowserを操作できます。');
    const path=url.pathname.slice(token.length+1);
    if(path==='/json/version'){json({Browser:`Chrome/${version}`,'Protocol-Version':'1.3','AiDiy-Session':name,'AiDiy-Owner':token});return;}
    if(path==='/json'||path==='/json/list'){json([...pages.values()].filter(p=>!p.contents.isDestroyed()).map(describe));return;}
    if(path==='/json/new'){
     const target=url.searchParams.get('url')||'https://www.google.com/';if(!allowedURL(target))throw Error('WebのURLまたはプロジェクト内のファイルURLを指定してください。');
-    const record=await openPanel(target),page=[...pages.values()].find(p=>p.record===record);if(!page)throw Error('Browserを開けませんでした。');json(describe(page));return;
+    const record=await openPanel(target),page=record&&publishedPages.get(record)?.();if(!page)throw Error('Browserを開けませんでした。');json(page);return;
    }
    if(path==='/close'){for(const page of [...pages.values()])page.record.window.close();json({ok:true});return;}
    const match=/^\/json\/(close|activate)\/([a-f\d-]+)$/.exec(path),page=match&&pages.get(match[2]);
@@ -60,12 +63,12 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
   });
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});port=server.address().port;
- function describe(page){return{id:page.id,type:'page',title:page.contents.getTitle(),url:page.contents.getURL(),webSocketDebuggerUrl:`ws://127.0.0.1:${port}/${token}/devtools/page/${page.id}`};}
+ function describe(page){return{id:page.id,session:name,type:'page',title:page.contents.getTitle(),url:page.contents.getURL(),webSocketDebuggerUrl:`ws://127.0.0.1:${port}/${token}/devtools/page/${page.id}`};}
  try{
   mkdirSync(directory,{recursive:true});
   let assigned={};try{assigned=JSON.parse(readFileSync(join(directory,'../_chrome_sessions.json'),'utf8')).sessions||{};}catch{}
   for(let i=1;i<=100;i++){
-   // IDE番号は起動インスタンス単位。単独起動のUUIDはbridgeの生存中ずっと同じ名前を使う。
+   // IDE番号はBrowser窓単位。単独起動のUUIDはbridgeの生存中ずっと同じ名前を使う。
    name=sessionPrefix==='aidiy_browser'?`${sessionPrefix} ${randomUUID()}`:`${sessionPrefix} ${i}`;file=join(directory,name+'.json');
    if(Object.hasOwn(assigned,name))continue;
    try{
@@ -78,6 +81,6 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
   if(!file||JSON.parse(readFileSync(file,'utf8')).token!==token)throw Error('IDEブラウザのセッションを確保できません。');
  }catch(error){server.close();ws.close();throw error;}
  function close(){if(closed)return;closed=true;for(const client of sockets)client.terminate();ws.close();server.close();try{if(JSON.parse(readFileSync(file,'utf8')).token===token)unlinkSync(file);}catch{}}
- return{name,add(record,contents){const id=randomUUID();pages.set(id,{id,record,contents});record.browserSession=name;record.browserTabId=id;contents.once('destroyed',()=>pages.delete(id));},close};
+ return{name,add(record,contents){const id=randomUUID(),page={id,record,contents};pages.set(id,page);record.browserSession=name;record.browserTabId=id;publishedPages.set(record,()=>closed||contents.isDestroyed()?undefined:describe(page));contents.once('destroyed',()=>{pages.delete(id);publishedPages.delete(record);});},close};
 }
 module.exports={createBrowserCDP};
