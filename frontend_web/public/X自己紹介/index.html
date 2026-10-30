@@ -44,7 +44,8 @@ https://github.com/monjyu1101/AiDiy2026 -->
 
         /* ヒーローセクション */
         .hero-section {
-            height: 100vh;
+            min-height: 100vh;
+            padding: 80px 20px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -1136,10 +1137,13 @@ https://github.com/monjyu1101/AiDiy2026 -->
             日本語を第一言語にしたフルスタック業務システム開発フレームワーク。<br>
             FastAPI マルチサーバー、Vue 3 Web UI、Electron/Web デュアルモードのアバター、<br>
             WebSocket ベースの AI コアを一体で扱えます。<br>
-            さらに、プロジェクトを宇宙として眺め、変更は AI に頼む開発スペース（Code / Live / IDE）を搭載。
+            プロジェクトを宇宙として眺め、変更は AI に頼む IDE へ。<br>
+            Console・Code・Live・Task・Team・Browser を組み合わせ、Discord・Slack からも AI と作業できます。
         </p>
         <div class="hero-actions">
             <a href="/AiDiy" class="cyber-button" target="_blank">AiDiy を開く</a>
+            <a href="#開発スペース" class="cyber-button-ghost">IDE を知る</a>
+            <a href="#外部連携" class="cyber-button-ghost">Discord / Slack</a>
             <a href="#業務サンプル" class="cyber-button-ghost">業務サンプルを見る</a>
         </div>
         <div class="hero-tags">
@@ -1151,7 +1155,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
             <span>claude / copilot / codex / antigravity / grok / opencode / hermes CLI</span>
             <span>🔌 MCP Hub ×20 — browser / capture / sqlite / postgres / logs / check / backup / image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / decisions / task / team / windows</span>
             <span>🤖 AIタスク自動実行 — AI分解 × 自由なタスクフロー × クリティカルパス実行</span>
-            <span>🌌 開発スペース — Code / Live / IDE（VS Code 拡張 × 単独起動 × IDE 部品）</span>
+            <span>🌌 7 つのアプリ — Console / Code / Live / IDE / Task / Team / Browser</span>
         </div>
         <div class="typing-text" id="typing-text"></div>
     </section>
@@ -1159,7 +1163,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
     <!-- Feature Overview（特徴概要） -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Feature Overview</h2>
-        <p class="section-subtitle animate-on-scroll">AiDiy を支える 8 つの特徴。</p>
+        <p class="section-subtitle animate-on-scroll">業務テンプレートから、AI と一緒に開発する作業環境へ。</p>
         <div class="core-features">
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🇯🇵</span>
@@ -1217,7 +1221,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
             </div>
             <div class="feature-card animate-on-scroll">
                 <span class="feature-icon">🌌</span>
-                <h3 class="feature-title">開発スペース — Code / Live / IDE<span class="fx-new-badge">NEW</span></h3>
+                <h3 class="feature-title">開発スペース — AiDiy IDE<span class="fx-new-badge">NEW</span></h3>
                 <p class="feature-description">
                     フォルダは銀河、ファイルは星。宇宙を眺めて・辿って・読み、<br>
                     変更は Code（コード支援）と Live（音声会話）に頼む。<br>
@@ -1230,8 +1234,18 @@ https://github.com/monjyu1101/AiDiy2026 -->
                 <p class="feature-description">
                     browser / capture / sqlite / postgres / logs / check / backup /<br>
                     image / movie / stt / tts / obs / ffmpeg / notify / agents / chat / decisions / task / team / windows の 20 MCP サーバー同居。<br>
-                    8 種の Code CLI を code1〜code6 パネルで並走可能。
+                    SDK / CLI の 8 方式を code1〜code6 パネルで並走可能。
                 </p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">💬</span>
+                <h3 class="feature-title">Discord / Slack 連携</h3>
+                <p class="feature-description">普段のチャンネルから Hermes に依頼。Discord は Live 音声、Slack は HTTPS 定期取得によるスレッド会話に対応。</p>
+            </div>
+            <div class="feature-card animate-on-scroll">
+                <span class="feature-icon">🩺</span>
+                <h3 class="feature-title">診断から起動まで</h3>
+                <p class="feature-description">Diag で導入・接続・Tools の試験結果を確認。プロジェクトを選び、必要なアプリをランチャーから開けます。</p>
             </div>
         </div>
     </section>
@@ -1263,7 +1277,7 @@ https://github.com/monjyu1101/AiDiy2026 -->
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="8">0</span>
-                <span class="stat-label">Code CLI 種</span>
+                <span class="stat-label">コード AI 接続方式</span>
                 <span class="stat-sub">claude_sdk / claude / copilot / codex / antigravity / grok / opencode / hermes</span>
             </div>
             <div class="stat-item animate-on-scroll">
@@ -1272,9 +1286,9 @@ https://github.com/monjyu1101/AiDiy2026 -->
                 <span class="stat-sub">aidiy_hermes — カスタムツール・TUI・コンテキスト圧縮</span>
             </div>
             <div class="stat-item animate-on-scroll">
-                <span class="stat-number" data-count="3">0</span>
-                <span class="stat-label">開発スペース部品</span>
-                <span class="stat-sub">Code / Live / IDE — VS Code 拡張・単独起動・IDE 部品で共用</span>
+                <span class="stat-number" data-count="7">0</span>
+                <span class="stat-label">独立アプリ</span>
+                <span class="stat-sub">Console / Code / Live / IDE / Task / Team / Browser。Code / Live は VS Code 拡張でも利用</span>
             </div>
             <div class="stat-item animate-on-scroll">
                 <span class="stat-number" data-count="2">0</span>
@@ -1373,7 +1387,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔌 MCP サーバー (統合)</h3>
-                <p>FastAPI + SSE で 20 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AI判断・AIタスク非同期投入・AIチーム依頼投入・Windows デスクトップ操作制御を一手に提供。SSE（MCP標準）/ stdio gateway（mcp_stdio.py）/ HTTP POST（FastAPI /docs）の 3 インターフェースを同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
+                <p>FastAPI + SSE で 20 個の MCP サーバーをポート 8095 に同居。AI エージェントのブラウザ操作・画面キャプチャ・DB 観測・ログ監視・型チェック・画像/動画生成・音声認識/合成・OBS 制御・ffmpeg 実行・通知音再生・コードエージェント実行・チャット LLM 実行・AI判断・AIタスク非同期投入・AIチーム依頼投入・Windows デスクトップ操作制御を一手に提供。SSE / Streamable HTTP / stdio gateway（mcp_stdio.py）の 3 トランスポートに加え、HTTP POST（FastAPI /docs）を同一ポートで提供。詳細は下の MCP Hub セクションへ。</p>
                 <div class="meta-tags"><span>tools_main.py:8095</span><span>SSE × 20</span><span>HTTP POST</span><span>stdio gateway</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1397,14 +1411,14 @@ Key:   利用者名</pre>
                 <div class="meta-tags"><span>Electron</span><span>Web Mode</span><span>BroadcastChannel</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
-                <h3 class="architecture-title">🌌 frontend_ide (Code / Live / IDE)<span class="fx-new-badge">NEW</span></h3>
-                <p>Code / Live / IDE の画面を Vue 3 の共通部品で統一。VS Code 拡張ホストと Code / Live の通信は host/、ファイル API と Office 表示は viewer/ に集約。Electron と Web で同じ画面を使い、ポートは自動割り当て。</p>
+                <h3 class="architecture-title">🌌 frontend_ide — 7 つのアプリ<span class="fx-new-badge">NEW</span></h3>
+                <p>Console / Code / Live / IDE / Task / Team / Browser の画面を Vue 3 の共通部品で統一。VS Code 拡張ホストと Code / Live の通信は host/、ファイル API と Office 表示は viewer/ に集約。Electron と Web で共通画面を使い、ポートは自動割り当て。単独 Browser は Electron 専用です。</p>
                 <div class="meta-tags"><span>aidiy_code / aidiy_live / aidiy_ide</span><span>Vue 3 共通部品</span><span>VSIX × 2</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">💬 frontend_channels<span class="fx-new-badge">NEW</span></h3>
-                <p>Hermes チャットと AIコアの Live 音声会話を Discord につなぐ、任意起動の Bot。Code / Live と共通の通信処理を使い、ブラウザ版の操作パネルも備えます。</p>
-                <div class="meta-tags"><span>Discord Bot</span><span>Live 音声</span><span>任意起動</span></div>
+                <p>Discord と Slack に AI の作業窓口を広げる、任意起動の Bot。Discord は Hermes チャットと AIコアの Live 音声、Slack は HTTPS 定期取得による Hermes のスレッド会話に対応。両者は同じ作りの双子の接続パネル（Electron / Web）を備え、保存した設定で起動時に自動接続します。</p>
+                <div class="meta-tags"><span>Discord / Slack</span><span>テキスト / Discord 音声</span><span>任意起動</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🔒 認証 + 採番</h3>
@@ -1553,7 +1567,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">✅ 自己検証つき実行</h3>
-                <p>開始明細は AI を使わず aidiy_backup で差分バックアップを取る。処理明細は 1 ステップだけを Code AI へ依頼し、操作検証ありなら AI 自身の報告を確認して、書き込みなし・エラーなら 1 回だけ自動リトライ。終了明細が最終検証を行う。</p>
+                <p>開始明細は AI を使わず aidiy_backup で差分バックアップを取る。処理明細は 1 ステップだけを Code AI へ依頼し、操作検証ありなら AI 自身の報告を確認して、書き込みなし・エラーなら最大 2 回まで自動リトライ。終了明細が最終検証を行う。</p>
                 <div class="meta-tags"><span>差分バックアップ</span><span>操作検証</span><span>自動リトライ</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1614,9 +1628,9 @@ Key:   利用者名</pre>
         </div>
     </section>
 
-    <!-- 6. 開発スペース — Code / Live / IDE -->
-    <section class="section">
-        <h2 class="section-title animate-on-scroll">🌌 開発スペース — Code / Live / IDE 実装詳細</h2>
+    <!-- 6. 開発スペース -->
+    <section class="section" id="開発スペース">
+        <h2 class="section-title animate-on-scroll">🌌 AiDiy IDE — AI と開発する場所</h2>
         <p class="section-subtitle animate-on-scroll">人は書かずに、眺めて・辿って・読んで・頼む。その作業の場を、宇宙という一つの空間にまとめました。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
@@ -1631,7 +1645,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌌 AiDiy IDE — 宇宙表示<span class="fx-new-badge">NEW</span></h3>
-                <p>フォルダは銀河、ファイルは星・惑星。フォルダの大きさ・ファイルの種類・更新の新しさを、銀河の形・星の色・明るさで表します。起点日時より後に更新されたファイルが明滅し、AI が触った場所がひと目でわかります。</p>
+                <p>フォルダは銀河、ファイルは星・惑星。フォルダの大きさ・ファイルの種類・更新の新しさを、銀河の形・星の色・明るさで表します。起点日時より後に更新されたファイルが明滅し、更新された場所がひと目でわかります。</p>
                 <div class="meta-tags"><span>aidiy_ide</span><span>Canvas</span><span>読み取り専用</span></div>
             </div>
             <div class="architecture-item animate-on-scroll">
@@ -1646,7 +1660,7 @@ Key:   利用者名</pre>
             </div>
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">📖 読み取り専用ビューア</h3>
-                <p>コードは Monaco Editor、画像・Office 文書・PDF も表示。HTML / SVG / Vue はサンドボックスで実際の表示に切り替えられます。バックアップと現在のファイルを左右に並べる「更新履歴」、📌 で別ウィンドウに並べるピン留めにも対応。</p>
+                <p>コードは Monaco Editor、画像・Office 文書・PDF も表示。HTML / SVG のプレビューにも対応。frontend_web の Vue 画面は開発サーバー起動中に対応ルートを表示できます。バックアップと現在のファイルを左右に並べる「更新履歴」、📌 で別ウィンドウに並べるピン留めにも対応。</p>
                 <div class="meta-tags"><span>Monaco</span><span>Office / PDF</span><span>更新履歴</span></div>
             </div>
         </div>
@@ -1662,8 +1676,8 @@ Key:   利用者名</pre>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
                     単独起動: <code>aidiy_code</code> / <code>aidiy_live</code><br>
                     VS Code 拡張: セカンダリサイドバー<br>
-                    IDE 部品: 「＋ Code」「＋ Live」（Electron は別ウィンドウ、Web は画面内タブ）<br>
-                    <strong>会話履歴とモデル選択は 3 か所で共用</strong>
+                    IDE 部品: 「＋ Console」「＋ Code」「＋ Live」（Electron は別ウィンドウ、Web は画面内タブ）<br>
+                    <strong>場所を変えても、同じ Code / Live の操作感</strong>
                 </div>
             </div>
             <div class="feature-card animate-on-scroll">
@@ -1675,10 +1689,94 @@ Key:   利用者名</pre>
                     AIコアが止まっても作業を保ち、復帰時に再接続します。
                 </p>
                 <div class="self-improve-detail" style="border-left-color:#00ffff; color:#aaf0ff;">
-                    二重起動を防いで既存の窓を前面へ。<br>
-                    オフラインでは Code（aidiy_hermes 直接実行）だけ、<br>
-                    オンラインでは Code / Live の両方を使えます。
+                    AIコアなしでも Console と Code（Hermes 直接実行）を利用。<br>
+                    AIコアへ接続すると Live 音声も使えます。<br>
+                    ここでのオフラインは AIコア未接続の意味で、外部 AI の利用には通信が必要です。
                 </div>
+            </div>
+        </div>
+    </section>
+
+
+    <section class="section" id="独立アプリ">
+        <h2 class="section-title animate-on-scroll">🧩 作業に合わせて、必要なアプリを開く</h2>
+        <p class="section-subtitle animate-on-scroll">Code・Live・IDE に加え、Console・Task・Team・Browser まで。7 つの独立アプリが開発の各場面を支えます。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">⌨️ Console — 端末をそばに</h3>
+                <p>作業フォルダでコマンドやコード AI の CLI を実行するターミナル。IDE から複数の窓を開き、調査・実行・ログ確認を並べられます。Code への依頼と手元の操作を同じプロジェクトで進めます。</p>
+                <div class="meta-tags"><span>aidiy_console</span><span>PTY</span><span>複数ウィンドウ</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔀 Task — 要求を実行フローへ</h3>
+                <p>要求を AI が明細タスクへ分解し、依存関係のある処理をフロー図で確認。並行分岐を含む実行、進捗の追跡、検証、定期実行を専用画面で扱います。</p>
+                <div class="meta-tags"><span>aidiy_task</span><span>DAG</span><span>定期タスク</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🤝 Team — 役割を持つ AI と働く</h3>
+                <p>要員ごとに役割や目標を持たせ、チームへの依頼と活動を専用画面で管理。計画・実施・検証を分け、誰が何を担当し、どこまで進んだかを確認します。</p>
+                <div class="meta-tags"><span>aidiy_team</span><span>AI チーム</span><span>Plan / Do / Check</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🌐 Browser — 見ているページを AI へ</h3>
+                <p>URL・検索・履歴操作を備えた専用ブラウザ。tools 接続中は MCP による操作ができ、表示中の URL と撮影画像を Code / Live の下書きへ渡して、調査や修正を相談できます。単独版は Electron 専用です。</p>
+                <div class="meta-tags"><span>aidiy_browser</span><span>Chrome DevTools 連携</span><span>Code / Live へ</span></div>
+            </div>
+        </div>
+    </section>
+
+
+    <section class="section" id="外部連携">
+        <h2 class="section-title animate-on-scroll">💬 Discord / Slack — いつもの会話を作業の入口に</h2>
+        <p class="section-subtitle animate-on-scroll">開発画面の外からも、プロジェクトについて AI に依頼。接続パネルで設定・モデル・接続状態を確認できます。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎮 Discord — テキストも、声も</h3>
+                <p>専用テキストチャンネルにそのまま話しかけると aidiy_hermes がチャンネルに返信し、利用者・チャンネルごとに会話を引き継ぎます。Live 音声を ON にすれば、ボイスチャンネルで AIコアの Live 音声へ接続し、話しながら相談できます。テキストと音声、それぞれの入口を一つの Bot にまとめています。</p>
+                <div class="meta-tags"><span>aidiy_discord</span><span>Hermes チャット</span><span>Live 音声</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">💼 Slack — スレッドで依頼を進める</h3>
+                <p>専用チャンネルの投稿を HTTPS で定期取得し、aidiy_hermes の回答をスレッドに返します。スレッド内の返信は同じ会話として続きます。WebSocket を使わず外向き HTTPS だけで送受信するので、プロキシが必要な社内ネットワークでも使えます。パネルは Discord 版と双子の構成で、Slack 版はテキスト会話に対応します。</p>
+                <div class="meta-tags"><span>aidiy_slack</span><span>Slack Web API</span><span>HTTPS 定期取得</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🎛️ 作業フォルダとモデルを選ぶ</h3>
+                <p>Bot の接続先と許可する利用者を設定し、AI が扱うプロジェクトを選択。コードは aidiy_hermes 固定で、モデルは aidiy_code と同じ auto / same / openai_oauth/gpt-… などから選びます。画面下部の「モデル ▾」から、接続中でも設定を開き「適用して再接続」で切り替えられます。</p>
+                <div class="meta-tags"><span>プロジェクト選択</span><span>aidiy_hermes 固定</span><span>モデル選択</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔁 起動したら、そのまま使える</h3>
+                <p>選んだ設定は aidiy_discord.json / aidiy_slack.json に保存され、次からは起動するだけで前回の設定で自動接続します。初回は接続せず設定画面から始まり、切断するとモデル選択に戻ります。接続中にパネルを閉じるときは確認を出し、うっかり切断を防ぎます。</p>
+                <div class="meta-tags"><span>自動接続</span><span>設定は1ファイル</span><span>終了確認</span></div>
+            </div>
+        </div>
+    </section>
+
+
+    <section class="section" id="環境診断">
+        <h2 class="section-title animate-on-scroll">🩺 Diag — 確認して、そのまま起動</h2>
+        <p class="section-subtitle animate-on-scroll">環境を整えるときも、毎日の作業を始めるときも。aidiy_diag が診断とアプリ起動の入口になります。</p>
+        <div class="architecture-grid">
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔎 導入状況と公式サイト</h3>
+                <p>言語・開発ツール・AI CLI などの導入状態をカテゴリ別に確認。名前のそばの Web ボタンから公式サイトを開き、必要なプログラムの情報へ進めます。</p>
+                <div class="meta-tags"><span>導入状況</span><span>公式 Web</span><span>カテゴリ別一覧</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🔑 モデルと外部連携</h3>
+                <p>AI プロバイダーのモデル情報や、Hugging Face・Discord・Slack の接続設定を確認。認証情報の確認と AI の試行を分けて、何が利用できるかを調べます。</p>
+                <div class="meta-tags"><span>モデル情報</span><span>外部連携</span><span>AI 試行</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🧪 Tools の個別・一括テスト</h3>
+                <p>MCP の代表的な軽量チェックを個別または一括で実行。未導入・無効と、未実施・OK・ERR を分けて表示し、実行した試験の結果を確認できます。各チェックの範囲は項目ごとに表示します。</p>
+                <div class="meta-tags"><span>個別テスト</span><span>一括テスト</span><span>結果を区別</span></div>
+            </div>
+            <div class="architecture-item animate-on-scroll">
+                <h3 class="architecture-title">🚀 アプリ起動とミニランチャー</h3>
+                <p>システムの起動操作に加え、プロジェクトを選んで IDE・Code・Live・Console・Task・Team・Browser や Discord・Slack を開く入口を用意。ミニ表示・アイコン表示で、作業中も手元に置けます。</p>
+                <div class="meta-tags"><span>aidiy_diag</span><span>アプリ起動</span><span>ミニ / アイコン表示</span></div>
             </div>
         </div>
     </section>
@@ -1790,7 +1888,7 @@ Key:   利用者名</pre>
     <!-- 9. MCP Hub × 20 + Multi CLI -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">🔌 MCP Hub × 20 + Multi CLI — 実装詳細</h2>
-        <p class="section-subtitle animate-on-scroll">ポート 8095 に 20 個の MCP サーバーを同居。SSE（MCP標準）/ stdio gateway / HTTP POST の 3 インターフェースを同一ポートで提供。Python からも直接呼び出し可能。</p>
+        <p class="section-subtitle animate-on-scroll">ポート 8095 に Windows は 20 個、Linux / macOS は 19 個の MCP サーバーを同居。SSE / Streamable HTTP / stdio gateway の 3 トランスポートと HTTP POST APIを同一ポートで提供。Python からも直接呼び出し可能。</p>
         <div class="architecture-grid">
             <div class="architecture-item animate-on-scroll">
                 <h3 class="architecture-title">🌐 aidiy_chrome_devtools</h3>
@@ -1906,7 +2004,7 @@ Key:   利用者名</pre>
                     edit → observe → verify → backup<br>
                     MCP 20 サーバーの連携で、修正の影響範囲を<br>
                     <strong>AI が自分で確認</strong>してから報告します。<br>
-                    SSE / stdio / HTTP POST の 3 経路でどの CLI からでも利用可。<br>
+                    SSE / Streamable HTTP / stdio と HTTP POSTでどの CLI からでも利用可。<br>
                     バックアップ保存→チェックのサイクルも内蔵。
                 </div>
             </div>
@@ -1914,7 +2012,7 @@ Key:   利用者名</pre>
                 <span class="feature-icon">🔧</span>
                 <h3 class="feature-title">マルチ Code CLI 対応</h3>
                 <p class="feature-description">
-                    8 種の Code CLI を code1〜code6 パネルへ<br>
+                    SDK / CLI の 8 方式を code1〜code6 パネルへ<br>
                     自由に割り当てて並走できます。<br>
                     新しいツールも手順に沿って追加可能。
                 </p>
@@ -1929,11 +2027,11 @@ Key:   利用者名</pre>
     <!-- Future Roadmap（将来性） -->
     <section class="section">
         <h2 class="section-title animate-on-scroll">Future Roadmap</h2>
-        <p class="section-subtitle animate-on-scroll">育つテンプレート、広がるエコシステム。</p>
+        <p class="section-subtitle animate-on-scroll">ここからは今後の拡張方針。現在の機能を土台に、使い勝手と対応領域を育てます。</p>
         <div class="expansion-grid">
             <div class="expansion-item animate-on-scroll">
-                <h4>🌌 ソースをほぼ触らない IDE</h4>
-                <p>眺める・辿る・読む・頼むを開発スペースに集約し、変更は Code / Live の AI に任せる開発スタイルへ。</p>
+                <h4>🌌 開発スペースをさらに磨く</h4>
+                <p>実装済みの宇宙表示・探索・AI への依頼を土台に、プロジェクトの把握と変更確認をさらにわかりやすく。</p>
             </div>
             <div class="expansion-item animate-on-scroll">
                 <h4>🌱 蓄積で育つ</h4>
@@ -1962,6 +2060,10 @@ Key:   利用者名</pre>
             <div class="expansion-item animate-on-scroll">
                 <h4>🧪 OSS テンプレート化</h4>
                 <p>非商用ライセンスのもと、コミュニティが業務テンプレートを共有・進化させる土台。</p>
+            </div>
+            <div class="expansion-item animate-on-scroll">
+                <h4>💬 チャンネルと実行環境を広げる</h4>
+                <p>Discord / Slack は双子の構成で、新しいチャンネルも同じ形で追加できる設計。設定には実行環境名（code_name）を持たせ、aidiy_hermes 以外のスタンドアロン・ハーネスにも備えます。</p>
             </div>
         </div>
     </section>

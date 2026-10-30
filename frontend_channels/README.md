@@ -1,5 +1,7 @@
 # AiDiy Discord
 
+> Slack 版（`slack/`、`aidiy_slack`）は、この Discord 版から音声会話を除いた双子のプログラムです。ファイル構成・画面・起動引数・試験をそろえ、接続部品とモデル設定だけが異なります。
+
 配置フォルダは `frontend_channels` です。将来の外部接続チャンネル拡張に備えたフォルダ名で、現在の Discord 機能・内部モジュール名・`aidiy_discord` コマンドは変わりません。
 
 自分と AiDiy の専用テキストチャンネルに普通に話しかけると、`aidiy_hermes` が返信します。専用ボイスチャンネルに参加すると、AIコアの LiveAI と音声会話できます。チャットは `frontend_ide/host` の Code と同じ CLI 実行処理、ライブは同じ Live WebSocket 処理を使います。
@@ -105,27 +107,27 @@ Hermes と Python は VS Code と同じ起動探索で自動解決します。Op
 aidiy_discord
 ```
 
-画面中央上部に小さなパネルが開きます。Live の AI・モデル・音声と、コード AI（Hermes の Provider）・モデルを選び、右上の「接続」で Discord に接続します。左上には作業フォルダを「プロジェクト: フォルダ名」で表示します。作業フォルダは aidiy_code / aidiy_live と同じく、`aidiy_discord [作業フォルダ]`（または `--project`）で指定し、省略時は起動したフォルダです。Liveのモデル・音声と初期値はAPIを優先して取得し、API停止中は診断の合成JSONから選択します。コードモデルは直接入力もできます。コードの候補取得は `aidiy_code` と同じカタログを使います。「切断」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中のモデル変更は切断してから行います。パネルを重ねて起動すると既存の画面を表示します。終了処理中のパネルに重ねて起動した場合は、終了を待ってから開き直します。
+画面中央上部に小さなパネルが開き、前回のモデルで Discord へ自動接続します。初回（接続時の設定が未保存）は自動接続せず、モデル設定画面から始まります。音声会話は OFF が初期値です。モデルを選んで「接続」を押すと設定が保存され、次回から自動接続します。「切断」を押すとモデル選択の画面に戻り、Live の AI・モデル・音声と、コードのモデルを選び直して右上の「接続」で再接続できます。コードは「aidiy_hermes」の固定表示で、モデルを `auto`（自動判定）／`same`（変更なし）／`codex_cli/same` などの CLI 名付き／`openai_oauth/gpt-…` などの一覧から選びます（aidiy_code と同じ指定）。候補は AIコアのモデル情報APIから取得し、停止中は `_AIDIY/aidiy_diag/code_models_info.json` を読みます。未保存時の初期表示は共通設定の `CODE_AIDIY_HERMES_MODEL` です。接続に失敗した場合も、エラーの案内と詳細を表示したモデル選択の画面に戻ります。左上には作業フォルダを「プロジェクト: フォルダ名」で表示します。作業フォルダは aidiy_code / aidiy_live と同じく、`aidiy_discord [作業フォルダ]`（または `--project`）で指定し、省略時は起動したフォルダです。Liveのモデル・音声と初期値はAPIを優先して取得し、API停止中は診断の合成JSONから選択します。「切断」でチャット・音声を終了して切断し、パネルを閉じた場合も Bot と実行中の CLI を終了します。接続中に「×」で閉じると「接続中です。終了しますか？」と確認し、「キャンセル」なら接続を続けます。切断中はそのまま終了します。画面下部には aidiy_code / aidiy_live と同じ「モデル ▾」と現在のモデル（`Live: AI - モデル · Code: aidiy_hermes - モデル`、Live OFF のときは Code だけ）を表示します。未接続で「モデル」を押すと設定欄へ移ります。接続中に押すと設定欄を開き、「適用して再接続」で切断・保存・再接続し、「キャンセル」で変更を戻して接続を続けます。パネルを重ねて起動すると既存の画面を表示します。終了処理中のパネルに重ねて起動した場合は、終了を待ってから開き直します。
 
-コードモデルを直接入力する場合は、先にコード AI を選択してください。「自動選択」の間はモデル欄を操作できません。コード AI・モデルは Live の選択状態と独立して保存します。Live のモデルまたは音声候補がない AI は「候補なし」と表示し、選択できません。保存済みの Live 設定が無効な場合もコードの変更は保存できますが、Live を ON で接続する前に有効なモデル・音声を選び直してください。
+コードのモデルは Live の選択状態と独立して保存します。Live のモデルまたは音声候補がない AI は「候補なし」と表示し、選択できません。保存済みの Live 設定が無効な場合もコードの変更は保存できますが、Live を ON で接続する前に有効なモデル・音声を選び直してください。
 
 「音声会話」「コード」の見出し右にある OFF / ON スイッチで、接続する機能を選びます。音声会話（Live）は切り替えでき、OFF で接続するとボイスチャンネルに入室しても音声会話を開始せず、Live のモデル確認も行いません。コードは現在 ON 固定で、スイッチは操作できません。両方 OFF では接続しません。切り替えは切断中だけ行えます。
 
-接続中のパネルは設定欄の代わりに、AiDiy の絵と、最後のやり取り（発言者と本文）を1件だけ表示し、約1分で消します。プロジェクト行の下の右寄せに「LIVE ON/OFF」「CODE ON/OFF」を表示し、Live が ON の間は背景に入力（赤）と AI の声（水色）の円型インジケーターを描きます。左下の「モニター」を ON にすると、通過する音声（許可ユーザーの入力と AI の声）をこの PC で聞けます。スピーカーの音を Discord のマイクが拾うとエコーになるため、モニターは接続ごとに OFF から始まります。Live が OFF の間はインジケーターとモニターを表示しません。
+接続中のパネルは設定欄の代わりに、AiDiy の絵と、最後のやり取り（発言者と本文）を1件だけ表示し、約1分で消します。プロジェクト行の下の右寄せに「LIVE ON/OFF」「CODE ON/OFF」を表示し、Live が ON の間は背景に入力（赤）と AI の声（水色）の円型インジケーターを描きます。画面下部右端の「モニター」を ON にすると、通過する音声（許可ユーザーの入力と AI の声）をこの PC で聞けます。スピーカーの音を Discord のマイクが拾うとエコーになるため、モニターは接続ごとに OFF から始まります。Live が OFF の間はインジケーターとモニターを表示しません。
 
-単独の `aidiy_discord` は未接続で開きます。ルート `_start.py` で Discord を Yes にした場合（または明示的な `aidiy_discord --connect`）は、前回のモデルで自動接続します。全体起動からのパネルも手動で停止・終了でき、閉じたパネルを監視ループで再表示しません。setup / start 開始時と全体の Ctrl+C 終了時も、Discord と必要な CLI / MCP 子プロセスは Code / IDE と同じく継続します。Core 停止中は Live の接続機能が使えません。明示的な cleanup、またはパネルからの停止・終了では従来どおり停止します。
+`aidiy_discord`、Diag の Discord ボタン、ルート `_start.py` で Discord を Yes にした場合のいずれも、前回のモデルで自動接続します。未接続で開く場合は `aidiy_discord --no-connect` を使います（`--connect` は従来の指定として受け付けます）。起動引数は Slack 版（`aidiy_slack`）と同じです。全体起動からのパネルも手動で停止・終了でき、閉じたパネルを監視ループで再表示しません。setup / start 開始時と全体の Ctrl+C 終了時も、Discord と必要な CLI / MCP 子プロセスは Code / IDE と同じく継続します。Core 停止中は Live の接続機能が使えません。明示的な cleanup、またはパネルからの停止・終了では従来どおり停止します。
 
 どちらの起動方法でも、パネルを開く前に共通設定・Hermes の起動パスを確認します。トークンが空欄・1文字・`<` で始まる仮設定の場合は、設定項目名を示すエラーを表示して終了コード1で中止します。トークンそのものは表示せず、この確認で Discord には接続しません。
 
 モデル情報APIから初期値とモデル・音声候補を取得します。APIを取得できない場合は `_AIDIY/aidiy_diag/` の `live_models_info.json`、`live_voices_info.json`、`chat_models_info.json`、`code_models_info.json` を読みます。キーや音声の旧設定ファイルは使いません。候補を更新する場合は `aidiy_diag --headless` を実行してパネルを開き直してください。共通初期値は有効な候補へ補正します。手動保存したモデル・音声が候補から削除されている場合は、選び直すまで接続を止めます。
 
-最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json`、Live の ON/OFF は `~/.aidiy/aidiy_discord_features.json`（未保存時は ON）に保存します。単独起動でも全体起動からの自動接続でも、これらを復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
+パネルの選択は `~/.aidiy/aidiy_discord.json` の1ファイルに、音声会話の ON/OFF（`live`、未保存時は OFF）、Live のモデル・音声（`live_models`）、コードの実行環境（`code_name`、現在は `aidiy_hermes` 固定。将来の別ハーネス用）とモデル（`code_model`）をまとめて保存します。このファイルがあれば起動時に自動接続します。旧形式の `aidiy_discord_features.json` / `aidiy_discord_model.json` / `aidiy_discord_code_model.json` は、初回の読込で1回だけ移して削除します。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
 `cd frontend_channels` 後の `npm start`、`python frontend_channels/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは配置先リポジトリの `temp/aidiy_discord/logs/`（`<UUID>.stdout.log` / `.stderr.log`）、起動完了通知は `temp/aidiy_discord/runtime/`（`<UUID>.ready.json`）に保存します。旧ログの移行・削除・旧保存先への退避は行いません。ブラウザ版の `frontend_channels/out/aidiy_discord/browser-profile` と Electron の保存先・設定は従来のままです。
 
 ### ブラウザ版（Codespaces など）
 
-`aidiy_discord --browser` で、Electron の代わりにブラウザでパネルを開きます。画面・操作は Electron 版と同じで、パネルのサーバー（`src/web-server.ts`）と WebSocket でやり取りします。GitHub Codespaces（`CODESPACES=true`）と画面のない Linux（`DISPLAY` / `WAYLAND_DISPLAY` なし）では、`--browser` を省略してもブラウザ版で開きます。ブラウザは VS Code / Codespaces が設定する `$BROWSER` を優先して手元の PC で開き、Codespaces の `$BROWSER` には元の localhost URL を渡し、VS Code にポート転送と外部 URI の解決を任せます。手動用にはトークン付き転送先 URL（`https://<名前>-<ポート>.app.github.dev/…`）を表示します。開けない場合は URL を表示します。判定と起動は `frontend_ide/host/scripts/launch-project.mjs`、接続元の許可は `frontend_ide/host/src/forwarded-origin.ts` で aidiy_code / aidiy_live / aidiy_discord 共通です。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒後（初回は120秒後、Codespaces では初回接続まで終了しない）に Bot も終了します。3本（aidiy_code / aidiy_live / aidiy_discord）の起動規則は `frontend_ide/host/scripts/launch-project.mjs` の冒頭に一覧し、そこで共通化しています。Electron の専用ウィンドウを開けない場合（未セットアップ・起動失敗）は、理由を表示してブラウザ版に切り替えます。通常のブラウザ版は初回120秒、最後の画面切断後60秒で終了します。Codespaces では初回接続まで終了しません。Bot の音声は Discord の UDP 通信を使うため、Codespaces で音声会話がつながるかは環境によります。
+`aidiy_discord --browser` で、Electron の代わりにブラウザでパネルを開きます。画面・操作は Electron 版と同じで、パネルのサーバー（`src/web-server.ts`）と WebSocket でやり取りします。GitHub Codespaces（`CODESPACES=true`）と画面のない Linux（`DISPLAY` / `WAYLAND_DISPLAY` なし）では、`--browser` を省略してもブラウザ版で開きます。ブラウザは VS Code / Codespaces が設定する `$BROWSER` を優先して手元の PC で開き、Codespaces の `$BROWSER` には元の localhost URL を渡し、VS Code にポート転送と外部 URI の解決を任せます。手動用にはトークン付き転送先 URL（`https://<名前>-<ポート>.app.github.dev/…`）を表示します。開けない場合は URL を表示します。判定と起動は `frontend_ide/host/scripts/launch-project.mjs`、接続元の許可は `frontend_ide/host/src/forwarded-origin.ts` で aidiy_code / aidiy_live / aidiy_discord / aidiy_slack 共通です。Electron 版でパネルを閉じた時と同じく、画面を閉じると60秒後（初回は120秒後、Codespaces では初回接続まで終了しない）に Bot も終了します。4本（aidiy_code / aidiy_live / aidiy_discord / aidiy_slack）の起動規則は `frontend_ide/host/scripts/launch-project.mjs` の冒頭に一覧し、そこで共通化しています。Electron の専用ウィンドウを開けない場合（未セットアップ・起動失敗）は、理由を表示してブラウザ版に切り替えます。通常のブラウザ版は初回120秒、最後の画面切断後60秒で終了します。Codespaces では初回接続まで終了しません。Bot の音声は Discord の UDP 通信を使うため、Codespaces で音声会話がつながるかは環境によります。
 
 ## クリーンアップ
 
@@ -150,7 +152,7 @@ Live は指定ユーザーが指定ボイスチャンネルへ入室すると自
 
 ## 接続パネルの Vue ソースと配布物
 
-Electron とブラウザ版は同じ Vue 3 画面を使います。`panel/画面/接続パネル.vue` が画面、`機能切替.vue` が共通トグル、`panel/接続/パネル状態.js` が接続状態・モデル選択・コード・ライブの状態管理、`panel/ライブ/音声表示.js` が描画を担当します。画面内部は「接続状態」「コードAI」「ライブAI」「ライブモデル」「音声」「ウィンドウ操作」などの日本語で追えます。IPC、`LIVE_*`、保存済み JSON のキーは互換性のため変更しません。
+Electron とブラウザ版は同じ Vue 3 画面を使います。`panel/画面/接続パネル.vue` が画面、`機能切替.vue` が共通トグル、`panel/接続/パネル状態.js` が接続状態・モデル選択・コード・ライブの状態管理、`panel/ライブ/音声表示.js` が描画を担当します。画面内部は「接続状態」「コードモデル」「ライブAI」「ライブモデル」「音声」「ウィンドウ操作」などの日本語で追えます。IPC、`LIVE_*`、保存済み JSON のキーは互換性のため変更しません。
 
 `panel/view.js` は事前コンパイルした配布物としてリポジトリへ同梱します。通常起動・セットアップにビルドや CDN 接続は不要です。`index.html`、`view.js`、`visualizer.js`、`style.css` の公開 URL、Electron preload と WebSocket の API は維持しています。`visualizer.js` は互換 URL のための小さな入口で、描画本体は Vue バンドルに含まれます。
 
@@ -163,7 +165,7 @@ npm run check
 npm test
 ```
 
-`npm run check` は TypeScript と `panel/build-manifest.json` のソース・配布物一致を確認します。生成された `view.js`、manifest と Vue の MIT 表記を含む `THIRD_PARTY_NOTICES.txt` を一緒に保存します。`checks/panel-vue.test.ts` は実バンドルを模擬 DOM・IPC・音声で操作し、選択と保存、接続・再接続、連打、保存失敗、モニター OFF 初期化、遅延応答、画面終了時の後始末を検証します。これは実 Discord 通話・OS 上の描画確認の代わりにはなりません。
+`npm run check` は TypeScript と `panel/build-manifest.json` のソース・配布物一致を確認します。生成された `view.js`、manifest と Vue の MIT 表記を含む `THIRD_PARTY_NOTICES.txt` を一緒に保存します。`checks/panel-vue.test.ts` は実バンドルを模擬 DOM・IPC・音声で操作し、選択と保存、接続・再接続、画面下部のモデル設定と適用時の再接続、連打、保存失敗、モニター OFF 初期化、遅延応答、画面終了時の後始末を検証します。これは実 Discord 通話・OS 上の描画確認の代わりにはなりません。
 
 ## 検証・音声仕様
 

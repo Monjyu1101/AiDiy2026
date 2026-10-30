@@ -102,8 +102,12 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 - 管理APIは `POST api/Tools/enabled` と `POST api/Tools/defaults` の2つ。いずれも `{token, data}` を送ります。`data: {}` は実行時設定の読取だけです。オン・オフの切替と「適用のみ」は `write: false`、明示的な「保存」だけ `write: true` にします。`data.saved: true` を確認してから保存完了と表示します。
 - 左に登録済みToolのオン・オフ、代表テスト、状態を表示します。OFFでも登録は残り「サービス外」です。`available: false` の操作は無効にし、依存機能が無い状態をONと誤認させません。保存は変更したIDだけを送り、対象外Toolを勝手に有効化しません。
 - AIモデルと同じ見出し・テストボタン・状態バッジを使い、右に選択Toolの既定値・テスト条件・結果を表示します。結果は未実施でも応答欄を表示し、未対応／OFF／利用不可でも理由と右ペインを残します。変更候補はサーバーの `schema` を使用し、秘密情報や任意設定項目を編集対象にしません。オン・オフの保存と既定値の保存は別操作として成功・失敗を表示します。
-- 代表テストは初版ではChromeの専用セッション `diag-tools-test` の起動・終了だけです。表示あり／headlessを選べます。既存APIは稼働中セッションを再利用するため、条件変更時は専用ブラウザを明示終了してから再テストします。固定中継 `api/Tools/representative` から既存Tool APIを呼び、毎回Core認証と有効・利用可能状態を確認します。管理APIの追加ではなく、任意URL・コマンド・セッション名も受け付けません。他Toolのボタンには未対応理由を表示し、状態読取だけを機能テスト成功にしません。
-- 全テスト・初期表示から代表機能を自動実行しません。同時操作／二重押しを抑止し、タブを離れた場合はテスト応答の待機を中止します。開始済みの実操作が取り消せるとは表示しません。
+- 代表テストは登録済み20 Toolに用意する（Windows ControlはWindowsのみ）。Chromeは専用セッション `diag-tools-test` の起動・終了、Desktopはモニター情報、SQLite/PostgreSQLは読取専用の `SELECT 1`、Logsは一覧、Code Checkは `backend_tools/tools_main.py` の構文、Backupは差分スキャン、OBSはシーン一覧、FFmpegは0.1秒の無音を処理して破棄、通知音はlegacy完了音、Teamは要員一覧、Windows Controlはウィンドウ一覧を確認する。既存APIを固定条件で呼び、件数・成否だけ表示する。通知音の実際の聞こえ方は利用者が確認する。
+- 画像・動画生成、STT/TTS、Code Agents、Chat、Decisions、Taskの8 Toolは説明APIの疎通確認だけを行う。「生成・認識・AI実行の動作は未試験」と表示し、生成APIへの課金、録音、コード変更、タスク登録を行わない。画面のOKは表示した試験内容の成功であり、全機能の保証ではない。
+- 固定中継 `api/Tools/representative` は毎回Core認証と対象Toolの有効・利用可能状態を確認する。Chromeは `{operation: open|close, headless: boolean}`、他は `{operation: test, tool: 登録済みID}` だけを受け付け、任意URL・SQL・パス・コマンドは拒否する。試験の所有元は `Tools/代表試験.mjs`、画面説明は `ui/src/Tools/Tools代表テスト.mjs`。説明APIのGETも固定loopbackへ中継し、応答本文や秘密値を画面へ返さない。ChromeのheadlessはChromeだけに表示し、条件変更時は専用セッションを終了して再試験する。
+- 回帰確認は `node --test backend_diag/checks/tools-representative.check.mjs backend_diag/checks/tools-settings-api.check.mjs backend_diag/checks/tools-panel.check.cjs backend_diag/checks/tools-layout.check.cjs`。合成応答で全項目・失敗・無効・認証・中止・二重実行を確認する。実サービスの接続可否はTools画面の個別テストで別途確認する。
+- Tools見出し右上の「一括テスト」は、開始時に有効・利用可能なToolと条件を固定し、一覧順に逐次実行します。OFF・利用不可・未対応は対象外、個別失敗は記録して次へ進み、最後に成功・失敗・対象外件数を表示します。通知音とChrome専用セッションの起動も含みます。中止・タブ移動・切断・ログアウト・認証期限切れでは後続を実行せず、遅い応答を破棄します。Chromeの終了は既存の「専用ブラウザを終了」で行います。
+- 全体の全診断・初期表示から代表機能を自動実行しません。同時操作／二重押しを抑止し、タブを離れた場合はテスト応答の待機を中止します。開始済みの実操作が取り消せるとは表示しません。
 - 画面の残り高さは `.tools-scroll` が `flex:1 1 auto!important; min-height:0` で受け、認証後の一覧・詳細は各ペイン内だけでスクロールします。共通の `#app>.panel>*{flex:none}` に戻さないでください。701px以上は左右2列、700px以下は一覧40%・内容を残り高さへ割り当て、長い一覧の下に詳細が隠れないようにします。Tool変更時は右だけを先頭へ戻し、一覧のスクロール位置は維持します。ログイン画面も内部スクロールで低い画面に対応します。
 - `node --test backend_diag/checks/tools-layout.check.cjs backend_diag/checks/tools-panel.check.cjs backend_diag/checks/tools-settings-api.check.mjs backend_diag/checks/compact-tabs.check.cjs` はモックで検証し、実Chromeや有料APIは呼びません。UI変更後は既存手順で配布build・manifest照合を実施します。
 
@@ -315,13 +319,19 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 - 一括確認・同時2件の待機・重複防止・切断時abort・再確認・結果書込は既存処理を共有。`integration_info.json` には未実施を含む4行を保存し、起動時とheadlessは外部認証を呼びません。
 - `node --test backend_diag/checks/slack-integration-ui.check.mjs` はローカルVue描画とmockで選択・未設定・未認証・待機・二重押し・遅い応答・FIFO・保存先を確認します。backendの `model-probe` / `key-status` / `server` / `headless` 回帰も実施します。実Slack APIや実GUIは試験とは別です。
 
-固定メソッドと認証応答の根拠: [Slack公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/)。Discord固有voice/GatewayとSlack transportの未実装箇所は [`aidiy_slack実装準備.md`](../../frontend_channels/aidiy_slack実装準備.md) の対応表を参照してください。
+固定メソッドと認証応答の根拠: [Slack公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/)。SlackのHTTPS定期取得・接続パネル・制限は [SlackのREADME](../../frontend_channels/slack/README.md) を参照してください。
 
 
 ### Slackのランチャー登録と未導入時
 
 通常・ミニ・マイクロ・右クリックのSlackはDiscordの直後に並ぶ。アイコンはDiag内の `AiDiy_slack.png` コピーだけを参照する。`frontend_channels/slack/panel/launch.mjs` が通常ファイルとして見つからなければ「未導入」として起動不可、認証済APIの直接要求も503で返し、process探索・ログ作成・spawnをしない。通常表示に特別な「準備中」ラベルは加えない。
 
-現状Slackの接続runtimeは未実装で、ランチャー登録やBot認証OKは接続成功を意味しない。将来入口を実装すると、明示クリック時に同じ実在確認を再実行し、Slack専用のprocess識別を経て固定argvで起動を要求する。通常のbuild/verify/testが兄弟moduleの画像へ依存しない点は維持する。全体の後工程は `frontend_channels/aidiy_slack実装準備.md` のgrep確認先を参照。
+現行実装ではSlackの接続runtimeとパネルを実装済み。ランチャー登録やBot認証OKは接続成功を意味しない。明示クリック時に入口の実在確認を再実行し、Slack専用のprocess識別を経て固定argvでパネルを起動する。通常のbuild/verify/testが兄弟moduleの画像へ依存しない点は維持する。接続・停止・確認手順は `frontend_channels/slack/README.md` を参照。
 
 局所確認: `node --test backend_diag/checks/slack-launcher.check.mjs backend_diag/checks/micro-project.check.cjs backend_diag/checks/icon-menu.check.cjs`。すべてmockで実アプリやSlack APIを起動しない。
+
+## 導入状況の公式サイト
+
+左の名前直後の角丸の「Web」は公式サイトを既定ブラウザで開きます。URLは `backend_diag/ui/src/導入状況/公式サイト.json` が所有し、VueのリンクとElectronの許可先で共用します。登録URLとの完全一致だけを外部ブラウザへ渡し、Diag本体のページ遷移・Electron新規ウィンドウは許可しません。ベース・CLI群・その他拡張は初期状態ですべて展開します。URL追加時は診断カタログのIDと照合し、画面反映のbuild・verify、導入状況checksとdesktop.checkを確認します。Electron側の変更反映にはDiagの再起動が必要です。
+
+外部連携タブも同じURL一覧を使用し、公開モデル操作（Hugging Face）・Discord・Slackの見出し横にWebリンク、その下にサービス名を表示します。外部連携のURL追加時は `backend_diag/ui/src/外部連携/checks` も確認します。

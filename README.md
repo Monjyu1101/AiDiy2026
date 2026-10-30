@@ -14,6 +14,9 @@
 - [backend_taskteam/AGENTS.md](./backend_taskteam/AGENTS.md)
 - [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 - [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
+- [backend_diag/AGENTS.md](./backend_diag/AGENTS.md)
+- [frontend_ide/AGENTS.md](./frontend_ide/AGENTS.md)
+- [frontend_channels/slack/AGENTS.md](./frontend_channels/slack/AGENTS.md)
 - [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md)
 - [frontend_channels/AGENTS.md](./frontend_channels/AGENTS.md)
 - [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md)
@@ -27,12 +30,13 @@
 
 - バックエンド: FastAPI + SQLAlchemy + SQLite
 - Command Hermes: `command_hermes` / `aidiy_hermes`（コード支援用 CLI 基盤、常駐サーバーではない）
-- バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**Windows は19、Linux / macOS は18サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）
+- バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**Windows は20、Linux / macOS は19サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Decisions Check / Task Agents / Team Agents / Windows Control）
 - バックエンド Local: `backend_local`（ポート 8096、OpenAI 互換の Gemma ローカル推論サーバー）
 - バックエンド TaskTeam: `backend_taskteam`（ポート 8093、AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI）
 - フロントエンド Web: Node.js + Vue 3 + Vite + TypeScript + Pinia
 - フロントエンド Avatar: Node.js + Vue 3 + Vite + TypeScript + Electron
 - フロントエンド VS Code: Node.js + Vue 3 共通画面 + TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版。さらに開発スペース `aidiy_ide` の部品としても動作、常駐なし）
+- フロントエンド Slack: Node.js + Vue 3 接続パネル + Electron / Web + TypeScript（HTTPS定期取得によるHermesチャット、音声なし）
 - フロントエンド Discord: Node.js + Vue 3 接続パネル + Electron / Web + TypeScript + discord.js（Hermes チャット / AIコア Live 音声接続、任意起動の Bot）
 - フロントエンド IDE（開発スペース）: Node.js + Vue 3 + Canvas 2D + Monaco Editor + Electron（宇宙をテーマにした IDE 開発環境。Code / Live を部品として組み込んだ `aidiy_ide`、ポート自動割り当て）
 - 常駐バックエンドは **5 サーバー構成**
@@ -100,10 +104,11 @@ python _setup.py
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
-9. `frontend_ide/host` の依存導入 / Electron バイナリ準備 / `aidiy_code`・`aidiy_live` ランチャー配置 / Code・Live の VSIX 生成と VS Code 拡張機能への配置
-10. `frontend_ide/viewer` の依存導入 / Electron 準備 / `aidiy_ide` ランチャー配置（既定 Yes）
-11. `frontend_channels` の依存導入 / Electron バイナリ準備 / `aidiy_discord` ランチャー配置 / `AiDiy_key.json` の Discord 設定キー補完（既定 Yes）
-11. `frontend_ide/viewer` の Monaco Editor 導入 / `aidiy_ide` ランチャー配置（既定 Yes）
+9. `frontend_ide` の共通Vue依存、Console / Code / Live / IDE / Task / Team / Browserのセットアップ、ランチャー登録、Code / LiveのVS Code拡張配置
+10. `frontend_channels` のDiscord依存・パネル・ランチャー準備
+11. `frontend_channels/slack` のSlack依存・パネル・ランチャー準備
+
+Diagを選択した場合は診断UI・Electron・ランチャーを準備し、最後にheadless診断で導入状況とモデル情報を書き込みます。外部連携の認証試験はheadless対象外です。
 
 補足:
 
@@ -132,13 +137,16 @@ python _start.py
 - フロントエンド(Avatar) を起動するか
 - フロントエンド(IDE) を起動するか（デフォルト No、ポート自動割り当て）
 - フロントエンド(Discord) を起動するか（デフォルト No）
+- フロントエンド(Slack) を起動するか（デフォルト No）
 
 その後、選択したサービスを順に起動し、必要なポートの既存プロセスも自動で整理します。
 
 `command_hermes` は **常駐サーバーではないため `_start.py` の起動対象外** です。セットアップ後は、AIコードパネルから `aidiy_hermes` として呼び出すか、必要時に手動で起動します。
 `frontend_ide/host` も常駐サービスではありません。セットアップ後は VS Code のコマンドパレットから **AiDiy (Code): チャットを開く** / **AiDiy (Live): ライブ会話を開く**を実行します。単独ウィンドウは作業フォルダで `aidiy_code` / `aidiy_live`を実行します。Live は `backend_server`（8091）の起動が必要です。
 
-`frontend_channels` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord` または `cd frontend_channels && npm start` での個別起動も可能です。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_channels/README.md](./frontend_channels/README.md) を参照してください。
+`frontend_channels` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord` または `cd frontend_channels && npm start` での個別起動も可能です。保存済みの設定（`~/.aidiy/aidiy_discord.json`）があれば起動時に自動接続し、初回はモデル設定画面から始まります。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_channels/README.md](./frontend_channels/README.md) を参照してください。
+
+`frontend_channels/slack` は `_config/AiDiy_key.json` の `slack_*` を設定後、同じく全体 `_start.py` で選択するか `aidiy_slack` で起動します（デフォルト No）。Discord 版と双子の接続パネルで、専用チャンネルへの投稿にスレッドで返信します（HTTPS の定期取得、音声なし）。保存は `~/.aidiy/aidiy_slack.json` です。導入は [frontend_channels/slack/README.md](./frontend_channels/slack/README.md) を参照してください。
 
 ### 個別起動
 
@@ -194,7 +202,7 @@ npm run dev
 | Avatar Web モード | http://127.0.0.1:8092 |
 | Avatar Electron モード | `npm run dev` で Electron アプリ起動 |
 
-MCP は Windows で19、Linux / macOS で18サーバー（Windows Control は Windows のみ。`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms` / `aidiy_task_agents` / `aidiy_team_agents` / `aidiy_windows_control`）です。詳細は [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) を参照してください。
+MCP は Windows で20、Linux / macOS で19サーバー（Windows Control は Windows のみ。`aidiy_chrome_devtools` / `aidiy_desktop_capture` / `aidiy_sqlite` / `aidiy_postgres` / `aidiy_logs` / `aidiy_code_check` / `aidiy_backup` / `aidiy_image_generation` / `aidiy_movie_generation` / `aidiy_speech_to_text` / `aidiy_text_to_speech` / `aidiy_obs_studio_control` / `aidiy_ffmpeg_control` / `aidiy_notification_sounds` / `aidiy_code_agents` / `aidiy_chat_llms` / `aidiy_decisions_check` / `aidiy_task_agents` / `aidiy_team_agents` / `aidiy_windows_control`）です。詳細は [backend_tools/AGENTS.md](./backend_tools/AGENTS.md) を参照してください。
 `aidiy_chrome_devtools` は `session` パラメータ（省略時 `default`）で複数の Chrome を並行セッション管理でき、システムテストの自動実行など並行実行が可能です（使用後は `close_session` で破棄）。
 
 ### 初期ログイン
@@ -214,7 +222,7 @@ MCP は Windows で19、Linux / macOS で18サーバー（Windows Control は Wi
 
 ## 3. 停止
 
-全体起動の起動前整理・Ctrl+C・リブートでは Code / IDE / Discord は継続します。IDE は自動再起動せず、cleanup 時に停止します。
+全体起動の起動前整理・Ctrl+C・リブートでは Code / IDE / Discord / Slack は継続します。IDE は自動再起動せず、cleanup 時に停止します。
 
 ### `_start.py` で起動した場合
 
@@ -263,14 +271,14 @@ python _cleanup.py
 - 必要に応じて SQLite DB
 
 `_cleanup.py` は `command_hermes` の `.venv` / `venv` と Python キャッシュに加え、`frontend_ide/host` の配置済み拡張機能（Code / Live）、単独起動ランチャー（`aidiy_code` / `aidiy_live`）、`node_modules`、`dist`、`out` も削除対象として確認します。
-`frontend_channels` の依存物・生成物・キャッシュも削除対象です（既定 Yes）。削除前に実行パスを照合して Bot を停止し、全体監視の自動再起動も止めます。共通 `AiDiy_key.json` の Discord 設定は保持します。
+`frontend_channels` と `frontend_channels/slack` の依存物・生成物・キャッシュも削除対象です（既定 Yes）。削除前に実行パスを照合して Bot を停止し、全体監視の自動再起動も止めます。共通 `AiDiy_key.json` の Discord / Slack 設定は保持します。
 
 `frontend_ide/viewer` も全体クリーンアップに対応しています（既定 Yes）。この配置先のサーバープロセス停止、`aidiy_ide` ランチャー解除、依存物・Python キャッシュの削除を行います。利用方法は [frontend_ide/viewer/README.md](./frontend_ide/viewer/README.md) を参照してください。
 クリーンアップを実行すると、ファイル削除の前に、選択した対象に限らず全常駐サービスの待受プロセス（Avatar は残留 Electron も含む）を停止します。この作業コピーの Code / Live 単独実行と、tools の MCP 接続プロセスも終了します。ルート `_start.py` の監視中でも全常駐サービスが自動再起動の対象から外れ、クリーンアップ中や直後に再起動しません。
 
 cleanup のために新しい Python / Node.js や対象仮想環境は要求しません（管理スクリプト自体を実行できる Python は必要）。選択したグローバル npm ツール・VS Code 拡張の解除には対応 CLI を使いますが、OS の Python / Node.js / VS Code 本体は削除しません。削除・解除に失敗した場合は場所を表示して終了コード 1 を返し、成功扱いにしません。
 
-クリーンアップ後は再度 `python _setup.py` が必要です。
+クリーンアップ後の残骸・資料確認は [cleanup後の確認](./_AIDIY/knowledge/共通,_cleanup.py後の確認.md) に従います。再起動には再度 `python _setup.py` が必要です。
 
 ---
 
@@ -301,5 +309,6 @@ cleanup のために新しい Python / Node.js や対象仮想環境は要求し
 10. [frontend_ide/AGENTS.md](./frontend_ide/AGENTS.md) — Console / Code / Live / IDE の共通 Vue 画面
 11. [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md) — Code / Live の拡張ホスト・通信
 12. [frontend_channels/AGENTS.md](./frontend_channels/AGENTS.md) — Discord の接続・Vue パネル
-13. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) — ファイルAPI・Office表示
-14. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+13. [frontend_channels/slack/AGENTS.md](./frontend_channels/slack/AGENTS.md) — Slack の接続・Vue パネル（Discord の双子）
+14. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) — ファイルAPI・Office表示
+15. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)

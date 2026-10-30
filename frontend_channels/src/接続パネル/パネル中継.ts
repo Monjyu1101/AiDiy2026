@@ -32,8 +32,9 @@ export function パネルサービス(send: (data: パネル通知) => void, pro
         case 'select': result = panel.選択保存(value); break;
         case 'select-features': result = panel.機能選択保存(value); break;
         case 'select-code': result = panel.コード選択保存(value); break;
-        case 'catalog-code': result = await panel.コード候補(value); break;
+        case 'catalog-code': result = await panel.コード候補(); break;
         case 'start': await panel.開始(); break;
+        case 'auto-start': result = await panel.自動開始(); break;
         case 'stop': await panel.停止(); break;
         case 'monitor': result = panel.モニター(value); break;
         default: throw new Error();

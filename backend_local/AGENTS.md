@@ -63,25 +63,9 @@ OpenAI 互換の `tool_calls`（`finish_reason="tool_calls"`）へ変換して�
 2. `temp/models/<safe_name>/config.json` が存在 → そのフォルダをオフラインロード
 3. いずれも無ければ repo_id でハブからダウンロード（`temp/models` をキャッシュ先に使用）
 
-## セットアップ・起動
+## HowTo参照先
 
-```bash
-# 1. 依存インストール（uv）
-cd backend_local && uv sync --upgrade
-
-# 2. モデルを temp/models へ事前ダウンロード（トークンは AiDiy_key.json の huggingface_key_read）
-#    既定 CHAT_LOCAL_MODEL、または引数でモデル指定
-cd backend_local && uv run python download_model.py
-cd backend_local && uv run python download_model.py google/gemma-4-E2B-it
-
-# 3. 起動（ポート 8096）。temp/models にあればオフラインでロードされる
-cd backend_local && uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
-# または
-cd backend_local && uv run python local_main.py
-```
-
-`_setup.py` の「バックエンド(local)」セットアップでは `uv sync --upgrade` に加え、
-任意でモデルの事前ダウンロードも実行できる（トークンは AiDiy_key.json から読む）。
+モデルの取得、起動、確認、cleanupは [モデル準備と起動](../_AIDIY/knowledge/backend_local,モデル準備と起動.md) を参照してください。
 
 ## 設定（AiDiy_key.json）
 
@@ -110,31 +94,6 @@ AiDiy_key.json に無くても起動時に補完される。その他の `CHAT_L
   しなかった場合は使用時に自動ダウンロードする。
 - メモリへのロード: **遅延ロード**（最初の `/v1/chat/completions` リクエスト時）。
   起動時の先読みロードは行わない。
-
-## Gemma はゲートモデル
-
-Gemma は HuggingFace 上のゲート付きモデルです。利用前に以下が必要です。
-
-1. HuggingFace アカウントで対象モデル（例: `google/gemma-4-E2B-it`）の
-   ライセンスに同意する。
-2. 取得したアクセストークンを AiDiy_key.json の `huggingface_key_read` に設定する。
-
-トークン未設定の場合、モデルダウンロード時に 401 / 403 となります。
-
-## ハードウェアの目安
-
-| モデル | 目安メモリ | 備考 |
-|--------|-----------|------|
-| `gemma-4-E2B-it` | 〜4GB | 既定。Gemma 4 最小。CPU でも比較的軽量 |
-| `gemma-4-E4B-it` | 8GB+ | Gemma 4 小型（effective 4B）。CPU ではかなり遅め |
-| `gemma-4-26B-A4B-it` | 多 | Gemma 4 MoE。サーバー向け |
-| `gemma-4-31B-it` | 多 | Gemma 4 Dense 大型。サーバー向け |
-| `gemma-3-1b-it` | 〜3GB | 旧世代だが CPU で実用的な軽量代替 |
-| `gemma-3-270m-it` | 〜1GB | 旧世代。非常に軽量・高速、品質は限定的 |
-
-Gemma 4（2026-04 リリース）は E2B / E4B（Dense, 画像/音声/動画対応）、26B-A4B（MoE）、31B（Dense）を提供します。
-VRAM が小さい GPU では CPU 推論（`CHAT_LOCAL_DEVICE=cpu`）が安定します。低速環境では
-`gemma-4-E2B-it` や旧世代の小型モデルへ `CHAT_LOCAL_MODEL` で切り替えてください。
 
 ## ポート
 

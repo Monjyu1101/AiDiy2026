@@ -1,6 +1,9 @@
 # _AIDIY/knowledge インデックス
 
+- [ローカルモデルの準備と起動](./backend_local,モデル準備と起動.md): モデル取得、遅延ロード、起動確認とcleanup後の再取得。
+
 - [AiDiy アイコンの原本と配布](./共通,アイコン原本と配布.md): 所有モジュールの SVG / PNG と、ローカル配布コピーの更新・検証。
+- [_cleanup.py後の確認](./共通,_cleanup.py後の確認.md): 残留プロセス・不要フォルダ・一時テストプログラムの確認、現行実装を基準とする資料の選別・改名。
 
 このフォルダは AiDiy2026 専用の再利用ナレッジ置き場です。
 残す内容は、次回の修正で使える HowTo、判断基準、注意点、確認方法だけにします。
@@ -33,7 +36,7 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
 | `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
 | `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_channels` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続 |
+| `frontend_channels` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続。`slack/` に双子の Slack Bot（Code のみ、HTTPS 定期取得） |
 | `frontend_ide` | Console / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
 
 例:
@@ -119,8 +122,10 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | aidiy_diagの起動・停止を総合テストし、操作手順書素材を残す | [システム起動編](./セルフテスト,aidiy_diag,システム起動編.md) |
 | aidiy_diagのプロジェクト選択・アプリ起動を総合テストし、操作手順書素材を残す | [アプリ起動編](./セルフテスト,aidiy_diag,アプリ起動編.md) |
 | aidiy_diagの導入状況・モデル・外部連携を総合テストし、操作手順書素材を残す | [環境確認編](./セルフテスト,aidiy_diag,環境確認編.md) |
+| aidiy_diagのTools個別試験・一括テストを確認する | [Tools編](./セルフテスト,aidiy_diag,Tools編.md) |
 | IDEの利用開始・閲覧・Code/Live連携を総合テストし、操作手順書素材を残す | [IDE操作編](./セルフテスト,aidiy_ide,操作編.md) |
 | Browserの表示・撮影・Code/Live連携を確認する | [Browser操作編](./セルフテスト,aidiy_browser,操作編.md) |
+| Slackの起動・応答・スレッド継続・モデル設定を確認する | [Slack操作編](./セルフテスト,aidiy_slack,操作編.md) |
 | WebのAI機能を確認する | [AiDiy編](./セルフテスト,frontend_web,AiDiy編.md) |
 | 独立Task・Teamを操作・確認する | [確認結果](./セルフテスト,共通,確認結果.md)。[Task操作編](./セルフテスト,aidiy_task,操作編.md)・[Team操作編](./セルフテスト,aidiy_team,操作編.md)に現行の操作と確認結果をまとめています。 |
 | Webの配車・生産・在庫を確認する | [配車管理編](./セルフテスト,frontend_web,配車管理編.md)、[生産・在庫管理編](./セルフテスト,frontend_web,生産・在庫管理編.md) |
@@ -255,11 +260,12 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | IDE の今日・本日最新の強調、電子の周回、描画負荷を確認する | [`frontend_ide,更新の目印と電子表示.md`](./frontend_ide,更新の目印と電子表示.md) |
 | IDE の文書表示（Word / Excel / PowerPoint / PDF）を変更する | [`frontend_ide,文書ビューア.md`](./frontend_ide,文書ビューア.md) |
 
-## Frontend Discord
+## Frontend Discord / Slack
 
 | 目的 | 参照ファイル |
 |------|--------------|
 | Discord の Code / Live 接続・Vue パネル・配布物を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
+| Slack の接続・パネルを変更・検証する（Discord と双子） | 同上の手順に加え、[`frontend_channels/slack/AGENTS.md`](../../frontend_channels/slack/AGENTS.md) の対応表で Discord 側の同じファイルもそろえる。確認は [Slack操作編](./セルフテスト,aidiy_slack,操作編.md) |
 
 ## Frontend VS Code
 

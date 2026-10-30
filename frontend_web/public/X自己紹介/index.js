@@ -17,7 +17,7 @@ const isSmallScreen = () => window.innerWidth <= 720;
 class AiDiyIntroduction {
     constructor() {
         this.typewriterTexts = [
-            "FastAPI Dual Server → Ready",
+            "FastAPI Multi Server → Ready",
             "Vue 3 + Vite + TypeScript → Active",
             "6 Parallel Code Agents → Running",
             "Gemini Live API → Connected",
@@ -25,10 +25,14 @@ class AiDiyIntroduction {
             "Ollama Chat → Local & Cloud Models",
             "opencode → CLI Integrated",
             "aidiy_hermes → Custom Agent Engine",
-            "MCP Hub ×19 → browser / db / logs / check / backup / media / voice / obs / ffmpeg / agents / chat / task / team / windows",
+            "MCP Hub ×20 (Windows) / ×19 (Linux・macOS) → browser / db / logs / check / backup / media / voice / obs / ffmpeg / agents / chat / task / team / windows",
             "AI Task Runner → Free-Flow DAG × Critical Path",
             "AiDiy Code / Live → VS Code × Standalone × IDE",
             "AiDiy IDE → Development Space Launched",
+            "7 Apps → Console / Code / Live / IDE / Task / Team / Browser",
+            "Discord → Hermes Chat + Live Voice",
+            "Slack → Thread Chat via HTTPS",
+            "AiDiy Diag → Check, Test & Launch",
             "Comet Orbit Autopilot → Tracking Latest Change",
             "Context Compression → 20% summary ratio",
             "60+ Tools → Composable Toolsets",

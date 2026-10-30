@@ -40,7 +40,7 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
     for (const args of [[], ['--connect'], ['--wait', '--connect']]) {
       for (const token of ['', '<', '<secret-placeholder>', '>']) {
         writeFileSync(join(root, '_config/AiDiy_key.json'), JSON.stringify({ ...defaults, discord_bot_token: token }));
-        const result = spawnSync(process.execPath, [join(frontend, 'panel/launch.mjs'), ...args], { cwd: tmpdir(), encoding: 'utf8', timeout: 15_000, windowsHide: true });
+        const result = spawnSync(process.execPath, [join(frontend, 'panel/launch.mjs'), ...args], { cwd: tmpdir(), encoding: 'utf8', timeout: 60_000, windowsHide: true });
         assert.equal(result.status, 1, result.stderr);
         assert.match(result.stderr, /discord_bot_token/);
         assert.doesNotMatch(result.stderr, /secret-placeholder|Electron|パネルの準備/);

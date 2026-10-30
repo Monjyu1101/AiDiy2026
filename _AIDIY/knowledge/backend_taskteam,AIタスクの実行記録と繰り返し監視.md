@@ -164,3 +164,16 @@ AI エージェントが直接呼ぶ用の ASCII 専用エンドポイントと�
 - 監視ループの間隔・タイムアウト・自動復旧上限: `task_proc/tasks_watcher.py` 冒頭の定数
 - 1 ステップのタイムアウト計算: `task_sub/sub_do.py` の `CODE実行タイムアウト秒()`（`tasks_watcher` の倍率・最低分と同じ値を持つ二重管理なので、片方を変えたらもう片方も直す）
 - 実行監視ひな形の本文と明細: `task_proc/tasks_seed.py`
+
+## 開発時の単独起動
+
+```powershell
+cd backend_taskteam
+uv sync
+uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
+```
+
+通常運用はプロジェクトルートの `python _start.py` で `バックエンド(task,team)` を選択します。ルート起動は `--reload` なしです。コード変更の反映は個別起動の `--reload` または `backend_taskteam/temp/reboot_taskteam.txt` を使います。
+
+Task / Team は共通のポート `8093` だけを使用します。
+

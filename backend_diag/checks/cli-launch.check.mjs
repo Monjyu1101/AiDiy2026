@@ -156,12 +156,12 @@ test('Copilot SVG includes its white caption band while preserving Octicons path
 test('外部CLI SVGの形状・色を維持し、Hermesはlocal PNGのみ配布する',async()=>{
  const root=new URL('../ui/src/アプリ起動/CLIアイコン/',import.meta.url),text=async path=>(await readFile(new URL(path,root),'utf8')).replace(/\r\n/g,'\n');
  const paths=value=>[...value.matchAll(/<path\b[^>]*\bd="([^"]+)"/g)].map(item=>item[1]);
- for(const [id,filename] of [['claude','claude-code-color-lobe.svg'],['codex','codex-color-lobe.svg'],['grok','Grok_Logomark_Light.svg'],['opencode','opencode-logo-dark-square.svg']]){
+ for(const [id,filename] of [['claude','claude-code-color-lobe.svg'],['codex','codex-devicons.svg'],['grok','Grok_Logomark_Light.svg'],['opencode','opencode-logo-dark-square.svg']]){
   const original=await text('upstream/'+filename),display=await text(id+'.svg');assert.deepEqual(paths(display),paths(original),id);
   for(const [,fill] of original.matchAll(/\bfill="([^"]+)"/g))assert.ok(display.includes(`fill="${fill}"`),id+' preserves '+fill);
   assert.ok(display.includes('viewBox="'+original.match(/viewBox="([^"]+)"/)[1]+'"'),id+' preserves its original viewport');
  }
- for(const [id,label] of Object.entries({claude:'Claude',codex:'Codex',copilot:'Copilot',agy:'Agy',grok:'Grok',opencode:'OpenCode'})){
+ for(const [id,label] of Object.entries({claude:'Claude',codex:'Codex',copilot:'Copilot',agy:'Antigravity',grok:'Grok',opencode:'OpenCode'})){
   const svg=await text(id+'.svg');assert.match(svg,/width="120" height="120" viewBox="0 0 120 120"/);
   assert.match(svg,/<rect id="caption-band" x="0" y="90" width="120" height="30" fill="#ffffff"/);
   assert.match(svg,new RegExp('<text[^>]*id="caption-label"[^>]*fill="#000000"[^>]*>'+label+'<\\/text>'));

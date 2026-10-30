@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 'use strict';
-const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen}=require('electron');
+const {app,BrowserWindow,session,ipcMain,dialog,Menu,screen,shell}=require('electron');
 const path=require('node:path');
 const {アイコンメニューを作成}=require('./アイコンメニュー.cjs');
 const {拡大表示}=require('../../frontend_ide/host/scripts/window-opening.cjs');
@@ -144,7 +144,11 @@ async function start(value) {
     else if(action==='close')window.close();
     return false;
   });
-  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  window.webContents.setWindowOpenHandler(({url:target}={})=>{
+    const sites=require('../ui/src/導入状況/公式サイト.json');
+    if(Object.values(sites).includes(target))void shell.openExternal(target).catch(()=>{});
+    return {action:'deny'};
+  });
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.on('will-redirect',event=>event.preventDefault());
   window.webContents.on('will-attach-webview',event=>event.preventDefault());

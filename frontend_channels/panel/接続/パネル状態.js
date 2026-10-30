@@ -22,35 +22,47 @@ export function パネル状態作成(api) {
   const モデル一覧 = reactive({}), 音声一覧 = reactive({});
   let 設定 = {}, 保存待ち = Promise.resolve(), 候補世代 = 0;
   let 終了済み = false, 状態通知済み = false, 状態案内 = false, 描画, 本文要素, 詳細要素;
-  let 入力タイマー, 消去タイマー, 音声Context, 音声世代 = 0, 操作世代 = 0;
+  let 入力タイマー, 消去タイマー, 音声Context, 音声世代 = 0, 操作世代 = 0, 退避;
   let 再生時刻 = { input: 0, output: 0 };
   const 解除 = [];
   const 画面 = reactive({
     接続状態: { phase: 'idle' }, 読込済み: false, 保存中: false, 致命的: false, 操作中: false, 操作種別: '',
     機能: { live: true, code: true }, ライブAI: 'freeai_live', ライブモデル: '', 音声: '', AI候補,
-    コードAI: '', コードモデル: '', コードAI候補: { '': '自動選択' }, コードモデル候補: [], フォルダ: {},
+    // コードは aidiy_hermes 固定。モデルは auto / same / openai_oauth/gpt-… などの1つの文字列（aidiy_code・Slack 版と同じ）。
+    コードCLI: 'aidiy_hermes', コードモデル: '', コードモデル候補: [], フォルダ: {},
     案内: 'Live・コードとも、最後に選んだモデルを次回も使用します。', 案内エラー: false,
     発言表示: false, 発言消去中: false, 発言役割: 'ai', 発言者: '', 発言本文: '', 文字表示中: false,
-    モニター: false, モニター切替中: false,
+    モニター: false, モニター切替中: false, 設定表示: false,
     状態名: computed(() => !画面.読込済み && 画面.接続状態.phase === 'idle' ? '設定を読み込んでいます…' : 状態名[画面.接続状態.phase] || 画面.接続状態.phase),
     ライブ画面: computed(() => ['connected', 'reconnecting'].includes(画面.接続状態.phase)),
-    編集可能: computed(() => 画面.読込済み && !画面.致命的 && ['idle', 'error'].includes(画面.接続状態.phase)),
+    // 接続中に開いた設定（設定表示）は、適用まで保存せずに編集できる。
+    編集可能: computed(() => 画面.読込済み && !画面.致命的 && (画面.設定表示 || ['idle', 'error'].includes(画面.接続状態.phase))),
     ライブ編集不可: computed(() => !画面.編集可能 || 画面.保存中 || !画面.機能.live || 画面.操作中),
     コード編集不可: computed(() => !画面.編集可能 || 画面.保存中 || 画面.操作中),
-    接続操作不可: computed(() => !画面.読込済み || 画面.致命的 || 画面.保存中 || (画面.操作中 && !(画面.操作種別 === 'start' && 画面.接続状態.phase === 'connecting')) || 画面.接続状態.phase === 'stopping' || 画面.編集可能 && 画面.機能.live && (!画面.ライブモデル || !画面.音声)),
+    接続操作不可: computed(() => !画面.読込済み || 画面.致命的 || 画面.保存中 || 画面.設定表示 || (画面.操作中 && !(画面.操作種別 === 'start' && 画面.接続状態.phase === 'connecting')) || 画面.接続状態.phase === 'stopping' || 画面.編集可能 && 画面.機能.live && (!画面.ライブモデル || !画面.音声)),
     接続ボタン: computed(() => 画面.接続状態.phase === 'connecting' ? '接続中…' : 画面.ライブ画面 ? '切断' : 画面.接続状態.phase === 'stopping' ? '切断中…' : '接続'),
     モデル候補: computed(() => モデル一覧[画面.ライブAI] || {}), 音声候補: computed(() => 音声一覧[画面.ライブAI] || {}),
-    保存, 接続切替, 開始, 終了, モニター切替,
+    // 画面下部の表示は aidiy_live / aidiy_code と同じ「AI - モデル」。Live が OFF ならコードだけを示す。
+    モデル表示: computed(() => {
+      const コード = `${画面.コードCLI} - ${画面.コードモデル || 'auto'}`;
+      const ライブ = [画面.ライブAI, 画面.ライブモデル].filter(Boolean).join(' - ');
+      return 画面.機能.live && ライブ ? `Live: ${ライブ} · Code: ${コード}` : `Code: ${コード}`;
+    }),
+    モデル操作不可: computed(() => !画面.読込済み || 画面.致命的 || 画面.保存中 || 画面.操作中 || 画面.設定表示 || ['connecting', 'stopping'].includes(画面.接続状態.phase)),
+    保存, 接続切替, 開始, 終了, モニター切替, モデル設定, 設定適用, 設定取消,
     ライブ切替() { if (!画面.編集可能 || 画面.保存中 || 画面.操作中) return; 画面.機能.live = !画面.機能.live; void 保存(); },
     ライブAI利用可能(id) { return Object.keys(モデル一覧[id] || {}).length > 0 && Object.keys(音声一覧[id] || {}).length > 0; },
     ライブAI変更() { モデル反映(); void 保存(); },
-    コードAI変更() { 画面.コードモデル = ''; void 保存('code'); void コード候補取得(); },
+    // 保存済みの値が候補にない場合も、選択中の値として残す。
+    コードモデル一覧: computed(() => 画面.コードモデル && !画面.コードモデル候補.some(item => item.id === 画面.コードモデル)
+      ? [...画面.コードモデル候補, { id: 画面.コードモデル, label: 画面.コードモデル }] : 画面.コードモデル候補),
     async ウィンドウ操作(action) { try { if (action === 'close') await 保存待ち; await api.window(action); } catch { 案内表示('ウィンドウを操作できませんでした。', true); } },
   });
   const 監視解除 = watchEffect(() => {
     document.body.classList.toggle('connected', 画面.接続状態.phase === 'connected');
     document.body.classList.toggle('live-view', 画面.ライブ画面);
     document.body.classList.toggle('live-off', !画面.機能.live);
+    document.body.classList.toggle('settings-open', 画面.設定表示);
   });
   function 案内表示(text, error = false) { if (終了済み) return; 画面.案内 = text; 画面.案内エラー = error; }
   function モデル反映() {
@@ -61,6 +73,8 @@ export function パネル状態作成(api) {
   }
   function 保存(対象) {
     if (終了済み) return Promise.resolve(false);
+    // 接続中の設定は「適用して再接続」でまとめて検証・保存する。
+    if (画面.設定表示) return Promise.resolve(true);
     // Code 単独の変更を、無関係な Live の候補欠落や保存失敗で拒否しない。
     // 接続時は引き続き全項目を検証・保存する。
     const コードのみ = 対象 === 'code';
@@ -71,7 +85,7 @@ export function パネル状態作成(api) {
     // 保存中の別イベントが待ち行列の内容を書き換えないよう、要求時点の値を固定する。
     const 機能 = { live: 画面.機能.live, code: true };
     const ライブ = { LIVE_AI_NAME: 画面.ライブAI, [modelKey]: 画面.ライブモデル.trim(), [voiceKey]: 画面.音声 };
-    const コード = { provider: 画面.コードAI, model: 画面.コードモデル.trim() };
+    const コード = { model: 画面.コードモデル.trim() };
     画面.保存中 = true;
     const job = 保存待ち.then(async () => {
       if (終了済み) return false;
@@ -81,7 +95,7 @@ export function パネル状態作成(api) {
           if (機能.live) Object.assign(設定, await api.select(ライブ));
         }
         await api.selectCode(コード);
-        案内表示(コードのみ ? 'コード AI・モデルの選択を保存しました。' : 機能.live ? '選択を保存しました。次回もこのモデル・音声を使用します。' : '選択を保存しました。Live は OFF で接続します。');
+        案内表示(コードのみ ? 'モデルの選択を保存しました。' : 機能.live ? '選択を保存しました。次回もこのモデル・音声を使用します。' : '選択を保存しました。Live は OFF で接続します。');
         return true;
       } catch (error) { 案内表示(error?.message || '選択を保存できませんでした。保存先を確認して再試行してください。', true); return false; }
     });
@@ -100,14 +114,38 @@ export function パネル状態作成(api) {
     } catch { 案内表示('操作できませんでした。設定を確認して再試行してください。', true); }
     finally { if (run === 操作世代) { 画面.操作中 = false; 画面.操作種別 = ''; } }
   }
-  async function コード候補取得() {
-    const run = ++候補世代, name = 画面.コードAI;
-    画面.コードモデル候補 = [];
-    if (!name) return;
+  /** 画面下部の「モデル」。未接続なら設定欄へ移り、接続中なら設定を開いて適用時に再接続する。 */
+  function モデル設定() {
+    if (画面.モデル操作不可 || !画面.ライブ画面) return false;
+    if (画面.モニター) void モニター切替();
+    退避 = { 機能: { ...画面.機能 }, ライブAI: 画面.ライブAI, ライブモデル: 画面.ライブモデル, 音声: 画面.音声, コードモデル: 画面.コードモデル };
+    画面.設定表示 = true;
+    案内表示('変更後「適用して再接続」を押すと、Discord に再接続します。');
+    return true;
+  }
+  function 設定取消() {
+    if (!画面.設定表示) return;
+    if (退避) Object.assign(画面, 退避);
+    退避 = undefined; 画面.設定表示 = false; 案内表示('');
+  }
+  async function 設定適用() {
+    if (!画面.設定表示 || 画面.操作中) return;
+    const run = ++操作世代;
+    画面.操作中 = true; 画面.操作種別 = 'stop';
     try {
-      const result = await api.catalogCode(name);
-      if (!終了済み && run === 候補世代 && name === 画面.コードAI) 画面.コードモデル候補 = result.models || [];
-    } catch { if (run === 候補世代) 案内表示('コードモデルの候補を取得できません。モデル名を直接入力できます。'); }
+      if (['connecting', 'connected', 'reconnecting'].includes(画面.接続状態.phase)) await api.stop();
+      画面.設定表示 = false; 退避 = undefined;
+      画面.操作種別 = 'start';
+      if (await 保存() && !終了済み) await api.start();
+    } catch { 画面.設定表示 = false; 案内表示('再接続できませんでした。設定を確認して接続してください。', true); }
+    finally { if (run === 操作世代) { 画面.操作中 = false; 画面.操作種別 = ''; } }
+  }
+  async function コード候補取得() {
+    const run = ++候補世代;
+    try {
+      const result = await api.catalogCode();
+      if (!終了済み && run === 候補世代) 画面.コードモデル候補 = result.models || [];
+    } catch { if (run === 候補世代) 案内表示('モデルの候補を取得できません。保存済みのモデルで接続できます。'); }
   }
   function 発言消去() {
     clearTimeout(入力タイマー); clearTimeout(消去タイマー);
@@ -190,17 +228,11 @@ export function パネル状態作成(api) {
       設定 = data.settings; Object.assign(モデル一覧, data.models); Object.assign(音声一覧, data.voices);
       画面.機能 = { live: data.features?.live !== false, code: true };
       画面.ライブAI = 設定.LIVE_AI_NAME || 'freeai_live';
-      画面.コードAI = data.code.provider; 画面.コードモデル = data.code.model;
-      画面.コードAI候補 = { '': '自動選択', [data.code.provider]: data.code.provider || '自動選択' };
+      画面.コードCLI = data.code.cli || 'aidiy_hermes'; 画面.コードモデル = data.code.model;
       画面.フォルダ = data.folder || {}; 画面.読込済み = true; モデル反映();
       if (!状態通知済み) 状態反映(data.state);
       if (data.notice && !状態案内) 案内表示(data.notice);
-      void api.catalogCode('').then(catalog => {
-        if (終了済み) return;
-        const selected = 画面.コードAI;
-        画面.コードAI候補 = { '': '自動選択', ...Object.fromEntries((catalog.providers || []).map(item => [item.id, item.label])) };
-        if (selected && !(selected in 画面.コードAI候補)) 画面.コードAI候補[selected] = selected;
-      }).catch(() => {});
+      else if (data.firstRun && !状態案内) 案内表示('初回起動です。モデルを確認して「接続」を押してください。次回からは起動時に自動で接続します。');
       void コード候補取得();
     } catch (error) { if (!終了済み) 状態反映({ phase: 'error', message: `${error?.message || ''} 共通設定を確認し、パネルを開き直してください。`.trim() }); }
   }
@@ -210,7 +242,7 @@ export function パネル状態作成(api) {
     if (画面.モニター) void api.monitor(false).catch(() => {});
     発言消去(); モニター停止(); 描画?.dispose();
     for (const cancel of 解除) cancel(); 監視解除();
-    document.body.classList.remove('connected', 'live-view', 'live-off');
+    document.body.classList.remove('connected', 'live-view', 'live-off', 'settings-open');
   }
   return 画面;
 }

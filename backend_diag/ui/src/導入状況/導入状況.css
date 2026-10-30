@@ -19,8 +19,11 @@
 .install-check>.badge{min-width:60px}
 /* 1行目は左に名称、右に確認・状態。2行目の導入操作は左寄せし、長い名称と重ねない。 */
 .install-item{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name check" "manage manage";align-items:center;gap:0 4px}
-.install-item>.item{grid-area:name;min-width:0;overflow-wrap:anywhere;justify-content:flex-start}
-.install-item>.item>span{min-width:0}
+.install-name{grid-area:name;display:flex;align-items:center;gap:5px;min-width:0;padding:0 4px 0 10px}
+.install-name>.item{width:auto;min-width:0;padding:11px 0;overflow-wrap:anywhere;justify-content:flex-start}
+.install-web{display:inline-flex;align-items:center;justify-content:center;height:24px;padding:0 7px;flex:0 0 auto;border:1px solid #52778d;border-radius:5px;color:#b8def2;background:#142632;font:11px Arial,sans-serif;text-decoration:none}
+.install-web:hover,.install-web:focus-visible{background:#183443;color:#fff;outline:1px solid #7dd3fc}
+.install-name>.item>span{min-width:0}
 .install-manage{grid-area:manage;display:flex;justify-content:flex-start;flex-wrap:wrap;gap:4px;padding:0 10px 10px}
 .install-manage button{padding:3px 7px;font-size:11px;white-space:nowrap}
 .install-manage .install-delete{border-color:#925064;color:#ffbdc8}

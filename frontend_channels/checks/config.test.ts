@@ -26,8 +26,7 @@ test('PORT_CORE、共通モデル、作業フォルダを読み込み、元設�
   assert.equal(result.folder, resolve(プロジェクトルート, 'frontend_ide/host'));
   assert.equal(result.liveModels.LIVE_AI_NAME, 'openai_live');
   assert.equal(JSON.stringify(data), before);
-  assert.equal(result.provider, 'openai_oauth');
-  assert.equal(result.model, 'gpt-6.1-sol');
+  assert.equal(result.hermesModel, 'openai_oauth/gpt-6.1-sol');
   assert.equal(result.maxTurns, 999);
 });
 
@@ -76,13 +75,13 @@ test('全Liveベンダーで共通設定を使い、廃止したDiscord設定で
     assert.equal(result.liveModels[`LIVE_${prefix}_MODEL`], 'common-model');
     assert.equal(result.liveModels[`LIVE_${prefix}_VOICE`], 'common-voice');
     const baseline = 設定解析(defaults);
-    for (const key of ['coreUrl', 'folder', 'cli', 'python', 'prefix', 'provider', 'model', 'maxTurns', 'timeoutMs'] as const) {
+    for (const key of ['coreUrl', 'folder', 'cli', 'python', 'prefix', 'hermesModel', 'maxTurns', 'timeoutMs'] as const) {
       assert.equal(result[key], baseline[key]);
     }
     assert.equal(JSON.stringify(data), before);
   }
-  assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: 'freeai/gemini-test' }).model, 'freeai/gemini-test');
-  assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: 'freeai/gemini-test' }).provider, '');
+  assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: 'freeai/gemini-test' }).hermesModel, 'freeai/gemini-test');
+  assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: '' }).hermesModel, 'auto', '未設定は auto');
 });
 
 test('共通Slack5欄はDiscord解析結果に混入せず入力も変更しない', () => {

@@ -20,7 +20,8 @@ export const 設定ファイル = resolve(プロジェクトルート, '_config/
 export interface Discord設定 {
   token: string; guildId: string; userId: string; textChannelId: string; voiceChannelId: string;
   prefix: string; coreUrl: string; folder: string; cli: string; python: string;
-  provider: string; model: string; maxTurns: number; timeoutMs: number; liveModels: Record<string, string>;
+  /** aidiy_hermes のモデル（auto / same / openai_oauth/gpt-… など）。 */
+  hermesModel: string; maxTurns: number; timeoutMs: number; liveModels: Record<string, string>;
   /** 接続制御。省略時は両方 ON。パネルの設定（Live は切替可、Code は ON 固定）で上書きする。 */
   liveEnabled?: boolean; codeEnabled?: boolean;
 }
@@ -62,13 +63,12 @@ export function 設定解析(data: Record<string, unknown>, root = プロジェ�
     const value = text(key);
     if (value) liveModels[key] = value;
   }
-  const hermesModel = text('CODE_AIDIY_HERMES_MODEL') || 'openai_oauth/gpt-6.1-sol';
-  // OAuth 指定時は provider も明示し、認証切れを別 provider への退避で隠さない。
-  const oauthModel = /^(openai_oauth|xai-oauth)\/(.+)$/.exec(hermesModel);
+  // 引数への変換（OAuth の provider 明示など）は コード/Hermesモデル.ts の Hermes会話引数 で行う。
+  const hermesModel = text('CODE_AIDIY_HERMES_MODEL') || 'auto';
   return {
     token, guildId, userId, textChannelId, voiceChannelId, prefix: '!aidiy', coreUrl: url.href, folder, liveModels,
     cli: 'aidiy_hermes', python: '',
-    provider: oauthModel?.[1] || '', model: oauthModel?.[2] || hermesModel,
+    hermesModel,
     maxTurns: integer('CODE_MAX_TURNS', 999, 1, Number.MAX_SAFE_INTEGER), timeoutMs: 900_000,
   };
 }

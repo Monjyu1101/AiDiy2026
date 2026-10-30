@@ -6,7 +6,7 @@ Console / Code / Live / IDE / Task / Team / Browser は AiDiy の正式なサブ
 
 - ルート直下は起動入口（`launch.mjs` / `server.mjs` / `desktop.cjs`）、セットアップ・解除、設定・説明に限定する。Electronの内部処理は `デスクトップ/`、検索・解析・履歴・エクスプローラー操作のAPIは `ファイル機能/`、PTYは `aidiy_console/`、Markdown表示は `viewer/`、VS Code用HTMLは `host/src/` に置く。
 - 画面・通信・描画・補助処理は `src/` の日本語機能フォルダにまとめる。共通表示と下書き連携は各画面から共有し、同じ概念の別名部品やアプリ別コピーを増やさない。
-- Code / Liveの通信・VS Code拡張ホストは `host/`、ファイルAPI・Office表示は `viewer/` に統合する。Discordは `host/` の共通処理を利用する。AIコア・Hermesは共通バックエンドを使用し、UIに秘密情報を渡さない。
+- Code / Liveの通信・VS Code拡張ホストは `host/`、ファイルAPI・Office表示は `viewer/` に統合する。Discord・Slack（`frontend_channels`）は `host/` の共通処理を利用する。AIコア・Hermesは共通バックエンドを使用し、UIに秘密情報を渡さない。
 - ポートは自動割り当て。ElectronとWebで同じVue画面を使う。
 - IDEのElectron版は「＋ Console」「＋ Code」「＋ Live」で同じプロジェクトの別ウィンドウを開く。Web版は画面内タブ。別窓はIDEの利用モード・セッションとの連携を必須とする。「終了」は子窓を閉じて起動画面へ戻す。タイトルバーの×は確認後にIDE全体を閉じる。オンライン判定はConsoleと同じtoolsポートのpingを使う。toolsの接続喪失では作業セッションと子窓を維持し、tools復帰時に再接続する。起動・権限・終了連携はElectronメインプロセスで管理する。
 - IDEの利用開始は手動。オフラインではConsole / Code、オンラインではConsole / Code / Live。宇宙表示と文書ビューアは読み取り専用。

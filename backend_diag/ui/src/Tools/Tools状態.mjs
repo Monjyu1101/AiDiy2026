@@ -54,19 +54,40 @@ export function Tools状態を作成({api,利用可能=()=>true,代表テスト=
   return operation(write?'save-defaults':'apply-defaults',async run=>{const defaults={[key]:copy(編集値.value[key])};const data=await call('Tools/defaults',{defaults,write},run);snapshot(data);if(write&&data.saved!==true){未保存規定値.value={...未保存規定値.value,[key]:true};throw Error('ファイルへの保存を確認できませんでした。再読込して確認してください。');}編集値.value={...編集値.value,[key]:copy(規定値.value[key]||{})};未保存規定値.value={...未保存規定値.value,[key]:!write};通知.value=write?'選択Toolの既定値を保存しました。':'既定値を実行時へ適用しました。ファイルには保存していません。';});
  }
  function テスト定義(id){return 代表テスト[id]||null;}
+ const 一括対象数=computed(()=>項目.value.filter(row=>row.available&&row.enabled&&テスト定義(row.id)).length);
+ async function 試験実行(id,test,input,run,終了=false){
+  選択ID.value=id;結果.value={...結果.value,[id]:{status:'実行中',message:test.label}};
+  try{
+   const value=await (終了?test.close:test.run)({api,token,input,signal:controller.signal,call:(action,data)=>call(action,data,run)});
+   if(run!==revision||disposed)return;
+   結果.value={...結果.value,[id]:value};return value;
+  }catch(error){if(run===revision)結果.value={...結果.value,[id]:{status:'ERR',message:error.message||'テストに失敗しました。'}};throw error;}
+ }
  async function テスト(id,終了=false){
   const row=項目.value.find(row=>row.id===id),test=テスト定義(id);
   if(!row?.available||!row.enabled||!test||終了&&!test.close)return false;
   return operation('test',async run=>{
-   選択ID.value=id;結果.value={...結果.value,[id]:{status:'実行中',message:test.label}};
-   try{
-    const input=テスト条件.value[id]??copy(test.defaults||{});
-    const value=await (終了?test.close:test.run)({api,token,input,signal:controller.signal,call:(action,data)=>call(action,data,run)});
-    if(run!==revision||disposed)return;
-    結果.value={...結果.value,[id]:value};通知.value=value.message;
-   }catch(error){if(run===revision)結果.value={...結果.value,[id]:{status:'ERR',message:error.message||'テストに失敗しました。'}};throw error;}
+   const value=await 試験実行(id,test,copy(テスト条件.value[id]??test.defaults??{}),run,終了);
+   if(value)通知.value=value.message;
   });
  }
- function テスト中止(){if(処理中.value!=='test')return;revision++;controller.abort();controller=new AbortController();処理中.value='';for(const [id,value]of Object.entries(結果.value))if(value.status==='実行中')結果.value={...結果.value,[id]:{status:'中止',message:'応答の待機を中止しました。開始済みの操作は取り消せない場合があります。'}};通知.value='テストの待機を中止しました。';}
- return {認証済み,処理中,通知,項目,選択ID,選択,規定値,編集値,schema,有効変更,未保存規定値,結果,テスト条件,ログイン,ログアウト,切断,終了,再読込,切替,有効保存,規定値設定,テスト定義,テスト,テスト中止};
+ async function 一括テスト(){
+  if(!一括対象数.value)return false;
+  return operation('test-all',async run=>{
+   const targets=項目.value.filter(row=>row.available&&row.enabled&&テスト定義(row.id)).map(row=>({id:row.id,test:テスト定義(row.id),input:copy(テスト条件.value[row.id]??テスト定義(row.id).defaults??{})}));
+   const ids=new Set(targets.map(row=>row.id));
+   結果.value=Object.fromEntries(項目.value.map(row=>[row.id,ids.has(row.id)?{status:'待機中',message:'一括テストの順番待ちです。'}:{status:'対象外',message:'OFF・利用不可・試験未対応のため実行しません。'}]));
+   let ok=0,failed=0;
+   for(const [index,{id,test,input}] of targets.entries()){
+    if(run!==revision||disposed||!利用可能())return;
+    通知.value=`一括テスト ${index+1}/${targets.length}: ${test.label}`;
+    try{const value=await 試験実行(id,test,input,run);if(value?.status==='OK')ok++;else failed++;}
+    catch{failed++;}
+    if(run!==revision||disposed)return;
+   }
+   通知.value=`一括テスト完了: 成功 ${ok}件、失敗 ${failed}件、対象外 ${項目.value.length-targets.length}件。`;
+  });
+ }
+ function テスト中止(){if(!['test','test-all'].includes(処理中.value))return;revision++;controller.abort();controller=new AbortController();処理中.value='';for(const [id,value]of Object.entries(結果.value))if(['実行中','待機中'].includes(value.status))結果.value={...結果.value,[id]:{status:'中止',message:'試験・応答の待機を中止しました。開始済みの操作は取り消せない場合があります。'}};通知.value='テストの待機を中止しました。';}
+ return {認証済み,処理中,通知,項目,選択ID,選択,規定値,編集値,schema,有効変更,未保存規定値,結果,テスト条件,一括対象数,一括テスト,ログイン,ログアウト,切断,終了,再読込,切替,有効保存,規定値設定,テスト定義,テスト,テスト中止};
 }

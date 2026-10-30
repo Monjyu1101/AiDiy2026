@@ -22,6 +22,8 @@ import { runInNewContext } from 'node:vm';
 import { parseArgs } from 'node:util';
 
 type 起動記録 = { executable: string; args: string[]; options: any };
+// Windows の C:\ 区切りも posix の結合で扱えるよう、模擬パスは / 区切りにそろえる。
+const 区切り = (value: string | URL) => fileURLToPath(value).replaceAll('\\', '/');
 
 // 起動コード全体を実行し、Electron・時刻・ファイル・共通の起動処理だけを置き換える。
 async function 起動実行(options: { argv: string[]; electron: boolean; ready: (count: number) => object; storageError?: boolean }) {
@@ -33,7 +35,7 @@ async function 起動実行(options: { argv: string[]; electron: boolean; ready:
   const directories: string[] = [], logs: string[] = [], reads: string[] = [], removed: string[] = [], profiles: string[] = [];
   let clock = 0, probes = 0, exitCode: number | undefined;
   await runInNewContext(`(async () => { ${source} })()`, {
-    moduleUrl, dirname, join, fileURLToPath, pathToFileURL, URL, parseArgs,
+    moduleUrl, dirname, join, fileURLToPath: 区切り, pathToFileURL, URL, parseArgs,
     プロジェクト引数書式: '[作業フォルダ]', プロジェクトフォルダ決定: () => '/project', ブラウザ自動判定: () => false,
     ブラウザ版表示: async (url: string, value: { profile: string }) => { opened.push(url); profiles.push(value.profile); return true; },
     ブラウザ版へ切替: (error: Error) => { warnings.push(error.message); }, ウィンドウ: { パネル高さ: 414 },
@@ -112,7 +114,7 @@ test('既存ブラウザ版を検出したら、別の画面を開かず成功�
 });
 
 test('Electron / Web のログ・readyだけを配置先tempへ分け、browser-profileは従来位置を維持する', async () => {
-  const frontend = fileURLToPath(new URL('..', new URL('../panel/launch.mjs', import.meta.url)));
+  const frontend = 区切り(new URL('..', new URL('../panel/launch.mjs', import.meta.url)));
   const temporary = join(frontend, '..', 'temp', 'aidiy_discord');
   for (const browser of [false, true]) {
     const result = await 起動実行({ argv: browser ? ['--browser'] : [], electron: !browser,
@@ -139,4 +141,13 @@ test('一時保存先へ書き込めない場合は起動せず、旧outへの�
   assert.deepEqual(result.profiles, []);
   assert.deepEqual(result.removed, []);
   assert.deepEqual(result.errors, ['一時保存先へ書き込めません']);
+});
+
+test('既定で自動接続し、--no-connect の時だけ未接続で開く（Slack と同じ起動引数）', async () => {
+  for (const [argv, connect] of [[[], '1'], [['--connect'], '1'], [['--no-connect'], '0']] as const) {
+    const result = await 起動実行({ argv: [...argv], electron: true, ready: () => ({ windowShown: true }) });
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.spawned[0].options.env.AIDIY_DISCORD_CONNECT, connect, argv.join(' '));
+    assert.match(result.messages[0], connect === '1' ? /自動接続/ : /「接続」で接続/);
+  }
 });

@@ -8,11 +8,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 const root=new URL('../',import.meta.url);
-test('Discord は人物原画を保持し、黒い名称帯だけ白枠・白文字にする',async()=>{
+test('Discord は公式ロゴを保持し、黒い名称帯だけ白枠・白文字にする',async()=>{
  for(const id of ['discord']){
   const svg=await readFile(new URL(`${id}/panel/AiDiy_${id}.svg`,root),'utf8');
-  assert.match(svg,/width="512" height="512" viewBox="0 0 512 512"/);assert.match(svg,/id="caption-band" x="0" y="384" width="512" height="128" fill="#000000"/);assert.ok(svg.includes(`aria-label="${id.toUpperCase()}" fill="#FFFFFF"`));assert.match(svg,/id="caption-frame" x="4" y="388" width="504" height="120" fill="none" stroke="#FFFFFF" stroke-width="8"/);assert.doesNotMatch(svg,/<text|<script|<filter|id="white-frame"|id="caption-divider"/);assert.equal([...svg.matchAll(/<[^>]+stroke=/g)].length,1);
-  const image=svg.match(/xlink:href="data:image\/png;base64,([^"]+)"/)!;assert.ok(image);assert.equal(createHash('sha256').update(Buffer.from(image[1],'base64')).digest('hex'),'3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042');
+  assert.match(svg,/width="512" height="512" viewBox="0 0 512 512"/);assert.match(svg,/id="caption-band" x="0" y="384" width="512" height="128" fill="#000000"/);assert.ok(svg.includes(`aria-label="Discord" fill="#FFFFFF"`));assert.match(svg,/id="caption-frame" x="4" y="388" width="504" height="120" fill="none" stroke="#FFFFFF" stroke-width="8"/);assert.doesNotMatch(svg,/<script|<filter|id="white-frame"|id="caption-divider"/);assert.equal([...svg.matchAll(/<[^>]+stroke=/g)].length,1);
+  const image=svg.match(/xlink:href="data:image\/svg\+xml;base64,([^"]+)"/)!;assert.ok(image);assert.equal(createHash('sha256').update(Buffer.from(image[1],'base64')).digest('hex'),createHash('sha256').update(await readFile(new URL('discord/panel/upstream/discord-symbol.svg',root))).digest('hex'));
   const png=await readFile(new URL(`${id}/panel/AiDiy_${id}.png`,root));assert.equal(png.readUInt32BE(16),512);assert.equal(png.readUInt32BE(20),512);
   if(id==='discord')assert.deepEqual(await readFile(new URL('panel/AiDiy_discord.png',root)),png);
  }

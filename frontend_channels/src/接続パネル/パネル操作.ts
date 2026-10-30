@@ -10,33 +10,19 @@
  * -------------------------------------------------------------------------
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename } from 'node:path';
 import { DiscordBot } from '../接続/Bot接続';
-import { 設定読込, 設定エラー, プロジェクトルート, type Discord設定 } from '../接続/接続設定';
-import { ライブ選択エラー, ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存, 起動解決, CLI実行 } from '../共通連携/IDE連携';
+import { 設定読込, 設定エラー, type Discord設定 } from '../接続/接続設定';
+import { ライブ選択エラー, 起動解決 } from '../共通連携/IDE連携';
 import { ライブ候補読込, ライブ初期値 } from '../ライブ/ライブモデル候補';
-import { モデル情報取得, APIコード候補, APIコード初期値, type モデル初期情報 } from '../モデル情報/モデル情報';
+import { モデル情報取得, type モデル初期情報 } from '../モデル情報/モデル情報';
 import { 接続失敗案内, 接続エラー詳細, type 接続段階 } from '../接続/接続エラー';
+import { Hermesモデル候補, Hermesモデル検証, 既定コード名, 対応コード名 } from '../コード/Hermesモデル';
+import { パネル設定保存先, パネル設定読込, パネル設定更新, type パネル設定 } from './パネル設定';
 
-export const モデル保存先 = join(homedir(), '.aidiy', 'aidiy_discord_model.json');
 export type 機能設定 = { live: boolean; code: boolean };
 /** Code は現在 ON 固定（パネルでは操作不可）。切替できるようになっても接続制御はそのまま使える。 */
 export const コード固定ON = true;
-export function 機能設定読込(path: string): 機能設定 {
-  let live = true;
-  try { const data = JSON.parse(readFileSync(path, 'utf8')); if (typeof data?.live === 'boolean') live = data.live; } catch {}
-  return { live, code: true };
-}
-export function 機能設定保存(value: unknown, path: string): 機能設定 {
-  const live = (value as { live?: unknown } | null)?.live;
-  if (typeof live !== 'boolean') throw new 設定エラー('Live の ON/OFF を指定してください。');
-  const features = { live, code: コード固定ON ? true : (value as { code?: unknown }).code !== false };
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(features), 'utf8');
-  return features;
-}
 export function 機能案内(features: 機能設定) {
   return features.live && features.code ? 'コード／音声会話' : features.live ? '音声会話' : features.code ? 'コード' : '機能なし';
 }
@@ -52,28 +38,24 @@ export class Discordパネル {
   private stopping?: Promise<void>;
   private generation = 0;
   private closed = false;
-  private preferred: Record<string, string>;
-  private codePreferred?: { provider: string; model: string };
-  private features: 機能設定;
   private apiInfo?: モデル初期情報;
-  private catalogs = new Set<ReturnType<typeof CLI実行>>();
   発言?: (value: パネル発言) => void;
   音量?: (value: { kind: 'input' | 'output'; level: number; bins: number[] }) => void;
   音声?: (value: { kind: 'input' | 'output'; data: string; rate: number }) => void;
   constructor(private changed: (state: パネル状態) => void,
     private readConfig = 設定読込,
     private createBot: (config: Discord設定) => Bot = config => new DiscordBot(config),
-    private preferenceFile = モデル保存先,
+    private settingsFile = パネル設定保存先,
     private validateCLI = (config: Discord設定) => { 起動解決(config.cli, config.python, config.folder); },
     private timeoutMs = 40_000,
-    private codePreferenceFile = join(dirname(preferenceFile), 'aidiy_discord_code_model.json'),
     private readCatalog = ライブ候補読込,
-    private featureFile = join(dirname(preferenceFile), 'aidiy_discord_features.json'),
-    private readAPI = モデル情報取得) {
-    this.preferred = ライブモデル読込(preferenceFile) || {};
-    this.codePreferred = コードモデル読込(codePreferenceFile);
-    this.features = 機能設定読込(featureFile);
-  }
+    private readAPI = モデル情報取得) {}
+  /** 未保存時のコードモデルは共通設定の CODE_AIDIY_HERMES_MODEL（AIコアの値を優先）。 */
+  private 既定モデル(config = this.readConfig()) { return this.apiInfo?.settings.CODE_AIDIY_HERMES_MODEL || config.hermesModel; }
+  private 保存値(config = this.readConfig()): パネル設定 | undefined { return パネル設定読込(this.既定モデル(config), this.settingsFile); }
+  /** 初回（未保存）は音声会話 OFF。保存後はその選択を使う。 */
+  private get features(): 機能設定 { return { live: this.保存値()?.live ?? false, code: true }; }
+  private get preferred(): Record<string, string> { return this.保存値()?.live_models ?? {}; }
   private 状態変更(phase: パネル状態['phase'], message: string, details?: string) {
     this.状態 = { phase, message, ...(details ? { details } : {}) }; this.changed(this.状態);
   }
@@ -83,37 +65,42 @@ export class Discordパネル {
     const { models, voices } = this.apiInfo?.catalog || this.readCatalog();
     const settings = { ...ライブ初期値(this.apiInfo?.settings || config.liveModels, {models, voices}), ...this.preferred };
     const notice = this.features.live ? ライブ選択エラー(settings, { models, voices }) : '';
-    return { state: this.状態, features: this.features, settings, models, voices, notice, code: this.codePreferred || APIコード初期値(this.apiInfo, config), folder: { name: basename(config.folder) || config.folder, path: config.folder } };
+    const saved = this.保存値(config);
+    return { state: this.状態, firstRun: !saved, features: this.features, settings, models, voices, notice, code: { cli: saved?.code_name ?? 既定コード名, model: saved?.code_model ?? this.既定モデル(config) }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
   }
-  async コード候補(provider: unknown) {
-    if (this.closed || typeof provider !== 'string' || provider.length > 200) throw new Error();
-    if (this.apiInfo) return APIコード候補(this.apiInfo, provider);
-    const config = this.readConfig(), cli = 起動解決(config.cli, config.python, config.folder);
-    if (!cli.引数[0]?.endsWith('.py')) throw new Error();
-    const job = CLI実行({ 起動: { 実行ファイル: cli.実行ファイル, 引数: [join(プロジェクトルート, 'frontend_ide/host/scripts/model-catalog.py'), cli.引数[0], provider] }, 作業フォルダ: config.folder, 本文: '', 引数: [], 制限時間: 30_000 });
-    this.catalogs.add(job);
-    try {
-      const result = await job.完了;
-      if (result.終了コード !== 0) throw new Error();
-      return JSON.parse(result.回答) as { providers?: { id: string; label: string }[]; models?: { id: string; label: string }[] };
-    } finally { this.catalogs.delete(job); }
+  /** aidiy_hermes のモデル候補（auto / same / openai_oauth/gpt-… など）。 */
+  async コード候補() {
+    if (this.closed) throw new Error();
+    return { models: Hermesモデル候補(this.apiInfo) };
+  }
+  private 編集確認(what: string) {
+    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error(`切断してから${what}を選択してください。`);
   }
   コード選択保存(value: unknown) {
-    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
-    this.codePreferred = コードモデル保存(value, this.codePreferenceFile);
-    return this.codePreferred;
+    this.編集確認('モデル');
+    const model = Hermesモデル検証((value as { model?: unknown } | null)?.model);
+    const saved = パネル設定更新({ code_name: 既定コード名, code_model: model }, this.既定モデル(), this.settingsFile);
+    return { cli: saved.code_name, model: saved.code_model };
   }
   機能選択保存(value: unknown) {
-    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してから機能を選択してください。');
-    this.features = 機能設定保存(value, this.featureFile);
-    return this.features;
+    this.編集確認('機能');
+    const live = (value as { live?: unknown } | null)?.live;
+    if (typeof live !== 'boolean') throw new 設定エラー('Live の ON/OFF を指定してください。');
+    return { live: パネル設定更新({ live }, this.既定モデル(), this.settingsFile).live, code: コード固定ON };
   }
   選択保存(value: unknown) {
-    if (this.closed || !['idle', 'error'].includes(this.状態.phase)) throw new Error('切断してからモデルを選択してください。');
+    this.編集確認('モデル');
     const error = ライブ選択エラー({ ...(this.apiInfo?.settings || this.readConfig().liveModels), ...value as Record<string, string> }, this.apiInfo?.catalog || this.readCatalog());
     if (error) throw new 設定エラー(error);
-    this.preferred = ライブモデル保存(value, this.preferenceFile);
-    return this.preferred;
+    return パネル設定更新({ live_models: value as Record<string, string> }, this.既定モデル(), this.settingsFile).live_models;
+  }
+  /** 一度でも接続時の設定を保存したか。初回は自動接続せず、モデル設定画面から始める。 */
+  設定済み() { return !!this.保存値(); }
+  /** 起動時の自動接続。初回は接続せず false を返す（Slack 版と同じ動き）。 */
+  async 自動開始() {
+    if (this.closed || !this.設定済み()) return false;
+    await this.開始();
+    return true;
   }
   async 開始() {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) return;
@@ -132,6 +119,9 @@ export class Discordパネル {
       // 接続制御: 無効な機能は確認も接続もしない。
       const features = this.features;
       if (!features.live && !features.code) throw new 設定エラー('Live と Code の両方が OFF です。どちらかを ON にしてください。');
+      const saved = this.保存値(config);
+      // 将来の別ハーネス用に code_name を保存している。現在は aidiy_hermes だけを実行できる。
+      if (features.code && saved && !対応コード名.includes(saved.code_name)) throw new 設定エラー(`コード実行環境 ${saved.code_name} には未対応です。aidiy_hermes を選び直してください。`);
       if (features.code) { stage = 'Hermes確認'; this.validateCLI(config); }
       if (features.live) {
         stage = 'モデル確認';
@@ -141,7 +131,7 @@ export class Discordパネル {
         if (error) throw new 設定エラー(error);
       }
       stage = 'Bot作成';
-      const bot = this.createBot({ ...config, ...APIコード初期値(this.apiInfo, config), ...this.codePreferred, liveModels, liveEnabled: features.live, codeEnabled: features.code });
+      const bot = this.createBot({ ...config, hermesModel: saved?.code_model ?? this.既定モデル(config), liveModels, liveEnabled: features.live, codeEnabled: features.code });
       this.bot = bot;
       bot.音声 = (kind, pcm, rate) => { if (run === this.generation) this.音声?.({ kind, data: pcm.toString('base64'), rate }); };
       bot.メーター = (kind, level, bins) => { if (run === this.generation) this.音量?.({ kind, level, bins }); };
@@ -207,9 +197,6 @@ export class Discordパネル {
   }
   async 終了() {
     this.closed = true;
-    const stopping = this.停止();
-    for (const job of this.catalogs) job.停止();
-    const results = await Promise.allSettled([stopping, ...[...this.catalogs].map(job => job.完了)]);
-    if (results[0].status === 'rejected') throw results[0].reason;
+    await this.停止();
   }
 }

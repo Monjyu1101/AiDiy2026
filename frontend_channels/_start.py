@@ -77,7 +77,7 @@ def process_tree_pids() -> set[int]:
 def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
     kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if sys.platform == 'win32' else {'start_new_session': True}
     # パネルはログファイルを使って独立起動し、全体起動の終了後も継続する。
-    args = ['--connect'] if auto_connect else []
+    args = ['--connect'] if auto_connect else ['--no-connect']
     # aidiy_code / aidiy_live と同じく、全体起動ではリポジトリ直下をプロジェクトにする。
     return subprocess.Popen(launch_command() + args, cwd=THIS_DIR.parent, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, bufsize=0, **kwargs)

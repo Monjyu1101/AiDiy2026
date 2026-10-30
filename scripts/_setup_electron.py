@@ -7,7 +7,7 @@
 
 
 
-"""Diag / Avatar / IDE / Discord 共通の Electron 事前セットアップと ZIP キャッシュ。"""
+"""Diag / Avatar / IDE / Discord / Slack 共通の Electron 事前セットアップと ZIP キャッシュ。"""
 
 import json
 import os
@@ -207,8 +207,8 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
             (electron_dir / "path.txt").write_bytes(electron_executable_name().encode("utf-8"))
             return True
 
-        project_root = frontend_dir.parent.parent if frontend_dir.parent.name == 'frontend_ide' else frontend_dir.parent
-        for name in ("backend_diag", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels"):
+        project_root = frontend_dir.parent.parent if frontend_dir.parent.name in ('frontend_ide', 'frontend_channels') else frontend_dir.parent
+        for name in ("backend_diag", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels", "frontend_channels/slack"):
             peer = project_root / name
             if peer.resolve() == frontend_dir.resolve():
                 continue

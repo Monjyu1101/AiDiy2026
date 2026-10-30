@@ -78,6 +78,8 @@ X自己紹介ページの「Powered by」バッジや関連技術の装飾画像
 
 ## 開発ツール・CLI
 
+VS Code は `icons/vscode.svg` に公式の青色 stable ロゴを無改変で同梱します。クリック先は `https://code.visualstudio.com`。取得元は [公式ブランド指針](https://code.visualstudio.com/brand) の [アイコンZIP](https://code.visualstudio.com/assets/branding/visual-studio-code-icons.zip) で、配布元の説明は `icons/README-VSCode.txt` に保持します。既存の `backend_diag` の保存原本から複製しており、通常表示では他モジュールや外部画像配信へ依存しません。VS Code の名称・ロゴは Microsoft の商標です。
+
 | # | 名称 | 種別 | 備考 | 公式URL | アイコン | 取得URL |
 |---|------|------|------|--------|---------|---------|
 | 44 | **prompt_toolkit** | TUIライブラリ | hermes TUI 基盤 | — | ❌ | 掲載見送り（アイコン無し） |
@@ -86,6 +88,15 @@ X自己紹介ページの「Powered by」バッジや関連技術の装飾画像
 | 47 | **Pillow (PIL)** | 画像処理 | MCP Desktop Capture 画像処理 | `https://pillow.readthedocs.io` | ❌ | 掲載見送り |
 | 48 | **psycopg** | PostgreSQL接続 | MCP PostgreSQL 接続 | `https://www.psycopg.org` | ❌ | 掲載見送り |
 | 49 | **Hermes Agent** | 独自エージェント | aidiy_hermes CLI | — | ❌ | 掲載見送り（独自開発のためアイコン無し） |
+
+## コミュニケーション
+
+Discord・Slack は取得済みの公式原本を無改変で `icons/` に同梱し、通常表示では他モジュールや外部画像配信へ依存しません。各ロゴは各社の商標・ブランド素材であり、プロジェクトのライセンスは適用しません。
+
+| 名称 | 同梱画像 | 公式URL | 出典・使用条件 | 原本の取得URL |
+|---|---|---|---|---|
+| Discord | `icons/discord.svg` | https://discord.com | https://discord.com/branding | https://cdn.prod.website-files.com/6257adef93867e50d84d30e2/66e3d80db9971f10a9757c99_Symbol.svg |
+| Slack | `icons/slack.svg` | https://slack.com | https://slack.com/media-kit | https://a.slack-edge.com/1f40066/marketing/img/nav/logo.svg |
 
 ## フォント・デザイン
 

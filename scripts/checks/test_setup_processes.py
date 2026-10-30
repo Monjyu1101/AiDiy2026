@@ -41,8 +41,9 @@ class SetupProcessesTest(unittest.TestCase):
     def test_discord_entries_and_cli_mcp_descendants_are_preserved(self):
         for windows in (False, True):
             root = r'C:\repo\AiDiy' if windows else ROOT
-            for entry in ('panel/launch.mjs', 'panel/desktop.cjs', 'src/panel-worker.ts',
-                          'src/web-server.ts', 'src/main.ts'):
+            entries = ('panel/launch.mjs', 'panel/desktop.cjs', 'src/panel-worker.ts',
+                       'src/web-server.ts', 'src/main.ts', '_start.py')
+            for entry in (*entries, *(f'slack/{entry}' for entry in entries)):
                 with self.subTest(windows=windows, entry=entry):
                     records = [proc(5, f'python {root}/_start.py', name='python'),
                                proc(10, f'node "{root}/frontend_channels/{entry}"', 5),
@@ -58,6 +59,15 @@ class SetupProcessesTest(unittest.TestCase):
         p = proc(10, f'{exe} --type=gpu-process', name='electron', executable=exe)
         self.assertEqual(subject.select_targets([p], ROOT, current_pid=999), {})
 
+    def test_orphan_slack_electron_is_preserved(self):
+        for windows in (False, True):
+            root = r'C:\repo\AiDiy' if windows else ROOT
+            exe = f'{root}/frontend_channels/slack/node_modules/electron/dist/electron'
+            if windows:
+                exe += '.exe'
+            p = proc(10, f'"{exe}" --type=gpu-process', name='electron', executable=exe)
+            self.assertEqual(subject.select_targets([p], root, windows, current_pid=999), {})
+
     def test_setup_and_start_share_discord_preserving_selector(self):
         import importlib.util
         root = Path(__file__).resolve().parents[2]
@@ -67,7 +77,10 @@ class SetupProcessesTest(unittest.TestCase):
             spec.loader.exec_module(module)
             records = [proc(10, f'node {root}/frontend_channels/src/web-server.ts'),
                        proc(11, f'python {root}/command_hermes/cli_main.py', 10, 'python'),
-                       proc(12, f'python {root}/backend_tools/mcp_stdio.py', 11, 'python')]
+                       proc(12, f'python {root}/backend_tools/mcp_stdio.py', 11, 'python'),
+                       proc(20, f'node {root}/frontend_channels/slack/src/web-server.ts'),
+                       proc(21, f'python {root}/command_hermes/cli_main.py', 20, 'python'),
+                       proc(22, f'python {root}/backend_tools/mcp_stdio.py', 21, 'python')]
             with patch.object(subject, 'snapshot', return_value=records), patch.object(subject.os, 'kill') as kill, \
                  patch.object(subject.subprocess, 'run') as run, patch.object(module, 'print_header'), \
                  patch.object(module, 'print_info'):
@@ -254,7 +267,7 @@ class StopOutputTest(unittest.TestCase):
         with patch.object(subject, 'snapshot', side_effect=[[p], [p], []]), patch.object(subject.os, 'kill'):
             self.assertTrue(subject.stop_setup_processes(ROOT, info.append, errors.append))
         self.assertIn('この配置先で確認した停止対象', info[-1])
-        self.assertIn('Code / IDE / Discord は継続', info[-1])
+        self.assertIn('Code / IDE / Discord / Slack は継続', info[-1])
         self.assertEqual(errors, [])
 
     def test_remaining_and_snapshot_error_never_claim_success_or_setup(self):

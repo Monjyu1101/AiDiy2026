@@ -33,6 +33,7 @@ function component(name) {
     if (id.endsWith('.css')) return {};
     const relative = path.posix.normalize(path.posix.join(path.posix.dirname(name), id));
     if (id.endsWith('.vue')) return component(relative);
+    if (id.endsWith('.json')) return JSON.parse(source(relative));
     if (id.endsWith('.mjs')) {
       return dependency(relative);
     }

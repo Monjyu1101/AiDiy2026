@@ -18,7 +18,8 @@ import { config } from './helpers';
 
 const launch = { 実行ファイル: process.execPath, 引数: [fileURLToPath(new URL('./fake-cli.cjs', import.meta.url))] };
 test('VS Code と共通のCLIでstdinを渡し、ユーザーとチャンネルごとに会話を継続・リセットする', async () => {
-  const settings = config();
+  // OAuth のモデルは provider を明示して渡す（Hermesモデル.ts の Hermes会話引数）。
+  const settings = { ...config(), hermesModel: 'openai_oauth/gpt-6.1-sol' };
   const code = new Code接続(settings, launch);
   try {
     const text = '日本語 & | " ` $() %PATH%\n';

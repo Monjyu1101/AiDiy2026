@@ -29,10 +29,11 @@
 - frontend_ide/host/_start.py  check_environment / start_code / start_live / kill_ports
 - frontend_ide/viewer/_start.py     check_environment / start / kill_ports（空きポート）
 - frontend_channels/_start.py check_environment / start / kill_ports（パネルから自動接続）
+- frontend_channels/slack/_start.py check_environment / start / kill_ports（パネルから自動接続）
 
 開始承認後と Ctrl+C 終了時は、setupと共通のプロセス照合で停止します。
-この配置先の aidiy_code / aidiy_ide / aidiy_discord と必要な補助プロセスを保持します。
-独立して起動された Live / Console 等は、Code / IDE / Discord の子でも停止対象です。
+この配置先の aidiy_code / aidiy_ide / aidiy_discord / aidiy_slack と必要な補助プロセスを保持します。
+独立して起動された Live / Console 等は、Code / IDE / Discord / Slack の子でも停止対象です。
 cleanupの全停止とは別の保持方針です。
 
 標準の起動順:
@@ -51,8 +52,9 @@ cleanupの全停止とは別の保持方針です。
 12. フロントエンド(live、選択時に自動接続)
 13. フロントエンド(IDE・選択時)
 14. フロントエンド(Discord、選択時にパネルを開いて自動接続)
-15. ページ表示
-16. 自動再起動監視
+15. フロントエンド(Slack、選択時にパネルを開いて自動接続)
+16. ページ表示
+17. 自動再起動監視
 """
 
 from __future__ import annotations
@@ -151,10 +153,13 @@ MANAGED_SERVICE_NAMES = frozenset({
     "フロントエンド(code)",
     "フロントエンド(live)",
     "フロントエンド(Discord)",
+    "フロントエンド(Slack)",
 })
 
 # フォルダ別 _start.py モジュール（_init_modules で設定）
-LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = DEV = CONSOLE = DIAG = TASK = TEAM = None
+LOCAL = TOOLS = SERVER = TASKTEAM = WEB = AVATAR = VSCODE = DISCORD = SLACK = DEV = CONSOLE = DIAG = TASK = TEAM = None
+# collect_startup_choices で設定する Slack の起動選択。
+SLACK_ENABLED = False
 
 
 def _load_folder_module(folder: str):
@@ -184,7 +189,7 @@ def _remove_folder_import_cache(folder: str) -> None:
 
 
 def _init_modules() -> None:
-    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD, DEV, CONSOLE, DIAG, TASK, TEAM
+    global LOCAL, TOOLS, SERVER, TASKTEAM, WEB, AVATAR, VSCODE, DISCORD, SLACK, DEV, CONSOLE, DIAG, TASK, TEAM
     DIAG = _load_folder_module("backend_diag")
     LOCAL = _load_folder_module("backend_local")
     TOOLS = _load_folder_module("backend_tools")
@@ -198,9 +203,10 @@ def _init_modules() -> None:
     VSCODE = _load_folder_module("frontend_ide/host")
     DEV = _load_folder_module("frontend_ide/viewer")
     DISCORD = _load_folder_module("frontend_channels")
+    SLACK = _load_folder_module("frontend_channels/slack")
 
     # 起動そのものには不要なので、import で残ったキャッシュは畳んでおく。
-    for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels"):
+    for folder in ("backend_diag", "frontend_web", "frontend_avatar", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels", "frontend_channels/slack"):
         _remove_folder_import_cache(folder)
 
 
@@ -518,6 +524,9 @@ def collect_startup_choices() -> tuple[bool, ...]:
     dev_enabled           = prompt_choice("  IDE       : 起動しますか?", default_yes=STARTUP_DEFAULTS['ide'])
     print("フロントエンド(その他)")
     discord_enabled       = prompt_choice("  Discord   : 起動しますか?", default_yes=STARTUP_DEFAULTS['discord'])
+    # 既存の選択結果の並びを変えないよう、Slack はモジュール変数で main へ渡す。
+    global SLACK_ENABLED
+    SLACK_ENABLED         = prompt_choice("  Slack     : 起動しますか?", default_yes=STARTUP_DEFAULTS.get('slack', False))
     return local_enabled, backend_tools_enabled, backend_enabled, backend_taskteam_enabled, web_enabled, avatar_enabled, diag_enabled, console_enabled, code_enabled, live_enabled, dev_enabled, discord_enabled, task_enabled, team_enabled
 
 
@@ -572,10 +581,11 @@ def open_browser_via_tools(port: int) -> bool:
 # ============================================================
 def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standalone: bool = True) -> None:
     avatar_was_running = "フロントエンド(Avatar)" in processes
-    # 通常終了では Code / IDE / Discord を継続し、明示的な cleanup 要求では停止する。
+    # 通常終了では Code / IDE / Discord / Slack を継続し、明示的な cleanup 要求では停止する。
     standalone_modules = [module for module in (("live",) if keep_standalone else ("code", "live"))
                           if f"フロントエンド({module})" in processes]
     discord_was_running = not keep_standalone and "フロントエンド(Discord)" in processes
+    slack_was_running = not keep_standalone and "フロントエンド(Slack)" in processes
     task_windows = [module for label, module in (("task", TASK), ("team", TEAM))
                     if f"フロントエンド({label})" in processes and module is not None]
     console_was_running = "フロントエンド(console)" in processes
@@ -585,7 +595,7 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
             # 起動通知後のランチャーPIDは終了済み。所有する8092とElectronを後段で回収する。
             processes.pop(name, None)
             continue
-        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)"):
+        if keep_standalone and name in ("フロントエンド(code)", "フロントエンド(IDE)", "フロントエンド(Discord)", "フロントエンド(Slack)"):
             print_info(f"[{name}] 全体停止の対象外として継続します")
             processes.pop(name, None)
             continue
@@ -630,13 +640,15 @@ def stop_processes(processes: dict[str, subprocess.Popen[bytes]], *, keep_standa
         DEV.kill_ports()
     if discord_was_running and DISCORD is not None:
         DISCORD.kill_ports()
+    if slack_was_running and SLACK is not None:
+        SLACK.kill_ports()
 
 
 def stop_all_tasks(title: str = "起動中サービスの一括停止") -> bool:
-    """setupと共通の照合で、この配置先のCode / IDE / Discord以外を停止する。
+    """setupと共通の照合で、この配置先のCode / IDE / Discord / Slack以外を停止する。
 
     cleanupの全停止とは分ける。ポート番号だけでは判定せず、呼出元と
-    Code / IDE / Discordを保護した個別PID停止を使う。
+    Code / IDE / Discord / Slackを保護した個別PID停止を使う。
     """
     print_header(title)
     try:
@@ -666,6 +678,7 @@ def validate_initial_environment(
     diag_enabled: bool = False,
     task_enabled: bool = False,
     team_enabled: bool = False,
+    slack_enabled: bool = False,
 ) -> tuple[bool, str | None]:
     print_header("環境確認")
     has_error = False
@@ -781,6 +794,13 @@ def validate_initial_environment(
         else:
             print_error(f"フロントエンド(Discord): 未準備 ({detail})")
             has_error = True
+    if slack_enabled:
+        ok, detail = SLACK.check_environment()
+        if ok:
+            print_success(f"フロントエンド(Slack): OK ({detail})")
+        else:
+            print_error(f"フロントエンド(Slack): 未準備 ({detail})")
+            has_error = True
 
     return (not has_error), npm_command
 
@@ -865,6 +885,8 @@ def start_service(
             process = VSCODE.start_live(auto_connect=True)
         elif name == "フロントエンド(Discord)":
             process = DISCORD.start(auto_connect=True)
+        elif name == "フロントエンド(Slack)":
+            process = SLACK.start(auto_connect=True)
         elif name == "フロントエンド(IDE)":
             # 全体終了後も継続する独立プロセスとして起動する。
             process = DEV.start()
@@ -898,6 +920,7 @@ def start_initial_services(
     diag_enabled: bool = False,
     task_enabled: bool = False,
     team_enabled: bool = False,
+    slack_enabled: bool = False,
 ) -> dict[str, bool]:
     selected_flags = {
         "バックエンド(local)": start_backend_local_enabled,
@@ -916,6 +939,7 @@ def start_initial_services(
         "フロントエンド(live)": False,
         "フロントエンド(IDE)": False,
         "フロントエンド(Discord)": False,
+        "フロントエンド(Slack)": False,
     }
 
     if start_backend_local_enabled:
@@ -986,6 +1010,11 @@ def start_initial_services(
         print_header("フロントエンド(Discord) パネル起動・自動接続")
         if start_service("フロントエンド(Discord)", processes, last_output_times, npm_command):
             wait_for_services_quiet(last_output_times, ["フロントエンド(Discord)"], label="フロントエンド(Discord)")
+
+    if slack_enabled:
+        print_header("フロントエンド(Slack) パネル起動・自動接続")
+        if start_service("フロントエンド(Slack)", processes, last_output_times, npm_command):
+            wait_for_services_quiet(last_output_times, ["フロントエンド(Slack)"], label="フロントエンド(Slack)")
 
     if web_enabled and "フロントエンド(Web)" in processes:
         if not (start_backend_tools_enabled and "バックエンド(tools)" in processes and open_browser_via_tools(WEB.PORT_WEB)):
@@ -1113,9 +1142,10 @@ def main() -> None:
         task_enabled,
         team_enabled,
     ) = collect_startup_choices()
+    slack_enabled = SLACK_ENABLED and not diag_enabled
 
     # 開始承認後に一度だけ停止する。各サービスの起動直前には重ねて停止しない。
-    if stop_all_tasks("AiDiy プロセスの停止（Code / IDE / Discord は継続）") is False:
+    if stop_all_tasks("AiDiy プロセスの停止（Code / IDE / Discord / Slack は継続）") is False:
         print_error("既存プロセスを停止できないため、起動を中止します。")
         raise SystemExit(1)
 
@@ -1133,6 +1163,7 @@ def main() -> None:
         task_enabled=task_enabled,
         team_enabled=team_enabled,
         discord_enabled=discord_enabled,
+        slack_enabled=slack_enabled,
         diag_enabled=diag_enabled,
         console_enabled=console_enabled,
         code_enabled=code_enabled,
@@ -1166,6 +1197,7 @@ def main() -> None:
                 last_output_times=last_output_times,
                 npm_command=npm_command,
                 discord_enabled=discord_enabled,
+                slack_enabled=slack_enabled,
                 diag_enabled=diag_enabled,
                 console_enabled=console_enabled,
                 code_enabled=code_enabled,
@@ -1200,14 +1232,16 @@ def main() -> None:
                 print_success("フロントエンド(IDE): 空きポートで起動済み（URL は起動ログを参照）")
             if "フロントエンド(Discord)" in processes:
                 print_success("フロントエンド(Discord): パネル起動済み（接続状態はパネルで確認してください）")
+            if "フロントエンド(Slack)" in processes:
+                print_success("フロントエンド(Slack): パネル起動済み（接続状態はパネルで確認してください）")
             monitor_and_restart(selected_services, processes, last_output_times, npm_command)
 
         except KeyboardInterrupt:
             print_header("停止処理")
-            print_info("Ctrl+C を検出しました。Code / IDE / Discord を継続し、この配置先の他の AiDiy プロセスを停止します")
+            print_info("Ctrl+C を検出しました。Code / IDE / Discord / Slack を継続し、この配置先の他の AiDiy プロセスを停止します")
             stop_processes(processes)
-            print_info("Code / IDE / Discord と必要な補助プロセスを保持し、残る停止対象を確認します")
-            shutdown_verified = stop_all_tasks("終了時の既存プロセス整理（Code / IDE / Discord は継続）")
+            print_info("Code / IDE / Discord / Slack と必要な補助プロセスを保持し、残る停止対象を確認します")
+            shutdown_verified = stop_all_tasks("終了時の既存プロセス整理（Code / IDE / Discord / Slack は継続）")
 
             if sys.platform == "win32":
                 clear_keyboard_buffer()
@@ -1231,7 +1265,7 @@ def main() -> None:
 
         if shutdown_verified is True:
             print_header("停止完了")
-            print_success("この配置先の停止対象を確認しました（Code / IDE / Discord と必要な補助プロセスは継続）")
+            print_success("この配置先の停止対象を確認しました（Code / IDE / Discord / Slack と必要な補助プロセスは継続）")
         elif shutdown_verified is False:
             print_header("停止確認未完了")
             print_warning("停止できなかったプロセス、または確認できない対象があります。上記の警告を確認してください")

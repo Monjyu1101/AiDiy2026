@@ -41,7 +41,7 @@
 - 対象: `agy.svg`、`agy.png`。無改変原本: `upstream/antigravity-logo-mark.svg`。
 - 引用元: [Google Antigravity 公式サイト](https://antigravity.google/) のヘッダーに埋め込まれた虹色の山形マーク（背景なし、180単位の viewBox）。取得日: 2026-10-20 UTC。ページ内の SVG 要素をそのまま保存し、末尾に改行1つを付けています。番号つきリリースはなく、取得時のハッシュで固定しています。
 - 原本 SHA-256: `db3b1dd11fddd2680cc2b5785dbd79f03e1fb305c871b466c3485b4383fd957a`。
-- 形状・色: viewBox、パス、マスク、ぼかしフィルター、色は入れ子 SVG 内にそのまま保持します。トリミングはしていません。表示用 SVG は共通枠に等比配置し、図形の外の白帯に黒字の Agy を追加。PNG は合成 SVG をブラウザで描画した120×120pxの透過出力で、公式配布ファイルそのものではありません。
+- 形状・色: viewBox、パス、マスク、ぼかしフィルター、色は入れ子 SVG 内にそのまま保持します。トリミングはしていません。表示用 SVG は共通枠に等比配置し、図形の外の白帯に黒字の Antigravity を追加。PNG は合成 SVG をブラウザで描画した120×120pxの透過出力で、公式配布ファイルそのものではありません。
 - 利用条件: Google の製品ロゴであり、MIT 等のオープンライセンスは付いていません。商標その他の権利は Google に帰属します。Antigravity CLI の起動先の識別だけに使い、AiDiy 自身のマークとしては使いません。公式な提携・承認を示すものではなく、AiDiy のソフトウェアライセンスによって再許諾しません。この記録は、全配布・宣伝用途への許諾を保証するものではありません。
 
 ## Claude Code / Codex
@@ -53,14 +53,36 @@
 - 対象: `claude.svg`、`claude.png`。無改変原本: `upstream/claude-code-color-lobe.svg`。
 - 引用元: [Lobe Icons / claudecode-color.svg](https://github.com/lobehub/lobe-icons/blob/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/claudecode-color.svg)。[製品との対応情報](https://github.com/lobehub/lobe-icons/blob/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/src/ClaudeCode/index.mdx)。
 - 原本 SHA-256: `670b3d8d749d0815ad8f7e62a59d51cb5e2053cb19403f3541a8aed7036a877f`。Git blob SHA: `ed1293c473d1b6fca5403f7abddaa9147fa46d72`。
-- 形状・色: 24単位の viewBox、ピクセルキャラクター、色 `#D97757` は入れ子 SVG 内に原本のまま保持します。表示用 SVG は共通枠に等比配置し、図形の外の白帯に黒字の Claude を追加。PNG は合成結果の120×120px出力です。保存原本は全バイト無改変です。
+- 形状・色: 24単位の viewBox、ピクセルキャラクター、色 `#D97757` は入れ子 SVG 内に原本のまま保持します。表示用 SVG は x=9、y=-8、102×102px に等比配置し、原本内の上下余白を考慮してキャラクターを大きく表示します。図形の外の白帯に黒字の Claude を追加。PNG は合成結果の120×120px出力です。保存原本は全バイト無改変です。
 
 ### Codex
 
-- 対象: `codex.svg`、`codex.png`。無改変原本: `upstream/codex-color-lobe.svg`。
-- 引用元: [Lobe Icons / codex-color.svg](https://github.com/lobehub/lobe-icons/blob/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/codex-color.svg)。[製品との対応情報](https://github.com/lobehub/lobe-icons/blob/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/src/Codex/index.mdx)。
-- 原本 SHA-256: `4a2f43ce46b5b6e3722c95088f88d26ef91e6a8c2e598e70642a1c54367386e4`。Git blob SHA: `c77ccfdd9073d71cfbc3521dd7f31efb2455d916`。
-- 形状・色: 24単位の viewBox、白い角丸背景と青紫のグラデーションは入れ子 SVG 内に原本のまま保持します。表示用 SVG は共通枠に等比配置し、図形の外の白帯に黒字の Codex を追加。PNG は合成結果の120×120px出力です。保存原本は全バイト無改変です。
+- 対象: codex.svg、codex.png。無改変原本: upstream/codex-devicons.svg。
+- 引用元: [Devicons / Codex](https://devicons.io/icons/codex/)、[SVG原本](https://devicons.io/devicons/icons/codex-icon.svg)。取得日: 2026-10-31。
+- 原本 SHA-256: 58d4d628332ea66e96865350adcdd9cbd736fffe6983e726a04d13af8f871352。
+- 透明背景の青色グラデーション版。原本の600×600 viewBox・全パス・変換・色を保持し、84×84px枠へ等比配置します。色は上から #B1A7FF、#7A9DFF、#3941FF。図形の外の白帯に黒字の Codex を追加し、PNG は120×120pxの透過RGBAです。
+- Devicons は第三者配布素材です。[MIT使用条件](https://devicons.io/legal/)が適用され、ブランドの商標権とは区別します。配布ページ掲載の許諾文を以下に保持します。
+
+MIT License
+
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ### 利用条件と権利の区別
 

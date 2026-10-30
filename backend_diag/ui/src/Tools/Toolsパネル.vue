@@ -24,7 +24,11 @@ onUnmounted(()=>{password.value='';state.終了();});
 <section class="tools-panel panel" aria-label="Tools管理">
  <div class="panel-heading tools-heading">
   <div class="heading-title"><h2>Tools管理</h2><button v-if="authenticated" class="tools-reload refresh-button" :aria-busy="state.処理中.value==='read'" :disabled="!!state.処理中.value" @click="state.再読込()"><span class="refresh-glyph" aria-hidden="true">↺</span><span>再読込</span></button></div>
-  <div class="panel-actions"><button v-if="state.認証済み.value" @click="state.ログアウト()">Coreからログアウト</button></div>
+  <div class="panel-actions">
+   <button v-if="authenticated" class="single-test-button tools-batch-test" :disabled="!!state.処理中.value||!state.一括対象数.value" :aria-busy="state.処理中.value==='test-all'" title="有効・利用可能なToolを順番に試験します。通知音や専用ブラウザの起動も含みます。" @click="state.一括テスト()">一括テスト</button>
+   <button v-if="state.処理中.value==='test-all'" @click="state.テスト中止()">一括テストを中止</button>
+   <button v-if="state.認証済み.value" @click="state.ログアウト()">Coreからログアウト</button>
+  </div>
  </div>
  <div class="tools-scroll" :class="{'tools-authenticated':authenticated}">
   <div v-if="!authenticated" class="tools-auth">
@@ -42,14 +46,13 @@ onUnmounted(()=>{password.value='';state.終了();});
    <section class="tools-list" aria-label="Tools一覧" tabindex="0">
     <div class="tools-section-heading"><h3>Tools一覧</h3><button :class="{'write-next':Object.keys(state.有効変更.value).length>0}" :disabled="!!state.処理中.value||!Object.keys(state.有効変更.value).length" @click="state.有効保存()">オン・オフを保存</button></div>
     <p class="tools-help">Tool名を選ぶと、右側（狭い画面では下側）に既定値・テスト内容を表示します。</p>
-    <details class="tools-help"><summary>管理の注意事項</summary><p>OFFでも登録は維持し「サービス外」として応答します。既定値の変更は次の実行から反映されます。状態欄は利用可否であり、機能テスト成功を意味しません。</p></details>
+    <details class="tools-help"><summary>管理の注意事項</summary><p>OFFでも登録は維持し「サービス外」として応答します。既定値の変更は次の実行から反映されます。状態バッジはテスト結果です。未実施・実行中・OK・ERRなどを表示します。</p></details>
     <p v-if="Object.keys(state.有効変更.value).length" class="tools-unsaved">オン・オフ：未保存の適用があります</p>
     <ul><li v-for="row in state.項目.value" :key="row.id" :class="{selected:row.id===state.選択ID.value}">
-     <button class="tools-name" :aria-pressed="row.id===state.選択ID.value" @click="state.選択ID.value=row.id">{{row.label||row.id}}</button>
+     <button class="tools-name" :aria-pressed="row.id===state.選択ID.value" @click="state.選択ID.value=row.id">{{row.label||row.id}}<span v-if="!row.available||!row.enabled" class="tools-status">{{!row.available?'未導入':'無効'}}</span></button>
      <button class="tools-switch" :aria-pressed="row.enabled" :aria-label="`${row.label||row.id} ${row.enabled?'OFFにする':'ONにする'}`" :disabled="!!state.処理中.value||!row.available" @click="state.切替(row.id)">{{row.enabled?'ON':'OFF'}}</button>
      <button class="single-test-button tools-row-test" :disabled="!!state.処理中.value||!row.available||!row.enabled||!state.テスト定義(row.id)" :title="state.テスト定義(row.id)?.label||'代表機能テストは未対応です'" @click="state.テスト(row.id)">テスト</button>
-     <span class="tools-status">{{!row.available?'サービス外（利用不可）':!row.enabled?'サービス外':row.status}}</span>
-     <span v-if="state.結果.value[row.id]" class="tools-result" :title="state.結果.value[row.id].message">{{state.結果.value[row.id].status}}</span>
+     <component :is="状態バッジ" class="tools-result" :state="state.結果.value[row.id]?.status||'未実施'" :title="state.結果.value[row.id]?.message||'テストは未実施です。'"/>
     </li></ul>
    </section>
    <section ref="detailPane" class="tools-detail" aria-label="既定値とテスト内容" tabindex="0">
@@ -68,7 +71,7 @@ onUnmounted(()=>{password.value='';state.終了();});
      </section>
      <fieldset class="tools-test-content"><legend>テスト条件</legend>
       <p v-if="!current.available" class="warning">この環境では利用できません。</p><p v-else-if="!current.enabled" class="warning">OFF（サービス外）のため実行しません。専用ブラウザを終了する場合は、先にこのToolをONへ戻してください。</p>
-      <template v-if="test"><h4>{{test.label}}</h4><p class="tools-help">{{test.description}}</p><label class="tools-test-option"><input v-model="state.テスト条件.value[current.id].headless" type="checkbox" :disabled="!!state.処理中.value||!current.available||!current.enabled">画面を表示しない（headless）</label><div class="tools-actions"><button class="single-test-button" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id)">この条件でテスト</button><button v-if="test.close" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id,true)">専用ブラウザを終了</button></div></template>
+      <template v-if="test"><h4>{{test.label}}</h4><p class="tools-help">{{test.description}}</p><label v-if="test.headless" class="tools-test-option"><input v-model="state.テスト条件.value[current.id].headless" type="checkbox" :disabled="!!state.処理中.value||!current.available||!current.enabled">画面を表示しない（headless）</label><div class="tools-actions"><button class="single-test-button" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id)">この条件でテスト</button><button v-if="test.close" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id,true)">専用ブラウザを終了</button></div></template>
       <p v-else class="tools-help">このToolの代表機能テストは未対応です。状態の表示は機能テスト成功を意味しません。</p>
      </fieldset>
     </template><p v-else class="tools-help">一覧からToolを選択してください。</p>

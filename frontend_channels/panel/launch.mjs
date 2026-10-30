@@ -20,20 +20,21 @@ import { parseArgs } from 'node:util';
 import { プロジェクト引数書式, プロジェクトフォルダ決定, ブラウザ自動判定, ブラウザ版表示, ブラウザ版へ切替, ウィンドウ } from '../../frontend_ide/host/scripts/launch-project.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const usage = `aidiy_discord ${プロジェクト引数書式} [--browser] [--check] [--connect]`;
+const usage = `aidiy_discord ${プロジェクト引数書式} [--browser] [--check] [--no-connect]`;
 let options, projectRoot;
 try {
   const parsed = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: {
-    project: { type: 'string' }, browser: { type: 'boolean' }, check: { type: 'boolean' }, connect: { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
+    project: { type: 'string' }, browser: { type: 'boolean' }, check: { type: 'boolean' }, connect: { type: 'boolean' }, 'no-connect': { type: 'boolean' }, wait: { type: 'boolean' }, help: { type: 'boolean' },
   } });
   options = parsed.values;
   if (!options.help) projectRoot = プロジェクトフォルダ決定(parsed.positionals, options.project);
 } catch (error) { console.error(`${error.message}\n使用方法: ${usage}`); process.exit(1); }
 if (options.help) {
-  console.log(`${usage}\nLive・コードの前回の選択でパネルを開きます。作業フォルダ未指定時は起動したフォルダをプロジェクトにします。Codespaces・画面のない Linux では --browser を省略してもブラウザ版で開きます。単独起動は未接続、--connect は自動接続です。`);
+  console.log(`${usage}\nLive・コードの前回の選択でパネルを開きます。作業フォルダ未指定時は起動したフォルダをプロジェクトにします。Codespaces・画面のない Linux では --browser を省略してもブラウザ版で開きます。起動すると前回の設定で自動接続します（初回は接続せずモデル設定画面を開きます）。--no-connect は未接続で開きます（--connect は従来の指定として受け付けます）。`);
   process.exit(0);
 }
-const args = [...(options.check ? ['--check'] : []), ...(options.connect ? ['--connect'] : []), ...(options.wait ? ['--wait'] : [])];
+// 単独起動・Diag・全体起動とも自動接続する。切断するとモデル選択の画面に戻る。
+const args = [...(options.check ? ['--check'] : []), ...(options['no-connect'] ? [] : ['--connect']), ...(options.wait ? ['--wait'] : [])];
 // 通常起動・自動接続とも、Electron を探す／起動する前に共通の設定検証を通す。
 // --check 以外は成功ログを省略し、入力したトークン自体はどの出力にも含めない。
 const checkOnly = args.includes('--check');
@@ -95,7 +96,7 @@ async function パネル起動(browser) {
     } else if (state.windowShown) {
       // Codespaces ではポート転送先の URL を開く。$BROWSER があれば手元の PC のブラウザで開く。
       if (browser) await ブラウザ版表示(state.publicUrl || state.url, { profile: browserProfile, height: ウィンドウ.パネル高さ });
-      console.log(args.includes('--connect') ? 'AiDiy Discord パネルを開き、自動接続を開始しました。' : 'AiDiy Discord パネルを開きました。「接続」で接続します。');
+      console.log(args.includes('--connect') ? 'AiDiy Discord パネルを開きました。前回の設定で自動接続します（初回はモデルを選んで「接続」）。' : 'AiDiy Discord パネルを開きました。「接続」で接続します。');
       if (args.includes('--wait') && child.exitCode === null && child.signalCode === null) await new Promise(resolve => child.once('exit', resolve));
       return child.exitCode ?? 0;
     }

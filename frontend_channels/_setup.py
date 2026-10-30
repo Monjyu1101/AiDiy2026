@@ -62,9 +62,13 @@ def _discord_in_use() -> bool:
     if _runtime_in_use(THIS_DIR):
         return True
     windows = sys.platform == 'win32'
+    # 同じ frontend_channels 配下でも、独立した Slack Bot（slack/）は Discord の稼働に数えない。
+    slack_root = os.path.normcase(str(THIS_DIR / 'slack') + os.sep)
     for process in snapshot():
         if process.get('ProcessId') == os.getpid():
             continue  # この _setup.py 自身は Discord の稼働ではない。
+        if slack_root in os.path.normcase(process.get('CommandLine') or ''):
+            continue
         if (process_role(process, THIS_DIR.parent, windows) == 'frontend_channels'
                 or is_discord_process(process, THIS_DIR, windows)):
             return True

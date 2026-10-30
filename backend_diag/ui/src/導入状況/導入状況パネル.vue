@@ -10,6 +10,7 @@ import 状態バッジ from '../共通表示/状態バッジ.vue';
 import { 先頭へスクロール, 完了時 } from '../共通表示/先頭表示.mjs';
 import { 導入状況表示を作成 } from './導入状況表示.mjs';
 import './導入状況.css';
+import 公式サイト from './公式サイト.json';
 
 const props = defineProps(['lastRun','項目', '結果', '確認中', '個別確認中', '個別確認Ids', '接続済み', '確認済み', '書込中', '書込済み', '表示中', '操作', '操作中', '全診断中']);
 defineEmits(['確認', '個別確認', '書込']);
@@ -45,7 +46,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
   <main>
     <aside aria-label="診断項目"><nav id="list"><details open><summary>導入状況</summary><template v-for="group in 分類" :key="group"><details :open="!折り畳み.has(group)" @toggle="開閉(group,$event)"><summary>{{group}} · {{項目.filter(e=>(e.menuGroup || 'その他拡張')===group).length}}</summary>
       <div v-for="item in 項目.filter(e=>(e.menuGroup || 'その他拡張')===group)" :key="item.id" class="install-item" :class="{selected:選択ID===item.id}">
-        <button class="item" :class="{selected:選択ID===item.id}" :aria-pressed="選択ID===item.id" @click="選択ID=item.id;詳細表示=true"><span>{{item.name}}</span></button>
+        <div class="install-name"><button class="item" :class="{selected:選択ID===item.id}" :aria-pressed="選択ID===item.id" @click="選択ID=item.id;詳細表示=true"><span>{{item.name}}</span></button><a v-if="公式サイト[item.id]" class="install-web" :href="公式サイト[item.id]" target="_blank" rel="noopener noreferrer" :aria-label="`${item.name} の公式サイトを開く`" :title="`${item.name} の公式サイト`">Web</a></div>
         <div class="install-check"><button class="single-test-button" :data-install-check="item.id" :aria-label="`${item.name} の導入状況を確認`" :disabled="行確認禁止(item.id)" title="この項目の導入状況だけを再確認します" @click="選択ID=item.id;$emit('個別確認',item.id)">{{行確認中(item.id)?'確認中…':'確認'}}</button><component :is="状態バッジ" :state="状態(item.id)"/></div>
         <div v-if="可能操作(item.id).length" class="install-manage"><button v-for="action in 可能操作(item.id)" :key="action" type="button" :data-install-action="action" :data-install-id="item.id" :aria-label="`${item.name} を${action}`" :class="{'install-delete':action==='削除'}" :disabled="項目操作禁止(item.id)" :title="能力(item.id)?.説明" @click="実行開始(item,action)">{{action}}</button></div>
       </div>
@@ -63,7 +64,7 @@ watch(()=>props.確認中,完了時(()=>先頭へスクロール(パネル.value
         </template>
         <template v-else><component :is="状態バッジ" class="status" :state="状態(選択項目.id)"/><p>{{選択項目.description}}</p><p v-if="能力(選択項目.id)?.理由" class="install-capability-note">{{能力(選択項目.id).理由}}</p><dl><template v-for="[label,value] in 詳細項目" :key="label"><dt>{{label}}</dt><dd>{{value}}</dd></template></dl><h3>ソースの参照箇所</h3><ul><li v-for="source in 参照箇所" :key="source">{{source}}</li></ul></template>
       </template>
-      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>名称の右側に「確認」と状態を表示します。各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、2行目の左側に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、別の項目とは並行して実行できます（実行中の項目のボタンだけ押せなくなります）。終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
+      <div v-else class="welcome"><span class="eyebrow">ENVIRONMENT DIAGNOSTICS</span><h2>導入状況</h2><p>ベース・CLI群・その他拡張からプログラムを選ぶと、利用用途と検出結果を表示します。</p><p>名前の直後の角丸の「Web」で公式サイトを開きます。右側に「確認」と状態を表示します。各項目の「確認」でその項目だけ、右上の「状況確認」で全項目のパスとバージョンを確認します。コマンドで安全に管理できる項目だけ、2行目の左側に「導入」または「再導入」「削除」を表示します。</p><p>導入操作は確認ダイアログへの同意後に実行し、別の項目とは並行して実行できます（実行中の項目のボタンだけ押せなくなります）。終了後は「確認」ボタンと同じ処理を実行し、右側コンソールにログと確認結果を表示します。ログインや AI への問い合わせは行いません。</p></div>
     </article>
   </main>
 </section>

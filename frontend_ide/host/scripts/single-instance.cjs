@@ -13,7 +13,7 @@
 'use strict';
 
 const { createServer, createConnection } = require('node:net');
-const ports = { aidiy_live: 18094, aidiy_discord: 18095 };
+const ports = { aidiy_live: 18094, aidiy_discord: 18095, aidiy_slack: 18096 };
 
 // GUI / ブラウザで共通の排他。プロセス終了時に OS が解放する。
 async function 起動ロック(name, repeated = () => {}, port = ports[name]) {

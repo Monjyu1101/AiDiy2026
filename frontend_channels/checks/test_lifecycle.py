@@ -111,8 +111,10 @@ class DiscordLifecycleTest(unittest.TestCase):
         # 戻り値は Discord の後に aidiy_task / aidiy_team を加えた14項目。Discord は12番目。
         self.assertEqual(len(flags), 14)
         self.assertFalse(flags[11])
-        self.assertIn('IDE', ask.call_args_list[-2].args[0])
-        self.assertIn('Discord', ask.call_args_list[-1].args[0])
+        # Slack は戻り値の並びを変えず、Discord の直後に尋ねる。
+        self.assertIn('IDE', ask.call_args_list[-3].args[0])
+        self.assertIn('Discord', ask.call_args_list[-2].args[0])
+        self.assertIn('Slack', ask.call_args_list[-1].args[0])
         with tempfile.TemporaryDirectory() as folder, patch.object(cleanup, 'ask_start_mode', return_value=(True, False)), patch.object(
             cleanup, 'ask_yes_no', side_effect=setup_answer
         ):
@@ -233,7 +235,7 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][-1], '--check')
             with patch.object(discord_start.subprocess, 'Popen') as spawn:
                 discord_start.start()
-            self.assertEqual(spawn.call_args.args[0], command)
+            self.assertEqual(spawn.call_args.args[0], command + ['--no-connect'], '起動入口は既定で自動接続するため、未接続は明示する')
             self.assertNotIn('shell', spawn.call_args.kwargs)
             with patch.object(discord_start.subprocess, 'Popen') as spawn:
                 discord_start.start(auto_connect=True)
@@ -245,12 +247,14 @@ class DiscordLifecycleTest(unittest.TestCase):
             modules['frontend_ide/host'] = Mock()
             modules['frontend_ide/host'].process_tree_pids.return_value = {100, 101}
             modules['frontend_channels'].process_tree_pids.return_value = {200, 201, 202}
+            modules['frontend_channels/slack'].process_tree_pids.return_value = set()
             tools = Mock()
             with patch.object(cleanup, '_load_folder_start_module', side_effect=modules.get), patch.object(
                 cleanup, '_load_folder_module', return_value=tools
             ), patch.object(cleanup.time, 'sleep'):
                 self.assertTrue(cleanup.stop_all_services({}, strict=False, keep_code=keep_code, keep_discord=True))
             modules['frontend_channels'].kill_ports.assert_not_called()
+            modules['frontend_channels/slack'].kill_ports.assert_not_called()
             expected = {200, 201, 202} | ({100, 101} if keep_code else set())
             tools.stop_tools_processes.assert_called_once_with(exclude_pids=frozenset(expected))
 

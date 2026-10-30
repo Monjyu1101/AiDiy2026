@@ -1,6 +1,7 @@
 // Diag起動認証に加え、Tools側でCore利用者を毎回再検証する固定用途の中継。
 import http from 'node:http';
 import {readConfig} from '../runtime/model_probe.mjs';
+import {代表試験,試験結果} from './代表試験.mjs';
 export const TOOLS_SETTINGS_ACTIONS=Object.freeze({enabled:'/management/enabled',defaults:'/management/defaults'});
 export const TOOLS_SETTINGS_BODY_LIMIT=32*1024;
 export const TOOL_IDS=Object.freeze(['aidiy_chrome_devtools','aidiy_desktop_capture','aidiy_sqlite','aidiy_postgres','aidiy_logs','aidiy_code_check','aidiy_backup','aidiy_image_generation','aidiy_movie_generation','aidiy_speech_to_text','aidiy_text_to_speech','aidiy_obs_studio_control','aidiy_ffmpeg_control','aidiy_notification_sounds','aidiy_code_agents','aidiy_chat_llms','aidiy_decisions_check','aidiy_task_agents','aidiy_team_agents','aidiy_windows_control']);
@@ -34,14 +35,14 @@ function bounded(promise,signal,timeoutMs){
   promise.then(value=>finish(null,value),()=>finish(failure(503,'Tools の接続設定を確認してください。')));
  });
 }
-function requestTools({port,path,token,data,signal,timeoutMs}){
+function requestTools({port,path,token,data,signal,timeoutMs,method='POST'}){
  return new Promise((resolve,reject)=>{
   let req,res,done=false;
   const finish=(err,value)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();err?reject(err):resolve(value);};
   const abort=()=>finish(failure(503,'Tools の接続を確認できませんでした。'));
   const timer=setTimeout(abort,timeoutMs);signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)return abort();
-  const payload=Buffer.from(JSON.stringify(data));
-  req=http.request({hostname:'127.0.0.1',port,path:encodeURI(path),method:'POST',agent:false,maxHeaderSize:8192,headers:{'Content-Type':'application/json','Content-Length':payload.length,Authorization:`Bearer ${token}`,Accept:'application/json'}},incoming=>{
+  const payload=Buffer.from(method==='GET'?'':JSON.stringify(data));
+  req=http.request({hostname:'127.0.0.1',port,path:encodeURI(path),method,agent:false,maxHeaderSize:8192,headers:{'Content-Type':'application/json','Content-Length':payload.length,Authorization:`Bearer ${token}`,Accept:'application/json'}},incoming=>{
    res=incoming;const chunks=[];let size=0;
    res.on('error',abort);res.on('aborted',abort);
    res.on('data',chunk=>{size+=chunk.length;if(size>256*1024)return abort();chunks.push(chunk);});
@@ -86,20 +87,29 @@ export function createToolsRepresentativeBridge({reader,requestFn=requestTools,t
   if(!object(envelope)||!object(envelope.data)||Object.keys(envelope).some(k=>!['token','data'].includes(k)))throw failure(400,'入力が不正です。');
   const {token}=validate('enabled',{token:envelope.token,data:{}});
   const data=envelope.data;
-  if(Object.keys(data).some(k=>!['operation','headless'].includes(k))||!['open','close'].includes(data.operation)||(data.headless!==undefined&&typeof data.headless!=='boolean'))throw failure(400,'試行条件が不正です。');
-  if(busy)throw failure(409,'ブラウザ試行中です。完了後に再試行してください。');
+  const simple=data.operation==='test';
+  if(simple ? Object.keys(data).some(k=>!['operation','tool'].includes(k))||typeof data.tool!=='string'||!Object.hasOwn(代表試験,data.tool) : Object.keys(data).some(k=>!['operation','headless'].includes(k))||!['open','close'].includes(data.operation)||(data.headless!==undefined&&typeof data.headless!=='boolean'))throw failure(400,'試行条件が不正です。');
+  const toolId=simple?data.tool:'aidiy_chrome_devtools';
+  if(busy)throw failure(409,'Tools試行中です。完了後に再試行してください。');
   busy=true;
   try{
    const [state,config]=await bounded(readConfig(reader),signal,Math.min(timeoutMs,5000));
    const ports=[config.PORT_CORE??8091,config.PORT_TOOLS??8095];
    if(state==='読込不可'||ports.some(raw=>!['number','string'].includes(typeof raw)||!/^\d+$/.test(String(raw).trim())||!Number.isInteger(Number(raw))||Number(raw)<1||Number(raw)>65535))throw failure(503,'Core / Tools の接続設定を確認してください。');
-   const call=(port,path,body)=>bounded(requestFn({port:Number(port),path,token,data:body,signal,timeoutMs}),signal,timeoutMs);
+   const call=(port,path,body,method='POST')=>bounded(requestFn({port:Number(port),path,token,data:body,signal,timeoutMs,method}),signal,timeoutMs);
    const auth=await call(ports[0],'/core/auth/現在利用者',{});
    if(auth.authExpired||auth.status!=='OK')return authExpired();
    const stateResponse=await call(ports[1],'/management/enabled',{});
    if(stateResponse.authExpired)return authExpired();
-   const tool=stateResponse.data?.tools?.find(row=>row.id==='aidiy_chrome_devtools');
-   if(stateResponse.status!=='OK'||tool?.enabled!==true||tool?.available!==true)return {status:'NG',message:'ブラウザToolsはサービス外です。導入状態と有効設定を確認してください。',data:{}};
+   const tool=stateResponse.data?.tools?.find(row=>row.id===toolId);
+   if(stateResponse.status!=='OK'||tool?.enabled!==true||tool?.available!==true)return {status:'NG',message:'選択したToolsはサービス外です。導入状態と有効設定を確認してください。',data:{}};
+   if(simple){
+    const test=代表試験[toolId];
+    const response=await call(ports[1],`/${toolId}/${test.method}`,test.body,test.httpMethod||'POST');
+    if(response.authExpired)return authExpired();
+    const summary=試験結果(toolId,response);
+    return summary?{status:'OK',message:summary,data:{summary}}:{status:'NG',message:'試験に失敗しました。対象サービスの起動・接続設定・Toolsログを確認してください。',data:{}};
+   }
    const operation=data.operation==='open'?'open_session':'close_session';
    const payload={session:'diag-tools-test',...(operation==='open_session'?{headless:data.headless??false,show_automation_banner:true}:{})};
    const response=await call(ports[1],'/aidiy_chrome_devtools/'+operation,payload);

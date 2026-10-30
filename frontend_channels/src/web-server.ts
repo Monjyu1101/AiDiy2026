@@ -135,7 +135,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     void app.closed.then(() => process.exit(0));
     if (process.env.AIDIY_DISCORD_READY) writeFileSync(process.env.AIDIY_DISCORD_READY, JSON.stringify({ url: app.url, publicUrl: app.publicUrl, pid: process.pid, windowShown: true }));
     console.log(`AiDiy Discord ブラウザ版: ${app.publicUrl}`);
-    if (process.env.AIDIY_DISCORD_CONNECT === '1') void app.service.要求('start', undefined);
+    // 自動接続は保存済みの設定があるときだけ。初回はモデル設定画面から始める。
+    if (process.env.AIDIY_DISCORD_CONNECT === '1') void app.service.要求('auto-start', undefined);
   } catch (error) {
     await instance?.close();
     console.error(`Discord パネル（ブラウザ版）を起動できません: ${error instanceof Error ? error.message : String(error)}`);

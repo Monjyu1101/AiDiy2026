@@ -23,7 +23,7 @@ test('Slack は Discord の次の外部連携行で、モデル一覧へ混ざ�
  const {外部連携ID,外部連携か}=dependency('キー設定共通/キー設定表示.mjs');assert.deepEqual(Array.from(外部連携ID),ids);assert.equal(外部連携か({id:'slack'}),true);
  const data={設定状態:'読込済み',項目:[{id:'openai',名前:'OpenAI',設定済み:true,テスト可能:true},...rows()]};
  const html=await render('外部連携/外部連携パネル.vue',{data,connected:true,results:{}});
- assert.equal((html.match(/class="integration-row"/g)||[]).length,4);assert.ok(html.indexOf('>discord<')<html.indexOf('>Slack Bot<'));
+ assert.equal((html.match(/class="integration-row"/g)||[]).length,4);assert.ok(html.indexOf('>Discord<')>=0 && html.indexOf('>Discord<')<html.indexOf('>Slack<'));
  assert.equal((html.match(/data-state="未実施"/g)||[]).length,4);assert.doesNotMatch(html,/準備中|接続済み|data-state="OK"|>OpenAI</);
  const models=await render('モデル一覧/モデル一覧パネル.vue',{data,connected:true,results:{}});assert.doesNotMatch(models,/Slack Bot/);
  assert.match(html,/auth\.test/);assert.match(html,/App トークン/);assert.match(html,/Socket Mode/);
@@ -51,7 +51,7 @@ function mount(props){
 test('Slack 選択で右詳細を表示し、テストはSlack IDだけ送信・設定更新後も選択維持',async()=>{
  const emitted=[],props=vue.reactive({connected:true,data:{設定状態:'読込済み',項目:rows()},results:{},onTest:id=>emitted.push(id)}),ui=mount(props);
  try{
-  const select=ui.all().find(n=>n.tag==='button'&&ui.text(n)==='Slack Bot設定済');ui.click(select);await flush();
+  const select=ui.all().find(n=>n.tag==='button'&&ui.text(n)==='Slack設定済');ui.click(select);await flush();
   const article=ui.all().find(n=>n.tag==='article');assert.match(ui.text(article),/Slack Bot/);assert.match(ui.text(article),/slack_bot_token/);assert.match(ui.text(article),/auth\.test/);
   const row=ui.all().find(n=>n.props.class==='integration-row selected');ui.click(row.children.flatMap(n=>[n,...n.children]).find(n=>n.tag==='button'&&n.props.class==='single-test-button'));assert.deepEqual(emitted,['slack']);
   props.data={設定状態:'読込済み',項目:rows()};props.results={slack:{状態:'NG',説明:'Bot認証を確認できません。'}};await flush();assert.match(ui.text(article),/Bot認証を確認できません/);

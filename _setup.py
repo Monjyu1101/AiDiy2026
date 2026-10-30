@@ -26,6 +26,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - command_hermes/_setup.py   コマンド(hermes)
 - frontend_ide/_setup.py     IDE群(Console / Code / Live / IDE / Task / Team)
 - frontend_channels/_setup.py フロントエンド(Discord、任意)
+- frontend_channels/slack/_setup.py フロントエンド(Slack、任意)
 
 Usage:
     python _setup.py
@@ -138,8 +139,8 @@ def _load_folder_module(folder: str, entry: str = "_setup.py"):
 
 
 def stop_setup_apps() -> None:
-    """Code / IDE / Discord以外の、この作業コピーのAiDiy実行を依存物更新前に停止する。"""
-    print_header("AiDiy プロセスの停止（Code / IDE / Discord は継続）")
+    """Code / IDE / Discord / Slack以外の、この作業コピーのAiDiy実行を依存物更新前に停止する。"""
+    print_header("AiDiy プロセスの停止（Code / IDE / Discord / Slack は継続）")
     sys.path.insert(0, str(BASE_DIR / "scripts"))
     from _setup_processes import stop_setup_processes
     if not stop_setup_processes(BASE_DIR, print_info, print_error):
@@ -177,6 +178,7 @@ IMPORT_CACHE_FOLDERS = (
     "frontend_ide/host",
     "frontend_ide/viewer",
     "frontend_channels",
+    "frontend_channels/slack",
 )
 
 
@@ -713,6 +715,7 @@ def collect_setup_choices() -> dict | None:
         "ide":                   False,
         "diag":                  False,
         "discord":               False,
+        "slack":                 False,
         "continue_on_error":     False,
     }
 
@@ -745,6 +748,7 @@ def collect_setup_choices() -> dict | None:
     choices["hermes"] = ask_yes_no("Hermes のセットアップを実行しますか？", default="y")
     choices["ide"] = ask_yes_no("Console / Code / Live / IDE / Task / Team のセットアップを実行しますか？", default="y")
     choices["discord"] = ask_yes_no("Discord のセットアップを実行しますか？", default="y")
+    choices["slack"] = ask_yes_no("Slack のセットアップを実行しますか？", default="y")
 
     choices["continue_on_error"] = ask_yes_no("エラーが発生しても続行しますか？", default="y")
 
@@ -834,6 +838,9 @@ def setup_node_refresh() -> list[str]:
         ("Discord: 依存", lambda: dependencies("frontend_channels", electron=True)),
         ("Discord: ビルド", lambda: build("frontend_channels", "build:panel")),
         ("Discord: aidiy_discord", lambda: _load_folder_module("frontend_channels").install_launcher(BASE_DIR / "frontend_channels")),
+        ("Slack: 依存", lambda: dependencies("frontend_channels/slack", electron=True)),
+        ("Slack: ビルド", lambda: build("frontend_channels/slack", "build:panel")),
+        ("Slack: aidiy_slack", lambda: _load_folder_module("frontend_channels/slack").install_launcher(BASE_DIR / "frontend_channels/slack")),
     ]
     for label, action in steps:
         print_info(label)
@@ -851,7 +858,7 @@ def setup_node_refresh() -> list[str]:
 # メイン
 # ============================================================
 def setup_launchers_only() -> list[str]:
-    """全11コマンドの登録を修復する。依存導入・ビルド・サービス起動は行わない。"""
+    """全12コマンドの登録を修復する。依存導入・ビルド・サービス起動は行わない。"""
     steps = [
         ('Diag', lambda: _load_folder_module('backend_diag').setup(desktop=False)),
         ('Avatar', lambda: _load_folder_module('frontend_avatar').install_standalone_launcher()),
@@ -863,6 +870,7 @@ def setup_launchers_only() -> list[str]:
         ('Team', lambda: _load_folder_module('frontend_ide/aidiy_team').setup()),
         ('Browser', lambda: _load_folder_module('frontend_ide/aidiy_browser').setup()),
         ('Discord', lambda: _load_folder_module('frontend_channels').install_launcher(BASE_DIR / 'frontend_channels')),
+        ('Slack', lambda: _load_folder_module('frontend_channels/slack').install_launcher(BASE_DIR / 'frontend_channels/slack')),
     ]
     errors = []
     for label, action in steps:
@@ -889,6 +897,7 @@ def print_app_launch_commands():
         ('Live', 'aidiy_live'),
         ('IDE', 'aidiy_ide'),
         ('Discord', 'aidiy_discord'),
+        ('Slack', 'aidiy_slack'),
     )
     app_width = max(len(name) for name, _ in app_commands)
     for name, command in app_commands:
@@ -915,6 +924,7 @@ def main():
     print_info("  8. Hermes")
     print_info("  9. Console / Code / Live / IDE / Task / Team")
     print_info(" 10. Discord")
+    print_info(" 11. Slack")
     print_info("外部チャンネル: Discord / Slack")
     print()
 
@@ -1112,6 +1122,16 @@ def main():
                 sys.exit(1)
     else:
         print_warning("Discord のセットアップをスキップしました。")
+
+    print()
+    if choices.get("slack"):
+        if not _load_folder_module("frontend_channels/slack").setup(choices):
+            error_locations.append("Slack")
+            if not continue_on_error:
+                print_setup_summary(error_locations)
+                sys.exit(1)
+    else:
+        print_warning("Slack のセットアップをスキップしました。")
 
     print_header("キャッシュクリア")
     remove_folder_import_caches()

@@ -29,6 +29,8 @@ async function ピン切替() {
 }
 async function 最大化反映() { try { 最大化中.value = !!(await window.discordPanel.isMaximized?.()); } catch {} }
 async function 最大化切替() { await 画面.ウィンドウ操作('maximize'); await 最大化反映(); }
+// 未接続では設定欄そのものへ移る。接続中は設定を開き、適用時に再接続する。
+function モデル押下() { if (!画面.モデル設定()) document.getElementById(画面.機能.live ? 'provider' : 'code-model')?.focus(); }
 onMounted(() => {
   画面.開始(canvas.value, 本文.value, 詳細.value);
   ピン購読解除 = window.discordPanel.onPinState?.(value => { ピン通知世代++; ピン反映(value); });
@@ -50,16 +52,17 @@ onBeforeUnmount(() => { 終了済み = true; ピン購読解除?.(); window.remo
       <div class="row"><label for="provider">AI</label><select id="provider" v-model="画面.ライブAI" :disabled="画面.ライブ編集不可" @change="画面.ライブAI変更"><option v-for="(名前, id) in 画面.AI候補" :key="id" :value="id" :disabled="!画面.ライブAI利用可能(id)">{{ 名前 }}{{ 画面.ライブAI利用可能(id) ? '' : '（候補なし）' }}</option></select><label class="voice-label" for="voice">音声</label><select id="voice" v-model="画面.音声" :disabled="画面.ライブ編集不可" @change="画面.保存"><option v-if="!画面.音声" value="" disabled>候補から選択してください</option><option v-for="(名前, id) in 画面.音声候補" :key="id" :value="id">{{ 名前 }}</option></select></div>
       <div class="row"><label for="model">モデル</label><select id="model" v-model="画面.ライブモデル" :disabled="画面.ライブ編集不可" @change="画面.保存"><option v-if="!画面.ライブモデル" value="" disabled>候補から選択してください</option><option v-for="(名前, id) in 画面.モデル候補" :key="id" :value="id">{{ 名前 }}</option></select></div>
       <div class="section-label code-section">コード <component :is="機能切替" id="code-toggle" :有効="true" :無効="true" 説明="コードは常に ON です" /></div>
-      <div class="row"><label for="code-provider">コード AI</label><select id="code-provider" v-model="画面.コードAI" :disabled="画面.コード編集不可" @change="画面.コードAI変更"><option v-for="(名前, id) in 画面.コードAI候補" :key="id" :value="id">{{ 名前 }}</option></select></div>
-      <div class="row code-last"><label for="code-model">モデル</label><input id="code-model" v-model="画面.コードモデル" list="code-models" maxlength="300" spellcheck="false" autocomplete="off" :placeholder="画面.コードAI ? '未指定時はコード AI の既定モデル' : 'モデルを指定するにはコード AI を選択'" :disabled="画面.コード編集不可 || !画面.コードAI" @change="画面.保存('code')"><datalist id="code-models"><option v-for="item in 画面.コードモデル候補" :key="item.id" :value="item.id">{{ item.label }}</option></datalist></div>
+      <div class="row"><label for="code-cli">コード</label><span id="code-cli" class="fixed-value" title="コードは aidiy_hermes 固定です">{{ 画面.コードCLI }}</span></div>
+      <div class="row code-last"><label for="code-model">モデル</label><select id="code-model" v-model="画面.コードモデル" :disabled="画面.コード編集不可" @change="画面.保存('code')"><option v-for="item in 画面.コードモデル一覧" :key="item.id" :value="item.id">{{ item.label }}</option></select></div>
       <textarea id="error-detail" ref="詳細" readonly :hidden="!画面.接続状態.details" :value="画面.接続状態.details || ''" aria-label="接続エラーの詳細（選択してコピーできます）"></textarea>
       <p class="hint">専用チャンネルに投稿、またはボイスチャンネルに参加。</p>
       <p id="note" class="note" :class="{ error: 画面.案内エラー }" role="status">{{ 画面.案内 }}</p>
+      <div v-if="画面.設定表示" id="settings-actions"><button id="settings-cancel" type="button" :disabled="画面.操作中" @click="画面.設定取消">キャンセル</button><button id="settings-apply" type="button" :disabled="画面.操作中 || 画面.機能.live && (!画面.ライブモデル || !画面.音声)" @click="画面.設定適用">適用して再接続</button></div>
     </div>
     <section id="stage" aria-label="最後のやり取り">
       <div class="welcome-mark" aria-hidden="true"><img src="AiDiy.png" alt=""></div>
       <div id="stage-log" aria-live="polite"><div id="stage-idle" class="stage-entry" :hidden="画面.発言表示"><span class="stage-who">接続先</span><span class="stage-text">専用チャンネルに投稿、またはボイスチャンネルに参加。</span></div><div id="stage-message" class="stage-entry" :hidden="!画面.発言表示" :class="{ fading: 画面.発言消去中 }" :data-role="画面.発言役割"><span id="stage-who" class="stage-who">{{ 画面.発言者 }}</span><span id="stage-text" ref="本文" class="stage-text"><span>{{ 画面.発言本文 }}</span><span v-if="画面.文字表示中" class="terminal-cursor"></span></span></div></div>
     </section>
   </main>
-  <button id="monitor" role="switch" :aria-checked="画面.モニター" :disabled="画面.モニター切替中" title="接続中の音声（入力・AI の声）をこのPCで聞く" @click="画面.モニター切替"><span class="monitor-label">モニター</span><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span id="monitor-state">{{ 画面.モニター ? 'ON' : 'OFF' }}</span></button>
+  <footer id="model-bar"><button id="choose-model" type="button" :disabled="画面.モデル操作不可" title="モデルを設定（接続中は適用時に再接続）" @click="モデル押下"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span id="model-label" :title="画面.モデル表示">{{ 画面.モデル表示 }}</span><button id="monitor" role="switch" :aria-checked="画面.モニター" :disabled="画面.モニター切替中" title="接続中の音声（入力・AI の声）をこのPCで聞く" @click="画面.モニター切替"><span class="monitor-label">モニター</span><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span id="monitor-state">{{ 画面.モニター ? 'ON' : 'OFF' }}</span></button></footer>
 </template>

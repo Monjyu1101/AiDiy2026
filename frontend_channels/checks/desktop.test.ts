@@ -24,7 +24,8 @@ import { createRequire } from 'node:module';
 async function desktop(platform = 'win32', owned = true) {
   const file = fileURLToPath(new URL('../panel/desktop.cjs', import.meta.url));
   const timers = new Map<number, { at: number; callback: () => void }>();
-  const files = new Map<string, any>(), requests: any[] = [], kills: any[] = [], states: any[] = [], moves: any[] = [];
+  const files = new Map<string, any>(), requests: any[] = [], kills: any[] = [], states: any[] = [], moves: any[] = [], dialogs: any[] = [];
+  let dialogAnswer = 1;
   const handlers = new Map<string, (...args: any[]) => any>();
   let clock = 0, sequence = 0, window: any, exited = false, locked = false;
   const worker = Object.assign(new EventEmitter(), {
@@ -82,7 +83,7 @@ async function desktop(platform = 'win32', owned = true) {
       if (name === 'node:child_process') return { fork: () => worker, spawn: (...args: any[]) => {
         kills.push(args); return Object.assign(new EventEmitter(), { kill() {} });
       } };
-      if (name === 'electron') return { app, BrowserWindow: Window, Menu: {buildFromTemplate: (value: any[]) => value, setApplicationMenu(value: any[]) {app.menu = value;}}, ipcMain: { handle(name: string, callback: (...args: any[]) => any) { handlers.set(name, callback); } },
+      if (name === 'electron') return { app, BrowserWindow: Window, dialog: { showMessageBox: async (_window: any, options: any) => { dialogs.push(options); return { response: dialogAnswer }; } }, Menu: {buildFromTemplate: (value: any[]) => value, setApplicationMenu(value: any[]) {app.menu = value;}}, ipcMain: { handle(name: string, callback: (...args: any[]) => any) { handlers.set(name, callback); } },
         screen: { getCursorScreenPoint: () => ({}), getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) } };
       throw new Error(name);
     },
@@ -93,7 +94,7 @@ async function desktop(platform = 'win32', owned = true) {
   for (let entry; (entry = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0]) && entry[1].at <= 1000;) {
     clock = entry[1].at; timers.delete(entry[0]); entry[1].callback(); await flush();
   }
-  return { app, worker, window, files, requests, kills, states, timers, flush, moves, handlers,
+  return { app, worker, window, files, requests, kills, states, timers, flush, moves, handlers, dialogs, answer(value: number) { dialogAnswer = value; },
     exited: () => exited, locked: () => locked,
     exitWorker(code: number | null, signal: string | null = null) {
       worker.exitCode = code; worker.signalCode = signal; worker.connected = false; worker.emit('exit', code, signal);
@@ -193,4 +194,20 @@ test('Discord preload は固定の窓操作と検証済みピン通知のみを�
   assert.equal(values.length, 0); ipc.emit('discord:pin-state', {}, { pinned: true, locked: false, extra: 'ignored' });
   assert.equal(JSON.stringify(values), JSON.stringify([{ pinned: true, locked: false }])); cancel(); assert.equal(ipc.listenerCount('discord:pin-state'), 0);
   api.onPinState(null)();
+});
+
+test('接続中の終了は確認し、キャンセルなら続ける。切断中はそのまま終了する（Slack と同じ動き）', async () => {
+  const connected = await desktop();
+  connected.worker.emit('message', { type: 'state', state: { phase: 'connected', message: '' } });
+  connected.window.close(); await connected.flush();
+  assert.equal(connected.dialogs.length, 1); assert.match(connected.dialogs[0].message, /Discord に接続中です。終了しますか/);
+  assert.equal(connected.exited(), false); assert.equal(connected.requests.filter(item => item.action === 'shutdown').length, 0, 'キャンセルでは切断しない');
+  connected.answer(0); connected.window.close(); await connected.flush();
+  assert.equal(connected.dialogs.length, 2); assert.equal(connected.requests.filter(item => item.action === 'shutdown').length, 1);
+  connected.exitWorker(0); await connected.flush(); assert.equal(connected.exited(), true);
+  const idle = await desktop();
+  idle.worker.emit('message', { type: 'state', state: { phase: 'idle', message: '' } });
+  idle.window.close(); await idle.flush();
+  assert.equal(idle.dialogs.length, 0); assert.equal(idle.requests.filter(item => item.action === 'shutdown').length, 1);
+  idle.exitWorker(0); await idle.flush(); assert.equal(idle.exited(), true);
 });

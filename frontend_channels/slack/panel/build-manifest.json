@@ -1,0 +1,18 @@
+{
+  "package-lock.json": "1b014e65182c38bac57e1779a2842acab669f81c04046bce69e01964e4942232",
+  "package.json": "fcb98127180ebfa382e25a8a67953987933c47cfa951fca7e8caa50c1732f6e5",
+  "panel/AiDiy.png": "3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042",
+  "panel/AiDiy_slack.png": "3ad4201ea8da4c3770bae87f7e15028fc7242abfa505a1adcfde9ce09ac35dd4",
+  "panel/AiDiy_slack.svg": "176b6346a66e39c7c1fca4ce8995d7c69feb535ecf0872881f6bc0482ea1de69",
+  "panel/THIRD_PARTY_NOTICES.txt": "991f108cf9b45856e7f9864d918cb66c1f6f9ab41f18dd885f0c95bf8aa10d12",
+  "panel/index.html": "3711199ea1ac25861fc52475f918e1cf97f5f32e78ba4baba415c928a36b4d23",
+  "panel/main.js": "616f09741642b2e3598fa0677e7fef28ca2b2f9528ec364fe28c161391c83c8c",
+  "panel/style.css": "dc39e41d8db282f7e816261da9ed936ed104dd2e811b359d83368b6d688f5e9d",
+  "panel/titlebar.css": "35f57ac2c9227b2fa9a09e748b56bae5dd2cfe4761725dc1402a18e7ba616f6c",
+  "panel/view.js": "5dd9b6597cf747bf90c0d130cbd3f10b10a3d60dc7ff9d8ff1221a395cd3986c",
+  "panel/接続/パネル状態.js": "311494db590d8db0d53a09dcbb94fdb49d896ca651faa83023999a27cb52317b",
+  "panel/画面/接続パネル.vue": "d3127edb129b4913a77b92970e7ff313dfef33c403659f800d2585b9d258394c",
+  "panel/画面/機能切替.vue": "1cd911c0dac6c2f3fc14c810c5c4bcbdb8d54e0f02959b3d65b0a7fa459051f2",
+  "scripts/build-panel.mjs": "edce62b4c035819cd26886fd9787b44a98143a8a563a7693f0ac58dffd295d63",
+  "scripts/verify-panel.mjs": "47c070ed7c4b6b67fa517c25a8b221f23297fdc30ea27a9ffcd4178af3384ef6"
+}

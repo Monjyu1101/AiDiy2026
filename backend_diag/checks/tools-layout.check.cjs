@@ -34,14 +34,27 @@ test('認証後の右ペインは実行前もテスト内容・条件・結果�
  const html=await authenticated();assert.match(html,/class="panel-heading tools-heading"/);assert.match(html,/aria-label="既定値とテスト内容" tabindex="0"/);assert.match(html,/<h3>テスト内容<\/h3>/);assert.match(html,/<legend>テスト条件<\/legend>/);assert.match(html,/aria-label="テスト結果"/);assert.match(html,/data-state="未実施"/);assert.match(html,/テストの応答はまだありません/);assert.match(html,/tools-detail-test/);assert.match(html,/headless/);
 });
 test('未対応・OFF・利用不可でも右内容は消えず、理由とdisabled操作を保つ',async()=>{
- for(const row of [rows[1],{...rows[0],enabled:false},{...rows[0],available:false}]){
+ for(const row of [{...rows[1],id:'unknown'},{...rows[0],enabled:false},{...rows[0],available:false}]){
   const html=await authenticated(row);assert.match(html,/<h3>テスト内容<\/h3>/);assert.match(html,/aria-label="テスト結果"/);assert.match(html,/class="single-test-button tools-detail-test" disabled/);
-  if(row.id===rows[1].id){assert.match(html,/このToolの代表機能テストは未対応/);assert.match(html,/<select/);}else assert.match(html,/サービス外|この環境では利用できません/);
+  if(row.id==='unknown'){assert.match(html,/このToolの代表機能テストは未対応/);assert.match(html,/<select/);}else assert.match(html,/サービス外|この環境では利用できません/);
  }
 });
 test('登録0件でも右結果の枠は残り、長い登録一覧も省略・非公開にしない',async()=>{
  assert.match(await authenticated(null),/一覧からToolを選択してください/);
  const extra=Array.from({length:20},(_,i)=>({...rows[1],id:'aidiy_'+i,label:'長い名称_'.repeat(12)+i}));const html=await authenticated(rows[0],extra);assert.equal((html.match(/class="tools-name"/g)||[]).length,21);assert.match(html,/aria-label="テスト結果"/);
+});
+
+test('生成系の軽量試験は説明APIだけと表示し、Chrome専用のheadless条件を表示しない',async()=>{
+ const html=await authenticated(rows[1]);
+ assert.match(html,/説明APIの疎通確認/);assert.match(html,/実機能の動作確認とは別/);
+ assert.doesNotMatch(html,/headless|専用ブラウザを終了/);
+ assert.doesNotMatch(html,/class="single-test-button tools-detail-test" disabled/);
+});
+
+test('一括テストは認証後の見出し右側に置き、対象なしでは無効',async()=>{
+ const html=await authenticated();assert.match(html,/<div class="panel-actions"><button[^>]*tools-batch-test/);assert.match(html,/>一括テスト<\/button>/);
+ assert.match(await authenticated(null),/tools-batch-test" disabled/);
+ const guest=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true});assert.doesNotMatch(guest,/tools-batch-test/);
 });
 test('未認証のログイン領域も内部スクロールに入れ、一覧・右ペインは認証後だけ',async()=>{
  const html=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true,visible:true});assert.match(html,/class="tools-scroll"/);assert.match(html,/class="tools-auth"/);assert.match(html,/Coreへログイン/);assert.doesNotMatch(html,/class="tools-columns"|aria-label="テスト結果"/);

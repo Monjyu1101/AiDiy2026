@@ -379,17 +379,9 @@ Task ID と Team 依頼IDが同じ文字列になる連携があるため、Task
 - `backend_tools/tools_proc/task_agents.py` と `team_agents.py` も同じ 8093 の統合サーバーへ接続します。
 - Team のサブプロセスが Task API を呼ぶ場合も、`/team` と `/task` の両方を 8093 で使用します。
 
-## セットアップ・起動
+## 起動手順の参照先
 
-```powershell
-cd backend_taskteam
-uv sync --upgrade
-uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
-```
-
-通常運用はプロジェクトルートの `python _start.py` で `バックエンド(task,team)` を選択します。ルート起動は `--reload` なしです。コード変更の反映は個別起動の `--reload` または `backend_taskteam/temp/reboot_taskteam.txt` を使います。
-
-Task / Team は共通のポート `8093` だけを使用します。
+全体起動は [開発環境運用手順](../_AIDIY/knowledge/共通,開発環境運用手順.md)、単独起動・再起動は [AIタスクの実行記録と繰り返し監視](../_AIDIY/knowledge/backend_taskteam,AIタスクの実行記録と繰り返し監視.md) を参照してください。
 
 ## 実装時の注意
 

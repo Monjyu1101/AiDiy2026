@@ -42,12 +42,19 @@ class SlackLifecycleMessagesTests(unittest.TestCase):
                 for unwanted in ('準備中', '未実装', '起動不可', '対象なし'):
                     self.assertNotIn(unwanted, messages[0])
 
-    def test_no_runnable_slack_selection_added(self):
+    def test_slack_selection_uses_existing_module(self):
+        # 選択肢は実在する独立モジュールの入口だけを呼ぶ。成功表示だけを先に作らない。
+        slack = ROOT / 'frontend_channels' / 'slack'
+        for name, functions in (('_setup.py', ('setup',)), ('_start.py', ('check_environment', 'start', 'kill_ports', 'process_tree_pids')),
+                                ('_cleanup.py', ('cleanup',))):
+            with self.subTest(module=name):
+                source = (slack / name).read_text(encoding='utf-8')
+                for function in functions:
+                    self.assertIn(f'def {function}(', source)
         for filename in ('_setup.py', '_start.py', '_cleanup.py'):
             source = (ROOT / filename).read_text(encoding='utf-8')
-            self.assertNotIn('choices["slack"]', source)
-            self.assertNotIn("choices['slack']", source)
-            self.assertNotIn('_load_folder_module("frontend_channels/slack")', source)
+            self.assertIn('frontend_channels/slack', source)
+        self.assertTrue((slack / 'src' / 'main.ts').is_file())
 
 
 if __name__ == '__main__':

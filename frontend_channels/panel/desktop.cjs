@@ -10,7 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, dialog } = require('electron');
 const { fork, spawn } = require('node:child_process');
 const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -27,6 +27,8 @@ app.setName(process.platform === 'darwin' ? 'AiDiy Discord' : 'aidiy_discord');
 app.setPath('userData', join(app.getPath('appData'), 'aidiy_discord'));
 if (process.platform === 'win32') app.setAppUserModelId('AiDiy.aidiy_discord');
 let window, worker, quitting = false, shutdownComplete = false, shutdown;
+// 接続中の終了だけ確認する（Slack / Discord 共通）。phase は worker から届く最新の接続状態。
+let phase = 'idle', closeAsking = false;
 const pins = createWindowPins({ onChanged: (target, state) => {
   if (!target.isDestroyed() && !target.webContents.isDestroyed()) target.webContents.send('discord:pin-state', state);
 } });
@@ -93,7 +95,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     }
     if (window.isMinimized()) window.restore();
     window.show(); window.focus(); ready(data.readyFile);
-    if (data.autoConnect) void request('start').catch(() => {});
+    if (data.autoConnect) void request('auto-start').catch(() => {});
   });
   app.on('before-quit', event => {
     if (shutdownComplete) return;
@@ -123,7 +125,7 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true, detached: process.platform !== 'win32',
     });
     worker.on('message', message => {
-      if (message.type === 'state') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:state', message.state); return; }
+      if (message.type === 'state') { phase = message.state?.phase || 'idle'; if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:state', message.state); return; }
       if (message.type === 'audio') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:audio', message.audio); return; }
       if (message.type === 'meter') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:meter', message.meter); return; }
       if (message.type === 'activity') { if (!quitting && !window?.isDestroyed()) window?.webContents.send('discord:activity', message.activity); return; }
@@ -152,7 +154,15 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     attachNativeWindowMove(window, screen, 'discord');
     window.on('close', event => {
       if (shutdownComplete) return;
-      event.preventDefault(); app.quit();
+      event.preventDefault();
+      if (quitting || closeAsking) return;
+      // 切断中はそのまま終了する。接続中（接続処理中・再接続待ちを含む）は終了してよいか確認する。
+      if (!['connecting', 'connected', 'reconnecting'].includes(phase)) { app.quit(); return; }
+      closeAsking = true;
+      void dialog.showMessageBox(window, {
+        type: 'question', buttons: ['終了', 'キャンセル'], defaultId: 0, cancelId: 1, noLink: true,
+        title: 'AiDiy Discord', message: 'Discord に接続中です。終了しますか？', detail: '終了すると Discord から切断し、実行中のコード要求・音声会話も止まります。',
+      }).then(({ response }) => { closeAsking = false; if (response === 0) app.quit(); }, () => { closeAsking = false; });
     });
     if (process.platform === 'darwin') require('../../frontend_ide/host/scripts/MacOS-Menu.cjs').Macメニューを設定({ app, Menu, 名前: 'AiDiy Discord', 閉じる: () => window.close(), icon: join(__dirname, 'AiDiy_discord.png'), platform: process.platform });
     window.webContents.session.setPermissionCheckHandler(() => false);
@@ -184,6 +194,6 @@ if (!app.requestSingleInstanceLock({ readyFile, autoConnect })) {
     if (!window.isVisible()) throw new Error();
     await window.webContents.removeInsertedCSS(hidden);
     ready();
-    if (autoConnect) void request('start').catch(() => {});
+    if (autoConnect) void request('auto-start').catch(() => {});
   }).catch(error => { console.error(`Discord パネルを開けませんでした: ${error.message}`); app.quit(); process.exitCode = 1; });
 }

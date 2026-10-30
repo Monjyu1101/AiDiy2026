@@ -293,7 +293,7 @@ Canvas描画は `src/開発スペース/宇宙描画.js`、通信は `src/コー
 - 同じ Electron 確認で、タイトルバーの最大化／元のサイズへの復元も実ウィンドウで検証します。
 - 音声・バックエンドの回帰確認: `frontend_ide/host` の `npm test` / `npm run live:test`、`frontend_ide/viewer` の `npm test`。
 
-全体のsetup・cleanupは「IDE群(Console / Code / Live / IDE)」を一括選択します。startは同じIDE群の中でConsole → Code → Live → IDEを個別に選び、その後にDiscordを選びます。セットアップで稼働中の画面を停止しません。cleanupはConsole → Code → Live → IDE → 共通UIの順に解除し、停止・解除に失敗した場合は共通のnode_modulesとdistを残します。
+全体のsetup・cleanupは「IDE群(Console / Code / Live / IDE)」を一括選択します。startは同じIDE群の中でConsole → Code → Live → IDEを個別に選び、その後にDiscord・Slackを選びます。セットアップで稼働中の画面を停止しません。cleanupはConsole → Code → Live → IDE → 共通UIの順に解除し、停止・解除に失敗した場合は共通のnode_modulesとdistを残します。
 
 ## ウィンドウ配置
 

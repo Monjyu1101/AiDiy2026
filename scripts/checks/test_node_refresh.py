@@ -103,6 +103,8 @@ class NodeRefreshTests(unittest.TestCase):
         self.enterContext(patch.object(setup, "npm_command", return_value="npm"))
         self.enterContext(patch.dict(os.environ, {"CODESPACES": "false" if desktop else "true", "ELECTRON_SKIP_BINARY_DOWNLOAD": "", "DISPLAY": ":fixture"}))
         prepare = self.enterContext(patch.object(common, "prepare_electron_binary", return_value=True))
+        # 実機で Discord / Slack 等のパネルが起動中でも、使用中保護で手順が省かれないよう固定する。
+        self.enterContext(patch.object(common, "frontend_dependency_guard", return_value=None))
         self.enterContext(patch.object(setup.importlib.util, "spec_from_file_location", return_value=SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module: None))))
         self.enterContext(patch.object(setup.importlib.util, "module_from_spec", return_value=common))
         run = self.enterContext(patch.object(setup, "run_command", return_value=True))
@@ -117,6 +119,7 @@ class NodeRefreshTests(unittest.TestCase):
             "frontend_ide/aidiy_browser": SimpleNamespace(setup=Mock(return_value=True)),
             # setup()やconf_jsonは用意しない。設定補完経路へ入れば失敗する。
             "frontend_channels": SimpleNamespace(install_launcher=Mock(return_value=None)),
+            "frontend_channels/slack": SimpleNamespace(install_launcher=Mock(return_value=None)),
         }
         self.enterContext(patch.object(setup, "_load_folder_module", side_effect=modules.__getitem__))
         return run, prepare, modules
@@ -135,18 +138,20 @@ class NodeRefreshTests(unittest.TestCase):
         for _ in range(2):
             self.assertEqual(setup.setup_node_refresh(), [])
         commands = [call.args[0] for call in run.call_args_list]
-        self.assertEqual(sum(command[1] == "install" for command in commands), 16)
+        self.assertEqual(sum(command[1] == "install" for command in commands), 18)
         self.assertTrue(all(command[1] in ("install", "run") for command in commands))
         self.assertTrue(all("--include=dev" in command for command in commands if command[1] == "install"))
         builds = [(call.kwargs["cwd"].relative_to(ROOT).as_posix(), call.args[0][-1])
                   for call in run.call_args_list if call.args[0][1] == "run"]
         self.assertEqual(builds, [("backend_diag/ui", "build"), ("frontend_web", "build"),
-                                 ("frontend_avatar", "build"), ("frontend_channels", "build:panel")] * 2)
-        self.assertEqual(prepare.call_count, 10)
+                                 ("frontend_avatar", "build"), ("frontend_channels", "build:panel"),
+                                 ("frontend_channels/slack", "build:panel")] * 2)
+        self.assertEqual(prepare.call_count, 12)
         modules["backend_diag"].setup.assert_called_with(desktop=False)
         self.assertEqual(modules["frontend_ide/host"].setup_assets.call_count, 2)
         modules["frontend_ide/host"].setup_assets.assert_called_with("npm")
         self.assertEqual(modules["frontend_channels"].install_launcher.call_count, 2)
+        self.assertEqual(modules["frontend_channels/slack"].install_launcher.call_count, 2)
 
     def test_browser_environment_skips_electron_binary_but_builds(self):
         run, prepare, _ = self.fixture(desktop=False)

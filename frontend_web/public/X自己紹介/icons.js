@@ -275,6 +275,28 @@ const ICON_DATA = [
     category: 'Framework',
   },
 
+  // ===== 開発ツール =====
+  {
+    name: 'VS Code',
+    iconUrl: 'icons/vscode.svg',
+    linkUrl: 'https://code.visualstudio.com',
+    category: 'Development Tool',
+  },
+
+  // ===== コミュニケーション =====
+  {
+    name: 'Discord',
+    iconUrl: 'icons/discord.svg',
+    linkUrl: 'https://discord.com',
+    category: 'Communication',
+  },
+  {
+    name: 'Slack',
+    iconUrl: 'icons/slack.svg',
+    linkUrl: 'https://slack.com',
+    category: 'Communication',
+  },
+
   // ===== データベース =====
   {
     name: 'SQLite',

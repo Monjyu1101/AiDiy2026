@@ -4,7 +4,7 @@
  * See LICENSE for full terms. Thank you for keeping the rules.
  * https://github.com/monjyu1101/AiDiy2026 */
 
-// ../runtime/model_probe.ts
+// backend_diag/runtime/model_probe.ts
 import { open, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,7 @@ import path from "node:path";
 import https2 from "node:https";
 import http2 from "node:http";
 
-// ../runtime/environment_proxy.ts
+// backend_diag/runtime/environment_proxy.ts
 import http from "node:http";
 import https from "node:https";
 import tls from "node:tls";
@@ -119,7 +119,7 @@ function networkFailure(error) {
   return "network";
 }
 
-// ../runtime/model_catalog.ts
+// backend_diag/runtime/model_catalog.ts
 var empty = () => /* @__PURE__ */ Object.create(null);
 var pythonString = (value) => value === null || value === void 0 ? "None" : value === true ? "True" : value === false ? "False" : String(value);
 function dateLabel(date) {
@@ -341,7 +341,7 @@ function ollamaLocalCatalog(body) {
   return out;
 }
 
-// ../runtime/model_probe.ts
+// backend_diag/runtime/model_probe.ts
 var CONFIG_LIMIT = 128 * 1024;
 var RESPONSE_LIMIT = 1024 * 1024;
 var PUBLIC_RESPONSE_LIMIT = 16 * 1024 * 1024;
@@ -735,7 +735,7 @@ async function integrationProbe(id, provider, key, output, secrets, fetch, signa
   }
 }
 
-// ../runtime/model_runner.ts
+// backend_diag/runtime/model_runner.ts
 function createModelRunner() {
   const active = /* @__PURE__ */ new Set();
   let stopping = false;

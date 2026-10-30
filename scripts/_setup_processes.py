@@ -4,7 +4,7 @@
 # See LICENSE for full terms. Thank you for keeping the rules.
 # https://github.com/monjyu1101/AiDiy2026
 
-"""setup前に、この配置先のAiDiyだけを停止する。Code / IDE / Discordと起動元は保護する。"""
+"""setup前に、この配置先のAiDiyだけを停止する。Code / IDE / Discord / Slackと起動元は保護する。"""
 from contextlib import contextmanager
 import json
 import shlex
@@ -22,6 +22,7 @@ from _cleanup_processes import list_processes, process_arguments
 COMPONENTS = ('backend_diag', 'backend_local', 'backend_tools', 'backend_server',
               'backend_taskteam', 'frontend_web', 'frontend_avatar', 'frontend_channels',
               'command_hermes', 'frontend_ide')
+# frontend_channels 配下の Discord と Slack をまとめて保護する。
 KEEP = frozenset(('code', 'ide', 'frontend_channels'))
 
 
@@ -142,7 +143,7 @@ def select_targets(processes, root, windows=False, current_pid=None):
     for process in processes:
         if roles[process['ProcessId']] is None and registered_supervisor(process, root):
             roles[process['ProcessId']] = 'supervisor'
-    # Code/IDE/Discordの補助/MCP子孫を保護。ただし独立アプリLive等は保護の境界にする。
+    # Code/IDE/Discord/Slackの補助/MCP子孫を保護。ただし独立アプリLive等は保護の境界にする。
     boundaries = {'live', 'console', 'task', 'team', 'browser', 'frontend_avatar', 'backend_diag', 'supervisor'}
     protected = {pid for pid, role in roles.items() if role in KEEP}
     while True:
@@ -287,9 +288,9 @@ def stop_setup_processes(root, info=print, error=print):
                 return False
             ancestor = process.get('ParentProcessId', 0)
         if not targets:
-            info('この配置先で確認できる停止対象の AiDiy プロセスはありません（Code / IDE / Discord は継続）。')
+            info('この配置先で確認できる停止対象の AiDiy プロセスはありません（Code / IDE / Discord / Slack は継続）。')
             return True
-        # 監視親を先に止め、自動再起動を防ぐ。Code/IDE/Discord子孫は個別に除外済み。
+        # 監視親を先に止め、自動再起動を防ぐ。Code/IDE/Discord/Slack子孫は個別に除外済み。
         def depth(process):
             seen = set()
             while process.get('ParentProcessId') in targets and process['ProcessId'] not in seen:
@@ -318,7 +319,7 @@ def stop_setup_processes(root, info=print, error=print):
             remaining.update({p['ProcessId']: p for p in current_processes
                               if p['ProcessId'] in targets and identity(p) == identity(targets[p['ProcessId']])})
             if not remaining:
-                info('この配置先で確認した停止対象の AiDiy プロセスの終了を確認しました（Code / IDE / Discord は継続）。')
+                info('この配置先で確認した停止対象の AiDiy プロセスの終了を確認しました（Code / IDE / Discord / Slack は継続）。')
                 return True
             if time.monotonic() >= deadline:
                 error('停止対象の AiDiy プロセスが残っています。停止を完了できませんでした。')

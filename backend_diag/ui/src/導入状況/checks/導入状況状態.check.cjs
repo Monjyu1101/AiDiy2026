@@ -102,7 +102,8 @@ test('演出中は表示中の項目へ選択（右側の詳細）を順に切�
   const { 導入状況表示を作成 } = await import('../導入状況表示.mjs');
   const props = reactive({ 項目: 一覧.項目, 結果: [], 表示中: null });
   const view = 導入状況表示を作成(props);
-  assert.equal(view.折り畳み.value.has('その他拡張'), true);
+  assert.equal(view.折り畳み.value.has('その他拡張'), false);
+  view.開閉('その他拡張', {target:{open:false}});
   props.表示中 = 'claude'; await Promise.resolve(); assert.equal(view.選択ID.value, 'claude');
   props.表示中 = 'ffmpeg'; await Promise.resolve(); assert.equal(view.選択ID.value, 'ffmpeg'); assert.equal(view.折り畳み.value.has('その他拡張'), false);
 });
@@ -174,7 +175,7 @@ test('個別確認の完了は選択・折り畳みを変更せず、待機中�
  let finish;
  const state=await 状態を作成(()=>new Promise(resolve=>{finish=resolve;}));state.一覧を反映(一覧);
  const props=reactive({項目:一覧.項目,結果:state.結果,確認中:state.確認中,個別確認中:state.個別確認中,表示中:state.表示中});
- const view=導入状況表示を作成(props);view.選択ID.value='ffmpeg';
+ const view=導入状況表示を作成(props);view.開閉('その他拡張',{target:{open:false}});view.選択ID.value='ffmpeg';
  const pending=state.個別確認('ffmpeg');await Promise.resolve();view.選択ID.value='claude';
  finish({結果:{id:'ffmpeg',状態:'OK'},確認済み:false});await pending;await Promise.resolve();
  assert.equal(view.選択ID.value,'claude');assert.equal(view.折り畳み.value.has('その他拡張'),true);

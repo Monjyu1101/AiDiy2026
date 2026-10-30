@@ -10,9 +10,16 @@ import 状態バッジ from '../共通表示/状態バッジ.vue';
 import { 先頭へスクロール, 完了時 } from '../共通表示/先頭表示.mjs';
 import { 外部連携表示を作成 } from './外部連携表示.mjs';
 import './外部連携.css';
+import 公式サイト from '../導入状況/公式サイト.json';
 const props=defineProps(['lastRun','data','results','loading','testing','testingIds','batchBusy','connected','busy','writeBusy','written']);
 defineEmits(['check','write','test']);
 const { selected,items,row,result,config } = 外部連携表示を作成(props);
+const グループ=computed(()=>[
+ {id:'huggingface',名前:'公開モデル操作',項目:items.value.filter(item=>item.id.startsWith('huggingface'))},
+ {id:'discord',名前:'Discord',項目:items.value.filter(item=>item.id==='discord')},
+ {id:'slack',名前:'Slack',項目:items.value.filter(item=>item.id==='slack')},
+].filter(group=>group.項目.length));
+const サービス名=item=>item.id.startsWith('huggingface')?'Hugging Face'+(items.value.filter(row=>row.id.startsWith('huggingface')).length>1?(item.id.endsWith('read')?' 読取':' 書込'):''):item.id==='discord'?'Discord':item.id==='slack'?'Slack':item.名前;
 const 行確認中=id=>props.testingIds?props.testingIds.has(id):props.testing===id;
 const パネル=ref(null);
 const 確認済み=computed(()=>items.value.some(item=>props.results?.[item.id] && !props.results[item.id].前回結果));
@@ -26,10 +33,11 @@ watch(()=>props.busy,完了時(()=>先頭へスクロール(パネル.value)));
  <main class="key-layout"><aside aria-label="外部連携の一覧">
   <p v-if="loading">設定状況を確認中…</p><p v-else-if="!data">接続すると設定状況を表示します。</p>
   <template v-else><p v-if="data.設定状態!=='読込済み'" role="status">設定ファイル: {{data.設定状態}}</p><p v-if="data.説明" role="status">{{data.説明}}</p>
-   <div v-for="item in items" :key="item.id" class="integration-row" :class="{selected:selected===item.id}">
-    <button class="key-select" :aria-pressed="selected===item.id" @click="selected=item.id"><span>{{item.名前}}</span><span class="config-state">{{config(item)}}</span></button>
+   <section v-for="group in グループ" :key="group.id" class="integration-group"><div class="integration-group-heading"><span>{{group.名前}}</span><a class="integration-web" :href="公式サイト[group.id]" target="_blank" rel="noopener noreferrer" :aria-label="`${group.名前} の公式サイトを開く`">Web</a></div>
+   <div v-for="item in group.項目" :key="item.id" class="integration-row" :class="{selected:selected===item.id}">
+    <button class="key-select" :aria-pressed="selected===item.id" @click="selected=item.id"><span>{{サービス名(item)}}</span><span class="config-state">{{config(item)}}</span></button>
     <div class="integration-test"><button class="single-test-button" :disabled="!connected || busy || writeBusy || 行確認中(item.id) || batchBusy || loading || !item.テスト可能" :title="item.理由 || '読み取り専用の認証確認を1回行います'" @click="selected=item.id;$emit('test',item.id)">{{行確認中(item.id)?(results?.[item.id]?.状態==='待機中'?'待機中…':'確認中…'):'テスト'}}</button><component :is="状態バッジ" :state="results?.[item.id]?.状態 || '未実施'"/><span v-if="item.理由" class="integration-reason">{{item.理由}}</span></div>
-   </div>
+   </div></section>
   </template>
  </aside>
  <article aria-live="polite"><template v-if="row"><span class="eyebrow">外部連携 / {{row.名前}}</span><h2>{{row.名前}}</h2><component :is="状態バッジ" class="status" :state="result?.状態 || '未実施'"/>

@@ -69,11 +69,12 @@ test('音声WSSの接続先・ポートごとにNO_PROXYを適用し、停止後
   assert.equal(https.request, original);
 });
 
-test('実SDKでREST・Gateway・resume・音声WSS・NO_PROXY・直接接続・接続途中の停止をローカル検証', { timeout: 20_000 }, async () => {
+test('実SDKでREST・Gateway・resume・音声WSS・NO_PROXY・直接接続・接続途中の停止をローカル検証', { timeout: 60_000 }, async () => {
+  // 単独では約5秒。全試験の並列実行中は CPU 負荷で遅くなるため、上限に余裕を持たせる。
   // テスト用証明書だけを子プロセスで信頼する。製品のTLS検証は緩和しない。
   const { stdout, stderr } = await promisify(execFile)(process.execPath,
     ['--import', 'tsx', fileURLToPath(new URL('./fixtures/network-runner.ts', import.meta.url))],
-    { env: { ...process.env, NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/network-cert.fixture', import.meta.url)) }, timeout: 18_000 });
+    { env: { ...process.env, NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/network-cert.fixture', import.meta.url)) }, timeout: 58_000 });
   assert.match(stdout, /network integration: OK/);
   assert.doesNotMatch(stdout + stderr, /proxy-user|proxy-password|test-bot-token|private-voice/);
 });

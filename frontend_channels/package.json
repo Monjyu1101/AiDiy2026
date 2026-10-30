@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node panel/launch.mjs",
+    "bot": "tsx src/main.ts",
     "config:check": "tsx src/main.ts --check",
     "check": "tsc --noEmit && node scripts/verify-panel.mjs",
     "test": "tsx --test checks/*.test.ts",

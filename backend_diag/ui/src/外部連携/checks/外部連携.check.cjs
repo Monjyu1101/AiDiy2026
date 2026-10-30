@@ -15,7 +15,7 @@ test('外部連携は行ごとの「テスト」で認証を確認し、キー�
  assert.equal((html.match(/data-state="未実施"/g)||[]).length,2);assert.equal((html.match(/data-state="OK"/g)||[]).length,1);
  assert.match(html,/>外部連携確認<\/h2>/);assert.match(html,/id="integration-run"[^>]*>状況確認<\/button>/);assert.match(html,/id="integration-write"[^>]*>書込<\/button>/);assert.doesNotMatch(html,/<button[^>]*disabled[^>]*id="integration-write"|id="integration-write"[^>]*disabled/,'確認結果があれば書込できる');
  assert.match(html,/キーが未設定です/);assert.match(html,/確認不可/);assert.match(html,/未設定/);
- assert.doesNotMatch(html,/OpenAI|公開モデル|class="models"/);
+ assert.doesNotMatch(html,/OpenAI|class="models"/);
  const panel=source('外部連携/外部連携パネル.vue');assert.match(panel,/\$emit\('test',item\.id\)/);assert.doesNotMatch(panel,/v-html|innerHTML/);
 });
 test('状況確認中は確認中の行へ選択を追従し、終わったら1項目目を表示する', async () => {

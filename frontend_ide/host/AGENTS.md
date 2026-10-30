@@ -16,7 +16,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | プロジェクト全体のセットアップ | [`../../_AIDIY/knowledge/共通,開発環境運用手順.md`](../../_AIDIY/knowledge/共通,開発環境運用手順.md) |
 | 拡張機能と生成物のクリーンアップ | [`../../_AIDIY/knowledge/共通,クリーンアップ手順.md`](../../_AIDIY/knowledge/共通,クリーンアップ手順.md) |
 | Hermes の Provider / モデル選択 | [`../../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](../../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md) |
-| Discord Bot からの共有利用 | [`../../frontend_channels/AGENTS.md`](../../frontend_channels/AGENTS.md)、[`../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
+| Discord / Slack Bot からの共有利用 | [`../../frontend_channels/AGENTS.md`](../../frontend_channels/AGENTS.md)、[`../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
 | Hermes の Windows 対応 | [`../../_AIDIY/knowledge/command_hermes,Windows対応規則.md`](../../_AIDIY/knowledge/command_hermes,Windows対応規則.md) |
 
 ## 概要
@@ -29,7 +29,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 `aidiy_live/` は Live 拡張とスタンドアロンの共通画面・音声処理を持ちます。拡張ホスト側で REST / WebSocket と Windows マイクを扱い、Webview へ渡します。マイク補助は Python 標準ライブラリだけを使います。利用・検証方法は [`aidiy_live/README.md`](./aidiy_live/README.md) を参照してください。
 
-`frontend_channels`（`aidiy_discord`）は、本フォルダの `src/runner.ts`、`src/protocol.ts`、`aidiy_live/src/protocol.ts`、`src/model-preferences.ts` と `scripts/model-catalog.py` をビルドせず直接読み込み、Discord から同じ Code / Live を利用します。
+`frontend_channels`（`aidiy_discord`）と `frontend_channels/slack`（`aidiy_slack`）は、本フォルダの `src/runner.ts`、`src/protocol.ts`、`src/forwarded-origin.ts`（Discord は `aidiy_live/src/protocol.ts` と `aidiy_live/src/model-catalog.ts` も）と、`scripts/` の起動規則（`launch-project.mjs`・`single-instance.cjs`・`window-size.cjs`・`window-opening.cjs`）をビルドせず直接読み込み、同じ Code / Live を利用します。コードは aidiy_hermes 固定で、モデルの保存とモデル候補は各アプリ側（`aidiy_discord.json` / `aidiy_slack.json`、AIコアのモデル情報API）で扱います。
 
 ## 技術スタック
 
@@ -48,7 +48,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 - Code / Live の `extensionKind` はどちらも `workspace` とし、配置・解除対象を同じ実行環境に揃える。リモート接続では接続先の拡張ホストで動作し、Live の Windows マイク入力は Windows の拡張ホストでのみ使う。
 - 拡張バージョンは、固定解除の明示的な指示があるまで `0.1.0` を維持する。
 - ワークスペースを信頼済みの場合だけ、Code の CLI 実行・コード添付と、Live のマイク入力・AIコア接続を許可する。
-- 直接CLIを使う対話CLI・Discordでは `shell: false` と UTF-8 の標準入力を維持する。
+- 直接CLIを使う対話CLI・Discord・Slackでは `shell: false` と UTF-8 の標準入力を維持する。
 - 拡張側から `--yolo` を付与せず、Hermes 側の承認・ツール設定を維持する。
 - Code の AIコア接続と Webview 中継では、既存の `AIコード.vue` / `AIコード.py` / `AIコード_cli.py` と同じメッセージ識別子を使う。
 - Live は既存 AIコアの WebSocket（`/core/ws/AIコア`）とモデル情報 API をそのまま使い、拡張専用の API を追加しない。
@@ -63,7 +63,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | `package.json` | 拡張 ID、ビュー、コマンド、設定、ビルド / 配布スクリプト |
 | `src/extension.ts` | 拡張のエントリ、WebviewView、会話状態、VS Code コマンド、モデル選択 |
 | `src/code-connection.ts` | AIコアの入力・コード出力接続、モデルAPI、接続状態、再接続 |
-| `src/runner.ts` | 対話CLI・Discord用のCLI解決と実行 |
+| `src/runner.ts` | 対話CLI・Discord・Slack用のCLI解決と実行 |
 | `src/protocol.ts` | AIコード互換 packet と開始・進捗・終了・回答の変換 |
 | `src/stream-control.ts` | STX / ETX / CAN 制御コードの判定と表示用除去 |
 | `src/model-preferences.ts` | Code / Live の最終手動モデルを `~/.aidiy/aidiy_*_model.json` へ読込・保存（Live bundle にも内包） |
@@ -101,7 +101,7 @@ Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声�
 - Code は通信切断時に約10秒間隔で再接続する。明示的な切断・破棄は再試行を止める。
 - Code の会話履歴は作業フォルダ別に管理し、AIコアのセッションIDで再開する。保存先はプロジェクトの `_AIDIY/aidiy_code/histories/<会話ID>.json`（`src/conversation-store.ts`）で、拡張・単独起動版・開発スペースが同じ形式で共用する。応答の途中経過ごとに書かないよう0.5秒まとめて書き、終了時に書き出す。拡張の旧 `workspaceState` 履歴は開いたフォルダへ移し、テストは一時フォルダへ書く（作業フォルダの `_AIDIY` に書かない）。旧Hermesの表示履歴は保持するが、CLIセッションIDをコアへ渡さない。
 - 最終手動モデルは `~/.aidiy/aidiy_code_model.json` で拡張・単独画面共通に保存する。
-- `src/runner.ts` と `src/protocol.ts` は引き続き Discord の直接CLI実行と対話CLIを支える。
+- `src/runner.ts` と `src/protocol.ts` は引き続き Discord・Slack の直接CLI実行と対話CLIを支える。
 
 ## セキュリティ境界
 
@@ -119,7 +119,7 @@ Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声�
 - CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `checks/runner.test.cjs` をセットで見る。
 - packet を変える場合は `src/protocol.ts` と既存 AIコード実装との互換性を確認する。
 - チャット UI を変える場合は frontend_ide の Vue 画面（`src/コード/`・`src/共通表示/`）を変更し、拡張の Webview・単独起動・IDE の 3 つで同じ画面になることを確認する。
-- Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord の直接CLI候補は `scripts/model-catalog.py` を使う。
+- Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord・Slack の aidiy_hermes モデル候補は AIコアのモデル情報API（`code_models.aidiy_hermes`）を優先し、停止中は `_AIDIY/aidiy_diag/code_models_info.json` を読む（各アプリの `src/コード/Hermesモデル.ts`）。
 - モデル選択の保存・復元を変える場合は `src/model-preferences.ts` と、Code / Live それぞれの拡張・単独起動の読込箇所をセットで見る。
 - Live の画面を変える場合は frontend_ide の Vue 画面（`src/ライブ/`）、音声を変える場合は `aidiy_live/src/audio.ts`・`visualizer.ts`・`aidiy_live/media/capture.js` をセットで見る。
 - Live の通信を変える場合は、拡張ホスト（`aidiy_live/src/host.ts`）と単独起動の中継（`aidiy_live/src/server.ts`）の許可範囲を揃える。
@@ -127,4 +127,4 @@ Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声�
 
 ## Vue共通画面
 
-現行のConsole / Code / Live / IDEの画面は `frontend_ide` のVue部品を使用します。VS Code拡張はCode / Liveのみ、単独実行は4種類です。エクスプローラーは `ファイル一覧.vue` に集約し、選択と検索マークを宇宙表示へ通知します。既存の `frontend_ide/host` は拡張ホスト・Code/Hermes・Live音声基盤、`frontend_ide/viewer` はファイルAPI・Office表示資産を提供します。旧起動入口からもVue版へ進みます。詳細は `frontend_ide/AGENTS.md` と `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。
+現行のConsole / Code / Live / IDE / Task / Team / Browserの画面は `frontend_ide` のVue部品を使用します。VS Code拡張はCode / Liveのみ、単独実行は7種類です。エクスプローラーは `ファイル一覧.vue` に集約し、選択と検索マークを宇宙表示へ通知します。既存の `frontend_ide/host` は拡張ホスト・Code/Hermes・Live音声基盤、`frontend_ide/viewer` はファイルAPI・Office表示資産を提供します。旧起動入口からもVue版へ進みます。詳細は `frontend_ide/AGENTS.md` と `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。

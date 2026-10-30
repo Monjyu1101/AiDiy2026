@@ -8,6 +8,46 @@ const baseline=()=>({tools:[{id:'aidiy_chrome_devtools',label:'Chrome',enabled:t
 function setup(options={}){let data=baseline();const calls=[];const api=async(path,method,signal,format,body)=>{calls.push({path,method,signal,format,body:clone(body)});if(options.api)return options.api(path,method,signal,format,body);if(path==='api/AI設定/ログイン')return{status:'OK',data:{access_token:'test-token'}};if(body.data.enabled)for(const row of data.tools)if(Object.hasOwn(body.data.enabled,row.id))row.enabled=body.data.enabled[row.id];if(body.data.defaults)data.defaults={...data.defaults,...clone(body.data.defaults)};return{status:'OK',data:{...clone(data),saved:body.data.write===true}};};return{state:create({api,...options}),calls};}
 const login=state=>state.ログイン('user','secret');
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{resolve,promise};};
+
+test('Tools一括: 順次実行・条件固定・失敗後継続・対象外・二重押し防止',async()=>{
+ const pending=deferred(),order=[];
+ const {state}=setup({代表テスト:{
+  aidiy_chrome_devtools:{label:'Chrome',defaults:{headless:false},run:async({input})=>{order.push(['chrome',clone(input)]);await pending.promise;throw Error('fixture failure');}},
+  aidiy_text_to_speech:{label:'説明',defaults:{sample:'before'},run:async({input})=>{order.push(['speech',clone(input)]);return {status:'OK',message:'説明応答'};}},
+  aidiy_windows:{label:'実行不可',run:()=>assert.fail('OFFは呼ばない')},
+ }});
+ assert.equal(await state.一括テスト(),false);await login(state);
+ const task=state.一括テスト();assert.equal(state.処理中.value,'test-all');assert.equal(order.length,1);
+ assert.equal(await state.一括テスト(),false);assert.equal(await state.テスト('aidiy_text_to_speech'),false);
+ state.テスト条件.value.aidiy_text_to_speech={sample:'after'};
+ pending.resolve();assert.equal(await task,true);
+ assert.deepEqual(order,[['chrome',{headless:false}],['speech',{sample:'before'}]]);
+ assert.equal(state.結果.value.aidiy_chrome_devtools.status,'ERR');assert.equal(state.結果.value.aidiy_windows.status,'対象外');
+ assert.match(state.通知.value,/成功 1件、失敗 1件、対象外 1件/);state.終了();
+});
+
+for(const action of ['テスト中止','ログアウト','切断','終了'])test(`Tools一括: ${action}で残りを実行せず遅い応答を破棄`,async()=>{
+ const pending=deferred();let next=0,signal;
+ const {state}=setup({代表テスト:{
+  aidiy_chrome_devtools:{label:'起動',run:args=>{signal=args.signal;return pending.promise;}},
+  aidiy_text_to_speech:{label:'次',run:()=>{next++;return {status:'OK',message:'次'};}},
+ }});
+ await login(state);const task=state.一括テスト();state[action]();assert.equal(signal.aborted,true);
+ pending.resolve({status:'OK',message:'遅い成功'});assert.equal(await task,false);assert.equal(next,0);
+ if(action==='テスト中止'){assert.equal(state.結果.value.aidiy_chrome_devtools.status,'中止');assert.equal(state.結果.value.aidiy_text_to_speech.status,'中止');}
+ else assert.equal(Object.keys(state.結果.value).length,0);
+ state.終了();
+});
+
+test('Tools一括: 認証期限切れで次項目を呼ばずログインへ戻す',async()=>{
+ let calls=0;const {Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');
+ const {state}=setup({代表テスト:Tools代表テスト,api:async path=>{
+  if(path.endsWith('ログイン'))return {status:'OK',data:{access_token:'fixture'}};
+  if(path.endsWith('representative')){calls++;return {authExpired:true};}
+  return {status:'OK',data:baseline()};
+ }});
+ await login(state);assert.equal(await state.一括テスト(),false);assert.equal(calls,1);assert.equal(state.認証済み.value,false);assert.match(state.通知.value,/有効期限/);state.終了();
+});
 test('Tools: 未認証では一覧・保存・test APIを呼ばず、ログイン後だけ読取、tokenはメモリ',async()=>{const{state,calls}=setup();assert.equal(await state.再読込(),false);assert.equal(await state.有効保存(),false);assert.equal(calls.length,0);assert.equal(await login(state),true);assert.equal(calls[0].path,'api/AI設定/ログイン');assert.equal(calls[1].path,'api/Tools/enabled');assert.deepEqual(calls[1].body,{token:'test-token',data:{}});assert.equal(state.項目.value.length,3);assert.doesNotMatch(source('Tools/Tools状態.mjs'),/localStorage|sessionStorage/);state.終了();});
 test('Tools: OFFは登録を残しruntime適用、保存操作だけwrite:true、再読込は書込しない',async()=>{const{state,calls}=setup();await login(state);await state.切替('aidiy_chrome_devtools');assert.equal(state.項目.value.length,3);assert.equal(state.項目.value[0].enabled,false);assert.deepEqual(calls.at(-1).body.data,{enabled:{aidiy_chrome_devtools:false},write:false});await state.再読込();assert.deepEqual(calls.at(-1).body.data,{});assert.equal(Object.keys(state.有効変更.value).length,1,'読取では未保存の適用を忘れない');await state.有効保存();assert.equal(calls.at(-1).body.data.write,true);assert.equal(Object.keys(state.有効変更.value).length,0);assert.match(state.通知.value,/保存しました/);state.終了();});
 test('Tools: available=falseは切替・test無効、OFFはtest無効',async()=>{let runs=0;const{state,calls}=setup({代表テスト:{aidiy_windows:{run:()=>runs++},aidiy_chrome_devtools:{run:()=>runs++}}});await login(state);const before=calls.length;assert.equal(await state.切替('aidiy_windows'),false);assert.equal(await state.テスト('aidiy_windows'),false);assert.equal(calls.length,before);await state.切替('aidiy_chrome_devtools');assert.equal(await state.テスト('aidiy_chrome_devtools'),false);assert.equal(runs,0);state.終了();});
@@ -20,5 +60,5 @@ test('Tools: 処理中の二重押しと別保存を抑止、logoutで遅い結�
 test('Tools: 代表testの待機中止で古い応答は結果を上書きしない',async()=>{const d=deferred();let signal;const{state}=setup({代表テスト:{aidiy_chrome_devtools:{label:'起動',run:args=>{signal=args.signal;return d.promise;}}}});await login(state);const p=state.テスト('aidiy_chrome_devtools');state.テスト中止();assert.equal(signal.aborted,true);assert.equal(state.認証済み.value,true);d.resolve({status:'OK',message:'遅い成功'});await p;assert.equal(state.結果.value.aidiy_chrome_devtools.status,'中止');state.終了();});
 test('Tools: 初期DOMはloginだけ、Core/Tools停止中は操作画面を出さない',async()=>{const html=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true,visible:true,api:async()=>{throw Error('初期表示からAPIを呼ばない');}});assert.match(html,/Coreへログイン/);assert.doesNotMatch(html,/class="tools-columns"/);assert.doesNotMatch(html,/class="tools-detail"/);const offline=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:false,toolsOnline:false});assert.match(offline,/Core と Tools を起動/);assert.doesNotMatch(offline,/<form/);});
 test('Tools: システム起動の直前へ追加し、全テスト対象には混ぜない',()=>{const app=source('App.vue');assert.match(app,/class="tab-tools"[\s\S]*?>Tools<\/button><button class="tab-launch"/);assert.match(app,/tab!=='apps'&&tab!=='settings'&&tab!=='tools'/);assert.match(app,/:core-online="起動.Core利用可能.value" :tools-online="toolsOnline"/);assert.doesNotMatch(app.match(/async function 全診断\(\)[\s\S]*?async function changeTab/)[0],/Tools|tools/);});
-test('Tools: Chrome代表は固定ブラウザ起動/終了だけ、URL・コマンド・有料APIを渡さない',async()=>{const{Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const calls=[];const call=async(...args)=>calls.push(clone(args));const def=Tools代表テスト.aidiy_chrome_devtools;assert.match(def.description,/headless条件.*終了.*再テスト/);assert.equal(Object.keys(Tools代表テスト).length,1);assert.equal((await def.run({call,input:{headless:true,url:'https://ignored.invalid',command:'ignored'}})).status,'OK');await def.close({call});assert.deepEqual(calls,[['Tools/representative',{operation:'open',headless:true}],['Tools/representative',{operation:'close',headless:false}]]);});
+test('Tools: Chrome代表は固定ブラウザ起動/終了だけ、URL・コマンド・有料APIを渡さない',async()=>{const{Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const calls=[];const call=async(...args)=>calls.push(clone(args));const def=Tools代表テスト.aidiy_chrome_devtools;assert.match(def.description,/headless条件.*終了.*再テスト/);assert.equal(Object.keys(Tools代表テスト).length,20);assert.equal((await def.run({call,input:{headless:true,url:'https://ignored.invalid',command:'ignored'}})).status,'OK');await def.close({call});assert.deepEqual(calls,[['Tools/representative',{operation:'open',headless:true}],['Tools/representative',{operation:'close',headless:false}]]);});
 test('Tools: 代表testの認証期限切れも一覧と実行結果を消して再ログインへ戻す',async()=>{const{Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const{state}=setup({代表テスト:Tools代表テスト,api:async path=>path.endsWith('ログイン')?{status:'OK',data:{access_token:'token'}}:path.endsWith('representative')?{authExpired:true}:{status:'OK',data:baseline()}});await login(state);assert.equal(await state.テスト('aidiy_chrome_devtools'),false);assert.equal(state.認証済み.value,false);assert.equal(Object.keys(state.結果.value).length,0);assert.match(state.通知.value,/有効期限/);state.終了();});

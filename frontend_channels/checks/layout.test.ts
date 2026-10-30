@@ -21,8 +21,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const source = join(root, 'src');
 const features: Record<string, string[]> = {
   接続: ['Bot接続.ts', 'コマンド処理.ts', '接続設定.ts', 'ネットワーク接続.ts', '接続エラー.ts'],
-  コード: ['コード会話.ts'], ライブ: ['ライブ会話.ts', '音声処理.ts', 'ライブモデル候補.ts'],
-  モデル情報: ['モデル情報.ts'], 接続パネル: ['パネル操作.ts', 'パネル中継.ts'], 共通連携: ['IDE連携.ts'],
+  コード: ['コード会話.ts', 'Hermesモデル.ts'], ライブ: ['ライブ会話.ts', '音声処理.ts', 'ライブモデル候補.ts'],
+  モデル情報: ['モデル情報.ts'], 接続パネル: ['パネル操作.ts', 'パネル中継.ts', 'パネル設定.ts'], 共通連携: ['IDE連携.ts'],
 };
 test('内部実装は日本語の機能フォルダーへ集約し、公開起動入口を維持する', () => {
   const entries = readdirSync(source, { withFileTypes: true });
