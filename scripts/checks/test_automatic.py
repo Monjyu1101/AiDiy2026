@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
+import os
 import tempfile
 import unittest
 
@@ -12,10 +14,13 @@ TEXT = BAT.read_bytes().decode("utf-8").replace("\r\n", "\n")
 
 
 class BatchStructureTests(unittest.TestCase):
-    def test_utf8_crlf_no_bom(self):
+    def test_ascii_crlf_no_bom_no_multibyte_cmd_source(self):
         data = BAT.read_bytes()
+        self.assertTrue(data.isascii(), "CMD source, including comments, must be ASCII only")
         self.assertFalse(data.startswith(b"\xef\xbb\xbf"))
         self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
+        self.assertNotIn(b"\x1a", data)
+        self.assertNotIn(b"\x00", data)
 
     def test_labels_and_calls_resolve(self):
         labels = re.findall(r"^:([a-z_]+)$", TEXT, re.M)
@@ -74,7 +79,7 @@ class BatchStructureTests(unittest.TestCase):
     def test_interactive_setup_start_and_error_propagation(self):
         block = TEXT[TEXT.index('\n:setup\n'):TEXT.index('\n:validate_repository\n')]
         for script in ('_setup.py', '_start.py'):
-            self.assertIn(f'"%PYTHON%" -u {script}\nset "RC=%ERRORLEVEL%"', block)
+            self.assertIn(f'"%PYTHON%" -X utf8 -u {script}\nset "RC=%ERRORLEVEL%"', block)
         self.assertLess(block.index('_setup.py'), block.index('_start.py'))
         self.assertIn('if not "%RC%"=="0" goto failed', block)
         self.assertNotRegex(block, r"(?m)^.*(?:_setup|_start)\.py.*[<>|]")
@@ -86,6 +91,62 @@ class BatchStructureTests(unittest.TestCase):
         self.assertNotIn('/s', cleanup.lower())
         self.assertNotIn('%AIDIY_SOURCE%', cleanup)
         self.assertIn('exit /b %RC%', cleanup)
+
+    def test_cleanup_keeps_executing_batch_and_restores_caller_before_pause(self):
+        cleanup = TEXT[TEXT.index('\n:finish\n'):TEXT.index('\n:log_error\n')]
+        self.assertNotIn('del /q "%~f0"', cleanup)
+        self.assertNotIn('rd "%AIDIY_TEMP%"', cleanup)
+        self.assertIn('TEMP_COPY_RETAINED=', cleanup)
+        self.assertIn('do if exist "%AIDIY_TEMP%\\%%F" del', cleanup)
+        self.assertLess(cleanup.index('cd /d "%AIDIY_CWD%"'), cleanup.index(' pause'))
+        self.assertTrue(cleanup.rstrip().endswith('pause\nexit /b %RC%'))
+        self.assertNotRegex(cleanup, r'(?im)^endlocal\b')
+
+    def test_required_checks_identify_failure_and_preserve_diagnostics(self):
+        for name in ('git', 'robocopy', 'python'):
+            self.assertIn(f'set "STAGE=prerequisite_{name}"', TEXT)
+        block = TEXT[TEXT.index('\n:prerequisite_failed\n'):TEXT.index('\n:validate_repository\n')]
+        self.assertIn('REQUIRED_CHECK_FAILED %STAGE%', block)
+        self.assertIn('type "%AIDIY_TEMP%\\probe.txt"', block)
+        self.assertIn('set "RC=2"', block)
+        self.assertIn('goto failed', block)
+
+    def test_optional_tools_cannot_block_initial_setup(self):
+        block = TEXT[TEXT.index('set "STAGE=check_node"'):TEXT.index('set "STAGE=git_environment"')]
+        for name in ('node', 'npm', 'uv'):
+            self.assertIn(f'set "STAGE=check_{name}"', block)
+        self.assertEqual(block.count('set "CHECK_RC=%ERRORLEVEL%"'), 3)
+        self.assertEqual(block.count('call :report_optional_check'), 3)
+        self.assertNotIn('goto failed', block)
+        self.assertNotIn('goto prerequisite_failed', block)
+        report = TEXT[TEXT.index('\n:report_optional_check\n'):TEXT.index('\n:prerequisite_failed\n')]
+        self.assertIn('exit /b 0', report)
+
+    def test_npm_cmd_is_isolated_in_child_cmd_not_chained(self):
+        self.assertIn('"%ComSpec%" /d /c npm --version', TEXT)
+        self.assertNotRegex(TEXT, r'(?m)^npm(?:\.cmd)?\s')
+
+    def test_python_path_is_utf8_even_when_redirected(self):
+        probes = [line for line in TEXT.splitlines() if 'print(sys.executable)' in line]
+        self.assertEqual(len(probes), 2)
+        for line in probes:
+            self.assertIn('-X utf8 -c', line)
+            self.assertIn('sys.version_info >= (3,13)', line)
+            self.assertIn('2>"%AIDIY_TEMP%\\probe.txt"', line)
+        self.assertIn('chcp 65001 >nul\nif errorlevel 1 goto temp_error', TEXT)
+
+    def test_actual_python_probe_has_clean_utf8_stdout_and_version_diagnostic(self):
+        line = next(line for line in TEXT.splitlines() if 'print(sys.executable)' in line)
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        compile(code, '<batch Python probe>', 'exec')
+        with tempfile.TemporaryDirectory(prefix='python probe 日本語 ') as folder:
+            executable = Path(folder) / 'python'
+            executable.symlink_to(sys.executable)
+            result = subprocess.run([str(executable), '-X', 'utf8', '-c', code],
+                                    capture_output=True, env={**os.environ, 'PYTHONIOENCODING': 'ascii'})
+            self.assertEqual(result.returncode, 0 if sys.version_info >= (3, 13) else 1)
+            self.assertEqual(Path(result.stdout.decode('utf-8').strip()), executable)
+            self.assertTrue(result.stderr.decode('ascii').startswith('Python '))
 
 
 class RoutingModelTests(unittest.TestCase):

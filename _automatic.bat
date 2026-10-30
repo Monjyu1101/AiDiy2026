@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 chcp 65001 >nul
-rem 単体配布。元cwdを保持し、TEMPの自己コピーだけで処理する。
+if errorlevel 1 goto temp_error
+rem Standalone ASCII batch. Preserve original cwd; execute only the TEMP copy.
 if /i "%~1"=="--_aidiy_temp" goto temp_entry
 if not defined TEMP goto temp_error
 if not defined USERPROFILE goto temp_error
@@ -18,7 +19,7 @@ mkdir "%AIDIY_TEMP%" >nul 2>&1
 if errorlevel 1 goto make_temp
 copy /b /v /y "%~f0" "%AIDIY_TEMP%\_automatic.bat" >nul
 if errorlevel 1 goto temp_error
-rem CALLせず制御を移す。更新で元batが書き換わっても、読み直さない。
+rem Transfer without CALL. Never read the original batch after self-update.
 "%AIDIY_TEMP%\_automatic.bat" --_aidiy_temp
 exit /b 2
 
@@ -37,50 +38,68 @@ set "LOG=%LOG_ROOT%\automatic-%AIDIY_RUN%.log"
 >"%LOG%" echo START %DATE% %TIME%
 if errorlevel 1 goto log_error
 >>"%LOG%" echo CWD="%AIDIY_CWD%"
-echo 実行記録: "%LOG%"
+echo Log: "%LOG%"
 set "RUN_AIDIY=y"
-set /p "RUN_AIDIY=aidiyセットアップと実行しますか？ [y]/n: "
-rem 入力をコマンドへ展開しない。空入力は既定Yes。
+set /p "RUN_AIDIY=Run AiDiy update, setup and start? [y]/n: "
+rem Do not expand user input as command text. Empty input keeps default Yes.
 set RUN_AIDIY | findstr /i /x /c:"RUN_AIDIY=n" >nul
 if not errorlevel 1 goto cancelled
 
-set "STAGE=前提確認"
+rem Only bootstrap requirements are fatal here. Normal setup owns Node/npm/uv.
 set "RC=2"
-where git >nul 2>&1
-if errorlevel 1 goto failed
-git --version >nul 2>&1
-if errorlevel 1 goto failed
-where node >nul 2>&1
-if errorlevel 1 goto failed
-node -e "const v=process.versions.node.split('.').map(Number);process.exit(v[0]>22||v[0]===22&&v[1]>=13?0:1)" >nul 2>&1
-if errorlevel 1 goto failed
-where npm >nul 2>&1
-if errorlevel 1 goto failed
-where uv >nul 2>&1
-if errorlevel 1 goto failed
-where robocopy >nul 2>&1
-if errorlevel 1 goto failed
-py -3 -c "import sys;print(sys.executable);sys.exit(0 if sys.version_info >= (3,13) else 1)" >"%AIDIY_TEMP%\python.txt" 2>nul
+set "STAGE=prerequisite_git"
+echo [CHECK] Git
+git --version >"%AIDIY_TEMP%\probe.txt" 2>&1
+if errorlevel 1 goto prerequisite_failed
+type "%AIDIY_TEMP%\probe.txt"
+type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
+set "STAGE=prerequisite_robocopy"
+echo [CHECK] robocopy
+where robocopy >"%AIDIY_TEMP%\probe.txt" 2>&1
+if errorlevel 1 goto prerequisite_failed
+>>"%LOG%" echo CHECK robocopy OK
+set "STAGE=prerequisite_python"
+echo [CHECK] Python 3.13 or newer
+py -3 -X utf8 -c "import sys;sys.stdout.reconfigure(encoding='utf-8');print(sys.executable);sys.stderr.write('Python '+sys.version.split()[0]+'\n');sys.exit(0 if sys.version_info >= (3,13) else 1)" >"%AIDIY_TEMP%\python.txt" 2>"%AIDIY_TEMP%\probe.txt"
 if not errorlevel 1 goto python_ready
-python -c "import sys;print(sys.executable);sys.exit(0 if sys.version_info >= (3,13) else 1)" >"%AIDIY_TEMP%\python.txt" 2>nul
-if errorlevel 1 goto failed
+type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
+python -X utf8 -c "import sys;sys.stdout.reconfigure(encoding='utf-8');print(sys.executable);sys.stderr.write('Python '+sys.version.split()[0]+'\n');sys.exit(0 if sys.version_info >= (3,13) else 1)" >"%AIDIY_TEMP%\python.txt" 2>"%AIDIY_TEMP%\probe.txt"
+if errorlevel 1 goto prerequisite_failed
 :python_ready
 set "PYTHON="
 set /p "PYTHON="<"%AIDIY_TEMP%\python.txt"
-if not defined PYTHON goto failed
-rem Gitの対象を外から差し替える環境変数がある場合は停止する。
+if not defined PYTHON goto prerequisite_failed
+type "%AIDIY_TEMP%\probe.txt"
+type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
+
+rem Advisory only: setup offers its normal installation and update choices.
+set "STAGE=check_node"
+node --version >"%AIDIY_TEMP%\probe.txt" 2>&1
+set "CHECK_RC=%ERRORLEVEL%"
+call :report_optional_check
+set "STAGE=check_npm"
+rem npm is commonly npm.cmd. A child CMD returns here instead of chaining away.
+"%ComSpec%" /d /c npm --version >"%AIDIY_TEMP%\probe.txt" 2>&1
+set "CHECK_RC=%ERRORLEVEL%"
+call :report_optional_check
+set "STAGE=check_uv"
+uv --version >"%AIDIY_TEMP%\probe.txt" 2>&1
+set "CHECK_RC=%ERRORLEVEL%"
+call :report_optional_check
+set "STAGE=git_environment"
+rem Refuse inherited Git environment variables that redirect the checkout.
 if defined GIT_DIR goto failed
 if defined GIT_WORK_TREE goto failed
 if defined GIT_COMMON_DIR goto failed
 if defined GIT_INDEX_FILE goto failed
 if defined GIT_OBJECT_DIRECTORY goto failed
 set "GIT_TERMINAL_PROMPT=0"
-rem 優先順: 元cwd、元bat配置先、USERPROFILE。ショートカットの空cwdにも対応。
+rem Priority: original cwd, original script directory, USERPROFILE fallback.
 set "TARGET=%USERPROFILE%\AiDiy2026"
 if exist "%AIDIY_SOURCE_DIR%\backend_server\" set "TARGET=%AIDIY_SOURCE_DIR%"
 if exist "%AIDIY_CWD%\backend_server\" set "TARGET=%AIDIY_CWD%"
 >>"%LOG%" echo TARGET="%TARGET%"
-echo 対象: "%TARGET%"
+echo Target: "%TARGET%"
 if exist "%TARGET%" goto existing
 
 set "STAGE=clone"
@@ -88,13 +107,13 @@ set "STAGING=%USERPROFILE%\.AiDiy2026-clone-%AIDIY_RUN%"
 git clone --branch main --single-branch https://github.com/Monjyu1101/AiDiy2026.git "%STAGING%"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
-rem renは既存の同名フォルダへ移動しない。競合時は途中取得物を保持する。
+rem REN refuses an existing destination. Keep the staging clone on failure.
 ren "%STAGING%" "AiDiy2026"
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 
 :existing
-set "STAGE=対象検証"
+set "STAGE=repository_validation"
 set "RC=3"
 cd /d "%TARGET%"
 if errorlevel 1 goto failed
@@ -109,23 +128,23 @@ if errorlevel 1 goto locked
 set "LOCK_OWNED=1"
 >"%CONTROL%\run.lock\owner.txt" echo %AIDIY_RUN%
 
-set "STAGE=ローカル退避"
+set "STAGE=local_backup"
 set "BACKUP=%CONTROL%\%AIDIY_RUN%"
 call :backup_local_state
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 >>"%LOG%" echo BACKUP="%BACKUP%"
-echo 退避先: "%BACKUP%"
+echo Backup: "%BACKUP%"
 
 set "STAGE=fetch"
 git fetch --no-tags origin main
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
-set "STAGE=fast-forward検証"
+set "STAGE=fast_forward_validation"
 git merge-base --is-ancestor HEAD FETCH_HEAD
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
-set "STAGE=fast-forward更新"
+set "STAGE=fast_forward_update"
 git merge --ff-only --no-edit --no-overwrite-ignore --no-autostash FETCH_HEAD
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
@@ -133,8 +152,8 @@ if not "%RC%"=="0" goto failed
 git rev-parse HEAD >>"%LOG%"
 if errorlevel 1 goto failed
 
-rem 初回配布のbatを次回用に配置する。既存ファイルは上書きしない。
-set "STAGE=bat配置"
+rem Copy this launcher only when absent. Never overwrite an existing file.
+set "STAGE=launcher_copy"
 if exist "%TARGET%\_automatic.bat" goto setup
 copy /b /v /-y "%~f0" "%TARGET%\_automatic.bat" <nul >nul
 set "RC=%ERRORLEVEL%"
@@ -143,19 +162,35 @@ if not "%RC%"=="0" goto failed
 :setup
 set "STAGE=setup"
 >>"%LOG%" echo SETUP %DATE% %TIME%
-echo セットアップ開始（通常の確認入力を維持します）
-"%PYTHON%" -u _setup.py
+echo Running normal setup. Answer its existing prompts in this console.
+"%PYTHON%" -X utf8 -u _setup.py
 set "RC=%ERRORLEVEL%"
 >>"%LOG%" echo SETUP_EXIT=%RC%
 if not "%RC%"=="0" goto failed
 set "STAGE=start"
 >>"%LOG%" echo START_APP %DATE% %TIME%
-"%PYTHON%" -u _start.py
+"%PYTHON%" -X utf8 -u _start.py
 set "RC=%ERRORLEVEL%"
 >>"%LOG%" echo START_EXIT=%RC%
 if not "%RC%"=="0" goto failed
 >>"%LOG%" echo SUCCESS %DATE% %TIME%
 goto finish
+
+:report_optional_check
+echo [CHECK] %STAGE% exit=%CHECK_RC%
+>>"%LOG%" echo CHECK %STAGE% exit=%CHECK_RC%
+type "%AIDIY_TEMP%\probe.txt"
+type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
+if not "%CHECK_RC%"=="0" echo [WARN] Tool unavailable. Normal setup will handle its requirements and choices.
+exit /b 0
+
+:prerequisite_failed
+echo [ERROR] Required tool check failed: %STAGE%
+>>"%LOG%" echo REQUIRED_CHECK_FAILED %STAGE%
+type "%AIDIY_TEMP%\probe.txt"
+type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
+set "RC=2"
+goto failed
 
 :validate_repository
 if not exist ".git" exit /b 3
@@ -166,7 +201,7 @@ if errorlevel 1 exit /b 3
 for %%F in ("%AIDIY_TEMP%\prefix.txt") do if %%~zF GTR 2 exit /b 3
 git remote get-url --all origin >"%AIDIY_TEMP%\origin.txt"
 if errorlevel 1 exit /b 3
-rem originの文字列をコマンドに展開しない。許可リストに完全一致するか確認。
+rem Treat origin URLs as data, never command text. Match the exact allowlist.
 >"%AIDIY_TEMP%\allowed-origins.txt" echo https://github.com/Monjyu1101/AiDiy2026.git
 >>"%AIDIY_TEMP%\allowed-origins.txt" echo https://github.com/Monjyu1101/AiDiy2026
 >>"%AIDIY_TEMP%\allowed-origins.txt" echo git@github.com:Monjyu1101/AiDiy2026.git
@@ -221,8 +256,8 @@ exit /b 0
 
 :locked
 set "RC=3"
-echo [ERROR] 別の自動実行中、または前回中断のロックがあります。
-echo 全ての自動実行が終了したことを確認してから、次のロックだけを手動確認してください。
+echo [ERROR] Another run is active, or a lock remains after interruption.
+echo Verify all automatic runs have ended before manually checking this lock:
 echo "%CONTROL%\run.lock"
 goto failed
 
@@ -234,30 +269,39 @@ goto finish
 :failed
 if "%RC%"=="0" set "RC=1"
 >>"%LOG%" echo FAILED stage=%STAGE% exit=%RC% %DATE% %TIME%
-echo [ERROR] "%STAGE%" で停止しました。終了コード=%RC%
-echo Python 3.13以上、Git、Node.js 22.13以上、npm、uvが必要です。
-echo Gitのorigin/main、競合、権限、ネットワークと画面のエラーを確認してください。
-echo 既存変更・退避・途中cloneは削除していません。
-echo 実行記録: "%LOG%"
-if defined STAGING echo 取得先: "%STAGING%"
+echo [ERROR] Stage "%STAGE%" stopped. Exit code=%RC%
+echo Required for this launcher: Git, Python 3.13 or newer, and robocopy.
+echo Check the named stage, tool output, origin/main, conflicts and permissions.
+echo Existing changes, backups and partial clones have NOT been deleted.
+echo Log: "%LOG%"
+if defined STAGING echo Clone staging: "%STAGING%"
 
 :finish
 if not defined LOCK_OWNED goto clean_temp
-del /q "%CONTROL%\run.lock\owner.txt" >nul 2>&1
-rd "%CONTROL%\run.lock" >nul 2>&1
+if exist "%CONTROL%\run.lock\owner.txt" del /q "%CONTROL%\run.lock\owner.txt" >nul 2>&1
+if exist "%CONTROL%\run.lock\" rd "%CONTROL%\run.lock" >nul 2>&1
 :clean_temp
+rem Delete only known scratch files. Never delete the currently executing batch.
+for %%F in (python.txt probe.txt prefix.txt origin.txt allowed-origins.txt bad-origins.txt branch.txt gitdir.txt unmerged.txt untracked.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
+>>"%LOG%" echo TEMP_COPY_RETAINED="%~f0"
+rem Restore the caller directory before returning. Do not modify that directory.
+cd /d "%AIDIY_CWD%" >nul 2>&1
+if not errorlevel 1 goto exit_ready
+echo [WARN] Could not restore the original working directory.
+>>"%LOG%" echo CWD_RESTORE_FAILED
+if "%RC%"=="0" set "RC=1"
+:exit_ready
+rem Keep this small TEMP batch so CMD can finish reading it without path errors.
+rem No deferred deletion process, wildcard cleanup, ENDLOCAL or self-delete.
 if not "%RC%"=="0" pause
-rem 自分で作った既知の一時ファイルだけを削除。未知のファイルは残す。
-for %%F in (python.txt prefix.txt origin.txt allowed-origins.txt bad-origins.txt branch.txt gitdir.txt unmerged.txt untracked.txt) do del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
-rem 最終行全体が読み込まれた後に、自分を削除して終了コードを返す。
-del /q "%~f0" >nul 2>&1 & rd "%AIDIY_TEMP%" >nul 2>&1 & exit /b %RC%
+exit /b %RC%
 
 :log_error
-echo [ERROR] 実行ログを作成できません。途中TEMPは保持しました。
+echo [ERROR] Cannot create the log file. Temporary files have been kept.
 pause
 exit /b 2
 :temp_error
-echo [ERROR] TEMPの自己コピーまたは内部起動情報を確認できません。
-echo 引数なしで実行し、TEMPの容量・権限を確認してください。途中のファイルは保持しています。
+echo [ERROR] Cannot verify the TEMP copy or internal launch information.
+echo Run without arguments; check TEMP free space and permissions. Files kept.
 pause
 exit /b 2
