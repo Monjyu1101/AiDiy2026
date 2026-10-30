@@ -162,8 +162,8 @@ models.fetch_all_models()  # 互換入口。合成ファイルの読込確認の
 readerのtoken未設定契約はDiscord同様、非文字列、trim後length<=1、`<`で始まる値、
 内部空白を拒否し、エラーには値を出さない。
 
-この変更は初期値と秘密値除去の定義までで、Slack接続reader・実接続・設定画面/APIを追加しない。
-Diag既存診断ではSlackの2 tokenも秘密値として除去する。Slackを診断providerへ追加しない。
+初期値と秘密値除去に加え、Diag外部連携はSlack Botトークンの認証確認に対応する。Slack接続reader・実接続・設定画面/APIを追加しない。
+Diag既存診断ではSlackの2 tokenも秘密値として除去する。外部連携の `Slack Bot` はBot tokenの認証確認のみで、App token・ID設定・Socket Mode接続・投稿権限は確認しない。
 `backend_server/checks/test_slack_config_defaults.py` は一時JSONだけを使う。
 `frontend_channels/checks/config.test.ts` は現Discordの未設定契約・Slack欄の非干渉を検証し、
 Slack readerが実装済みであることを意味しない。

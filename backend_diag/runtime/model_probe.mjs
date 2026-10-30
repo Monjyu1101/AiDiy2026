@@ -370,7 +370,8 @@ var KEY_PROVIDERS = Object.freeze([
   ["local", "\u30ED\u30FC\u30AB\u30EB\uFF08backend_local\uFF09", "\u56FA\u5B9A\u5019\u88DC", "local-fixed"],
   ["huggingface_read", "Hugging Face \u8AAD\u53D6", "huggingface_key_read", "huggingface"],
   ["huggingface_write", "Hugging Face \u66F8\u8FBC", "huggingface_key_write", "huggingface"],
-  ["discord", "Discord Bot", "discord_bot_token", "discord"]
+  ["discord", "Discord Bot", "discord_bot_token", "discord"],
+  ["slack", "Slack Bot", "slack_bot_token", "slack"]
 ].map(([id, \u540D\u524D, \u30AD\u30FC\u540D, probe2]) => Object.freeze({ id, \u540D\u524D, \u30AD\u30FC\u540D, probe: probe2, oauth: probe2 === "codex" || probe2 === "grok" ? probe2 : null })));
 var SECRET_CONFIG_KEYS = Object.freeze(["gemini_key_id", "freeai_key_id", "claude_key_id", "openai_key_id", "azure_key_id", "copilot_key_id", "openrt_key_id", "ollama_key_id", "huggingface_key_read", "huggingface_key_write", "discord_bot_token", "slack_bot_token", "slack_app_token", "openai_organization"]);
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -454,9 +455,9 @@ async function readCodexLocal(reader, env = process.env, home = os.homedir()) {
   }
   return { defaultModel, cacheIds };
 }
-var INTEGRATION_PROBES = Object.freeze(["huggingface", "discord"]);
+var INTEGRATION_PROBES = Object.freeze(["huggingface", "discord", "slack"]);
 function configured(value, id) {
-  return typeof value === "string" && !!value.trim() && !value.trim().startsWith("<") && !(id === "ollama" && value.trim().toLowerCase() === "ollama");
+  return typeof value === "string" && (id !== "slack" || value.trim().length > 1 && !/\s/.test(value.trim())) && !!value.trim() && !value.trim().startsWith("<") && !(id === "ollama" && value.trim().toLowerCase() === "ollama");
 }
 async function status({ reader, oauthReader } = {}) {
   const [state, values] = await readConfig(reader);
@@ -474,7 +475,7 @@ async function status({ reader, oauthReader } = {}) {
   }), \u30E2\u30C7\u30EB: [] };
 }
 var LOCAL_ENDPOINTS = { "ollama-local": ["127.0.0.1", 11434, "/api/tags"] };
-var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], "openrouter-key": ["openrouter.ai", "/api/v1/key"], ollama: ["ollama.com", "/v1/models"], huggingface: ["huggingface.co", "/api/whoami-v2"], discord: ["discord.com", "/api/v10/users/@me"] };
+var ENDPOINTS = { codex: ["chatgpt.com", "/backend-api/codex/models?client_version=1.0.0"], grok: ["cli-chat-proxy.grok.com", "/v1/models"], google: ["generativelanguage.googleapis.com", "/v1beta/models"], anthropic: ["api.anthropic.com", "/v1/models"], openai: ["api.openai.com", "/v1/models"], openrouter: ["openrouter.ai", "/api/v1/models"], "openrouter-key": ["openrouter.ai", "/api/v1/key"], ollama: ["ollama.com", "/v1/models"], huggingface: ["huggingface.co", "/api/whoami-v2"], discord: ["discord.com", "/api/v10/users/@me"], slack: ["slack.com", "/api/auth.test"] };
 var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resolve, reject) => {
   const local = LOCAL_ENDPOINTS[provider], endpoint = local ? [local[0], local[2]] : ENDPOINTS[provider];
   if (!endpoint) return reject(new Error("provider"));
@@ -531,7 +532,7 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
     else resolve(value);
   }
   try {
-    request = local ? http2.request({ hostname: local[0], port: local[1], path: pathname, method: "GET", agent: false, headers: { Accept: "application/json", ...headers } }, respond) : https2.request({ hostname: endpoint[0], path: pathname, port: 443, method: "GET", agent: agent ?? false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, respond);
+    request = local ? http2.request({ hostname: local[0], port: local[1], path: pathname, method: "GET", agent: false, headers: { Accept: "application/json", ...headers } }, respond) : https2.request({ hostname: endpoint[0], path: pathname, port: 443, method: provider === "slack" ? "POST" : "GET", agent: agent ?? false, rejectUnauthorized: true, headers: { Accept: "application/json", ...headers } }, respond);
     signal?.addEventListener("abort", cancel, { once: true });
     request.on("error", (error) => finish(new Error(networkFailure(error))));
     request.end();
@@ -723,8 +724,13 @@ function safeName(value, secrets) {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._\-]{0,63}$/.test(value) && !secrets.some((secret) => value.includes(secret)) ? value : "";
 }
 async function integrationProbe(id, provider, key, output, secrets, fetch, signal) {
-  const name = provider === "discord" ? "Discord" : "Hugging Face";
+  const name = provider === "slack" ? "Slack" : provider === "discord" ? "Discord" : "Hugging Face";
   try {
+    if (provider === "slack") {
+      const body2 = await fetch("slack", { Authorization: "Bearer " + key, "Content-Type": "application/x-www-form-urlencoded" }, void 0, signal);
+      if (body2.ok !== true || typeof body2.bot_id !== "string" || !/^B[A-Z0-9]+$/.test(body2.bot_id)) return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "Slack Bot \u30C8\u30FC\u30AF\u30F3\u3068\u3057\u3066\u8A8D\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002" };
+      return { ...output, \u72B6\u614B: "OK", \u8AAC\u660E: "Slack Bot \u30C8\u30FC\u30AF\u30F3\u3067\u8A8D\u8A3C\u3067\u304D\u307E\u3057\u305F\u3002App \u30C8\u30FC\u30AF\u30F3\u30FBSocket Mode\u30FB\u30C1\u30E3\u30F3\u30CD\u30EB\u6A29\u9650\u30FB\u30E1\u30C3\u30BB\u30FC\u30B8\u9001\u4FE1\u306F\u672A\u78BA\u8A8D\u3067\u3059\u3002" };
+    }
     if (provider === "discord") {
       const body2 = await fetch("discord", { Authorization: "Bot " + key, "User-Agent": "DiscordBot (aidiy-diag, 0.1.0)" }, void 0, signal);
       if (body2.bot !== true) return { ...output, \u72B6\u614B: "NG", \u8AAC\u660E: "Bot \u30C8\u30FC\u30AF\u30F3\u3068\u3057\u3066\u8A8D\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002Discord Developer Portal \u306E Bot \u30C8\u30FC\u30AF\u30F3\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002" };

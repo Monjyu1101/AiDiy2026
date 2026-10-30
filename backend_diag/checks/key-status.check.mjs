@@ -107,11 +107,11 @@ test('Ollama confirmed missing skips all model work, other installation states p
  }
 });
 
-test('Slack credentials never appear in status or hostile integration display fields and are not testable',async()=>{
+test('Slack credentials never appear in status or hostile integration display fields without exposing token values',async()=>{
  const secrets=['xoxb-fixture-bot-token','xapp-fixture-app-token'];
  const values={discord_bot_token:'fixture-discord',huggingface_key_read:'fixture-hf',slack_bot_token:secrets[0],slack_app_token:secrets[1]};
  const status=await runModels('status',undefined,{reader:reader(values),fetch:forbidden});
- assert.ok(status.data.項目.every(row=>!row.id.startsWith('slack')));
+ assert.equal(status.data.項目.find(row=>row.id==='slack').設定済み,true);
  for(const secret of secrets)assert.ok(!JSON.stringify(status).includes(secret));
  for(const secret of secrets){
   for(const [id,body] of [['discord',{bot:true,username:'prefix-'+secret}],['huggingface_read',{name:secret,auth:{accessToken:{role:'read'}}}]]){
@@ -120,7 +120,7 @@ test('Slack credentials never appear in status or hostile integration display fi
    for(const token of secrets)assert.ok(!JSON.stringify(response).includes(token));
   }
  }
- for(const id of ['slack','slack_bot','slack_app']){
+ for(const id of ['slack_bot','slack_app']){
   assert.equal((await testKey(id,{run:forbidden})).状態,'未実施');
   assert.equal((await runModels('test',id,{reader:forbidden,fetch:forbidden})).error,'unsupported');
  }

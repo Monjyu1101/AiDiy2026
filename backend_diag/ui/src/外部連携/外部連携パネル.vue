@@ -34,7 +34,7 @@ watch(()=>props.busy,完了時(()=>先頭へスクロール(パネル.value)));
  </aside>
  <article aria-live="polite"><template v-if="row"><span class="eyebrow">外部連携 / {{row.名前}}</span><h2>{{row.名前}}</h2><component :is="状態バッジ" class="status" :state="result?.状態 || '未実施'"/>
   <dl><dt>キー名</dt><dd>{{row.キー名}}</dd><dt>設定状況</dt><dd>{{config(row)}}</dd><dt>確認内容</dt><dd>{{row.説明}}</dd><dt>テスト</dt><dd>{{result?.説明 || row.理由 || '未実施。左側のテストボタンで認証を確認します。'}}</dd><dt>確認日時</dt><dd>{{result?.確認日時?new Date(result.確認日時).toLocaleString():'—'}}</dd></dl>
- </template><div v-else class="welcome"><span class="eyebrow">EXTERNAL INTEGRATIONS</span><h2>外部連携の設定状況</h2><p>Hugging Face・Discord を選択すると設定の有無と確認範囲を表示します。</p></div></article></main>
- <details class="test-notes"><summary>確認範囲について</summary><p>キーの値は表示しません。設定済は認証成功を意味しません。「状況確認」はテストできる行を上から順に、各行の「テスト」はその行だけを、読み取り専用で1回ずつ認証確認します（Hugging Face は whoami-v2、Discord は Bot 自身の情報の取得）。キー未設定の行は確認せず未実施のままです。「書込」は直前の確認結果を _AIDIY/aidiy_diag/integration_info.json へ保存します。「全テスト」でも状況確認と書込を行います。</p><p>メッセージ送信・Gateway 接続・リポジトリへの書込は行いません。Hugging Face 書込は、トークンに書込権限があるかを確認します。OK は認証と権限の確認で、個別のリポジトリ・チャンネルで実際に操作できることは保証しません。起動時・headless では確認しません。</p></details>
+ </template><div v-else class="welcome"><span class="eyebrow">EXTERNAL INTEGRATIONS</span><h2>外部連携の設定状況</h2><p>Hugging Face・Discord・Slack を選択すると設定の有無と確認範囲を表示します。</p></div></article></main>
+ <details class="test-notes"><summary>確認範囲について</summary><p>キーの値は表示しません。設定済は認証成功を意味しません。「状況確認」はテストできる行を上から順に、各行の「テスト」はその行だけを、読み取り専用で1回ずつ認証確認します（Hugging Face は whoami-v2、Discord は Bot 自身の情報の取得、Slack は auth.test による Bot トークンの認証）。キー未設定の行は確認せず未実施のままです。「書込」は直前の確認結果を _AIDIY/aidiy_diag/integration_info.json へ保存します。「全テスト」でも状況確認と書込を行います。</p><p>メッセージ送信・Gateway / Socket Mode 接続・リポジトリへの書込は行いません。Hugging Face 書込は、トークンに書込権限があるかを確認します。OK は認証と権限の確認で、個別のリポジトリ・チャンネルで実際に操作できることは保証しません。Slack の App トークン、workspace・user・channel の設定値、Socket Mode 接続、投稿権限はこの確認の対象外です。起動時・headless では確認しません。</p></details>
 </section>
 </template>

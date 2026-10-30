@@ -4,7 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 // サーバーの登録順を変えず、各キーを必ず一方の画面へ分類する。
-export const 外部連携ID = Object.freeze(['huggingface_read', 'huggingface_write', 'discord']);
+export const 外部連携ID = Object.freeze(['huggingface_read', 'huggingface_write', 'discord', 'slack']);
 export const 外部連携か = item => 外部連携ID.includes(item.id);
 // モデル一覧の確認に対応しない項目は、どちらの画面にも表示しない（サーバー側の登録と秘匿対象には残す）。
 export const 確認不要ID = Object.freeze(['azure', 'copilot']);

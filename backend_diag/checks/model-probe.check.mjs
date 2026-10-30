@@ -68,7 +68,7 @@ test('fixed config path, provider order and safe status without key values',asyn
   assert.match(file.replaceAll('\\','/'),/\/_config\/AiDiy_key\.json$/);
   return JSON.stringify({openai_key_id:'fixture-secret',gemini_key_id:' < placeholder > ',ollama_key_id:'ollama'});
  }});
- assert.deepEqual(result.項目.map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt','ollama','local','huggingface_read','huggingface_write','discord']);
+ assert.deepEqual(result.項目.map(row=>row.id),['gemini','freeai','claude','openai','openai_oauth','grok','azure','copilot','openrt','ollama','local','huggingface_read','huggingface_write','discord','slack']);
  assert.ok(!JSON.stringify(result).includes('fixture-secret'));
  const rows=Object.fromEntries(result.項目.map(row=>[row.id,row]));
  assert.equal(rows.openai.設定済み,true);assert.equal(rows.gemini.設定済み,false);
@@ -150,7 +150,7 @@ test('OpenRouter never promotes public metadata without a verified key',async()=
  assert.equal(result.認証確認,true);assert.deepEqual(result.モデル,['other/new']);
 });
 
-test('configured Slack tokens are secrets in hostile model identifiers and metadata, not providers',async()=>{
+test('configured Slack tokens are secrets in hostile model identifiers and metadata',async()=>{
  const secrets=['xoxb-fixture-slack-bot','xapp-fixture-slack-app'];
  const values={openai_key_id:'fixture-openai',openrt_key_id:'fixture-openrouter',slack_bot_token:secrets[0],slack_app_token:secrets[1]};
  const result=await probe('openai',{now,reader:reader(values),fetch:async()=>({data:[{id:'safe-model',created},...secrets.map(id=>({id,created}))]})});
@@ -160,5 +160,46 @@ test('configured Slack tokens are secrets in hostile model identifiers and metad
  const metadata=await probe('openrt',{now,reader:reader(values),cache,fetch:async()=>({data:{is_free_tier:false}})});
  for(const secret of secrets)assert.ok(!JSON.stringify(metadata).includes(secret));
  assert.deepEqual(metadata.モデル,['safe']);
- for(const id of ['slack','slack_bot','slack_app'])assert.equal((await probe(id,{reader:forbidden,fetch:forbidden})).状態,'未実施');
+ for(const id of ['slack_bot','slack_app'])assert.equal((await probe(id,{reader:forbidden,fetch:forbidden})).状態,'未実施');
+});
+
+test('Slack status is bot-token presence only; invalid tokens never authenticate',async()=>{
+ for(const value of [undefined,null,1,'',' ','x','<placeholder>','token whitespace','token\nline']){
+  const options={reader:reader({slack_bot_token:value}),fetch:forbidden};
+  const row=(await status(options)).項目.find(row=>row.id==='slack');
+  assert.equal(row.設定済み,false);assert.equal(row.テスト可能,false);
+  assert.equal((await probe('slack',options)).状態,'未実施');
+ }
+ const row=(await status({reader:reader({slack_bot_token:' xoxb-fixture '})})).項目.find(row=>row.id==='slack');
+ assert.equal(row.設定済み,true);assert.equal(row.テスト可能,true);assert.equal(row.状態,'未実施');
+});
+test('Slack manual auth requires bot success and never publishes response or app credentials',async()=>{
+ const values={slack_bot_token:' xoxb-fixture ',slack_app_token:'xapp-secret'};
+ for(const body of [{ok:true,bot_id:'B123',user:'xapp-secret',team:'private'}, {ok:true}, {ok:false,error:'xapp-secret'}, {ok:'true',bot_id:'B123'},new Error('xapp-secret')]){
+  let calls=0;const result=await probe('slack',{reader:reader(values),fetch:async(provider,headers)=>{
+   calls++;assert.equal(provider,'slack');assert.deepEqual(headers,{Authorization:'Bearer xoxb-fixture','Content-Type':'application/x-www-form-urlencoded'});
+   if(body instanceof Error)throw body;return body;
+  }});
+  assert.equal(calls,1);assert.equal(result.状態,body.ok===true&&body.bot_id==='B123'?'OK':'NG');
+  assert.deepEqual(result.モデル,[]);assert.doesNotMatch(JSON.stringify(result),/xapp-secret|xoxb-fixture|private/);
+ }
+});
+
+test('Slack transport fixes HTTPS endpoint and POST without URL credentials or socket',async t=>{
+ const {default:https}=await import('node:https');const {EventEmitter}=await import('node:events');
+ const {fetchMetadata}=await import('../runtime/model_probe.mjs');
+ const saved={NO_PROXY:process.env.NO_PROXY,no_proxy:process.env.no_proxy};
+ t.after(()=>{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+ process.env.NO_PROXY='*';process.env.no_proxy='*';
+ let calls=0;
+ t.mock.method(https,'request',(options,respond)=>{
+  calls++;assert.equal(options.hostname,'slack.com');assert.equal(options.path,'/api/auth.test');
+  assert.equal(options.port,443);assert.equal(options.method,'POST');assert.equal(options.rejectUnauthorized,true);
+  assert.equal(options.headers.Authorization,'Bearer fixture');
+  const request=new EventEmitter();request.destroy=()=>{};request.end=()=>queueMicrotask(()=>{
+   const response=new EventEmitter();response.statusCode=200;response.destroy=()=>{};respond(response);
+   response.emit('data',Buffer.from('{"ok":true,"bot_id":"B123"}'));response.emit('end');
+  });return request;
+ });
+ assert.equal((await fetchMetadata('slack',{Authorization:'Bearer fixture'})).ok,true);assert.equal(calls,1);
 });

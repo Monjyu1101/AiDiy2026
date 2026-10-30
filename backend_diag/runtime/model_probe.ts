@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-// 診断サーバー専用。固定設定の読取・モデル一覧GETのみ。キーを戻り値やログへ出さない。
+// 診断サーバー専用。固定設定の読取・モデル一覧・読み取り専用の認証確認のみ。キーを戻り値やログへ出さない。
 import {open,stat} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -35,6 +35,7 @@ export const KEY_PROVIDERS=Object.freeze([
  ['openrt','OpenRouter','openrt_key_id','openrouter'],['ollama','Ollama（ローカル）','ollama list','ollama-local'],['local','ローカル（backend_local）','固定候補','local-fixed'],
  ['huggingface_read','Hugging Face 読取','huggingface_key_read','huggingface'],['huggingface_write','Hugging Face 書込','huggingface_key_write','huggingface'],
  ['discord','Discord Bot','discord_bot_token','discord'],
+ ['slack','Slack Bot','slack_bot_token','slack'],
 ].map(([id,名前,キー名,probe])=>Object.freeze({id:id!,名前:名前!,キー名:キー名!,probe,oauth:probe==='codex'||probe==='grok'?probe as OAuthKind:null})));
 // モデル名に紛れたキー値を伏せる対象（行の追加・変更とは独立）。
 const SECRET_CONFIG_KEYS=Object.freeze(['gemini_key_id','freeai_key_id','claude_key_id','openai_key_id','azure_key_id','copilot_key_id','openrt_key_id','ollama_key_id','huggingface_key_read','huggingface_key_write','discord_bot_token','slack_bot_token','slack_app_token','openai_organization']);
@@ -100,9 +101,9 @@ export async function readCodexLocal(reader?:CodexLocalReader,env:NodeJS.Process
  try {cacheIds=codexSlugs(parseJson(await read('models_cache.json'),RESPONSE_LIMIT));}catch{}
  return {defaultModel,cacheIds};
 }
-// 外部連携（モデル一覧なし）。認証確認の GET だけを行い、送信・書込・Gateway 接続はしない。
-export const INTEGRATION_PROBES=Object.freeze(['huggingface','discord']);
-export function configured(value:unknown,id:string):value is string {return typeof value==='string'&&!!value.trim()&&!value.trim().startsWith('<')&&!(id==='ollama'&&value.trim().toLowerCase()==='ollama');}
+// 外部連携（モデル一覧なし）。読み取り専用の認証確認だけを行い、送信・書込・Gateway 接続はしない。
+export const INTEGRATION_PROBES=Object.freeze(['huggingface','discord','slack']);
+export function configured(value:unknown,id:string):value is string {return typeof value==='string'&&(id!=='slack'||(value.trim().length>1&&!/\s/.test(value.trim())))&&!!value.trim()&&!value.trim().startsWith('<')&&!(id==='ollama'&&value.trim().toLowerCase()==='ollama');}
 export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:OAuthReader}={}) {
  const [state,values]=await readConfig(reader);
  const oauth:Record<OAuthKind,boolean>={codex:!!await readOAuth('codex',oauthReader),grok:!!await readOAuth('grok',oauthReader)};
@@ -118,7 +119,7 @@ export async function status({reader,oauthReader}:{reader?:Reader;oauthReader?:O
 }
 // ローカル Ollama は ollama list と同じ API を loopback 固定で読む（プロセスは起動しない）。
 const LOCAL_ENDPOINTS:Record<string,readonly [string,number,string]>={'ollama-local':['127.0.0.1',11434,'/api/tags']};
-const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],'openrouter-key':['openrouter.ai','/api/v1/key'],ollama:['ollama.com','/v1/models'],huggingface:['huggingface.co','/api/whoami-v2'],discord:['discord.com','/api/v10/users/@me']};
+const ENDPOINTS:Record<string,readonly [string,string]>={codex:['chatgpt.com','/backend-api/codex/models?client_version=1.0.0'],grok:['cli-chat-proxy.grok.com','/v1/models'],google:['generativelanguage.googleapis.com','/v1beta/models'],anthropic:['api.anthropic.com','/v1/models'],openai:['api.openai.com','/v1/models'],openrouter:['openrouter.ai','/api/v1/models'],'openrouter-key':['openrouter.ai','/api/v1/key'],ollama:['ollama.com','/v1/models'],huggingface:['huggingface.co','/api/whoami-v2'],discord:['discord.com','/api/v10/users/@me'],slack:['slack.com','/api/auth.test']};
 export type Fetch=(provider:string,headers:Record<string,string>,pageToken?:unknown,signal?:AbortSignal)=>Promise<Dictionary>;
 export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promise((resolve,reject)=>{
  const local=LOCAL_ENDPOINTS[provider],endpoint=local?[local[0],local[2]] as const:ENDPOINTS[provider];if(!endpoint)return reject(new Error('provider'));
@@ -141,7 +142,7 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
  const timer=setTimeout(()=>finish(new Error('timeout')),local?10000:8000);
  function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request?.destroy();agent?.destroy();if(error)reject(error);else resolve(value!);}
  try{
-  request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:'GET',agent:agent??false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
+  request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:provider==='slack'?'POST':'GET',agent:agent??false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
   signal?.addEventListener('abort',cancel,{once:true});request.on('error',error=>finish(new Error(networkFailure(error))));request.end();
  }catch(error){finish(new Error(networkFailure(error)));}
 });
@@ -296,8 +297,14 @@ function safeName(value:unknown,secrets:string[]):string {
  return typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9._\-]{0,63}$/.test(value)&&!secrets.some(secret=>value.includes(secret))?value:'';
 }
 async function integrationProbe(id:string,provider:string,key:string,output:Dictionary,secrets:string[],fetch:Fetch,signal?:AbortSignal) {
- const name=provider==='discord'?'Discord':'Hugging Face';
+ const name=provider==='slack'?'Slack':provider==='discord'?'Discord':'Hugging Face';
  try {
+  if(provider==='slack'){
+   // auth.test: 認証の確認のみ。App token・Socket Mode・投稿は使用しない。
+   const body=await fetch('slack',{Authorization:'Bearer '+key,'Content-Type':'application/x-www-form-urlencoded'},undefined,signal);
+   if(body.ok!==true||typeof body.bot_id!=='string'||!/^B[A-Z0-9]+$/.test(body.bot_id))return {...output,状態:'NG',説明:'Slack Bot トークンとして認証できませんでした。'};
+   return {...output,状態:'OK',説明:'Slack Bot トークンで認証できました。App トークン・Socket Mode・チャンネル権限・メッセージ送信は未確認です。'};
+  }
   if(provider==='discord'){
    // Discord API の User-Agent 規約に合わせる。Bot トークン以外（ユーザートークン）は NG。
    const body=await fetch('discord',{Authorization:'Bot '+key,'User-Agent':'DiscordBot (aidiy-diag, 0.1.0)'},undefined,signal);

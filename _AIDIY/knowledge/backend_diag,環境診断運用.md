@@ -306,3 +306,13 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 - アイコン表示の右クリックで「ミニサイズ」「標準サイズ」「閉じる」、区切り線、「ランチメニュー」を表示します。「ランチメニュー」のサブメニューには、表示中の起動アイコンを同じ順序で1項目1行ずつ並べます。表示中のアイコンだけを通常表示で並べ、選択したアプリへ既存の起動処理を呼び出します。終了時は既存の終了確認を使用します。
 
 - 展開は外側を順に広げてから内側へ進み、収納は内側から外側へ逆順です。アイコンごとに45msの時間差をつけ、収納演出が終わってから窓を縮めます。
+
+## Slack の外部連携確認
+
+- 外部連携タブは Hugging Face 読取・書込、Discord Bot、Slack Bot の順。Slackをモデル一覧へ混ぜません。通常の行・状態バッジ・右詳細・明示テストを再利用します。
+- 設定有無は `slack_bot_token` のみ判定。trim後の空欄・1文字・`<` 始まり・内部空白はDiscordと同様に未設定です。実値は表示・保存しません。残るApp token・ID3欄を検証済みとは扱いません。
+- 明示操作だけで固定 POST `https://slack.com/api/auth.test` を使用します。`ok === true` とBot IDの確認に成功して初めてOKです。接続中・投稿可能という意味ではありません。App token・Socket Mode・チャンネル権限確認やメッセージ送信は行いません。
+- 一括確認・同時2件の待機・重複防止・切断時abort・再確認・結果書込は既存処理を共有。`integration_info.json` には未実施を含む4行を保存し、起動時とheadlessは外部認証を呼びません。
+- `node --test backend_diag/checks/slack-integration-ui.check.mjs` はローカルVue描画とmockで選択・未設定・未認証・待機・二重押し・遅い応答・FIFO・保存先を確認します。backendの `model-probe` / `key-status` / `server` / `headless` 回帰も実施します。実Slack APIや実GUIは試験とは別です。
+
+固定メソッドと認証応答の根拠: [Slack公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/)。Discord固有voice/GatewayとSlack transportの未実装箇所は [`aidiy_slack実装準備.md`](../../frontend_channels/aidiy_slack実装準備.md) の対応表を参照してください。

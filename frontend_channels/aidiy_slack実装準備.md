@@ -4,7 +4,7 @@
 > 公式文書確認: 2026-10-30。
 >
 > 今回の実装範囲は共通設定のSlack接続5欄、Diag既存処理の秘密値除去、回帰試験、
-> lifecycle入口の通常「Discord / Slack」表記。Slack runtime・reader・設定画面/API・
+> lifecycle入口の通常「Discord / Slack」表記、Diag外部連携のSlack Bot認証確認。Slack runtime・reader・設定画面/API・
 > 実接続・Discordフォルダ移動はまだ行っていない。以下は次段階の設計と受入条件。
 
 ## 1. 独立したDiscord / Slackモジュール
@@ -41,7 +41,7 @@ Socket Mode + Bot Web APIを採用する設計。1 workspace・1専用テキス�
 
 - `aidiy_slack` は接続パネルを開く。将来の `--connect` だけ明示的に接続する。
 - Slackの通常表示はDiscordと同じ粒度。lifecycle画面へ特別な準備中ラベルを付けない。
-- 初期表示・setup・cleanup・全診断でSlack API認証や投稿を自動実行しない。
+- 初期表示・setup・cleanup・headlessでSlack API認証や投稿を自動実行しない。Diagの外部連携「状況確認」「テスト」「全テスト」は、利用者の明示操作でBot認証だけを確認する。
 - 接続開始/停止、状態、設定確認、Codeモデル、会話停止/リセットを同じパネルから操作する。
 - 1親投稿を1会話とし、応答と継続投稿は同じスレッドへ返す。キーはteam/channel/threadの組合せ。
   threadのイベント順序を維持し、重複イベントで同じHermes実行/投稿を増やさない。
@@ -80,7 +80,7 @@ Code作業フォルダ・Hermesモデル・ターン上限などは既存共通�
 3. イベントID・スレッド状態の保存は境界と上限を持ち、再接続後の再配信でも二重実行しない。
 4. メッセージ本文はデータとしてstdinへ渡し、シェル文字列へ連結しない。
 5. エラー本文、APIオブジェクト、URL、headers、WebSocket URL、添付download URLにtokenを残さない。
-6. token2種をDiag既存secret sanitizer対象に加えるが、Slackを実診断providerとして登録しない。
+6. token2種をDiag既存secret sanitizer対象に保持する。外部連携には `slack` / `Slack Bot` を登録し、固定POST `auth.test` でBot認証だけを確認する。App token・ID設定・Socket Mode・投稿可否は確認しない。認証OKを接続済み表示に流用しない。
 7. 再接続・レート制限はbounded retryとし、認証失敗を別providerへ隠蔽しない。
 8. 回答はチャンネル＋`thread_ts`を固定する。長文は分割し、意図しないchannel全体通知を作らない。
 
@@ -131,3 +131,16 @@ Slack導入失敗がDiscordを壊さないこと、片側削除がもう片側�
 今回の確認コマンドは `python -m unittest discover -s backend_server/checks -p test_slack_config_defaults.py`、
 Channelsのconfig試験、Diagのkey-status/model-probe/ai-settings-api回帰。
 Slack実APIを呼ぶ試験は今回行わない。ネイティブSlack起動コマンドや成功表示だけを先に捏造しない。
+
+## Discord grep による対応箇所の確認
+
+| 分類 | 対応箇所 / 結果 |
+|---|---|
+| 共通設定・秘密値除去 | `backend_server/conf/conf_json.py` の接続5欄、`backend_diag/runtime/model_probe.ts` の2token秘匿は両者に対応 |
+| Diag診断・表示・保存 | 同runtimeのprovider/probe、`キー設定共通/キー設定表示.mjs`、外部連携SFC、`モデル情報/integration_info.mjs` はSlack追加済み。モデル一覧とは分離 |
+| 配布asset | 各module正本SVG/PNGとDiagローカルPNGコピー。兄弟moduleのassetを実行・build・verify・testから読まない |
+| root/module lifecycleの説明 | 既存6入口は「Discord / Slack」。実処理のSlack登録とは区別する |
+| 実行・停止・接続・会話 | `frontend_channels/launcher.py`、`discord_processes.py`、`src/接続`、`src/コード`、`panel` は現在Discord実装。Slack runtime、Socket Mode、起動コマンド、終了処理への対応はこの計画の後続工程 |
+| Discord固有 | voice channel / Opus / Gateway / guild数値ID規則はSlackへ機械的に複製しない。Slackのworkspace/user/channel IDは独自規則で検証する |
+
+Diag確認は [公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/) の認証確認のみ。設定画面・新規設定API・メッセージ送信・Socket Mode接続は追加していない。

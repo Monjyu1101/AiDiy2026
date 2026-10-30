@@ -55,11 +55,11 @@ test('integration write saves only server-side integration results, never model 
 });
 test('integration report keeps registered rows, untested reasons and no secrets or extra fields',async()=>{
  const {integrationReport,INTEGRATION_IDS}=await import('../モデル情報/integration_info.mjs');
- assert.deepEqual(INTEGRATION_IDS,['huggingface_read','huggingface_write','discord']);
+ assert.deepEqual(INTEGRATION_IDS,['huggingface_read','huggingface_write','discord','slack']);
  const report=integrationReport([{id:'huggingface_read',名前:'Hugging Face 読取',キー名:'huggingface_key_read',設定済み:true},{id:'huggingface_write',名前:'Hugging Face 書込',設定済み:false,理由:'キーが未設定です。'},{id:'discord',名前:'Discord Bot',設定済み:true}],
   {huggingface_read:{状態:'OK',説明:'認証できました',確認日時:'2026-10-17T00:00:00Z',secret:'hidden'},discord:{状態:'NG',説明:'失敗',確認日時:'bad'}},new Date('2026-10-17T01:00:00Z'));
- assert.equal(report.件数,3);assert.deepEqual(report.集計,{OK:1,NG:1,未実施:1});assert.equal(report.保存日時,'2026-10-17T01:00:00.000Z');
- assert.deepEqual(report.項目.map(item=>[item.id,item.状態,item.確認日時]),[['huggingface_read','OK','2026-10-17T00:00:00Z'],['huggingface_write','未実施',null],['discord','NG',null]]);
+ assert.equal(report.件数,4);assert.deepEqual(report.集計,{OK:1,NG:1,未実施:2});assert.equal(report.保存日時,'2026-10-17T01:00:00.000Z');
+ assert.deepEqual(report.項目.map(item=>[item.id,item.状態,item.確認日時]),[['huggingface_read','OK','2026-10-17T00:00:00Z'],['huggingface_write','未実施',null],['discord','NG',null],['slack','未実施',null]]);
  assert.equal(report.項目[1].説明,'キーが未設定です。');assert.ok(!JSON.stringify(report).includes('hidden'));
 });
 test('server connection/header bounds, no listener started',()=>{
