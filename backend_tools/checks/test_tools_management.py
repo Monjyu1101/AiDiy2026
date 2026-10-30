@@ -19,7 +19,7 @@ class ManagementTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.path = Path(self.tmp.name) / 'aidiy_tools.json'
+        self.path = Path(self.tmp.name) / 'AiDiy_tools.json'
         self.manager = ToolsManagement(self.path)
         self.manager.availability = {'aidiy_text_to_speech': lambda: True, 'aidiy_chrome_devtools': lambda: False}
         self.tts = SimpleNamespace()

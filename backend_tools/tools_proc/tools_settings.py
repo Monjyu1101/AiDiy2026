@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 
 logger = logging.getLogger(__name__)
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "_config" / "aidiy_tools.json"
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "_config" / "AiDiy_tools.json"
 DEFAULTS = {
     "text_to_speech": {"auto_provider": "edge", "auto_voice": "female"},
     "speech_to_text": {"auto_provider": "google"},

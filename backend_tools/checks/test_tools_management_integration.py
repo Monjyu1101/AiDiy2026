@@ -217,7 +217,7 @@ class ManagementIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(self.path.read_bytes(), before)
         self.assertEqual(self.fixture.tts.auto_voice, 'female')
-        self.assertEqual(sorted(p.name for p in self.path.parent.iterdir()), ['AiDiy_key.json', 'aidiy_tools.json'])
+        self.assertEqual(sorted(p.name for p in self.path.parent.iterdir()), ['AiDiy_key.json', 'AiDiy_tools.json'])
         self.assertEqual((await self.manage('defaults', body)).status_code, 200)
         self.assertEqual(self.fixture.tts.auto_voice, 'male')
 

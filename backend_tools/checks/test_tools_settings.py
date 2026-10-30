@@ -25,7 +25,7 @@ class SettingsTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.path = Path(self.tmp.name) / "config" / "aidiy_tools.json"
+        self.path = Path(self.tmp.name) / "config" / "AiDiy_tools.json"
 
     def write(self, value):
         self.path.parent.mkdir(exist_ok=True)
@@ -70,6 +70,9 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(settings.load_tools_settings(self.path), settings.DEFAULTS)
         self.assertFalse(self.path.exists())
         self.assertEqual(list(self.path.parent.iterdir()), [])
+
+    def test_canonical_filename(self):
+        self.assertEqual(settings.CONFIG_PATH.name, "AiDiy_tools.json")
 
     def test_absolute_path_and_no_shared_mutation(self):
         self.assertTrue(settings.CONFIG_PATH.is_absolute())

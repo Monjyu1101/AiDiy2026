@@ -36,7 +36,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.path = self.root / '_config' / 'aidiy_tools.json'
+        self.path = self.root / '_config' / 'AiDiy_tools.json'
         self.patches = ExitStack()
         self.addCleanup(self.patches.close)
         self.ig, self.mg, self.stt = ImageGeneration(), MovieGeneration(), SpeechToText()
@@ -165,7 +165,7 @@ class LocationTests(unittest.TestCase):
             module = importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
             result = module.load_tools_settings()
             self.assertEqual(result, module.DEFAULTS)
-            self.assertEqual(module.CONFIG_PATH, root / '_config' / 'aidiy_tools.json')
+            self.assertEqual(module.CONFIG_PATH, root / '_config' / 'AiDiy_tools.json')
             self.assertTrue(module.CONFIG_PATH.is_file())
 
     def test_independent_processes_publish_one_complete_default_file(self):
@@ -179,7 +179,7 @@ class LocationTests(unittest.TestCase):
                 for child in children:
                     stdout, stderr = child.communicate(timeout=15)
                     self.assertEqual(child.returncode, 0, stderr.decode(errors='replace'))
-                config = root / '_config' / 'aidiy_tools.json'
+                config = root / '_config' / 'AiDiy_tools.json'
                 self.assertEqual(json.loads(config.read_text()), tools_settings.DEFAULTS)
                 self.assertEqual(list(config.parent.iterdir()), [config])
             finally:

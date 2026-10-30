@@ -264,10 +264,10 @@ curl -s -X POST http://127.0.0.1:8095/aidiy_chrome_devtools/screenshot \
 MCP の選択基準は `backend_server,backend_tools,MCP活用手順.md` を使う。
 サーバー構成や新規 MCP 追加は `backend_tools,構成.md` を使う。
 
-## auto 時の既定設定（aidiy_tools.json）
+## auto 時の既定設定（AiDiy_tools.json）
 
 `backend_tools` の起動時（FastAPI lifespan）に、プロジェクトルートの
-`_config/aidiy_tools.json` が無ければ次を初期生成する。起動ディレクトリには依存しない。
+`_config/AiDiy_tools.json` が無ければ次を初期生成する。起動ディレクトリには依存しない。
 APIキーは書かず、従来の `AiDiy_key.json` を利用する。
 
 ```json
@@ -344,11 +344,11 @@ Tools側は `Authorization: Bearer <Core JWT>` とdata本体を受ける。
 {"defaults":{"text_to_speech":{"auto_provider":"edge","auto_voice":"male"}},"write":true}
 ```
 
-既存 `_config/aidiy_tools.json` の4媒体既定値に加え、`enabled` objectへツールID別booleanを保存する。
+既存 `_config/AiDiy_tools.json` の4媒体既定値に加え、`enabled` objectへツールID別booleanを保存する。
 未指定enabledはtrue。falseは明示的に優先する。既存の未知項目は保存時にも維持する。
 保存は同じディレクトリの一時ファイルから置換し、`.json.lock`ディレクトリでプロセス間を排他する。
 競合は409で再試行を促す。異常終了でlockが残った場合は、保存処理が動いていないことを確認してから
-`_config/aidiy_tools.json.lock`空ディレクトリを削除する（自動的に他プロセスのlockを奪わない）。
+`_config/AiDiy_tools.json.lock`空ディレクトリを削除する（自動的に他プロセスのlockを奪わない）。
 複数Toolsプロセスを個別に動かす場合、実行時設定は要求を受けたプロセスだけへ適用される。
 保存後に他プロセスへ反映するには再起動する。
 
