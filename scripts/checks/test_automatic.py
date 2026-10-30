@@ -10,17 +10,25 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 BAT = ROOT / "_automatic.bat"
-TEXT = BAT.read_bytes().decode("utf-8").replace("\r\n", "\n")
+TEXT = BAT.read_bytes().decode("cp932").replace("\r\n", "\n")
 
 
 class BatchStructureTests(unittest.TestCase):
-    def test_ascii_crlf_no_bom_no_multibyte_cmd_source(self):
+    def test_cp932_crlf_no_bom_and_japanese_ui(self):
         data = BAT.read_bytes()
-        self.assertTrue(data.isascii(), "CMD source, including comments, must be ASCII only")
+        self.assertEqual(data.decode('cp932').encode('cp932'), data)
+        self.assertIn('aidiyセットアップと実行しますか？ [y]/n:', TEXT)
+        self.assertIn('chcp 932 >nul', TEXT)
+        self.assertNotIn('chcp 65001', TEXT)
         self.assertFalse(data.startswith(b"\xef\xbb\xbf"))
         self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
         self.assertNotIn(b"\x1a", data)
         self.assertNotIn(b"\x00", data)
+
+    def test_nonascii_source_is_only_ui_not_control_flow(self):
+        for line in TEXT.splitlines():
+            if not line.isascii():
+                self.assertRegex(line, r'^(echo |set /p |if .+ echo )')
 
     def test_labels_and_calls_resolve(self):
         labels = re.findall(r"^:([a-z_]+)$", TEXT, re.M)
@@ -86,6 +94,16 @@ class BatchStructureTests(unittest.TestCase):
         self.assertNotIn('再セットアップ', TEXT)
         self.assertNotIn('setup-state', TEXT)
 
+    def test_setup_start_restore_codepage_after_saving_exit_status(self):
+        for script in ('_setup.py', '_start.py'):
+            start = TEXT.index(f'"%PYTHON%" -X utf8 -u {script}\n')
+            lines = TEXT[start:].splitlines()
+            self.assertEqual(lines[1], 'set "RC=%ERRORLEVEL%"')
+            self.assertEqual(lines[3], 'chcp 932 >nul')
+            self.assertTrue(lines[4].startswith('if errorlevel 1 '))
+            self.assertIn('exit /b 2', lines[4])
+            self.assertTrue(all(line.isascii() for line in lines[:5]))
+
     def test_cleanup_does_not_remove_unknown_files_or_original(self):
         cleanup = TEXT[TEXT.index(':clean_temp\n'):TEXT.index(':log_error\n')]
         self.assertNotIn('/s', cleanup.lower())
@@ -126,17 +144,18 @@ class BatchStructureTests(unittest.TestCase):
         self.assertIn('"%ComSpec%" /d /c npm --version', TEXT)
         self.assertNotRegex(TEXT, r'(?m)^npm(?:\.cmd)?\s')
 
-    def test_python_path_is_utf8_even_when_redirected(self):
-        probes = [line for line in TEXT.splitlines() if 'print(sys.executable)' in line]
+    def test_python_path_encoding_matches_cp932_and_does_not_enforce_version(self):
+        probes = [line for line in TEXT.splitlines() if 'sys.stdout.buffer.write' in line]
         self.assertEqual(len(probes), 2)
         for line in probes:
             self.assertIn('-X utf8 -c', line)
-            self.assertIn('sys.version_info >= (3,13)', line)
+            self.assertIn("sys.executable.encode('cp932')", line)
+            self.assertNotIn('sys.version_info', line)
             self.assertIn('2>"%AIDIY_TEMP%\\probe.txt"', line)
-        self.assertIn('chcp 65001 >nul\nif errorlevel 1 goto temp_error', TEXT)
+        self.assertIn('chcp 932 >nul\nif errorlevel 1 goto temp_error', TEXT)
 
-    def test_actual_python_probe_has_clean_utf8_stdout_and_version_diagnostic(self):
-        line = next(line for line in TEXT.splitlines() if 'print(sys.executable)' in line)
+    def test_actual_python_probe_returns_zero_and_cp932_japanese_path(self):
+        line = next(line for line in TEXT.splitlines() if 'sys.stdout.buffer.write' in line)
         code = re.search(r'-c "([^"]+)"', line).group(1)
         compile(code, '<batch Python probe>', 'exec')
         with tempfile.TemporaryDirectory(prefix='python probe 日本語 ') as folder:
@@ -144,9 +163,40 @@ class BatchStructureTests(unittest.TestCase):
             executable.symlink_to(sys.executable)
             result = subprocess.run([str(executable), '-X', 'utf8', '-c', code],
                                     capture_output=True, env={**os.environ, 'PYTHONIOENCODING': 'ascii'})
-            self.assertEqual(result.returncode, 0 if sys.version_info >= (3, 13) else 1)
-            self.assertEqual(Path(result.stdout.decode('utf-8').strip()), executable)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(Path(result.stdout.decode('cp932').strip()), executable)
             self.assertTrue(result.stderr.decode('ascii').startswith('Python '))
+
+    def test_python_310_version_check_routes_only_to_warning(self):
+        line = next(line for line in TEXT.splitlines() if 'sys.version_info >=' in line)
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        result = subprocess.run([sys.executable, '-c', 'import sys;sys.version_info=(3,10,11);' + code], capture_output=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(line + '\nif errorlevel 1 call :python_version_warning', TEXT)
+        warning = TEXT[TEXT.index('\n:python_version_warning\n'):TEXT.index('\n:convert_git_path_text\n')]
+        self.assertIn('exit /b 0', warning)
+        self.assertNotIn('goto failed', warning)
+
+    def test_git_path_lists_are_converted_before_cmd_reads_them(self):
+        for filename in ('gitdir.txt', 'untracked.txt'):
+            marker = f'set "AIDIY_TEXT_FILE=%AIDIY_TEMP%\\{filename}"\ncall :convert_git_path_text\nif errorlevel 1 exit /b '
+            self.assertIn(marker, TEXT)
+
+    def test_git_path_conversion_preserves_japanese_and_rejects_loss(self):
+        line = next(line for line in TEXT.splitlines() if "os.environ['AIDIY_TEXT_FILE']" in line)
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'paths.txt'
+            for text, expected in [('C:/利用者/日本語 path!100%/file.txt\n', 0), ('emoji😀.txt\n', 1), ('wave〜.txt\n', 3)]:
+                original = text.encode('utf-8')
+                path.write_bytes(original)
+                result = subprocess.run([sys.executable, '-X', 'utf8', '-c', code], capture_output=True,
+                                        env={**os.environ, 'AIDIY_TEXT_FILE': str(path)})
+                self.assertEqual(result.returncode, expected)
+                if expected == 0:
+                    self.assertEqual(path.read_bytes().decode('cp932'), text)
+                else:
+                    self.assertEqual(path.read_bytes(), original)
 
 
 class RoutingModelTests(unittest.TestCase):
