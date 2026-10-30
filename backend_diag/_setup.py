@@ -77,6 +77,15 @@ def setup(choices=None, *, desktop=True):
 
 def setup_desktop():
     if os.environ.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))):
+        # Electronを省略しても、ブラウザ版のサーバーにはNode.jsが必要。
+        sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+        from _runtime_requirements import check_node_runtime
+        ok, detail = check_node_runtime('>=18')
+        if not ok:
+            print(f'{detail} Node.jsを導入・修復してから python "{THIS_DIR / "_setup.py"}" を再実行してください。')
+            return False
+        if detail.startswith('[WARN]'):
+            print(detail)
         print('GUI なし / Codespaces: ブラウザ起動を使用します。Electron 導入をスキップします。')
         return True
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')

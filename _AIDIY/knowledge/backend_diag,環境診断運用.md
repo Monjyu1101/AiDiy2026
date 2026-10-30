@@ -16,11 +16,14 @@ Electronの長押し操作と表示開始ズームは [共通の基本方針](./
 
 専用Electron窓は通常・ミニ表示とも左ボタンを同じ位置で0.5秒押すとドラッグ移動できる。`起動/electron-main.cjs` が窓の生成時に `frontend_ide/デスクトップ/長押し窓移動.cjs` の `attachNativeWindowMove(window,screen,'diag')` を一度取り付ける。短押しはクリック、0.5秒前の移動は通常のログ選択・ドラッグとして扱い、移動後の解放でボタンを押さない。解放・Esc・フォーカス喪失・破棄で解除し、最大化・全画面では開始しない。ミニ状態の位置と通常表示への復元は `ミニ表示.cjs`、最前面ピンは共通の `最前面ピン.cjs` が管理する。通常・ミニとも起動時はOFFで、切替中もユーザーのON/OFF選択を維持する。Web / headlessには適用しない。`node backend_diag/checks/initial-mini-desktop.mjs` は合成Tools状態と隔離プロファイルで初期ミニ表示・通常復元に加え、実Electron入力による両表示の長押し移動とサイズ維持・誤クリック防止・Esc解除を確認する。
 
-- セットアップとクリーンアップでは最初の選択項目に置き、既定 `[y]/n`、全体の a=auto でも対象にします。
+- 通常の全体setupではDiagを質問なしで対象にし、共通処理の後に準備します。全体cleanupではDiagの解除を最初に確認し、既定 `[y]/n`・a=autoでも対象です。全体startでは最初のDiag起動質問（既定Yes）で、Diag経由と個別サービス起動を分けます。
 - 通常は `aidiy_diag` で Electron 起動、`aidiy_diag --browser` で Web 起動します。Codespaces / GUI なしでは Web です。Electron は既存 `scripts/_setup_electron.py` の共有 ZIP / 同版 dist を使ってセットアップします。Node.js 自体が無い場合はランチャーが理由と公式導入先を表示します。Python は診断アプリ起動には不要です。
+- 単独のPython管理入口 `python backend_diag/_start.py [引数]` は通常の `aidiy_diag` と同じNode本体へ引数をそのまま渡し、暗黙の `--auto` は付けません。子の失敗を終了コードに反映し、中断は130です。ルート起動のDiag選択にだけ既存の `--auto` が付きます。
+- GUIなしの通常setupでもNodeの実行可否は確認します。Electron / npmは不要ですが、Node未導入・実行不能・timeoutは成功にしません。新しい版数確認は警告継続、起動前の既存Node18条件は維持します。ランチャーだけの再登録では実行環境を新たに要求しません。
+- cleanupの停止通知は排他的な同一フォルダの一時ファイルから置換します。固定 `.stop-request.tmp` のsymlink参照先を書き換えず、置換失敗時には自分の一時ファイルだけを整理します。所属が不明な相対起動や、POSIXの未引用空白パスは断片を結合して停止対象へ加えず、終了確認不能として削除を中止します。対象を画面・元端末で終了してから再実行します。配布 `static/` と既存の削除選択は保持します。
 - Mac / Linux の Electron 導入失敗は共通セットアップを確認します。Python の証明書検証失敗時は検証を有効にした curl へ切り替え、ZIP は unzip に依存せずリンクと補助プログラムの実行権限を保持します。修復は `python3 backend_diag/_setup.py` で行います。ランチャー専用の修復では Electron 本体を直しません。詳細は [共通の Electron セットアップ](./共通,開発環境運用手順.md#electron-の共通セットアップ) を参照してください。
 - `aidiy_diag --headless` は画面を開かず全診断をコマンドラインで最速実行し、`_AIDIY/aidiy_diag/install_info.json` へ保存します。画面の「書込」「全テスト」も同じ形式で保存します。画面の「全テスト」は外部連携（Hugging Face / Discord）の読み取り専用の認証確認と `integration_info.json` への保存も行いますが、headless では外部連携を確認しません。実行に失敗した場合は既存の結果を書き換えません。
-- ルート `_start.py` はToolsを実際に起動する直前（自動再起動時も含む）に必ず `aidiy_diag --headless` を1回実行し、モデル合成JSONの生成完了を待ちます。Tools未選択・クリーンアップによる起動スキップ時は実行しません。失敗時はToolsを起動せず終了し、すでに起動した管理対象プロセスを停止します。aidiy_diagのGUI起動を選ぶ質問はありません。
+- ルート `_start.py` はToolsを実際に起動する直前（自動再起動時も含む）に必ず `aidiy_diag --headless` を1回実行し、モデル合成JSONの生成完了を待ちます。Tools未選択・クリーンアップによる起動スキップ時は実行しません。失敗時はToolsを起動せず終了し、すでに起動した管理対象プロセスを停止します。最初のDiag起動の質問でNoを選び、Toolsを個別起動する経路でも、このheadless事前処理は必須です。
 - ルート `_setup.py` のaidiy_diagは `[y]` の表示だけで選択入力を受けず、ランチャー配置とElectronの準備を必ず行います。終盤は「キャッシュクリア」の見出し、import由来キャッシュの削除、headless診断の順で実行します。診断失敗は既存の「エラーが発生しても続行」の選択に従います。単独の `aidiy_diag` は従来どおりGUIで使えます。
 - Python、uv、Node.js、npm、npx、Electron、その他のコア周辺、機能別の任意依存の順に確認します。任意機能の未検出をシステム全体の故障と判断しないでください。
 - バージョン確認は各15秒待ちます。一括診断は4並列のため、高負荷時に失敗した項目は個別確認で切り分けます。全体・Web・Avatarの起動前npm確認、Diag起動前のNode.js確認、サービス起動用Python確認も15秒です。npmのタイムアウトは未導入と断定せず、直前の警告と導入パスを確認します。Windowsの通常のnpm.cmdはユーザー側npmへ転送する場合がありますが、Diagは検出パスに同居するJS CLIを直接確認するため、両者のバージョンが異なる場合があります。

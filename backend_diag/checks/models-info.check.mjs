@@ -60,7 +60,7 @@ test('merged code includes only installed CLIs and Hermes starts with installed 
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('Copilot standalone fallback is used only when installed and merged models are empty',async()=>{
+test('Copilot installed fallback also retains versioned Claude candidates when only OpenAI was fetched',async()=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'diag-copilot-fallback-'));
  const load=async()=>JSON.parse(await readFile(path.join(directory,'code_models_info.json'),'utf8'));
  const expected={
@@ -82,7 +82,7 @@ test('Copilot standalone fallback is used only when installed and merged models 
   assert.deepEqual((await load()).copilot_cli.models,expected);
   assert.deepEqual(JSON.parse(await readFile(path.join(directory,'openai_models_info.json'),'utf8')).code.copilot_cli.models,{});
   await writeModelsInfo([{id:'openai',名前:'OpenAI'}],{openai:ok({モデル詳細:[{model_id:'gpt-only'}]})},options);
-  assert.deepEqual((await load()).copilot_cli.models,{'gpt-only':'yyyy/mm/dd - gpt-only'});
+  assert.deepEqual((await load()).copilot_cli.models,{'gpt-only':'yyyy/mm/dd - gpt-only',...Object.fromEntries(Object.entries(expected).filter(([id])=>id.startsWith('claude-')))});
   await writeModelsInfo([{id:'openai',名前:'OpenAI'}],{openai:ok({状態:'NG'})},{...options,installedClis:{}});
   assert.equal(Object.hasOwn(await load(),'copilot_cli'),false);
  }finally{await rm(directory,{recursive:true,force:true});}
@@ -369,4 +369,35 @@ test('OpenCode prefixes model IDs and labels once, preserving date and control o
  const expected={'openai/gpt-8-sol':'2026/10/18 - openai/gpt-8-sol',auto:'auto',same:'same'};
  assert.deepEqual(openCodeModels({'gpt-8-sol':'2026/10/18 - gpt-8-sol',auto:'auto',same:'same'}),expected);
  assert.deepEqual(openCodeModels(expected),expected);
+});
+
+
+test('Copilot keeps fetched latest versioned Claude families, then restores fixed families if Anthropic fails',async()=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),'diag-copilot-claude-'));
+ const load=async()=>JSON.parse(await readFile(path.join(directory,'code_models_info.json'),'utf8'));
+ const providers=[{id:'claude',名前:'Claude'},{id:'openai',名前:'OpenAI'}];
+ const openai=ok({モデル詳細:[{model_id:'gpt-6-luna',作成日:'2026/09/15'}]});
+ const rows=[
+  {model_id:'claude-haiku-5',作成日:'2026/06/01'},
+  {model_id:'claude-fable-5-1',作成日:'2026/08/28'},
+  {model_id:'claude-opus-5',作成日:'2026/07/24'},
+  {model_id:'claude-sonnet-5-5',作成日:'2026/09/28'},
+  {model_id:'claude-haiku-5-5',作成日:'2026/10/07'},
+  {model_id:'claude-opus-5-5',作成日:'2026/09/21'},
+ ];
+ try{
+  const options={directory,installedClis:{copilot_cli:true,opencode_cli:true}};
+  await writeModelsInfo(providers,{claude:ok({モデル詳細:rows}),openai},options);
+  const fetched=await load();
+  assert.deepEqual(Object.keys(fetched.copilot_cli.models),['claude-haiku-5.5','claude-sonnet-5.5','claude-opus-5.5','claude-fable-5.1','gpt-6-luna']);
+  assert.equal(fetched.copilot_cli.models['claude-haiku-5.5'],'2026/10/07 - claude-haiku-5.5');
+  assert.deepEqual(fetched.opencode_cli.models,{'openai/gpt-6-luna':'2026/09/15 - openai/gpt-6-luna'});
+  await writeModelsInfo(providers,{claude:ok({状態:'NG',モデル:[],モデル詳細:[]}),openai},options);
+  const failed=await load();
+  assert.deepEqual(Object.keys(failed.copilot_cli.models),['gpt-6-luna','claude-fable-5.1','claude-opus-5.5','claude-sonnet-5.5','claude-haiku-5.5']);
+  assert.equal(failed.copilot_cli.models['gpt-6-luna'],'2026/09/15 - gpt-6-luna');
+  assert.deepEqual(failed.opencode_cli,fetched.opencode_cli);
+  const source=JSON.parse(await readFile(path.join(directory,'claude_models_info.json'),'utf8'));
+  assert.deepEqual(source.code.copilot_cli.models,{}); // 未取得source自体を取得成功に書換えない
+ }finally{await rm(directory,{recursive:true,force:true});}
 });

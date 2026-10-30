@@ -54,6 +54,91 @@ class DiagCleanupTests(unittest.TestCase):
         root = (ROOT / 'space folder').resolve()
         self.assertTrue(processes.is_diag(dict(Name='node', CommandLine=f"node --require '/tmp/probe file.cjs' '{root.as_posix()}/diag_main.mjs'"), root, False))
 
+    def test_posix_raw_space_entrypoint_is_uncertain_not_owned(self):
+        root = (ROOT / 'space folder').resolve()
+        for prefix in ('node ', 'node -- ', 'node --import=probe.mjs '):
+            with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, '所属を確認できません'):
+                processes.is_diag(dict(Name='node', CommandLine=f'{prefix}{root}/diag_main.mjs --browser'), root, False)
+        # 引数を連結して True にすると、この文字列が別script+引数だった場合に誤停止する。
+        with self.assertRaises(ValueError):
+            processes.is_diag(dict(Name='node', CommandLine=f'node {root}/diag_main.mjs'), root, False)
+
+    def test_posix_raw_space_path_negative_cases_remain_excluded(self):
+        root = (ROOT / 'space folder').resolve()
+        entry = root / 'diag_main.mjs'
+        for command in (f'node other.js {entry}', f'node --eval run() {entry}',
+                        f'node -erun() {entry}', f'node {entry}.old',
+                        f'node {root}-other/diag_main.mjs', f'python {entry}'):
+            with self.subTest(command=command):
+                name = command.split()[0]
+                self.assertFalse(processes.is_diag(dict(Name=name, CommandLine=command), root, False))
+        self.assertTrue(processes.is_diag(dict(Name='node', CommandLine=f'node {ROOT}/diag_main.mjs'), ROOT, False))
+
+    def test_posix_unescaped_quote_path_does_not_mean_process_absent(self):
+        root = ROOT / "owner's folder"
+        with self.assertRaisesRegex(ValueError, '所属を確認できません'):
+            processes.is_diag(dict(Name='node', CommandLine=f'node {root}/diag_main.mjs'), root, False)
+        self.assertFalse(processes.is_diag(dict(Name='node', CommandLine='node other.js "unclosed'), root, False))
+
+    def test_relative_entrypoint_is_uncertain_without_process_cwd(self):
+        for windows in (False, True):
+            name = 'node.exe' if windows else 'node'
+            for entry in ('backend_diag/diag_main.mjs', './backend_diag/diag_main.mjs',
+                          'diag_main.mjs', '../backend_diag/diag_main.mjs', '起動/electron-main.cjs'):
+                with self.subTest(windows=windows, entry=entry), self.assertRaisesRegex(ValueError, '作業フォルダが不明'):
+                    processes.is_diag(dict(Name=name, CommandLine=f'{name} {entry} --browser'), ROOT, windows)
+            self.assertFalse(processes.is_diag(dict(Name=name, CommandLine=f'{name} other.js backend_diag/diag_main.mjs'), ROOT, windows))
+            self.assertFalse(processes.is_diag(dict(Name=name, CommandLine=f'{name} --eval run() backend_diag/diag_main.mjs'), ROOT, windows))
+
+    def test_ambiguous_process_blocks_stop_and_cleanup_without_deletion(self):
+        common = processes.common
+        with tempfile.TemporaryDirectory(prefix='diag cleanup ') as folder:
+            root = Path(folder)
+            for script in (str(root / 'diag_main.mjs'), 'backend_diag/diag_main.mjs'):
+                record = dict(ProcessId=987654, ParentProcessId=0, Name='node', CommandLine=f'node {script} --browser')
+                with self.subTest(script=script), patch.object(diag, '__file__', str(root / '_cleanup.py')), \
+                        patch.object(common.sys, 'platform', 'linux'), \
+                        patch.object(common, 'list_processes', return_value=[record]), \
+                        patch.object(common.os, 'kill') as kill, patch.object(common.subprocess, 'run') as run, \
+                        patch.object(diag, 'cleanup_dependencies') as delete, \
+                        patch.object(diag, 'remove_launcher_path') as remove, patch('builtins.print'):
+                    self.assertFalse(processes.stop(root))
+                    self.assertFalse(diag.cleanup())
+                    kill.assert_not_called()
+                    run.assert_not_called()
+                    delete.assert_not_called()
+                    remove.assert_not_called()
+
+    def test_macos_unquoted_electron_helper_and_ps_comm_are_uncertain(self):
+        root = ROOT / 'space folder'
+        executable = root / 'node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)'
+        # 実行ファイル全体が引用されていないps argsと、空白入りcommの両方を検証する。
+        raw = dict(Name='Electron Helper (Renderer)', CommandLine=f'{executable} --type=renderer')
+        with self.assertRaisesRegex(ValueError, '所属を確認できません'):
+            processes.is_diag(raw, root, False)
+        common = processes.common
+        for comm in (str(executable), executable.name):
+            output = f'987654 1 {comm} {executable} --type=renderer\n'
+            with patch.object(common.sys, 'platform', 'darwin'), \
+                    patch.object(common.subprocess, 'run', return_value=Mock(stdout=output)):
+                record = common.list_processes()[0]
+            with self.subTest(comm=comm), self.assertRaisesRegex(ValueError, '所属を確認できません'):
+                processes.is_diag(record, root, False)
+        # 他コピーの同名Electronを停止対象や曖昧な自コピーとして扱わない。
+        other = str(executable).replace(str(root), str(root) + '-other', 1)
+        self.assertFalse(processes.is_diag(dict(Name='Electron Helper (Renderer)', CommandLine=f'{other} --type=renderer'), root, False))
+
+    def test_macos_similar_executable_prefix_is_not_owned_or_uncertain(self):
+        for root in (ROOT, ROOT / 'space folder'):
+            executable = root / 'node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper (GPU).app/Contents/MacOS/Electron Helper (GPU)'
+            for suffix in ('.old', '-other'):
+                command = f'{executable}{suffix} --type=gpu-process'
+                self.assertFalse(processes.is_diag(dict(Name='Electron Helper (GPU)', CommandLine=command), root, False))
+                for comm in (str(executable), executable.name):
+                    parts = comm.split(None, 1)
+                    record = dict(Name=Path(parts[0]).name, CommandLine=f'{parts[1]} {command}')
+                    self.assertFalse(processes.is_diag(record, root, False))
+
     def test_macos_orphan_electron_children(self):
         distribution = ROOT / 'node_modules/electron/dist/Electron.app/Contents'
         targets = [('Electron', distribution / 'MacOS/Electron')]

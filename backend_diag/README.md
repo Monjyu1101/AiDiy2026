@@ -36,6 +36,7 @@ Electron の依存物は引き続き `backend_diag/node_modules/`、停止要求
 
 ```sh
 node backend_diag/diag_main.mjs --browser
+python backend_diag/_start.py --browser  # Python管理入口（同じNode本体へ引数を渡す）
 # ランチャー配置後
 aidiy_diag                  # Electron 表示後、コマンドプロンプトへ戻る
 aidiy_diag --browser        # ブラウザ起動・foreground
@@ -44,6 +45,8 @@ aidiy_diag --wait           # --foreground と同じ
 aidiy_diag --headless       # 画面を開かず全診断を最速で実行し、結果を保存
 aidiy_diag --auto           # 画面を開き、保存済みの起動設定で「一括起動」を自動実行
 ```
+
+`python backend_diag/_start.py` は通常の `aidiy_diag` と同じ引数で起動します。引数を省略しただけでは `--auto` を付けません。ルートの `_start.py` で Diag を選択した場合と、明示的に `--auto` を渡した場合だけ保存済みの一括起動を行います。Node本体の失敗終了コードを返し、Ctrl+C は終了コード130です。
 
 `--auto` は表示系の指定（`--browser` / `--foreground` など）と併用できます。画面表示と並行して、システム起動タブの「一括起動」と同じ処理を1回だけ実行します。各機能の環境確認と、Tools 起動前の headless 診断もこの中で行います。直前の停止でポート解放が遅れている間は最大約10秒待って再試行し、それでも稼働中・未確認の機能が残る場合は起動せず、理由をシステム起動タブの通知に表示します。起動後は、Tools が稼働していればアプリ起動・ランチャーからそのまま各アプリを開けます。
 
@@ -195,7 +198,7 @@ node backend_diag/diag_main.mjs --browser --no-open --port 8097
 
 ## 終了・解除
 
-通常の Electron 起動は表示確認後にコマンドプロンプトへ戻ります。Electron 版のウィンドウは1つだけで、起動中にもう一度 `aidiy_diag` を実行すると、新しいウィンドウ・サーバーは作らず既存のウィンドウを前面に表示して終了コード 0 で戻ります（Electron の単一インスタンスロック。ブラウザ版・headless は対象外）。ウィンドウを閉じると HTTP・診断子プロセスも終了します。`--foreground` / `--wait`、`--browser` / `--no-open`、Codespaces・GUI のない環境では起動ターミナルの Ctrl+C で終了します。キーも失効します。`python backend_diag/_cleanup.py` または全体クリーンアップで、この作業コピーのランチャーだけを解除します。別コピーのランチャーは削除しません。全体起動 `python _start.py` では、最初の質問「Diag : 開始しますか? [y]/n」で y（既定）を選ぶと、後続の質問をすべて省き、Code / IDE 以外の AiDiy プロセスを停止してから `aidiy_diag --auto` を起動して終了します。n を選んだ場合は従来どおり機能ごとに起動を選択し、Tools の起動前に `aidiy_diag --headless` の完了を待ってモデル合成JSONを生成します。診断の実行・保存に失敗した場合はサービス起動を中止します。単独ランチャーで起動した診断も、同じ作業コピーのクリーンアップで終了します。停止通知は `.stop-request` の短いランダム識別子のみで、PID・認証キー・診断結果は保存しません。
+通常の Electron 起動は表示確認後にコマンドプロンプトへ戻ります。Electron 版のウィンドウは1つだけで、起動中にもう一度 `aidiy_diag` を実行すると、新しいウィンドウ・サーバーは作らず既存のウィンドウを前面に表示して終了コード 0 で戻ります（Electron の単一インスタンスロック。ブラウザ版・headless は対象外）。ウィンドウを閉じると HTTP・診断子プロセスも終了します。`--foreground` / `--wait`、`--browser` / `--no-open`、Codespaces・GUI のない環境では起動ターミナルの Ctrl+C で終了します。キーも失効します。`python backend_diag/_cleanup.py` または全体クリーンアップで、この作業コピーのランチャーだけを解除します。別コピーのランチャーは削除しません。全体起動 `python _start.py` では、最初の質問「Diag : 開始しますか? [y]/n」で y（既定）を選ぶと、後続の質問をすべて省き、Code / IDE / Discord 以外の AiDiy プロセスを停止してから `aidiy_diag --auto` を起動して終了します。n を選んだ場合は従来どおり機能ごとに起動を選択し、Tools の起動前に `aidiy_diag --headless` の完了を待ってモデル合成JSONを生成します。診断の実行・保存に失敗した場合はサービス起動を中止します。単独ランチャーで起動した診断も、同じ作業コピーのクリーンアップで終了します。停止通知は `.stop-request` の短いランダム識別子のみで、PID・認証キー・診断結果は保存しません。
 
 ## 追加と検証
 
@@ -330,9 +333,13 @@ Python、uv を先頭に表示します。CLI や拡張は利用する機能に�
 
 通常の `aidiy_diag` は Electron ウィンドウを開きます。`--browser`、`--no-open`、Codespaces、Linux の DISPLAY / WAYLAND_DISPLAY がない環境では Node.js の Web 版を使います。CI 環境も Web です。GUI 環境で Electron が未準備の場合は黙ってブラウザに切り替えず、セットアップまたは `--browser` を案内します。
 
-全体 `_setup.py` は Git / Node.js の前提確認後、共通セットアップ（AI CLI 導入の待機を含む）→ Diag ランチャー配置・Electron準備 → local の順で実行します。共通や local が未選択ならその段階だけをスキップします。前提ツールの導入は auto 選択時も従来どおり確認付きです。単体 `python backend_diag/_setup.py` は Node.js / npm の準備後に使います。Codespaces / Linux GUI なしでは Electron 導入をスキップします。
+全体 `_setup.py` は Git / Node.js の前提確認後、共通セットアップ（AI CLI 導入の待機を含む）→ Diag ランチャー配置・Electron準備 → local の順で実行します。共通や local が未選択ならその段階だけをスキップします。前提ツールの導入は auto 選択時も従来どおり確認付きです。単体 `python backend_diag/_setup.py` は Node.js / npm の準備後に使います。Codespaces / Linux GUI なしでは Electron / npm の準備を省略しますが、ブラウザ版のサーバーに必要な Node.js の実行可否は確認します。版数だけの警告は継続し、未導入・実行不能・timeout はセットアップ失敗です。明示的なランチャー再登録だけの経路（ルートの `--launchers-only`）は依存導入・実行確認を行いません。
 
-macOS / Linux でも `~/.local/bin` のランチャーを zsh / bash の設定へ自動登録します。既にセットアップ済みでコマンドが見つからない場合は、プロジェクトルートで `python3 _setup.py --launchers-only` を実行してから新しいターミナルを開いてください。現在のターミナルで使う場合は `export PATH="$HOME/.local/bin:$PATH"` で反映できます。この修復は8コマンドのランチャー・PATH 登録だけを行い、依存導入・ビルド・サービス起動はしません。クリーンアップでは登録したランチャーを解除し、共有 bin が空になった場合に自動追記分の PATH 設定も解除します。
+macOS / Linux でも `~/.local/bin` のランチャーを zsh / bash の設定へ自動登録します。既にセットアップ済みでコマンドが見つからない場合は、プロジェクトルートで `python3 _setup.py --launchers-only` を実行してから新しいターミナルを開いてください。現在のターミナルで使う場合は `export PATH="$HOME/.local/bin:$PATH"` で反映できます。この修復は登録対象アプリのランチャー・PATH 登録だけを行い、依存導入・ビルド・サービス起動はしません。クリーンアップでは登録したランチャーを解除し、共有 bin が空になった場合に自動追記分の PATH 設定も解除します。
+
+通常setupは同梱のVue配布物を勝手に再ビルドしません。起動時の既存manifest検証で欠損・不一致を検出した場合は成功扱いにせず、同じ版の配布物の取得、または本書のUIビルド手順を案内します。headless診断には画面の配布物を要求しません。
+
+cleanupの停止通知は同じDiagフォルダに排他的に作った一時ファイルから置換します。固定名 `.stop-request.tmp` が既に存在しても、そのファイルやsymlinkの参照先へ書き込みません。停止・終了確認に失敗した場合は依存削除へ進みません。POSIXの引用符を失った空白入りコマンドや、作業フォルダが分からない相対起動など、プロセス所属を安全に確認できない場合も中止します。その場合は対象Diagのウィンドウを閉じるか起動端末のCtrl+Cで終了し、再実行してください。パスの断片一致だけで別コピーを強制終了することはしません。`static/` の保持、ランチャーの所有マーカー、既存の削除範囲は維持します。
 
 Electron は既存 `scripts/_setup_electron.py` を使い、配置済み、他コンポーネントの同版 dist、`.aidiy_cache/electron` の共有 ZIP の順で再利用し、不足時だけ取得します。Diag は既存 frontend と同じ `^44.7.0` の Electron パッケージを使います。同版 Diag dist も後段 frontend から再利用でき、専用の別キャッシュは作りません。起動時の npm install / ダウンロードはしません。
 

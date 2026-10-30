@@ -44,7 +44,12 @@ function availableCodeModels(code, installedClis) {
     || installedClis[key === 'claude_sdk' ? 'claude_cli' : key] === true));
   // OpenCodeはCodex用の候補を共有。空の場合の規定値と導入判定はCopilotと同じ方式。
   for (const [key, source] of [['copilot_cli', 'copilot_cli'], ['opencode_cli', 'codex_cli']]) {
-    const models = Object.keys(code[source]?.models ?? {}).length ? code[source].models : COPILOT_FALLBACK_MODELS;
+    let models = Object.keys(code[source]?.models ?? {}).length ? code[source].models : COPILOT_FALLBACK_MODELS;
+    // CopilotはAnthropic未取得でも4系統のバージョン付きIDを補う。
+    // 取得済みClaudeのfamily別最新選択、OpenAI候補の順序、OpenCodeの候補元は維持する。
+    if (key === 'copilot_cli' && !Object.keys(models).some(id => id.startsWith('claude-'))) {
+      models = {...models, ...Object.fromEntries(Object.entries(COPILOT_FALLBACK_MODELS).filter(([id]) => id.startsWith('claude-')))};
+    }
     if (installedClis[key] === true) filtered[key] = {models:key === 'opencode_cli' ? openCodeModels(models) : {...models}};
   }
   const routes = Object.fromEntries(Object.keys(CODE_CLIS).filter(key => installedClis[key])

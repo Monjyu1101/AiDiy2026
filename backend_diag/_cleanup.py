@@ -10,6 +10,7 @@ import hashlib
 import secrets
 import importlib.util
 import shutil
+import tempfile
 
 
 def cleanup_dependencies(root: Path) -> bool:
@@ -53,11 +54,16 @@ def cleanup(choices=None):
         return True
     script = str(Path(__file__).resolve().with_name('diag_main.mjs'))
     marker = 'aidiy_diag-owner:' + hashlib.sha256(script.encode('utf-8')).hexdigest()
+    temporary = None
     try:
         stop_file = Path(__file__).resolve().with_name('.stop-request')
-        temporary = stop_file.with_suffix('.tmp')
-        temporary.write_text(secrets.token_hex(16), encoding='utf-8')
+        # 固定名を開くと既存symlinkの参照先を上書きする。同じ配置先に排他的に作る。
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=stop_file.parent,
+                                         prefix='.stop-request-', suffix='.tmp', delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(secrets.token_hex(16))
         temporary.replace(stop_file)
+        temporary = None
         if not stop_processes():
             return False
         if not cleanup_dependencies(Path(__file__).resolve().parent):
@@ -72,6 +78,12 @@ def cleanup(choices=None):
     except OSError as exc:
         print(f'診断ランチャーの解除に失敗しました: {exc}')
         return False
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                print('Diag の停止通知用一時ファイルを整理できませんでした。')
 
 
 if __name__ == '__main__':

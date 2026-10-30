@@ -60,3 +60,32 @@ def start():
     return subprocess.Popen([node, str(ROOT / 'diag_main.mjs'), '--foreground'], cwd=ROOT,
                             start_new_session=sys.platform != 'win32',
                             creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if sys.platform == 'win32' else 0)
+
+
+
+def main(argv=None):
+    """単独入口。aidiy_diag と同じ引数を渡し、明示されない --auto は付けない。"""
+    args = sys.argv[1:] if argv is None else list(argv)
+    try:
+        ok, detail = check_environment()
+        if not ok:
+            print(f'Diag の環境が準備されていません: {detail}', file=sys.stderr)
+            return 1
+        node = shutil.which('node.exe' if sys.platform == 'win32' else 'node')
+        if not node:
+            raise FileNotFoundError('Node.js')
+        result = subprocess.run([node, str(ROOT / 'diag_main.mjs'), *args], cwd=ROOT,
+                                stdin=subprocess.DEVNULL,
+                                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+        # POSIXのsignal終了を、シェルと同じ128+signalの終了コードへ変換する。
+        return result.returncode if result.returncode >= 0 else 128 - result.returncode
+    except KeyboardInterrupt:
+        print('Diag の起動を中断しました。', file=sys.stderr)
+        return 130
+    except (OSError, subprocess.SubprocessError):
+        print('Diag を実行できません。Node.js と診断ファイルの配置・アクセス権を確認してください。', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

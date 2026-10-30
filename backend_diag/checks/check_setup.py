@@ -13,6 +13,7 @@ from contextlib import redirect_stdout, ExitStack
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -422,7 +423,7 @@ class ElectronSetupTests(unittest.TestCase):
         self.enterContext(patch.object(setup, 'ensure_launcher_path', return_value=True))
 
     def test_browser_environment_skips_electron_installs(self):
-        with patch.dict('os.environ',{'CODESPACES':'true'}),patch.object(setup.shutil,'which') as which,patch('builtins.print'):
+        with patch.dict('os.environ',{'CODESPACES':'true'}),patch.dict('sys.modules',{'_runtime_requirements':SimpleNamespace(check_node_runtime=lambda *args,**kwargs:(True,'Node fixture'))}),patch.object(setup.shutil,'which') as which,patch('builtins.print'):
             self.assertTrue(setup.setup_desktop());which.assert_not_called()
     def test_desktop_uses_shared_helper(self):
         from types import SimpleNamespace
