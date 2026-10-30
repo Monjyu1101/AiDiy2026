@@ -29,8 +29,8 @@
 
 ## AiDiy / aidiy_hermes
 
-- 対象: `aidiy_hermes.png`、`aidiy_hermes.svg`、固定原本 `upstream/AiDiy.png`。
-- 引用元: リポジトリ既存の [`frontend_web/public/icons/AiDiy.png`](../../../../../frontend_web/public/icons/AiDiy.png)。`_icons/AiDiy.png` および `frontend_avatar/public/icons/AiDiy.png` ともバイト単位で同一です。スクリーンショット由来ではありません。
+- 対象: `aidiy_hermes.png`（Diag 配布コピー）。合成アイコンの正本は [`command_hermes/assets/AiDiy_hermes.svg`](../../../../../command_hermes/assets/AiDiy_hermes.svg) / `.png`、人物の共通原画は [`_icons/AiDiy.png`](../../../../../_icons/AiDiy.png) です。
+- 引用元: リポジトリ既存の [`_icons/AiDiy.png`](../../../../../_icons/AiDiy.png)。`frontend_web/public/icons/AiDiy.png` および `frontend_avatar/public/icons/AiDiy.png` ともバイト単位で同一です。スクリーンショット由来ではありません。
 - 原本形式: PNG、512×512px、RGBA。SHA-256: `3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042`。
 - 加工: SVG の人物部分は原本 PNG の全バイトを data URI として無改変で埋め込んだラスター画像です。人物は等比縮小のみで、ベクター化・トレース・色変更・描き直し・切り抜きはしていません。原本を120×120px全面へ配置し、下部25%へ白帯・黒字の HERMES を1つ重ねます。文字は23pxで左右に余白を設けます。表示用 PNG は合成 SVG から生成した120×120pxの派生画像であり、原本とバイト同一ではありません。
 - リポジトリ内の利用条件: [AiDiy 公開利用ライセンス v1.1](../../../../../LICENSE)、`Copyright (c) 2014-2026 Mitsuo KONDOU and contributors`。非商用利用と再配布条件はライセンス本文に従ってください。画像固有の別ライセンス・生成元の追加証跡はこの作業では確認できていません。独立した外部再配布の権利確認が完了したという意味ではありません。

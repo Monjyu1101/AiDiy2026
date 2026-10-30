@@ -9,12 +9,12 @@ import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 
 const palette = readFileSync(new URL('../panel/titlebar.css', import.meta.url), 'utf8');
-const shared = readFileSync(new URL('../../frontend_ide/src/共通表示/タイトルバー配色.css', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../panel/style.css', import.meta.url), 'utf8');
 
-test('Discord のタイトル配色は共通原本のコピーだけを読み、Web と Electron で同じ色にする', async () => {
-  assert.equal(palette, shared);
+test('Discord のタイトル配色はmodule内のコピーだけを読み、Web と Electron で同じ色にする', async () => {
   assert.match(css, /@import "\.\/titlebar\.css"/);
+  const bar=css.match(/#activity-bar\s*\{([^}]+)\}/)![1];
+  assert.match(bar,/box-sizing:\s*content-box/);assert.match(bar,/height:\s*2px/);assert.match(bar,/border-top:\s*1px solid #242424/);
   const window = new Window({ settings: { disableCSSFileLoading: true } });
   try {
     // OS描画ではなく、配布CSSの変数・継承・状態別の適用範囲を確認する。

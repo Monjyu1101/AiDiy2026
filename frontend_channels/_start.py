@@ -85,6 +85,7 @@ def start(auto_connect: bool = False) -> subprocess.Popen[bytes]:
 
 def main() -> None:
     print_header('フロントエンド(Discord) パネル起動')
+    print('[INFO] 外部チャンネル: Discord / Slack')
     try:
         sys.exit(subprocess.call(launch_command() + sys.argv[1:], cwd=THIS_DIR.parent,
                                  creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0))

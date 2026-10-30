@@ -17,10 +17,7 @@ async function fixture(){
  const workspace=await mkdtemp(path.join(os.tmpdir(),'diag-startup-'));
  const root=path.join(workspace,'backend_diag');
  await cp(new URL('../',import.meta.url),root,{recursive:true,filter:source=>!/(?:^|[/\\])(?:node_modules|tests|__pycache__)(?:[/\\]|$)/.test(source)});
- await cp(new URL('../../frontend_ide/src/共通表示/シアンバー.css',import.meta.url),path.join(workspace,'frontend_ide/src/共通表示/シアンバー.css'));
- await cp(new URL('../../frontend_ide/src/共通表示/タイトルバー配色.css',import.meta.url),path.join(workspace,'frontend_ide/src/共通表示/タイトルバー配色.css'));
  await cp(new URL('../../scripts/opencode-npm.mjs',import.meta.url),path.join(workspace,'scripts/opencode-npm.mjs'));
- await cp(new URL('../../_icons/AiDiy.png',import.meta.url),path.join(workspace,'_icons/AiDiy.png'));
  return root;
 }
 async function cleanup(root){
@@ -42,7 +39,7 @@ test('LF and Windows CRLF checkouts verify without rebuilding; actual edits stil
   await convert(path.dirname(root));assert.equal(await verify(ui),true);assert.deepEqual(await manifest(ui),lf);
   const manifestFile=path.join(root,'static/build-manifest.json');
   await writeFile(manifestFile,JSON.stringify(Object.fromEntries(Object.entries(lf).reverse())));assert.equal(await verify(ui),true);
-  for(const relative of ['../frontend_ide/src/共通表示/シアンバー.css','ui/src/App.vue','ui/src/導入状況/導入状況パネル.vue','ui/src/導入状況/導入状況状態.mjs','ui/src/導入状況/導入状況表示.mjs','ui/src/導入状況/導入状況.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html','ui/src/アプリ起動/CLIアイコン/copilot.svg','ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md','ui/src/アプリ起動/CLIアイコン/upstream/antigravity-logo-mark.svg','static/LICENSE_ICONS.md','static/LICENSE-Octicons.txt']){
+  for(const relative of ['ui/src/共通表示/シアンバー.css','ui/src/App.vue','ui/src/導入状況/導入状況パネル.vue','ui/src/導入状況/導入状況状態.mjs','ui/src/導入状況/導入状況表示.mjs','ui/src/導入状況/導入状況.css','runtime/model_catalog.ts','runtime/model_probe.mjs','ui/tsconfig.runtime.json','ui/build.mjs','static/app.js','static/style.css','static/index.html','ui/src/アプリ起動/CLIアイコン/copilot.svg','ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md','ui/src/アプリ起動/CLIアイコン/upstream/antigravity-logo-mark.svg','static/LICENSE_ICONS.md','static/LICENSE-Octicons.txt']){
    const file=path.join(root,relative),before=await readFile(file);await writeFile(file,Buffer.concat([before,Buffer.from('\nchanged')]));assert.equal(await verify(ui),false,relative);await writeFile(file,before);
   }
   await rm(path.join(root,'static/app.js'));assert.equal(await verify(ui),false);

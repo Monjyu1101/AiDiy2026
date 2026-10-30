@@ -20,15 +20,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('依存更新後は実ビルドで manifest を揃え、ソースと配布物の改変検出を保つ', async () => {
+test('他moduleのassetsが無い隔離環境でもビルド/manifest照合と改変検出を保つ', async () => {
   const repository = await mkdtemp(join(tmpdir(), 'aidiy-discord-manifest-'));
   const folder = join(repository, 'frontend_channels');
-  const shared = '../frontend_ide/src/共通表示/タイトルバー配色.css';
   try {
     await mkdir(folder);
-    await mkdir(join(repository, 'frontend_ide/src/共通表示'), { recursive: true });
-    await cp(join(root, shared), join(folder, shared));
-    for (const entry of ['package.json', 'package-lock.json', 'scripts', 'panel']) {
+    for (const entry of ['package.json', 'package-lock.json', 'scripts', 'panel', 'discord']) {
       await cp(join(root, entry), join(folder, entry), { recursive: true });
     }
     await symlink(join(root, 'node_modules'), join(folder, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
@@ -43,7 +40,7 @@ test('依存更新後は実ビルドで manifest を揃え、ソースと配布�
     assert.equal(built.status, 0, built.stderr);
     assert.equal(run('verify-panel.mjs').status, 0);
     // 配布物と元ソースのどちらの変更も、再ビルド前には拒否する。
-    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue', 'panel/titlebar.css', shared]) {
+    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue', 'panel/titlebar.css']) {
       const path = join(folder, entry);
       const original = await readFile(path, 'utf8');
       await writeFile(path, original + '\n// changed fixture\n');

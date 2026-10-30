@@ -36,7 +36,8 @@ await build({
     });
   } }],
 });
-// 共通配色の原本をコピーし、file:// と token 配下の Web で同じ CSS import を使う。
-await copyFile(resolve(root, '../frontend_ide/src/共通表示/タイトルバー配色.css'), resolve(root, 'panel/titlebar.css'));
+// 配色は module 内の titlebar.css コピーだけを使う。
+// Discord の正本と配布コピーは同じ frontend_channels module 内に保持する。
+await copyFile(resolve(root, 'discord/panel/AiDiy_discord.png'), resolve(root, 'panel/AiDiy_discord.png'));
 await writeFile(resolve(root, 'panel/build-manifest.json'), JSON.stringify(await 配布物一覧(), null, 2) + '\n');
 console.log('Discord 接続パネルの配布用 Vue バンドルを更新しました。');

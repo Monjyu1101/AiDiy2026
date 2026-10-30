@@ -6,7 +6,7 @@
 
 Electronの長押し操作と表示開始ズームは [共通の基本方針](./共通,Electronウィンドウ基本方針.md) に従う。初期ミニ表示でも最終位置・寸法を先に確定し、透明パネル内でズームする。表示中の通常・ミニ切替には登場ズームを再実行しない。
 
-通常・ミニ表示のタイトル行は `frontend_ide/src/共通表示/タイトルバー配色.css` の共通変数を使い、Electron と Web で暗灰色 `#30343a`・白文字 `#fff` に揃えます。外枠は同じ背景色を参照する `--aidiy-panel-border` の1pxを内側に確保します。左上の実操作は `.launcher-selector` が所有し、未接続・切替中も文字のopacityを落とさず、暗い面・破線枠とnative disabledで無効を示します。古い `.window-actions .title-mini-switch` を配色元にしません。
+通常・ミニ表示のタイトル行は 自 module 内の `ui/src/共通表示/タイトルバー配色.css` の変数を使い、Electron と Web で暗灰色 `#30343a`・白文字 `#fff` に揃えます。外枠は同じ背景色を参照する `--aidiy-panel-border` の1pxを内側に確保します。左上の実操作は `.launcher-selector` が所有し、未接続・切替中も文字のopacityを落とさず、暗い面・破線枠とnative disabledで無効を示します。古い `.window-actions .title-mini-switch` を配色元にしません。
 
 シアンバーより下の通常面・タブ土台・見出し・通知・応答・ランチャー・AI設定フォームの外側は真黒 `#000` にします。入力欄、選択中タブ、警告、稼働状態、hoverと画像・内容本来の色は識別のため保持します。AI設定は黒い外側のラベルだけ明るくし、白い入力欄の暗色文字は保持します。microアイコン表示は背景透明・外枠0の例外です。配色原本を変更したら UI を再ビルドし、manifest一致と `checks/mini-titlebar.check.cjs`、`panel-palette.check.cjs`、`statusbar.check.cjs` で実タイトル操作・本文面・状態の分離を確認します。
 
@@ -247,7 +247,7 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 - `ui/src/アプリ起動/CLI状態.mjs` と `ミニCLI起動.vue` が確認・利用可能項目・名称帯を管理する。プロジェクトは既存アプリ状態を共有する。Hermes・外部CLIは起動中も追加起動でき、要求ごとの処理中状態を管理する。確認ダイアログ・他アプリの起動・フォルダ選択は重ねない。ミニ表示時と再接続時は存在確認だけで、CLI・ログイン・導入を実行しない。
 - `起動/CLI起動.mjs` は固定ID・絶対プロジェクト・自動承認指定だけを受け付け、固定 `frontend_ide/launch.mjs --app console --cli <ID> --cli-auto-approve` へ渡す。ミニの明示クリックは確認ダイアログなしで従来の起動指定を送り、成功後の説明を表示しない。エラー・処理中の状態は通常画面で確認できるまま保持し、ミニには表示しない。同じCLI・プロジェクトでもクリックごとに別のConsole窓を開く。モデル・コマンド文字列を受け付けず、実行ファイルの探索と引数は `frontend_ide/aidiy_console/cli-launch.mjs` を共有する。公式フラグ・出典・古いCLIでの失敗時の扱いは backend_diag/README.md の「ミニ表示からCLIを開く」を参照する。
 - 起動通知はIPCでConsole窓の準備完了を待つ。CLI自身の起動結果はConsoleに表示する。同じDiagで同じCLI・正規化済みプロジェクトでも並行起動し、既存窓へ戻らない。Consoleごとに動的ポート・端末セッション・起動ログを分ける。1つの窓の起動失敗・終了では他の窓のCLIやサーバーを止めない。ブラウザの最後の有効な端末接続が切れて30秒戻らない場合と、表示後30秒以内に初回端末接続が始まらない場合はその窓のCLIと所有サーバーだけを終了する。Diag終了とConsole終了は連動させない。Avatar・Live・Discordの単一起動制限は維持する。
-- タイトル欄はdrag、ボタンはno-dragを維持する。ミニは幅384pxで高さは表示内容に追従する。アイコンは原本SVG・透過PNG・出典・ライセンスを `ui/src/アプリ起動/CLIアイコン/` に保持する。CopilotはGitHub Octicons、Codex / Claude CodeはLobeHub、Grok / OpenCodeは公式配布元の実素材。Hermesは既存AiDiy画像、AgyはAntigravity公式サイトの山形マーク。画像はSVGで作ってPNG化し、生成スクリプトは常設しない。白帯・黒文字を内包する120×120pxの固定7SVGとPNG派生物、出典・ライセンス全文 `LICENSE_ICONS.md` をstaticへ配布する。ミニはSVGを直接表示し、Hermesは既存AiDiy画像とHERMESの帯を内包する。AiDiy6アプリも画像内の名称を使い、HTMLの名前は重ねない。上段はAiDiy6アプリ＋Hermes、下段は存在する外部CLIだけを同じ幅で中央寄せする。外部CLI0件なら下段と余白を出さず、更新ボタンも置かない。全画像は名称帯込みの40px枠・40px表示（縦横比維持）、稼働インジケーター6件は1行。変更後はUIビルドとmanifest照合を行う。
+- タイトル欄はdrag、ボタンはno-dragを維持する。ミニは幅384pxで高さは表示内容に追従する。外部CLIのSVG・PNG・出典・ライセンスは `ui/src/アプリ起動/CLIアイコン/` に保持する。AiDiy系は各所有moduleが正本を持ち、DiagはローカルPNGコピーだけを使う（[共通手順](./共通,アイコン原本と配布.md)）。CopilotはGitHub Octicons、Codex / Claude CodeはLobeHub、Grok / OpenCodeは公式配布元の実素材。Hermesは既存AiDiy画像、AgyはAntigravity公式サイトの山形マーク。画像はSVGで作ってPNG化し、生成スクリプトは常設しない。外部CLIのSVGとPNG派生物、HermesのPNG、出典・ライセンス全文 `LICENSE_ICONS.md` をstaticへ配布する。Hermesの正本は `command_hermes/assets/`、Diagでは保守時にコピーしたPNGだけを表示する。通常build/verifyでは他moduleのassetを読まない。AiDiy6アプリも画像内の名称を使い、HTMLの名前は重ねない。上段はAiDiy6アプリ＋Hermes、下段は存在する外部CLIだけを同じ幅で中央寄せする。外部CLI0件なら下段と余白を出さず、更新ボタンも置かない。全画像は名称帯込みの40px枠・40px表示（縦横比維持）、稼働インジケーター6件は1行。変更後はUIビルドとmanifest照合を行う。
 - 回帰確認: `node --test backend_diag/checks/{cli-launch,cli-launch-state,mini-cli-ui,start-mini}.check.*` と frontend_ide のCLI/端末テスト（`cli-parallel-lifecycle.test.mjs`を含む）。全タブ復帰・ミニの確認なし起動と成功説明の非表示・連続／同時起動・個別終了・切断・起動失敗・日本語と記号付きパス・モデル引数なし・再接続での再実行なしをfixtureで確認する。実CLI自動作業や有料APIを回帰テストに使わない。
 
 

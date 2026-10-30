@@ -121,3 +121,21 @@ test('Core NG response messages and unrecognized transport exceptions never expo
  const handler=createHandler({token:'diag-fixture',coreSettingsBridge:async()=>{throw new Error('secret fixture credential');}});
  const result=await handlerRequest(handler);assert.equal(result.status,503);assert.ok(!JSON.stringify(result.body).includes('secret'));
 });
+
+test('AI settings filters Slack credential fields from success data and never echoes credential errors',async()=>{
+ const secrets={slack_bot_token:'xoxb-fixture-slack-bot',slack_app_token:'xapp-fixture-slack-app'};
+ const configured=async()=>JSON.stringify({PORT_CORE:8091,...secrets});
+ const bridge=createCoreSettingsBridge({reader:configured,requestFn:async r=>{
+  if(r.path===AI_SETTINGS_ACTIONS.現在利用者)return ok({利用者ID:'fixture',...secrets});
+  if(r.path===AI_SETTINGS_ACTIONS.初期化)return ok({セッションID:'fixture-session',...secrets});
+  if(r.path===AI_SETTINGS_ACTIONS.取得)return ok({モデル設定:{CHAT_AI_NAME:'openai',...secrets},...secrets});
+  return {status:'NG',message:Object.values(secrets).join(' '),data:secrets};
+ }});
+ for(const [action,data] of [['現在利用者',{}],['初期化',{}],['取得',{セッションID:'fixture-session'}],['設定',mutation]]){
+  const response=await bridge(action,envelope(data));
+  for(const value of Object.values(secrets))assert.ok(!JSON.stringify(response).includes(value));
+ }
+ const handler=createHandler({token:'diag-fixture',coreSettingsBridge:async()=>{throw Error(Object.values(secrets).join(' '));}});
+ const failed=await handlerRequest(handler);assert.equal(failed.status,503);
+ for(const value of Object.values(secrets))assert.ok(!JSON.stringify(failed.body).includes(value));
+});

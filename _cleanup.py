@@ -839,6 +839,7 @@ def main():
     print_info("  8. コマンド(hermes)")
     print_info("  9. IDE群(Console / Code / Live / IDE)")
     print_info(" 10. フロントエンド(Discord)")
+    print_info("外部チャンネル: Discord / Slack")
     print_info(f" 11. 全階層の {TEMP_TARGET_LABEL} フォルダ（最後にまとめて削除）")
     print()
 

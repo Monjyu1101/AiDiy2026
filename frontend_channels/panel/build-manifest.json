@@ -1,19 +1,22 @@
 {
-  "../frontend_ide/src/共通表示/タイトルバー配色.css": "35f57ac2c9227b2fa9a09e748b56bae5dd2cfe4761725dc1402a18e7ba616f6c",
+  "discord/panel/AiDiy_discord.png": "f735d4f89e1df873a13375b047cbed919b545fd186cdb33dd7b50fc0fd61cc0c",
+  "discord/panel/AiDiy_discord.svg": "de925103a4aa18184821ba236fc449fbbd274c1574a044214504c5b28c2cce82",
   "package-lock.json": "45e73758f79d6ad9db829dfb774fc243d28fc5dcde7280d6f484765d03cca24b",
   "package.json": "62f12b5a5e84e6a4687e11594eaeed99885edc1b882cddf43614a53d8ff5d4d6",
+  "panel/AiDiy.png": "3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042",
+  "panel/AiDiy_discord.png": "f735d4f89e1df873a13375b047cbed919b545fd186cdb33dd7b50fc0fd61cc0c",
   "panel/THIRD_PARTY_NOTICES.txt": "991f108cf9b45856e7f9864d918cb66c1f6f9ab41f18dd885f0c95bf8aa10d12",
   "panel/index.html": "a6bd2ff29d8416ec53d3b3b0f572d4278b75a3be8ad24c8cbb3459df520bfe74",
   "panel/main.js": "616f09741642b2e3598fa0677e7fef28ca2b2f9528ec364fe28c161391c83c8c",
   "panel/style.css": "dad716794909d3376c0578c6784cbf242569c97af657d2ce9a072c30facd39e8",
   "panel/titlebar.css": "35f57ac2c9227b2fa9a09e748b56bae5dd2cfe4761725dc1402a18e7ba616f6c",
-  "panel/view.js": "36ca9d02e498f1051c93f67bdb3b97e4305dca70cd893921bbad74171f371796",
+  "panel/view.js": "48210b2c751ff1c3cc3e1358361a899f25b42759c983133aa00b95be0db7caed",
   "panel/visualizer.js": "4ff5202bee0fe0c85fa74fa628b9a00d4cd6c00fdfef88bb0ccbff6dbaeec8d7",
   "panel/ライブ/音声表示.js": "adfbfb27e5d1a454645afde3cf8297057b887be067a92915ff56045fbcf26987",
   "panel/接続/パネル状態.js": "2940c531def4e18e2ad73c62d9c17f6a2fa15e627260f0e43a446363fd3a1711",
-  "panel/画面/接続パネル.vue": "5a735a2cff61484d957f6cf32b12c49699193ca98ef46c0529f3b2fa0c6becbb",
+  "panel/画面/接続パネル.vue": "f1cacb4f41f1daf0a9fca550a53b98ef87f812ff073a18b903bac5f44201e985",
   "panel/画面/機能切替.vue": "1cd911c0dac6c2f3fc14c810c5c4bcbdb8d54e0f02959b3d65b0a7fa459051f2",
-  "scripts/build-panel.mjs": "d0eae0eaefde509d0438a6211fea3f2e371b0a6baa3bcca0265d4d96f34eb4cf",
+  "scripts/build-panel.mjs": "32525be53c67c1779456dd34d0df7ea0c49c293cb0d2526b9565fee4084d5b2d",
   "scripts/verify-lock.mjs": "d88f888bf600d543ee6ed93382524b4268f02537e15f6ca156a99ee30a540670",
-  "scripts/verify-panel.mjs": "6e2801d1b27a89fc48d2cd99f9c3d090c513d2d53f2ebb196bdd93067477fc43"
+  "scripts/verify-panel.mjs": "750bfc9528235f44c11d1648c02bf65eb64d29743dd2576050093d9346b16a2a"
 }

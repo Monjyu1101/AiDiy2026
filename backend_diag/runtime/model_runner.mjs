@@ -372,7 +372,7 @@ var KEY_PROVIDERS = Object.freeze([
   ["huggingface_write", "Hugging Face \u66F8\u8FBC", "huggingface_key_write", "huggingface"],
   ["discord", "Discord Bot", "discord_bot_token", "discord"]
 ].map(([id, \u540D\u524D, \u30AD\u30FC\u540D, probe2]) => Object.freeze({ id, \u540D\u524D, \u30AD\u30FC\u540D, probe: probe2, oauth: probe2 === "codex" || probe2 === "grok" ? probe2 : null })));
-var SECRET_CONFIG_KEYS = Object.freeze(["gemini_key_id", "freeai_key_id", "claude_key_id", "openai_key_id", "azure_key_id", "copilot_key_id", "openrt_key_id", "ollama_key_id", "huggingface_key_read", "huggingface_key_write", "discord_bot_token", "openai_organization"]);
+var SECRET_CONFIG_KEYS = Object.freeze(["gemini_key_id", "freeai_key_id", "claude_key_id", "openai_key_id", "azure_key_id", "copilot_key_id", "openrt_key_id", "ollama_key_id", "huggingface_key_read", "huggingface_key_write", "discord_bot_token", "slack_bot_token", "slack_app_token", "openai_organization"]);
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 async function readLimited(file, limit = CONFIG_LIMIT) {
   const before = await stat(file);

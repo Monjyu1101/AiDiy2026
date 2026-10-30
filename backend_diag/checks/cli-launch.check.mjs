@@ -122,11 +122,12 @@ test('authenticated CLI API limits body fields, confirmation, asset names and me
  const base=`http://127.0.0.1:${server.address().port}/`,headers={Authorization:'Bearer fixture','Content-Type':'application/json'};
  assert.equal((await fetch(base+'api/CLI起動')).status,401);assert.equal((await fetch(base+'api/CLI起動',{headers})).status,200);
  for(const id of ids){const response=await fetch(base+`CLI_${id}.png`);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await response.arrayBuffer()),await readFile(new URL(`../ui/src/アプリ起動/CLIアイコン/${id}.png`,import.meta.url)));}
- for(const id of ids){const response=await fetch(base+`CLI_${id}.svg`);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/svg+xml');assert.equal(await response.text(),await readFile(new URL(`../ui/src/アプリ起動/CLIアイコン/${id}.svg`,import.meta.url),'utf8'));}
+ for(const id of ids.filter(id=>id!=='aidiy_hermes')){const response=await fetch(base+`CLI_${id}.svg`);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/svg+xml');assert.equal(await response.text(),await readFile(new URL(`../ui/src/アプリ起動/CLIアイコン/${id}.svg`,import.meta.url),'utf8'));}
  for(const name of ['LICENSE-Octicons.txt','LICENSE-LobeHub.txt','LICENSE-OpenCode.txt']){const license=await fetch(base+name);assert.equal(license.status,200);assert.equal(license.headers.get('content-type'),'text/plain; charset=utf-8');assert.equal(await license.text(),await readFile(new URL('../ui/src/アプリ起動/CLIアイコン/'+name,import.meta.url),'utf8'));}
  const citations=await fetch(base+'LICENSE_ICONS.md');assert.equal(citations.status,200);assert.equal(await citations.text(),await readFile(new URL('../ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md',import.meta.url),'utf8'));
  assert.equal((await fetch(base+'CLI_bad.png')).status,404);
  assert.equal((await fetch(base+'CLI_bad.svg')).status,404);
+ assert.equal((await fetch(base+'CLI_aidiy_hermes.svg')).status,404);
  for(const [body,status] of [[{対象:'copilot',フォルダ:f.project},400],[{対象:'copilot',フォルダ:f.project,自動承認確認:true,model:'bad'},400],[{対象:'copilot',フォルダ:'x'.repeat(9000),自動承認確認:true},413]])assert.equal((await fetch(base+'api/CLI起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,status);
  assert.equal((await fetch(base+'api/CLI起動/開始',{headers})).status,404);assert.equal(f.calls.length,0);
  assert.equal((await fetch(base+'api/CLI起動/開始',{method:'POST',headers,body:JSON.stringify({対象:'copilot',フォルダ:f.project,自動承認確認:true})})).status,202);assert.equal(f.calls.length,1);
@@ -152,7 +153,7 @@ test('Copilot SVG includes its white caption band while preserving Octicons path
 });
 
 
-test('名前帯付きSVGは原本の形状と色を維持し、Hermesは既存AiDiy画像を内包する',async()=>{
+test('外部CLI SVGの形状・色を維持し、Hermesはlocal PNGのみ配布する',async()=>{
  const root=new URL('../ui/src/アプリ起動/CLIアイコン/',import.meta.url),text=async path=>(await readFile(new URL(path,root),'utf8')).replace(/\r\n/g,'\n');
  const paths=value=>[...value.matchAll(/<path\b[^>]*\bd="([^"]+)"/g)].map(item=>item[1]);
  for(const [id,filename] of [['claude','claude-code-color-lobe.svg'],['codex','codex-color-lobe.svg'],['grok','Grok_Logomark_Light.svg'],['opencode','opencode-logo-dark-square.svg']]){
@@ -160,14 +161,13 @@ test('名前帯付きSVGは原本の形状と色を維持し、Hermesは既存Ai
   for(const [,fill] of original.matchAll(/\bfill="([^"]+)"/g))assert.ok(display.includes(`fill="${fill}"`),id+' preserves '+fill);
   assert.ok(display.includes('viewBox="'+original.match(/viewBox="([^"]+)"/)[1]+'"'),id+' preserves its original viewport');
  }
- const original=await readFile(new URL('../../frontend_web/public/icons/AiDiy.png',import.meta.url));assert.deepEqual(original,await readFile(new URL('upstream/AiDiy.png',root)));
- const embedded=(await text('aidiy_hermes.svg')).match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/);assert.ok(embedded);assert.deepEqual(Buffer.from(embedded[1],'base64'),original);
- for(const [id,label] of Object.entries({claude:'Claude',codex:'Codex',copilot:'Copilot',agy:'Agy',grok:'Grok',opencode:'OpenCode',aidiy_hermes:'HERMES'})){
+ for(const [id,label] of Object.entries({claude:'Claude',codex:'Codex',copilot:'Copilot',agy:'Agy',grok:'Grok',opencode:'OpenCode'})){
   const svg=await text(id+'.svg');assert.match(svg,/width="120" height="120" viewBox="0 0 120 120"/);
   assert.match(svg,/<rect id="caption-band" x="0" y="90" width="120" height="30" fill="#ffffff"/);
   assert.match(svg,new RegExp('<text[^>]*id="caption-label"[^>]*fill="#000000"[^>]*>'+label+'<\\/text>'));
   assert.doesNotMatch(svg,/<script|<foreignObject|\b(?:href|xlink:href)="(?!data:image\/png;base64,)/i);
   const png=await readFile(new URL(id+'.png',root));assert.equal(png.readUInt32BE(16),120);assert.equal(png.readUInt32BE(20),120);
  }
+ const hermes=await readFile(new URL('aidiy_hermes.png',root));assert.equal(hermes.readUInt32BE(16),120);assert.equal(hermes.readUInt32BE(20),120);await assert.rejects(readFile(new URL('aidiy_hermes.svg',root)),{code:'ENOENT'});
  const notes=await text('LICENSE_ICONS.md');for(const label of ['Copilot','Claude','Codex','Grok','OpenCode','aidiy_hermes','LobeHub'])assert.ok(notes.includes(label),label);assert.doesNotMatch(notes,/取得・確認待ち|独自仮ピクトグラム/);
 });

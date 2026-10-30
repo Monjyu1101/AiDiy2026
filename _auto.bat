@@ -17,10 +17,10 @@ set "AIDIY_RUN=%RANDOM%-%RANDOM%-%RANDOM%"
 set "AIDIY_TEMP=%TEMP%\AiDiy-automatic-%AIDIY_RUN%"
 mkdir "%AIDIY_TEMP%" >nul 2>&1
 if errorlevel 1 goto make_temp
-copy /b /v /y "%~f0" "%AIDIY_TEMP%\_automatic.bat" >nul
+copy /b /v /y "%~f0" "%AIDIY_TEMP%\_auto.bat" >nul
 if errorlevel 1 goto temp_error
 rem Transfer without CALL. Never read the original batch after self-update.
-"%AIDIY_TEMP%\_automatic.bat" --_aidiy_temp
+"%AIDIY_TEMP%\_auto.bat" --_aidiy_temp
 exit /b 2
 
 :temp_entry
@@ -111,16 +111,16 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 
 :existing
-set "STAGE=repository_validation"
 set "RC=3"
-cd /d "%TARGET%"
-if errorlevel 1 goto failed
 call :validate_repository
 if errorlevel 1 goto failed
-for /f "usebackq delims=" %%G in ("%AIDIY_TEMP%\gitdir.txt") do set "AIDIY_GIT_DIR=%%G"
 set "CONTROL=%AIDIY_GIT_DIR%\aidiy-automatic"
-if not exist "%CONTROL%\" mkdir "%CONTROL%" >nul 2>&1
-if errorlevel 1 goto failed
+set "STAGE=repository_control_directory"
+if exist "%CONTROL%\" goto control_ready
+mkdir "%CONTROL%" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto control_failed
+:control_ready
+set "STAGE=repository_lock"
 mkdir "%CONTROL%\run.lock" >nul 2>&1
 if errorlevel 1 goto locked
 set "LOCK_OWNED=1"
@@ -152,8 +152,8 @@ if errorlevel 1 goto failed
 
 rem Copy this launcher only when absent. Never overwrite an existing file.
 set "STAGE=launcher_copy"
-if exist "%TARGET%\_automatic.bat" goto setup
-copy /b /v /-y "%~f0" "%TARGET%\_automatic.bat" <nul >nul
+if exist "%TARGET%\_auto.bat" goto setup
+copy /b /v /-y "%~f0" "%TARGET%\_auto.bat" <nul >nul
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 
@@ -211,38 +211,74 @@ set "RC=2"
 goto failed
 
 :validate_repository
-if not exist ".git" exit /b 3
-if not exist "_setup.py" exit /b 3
-if not exist "_start.py" exit /b 3
-git rev-parse --show-prefix >"%AIDIY_TEMP%\prefix.txt"
-if errorlevel 1 exit /b 3
-for %%F in ("%AIDIY_TEMP%\prefix.txt") do if %%~zF GTR 2 exit /b 3
-git remote get-url --all origin >"%AIDIY_TEMP%\origin.txt"
-if errorlevel 1 exit /b 3
-rem Treat origin URLs as data, never command text. Match the exact allowlist.
->"%AIDIY_TEMP%\allowed-origins.txt" echo https://github.com/Monjyu1101/AiDiy2026.git
->>"%AIDIY_TEMP%\allowed-origins.txt" echo https://github.com/Monjyu1101/AiDiy2026
->>"%AIDIY_TEMP%\allowed-origins.txt" echo git@github.com:Monjyu1101/AiDiy2026.git
->>"%AIDIY_TEMP%\allowed-origins.txt" echo git@github.com:Monjyu1101/AiDiy2026
-for %%F in ("%AIDIY_TEMP%\origin.txt") do if %%~zF EQU 0 exit /b 3
-findstr /i /l /x /v /g:"%AIDIY_TEMP%\allowed-origins.txt" "%AIDIY_TEMP%\origin.txt" >"%AIDIY_TEMP%\bad-origins.txt"
-if errorlevel 2 exit /b 3
-for %%F in ("%AIDIY_TEMP%\bad-origins.txt") do if %%~zF GTR 0 exit /b 3
-git branch --show-current >"%AIDIY_TEMP%\branch.txt"
-if errorlevel 1 exit /b 3
-findstr /x /c:"main" "%AIDIY_TEMP%\branch.txt" >nul
-if errorlevel 1 exit /b 3
-git rev-parse --absolute-git-dir >"%AIDIY_TEMP%\gitdir.txt"
-if errorlevel 1 exit /b 3
+set "STAGE=repository_directory"
+cd /d "%TARGET%" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_files"
+echo [確認] 必要なGit・setup・startファイル
+>>"%LOG%" echo CHECK %STAGE%
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');(Path('.git').exists() and Path('_setup.py').is_file() and Path('_start.py').is_file()) or sys.exit('Required .git, _setup.py or _start.py is missing/not a file.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_root"
+echo [確認] Gitルートフォルダ
+>>"%LOG%" echo CHECK %STAGE%
+git rev-parse --show-prefix >"%AIDIY_TEMP%\prefix.txt" 2>"%AIDIY_TEMP%\validation.txt"
+if errorlevel 1 goto repository_failed
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');value=(Path(os.environ['AIDIY_TEMP'])/'prefix.txt').read_bytes();value in (b'',b'\n',b'\r\n') or sys.exit('Selected directory is not the Git worktree root.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_origin"
+echo [確認] originの接続先
+>>"%LOG%" echo CHECK %STAGE%
+git remote get-url --all origin >"%AIDIY_TEMP%\origin.txt" 2>"%AIDIY_TEMP%\validation.txt"
+if errorlevel 1 goto repository_failed
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');urls=(Path(os.environ['AIDIY_TEMP'])/'origin.txt').read_text(encoding='utf-8').splitlines();allowed={'https://github.com/monjyu1101/aidiy2026.git','https://github.com/monjyu1101/aidiy2026','git@github.com:monjyu1101/aidiy2026.git','git@github.com:monjyu1101/aidiy2026'};urls and all(url.lower() in allowed for url in urls) or sys.exit('Origin must be Monjyu1101/AiDiy2026 on GitHub (HTTPS or git@github.com). URL values omitted for privacy.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_branch"
+echo [確認] mainブランチ
+>>"%LOG%" echo CHECK %STAGE%
+git branch --show-current >"%AIDIY_TEMP%\branch.txt" 2>"%AIDIY_TEMP%\validation.txt"
+if errorlevel 1 goto repository_failed
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');lines=(Path(os.environ['AIDIY_TEMP'])/'branch.txt').read_text(encoding='utf-8').splitlines();lines==['main'] or sys.exit('Current branch must be main; detached HEAD is not supported.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_gitdir"
+echo [確認] Git管理フォルダ
+>>"%LOG%" echo CHECK %STAGE%
+git rev-parse --absolute-git-dir >"%AIDIY_TEMP%\gitdir.txt" 2>"%AIDIY_TEMP%\validation.txt"
+if errorlevel 1 goto repository_failed
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');lines=(Path(os.environ['AIDIY_TEMP'])/'gitdir.txt').read_text(encoding='utf-8').splitlines();len(lines)==1 and Path(lines[0]).is_dir() or sys.exit('Git directory is missing or its path output is invalid.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
 set "AIDIY_TEXT_FILE=%AIDIY_TEMP%\gitdir.txt"
 call :convert_git_path_text
 if errorlevel 1 exit /b 3
+set "AIDIY_GIT_DIR="
 for /f "usebackq delims=" %%G in ("%AIDIY_TEMP%\gitdir.txt") do set "AIDIY_GIT_DIR=%%G"
-for %%O in (MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply) do if exist "%AIDIY_GIT_DIR%\%%O" exit /b 3
-git ls-files --unmerged >"%AIDIY_TEMP%\unmerged.txt"
-if errorlevel 1 exit /b 3
-for %%F in ("%AIDIY_TEMP%\unmerged.txt") do if %%~zF GTR 0 exit /b 3
+if not defined AIDIY_GIT_DIR goto repository_failed
+set "STAGE=repository_operation"
+echo [確認] 未完了のGit操作
+>>"%LOG%" echo CHECK %STAGE%
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');pending=[name for name in ('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply') if (Path(os.environ['AIDIY_GIT_DIR'])/name).exists()];not pending or sys.exit('Unfinished Git operation: '+', '.join(pending))" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
+set "STAGE=repository_unmerged"
+echo [確認] 未解決の競合
+>>"%LOG%" echo CHECK %STAGE%
+git ls-files --unmerged >"%AIDIY_TEMP%\unmerged.txt" 2>"%AIDIY_TEMP%\validation.txt"
+if errorlevel 1 goto repository_failed
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');not (Path(os.environ['AIDIY_TEMP'])/'unmerged.txt').read_bytes() or sys.exit('Unresolved index conflicts exist.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto repository_failed
 exit /b 0
+
+:repository_failed
+set "VALIDATION_RC=%ERRORLEVEL%"
+echo [エラー] リポジトリの安全確認に失敗しました: %STAGE%
+echo 接続先・ブランチ・Gitの権限・未完了操作を確認してください。自動修正はしません。
+>>"%LOG%" echo REPOSITORY_CHECK_FAILED %STAGE% command_exit=%VALIDATION_RC%
+type "%AIDIY_TEMP%\validation.txt"
+type "%AIDIY_TEMP%\validation.txt" >>"%LOG%"
+exit /b 3
+
+:control_failed
+call :repository_failed
+goto failed
 
 :backup_local_state
 mkdir "%BACKUP%" >nul 2>&1
@@ -311,7 +347,7 @@ if exist "%CONTROL%\run.lock\owner.txt" del /q "%CONTROL%\run.lock\owner.txt" >n
 if exist "%CONTROL%\run.lock\" rd "%CONTROL%\run.lock" >nul 2>&1
 :clean_temp
 rem Delete only known scratch files. Never delete the currently executing batch.
-for %%F in (python.txt probe.txt prefix.txt origin.txt allowed-origins.txt bad-origins.txt branch.txt gitdir.txt unmerged.txt untracked.txt backup.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
+for %%F in (python.txt probe.txt prefix.txt origin.txt branch.txt gitdir.txt unmerged.txt untracked.txt backup.txt validation.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
 >>"%LOG%" echo TEMP_COPY_RETAINED="%~f0"
 rem Restore the caller directory before returning. Do not modify that directory.
 cd /d "%AIDIY_CWD%" >nul 2>&1

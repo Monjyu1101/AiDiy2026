@@ -915,6 +915,7 @@ def main():
     print_info("  8. Hermes")
     print_info("  9. Console / Code / Live / IDE / Task / Team")
     print_info(" 10. Discord")
+    print_info("外部チャンネル: Discord / Slack")
     print()
 
     choices = collect_setup_choices()

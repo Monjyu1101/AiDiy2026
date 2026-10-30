@@ -495,6 +495,7 @@ def prompt_choice(question: str, default_yes: bool) -> bool:
 
 def collect_startup_choices() -> tuple[bool, ...]:
     print_header("起動条件の確認")
+    print_info("外部チャンネル: Discord / Slack")
     print("診断")
     diag_enabled          = prompt_choice("  Diag      : 開始しますか?", default_yes=True)
     if diag_enabled:

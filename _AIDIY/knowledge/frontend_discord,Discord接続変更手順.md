@@ -83,7 +83,7 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 
 - `panel/画面/接続パネル.vue` と `機能切替.vue` が描画、`panel/接続/パネル状態.js` が状態管理、`panel/ライブ/音声表示.js` が音声インジケーター。内部状態名は「接続状態」「コードAI」「ライブAI」「ライブモデル」「音声」「ウィンドウ操作」に揃える。IPC と `LIVE_*` 設定キーは外部互換のため維持する。
 - `panel/view.js` は SFC を事前コンパイルした配布物。Electron の file:// とブラウザの token 配下で同じ静的 URL を使い、CSP に unsafe-eval や CDN を追加しない。`panel/visualizer.js` は旧 URL の互換入口として残す。
-- シアン接続バー上のタイトル行は `frontend_ide/src/共通表示/タイトルバー配色.css` の共通変数を使います。`build:panel` が原本を `panel/titlebar.css` へコピーし、`style.css` から import します。Web は固定 allowlist にあるコピーだけを配信し、原本フォルダは公開しません。配色変更後は `build:panel` と `check:panel` で原本・コピーの manifest を同期します。タイトルは背景 `#30343a`・文字 `#fff` に統一し、1px外枠も共通 `--aidiy-panel-border` でタイトルと同色にします。シアンバーより下の外側・通常の応答表示面は未接続・接続中とも真黒 `#000` に揃えます。入力・警告・機能状態・内容本来の色、接続バー、ピンの状態色は識別のため維持します。
+- シアン接続バー上のタイトル行は module 内の `panel/titlebar.css` の変数を使い、`style.css` から import します。共通配色と同じ内容を保守作業でコピーしますが、通常buildは他moduleのCSSを読みません。Web は固定 allowlist にあるコピーだけを配信し、原本フォルダは公開しません。配色変更後は ローカルコピー更新後に `build:panel` と `check:panel` で module 内の manifest を同期します。タイトルは背景 `#30343a`・文字 `#fff` に統一し、1px外枠も共通 `--aidiy-panel-border` でタイトルと同色にします。シアンバーより下の外側・通常の応答表示面は未接続・接続中とも真黒 `#000` に揃えます。入力・警告・機能状態・内容本来の色、接続バー、ピンの状態色は識別のため維持します。
 - `checks/panel-vue.test.ts` は実バンドルを模擬 DOM・IPC・音声で検証する。保存中の連打、開始応答待ち中の停止、再接続、候補欠落、Live OFF、音声モニターの初期 OFF、終了時の購読・タイマー・AudioContext の回収も確認する。OS の実描画と Discord の実通話は別途検証する。
 
 ## 音声変更時の注意
@@ -142,3 +142,11 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 - 終了待ち中の `second-instance` には `closing` と親 PID を通知する。`panel/launch.mjs` は旧プロセス終了後に起動し直し、表示完了まで確認する。消える予定のウィンドウを起動成功と通知しない。
 - Bot の終了は Live・Code・Gateway の回収を並行して開始する。返信先取得などの REST 応答やモデル候補 CLI の完了を待ってから Gateway を切断する順序に戻さない。遅れて戻った音声開始処理は `closing` で拒否する。
 - `checks/desktop.test.ts` / `checks/launch-restart.test.ts` で閉じる連打、シグナル終了済み、worker 起動失敗、強制停止、終了中の再起動をモック確認する。`checks/bot.test.ts` / `checks/panel.test.ts` では通信・CLI待ちが切断開始を妨げないことを確認する。実際の Discord 通話と Windows の GUI 再起動は別途確認する。
+
+## アプリアイコンの所有者
+
+Discord / Slack の正本はそれぞれ `frontend_channels/discord/panel/AiDiy_discord.{svg,png}`、`frontend_channels/slack/panel/AiDiy_slack.{svg,png}` です。現行 Discord の `panel/AiDiy_discord.png` と Diag の PNG は配布コピーで、別の SVG 原本を置きません。
+
+名称帯は黒・白文字、8px白枠は下の帯だけ。人物原画は無改変です。`build:panel` は現行 module 内の Discord PNG を配布します。Diag へのコピーは明示的な保守作業で行い、通常 Diag build / verify / test / 起動に他 module の asset を必要としません。welcome 原画も `panel/AiDiy.png` を使い、旧 frontend_ide 素材パスを公開しません。
+
+[共通,アイコン原本と配布](./共通,アイコン原本と配布.md) に全所有者と検証手順をまとめています。素材追加は Slack runtime 実装や Discord 実行コード移動とは別作業です。

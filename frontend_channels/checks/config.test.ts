@@ -84,3 +84,47 @@ test('全Liveベンダーで共通設定を使い、廃止したDiscord設定で
   assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: 'freeai/gemini-test' }).model, 'freeai/gemini-test');
   assert.equal(設定解析({ ...defaults, CODE_AIDIY_HERMES_MODEL: 'freeai/gemini-test' }).provider, '');
 });
+
+test('共通Slack5欄はDiscord解析結果に混入せず入力も変更しない', () => {
+  const data = {...defaults, slack_bot_token:'slack-bot-fixture', slack_app_token:'slack-app-fixture',
+    slack_team_id:'T123', slack_allowed_user_id:'U123', slack_text_channel_id:'C123'};
+  const before = JSON.stringify(data);
+  assert.deepEqual(設定解析(data), 設定解析(defaults));
+  assert.equal(JSON.stringify(data), before);
+});
+
+test('Slack欄だけではDiscord認証・許可範囲を代替しない', () => {
+  assert.throws(() => 設定解析({slack_bot_token:'slack-bot-fixture', slack_app_token:'slack-app-fixture',
+    slack_team_id:'T123', slack_allowed_user_id:'U123', slack_text_channel_id:'C123'}), /discord_bot_token/);
+});
+
+test('未設定契約: null・undefined・空白だけのtokenを拒否する', () => {
+  for (const token of [null, undefined, '', ' ', '\t\n']) {
+    assert.throws(() => 設定解析({...defaults, discord_bot_token:token}), /discord_bot_token/);
+  }
+});
+
+test('未設定契約: tokenの非文字列・内部空白は秘密を出さず拒否する', () => {
+  for (const token of [123, false, [], {}, 'fixture secret', 'fixture\tsecret', 'fixture\nsecret']) {
+    assert.throws(() => 設定解析({...defaults, discord_bot_token:token}), error => {
+      assert.ok(error instanceof Error);
+      assert.doesNotMatch(error.message, /fixture|secret/);
+      return true;
+    });
+  }
+});
+
+test('未設定契約: trim後の1文字・仮設定先頭を拒否する', () => {
+  for (const token of [' x ', ' < fixture-token > ', '<fixture-token']) {
+    assert.throws(() => 設定解析({...defaults, discord_bot_token:token}), error => {
+      assert.ok(error instanceof Error);
+      assert.doesNotMatch(error.message, /fixture-token/);
+      return true;
+    });
+  }
+});
+
+test('有効tokenの外側空白だけは除去しSlackの空欄は影響させない', () => {
+  const result = 設定解析({...defaults, discord_bot_token:'  fixture-token  ', slack_bot_token:'', slack_app_token:null});
+  assert.equal(result.token, 'fixture-token');
+});

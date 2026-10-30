@@ -18,7 +18,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Socket } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
 import { パネルサービス, type パネル通知 } from './接続パネル/パネル中継';
-import { プロジェクトルート } from './接続/接続設定';
 import { 接続元許可 } from './共通連携/IDE連携';
 import instanceLock from '../../frontend_ide/host/scripts/single-instance.cjs';
 
@@ -26,10 +25,8 @@ import instanceLock from '../../frontend_ide/host/scripts/single-instance.cjs';
 // IPC の代わりに WebSocket で panel-service.ts へ中継する。接続元の確認は aidiy_code / aidiy_live と共通。
 const panelRoot = fileURLToPath(new URL('../panel', import.meta.url));
 const assets: Record<string, string> = {
-  'style.css': 'text/css', 'titlebar.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
+  'AiDiy.png': 'image/png', 'AiDiy_discord.png': 'image/png', 'style.css': 'text/css', 'titlebar.css': 'text/css', 'view.js': 'text/javascript', 'visualizer.js': 'text/javascript', 'web-bridge.js': 'text/javascript',
 };
-// index.html は ../../frontend_ide/host/media/AiDiy.png を参照する。/<token>/ から辿るとこのパスになる。
-const iconPath = '/frontend_ide/host/media/AiDiy.png';
 
 export function ブラウザ用HTML(html: string) {
   const script = '<script src="visualizer.js" defer></script>';
@@ -63,7 +60,6 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
     }
     const url = req.url ?? '';
     try {
-      if (url === iconPath) { res.writeHead(200, { 'Content-Type': 'image/png' }).end(readFileSync(join(プロジェクトルート, 'frontend_ide/host/media/AiDiy.png'))); return; }
       const path = url.startsWith(prefix) ? url.slice(prefix.length) : null;
       if (path === '') {
         res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
@@ -71,7 +67,7 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
         return;
       }
       if (path !== null && Object.hasOwn(assets, path)) {
-        res.writeHead(200, { 'Content-Type': `${assets[path]}; charset=utf-8` }).end(readFileSync(join(panelRoot, path)));
+        res.writeHead(200, { 'Content-Type': assets[path].startsWith('image/') ? assets[path] : `${assets[path]}; charset=utf-8` }).end(readFileSync(join(panelRoot, path)));
         return;
       }
       res.writeHead(404).end();

@@ -191,7 +191,7 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとC
    assert.equal(img.props.width,'40');assert.equal(img.props.height,'40');assert.equal(button.children[0].props.class,'mini-icon-frame');assert.equal(text(button),'');
    const name=cliId==='aidiy_hermes'?'Hermes':appId?app.項目.value.find(item=>item.id===appId).名前:state.項目.value.find(item=>item.id===cliId).名前;
    assert.ok(button.props['aria-label'].includes(name));assert.ok(button.props.title.includes(name));
-   assert.equal(img.props.src,appId?icons.アプリアイコン[appId]:cliId==='aidiy_hermes'?'CLI_aidiy_hermes.svg':'CLI_'+cliId+'.svg');
+   assert.equal(img.props.src,appId?icons.アプリアイコン[appId]:cliId==='aidiy_hermes'?'CLI_aidiy_hermes.png':'CLI_'+cliId+'.svg');
   }
   app.フォルダ.value='/project';await flush();assert.equal(hermes().props.disabled,false);
   hermes().props.onClick();hermes().props.onClick();lowerButtons()[0].props.onClick();assert.equal(prompts,0);assert.equal(launches.length,3);assert.deepEqual(launches[0],{対象:'aidiy_hermes',フォルダ:'/project',自動承認確認:true});assert.deepEqual(launches[1],launches[0]);assert.equal(launches[2].対象,'claude');
@@ -250,7 +250,7 @@ test('Chrome / Browser icons render in full and mini launchers; Chrome works wit
   const ui=mount(target,()=>({state,cliState,online:true,visible:true}));
   try{
    await flush();assert.deepEqual(ui.nodes().filter(n=>n.props['data-app']).map(n=>n.props['data-app']),['browser','chrome']);assert.equal(ui.button('Chrome を起動').props.disabled,false);assert.equal(ui.button('Browser を起動').props.disabled,true);
-   assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy_browser.svg'));
+   assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy_browser.png'));
    ui.button('Chrome を起動').props.onClick({});await flush();assert.deepEqual(calls.at(-1),{route:'api/起動/ブラウザ',body:{}});
    state.フォルダ.value='/project';await flush();assert.equal(ui.button('Browser を起動').props.disabled,false);
    state.項目.value[0].利用可能=false;await flush();assert.equal(ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動')).props.disabled,true);

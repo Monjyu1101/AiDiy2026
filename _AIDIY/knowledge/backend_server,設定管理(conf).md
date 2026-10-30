@@ -143,3 +143,27 @@ models.fetch_all_models()  # 互換入口。合成ファイルの読込確認の
 - **conf_models の生成元**: 合成JSONを先に `aidiy_diag --headless` で生成する。Core側の読込ではAPIキーを参照しない
 - **conf_path の init**: `conf_path.init()` は `__file__` 基準でパスを再計算する。繰り返し呼んでも階層はズレず、外部プロジェクト一覧も再探索する
 - **外部プロジェクト探索**: `_AIDIY.md` の有無で判定。新しい外部エージェントを追加したらこのファイルを配置する
+
+## Slack接続欄
+
+`DEFAULT_CONFIG` はDiscord接続5項目の直後へ次のSlack接続5項目を置く。
+共通保存先は `_config/AiDiy_key.json` のまま変更せず、Discordの値を流用しない。
+
+| キー | 初期値 |
+|---|---|
+| `slack_bot_token` | `< your slack bot token >` |
+| `slack_app_token` | `< your slack app-level token >` |
+| `slack_team_id` | `< your slack workspace id >` |
+| `slack_allowed_user_id` | `< your slack user id >` |
+| `slack_text_channel_id` | `< your slack text channel id >` |
+
+不足キーのみ初期値で補完し、既存値・空欄・未知キーを勝手に置換しない。IDは文字列で指定する。
+設定保存クラスは型の接続検証を担わず、接続readerで拒否する設計とする。
+readerのtoken未設定契約はDiscord同様、非文字列、trim後length<=1、`<`で始まる値、
+内部空白を拒否し、エラーには値を出さない。
+
+この変更は初期値と秘密値除去の定義までで、Slack接続reader・実接続・設定画面/APIを追加しない。
+Diag既存診断ではSlackの2 tokenも秘密値として除去する。Slackを診断providerへ追加しない。
+`backend_server/checks/test_slack_config_defaults.py` は一時JSONだけを使う。
+`frontend_channels/checks/config.test.ts` は現Discordの未設定契約・Slack欄の非干渉を検証し、
+Slack readerが実装済みであることを意味しない。

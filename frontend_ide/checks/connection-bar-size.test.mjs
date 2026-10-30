@@ -19,17 +19,7 @@ test('Console / Code / Live / IDE の接続バーは境界線込み3pxを共有�
   assert.equal(declaration(sizes[0][2], 'border-top'), '1px solid #242424');
   assert.equal(declaration(sizes[0][2], 'flex'), 'none');
 });
-test('Diag / Discord も境界線込み3pxに揃う', () => {
-  const diag = read('../../backend_diag/ui/src/style.css');
-  assert.match(diag, /\*\s*\{\s*box-sizing\s*:\s*border-box/);
-  const diagBar = rules(diag).find(([_, selector]) => selector.trim() === '.connection-bar')[2];
-  assert.equal(declaration(diagBar, 'height'), '3px');
-  assert.equal(declaration(diagBar, 'border-top'), '1px solid #242424');
-  const discordBar = rules(read('../../frontend_channels/panel/style.css')).find(([_, selector]) => selector.trim() === '#activity-bar')[2];
-  assert.equal(declaration(discordBar, 'box-sizing'), 'content-box');
-  assert.equal(declaration(discordBar, 'height'), '2px');
-  assert.equal(declaration(discordBar, 'border-top'), '1px solid #242424');
-});
+// Diag / Discord の配布 CSS はそれぞれ自身の module 内で同じ寸法を検証する。
 test('VS Code版は単独版と同じ共通CSSを配布・参照する', () => {
   assert.match(read('../host/src/vscode-html.ts'), /dist\/development\/app\.css/);
   const build = read('../scripts/build.mjs');

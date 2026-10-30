@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-BAT = ROOT / "_automatic.bat"
+BAT = ROOT / "_auto.bat"
 TEXT = BAT.read_bytes().decode("cp932").replace("\r\n", "\n")
 
 
@@ -39,12 +39,14 @@ class BatchStructureTests(unittest.TestCase):
             self.assertIn(label.lower(), labels)
 
     def test_single_file_no_companion_or_embedded_program(self):
-        self.assertNotIn("_automatic.py", TEXT)
+        self.assertNotIn("_auto.py", TEXT)
         self.assertNotIn("runpy", TEXT)
-        self.assertFalse((ROOT / "_automatic.py").exists())
+        self.assertFalse((ROOT / "_auto.py").exists())
+        self.assertFalse((ROOT / "_automatic.bat").exists())
+        self.assertNotIn('_automatic.bat', TEXT)
 
     def test_original_locations_saved_before_control_transfer(self):
-        transfer = TEXT.index('"%AIDIY_TEMP%\\_automatic.bat" --_aidiy_temp')
+        transfer = TEXT.index('"%AIDIY_TEMP%\\_auto.bat" --_aidiy_temp')
         self.assertLess(TEXT.index('set "AIDIY_CWD=%CD%"'), transfer)
         self.assertLess(TEXT.index('set "AIDIY_SOURCE_DIR=%~dp0."'), transfer)
         self.assertNotRegex(TEXT, r"(?im)^\s*call\s+[^:]")
@@ -69,8 +71,37 @@ class BatchStructureTests(unittest.TestCase):
 
     def test_origin_allowlist_never_expanded_as_command_text(self):
         self.assertNotIn('%ORIGIN_URL%', TEXT)
-        self.assertIn('findstr /i /l /x /v /g:', TEXT)
+        validator = TEXT[TEXT.index('\n:validate_repository\n'):TEXT.index('\n:backup_local_state\n')]
+        self.assertNotIn('findstr', validator.lower())
+        self.assertNotIn('%%~zF', validator)
+        self.assertIn('all(url.lower() in allowed for url in urls)', validator)
         self.assertIn('git remote get-url --all origin', TEXT)
+
+    def test_repository_checks_report_each_guard_without_disclosing_origin(self):
+        validator = TEXT[TEXT.index('\n:validate_repository\n'):TEXT.index('\n:backup_local_state\n')]
+        for name in ('directory', 'files', 'root', 'origin', 'branch', 'gitdir', 'operation', 'unmerged'):
+            self.assertIn(f'set "STAGE=repository_{name}"', validator)
+        for line in validator.splitlines():
+            if line.startswith('git '):
+                self.assertIn('2>"%AIDIY_TEMP%\\validation.txt"', line)
+        failed = validator[validator.index('\n:repository_failed\n'):]
+        self.assertIn('REPOSITORY_CHECK_FAILED %STAGE%', failed)
+        self.assertIn('type "%AIDIY_TEMP%\\validation.txt" >>"%LOG%"', failed)
+        self.assertIn('exit /b 3', failed)
+        self.assertNotIn('type "%AIDIY_TEMP%\\origin.txt"', TEXT)
+        self.assertIn('if exist "%CONTROL%\\" goto control_ready', TEXT)
+        main = TEXT[TEXT.index('\n:existing\n'):TEXT.index('\n:setup\n')]
+        self.assertIn('call :validate_repository\nif errorlevel 1 goto failed', main)
+        self.assertLess(main.index('call :validate_repository'), main.index('call :backup_local_state'))
+        self.assertLess(main.index('call :validate_repository'), main.index('git fetch '))
+
+    def test_git_failure_is_not_overwritten_by_following_python_probe(self):
+        validator = TEXT[TEXT.index('\n:validate_repository\n'):TEXT.index('\n:repository_failed\n')]
+        lines = validator.splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith('git '):
+                self.assertEqual(lines[i + 1], 'if errorlevel 1 goto repository_failed')
+        self.assertIn(':repository_failed\nset "VALIDATION_RC=%ERRORLEVEL%"', TEXT)
 
     def test_clone_publish_uses_rename_not_move_into_existing_target(self):
         self.assertIn('ren "%STAGING%" "AiDiy2026"', TEXT)
@@ -202,6 +233,104 @@ class BatchStructureTests(unittest.TestCase):
                     self.assertEqual(path.read_bytes().decode('cp932'), text)
                 else:
                     self.assertEqual(path.read_bytes(), original)
+
+
+class RepositoryValidationTests(unittest.TestCase):
+    """実batの短いPython検証を実行。CMD/FINDSTRの実行結果を模倣しない。"""
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='repo validation 日本語 & % ! ')
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.gitdir = self.root / 'Git 管理'
+        self.gitdir.mkdir()
+
+    def run_guard(self, name):
+        block = TEXT.split(f'set "STAGE=repository_{name}"', 1)[1]
+        line = next(line for line in block.splitlines() if line.startswith('"%PYTHON%"'))
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        return subprocess.run([sys.executable, '-X', 'utf8', '-c', code],
+                              cwd=self.root, capture_output=True,
+                              env={**os.environ, 'AIDIY_TEMP': str(self.root),
+                                   'AIDIY_GIT_DIR': str(self.gitdir)})
+
+    def test_root_accepts_lf_crlf_and_empty_only(self):
+        for raw, valid in [(b'\n', True), (b'\r\n', True), (b'', True),
+                           (b'a\n', False), (b'a\r\n', False), (b' \n', False)]:
+            with self.subTest(raw=raw):
+                (self.root / 'prefix.txt').write_bytes(raw)
+                self.assertEqual(self.run_guard('root').returncode == 0, valid)
+
+    def test_origin_allowlist_accepts_git_lf_and_crlf(self):
+        allowed = ['https://github.com/Monjyu1101/AiDiy2026.git',
+                   'https://github.com/Monjyu1101/AiDiy2026',
+                   'git@github.com:Monjyu1101/AiDiy2026.git',
+                   'git@github.com:Monjyu1101/AiDiy2026']
+        for newline in ('\n', '\r\n'):
+            for url in allowed + [allowed[0].upper(), newline.join(allowed)]:
+                with self.subTest(newline=newline, url=url):
+                    (self.root / 'origin.txt').write_bytes((url + newline).encode())
+                    self.assertEqual(self.run_guard('origin').returncode, 0)
+
+    def test_origin_rejects_empty_other_mixed_and_command_text_privately(self):
+        valid = 'https://github.com/Monjyu1101/AiDiy2026.git'
+        secret = 'fixture-secret-token'
+        for value in ['', '\n', valid + '/wrong\n', valid + '\nhttps://other.invalid/repo\n',
+                      f'https://{secret}@github.com/Monjyu1101/AiDiy2026.git\n',
+                      valid + '& echo injected\n', ' ' + valid + '\n']:
+            with self.subTest(value=value):
+                (self.root / 'origin.txt').write_bytes(value.encode())
+                result = self.run_guard('origin')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(b'Origin must be', result.stderr)
+                self.assertNotIn(secret.encode(), result.stderr + result.stdout)
+                self.assertNotIn(b'injected', result.stderr + result.stdout)
+
+    def test_branch_accepts_only_main_with_normal_line_endings(self):
+        for raw, valid in [(b'main\n', True), (b'main\r\n', True), (b'main', True),
+                           (b'', False), (b'develop\n', False), (b'Main\n', False),
+                           (b'main\nother\n', False), (b'main \n', False)]:
+            with self.subTest(raw=raw):
+                (self.root / 'branch.txt').write_bytes(raw)
+                self.assertEqual(self.run_guard('branch').returncode == 0, valid)
+
+    def test_files_guard_requires_real_setup_start_files_and_dotgit(self):
+        self.assertNotEqual(self.run_guard('files').returncode, 0)
+        (self.root / '.git').write_text('gitdir: fixture')
+        (self.root / '_setup.py').write_text('# fixture')
+        (self.root / '_start.py').mkdir()
+        self.assertNotEqual(self.run_guard('files').returncode, 0)
+        (self.root / '_start.py').rmdir()
+        (self.root / '_start.py').write_text('# fixture')
+        self.assertEqual(self.run_guard('files').returncode, 0)
+
+    def test_gitdir_requires_one_existing_path_with_lf_or_crlf(self):
+        for suffix in ('\n', '\r\n'):
+            (self.root / 'gitdir.txt').write_bytes((str(self.gitdir) + suffix).encode())
+            self.assertEqual(self.run_guard('gitdir').returncode, 0)
+        for value in ['', str(self.root / 'absent') + '\n', str(self.gitdir) + '\nextra\n']:
+            (self.root / 'gitdir.txt').write_bytes(value.encode())
+            self.assertNotEqual(self.run_guard('gitdir').returncode, 0)
+
+    def test_incomplete_operation_and_unmerged_index_are_rejected(self):
+        self.assertEqual(self.run_guard('operation').returncode, 0)
+        for name in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
+            marker = self.gitdir / name
+            marker.write_text('fixture')
+            result = self.run_guard('operation')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(name.encode(), result.stderr)
+            marker.unlink()
+        (self.root / 'unmerged.txt').write_bytes(b'')
+        self.assertEqual(self.run_guard('unmerged').returncode, 0)
+        (self.root / 'unmerged.txt').write_bytes(b'100644 sha 1\tfile\n')
+        self.assertNotEqual(self.run_guard('unmerged').returncode, 0)
+
+    def test_all_inline_validators_support_python_310_syntax(self):
+        import ast
+        for line in TEXT.splitlines():
+            if ' -c "' in line:
+                code = re.search(r'-c "([^"]+)"', line).group(1)
+                ast.parse(code, feature_version=(3, 10))
 
 
 class ConfigurationBackupTests(unittest.TestCase):
@@ -427,6 +556,38 @@ class GitContractTests(unittest.TestCase):
         line = next(line for line in TEXT.splitlines() if line.startswith('git diff --binary'))
         command = shlex.split(line.split('>')[0])[1:]
         self.assertIn(b'+unsaved', self.git(self.repo, *command).stdout)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows CMD unavailable; no Windows execution claim')
+    def test_real_cmd_repository_validator_success_and_failures(self):
+        """Windowsでは実bat subroutineのみ実行。fetch/setup/startは含めない。"""
+        for name in ('_setup.py', '_start.py'):
+            (self.repo / name).write_text('# fixture', encoding='utf-8')
+        temporary = self.base / '診断 temp'
+        temporary.mkdir()
+        log = temporary / 'validation.log'
+        script = temporary / 'validator.bat'
+        validator = TEXT[TEXT.index('\n:validate_repository\n'):TEXT.index('\n:control_failed\n')]
+        conversion = TEXT[TEXT.index('\n:convert_git_path_text\n'):TEXT.index('\n:report_optional_check\n')]
+        harness = ('@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n'
+                   'chcp 932 >nul\ncall :validate_repository\nexit /b %ERRORLEVEL%\n')
+        script.write_bytes((harness + validator + conversion).replace('\n', '\r\n').encode('cp932'))
+        env = {**os.environ, 'TARGET': str(self.repo), 'AIDIY_TEMP': str(temporary),
+               'PYTHON': sys.executable, 'LOG': str(log)}
+
+        def run():
+            return subprocess.run([os.environ['ComSpec'], '/d', '/c', str(script)],
+                                  capture_output=True, env=env)
+
+        self.git(self.repo, 'remote', 'set-url', 'origin', 'https://github.com/Monjyu1101/AiDiy2026.git')
+        result = run()
+        self.assertEqual(result.returncode, 0, result.stdout.decode('cp932', errors='replace'))
+        self.git(self.repo, 'checkout', '-b', 'not-main')
+        self.assertEqual(run().returncode, 3)
+        self.assertIn('repository_branch', log.read_text(encoding='cp932'))
+        self.git(self.repo, 'checkout', 'main')
+        self.git(self.repo, 'remote', 'set-url', 'origin', 'https://other.invalid/wrong.git')
+        self.assertEqual(run().returncode, 3)
+        self.assertIn('repository_origin', log.read_text(encoding='cp932'))
 
 
 if __name__ == '__main__':

@@ -81,6 +81,7 @@ def setup(choices=None) -> bool:
     print_header("Discord セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
     print_info("対象: Discord / Node.js / Vue 3 / TypeScript / Electron")
+    print_info("外部チャンネル: Discord / Slack")
     # npm ci は node_modules を削除するため、Electron の準備より先に確認する。
     try:
         if _discord_in_use():

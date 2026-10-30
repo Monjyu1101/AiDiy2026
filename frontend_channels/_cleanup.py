@@ -88,6 +88,7 @@ def cleanup(choices: dict | None = None) -> bool:
     if choices is not None and choices.get('discord') is False:
         return True
     print_header(f'{LABEL} のクリーンアップ')
+    print_info("外部チャンネル: Discord / Slack")
     if not stop_discord_processes(THIS_DIR):
         print_warning('Discord Bot の停止を確認できないため、ランチャーと生成物の削除を中止します。')
         return False

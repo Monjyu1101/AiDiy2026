@@ -10,6 +10,11 @@ import { join } from 'node:path';
 import { mkdir, readFile, readdir, writeFile, cp, rm } from 'node:fs/promises';
 import { catppuccinNotice } from './icon-notices.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
+// 正本は同じ frontend_ide module の各 aidiy_*。他 module の素材は参照しない。
+for(const id of ['console','code','live','ide','task','team','browser']){
+ await cp(join(root,`aidiy_${id}/AiDiy_${id}.png`),join(root,'public',`AiDiy_${id}.png`));
+ await rm(join(root,'dist',`AiDiy_${id}.svg`),{force:true});
+}
 // Viteがpublicの原文SVGを外部ファイルのままコピーする。旧選択分は残さない。
 await rm(join(root,'dist/assets/catppuccin_icons'),{recursive:true,force:true});
 await build({root,plugins:[vue()],define:{'process.env.NODE_ENV':JSON.stringify('production'),__VUE_OPTIONS_API__:true,__VUE_PROD_DEVTOOLS__:false,__VUE_PROD_HYDRATION_MISMATCH_DETAILS__:false},build:{emptyOutDir:false,lib:{entry:join(root,'src/main.js'),formats:['iife'],name:'AiDiyDevelopment',fileName:()=> 'app.js',cssFileName:'app'},rollupOptions:{output:{banner:'/*! COPYRIGHT (C) 2014-2026 Mitsuo KONDOU and contributors. Licensed under "AiDiy 公開利用ライセンス v1.1". Commercial use requires prior written consent from all copyright holders. See LICENSE for full terms. Thank you for keeping the rules. https://github.com/monjyu1101/AiDiy2026 */'}}}});

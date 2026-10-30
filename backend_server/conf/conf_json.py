@@ -66,6 +66,13 @@ class conf_json:
         'discord_text_channel_id': '< your discord text channel id >',
         'discord_voice_channel_id': '< your discord voice channel id >',
 
+        # Slack接続（IDは文字列で指定）
+        'slack_bot_token': '< your slack bot token >',
+        'slack_app_token': '< your slack app-level token >',
+        'slack_team_id': '< your slack workspace id >',
+        'slack_allowed_user_id': '< your slack user id >',
+        'slack_text_channel_id': '< your slack text channel id >',
+
         # ChatAI設定
         'CHAT_AI_NAME': 'freeai_chat',
         'CHAT_GEMINI_MODEL': 'gemini-3.1-flash-image',

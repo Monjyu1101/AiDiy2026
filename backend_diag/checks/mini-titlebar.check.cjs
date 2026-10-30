@@ -8,7 +8,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const {createRequire}=require('node:module'),req=createRequire(path.join(__dirname,'../ui/package.json'));
 const {parse}=req('postcss'),{source}=require('./ui-components.cjs');
 const normal=parse(source('style.css')),mini=parse(source('起動/起動ミニ.css')),launcher=parse(source('アプリ起動/マイクロランチャー.css'));
-const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../../frontend_ide/src/共通表示/タイトルバー配色.css'),'utf8'));
+const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../ui/src/共通表示/タイトルバー配色.css'),'utf8'));
 const titleColor=value=>value.replace(/var\((--[\w-]+)\)/g,(_match,name)=>declarations(palette,':root')[name]);
 function declarations(css,selector){
  const values={};css.walkRules(rule=>{if(rule.selector===selector)rule.walkDecls(({prop,value})=>values[prop]=value);});return values;
@@ -24,7 +24,7 @@ function contrast(a,b){
 test('通常・ミニのタイトル31px、接続線3px、タイトル文字13pxと操作寸法を共有する',()=>{
  const title=declarations(normal,'.panel-brand'),bar=declarations(normal,'.connection-bar');
  assert.equal(title.height,'31px');assert.equal(declarations(normal,'.panel-brand strong')['font-size'],'13px');
- assert.equal(bar.height,'3px');assert.equal(bar.top,title.height);
+ assert.equal(bar.height,'3px');assert.equal(bar['border-top'],'1px solid #242424');assert.equal(bar.top,title.height);
  assert.equal(declarations(normal,'.connection-label')['font-size'],'10px');
  const controls=declarations(normal,'.window-actions button');
  assert.equal(controls.width,'28px');assert.equal(controls.height,'28px');assert.equal(controls['font-size'],'21px');
@@ -101,7 +101,7 @@ test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り�
  assert.equal(declarations(normal,'.connection-bar.online').background,'cyan');
  assert.equal(declarations(normal,'.window-actions .window-pin').color,'#778394');assert.equal(declarations(normal,'.window-actions .window-pin.pinned').color,'#c3f7ff');
  assert.match(declarations(normal,'.window-maximized .window-maximize')['box-shadow'],/var\(--aidiy-titlebar-background\)/);
- const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"../../../frontend_ide/src/共通表示/タイトルバー配色.css"'));
+ const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"./共通表示/タイトルバー配色.css"'));
 });
 
 

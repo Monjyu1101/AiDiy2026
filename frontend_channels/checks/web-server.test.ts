@@ -52,8 +52,13 @@ test('ブラウザ版サーバー: 許可した接続元の要求だけを中継
     assert.equal(style.status, 200);assert.match(await style.text(), /@import "\.\/titlebar\.css"/);
     const palette = await fetch(new URL('titlebar.css', app.url));
     assert.equal(palette.status, 200);assert.match(palette.headers.get('content-type') ?? '', /text\/css/);
-    assert.equal(await palette.text(), readFileSync(new URL('../../frontend_ide/src/共通表示/タイトルバー配色.css', import.meta.url), 'utf8'));
+    assert.equal(await palette.text(), readFileSync(new URL('../panel/titlebar.css', import.meta.url), 'utf8'));
     assert.equal((await fetch(new URL('/frontend_ide/src/共通表示/タイトルバー配色.css', app.url))).status, 404, '原本フォルダの配信を開放しない');
+    for (const file of ['AiDiy.png', 'AiDiy_discord.png']) {
+      const image = await fetch(new URL(file, app.url));assert.equal(image.status, 200);assert.equal(image.headers.get('content-type'), 'image/png');
+      assert.deepEqual(Buffer.from(await image.arrayBuffer()), readFileSync(new URL('../panel/'+file, import.meta.url)));
+    }
+    assert.equal((await fetch(new URL('/frontend_ide/host/media/AiDiy.png', app.url))).status, 404);
     assert.equal((await fetch(app.url, { headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal((await fetch(new URL('/wrong/', app.url))).status, 404);
     assert.equal((await fetch(new URL('../src/接続/接続設定.ts', app.url))).status, 404);
@@ -110,4 +115,11 @@ test('Codespaces は初回画面接続を120秒以上待っても終了しない
     assert.equal((await fetch(app.url)).status, 200);
   } finally { await app.close(); }
   assert.equal(service.stopped(), 1);
+});
+
+// ネットワーク待受なしでローカル画像の配布境界を固定する。
+test('welcome画像と配色は自moduleのassetsだけを参照する', () => {
+ const component=readFileSync(new URL('../panel/画面/接続パネル.vue',import.meta.url),'utf8');assert.ok(component.includes('src="AiDiy.png"'));assert.doesNotMatch(component,/frontend_ide\/host\/media/);
+ const server=readFileSync(new URL('../src/web-server.ts',import.meta.url),'utf8');assert.ok(server.includes("'AiDiy.png': 'image/png'"));assert.ok(server.includes("'AiDiy_discord.png': 'image/png'"));assert.doesNotMatch(server,/iconPath|frontend_ide\/host\/media/);
+ for(const file of ['scripts/build-panel.mjs','scripts/verify-panel.mjs'])assert.doesNotMatch(readFileSync(new URL('../'+file,import.meta.url),'utf8'),/frontend_ide\/src/);
 });

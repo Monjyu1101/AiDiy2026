@@ -23,11 +23,12 @@ await copyFile(path.join(root,'../static/app.css'),path.join(root,'../static/sty
 await unlink(path.join(root,'../static/app.css')); 
 await copyFile(path.join(root,'src/index.html'),path.join(root,'../static/index.html'));
 await copyFile(path.join(root,'src/アプリ起動/アプリアイコン/chrome.svg'),path.join(root,'../static/Chrome.svg'));
-await copyFile(path.join(root,'../../_icons/AiDiy.png'),path.join(root,'../static/AiDiy.png'));
-for(const id of ['avatar','ide','console','code','live','discord'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
-for(const id of ['task','team','browser'])await copyFile(path.join(root,'src/アプリ起動/アプリアイコン',`${id}.svg`),path.join(root,'../static',`AiDiy_${id}.svg`));
+await copyFile(path.join(root,'src/アプリ起動/アイコン/AiDiy.png'),path.join(root,'../static/AiDiy.png'));
+// Diag 内の配布コピーだけでビルドする。他 module の画像・CSSを読まない。
+await copyFile(path.join(root,'../icons/AiDiy_diag.png'),path.join(root,'src/アプリ起動/アイコン/AiDiy_diag.png'));
+for(const id of ['avatar','ide','console','code','live','task','team','browser','discord','slack','diag'])await copyFile(path.join(root,'src/アプリ起動/アイコン',`AiDiy_${id}.png`),path.join(root,'../static',`AiDiy_${id}.png`));
 for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.png`),path.join(root,'../static',`CLI_${id}.png`));
-for(const id of ['claude','codex','copilot','agy','grok','opencode','aidiy_hermes','vscode'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.svg`),path.join(root,'../static',`CLI_${id}.svg`));
+for(const id of ['claude','codex','copilot','agy','grok','opencode','vscode'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',`${id}.svg`),path.join(root,'../static',`CLI_${id}.svg`));
 await copyFile(path.join(root,'src/アプリ起動/CLIアイコン/LICENSE_ICONS.md'),path.join(root,'../static/LICENSE_ICONS.md'));
 for(const name of ['LICENSE-Octicons.txt','LICENSE-LobeHub.txt','LICENSE-OpenCode.txt'])await copyFile(path.join(root,'src/アプリ起動/CLIアイコン',name),path.join(root,'../static',name));
 await writeFile(path.join(root,'../static/build-manifest.json'),JSON.stringify(await manifest(),null,2)+'\n');

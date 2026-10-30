@@ -149,3 +149,16 @@ test('OpenRouter never promotes public metadata without a verified key',async()=
  const result=await probe('openrt',{...routerAuth,cache});
  assert.equal(result.認証確認,true);assert.deepEqual(result.モデル,['other/new']);
 });
+
+test('configured Slack tokens are secrets in hostile model identifiers and metadata, not providers',async()=>{
+ const secrets=['xoxb-fixture-slack-bot','xapp-fixture-slack-app'];
+ const values={openai_key_id:'fixture-openai',openrt_key_id:'fixture-openrouter',slack_bot_token:secrets[0],slack_app_token:secrets[1]};
+ const result=await probe('openai',{now,reader:reader(values),fetch:async()=>({data:[{id:'safe-model',created},...secrets.map(id=>({id,created}))]})});
+ assert.deepEqual(result.モデル,['safe-model']);
+ for(const secret of secrets)assert.ok(!JSON.stringify(result).includes(secret));
+ const cache={公開状態:'取得済',公開モデル:{safe:{model_id:'safe',作成日:secrets[0],トークン数:'prefix-'+secrets[1],モダリティ:secrets.join('/')}}};
+ const metadata=await probe('openrt',{now,reader:reader(values),cache,fetch:async()=>({data:{is_free_tier:false}})});
+ for(const secret of secrets)assert.ok(!JSON.stringify(metadata).includes(secret));
+ assert.deepEqual(metadata.モデル,['safe']);
+ for(const id of ['slack','slack_bot','slack_app'])assert.equal((await probe(id,{reader:forbidden,fetch:forbidden})).状態,'未実施');
+});
