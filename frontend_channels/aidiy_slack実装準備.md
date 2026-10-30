@@ -4,7 +4,7 @@
 > 公式文書確認: 2026-10-30。
 >
 > 今回の実装範囲は共通設定のSlack接続5欄、Diag既存処理の秘密値除去、回帰試験、
-> lifecycle入口の通常「Discord / Slack」表記、Diag外部連携のSlack Bot認証確認。Slack runtime・reader・設定画面/API・
+> lifecycle入口の通常「Discord / Slack」表記、Diag外部連携のSlack Bot認証確認とDiagランチャー登録。Slack runtime・reader・設定画面/API・
 > 実接続・Discordフォルダ移動はまだ行っていない。以下は次段階の設計と受入条件。
 
 ## 1. 独立したDiscord / Slackモジュール
@@ -140,7 +140,20 @@ Slack実APIを呼ぶ試験は今回行わない。ネイティブSlack起動コ�
 | Diag診断・表示・保存 | 同runtimeのprovider/probe、`キー設定共通/キー設定表示.mjs`、外部連携SFC、`モデル情報/integration_info.mjs` はSlack追加済み。モデル一覧とは分離 |
 | 配布asset | 各module正本SVG/PNGとDiagローカルPNGコピー。兄弟moduleのassetを実行・build・verify・testから読まない |
 | root/module lifecycleの説明 | 既存6入口は「Discord / Slack」。実処理のSlack登録とは区別する |
+| Diagランチャー | 通常・ミニ・マイクロ・右クリックにDiscord直後のSlackを登録。固定入口 `frontend_channels/slack/panel/launch.mjs` がない現状は「未導入」で起動不可、APIも503。入口の検出と明示起動の再検証だけで、本体やPATH wrapperを作った意味ではない |
 | 実行・停止・接続・会話 | `frontend_channels/launcher.py`、`discord_processes.py`、`src/接続`、`src/コード`、`panel` は現在Discord実装。Slack runtime、Socket Mode、起動コマンド、終了処理への対応はこの計画の後続工程 |
 | Discord固有 | voice channel / Opus / Gateway / guild数値ID規則はSlackへ機械的に複製しない。Slackのworkspace/user/channel IDは独自規則で検証する |
 
 Diag確認は [公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/) の認証確認のみ。設定画面・新規設定API・メッセージ送信・Socket Mode接続は追加していない。
+
+
+### runtime導入時のgrep確認先（Diagの登録だけでは完了しない）
+
+- PATH: `frontend_channels/launcher.py` のwrapper生成・所有者確認・削除、root `_setup.py` の依存/build/refresh/`--launchers-only`/完了一覧。独立Slackの入口が実在する段階で登録する。
+- 起動: `_start.py` のchoices/環境/起動/一覧、`scripts/起動対象.json`、`scripts/_diag_start.py`。現在の6入口の「Discord / Slack」は案内表記で、Slackサービス登録とは別。
+- 停止: `_cleanup.py`、`scripts/_setup_processes.py`、`frontend_channels/discord_processes.py`。Slack独自PID/子プロセス/keep条件/owner付きwrapper除去を実装し、Discord削除や親フォルダ全体の再帰掃除に巻き込まない。
+- Native: 共有helperを採用するなら `frontend_ide/host/scripts/single-instance.cjs` の対象名/lock/port、`frontend_ide/デスクトップ/{長押し窓移動,code-drag}.cjs` の `movableKinds` へSlackの独立名を設計する。Discordの識別子を流用しない。
+- 独立module: own package/deps/lock/setup/start/cleanup/panelを用意し、今の親packageやDiscord出力を共有しない。`.gitignore` の現node_modules/temp指定だけでは将来の `slack/out` を除外しないため、実際の生成物/profileだけを精密に追加する。
+- `command_hermes` 自身のDiscord/Slack pluginは別製品境界の既存adapterであり、`frontend_channels/slack` の完成を意味しない。過去資料・診断catalogの固定inventory・voice/Opus等のDiscord固有語を一括置換しない。
+
+回帰は未導入/入口がdirectory/入口削除直後/連打/別Discord process/未認証/API直呼びを含む。通常・ミニ・マイクロのローカルPNG/順序と、未導入Slackの右クリック無効化も確認する。mock入口を実行せずspawn引数だけを検証し、実Slack接続やGUI確認とは区別する。

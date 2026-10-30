@@ -11,11 +11,11 @@ const {release}=require('node:os');
 const glass=process.platform==='win32'&&Number(release().split('.')[2])>=22621;
 function icon(key){
  const [kind,id]=key.split(':');
- const name=kind==='cli'?`CLI_${id}.svg`:id==='chrome'?'Chrome.svg':`AiDiy_${id}.${['browser','task','team'].includes(id)?'svg':'png'}`;
+ const name=kind==='cli'?`CLI_${id}.${id==='aidiy_hermes'?'png':'svg'}`:id==='chrome'?'Chrome.svg':`AiDiy_${id}.png`;
  if(!/^[a-zA-Z_]+\.(svg|png)$/.test(name))return '';
  try{if(name.endsWith('.png'))return nativeImage.createFromPath(path.join(__dirname,'../static',name)).resize({width:32,height:32}).toDataURL();return `data:image/${name.endsWith('.svg')?'svg+xml':'png'};base64,${readFileSync(path.join(__dirname,'../static',name)).toString('base64')}`;}catch{return '';}
 }
-const aidiyKeys=new Set(['app:avatar','app:task','app:team','app:ide','app:console','app:code','app:live','app:browser','cli:aidiy_hermes','app:discord']);
+const aidiyKeys=new Set(['app:avatar','app:task','app:team','app:ide','app:console','app:code','app:live','app:browser','cli:aidiy_hermes','app:discord','app:slack']);
 function メニュー範囲(cursor,area,items){
  const left=items.filter(item=>aidiyKeys.has(item.key)).length,rows=Math.max(left,items.length-left,1);
  const width=Math.min(264,area.width),height=Math.min(122+rows*32,area.height);
@@ -35,7 +35,7 @@ function アイコンメニューを作成(parent){
   popup=target;target.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
   const action=(event,value)=>{
    if(event.sender!==target.webContents||event.senderFrame!==target.webContents.mainFrame)return;
-   if(['mini','normal','close','dismiss'].includes(value)||items.some(item=>item.key===value)){
+   if(['mini','normal','close','dismiss'].includes(value)||items.some(item=>item.key===value&&item.enabled!==false)){
     close();if(value==='close')parent.close();else if(value==='mini'||value==='normal')send(value);else if(value!=='dismiss')send({type:'launch',key:value});
    }
   };

@@ -16,7 +16,7 @@ import {createTaskTeamStatus} from './TaskTeam接続.mjs';
 
 const ROOT=fileURLToPath(new URL('../../',import.meta.url));
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-export const アプリ一覧=Object.freeze(['avatar','task','team','ide','console','code','live','discord','chrome','browser'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',console:'Console',code:'Code',live:'Live',discord:'Discord',chrome:'Chrome',browser:'aidiy_browser'})[id],単一起動:['avatar','live','discord'].includes(id)})));
+export const アプリ一覧=Object.freeze(['avatar','task','team','ide','console','code','live','discord','slack','chrome','browser'].map(id=>Object.freeze({id,名前:({avatar:'Avatar',task:'Task',team:'Team',ide:'IDE',console:'Console',code:'Code',live:'Live',discord:'Discord',slack:'Slack',chrome:'Chrome',browser:'aidiy_browser'})[id],単一起動:['avatar','live','discord','slack'].includes(id)})));
 const execute=(command,args,options={})=>new Promise((resolve,reject)=>execFile(command,args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:8*1024*1024,...options},(error,stdout)=>error?reject(error):resolve(stdout)));
 
 // 明示起動時だけ取得する。タスクのコマンドラインや一覧を画面・ログへ返さない。
@@ -37,16 +37,19 @@ export function アプリタスク(id,{command=''}){
  if(id==='avatar')return entry('frontend_avatar/(?:launch\\.mjs|_start\\.py|dist-electron/main\\.js)')||entry('frontend_avatar/node_modules/[^\\s"\']*electron[^\\s"\']*')&&/\s\.\s*$/.test(text);
  if(id==='live')return (entry('frontend_ide/desktop\\.cjs')||entry('frontend_ide/launch\\.mjs'))&&/--app(?:=|\s+)live(?:[\s"']|$)/.test(text)||entry('frontend_ide/(?:host/)?aidiy_live/(?:launch\\.mjs|desktop\\.cjs)');
  if(id==='discord')return entry('frontend_channels/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
+ if(id==='slack')return entry('frontend_channels/slack/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
  return false;
 }
 export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus,portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}={}){
  const pending=new Set();
+ const slackEntry=join(root,'frontend_channels','slack','panel','launch.mjs');
+ async function slackAvailability(){try{if((await stat(slackEntry)).isFile())return {利用可能:true,無効理由:'',無効表示:''};}catch{}return {利用可能:false,無効理由:'Slack の起動ファイルが見つかりません。セットアップを確認してください。',無効表示:'未導入'};}
  const checkTaskTeam=taskTeamStatus||createTaskTeamStatus({root});
  const taskTeam=id=>id==='task'||id==='team';
  const availability=async()=>{try{return await checkTaskTeam();}catch{return {利用可能:false,無効理由:'Task / Team バックエンドを確認できません。'};}};
  async function browserAvailability(){try{const ports=await portStatusFn();if(ports.対象.some(item=>item.id==='tools'&&item.開放===true))return {利用可能:true,無効理由:''};}catch{}return {利用可能:false,無効理由:'Tools / MCP が稼働中の場合だけ開けます。'};}
  async function catalog(){
-  const state=await availability(),browserState=await browserAvailability();
+  const state=await availability(),browserState=await browserAvailability(),slackState=await slackAvailability();
   let chromeState={利用可能:false,無効理由:'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。'};
   try{const ports=await portStatusFn();if(['tools','web'].every(id=>ports.対象.some(item=>item.id===id&&item.開放===true)))chromeState={利用可能:true,無効理由:''};}catch{}
   const [,config]=await readConfig(()=>readFile(join(root,'_config','AiDiy_key.json'),'utf8'));
@@ -57,7 +60,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   // 表示は設定値そのまま。起動引数だけAIコアと同じbackend_server基準で解決する。
   // 空欄・制御文字・ドライブ相対値から別のフォルダを補完しない。
   const 起動フォルダ=!normalized||フォルダ.length>4096||/[\u0000-\u001f\u007f]/.test(フォルダ)||(/^[a-z]:/i.test(normalized)&&!isAbsolute(normalized))?'':resolve(root,'backend_server',normalized);
-  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='chrome'?{...app,...chromeState}:app.id==='browser'?{...app,...browserState}:app),フォルダ,起動フォルダ};
+  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='slack'?{...app,...slackState}:app.id==='chrome'?{...app,...chromeState}:app.id==='browser'?{...app,...browserState}:app),フォルダ,起動フォルダ};
  }
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
@@ -81,6 +84,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   if(pending.has(id))throw fail('このアプリの起動処理中です。',409);
   pending.add(id);
   try{
+   if(id==='slack'){const state=await slackAvailability();if(!state.利用可能)throw fail(state.無効理由,503);}
    if(id==='browser'){const state=await browserAvailability();if(!state.利用可能)throw fail(state.無効理由,409);}
    if(taskTeam(id)){const state=await availability();if(state.利用可能!==true)throw fail(state.無効理由||'Task / Team バックエンドを起動してください。',409);}
    if(app.単一起動){
@@ -90,6 +94,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
    let command=node,args,cwd=path;
    if(id==='avatar'){args=[join(root,'frontend_avatar','launch.mjs')];cwd=root;}
    else if(id==='discord')args=[join(root,'frontend_channels','panel','launch.mjs'),'--project',path];
+   else if(id==='slack')args=[slackEntry,'--project',path];
    else args=[join(root,'frontend_ide','launch.mjs'),'--app',id,'--project',path,...(id==='live'?[]:['--new-window'])];
    const env={...process.env,PYTHONIOENCODING:'utf-8',PYTHONUNBUFFERED:'1'};
    for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(key))delete env[key];

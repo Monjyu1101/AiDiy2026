@@ -16,15 +16,15 @@ import {createServer} from '../diag_main.mjs';
 async function fixture(t){
  const root=await mkdtemp(join(tmpdir(),'diag-app-test-')),project=join(root,'日本語 空白 project');await mkdir(project);
  t.after(()=>rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100}));
- const calls=[],manager=createAppLauncher({root,pythonCommand:'fixture-python',tasks:async()=>[],spawnFn(command,args,options){
+ const calls=[],manager=createAppLauncher({root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),pythonCommand:'fixture-python',tasks:async()=>[],spawnFn(command,args,options){
   const child=new EventEmitter();child.unref=()=>{child.unreferenced=true;};calls.push({command,args,options,child});queueMicrotask(()=>child.emit('spawn'));return child;
  }});
  return {root,project:await realpath(project),manager,calls};
 }
-test('10 fixed apps; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
+test('11 fixed apps; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
  const f=await fixture(t);let reads=0;
- const manager=createAppLauncher({tasks:async()=>{reads++;return [];}});
- assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord','chrome','browser']);
+ const manager=createAppLauncher({root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return [];}});
+ assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord','slack','chrome','browser']);
  for(const id of ['avatar','ide','console','code','live','discord'])for(const path of ['',undefined,'relative',join(f.root,'missing')])await assert.rejects(manager.launch(id,path),{status:400});
  await writeFile(join(f.root,'file'),'x');await assert.rejects(manager.launch('avatar',join(f.root,'file')),{status:400});
  await assert.rejects(manager.launch('arbitrary-command',f.project),{status:400});assert.equal(reads,0);
@@ -43,7 +43,7 @@ test('project argument/cwd remain exact; Avatar retains app base; detached logs 
 test('singleton checks run only on click, block existing tasks, permit IDE/Console/Code repeats and serialize races',async t=>{
  const f=await fixture(t);let reads=0,calls=0,release;
  const tasks=[{command:'python "C:/AiDiy/frontend_avatar/_start.py"'},{command:'electron "C:/AiDiy/frontend_ide/desktop.cjs" --app live'},{command:'node "/a/frontend_channels/src/web-server.ts"'}];
- const manager=createAppLauncher({tasks:async()=>{reads++;return tasks;},spawnFn(){calls++;throw Error();}});
+ const manager=createAppLauncher({root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return tasks;},spawnFn(){calls++;throw Error();}});
  manager.catalog();assert.equal(reads,0);
  for(const id of ['avatar','live','discord'])assert.equal((await manager.launch(id,f.project)).起動済み,true);
  assert.equal(calls,0);assert.equal(reads,3);

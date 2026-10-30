@@ -7,14 +7,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
-test('Console title keeps the standard band and bright green path glyphs', async () => {
+test('Console title keeps the standard band and white path glyphs on an orange band', async () => {
   const svg = await readFile(new URL('aidiy_console/AiDiy_console.svg', root), 'utf8');
   assert.match(svg, /width="512"/); assert.match(svg, /height="512"/);
   assert.match(svg, /viewBox="0 0 512 512"/);
   assert.match(svg, /<title[^>]*>AiDiy CONSOLE<\/title>/);
-  assert.match(svg, /fill="#D3D3D3"/i);
+  assert.match(svg, /fill="#C15308"/i);
   assert.match(svg, /aria-label="CONSOLE"/);
-  assert.match(svg, /fill:#00d040/i);
+  assert.match(svg, /fill:#FFFFFF/i);
   assert.doesNotMatch(svg, /<text\b/);
 });
 test('Console title PNG is identical in its owner and local IDE distribution', async () => {

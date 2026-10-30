@@ -11,7 +11,7 @@
 - SVG 原本 SHA-256: `74ad401c6487a0dc5af1f6b2935556ab2d3553ae45effc7e1697b4d117d046b6`。
 - PNG 原本 SHA-256: `7ac29e00cd66e549acc2ea6a99a813f92cb23a6d165293be6959845670f0c5a4`。
 - 配布元 README: `upstream/README-VSCode.txt`（全バイト無改変）、SHA-256: `e6d125cce511516b347d6b66b893e650a6a412fb9124231d9b008e1dc3a68d7e`。
-- 加工: 原本 SVG の形状・色・100×100 viewBox を保持し、120×120px の外枠内 x=18、y=3、84×84px に等比配置。下部 x=0、y=90、120×30px に青色 `#1e3a5f` の帯を追加し、白 `#ffffff`、22px 太字、Arial / Liberation Sans / sans-serif の VSCODE を中央配置。CLI の白帯・黒字とは区別します。表示用 PNG は合成 SVG から Inkscape で120×120px RGBAへ変換しています。公式原本は upstream に無改変で保持します。
+- 加工: 原本 SVG の形状・色・100×100 viewBox を保持し、120×120px の外枠内 x=18、y=3、84×84px に等比配置。下部 x=0、y=90、120×30px に青色 `#1e3a5f` の帯を追加し、白 `#ffffff`、22px 太字、Arial / Liberation Sans / sans-serif の VSCODE を中央配置。帯の内側だけに青枠 `#2F9BFF`（2px）を追加しています。CLI の白帯・黒字とは区別します。表示用 PNG は合成 SVG から Inkscape で120×120px RGBAへ変換しています。公式原本は upstream に無改変で保持します。
 - 権利: Visual Studio Code、VS Code、アイコンは Microsoft Corporation の商標です。公式配布元は All rights reserved と記載しており、本フォルダの他素材の MIT 許諾を適用しません。
 - 公式ブランド指針は、アイコンの変形・文字や背景の追加・名称とのロゴ一体化・自社製品のロゴとしての利用を認めていません。今回の名称帯を含む合成画像について、公式指針への適合や権利者の個別許諾を確認したという意味ではありません。包括的な商標利用許諾や Microsoft の承認・提携を意味しません。
 - 公式指針の操作ボタンの項は「Open in VS Code」形式を案内しています。配布時も最新の指針を確認し、対象外の用途は権利者へ確認してください。
@@ -32,7 +32,7 @@
 - 対象: `aidiy_hermes.png`（Diag 配布コピー）。合成アイコンの正本は [`command_hermes/assets/AiDiy_hermes.svg`](../../../../../command_hermes/assets/AiDiy_hermes.svg) / `.png`、人物の共通原画は [`_icons/AiDiy.png`](../../../../../_icons/AiDiy.png) です。
 - 引用元: リポジトリ既存の [`_icons/AiDiy.png`](../../../../../_icons/AiDiy.png)。`frontend_web/public/icons/AiDiy.png` および `frontend_avatar/public/icons/AiDiy.png` ともバイト単位で同一です。スクリーンショット由来ではありません。
 - 原本形式: PNG、512×512px、RGBA。SHA-256: `3b580e91b8e91a2accd55675c07f2b2b8c3c9cf85677da804ef6b74ae8267042`。
-- 加工: SVG の人物部分は原本 PNG の全バイトを data URI として無改変で埋め込んだラスター画像です。人物は等比縮小のみで、ベクター化・トレース・色変更・描き直し・切り抜きはしていません。原本を120×120px全面へ配置し、下部25%へ白帯・黒字の HERMES を1つ重ねます。文字は23pxで左右に余白を設けます。表示用 PNG は合成 SVG から生成した120×120pxの派生画像であり、原本とバイト同一ではありません。
+- 加工: 人物と既存字形を保ち、下部120×30pxの帯は黒 `#000000`、文字と帯だけの2px枠は金色 `#D4AF37`。字形は正本SVG内の固定埋込PNGをSVG filterで再着色し、不足フォントによる変形を避けます。DiagはPNGコピーだけを配布し、通常buildから正本moduleを参照しません。
 - リポジトリ内の利用条件: [AiDiy 公開利用ライセンス v1.1](../../../../../LICENSE)、`Copyright (c) 2014-2026 Mitsuo KONDOU and contributors`。非商用利用と再配布条件はライセンス本文に従ってください。画像固有の別ライセンス・生成元の追加証跡はこの作業では確認できていません。独立した外部再配布の権利確認が完了したという意味ではありません。
 - `aidiy_hermes` に AiDiy アイコンを使う指定に従った再利用です。別製品の公式ロゴと誤認させる加工はしていません。
 

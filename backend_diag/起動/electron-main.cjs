@@ -74,7 +74,7 @@ async function start(value) {
   ipcMain.handle('diag:window',(event,action,value)=>{
     if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame)return false;
     if(action==='microMenu'){
-      if(!micro.active||opening||displaySwitch||!Array.isArray(value)||value.length>32||value.some(item=>!item||typeof item.key!=='string'||!/^(app|cli):[a-z_]+$/.test(item.key)||typeof item.label!=='string'||item.label.length>100))return false;
+      if(!micro.active||opening||displaySwitch||!Array.isArray(value)||value.length>32||value.some(item=>!item||typeof item.key!=='string'||!/^(app|cli):[a-z_]+$/.test(item.key)||typeof item.label!=='string'||item.label.length>100||item.enabled!==undefined&&typeof item.enabled!=='boolean'||item.reason!==undefined&&(typeof item.reason!=='string'||item.reason.length>200)))return false;
       const send=action=>{if(!window.isDestroyed())window.webContents.send('diag:micro-menu',action);};
       iconMenu.open(value,send);return true;
     }

@@ -316,3 +316,12 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 - `node --test backend_diag/checks/slack-integration-ui.check.mjs` はローカルVue描画とmockで選択・未設定・未認証・待機・二重押し・遅い応答・FIFO・保存先を確認します。backendの `model-probe` / `key-status` / `server` / `headless` 回帰も実施します。実Slack APIや実GUIは試験とは別です。
 
 固定メソッドと認証応答の根拠: [Slack公式 auth.test](https://docs.slack.dev/reference/methods/auth.test/)。Discord固有voice/GatewayとSlack transportの未実装箇所は [`aidiy_slack実装準備.md`](../../frontend_channels/aidiy_slack実装準備.md) の対応表を参照してください。
+
+
+### Slackのランチャー登録と未導入時
+
+通常・ミニ・マイクロ・右クリックのSlackはDiscordの直後に並ぶ。アイコンはDiag内の `AiDiy_slack.png` コピーだけを参照する。`frontend_channels/slack/panel/launch.mjs` が通常ファイルとして見つからなければ「未導入」として起動不可、認証済APIの直接要求も503で返し、process探索・ログ作成・spawnをしない。通常表示に特別な「準備中」ラベルは加えない。
+
+現状Slackの接続runtimeは未実装で、ランチャー登録やBot認証OKは接続成功を意味しない。将来入口を実装すると、明示クリック時に同じ実在確認を再実行し、Slack専用のprocess識別を経て固定argvで起動を要求する。通常のbuild/verify/testが兄弟moduleの画像へ依存しない点は維持する。全体の後工程は `frontend_channels/aidiy_slack実装準備.md` のgrep確認先を参照。
+
+局所確認: `node --test backend_diag/checks/slack-launcher.check.mjs backend_diag/checks/micro-project.check.cjs backend_diag/checks/icon-menu.check.cjs`。すべてmockで実アプリやSlack APIを起動しない。

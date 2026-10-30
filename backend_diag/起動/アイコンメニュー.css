@@ -30,3 +30,5 @@ header small,.caption,footer,.dot,.size-icon{display:none}
 .glass main{margin:0;min-height:100vh;background:linear-gradient(135deg,#243b589c,#101c30b5 70%)}
 
 header strong{font-size:11px;white-space:nowrap;letter-spacing:0}.main{gap:3px}.sizes button{padding:5px 4px}
+
+.app-list button:disabled{opacity:.55;cursor:not-allowed;background:none;transform:none}

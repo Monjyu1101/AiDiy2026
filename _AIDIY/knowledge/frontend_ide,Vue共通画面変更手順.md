@@ -631,3 +631,12 @@ rendererの本文矩形には同時に測定した小数のroot幅・高さ、fu
 ### Windowsの最前面ONが実窓へ反映されない場合
 
 最大化・全画面遷移などの後、ElectronへONを再指定しても実状態がOFFのままになる場合があります。共有の `デスクトップ/最前面ピン.cjs` はON指定直後の `isAlwaysOnTop()` がfalseの時だけ、一度OFFにして同じ層でONへ戻します。定期タイマーやフォーカス奪取は追加しません。`checks/window-pin.test.mjs` の状態回帰に加え、`scripts/check-browser-window.mjs` で最大化から全画面への実遷移、`scripts/check-ide-pin-order.mjs` でWin32の最前面属性と重なり順を確認します。
+
+
+### 名称帯の配色と元画像の保持
+
+Taskの帯/文字は `#0F5C3A` / `#7DD3FC`、Teamはその反転（4.82:1）。Consoleは `#C15308` / 白（4.66:1）、Browserは `#F5A9C8` / 黒。AvatarはIDEと同じ `#7C3AED` / 白。Hermesは黒地に `#D4AF37` の文字・帯だけの枠、VSCodeは既存青帯/白文字を保ち帯だけ `#2F9BFF` の枠を使う。
+
+帯は従来の下25%、原画・透過・寸法は変更しない。SVGがpathならfill/strokeだけを変更する。Avatar/Hermesは環境フォントで旧字形が変わるため、正本SVG内の `caption-source` に従来PNGを固定埋込し、`caption-ink` の色変換filterと帯clipで字形を再着色する（画像ピクセルを編集しない）。Hermesの縮小済原画も同じ固定素材で保持する。Browserの既存描画に一致する字形はpathに固定済み。通常buildはPNGを使い、Inkscapeやフォントを要求しない。
+
+素材変更時だけ正本SVGをheadless InkscapeでPNGへ描画し、上部原画のRGBA不変・帯色対比・帯だけの枠を検証する。各ownerのSVG/PNGを正本とし、IDE内publicコピーはIDE build、Diag内PNGコピーは変更時の明示コピーで追従する。Diag通常build/verify/testsが他moduleの素材へ依存する仕組みを追加しない。VSCode upstream原本は変更しない。
