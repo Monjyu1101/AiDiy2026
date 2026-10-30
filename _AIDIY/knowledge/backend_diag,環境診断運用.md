@@ -98,10 +98,11 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 
 - 管理APIは `POST api/Tools/enabled` と `POST api/Tools/defaults` の2つ。いずれも `{token, data}` を送ります。`data: {}` は実行時設定の読取だけです。オン・オフの切替と「適用のみ」は `write: false`、明示的な「保存」だけ `write: true` にします。`data.saved: true` を確認してから保存完了と表示します。
 - 左に登録済みToolのオン・オフ、代表テスト、状態を表示します。OFFでも登録は残り「サービス外」です。`available: false` の操作は無効にし、依存機能が無い状態をONと誤認させません。保存は変更したIDだけを送り、対象外Toolを勝手に有効化しません。
-- 右に選択Toolの既定値とテスト条件を表示します。変更候補はサーバーの `schema` を使用し、秘密情報や任意設定項目を編集対象にしません。オン・オフの保存と既定値の保存は別操作として成功・失敗を表示します。
+- AIモデルと同じ見出し・テストボタン・状態バッジを使い、右に選択Toolの既定値・テスト条件・結果を表示します。結果は未実施でも応答欄を表示し、未対応／OFF／利用不可でも理由と右ペインを残します。変更候補はサーバーの `schema` を使用し、秘密情報や任意設定項目を編集対象にしません。オン・オフの保存と既定値の保存は別操作として成功・失敗を表示します。
 - 代表テストは初版ではChromeの専用セッション `diag-tools-test` の起動・終了だけです。表示あり／headlessを選べます。既存APIは稼働中セッションを再利用するため、条件変更時は専用ブラウザを明示終了してから再テストします。固定中継 `api/Tools/representative` から既存Tool APIを呼び、毎回Core認証と有効・利用可能状態を確認します。管理APIの追加ではなく、任意URL・コマンド・セッション名も受け付けません。他Toolのボタンには未対応理由を表示し、状態読取だけを機能テスト成功にしません。
 - 全テスト・初期表示から代表機能を自動実行しません。同時操作／二重押しを抑止し、タブを離れた場合はテスト応答の待機を中止します。開始済みの実操作が取り消せるとは表示しません。
-- `node --test backend_diag/checks/tools-panel.check.cjs backend_diag/checks/tools-settings-api.check.mjs backend_diag/checks/compact-tabs.check.cjs` はモックで検証し、実Chromeや有料APIは呼びません。UI変更後は既存手順で配布build・manifest照合を実施します。
+- 画面の残り高さは `.tools-scroll` が `flex:1 1 auto!important; min-height:0` で受け、認証後の一覧・詳細は各ペイン内だけでスクロールします。共通の `#app>.panel>*{flex:none}` に戻さないでください。701px以上は左右2列、700px以下は一覧40%・内容を残り高さへ割り当て、長い一覧の下に詳細が隠れないようにします。Tool変更時は右だけを先頭へ戻し、一覧のスクロール位置は維持します。ログイン画面も内部スクロールで低い画面に対応します。
+- `node --test backend_diag/checks/tools-layout.check.cjs backend_diag/checks/tools-panel.check.cjs backend_diag/checks/tools-settings-api.check.mjs backend_diag/checks/compact-tabs.check.cjs` はモックで検証し、実Chromeや有料APIは呼びません。UI変更後は既存手順で配布build・manifest照合を実施します。
 
 タブは文字サイズを維持して上下・左右の余白と間隔を詰め、800px以下では折返しを維持します。行を非表示にしたり横切れでアクセスできなくしたりしないでください。
 
