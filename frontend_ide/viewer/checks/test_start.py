@@ -29,6 +29,7 @@ cleanup = load_root("_cleanup")
 
 class StartTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(dev, "check_node_environment", return_value=(True, "fixture Node")))
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
 
     def test_launch_is_detached_with_file_logs_and_auto_port(self):

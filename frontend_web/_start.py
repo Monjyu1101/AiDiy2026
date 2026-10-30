@@ -71,6 +71,8 @@ THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_WEB_DIR = THIS_DIR
 PORT_WEB = 8090
 FRONTEND_COMMAND = "npm"
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import check_project_node_runtime
 
 
 def get_npm_command() -> str | None:
@@ -83,7 +85,7 @@ def get_npm_command() -> str | None:
         except subprocess.TimeoutExpired:
             print_warning(f"{candidate} のバージョン確認が15秒でタイムアウトしました。")
             continue
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        except (subprocess.CalledProcessError, OSError):
             continue
     return None
 
@@ -102,10 +104,18 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
             return False, f"node_modules が空です: {node_modules}"
     except Exception as exc:
         return False, f"node_modules の確認でエラー: {exc}"
+    for package in ("vue", "vite"):
+        if not (node_modules / package / "package.json").is_file():
+            return False, f'{package} が未準備です。python "{FRONTEND_WEB_DIR / "_setup.py"}" を実行してください。'
     return True, str(node_modules)
 
 
 def check_environment() -> tuple[bool, str]:
+    ok, detail = check_project_node_runtime(FRONTEND_WEB_DIR, dependency="vite", fallback="^20.19.0 || >=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        return False, detail
     if get_npm_command() is None:
         return False, "npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)"
     return check_npm_project_environment(FRONTEND_WEB_DIR)
@@ -277,7 +287,7 @@ def main() -> None:
     ok, detail = check_environment()
     if not ok:
         print_error(f"環境が準備されていません: {detail}")
-        print_info(f"  対応例: {get_npm_command() or FRONTEND_COMMAND} install")
+        print_info(f'  対応例: python "{FRONTEND_WEB_DIR / "_setup.py"}"')
         sys.exit(1)
     print_success("環境確認: OK")
 

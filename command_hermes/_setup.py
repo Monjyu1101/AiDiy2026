@@ -32,9 +32,10 @@ if sys.platform == "win32":
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import python_requirement
 BACKEND_HERMES_DIR = THIS_DIR
 BACKEND_HERMES_ENV = ".venv"
-sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
 from _setup_path import ensure_launcher_path
 
 AUTO_MODE = False
@@ -167,6 +168,13 @@ def setup(choices: dict | None = None) -> bool:
     if not req_file.exists():
         print_error(f"{label}: pyproject.toml が見つかりません: {req_file}")
         return False
+
+    try:
+        requirement = python_requirement(BACKEND_HERMES_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"{label}: Python 実行条件を確認できません。uv の確認を続行します: {exc}")
+    else:
+        print_info(f"実行環境: Python {requirement}（pyproject.toml。uv が互換 Python を選択します）")
 
     venv_dir = BACKEND_HERMES_DIR / BACKEND_HERMES_ENV
     if not venv_dir.exists():

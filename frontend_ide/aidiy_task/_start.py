@@ -13,10 +13,11 @@ shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
 
 def check_environment():
-    if shared.node_command() is None:
-        return False, 'Node.jsが見つかりません。'
+    ok, detail = shared.check_node_environment()
+    if not ok:
+        return False, detail
     return ((True, 'Vue Task') if (ROOT.parent / 'dist/taskteam.js').is_file()
-            else (False, 'Vue画面が未準備です。'))
+            else (False, f'Vue画面が未準備です。python "{ROOT.parent / "_setup.py"}" を実行してください。'))
 
 def start(open_window=None):
     return shared.start(open_window, kind='task')

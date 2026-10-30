@@ -15,11 +15,18 @@ import subprocess
 import sys
 
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
+from _runtime_requirements import check_project_node_runtime
 sys.path.insert(0, str(THIS_DIR / 'scripts'))
 from standalone_processes import standalone_tree_pids, stop_standalone
 
 
 def launch_command(module: str) -> list[str]:
+    ok, detail = check_project_node_runtime(THIS_DIR, dependency="electron", fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        raise RuntimeError(detail)
     if module not in ('code', 'live'):
         raise ValueError(f'未対応のフロントエンドです: {module}')
     node = shutil.which('node')
@@ -35,12 +42,12 @@ def check_environment(module: str) -> tuple[bool, str]:
     except (OSError, RuntimeError) as error:
         return False, str(error)
     if not (THIS_DIR / f'dist/aidiy_{module}/server.cjs').is_file() or not (THIS_DIR.parent.parent / 'frontend_ide/dist/app.js').is_file():
-        return False, '画面が未準備です。python frontend_ide/host/_setup.py を実行してください。'
+        return False, f'画面が未準備です。python "{THIS_DIR / "_setup.py"}" を実行してください。'
     sys.path.insert(0, str(THIS_DIR.parent.parent / 'scripts'))
     from _setup_electron import electron_binary_ready
-    if not electron_binary_ready(THIS_DIR):
-        return False, 'Electron が未準備です。python frontend_ide/host/_setup.py を実行してください。'
-    return True, f'aidiy_{module} / Electron'
+    if any(electron_binary_ready(folder) for folder in (THIS_DIR.parent / 'viewer', THIS_DIR)):
+        return True, f'aidiy_{module} / Electron'
+    return True, f'aidiy_{module} / Web へ切替（専用ウィンドウの復旧: python "{THIS_DIR.parent / "_setup.py"}"）'
 
 
 def _start(module: str, args: list[str]) -> subprocess.Popen[bytes]:

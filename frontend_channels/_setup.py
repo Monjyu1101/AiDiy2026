@@ -25,6 +25,7 @@ _launcher_spec.loader.exec_module(_launcher)
 install_launcher = _launcher.install_launcher
 sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
 from _setup_electron import prepare_electron_binary, _runtime_in_use
+from _runtime_requirements import check_project_node_runtime
 from _setup_processes import snapshot, process_role
 from _cleanup_processes import process_arguments
 from discord_processes import is_discord_process
@@ -79,7 +80,7 @@ def setup(choices=None) -> bool:
     del choices
     print_header("Discord セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
-    print_info("対象: Discord / Node.js / TypeScript / Electron")
+    print_info("対象: Discord / Node.js / Vue 3 / TypeScript / Electron")
     # npm ci は node_modules を削除するため、Electron の準備より先に確認する。
     try:
         if _discord_in_use():
@@ -88,14 +89,21 @@ def setup(choices=None) -> bool:
     except (OSError, ValueError, subprocess.SubprocessError):
         print_error('Discord の停止状態を確認できないためセットアップを中止します。依存・設定は変更しません。')
         return False
+    ok, detail = check_project_node_runtime(THIS_DIR, fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
+        return False
+
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.12 以降と npm を導入してください。")
         return False
     try:
         env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
-        print_info(f"実行中: {npm} ci --no-fund --no-audit")
-        subprocess.run([npm, "ci", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
+        print_info(f"実行中: {npm} ci --include=dev --no-fund --no-audit")
+        subprocess.run([npm, "ci", "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
         # ロック済みの旧版に留めず、他のフロントエンドと同じ宣言範囲で更新する。
         print_info(f"実行中: {npm} run update:electron")
         subprocess.run([npm, "run", "update:electron"], cwd=THIS_DIR, env=env, check=True)

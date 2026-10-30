@@ -28,6 +28,7 @@ import _setup_electron as common
 
 class ViewerSetupTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(viewer, "check_project_node_runtime", return_value=(True, "fixture Node")))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.project = Path(temporary.name)
@@ -35,6 +36,7 @@ class ViewerSetupTests(unittest.TestCase):
         self.electron = self.target / 'node_modules/electron'
         self.electron.mkdir(parents=True)
         (self.electron / 'package.json').write_text(json.dumps({'version': '44.7.0'}), encoding='utf-8')
+        (self.target / 'package.json').write_text(json.dumps({'engines': {'node': '>=22.13'}}), encoding='utf-8')
         (self.target / 'package-lock.json').write_text('{}', encoding='utf-8')
         for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws'):
             (self.target.parent / 'node_modules' / name).mkdir(parents=True)
@@ -323,7 +325,7 @@ class SharedUiSetupTests(unittest.TestCase):
         spec.loader.exec_module(shared)
         for guard_result in (True, False, None):
             with self.subTest(guard_result=guard_result), \
-                    patch.object(shared.shutil, 'which', return_value='npm'), \
+                    patch.object(shared, 'check_project_node_runtime', return_value=(True, 'fixture Node')), patch.object(shared.shutil, 'which', return_value='npm'), \
                     patch.object(shared, 'frontend_dependency_guard', return_value=guard_result) as guard, \
                     patch.object(shared.subprocess, 'run') as run:
                 self.assertEqual(shared.prepare(), guard_result is not False)

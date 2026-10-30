@@ -16,6 +16,7 @@
 ブラウザ表示・自動再起動監視・一括停止を一元管理します。
 
 フォルダ別スクリプト:
+- backend_diag/_start.py     check_environment / start / run_headless / kill_ports
 - backend_local/_start.py    PORT_LOCAL / check_environment / start / kill_ports
 - backend_tools/_start.py    PORT_TOOLS / check_environment / start / kill_ports
 - backend_server/_start.py   PORT_CORE / PORT_APPS / check_environment / start_core / start_apps
@@ -675,7 +676,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(local): OK ({detail})")
         else:
             print_error(f"バックエンド(local): 未準備 ({detail})")
-            print_info("  対応例: cd backend_local && uv sync --upgrade")
+            print_info(f'  対応例: python "{BASE_DIR / "backend_local" / "_setup.py"}"')
             has_error = True
 
     if backend_tools_enabled:
@@ -684,7 +685,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(tools): OK ({detail})")
         else:
             print_error(f"バックエンド(tools): 未準備 ({detail})")
-            print_info("  対応例: cd backend_tools && uv sync --upgrade")
+            print_info(f'  対応例: python "{BASE_DIR / "backend_tools" / "_setup.py"}"')
             has_error = True
 
     if backend_enabled:
@@ -693,7 +694,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(core,apps): OK ({detail})")
         else:
             print_error(f"バックエンド(core,apps): 未準備 ({detail})")
-            print_info("  対応例: cd backend_server && uv sync --upgrade")
+            print_info(f'  対応例: python "{BASE_DIR / "backend_server" / "_setup.py"}"')
             has_error = True
 
     if backend_taskteam_enabled:
@@ -702,7 +703,7 @@ def validate_initial_environment(
             print_success(f"バックエンド(task,team): OK ({detail})")
         else:
             print_error(f"バックエンド(task,team): 未準備 ({detail})")
-            print_info("  対応例: cd backend_taskteam && uv sync --upgrade")
+            print_info(f'  対応例: python "{BASE_DIR / "backend_taskteam" / "_setup.py"}"')
             has_error = True
 
     if web_enabled or avatar_enabled:
@@ -715,19 +716,19 @@ def validate_initial_environment(
     if web_enabled:
         ok, detail = WEB.check_environment()
         if ok:
-            print_success("フロントエンド(Web): OK")
+            print_success(f"フロントエンド(Web): OK ({detail})")
         else:
             print_error(f"フロントエンド(Web): 未準備 ({detail})")
-            print_info(f"  対応例: cd frontend_web && {(npm_command or FRONTEND_COMMAND)} install")
+            print_info(f'  対応例: python "{BASE_DIR / "frontend_web" / "_setup.py"}"')
             has_error = True
 
     if avatar_enabled:
         ok, detail = AVATAR.check_environment()
         if ok:
-            print_success("フロントエンド(Avatar): OK")
+            print_success(f"フロントエンド(Avatar): OK ({detail})")
         else:
             print_error(f"フロントエンド(Avatar): 未準備 ({detail})")
-            print_info(f"  対応例: cd frontend_avatar && {(npm_command or FRONTEND_COMMAND)} install")
+            print_info(f'  対応例: python "{BASE_DIR / "frontend_avatar" / "_setup.py"}"')
             has_error = True
 
     for label, module, enabled in (("task", TASK, task_enabled), ("team", TEAM, team_enabled)):
@@ -793,8 +794,7 @@ def ensure_optional_service_ready(name: str, npm_command: str | None) -> bool:
         print_success(f"{name}: OK ({detail})")
         return True
     print_warning(f"{name}: 未準備のため起動をスキップします ({detail})")
-    print_info("  対応例: cd frontend_avatar")
-    print_info(f"  対応例: {npm_command or FRONTEND_COMMAND} install")
+    print_info(f'  対応例: python "{BASE_DIR / "frontend_avatar" / "_setup.py"}"')
     return False
 
 
@@ -1080,7 +1080,7 @@ def launch_diag_gui() -> None:
     ok, detail = DIAG.check_environment()
     if not ok:
         print_error(f"バックエンド(Diag): 未準備 ({detail})")
-        print_info("必要に応じて次を実行してください: python _setup.py")
+        print_info(f'必要に応じて次を実行してください: python "{BASE_DIR / "_setup.py"}"')
         sys.exit(1)
     try:
         DIAG.launch_gui()
@@ -1141,7 +1141,7 @@ def main() -> None:
     if not is_ready:
         print()
         print_error("必要な環境が準備されていないため、起動を中止します")
-        print_info("必要に応じて次を実行してください: python _setup.py")
+        print_info(f'必要に応じて次を実行してください: python "{BASE_DIR / "_setup.py"}"')
         sys.exit(1)
 
     while True:

@@ -405,7 +405,7 @@ def remove_grok_mcp_servers_by_prefix(prefix: str) -> bool:
     return remove_toml_mcp_servers_by_prefix(get_grok_config_path(), prefix, "Grok")
 
 
-def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
+def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX) -> bool:
     print_header("グローバルMCP設定の解除")
 
     copilot_home = Path(os.environ.get("COPILOT_HOME", str(Path.home() / ".copilot")))
@@ -419,28 +419,30 @@ def cleanup_global_mcp_configs(prefix: str = BACKEND_TOOLS_SERVER_PREFIX):
         (get_vscode_mcp_path(),                   "servers"),
     ]
 
-    updated_count = 0
+    cleanup_ok = True
     for path, top_key in targets:
-        if remove_json_mcp_servers_by_prefix(path, prefix, top_key=top_key):
-            updated_count += 1
+        if not remove_json_mcp_servers_by_prefix(path, prefix, top_key=top_key):
+            cleanup_ok = False
 
     print_info(f"Codex CLI 設定も解除対象です: {Path.home() / '.codex' / 'config.toml'}")
-    if remove_codex_mcp_servers_by_prefix(prefix):
-        updated_count += 1
+    if not remove_codex_mcp_servers_by_prefix(prefix):
+        cleanup_ok = False
 
     print_info(f"Grok CLI 設定も解除対象です: {get_grok_config_path()}")
-    if remove_grok_mcp_servers_by_prefix(prefix):
-        updated_count += 1
+    if not remove_grok_mcp_servers_by_prefix(prefix):
+        cleanup_ok = False
 
     vscode_chat = get_vscode_chat_models_path()
     print_info(f"VS Code チャットモデル設定も解除対象です: {vscode_chat}")
-    if remove_vscode_aidiy_chat_models(vscode_chat):
-        updated_count += 1
+    if not remove_vscode_aidiy_chat_models(vscode_chat):
+        cleanup_ok = False
 
-    if updated_count > 0:
+    if cleanup_ok:
         print_success(f"グローバルMCP設定の解除処理を完了しました: {prefix}*")
     else:
         print_warning(f"グローバルMCP設定の解除に失敗しました: {prefix}*")
+
+    return cleanup_ok
 
 
 # ============================================================
@@ -506,6 +508,7 @@ def cleanup(choices: dict) -> bool:
     if not stop_tools_processes():
         return False
     cleanup_ok = True
+    deleted_count = 0
 
     if not BACKEND_TOOLS_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
@@ -546,16 +549,17 @@ def cleanup(choices: dict) -> bool:
             elif choices.get("tools_temp") is False:
                 print_info("  temp はそのまま残します")
 
-        if not cleanup_ok:
-            print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
-        elif deleted_count > 0:
-            print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
-        else:
-            print_info(f"{label}: 削除対象はありませんでした")
-
     # 各 CLI のグローバル MCP 設定 (aidiy_*) を解除する
     print()
-    cleanup_global_mcp_configs(BACKEND_TOOLS_SERVER_PREFIX)
+    if not cleanup_global_mcp_configs(BACKEND_TOOLS_SERVER_PREFIX):
+        cleanup_ok = False
+
+    if not cleanup_ok:
+        print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+    elif deleted_count > 0:
+        print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
+    else:
+        print_info(f"{label}: 削除対象はありませんでした")
     return cleanup_ok
 
 

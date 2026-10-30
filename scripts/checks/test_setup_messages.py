@@ -31,17 +31,17 @@ class InventoryCaptured(Exception):
 class SetupMessageTests(unittest.TestCase):
     def test_component_inventories_list_technologies_without_role_descriptions(self):
         inventories = {
-            "backend_diag": ("Diag", "Node.js / Electron"),
+            "backend_diag": ("Diag", "Node.js / Electron / Vue 3"),
             "backend_local": ("Local", "Python / uv / FastAPI / PyTorch / Transformers / Gemma"),
             "backend_tools": ("Tools", "Python / uv / FastAPI / MCP"),
             "backend_server": ("Core / Apps", "Python / uv / FastAPI / SQLAlchemy / SQLite"),
             "backend_taskteam": ("Task / Team", "Python / uv / FastAPI / SQLite"),
-            "frontend_web": ("Web", "Vue 3 / Vite / TypeScript"),
-            "frontend_avatar": ("Avatar", "Vue 3 / Vite / TypeScript / Electron"),
+            "frontend_web": ("Web", "Node.js / Vue 3 / Vite / TypeScript"),
+            "frontend_avatar": ("Avatar", "Node.js / Vue 3 / Vite / TypeScript / Electron"),
             "command_hermes": ("Hermes", "Python / uv / Hermes CLI"),
-            "frontend_ide/host": ("Code / Live", "Node.js / TypeScript / Electron / VS Code / VSIX"),
-            "frontend_ide/viewer": ("IDE", "Electron / Monaco Editor / docx-preview / SheetJS / PptxViewJS / PDF.js"),
-            "frontend_channels": ("Discord", "Discord / Node.js / TypeScript / Electron"),
+            "frontend_ide/host": ("Code / Live", "Node.js / Vue 3 / TypeScript / Electron / VS Code / VSIX"),
+            "frontend_ide/viewer": ("IDE", "Node.js / Electron / Monaco Editor / docx-preview / SheetJS / PptxViewJS / PDF.js"),
+            "frontend_channels": ("Discord", "Discord / Node.js / Vue 3 / TypeScript / Electron"),
         }
         for folder, (label, technologies) in inventories.items():
             with self.subTest(folder=folder), contextlib.ExitStack() as stack:

@@ -70,6 +70,8 @@ def print_info(message: str) -> None:
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import check_python_runtime, python_requirement
 BACKEND_TOOLS_DIR = THIS_DIR
 PORT_TOOLS = 8095
 APP = "tools_main:app"
@@ -120,7 +122,22 @@ def check_environment() -> tuple[bool, str]:
         return False, f"フォルダが見つかりません: {BACKEND_TOOLS_DIR}"
     if not (BACKEND_TOOLS_DIR / "pyproject.toml").exists():
         return False, f"pyproject.toml が見つかりません: {BACKEND_TOOLS_DIR / 'pyproject.toml'}"
+    try:
+        requirement = python_requirement(BACKEND_TOOLS_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"Python 実行条件を確認できません。起動を続行します: {exc}")
+        requirement = None
     python_path = find_python_in_env(BACKEND_TOOLS_DIR, ENV_CANDIDATES)
+    runtime_detail = ""
+    if python_path is not None:
+        ok, runtime_detail = check_python_runtime(python_path, requirement or ">=0")
+        if not ok:
+            return False, runtime_detail
+        if runtime_detail.startswith("[WARN]"):
+            print_warning(runtime_detail.removeprefix("[WARN] "))
+            runtime_detail = ""
+        if requirement is None:
+            runtime_detail = ""
     if python_path is None and (BACKEND_TOOLS_DIR / ".venv").exists():
         return False, "現在の OS で使えない .venv です。backend_tools/_setup.py を実行してください"
     if python_path is None and not check_command_exists("uv"):
@@ -129,7 +146,9 @@ def check_environment() -> tuple[bool, str]:
         ok, detail = check_npm_project_environment(BACKEND_TOOLS_DIR)
         if not ok:
             return False, detail
-    return True, str(python_path) if python_path is not None else "uv"
+    if python_path is not None:
+        return True, f"{python_path} ({runtime_detail})" if runtime_detail else str(python_path)
+    return True, f"uv (Python {requirement})" if requirement else "uv"
 
 
 def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen[bytes]:
@@ -294,7 +313,7 @@ def main() -> None:
     ok, detail = check_environment()
     if not ok:
         print_error(f"環境が準備されていません: {detail}")
-        print_info("  対応例: uv sync --upgrade")
+        print_info(f'  対応例: python "{BACKEND_TOOLS_DIR / "_setup.py"}"')
         sys.exit(1)
     print_success(f"環境確認: OK ({detail})")
 

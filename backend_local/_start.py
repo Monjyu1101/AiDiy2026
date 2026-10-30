@@ -69,6 +69,8 @@ def print_info(message: str) -> None:
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import check_python_runtime, python_requirement
 BACKEND_LOCAL_DIR = THIS_DIR
 PORT_LOCAL = 8096
 APP = "local_main:app"
@@ -102,11 +104,23 @@ def check_environment() -> tuple[bool, str]:
         return False, f"フォルダが見つかりません: {BACKEND_LOCAL_DIR}"
     if not (BACKEND_LOCAL_DIR / "pyproject.toml").exists():
         return False, f"pyproject.toml が見つかりません: {BACKEND_LOCAL_DIR / 'pyproject.toml'}"
+    try:
+        requirement = python_requirement(BACKEND_LOCAL_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"Python 実行条件を確認できません。起動を続行します: {exc}")
+        requirement = None
     python_path = find_python_in_env(BACKEND_LOCAL_DIR, ENV_CANDIDATES)
     if python_path is not None:
+        ok, detail = check_python_runtime(python_path, requirement or ">=0")
+        if not ok:
+            return False, detail
+        if detail.startswith("[WARN]"):
+            print_warning(detail.removeprefix("[WARN] "))
+        elif requirement is not None:
+            return True, f"{python_path} ({detail})"
         return True, str(python_path)
     if check_command_exists("uv"):
-        return True, "uv"
+        return True, f"uv (Python {requirement})" if requirement else "uv"
     return False, f"Python 仮想環境 ({' / '.join(ENV_CANDIDATES)}) または uv が見つかりません"
 
 
@@ -270,7 +284,7 @@ def main() -> None:
     ok, detail = check_environment()
     if not ok:
         print_error(f"環境が準備されていません: {detail}")
-        print_info("  対応例: uv sync --upgrade")
+        print_info(f'  対応例: python "{BACKEND_LOCAL_DIR / "_setup.py"}"')
         sys.exit(1)
     print_success(f"環境確認: OK ({detail})")
 

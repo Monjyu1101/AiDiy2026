@@ -16,6 +16,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 各フォルダの `_setup.py` に委譲します。
 
 フォルダ別スクリプト:
+- backend_diag/_setup.py     環境診断（Node.js / Electron / Vue 3）
 - backend_server/_setup.py   バックエンド(core,apps)
 - backend_taskteam/_setup.py バックエンド(task,team)
 - backend_tools/_setup.py    バックエンド(tools) + MCP 設定
@@ -31,6 +32,7 @@ Usage:
 """
 
 import importlib.util
+import json
 import os
 import shutil
 import stat
@@ -46,6 +48,7 @@ if sys.platform == "win32":
 # プロジェクト設定
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
+from scripts._runtime_requirements import project_node_requirement, version_satisfies
 
 FRONTEND_COMMAND = "npm"
 DATABASE_TYPE = "sqlite"
@@ -398,6 +401,11 @@ def ensure_prerequisites() -> bool:
     両方とも導入済み（または導入成功）なら True を返す。
     """
     print_header("Git / Node.js")
+    print_info(f"管理スクリプト: Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    if sys.version_info < (3, 13):
+        print_warning("Python 3.13以降を推奨します。版数だけで一括中止せず、バックエンドの対象環境はuv / pyproject.tomlで確認します。")
+    print_info("全体構成の推奨: Node.js 22.13以降。各モジュールの実際の必要条件は個別に確認します。")
+    print_info("Vue 3 / Electronは各npmプロジェクトの依存です。VS Code 1.106以降はCode / Live拡張の配置時だけ必要です。")
 
     all_ok = True
 
@@ -408,6 +416,13 @@ def ensure_prerequisites() -> bool:
         version = version_getter()
         if version is not None:
             print_success(f"{name} は導入済みです。（{version}）")
+            if name == "Node.js":
+                try:
+                    recommended = version_satisfies(version.split(" / ", 1)[0], ">=22.13")
+                except ValueError:
+                    recommended = False
+                if not recommended:
+                    print_warning("Node.jsの版数は全体構成の推奨範囲外または確認不能です。続行し、対象モジュールの実互換性を個別確認します。")
             continue
 
         print_warning(f"{name} が見つかりません。")
@@ -737,15 +752,37 @@ def collect_setup_choices() -> dict | None:
 # ============================================================
 # git pull 後の Node.js 系再ビルド
 # ============================================================
+def check_refresh_node_runtime(version: str) -> bool:
+    """一括buildの実package条件を案内。版数だけでは停止しない。"""
+    projects = ("backend_diag", "backend_diag/ui", "frontend_web", "frontend_avatar",
+                "frontend_ide", "frontend_ide/host", "frontend_ide/viewer", "frontend_channels")
+    try:
+        for folder in projects:
+            directory = BASE_DIR / folder
+            package = json.loads((directory / "package.json").read_text(encoding="utf-8-sig"))
+            dependencies = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
+            targets = [None] + [name for name in ("vite", "electron", "esbuild", "@vscode/vsce", "@discordjs/voice") if name in dependencies]
+            for dependency in targets:
+                requirement = project_node_requirement(directory, dependency)
+                if requirement and not version_satisfies(version, requirement):
+                    print_warning(f"{folder} ({dependency or 'package.json'}): Node.js {version} は宣言された必要条件 {requirement} を満たしません。実行結果を確認して続行します。")
+        return True
+    except (OSError, ValueError, TypeError, AttributeError):
+        print_warning("Node.js / package metadataの版数条件を判定できません。実行結果を確認して続行します。")
+        return True
+
+
 def setup_node_refresh() -> list[str]:
     """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
     print_header("Node.js系の再ビルド")
     print_info("対象: Diag / Web / Avatar / Console / Code / Live / IDE / Task / Team / Discord")
     print_info("依存同期 / 再ビルド / 起動コマンド登録")
     print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
-    if get_node_version() is None or get_npm_version() is None:
+    node_version = get_node_version()
+    if node_version is None or get_npm_version() is None:
         print_error("Node.js と npm が必要です。導入後に b（build）を再実行してください。")
         return ["Node.js / npm の確認"]
+    check_refresh_node_runtime(node_version)
 
     spec = importlib.util.spec_from_file_location("aidiy_refresh_electron", BASE_DIR / "scripts" / "_setup_electron.py")
     helper = importlib.util.module_from_spec(spec)

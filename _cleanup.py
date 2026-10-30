@@ -14,12 +14,13 @@
 仮想環境などを対話的に一括削除します。クリーンアップを実行する場合は、削除開始前に
 全常駐サービス（Discord Bot を含む）を各フォルダの `_start.py` が公開する `kill_ports()` で停止し、
 Code / Live / Console / IDE の単独実行と tools の MCP 接続プロセスも強制終了・確認します。
-setup / start の Code / IDE 継続方針とは異なります。ルート固有の
+setup / start の Code / IDE / Discord 継続方針とは異なります。ルート固有の
 処理（全階層の temp / _temp / .temp / tmp / test / _test / .test とルート .aidiy_backup の削除、グローバル npm ツールの
 アンインストール）のみこのスクリプトが直接担当し、フォルダ固有の処理は
 各フォルダの `_cleanup.py` に委譲します。
 
 フォルダ別スクリプト:
+- backend_diag/_cleanup.py     cleanup(choices)（配布画面は保持）
 - backend_local/_cleanup.py    cleanup(choices)
 - backend_tools/_cleanup.py    cleanup(choices)（グローバル MCP 設定も解除）
 - backend_server/_cleanup.py   cleanup(choices)
@@ -147,7 +148,7 @@ def _load_folder_start_module(folder: str):
     return mod
 
 
-def _remove_folder_import_cache(folder: str) -> None:
+def _remove_folder_import_cache(folder: str) -> bool:
     """`_start.py` / `_cleanup.py` の import で生成された `__pycache__` を消す。
 
     各フォルダの `cleanup()` は自分自身が import された後に走るため、
@@ -155,12 +156,14 @@ def _remove_folder_import_cache(folder: str) -> None:
     """
     pycache_dir = BASE_DIR / folder / "__pycache__"
     if not pycache_dir.is_dir():
-        return
+        return True
     try:
         shutil.rmtree(pycache_dir, onerror=handle_remove_readonly)
         print_success(f"__pycache__ ({folder}) を削除しました: {pycache_dir}")
+        return True
     except Exception as e:
         print_warning(f"__pycache__ ({folder}) の削除に失敗しました: {e}")
+        return False
 
 
 def _remove_root_python_caches() -> bool:
@@ -194,9 +197,9 @@ def _run_folder_cleanup(folder: str, choices: dict) -> bool:
     """フォルダ別 cleanup を実行し、明示的な False だけを失敗として返す。"""
     try:
         result = _load_folder_module(folder).cleanup(choices)
-        return result is not False
     finally:
-        _remove_folder_import_cache(folder)
+        cache_ok = _remove_folder_import_cache(folder)
+    return result is not False and cache_ok is not False
 
 
 SERVICE_CLEANUP_TARGETS = (
@@ -532,23 +535,25 @@ def cleanup_temp_directories(base_dir: Path) -> bool:
     return ok
 
 
-def cleanup_backup(base_dir: Path, choices: dict):
+def cleanup_backup(base_dir: Path, choices: dict) -> bool:
     backup_dir = base_dir / BACKUP_PATH
     if not backup_dir.exists():
-        return
+        return True
     print_header(".aidiy_backup フォルダのクリーンアップ")
     if choices.get("backup") is True:
-        remove_directory(backup_dir, ".aidiy_backup")
+        return remove_directory(backup_dir, ".aidiy_backup")
     elif choices.get("backup") is False:
         print_info(".aidiy_backup フォルダはそのまま残します")
+    return True
 
 
-def uninstall_global_npm_tools():
+def uninstall_global_npm_tools() -> bool:
     print_header("グローバルnpmツールのアンインストール")
 
     npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
 
     uninstalled_count = 0
+    ok = True
     for i, package in enumerate(NPM_PACKAGES, 1):
         cmd = [npm_cmd, "uninstall", "-g", package]
         print_info(f"実行中: {' '.join(cmd)}")
@@ -557,15 +562,18 @@ def uninstall_global_npm_tools():
             print_success(f"  [{i}/{len(NPM_PACKAGES)}] {package} をアンインストールしました")
             uninstalled_count += 1
         except subprocess.CalledProcessError as e:
+            ok = False
             print_error(f"  [{i}/{len(NPM_PACKAGES)}] {package} のアンインストールに失敗しました: {e}")
-        except FileNotFoundError:
-            print_error(f"  {npm_cmd} が見つかりません。Node.jsがインストールされているか確認してください")
+        except OSError:
+            ok = False
+            print_error(f"  {npm_cmd} を実行できません。グローバルnpmツールの削除には Node.js / npm が必要です。")
             break
 
     if uninstalled_count > 0:
         print_success(f"グローバルnpmツールのアンインストール完了 ({uninstalled_count}個削除)")
-    else:
+    elif ok:
         print_info("アンインストール対象はありませんでした")
+    return ok
 
 
 # ============================================================
@@ -701,7 +709,8 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     stop_all_services(choices, keep_diag=False)
 
     print()
-    cleanup_backup(base_dir, choices)
+    if cleanup_backup(base_dir, choices) is False:
+        cleanup_errors.append(".aidiy_backup")
 
     print()
     if choices.get("diag"):
@@ -709,13 +718,15 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
             cleanup_errors.append("バックエンド(Diag)")
 
     if choices["npm_uninstall"]:
-        uninstall_global_npm_tools()
+        if uninstall_global_npm_tools() is False:
+            cleanup_errors.append("グローバルnpmツール")
     else:
         print_info("グローバルnpmツールのアンインストールをスキップしました")
 
     print()
     if choices["local"]:
-        _run_folder_cleanup("backend_local", choices)
+        if not _run_folder_cleanup("backend_local", choices):
+            cleanup_errors.append("バックエンド(local)")
     else:
         print_info("バックエンド(local) のクリーンアップをスキップしました")
 
@@ -728,19 +739,22 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
 
     print()
     if choices["backend"]:
-        _run_folder_cleanup("backend_server", choices)
+        if not _run_folder_cleanup("backend_server", choices):
+            cleanup_errors.append("バックエンド(core,apps)")
     else:
         print_info("バックエンド(core,apps)のクリーンアップをスキップしました")
 
     print()
     if choices["taskteam"]:
-        _run_folder_cleanup("backend_taskteam", choices)
+        if not _run_folder_cleanup("backend_taskteam", choices):
+            cleanup_errors.append("バックエンド(task,team)")
     else:
         print_info("バックエンド(task,team)のクリーンアップをスキップしました")
 
     print()
     if choices["web"]:
-        _run_folder_cleanup("frontend_web", choices)
+        if not _run_folder_cleanup("frontend_web", choices):
+            cleanup_errors.append("フロントエンド(Web)")
     else:
         print_info("フロントエンド(Web)のクリーンアップをスキップしました")
 
@@ -783,7 +797,8 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     print()
     # スキップしたフォルダにも `_start.py` の import キャッシュが残るため、最後に掃う。
     for folder in IMPORT_CACHE_FOLDERS:
-        _remove_folder_import_cache(folder)
+        if _remove_folder_import_cache(folder) is False:
+            cleanup_errors.append(f"Pythonキャッシュ ({folder})")
     if not _remove_root_python_caches():
         cleanup_errors.append("全階層のPythonキャッシュ")
 
@@ -810,6 +825,8 @@ def main():
 
     base_dir = BASE_DIR
     print_info(f"プロジェクトディレクトリ: {base_dir}")
+    print_info("Python実行環境、Node.js / Vue 3依存、Electron、VS Code拡張は各モジュールの選択に従って整理します。")
+    print_info("削除のために対象ランタイムの新版・仮想環境を要求しません。npm / VS Code CLI は選択した外部登録の解除時だけ使用します。")
     print_info("クリーンアップ対象:")
     print_info("  0. ルート .aidiy_backup フォルダ")
     print_info("  1. バックエンド(Diag)")

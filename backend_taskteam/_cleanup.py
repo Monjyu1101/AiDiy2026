@@ -138,28 +138,33 @@ def remove_directory(path: Path, description: str) -> bool:
     return False
 
 
-def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+def cleanup_common_python_caches(target_dir: Path, label: str) -> tuple[int, bool]:
     deleted_count = 0
+    cleanup_ok = True
     print_info(f"{label}: __pycache__ フォルダを検索中...")
     for pycache in target_dir.rglob("__pycache__"):
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
+        else:
+            cleanup_ok = False
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
     for pytest_cache in target_dir.rglob(".pytest_cache"):
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    return deleted_count
+        else:
+            cleanup_ok = False
+    return deleted_count, cleanup_ok
 
 
-def cleanup(choices: dict) -> None:
+def cleanup(choices: dict) -> bool:
     label = "バックエンド(task,team)"
     print_header(f"{label} のクリーンアップ")
 
     if not BACKEND_TASKTEAM_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
-        return
+        return True
 
-    deleted_count = cleanup_common_python_caches(BACKEND_TASKTEAM_DIR, label)
+    deleted_count, cleanup_ok = cleanup_common_python_caches(BACKEND_TASKTEAM_DIR, label)
 
     taskteam_envs = choices.get("taskteam_envs", {})
     for env_name in BACKEND_TASKTEAM_ENV_LIST:
@@ -169,6 +174,8 @@ def cleanup(choices: dict) -> None:
         if taskteam_envs.get(env_name):
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
+            else:
+                cleanup_ok = False
         elif env_name in taskteam_envs:
             print_info(f"  {env_name} はそのまま残します")
 
@@ -177,13 +184,18 @@ def cleanup(choices: dict) -> None:
         if choices.get("taskteam_temp") is True:
             if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
+            else:
+                cleanup_ok = False
         elif choices.get("taskteam_temp") is False:
             print_info("  temp はそのまま残します")
 
-    if deleted_count > 0:
+    if not cleanup_ok:
+        print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+    elif deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
+    return cleanup_ok
 
 
 def collect_choices() -> dict:
@@ -206,7 +218,8 @@ def main() -> None:
         return
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
-    cleanup(collect_choices())
+    if not cleanup(collect_choices()):
+        sys.exit(1)
     print_success("クリーンアップが完了しました")
 
 

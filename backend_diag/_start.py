@@ -11,6 +11,8 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent / "scripts"))
+from _runtime_requirements import check_node_runtime
 
 
 def check_environment():
@@ -19,17 +21,11 @@ def check_environment():
         return False, 'Node.js 18 以降が必要です: https://nodejs.org/'
     if not (ROOT / 'diag_main.mjs').is_file() or not (ROOT / '診断' / 'catalog.json').is_file():
         return False, '診断のソースファイルが見つかりません。'
-    try:
-        version = subprocess.run([node, '--version'], stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0,
-                                 timeout=15, check=True).stdout.strip()
-        if int(version.lstrip('v').split('.')[0]) < 18:
-            return False, 'Node.js 18 以降が必要です: https://nodejs.org/'
-    except subprocess.TimeoutExpired:
-        return False, 'Node.js のバージョン確認が15秒でタイムアウトしました。'
-    except (ValueError, OSError, subprocess.SubprocessError):
-        return False, 'Node.js のバージョンを確認できません。'
-    return True, 'Node.js / Electron またはブラウザ / AIコア不要'
+    ok, detail = check_node_runtime('>=18', command=node, strict=True)
+    if not ok:
+        return False, detail
+    return True, f'{detail} / Vue 3配布画面 / Electron またはブラウザ / AIコア不要'
+
 
 
 def run_headless():

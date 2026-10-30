@@ -30,6 +30,8 @@ if sys.platform == "win32":
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import python_requirement
 BACKEND_DIR = THIS_DIR
 BACKEND_ENV = ".venv"
 BACKEND_VENV_DIR = BACKEND_DIR / BACKEND_ENV
@@ -191,6 +193,13 @@ def setup(choices: dict | None = None) -> bool:
         print_info("  PowerShell: irm https://astral.sh/uv/install.ps1 | iex")
         print_info("  または: pip install uv")
         return False
+
+    try:
+        requirement = python_requirement(BACKEND_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"{label}: Python 実行条件を確認できません。uv の確認を続行します: {exc}")
+    else:
+        print_info(f"実行環境: Python {requirement}（pyproject.toml。uv が互換 Python を選択します）")
 
     if BACKEND_VENV_DIR.exists():
         print_success(f"{label}: 既存の仮想環境を検出しました: {BACKEND_VENV_DIR}")

@@ -1,6 +1,6 @@
 # 環境診断の運用
 
-`backend_diag` は、Node.js の診断サーバーを Electron / Web で表示する任意起動の診断ツールです。起動・認証・Codespaces・検証の詳細は [backend_diag/README.md](../../backend_diag/README.md) を参照してください。
+`backend_diag` は、Node.js の診断サーバーと Vue 3 配布画面を Electron / Web で表示する任意起動の診断ツールです。起動・認証・Codespaces・検証の詳細は [backend_diag/README.md](../../backend_diag/README.md) を参照してください。
 
 総合テストの手順・実施結果・エビデンスと、その副産物として残す操作手順書素材は、別冊の[環境確認編](./セルフテスト,aidiy_diag,環境確認編.md)を参照してください。[システム起動編](./セルフテスト,aidiy_diag,システム起動編.md)・[アプリ起動編](./セルフテスト,aidiy_diag,アプリ起動編.md)とは、手順と実施結果を分けます。本書は実装・保守の運用情報を扱います。
 

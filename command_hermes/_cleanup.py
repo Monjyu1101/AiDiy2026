@@ -172,17 +172,22 @@ def remove_file(path: Path, description: str) -> bool:
     return False
 
 
-def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+def cleanup_common_python_caches(target_dir: Path, label: str) -> tuple[int, bool]:
     deleted_count = 0
+    cleanup_ok = True
     print_info(f"{label}: __pycache__ フォルダを検索中...")
     for pycache in target_dir.rglob("__pycache__"):
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
+        else:
+            cleanup_ok = False
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
     for pytest_cache in target_dir.rglob(".pytest_cache"):
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    return deleted_count
+        else:
+            cleanup_ok = False
+    return deleted_count, cleanup_ok
 
 
 def _remove_marked_block(content: str, begin_marker: str, end_marker: str) -> str:
@@ -213,10 +218,11 @@ def get_shell_profile_paths() -> list[Path]:
     return [home / ".profile", home / ".bashrc"]
 
 
-def cleanup_shell_path_entries(label: str) -> int:
+def cleanup_shell_path_entries(label: str) -> tuple[int, bool]:
     if sys.platform == "win32":
-        return 0
+        return 0, True
     removed_count = 0
+    cleanup_ok = True
     for profile_path in get_shell_profile_paths():
         if not profile_path.exists():
             continue
@@ -231,8 +237,9 @@ def cleanup_shell_path_entries(label: str) -> int:
             print_success(f"{label}: PATH 設定を解除しました: {profile_path}")
             removed_count += 1
         except Exception as e:
+            cleanup_ok = False
             print_warning(f"{label}: PATH 設定の解除に失敗しました: {profile_path} ({e})")
-    return removed_count
+    return removed_count, cleanup_ok
 
 
 # ============================================================
@@ -243,24 +250,34 @@ def cleanup(choices: dict) -> bool:
     print_header(f"{label} のクリーンアップ")
 
     deleted_count = 0
+    cleanup_ok = True
     launcher_dir = Path.home() / ".local" / "bin"
     launcher_paths = [launcher_dir / "aidiy_hermes.cmd", launcher_dir / "aidiy_hermes"]
     for launcher_path in launcher_paths:
-        if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
-            deleted_count += 1
+        if launcher_path.exists():
+            if remove_file(launcher_path, f"{launcher_path.name} ({label})"):
+                deleted_count += 1
+            else:
+                cleanup_ok = False
     if not remove_launcher_path(launcher_dir):
         return False
-    deleted_count += cleanup_shell_path_entries(label)
+    profile_count, profiles_ok = cleanup_shell_path_entries(label)
+    deleted_count += profile_count
+    cleanup_ok = cleanup_ok and profiles_ok
 
     if not BACKEND_HERMES_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
-        if deleted_count > 0:
+        if not cleanup_ok:
+            print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+        elif deleted_count > 0:
             print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
         else:
             print_info(f"{label}: 削除対象はありませんでした")
-        return True
+        return cleanup_ok
 
-    deleted_count += cleanup_common_python_caches(BACKEND_HERMES_DIR, label)
+    cache_count, caches_ok = cleanup_common_python_caches(BACKEND_HERMES_DIR, label)
+    deleted_count += cache_count
+    cleanup_ok = cleanup_ok and caches_ok
 
     hermes_envs = choices.get("hermes_envs", {})
     for env_name in BACKEND_HERMES_ENV_LIST:
@@ -271,6 +288,7 @@ def cleanup(choices: dict) -> bool:
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
             else:
+                cleanup_ok = False
                 print_error(f"  {env_name} 削除失敗。手動で削除してください: {env_dir}")
         elif env_name in hermes_envs:
             print_info(f"  {env_name} はそのまま残します")
@@ -280,14 +298,18 @@ def cleanup(choices: dict) -> bool:
         if choices.get("hermes_temp") is True:
             if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
+            else:
+                cleanup_ok = False
         elif choices.get("hermes_temp") is False:
             print_info("  temp はそのまま残します")
 
-    if deleted_count > 0:
+    if not cleanup_ok:
+        print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+    elif deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
-    return True
+    return cleanup_ok
 
 
 def collect_choices() -> dict | None:

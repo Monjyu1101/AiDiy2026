@@ -120,7 +120,7 @@ class PosixPathTests(unittest.TestCase):
         profile = self.home / '.zshrc'
         original = b'# user settings\n\n\n'
         profile.write_bytes(original)
-        self.assertEqual(cleanup.cleanup_shell_path_entries('fixture'), 0)
+        self.assertEqual(cleanup.cleanup_shell_path_entries('fixture'), (0, True))
         self.assertEqual(profile.read_bytes(), original)
 
     def test_root_repair_uses_launcher_actions_and_continues_after_failure(self):

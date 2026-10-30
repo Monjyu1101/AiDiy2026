@@ -30,11 +30,11 @@
 - バックエンド MCP: FastAPI (SSE / Streamable HTTP / stdio) + Python MCP SDK（**Windows は19、Linux / macOS は18サーバーを同居**: Chrome DevTools / Desktop Capture / SQLite / PostgreSQL / Logs / Code Check / Backup / Image Generation / Movie Generation / Speech-to-Text / Text-to-Speech / OBS Studio Control / FFmpeg Control / Notification Sounds / Code Agents / Chat LLM / Task Agents / Team Agents / Windows Control）
 - バックエンド Local: `backend_local`（ポート 8096、OpenAI 互換の Gemma ローカル推論サーバー）
 - バックエンド TaskTeam: `backend_taskteam`（ポート 8093、AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI）
-- フロントエンド Web: Vue 3 + Vite + TypeScript + Pinia
-- フロントエンド Avatar: Vue 3 + Vite + TypeScript + Electron
-- フロントエンド VS Code: TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版。さらに開発スペース `aidiy_ide` の部品としても動作、常駐なし）
-- フロントエンド Discord: TypeScript + discord.js（Hermes チャット / AIコア Live 音声接続、任意起動の Bot）
-- フロントエンド IDE（開発スペース）: Vue 3 + Canvas 2D + Monaco Editor + Electron（宇宙をテーマにした IDE 開発環境。Code / Live を部品として組み込んだ `aidiy_ide`、ポート自動割り当て）
+- フロントエンド Web: Node.js + Vue 3 + Vite + TypeScript + Pinia
+- フロントエンド Avatar: Node.js + Vue 3 + Vite + TypeScript + Electron
+- フロントエンド VS Code: Node.js + Vue 3 共通画面 + TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版。さらに開発スペース `aidiy_ide` の部品としても動作、常駐なし）
+- フロントエンド Discord: Node.js + Vue 3 接続パネル + Electron / Web + TypeScript + discord.js（Hermes チャット / AIコア Live 音声接続、任意起動の Bot）
+- フロントエンド IDE（開発スペース）: Node.js + Vue 3 + Canvas 2D + Monaco Editor + Electron（宇宙をテーマにした IDE 開発環境。Code / Live を部品として組み込んだ `aidiy_ide`、ポート自動割り当て）
 - 常駐バックエンドは **5 サーバー構成**
   - `core_main.py` : `8091`
   - `apps_main.py` : `8098`
@@ -64,11 +64,14 @@
 
 | ソフトウェア | 目安 |
 |---|---|
-| Python | 3.13 以上 |
-| Node.js | 22 系 |
+| Python | バックエンド・Hermes の宣言条件は 3.13 以上。uv が対象仮想環境を選択 |
+| Node.js / npm | 全体構成では Node.js 22.13 以降を推奨。モジュール別条件は下記参照 |
 | Git | 最新版推奨 |
 | uv | Python パッケージ管理に使用 |
-| VS Code | 1.106 以降（`frontend_ide/host` を利用する場合） |
+| Electron / Vue 3 | 各モジュールの npm 依存として導入。グローバル導入は不要 |
+| VS Code | Code / Live **拡張**を使う場合のみ。宣言条件 `^1.106.0`、単独 Electron / Web では不要 |
+
+実際の条件は各 `pyproject.toml` / `package.json` と依存 metadata を参照します。新しい版数確認は警告して続行し、コマンド未導入・実行失敗はエラーとして扱います。Diag の従来からの Node.js 18 未満停止は維持します。詳しくは[モジュール別の実行環境](./_AIDIY/knowledge/共通,開発環境運用手順.md#モジュール別の実行環境)を参照してください。
 
 ### リポジトリ取得
 
@@ -264,6 +267,8 @@ python _cleanup.py
 
 `frontend_ide/viewer` も全体クリーンアップに対応しています（既定 Yes）。この配置先のサーバープロセス停止、`aidiy_ide` ランチャー解除、依存物・Python キャッシュの削除を行います。利用方法は [frontend_ide/viewer/README.md](./frontend_ide/viewer/README.md) を参照してください。
 クリーンアップを実行すると、ファイル削除の前に、選択した対象に限らず全常駐サービスの待受プロセス（Avatar は残留 Electron も含む）を停止します。この作業コピーの Code / Live 単独実行と、tools の MCP 接続プロセスも終了します。ルート `_start.py` の監視中でも全常駐サービスが自動再起動の対象から外れ、クリーンアップ中や直後に再起動しません。
+
+cleanup のために新しい Python / Node.js や対象仮想環境は要求しません（管理スクリプト自体を実行できる Python は必要）。選択したグローバル npm ツール・VS Code 拡張の解除には対応 CLI を使いますが、OS の Python / Node.js / VS Code 本体は削除しません。削除・解除に失敗した場合は場所を表示して終了コード 1 を返し、成功扱いにしません。
 
 クリーンアップ後は再度 `python _setup.py` が必要です。
 

@@ -39,6 +39,8 @@ if sys.platform == "win32":
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import python_requirement
 PROJECT_ROOT = THIS_DIR.parent
 BASE_DIR = PROJECT_ROOT
 BACKEND_DIR = PROJECT_ROOT / "backend_server"
@@ -691,6 +693,12 @@ def setup_mcp_module(module: dict) -> bool:
 
     # uv sync --upgrade (pyproject.toml があれば)
     if (mcp_dir / "pyproject.toml").exists():
+        try:
+            requirement = python_requirement(mcp_dir)
+        except (OSError, ValueError) as exc:
+            print_warning(f"{label}: Python 実行条件を確認できません。uv の確認を続行します: {exc}")
+        else:
+            print_info(f"実行環境: Python {requirement}（pyproject.toml。uv が互換 Python を選択します）")
         if not check_uv_installed():
             print_error(f"{label}: uv がインストールされていません。")
             return False

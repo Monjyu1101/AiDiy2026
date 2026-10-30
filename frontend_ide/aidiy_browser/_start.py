@@ -13,10 +13,14 @@ shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
 
 def check_environment():
-    if shared.node_command() is None:
-        return False, 'Node.jsが見つかりません。'
+    ok, detail = shared.check_node_environment()
+    if not ok:
+        return False, detail
+    from _setup_electron import electron_binary_ready
+    if not any(electron_binary_ready(ROOT.parent / folder) for folder in ('viewer', 'host')):
+        return False, f'Browser は Electron 専用です。python "{ROOT.parent / "_setup.py"}" を実行してください。'
     return ((True, 'Vue Browser') if (ROOT.parent / 'dist/app.js').is_file()
-            else (False, 'Vue画面が未準備です。'))
+            else (False, f'Vue画面が未準備です。python "{ROOT.parent / "_setup.py"}" を実行してください。'))
 
 def start(open_window=None):
     if open_window is False:

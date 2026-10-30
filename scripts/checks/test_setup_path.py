@@ -253,6 +253,7 @@ class PathTests(unittest.TestCase):
             file = project / folder / script
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_text('', encoding='utf-8')
+        (project / 'command_hermes/pyproject.toml').write_text('[project]\nrequires-python = ">=3.13"\n', encoding='utf-8')
         live = project / 'frontend_ide/host/aidiy_live/launch.mjs'
         live.parent.mkdir()
         live.write_text('', encoding='utf-8')

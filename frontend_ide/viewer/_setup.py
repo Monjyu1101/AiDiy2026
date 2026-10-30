@@ -33,6 +33,7 @@ _launcher_spec.loader.exec_module(_launcher)
 install_launcher = _launcher.install_launcher
 sys.path.insert(0, str(THIS_DIR.parents[1] / 'scripts'))
 from _setup_electron import prepare_electron_binary, frontend_dependency_guard
+from _runtime_requirements import check_project_node_runtime
 
 
 class Colors:
@@ -69,7 +70,14 @@ def setup(choices=None) -> bool:
     if not (choices and choices.get("ide")):
         print_header("IDE セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
-    print_info("対象: Electron / Monaco Editor / docx-preview / SheetJS / PptxViewJS / PDF.js")
+    print_info("対象: Node.js / Electron / Monaco Editor / docx-preview / SheetJS / PptxViewJS / PDF.js")
+    ok, detail = check_project_node_runtime(THIS_DIR, fallback=">=22.13")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
+        return False
+
     npm = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
     if not npm:
         print_error("Node.js 22.13 以降と npm を導入してください。")

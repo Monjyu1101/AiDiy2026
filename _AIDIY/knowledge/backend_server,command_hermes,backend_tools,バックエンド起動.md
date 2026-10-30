@@ -43,6 +43,20 @@ cd ..\command_hermes
 
 `_start.py` は常駐系だけを起動する。`command_hermes` は `_start.py` の対象外で、必要時に `aidiy_hermes` または `cli_main.py` として実行する。
 
+### setup / start / cleanup の実行条件
+
+- Local / Tools / Core・Apps / Task・Team / Hermes のアプリ用 Python は、それぞれの `pyproject.toml` の `requires-python` を正とする（現在はいずれも `>=3.13`）。管理スクリプトを動かす Python と、アプリ用 `.venv` の Python は区別する。
+- 各 `_setup.py` は対象の条件を表示し、互換 Python の選択と依存解決を `uv sync --upgrade` に委ねる。管理スクリプト側の Python が対象条件より古いという理由だけで一括停止しない。`uv` 未導入や同期失敗はエラーのまま扱う。
+- 各 `_start.py` は既存の `.venv` / `venv` を使う場合、その Python の `--version` を実行して対象条件を確認する。旧版や版数・条件の判定不能は警告して続行し、版数だけでは新たに停止しない。実行ファイルの起動失敗・非0終了・確認タイムアウトはエラーのまま扱う。実際の import / アプリ実行時のエラーも隠さない。仮想環境が未作成で `uv` がある場合は、起動時の Python 選択を `uv` に委ねる。Tools の別 OS 由来の `.venv` は従来どおり `_setup.py` での再作成を案内する。
+- 現行の Python バックエンド起動に Node.js / Electron / VS Code / Vue 3 の条件を一律に加えない。外部 CLI や個別 MCP 機能の条件は、その機能を使う場合に確認する。
+- `_cleanup.py` はアプリ用 Python・uv・Node.js の版や依存導入を前提にしない。壊れた仮想環境の整理にも使える。削除対象の確認と停止方針は変更せず、選択した環境・temp・キャッシュ等の削除失敗は `False` と終了コード `1` で通知する。DB は明示的に選んだ場合だけ削除する。
+
+インストール・実起動・実環境の削除を行わない回帰確認:
+
+```powershell
+python -B -X utf8 -m unittest discover -s backend_server/checks -p "test_component_*.py" -v
+```
+
 ## `_start.py` の選択肢
 
 | プロンプト | デフォルト | 内容 |

@@ -43,6 +43,8 @@ import launcher
 
 class DiscordSetupTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(discord_setup, "check_project_node_runtime", return_value=(True, "fixture Node")))
+        self.enterContext(patch.object(discord_start, "check_project_node_runtime", return_value=(True, "fixture Node")))
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
         self.enterContext(patch.object(discord_setup, '_discord_in_use', return_value=False))
         self.enterContext(patch.object(discord_setup.shutil, 'which', return_value='npm'))
@@ -59,7 +61,7 @@ class DiscordSetupTest(unittest.TestCase):
         calls.attach_mock(self.prepare, 'prepare')
         self.assertTrue(discord_setup.setup())
         self.assertEqual([call.args[0] for call in self.run.call_args_list], [
-            ['npm', 'ci', '--no-fund', '--no-audit'],
+            ['npm', 'ci', '--include=dev', '--no-fund', '--no-audit'],
             ['npm', 'run', 'update:electron'],
             ['npm', 'run', 'build:panel'],
             ['npm', 'run', 'check:panel'],
@@ -92,6 +94,8 @@ class DiscordSetupTest(unittest.TestCase):
 
 class DiscordLifecycleTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(discord_setup, "check_project_node_runtime", return_value=(True, "fixture Node")))
+        self.enterContext(patch.object(discord_start, "check_project_node_runtime", return_value=(True, "fixture Node")))
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
 
     def test_setup_yes_start_no_cleanup_yes_defaults(self):
@@ -329,6 +333,8 @@ class DiscordProcessMatchingTest(unittest.TestCase):
 
 class DiscordLauncherTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(discord_setup, "check_project_node_runtime", return_value=(True, "fixture Node")))
+        self.enterContext(patch.object(discord_start, "check_project_node_runtime", return_value=(True, "fixture Node")))
         self.enterContext(patch.object(launcher, 'ensure_launcher_path', return_value=True))
         self.enterContext(patch.object(launcher, 'remove_launcher_path', return_value=True))
 

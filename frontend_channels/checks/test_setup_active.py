@@ -21,6 +21,7 @@ spec.loader.exec_module(setup)
 
 class ActiveDiscordSetupTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(setup, "check_project_node_runtime", return_value=(True, "fixture Node")))
         self.output = self.enterContext(contextlib.redirect_stdout(io.StringIO()))
         self.enterContext(patch.object(setup, '_runtime_in_use', return_value=False))
         self.snapshot = self.enterContext(patch.object(setup, 'snapshot', return_value=[]))

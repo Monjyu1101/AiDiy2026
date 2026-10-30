@@ -13,13 +13,14 @@ shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
 
 def check_environment():
-    if shared.node_command() is None:
-        return False, 'Node.jsが見つかりません。'
+    ok, detail = shared.check_node_environment()
+    if not ok:
+        return False, detail
     for name in ('node-pty', 'ws', '@xterm/xterm', '@xterm/addon-fit'):
         if not (ROOT.parent / 'node_modules' / name).is_dir():
-            return False, 'python frontend_ide/_setup.py を実行してください。'
+            return False, f'python "{ROOT.parent / "_setup.py"}" を実行してください。'
     return ((True, 'PTY / Vue ターミナル') if (ROOT.parent / 'dist/app.js').is_file()
-            else (False, 'Vue画面が未準備です。'))
+            else (False, f'Vue画面が未準備です。python "{ROOT.parent / "_setup.py"}" を実行してください。'))
 
 def start(open_window=None):
     return shared.start(open_window, kind='console')

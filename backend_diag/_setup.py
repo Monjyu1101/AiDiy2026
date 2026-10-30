@@ -57,7 +57,7 @@ def setup(choices=None, *, desktop=True):
         return True
     print_header('Diag セットアップ')
     print_info(f'作業ディレクトリ: {THIS_DIR}')
-    print_info('対象: Node.js / Electron')
+    print_info('対象: Node.js / Electron / Vue 3')
     directory = Path.home() / '.local' / 'bin'
     launcher = directory / ('aidiy_diag.cmd' if sys.platform == 'win32' else 'aidiy_diag')
     try:
@@ -81,8 +81,16 @@ def setup_desktop():
         return True
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
     if not shutil.which('node.exe' if sys.platform == 'win32' else 'node') or not npm:
-        print('Electron の準備には Node.js と npm が必要です。導入後に python backend_diag/_setup.py を再実行してください。')
+        print(f'Electron の準備には Node.js と npm が必要です。導入後に python "{THIS_DIR / "_setup.py"}" を再実行してください。')
         return False
+    sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
+    from _runtime_requirements import check_project_node_runtime
+    ok, detail = check_project_node_runtime(THIS_DIR, dependency='electron', fallback='>=22.12.0')
+    if not ok:
+        print(detail)
+        return False
+    if detail.startswith('[WARN]'):
+        print(detail)
     spec = importlib.util.spec_from_file_location('aidiy_diag_shared_electron', THIS_DIR.parent / 'scripts' / '_setup_electron.py')
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)

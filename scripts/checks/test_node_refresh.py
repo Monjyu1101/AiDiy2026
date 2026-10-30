@@ -98,7 +98,7 @@ class NodeRefreshTests(unittest.TestCase):
                 self.assertIn("b=build（Node.js系の再ビルド）", output.getvalue())
 
     def fixture(self, *, desktop=True):
-        self.enterContext(patch.object(setup, "get_node_version", return_value="v24"))
+        self.enterContext(patch.object(setup, "get_node_version", return_value="v24.0.0"))
         self.enterContext(patch.object(setup, "get_npm_version", return_value="11"))
         self.enterContext(patch.object(setup, "npm_command", return_value="npm"))
         self.enterContext(patch.dict(os.environ, {"CODESPACES": "false" if desktop else "true", "ELECTRON_SKIP_BINARY_DOWNLOAD": "", "DISPLAY": ":fixture"}))
@@ -120,6 +120,14 @@ class NodeRefreshTests(unittest.TestCase):
         }
         self.enterContext(patch.object(setup, "_load_folder_module", side_effect=modules.__getitem__))
         return run, prepare, modules
+
+    def test_refresh_warns_and_continues_for_old_or_unparseable_node(self):
+        run, _prepare, _modules = self.fixture()
+        for version in ('v20.18.0', 'unknown'):
+            with self.subTest(version=version), patch.object(setup, 'get_node_version', return_value=version), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(setup.setup_node_refresh(), [])
+                self.assertIn('[WARN]', output.getvalue())
+        self.assertGreater(run.call_count, 0)
 
     def test_refresh_syncs_all_dependencies_and_always_builds_then_reinstalls_launchers(self):
         run, prepare, modules = self.fixture()

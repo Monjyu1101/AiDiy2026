@@ -30,6 +30,8 @@ if sys.platform == "win32":
 THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_WEB_DIR = THIS_DIR
 FRONTEND_COMMAND = "npm"
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import check_project_node_runtime
 
 AUTO_MODE = False
 
@@ -149,15 +151,22 @@ def setup(choices: dict | None = None) -> bool:
     label = "Web"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_WEB_DIR}")
-    print_info("対象: Vue 3 / Vite / TypeScript")
+    print_info("対象: Node.js / Vue 3 / Vite / TypeScript")
 
     if not FRONTEND_WEB_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {FRONTEND_WEB_DIR}")
         return False
 
+    ok, detail = check_project_node_runtime(FRONTEND_WEB_DIR, dependency="vite", fallback="^20.19.0 || >=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
+        return False
+
     if not check_npm_installed():
         print_error(f"{label}: npm がインストールされていません。")
-        print_info("  Node.js をインストールしてください: https://nodejs.org/")
+        print_info("  対応する Node.js と同梱の npm をインストールしてください: https://nodejs.org/")
         return False
 
     package_json = FRONTEND_WEB_DIR / "package.json"

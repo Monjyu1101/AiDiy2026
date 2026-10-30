@@ -71,15 +71,24 @@ NAME = "フロントエンド(IDE)"
 _processes: list[subprocess.Popen[bytes]] = []
 sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
 from _cleanup_processes import list_processes, process_arguments, stop_matching
+from _runtime_requirements import check_project_node_runtime
 
 
 def node_command() -> str | None:
     return shutil.which("node")
 
 
+def check_node_environment() -> tuple[bool, str]:
+    ok, detail = check_project_node_runtime(THIS_DIR, fallback=">=22.13", command=node_command())
+    if detail.startswith("[WARN]"):
+        print(detail)
+    return ok, detail
+
+
 def check_environment() -> tuple[bool, str]:
-    if node_command() is None:
-        return False, "Node.js が見つかりません (Node.js 22.13 以降をインストールしてください)"
+    ok, detail = check_node_environment()
+    if not ok:
+        return False, detail
     assets = (
         "monaco-editor/min/vs/loader.js", "docx-preview/dist/docx-preview.min.js",
         "xlsx/dist/xlsx.full.min.js", "pptxviewjs/dist/PptxViewJS.min.js",
@@ -87,14 +96,17 @@ def check_environment() -> tuple[bool, str]:
         "jszip/dist/jszip.min.js", "chart.js/dist/chart.umd.js",
     )
     if any(not (THIS_DIR / "node_modules" / asset).is_file() for asset in assets):
-        return False, "ビューアの依存関係が不足しています。python frontend_ide/viewer/_setup.py を実行してください。"
+        return False, f'ビューアの依存関係が不足しています。python "{THIS_DIR / "_setup.py"}" を実行してください。'
     if not (THIS_DIR.parent.parent / "frontend_ide/dist/app.js").is_file():
-        return False, "Vue画面が未準備です。python frontend_ide/_setup.py を実行してください。"
+        return False, f'Vue画面が未準備です。python "{THIS_DIR.parent / "_setup.py"}" を実行してください。'
     return True, "Vue / Node.js / Monaco / Office文書ビューア"
 
 
 def start(open_window: bool | None = None, *, kind='ide') -> subprocess.Popen[bytes]:
     """空きポートで独立起動する。親の終了後もログファイルへ出力して継続する。"""
+    ok, detail = check_node_environment()
+    if not ok:
+        raise RuntimeError(detail)
     label = f'フロントエンド({kind})' if kind != 'ide' else NAME
     node = node_command()
     if node is None:

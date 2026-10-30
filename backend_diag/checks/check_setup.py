@@ -429,7 +429,7 @@ class ElectronSetupTests(unittest.TestCase):
         calls=[]
         helper=SimpleNamespace(setup_dependencies=lambda *args: calls.append(args) or True)
         spec=SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module:None))
-        with patch.dict('os.environ',{'CODESPACES':'false','DISPLAY':':fixture'}),patch.object(setup.shutil,'which',return_value='/mock/npm'),patch.object(setup.importlib.util,'spec_from_file_location',return_value=spec) as load,patch.object(setup.importlib.util,'module_from_spec',return_value=helper),patch('builtins.print'):
+        with patch.dict('os.environ',{'CODESPACES':'false','DISPLAY':':fixture'}),patch.object(setup.shutil,'which',return_value='/mock/npm'),patch.dict('sys.modules',{'_runtime_requirements':SimpleNamespace(check_project_node_runtime=lambda *args,**kwargs:(True,'Node fixture'))}),patch.object(setup.importlib.util,'spec_from_file_location',return_value=spec) as load,patch.object(setup.importlib.util,'module_from_spec',return_value=helper),patch('builtins.print'):
             self.assertTrue(setup.setup_desktop())
         self.assertEqual(load.call_args.args[1],ROOT.parent/'scripts'/'_setup_electron.py')
         self.assertEqual(calls[0][0],ROOT)

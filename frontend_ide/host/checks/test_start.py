@@ -33,6 +33,7 @@ cleanup = load('vscode_root_cleanup_start_tests', ROOT.parent.parent / '_cleanup
 
 class StartupTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(standalone, "check_project_node_runtime", return_value=(True, "fixture Node")))
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))
 
     def test_only_selected_windows_launch_and_do_not_reopen(self):

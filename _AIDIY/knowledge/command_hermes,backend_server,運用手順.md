@@ -38,7 +38,11 @@ python _setup.py
 `_setup.py` の Hermes セットアップは、`command_hermes/pyproject.toml` を `uv sync --upgrade` で同期したうえで `~/.local/bin/aidiy_hermes.cmd` を生成する。
 `uv tool install` は使わない（セキュリティ警告の原因になるため）。
 
-生成される `.cmd` の内容（ASCII エンコード）:
+アプリ用 Python の条件は `command_hermes/pyproject.toml` の `requires-python`（現在 `>=3.13`）で管理する。セットアップはこの条件を表示して `uv` に Python 選択を委ね、`command_hermes/_start.py` は既存の仮想環境を使う場合に実際の Python の版を確認する。旧版や版数・条件の判定不能は警告して続行し、新たな版数停止条件にしない。実行ファイルの起動失敗・非0終了・確認タイムアウトや、実際の依存解決 / import / CLI 実行エラーは引き続き失敗として扱う。
+
+AiDiy Hermes の Python CLI は `npm install` を前提にしない。同梱 `package.json` の Node.js 条件は upstream の Node/workspace ツール向けで、Python CLI や cleanup の必須条件へ転用しない。Node/TypeScript TUI は同梱しない。
+
+生成される `.cmd` の内容（UTF-8・CRLF）:
 
 ```bat
 @echo off
@@ -70,6 +74,8 @@ python _cleanup.py
 ```
 
 `_cleanup.py` は `~/.local/bin/aidiy_hermes.cmd` を削除する。
+
+POSIX の `~/.local/bin/aidiy_hermes` と共通 PATH 登録も解除する。アプリ用 Python / uv / Node.js の版確認や依存導入は行わず、選択した環境・temp・キャッシュ等の削除失敗は失敗として返す。実際の削除範囲と停止方針は[共通の運用手順](./共通,開発環境運用手順.md#クリーンアップ)を確認する。
 
 主な provider 依存:
 

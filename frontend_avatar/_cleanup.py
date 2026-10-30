@@ -142,8 +142,9 @@ def remove_directory(path: Path, description: str) -> bool:
     return False
 
 
-def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+def cleanup_common_python_caches(target_dir: Path, label: str) -> tuple[int, bool]:
     deleted_count = 0
+    cleanup_ok = True
     print_info(f"{label}: __pycache__ フォルダを検索中...")
     # 削除中に再帰探索の列挙結果が変わらないよう、全階層の対象を先に確定する。
     # 万一キャッシュフォルダが入れ子でも、深い階層から削除する。
@@ -155,6 +156,8 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     for pycache in pycache_dirs:
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
+        else:
+            cleanup_ok = False
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
     pytest_cache_dirs = sorted(
         (path for path in target_dir.rglob(".pytest_cache") if path.is_dir()),
@@ -164,7 +167,9 @@ def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
     for pytest_cache in pytest_cache_dirs:
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    return deleted_count
+        else:
+            cleanup_ok = False
+    return deleted_count, cleanup_ok
 
 
 # ============================================================
@@ -199,26 +204,34 @@ def cleanup(choices: dict | None = None) -> bool:
         return True
 
     deleted_count = 0
+    cleanup_ok = True
 
     node_modules_dir = FRONTEND_AVATAR_DIR / "node_modules"
     if remove_directory(node_modules_dir, f"node_modules ({label})"):
         deleted_count += 1
     elif node_modules_dir.exists():
         print_error(f"  node_modules 削除失敗。手動で削除してください: {node_modules_dir}")
+        cleanup_ok = False
 
     for build_dir_name in FRONTEND_AVATAR_BUILD_DIRS:
         build_dir = FRONTEND_AVATAR_DIR / build_dir_name
         if remove_directory(build_dir, f"{build_dir_name} ({label})"):
             deleted_count += 1
+        elif build_dir.exists():
+            cleanup_ok = False
 
     # node_modules / ビルド成果物を消してから走査し、無駄なスキャンを避ける。
-    deleted_count += cleanup_common_python_caches(FRONTEND_AVATAR_DIR, label)
+    cache_count, cache_ok = cleanup_common_python_caches(FRONTEND_AVATAR_DIR, label)
+    deleted_count += cache_count
+    cleanup_ok = cleanup_ok and cache_ok
 
-    if deleted_count > 0:
+    if not cleanup_ok:
+        print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+    elif deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
-    return True
+    return cleanup_ok
 
 
 def main():

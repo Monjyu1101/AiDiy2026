@@ -20,6 +20,9 @@ spec.loader.exec_module(start)
 
 
 class AvatarStartTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(start, "check_project_node_runtime", return_value=(True, "fixture Node")))
+
     @unittest.skipUnless(sys.platform == "win32", "Windowsのコンソール非表示")
     def test_child_has_no_console_and_output_is_captured(self):
         process = start.launch_process("非表示試験", [sys.executable, "-c", "import ctypes; print(ctypes.windll.kernel32.GetConsoleWindow())"], SCRIPT.parent)

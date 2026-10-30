@@ -38,6 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
 from _setup_electron import setup_dependencies
+from _runtime_requirements import check_project_node_runtime
 from _setup_path import ensure_launcher_path, windows_launcher_command, launcher_owner_comment
 
 AUTO_MODE = False
@@ -187,15 +188,22 @@ def setup(choices: dict | None = None) -> bool:
     label = "Avatar"
     print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_AVATAR_DIR}")
-    print_info("対象: Vue 3 / Vite / TypeScript / Electron")
+    print_info("対象: Node.js / Vue 3 / Vite / TypeScript / Electron")
 
     if not FRONTEND_AVATAR_DIR.exists():
         print_error(f"{label}: フォルダが見つかりません: {FRONTEND_AVATAR_DIR}")
         return False
 
+    ok, detail = check_project_node_runtime(FRONTEND_AVATAR_DIR, dependency="electron", fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
+        return False
+
     if not check_npm_installed():
         print_error(f"{label}: npm がインストールされていません。")
-        print_info("  Node.js をインストールしてください: https://nodejs.org/")
+        print_info("  対応する Node.js と同梱の npm をインストールしてください: https://nodejs.org/")
         return False
 
     if not setup_dependencies(

@@ -6,6 +6,7 @@
 
 """起動入口の実子プロセスにコンソールがなく、ログを取得できることを確認する。"""
 import importlib.util
+import contextlib
 import asyncio
 import json
 from pathlib import Path
@@ -38,7 +39,10 @@ class ElectronConsoleTest(unittest.TestCase):
             observed.append(child)
             return child
 
-        with patch.object(module.subprocess, 'Popen', side_effect=probe), patch('builtins.print'):
+        with patch.object(module.subprocess, 'Popen', side_effect=probe), patch('builtins.print'), contextlib.ExitStack() as stack:
+            # 実子のコンソール属性だけを測る。版数確認用の別プロセスは専用回帰で扱う。
+            if hasattr(module, 'check_project_node_runtime'):
+                stack.enter_context(patch.object(module, 'check_project_node_runtime', return_value=(True, 'Node fixture')))
             child = action()
         output, error = child.communicate(timeout=10)
         self.assertEqual(child.returncode, 0, error)
@@ -109,6 +113,7 @@ class ElectronConsoleTest(unittest.TestCase):
 
     def test_discord_preflight_and_direct_entry(self):
         module = load('frontend_channels/_start.py')
+        self.enterContext(patch.object(module, 'check_project_node_runtime', return_value=(True, 'Node fixture')))
         import _setup_electron
         real_run = subprocess.run
         records = []
@@ -166,7 +171,10 @@ class PosixLaunchOptionsTest(unittest.TestCase):
         ):
             module = load(relative)
             for platform in ('darwin', 'linux'):
-                with self.subTest(module=relative, platform=platform), patch.object(module.sys, 'platform', platform), patch.object(module.shutil, 'which', return_value='/fixture/node'), patch.object(module.subprocess, 'Popen') as popen:
+                with self.subTest(module=relative, platform=platform), patch.object(module.sys, 'platform', platform), patch.object(module.shutil, 'which', return_value='/fixture/node'), patch.object(module.subprocess, 'Popen') as popen, contextlib.ExitStack() as stack:
+                    # 本試験はPopen起動オプションが対象。新しい版数preflightは別の回帰で確認する。
+                    if hasattr(module, 'check_project_node_runtime'):
+                        stack.enter_context(patch.object(module, 'check_project_node_runtime', return_value=(True, 'fixture')))
                     getattr(module, name)(*args)
                     self.assertEqual(popen.call_args.kwargs.get('creationflags', 0), 0)
                     self.assertTrue(popen.call_args.kwargs['start_new_session'])

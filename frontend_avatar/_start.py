@@ -77,6 +77,8 @@ THIS_DIR = Path(__file__).resolve().parent
 FRONTEND_AVATAR_DIR = THIS_DIR
 PORT_AVATAR = 8092
 FRONTEND_COMMAND = "npm"
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import check_project_node_runtime
 
 
 def _hidden_process_options() -> dict:
@@ -92,7 +94,7 @@ def get_npm_command() -> str | None:
         except subprocess.TimeoutExpired:
             print_warning(f"{candidate} のバージョン確認が15秒でタイムアウトしました。")
             continue
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        except (subprocess.CalledProcessError, OSError):
             continue
     return None
 
@@ -111,10 +113,18 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
             return False, f"node_modules が空です: {node_modules}"
     except Exception as exc:
         return False, f"node_modules の確認でエラー: {exc}"
+    for package in ("vue", "vite"):
+        if not (node_modules / package / "package.json").is_file():
+            return False, f'{package} が未準備です。python "{FRONTEND_AVATAR_DIR / "_setup.py"}" を実行してください。'
     return True, str(node_modules)
 
 
 def check_environment() -> tuple[bool, str]:
+    ok, detail = check_project_node_runtime(FRONTEND_AVATAR_DIR, dependency="electron", fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        return False, detail
     if get_npm_command() is None:
         return False, "npm を確認できません (未導入・実行失敗・15秒のタイムアウトを確認してください)"
     return check_npm_project_environment(FRONTEND_AVATAR_DIR)
@@ -140,6 +150,11 @@ def launch_process(name: str, command: list[str], cwd: Path) -> subprocess.Popen
 
 
 def launch_command() -> list[str]:
+    ok, detail = check_project_node_runtime(FRONTEND_AVATAR_DIR, dependency="electron", fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        raise RuntimeError(detail)
     node = shutil.which('node')
     if node is None:
         raise RuntimeError("Node.js が見つかりません")
@@ -341,7 +356,11 @@ def main() -> None:
         prog="aidiy_avatar",
         description="Electron 版 Avatar を独立プロセスで起動し、すぐ戻ります。ログイン画面を閉じると renderer（8092）も停止します。",
     ).parse_args()
-    sys.exit(subprocess.run(launch_command(), cwd=str(FRONTEND_AVATAR_DIR)).returncode)
+    try:
+        sys.exit(subprocess.run(launch_command(), cwd=str(FRONTEND_AVATAR_DIR)).returncode)
+    except (OSError, RuntimeError) as error:
+        print_error(str(error))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

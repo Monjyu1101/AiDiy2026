@@ -2,7 +2,7 @@
 
 外部プログラムの導入状態を、ソースに記載された利用箇所と一緒に確認します。診断サーバー・インストール確認・キー設定・モデル確認は Node.js 18 以降の標準モジュールで動作します。診断の実行に Python は不要です。通常は Electron ウィンドウで表示し、--browser / Codespaces / GUI のない環境では Web で表示します。AIコア / DB の起動は不要です。
 
-診断本体の起動には Node.js が必要です。一覧は Python、uv、Node.js、npm、npx、Electron の順です。Python はバックエンドで使用します。Python が無くても配置済みランチャー・直接 Node 起動は使えます。全体セットアップは既存方式に合わせ Python を使用します。
+画面は Vue 3 のビルド済み配布物です。診断本体の起動には Node.js が必要です。一覧は Python、uv、Node.js、npm、npx、Electron の順です。Python はバックエンドで使用します。Python が無くても配置済みランチャー・直接 Node 起動は使えます。全体・個別の `_setup.py` / `_start.py` / `_cleanup.py` 管理入口は Python を使用します。Electron 44 の依存導入には Node.js 22.12 以降が宣言されており、診断本体の Node.js 18 以上とは用途が異なります。VS Code とグローバル Vue CLI は不要です。版数警告・cleanup の扱いは[共通の実行環境表](../_AIDIY/knowledge/共通,開発環境運用手順.md#モジュール別の実行環境)を参照してください。
 
 ## フォルダ構成
 

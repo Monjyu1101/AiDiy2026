@@ -3,6 +3,15 @@
 Console / Code / Live / IDE / Task / Team / Browser の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は7種類です。
 
 
+## 導入・起動の要件
+
+IDE群全体は **Node.js 22.13 以降と npm** を使用してください。`viewer/package.json` の要件と文書ビューアを含む構成に合わせます。共通UIのVite単体は `^20.19.0 || >=22.12.0`、Code / LiveのElectron依存は `>=22.12.0` で、各 `_setup.py` / `_start.py` は対象の実metadataを確認します。版数不足・版数不明だけなら警告して継続し、コマンド未導入・実行失敗・タイムアウトや実際のnpm/Node失敗はエラーにします。一律に同じ最低版へ書き換えません。
+
+- Vue 3はプロジェクトのnpm依存です。グローバルのVue CLIは不要です。共有画面・依存物の復旧は `python frontend_ide/_setup.py` を使います。
+- VS Codeは **Code / Liveの拡張配置時だけ** 必要です（`^1.106.0`）。CLI未導入では通常setupは単独画面だけを準備します。版数不足・版数不明は警告して従来の配置処理へ進み、`--extensions-only` も実際のCLI結果に従います。
+- Electronは各プロジェクトで宣言されたnpmパッケージと同版の本体を使います。Code / Live / Console / IDE / Task / Teamは既存のWeb切替を維持します。**BrowserだけはElectron必須**で、viewerまたはhostに準備された本体を利用します。
+- cleanupにはNode.js・Electron・VS Codeの最低版チェックを追加しません。Code / Liveの拡張解除は従来どおりVS Code CLIで確認し、確認不能なら生成物を残して失敗を報告します。依存を直す前にcleanupする必要はありません。
+
 ## ソースの配置
 
 - `launch.mjs` / `server.mjs` / `desktop.cjs`: 共通起動・HTTPサーバー・Electronの入口。既存のコマンドと起動パスを維持します。

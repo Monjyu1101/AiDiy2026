@@ -13,10 +13,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / "scripts"))
 from _setup_electron import frontend_dependency_guard
+from _runtime_requirements import check_project_node_runtime
 
 def prepare():
+    ok, detail = check_project_node_runtime(ROOT, dependency="vite", fallback="^20.19.0 || >=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print(detail)
+        return False
+
     npm = shutil.which('npm.cmd' if sys.platform == 'win32' else 'npm')
     if not npm:
+        print("[NG] npm が見つかりません。対応する Node.js と同梱の npm を導入してください。")
         return False
     try:
         reuse = frontend_dependency_guard(ROOT, 'Console / Code / Live / IDE / Task / Team / Browser 共通UI', desktop=False)
@@ -59,6 +68,7 @@ def setup(choices=None):
     print("\n" + "=" * 60)
     print("Console / Code / Live / IDE / Task / Team / Browser セットアップ")
     print("=" * 60 + "\n")
+    print("対象: Node.js / Vue 3 / Vite / TypeScript / Electron / VS Code / VSIX")
     child_choices = {**(choices or {}), "ide": True, "_defer_ide_launchers": True}
     # hostからprepareだけを呼ぶため再帰しない。
     host = None

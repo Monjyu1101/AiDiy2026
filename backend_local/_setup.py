@@ -35,6 +35,8 @@ if sys.platform == "win32":
 # 設定
 # ============================================================
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import python_requirement
 BACKEND_LOCAL_DIR = THIS_DIR
 PROJECT_ROOT = THIS_DIR.parent
 BACKEND_SERVER_DIR = PROJECT_ROOT / "backend_server"
@@ -421,6 +423,13 @@ def setup(choices: dict | None = None) -> bool:
     if not req_file.exists():
         print_error(f"{label}: pyproject.toml が見つかりません: {req_file}")
         return False
+
+    try:
+        requirement = python_requirement(BACKEND_LOCAL_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"{label}: Python 実行条件を確認できません。uv の確認を続行します: {exc}")
+    else:
+        print_info(f"実行環境: Python {requirement}（pyproject.toml。uv が互換 Python を選択します）")
 
     venv_dir = BACKEND_LOCAL_DIR / BACKEND_LOCAL_ENV
     if venv_dir.exists():

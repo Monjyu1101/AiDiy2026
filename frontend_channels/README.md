@@ -21,6 +21,8 @@ Electron のタイトルバーは「ー □ 📌 ×」で最小化・最大化�
 python frontend_channels/_setup.py
 ```
 
+setupとPython起動入口は `package.json` のNode.js要件を確認します。Vue 3・Electron・パネル生成用ツールは `npm ci --include=dev` でプロジェクトに導入し、グローバルVue CLI・Electronは不要です。Electron本体がない場合も既存のWeb起動へ切り替えられますが、Node.jsの版数不足・版数不明だけなら警告して継続します。Node.jsの実行失敗やDiscord設定の不備はエラーのままです。専用ウィンドウの復旧は上記 `_setup.py` を使います。
+
 ルート `_setup.py` の「フロントエンド(Discord)」からも導入できます。セットアップは既定 Yes（`[y]/n`）で、Electron の事前配置と `~/.local/bin/aidiy_discord`（Windows は `.cmd`）の登録も行います。ルート `_start.py` の Discord 起動は既定 No（`[n]/y`）で、Yes を選ぶとパネルを開いて自動接続します。
 
 フォルダ移動前に登録した `aidiy_discord` は旧絶対パスを含むため、移動後にルート `_setup.py` の `b`（build: Node.js系の再ビルド）または上記のセットアップで再登録してください。既存の `node_modules` はフォルダごと移動して再利用でき、Git管理には追加しません。

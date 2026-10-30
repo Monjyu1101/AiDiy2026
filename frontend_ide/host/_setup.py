@@ -38,6 +38,7 @@ FRONTEND_COMMAND = "npm"
 # 単体実行とルートセットアップの両方から共通処理を参照する。
 sys.path.insert(0, str(THIS_DIR.parent.parent / "scripts"))
 from _setup_electron import setup_dependencies
+from _runtime_requirements import check_project_node_runtime, check_vscode_runtime
 from _setup_path import ensure_launcher_path, windows_launcher_command, launcher_owner_comment
 
 sys.path.insert(0, str(THIS_DIR / "scripts"))
@@ -302,6 +303,12 @@ def install_standalone_launcher(*, register_path: bool = True) -> bool:
 
 def install_extensions(vscode_cli: str) -> bool:
     """aidiy- 拡張を除去してから Code / Live を配置し、両 ID を確認する。"""
+    ok, detail = check_vscode_runtime(vscode_cli)
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
+        return False
     expected = set()
     packages = []
     for package_root in (FRONTEND_VSCODE_DIR, FRONTEND_VSCODE_DIR / "aidiy_live"):
@@ -338,11 +345,18 @@ def setup(choices: dict | None = None) -> bool:
     if not (choices and choices.get("ide")):
         print_header(f"{label} セットアップ")
     print_info(f"作業ディレクトリ: {FRONTEND_VSCODE_DIR}")
-    print_info("対象: Node.js / TypeScript / Electron / VS Code / VSIX")
+    print_info("対象: Node.js / Vue 3 / TypeScript / Electron / VS Code / VSIX")
 
     package_json = FRONTEND_VSCODE_DIR / "package.json"
     if not package_json.is_file():
         print_error(f"{label}: package.json が見つかりません: {package_json}")
+        return False
+
+    ok, detail = check_project_node_runtime(FRONTEND_VSCODE_DIR, dependency="electron", fallback=">=22.12.0")
+    if detail.startswith("[WARN]"):
+        print(detail)
+    if not ok:
+        print_error(detail)
         return False
 
     npm_path = shutil.which(npm_command()) or shutil.which(FRONTEND_COMMAND)
@@ -368,7 +382,7 @@ def setup_assets(npm_path: str, *, choices=None) -> bool:
     label = "Code / Live"
     vscode_cli = find_vscode_cli()
     if vscode_cli is None:
-        print_warning("vscode CLI が見つからないため、単独画面だけをセットアップします。")
+        print_warning("VS Code CLI が見つからないため、単独画面だけをセットアップします。")
         if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):
             print_error(f"{label}: 単独画面の生成に失敗しました。")
             return False

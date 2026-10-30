@@ -40,6 +40,9 @@ import _cleanup_processes as processes
 
 class ElectronSetupTest(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(vscode, "check_project_node_runtime", return_value=(True, "fixture Node")))
+        self.enterContext(patch.object(avatar, "check_project_node_runtime", return_value=(True, "fixture Node")))
+        self.enterContext(patch.object(vscode, "check_vscode_runtime", return_value=(True, "fixture VS Code")))
         # 一時コピーの配布物試験。模擬Windowsでも実OSのPowerShell/プロセス一覧へ触れない。
         self.enterContext(patch.object(processes, 'list_processes', return_value=[]))
         self.enterContext(patch.object(vscode, 'ensure_launcher_path', return_value=True))

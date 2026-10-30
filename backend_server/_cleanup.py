@@ -15,7 +15,7 @@
 このスクリプトを直接実行して単体クリーンアップすることもできます。
 
 公開 API:
-    cleanup(choices: dict) -> None
+    cleanup(choices: dict) -> bool
     collect_choices() -> dict | None
 """
 
@@ -197,31 +197,36 @@ def clean_directory_contents(path: Path, description: str) -> bool:
     return False
 
 
-def cleanup_common_python_caches(target_dir: Path, label: str) -> int:
+def cleanup_common_python_caches(target_dir: Path, label: str) -> tuple[int, bool]:
     deleted_count = 0
+    cleanup_ok = True
     print_info(f"{label}: __pycache__ フォルダを検索中...")
     for pycache in target_dir.rglob("__pycache__"):
         if remove_directory(pycache, f"__pycache__ ({label})"):
             deleted_count += 1
+        else:
+            cleanup_ok = False
     print_info(f"{label}: .pytest_cache フォルダを検索中...")
     for pytest_cache in target_dir.rglob(".pytest_cache"):
         if remove_directory(pytest_cache, f".pytest_cache ({label})"):
             deleted_count += 1
-    return deleted_count
+        else:
+            cleanup_ok = False
+    return deleted_count, cleanup_ok
 
 
 # ============================================================
 # クリーンアップ本体
 # ============================================================
-def cleanup(choices: dict) -> None:
+def cleanup(choices: dict) -> bool:
     label = "バックエンド(core,apps)"
     print_header(f"{label} のクリーンアップ")
 
     if not BACKEND_DIR.exists():
         print_warning(f"{label} のフォルダが見つかりません")
-        return
+        return True
 
-    deleted_count = cleanup_common_python_caches(BACKEND_DIR, label)
+    deleted_count, cleanup_ok = cleanup_common_python_caches(BACKEND_DIR, label)
 
     backend_envs = choices.get("backend_envs", {})
     for env_name in BACKEND_ENV_LIST:
@@ -232,6 +237,7 @@ def cleanup(choices: dict) -> None:
             if remove_directory(env_dir, f"{env_name} ({label})"):
                 deleted_count += 1
             else:
+                cleanup_ok = False
                 print_error(f"  {env_name} 削除失敗。手動で削除してください: {env_dir}")
         elif env_name in backend_envs:
             print_info(f"  {env_name} はそのまま残します")
@@ -241,6 +247,8 @@ def cleanup(choices: dict) -> None:
         if choices.get("backend_logs") is True:
             if clean_directory_contents(logs_dir, f"logs ({label})"):
                 deleted_count += 1
+            else:
+                cleanup_ok = False
         elif choices.get("backend_logs") is False:
             print_info("  logs はそのまま残します")
 
@@ -249,6 +257,8 @@ def cleanup(choices: dict) -> None:
         if choices.get("backend_temp") is True:
             if remove_directory(temp_dir, f"temp ({label})"):
                 deleted_count += 1
+            else:
+                cleanup_ok = False
         elif choices.get("backend_temp") is False:
             print_info("  temp はそのまま残します")
 
@@ -258,13 +268,18 @@ def cleanup(choices: dict) -> None:
             if choices.get("backend_sqlite") is True:
                 if remove_file(sqlite_db, f"SQLite データベース ({label})"):
                     deleted_count += 1
+                else:
+                    cleanup_ok = False
             elif choices.get("backend_sqlite") is False:
                 print_info("  SQLite データベースはそのまま残します")
 
-    if deleted_count > 0:
+    if not cleanup_ok:
+        print_warning(f"{label}: 一部のクリーンアップを完了できませんでした")
+    elif deleted_count > 0:
         print_success(f"{label} のクリーンアップ完了 ({deleted_count}個削除)")
     else:
         print_info(f"{label}: 削除対象はありませんでした")
+    return cleanup_ok
 
 
 def collect_choices() -> dict | None:
@@ -296,7 +311,8 @@ def main():
     if AUTO_MODE:
         print_info("AUTOモードで実行します。以降の質問はデフォルト値で自動回答します。")
     choices = collect_choices()
-    cleanup(choices)
+    if not cleanup(choices):
+        sys.exit(1)
     print_success("クリーンアップが完了しました")
 
 

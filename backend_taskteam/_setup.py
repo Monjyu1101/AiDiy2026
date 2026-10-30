@@ -23,6 +23,8 @@ if sys.platform == "win32":
 
 
 THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(THIS_DIR.parent / "scripts"))
+from _runtime_requirements import python_requirement
 BACKEND_TASKTEAM_DIR = THIS_DIR
 BACKEND_TASKTEAM_ENV = ".venv"
 AUTO_MODE = False
@@ -142,6 +144,13 @@ def setup(choices: dict | None = None) -> bool:
     if not (BACKEND_TASKTEAM_DIR / "pyproject.toml").exists():
         print_error(f"{label}: pyproject.toml が見つかりません。")
         return False
+
+    try:
+        requirement = python_requirement(BACKEND_TASKTEAM_DIR)
+    except (OSError, ValueError) as exc:
+        print_warning(f"{label}: Python 実行条件を確認できません。uv の確認を続行します: {exc}")
+    else:
+        print_info(f"実行環境: Python {requirement}（pyproject.toml。uv が互換 Python を選択します）")
 
     venv_dir = BACKEND_TASKTEAM_DIR / BACKEND_TASKTEAM_ENV
     if venv_dir.exists():
