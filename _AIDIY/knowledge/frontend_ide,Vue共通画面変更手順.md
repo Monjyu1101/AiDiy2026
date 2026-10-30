@@ -45,6 +45,8 @@
 
 ## 変更先の選び方
 
+`viewer/_start.py` を共用する IDE / Console / Task / Team / Browser の起動ログは、配置先リポジトリの `temp/aidiy_<kind>/logs/<UUID>.log` に保存する。閲覧プロジェクトやカレントディレクトリから保存先を決めず、旧 `viewer/out/` のログは移行・削除・退避先利用しない。ElectronのuserData・profile・会話履歴の保存先は変更しない。`python -B -m unittest discover -s frontend_ide/viewer/checks -p test_start.py` で5種類の保存先・別起動のログ分離・旧ログ保持・保存失敗時の非起動を確認する。
+
 Mac のアプリ名とメニューは `desktop.cjs` と `host/scripts/MacOS-Menu.cjs` で扱います。Console / Code / Live / IDE の単独起動・IDE子窓・ピン留め・ブラウザ窓は同じアプリメニューを使います。⌘Q / アプリメニューの「閉じる」は親窓の既存 close を通し、⌘W はフォーカス中の窓だけを閉じます。Mac のシステム Dock「終了」も IDE の利用中確認を通します。親との切断時の回収は `forcedQuit` で確認待ちにしません。編集キーは native role に任せ、Console の選択コピーやシェルへの Ctrl+C を main のキー処理で奪わないでください。`node --test checks/code-window-title.test.mjs host/checks/mac-menu.test.cjs` は各起動種別・終了確認と親子窓の寿命を確認します。
 
 IDEのElectron版はプロジェクト表示行の名前のすぐ右側に並ぶ「＋ Console」「＋ Code」「＋ Live」から別ウィンドウを開き、Web版は画面内タブです。切り分けは `window.aidiyWindow` で行います。IPCにはアプリ種別だけを渡し、プロジェクト・モードはメインプロセスでIDEサーバーの状態から取得します。

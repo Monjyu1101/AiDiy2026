@@ -53,11 +53,6 @@ git --version >"%AIDIY_TEMP%\probe.txt" 2>&1
 if errorlevel 1 goto prerequisite_failed
 type "%AIDIY_TEMP%\probe.txt"
 type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
-set "STAGE=prerequisite_robocopy"
-echo [確認] robocopy
-where robocopy >"%AIDIY_TEMP%\probe.txt" 2>&1
-if errorlevel 1 goto prerequisite_failed
->>"%LOG%" echo CHECK robocopy OK
 set "STAGE=prerequisite_python"
 echo [確認] Python実行環境（3.13以上を推奨、旧版でも続行）
 py -3 -X utf8 -c "import sys;encoded=sys.executable.encode('cp932');encoded.decode('cp932')!=sys.executable and sys.exit(3);sys.stdout.buffer.write(encoded+b'\r\n');sys.stderr.write('Python '+sys.version.split()[0]+'\n')" >"%AIDIY_TEMP%\python.txt" 2>"%AIDIY_TEMP%\probe.txt"
@@ -268,13 +263,18 @@ for /f "usebackq eol=| delims=" %%F in ("%AIDIY_TEMP%\untracked.txt") do (
     call :backup_file
     if errorlevel 1 exit /b 1
 )
-if not exist "_config\" goto backup_done
-robocopy "_config" "%BACKUP%\_config" /E /COPY:DAT /DCOPY:DAT /XJ /SL /R:1 /W:1 /NFL /NDL /NJH /NJS >nul
-if errorlevel 8 exit /b 1
-:backup_done
+rem Python standard library only. Never follow configuration links or junctions.
+"%PYTHON%" -X utf8 -c "import os,sys,shutil;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');src=Path('_config');safe=lambda p:not (p.is_symlink() or getattr(p.lstat(),'st_file_attributes',0) & 1024);guard=lambda folder,names:[] if all(safe(Path(folder)/name) for name in names) else sys.exit('Configuration backup refuses links/reparse points: '+str(folder));os.path.lexists(src) and (guard(src.parent,[src.name]),shutil.copytree(src,Path(os.environ['BACKUP'])/'_config',symlinks=True,ignore=guard))" >"%AIDIY_TEMP%\backup.txt" 2>&1
+if errorlevel 1 goto config_backup_failed
 git rev-parse HEAD >"%BACKUP%\head.txt"
 if errorlevel 1 exit /b 1
 exit /b 0
+
+:config_backup_failed
+echo [エラー] 設定ファイルを退避できません。更新せず停止します。
+type "%AIDIY_TEMP%\backup.txt"
+type "%AIDIY_TEMP%\backup.txt" >>"%LOG%"
+exit /b 1
 
 :backup_file
 for %%D in ("%BACKUP%\untracked\%UNTRACKED_FILE%") do if not exist "%%~dpD" mkdir "%%~dpD" >nul 2>&1
@@ -299,7 +299,7 @@ goto finish
 if "%RC%"=="0" set "RC=1"
 >>"%LOG%" echo FAILED stage=%STAGE% exit=%RC% %DATE% %TIME%
 echo [エラー] "%STAGE%" で停止しました。終了コード=%RC%
-echo Git・Python・robocopyの実行環境が必要です。版の不足だけでは停止しません。
+echo Git・Pythonの実行環境が必要です。版の不足だけでは停止しません。
 echo 上記の処理名とエラー表示、origin/main、競合、権限を確認してください。
 echo 既存変更・退避・途中cloneは削除していません。
 echo 実行記録: "%LOG%"
@@ -311,7 +311,7 @@ if exist "%CONTROL%\run.lock\owner.txt" del /q "%CONTROL%\run.lock\owner.txt" >n
 if exist "%CONTROL%\run.lock\" rd "%CONTROL%\run.lock" >nul 2>&1
 :clean_temp
 rem Delete only known scratch files. Never delete the currently executing batch.
-for %%F in (python.txt probe.txt prefix.txt origin.txt allowed-origins.txt bad-origins.txt branch.txt gitdir.txt unmerged.txt untracked.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
+for %%F in (python.txt probe.txt prefix.txt origin.txt allowed-origins.txt bad-origins.txt branch.txt gitdir.txt unmerged.txt untracked.txt backup.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
 >>"%LOG%" echo TEMP_COPY_RETAINED="%~f0"
 rem Restore the caller directory before returning. Do not modify that directory.
 cd /d "%AIDIY_CWD%" >nul 2>&1

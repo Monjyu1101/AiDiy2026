@@ -54,7 +54,7 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 - 設定は `_config/AiDiy_diag_start.json` に原子的に保存する。機能ごとに既知の真偽値だけを受け付ける。起動時に設定のコピーを固定し、処理中に変更した設定は次回へ適用する。ページ再読込・別タブへの移動ではプロセスを停止しない。
 - `scripts/_diag_start.py` は既存の `check_environment` / `start` / `kill_ports` を共用する。Core / Apps は対応するポートだけを停止する。Tools は固定の `diag_main.mjs --headless` を先に実行する。設定不足・事前診断失敗・待受失敗時は後続の起動を中止する。
 - Web の表示設定は「ブラウザで開く」の1項目（保存キー `ブラウザ表示`、既定 ON）。保存ファイルに統合前の `chrome_devtoolsで開く` があれば読込時だけ取り除き、`ブラウザ表示` の ON / OFF は維持する。設定 API は引き続き既知の真偽値だけを受け付ける。ON 時はポート開通後も HTTP 200 が20秒間継続するまで待ち、失敗応答で安定時間を数え直す（最大90秒）。安定後に Tools の既存 `POST /aidiy_chrome_devtools/new_page` を呼び、戻り値のページ ID を確認する。OFF 時は画面を開かず Web だけ起動する。Tools / Chrome の失敗は理由をコンソールに出して Web を稼働継続し、HTTP 安定待機の失敗は起動失敗とする。loopback 通信はプロキシを経由させず、安定待機中の停止ではページを開かない。外部サービスを操作しない Python 試験で応答失敗・継続安定・停止・タイムアウト・呼出順・Tools 失敗を確認する。
-- 通常の `_start.py` 監視には既存の `cleanup_stop_request` を通知し、旧インスタンスの自動復活を防ぐ。aidiy_diag 同士の入替は `_AIDIY/aidiy_diag/起動/<ID>.json` の実行IDと OS ファイルロックを使い、旧監視が停止処理を終えるまで新監視は待つ。PID だけを保存して後から停止する方式にはしない。
+- 通常の `_start.py` 監視には既存の `cleanup_stop_request` を通知し、旧インスタンスの自動復活を防ぐ。aidiy_diag 同士の入替は `temp/aidiy_diag/起動/<ID>.json` の実行IDと OS ファイルロックを使い、旧監視が停止処理を終えるまで新監視は待つ。PID だけを保存して後から停止する方式にはしない。
 - キーボードの Ctrl+C / ⌘C はログの選択コピーに使い、停止 API へ接続しない。起動画面は通常のテキスト選択を許可する。「停止（Ctrl+C）」ボタンは Python の制御入力に停止要求を送り、`scripts/_diag_console.py` が対象へ実際の割り込みを送る。POSIX は対象のプロセスグループへ SIGINT、Windows は aidiy_diag 経路だけ隠した専用コンソールへ分離し、短命の補助プロセスから CTRL_C_EVENT を送る。専用コンソールとして生成した印がないプロセスには送らず、他のターミナルを巻き込まない。5秒で終了しない場合や送信失敗時は従来の強制停止へ進み、各機能の子・孫プロセスも既存停止 API で回収する。起動中の停止、異常終了時の再起動待ちの停止、aidiy_diag 終了による標準入力 EOF も同じ停止要求として処理する。自動再起動 ON の明示停止は再起動させない。
 - Windows で一瞬コマンド画面が出る場合は、診断本体だけでなく環境確認・ポート整理・強制停止の子プロセスも確認する。Tools の事前 headless 診断は本サービスと同じ `ConsoleSubprocess` で隠した専用コンソールへ起動し、停止時の Ctrl+C を維持する。各フォルダの `subprocess.run` は aidiy_diag 経路の間だけ `HiddenSubprocess` を介し、`CREATE_NO_WINDOW` と既定の標準入力 EOF を指定する。診断単独の Node バージョン確認・headless 実行も同様に非表示にする。Node 側の診断コマンドは `windowsHide: true` を維持する。Electron や利用者が選んだ Web ブラウザには非表示指定を適用しない。`scripts/checks/test_diag_start.py` は実プロセスのコンソール有無・非表示・出力取得と Ctrl+C を確認する。
 - コンソールは機能別にメモリ上で最大120,000文字を保持し、ログ位置を指定して差分を取得する。個別再起動の受理時は対象のログをクリアし、位置の基点を以前の末尾より先へ進めて古いカーソルにも置換を通知する。UIも対象のキャッシュとカーソルを消し、取得中の古い応答を無効にする。一括起動では履歴を維持する。ANSI 制御文字を除去し、画面はテキスト補間で表示する。HTTP の起動要求を全診断・headless・画面初期表示から呼ばない。起動画面の表示だけでは Python を探索・起動しない。
@@ -82,7 +82,7 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 - ルートには公開入口 `diag_main.mjs` / `aidiy_diag` / `aidiy_diag.cmd` と `_setup.py` / `_start.py` / `_cleanup.py`、パッケージ設定・案内を残します。
 - `起動/` は Electron・IPC・停止監視、`診断/` は導入確認・headless・カタログ、`モデル情報/` はキー確認・モデル/音声合成を担当します。
 - OpenRouter の同梱 ZIP は `backend_diag/モデル情報/openrouter_models/openrouter_models.zip`。対応するローダーと同じ機能の配下に置き、静的公開する `static/` へは入れません。
-- モジュール移動時は import、`import.meta.url`、Electron の package main / preload、fixture の差し替え先を追従させます。Electron の依存物・安全ログ・停止要求は従来の `backend_diag/` 基準、出力は従来の `_AIDIY/aidiy_diag/` 基準を維持します。
+- モジュール移動時は import、`import.meta.url`、Electron の package main / preload、fixture の差し替え先を追従させます。Electron の依存物・安全ログ・停止要求は従来の `backend_diag/` 基準、永続的な診断・モデル情報JSONは `_AIDIY/aidiy_diag/` に維持します。一時用途のアプリ/CLI起動ログは `temp/aidiy_diag/アプリ起動/`、サービス監視の実行ID JSON・OSロック・置換用一時ファイルは `temp/aidiy_diag/起動/` を使います。旧場所の自動移動・削除・フォールバックは行いません。更新前の Diag と管理サービスは終了してから起動し直し、稼働中のロック・実行IDは手動削除しません。停止API・cleanupの対象は変更せず、`backend_diag/.stop-request` の位置も維持します。
 - `node --test backend_diag/checks/*.check.mjs backend_diag/checks/*.check.cjs` の layout / bundled-models / launcher / startup / headless テストでパスと起動の回帰を確認します。UI・runtime を変更しない配置変更では配布物を無用に再生成せず、`node backend_diag/ui/verify.mjs` で一致を確認します。
 
 ミニ表示の外部アイコンは7列相当の幅で折り返します。8個以上で1列に固定すると、中央寄せの両端が窓の外へ出るため、`.mini-cli-buttons` の `flex-wrap:wrap` を維持します。高さは内容とタイトル・接続線・外周枠から測り、横方向にはスクロールを作りません。`node backend_diag/checks/initial-mini-desktop.mjs` は実Electronの端数DPI、全外部アイコンの画面内配置、縦スクロール残り、最前面の切替、通常表示への復帰と操作領域を検証します。CLIの導入状態は読み取り、アプリは実起動しません。
@@ -204,7 +204,7 @@ Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付
 - 起動には存在する絶対パスのフォルダが必要。Avatar にも選択を必須とするが、Avatar 自体の作業パスは AiDiy 本体にする。他の5種類は選択したパスを `cwd` と `--project` の単一引数に渡す。シェル文字列や任意コマンド・引数は受け付けない。共有設定の `CODE_BASE_PATH` を書き換えない。
 - Electron の `selectProject` は主ウィンドウの主フレームだけが呼べる固定フォルダダイアログ。Web はサーバー側フォルダだけを列挙する。選択は画面内だけで保持し、再読込時は未選択とする。
 - Avatar / Live / Discord だけ、押下後に PowerShell CIM（Windows）または ps（macOS / Linux）でタスクを1回取得し、既知の実行入口と照合する。タスク内容は画面へ返さない。確認失敗時は起動しない。起動直前の同時クリックを排除し、各アプリ既存の排他も残す。起動後のタイマー・状態監視・PID保存による後日停止を追加しない。
-- 起動は `detached: true` / 標準入力 EOF / ログファイル出力 / `unref()`。aidiy_diag と IPC で所有関係を結ばない。ログは `_AIDIY/aidiy_diag/アプリ起動/` に起動ごとに分ける。画面の通知は「起動要求」とし、表示成功として扱わない。
+- 起動は `detached: true` / 標準入力 EOF / ログファイル出力 / `unref()`。aidiy_diag と IPC で所有関係を結ばない。ログは `temp/aidiy_diag/アプリ起動/` に起動ごとに分ける。画面の通知は「起動要求」とし、表示成功として扱わない。
 - IDE / Code は既存 `frontend_ide/launch.mjs --new-window` から一時プロファイルで別窓を開く。通常起動の既存窓再利用や Live の排他は変えない。Console は従来から複数起動を許可する。一時プロファイルはアプリ終了時に回収する。
 - 検証は `checks/app-launch.check.mjs`（実フォルダ・パス・タスク判定・認証・入力制限・aidiy_diag終了後の無害な子プロセス継続）、`checks/desktop.check.mjs`（フォルダ選択の限定IPC）、`frontend_ide/checks/project-instance.test.mjs`（通常起動と複数窓）。`checks/app-launch-browser.mjs` は合成プロセスで390/1280pxの実画面、フォルダ必須、押下時だけの確認、起動先、定時監視がないことを確認する。
 

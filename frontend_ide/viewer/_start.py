@@ -120,7 +120,8 @@ def start(open_window: bool | None = None, *, kind='ide') -> subprocess.Popen[by
         command.append("--no-open")
     print_info(f"[{label}] 作業ディレクトリ: {project}")
     print_info(f"[{label}] コマンド: {' '.join(command)}")
-    log_dir = THIS_DIR / 'out' / f'aidiy_{kind}'
+    # 起動ログだけを配置先リポジトリの一時領域へ置く。Electronの保存先は変えない。
+    log_dir = project / 'temp' / f'aidiy_{kind}' / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{uuid4().hex}.log"
     kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS} if sys.platform == "win32" else {"start_new_session": True}

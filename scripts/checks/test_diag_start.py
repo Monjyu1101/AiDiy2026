@@ -33,6 +33,21 @@ def load(path):
 
 
 class StartTests(unittest.TestCase):
+    def test_runtime_uses_repository_temp_not_diagnostic_results_or_cwd(self):
+        module = load(ROOT / 'scripts/_diag_start.py')
+        self.assertEqual(module.RUNTIME, ROOT / 'temp/aidiy_diag/起動')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / '日本語 空白 project'
+            scripts = root / 'scripts'
+            scripts.mkdir(parents=True)
+            (scripts / '_diag_start.py').write_bytes((ROOT / 'scripts/_diag_start.py').read_bytes())
+            (scripts / '起動対象.json').write_text('[]', encoding='utf-8')
+            copied = load(scripts / '_diag_start.py')
+            self.assertEqual(copied.RUNTIME, root / 'temp/aidiy_diag/起動')
+            with copied.service_lock(copied.RUNTIME / 'fixture.lock', threading.Event()):
+                self.assertTrue((copied.RUNTIME / 'fixture.lock').is_file())
+            self.assertFalse((root / '_AIDIY').exists())
+
     def test_short_progress_is_forwarded_before_child_exit(self):
         module = load(ROOT / 'scripts/_diag_start.py')
         output = queue.Queue()
@@ -336,7 +351,7 @@ from pathlib import Path
 from types import SimpleNamespace
 spec=importlib.util.spec_from_file_location('shared_diag_start', {str(ROOT / 'scripts/_diag_start.py')!r})
 shared=importlib.util.module_from_spec(spec);spec.loader.exec_module(shared)
-shared.ROOT=Path({str(directory)!r});shared.RUNTIME=shared.ROOT/'runtime'
+shared.ROOT=Path({str(directory)!r});shared.RUNTIME=shared.ROOT/'temp/aidiy_diag/起動'
 shared.TARGETS=[{{'id':'fixture','フォルダ':'fixture','監視名':'fixture','初期設定':{{'起動対象':True,'自動再起動':False}}}}]
 def stop():
     with (shared.ROOT/'stops.txt').open('a') as output: output.write('stop\\n')
@@ -399,11 +414,17 @@ shared.run(module,'fixture',{{'起動対象':True,'自動再起動':False}})
     def test_a_new_run_replaces_old_supervisor_before_starting(self):
         with tempfile.TemporaryDirectory() as directory:
             file = self.make_runner(directory)
-            runtime = Path(directory) / 'runtime';runtime.mkdir()
+            runtime = Path(directory) / 'temp/aidiy_diag/起動';runtime.mkdir(parents=True)
+            legacy = Path(directory) / '_AIDIY/aidiy_diag/起動'
+            legacy.mkdir(parents=True)
+            (legacy / 'fixture.json').write_text('{"run":"stale"}', encoding='utf-8')
             revision = runtime / 'fixture.json'
             revision.write_text('{"run":"first"}', encoding='utf-8')
             first, first_events = self.spawn_runner(file, 'first')
             self.ready(first, first_events)
+            self.assertTrue((runtime / 'fixture.lock').is_file())
+            self.assertEqual(list(legacy.iterdir()), [legacy / 'fixture.json'])
+            self.assertEqual((legacy / 'fixture.json').read_text(), '{"run":"stale"}')
             revision.write_text('{"run":"second"}', encoding='utf-8')
             second, second_events = self.spawn_runner(file, 'second')
             self.ready(second, second_events)

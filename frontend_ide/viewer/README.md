@@ -57,7 +57,7 @@ node frontend_ide/viewer\launch.mjs . --no-open   # サーバーだけ起動
 - 通常は Electron の専用ウィンドウを独立プロセスで開き、コマンドプロンプトへ戻ります。窓を閉じると、そのプロジェクトのサーバーも終了します。`--foreground` / `--wait` 指定時は起動中のまま待機し、Ctrl+Cでも終了できます。
 - Codespaces・画面のない Linux・Electron 未導入または起動失敗時は Web 版へ自動で切り替えます。`--browser` でも指定できます。Web 版は Ctrl+C で終了します。
 - ポート番号は固定せず、起動ごとに OS が空きポートを割り当てます。画面は起動ログの URL で開きます。番号が必要な場合だけ `--port 番号`（厳密指定は `--strict-port` を併用）を渡します。Codespaces では実際に割り当てたポートの転送 URL を表示し、`$BROWSER` へ localhost URL を渡して VS Code に転送を任せます。「ポート」から開くこともできます。転送先は環境変数で特定した当該 Codespace だけを許可します。
-- 全体起動は Code → Live → IDE → Discord の順です。IDE は空きポートで独立起動し、ログを `frontend_ide/viewer/out/aidiy_ide/` に保存します。全体起動の起動前整理・Ctrl+C・リブートでは停止せず、自動再起動もしません。クリーンアップ（`python _cleanup.py`）はこの配置先のプロセスを照合して停止し、`aidiy_ide` コマンド解除・`node_modules` 削除を行います。
+- 全体起動は Code → Live → IDE → Discord の順です。IDE は空きポートで独立起動し、ログを配置先リポジトリの `temp/aidiy_ide/logs/` に保存します。共通起動を使う Console / Task / Team / Browser も `temp/aidiy_<kind>/logs/` へ起動ごとの UUID 名で保存します。旧 `viewer/out/` のログは移行・削除せず、新保存先に書けない場合も旧保存先へ退避しません。Electron の設定・認証・プロファイルは変更しません。全体起動の起動前整理・Ctrl+C・リブートでは停止せず、自動再起動もしません。クリーンアップ（`python _cleanup.py`）はこの配置先のプロセスを照合して停止し、`aidiy_ide` コマンド解除・`node_modules` 削除を行います。
 - `node_modules`、`.git`、`dist`、`.venv`、`_cache` などは表示しません（`server.mjs` の `IGNORED`）。
 
 ## AiDiyへの接続

@@ -121,7 +121,7 @@ aidiy_discord
 
 最後に手動選択した Live モデル・音声は `~/.aidiy/aidiy_discord_model.json`、コード AI・モデルは `~/.aidiy/aidiy_discord_code_model.json`、Live の ON/OFF は `~/.aidiy/aidiy_discord_features.json`（未保存時は ON）に保存します。単独起動でも全体起動からの自動接続でも、これらを復元して適用します。保存処理は `aidiy_live` / `aidiy_code` と共用し、保存ファイルは Discord 専用です。未保存・破損時は共通 `LIVE_*` / `CODE_AIDIY_HERMES_MODEL` を使います。API キー・トークン・ID はモデル保存ファイルには含めません。
 
-`cd frontend_channels` 後の `npm start`、`python frontend_channels/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは `frontend_channels/out/aidiy_discord/` に保存します。
+`cd frontend_channels` 後の `npm start`、`python frontend_channels/_start.py` でも同じパネルが開きます。`aidiy_discord --check` / `npm run config:check` は設定と Hermes の実行パスだけを確認し、Discord には接続しません。Code だけなら Core は不要で、Live を利用する場合はルート `_start.py` などで Core を起動してください。Core 停止中は保存済み・共通設定のモデルを表示します。起動ログは配置先リポジトリの `temp/aidiy_discord/logs/`（`<UUID>.stdout.log` / `.stderr.log`）、起動完了通知は `temp/aidiy_discord/runtime/`（`<UUID>.ready.json`）に保存します。旧ログの移行・削除・旧保存先への退避は行いません。ブラウザ版の `frontend_channels/out/aidiy_discord/browser-profile` と Electron の保存先・設定は従来のままです。
 
 ### ブラウザ版（Codespaces など）
 

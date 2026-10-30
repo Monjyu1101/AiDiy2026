@@ -34,6 +34,8 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 
 ## 確認
 
+起動ログは配置先リポジトリの `temp/aidiy_discord/logs/<UUID>.stdout.log` / `.stderr.log`、起動完了通知は `temp/aidiy_discord/runtime/<UUID>.ready.json` に保存する。`panel/launch.mjs` が保存先を決め、Electron / Web の通知書込先は `AIDIY_DISCORD_READY` で渡す。終了中の再起動も同じ通知ファイルで確認する。旧ログの移行・削除・旧保存先への退避は行わない。Windowsブラウザ版の `frontend_channels/out/aidiy_discord/browser-profile` と Electron の userData、モデル設定は従来のまま維持する。`checks/launch-restart.test.ts` で新保存先・profile維持・再起動・書込失敗時の非起動を、`checks/launch.test.ts` で設定検証失敗時に一時ファイルを作らないことを確認する。
+
 独自実装のソース・パネル・起動スクリプト・検証コードには、README にある AiDiy の著作権・ライセンス定型文を付ける。JS / TS / CSS は `/*! ... */`、その他は各言語のコメント形式を使う。`frontend_channels/LICENSE` はルート `LICENSE` の全文と揃え、`package.json` の `license` は `SEE LICENSE IN LICENSE` とする。第三者ライブラリの表記には独自実装の定型文を適用しない。
 
 `frontend_channels` で `npm run check` と `npm test` を実行する。通常起動には同梱の配布物を使うためビルド不要。Vue の画面・状態管理・描画ソースや依存関係を変更した場合だけ `npm run build:panel` で `panel/view.js` と `panel/build-manifest.json` を更新する。`npm run check:panel` はソースと配布物の一致を確認する。 セットアップは Electron 更新で lockfile が変わり得るため、依存導入後に `build:panel` → `check:panel` を実行し、いずれかが失敗した場合は導入失敗とする。manifest だけの書き換えや package-lock の検証除外で不一致を隠さない。

@@ -8,6 +8,7 @@
 import contextlib
 import importlib.util
 import io
+import re
 from pathlib import Path
 import subprocess
 import unittest
@@ -29,6 +30,34 @@ class InventoryCaptured(Exception):
 
 
 class SetupMessageTests(unittest.TestCase):
+    def test_skipped_ai_cli_has_section_header_and_blank_before_manual_commands(self):
+        module = load("")
+        # 手動コマンドの既存出力を基準にし、コマンド文字列自体は変えない。
+        with patch.object(module, "check_npm_installed", return_value=True), patch.object(module, "npm_command", return_value="npm"), patch.object(module.subprocess, "Popen") as popen:
+            with contextlib.redirect_stdout(io.StringIO()) as manual:
+                module.print_ai_cli_manual_setup()
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                result = module.setup_common_global_tools({"common_python_upgrade": False, "common_npm_install": False})
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", output.getvalue())
+        header = "=" * 60 + "\nAI CLI ツール セットアップ\n" + "=" * 60
+        self.assertIn(header, clean)
+        self.assertEqual(clean.count("AI CLI ツール セットアップ"), 1)
+        self.assertIn("[WARN] 共通: AI CLI ツールのインストールをスキップしました。\n\n[INFO] AI CLI: 手動導入コマンド", clean)
+        self.assertTrue(output.getvalue().endswith(manual.getvalue()))
+        self.assertEqual(result, [])
+        popen.assert_not_called()
+
+    def test_install_path_keeps_one_existing_header_without_skip_section(self):
+        module = load("")
+        with patch.object(module, "check_npm_installed", return_value=True), patch.object(module, "npm_command", return_value="npm"), patch.object(module, "prepare_antigravity_installer", return_value=(None, None)), patch.object(module, "prepare_grok_build_installer", return_value=(None, None)), patch.object(module.subprocess, "Popen") as popen, contextlib.redirect_stdout(io.StringIO()) as output:
+            module.setup_common_global_tools({"common_python_upgrade": False, "common_npm_install": True})
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", output.getvalue())
+        self.assertEqual(clean.count("AI CLI: 導入開始"), 1)
+        self.assertNotIn("AI CLI ツール セットアップ", clean)
+        self.assertNotIn("AI CLI: 手動導入コマンド", clean)
+        self.assertEqual(popen.call_count, 4)
+        self.assertEqual(popen.call_args_list[0].args[0], ["npm", "install", "-g", "@anthropic-ai/claude-code"])
+
     def test_component_inventories_list_technologies_without_role_descriptions(self):
         inventories = {
             "backend_diag": ("Diag", "Node.js / Electron / Vue 3"),

@@ -45,6 +45,7 @@ test('単独起動・自動接続は無効なトークンを Electron 起動前�
         assert.match(result.stderr, /discord_bot_token/);
         assert.doesNotMatch(result.stderr, /secret-placeholder|Electron|パネルの準備/);
         assert.equal(existsSync(join(frontend, 'out')), false, 'Electron 起動用のログも作らない');
+        assert.equal(existsSync(join(root, 'temp')), false, '設定検証に失敗したら一時ログ・完了通知も作らない');
       }
     }
   } finally { rmSync(root, { recursive: true, force: true }); }

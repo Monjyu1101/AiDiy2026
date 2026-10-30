@@ -22,7 +22,8 @@ from contextlib import contextmanager
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = [item for item in json.loads((ROOT / 'scripts/起動対象.json').read_text(encoding='utf-8'))
            if item.get('起動管理', True)]
-RUNTIME = ROOT / '_AIDIY/aidiy_diag/起動'
+# 実行ID・OSロックは永続診断結果と分け、リポジトリ直下の一時領域へ置く。
+RUNTIME = ROOT / 'temp/aidiy_diag/起動'
 
 
 def load_module(name, path):

@@ -848,7 +848,7 @@ test('軌跡の外部Explorer配置は本体の左余白16pxで縦横共通、�
 });
 
 
-test('Explorer日時と開閉印: 中央揃え・縮小しない日時欄・共通SVG寸法をscoped CSSで保持', () => {
+test('Explorer日時と開閉印: SVGだけ0.7倍・展開時は輪郭▽にし、操作枠・日時欄を保持', () => {
   const { descriptor } = parse(readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8'));
   const result = require('@vue/compiler-sfc').compileStyle({ source: descriptor.styles[0].content, filename: 'FileExplorer.vue', id: 'data-v-explorer-ui', scoped: true });
   assert.deepEqual(result.errors, []);
@@ -858,11 +858,11 @@ test('Explorer日時と開閉印: 中央揃え・縮小しない日時欄・共�
   assert.match(css, /input\[type=datetime-local\]\[data-v-explorer-ui\]\{flex:1 0 auto;min-width:max-content;max-width:none;box-sizing:border-box;text-align:center/);
   assert.match(css, /::-webkit-datetime-edit\{[^}]*justify-content:safe center/);
   assert.match(css, /\.chevron\[data-v-explorer-ui\]\{[^}]*width:20px;min-width:20px;height:24px;padding:0/);
-  assert.match(css, /svg\[data-v-explorer-ui\]\{width:16px;height:16px;[^}]*pointer-events:none/);
-  assert.match(css, /svg\.expanded\[data-v-explorer-ui\]\{transform:rotate\(90deg\)\}/);
+  assert.match(css, /svg\[data-v-explorer-ui\]\{width:11\.2px;height:11\.2px;[^}]*fill:currentColor;pointer-events:none/);
+  assert.match(css, /svg\.expanded\[data-v-explorer-ui\]\{transform:rotate\(90deg\);fill:none;stroke:currentColor;stroke-width:1\.5\}/);
   assert.doesNotMatch(css, /\.space-view/, '本体の祖先に依存せず別窓にも同じscoped CSSを使う');
 });
-test('Explorer大きい開閉印: root/階層の連打・キーボード・外部化でも選択移動と分離', async t => {
+test('Explorer開閉印: root/階層の連打・キーボード・外部化でも選択移動と分離', async t => {
   const windows = layoutPanelWindows(), h = await workspace(t, { panelWindowFactory: windows.create });
   try {
     await h.click(node => hasClass(node, 'explorer-toggle'));

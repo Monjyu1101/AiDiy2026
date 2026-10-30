@@ -48,7 +48,7 @@ export function createStartManager({root=ROOT,spawnFn=spawn,python,readyTimeout=
  function failAutoStart(revision,text){if(revision!==startRevision||autoProgressRevision!==revision)return;updateBatch(batchProgress,text,'error');autoProgressRevision=null;}
  function cancelAutoProgress(){if(autoProgressRevision!==null){batchProgress=null;autoProgressRevision=null;}}
  const checkRevision=revision=>{if(revision!==startRevision)throw failure('起動操作は取り消されました。',499);};
- const settingsFile=join(root,'_config','AiDiy_diag_start.json'),runtime=join(root,'_AIDIY','aidiy_diag','起動');
+ const settingsFile=join(root,'_config','AiDiy_diag_start.json'),runtime=join(root,'temp','aidiy_diag','起動');
  const log=(id,text)=>{const old=logs.get(id)||{text:'',offset:0};old.text+=stripVTControlCharacters(String(text));if(old.text.length>120000){const size=old.text.length-120000;old.offset+=size;old.text=old.text.slice(size);}logs.set(id,old);};
  async function load(){
   if(loading)return loading;

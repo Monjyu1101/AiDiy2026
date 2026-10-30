@@ -44,7 +44,11 @@ if (result.error) console.error('Discord の起動前チェックを実行でき
 if (result.status !== 0 || checkOnly) process.exit(result.status ?? 1);
 // 明示しなくても、Codespaces・画面のない Linux ではブラウザ版にする（3本共通の規則は launch-project.mjs）。
 const requestedBrowser = !!options.browser || ブラウザ自動判定();
-const logs = join(root, 'out', 'aidiy_discord');
+// 起動ログ・完了通知だけを配置先リポジトリのtempへ分離する。
+const temporary = join(root, '..', 'temp', 'aidiy_discord');
+const logs = join(temporary, 'logs'), runtime = join(temporary, 'runtime');
+// ブラウザ版の保存済みprofileは移動せず、従来の場所を引き続き使う。
+const browserProfile = join(root, 'out', 'aidiy_discord', 'browser-profile');
 
 // パネルを起動し、終了コードを返す。開けなければ理由を例外で返す。
 async function パネル起動(browser) {
@@ -61,7 +65,8 @@ async function パネル起動(browser) {
     } catch { throw new Error(setupMessage); }
   }
   mkdirSync(logs, { recursive: true });
-  const id = randomUUID(), ready = join(logs, `${id}.ready.json`);
+  mkdirSync(runtime, { recursive: true });
+  const id = randomUUID(), ready = join(runtime, `${id}.ready.json`);
   const env = { ...process.env, AIDIY_DISCORD_NODE: process.execPath, AIDIY_DISCORD_READY: ready, AIDIY_DISCORD_CONNECT: args.includes('--connect') ? '1' : '0', AIDIY_DISCORD_PROJECT: projectRoot };
   delete env.ELECTRON_RUN_AS_NODE;
   let failed;
@@ -89,7 +94,7 @@ async function パネル起動(browser) {
       if (!running) { unlinkSync(ready); child = start(); }
     } else if (state.windowShown) {
       // Codespaces ではポート転送先の URL を開く。$BROWSER があれば手元の PC のブラウザで開く。
-      if (browser) await ブラウザ版表示(state.publicUrl || state.url, { profile: join(logs, 'browser-profile'), height: ウィンドウ.パネル高さ });
+      if (browser) await ブラウザ版表示(state.publicUrl || state.url, { profile: browserProfile, height: ウィンドウ.パネル高さ });
       console.log(args.includes('--connect') ? 'AiDiy Discord パネルを開き、自動接続を開始しました。' : 'AiDiy Discord パネルを開きました。「接続」で接続します。');
       if (args.includes('--wait') && child.exitCode === null && child.signalCode === null) await new Promise(resolve => child.once('exit', resolve));
       return child.exitCode ?? 0;

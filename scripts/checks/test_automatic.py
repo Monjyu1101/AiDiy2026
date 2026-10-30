@@ -80,7 +80,12 @@ class BatchStructureTests(unittest.TestCase):
     def test_backup_is_required_before_fetch_and_setup(self):
         self.assertLess(TEXT.index('call :backup_local_state'), TEXT.index('git fetch '))
         self.assertIn('call :backup_local_state\nset "RC=%ERRORLEVEL%"\nif not "%RC%"=="0" goto failed', TEXT)
-        self.assertIn('robocopy "_config"', TEXT)
+        self.assertNotIn('robocopy', TEXT.lower())
+        self.assertIn('shutil.copytree(src,', TEXT)
+        self.assertIn('if errorlevel 1 goto config_backup_failed', TEXT)
+        failed = TEXT[TEXT.index('\n:config_backup_failed\n'):TEXT.index('\n:backup_file\n')]
+        self.assertIn('type "%AIDIY_TEMP%\\backup.txt" >>"%LOG%"', failed)
+        self.assertTrue(failed.rstrip().endswith('exit /b 1'))
         self.assertIn('git diff --cached --binary', TEXT)
         self.assertIn('call :backup_file', TEXT)
 
@@ -121,7 +126,7 @@ class BatchStructureTests(unittest.TestCase):
         self.assertNotRegex(cleanup, r'(?im)^endlocal\b')
 
     def test_required_checks_identify_failure_and_preserve_diagnostics(self):
-        for name in ('git', 'robocopy', 'python'):
+        for name in ('git', 'python'):
             self.assertIn(f'set "STAGE=prerequisite_{name}"', TEXT)
         block = TEXT[TEXT.index('\n:prerequisite_failed\n'):TEXT.index('\n:validate_repository\n')]
         self.assertIn('REQUIRED_CHECK_FAILED %STAGE%', block)
@@ -197,6 +202,103 @@ class BatchStructureTests(unittest.TestCase):
                     self.assertEqual(path.read_bytes().decode('cp932'), text)
                 else:
                     self.assertEqual(path.read_bytes(), original)
+
+
+class ConfigurationBackupTests(unittest.TestCase):
+    """bat内のPythonそのものを一時fixtureで実行。Windows CMD試験ではない。"""
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='backup 日本語 & % ! ')
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.backup = self.root / '退避先 (copy)'
+        self.backup.mkdir()
+        line = next(line for line in TEXT.splitlines() if 'shutil.copytree(src,' in line)
+        self.code = re.search(r'-c "([^"]+)"', line).group(1)
+        compile(self.code, '<batch configuration backup>', 'exec')
+
+    def run_backup(self, prefix=''):
+        return subprocess.run([sys.executable, '-X', 'utf8', '-c', prefix + self.code],
+                              cwd=self.root, capture_output=True,
+                              env={**os.environ, 'BACKUP': str(self.backup)})
+
+    def test_missing_configuration_is_success_without_copying_other_data(self):
+        (self.root / '_data').mkdir()
+        (self.root / '_data/private').write_bytes(b'do not copy')
+        self.assertEqual(self.run_backup().returncode, 0)
+        self.assertEqual(list(self.backup.iterdir()), [])
+
+    def test_nested_binary_empty_and_read_only_files_are_preserved(self):
+        config = self.root / '_config'
+        nested = config / '日本語 空白 & % ! (nested)'
+        nested.mkdir(parents=True)
+        (nested / 'empty').mkdir()
+        content = bytes(range(256))
+        source = nested / 'configuration.bin'
+        source.write_bytes(content)
+        source.chmod(0o444)
+        os.utime(source, (1700000000, 1700000000))
+        result = self.run_backup()
+        self.assertEqual(result.returncode, 0, result.stderr.decode('cp932'))
+        copied = self.backup / source.relative_to(self.root)
+        self.assertEqual(source.read_bytes(), content)
+        self.assertEqual(copied.read_bytes(), content)
+        self.assertEqual(copied.stat().st_mtime_ns, source.stat().st_mtime_ns)
+        self.assertTrue((copied.parent / 'empty').is_dir())
+
+    def test_existing_destination_is_not_merged_or_overwritten(self):
+        (self.root / '_config').mkdir()
+        (self.root / '_config/key.txt').write_text('original')
+        (self.backup / '_config').mkdir()
+        (self.backup / '_config/key.txt').write_text('previous backup')
+        self.assertNotEqual(self.run_backup().returncode, 0)
+        self.assertEqual((self.backup / '_config/key.txt').read_text(), 'previous backup')
+        self.assertEqual((self.root / '_config/key.txt').read_text(), 'original')
+
+    def test_root_nested_and_broken_links_fail_without_traversal(self):
+        outside = self.root / 'outside'
+        outside.mkdir()
+        (outside / 'private').write_text('keep original')
+        config = self.root / '_config'
+        for kind in ('root', 'directory', 'file', 'broken'):
+            with self.subTest(kind=kind):
+                if kind == 'root':
+                    link = config
+                    target = outside
+                else:
+                    config.mkdir(exist_ok=True)
+                    link = config / 'link'
+                    target = outside if kind == 'directory' else outside / ('missing' if kind == 'broken' else 'private')
+                try:
+                    link.symlink_to(target, target_is_directory=kind in ('root', 'directory'))
+                except OSError:
+                    self.skipTest('symlink creation unavailable')
+                try:
+                    result = self.run_backup()
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(b'links/reparse points', result.stderr)
+                    self.assertFalse((self.backup / '_config').exists())
+                    self.assertEqual((outside / 'private').read_text(), 'keep original')
+                finally:
+                    link.unlink()
+
+    def test_windows_reparse_attribute_is_rejected_without_requiring_new_python_api(self):
+        (self.root / '_config/junction').mkdir(parents=True)
+        prefix = "from unittest.mock import patch;from types import SimpleNamespace;from pathlib import Path;old=Path.lstat;fake=lambda p,*a,**k:SimpleNamespace(st_mode=old(p,*a,**k).st_mode,st_file_attributes=1024) if p.name=='junction' else old(p,*a,**k);patcher=patch.object(Path,'lstat',fake);patcher.start();"
+        result = self.run_backup(prefix)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'links/reparse points', result.stderr)
+        self.assertFalse((self.backup / '_config').exists())
+        self.assertNotIn('is_junction', self.code)
+
+    def test_copy_failure_is_nonzero_and_does_not_remove_original_or_partial_backup(self):
+        (self.root / '_config').mkdir()
+        (self.root / '_config/key.txt').write_text('original')
+        prefix = "from unittest.mock import patch;import shutil;patcher=patch.object(shutil,'copytree',side_effect=PermissionError('fixture copy failure'));patcher.start();"
+        result = self.run_backup(prefix)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'fixture copy failure', result.stderr)
+        self.assertEqual((self.root / '_config/key.txt').read_text(), 'original')
+        self.assertTrue(self.backup.is_dir())
 
 
 class RoutingModelTests(unittest.TestCase):

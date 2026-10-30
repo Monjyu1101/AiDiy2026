@@ -59,6 +59,40 @@ class StartTests(unittest.TestCase):
                 self.assertEqual(dev.is_dev_process(record, dev.THIS_DIR, windows), kind == 'ide')
                 self.assertEqual(dev.is_dev_process(record, dev.THIS_DIR, windows, 'console'), kind == 'console')
 
+    def test_shared_logs_use_repository_temp_without_moving_existing_data(self):
+        directory = self.enterContext(tempfile.TemporaryDirectory(prefix='AiDiy 起動 '))
+        root = Path(directory)
+        module = root / 'frontend_ide/viewer'
+        process = MagicMock()
+        process.poll.return_value = None
+        try:
+            with patch.object(dev, 'THIS_DIR', module), patch.object(dev, 'node_command', return_value='node'), patch.object(dev.subprocess, 'Popen', return_value=process) as launch:
+                for kind in ('ide', 'console', 'task', 'team', 'browser'):
+                    with self.subTest(kind=kind):
+                        previous = module / 'out' / f'aidiy_{kind}' / 'previous.log'
+                        previous.parent.mkdir(parents=True)
+                        previous.write_text('keep existing log', encoding='utf-8')
+                        dev.start(kind=kind)
+                        dev.start(kind=kind)
+                        logs = root / 'temp' / f'aidiy_{kind}' / 'logs'
+                        self.assertEqual(len(list(logs.glob('*.log'))), 2, '起動ごとに別ログを作る')
+                        self.assertEqual(Path(launch.call_args.kwargs['stdout'].name).parent, logs)
+                        self.assertEqual(launch.call_args.kwargs['cwd'], str(root))
+                        self.assertEqual(list(previous.parent.iterdir()), [previous], '旧保存先へ書き戻さない')
+                        self.assertEqual(previous.read_text(encoding='utf-8'), 'keep existing log')
+        finally:
+            dev._processes.clear()
+
+    def test_log_storage_failure_does_not_launch_or_fall_back(self):
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        root = Path(directory)
+        (root / 'temp').write_text('not a directory', encoding='utf-8')
+        with patch.object(dev, 'THIS_DIR', root / 'frontend_ide/viewer'), patch.object(dev, 'node_command', return_value='node'), patch.object(dev.subprocess, 'Popen') as launch:
+            with self.assertRaises(OSError):
+                dev.start()
+            launch.assert_not_called()
+            self.assertFalse((root / 'frontend_ide/viewer/out').exists())
+
     def test_root_launch_order_and_no_dev_restart(self):
         with patch.object(start, "stop_all_tasks"), patch.object(start, "start_service", return_value=True) as launch, patch.object(start, "wait_for_services_quiet"):
             flags = start.start_initial_services(False, False, False, False, False, False, {}, {}, None,

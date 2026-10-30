@@ -93,7 +93,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
    else args=[join(root,'frontend_ide','launch.mjs'),'--app',id,'--project',path,...(id==='live'?[]:['--new-window'])];
    const env={...process.env,PYTHONIOENCODING:'utf-8',PYTHONUNBUFFERED:'1'};
    for(const key of Object.keys(env))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(key))delete env[key];
-   const logs=join(root,'_AIDIY','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
+   const logs=join(root,'temp','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
    const logPath=join(logs,`${id}-${randomUUID()}.log`),output=await open(logPath,'a',0o600);
    let child;
    try{

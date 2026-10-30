@@ -463,7 +463,7 @@ defineExpose({reveal,focusDetached:()=>panelWindow?.focus()||false,pinForAll});
 .explorer-panel .explorer-collapse{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;min-width:24px;padding:0}.explorer-collapse svg{display:block;pointer-events:none}
 /* 字体と本文サイズに左右されない開閉印。ファイルの空枠にも同じ幅を使う。 */
 .explorer-panel .chevron{display:inline-flex;align-items:center;justify-content:center;flex:none;width:20px;min-width:20px;height:24px;padding:0;box-sizing:border-box}
-.explorer-panel .chevron svg{width:16px;height:16px;display:block;fill:currentColor;pointer-events:none}.explorer-panel .chevron svg.expanded{transform:rotate(90deg)}
+.explorer-panel .chevron svg{width:11.2px;height:11.2px;display:block;fill:currentColor;pointer-events:none}.explorer-panel .chevron svg.expanded{transform:rotate(90deg);fill:none;stroke:currentColor;stroke-width:1.5}
 /* 秒とカレンダー操作を残したまま中央揃え。狭幅ではラベルを折返し、さらに狭ければ横スクロールする。 */
 .time-search{overflow-x:auto}
 .time-search>label{display:flex;align-items:center;flex-wrap:wrap;justify-content:safe center;gap:6px;margin-bottom:5px}

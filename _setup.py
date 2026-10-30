@@ -667,7 +667,9 @@ def setup_common_global_tools(choices: dict) -> list[str]:
         failed_packages = start_global_cli_tools_install()
         error_locations.extend([f"共通: AI CLI ツール導入 ({package})" for package in failed_packages])
     else:
+        print_header("AI CLI ツール セットアップ")
         print_warning("共通: AI CLI ツールのインストールをスキップしました。")
+        print()
         print_ai_cli_manual_setup()
 
     return error_locations

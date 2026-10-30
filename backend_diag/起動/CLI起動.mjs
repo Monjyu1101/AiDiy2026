@@ -39,7 +39,7 @@ export function createCliLauncher({root=ROOT,node=process.execPath,spawnFn=spawn
   const args=[join(root,'frontend_ide','launch.mjs'),'--app','console','--project',cwd,'--new-window','--cli',id,'--cli-auto-approve','--foreground'];
   const childEnv={...env,AIDIY_LAUNCHER_CHILD:'1'};
   for(const name of Object.keys(childEnv))if(/^(ELECTRON_RUN_AS_NODE|NODE_OPTIONS|NODE_PATH|AIDIY_(?:DIAG_LAUNCHER_CHILD|DIAG_SETTINGS|DIAG_RUN))$/i.test(name))delete childEnv[name];
-  const logs=join(root,'_AIDIY','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
+  const logs=join(root,'temp','aidiy_diag','アプリ起動');await mkdir(logs,{recursive:true});
   const logPath=join(logs,`cli-${id}-${randomUUID()}.log`),output=await open(logPath,'a',0o600);let child;
   try{
    child=spawnFn(node,args,{cwd,env:childEnv,detached:true,windowsHide:true,shell:false,stdio:['ignore',output.fd,output.fd,'ipc']});
