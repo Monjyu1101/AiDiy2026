@@ -42,8 +42,9 @@ test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存�
   };
   const loaded = { exports: {} };
   runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
-    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console,
+    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console, URL,
     require(name) {
+      if (name === './internal-auth') return { internalAuthorization: () => () => ({}) };
       if (name === './file-attachments') return require('../out/file-attachments.cjs');
       if (name === 'vscode') return vscode;
       if (name === './conversation-store') return store;
@@ -91,10 +92,11 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
   const loaded = {exports:{}};
   runInNewContext(transformSync(readFileSync('src/extension.ts','utf8'),{loader:'ts',format:'cjs'}).code,{
     exports:loaded.exports,module:loaded,require(name){
+      if (name === './internal-auth') return { internalAuthorization: () => () => ({}) };
       if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../src/vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
       if(name==='./file-attachments') return require('../out/file-attachments.cjs');
       if(name==='vscode') return vscode;
-      if(name==='./code-connection') return require('../out/code-connection.cjs');
+      if(name==='./code-connection') { const actual = require('../out/code-connection.cjs'); return { ...actual, CodeConnection: class extends actual.CodeConnection { constructor(...args) { args[3] = url => new global.WebSocket(url); super(...args); } } }; }
       if(name==='./input-prediction') return require('../out/input-prediction.cjs');
       if(name==='./model-preferences') return {
         モデル保存先:()=> 'online.json', コードモデル読込:(file='online.json')=>preferences.get(file),
@@ -118,7 +120,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
       if(name==='./protocol') return require('../out/protocol.cjs');
       if(name==='../aidiy_live/local-backend.cjs') return {ローカル接続先:()=> 'http://127.0.0.1:18091'};
       return require(name);
-    },setTimeout,clearTimeout,console,
+    },setTimeout,clearTimeout,console,URL,
   });
   loaded.exports.activate(context);
   const view = {visible:true,webview:{options:{},cspSource:'self',asWebviewUri:uri=>uri.fsPath,
@@ -276,7 +278,7 @@ test('Code 拡張添付: 信頼済みonlineの現scopeだけ送信、echo画像�
     constructor(_backend, receive, notify) { connection = this; this.receive = receive; this.notify = notify; }
     start() { this.notify(); } disconnect() { this.connected = false; } dispose() {} send(packet) { sent.push(packet); return true; }
   }
-  const dependencies = { vscode, './vscode-html': { developmentHtml: () => '' }, './file-attachments': require('../out/file-attachments.cjs'),
+  const dependencies = { './internal-auth': { internalAuthorization: () => () => ({}) }, vscode, './vscode-html': { developmentHtml: () => '' }, './file-attachments': require('../out/file-attachments.cjs'),
     './code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider || '', model: value.model || '' }) },
     './input-prediction': { InputPrediction: class { sync() {} clear() {} } }, './protocol': require('../out/protocol.cjs'),
     './model-preferences': { モデル保存先: () => 'model', コードモデル読込() {}, コード設定保存先: () => 'options', 検証回数読込() {} },
@@ -286,7 +288,7 @@ test('Code 拡張添付: 信頼済みonlineの現scopeだけ送信、echo画像�
   };
   const loaded = { exports: {} };
   runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
-    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console, require: name => dependencies[name] || require(name),
+    module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console, URL, require: name => dependencies[name] || require(name),
   });
   loaded.exports.activate({ extensionPath: '/fixture', extensionUri: uri, subscriptions: [], workspaceState: { get() {}, update: async () => {} }, globalState: { get() {} } });
   provider.resolveWebviewView({ webview: { asWebviewUri: value => value, onDidReceiveMessage() {}, postMessage: packet => posts.push(packet) }, onDidDispose() {}, onDidChangeVisibility() {} });

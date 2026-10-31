@@ -79,3 +79,34 @@ $token = $login.data.access_token
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/トークン更新" `
   -Headers @{ Authorization = "Bearer $token" }
 ```
+
+## 環境固有鍵と午前3時の更新
+
+- 公開固定署名鍵は使わない。通常ログインと Core 内部通信には、環境ごと・世代ごとに別のランダム鍵を生成する。
+- 秘密鍵一覧はプロジェクトルートの `_AIDIY/backend_core/internal_auth_keys.json`。クライアント用 `_AIDIY/backend_core/internal_auth.json` には **署名鍵を入れない**。Core と TaskTeam の鍵・内部トークンは別サービス用で、相互利用できない。
+- Core 起動時、最新鍵・内部トークンが25時間の有効期間内なら同じものを再利用する。午前3時を過ぎた起動でも、有効な最新世代を直ちに交換しない。期限外・初回のみ新世代を作る。壊れた既存秘密鍵一覧は上書きせず起動失敗にする。
+- 稼働中は OS ローカル午前3時の周期を日付で判定し、1周期に1回更新する（約1秒間隔）。午前3時より前でも最新世代が期限切れになれば更新する。時刻が最新世代の発行時刻より前へ戻った場合は、秘密ファイルを変更せず安全側で停止・再試行する。
+- 新世代へ移した旧鍵は、発行済み内部トークンと通常JWTの最大期限まで検証に使う。通常JWTの発行時に、その実際の期限を排他制御下で記録する。期限が過ぎた旧世代を削除し、保存世代数にも上限を設ける。
+- 通常ログインJWTの期限は従来どおり600分（10時間）。内部トークンは25時間。起動時再利用は「再起動だけを理由とするログイン失効」を防ぐもので、無操作でも丸一日ログインを保証するものではない。トークン更新APIは最新鍵で発行し直す。
+- 通常JWTは `kid`・`iss`・`aud`・`token_kind`・`iat`・`exp` を検証する。**旧公開固定鍵で発行したJWTは移行時に引き継がず、初回だけ再ログインが必要**。
+- Apps は Core の秘密鍵一覧を読んで通常JWTを検証するだけで、鍵を生成・更新しない。Core 初期化より早い要求には503を返し、次の要求で再読込する。Apps独自の内部トークンは作らない。
+- 別PCへ同じ秘密鍵一覧をコピーすると環境分離が失われる。配布物やGitへ秘密ファイルを含めない。
+
+## ローカル連携の内部認証
+
+- クライアント用 JSON は `access_token`、`token_type: "bearer"`、UTC ISO 8601 の `issued_at` / `expires_at`。パスは起動 CWD に依存しない。
+- ローカル Code / Live / Discord / Slack は接続・HTTP要求ごとにトークンファイルを再読込する。トークンを URL、ログ、ブラウザー storage、リモート宛先へ流さない。
+- 内部トークンは通常利用者へのなりすましではない。対象はモデル情報取得、セッション内のモデル設定、AIコアWebSocket。通常利用者API・ログイン更新・設定ファイル保存・リセット・再起動要求には使えない。
+- Web / Avatar / Diag は通常ログインJWTを使用する。初期化APIは通常JWT専用。モデル情報の対象セッションとWebSocket接続には認証主体の一致を要求する。同じ通常利用者は再発行JWTでも同じセッションを利用できるが、通常利用者と内部連携のセッションは混用しない。
+- HTTP と Node WebSocket は `Authorization: Bearer ...`。ブラウザー WebSocket は `['aidiy-auth', 'bearer.<JWT>']` のサブプロトコルで渡し、サーバーは認証成功後だけ `aidiy-auth` を選択して accept する。HTTP要求とWS接続時に期限を確認し、接続済みWSのハンドシェイクJWT期限による強制切断はしない。
+- 秘密鍵一覧の原子的保存を先に完了し、クライアント用トークンを後から公開する。後段の保存失敗・ファイル欠落時は、同じ最新世代の保存済みトークンを再公開する。不要な再生成はしない。
+- POSIXでは保存ディレクトリ0700・ファイル0600。WindowsではOS側ACLも管理する。Core/Apps間の競合はOSファイルロックと原子的置換で防ぐ。ログへ鍵・トークン・例外引数を出さない。
+- 全階層の `internal_auth.json`、`internal_auth_keys.json` と対応する非公開一時ファイルは Git・AIバックアップ対象外。汎用ファイル内容取得/更新APIとIDEの閲覧経路も拒否する。Git除外は暗号化ではなく、同じOSユーザーのファイルアクセスを禁止するものでもない。
+- `/core/サーバー状態` はログイン前のシアンバー用に公開を維持する。パスワード管理・MFA・全APIの権限再設計はこの変更の対象ではない。
+
+実サービス・実DB・実資格情報を使わない確認:
+
+```sh
+backend_server/.venv/bin/python -m unittest discover -s backend_server/checks -p test_auth_keyring.py -v
+backend_server/.venv/bin/python -m unittest discover -s backend_server/checks -p test_internal_auth.py -v
+```

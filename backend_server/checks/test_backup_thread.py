@@ -245,6 +245,8 @@ class BackupThreadTest(unittest.IsolatedAsyncioTestCase):
                                   sessions={"s": session}, get_session=lambda _: session)
         namespace = dict(Request=object, 初期化リクエスト=object, 初期化レスポンス=lambda **k: k,
                          AIセッション管理=manager, セッションバックアップ開始=runner.セッションバックアップ開始,
+                         authenticate=lambda *_: (SimpleNamespace(owner=("user", "fixture")), None),
+                         require_manager_owner=lambda *_: None, bind_session_owner=lambda *_: None,
                          バックエンドディレクトリ=self.root, logger=logging.getLogger("fixture"))
         exec(compile(ast.Module(body=[function], type_ignores=[]), "initialization-under-test", "exec"), namespace)
         response = await asyncio.wait_for(namespace["初期化"](

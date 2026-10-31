@@ -10,6 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
+import { internalAuthorization, internalSocket, type InternalAuthorization } from '../../src/internal-auth';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,7 +36,8 @@ export class LiveHost {
   private input?: { id: number; session: string; speaker: boolean; projectPath: string | null };
   private heartbeat?: ReturnType<typeof setInterval>;
   private target: URL;
-  constructor(backend: string, private post: (message: unknown) => void, private python: () => string, private microphoneFile: string) {
+  constructor(backend: string, private post: (message: unknown) => void, private python: () => string, private microphoneFile: string, private authorization: InternalAuthorization = internalAuthorization(new URL(backend), [__dirname]),
+    private createSocket: (url: URL, headers: Record<string, string>) => WebSocket = internalSocket) {
     this.target = backendUrl(backend);
   }
   async receive(message: Message) {
@@ -44,7 +46,9 @@ export class LiveHost {
     if (message.type === 'socket-open') {
       if (this.sockets.has(id) || this.sockets.size >= 3) { this.post({ type: 'socket-error', id }); this.post({ type: 'socket-closed', id }); return; }
       const url = new URL('/core/ws/AIコア', this.target); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(url);
+      let socket: WebSocket;
+      try { socket = this.createSocket(url, this.authorization()); }
+      catch { this.post({ type: 'socket-error', id }); this.post({ type: 'socket-closed', id }); return; }
       this.sockets.set(id, socket);
       socket.onopen = () => this.post({ type: 'socket-opened', id });
       socket.onmessage = event => {
@@ -106,7 +110,7 @@ export class LiveHost {
       const controller = new AbortController(); this.requests.add(controller);
       const timeout = setTimeout(() => controller.abort(new DOMException('AIコアの応答が35秒以内に返りませんでした。', 'TimeoutError')), 35000);
       try {
-        const response = await fetch(new URL('/' + message.path, this.target), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
+        const response = await fetch(new URL('/' + message.path, this.target), { method: 'POST', headers: { 'Content-Type': 'application/json', ...this.authorization() }, redirect: 'error', body, signal: controller.signal });
         const value = await response.json() as { message?: string };
         if (!response.ok) throw new Error(value.message || `接続エラー (${response.status})`);
         if (!this.disposed) this.post({ type: 'reply', id, value });

@@ -20,19 +20,25 @@ import time
 from collections import OrderedDict
 
 規則 = json.loads(Path(__file__).with_name("フォルダ除外規則.json").read_text(encoding="utf-8"))
+常時除外 = {name.lower() for name in 規則["ignored"]}
 予約名 = {"con", "prn", "aux", "nul", "null", *[f"com{i}" for i in range(1, 10)], *[f"lpt{i}" for i in range(1, 10)]}
 ロック = threading.Lock()
 キャッシュ = OrderedDict()
 
 
 def フォルダ許可(名前, 相対, フィルター):
+    if 名前.rstrip(". ").lower() in 常時除外:
+        return False
     if フィルター != "backup":
-        return 名前 not in 規則["ignored"]
+        return True
     return (名前 not in 規則["backupDirectories"] and not 名前.startswith(".")
             and not any("/" + p + "/" in "/" + 相対.strip("/") + "/" for p in 規則["backupPaths"]))
 
 
 def ファイル許可(名前, フィルター):
+    正規名 = 名前.split(":", 1)[0].rstrip(". ")
+    if re.fullmatch(r"(?:internal_auth(?:_keys)?\.json|\.internal_auth(?:_keys)?\.json\..+\.tmp)", 正規名, re.IGNORECASE):
+        return False
     return フィルター != "backup" or (名前 not in 規則["backupFiles"]
         and not 名前.startswith("~$") and not any(名前.endswith(e) for e in 規則["backupExtensions"])
         and 名前.rsplit(".", 1)[0].lower() not in 予約名)

@@ -28,7 +28,7 @@ cd backend_server
 .\.venv\Scripts\python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098
 
 cd ..\backend_tools
-.\.venv\Scripts\python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
+.\.venv\Scripts\python.exe -m uvicorn tools_main:app --reload --host 127.0.0.1 --port 8095
 
 cd ..\backend_taskteam
 .\.venv\Scripts\python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093

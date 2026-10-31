@@ -475,7 +475,7 @@ class WebSocketManager:
             logger.info(f"新規セッション初期CODE_BASE_PATH: {code_base_path} (session={セッションID})")
         return model_settings
 
-    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None, live_model_settings: Optional[dict] = None, voice: Optional[bool] = None) -> str:
+    async def connect(self, websocket: WebSocket, セッションID: Optional[str] = None, socket_no: str = "input", app_conf=None, accept_in_connect: bool = True, code_base_path: Optional[str] = None, live_model_settings: Optional[dict] = None, voice: Optional[bool] = None, auth_owner=None) -> str:
         """
         WebSocket接続を登録（セッション単位）
 
@@ -516,6 +516,14 @@ class WebSocketManager:
 
         セッションID = セッションID if セッションID else self.セッションID生成()
         session = self.sessions.get(セッションID)
+        if auth_owner is not None:
+            owners = getattr(self, "_auth_owners", None)
+            if owners is None:
+                self._auth_owners = owners = {}
+            existing_owner = owners.get(セッションID)
+            if ((existing_owner is not None and existing_owner != auth_owner)
+                    or (session is not None and getattr(session, "_auth_owner", None) != auth_owner)):
+                raise ValueError("セッションの認証主体が一致しません。")
         if session is None:
             saved_state = self.session_states.get(セッションID)
             saved_settings = saved_state.get("モデル設定") if saved_state else None
@@ -537,6 +545,10 @@ class WebSocketManager:
             if project_path is not None:
                 session.モデル設定["CODE_BASE_PATH"] = project_path
             self.sessions[セッションID] = session
+
+        if auth_owner is not None:
+            session._auth_owner = auth_owner
+            self._auth_owners[セッションID] = auth_owner
 
         async with session.初期化ロック:
             self._接続設定照合(session.モデル設定, live_settings, project_path, app_conf)

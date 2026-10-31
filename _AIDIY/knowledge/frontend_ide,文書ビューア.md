@@ -29,6 +29,19 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 
 ## 導入と検証
 
+### 内部認証ファイルの非公開
+
+- Core / TaskTeam が生成する `internal_auth.json`、秘密鍵リング `internal_auth_keys.json`、それぞれの原子的保存用 `.internal_auth.json.*.tmp` / `.internal_auth_keys.json.*.tmp` は、汎用ファイル表示・静的プレビュー・一覧/本文検索・履歴/解析・Explorer操作から除外する。要求パスだけでなく解決後の実パスも確認し、別名symlink経由の取得を防ぐ。
+- 資格情報としての拒否対象はこの名前に限定する。`docs/internal_auth.md` / `docs/internal_auth_keys.md` や通常のコード・JSONは従来どおり扱う。これはWebの汎用ファイルAPIからの公開を防ぐもので、同じマシンの利用者、Console、AI/CLIの直接ファイルアクセスを隔離する機能ではない。
+- `node --test frontend_ide/viewer/checks/internal-credential-files.test.mjs` は合成資格情報・symlinkだけで検証する。実資格情報を読まず、サーバー・外部AI・OS関連アプリは起動しない。
+
+### フィルターOFFでも残す除外
+
+- OFFは「すべて表示」ではなく、バックアップより緩い通常表示。`backend_server/core_router/フォルダ除外規則.json` の `ignored`（`.git` / `.git_local` / `venv` / `.venv` / `node_modules` / `node_module`、既存の生成物・キャッシュ等）を常時除外し、ONだけ追加の `backupDirectories` / `backupFiles` / `backupPaths` / `backupExtensions` 条件を適用する。バックアップ保存処理自体の条件はこの変更で広げない。
+- 常時除外はルート直下・入れ子の**ディレクトリ名の完全一致**で、大小文字を区別しない（Windowsの末尾の点・空白も正規化）。`.git-notes` や `node_modules.md` のような別名・通常ファイルは部分一致で除外しない。OFFなら `package.json` や `temp/` の通常文書は表示対象、ONなら従来のバックアップ条件で非表示になる。
+- 一覧・更新状態・本文検索は同じ基準を使う。ファイル表示/プレビュー・履歴/解析・AI検索結果も要求パスと実パスを確認し、除外フォルダへの別名symlinkで読み取れないようにする。Monaco / Officeの固定資産ルートはプロジェクト走査とは別であり、親が `node_modules` というだけで配信を止めない。既存の明示ファイル操作・OS/AI/CLIへの一般的な権限制限を追加するものではない。
+- `node --test frontend_ide/viewer/checks/always-excluded-files.test.mjs frontend_ide/viewer/checks/internal-credential-files.test.mjs` と `python -m unittest discover -s backend_server/checks -p test_folder_baseline.py` で、ON/OFF・入れ子・大小文字・symlink・通常文書の境界を合成ファイルだけで検証する。
+
 ### パスのコピーと関連アプリ
 
 - 共通の `ファイルビューア.vue` は通常プレビュー・ピン留めの両方で同じ操作を使う。Electronでは限定した `aidiyWindow.copyFilePath` / `openFile` IPCを使い、Webでは「アプリで開く」を表示しない。HTTPにOSのアプリ起動APIを追加しない。

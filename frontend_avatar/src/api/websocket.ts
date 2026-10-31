@@ -23,13 +23,14 @@ function 入力系認証トークン更新(message: WebSocketMessage): void {
   if (!認証延長対象メッセージ識別.has(メッセージ識別) || 認証トークン更新中) return
 
   const 認証Storage = 認証Storage取得()
-  if (!認証Storage.getItem('token')) return
+  const requestToken = 認証Storage.getItem('token')
+  if (!requestToken) return
 
   認証トークン更新中 = true
   void apiClient.post('/core/auth/トークン更新')
     .then((response) => {
       const nextToken = response.data?.data?.access_token
-      if (response.data?.status === 'OK' && nextToken) {
+      if (response.data?.status === 'OK' && nextToken && 認証Storage.getItem('token') === requestToken) {
         認証Storage.setItem('token', nextToken)
       }
     })
@@ -39,6 +40,21 @@ function 入力系認証トークン更新(message: WebSocketMessage): void {
     .finally(() => {
       認証トークン更新中 = false
     })
+}
+
+
+// 期限の事前確認のみ。署名・利用者・権限の検証は必ずサーバー側で行う。
+function ログイントークン取得(): { token: string; expires: number } {
+  const token = 認証Storage取得().getItem('token') || ''
+  try {
+    if (!token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) throw new Error()
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const expires = Number(JSON.parse(atob(payload)).exp) * 1000
+    if (!Number.isFinite(expires) || expires <= Date.now()) throw new Error()
+    return { token, expires }
+  } catch {
+    throw new Error('認証の有効期限が切れました。再ログインしてください。')
+  }
 }
 
 export type WebSocketMessage = {
@@ -90,6 +106,29 @@ export class AIWebSocket implements IWebSocketClient {
   private reconnectTimer: number | null = null
   private intentionallyClosed = false
 
+
+  private 接続取消: (() => void) | null = null
+  private 認証期限タイマー: number | null = null
+  private readonly 認証切断 = () => this.disconnect()
+  private readonly 認証変更 = (event: StorageEvent) => {
+    if (event.key === null || (event.key === 'token' && !event.newValue)) this.disconnect()
+  }
+  private 認証確認(): string {
+    try { return ログイントークン取得().token } catch (error) {
+      this.disconnect()
+      window.dispatchEvent(new Event('auth-expired'))
+      throw error
+    }
+  }
+  private 認証利用可能(): boolean {
+    try { this.認証確認(); return true } catch { return false }
+  }
+  private 認証期限監視(): void {
+    if (!this.認証利用可能()) return
+    const remaining = ログイントークン取得().expires - Date.now()
+    this.認証期限タイマー = window.setTimeout(() => this.認証期限監視(), Math.min(remaining, 2147483647))
+  }
+
   constructor(
     private readonly url: string,
     private requestedSessionId = '',
@@ -98,11 +137,23 @@ export class AIWebSocket implements IWebSocketClient {
   ) {}
 
   async connect(): Promise<string> {
-    this.clearReconnectTimer()
+    this.disconnect()
+    const token = this.認証確認()
     this.intentionallyClosed = false
+    window.addEventListener('auth-cleared', this.認証切断)
+    window.addEventListener('storage', this.認証変更)
+    this.認証期限監視()
 
     return new Promise<string>((resolve, reject) => {
-      const socket = new WebSocket(this.url)
+      let socket: WebSocket
+      try {
+        // JWT は URL・connect packet・ログへ入れず、upgrade 時だけ提示する。
+        socket = new WebSocket(this.url, ['aidiy-auth', `bearer.${token}`])
+      } catch {
+        this.disconnect()
+        reject(new Error('WebSocket connection error'))
+        return
+      }
       this.socket = socket
       let settled = false
 
@@ -114,13 +165,19 @@ export class AIWebSocket implements IWebSocketClient {
 
       const timeoutId = window.setTimeout(() => {
         fail(new Error('WebSocket initialization timeout'))
+        this.disconnect()
       }, 30000)
+      this.接続取消 = () => {
+        window.clearTimeout(timeoutId)
+        fail(new Error('WebSocket connection cancelled'))
+      }
 
       socket.onopen = () => {
         if (this.socket !== socket || this.intentionallyClosed) {
           socket.close()
           return
         }
+        if (!this.認証利用可能()) return
         this.reconnectAttempts = 0
         socket.send(JSON.stringify({
           type: 'connect',
@@ -146,6 +203,7 @@ export class AIWebSocket implements IWebSocketClient {
           this.intentionallyClosed = true
           window.clearTimeout(timeoutId)
           fail(new Error(String(message.メッセージ内容 || '接続に失敗しました。')))
+          this.disconnect()
         }
         if (messageType === 'init' && typeof message.セッションID === 'string' && message.セッションID) {
           this.sessionId = message.セッションID
@@ -185,15 +243,15 @@ export class AIWebSocket implements IWebSocketClient {
 
         // 4000: サーバーが同じセッション・チャンネルの新しい接続へ置き換えた。
         // 再接続すると新しい接続を閉じ返し、互いに置き換え合う繰り返しになるため再接続しない。
-        if (event.code === REPLACED_CLOSE_CODE) {
-          this.intentionallyClosed = true
+        if ([4000, 1008, 4401, 4403].includes(event.code)) {
+          this.disconnect()
           return
         }
 
         if (!this.intentionallyClosed) {
           this.reconnectAttempts += 1
           this.reconnectTimer = window.setTimeout(() => {
-            void this.connect().catch(() => undefined)
+            if (!this.intentionallyClosed) void this.connect().catch(() => undefined)
           }, Math.min(3000 * this.reconnectAttempts, this.maxReconnectDelayMs))
         }
       }
@@ -201,6 +259,7 @@ export class AIWebSocket implements IWebSocketClient {
   }
 
   send(message: WebSocketMessage): void {
+    if (!this.認証利用可能()) return
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       return
     }
@@ -286,6 +345,13 @@ export class AIWebSocket implements IWebSocketClient {
 
   disconnect(): void {
     this.intentionallyClosed = true
+
+    this.接続取消?.()
+    this.接続取消 = null
+    if (this.認証期限タイマー !== null) window.clearTimeout(this.認証期限タイマー)
+    this.認証期限タイマー = null
+    window.removeEventListener('auth-cleared', this.認証切断)
+    window.removeEventListener('storage', this.認証変更)
     this.clearReconnectTimer()
     if (this.socket) {
       this.socket.close()

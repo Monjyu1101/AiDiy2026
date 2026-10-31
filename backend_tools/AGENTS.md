@@ -122,7 +122,7 @@ print(res.json())
 Chrome DevTools は Node.js 版ではなく Python 実装の CDP client を使います。
 Chrome は `ChromeSessionRegistry` がセッションごとに `ChromeManager` と CDP client を管理します。既定セッションはポート `9222`、名前付きセッションは `9223`〜`9299` の空きポートと個別プロファイルを使います。
 
-現行実装では通常の起動は `0.0.0.0` で待ち受け、REST API 全体を localhost に制限する処理はありません。MCP SDK に渡す `host="127.0.0.1"` は SSE / Streamable HTTP 側の設定です。
+通常の Tools 起動は `127.0.0.1` のみに待ち受けます。これは bind 制限であり、独自の host 指定やポート転送・リバースプロキシによる再公開までは防ぎません。管理 API の既存認証は維持します。
 SQLite / PostgreSQL は read-only 中心で扱い、書き込みが必要な場合もまずアプリ API で再現できないか確認します。
 
 ## 実装時の入口

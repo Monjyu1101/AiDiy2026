@@ -15,9 +15,10 @@ const assert = require('node:assert/strict');
 const { readFileSync, mkdtempSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
+const { build } = require('esbuild');
 const { runInNewContext } = require('node:vm');
 
-test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通知を復帰時に届ける', t => {
+test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通知を復帰時に届ける', async t => {
   const home = mkdtempSync(join(tmpdir(), 'aidiy-live-extension-model-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const extensionPath = join(__dirname, '..');
@@ -45,7 +46,13 @@ test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通�
     close() { this.closed = true; this.readyState = 3; this.onclose?.(); }
   }
   const module = { exports: {} };
-  runInNewContext(readFileSync(join(extensionPath, 'dist/extension.js'), 'utf8'), {
+  // 実配置の認証ファイルは読まず、ホスト境界だけをメモリ内fixtureへ置換する。
+  const bundle = await build({ entryPoints: [join(extensionPath, 'src/extension.ts')], bundle: true, write: false,
+    platform: 'node', format: 'cjs', external: ['vscode'], plugins: [{ name: 'fixture-auth', setup(builder) {
+      builder.onLoad({ filter: /internal-auth\.ts$/ }, () => ({ contents: 'exports.internalAuthorization=()=>()=>({Authorization:"Bearer fixture-only"}); exports.internalSocket=(url)=>new WebSocket(url);', loader: 'js' }));
+      builder.onLoad({ filter: /local-backend\.cjs$/ }, () => ({ contents: 'exports.ローカル接続先=()=>"http://127.0.0.1:8091";', loader: 'js' }));
+    } }] });
+  runInNewContext(bundle.outputFiles[0].text, {
     module, exports: module.exports, require: name => name === 'vscode' ? vscode : name === 'node:os' ? { homedir: () => home } : require(name),
     WebSocket: Socket, process, Buffer, URL, AbortController, console,
     setTimeout, clearTimeout,

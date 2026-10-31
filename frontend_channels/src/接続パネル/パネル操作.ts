@@ -38,6 +38,7 @@ export class Discordパネル {
   private stopping?: Promise<void>;
   private generation = 0;
   private closed = false;
+  private apiAbort = new AbortController();
   private apiInfo?: モデル初期情報;
   発言?: (value: パネル発言) => void;
   音量?: (value: { kind: 'input' | 'output'; level: number; bins: number[] }) => void;
@@ -60,8 +61,9 @@ export class Discordパネル {
     this.状態 = { phase, message, ...(details ? { details } : {}) }; this.changed(this.状態);
   }
   async 初期情報() {
+    if (this.apiAbort.signal.aborted && !this.closed) this.apiAbort = new AbortController();
     const config = this.readConfig();
-    this.apiInfo = await this.readAPI(config.coreUrl);
+    this.apiInfo = await this.readAPI(config.coreUrl, undefined, config.coreRoot, { signal: this.apiAbort.signal });
     const { models, voices } = this.apiInfo?.catalog || this.readCatalog();
     const settings = { ...ライブ初期値(this.apiInfo?.settings || config.liveModels, {models, voices}), ...this.preferred };
     const notice = this.features.live ? ライブ選択エラー(settings, { models, voices }) : '';
@@ -104,6 +106,7 @@ export class Discordパネル {
   }
   async 開始() {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) return;
+    this.apiAbort.abort(); this.apiAbort = new AbortController();
     const run = ++this.generation;
     this.状態変更('connecting', 'Discord に接続しています…');
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -113,7 +116,7 @@ export class Discordパネル {
     const startedAt = Date.now();
     try {
       const config = this.readConfig(); token = config.token;
-      this.apiInfo = await this.readAPI(config.coreUrl);
+      this.apiInfo = await this.readAPI(config.coreUrl, undefined, config.coreRoot, { signal: this.apiAbort.signal });
       if (run !== this.generation || this.closed) return;
       let liveModels = { ...(this.apiInfo?.settings || config.liveModels), ...this.preferred };
       // 接続制御: 無効な機能は確認も接続もしない。
@@ -181,6 +184,7 @@ export class Discordパネル {
   }
   停止(): Promise<void> {
     if (this.stopping) return this.stopping;
+    this.apiAbort.abort();
     ++this.generation; this.cancel?.(); this.cancel = undefined;
     const bot = this.bot; this.bot = undefined;
     if (!bot) { this.状態変更('idle', '切断しました。接続すると再接続します。'); return Promise.resolve(); }

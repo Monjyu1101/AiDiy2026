@@ -6,12 +6,14 @@
 import {open,readdir,realpath,stat} from 'node:fs/promises';
 import {join,relative,isAbsolute,sep} from 'node:path';
 import {createHash} from 'node:crypto';
+import { hasAlwaysExcludedDirectory } from './フォルダ除外規則.mjs';
+import {isInternalCredentialPath} from './内部認証ファイル.mjs';
 
 const MAX_TEXT=1024*1024,MAX_SNAPSHOTS=5000;
 const within=(root,path)=>{const back=relative(root,path);return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back);};
 const failure=(status,message)=>Object.assign(Error(message),{status});
 const validPath=path=>typeof path==='string'&&path.length<=2000&&!/[\\:\0]/.test(path)&&path.split('/').every(part=>part&&part!=='.'&&part!=='..'&&!['.aidiy_backup','.backup_local','.aidiy_cache'].includes(part.toLowerCase()));
-async function safe(root,path){try{const full=await realpath(path);return within(root,full)?full:null;}catch(e){if(e.code==='ENOENT'||e.code==='ENOTDIR')return null;throw e;}}
+async function safe(root,path){if(isInternalCredentialPath(path)||hasAlwaysExcludedDirectory(relative(root,path)))return null;try{const full=await realpath(path);return within(root,full)&&!isInternalCredentialPath(full)&&!hasAlwaysExcludedDirectory(relative(root,full))?full:null;}catch(e){if(e.code==='ENOENT'||e.code==='ENOTDIR')return null;throw e;}}
 async function directories(path){return (await readdir(path,{withFileTypes:true})).filter(entry=>entry.isDirectory());}
 
 export function createFileHistory(project,{state}={}) {

@@ -16,35 +16,8 @@ const root = path.resolve(__dirname, '../..');
 
 for (const project of ['frontend_avatar', 'frontend_web']) {
   test(`${project}: 状態同期より先に接続通知を送り、initでセッションを確定する`, async () => {
-    const sockets = [];
-    class Socket {
-      static OPEN = 1;
-      readyState = 0;
-      sent = [];
-      constructor() { sockets.push(this); }
-      send(data) { this.sent.push(JSON.parse(data)); }
-      close() { this.readyState = 3; }
-      open() { this.readyState = Socket.OPEN; this.onopen(); }
-      receive(data) { this.onmessage({ data: JSON.stringify(data) }); }
-    }
-    const source = fs.readFileSync(path.join(root, project, 'src/api/websocket.ts'), 'utf8');
-    // Viteが注入する環境変数は、ブラウザを使わない検証用の値へ置き換える。
-    const compiled = ts.transpileModule(source.replaceAll('import.meta.env', '({ DEV: true })'), {
-      compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
-    }).outputText;
-    const exports = {};
-    const timers = { setTimeout: () => 1, clearTimeout: () => {} };
-    vm.runInNewContext(compiled, {
-      exports, WebSocket: Socket, window: timers, ...timers,
-      console: { log() {}, error() {} },
-      require: (name) => {
-        if (name === '@/api/config') return { AI_WS_ENDPOINT: 'ws://test' };
-        if (name === '@/api/client') return { default: {} };
-        if (name === '@/stores/auth') return { useAuthStore: () => ({}) };
-        throw new Error(`Unexpected import: ${name}`);
-      },
-    });
-    const client = new exports.AIWebSocket('ws://test', 'existing', 'input', '/project');
+    const { Client, sockets } = require('./browser-auth-harness.cjs').harness(project);
+    const client = new Client('ws://test', 'existing', 'input', '/project');
     client.onStateChange((connected) => {
       if (connected) client.updateState({ マイク: true });
     });

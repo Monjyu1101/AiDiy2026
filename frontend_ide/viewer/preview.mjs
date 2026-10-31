@@ -21,6 +21,8 @@ import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { MAX_MARKDOWN_BYTES, markdownText, renderMarkdownDocument } from './markdown-preview.mjs';
 import { forwardedOrigin } from './launch-options.mjs';
+import { hasAlwaysExcludedDirectory } from '../ファイル機能/フォルダ除外規則.mjs';
+import { isInternalCredentialPath } from '../ファイル機能/内部認証ファイル.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -42,6 +44,7 @@ const DOCUMENT_CSP = 'sandbox allow-scripts allow-same-origin allow-forms allow-
 
 /** 配ってよい相対パスか（/ 区切り）。 */
 export function previewAllowed(rel) {
+  if (isInternalCredentialPath(rel) || hasAlwaysExcludedDirectory(rel)) return false;
   const parts = rel.split('/');
   return parts.length > 0 && parts.every(part => part && part !== '.' && part !== '..' && !part.startsWith('.') && !BLOCKED_DIRS.has(part) && !part.includes('\0'))
     && !BLOCKED_FILE.test(parts.at(-1));

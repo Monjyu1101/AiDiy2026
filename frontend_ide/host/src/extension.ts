@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from './model-preferences';
 import { Hermes既定モデル, オフラインモデル候補, オフラインモデル保存先, オフライン実行 } from '../aidiy_code/src/offline';
 import { 起動解決 } from './runner';
+import { internalAuthorization } from './internal-auth';
 import { CodeConnection, コード選択 } from './code-connection';
 import { InputPrediction } from './input-prediction';
 import { validateFileUpload, fileAttachment, isDuplicateAttachment, type ChatAttachment } from './file-attachments';
@@ -348,7 +349,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
           this.保存(false);
         } else if (!this.オフラインジョブ) { this.実行中 = false; this.停止中 = false; }
         this.通知();
-      });
+      }, undefined, undefined, internalAuthorization(new URL(ローカル接続先(this.context.extensionPath, folder.uri.fsPath)), [this.context.extensionPath, folder.uri.fsPath]));
     if (!force && this.接続フォルダ === folder.uri.fsPath) return;
     if (!this.会話.作業URI) this.会話.作業URI = folder.uri.toString();
     this.接続フォルダ = folder.uri.fsPath;

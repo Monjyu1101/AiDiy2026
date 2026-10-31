@@ -14,7 +14,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
-const { LiveHost, backendUrl } = require('../../out/aidiy_live/host.cjs');
+const { LiveHost: RealLiveHost, backendUrl } = require('../../out/aidiy_live/host.cjs');
+
+class LiveHost extends RealLiveHost { constructor(...args) { args[4] = () => ({ Authorization: 'Bearer fixture-token-only' }); args[5] = url => new global.WebSocket(url); super(...args); } }
 
 test('Live ホスト: HTTP/WS中継はUTF-8で20MiBまで、1byte超過は中継しない', async () => {
   const limit = 20 * 1024 * 1024, originalSocket = global.WebSocket, originalFetch = global.fetch;

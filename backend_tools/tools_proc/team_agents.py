@@ -23,6 +23,8 @@ from typing import Optional
 
 import requests
 
+from .taskteam_auth import post_taskteam
+
 
 class TeamAgents:
     """backend_taskteam API へ Aチーム依頼を投入する薄いクライアント"""
@@ -54,8 +56,7 @@ class TeamAgents:
         """backend_taskteam の API を POST で呼び出す。接続不能時も dict で返す。"""
         url = f"{self.team_api_base}{path}"
         try:
-            res = requests.post(url, json=payload, timeout=max(1, int(request_timeout_sec)))
-            res.raise_for_status()
+            res = post_taskteam(url, payload, timeout=max(1, int(request_timeout_sec)))
             return res.json()
         except requests.RequestException as e:
             return {

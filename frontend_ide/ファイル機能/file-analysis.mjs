@@ -8,6 +8,8 @@ import { join, relative, isAbsolute, sep } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { runSearchAgent, validSearchPath } from './ai-search.mjs';
 import { ideDataFolder } from './ide-data.mjs';
+import { hasAlwaysExcludedDirectory } from './フォルダ除外規則.mjs';
+import { isInternalCredentialPath } from './内部認証ファイル.mjs';
 
 const within=(root,path)=>{const back=relative(root,path);return back!=='..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back);};
 const validInstruction=value=>typeof value==='string'&&value.length<=4000;
@@ -18,6 +20,8 @@ export function createFileAnalysis(project,{state,runAgent=runSearchAgent,now=Da
     if(!validSearchPath(path))throw Error('ファイルパスが不正です。');
     const root=await realpath(project),full=await realpath(join(root,path));
     if(!within(root,full))throw Error('プロジェクト外のファイルは解析できません。');
+    if(isInternalCredentialPath(full))throw Error('内部認証ファイルは解析できません。');
+    if(hasAlwaysExcludedDirectory(relative(root,full)))throw Error('除外フォルダ内のファイルは解析できません。');
     const info=await stat(full);if(!info.isFile())throw Error('解析するファイルを選択してください。');
     return {root,full,mtime:info.mtimeMs,size:info.size};
   }

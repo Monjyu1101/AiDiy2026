@@ -24,6 +24,8 @@ import { MEDIA_PATTERN } from './media-types.mjs';
 import { latestFile, latestFiles } from '../src/ファイル閲覧/最新ファイル.js';
 import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
 import { createExplorerFiles } from '../ファイル機能/explorer-files.mjs';
+import { hasAlwaysExcludedDirectory } from '../ファイル機能/フォルダ除外規則.mjs';
+import { isInternalCredentialPath } from '../ファイル機能/内部認証ファイル.mjs';
 export { scanTree, createScanPool } from './file-scan.mjs';
 
 const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
@@ -74,11 +76,13 @@ const IMAGES = {
 
 /** 作業フォルダからの相対パス（/ 区切り）を実ファイルへ解決する。作業フォルダの外（.. やリンク先）は null。 */
 async function insideRoot(root, rel) {
-  if (!rel || rel.includes('\0')) return null;
+  if (!rel || rel.includes('\0') || isInternalCredentialPath(rel) || hasAlwaysExcludedDirectory(rel)) return null;
   const realRoot = await realpath(root);
   let full;
   try { full = await realpath(resolve(realRoot, ...rel.split('/'))); } catch { return null; }
+  if (isInternalCredentialPath(full)) return null;
   const back = relative(realRoot, full);
+  if (hasAlwaysExcludedDirectory(back)) return null;
   // 空（ルート自身）、親への脱出、別ドライブ（絶対パスが返る）を拒否する
   if (!back || back === '..' || back.startsWith(`..${sep}`) || isAbsolute(back)) return null;
   return full;
@@ -326,7 +330,7 @@ export async function startServer(root, port = 0, { strict = false, env = proces
           const address = full ? (!forwarded && await publicMediaURL(root, path)) || await preview.url(path, { forwarded }) : null;
           return address ? json({ kind: 'media', url: address }) : json({ kind: 'media', error: 'このファイルは表示できません（設定・鍵・依存物などは配信しません）。' });
         }
-        if (/\.vue$/i.test(path)) return json(await vuePreview(root, path));
+        if (/\.vue$/i.test(path)) return await insideRoot(root, path) ? json(await vuePreview(root, path)) : fail(404, 'not found');
         return fail(404, 'not found');
       }
       // 最終更新欄。前回の更新日時から、同じ秒も含めて更新候補を返す。

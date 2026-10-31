@@ -10,6 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
+import { internalAuthorization, type InternalAuthorization } from '../../src/internal-auth';
 import { createServer, request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { randomBytes } from 'node:crypto';
@@ -23,12 +24,13 @@ import { 接続元許可 } from '../../src/forwarded-origin';
 import { catppuccinAsset } from '../../../src/ファイル閲覧/ファイルアイコン.js';
 
 // ホスト固有の接続をここに閉じ込める。会話・音声・UI はブラウザ側で共用する。
-export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false) {
+export async function ライブ起動(root: string, backend?: string, packaged = false, projectPath: string | null = process.cwd(), モデル設定: Record<string, string> = {}, modelFile = モデル保存先('live'), 自動接続 = false, authorization?: InternalAuthorization) {
   const 作業フォルダ = projectPath ? { 名前: basename(projectPath) || projectPath, パス: projectPath } : null;
   const target = new URL(backend || ローカル接続先(root, projectPath));
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
     throw new Error('バックエンドには http(s)://ホスト:ポート を指定してください。');
   }
+  const auth = authorization || internalAuthorization(target, [root, projectPath]);
   const prefix = `/${randomBytes(24).toString('hex')}/`;
   const sockets = new Set<Socket>();
   const viewers = new Set<import('node:http').ServerResponse>();
@@ -114,7 +116,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
         }
         return;
       }
-      const proxy = request(new URL(api, target), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': body.length }, timeout: 30000 }, upstream => {
+      const proxy = request(new URL(api, target), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': body.length, ...auth() }, timeout: 30000 }, upstream => {
         res.writeHead(upstream.statusCode || 502, { 'Content-Type': 'application/json' });
         upstream.on('error', () => res.destroy());
         upstream.pipe(res);
@@ -134,8 +136,11 @@ export async function ライブ起動(root: string, backend?: string, packaged =
     if (req.url !== prefix + 'socket' || !allowed?.host(req.headers.host) || !allowed.origin(req.headers.origin)) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return;
     }
+    let headers: Record<string, string>;
+    try { headers = auth(); }
+    catch { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
     const proxy = request(new URL('/core/ws/AIコア', target), {
-      headers: { host: target.host, origin: target.origin, connection: 'Upgrade', upgrade: 'websocket',
+      headers: { ...headers, host: target.host, origin: target.origin, connection: 'Upgrade', upgrade: 'websocket',
         'sec-websocket-key': req.headers['sec-websocket-key'] || '', 'sec-websocket-version': '13' }, timeout: 30000,
     });
     upstreamRequests.add(proxy);

@@ -10,6 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
+import { internalAuthorization, internalSocket, type InternalAuthorization } from './internal-auth';
 import { backendUrl } from '../aidiy_live/src/host';
 import { isAbsolute } from 'node:path';
 import { 接続エラー詳細 } from '../aidiy_live/src/connection-error';
@@ -65,7 +66,8 @@ export class CodeConnection {
   private sessionProject = '';
   get projectPath() { return this.connected ? this.sessionProject : ''; }
   constructor(backend: string, private onPacket: (packet: Packet) => void, private onState: () => void,
-    private createSocket: (url: string) => LiveSocket = url => new WebSocket(url), private request: typeof fetch = fetch) {
+    private createSocket: (url: string, headers?: Record<string, string>) => LiveSocket = (url, headers) => internalSocket(url, headers || {}), private request: typeof fetch = fetch,
+    private authorization: InternalAuthorization = internalAuthorization(new URL(backend), [__dirname])) {
     this.target = backendUrl(backend);
   }
   private project = '';
@@ -81,7 +83,7 @@ export class CodeConnection {
     const timer = setTimeout(() => controller.abort(new DOMException('AIコアの応答が30秒以内に返りませんでした。', 'TimeoutError')), 30000);
     try {
       const response = await this.request(new URL(`/core/AIコア/モデル情報/${path}`, this.target), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal,
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...this.authorization() }, redirect: 'error', body: JSON.stringify(body), signal: controller.signal,
       });
       const value = await response.json() as { status: string; message?: string; data: Info };
       if (!response.ok || value.status !== 'OK') throw new Error(value.message || 'モデル情報を取得・設定できません。');
@@ -163,7 +165,7 @@ export class CodeConnection {
   private open(channel: string, session: string, generation: number): Promise<string> {
     return new Promise((resolve, reject) => {
       const url = new URL('/core/ws/AIコア', this.target); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = this.createSocket(url.toString()); this.sockets.set(channel, socket);
+      const socket = this.createSocket(url.toString(), this.authorization()); this.sockets.set(channel, socket);
       let ready = false;
       const cancel = () => { clearTimeout(timer); this.pending.delete(cancel); reject(new Error('接続を中断しました。')); };
       const timer = setTimeout(() => { cancel(); socket.close(); }, 30000);

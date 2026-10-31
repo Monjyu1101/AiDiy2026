@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import database, core_crud, core_models
 import threading
 import time
+import auth as token_auth
 from conf import conf as app_conf
 from log_config import setup_logging, get_logger
 
@@ -131,6 +132,21 @@ def startup_event():
         core_crud.init_db_data(db)
     finally:
         db.close()
+
+    # 通常/内部の別署名鍵を永続化し、有効な最新鍵は起動時に再利用する。
+    rotator = token_auth.get_keyring()
+    rotator.on_error = lambda: logger.warning("認証鍵の更新に失敗しました。再試行します")
+    rotator.start()
+    app.state.internal_token_authority = rotator
+    app.state.internal_token_rotator = rotator
+
+
+@app.on_event("shutdown")
+def shutdown_internal_auth():
+    rotator = getattr(app.state, "internal_token_rotator", None)
+    if rotator is not None:
+        rotator.stop()
+
 
 @app.get("/")
 def read_root():

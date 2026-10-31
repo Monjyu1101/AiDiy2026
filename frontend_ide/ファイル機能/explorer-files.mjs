@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {renderMarkdownPdf} from './MarkdownPDF.mjs';
 import { createNativeExplorer } from './explorer-native.mjs';
+import { isInternalCredentialPath } from './内部認証ファイル.mjs';
 
 const ACTIONS = new Set(['copy', 'rename', 'trash', 'create-file', 'create-folder', 'pdf']);
 const MAX_BODY = 20 * 1024 * 1024;
@@ -19,6 +20,7 @@ const toPath = (directory, name) => directory ? `${directory}/${name}` : name;
 
 /** Windows でも別名・デバイス・ADS にならない、単一のファイル名だけを許可する。 */
 export function validateExplorerName(name) {
+  if (isInternalCredentialPath(name)) throw issue(403, '内部認証ファイルは操作できません。', 'private_credential');
   if (typeof name !== 'string' || !name || name === '.' || name === '..' || Buffer.byteLength(name, 'utf8') > 255
       || /[\x00-\x1f\x7f<>:"/\\|?*]/u.test(name) || /[.\s]$/u.test(name)
       || /^(con|prn|aux|nul|clock\$|conin\$|conout\$|com[0-9¹²³]|lpt[0-9¹²³])(?:\.|$)/iu.test(name)) {
@@ -82,6 +84,7 @@ export function createExplorerFiles(root, { state = () => ({ active: true }), on
       full = join(full, part); info = await lstat(full);
       if (info.isSymbolicLink()) throw issue(403, 'リンクを含むパスは変更できません。リンク元で操作してください。', 'symbolic_link');
       const canonical = await realpath(full), back = relative(base, canonical);
+      if (isInternalCredentialPath(canonical)) throw issue(403, '内部認証ファイルは操作できません。', 'private_credential');
       if (back === '..' || back.startsWith(`..${sep}`) || isAbsolute(back)) throw issue(403, 'プロジェクト外は変更できません。', 'outside_project');
       const again = await lstat(full);
       if (again.isSymbolicLink() || !sameEntry(info, again)) throw issue(409, '操作中に対象のパスが変更されました。', 'changed_path');

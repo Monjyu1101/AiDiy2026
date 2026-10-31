@@ -25,6 +25,8 @@ AIタスク要求が 1 件も無いとき（＝DB を作り直したとき）に
 
 from __future__ import annotations
 
+from taskteam_proc.internal_client import report_instruction
+
 # 実在しないダミー。書き換えずに動かしても停止検査が対象なしで終わるようにしてある。
 監視対象未設定ID = "TK00000000"
 
@@ -267,6 +269,9 @@ N 側を通って エラーなし。処理不要 で終わっている場合、�
 ・task_check_okng を 監視対象タスクID へ呼ばない（報告先はこの監視タスク自身だけ）
 ・task_check_okng のメッセージを空にしない
 """
+
+# token 本文は保存しない。通常ステップも runtime 指示を持つため既存 DB のテンプレートでも動作する。
+要求内容 += report_instruction()
 
 # 明細定義。要求内容にタスクIDを書かないのと同じ理由で、ここにもIDは書かない。
 明細 = [

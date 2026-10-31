@@ -9,9 +9,9 @@ import { createHash } from 'node:crypto';
 import rules from '../../backend_server/core_router/フォルダ除外規則.json' with { type: 'json' };
 import { opendir, lstat, realpath } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { alwaysExcludedDirectory, hasAlwaysExcludedDirectory } from '../ファイル機能/フォルダ除外規則.mjs';
+import { isInternalCredentialPath } from '../ファイル機能/内部認証ファイル.mjs';
 
-// 星にしないフォルダ（依存物・生成物・キャッシュ）。
-const IGNORED = new Set(rules.ignored);
 const MAX_FILES = 30000;
 
 // AiDiy のバックアップ対象（エクスプローラーのフィルター用）。
@@ -43,12 +43,12 @@ export async function resolveScanFolder(root, folder = '', filter, fs = { lstat,
   let target = root;
   for (const part of parts) {
     target = join(target, part);
-    if (filter === 'backup' ? !backupDirAllowed(part) || !backupPathAllowed(target) : IGNORED.has(part)) return null;
+    if (alwaysExcludedDirectory(part) || (filter === 'backup' && (!backupDirAllowed(part) || !backupPathAllowed(target)))) return null;
     try {
       const info = await fs.lstat(target);
       if (!info.isDirectory() || info.isSymbolicLink()) return null;
       const full = await fs.realpath(target), back = relative(root, full);
-      if (back === '..' || back.startsWith(`..${sep}`) || isAbsolute(back)) return null;
+      if (back === '..' || back.startsWith(`..${sep}`) || isAbsolute(back) || hasAlwaysExcludedDirectory(back, true)) return null;
     } catch { return null; }
   }
   return target;
@@ -112,7 +112,7 @@ export async function scanTree(root, { filter, scope, folder = '', signal, limit
     let handle;
     try {
       const full = await budget.run(() => fs.realpath(dir));
-      if (!below(canonicalRoot, full)) return;
+      if (!below(canonicalRoot, full) || hasAlwaysExcludedDirectory(relative(canonicalRoot, full), true)) return;
       handle = await budget.run(() => fs.opendir(full), closeDir);
       while (!budget.check()) {
         if (entries >= caps.maxEntries) { budget.stop('entries'); break; }
@@ -123,11 +123,12 @@ export async function scanTree(root, { filter, scope, folder = '', signal, limit
         if (entry.isDirectory()) {
           // grep対象外の保存版は走査前に除外し、候補や時間の上限を消費させない。
           if (scope === 'grep' && ['.aidiy_backup', '.backup_local'].includes(entry.name)) continue;
-          if (backup ? !backupDirAllowed(entry.name) || !backupPathAllowed(path) : IGNORED.has(entry.name)) continue;
+          if (alwaysExcludedDirectory(entry.name) || (backup && (!backupDirAllowed(entry.name) || !backupPathAllowed(path)))) continue;
           const child = { n: entry.name, d: [], f: [] };
           node.d.push(child);
           await walk(path, child, depth + 1, canonicalRoot);
         } else if (entry.isFile()) {
+          if (isInternalCredentialPath(entry.name)) continue;
           if (backup && !backupFileAllowed(entry.name)) continue;
           if (files >= caps.maxFiles) { budget.stop('files'); break; }
           try {

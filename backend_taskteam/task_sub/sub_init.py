@@ -30,9 +30,11 @@ import json
 import os
 import re
 import sys
+
+from pathlib import Path as _AuthPath
+sys.path.insert(0, str(_AuthPath(__file__).resolve().parent.parent))
+from taskteam_proc.internal_client import post_json
 import traceback
-import urllib.request
-from urllib.parse import quote
 
 _SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SELF_DIR not in sys.path:
@@ -43,7 +45,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AIDIYルート = os.path.normpath(os.path.join(BASE_DIR, ".."))
 TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
-_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
@@ -102,17 +103,7 @@ def ログ(メッセージ: str) -> None:
 
 
 def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
-    # 日本語を含む URL パスは urllib がそのまま扱えないためパーセントエンコードする
-    if url.startswith("http://"):
-        本体 = url[len("http://"):]
-        ホスト, _, パス = 本体.partition("/")
-        url = "http://" + ホスト + "/" + quote(パス)
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
-    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
-        return json.loads(res.read().decode("utf-8"))
+    return post_json(url, payload, timeout=timeout)
 
 
 def JSON形式サンプル(利用者ID: str, タスクID: str, プロジェクト: str, task_ai_name: str, task_ai_model: str) -> str:

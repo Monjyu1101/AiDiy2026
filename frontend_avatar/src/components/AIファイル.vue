@@ -550,13 +550,14 @@ const ファイル保存先選択 = async () => {
 // ===================== WebSocket =====================
 
 const 認証トークン更新 = async () => {
-  if (!認証Storage.getItem('token') || トークン更新中) return
+  const requestToken = 認証Storage.getItem('token')
+  if (!requestToken || トークン更新中) return
 
   トークン更新中 = true
   try {
     const response = await apiClient.post('/core/auth/トークン更新')
     const nextToken = response.data?.data?.access_token
-    if (response.data?.status === 'OK' && nextToken) {
+    if (response.data?.status === 'OK' && nextToken && 認証Storage.getItem('token') === requestToken) {
       認証Storage.setItem('token', nextToken)
     }
   } catch {

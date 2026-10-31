@@ -14,6 +14,7 @@ from typing import Literal
 from .フォルダ状態 import フォルダ状態取得
 import os
 import base64
+from internal_auth import is_internal_credential_path
 import core_schema as schemas
 import deps
 import core_models as models
@@ -53,6 +54,8 @@ def get_ファイル内容(
         )
 
     解決パス = _解決ファイルパス(ファイル名)
+    if is_internal_credential_path(解決パス):
+        raise HTTPException(status_code=403, detail="内部認証情報にはアクセスできません")
     if not os.path.isfile(解決パス):
         return schemas.ResponseBase(
             status="NG",
@@ -96,6 +99,8 @@ def update_ファイル内容(
         )
 
     解決パス = _解決ファイルパス(ファイル名)
+    if is_internal_credential_path(解決パス):
+        raise HTTPException(status_code=403, detail="内部認証情報にはアクセスできません")
     if not os.path.isfile(解決パス):
         return schemas.ResponseBase(
             status="NG",

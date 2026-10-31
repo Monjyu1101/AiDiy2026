@@ -169,6 +169,12 @@ julius/
 _MCP/
 
 # Secrets / sensitive
+# 全階層の内部認証情報と、同一ディレクトリで原子的に保存する際の一時ファイル。
+internal_auth.json
+.internal_auth.json.*.tmp
+internal_auth_keys.json
+.internal_auth_keys.json.*.tmp
+.internal_auth_keys.lock
 # NOTE: ここでは「実際の資格情報ファイル」だけを対象にする。
 #       *key* / *secret* のような広いパターンは、
 #       command_hermes/core/secret_scope.py や

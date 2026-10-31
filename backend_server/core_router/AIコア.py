@@ -12,7 +12,9 @@
 AIコア APIエンドポイント
 WebSocketベースのセッション管理とストリーミング処理
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, HTTPException
+from internal_api_auth import (authenticate, require_session_owner, require_session_settings,
+                               require_manager_owner, bind_session_owner)
 from starlette.websockets import WebSocketState
 from pydantic import BaseModel
 from typing import Dict, Optional
@@ -424,6 +426,8 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
     AIコア画面の初期化
     セッションIDがなければ新規生成、あれば既存データを返す
     """
+    principal, _ = authenticate(http_request, "POST", "/core/AIコア/初期化")
+    require_manager_owner(AIセッション管理, request.セッションID, principal)
     try:
         セッションID = request.セッションID
 
@@ -433,6 +437,7 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
             
             # セッションを確実に作成（存在しなければ新規）
             AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
+            bind_session_owner(AIセッション管理, セッションID, principal)
             
             # 新規セッション作成時は、セッション固有のCODE_BASE_PATHでバックアップ実行
             session = AIセッション管理.sessions.get(セッションID)
@@ -445,6 +450,7 @@ async def 初期化(http_request: Request, request: 初期化リクエスト):
         else:
             # セッションを確実に作成（存在しなければ新規）
             AIセッション管理.ensure_session(セッションID, app_conf=getattr(http_request.app, "conf", None))
+            bind_session_owner(AIセッション管理, セッションID, principal)
 
         return 初期化レスポンス(
             status="OK",
@@ -534,6 +540,9 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
     """
     ソケットのAIモデル情報と設定を取得
     """
+    principal, _ = authenticate(http_request, "POST", "/core/AIコア/モデル情報/取得")
+    if request.セッションID:
+        require_session_owner(AIセッション管理.get_session(request.セッションID), principal)
     try:
         セッションID = request.セッションID
 
@@ -673,6 +682,10 @@ async def モデル情報設定(http_request: Request, request: モデル設定�
     """
     ソケットのAIモデル設定を更新（セッション内のみ、ファイル保存しない）
     """
+    principal, _ = authenticate(http_request, "POST", "/core/AIコア/モデル情報/設定")
+    require_session_settings(principal, request)
+    if request.セッションID:
+        require_session_owner(AIセッション管理.get_session(request.セッションID), principal)
     try:
         セッションID = request.セッションID
         設定 = dict(request.モデル設定 or {})
@@ -968,11 +981,16 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
     AIコア WebSocketエンドポイント
     セッション確立、状態同期、ストリーミング処理を行う
     """
+    try:
+        principal, auth_protocol = authenticate(WebSocket接続, "WEBSOCKET", "/core/ws/AIコア")
+    except HTTPException:
+        await WebSocket接続.close(code=1008)
+        return
     セッションID = None
     ソケット番号 = "input"
 
     try:
-        await WebSocket接続.accept()
+        await WebSocket接続.accept(subprotocol=auth_protocol)
         # ノイズ削減: 接続受付ログは通常運用では出力しない
 
         # 初回メッセージでセッションID・ソケット番号を受信
@@ -1006,7 +1024,8 @@ async def websocket_endpoint(WebSocket接続: WebSocket):
                 accept_in_connect=False,
                 code_base_path=初期データ.get("CODE_BASE_PATH"),
                 live_model_settings=初期データ.get("モデル設定"),
-                voice=初期データ.get("voice")
+                voice=初期データ.get("voice"),
+                auth_owner=principal.owner,
             )
         except ValueError as e:
             await WebSocket接続.send_json({"メッセージ識別": "error", "メッセージ内容": str(e)})

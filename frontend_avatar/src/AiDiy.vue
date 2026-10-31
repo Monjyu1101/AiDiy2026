@@ -670,6 +670,7 @@ function 認証クリア(message = '') {
   認証Storage.removeItem('token')
   認証Storage.removeItem('user')
   認証Storage.removeItem('avatar_session_id')
+  window.dispatchEvent(new Event('auth-cleared'))
   if (message) {
     認証Storage.setItem(認証エラーメッセージKey, message)
   } else {

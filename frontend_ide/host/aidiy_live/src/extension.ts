@@ -15,6 +15,7 @@ import { developmentHtml } from '../../src/vscode-html';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { internalAuthorization } from '../../src/internal-auth';
 import { LiveHost, microphonePython } from './host';
 import { ローカル接続先 } from '../local-backend.cjs';
 import { ライブモデル読込, ライブモデル保存 } from '../../src/model-preferences';
@@ -56,7 +57,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
     }, () => microphonePython(
       vscode.workspace.getConfiguration('aidiyLive').get<string>('pythonPath', ''),
       (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file').map(folder => folder.uri.fsPath)
-    ), join(this.context.extensionPath, 'dist/microphone.py'));
+    ), join(this.context.extensionPath, 'dist/microphone.py'), internalAuthorization(new URL(backend), [this.context.extensionPath, this.folder()?.パス]));
     const resources = [
       view.webview.onDidReceiveMessage(message => {
         if (!vscode.workspace.isTrusted) { host.stop(); return; }

@@ -25,7 +25,7 @@ let fileNumber = 0;
 // 会話履歴はテストごとの一時フォルダへ（作業フォルダの _AIDIY には書かない）
 let historyNumber = 0;
 const fixtureServers = new Map();
-const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => (fixtureServers.get(project) || startServer)(project, launch, initial, file, run, history);
+const start = (project, launch, initial, file, run, history = join(preferences, `history-${++historyNumber}`)) => (fixtureServers.get(project) || startServer)(project, launch, initial, file, run, history, () => ({ Authorization: 'Bearer fixture-token-only' }), url => new global.WebSocket(url));
 const 単独起動 = (project, launch, initial, file = join(preferences, `${++fileNumber}.json`)) => start(project, launch, initial, file);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 

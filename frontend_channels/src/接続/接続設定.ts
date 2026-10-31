@@ -19,7 +19,7 @@ export const 設定ファイル = resolve(プロジェクトルート, '_config/
 
 export interface Discord設定 {
   token: string; guildId: string; userId: string; textChannelId: string; voiceChannelId: string;
-  prefix: string; coreUrl: string; folder: string; cli: string; python: string;
+  prefix: string; coreUrl: string; coreRoot?: string; folder: string; cli: string; python: string;
   /** aidiy_hermes のモデル（auto / same / openai_oauth/gpt-… など）。 */
   hermesModel: string; maxTurns: number; timeoutMs: number; liveModels: Record<string, string>;
   /** 接続制御。省略時は両方 ON。パネルの設定（Live は切替可、Code は ON 固定）で上書きする。 */
@@ -66,7 +66,7 @@ export function 設定解析(data: Record<string, unknown>, root = プロジェ�
   // 引数への変換（OAuth の provider 明示など）は コード/Hermesモデル.ts の Hermes会話引数 で行う。
   const hermesModel = text('CODE_AIDIY_HERMES_MODEL') || 'auto';
   return {
-    token, guildId, userId, textChannelId, voiceChannelId, prefix: '!aidiy', coreUrl: url.href, folder, liveModels,
+    token, guildId, userId, textChannelId, voiceChannelId, prefix: '!aidiy', coreUrl: url.href, coreRoot: root, folder, liveModels,
     cli: 'aidiy_hermes', python: '',
     hermesModel,
     maxTurns: integer('CODE_MAX_TURNS', 999, 1, Number.MAX_SAFE_INTEGER), timeoutMs: 900_000,
@@ -78,5 +78,5 @@ export function 設定読込(path = 設定ファイル): Discord設定 {
   try { data = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')); }
   catch { throw new 設定エラー('_config/AiDiy_key.json を UTF-8 の JSON オブジェクトとして読み込めません。'); }
   if (!data || Array.isArray(data) || typeof data !== 'object') throw new 設定エラー('AiDiy_key.json のルートは JSON オブジェクトにしてください。');
-  return 設定解析(data as Record<string, unknown>);
+  return 設定解析(data as Record<string, unknown>, resolve(dirname(path), '..'));
 }

@@ -676,4 +676,4 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         logger.info(f"WindowsControl       : {base}/aidiy_windows_control/  SSE:{MOUNT_WC}/sse")
     logger.info(f"ChatCompletions      : {base}/aidiy_chat_completions/v1/chat/completions [OpenAI/Ollama 互換]")
-    uvicorn.run(app, host="0.0.0.0", port=PORT_TOOLS, log_level="warning", ws_max_size=int(os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")))
+    uvicorn.run(app, host="127.0.0.1", port=PORT_TOOLS, log_level="warning", ws_max_size=int(os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")))

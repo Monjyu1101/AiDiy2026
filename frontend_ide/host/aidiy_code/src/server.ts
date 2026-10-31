@@ -14,6 +14,7 @@ import { createServer, type ServerResponse } from 'node:http';
 import { writeFileSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { internalAuthorization, type InternalAuthorization } from '../../src/internal-auth';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
 import { InputPrediction } from '../../src/input-prediction';
 import { validateFileUpload, fileAttachment, isDuplicateAttachment } from '../../src/file-attachments';
@@ -26,7 +27,7 @@ import { オフライン実行, オフラインモデル候補, オフライン�
 import type { Packet } from '../../aidiy_live/src/protocol';
 
 // 単独画面と拡張で AIコア接続・メッセージ形式・描画を共用する。
-export async function 単独起動(project: string, backend?: string, initialModel: { provider?: string; model?: string; offline?: boolean; lockedMode?: boolean; keepAlive?: boolean } = {}, modelFile = モデル保存先('code'), runOffline = オフライン実行, historyFolder?: string) {
+export async function 単独起動(project: string, backend?: string, initialModel: { provider?: string; model?: string; offline?: boolean; lockedMode?: boolean; keepAlive?: boolean } = {}, modelFile = モデル保存先('code'), runOffline = オフライン実行, historyFolder?: string, authorization?: InternalAuthorization, createSocket?: ConstructorParameters<typeof CodeConnection>[3]) {
   const root = resolve(__dirname, '../..');
   const folder = resolve(project);
   if (!statSync(folder).isDirectory()) throw new Error('作業フォルダがありません。');
@@ -155,7 +156,7 @@ export async function 単独起動(project: string, backend?: string, initialMod
       state.provider = connection.model.provider; state.model = connection.model.model;
     } else if (!offlineJob) { state.実行中 = false; state.停止中 = false; }
     notify();
-  });
+  }, createSocket, undefined, authorization || internalAuthorization(new URL(backend || ローカル接続先(root, folder)), [root, folder]));
   const reconnect = () => {
     if (!state.自動接続 || state.実行モード === 'offline') { connection.disconnect(); state.接続済み = false; state.接続中 = false; state.接続エラー = ''; state.モデル変更中 = false; notify(); }
     else connection.start(folder, { provider: state.provider, model: state.model }, state.セッションID, state.メッセージ);

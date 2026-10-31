@@ -361,3 +361,11 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 - オフラインではLiveを表示・起動しない。CodeのHermes直接実行は単独版と共通で、オフライン開始からAIコアへの通信を行わないことを確認する。
 - 埋め込み表示だけ `frame-ancestors 'self'` にする。単独版のCSPは変更しない。CodespacesのHost / Origin検証はIDEで行い、内部への転送時にローカルのHost / Originへ揃える。
 - 確認は `node --test frontend_ide/viewer/checks/panels.test.mjs`。Liveの音声許可は `frontend_ide/desktop.cjs` の `audioAllowed` の同一公開元・Live子フレーム・音声限定を維持する。マイク実機を使わない確認にはElectronの `use-fake-device-for-media-stream` を使い、許可判定を省く `use-fake-ui-for-media-stream` は付けない。
+
+## Code / Live 内部認証の変更・検証
+
+- Node 専用の `host/src/internal-auth.ts` が、接続先と同じ配置先の内部認証ファイルを要求ごとに読みます。配置先の優先順、`PORT_CORE` と loopback origin の一致、期限、秘密ファイルの symlink 拒否を維持します。配布済み拡張では信頼済み workspace の AiDiy checkout を参照できないと接続できません。
+- 接続箇所は `src/code-connection.ts`、`aidiy_live/src/host.ts`、`aidiy_live/src/server.ts`。Vue の `ライブ通信.ts` は既存 IPC / localhost 中継を使い、内部トークンを受け取りません。REST は redirect を追跡せず、WS は undici の header または Node HTTP upgrade の header にだけ付与します。
+- `checks/internal-auth.test.cjs` と `checks/internal-auth-transport.test.cjs` は一時 fixture / メモリ内 mock で実行します。実際の認証ファイルや利用者の設定・DBをテストに使いません。配置名変更、期限切れ、不正JSON、ローテーション、別origin拒否、画面・URLへの漏洩防止を検証します。
+- Core 再起動時、Code の既存10秒再接続が新しいトークンを再読込すること、切断・破棄で停止すること、依頼を二重送信しないことを確認します。Live の手動再接続方針は変更しません。
+- undici は Node bundle に含め、Web / Vue bundle に含めません。Live VSIX は `dist/THIRD_PARTY_NOTICES.txt` も配布します。

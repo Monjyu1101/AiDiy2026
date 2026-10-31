@@ -55,6 +55,23 @@ class BackupLocalTest(unittest.TestCase):
         os.utime(path, (mtime, mtime))
         return path
 
+    def test_internal_credentials_never_enter_snapshots(self):
+        for relative in ('internal_auth.json', 'nested/internal_auth.json',
+                         '_AIDIY/backend_core/internal_auth.json',
+                         '_AIDIY/backend_core/.internal_auth.json.fixture.tmp',
+                         '_AIDIY/backend_core/internal_auth_keys.json',
+                         '_AIDIY/backend_taskteam/internal_auth_keys.json',
+                         '_AIDIY/backend_core/.internal_auth_keys.json.fixture.tmp',
+                         '_AIDIY/backend_core/.internal_auth_keys.lock'):
+            self.write(relative, 'fake-only-not-a-token')
+        for relative in ('main.txt', 'nested/internal_auth.example.json', '_AIDIY/backend_core/README.md'):
+            self.write(relative)
+        result = self.saver.run()
+        self.assertTrue(result['ok'])
+        target = Path(result['バックアップ先'])
+        actual = sorted(str(p.relative_to(target)) for p in target.rglob('*') if p.is_file())
+        self.assertEqual(actual, ['_AIDIY/backend_core/README.md', 'main.txt', 'nested/internal_auth.example.json'])
+
     def test_first_save_uses_new_store_and_keeps_ordinary_backup_sources(self):
         self.write("main.txt", "first\n")
         legacy = self.write(".backup_local/20990101/000000.all/main.txt", "legacy\n")

@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 
 // Discord 版の モデル情報.ts から、Slack で使うコード候補だけを残したもの（Live の候補は扱わない）。
+import { Coreモデル要求, type Core復旧設定 } from '../接続/Core認証';
 type Choices = Record<string, Record<string, string>>;
 export type モデル初期情報 = {
   settings: Record<string, string>;
@@ -29,13 +30,10 @@ function choices(value: unknown): Choices {
 }
 
 // Core停止中の単独実行を妨げないよう、失敗時は呼出側のファイル読込へ戻す。
-export async function モデル情報取得(coreUrl: string, request: typeof fetch = fetch): Promise<モデル初期情報 | undefined> {
+export async function モデル情報取得(coreUrl: string, request: typeof fetch = fetch, root?: string, recovery: Core復旧設定 = {}): Promise<モデル初期情報 | undefined> {
   try {
-    const url = new URL(coreUrl);
-    url.pathname = '/core/AIコア/モデル情報/取得'; url.search=''; url.hash='';
-    const response = await request(url, {method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({セッションID:''}), signal:AbortSignal.timeout(1500)});
-    if (!response.ok) return;
+    const response = await Coreモデル要求(coreUrl, request, root, recovery);
+    if (!response?.ok) return;
     const value = await response.json();
     if (value.status !== 'OK' || !value.data?.モデル設定 || typeof value.data.モデル設定 !== 'object' || Array.isArray(value.data.モデル設定)) return;
     const available = value.data.available_models;

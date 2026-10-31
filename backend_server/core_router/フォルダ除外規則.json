@@ -1,7 +1,9 @@
 {
   "ignored": [
     "node_modules",
+    "node_module",
     ".git",
+    ".git_local",
     "dist",
     "out",
     "build",

@@ -39,6 +39,7 @@ export class Slackパネル {
   private stopping?: Promise<void>;
   private generation = 0;
   private closed = false;
+  private apiAbort = new AbortController();
   private apiInfo?: モデル初期情報;
   発言?: (value: パネル発言) => void;
   constructor(private changed: (state: パネル状態) => void,
@@ -55,8 +56,9 @@ export class Slackパネル {
   private 既定モデル(config: Slack設定) { return this.apiInfo?.settings.CODE_AIDIY_HERMES_MODEL || config.hermesModel; }
   private 保存値(config: Slack設定) { return パネル設定読込(this.既定モデル(config), this.settingsFile); }
   async 初期情報() {
+    if (this.apiAbort.signal.aborted && !this.closed) this.apiAbort = new AbortController();
     const config = this.readConfig();
-    this.apiInfo = await this.readAPI(config.coreUrl);
+    this.apiInfo = await this.readAPI(config.coreUrl, undefined, config.coreRoot, { signal: this.apiAbort.signal });
     const saved = this.保存値(config);
     return { state: this.状態, firstRun: !saved, code: { cli: saved?.code_name ?? 既定コード名, model: saved?.code_model ?? this.既定モデル(config) }, folder: { name: basename(config.folder) || config.folder, path: config.folder } };
   }
@@ -81,6 +83,7 @@ export class Slackパネル {
   }
   async 開始() {
     if (this.closed || !['idle', 'error'].includes(this.状態.phase)) return;
+    this.apiAbort.abort(); this.apiAbort = new AbortController();
     const run = ++this.generation;
     this.状態変更('connecting', 'Slack に接続しています…');
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -88,7 +91,7 @@ export class Slackパネル {
     const startedAt = Date.now();
     try {
       const config = this.readConfig();
-      this.apiInfo = await this.readAPI(config.coreUrl);
+      this.apiInfo = await this.readAPI(config.coreUrl, undefined, config.coreRoot, { signal: this.apiAbort.signal });
       if (run !== this.generation || this.closed) return;
       const saved = this.保存値(config);
       // 将来の別ハーネス用に code_name を保存している。現在は aidiy_hermes だけを実行できる。
@@ -125,6 +128,7 @@ export class Slackパネル {
   }
   停止(): Promise<void> {
     if (this.stopping) return this.stopping;
+    this.apiAbort.abort();
     ++this.generation; this.cancel?.(); this.cancel = undefined;
     const bot = this.bot; this.bot = undefined;
     if (!bot) { this.状態変更('idle', '切断しました。接続すると再接続します。'); return Promise.resolve(); }

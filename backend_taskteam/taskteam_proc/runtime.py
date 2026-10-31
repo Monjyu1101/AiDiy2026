@@ -23,6 +23,8 @@ from typing import AsyncIterator, Callable
 
 from fastapi import FastAPI
 
+from .internal_auth import InternalTokenAuthority, PersistentTokenRotator
+
 from task_proc import tasks_db, tasks_watcher
 from team_proc import team_db, team_exp_db, team_goal_db, team_pdca_db, team_talk_db, team_work_db
 from team_proc.store import シミュレーションループ
@@ -104,62 +106,81 @@ async def _team_initialize(logger: logging.Logger) -> None:
 def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        del app
-
-        # Teamテーブルを先に揃え、Task側の連携クリーンアップから同じDBを参照できるようにする。
-        await _team_initialize(logger)
-        await asyncio.to_thread(tasks_db.初期化)
-        初期タスクID = await asyncio.to_thread(tasks_db.初期タスクを投入)
-        if 初期タスクID:
-            logger.info(
-                "AIタスクが空だったため実行監視のひな形を投入しました: %s"
-                "（実行有効=0。監視対象タスクIDを書き換えて有効化すると動きます）",
-                初期タスクID,
-            )
-        await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
-        await asyncio.to_thread(tasks_watcher.起動時実行条件初期化, logger)
-        await asyncio.to_thread(team_watcher.起動時クリーンアップ, logger)
-
-        tasks = [
-            asyncio.create_task(
-                tasks_watcher.起動監視ループ(logger),
-                name="backend_taskteam_task_launch_watcher",
-            ),
-            asyncio.create_task(
-                tasks_watcher.状態監視ループ(logger),
-                name="backend_taskteam_task_status_watcher",
-            ),
-            asyncio.create_task(
-                シミュレーションループ(logger),
-                name="backend_taskteam_team_simulation",
-            ),
-            asyncio.create_task(
-                team_watcher.起動監視ループ(logger),
-                name="backend_taskteam_team_launch_watcher",
-            ),
-            asyncio.create_task(
-                team_watcher.状態監視ループ(logger),
-                name="backend_taskteam_team_status_watcher",
-            ),
-        ]
-        logger.info(
-            "backend_taskteam を開始しました "
-            "(task起動監視=%ss, task状態監視=%ss, team起動監視=%ss, team状態監視=%ss)",
-            tasks_watcher.起動監視間隔秒,
-            tasks_watcher.状態監視間隔秒,
-            team_watcher.起動監視間隔秒,
-            team_watcher.状態監視間隔秒,
-        )
+        endpoints = {(method, route.path) for route in app.routes
+                     for method in getattr(route, "methods", ())
+                     if method == "POST" and (route.path.startswith(("/task/", "/team/"))
+                                              or route.path == "/task_check_okng")}
+        authority = InternalTokenAuthority(endpoints=endpoints)
+        rotator = PersistentTokenRotator(
+            authority, BASE_DIR.parent,
+            on_error=lambda: logger.error("TaskTeam内部認証の更新に失敗しました。"))
+        rotator.start()
+        app.state.internal_token_authority = authority
         try:
-            yield
+            async with _worker_lifespan(logger):
+                yield
         finally:
-            for task in tasks:
-                task.cancel()
-            for task in tasks:
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-            logger.info("backend_taskteam を停止しました")
+            rotator.stop()
+            app.state.internal_token_authority = None
 
     return lifespan
+
+
+@asynccontextmanager
+async def _worker_lifespan(logger):
+
+    # Teamテーブルを先に揃え、Task側の連携クリーンアップから同じDBを参照できるようにする。
+    await _team_initialize(logger)
+    await asyncio.to_thread(tasks_db.初期化)
+    初期タスクID = await asyncio.to_thread(tasks_db.初期タスクを投入)
+    if 初期タスクID:
+        logger.info(
+            "AIタスクが空だったため実行監視のひな形を投入しました: %s"
+            "（実行有効=0。監視対象タスクIDを書き換えて有効化すると動きます）",
+            初期タスクID,
+        )
+    await asyncio.to_thread(tasks_watcher.起動時クリーンアップ, logger)
+    await asyncio.to_thread(tasks_watcher.起動時実行条件初期化, logger)
+    await asyncio.to_thread(team_watcher.起動時クリーンアップ, logger)
+
+    tasks = [
+        asyncio.create_task(
+            tasks_watcher.起動監視ループ(logger),
+            name="backend_taskteam_task_launch_watcher",
+        ),
+        asyncio.create_task(
+            tasks_watcher.状態監視ループ(logger),
+            name="backend_taskteam_task_status_watcher",
+        ),
+        asyncio.create_task(
+            シミュレーションループ(logger),
+            name="backend_taskteam_team_simulation",
+        ),
+        asyncio.create_task(
+            team_watcher.起動監視ループ(logger),
+            name="backend_taskteam_team_launch_watcher",
+        ),
+        asyncio.create_task(
+            team_watcher.状態監視ループ(logger),
+            name="backend_taskteam_team_status_watcher",
+        ),
+    ]
+    logger.info(
+        "backend_taskteam を開始しました "
+        "(task起動監視=%ss, task状態監視=%ss, team起動監視=%ss, team状態監視=%ss)",
+        tasks_watcher.起動監視間隔秒,
+        tasks_watcher.状態監視間隔秒,
+        team_watcher.起動監視間隔秒,
+        team_watcher.状態監視間隔秒,
+    )
+    try:
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        logger.info("backend_taskteam を停止しました")

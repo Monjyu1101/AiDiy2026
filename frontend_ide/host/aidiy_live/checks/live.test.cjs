@@ -20,7 +20,8 @@ const { readFileSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { runInNewContext } = require('node:vm');
 const { spawn } = require('node:child_process');
-const { ライブ起動: start } = require('../../dist/aidiy_live/server.cjs');
+const { ライブ起動: realStart } = require('../../dist/aidiy_live/server.cjs');
+const start = (...args) => { args[7] = () => ({ Authorization: 'Bearer fixture-token-only' }); return realStart(...args); };
 const preferences = mkdtempSync(join(tmpdir(), 'aidiy-live-model-'));
 after(() => rmSync(preferences, { recursive: true, force: true }));
 let fileNumber = 0;
@@ -258,7 +259,7 @@ test('Live 接続失敗: 単独画面と拡張に実際のローカル接続先�
     method: 'POST', headers: { 'Content-Type': 'application/json', origin: new URL(live.url).origin }, body: '{}',
   });
   assert.equal(response.status, 502);
-  const packets = [], host = new LiveHost(target, packet => packets.push(packet), () => 'python', '/microphone.py');
+  const packets = [], host = new LiveHost(target, packet => packets.push(packet), () => 'python', '/microphone.py', () => ({ Authorization: 'Bearer fixture-token-only' }));
   t.after(() => host.dispose());
   await host.receive({ type: 'api', id: 1, path: 'core/AIコア/モデル情報/取得', body: {} });
   for (const message of [(await response.json()).message, packets[0].error]) {

@@ -56,6 +56,9 @@ _バックアップ除外フォルダ組 = {
 _バックアップ除外ファイル = (
     ".DS_Store",
     "Thumbs.db",
+    "internal_auth.json",
+    "internal_auth_keys.json",
+    ".internal_auth_keys.lock",
     "package-lock.json",
     "package.json",
     "yarn.lock",
@@ -176,7 +179,8 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
         ]
         for file_name in file_names:
             # Office の一時ロックファイルは、件数判定・差分判定・コピーのすべてから除外する。
-            if file_name.startswith("~$"):
+            if (file_name.startswith("~$")
+                    or (file_name.startswith((".internal_auth.json.", ".internal_auth_keys.json.")) and file_name.endswith(".tmp"))):
                 continue
             file_path = os.path.join(root, file_name)
 

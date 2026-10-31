@@ -34,9 +34,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+from pathlib import Path as _AuthPath
+sys.path.insert(0, str(_AuthPath(__file__).resolve().parent.parent))
+from taskteam_proc.internal_client import post_json, report_instruction
 import traceback
-import urllib.request
-from urllib.parse import quote
 
 _SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SELF_DIR not in sys.path:
@@ -46,7 +48,6 @@ from sub_context import 差し込み  # noqa: E402  同フォルダの定型コ�
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TASK_API = "http://127.0.0.1:8093/task"
 MCP_URL = "http://127.0.0.1:8095/aidiy_code_agents/run"
-_LOCAL_HTTP_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TASK_AI_NAME既定 = "codex_cli"
 TASK_AI_MODEL既定 = "auto"
 DEFAULT_CONFIG_PATH = "../_config/AiDiy_key.json"
@@ -123,17 +124,7 @@ def ログ(メッセージ: str) -> None:
 
 
 def POST送信(url: str, payload: dict, timeout: int = 3600) -> dict:
-    # 日本語を含む URL パスは urllib がそのまま扱えないためパーセントエンコードする
-    if url.startswith("http://"):
-        本体 = url[len("http://"):]
-        ホスト, _, パス = 本体.partition("/")
-        url = "http://" + ホスト + "/" + quote(パス)
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-    )
-    with _LOCAL_HTTP_OPENER.open(req, timeout=timeout) as res:
-        return json.loads(res.read().decode("utf-8"))
+    return post_json(url, payload, timeout=timeout)
 
 
 def タスク要求取得() -> dict:
@@ -193,6 +184,7 @@ def プロンプト生成(タスクタイトル: str, 全明細: list[dict], 対
         "明細タイトル": 対象["タイトル"],
         "タスクID": タスクID,
     })
+    今回要求ブロック += report_instruction()
     今回要求ブロック += (
         "\n【回数制約の優先】全体要求が照合・読取り等の回数を制限し、実行済み記録にその照合結果がある場合は、同じ成果物を再読込せず記録から判断してください。\n"
         "これは実作業の重複を避けるための優先条件です。必要な証拠が記録にない場合は一致を推測せず、不足を報告してください。\n"

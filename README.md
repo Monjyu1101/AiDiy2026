@@ -157,7 +157,7 @@ cd backend_local
 
 # バックエンド MCP
 cd backend_tools
-.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095 --ws-max-size 20971520
+.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 127.0.0.1 --port 8095 --ws-max-size 20971520
 
 # バックエンド Core
 cd backend_server

@@ -27,9 +27,11 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+from pathlib import Path as _AuthPath
+sys.path.insert(0, str(_AuthPath(__file__).resolve().parent.parent))
+from taskteam_proc.internal_client import post_json
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import ProxyHandler, Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -48,7 +50,6 @@ CODE_AGENTS_URL = (
     os.environ.get("AIDIY_CODE_AGENTS_URL")
     or "http://127.0.0.1:8095/aidiy_code_agents/run"
 )
-_LOCAL_HTTP_OPENER = build_opener(ProxyHandler({}))
 既定利用者ID = "admin"
 TEAM_AI_NAME既定 = "claude_cli"
 TEAM_AI_MODEL既定 = "auto"
@@ -62,22 +63,7 @@ TEAM_AI_MODEL既定 = "auto"
 
 
 def POST送信(url: str, payload: dict, timeout: int = 30) -> dict:
-    request = Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json; charset=utf-8"},
-        method="POST",
-    )
-    try:
-        with _LOCAL_HTTP_OPENER.open(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code}: {body[:500]}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"接続できません ({url}): {exc.reason}") from exc
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"JSON以外の応答が返りました ({url})") from exc
+    return post_json(url, payload, timeout=timeout)
 
 
 def _候補一覧テキスト(候補: list[dict]) -> str:

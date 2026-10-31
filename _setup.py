@@ -1150,7 +1150,7 @@ def main():
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
     print_info(f"    Local起動  : cd backend_local && uv run uvicorn local_main:app --reload --host 0.0.0.0 --port {PORT_LOCAL} --ws-max-size 20971520")
-    print_info(f"    MCP起動    : cd backend_tools && uv run uvicorn tools_main:app --reload --host 0.0.0.0 --port {PORT_TOOLS} --ws-max-size 20971520")
+    print_info(f"    MCP起動    : cd backend_tools && uv run uvicorn tools_main:app --reload --host 127.0.0.1 --port {PORT_TOOLS} --ws-max-size 20971520")
     print_info(f"    Core起動   : cd backend_server && uv run uvicorn core_main:app --reload --host 0.0.0.0 --port {PORT_CORE} --ws-max-size 20971520")
     print_info(f"    Apps起動   : cd backend_server && uv run uvicorn apps_main:app --reload --host 0.0.0.0 --port {PORT_APPS} --ws-max-size 20971520")
     print_info("    Task / Team起動:")

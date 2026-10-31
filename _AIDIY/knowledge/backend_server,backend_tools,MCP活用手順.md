@@ -175,8 +175,12 @@ Codex / Antigravity のセットアップは Streamable HTTP の `/mcp` へ直�
 
 ## 起動・再起動
 
+Tools（8095）の標準起動は `127.0.0.1` のみに待ち受けます。ルート / 単独 `_start.py`、`tools_main.py` の直接起動、同梱の自動化起動を対象とします。TaskTeam（8093）の待受・認証は変更しません。
+
+これはバックエンドの bind 制限です。独自の `uvicorn --host` 指定や `UVICORN_HOST` を使う手動起動、SSH・Codespaces のポート転送、外向きリバースプロキシによる再公開までは防ぎません。Web の `/mcp` proxy は残ります（標準 Web は `127.0.0.1:8090`）。外部から到達できる転送先・Webへ公開しないでください。管理 API の既存 Bearer 認証は維持し、全 Tools API に認証を追加する変更ではありません。
+
 - `_start.py` 経由なら `backend_tools/temp/reboot_tools.txt` 作成で再起動する
-- 手動起動は `cd backend_tools && .venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095 --ws-max-size 20971520`
+- 手動起動は `cd backend_tools && .venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 127.0.0.1 --port 8095 --ws-max-size 20971520`
 - Docker 構成には `backend_tools` が含まれない。MCP 検証はローカルで別途起動する
 
 ## 不調時の切り分け

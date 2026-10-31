@@ -136,23 +136,7 @@ for (const [name, parent, audio] of [
   });
 }
 
-function websocketHarness() {
-  const sockets = [];
-  class NativeSocket {
-    static OPEN = 1;
-    constructor() { this.readyState = 0; this.sent = []; sockets.push(this); }
-    send(message) { this.sent.push(JSON.parse(message)); }
-    close() { this.readyState = 3; this.closed = true; }
-    open() { this.readyState = 1; this.onopen(); }
-    end() { this.onclose({ code: 1000, reason: '' }); }
-    init() { this.onmessage({ data: JSON.stringify({ メッセージ識別: 'init', セッションID: 'session' }) }); }
-  }
-  const exports = {};
-  vm.runInNewContext(transpile(read('frontend_avatar/src/api/websocket.ts')), {
-    exports, require: () => ({}), WebSocket: NativeSocket, window: { setTimeout, clearTimeout }, console,
-  });
-  return { Client: exports.AIWebSocket, sockets };
-}
+const websocketHarness = require('./browser-auth-harness.cjs').harness;
 
 test('Avatar: WebSocket open 前の切断で初期接続要求を送らない', async () => {
   const { Client, sockets } = websocketHarness();
@@ -163,7 +147,7 @@ test('Avatar: WebSocket open 前の切断で初期接続要求を送らない', 
   sockets[0].open();
   assert.equal(sockets[0].sent.length, 0);
   sockets[0].end();
-  assert.match(await result, /closed/);
+  assert.match(await result, /cancelled|closed/);
 });
 
 test('Avatar: 旧ソケットの遅延 close が再接続したソケットを消さない', async () => {

@@ -21,3 +21,5 @@ export const { LiveConnection, 入力レート, 音声入力, 音声操作 } = r
 export const { ライブ選択エラー } = require('../../../frontend_ide/host/aidiy_live/src/model-catalog.ts') as typeof import('../../../frontend_ide/host/aidiy_live/src/model-catalog');
 export const { ライブモデル読込, ライブモデル保存, コードモデル読込, コードモデル保存 } = require('../../../frontend_ide/host/src/model-preferences.ts') as typeof import('../../../frontend_ide/host/src/model-preferences');
 export const { 接続元許可 } = require('../../../frontend_ide/host/src/forwarded-origin.ts') as typeof import('../../../frontend_ide/host/src/forwarded-origin');
+
+export const { internalAuthorization } = require('../../../frontend_ide/host/src/internal-auth.ts') as typeof import('../../../frontend_ide/host/src/internal-auth');

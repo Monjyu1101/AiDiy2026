@@ -89,14 +89,16 @@ export const useAuthStore = defineStore('auth', {
             this.user = null
             this.authChecked = false
             localStorage.removeItem('token')
+            window.dispatchEvent(new Event('auth-cleared'))
             localStorage.removeItem('user')
             router.push('/ログイン')
         },
         async refreshToken(): Promise<void> {
-            if (!this.token) return
+            const requestToken = this.token
+            if (!requestToken) return
             try {
                 const response = await apiClient.post('/core/auth/トークン更新')
-                if (response.data.status === 'OK') {
+                if (response.data.status === 'OK' && this.token === requestToken) {
                     this.token = response.data.data.access_token
                     localStorage.setItem('token', this.token)
                 }

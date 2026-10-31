@@ -10,6 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
+import { authFixture } from './internal-auth-fixture';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
@@ -26,7 +27,8 @@ async function fixture(rejectChannel = '', provider = 'openai_live', selectedPro
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
   const address = server.address(); assert.ok(address && typeof address !== 'string');
-  const settings = config(); settings.coreUrl = `ws://127.0.0.1:${address.port}/core/ws/AIコア`;
+  const auth = authFixture(address.port);
+  const settings = config(); settings.coreRoot = auth.root; settings.coreUrl = `ws://127.0.0.1:${address.port}/core/ws/AIコア`;
   settings.liveModels = { LIVE_AI_NAME: selectedProvider };
   const received: Record<string, any>[] = [];
   const sockets = new Map<string, WebSocket>();
@@ -62,7 +64,7 @@ async function fixture(rejectChannel = '', provider = 'openai_live', selectedPro
   });
   return { connection, received, sockets, speaking, streams, voice, notices, members, closed: () => closed,
     async cleanup() {
-      connection.終了(); for (const socket of server.clients) socket.terminate();
+      connection.終了(); auth.cleanup(); for (const socket of server.clients) socket.terminate();
       await new Promise<void>(resolve => server.close(() => resolve()));
     } };
 }

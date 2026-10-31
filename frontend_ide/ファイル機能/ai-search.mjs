@@ -9,10 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createSearchHistory } from './ai-search-history.mjs';
 import { searchRouteRecords } from '../src/開発スペース/経路記録.js';
+import { hasAlwaysExcludedDirectory } from './フォルダ除外規則.mjs';
+import { isInternalCredentialPath } from './内部認証ファイル.mjs';
 
 const MAX_RESULT = 1024 * 1024;
 const within = (root, path) => { const back=relative(root,path); return back!== '..'&&!back.startsWith(`..${sep}`)&&!isAbsolute(back); };
-export const validSearchPath = path => typeof path==='string' && path.length<=1024 && !/[\\:\0]/.test(path) && !path.startsWith('/') && path.split('/').every(part=>part&&part!=='.'&&part!=='..');
+export const validSearchPath = path => typeof path==='string' && path.length<=1024 && !isInternalCredentialPath(path) && !hasAlwaysExcludedDirectory(path) && !/[\\:\0]/.test(path) && !path.startsWith('/') && path.split('/').every(part=>part&&part!=='.'&&part!=='..');
 
 export async function toolsTarget(project) {
   const visited=new Set();
@@ -53,7 +55,7 @@ export async function validateSearchResult(root, data, job, {checkFiles=true}={}
     if(!validSearchPath(file?.path)||typeof file.reason!=='string'||!file.reason.trim()||file.reason.length>2000||seen.has(file.path))throw Error('結果JSONのファイルパス・理由・重複を確認してください。');
     if(checkFiles){
       const full=await realpath(join(realRoot,file.path)).catch(()=>null);
-      if(!full||!within(realRoot,full)||!(await stat(full)).isFile())throw Error(`プロジェクト内のファイルを確認できません: ${file.path}`);
+      if(!full||!within(realRoot,full)||isInternalCredentialPath(full)||hasAlwaysExcludedDirectory(relative(realRoot,full))||!(await stat(full)).isFile())throw Error(`プロジェクト内のファイルを確認できません: ${file.path}`);
     }
     seen.add(file.path);files.push({path:file.path,reason:file.reason});
   }

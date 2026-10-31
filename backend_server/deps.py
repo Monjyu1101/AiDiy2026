@@ -10,7 +10,8 @@
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import JWTError
+from auth_keyring import KeyringError
 from sqlalchemy.orm import Session
 import auth, database, core_models as models
 
@@ -30,12 +31,16 @@ def get_現在利用者(token: str = Depends(oauth2_scheme), db: Session = Depen
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        payload = auth.verify_access_token(token)
+        if payload.get("token_kind") == "internal_code_live":
+            raise credentials_exception
         利用者ID: str = payload.get("sub")
         if 利用者ID is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+    except KeyringError:
+        raise HTTPException(status_code=503, detail="Authentication service is not ready") from None
 
     利用者 = db.query(models.C利用者).filter(models.C利用者.利用者ID == 利用者ID).first()
     if 利用者 is None:

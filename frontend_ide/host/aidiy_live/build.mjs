@@ -22,6 +22,7 @@ await Promise.all([
   copyFile(new URL('../media/AiDiy.png', import.meta.url), new URL('dist/AiDiy.png', import.meta.url)),
   copyFile(new URL('../media/sending.png', import.meta.url), new URL('dist/sending.png', import.meta.url)),
   copyFile(new URL('microphone.py', import.meta.url), new URL('dist/microphone.py', import.meta.url)),
+  copyFile(new URL('../node_modules/undici/LICENSE', import.meta.url), new URL('dist/THIRD_PARTY_NOTICES.txt', import.meta.url)),
   copyFile(new URL('../LICENSE', import.meta.url), new URL('LICENSE', import.meta.url)),
 ]);
 buildState.ビルド状態保存(fileURLToPath(new URL('..', import.meta.url)));

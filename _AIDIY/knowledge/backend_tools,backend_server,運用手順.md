@@ -36,14 +36,14 @@ python _start.py
 
 ```powershell
 Set-Location backend_tools
-.venv/Scripts/python.exe -m uvicorn tools_main:app --host 0.0.0.0 --port 8095
+.venv/Scripts/python.exe -m uvicorn tools_main:app --host 127.0.0.1 --port 8095
 ```
 
 uv 経由:
 
 ```powershell
 Set-Location backend_tools
-uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095
+uv run uvicorn tools_main:app --host 127.0.0.1 --port 8095
 ```
 
 stdio 接続を選ぶクライアントから使う場合:
@@ -132,7 +132,7 @@ print(res.json())
 | Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
 | Windows Control（Windows のみ） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
 
-現行実装では通常の起動は `0.0.0.0` で待ち受け、REST API 全体に接続元を localhost へ制限する処理はない。`tools_main.py` が MCP SDK へ渡す `host="127.0.0.1"` は SSE / Streamable HTTP 側の設定であり、REST 全体の接続制限とは異なる。
+通常の Tools 起動は `127.0.0.1` のみに待ち受けます。これは bind 制限であり、独自の host 指定やポート転送・リバースプロキシによる再公開までは防ぎません。管理 API の既存認証は維持します。
 
 ## 内部RESTの予測処理
 

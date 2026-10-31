@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+
+from .api_auth import require_auth
 
 from log_config import get_logger
 from task_proc.tasks_api import check_router
@@ -39,8 +41,8 @@ def create_app() -> FastAPI:
         lifespan=build_lifespan(logger),
     )
     taskteam_app.include_router(router)
-    taskteam_app.include_router(tasks_router)
-    taskteam_app.include_router(check_router)
-    taskteam_app.include_router(team_router)
+    taskteam_app.include_router(tasks_router, dependencies=[Depends(require_auth)])
+    taskteam_app.include_router(check_router, dependencies=[Depends(require_auth)])
+    taskteam_app.include_router(team_router, dependencies=[Depends(require_auth)])
     setup_reboot_watcher(logger)
     return taskteam_app

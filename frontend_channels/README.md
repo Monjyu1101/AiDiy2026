@@ -204,3 +204,20 @@ https://github.com/monjyu1101/AiDiy2026
 - Electron 更新は `npm run update:electron` を使います。npm 11 の `npm update electron` が変更対象外の `prism-media` 用 `opusscript@0.0.8` の lock を省略し、npm 10 の次回 `ci` が `Missing: opusscript@0.0.8` で失敗する場合があります。OS 固有ではありません。
 - 更新前の正常 lock と変更されていない peer 所有パッケージを照合し、この省略が起きた場合だけ既存 entry の維持を明示して `npm ci` で導入物も揃えます。元から Opus peer が不整合な lock や、peer 宣言が変わった不整合は自動修復せず失敗にします。
 - `build:panel` / `check:panel` もこの整合確認を行うため、manifest のハッシュ更新だけで依存欠落を承認しません。依存更新後は実際に `npm run build:panel` を実行します。
+
+### ローカル Core の内部認証
+
+モデル候補の取得と Discord Live の接続は、設定ファイルを読み込んだ配置先の
+`_AIDIY/backend_core/internal_auth.json` を Node 側だけで読み、Authorization ヘッダーで認証します。
+Core を先に起動してください。トークンは Core 起動時・日付変更時に更新され、各要求・接続の直前に再読込します。
+配置先の `PORT_CORE` と一致する `127.0.0.1` 以外へは送信せず、HTTP / WebSocket の転送も追従しません。
+作業フォルダの設定は認証探索に使わず、パネル・URL・ログへトークンを渡しません。
+Core 停止中はモデル候補を既存のローカルファイルから取得できますが、Live 接続は認証なしで継続しません。
+Code の Hermes 直接起動、Discord Bot 自体の認証、Discord への添付送信は別経路です。
+
+Core 再起動中のモデル取得は、認証ファイルの一時欠落や 401/403 に対して最大5回の準備確認を行います。
+拒否された旧トークンは再送せず、新しいファイルを待ちます（待機間隔 250 / 500 / 1000 / 2000 ms、各 HTTP 要求は最大1500 ms）。
+パネル停止で待機も中断します。業務 POST やチャット本文は再送しません。
+Live は最初の init より前の認証・接続失敗だけを最大5回再試行します。
+通話開始後に Core が落ちた場合は従来どおりボイスチャンネルへ入り直してください。
+その再接続時に新トークンを読み、以前の音声・テキストは再送しません。

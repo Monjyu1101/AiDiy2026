@@ -29,6 +29,21 @@ function 入力系認証トークン更新(message: WebSocketMessage): void {
     });
 }
 
+
+// 期限の事前確認のみ。署名・利用者・権限の検証は必ずサーバー側で行う。
+function ログイントークン取得(): { token: string; expires: number } {
+  const token = useAuthStore().token
+  try {
+    if (!token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) throw new Error()
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const expires = Number(JSON.parse(atob(payload)).exp) * 1000
+    if (!Number.isFinite(expires) || expires <= Date.now()) throw new Error()
+    return { token, expires }
+  } catch {
+    throw new Error('認証の有効期限が切れました。再ログインしてください。')
+  }
+}
+
 export interface WebSocketMessage {
   type?: string;
   セッションID?: string;
@@ -62,12 +77,43 @@ export class AIWebSocket implements IWebSocketClient {
   private messageHandlers: Map<string, MessageHandler[]> = new Map();
   private stateHandlers: Set<StateHandler> = new Set();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 3000; // 3秒
   private isIntentionallyClosed = false;
-  private isInitialConnection = true; // 初回接続フラグ
   private 要求セッションID: string | null = null; // 要求されたセッションID
   private 要求ソケット番号: string | null = null; // 要求されたソケット番号
+
+
+  private 接続取消: (() => void) | null = null
+  private 認証期限タイマー: number | null = null
+  private readonly 認証切断 = () => this.disconnect()
+  private readonly 認証変更 = (event: StorageEvent) => {
+    if (event.key === null || (event.key === 'token' && !event.newValue)) {
+      this.disconnect()
+      useAuthStore().logout()
+    }
+  }
+  private 認証確認(): string {
+    try { return ログイントークン取得().token } catch (error) {
+      this.disconnect()
+      useAuthStore().logout()
+      throw error
+    }
+  }
+  private 認証利用可能(): boolean {
+    try { this.認証確認(); return true } catch { return false }
+  }
+  private 認証期限監視(): void {
+    if (!this.認証利用可能()) return
+    const remaining = ログイントークン取得().expires - Date.now()
+    this.認証期限タイマー = window.setTimeout(() => this.認証期限監視(), Math.min(remaining, 2147483647))
+  }
+
+  private reconnectTimer: number | null = null
+  private readonly maxReconnectAttempts = 5
+  private readonly maxReconnectDelayMs = 15000
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer !== null) window.clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
+  }
 
   constructor(private url: string, セッションID?: string, ソケット番号?: string, private codeBasePath = '') {
     this.要求セッションID = セッションID || null;
@@ -78,127 +124,133 @@ export class AIWebSocket implements IWebSocketClient {
    * WebSocket接続を確立
    */
   async connect(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      let initialized = false;
+    this.disconnect()
+    const token = this.認証確認()
+    this.isIntentionallyClosed = false
+    window.addEventListener('auth-cleared', this.認証切断)
+    window.addEventListener('storage', this.認証変更)
+    this.認証期限監視()
+
+    return new Promise<string>((resolve, reject) => {
+      let socket: WebSocket
       try {
-        console.log('[WebSocket] 接続開始:', this.url);
-        this.ws = new WebSocket(this.url);
-        this.isIntentionallyClosed = false;
-
-        this.ws.onopen = () => {
-          console.log('[WebSocket] 接続確立');
-          this.reconnectAttempts = 0;
-          this.isInitialConnection = false; // 初回接続完了
-
-          // セッションIDを送信
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const initMessage = {
-              type: 'connect',
-              セッションID: this.要求セッションID,
-              ソケット番号: this.要求ソケット番号,
-              ...(this.codeBasePath ? { CODE_BASE_PATH: this.codeBasePath } : {}),
-            };
-            console.log('[WebSocket] セッションID送信:', this.要求セッションID, 'ソケット番号:', this.要求ソケット番号);
-            this.ws.send(JSON.stringify(initMessage));
-            // 接続通知を先に送り、状態ハンドラの送信が初回受信になるのを防ぐ。
-            this.emitState(true);
-          }
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const message: WebSocketMessage = JSON.parse(event.data);
-
-            // デバッグ: 受信メッセージの詳細をログ出力
-            const messageType = message.type || message.メッセージ識別 || 'unknown';
-            const channel = message.チャンネル ?? 'null';
-            console.log(`[WebSocket] 受信: type="${messageType}", チャンネル=${channel}`, message);
-
-            // 初期化メッセージの場合、セッションIDを保存
-            const initType = message.type || message.メッセージ識別;
-            if (!initialized && initType === 'error') {
-              this.isIntentionallyClosed = true;
-              reject(new Error(String(message.メッセージ内容 || '接続に失敗しました。')));
-            }
-            if (initType === 'init' && message.セッションID) {
-              initialized = true;
-              this.セッションID = message.セッションID;
-              this.要求セッションID = message.セッションID; // 以降の再接続で使用
-              if (message.ソケット番号 !== undefined && message.ソケット番号 !== null) {
-                this.要求ソケット番号 = String(message.ソケット番号);
-              }
-              console.log('[WebSocket] セッションID確定:', this.セッションID);
-              resolve(this.セッションID);
-            }
-
-            // 登録されたハンドラを実行
-            this.handleMessage(message);
-          } catch (error) {
-            console.error('[WebSocket] メッセージ解析エラー:', error);
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('[WebSocket] エラー:', error);
-          console.error('[WebSocket] URL:', this.url);
-          console.error('[WebSocket] ReadyState:', this.ws?.readyState);
-
-          // 初回接続時のエラーはすぐにreject
-          if (!initialized) {
-            console.log('[WebSocket] 初回接続エラー - フォールバックに切り替えます');
-            reject(new Error('WebSocket connection error'));
-          }
-        };
-
-        this.ws.onclose = (event) => {
-          console.log('[WebSocket] 接続切断:', event.code, event.reason);
-          this.セッションID = null;
-          this.emitState(false);
-
-          // 初回接続時のエラーはすぐにreject
-          if (!initialized) {
-            console.log('[WebSocket] 初回接続失敗 - フォールバックに切り替えます');
-            reject(new Error(`WebSocket connection closed: ${event.code} ${event.reason}`));
-            return;
-          }
-
-          // 4000: サーバーが同じセッション・チャンネルの新しい接続へ置き換えた。
-          // 再接続すると新しい接続を閉じ返して置き換え合いになるため、再接続しない。
-          if (event.code === 4000) {
-            this.isIntentionallyClosed = true;
-            return;
-          }
-
-          // 意図的な切断でない場合は再接続を試みる
-          if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            console.log(`[WebSocket] 再接続試行 ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-            setTimeout(() => {
-              this.connect().catch((err) => {
-                console.error('[WebSocket] 再接続失敗:', err);
-              });
-            }, this.reconnectDelay);
-          }
-        };
-
-        // 初期化タイムアウト（30秒）
-        setTimeout(() => {
-          if (!this.セッションID) {
-            console.error('[WebSocket] 初期化タイムアウト (30秒)');
-            reject(new Error('WebSocket initialization timeout'));
-          }
-        }, 30000);
-      } catch (error) {
-        console.error('[WebSocket] 接続エラー:', error);
-        reject(error);
+        // JWT は URL・connect packet・ログへ入れず、upgrade 時だけ提示する。
+        socket = new WebSocket(this.url, ['aidiy-auth', `bearer.${token}`])
+      } catch {
+        this.disconnect()
+        reject(new Error('WebSocket connection error'))
+        return
       }
-    });
+      this.ws = socket
+      let settled = false
+
+      const fail = (error: Error) => {
+        if (settled) return
+        settled = true
+        reject(error)
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        fail(new Error('WebSocket initialization timeout'))
+        this.disconnect()
+      }, 30000)
+      this.接続取消 = () => {
+        window.clearTimeout(timeoutId)
+        fail(new Error('WebSocket connection cancelled'))
+      }
+
+      socket.onopen = () => {
+        if (this.ws !== socket || this.isIntentionallyClosed) {
+          socket.close()
+          return
+        }
+        if (!this.認証利用可能()) return
+        this.reconnectAttempts = 0
+        socket.send(JSON.stringify({
+          type: 'connect',
+          セッションID: this.要求セッションID || null,
+          ソケット番号: this.要求ソケット番号 || null,
+          ...(this.codeBasePath ? { CODE_BASE_PATH: this.codeBasePath } : {}),
+        }))
+        // 接続通知を先に送り、状態ハンドラの送信が初回受信になるのを防ぐ。
+        this.emitState(true)
+      }
+
+      socket.onmessage = (event) => {
+        if (this.ws !== socket || this.isIntentionallyClosed) return
+        let message: WebSocketMessage
+        try {
+          message = JSON.parse(String(event.data)) as WebSocketMessage
+        } catch {
+          return
+        }
+
+        const messageType = String(message.メッセージ識別 || message.type || '')
+        if (!settled && messageType === 'error') {
+          this.isIntentionallyClosed = true
+          window.clearTimeout(timeoutId)
+          fail(new Error(String(message.メッセージ内容 || '接続に失敗しました。')))
+          this.disconnect()
+        }
+        if (messageType === 'init' && typeof message.セッションID === 'string' && message.セッションID) {
+          this.セッションID = message.セッションID
+          this.要求セッションID = message.セッションID
+          if (typeof message.ソケット番号 === 'string' && message.ソケット番号) {
+            this.要求ソケット番号 = message.ソケット番号
+          }
+          if (!settled) {
+            settled = true
+            window.clearTimeout(timeoutId)
+            resolve(this.セッションID)
+          }
+        }
+
+        this.handleMessage(message)
+      }
+
+      socket.onerror = () => {
+        if (!settled) {
+          window.clearTimeout(timeoutId)
+          fail(new Error('WebSocket connection error'))
+        }
+      }
+
+      socket.onclose = (event) => {
+        window.clearTimeout(timeoutId)
+        if (!settled) {
+          fail(new Error(`WebSocket connection closed: ${event.code} ${event.reason}`.trim()))
+        }
+        if (this.ws !== socket) return
+        this.emitState(false)
+        this.ws = null
+        this.セッションID = null
+        window.clearTimeout(timeoutId)
+
+        if (!settled) return
+
+        // 4000: サーバーが同じセッション・チャンネルの新しい接続へ置き換えた。
+        // 再接続すると新しい接続を閉じ返し、互いに置き換え合う繰り返しになるため再接続しない。
+        if ([4000, 1008, 4401, 4403].includes(event.code)) {
+          this.disconnect()
+          return
+        }
+
+        if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts += 1
+          this.reconnectTimer = window.setTimeout(() => {
+            if (!this.isIntentionallyClosed) void this.connect().catch(() => undefined)
+          }, Math.min(3000 * this.reconnectAttempts, this.maxReconnectDelayMs))
+        }
+      }
+    })
   }
+
 
   /**
    * メッセージを送信
    */
   send(message: WebSocketMessage): void {
+    if (!this.認証利用可能()) return
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       入力系認証トークン更新(message);
 
@@ -307,14 +359,19 @@ export class AIWebSocket implements IWebSocketClient {
    * 接続を切断
    */
   disconnect(): void {
-    if (this.ws) {
-      this.isIntentionallyClosed = true;
-      this.ws.close();
-      this.ws = null;
-      this.セッションID = null;
-      this.emitState(false);
-      console.log('[WebSocket] 切断完了');
-    }
+    this.isIntentionallyClosed = true
+
+    this.接続取消?.()
+    this.接続取消 = null
+    if (this.認証期限タイマー !== null) window.clearTimeout(this.認証期限タイマー)
+    this.認証期限タイマー = null
+    window.removeEventListener('auth-cleared', this.認証切断)
+    window.removeEventListener('storage', this.認証変更)
+    this.clearReconnectTimer()
+    if (this.ws) this.ws.close()
+    this.ws = null
+    this.セッションID = null
+    this.emitState(false)
   }
 
   /**

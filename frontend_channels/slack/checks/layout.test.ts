@@ -20,7 +20,7 @@ import { 起動解決, コード要求実行, CLI実行, コードモデル読�
 const root = fileURLToPath(new URL('..', import.meta.url));
 const source = join(root, 'src');
 const features: Record<string, string[]> = {
-  接続: ['Bot接続.ts', 'コマンド処理.ts', '接続設定.ts', 'ネットワーク接続.ts'], コード: ['コード会話.ts', 'Hermesモデル.ts'],
+  接続: ['Core認証.ts', 'Bot接続.ts', 'コマンド処理.ts', '接続設定.ts', 'ネットワーク接続.ts'], コード: ['コード会話.ts', 'Hermesモデル.ts'],
   モデル情報: ['モデル情報.ts'], 接続パネル: ['パネル操作.ts', 'パネル中継.ts', 'パネル設定.ts'], 共通連携: ['IDE連携.ts'],
 };
 test('Discord 版と同じ日本語の機能フォルダーに集約し、音声会話の部品を持たない', () => {

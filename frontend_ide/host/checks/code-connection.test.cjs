@@ -12,7 +12,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { CodeConnection, コード選択 } = require('../out/code-connection.cjs');
+const { CodeConnection: RealCodeConnection, コード選択 } = require('../out/code-connection.cjs');
+class CodeConnection extends RealCodeConnection { constructor(...args) { args[5] = () => ({ Authorization: 'Bearer fixture-token-only' }); super(...args); } }
 const { core } = require('./fake-core.cjs');
 const flush = async () => { for (let n = 0; n < 12; n++) await Promise.resolve(); };
 function connection(backend) {

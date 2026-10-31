@@ -14,6 +14,7 @@ import { createAudioPlayer, createAudioResource, EndBehaviorType, entersState, j
 import type { VoiceChannel } from 'discord.js';
 import WebSocket from 'ws';
 import OpusScript from 'opusscript';
+import { Coreソケット, Core初期接続 } from './Coreソケット';
 import type { LiveSocket, Packet } from '../../../frontend_ide/host/aidiy_live/src/protocol';
 import { LiveConnection, 入力レート, 音声入力, 音声操作 } from '../共通連携/IDE連携';
 import type { Discord設定 } from '../接続/接続設定';
@@ -53,6 +54,8 @@ export class Live接続 {
   private stage: ライブ接続段階 = 'Discordボイス接続';
   private startedAt = 0;
   private failure?: ライブ接続エラー;
+  private coreInitialized = false;
+  private handshakeRetry = false;
   private receivedVoice = false;
   private receivedOutput = false;
   private voiceNetwork?: Discord音声通信;
@@ -73,10 +76,14 @@ export class Live接続 {
     private transport = 音声トランスポート) {
     this.rate = 入力レート(config.liveModels.LIVE_AI_NAME || '');
     this.core = new LiveConnection(config.coreUrl, packet => this.受信(packet), () => this.失敗('AIコアとの接続が切れました。ボイスチャンネルに入り直してください。'), url => {
-      const socket = new WebSocket(url, { handshakeTimeout: 15000, maxPayload: 20 * 1024 * 1024 });
+      let socket: WebSocket;
+      try { socket = Coreソケット(url, config.coreRoot); }
+      catch (error) { this.handshakeRetry = true; throw error; }
       this.sockets.add(socket);
       socket.once('close', () => this.sockets.delete(socket));
       socket.once('error', error => {
+        this.handshakeRetry = /Unexpected server response: (401|403|502|503|504)/.test(error.message)
+          || ['ECONNREFUSED', 'ECONNRESET'].includes((error as NodeJS.ErrnoException).code || '');
         this.failure ??= new ライブ接続エラー(error, 'AIコア接続', config.token, Date.now() - this.startedAt);
       });
       return socket as unknown as LiveSocket;
@@ -144,6 +151,7 @@ export class Live接続 {
   private 受信(packet: Packet) {
     if (this.closed) return;
     if (packet.メッセージ識別 === 'init') {
+      this.coreInitialized = true;
       const settings = packet.モデル設定 as Record<string, unknown> | undefined;
       if (typeof settings?.LIVE_AI_NAME === 'string') this.rate = 入力レート(settings.LIVE_AI_NAME);
     } else if (packet.メッセージ識別 === 'cancel_audio') this.再生開始();
@@ -210,7 +218,10 @@ export class Live接続 {
       this.stage = 'AIコア接続';
       this.voice.subscribe(this.player);
       this.再生開始();
-      await this.core.connect({ codeBasePath: this.config.folder, modelSettings: this.config.liveModels, waitForLiveReady: true });
+      await Core初期接続(async () => {
+        this.handshakeRetry = false; this.coreInitialized = false; this.failure = undefined;
+        await this.core.connect({ codeBasePath: this.config.folder, modelSettings: this.config.liveModels, waitForLiveReady: true });
+      }, () => !this.closed && !this.coreInitialized && this.handshakeRetry, { signal: this.joinAbort.signal });
       if (this.closed) throw new Error('ライブ接続を中断しました。');
       this.stage = '音声中継';
       if (!this.core.send('input', 音声操作(true, true))) throw new Error('AIコアへ音声設定を送信できません。');
