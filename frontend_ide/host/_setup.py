@@ -365,38 +365,64 @@ def setup(choices: dict | None = None) -> bool:
         print_info("  Node.js をインストールしてください: https://nodejs.org/")
         return False
 
+    choices = choices if choices is not None else {}
+    copy_warnings = choices.setdefault("_setup_warnings", [])
+    warning_count = len(copy_warnings)
+    continue_on_error = bool(choices.get("continue_on_error"))
+    failed = False
     if not setup_dependencies(
         FRONTEND_VSCODE_DIR, npm_path, label, run_command,
         info=print_info, warning=print_warning, error=print_error,
+        continue_on_error=continue_on_error, copy_warnings=copy_warnings,
     ):
-        return False
+        failed = True
+        if not continue_on_error:
+            return False
     # Vue画面はCode / Live / IDEで共通。配布生成前に専用依存を用意する。
     vue_setup = FRONTEND_VSCODE_DIR.parent.parent / 'frontend_ide' / '_setup.py'
-    if not run_command([sys.executable, '-c', "import runpy; raise SystemExit(0 if runpy.run_path(" + repr(str(vue_setup)) + ")[\"prepare\"]() else 1)"], cwd=FRONTEND_VSCODE_DIR):
-        return False
-    return setup_assets(npm_path, choices=choices)
+    if not run_command([sys.executable, '-c', "import runpy; raise SystemExit(0 if runpy.run_path(" + repr(str(vue_setup)) + ")[\"prepare\"](continue_on_error=" + repr(continue_on_error) + ") else 1)"], cwd=FRONTEND_VSCODE_DIR):
+        failed = True
+        if not continue_on_error:
+            return False
+    assets_ok = setup_assets(npm_path, choices=choices, copy_warning_count=warning_count)
+    if failed:
+        print_error("Code / Live: 依存準備に失敗した項目があります。")
+    if len(copy_warnings) > warning_count:
+        print_warning("Code / Live: Electron コピーの警告があります。更新完了は未確認です。")
+    return assets_ok and not failed
 
 
-def setup_assets(npm_path: str, *, choices=None) -> bool:
+
+def setup_assets(npm_path: str, *, choices=None, copy_warning_count=None) -> bool:
     """導入済み依存から共通UI・Code/Live拡張を必ず再生成し、既存配置処理を使う。"""
     label = "Code / Live"
+    continue_on_error = bool(choices and choices.get("continue_on_error"))
+    failed = False
     vscode_cli = find_vscode_cli()
     if vscode_cli is None:
         print_warning("VS Code CLI が見つからないため、単独画面だけをセットアップします。")
-        if not run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR):
-            print_error(f"{label}: 単独画面の生成に失敗しました。")
-            return False
+        built = run_command([npm_path, "run", "compile"], cwd=FRONTEND_VSCODE_DIR)
     else:
-        if not run_command([npm_path, "run", "package"], cwd=FRONTEND_VSCODE_DIR):
-            print_error(f"{label}: VSIX の生成に失敗しました。")
+        built = run_command([npm_path, "run", "package"], cwd=FRONTEND_VSCODE_DIR)
+    if not built:
+        print_error(f"{label}: 配布物の生成に失敗しました。")
+        failed = True
+        if not continue_on_error:
             return False
-        if not install_extensions(vscode_cli):
+    # 生成失敗時の古い VSIX は配置しない。独立したランチャー登録は試行できる。
+    if built and vscode_cli is not None and not install_extensions(vscode_cli):
+        failed = True
+        if not continue_on_error:
             return False
-
     if not (choices and choices.get("_defer_ide_launchers")):
         if not install_standalone_launcher():
-            return False
-
+            failed = True
+    if failed:
+        print_error(f"{label}: セットアップに失敗した項目があります。")
+        return False
+    if copy_warning_count is not None and len((choices or {}).get("_setup_warnings", [])) > copy_warning_count:
+        print_warning(f"{label}: 生成・登録は完了しましたが Electron コピーの警告があります。")
+        return True
     if vscode_cli is not None:
         print_success(f"{label}: VS Code 拡張のセットアップが完了しました。")
         print_info("  vscode 本体や AiDiy の常駐サービスは停止していません。")
@@ -404,6 +430,7 @@ def setup_assets(npm_path: str, *, choices=None) -> bool:
     if not (choices and choices.get("ide")):
         print_success(f"{label}: aidiy_code / aidiy_live で起動できます。")
     return True
+
 
 
 def main():

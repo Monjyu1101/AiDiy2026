@@ -110,15 +110,16 @@ class SetupOutputTests(unittest.TestCase):
             self.assertTrue(host.install_standalone_launcher())
             ensure.assert_called_once()
 
-    def test_root_eleven_app_colons_align(self):
+    def test_root_twelve_app_colons_align(self):
         root = load('_setup.py')
         output = io.StringIO()
         with patch.object(root, 'print_info', side_effect=print), contextlib.redirect_stdout(output):
             root.print_app_launch_commands()
         lines = output.getvalue().splitlines()
-        self.assertEqual(len(lines), 11)
+        self.assertEqual(len(lines), 12)
         self.assertEqual(len({line.index(':') for line in lines}), 1)
         self.assertIn('Console起動: aidiy_console', output.getvalue())
+        self.assertIn('Browser起動: aidiy_browser', output.getvalue())
         self.assertIn('Discord起動: aidiy_discord', output.getvalue())
 
 

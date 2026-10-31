@@ -186,18 +186,36 @@ def _place_dist(source: Path, frontend_dir: Path, *, move: bool = False) -> None
     (electron_dir / "path.txt").write_bytes(electron_executable_name().encode("utf-8"))
 
 
-def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: bool = True, info=print, error=print) -> bool:
+def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: bool = True, info=print, error=print, continue_on_error=False, copy_warnings=None) -> bool:
     """配置済み → 他方の dist → 共有 ZIP → GitHub の順で準備し、ZIP は保持する。
 
     allow_download=False のときは導入済み npm パッケージと同じ版のローカル資産だけを使う。
     """
+    def place(source, *, move=False):
+        try:
+            _place_dist(source, frontend_dir, move=move)
+            return True
+        except FileNotFoundError:
+            # 入力欠損は単なる使用中ファイルのコピー警告とは区別する。
+            raise
+        except OSError as exc:
+            if not continue_on_error:
+                raise
+            message = f"{label}: Electron のコピー・配置に失敗しました（配置未確認）: {exc}"
+            info(f"[WARN] {message}")
+            if copy_warnings is not None:
+                copy_warnings.append(message)
+            return False
+
     try:
         version = get_electron_version(frontend_dir)
         if electron_binary_ready(frontend_dir):
             info(f"{label}: Electron v{version} の配置を確認しました。")
             return True
 
-        if _runtime_in_use(frontend_dir):
+        if continue_on_error:
+            info(f"[WARN] {label}: 続行指定のため、使用中でも Electron の配置を試行します。失敗は記録して次の処理へ進みます。")
+        elif _runtime_in_use(frontend_dir):
             error(f"{label}: Electron が使用中のため修復・置換できません。Code / IDE 等を閉じて再実行してください。")
             return False
 
@@ -215,7 +233,8 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
             source = peer / "node_modules" / "electron" / "dist"
             if _dist_ready(source, version):
                 info(f"{label}: {name} の Electron v{version} を再利用します。")
-                _place_dist(source, frontend_dir)
+                if not place(source):
+                    return False
                 return electron_binary_ready(frontend_dir)
 
         plat, arch = _electron_platform_arch()
@@ -236,7 +255,8 @@ def prepare_electron_binary(frontend_dir: Path, label: str, *, allow_download: b
             _extract_archive(archive, extracted)
             if not _dist_ready(extracted, version):
                 raise ValueError("展開した Electron の実行ファイル・バージョンを確認できません。")
-            _place_dist(extracted, frontend_dir, move=True)
+            if not place(extracted, move=True):
+                return False
         info(f"{label}: Electron v{version} の配置が完了しました。")
         return electron_binary_ready(frontend_dir)
     except (OSError, KeyError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
@@ -318,8 +338,11 @@ def _locked_dependencies_ready(frontend_dir: Path) -> bool:
         return False
 
 
-def frontend_dependency_guard(frontend_dir: Path, label: str, *, info=print, warning=print, error=print, desktop=True):
+def frontend_dependency_guard(frontend_dir: Path, label: str, *, info=print, warning=print, error=print, desktop=True, continue_on_error=False):
     """None=通常導入、True=使用中の整合した依存を再利用、False=更新を安全に中止。"""
+    if continue_on_error:
+        warning(f"{label}: 続行指定のため、使用中の依存も更新を試行します。画面の継続動作は保証されません。")
+        return None
     try:
         if not _runtime_in_use(frontend_dir):
             return None
@@ -340,13 +363,33 @@ def frontend_dependency_guard(frontend_dir: Path, label: str, *, info=print, war
         return False
 
 
-def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True) -> bool:
+def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True, continue_on_error=False, copy_warnings=None) -> bool:
     """npm での重複取得を避け、依存導入後に Electron を一度だけ準備する。"""
-    guarded = frontend_dependency_guard(frontend_dir, label, info=info, warning=warning, error=error, desktop=desktop)
+    guarded = frontend_dependency_guard(frontend_dir, label, info=info, warning=warning, error=error, desktop=desktop, continue_on_error=continue_on_error)
     if guarded is not None:
         return guarded
     env = {**os.environ, "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"}
     recovery_needed = False
+    if continue_on_error:
+        # 各段階を一度だけ試す。失敗を成功にせず、後続の独立した処理は実行する。
+        failed = False
+        flags = [] if update else ["--include=dev", "--no-fund", "--no-audit"]
+        for action in (("install", "update") if update else ("install",)):
+            try:
+                ok = run_command([npm, action, *flags], cwd=frontend_dir, env=env)
+            except (OSError, subprocess.SubprocessError) as exc:
+                warning(f"{label}: npm {action}: {exc}")
+                ok = False
+            if not ok:
+                warning(f"{label}: npm {action} に失敗しました。続行指定のため次の処理を試行します。")
+                failed = True
+        warnings = copy_warnings if copy_warnings is not None else []
+        warning_count = len(warnings)
+        if desktop and not prepare_electron_binary(frontend_dir, label, info=info, error=error, continue_on_error=True, copy_warnings=warnings):
+            if len(warnings) == warning_count:
+                error(f"{label}: Electron の準備に失敗しました。失敗を記録して続行します。")
+                failed = True
+        return not failed
     # pull後の再配置では導入済み依存を残して同期し、範囲内最新版への更新は行わない。
     flags = [] if update else ["--include=dev", "--no-fund", "--no-audit"]
     for action in (("install", "update") if update else ("install",)):

@@ -266,7 +266,7 @@ class SetupOrderingTests(unittest.TestCase):
             self.assertIs(selected,choices);self.assertFalse(desktop)
             return record('diag-launcher')
         modules={
-            'backend_diag':SimpleNamespace(setup=launcher,setup_desktop=lambda:record('diag-desktop')),
+            'backend_diag':SimpleNamespace(setup=launcher,setup_desktop=lambda **kwargs:record('diag-desktop')),
             'backend_local':SimpleNamespace(setup=lambda selected:record('local'),launch_model_download=lambda selected:record('download')),
         }
         with ExitStack() as stack:
@@ -341,7 +341,7 @@ class SetupOrderingTests(unittest.TestCase):
                 choices=dict.fromkeys(['common','local','mcp','backend','taskteam','web','avatar','hermes','ide','discord','diag'],False)
                 choices.update(diag=True,continue_on_error=keep_going)
                 from types import SimpleNamespace
-                fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda:True)
+                fake=SimpleNamespace(setup=lambda *a,**kw:True,setup_desktop=lambda **kwargs:True)
                 def diagnose():events.append('diag');return success
                 with patch.object(module,'collect_setup_choices',return_value=choices),patch.object(module,'stop_setup_apps'),patch.object(module,'_load_folder_module',return_value=fake),patch.object(module,'ensure_prerequisites'),patch.object(module,'remove_folder_import_caches',side_effect=lambda:events.append('clear')),patch.object(module,'run_diag_headless',side_effect=diagnose),patch.object(module,'print_header',side_effect=lambda text:events.append(text)),patch.object(module,'print_setup_summary') as summary,patch.object(module.time,'sleep'),patch('builtins.print'):
                     if not success:
@@ -391,7 +391,7 @@ class SetupDisplayTests(unittest.TestCase):
 
     def test_standalone_display_once_before_launcher_and_desktop(self):
         output=io.StringIO()
-        with tempfile.TemporaryDirectory() as directory, patch.object(Path,'home',return_value=Path(directory)), patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True), redirect_stdout(output):
+        with tempfile.TemporaryDirectory() as directory, patch.object(Path,'home',return_value=Path(directory)), patch.object(setup,'setup_desktop',side_effect=lambda **kwargs:print('desktop-fixture') or True), redirect_stdout(output):
             self.assertTrue(setup.setup())
         self.assert_diag_display(output.getvalue())
 
@@ -405,10 +405,10 @@ class SetupDisplayTests(unittest.TestCase):
             stack.enter_context(patch.object(Path,'home',return_value=Path(directory)))
             stack.enter_context(patch.object(module,'GLOBAL_CLI_INSTALL_PROCESSES',['fixture']))
             stack.enter_context(patch.object(module,'stop_setup_apps'))
-            for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:True),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda _:None)]:
+            for name,value in [('collect_setup_choices',lambda:choices),('ensure_prerequisites',lambda:True),('setup_common_global_tools',lambda _:print('common-fixture') or []),('wait_global_cli_tools_install',lambda:print('common-wait-fixture') or []),('_load_folder_module',lambda name:setup if name=='backend_diag' else local),('remove_folder_import_caches',lambda:None),('run_diag_headless',lambda:True),('print_setup_summary',lambda *_:None)]:
                 stack.enter_context(patch.object(module,name,value))
             stack.enter_context(patch.object(module.time,'sleep'))
-            stack.enter_context(patch.object(setup,'setup_desktop',side_effect=lambda:print('desktop-fixture') or True))
+            stack.enter_context(patch.object(setup,'setup_desktop',side_effect=lambda **kwargs:print('desktop-fixture') or True))
             stack.enter_context(redirect_stdout(output));module.main()
         text=output.getvalue();self.assert_diag_display(text)
         self.assertLess(text.index('common-wait-fixture'),text.index('Diag セットアップ'))
@@ -431,7 +431,7 @@ class ElectronSetupTests(unittest.TestCase):
     def test_desktop_uses_shared_helper(self):
         from types import SimpleNamespace
         calls=[]
-        helper=SimpleNamespace(setup_dependencies=lambda *args: calls.append(args) or True)
+        helper=SimpleNamespace(setup_dependencies=lambda *args, **kwargs: calls.append(args) or True)
         spec=SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module:None))
         with patch.dict('os.environ',{'CODESPACES':'false','DISPLAY':':fixture'}),patch.object(setup.shutil,'which',return_value='/mock/npm'),patch.dict('sys.modules',{'_runtime_requirements':SimpleNamespace(check_project_node_runtime=lambda *args,**kwargs:(True,'Node fixture'))}),patch.object(setup.importlib.util,'spec_from_file_location',return_value=spec) as load,patch.object(setup.importlib.util,'module_from_spec',return_value=helper),patch('builtins.print'):
             self.assertTrue(setup.setup_desktop())

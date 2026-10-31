@@ -82,6 +82,8 @@ def setup(choices=None) -> bool:
     if not npm:
         print_error("Node.js 22.13 以降と npm を導入してください。")
         return False
+    if choices and choices.get("continue_on_error"):
+        return _setup_best_effort(npm, choices)
     # ロックファイルがあれば再現性のある npm ci、初回だけ npm install で作る。
     command = "ci" if (THIS_DIR / "package-lock.json").exists() else "install"
     try:
@@ -130,6 +132,62 @@ def setup(choices=None) -> bool:
         return False
     if not (choices and choices.get("ide")):
         print_success("IDE: aidiy_ide で起動できます。")
+    return True
+
+
+def _setup_best_effort(npm, choices):
+    """明示された続行指定で、失敗を記録し独立した残りの配置も一度ずつ試す。"""
+    failures = []
+    copy_warnings = choices.setdefault("_setup_warnings", [])
+    warning_count = len(copy_warnings)
+
+    def attempt(label, action):
+        try:
+            if action() is not False:
+                return True
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            print_error(f"IDE: {label}: {exc}")
+        failures.append(label)
+        print_error(f"IDE: {label} に失敗しました。残りのセットアップを試行します。")
+        return False
+
+    env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
+    browser_only = env.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not env.get('DISPLAY') and not env.get('WAYLAND_DISPLAY'))
+    command = "ci" if (THIS_DIR / "package-lock.json").exists() else "install"
+    # ガードは使用中を警告するだけで、続行選択時は導入を保留しない。
+    attempt('使用中確認', lambda: frontend_dependency_guard(
+        THIS_DIR, 'IDE', info=print_info, warning=print_warning, error=print_error,
+        continue_on_error=True,
+    ))
+    attempt('依存導入', lambda: subprocess.run([npm, command, '--include=dev', '--no-fund', '--no-audit'], cwd=THIS_DIR, env=env, check=True))
+    updated = attempt('Electron 更新', lambda: subprocess.run([npm, 'update', 'electron', '--include=dev', '--no-fund', '--no-audit'], cwd=THIS_DIR, env=env, check=True))
+    if not browser_only and os.environ.get('ELECTRON_SKIP_BINARY_DOWNLOAD') != '1':
+        def place_electron():
+            before = len(copy_warnings)
+            ready = prepare_electron_binary(
+                THIS_DIR, 'IDE', allow_download=updated, info=print_info, error=print_error,
+                continue_on_error=True, copy_warnings=copy_warnings,
+            )
+            return ready or len(copy_warnings) > before
+        attempt('Electron 配置', place_electron)
+    vue = THIS_DIR.parent.parent / 'frontend_ide'
+    if any(not (vue / 'node_modules' / name).is_dir() for name in ('vue', '@xterm/xterm', '@xterm/addon-fit', 'node-pty', 'ws')):
+        attempt('共通UI使用中確認', lambda: frontend_dependency_guard(
+            vue, 'Console / Code / Live / IDE 共通UI', desktop=False,
+            info=print_info, warning=print_warning, error=print_error, continue_on_error=True,
+        ))
+        attempt('共通UI依存', lambda: subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=vue, check=True))
+    attempt('共通UI生成', lambda: subprocess.run([npm, 'run', 'build'], cwd=vue, check=True))
+    if not choices.get('_defer_ide_launchers'):
+        attempt('ランチャー登録', lambda: install_launcher(THIS_DIR))
+    if failures:
+        print_error('IDE: 失敗した項目: ' + '、'.join(failures))
+        return False
+    if len(copy_warnings) > warning_count:
+        print_warning('IDE: Electron コピーの警告付きで終了しました。更新完了は未確認です。')
+        return True
+    if not choices.get('ide'):
+        print_success('IDE: aidiy_ide で起動できます。')
     return True
 
 

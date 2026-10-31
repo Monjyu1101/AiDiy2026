@@ -113,7 +113,7 @@ def print_info(message):
     print(f"{Colors.OKGREEN}[INFO] {message}{Colors.ENDC}")
 
 
-def print_setup_summary(error_locations: list[str]) -> None:
+def print_setup_summary(error_locations: list[str], copy_warnings=None) -> None:
     print()
     print_header("セットアップ完了")
     if error_locations:
@@ -121,8 +121,12 @@ def print_setup_summary(error_locations: list[str]) -> None:
         print_warning("エラー発生場所:")
         for location in error_locations:
             print_warning(f"  - {location}")
-    else:
+    elif not copy_warnings:
         print_success("セットアップ処理が完了しました。")
+    if copy_warnings:
+        print_warning("Electron の配置に警告があります。使用可能とは確認できていません。")
+        for message in copy_warnings:
+            print_warning(message)
 
 
 # ============================================================
@@ -944,6 +948,7 @@ def main():
 
     print_header("一括実行開始")
     continue_on_error = choices["continue_on_error"]
+    copy_warnings = choices.setdefault("_setup_warnings", [])
     error_locations: list[str] = []
     local_setup_ok = False
     model_download_launched = False
@@ -996,7 +1001,7 @@ def main():
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
-        if not _load_folder_module("backend_diag").setup_desktop():
+        if not _load_folder_module("backend_diag").setup_desktop(continue_on_error=continue_on_error, copy_warnings=copy_warnings):
             error_locations.append("Diag: Electron")
             if not continue_on_error:
                 print_setup_summary(error_locations)
@@ -1145,7 +1150,7 @@ def main():
                 print_setup_summary(error_locations)
                 sys.exit(1)
 
-    print_setup_summary(error_locations)
+    print_setup_summary(error_locations, **({"copy_warnings": copy_warnings} if copy_warnings else {}))
     print_info("起動方法:")
     print_info("  全体起動: python _start.py")
     print_info("  個別起動:")
@@ -1161,6 +1166,8 @@ def main():
     print()
     if error_locations:
         print_error("セットアップに失敗した項目があります。上記のエラー発生場所を確認してください。")
+    elif copy_warnings:
+        print_warning("セットアップ処理は終了しました（警告あり／Electron 配置未確認）。")
     else:
         print_success("セットアップは正常終了しました。")
     if model_download_launched:

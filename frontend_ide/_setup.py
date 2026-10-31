@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT.parent / "scripts"))
 from _setup_electron import frontend_dependency_guard
 from _runtime_requirements import check_project_node_runtime
 
-def prepare():
+def prepare(*, continue_on_error=False):
     ok, detail = check_project_node_runtime(ROOT, dependency="vite", fallback="^20.19.0 || >=22.12.0")
     if detail.startswith("[WARN]"):
         print(detail)
@@ -28,7 +28,7 @@ def prepare():
         print("[NG] npm が見つかりません。対応する Node.js と同梱の npm を導入してください。")
         return False
     try:
-        reuse = frontend_dependency_guard(ROOT, 'Console / Code / Live / IDE / Task / Team / Browser 共通UI', desktop=False)
+        reuse = frontend_dependency_guard(ROOT, 'Console / Code / Live / IDE / Task / Team / Browser 共通UI', desktop=False, **({'continue_on_error': True} if continue_on_error else {}))
         if reuse is not None:
             return reuse
         subprocess.run([npm, 'ci', '--include=dev', '--no-fund', '--no-audit'], cwd=ROOT, check=True)
@@ -43,21 +43,27 @@ def load_setup_module(name):
     return module
 
 
-def register_launchers(host):
+def register_launchers(host, *, continue_on_error=False):
     """依存準備後に7コマンドを連続表示し、共有PATHの案内は一度だけ行う。"""
     launcher = load_setup_module('frontend_ide/viewer/launcher.py')
     print("\n起動コマンドの登録:")
-    try:
-        launcher.install_launcher(ROOT / 'aidiy_console', 'console', register_path=False)
-        if not host.install_standalone_launcher(register_path=False):
+    failures = []
+    actions = [('Console', lambda: launcher.install_launcher(ROOT / 'aidiy_console', 'console', register_path=False)),
+               ('Code / Live', lambda: host.install_standalone_launcher(register_path=False))]
+    for kind, folder in (('ide', 'viewer'), ('task', 'aidiy_task'), ('team', 'aidiy_team'), ('browser', 'aidiy_browser')):
+        actions.append((kind, lambda kind=kind, folder=folder: launcher.install_launcher(ROOT / folder, kind, register_path=False)))
+    actions.append(('PATH', lambda: launcher.ensure_launcher_path(launcher.launcher_path().parent)))
+    for label, action in actions:
+        try:
+            if action() is not False:
+                continue
+        except OSError as exc:
+            print(f"[NG] 起動コマンド {label} の登録に失敗しました: {exc}")
+        failures.append(label)
+        if not continue_on_error:
             return False
-        for kind, folder in (('ide', 'viewer'), ('task', 'aidiy_task'), ('team', 'aidiy_team'), ('browser', 'aidiy_browser')):
-            launcher.install_launcher(ROOT / folder, kind, register_path=False)
-        if not launcher.ensure_launcher_path(launcher.launcher_path().parent):
-            print("[NG] 起動コマンドの PATH 登録に失敗しました。")
-            return False
-    except OSError as exc:
-        print(f"[NG] 起動コマンドの登録に失敗しました: {exc}")
+        print(f"[WARN] {label}: 残りの起動コマンド登録を試行します。")
+    if failures:
         return False
     return True
 
@@ -69,17 +75,37 @@ def setup(choices=None):
     print("Console / Code / Live / IDE / Task / Team / Browser セットアップ")
     print("=" * 60 + "\n")
     print("対象: Node.js / Vue 3 / Vite / TypeScript / Electron / VS Code / VSIX")
-    child_choices = {**(choices or {}), "ide": True, "_defer_ide_launchers": True}
+    choices = choices if choices is not None else {}
+    warnings = choices.setdefault("_setup_warnings", [])
+    warning_count = len(warnings)
+    child_choices = {**choices, "ide": True, "_defer_ide_launchers": True}
     # hostからprepareだけを呼ぶため再帰しない。
     host = None
+    continue_on_error = bool(choices and choices.get("continue_on_error"))
+    failed = False
     for name in ('frontend_ide/aidiy_console', 'frontend_ide/host', 'frontend_ide/viewer', 'frontend_ide/aidiy_task', 'frontend_ide/aidiy_team', 'frontend_ide/aidiy_browser'):
         module = load_setup_module(name + '/_setup.py')
         if name == 'frontend_ide/host':
             host = module
-        if not module.setup(child_choices):
-            return False
-    if not register_launchers(host):
+        try:
+            completed = module.setup(child_choices)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            if not continue_on_error:
+                raise
+            print(f"[NG] {name}: {exc}。残りのセットアップを試行します。")
+            completed = False
+        if not completed:
+            failed = True
+            if not continue_on_error:
+                return False
+    if not register_launchers(host, **({'continue_on_error': True} if continue_on_error else {})):
+        failed = True
+    if failed:
+        print("[NG] IDE 系セットアップに失敗した項目があります。")
         return False
+    if len(warnings) > warning_count:
+        print("[WARN] IDE 系セットアップは Electron コピーの警告付きで完了しました。")
+        return True
     print("Console / Code / Live / IDE / Task / Team / Browser セットアップ完了")
     names = ('Console', 'Code', 'Live', 'IDE', 'Task', 'Team', 'Browser')
     width = max(map(len, names))

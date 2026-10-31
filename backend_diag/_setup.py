@@ -72,10 +72,10 @@ def setup(choices=None, *, desktop=True):
     if not ensure_launcher_path(directory):
         return False
     print('起動: aidiy_diag（Electron） / aidiy_diag --browser（ブラウザ）')
-    return setup_desktop() if desktop else True
+    return setup_desktop(continue_on_error=bool((choices or {}).get("continue_on_error")), copy_warnings=choices.setdefault("_setup_warnings", []) if choices is not None else None) if desktop else True
 
 
-def setup_desktop():
+def setup_desktop(*, continue_on_error=False, copy_warnings=None):
     if os.environ.get('CODESPACES') == 'true' or (sys.platform.startswith('linux') and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))):
         # Electronを省略しても、ブラウザ版のサーバーにはNode.jsが必要。
         sys.path.insert(0, str(THIS_DIR.parent / 'scripts'))
@@ -109,7 +109,7 @@ def setup_desktop():
             return True
         except (OSError, subprocess.SubprocessError):
             return False
-    return helper.setup_dependencies(THIS_DIR, npm, 'Diag', run)
+    return helper.setup_dependencies(THIS_DIR, npm, 'Diag', run, continue_on_error=continue_on_error, copy_warnings=copy_warnings)
 
 
 if __name__ == '__main__':

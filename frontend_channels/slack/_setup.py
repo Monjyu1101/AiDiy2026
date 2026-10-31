@@ -60,19 +60,37 @@ def _slack_in_use() -> bool:
     return bool(slack_tree_pids(THIS_DIR)) or _runtime_in_use(THIS_DIR)
 
 
+def _supplement_config():
+    # 共通設定は既存の補完・原子的保存を使い、独自に上書きしない。
+    backend_dir = THIS_DIR.parent.parent / "backend_server"
+    sys.path.insert(0, str(backend_dir))
+    spec = importlib.util.spec_from_file_location("_slack_conf_json", backend_dir / "conf" / "conf_json.py")
+    conf_json_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(conf_json_mod)
+    conf_json_mod.conf_json()
+    print_success("共通設定の不足キーを補完しました。")
+
+
 def setup(choices=None) -> bool:
-    del choices
+    continue_on_error = bool(choices and choices.get("continue_on_error"))
+    failures = []
+    copy_warnings = []
     print_header("Slack セットアップ")
     print_info(f"作業ディレクトリ: {THIS_DIR}")
     print_info("対象: Slack / Node.js / Vue 3 / TypeScript / Electron（HTTPS の定期取得、WebSocket 不使用）")
-    # npm ci は node_modules を削除するため、稼働中のパネル・Bot がないことを先に確認する。
+    # 続行を明示した場合だけ、稼働中でも停止せず可能な処理を試す。
     try:
         if _slack_in_use():
-            print_error('起動中の Slack は停止せず、依存更新を保留しました。他項目だけ更新する場合は Slack を選択しないでください。')
-            return False
+            if not continue_on_error:
+                print_error('起動中の Slack は停止せず、依存更新を保留しました。他項目だけ更新する場合は Slack を選択しないでください。')
+                return False
+            print_info('[WARN] Slack は起動中ですが、エラーでも継続の指定によりセットアップを試行します。使用中ファイルの更新に失敗する場合があります。')
     except (OSError, ValueError, subprocess.SubprocessError):
-        print_error('Slack の停止状態を確認できないためセットアップを中止します。依存・設定は変更しません。')
-        return False
+        if not continue_on_error:
+            print_error('Slack の停止状態を確認できないためセットアップを中止します。依存・設定は変更しません。')
+            return False
+        failures.append('稼働状態の確認')
+        print_info('[WARN] Slack の稼働状態を確認できません。エラーを記録してセットアップを続行します。')
     ok, detail = check_project_node_runtime(THIS_DIR, fallback=">=22.12.0")
     if detail.startswith("[WARN]"):
         print(detail)
@@ -84,34 +102,55 @@ def setup(choices=None) -> bool:
     if not npm:
         print_error("Node.js 22.12 以降と npm を導入してください。")
         return False
-    try:
-        # Electron 本体は npm で取得せず、他のフロントエンドの配置・共有 ZIP を再利用する。
-        env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
-        command = "ci" if (THIS_DIR / "package-lock.json").is_file() else "install"
-        print_info(f"実行中: {npm} {command} --include=dev --no-fund --no-audit")
-        subprocess.run([npm, command, "--include=dev", "--no-fund", "--no-audit"], cwd=THIS_DIR, env=env, check=True)
-        # Discord と同じく、ロック済みの旧版に留めず宣言範囲で Electron を更新する。
-        print_info(f"実行中: {npm} run update:electron")
-        subprocess.run([npm, "run", "update:electron"], cwd=THIS_DIR, env=env, check=True)
-        # 導入済み依存から Vue 配布物を生成して manifest と揃える（通常起動では再ビルドしない）。
-        for script in ('build:panel', 'check:panel'):
-            print_info(f"実行中: {npm} run {script}")
-            subprocess.run([npm, "run", script], cwd=THIS_DIR, env=env, check=True)
-        if not prepare_electron_binary(THIS_DIR, 'Slack'):
+
+    def attempt(label, action):
+        try:
+            # ランチャー登録など成功時に None を返す既存APIにも対応する。
+            if action() is not False:
+                return True
+        except (OSError, ValueError, ImportError, RuntimeError, subprocess.SubprocessError):
+            pass
+        failures.append(label)
+        print_error(f"Slack: {label} に失敗しました。")
+        if continue_on_error:
+            print_info('[WARN] エラーを記録して、後続のセットアップを試行します。')
+        return continue_on_error
+
+    env = {**os.environ, 'ELECTRON_SKIP_BINARY_DOWNLOAD': '1'}
+    command = "ci" if (THIS_DIR / "package-lock.json").is_file() else "install"
+    commands = [
+        [npm, command, "--include=dev", "--no-fund", "--no-audit"],
+        [npm, "run", "update:electron"],
+        [npm, "run", "build:panel"],
+        [npm, "run", "check:panel"],
+    ]
+    for args in commands:
+        print_info(f"実行中: {' '.join(args)}")
+        if not attempt(' '.join(args[1:]), lambda: subprocess.run(args, cwd=THIS_DIR, env=env, check=True)):
             return False
-        install_launcher(THIS_DIR)
-        # キーを独自に上書きせず、backend と同じ補完・原子的保存を使う。
-        backend_dir = THIS_DIR.parent.parent / "backend_server"
-        sys.path.insert(0, str(backend_dir))
-        spec = importlib.util.spec_from_file_location("_slack_conf_json", backend_dir / "conf" / "conf_json.py")
-        conf_json_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(conf_json_mod)
-        conf_json_mod.conf_json()
-        print_success("共通設定の不足キーを補完しました。")
-    except (OSError, ValueError, ImportError, subprocess.CalledProcessError):
-        print_error("Slack の依存導入・パネル生成検証・ランチャー登録・共通設定の補完のいずれかに失敗しました。")
+    def prepare_electron():
+        ready = prepare_electron_binary(THIS_DIR, 'Slack', continue_on_error=continue_on_error,
+                                        copy_warnings=copy_warnings)
+        if not ready and continue_on_error and copy_warnings:
+            # コピー失敗だけは WARN。依存欠損等の準備失敗は通常の NG に残す。
+            if choices is not None:
+                choices.setdefault('_setup_warnings', []).extend(copy_warnings)
+            return True
+        return ready
+
+    if not attempt('Electron 本体の準備', prepare_electron):
         return False
-    print_success("Slack: aidiy_slack で起動できます。")
+    if not attempt('ランチャー登録', lambda: install_launcher(THIS_DIR)):
+        return False
+    if not attempt('共通設定の補完', _supplement_config):
+        return False
+    if failures:
+        print_error('Slack: 未完了の項目: ' + ' / '.join(failures))
+        return False
+    if copy_warnings:
+        print_info('[WARN] Slack: 警告あり／Electron配置未確認。画面を閉じてセットアップを再実行してください。')
+    else:
+        print_success("Slack: aidiy_slack で起動できます。")
     return True
 
 

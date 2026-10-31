@@ -206,15 +206,29 @@ def setup(choices: dict | None = None) -> bool:
         print_info("  対応する Node.js と同梱の npm をインストールしてください: https://nodejs.org/")
         return False
 
-    if not setup_dependencies(
+    continue_on_error = bool((choices or {}).get("continue_on_error"))
+    copy_warnings = choices.setdefault("_setup_warnings", []) if choices is not None else []
+    warning_count = len(copy_warnings)
+    dependencies_ok = setup_dependencies(
         FRONTEND_AVATAR_DIR, npm_command(), label, run_command,
         info=print_info, warning=print_warning, error=print_error,
-    ):
+        continue_on_error=continue_on_error, copy_warnings=copy_warnings,
+    )
+    if not dependencies_ok and not continue_on_error:
+        return False
+    if not dependencies_ok:
+        print_warning(f"{label}: 依存の準備に失敗しました。続行指定のためランチャー登録を試行します。")
+    try:
+        launcher_ok = install_standalone_launcher()
+    except (OSError, subprocess.SubprocessError) as exc:
+        print_error(f"{label}: ランチャー登録に失敗しました: {exc}")
+        launcher_ok = False
+    if not dependencies_ok or not launcher_ok:
         return False
 
-    if not install_standalone_launcher():
-        return False
-
+    if len(copy_warnings) > warning_count:
+        print_warning(f"{label}: セットアップ処理は終了しましたが、Electron の配置は未確認です。")
+        return True
     print_success(f"{label}: セットアップが完了しました。")
     print_info("起動方法: aidiy_avatar （または cd frontend_avatar && npm run dev）")
     return True
