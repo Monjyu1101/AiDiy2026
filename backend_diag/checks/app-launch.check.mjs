@@ -16,15 +16,15 @@ import {createServer} from '../diag_main.mjs';
 async function fixture(t){
  const root=await mkdtemp(join(tmpdir(),'diag-app-test-')),project=join(root,'日本語 空白 project');await mkdir(project);
  t.after(()=>rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100}));
- const calls=[],manager=createAppLauncher({root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),pythonCommand:'fixture-python',tasks:async()=>[],spawnFn(command,args,options){
+ const calls=[],manager=createAppLauncher({chromeInstalled:async()=>true,root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),pythonCommand:'fixture-python',tasks:async()=>[],spawnFn(command,args,options){
   const child=new EventEmitter();child.unref=()=>{child.unreferenced=true;};calls.push({command,args,options,child});queueMicrotask(()=>child.emit('spawn'));return child;
  }});
  return {root,project:await realpath(project),manager,calls};
 }
-test('11 fixed apps; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
+test('unconfigured channel apps hidden; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
  const f=await fixture(t);let reads=0;
- const manager=createAppLauncher({root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return [];}});
- assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord','slack','chrome','browser']);
+ const manager=createAppLauncher({chromeInstalled:async()=>true,root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return [];}});
+ assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','chrome','browser']);
  for(const id of ['avatar','ide','console','code','live','discord'])for(const path of ['',undefined,'relative',join(f.root,'missing')])await assert.rejects(manager.launch(id,path),{status:400});
  await writeFile(join(f.root,'file'),'x');await assert.rejects(manager.launch('avatar',join(f.root,'file')),{status:400});
  await assert.rejects(manager.launch('arbitrary-command',f.project),{status:400});assert.equal(reads,0);
@@ -43,11 +43,11 @@ test('project argument/cwd remain exact; Avatar retains app base; detached logs 
 test('singleton checks run only on click, block existing tasks, permit IDE/Console/Code repeats and serialize races',async t=>{
  const f=await fixture(t);let reads=0,calls=0,release;
  const tasks=[{command:'python "C:/AiDiy/frontend_avatar/_start.py"'},{command:'electron "C:/AiDiy/frontend_ide/desktop.cjs" --app live'},{command:'node "/a/frontend_channels/src/web-server.ts"'}];
- const manager=createAppLauncher({root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return tasks;},spawnFn(){calls++;throw Error();}});
+ const manager=createAppLauncher({chromeInstalled:async()=>true,root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return tasks;},spawnFn(){calls++;throw Error();}});
  manager.catalog();assert.equal(reads,0);
  for(const id of ['avatar','live','discord'])assert.equal((await manager.launch(id,f.project)).起動済み,true);
  assert.equal(calls,0);assert.equal(reads,3);
- const racing=createAppLauncher({tasks:()=>new Promise(resolve=>{release=resolve;})});
+ const racing=createAppLauncher({chromeInstalled:async()=>true,tasks:()=>new Promise(resolve=>{release=resolve;})});
  const one=racing.launch('live',f.project);while(!release)await new Promise(resolve=>setImmediate(resolve));
  await assert.rejects(racing.launch('live',f.project),{status:409});release(tasks);await one;
  for(const id of ['ide','console','code']){await f.manager.launch(id,f.project);await f.manager.launch(id,f.project);}
@@ -61,7 +61,7 @@ test('Windows/macOS/Linux task entries and legacy Live match without matching ot
 });
 test('task lookup failure fails closed and releases pending state',async t=>{
  const f=await fixture(t);let reads=0;
- const m=createAppLauncher({tasks:async()=>{reads++;throw Error('private process data');}});
+ const m=createAppLauncher({chromeInstalled:async()=>true,tasks:async()=>{reads++;throw Error('private process data');}});
  for(let i=0;i<2;i++)await assert.rejects(m.launch('live',f.project),error=>error.status===503&&!error.message.includes('private'));
  assert.equal(reads,2);
 });
@@ -88,7 +88,7 @@ test('authenticated API rejects arbitrary commands/methods/oversized payloads',a
 test('real detached app survives Diag server shutdown and inherits chosen cwd',async t=>{
  const f=await fixture(t);await mkdir(join(f.root,'frontend_ide'));const marker=join(f.root,'alive.json');
  await writeFile(join(f.root,'frontend_ide','launch.mjs'),`import{writeFileSync}from'node:fs';setInterval(()=>writeFileSync(${JSON.stringify(marker)},JSON.stringify({cwd:process.cwd(),pid:process.pid,time:Date.now()})),50);`);
- let child;const manager=createAppLauncher({root:f.root,spawnFn:(...args)=>(child=spawn(...args))});
+ let child;const manager=createAppLauncher({chromeInstalled:async()=>true,root:f.root,spawnFn:(...args)=>(child=spawn(...args))});
  const server=createServer({token:'fixture',appLauncher:manager,modelTrials:{close(){}},startManager:{close(){}}});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  try{
   await manager.launch('console',f.project);for(let i=0;i<100;i++){try{await readFile(marker);break;}catch{await new Promise(resolve=>setTimeout(resolve,20));}}
@@ -100,7 +100,7 @@ test('real detached app survives Diag server shutdown and inherits chosen cwd',a
 test('catalog copies CODE_BASE_PATH including ../ without modifying config or launching apps',async t=>{
  const f=await fixture(t);await mkdir(join(f.root,'_config'));
  const filename=join(f.root,'_config','AiDiy_key.json');
- const manager=createAppLauncher({root:f.root,taskTeamStatus:async()=>({利用可能:false}),spawnFn(){throw Error('must not launch');}});
+ const manager=createAppLauncher({chromeInstalled:async()=>true,root:f.root,taskTeamStatus:async()=>({利用可能:false}),spawnFn(){throw Error('must not launch');}});
  assert.equal((await manager.catalog()).フォルダ,'');
  for(const value of [undefined,null,42,{},[],false,'','   ','../',' ../ ',f.project,'C:\\日本語 空白\\project','../other-project']){
   const raw='\uFEFF'+JSON.stringify({CODE_BASE_PATH:value,openai_key_id:'synthetic-private-key',OTHER:'private'});

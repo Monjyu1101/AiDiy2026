@@ -149,3 +149,15 @@ test('Slack は Discord の次に同じローカルPNGで表示し、未導入�
   f.menu({type:'launch',key:'app:slack'});assert.equal(launches,0);
  }finally{f.app.unmount();}
 });
+
+test('円形のVS Codeは導入状態の変化に追従して表示・非表示になる',async()=>{
+ const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
+ const f=await fixture();let installed=false;
+ const cli=CLI状態を作成({アプリ:f.appState,api:async()=>({対象:[{id:'vscode',名前:'VS Code',種類:'editor',利用可能:installed}]})});
+ try{
+  for(const value of [false,true,false,undefined,true]){
+   installed=value;await cli.読込();f.cliState.項目.value=cli.項目.value;await flush();
+   assert.equal(nodes(f.root).some(n=>n.tag==='img'&&n.props.src==='CLI_vscode.svg'),value===true);
+  }
+ }finally{f.app.unmount();}
+});

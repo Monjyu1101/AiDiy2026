@@ -16,14 +16,14 @@ import {createServer} from '../diag_main.mjs';
 async function fixture(t){const root=await mkdtemp(join(tmpdir(),'diag-taskteam-'));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 test('catalog order and backend availability update without disabling other apps',async t=>{
  const root=await fixture(t);let online=false;
- const m=createAppLauncher({root,taskTeamStatus:async()=>({利用可能:online,無効理由:online?'':'backend stopped'})});
- let data=await m.catalog();assert.deepEqual(data.対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','discord','slack','chrome','browser']);
+ const m=createAppLauncher({chromeInstalled:async()=>true,root,taskTeamStatus:async()=>({利用可能:online,無効理由:online?'':'backend stopped'})});
+ let data=await m.catalog();assert.deepEqual(data.対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','chrome','browser']);
  assert.equal(data.対象[1].利用可能,false);assert.equal(data.対象[2].利用可能,false);assert.equal(data.対象[0].利用可能,undefined);
  online=true;data=await m.catalog();assert.equal(data.対象[1].利用可能,true);assert.equal(data.対象[2].利用可能,true);
 });
 test('launch rechecks backend and serializes pending Task/Team clicks; no spawn while offline',async t=>{
  const root=await fixture(t);let online=true,release;const calls=[];
- const m=createAppLauncher({root,taskTeamStatus:async()=>({利用可能:online,無効理由:'backend stopped'}),spawnFn(command,args,options){calls.push({args,options});const child=new EventEmitter();child.unref=()=>{};release=()=>child.emit('spawn');return child;}});
+ const m=createAppLauncher({chromeInstalled:async()=>true,root,taskTeamStatus:async()=>({利用可能:online,無効理由:'backend stopped'}),spawnFn(command,args,options){calls.push({args,options});const child=new EventEmitter();child.unref=()=>{};release=()=>child.emit('spawn');return child;}});
  await m.catalog();online=false;for(const id of ['task','team'])await assert.rejects(m.launch(id,root),{status:409});assert.equal(calls.length,0);
  online=true;for(const id of ['task','team']){
   release=null;const first=m.launch(id,root);while(!release)await new Promise(r=>setImmediate(r));
@@ -44,12 +44,12 @@ test('health timeout and connection errors fail closed; missing config defaults 
  const root=await fixture(t);let port;
  const check=createTaskTeamStatus({root,timeoutMs:10,request(options){port=options.port;const req=new EventEmitter();req.end=()=>{};req.destroy=()=>{};return req;}});
  assert.equal((await check()).利用可能,false);assert.equal(port,8093);
- const bad=createAppLauncher({root,taskTeamStatus:async()=>{throw Error('private');}});
+ const bad=createAppLauncher({chromeInstalled:async()=>true,root,taskTeamStatus:async()=>{throw Error('private');}});
  assert.equal((await bad.catalog()).対象[1].利用可能,false);await assert.rejects(bad.launch('task',root),error=>error.status===409&&!error.message.includes('private'));
 });
 test('authenticated HTTP catalog awaits availability and POST denies stale enabled state',async t=>{
  const root=await fixture(t);let online=true;
- const server=createServer({token:'test',appLauncher:createAppLauncher({root,taskTeamStatus:async()=>({利用可能:online})}),modelTrials:{close(){}},startManager:{close(){}}});
+ const server=createServer({token:'test',appLauncher:createAppLauncher({chromeInstalled:async()=>true,root,taskTeamStatus:async()=>({利用可能:online})}),modelTrials:{close(){}},startManager:{close(){}}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));
  const base=`http://127.0.0.1:${server.address().port}/`,headers={Authorization:'Bearer test','Content-Type':'application/json'};
  assert.equal((await (await fetch(base+'api/アプリ起動',{headers})).json()).対象[1].利用可能,true);

@@ -11,7 +11,7 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await vue.nex
 const descendants=node=>[node,...node.children.flatMap(descendants)];
 const text=node=>node.text+node.children.map(text).join('');
 
-test('通常のCLIアイコンは確認なしで起動し、未導入は表示して起動要求を送らない',async()=>{
+test('通常のCLIアイコンは確認なしで起動し、未導入は非表示にして起動要求を送らない',async()=>{
  const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
  const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
  const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
@@ -22,8 +22,8 @@ test('通常のCLIアイコンは確認なしで起動し、未導入は表示�
  }});
  const ui=mount(compile('アプリ起動/アプリ起動パネル.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
  try{
-  await flush();const missing=ui.button('Grok Build をConsoleで起動');assert.equal(missing.props.disabled,true);assert.match(text(missing),/未導入/);
-  missing.props.onClick();await flush();assert.equal(launches.length,0);assert.equal(prompts,0);
+  await flush();assert.equal(ui.button('Grok Build をConsoleで起動'),undefined);
+  await cliState.起動('grok',{確認省略:true});await flush();assert.equal(launches.length,0);assert.equal(prompts,0);
   ui.button('Codex CLI をConsoleで起動').props.onClick();await flush();
   assert.equal(prompts,0);assert.deepEqual(launches,[{対象:'codex',フォルダ:'/fixture/project',自動承認確認:true}]);
   assert.doesNotMatch(text(ui.root),/fixture launch/);
@@ -255,5 +255,27 @@ test('Chrome / Browser icons render in full and mini launchers; Chrome works wit
    state.フォルダ.value='/project';await flush();assert.equal(ui.button('Browser を起動').props.disabled,false);
    state.項目.value[0].利用可能=false;await flush();assert.equal(ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動')).props.disabled,true);
   }finally{ui.app.unmount();state.終了();}
+ }
+});
+
+test('通常・ミニのVS CodeとCLIは導入済みだけ表示する',async()=>{
+ const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ for(const name of ['アプリ起動/アプリ起動パネル.vue','アプリ起動/ミニCLI起動.vue']){
+  const appState={項目:vue.ref([]),フォルダ:vue.ref('/fixture'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>''};
+  let installed=false,launches=0;
+  const cliState=CLI状態を作成({アプリ:appState,api:async route=>{
+   if(route==='api/CLI起動')return {対象:[{id:'vscode',名前:'VS Code',種類:'editor',利用可能:installed},{id:'grok',名前:'Grok Build',利用可能:false}]};
+   launches++;throw Error('render must not launch');
+  }});
+  const mini=name.includes('ミニ'),ui=mount(compile(name,{modules:{'./アプリアイコン.mjs':icons}}),()=>mini?{state:cliState,appState,online:true}:{state:appState,cliState,online:true,visible:true});
+  try{
+   for(const value of [false,true,false,undefined,true]){
+    installed=value;await cliState.読込();await flush();
+    assert.equal(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='CLI_vscode.svg'),value===true);
+    assert.equal(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='CLI_grok.svg'),false);
+   }
+   assert.equal(launches,0);
+  }finally{ui.app.unmount();}
  }
 });

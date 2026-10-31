@@ -13,7 +13,7 @@ function fixture(overrides={}){
  return {state,アプリ,requests,confirmations};
 }
 test('only available CLI entries appear and idle loading cannot launch anything',async()=>{const f=fixture();await f.state.読込();assert.deepEqual(f.state.項目.value.map(x=>x.id),['copilot']);assert.equal(f.requests.length,1);assert.equal(f.confirmations.length,0);});
-test('通常画面は未導入CLIも保持し、起動要求と確認は送らず、切断時に全項目を消す',async()=>{
+test('未導入CLIは内部の全項目に保持するが表示一覧から除外し、起動要求と確認は送らない',async()=>{
  const f=fixture();await f.state.読込();
  assert.deepEqual(f.state.全項目.value.map(x=>[x.id,x.利用可能]),[['copilot',true],['grok',false]]);
  await f.state.起動('grok');await f.state.起動('grok',{確認省略:true});

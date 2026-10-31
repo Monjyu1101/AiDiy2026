@@ -15,11 +15,12 @@ import {createWebBrowserOpener} from '../起動/Webブラウザ.mjs';
 import {アプリ状態を作成} from '../ui/src/アプリ起動/アプリ状態.mjs';
 import {アプリアイコン} from '../ui/src/アプリ起動/アプリアイコン.mjs';
 
-test('Chrome has the manual Web gate and fixed MCP call; no project, process spawn or service start',async()=>{
+test('Chrome has the manual Web gate and fixed MCP call; no project, process spawn or service start',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'diag-chrome-'));t.after(()=>rm(root,{recursive:true,force:true}));
  let online=false,calls=0;
  const portStatusFn=async()=>({対象:['tools','web'].map(id=>({id,開放:online,ポート:id==='tools'?8095:8090}))});
  const webBrowserOpenFn=createWebBrowserOpener({portStatusFn,fetchFn:async(url,options)=>{calls++;assert.equal(url,'http://127.0.0.1:8095/aidiy_chrome_devtools/new_page');assert.deepEqual(JSON.parse(options.body),{url:'http://localhost:8090/',show_automation_banner:false});return {ok:true,json:async()=>({id:'tab-1'})};}});
- const manager=createAppLauncher({taskTeamStatus:async()=>({利用可能:false}),portStatusFn,webBrowserOpenFn,spawnFn(){assert.fail('Chrome must use existing Tools');}});
+ const manager=createAppLauncher({root,chromeInstalled:async()=>true,taskTeamStatus:async()=>({利用可能:false}),portStatusFn,webBrowserOpenFn,spawnFn(){assert.fail('Chrome must use existing Tools');}});
  assert.equal((await manager.catalog()).対象.find(x=>x.id==='chrome').利用可能,false);
  await assert.rejects(manager.launch('chrome'),{status:409});assert.equal(calls,0);
  online=true;assert.equal((await manager.catalog()).対象.find(x=>x.id==='chrome').利用可能,true);

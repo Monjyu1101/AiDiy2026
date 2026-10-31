@@ -15,12 +15,13 @@ import {アプリ状態を作成} from '../ui/src/アプリ起動/アプリ状�
 const {render,dependency}=createRequire(import.meta.url)('./ui-components.cjs');
 async function fixture(t){
  const root=await mkdtemp(join(tmpdir(),'diag-slack-launch-')),project=join(root,'日本語 project'),entry=join(root,'frontend_channels/slack/panel/launch.mjs');await mkdir(project);
+ await mkdir(join(root,'_config'));await writeFile(join(root,'_config','AiDiy_key.json'),JSON.stringify({discord_bot_token:'fixture-discord',slack_bot_token:'fixture-slack'}));
  t.after(()=>rm(root,{recursive:true,force:true}));
  const calls=[],tasks=[];let release,taskReads=0,hold=false;
- const manager=createAppLauncher({root,node:'fixture-node',portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{taskReads++;return tasks;},spawnFn(command,args,options){const child=new EventEmitter();child.unref=()=>{};calls.push({command,args,options});release=()=>child.emit('spawn');if(!hold)queueMicrotask(release);return child;}});
+ const manager=createAppLauncher({chromeInstalled:async()=>true,root,node:'fixture-node',portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{taskReads++;return tasks;},spawnFn(command,args,options){const child=new EventEmitter();child.unref=()=>{};calls.push({command,args,options});release=()=>child.emit('spawn');if(!hold)queueMicrotask(release);return child;}});
  return {root,project,entry,manager,calls,tasks,taskReads:()=>taskReads,install:async()=>{await mkdir(join(root,'frontend_channels/slack/panel'),{recursive:true});await writeFile(entry,'// fixture only; never executed\n');},hold:()=>hold=true,release:()=>release()};
 }
-test('Slack catalog follows Discord; absent or non-file entry stays visible, unavailable and never launches',async t=>{
+test('configured Slack catalog follows Discord; absent or non-file entry stays visible, unavailable and never launches',async t=>{
  const f=await fixture(t);let list=(await f.manager.catalog()).対象;
  assert.equal(list[list.findIndex(x=>x.id==='discord')+1].id,'slack');
  const row=list.find(x=>x.id==='slack');assert.equal(row.名前,'Slack');assert.equal(row.利用可能,false);assert.equal(row.無効表示,'未導入');assert.doesNotMatch(row.無効理由,/準備中/);

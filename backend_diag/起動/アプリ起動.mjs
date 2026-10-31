@@ -9,7 +9,8 @@ import {join,dirname,isAbsolute,resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
-import {readConfig} from '../runtime/model_probe.mjs';
+import {readConfig,configured} from '../runtime/model_probe.mjs';
+import {catalog as programCatalog,resolveProgram} from '../診断/probes.mjs';
 import {createPortStatusChecker} from './ポート状態.mjs';
 import {createWebBrowserOpener} from './Webブラウザ.mjs';
 import {createTaskTeamStatus} from './TaskTeam接続.mjs';
@@ -40,7 +41,11 @@ export function アプリタスク(id,{command=''}){
  if(id==='slack')return entry('frontend_channels/slack/(?:panel/(?:desktop\\.cjs|launch\\.mjs)|src/(?:web-server|panel-worker|main)\\.ts)');
  return false;
 }
-export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus,portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}={}){
+// 導入タブと同じ Chrome 定義を使う。実行ファイルのパスは公開しない。
+export async function isChromeInstalled({resolveFn=resolveProgram}={}){
+ try{return Boolean(await resolveFn((await programCatalog()).find(item=>item.id==='chrome')));}catch{return false;}
+}
+export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧,node=process.execPath,pythonCommand,taskTeamStatus,chromeInstalled=isChromeInstalled,portStatusFn=createPortStatusChecker(),webBrowserOpenFn=createWebBrowserOpener({portStatusFn})}={}){
  const pending=new Set();
  const slackEntry=join(root,'frontend_channels','slack','panel','launch.mjs');
  async function slackAvailability(){try{if((await stat(slackEntry)).isFile())return {利用可能:true,無効理由:'',無効表示:''};}catch{}return {利用可能:false,無効理由:'Slack の起動ファイルが見つかりません。セットアップを確認してください。',無効表示:'未導入'};}
@@ -53,6 +58,7 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   let chromeState={利用可能:false,無効理由:'Tools / MCP と Web が両方とも稼働中の場合だけ開けます。'};
   try{const ports=await portStatusFn();if(['tools','web'].every(id=>ports.対象.some(item=>item.id===id&&item.開放===true)))chromeState={利用可能:true,無効理由:''};}catch{}
   const [,config]=await readConfig(()=>readFile(join(root,'_config','AiDiy_key.json'),'utf8'));
+  let showChrome=false;try{showChrome=await chromeInstalled()===true;}catch{}
   const project=config.CODE_BASE_PATH;
   // 設定全体やキーは公開せず、明示されたプロジェクトだけを初期値として渡す。
   const フォルダ=typeof project==='string'?project:'';
@@ -60,7 +66,11 @@ export function createAppLauncher({root=ROOT,spawnFn=spawn,tasks=タスク一覧
   // 表示は設定値そのまま。起動引数だけAIコアと同じbackend_server基準で解決する。
   // 空欄・制御文字・ドライブ相対値から別のフォルダを補完しない。
   const 起動フォルダ=!normalized||フォルダ.length>4096||/[\u0000-\u001f\u007f]/.test(フォルダ)||(/^[a-z]:/i.test(normalized)&&!isAbsolute(normalized))?'':resolve(root,'backend_server',normalized);
-  return {対象:アプリ一覧.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='slack'?{...app,...slackState}:app.id==='chrome'?{...app,...chromeState}:app.id==='browser'?{...app,...browserState}:app),フォルダ,起動フォルダ};
+  // Discord / Slack は先頭の Bot キーだけで表示を判断する。ID・接続成功は条件にしない。
+  // 判定はサーバー内で完結し、設定値やキーをランチャーへ渡さない。
+  // Chrome は導入タブと同じ実行ファイル探索のみ。起動やバージョン確認はしない。
+  const visibleApps=アプリ一覧.filter(app=>app.id==='chrome'?showChrome:!['discord','slack'].includes(app.id)||configured(config[`${app.id}_bot_token`],app.id));
+  return {対象:visibleApps.map(app=>taskTeam(app.id)?{...app,...state}:app.id==='slack'?{...app,...slackState}:app.id==='chrome'?{...app,...chromeState}:app.id==='browser'?{...app,...browserState}:app),フォルダ,起動フォルダ};
  }
  async function folder(value){
   if(typeof value!=='string'||!value.trim()||value.length>4096||value.includes('\0')||!isAbsolute(value))throw fail('プロジェクトフォルダを選択してください。');
