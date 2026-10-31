@@ -35,6 +35,11 @@ export function fileSizeScale(name, size) {
 export function createSpace(canvas, elements, { change = () => {}, layout = () => ({}), toggleExplorer = () => {} } = {}) {
 let disposed = false, frameId = 0, loadGeneration = 0, refreshPending = null, sessionStartedAt;
 let viewMode = '3d';
+let refreshPaused = false;
+function setRefreshPaused(value) {
+  refreshPaused=!!value;
+  if(refreshPaused){cancelRefresh();cancelScheduledFollow();if(following)invalidateNavigation();}
+}
 const listeners = new AbortController();
 const listen = (target, name, callback, options = {}) => target.addEventListener(name, callback, { ...options, signal: listeners.signal });
 // 2D は同じ状態を使うが、Canvas の描画ループを持たない。復帰時も予約は1本だけ。
@@ -1476,16 +1481,17 @@ function requestFollow(path) {
 }
 /** 今追いかけてよいか: 視点移動が ON、手動操作の直後でない、ユーザーが自分で開いたファイルを見ていない。 */
 function canFollow() {
-  return !disposed && autoSpin && !!world && !following && !diving && !dragging && !document.hidden && performance.now() >= autoOrbit.pausedUntil
+  return !disposed && !refreshPaused && autoSpin && !!world && !following && !diving && !dragging && !document.hidden && performance.now() >= autoOrbit.pausedUntil
     && (!selected || selected.path === followedPath);
 }
 async function follow(path) {
-  if (disposed || (viewMode === '2d' && !canFollow())) return false;
+  if (disposed || refreshPaused || (viewMode === '2d' && !canFollow())) return false;
   if(path === lastFollowedPath&&!updatePaths.length)return true;
   const parts = path.split('/'), level = parts.slice(0, -1);
   const run = ++followSequence, mode = viewMode;
   const stale = () => disposed || mode !== viewMode || document.hidden || run !== followSequence || !autoSpin || !!pendingFollow || (latestFollow && latestFollow !== path) || performance.now() < autoOrbit.pausedUntil;
   following = true; activeFollowPath = path;
+  notify();
   try { return await followSteps(path, parts, level, stale); }
   finally {
     if (run === followSequence) {
@@ -1497,8 +1503,6 @@ async function follow(path) {
 }
 async function followSteps(path, parts, level, stale) {
   if (viewMode === '3d') { holdProjection(); Object.assign(goal, cam); }
-  // 開いている自動のビューアは、元へ戻さずに閉じる
-  if (path !== lastFollowedPath) { selected = null; tracking = null; updateSide(); }
   // 毎回読み直す。直前の走査後に新規作成されたファイルも、予約を失わず表示する。
   const joinedEarlierRequest = !!refreshPending;
   const predatesUpdate = refreshPending && refreshPending.followRevision < followRevision;
@@ -1510,6 +1514,8 @@ async function followSteps(path, parts, level, stale) {
     if (!await refresh(undefined,{fresh:true}) || stale()) return false;
   }
   if (!exists()) return false;
+  // 更新中は前の閲覧を維持し、移動先が存在すると確認できてから切り替える。
+  if (path !== lastFollowedPath) { selected = null; tracking = null; updateSide(); }
   // 先行ファイルには移動・表示せず、階層ごとの経路と閲覧軌跡だけを保存する。
   const recorded = updatePaths; updatePaths = [];
   for (const updated of recorded) {
@@ -1653,10 +1659,15 @@ function setFilter(on) {
 }
 // 監視の結果を今のページへ反映する。移動・手動更新中の結果は次回に回す。
 function applyFolderSnapshot(context, result) {
-  if (disposed || viewMode !== '2d' || !autoSpin || refreshPending || context.path !== basePath() || context.filter !== fileFilter || !scan || result.truncated) return false;
+  if (disposed || refreshPaused || viewMode !== '2d' || !autoSpin || refreshPending || context.path !== basePath() || context.filter !== fileFilter || !scan || result.truncated) return false;
   const current = nodeAt(trail);
   if (!current || !result.tree) return false;
   if (JSON.stringify(current) === JSON.stringify(result.tree)) return true;
+  // 保存時の一時的な欠落では解除しない。全体の新しい走査で存在を再確認する。
+  if (selected && !selected.unlisted && !containsSelected(result.tree, selected.path.slice(context.path ? context.path.length + 1 : 0))) {
+    void refresh();
+    return false;
+  }
   const replace = (node, depth) => depth === trail.length ? result.tree : { ...node, d: node.d.map(child => child.n === trail[depth] ? replace(child, depth + 1) : child) };
   scan = { ...scan, tree: replace(scan.tree, 0), scannedAt: Date.now() };
   const previous = selected;
@@ -1669,8 +1680,13 @@ function applyFolderSnapshot(context, result) {
   knownPaths = new Set(collectFiles(scan.tree, '').map(file => file.path));
   notify(); return true;
 }
+function containsSelected(tree, path) {
+  const names = path.split('/'), name = names.pop();
+  for (const part of names) { tree = tree?.d.find(child => child.n === part); }
+  return !!tree?.f.some(file => file[0] === name);
+}
 function refresh(startedAt, {fresh=true}={}) {
-  if(disposed)return Promise.resolve(false);
+  if(disposed||refreshPaused)return Promise.resolve(false);
   if (Number.isFinite(startedAt)) {
     if(sessionStartedAt!==undefined && sessionStartedAt!==startedAt) {
       invalidateNavigation(); clearFollowRequests(); cancelRefresh();
@@ -1684,11 +1700,26 @@ function refresh(startedAt, {fresh=true}={}) {
   refreshPending=request;
   request.promise=(async()=>{
     try {
-      const params=new URLSearchParams({...(fileFilter?{filter:fileFilter}:{}),...(fresh?{fresh:'1'}:{})});
-      const response=await fetch('/api/galaxy'+(params.size?'?'+params:''),{cache:'no-store',signal:request.controller.signal});
-      if(!response.ok)throw Error(await response.text());
-      const data=await response.json();
-      if(disposed || run!==loadGeneration || request.filter!==fileFilter)return false;
+      const stale=()=>disposed || run!==loadGeneration || request.filter!==fileFilter;
+      const read=async fresh=>{
+        const params=new URLSearchParams({...(request.filter?{filter:request.filter}:{}),...(fresh?{fresh:'1'}:{})});
+        const response=await fetch('/api/galaxy'+(params.size?'?'+params:''),{cache:'no-store',signal:request.controller.signal});
+        if(!response.ok)throw Error(await response.text());
+        return response.json();
+      };
+      let data=await read(fresh);
+      if(stale())return false;
+      // 中間の一覧は公開しない。欠落だけはキャッシュを使わず一度確認してから反映する。
+      if(selected&&!selected.unlisted&&!data.truncated&&!containsSelected(data.tree,selected.path)) {
+        data=await read(true);
+        if(stale())return false;
+      }
+      // 打ち切られた走査の親欠落で現在地・閲覧を巻き戻さない。
+      if(data.truncated&&trail.length) {
+        let node=data.tree;
+        for(const part of trail)node=node?.d.find(child=>child.n===part);
+        if(!node){change({error:'一覧の走査上限により、現在の表示を保持しています。',loading:false});return false;}
+      }
       const first=!scan;scan=data;
       const available = [...trail];
       while(available.length&&!nodeAt(available))available.pop();
@@ -1746,7 +1777,7 @@ listen(document, 'visibilitychange', () => {
 });
 requestAnimationFrame(frame);
 return {
-  refresh, applyFolderSnapshot, clearViewHistory, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
+  refresh, setRefreshPaused, applyFolderSnapshot, clearViewHistory, goTo, ascend, flyHome, dive, approach, interact, setViewMode, setAutoSpin, setFastWarp: value => { fastWarp = !!value; }, clear: () => selectBody(null), follow, canFollow, requestFollow, setFilter,
   get viewMode() { return viewMode; }, get selected() { return selected; },
   get updateMarks() { return updateMarks; },
   get world() { return world; }, get trail() { return trail; }, get focus() { return focus; }, get labels() { return labelBoxes; }, cam, goal,

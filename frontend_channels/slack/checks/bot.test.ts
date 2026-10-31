@@ -10,7 +10,7 @@
  * -------------------------------------------------------------------------
  */
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { SlackBot } from '../src/接続/Bot接続';
 import { SlackAPIエラー, type SlackAPI } from '../src/接続/ネットワーク接続';
@@ -334,4 +334,41 @@ test('stopを繰り返しても新要求の順序と会話キーを保つ', asyn
     assert.equal(new Set(f.runs.map(item => item.key)).size, 1);
     assert.ok(f.posts.some(post => post.text === '実行中のコード要求はありません。'));
   } finally { await f.bot.終了(); }
+});
+
+
+test('起動・会話直後は3秒、最後の会話から10分で6秒へ落とし、新規投稿で戻る', async (t: TestContext) => {
+  let now = 0, timer: (() => void) | undefined;
+  const waits: number[] = [];
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(globalThis, 'setTimeout', ((callback: () => void, delay: number) => {
+    waits.push(delay); timer = callback; return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout);
+  t.mock.method(globalThis, 'clearTimeout', () => {});
+  const slack = 偽Slack(), { code } = 偽Code();
+  let answer!: (text: string) => void;
+  code.実行 = async () => new Promise<string>(resolve => { answer = resolve; });
+  const bot = new SlackBot(config(), slack.api, code);
+  const flush = () => new Promise<void>(resolve => setImmediate(resolve));
+  const poll = async (at: number) => {
+    now = at; const callback = timer; assert.ok(callback); timer = undefined; callback(); await flush();
+  };
+  try {
+    await bot.起動(); await flush();
+    assert.equal(waits.at(-1), 3000, '起動直後');
+    await poll(599_999); assert.equal(waits.at(-1), 3000, '10分未満');
+    await poll(600_000); assert.equal(waits.at(-1), 6000, '10分ちょうど');
+    slack.投稿追加({ user: 'U0OTHERUSR1', text: '許可外', ts: '101.000001' });
+    slack.投稿追加({ bot_id: 'B9', user: botUserId, text: 'Bot自身', ts: '101.000002' });
+    await poll(601_000); assert.equal(waits.at(-1), 6000, '許可外とBot投稿では復帰しない');
+    slack.投稿追加({ text: '会話開始', ts: '102.000001' });
+    await poll(602_000); assert.equal(waits.at(-1), 3000, '許可した新規投稿で復帰');
+    await poll(1_202_000); assert.equal(waits.at(-1), 3000, '回答待ちの間は通常間隔');
+    answer('回答'); await flush();
+    await poll(1_801_999); assert.equal(waits.at(-1), 3000, 'AI回答の直後から数える');
+    await poll(1_802_000); assert.equal(waits.at(-1), 6000, '最後のAI回答から10分');
+    slack.返信追加('102.000001', { text: '!aidiy status', ts: '901.000001', thread_ts: '102.000001' });
+    await poll(1_803_000); assert.equal(waits.at(-1), 3000, '同じスレッドの会話でも復帰');
+    assert.ok(slack.posts.some(post => post.text === 'Code: 待機中'));
+  } finally { await bot.終了(); }
 });

@@ -547,4 +547,4 @@ npm --prefix backend_diag/ui run check
 
 生成・AI系の8項目は説明APIの疎通確認です。生成やAI実行の成功とは区別します。他の項目はモニター数、SELECT 1、ログ件数、構文、差分件数、OBSシーン数、短い無音処理、通知音、要員数、ウィンドウ数、専用Chromeの起動を確認します。PostgreSQLの接続設定やOBSの稼働など、必要な実行条件を満たさなければ失敗になります。
 
-Toolsの一括試験は、通常タブの「全テスト」および `--headless` とは独立しています。詳細は [Tools編](../_AIDIY/knowledge/セルフテスト,aidiy_diag,Tools編.md) を参照してください。
+Toolsの一括試験は、通常タブの「全テスト」および `--headless` とは独立しています。詳細は [AIモデル・Tools編](../_AIDIY/knowledge/セルフテスト,aidiy_diag,AIモデル・Tools編.md) を参照してください。

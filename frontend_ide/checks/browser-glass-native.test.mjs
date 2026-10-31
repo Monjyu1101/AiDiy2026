@@ -33,10 +33,10 @@ function fixture({platform='linux',release='6.12.0',zoom=1,area={x:-1600,y:40,wi
 }
 
 for(const [platform,release,material,vibrancy]of [
- ['win32','10.0.22621','acrylic',undefined],['win32','10.0.26100','acrylic',undefined],
+ ['win32','10.0.22621',undefined,undefined],['win32','10.0.26100',undefined,undefined],
  ['win32','10.0.22000',undefined,undefined],['win32','10.0.19045',undefined,undefined],
- ['darwin','23.0.0',undefined,'menu'],['linux','6.12.0',undefined,undefined],
-])test(`Browserすりガラス: ${platform}/${release}の対応材質だけを設定する`,async()=>{
+ ['darwin','23.0.0',undefined,undefined],['linux','6.12.0',undefined,undefined],
+])test(`Browserすりガラス: ${platform}/${release}で中央を覆うOS材質を使わない`,async()=>{
  const f=fixture({platform,release});try{
   f.header.show(true);await flush();f.tick();const options=f.window.options;
   assert.equal(options.backgroundMaterial,material);assert.equal(options.vibrancy,vibrancy);assert.equal(options.visualEffectState,vibrancy?'active':undefined);

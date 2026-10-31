@@ -11,9 +11,9 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend_taskteam'))
-from fastapi import Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from pydantic import BaseModel
-from taskteam_proc.internal_auth import InternalTokenAuthority, DailyTokenRotator, write_token_file
+from taskteam_proc.internal_auth import InternalTokenAuthority, DailyTokenRotator, write_token_file, internal_post_endpoints
 from taskteam_proc import api_auth
 
 NOW = datetime(2026, 10, 31, 0, tzinfo=timezone.utc)
@@ -45,6 +45,30 @@ async def call(app, path='/task/test', token=None, body=None, method='POST', ext
 
 
 class AuthorityTests(unittest.TestCase):
+    def test_included_router_endpoints_accept_registered_posts_only(self):
+        app = FastAPI()
+        nested = APIRouter()
+        async def endpoint():
+            return {'status': 'OK'}
+        nested.add_api_route('/要員/一覧', endpoint, methods=['POST'])
+        nested.add_api_route('/閲覧', endpoint, methods=['GET'])
+        outer = APIRouter()
+        outer.include_router(nested, prefix='/team')
+        outer.add_api_route('/task/一覧', endpoint, methods=['POST'])
+        outer.add_api_route('/task_check_okng', endpoint, methods=['POST'])
+        outer.add_api_route('/core/test', endpoint, methods=['POST'])
+        outer.add_api_route('/teamwork/test', endpoint, methods=['POST'])
+        app.include_router(outer)
+        endpoints = internal_post_endpoints(app)
+        self.assertEqual(endpoints, {
+            ('POST', '/team/要員/一覧'), ('POST', '/task/一覧'), ('POST', '/task_check_okng')})
+        authority = InternalTokenAuthority(signing_key=b'fixture', clock=lambda: NOW, endpoints=endpoints)
+        token = authority.issue(NOW)['access_token']
+        authority.verify(token, 'POST', '/team/要員/一覧')
+        for method, path in [('GET', '/team/閲覧'), ('POST', '/team/未登録'), ('POST', '/core/test')]:
+            with self.assertRaises(ValueError):
+                authority.verify(token, method, path)
+
     def authority(self, now=NOW, key=b'fixture-only-key'):
         return InternalTokenAuthority(signing_key=key, clock=lambda: now, endpoints=ENDPOINTS)
 
@@ -137,7 +161,7 @@ class WiringTests(unittest.IsolatedAsyncioTestCase):
         import ast
         from contextlib import asynccontextmanager
         from types import SimpleNamespace
-        source = (ROOT / 'backend_taskteam/taskteam_proc/runtime.py').read_text()
+        source = (ROOT / 'backend_taskteam/taskteam_proc/runtime.py').read_text(encoding='utf-8')
         tree = ast.parse(source)
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'build_lifespan')
         function.returns = None
@@ -158,9 +182,11 @@ class WiringTests(unittest.IsolatedAsyncioTestCase):
             events.append('workers')
             raise RuntimeError('fixture startup failure')
             yield
-        app = SimpleNamespace(routes=[SimpleNamespace(methods={'POST'}, path='/task/test')], state=SimpleNamespace())
+        app = FastAPI()
+        app.add_api_route('/task/test', lambda: {}, methods=['POST'])
         scope = {'asynccontextmanager': asynccontextmanager, 'InternalTokenAuthority': lambda **kwargs: SimpleNamespace(issue=None),
                  'PersistentTokenRotator': Rotator, 'write_token_file': None, 'BASE_DIR': ROOT,
+                 'internal_post_endpoints': internal_post_endpoints,
                  '_worker_lifespan': worker}
         exec(compile(ast.Module(body=[function], type_ignores=[]), '<fixture extracted lifespan>', 'exec'), scope)
         with self.assertRaises(RuntimeError):
@@ -171,7 +197,7 @@ class WiringTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_every_business_router_uses_auth_and_bind_is_unchanged(self):
         import ast
-        tree = ast.parse((ROOT / 'backend_taskteam/taskteam_proc/app.py').read_text())
+        tree = ast.parse((ROOT / 'backend_taskteam/taskteam_proc/app.py').read_text(encoding='utf-8'))
         found = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'include_router':

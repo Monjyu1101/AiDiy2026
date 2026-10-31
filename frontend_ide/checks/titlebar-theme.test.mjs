@@ -41,13 +41,13 @@ test('通常タイトル行: ピンのON/OFFとシアン接続バーの状態色
  assert.doesNotMatch(tokens,/connection-bar|activity-bar|keyframes/);
 });
 
-test('全画面Browserガラス: 通常タイトル配色を継承せず透明背景と黒文字を維持する',()=>{
+test('全画面Browserガラス: 通常タイトル配色を継承せず透明背景と青系文字を維持する',()=>{
  const {descriptor}=parse(read('../src/ブラウザ/ブラウザパネル.vue'));
  const glass=values(descriptor.styles[0].content,'.development-app.browser-header-only');
  assert.equal(glass['--aidiy-titlebar-background'],'transparent');
- assert.equal(glass['--aidiy-titlebar-foreground'],'#102c32');
- assert.equal(glass['--aidiy-titlebar-secondary'],'#102c32');
- assert.equal(values(descriptor.styles[0].content,'.browser-header-only .browser-chrome').color,'#102c32');
+ assert.equal(glass['--aidiy-titlebar-foreground'],'#4b8eaa');
+ assert.equal(glass['--aidiy-titlebar-secondary'],'#4b8eaa');
+ assert.equal(values(descriptor.styles[0].content,'.browser-header-only .browser-chrome').color,'#4b8eaa');
 });
 
 

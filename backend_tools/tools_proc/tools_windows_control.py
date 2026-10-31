@@ -20,6 +20,12 @@ from pydantic import BaseModel
 from log_config import get_logger
 from tools_proc.windows_control import WindowsControlError
 
+DESCRIPTION = (
+    "Windows環境でComputer Use（computer-use）が利用できない場合の代替機能です。"
+    "マウス／キーボード、ウィンドウ、プロセス、クリップボード、"
+    "UI AutomationによるWindowsデスクトップ操作を提供します。Windows専用です。"
+)
+
 logger = get_logger(__name__)
 
 
@@ -295,9 +301,7 @@ def create_router(wc) -> APIRouter:
         return {
             "service": "aidiy_windows_control",
             "description": (
-                "Windows デスクトップ操作制御。マウス/キーボード、ウィンドウ、プロセス、"
-                "クリップボード、UI Automation 要素操作を提供する。"
-                "Windows 専用。参考: https://github.com/CursorTouch/Windows-MCP"
+DESCRIPTION + "参考: https://github.com/CursorTouch/Windows-MCP"
             ),
             "endpoint": "POST /aidiy_windows_control/{method_name}",
             "content_type": "application/json",

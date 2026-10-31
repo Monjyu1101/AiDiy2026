@@ -3,6 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
@@ -81,7 +82,7 @@ test('authenticated API rejects arbitrary commands/methods/oversized payloads',a
   assert.deepEqual(Buffer.from(await response.arrayBuffer()),await readFile(new URL(`../ui/src/アプリ起動/アイコン/AiDiy_${id}.png`,import.meta.url)));
  }
  assert.equal((await fetch(base+'AiDiy_unknown.png')).status,404);
- for(const [body,status] of [[{対象:'console',フォルダ:f.project,command:'bad'},400],[{対象:'bad',フォルダ:f.project},400],[{対象:'avatar',フォルダ:''},400],[{対象:'console',フォルダ:'x'.repeat(9000)},413]])assert.equal((await fetch(base+'api/アプリ起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,status);
+ for(const [body,status] of [[{対象:'console',フォルダ:f.project,command:'bad'},400],[{対象:'bad',フォルダ:f.project},400],[{対象:'avatar',フォルダ:''},400],[{対象:'console',フォルダ:'x'.repeat(DIAG_TRANSPORT_BYTE_LIMIT+1)},413]])assert.equal((await fetch(base+'api/アプリ起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,status);
  assert.equal((await fetch(base+'api/アプリ起動/開始',{headers})).status,404);
  const response=await fetch(base+'api/アプリ起動/開始',{method:'POST',headers,body:JSON.stringify({対象:'console',フォルダ:f.project})});assert.equal(response.status,202);assert.equal(f.calls.length,1);
 });

@@ -19,7 +19,7 @@ const BOOK_NAMES = Object.freeze({
 });
 const BOOK_DOCUMENTS = Object.freeze({
   system: 'セルフテスト,aidiy_diag,システム起動編',
-  apps: 'セルフテスト,aidiy_diag,アプリ起動編',
+  apps: 'セルフテスト,aidiy_diag,ランチャー編',
   environment: 'セルフテスト,aidiy_diag,環境確認編',
   ide: 'セルフテスト,aidiy_ide,操作編',
 });

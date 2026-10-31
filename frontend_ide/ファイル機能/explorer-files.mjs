@@ -245,10 +245,47 @@ export function createExplorerFiles(root, { state = () => ({ active: true }), on
       throw failure;
     } finally { if (changed) onChange(); }
   }
+  async function performBatch(body, options, version) {
+    const started=Date.now();
+    const check=()=>{
+      if(closed||version!==generation||!state().active||options.cancelled?.())throw issue(503,'利用が終了したため操作を中止しました。','session_ended');
+      if(Date.now()-started>caps.timeMs)throw issue(408,'一括操作の時間上限を超えました。','operation_timeout');
+    };
+    check();
+    if(!['copy','trash','pdf'].includes(body.action)||!Array.isArray(body.paths)||!body.paths.length||body.paths.length>1000)
+      throw issue(400,'一括操作の対象は1〜1000件で指定してください。','invalid_batch');
+    if(body.action==='trash'&&body.confirmed!==true)throw issue(400,'ゴミ箱への移動には確認が必要です。','confirmation_required');
+    const paths=[...new Set(body.paths.map(path=>validatePath(path)))];
+    // 階層の混在を親フォルダの操作へまとめない。意図せず配下全体を削除させない。
+    if(paths.some(path=>paths.some(parent=>parent!==path&&path.startsWith(parent+'/'))))
+      throw issue(400,'フォルダとその配下の項目が重複しています。フォルダ全体か個別ファイルのどちらかにチェックを整理してください。','overlapping_targets');
+    const entries=[];for(const path of paths){check();entries.push(await locate(path));}
+    const targets=entries;
+    if(body.action==='pdf'&&targets.some(entry=>entry.type!=='file'||!/\.md$/i.test(entry.path)))throw issue(400,'PDF化はMarkdownだけをチェックしてください。','not_markdown');
+    if(body.action==='copy')for(const source of targets){
+      const destination=body.duplicate===true?(source.path.includes('/')?source.path.slice(0,source.path.lastIndexOf('/')):''):body.directory??'';
+      await locate(destination,{directory:true,allowRoot:true});
+      if(source.type==='directory'&&(destination===source.path||destination.startsWith(source.path+'/')))throw issue(400,'フォルダを自分自身やその配下にはコピーできません。','recursive_copy');
+    }
+    const results=[];
+    for(const source of targets){
+      try{
+        check();
+        await recheck(source);
+        const directory=body.duplicate===true?(source.path.includes('/')?source.path.slice(0,source.path.lastIndexOf('/')):''):body.directory;
+        results.push(await perform({action:body.action,path:source.path,directory,confirmed:body.confirmed},options,version));
+      }catch(error){
+        const failure=filesystemError(error);
+        failure.message=`${results.length}/${targets.length}件完了。「${source.path}」で停止しました。${failure.message}`;
+        failure.completed=results;failure.failedPath=source.path;failure.total=targets.length;throw failure;
+      }
+    }
+    return {action:body.action,results,total:targets.length};
+  }
   function apply(body, options = {}) {
     if (pending >= caps.maxPending) return Promise.reject(issue(429, '操作が混み合っています。完了を待ってください。', 'busy'));
     const version = options.version ?? generation; pending++;
-    const result = tail.then(() => perform(body, options, version));
+    const result = tail.then(() => body&&Object.hasOwn(body,'paths')?performBatch(body,options,version):perform(body, options, version));
     tail = result.catch(() => {});
     return result.finally(() => { pending--; });
   }
@@ -266,7 +303,7 @@ export function createExplorerFiles(root, { state = () => ({ active: true }), on
       let body;
       try { body = JSON.parse(text); } catch { throw issue(400, 'JSONが正しくありません。', 'invalid_json'); }
       reply(200, await apply(body, { version, cancelled: () => req.aborted || res.destroyed }));
-    } catch (error) { const failure = filesystemError(error); req.resume(); reply(failure.status, { error: failure.code, message: failure.message, ...(failure.partialPath ? { partialPath: failure.partialPath } : {}) }); }
+    } catch (error) { const failure = filesystemError(error); req.resume(); reply(failure.status, { error: failure.code, message: failure.message, ...(failure.partialPath ? { partialPath: failure.partialPath } : {}), ...(failure.completed?{completed:failure.completed,failedPath:failure.failedPath,total:failure.total}:{}) }); }
     return true;
   }
   return { apply, handle, invalidate, close() { closed = true; invalidate(); } };

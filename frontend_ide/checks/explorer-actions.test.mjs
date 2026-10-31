@@ -7,10 +7,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createExplorerActions, explorerNameError, parentPath, containsPath, renamedPath } from '../src/ファイル閲覧/エクスプローラー操作.js';
 const file={path:'docs/sample.txt',name:'sample.txt',type:'file'},folder={path:'docs',name:'docs',type:'dir'};
-function fixture(){
+function fixture(checked=()=>[]){
   const requests=[],changes=[],copied=[];let response,resolve,pending=false,root='/project';
   const document={defaultView:{navigator:{clipboard:{writeText:async text=>copied.push(text)}}},querySelector:()=>null};
-  const actions=createExplorerActions({root:()=>root,document:()=>document,changed:async result=>changes.push(result),request:async(url,options)=>{
+  const actions=createExplorerActions({root:()=>root,checked,document:()=>document,changed:async result=>changes.push(result),request:async(url,options)=>{
     requests.push({url,options,payload:JSON.parse(options.body)});if(pending)await new Promise(done=>{resolve=done;});
     return response||new Response(JSON.stringify({action:JSON.parse(options.body).action,path:'docs/new.txt',previousPath:file.path,type:'file',name:'new.txt'}));
   }});
@@ -29,6 +29,42 @@ test('Explorerコピー: IDE内clipboard、ルート背景貼付け・複製・�
   await f.actions.action('duplicate',file);assert.equal(f.requests[1].payload.directory,'docs');
   await f.actions.action('copy-path',file);await f.actions.action('copy-relative',file);await f.actions.action('copy-path');await f.actions.action('copy-relative');assert.deepEqual(f.copied,['/project/docs/sample.txt','docs/sample.txt','/project','.']);
   f.root('/other');await f.actions.action('paste');assert.equal(f.requests.length,2);f.actions.dispose();
+});
+
+test('Explorerチェック一括: パス・内部コピー・複製・削除確認を同じ対象へ適用する',async()=>{
+ const rows=[file,{path:'docs/other.txt',name:'other.txt',type:'file'}],f=fixture(()=>rows);
+ try{
+  await f.actions.action('copy-relative',file);assert.equal(f.copied[0],'docs/sample.txt\ndocs/other.txt');
+  await f.actions.action('copy',file);assert.equal(f.state.clipboard.items.length,2);
+  await f.actions.action('paste',folder);assert.deepEqual(f.requests[0].payload,{action:'copy',paths:rows.map(row=>row.path),directory:'docs'});
+  await f.actions.action('duplicate',file);assert.deepEqual(f.requests[1].payload,{action:'copy',paths:rows.map(row=>row.path),duplicate:true});
+  await f.actions.action('trash',file);assert.deepEqual([...f.state.dialog.paths],rows.map(row=>row.path));assert.equal(f.requests.length,2);
+  f.actions.cancel();assert.equal(f.state.dialog,null);
+  await f.actions.action('trash',file);
+  const results=rows.map(row=>({...row,action:'trash',previousPath:row.path}));
+  f.response(new Response(JSON.stringify({action:'trash',results,total:2})));
+  await f.actions.perform({action:'trash',paths:rows.map(row=>row.path),confirmed:true});
+  assert.equal(f.state.dialog,null);assert.equal(f.state.clipboard,null);assert.equal(f.changes.at(-1).results.length,2);assert.match(f.state.notice,/2件/);
+ }finally{f.actions.dispose();}
+});
+
+test('Explorer一括: 部分成功は完了分だけ反映し、確認画面を閉じ自動再実行しない',async()=>{
+ const rows=[file,{path:'docs/other.txt',name:'other.txt',type:'file'}],f=fixture(()=>rows);
+ try{
+  await f.actions.action('trash',file);
+  f.response(new Response(JSON.stringify({message:'1/2件完了。other.txtで停止',completed:[{...file,action:'trash'}],failedPath:'other.txt',total:2}),{status:503}));
+  await f.actions.perform({action:'trash',paths:rows.map(row=>row.path),confirmed:true});
+  assert.equal(f.requests.length,1);assert.equal(f.state.dialog,null);assert.equal(f.changes.length,1);assert.equal(f.changes[0].results.length,1);assert.match(f.state.error,/1\/2件完了/);
+ }finally{f.actions.dispose();}
+});
+
+test('Explorer一括連携: ファイル参照を1回の下書き依頼にまとめ、本文を送らない',async()=>{
+ const drafts=[],rows=[file,{path:'docs/second.txt',name:'second.txt',type:'file'}];
+ const actions=createExplorerActions({root:()=>'/project',document:()=>null,checked:()=>rows,openDraft:value=>drafts.push(value)});
+ try{
+  await actions.action('handoff',file);assert.equal(drafts.length,1);assert.equal(drafts[0].selection,false);
+  assert.equal(drafts[0].text,'参照ファイル: docs/sample.txt\n\n参照ファイル: docs/second.txt');
+ }finally{actions.dispose();}
 });
 test('Explorer: 自分自身・子孫へ貼り付けない、rootのrename/trash/copy禁止',async()=>{
   const f=fixture();await f.actions.action('copy',folder);await f.actions.action('paste',folder);await f.actions.action('paste',{path:'docs/deep',type:'dir'});assert.equal(f.requests.length,0);assert.match(f.state.error,/配下/);
@@ -109,13 +145,14 @@ test('Explorer右クリック: 実Vueテンプレートでアプリで開くの�
  const module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{module,require:id=>id==='vue'?vue:{containsPath}});
  const component=module.exports;
+ const text=node=>Array.isArray(node)?node.map(text).join(''):node&&typeof node==='object'?node.type===vue.Comment?'':text(node.children):typeof node==='string'?node:'';
  const buttons=node=>Array.isArray(node)?node.flatMap(buttons):node&&typeof node==='object'?[(node.props?.role==='menuitem'?node:null),...buttons(node.children)].filter(Boolean):[];
  for(const desktop of [false,true])for(const row of [file,folder,{type:'dir',path:'',name:'project'},{type:'file',path:'docs/test.md'}]){
   const calls=[],actions=createExplorerActions({root:()=>'/project',document:()=>null,openFile:desktop?async()=>({ok:true}):null,openFolder:desktop?async path=>{calls.push(path);return{ok:true};}:null});
   actions.state.menu={target:row,directory:parentPath(row.path),x:0,y:0};
   const props={actions},state=component.setup(props,{expose(){}}),items=buttons(component.render({},[],props,vue.proxyRefs(state),{},{}));
   const index=items.findIndex(button=>button.props['data-action']==='open-app'),next=items[index+1];
-  assert.equal(next.props['data-action'],'open-folder');assert.equal(next.props.disabled,!desktop);assert.equal(next.children[0].children,'フォルダを開く');
+  assert.equal(next.props['data-action'],'open-folder');assert.equal(next.props.disabled,!desktop);assert.equal(text(next.children[0]),'フォルダを開く');
   if(desktop){await next.props.onClick();assert.deepEqual(calls,[row.path]);}
   actions.dispose();
  }

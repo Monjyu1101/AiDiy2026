@@ -10,6 +10,9 @@ import { createHash } from 'node:crypto';
 import { createPanels } from '../panels.mjs';
 import { startServer } from '../server.mjs';
 import { createCoreConnection } from '../core-connection.mjs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const require = createRequire(import.meta.url);
 const listen = server => new Promise(done => server.listen(0, '127.0.0.1', done));
 
 test('パネルは手動で遅延起動し、オフラインでLiveを拒否し、利用終了で破棄する', async () => {
@@ -92,7 +95,15 @@ test('Liveの設定とWebSocketをIDEの公開元で中継し、切断すると�
   });
   await listen(core);
   const connection = createCoreConnection(process.cwd(), { target: `http://127.0.0.1:${core.address().port}` });
-  const app = await startServer(process.cwd(), 0, { connection });
+  // 試験用Coreの動的ポートへだけ固定トークンを渡す。実Coreの認証・設定は変更しない。
+  const { ライブ起動 } = require('../../host/dist/aidiy_live/server.cjs');
+  const app = await startServer(process.cwd(), 0, { connection,
+    panelsFactory: (root, state) => createPanels(root, state, async (kind, project, snapshot) => {
+      assert.equal(kind, 'live');
+      return ライブ起動(fileURLToPath(new URL('../../host/', import.meta.url)), snapshot.backend,
+        false, project, {}, undefined, false, () => ({ Authorization: 'Bearer fixture-token-only' }));
+    }),
+  });
   let client;
   try {
     await connection.connect();

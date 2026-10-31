@@ -10,7 +10,7 @@ import {computed,watch,ref,onBeforeUnmount} from 'vue';
 import {アプリアイコン,起動項目を整列} from './アプリアイコン.mjs';
 const props=defineProps({state:Object,cliState:Object,online:Boolean});
 defineEmits(['open-apps']);
-const 起動一覧=computed(()=>起動項目を整列([...props.state.項目.value.filter(item=>item.id!=='chrome'),...(props.cliState?.項目.value||[]).filter(item=>item.id==='aidiy_hermes')]));
+const 起動一覧=computed(()=>起動項目を整列([...props.state.項目.value.filter(item=>item.id!=='chrome'&&props.state.利用可能(item.id)),...(props.cliState?.項目.value||[]).filter(item=>item.id==='aidiy_hermes')]));
 watch(()=>props.online,value=>{if(value)void props.state.読込();},{immediate:true});
 // 未選択の案内は英語で右端から左端へ流す（通常画面の入力欄とボタンのtitleは日本語のまま）
 const 未選択案内='SELECT YOUR PROJECT  ▸▸  READY FOR LAUNCH';

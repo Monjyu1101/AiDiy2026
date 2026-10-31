@@ -65,10 +65,10 @@ body.live-view{background:#000}
 body.live-view #settings{display:none}
 body.live-view main{display:flex;flex-direction:column;overflow:visible;padding:36px 12px 10px}
 body.live-view #stage{display:flex;flex:1;min-height:0;flex-direction:column;align-items:center}
-.welcome-mark{position:relative;display:grid;place-items:center;flex-shrink:0;width:88px;height:88px;background:radial-gradient(circle at 25% 15%,color-mix(in srgb,#667eea 5%,transparent),transparent 75%);animation:welcome-float 6s ease-in-out infinite}
+.welcome-mark{position:relative;display:grid;place-items:center;flex-shrink:0;width:88px;height:88px;background:radial-gradient(circle at 25% 15%,color-mix(in srgb,#667eea 5%,transparent),transparent 75%);animation:welcome-float 12s ease-in-out infinite}
 .welcome-mark::before,.welcome-mark::after{content:'';position:absolute;inset:0;border:1px solid #00ffff;box-shadow:0 0 24px #00ffff40,inset 0 0 16px #00ffff15;pointer-events:none}
-.welcome-mark::before{transform:rotate(-6deg);animation:welcome-rotate-clockwise 20s linear infinite,welcome-glow 6s ease-in-out infinite,welcome-rainbow 12s linear infinite}
-.welcome-mark::after{transform:rotate(6deg);animation:welcome-rotate-counterclockwise 20s linear infinite,welcome-glow 6s ease-in-out -3s infinite,welcome-rainbow 12s linear -6s infinite}
+.welcome-mark::before{transform:rotate(-6deg);animation:welcome-rotate-clockwise 40s linear infinite,welcome-glow 12s ease-in-out infinite,welcome-rainbow 24s linear infinite}
+.welcome-mark::after{transform:rotate(6deg);animation:welcome-rotate-counterclockwise 40s linear infinite,welcome-glow 12s ease-in-out -6s infinite,welcome-rainbow 24s linear -12s infinite}
 .welcome-mark img{position:relative;z-index:1;width:54px;height:54px;object-fit:contain}
 @keyframes welcome-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes welcome-rotate-clockwise{from{transform:rotate(-6deg)}to{transform:rotate(354deg)}}

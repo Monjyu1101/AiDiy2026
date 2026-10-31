@@ -4,7 +4,6 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 const {join}=require('node:path');
-const {release}=require('node:os');
 const {attachNativeWindowMove}=require('./長押し窓移動.cjs');
 
 // WebContentsViewの上に重ねる、全画面時だけの独立ヘッダー。本文の矩形は変更しない。
@@ -33,9 +32,8 @@ function createBrowserHeader({BrowserWindow,screen,record,entry,notify,fullscree
  }
  function ensure(){
   if(window||disposed||!BrowserWindow)return;
-  // 対応OSのすりガラス材質を使う。本文の定期キャプチャや縁だけの屈折処理は行わない。
-  const glass=process.platform==='win32'&&Number(release().split('.')[2])>=22621;
-  window=new BrowserWindow({parent:record.window,show:false,frame:false,roundedCorners:false,transparent:true,backgroundColor:'#00000000',...(glass?{backgroundMaterial:'acrylic'}:process.platform==='darwin'?{vibrancy:'menu',visualEffectState:'active'}:{}),hasShadow:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,...bounds(),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  // OSの材質は中央まで濃く覆うため使わず、透明な面とCSSの4辺で表現する。
+  window=new BrowserWindow({parent:record.window,show:false,frame:false,roundedCorners:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,...bounds(),webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   contents=window.webContents;headers.set(contents,record);
   window.setAlwaysOnTop(true,process.platform==='win32'?'pop-up-menu':'floating');
   contents.setZoomFactor(zoom());contents.on('before-input-event',fullscreenKey);

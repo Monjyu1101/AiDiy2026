@@ -18,7 +18,7 @@ export function explorerNameError(name) {
 }
 
 // OSのファイルクリップボードとは分離する。同じExplorerのピン留め・復帰ではこの実体を保持する。
-export function createExplorerActions({ root, document: ownerDocument, openFile = null, openFolder = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
+export function createExplorerActions({ root, document: ownerDocument, checked = () => [], openFile = null, openFolder = null, openDraft = null, changed = async () => {}, refresh = async () => {}, edit = () => {}, focus = () => {}, request = globalThis.fetch }) {
   const state = reactive({ menu: null, clipboard: null, rename: null, dialog: null, busy: false, refreshing: false, error: '', notice: '' });
   const canOpenFile = typeof openFile === 'function';
   const canOpenFolder = typeof openFolder === 'function';
@@ -37,7 +37,7 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     const run = epoch, target = { ...activeRow(row) }, rectangle = panel.getBoundingClientRect();
     const x = (event?.clientX || rectangle.left + 18) - rectangle.left;
     const y = (event?.clientY || rectangle.top + 50) - rectangle.top;
-    state.menu = { target, directory: directory(target), x: Math.max(6, Math.min(x, rectangle.width - 250)), y: Math.max(6, y) };
+    state.menu = { target, checked:checked().map(row=>({...row})), directory: directory(target), x: Math.max(6, Math.min(x, rectangle.width - 250)), y: Math.max(6, y) };
     const document = panel.ownerDocument, view = document.defaultView;
     const outside = event => { if (!event.target.closest?.('.explorer-context-menu')) closeMenu(); };
     const escape = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closeMenu(true); } };
@@ -68,18 +68,48 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
       const text = await response.text(); let result;
       try { result = JSON.parse(text); } catch { throw Error(text || 'ファイル操作の応答を読み取れません。'); }
       if (!response.ok) {
+        if(Array.isArray(result.completed)&&!disposed&&run===epoch){
+          state.dialog=null;
+          for(const item of result.completed)updateClipboard(item);
+          if(result.completed.length)await changed({action:payload.action,results:result.completed},()=>!disposed&&run===epoch);
+        }
         if(result.partialPath&&!disposed&&run===epoch)try{await refresh();}catch{}
         throw Error(result.message || result.error || 'ファイルを操作できません。');
       }
       if (disposed || run !== epoch) return;
-      if (result.action === 'rename' && state.clipboard) state.clipboard.path = renamedPath(state.clipboard.path, result.previousPath, result.path);
-      if (result.action === 'trash' && state.clipboard && containsPath(result.path, state.clipboard.path)) state.clipboard = null;
+      if(Array.isArray(result.results)){
+        state.rename=null;state.dialog=null;
+        state.notice=`☑ ${result.results.length}件${result.action==='trash'?'をゴミ箱へ移動しました。復元はOSのゴミ箱から行えます。':result.action==='copy'?'をコピーしました。':'のPDFを作成しました。'}`;
+        for(const item of result.results)updateClipboard(item);
+        try{await changed(result,()=>!disposed&&run===epoch);}catch(error){if(!disposed&&run===epoch)state.error=`操作は完了しましたが、一覧を更新できません。${error.message||''}`;}
+        return result;
+      }
+      updateClipboard(result);
       state.rename = null; state.dialog = null;
       state.notice = result.action === 'trash' ? `「${result.name}」をゴミ箱へ移動しました。復元はOSのゴミ箱から行えます。` : `「${result.name}」${result.action === 'rename' ? 'に名前を変更しました。' : result.action === 'copy' ? 'をコピーしました。' : 'を作成しました。'}`;
       try { await changed(result, () => !disposed && run === epoch); } catch (error) { if (!disposed && run === epoch) state.error = `操作は完了しましたが、一覧を更新できません。再読み込みしてください。${error.message || ''}`; }
       return result;
     } catch (error) { if (!disposed && run === epoch) state.error = error.message || 'ファイルを操作できません。'; }
     finally { if (!disposed && run === epoch) { state.busy = false; if(!state.rename&&!state.dialog)focus(); } }
+  }
+  function updateClipboard(result){
+    if(!state.clipboard)return;
+    const items=state.clipboard.items||[state.clipboard];
+    if(result.action==='rename'){
+      for(const item of items)item.path=renamedPath(item.path,result.previousPath,result.path);
+      state.clipboard.path=renamedPath(state.clipboard.path,result.previousPath,result.path);
+    }
+    if(result.action==='trash'){
+      const remaining=items.filter(item=>!containsPath(result.path,item.path));
+      state.clipboard=remaining.length?{...remaining[0],root:state.clipboard.root,...(state.clipboard.items?{items:remaining}:{})}:null;
+    }
+  }
+  function batchTargets(action, rows=state.menu?.checked||checked()){
+    if(rows.length<2)return [];
+    if(['copy-path','copy-relative','copy','duplicate','trash'].includes(action))return rows;
+    if(action==='pdf'&&rows.every(row=>row.type==='file'&&/\.md$/i.test(row.path)))return rows;
+    if(action==='handoff'&&rows.every(row=>row.type==='file'))return rows;
+    return [];
   }
   async function submitName() {
     const target = state.rename || state.dialog;
@@ -94,8 +124,25 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
   async function action(action, row = state.menu?.target) {
     if (state.busy || disposed) return;
     const run = epoch, current = () => !disposed && run === epoch;
+    const batch=batchTargets(action).map(row=>({...row}));
     row = { ...activeRow(row) }; closeMenu(); clearMessage();
     const path = row.path, destination = directory(row);
+    if(batch.length){
+      if(action==='trash')return showDialog({action:'trash',paths:batch.map(row=>row.path),targets:batch});
+      if(action==='duplicate'||action==='pdf')return perform({action:action==='duplicate'?'copy':'pdf',paths:batch.map(row=>row.path),...(action==='duplicate'?{duplicate:true}:{})});
+      if(action==='copy'){
+        state.clipboard={...batch[0],root:root(),items:batch};state.notice=`☑ ${batch.length}件をコピーしました。IDE内の貼り付け先を右クリックしてください。`;focus();return;
+      }
+      if(action==='copy-path'||action==='copy-relative'){
+        const text=batch.map(row=>action==='copy-path'?fullFilePath(root(),row.path):row.path).join('\n');
+        try{const document=doc();await copyBrowserText(text,{document,clipboard:document?.defaultView?.navigator?.clipboard,isCurrent:current});if(current())state.notice=`☑ ${batch.length}件のパスをコピーしました。`;}
+        catch{if(current())await showDialog({action:'manual-copy',value:text});}return;
+      }
+      if(action==='handoff'){
+        if(!canOpenDraft()){state.error='Code / Liveへの下書き連携を利用できません。';return;}
+        openDraft({projectPath:root(),path:`チェックした${batch.length}件`,text:batch.map(row=>fileDraftReference(row)).join('\n\n'),selection:false});return;
+      }
+    }
     if(action==='pdf'){
       if(row.type!=='file'||! /\.md$/i.test(path)){state.error='Markdown（.md）ファイルを選択してください。';return;}
       return perform({action:'pdf',path});
@@ -140,6 +187,7 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
       catch { if(current()) await showDialog({ action: 'manual-copy', value: text }); }
     } else if (action === 'copy' && path) { state.clipboard = { path, type: row.type, root: root() }; state.notice = `「${row.name || path}」をコピーしました。IDE内の貼り付け先を右クリックしてください。`; }
     else if (action === 'paste' && state.clipboard?.root === root()) {
+      if(state.clipboard.items){await perform({action:'copy',paths:state.clipboard.items.map(row=>row.path),directory:destination});return;}
       if (state.clipboard.type === 'dir' && containsPath(state.clipboard.path, destination)) { state.error = 'フォルダ自身やその配下には貼り付けできません。'; return; }
       await perform({ action: 'copy', path: state.clipboard.path, directory: destination });
     } else if (action === 'duplicate' && path) await perform({ action: 'copy', path, directory: parentPath(path) });
@@ -155,7 +203,7 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
     if(current()&&!state.dialog&&!state.rename&&!state.busy)focus();
   }
   function keyboard(event, row) {
-    if (event.target?.closest?.('input,textarea,[contenteditable="true"]')) return false;
+    if (event.target?.closest?.('input:not([type="checkbox"]),textarea,[contenteditable="true"]')) return false;
     if (state.busy || state.dialog || state.rename || state.menu) return false;
     let command;
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) return 'menu';
@@ -170,5 +218,5 @@ export function createExplorerActions({ root, document: ownerDocument, openFile 
   }
   function reset() { epoch++; closeMenu(); state.rename = null; state.dialog = null; state.clipboard = null; state.busy = state.refreshing = false; clearMessage(); }
   function dispose() { disposed = true; reset(); }
-  return { state, canOpenFile, canOpenFolder, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
+  return { state, batchTargets, canOpenFile, canOpenFolder, canOpenDraft, showMenu, closeMenu, action, perform, submitName, beginRename, keyboard, cancel, reset, dispose };
 }

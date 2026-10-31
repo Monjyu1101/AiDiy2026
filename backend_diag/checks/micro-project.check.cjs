@@ -18,7 +18,7 @@ async function fixture({switching=false}={}){
  const compiled=compileScript(descriptor,{id:'micro-project',inlineTemplate:true,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,window,document:{documentElement:{classList:{add(){},remove(){}}}},setTimeout,clearTimeout,require:id=>id==='vue'?vue:modules[id]||{}});
  const make=(tag,text='')=>({tag,_text:text,get text(){return this._text+this.children.filter(n=>n.tag!=='#comment').map(n=>n.text).join('');},set text(value){this._text=value;},children:[],props:{},style:{},parent:null,querySelector(){return null;},querySelectorAll(){return [];},getBoundingClientRect(){return {height:Math.max(18,Math.ceil(this.text.length/10)*18)};}});
- const renderer=vue.createRenderer({createElement:make,createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[];},parentNode:n=>n.parent,nextSibling:n=>n.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,k,_old,v)=>n.props[k]=v,insert(n,p){n.parent=p;p.children.push(n);},remove(n){n.parent?.children.splice(n.parent.children.indexOf(n),1);}});
+ const renderer=vue.createRenderer({createElement:make,createText:text=>make('#text',text),createComment:text=>make('#comment',text),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[];},parentNode:n=>n.parent,nextSibling:n=>n.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,k,_old,v)=>n.props[k]=v,insert(n,p,anchor){if(n.parent){const old=n.parent.children.indexOf(n);if(old>=0)n.parent.children.splice(old,1);}n.parent=p;const index=anchor?p.children.indexOf(anchor):-1;if(index<0)p.children.push(n);else p.children.splice(index,0,n);},remove(n){n.parent?.children.splice(n.parent.children.indexOf(n),1);}});
  const appState={フォルダ:vue.ref('/work/project'),項目:vue.ref([]),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}},cliState={項目:vue.ref([]),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  const state={進捗表示:vue.ref(null)};
  const root=make('root'),app=renderer.createApp({render:()=>vue.h(module.exports,{appState,cliState,state,online:true,switching})});app.mount(root);
@@ -110,7 +110,7 @@ test('右クリック一覧は表示アイコンと同じ順序・件数で、�
  try{
   f.appState.項目.value=[{id:'chrome',名前:'Chrome'},{id:'browser',名前:'aidiy_browser'},{id:'discord',名前:'Discord'},{id:'code',名前:'Code'}];
   f.cliState.項目.value=[{id:'aidiy_hermes',名前:'AiDiy Hermes'}];
-  f.appState.利用可能=()=>false;
+  f.appState.利用可能=()=>true;
   await flush();
   nodes(f.root).find(n=>n.props['aria-label']==='アイコン化ランチャー').props.onContextmenu({preventDefault(){}});
   assert.deepEqual(Array.from(f.menus.at(-1),x=>x.key),['app:code','app:browser','cli:aidiy_hermes','app:discord','app:chrome']);
@@ -139,14 +139,20 @@ test('二重円は外側完了後に内側を展開し、収納は同じ遅延�
 });
 
 
-test('Slack は Discord の次に同じローカルPNGで表示し、未導入は円周・右クリックとも起動不可',async()=>{
- const f=await fixture();let launches=0;
+test('起動不可の項目は円周と右クリックから消え、復帰すると同じ順序へ戻る',async()=>{
+ const f=await fixture();let launches=0;const blocked=vue.ref(new Set());
  try{
-  f.appState.項目.value=[{id:'slack',名前:'Slack'},{id:'discord',名前:'Discord'}];f.appState.利用可能=id=>id!=='slack';f.appState.不可理由=id=>id==='slack'?'Slack の起動ファイルが見つかりません。':'';f.appState.起動=()=>launches++;
-  await flush();const buttons=nodes(f.root).filter(n=>n.props.class==='micro-app');assert.deepEqual(buttons.map(n=>n.props['data-app']),['discord','slack']);assert.equal(buttons[1].props.disabled,true);assert.ok(nodes(buttons[1]).some(n=>n.tag==='img'&&n.props.src==='AiDiy_slack.png'));
-  nodes(f.root).find(n=>n.props['aria-label']==='アイコン化ランチャー').props.onContextmenu({preventDefault(){}});
-  const entries=f.menus.at(-1);assert.deepEqual(Array.from(entries,x=>x.key),['app:discord','app:slack']);assert.equal(entries[1].enabled,false);assert.match(entries[1].reason,/起動ファイル/);assert.equal(Object.hasOwn(entries[0],'enabled'),false,'既存項目のメニュー表示仕様は維持');
-  f.menu({type:'launch',key:'app:slack'});assert.equal(launches,0);
+  const ids=['avatar','task','team','browser','discord','slack','chrome'];
+  f.appState.項目.value=ids.map(id=>({id,名前:id}));f.appState.利用可能=id=>!blocked.value.has(id);f.appState.起動=()=>launches++;
+  for(const missing of [[],['task','team'],['task','team','browser','chrome'],['task','team','browser','chrome','slack'],[]]){
+   blocked.value=new Set(missing);await flush();
+   const shown=nodes(f.root).filter(n=>n.props.class==='micro-app').map(n=>n.props['data-app']);
+   assert.deepEqual(shown,['avatar','task','team','browser','discord','slack','chrome'].filter(id=>!missing.includes(id)));
+   nodes(f.root).find(n=>n.props['aria-label']==='アイコン化ランチャー').props.onContextmenu({preventDefault(){}});
+   assert.deepEqual(Array.from(f.menus.at(-1),x=>x.key),shown.map(id=>'app:'+id));
+   for(const id of missing)f.menu({type:'launch',key:'app:'+id});
+   assert.equal(launches,0);
+  }
  }finally{f.app.unmount();}
 });
 

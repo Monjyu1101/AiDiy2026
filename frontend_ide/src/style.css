@@ -330,3 +330,5 @@
 .development-app .route-window-actions{background:transparent}
 .development-app .viewer-close,.development-app .viewer-close:hover{background:transparent;border-color:transparent}
 .development-app .viewer-close:hover{color:#ff8e9e}
+
+.explorer-row-check{flex:none;width:14px;height:14px;margin:0 2px;accent-color:#7dd3fc;cursor:pointer}.explorer-checked-status{display:flex;align-items:center;gap:5px;margin:0;padding:5px 8px;font-size:11px;color:#7dd3fc;border-bottom:1px solid #29334c}.explorer-checked-status button{margin-left:auto}

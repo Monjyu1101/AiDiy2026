@@ -10,7 +10,7 @@ import {computed,watch} from 'vue';
 import {アプリアイコン} from './アプリアイコン.mjs';
 const props=defineProps({state:Object,appState:Object,online:Boolean});
 watch(()=>props.online,value=>{if(value)void props.state.読込();else props.state.切断();},{immediate:true});
-const Chrome=computed(()=>props.appState.項目?.value?.find(item=>item.id==='chrome'));
+const Chrome=computed(()=>props.appState.項目?.value?.find(item=>item.id==='chrome'&&props.appState.利用可能('chrome')));
 const 外部CLI=computed(()=>props.state.項目.value.filter(item=>item.id!=='aidiy_hermes'));
 </script>
 <template>

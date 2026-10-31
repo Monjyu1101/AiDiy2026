@@ -16,6 +16,16 @@ TOKEN_TTL = timedelta(hours=25)
 TOKEN_PREFIX = 'tt1.'
 
 
+def internal_post_endpoints(app):
+    """include_router の内部表現に依存せず、公開登録済みの POST だけを許可する。"""
+    return {
+        ('POST', path)
+        for path, operations in app.openapi().get('paths', {}).items()
+        if 'post' in operations
+        and (path.startswith(('/task/', '/team/')) or path == '/task_check_okng')
+    }
+
+
 def local_now():
     return datetime.now().astimezone()
 

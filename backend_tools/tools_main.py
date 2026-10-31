@@ -250,8 +250,8 @@ _setup_reboot_watcher()
 # MCPServer インスタンス生成
 # ------------------------------------------------------------------ #
 
-def _make_mcp(name: str) -> MCPServer:
-    instance = MCPServer(name, version="1.0.0", warn_on_duplicate_tools=False)
+def _make_mcp(name: str, *, instructions: str | None = None) -> MCPServer:
+    instance = MCPServer(name, version="1.0.0", description=instructions, instructions=instructions, warn_on_duplicate_tools=False)
     original_tool = instance.tool
     def guarded_tool(*args, **kwargs):
         return tools_management.decorate(name, original_tool(*args, **kwargs))
@@ -278,7 +278,7 @@ mcp_dj = _make_mcp("aidiy_decisions_check")
 mcp_ta = _make_mcp("aidiy_task_agents")
 mcp_tm = _make_mcp("aidiy_team_agents")
 if sys.platform == "win32":
-    mcp_wc = _make_mcp("aidiy_windows_control")
+    mcp_wc = _make_mcp("aidiy_windows_control", instructions=tools_windows_control.DESCRIPTION)
 
 # ------------------------------------------------------------------ #
 # MCP ツール登録

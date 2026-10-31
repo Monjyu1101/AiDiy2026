@@ -41,7 +41,7 @@
 | `aidiy_decisions_check` | `http://127.0.0.1:8095/aidiy_decisions_check/sse` | AI判断の真偽確率・選択・段階評価 |
 | `aidiy_task_agents` | `http://127.0.0.1:8095/aidiy_task_agents/sse` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 |
 | `aidiy_team_agents` | `http://127.0.0.1:8095/aidiy_team_agents/sse` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 |
-| `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
+| `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows環境でComputer Use（computer-use）が利用できない場合の代替機能。デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
 
 ## IDEのBrowserパネル・単独Browserを操作するとき
 
@@ -73,6 +73,8 @@ Electron版IDEをtoolsへ接続し、「＋ Browser」を開いてから、`aidi
 `type: "sse"` を明示する。環境依存の接続定義は `_config/` 配下で管理し、docs や code_samples へ実キーをコピーしない。
 
 ## 作業中の音声案内
+
+Toolsが起動中のときは、作業の経緯や判断理由も要点を短く音声で説明します。完了通知だけに限定せず、何を確認し、何が分かり、次に何をするかを伝えます。
 
 利用者の希望により、Toolsが利用できるときは、作業開始・重要な進捗・完了・利用者の操作が必要な場面を短い日本語の音声でも案内します。`aidiy_notification_sounds.play_notification_sound` に `scene="tts"` と案内文を `notification_type` として渡します。文字での報告も残します。
 
@@ -217,3 +219,9 @@ curl http://127.0.0.1:9222/json
 ```
 
 `/sse` が `text/event-stream` を返せば対象 MCP は起動している。
+
+## TaskTeam内部接続で401になる場合
+
+Toolsのteam_agents・task_agentsが接続不可を返す場合、8093のポート開放だけで起動成功とは判断しません。内部認証のHTTP状態とTaskTeamのログを確認します。資格情報の値は出力しません。
+
+TaskTeamの内部許可APIは、FastAPIのOpenAPIに登録された`POST /task/*`・`POST /team/*`・`POST /task_check_okng`から列挙します。`app.routes`の直下だけから`methods`・`path`を読むと、`include_router`が遅延登録されるFastAPIでは業務APIを拾えません。認証失敗を回避するための無条件許可は行わず、登録済みPOSTだけを許可します。回帰確認は`backend_taskteam/checks/test_taskteam_auth.py`のネストしたAPIRouterと、未登録パス・GET拒否の試験を使います。

@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import {getKeyStatus,testKey,KEY_PROVIDERS,runModels} from '../モデル情報/key_status.mjs';
 const now=new Date('2026-10-15T12:00:00Z');
 const reader=value=>async filename=>{assert.match(String(filename),/[\\/]_config[\\/]AiDiy_key\.json$/);return JSON.stringify(value);};
@@ -71,7 +72,7 @@ test('OpenRouter individual test verifies key and preserves authentication marke
  assert.equal(result.data.状態,'OK');assert.deepEqual(result.data.モデル,['example']);
 });
 test('oversized cache is rejected before configuration or network',async()=>{
- const result=await runModels('test','openai',{input:{large:'x'.repeat(1048577)},reader:forbidden,fetch:forbidden});assert.equal(result.error,'input');
+ const result=await runModels('test','openai',{input:{large:'x'.repeat(DIAG_TRANSPORT_BYTE_LIMIT+1)},reader:forbidden,fetch:forbidden});assert.equal(result.error,'input');
 });
 test('deadline aborts provider operation and returns a safe error',async()=>{
  let signal;

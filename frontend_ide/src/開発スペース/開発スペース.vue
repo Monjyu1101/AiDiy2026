@@ -26,6 +26,8 @@ async function toggleExplorer(){
 }
 const open=ref(false),loading=ref(true),error=ref(''),root=ref(),marks=shallowRef({mode:'since',since:props.startedAt,paths:[]});
 const autoSpin=ref(true),driving=ref(false),orbitPhase=ref('idle');
+const refreshPaused=ref(false);
+function pauseRefresh(value){refreshPaused.value=value;engine?.setRefreshPaused(value);if(!value)void engine?.refresh(undefined,{fresh:false});}
 const explorationStatus=ref('出航準備中');
 const fastWarp=ref(false);
 watch(fastWarp,value=>engine?.setFastWarp(value));
@@ -68,9 +70,11 @@ let navigationVersion=0;
 function navigationActivity(){navigationVersion++;}
 async function applyFileChange(result){
   const navigation=navigationVersion,session=props.startedAt,project=scan.value?.root;
-  const previous=result.previousPath||result.path,affected=result.action==='rename'||result.action==='trash';
+  const results=result.results||[result];
   const oldSelection=selected.value?.path,current=trail.value.join('/');
   let next;
+  for(const result of results){
+  const previous=result.previousPath||result.path,affected=result.action==='rename'||result.action==='trash';
   if(affected){
     if(result.action==='rename'){
       if(oldSelection&&containsPath(previous,oldSelection))next={type:'file',path:renamedPath(oldSelection,previous,result.path)};
@@ -81,8 +85,9 @@ async function applyFileChange(result){
     for(const path of viewerRefs.keys())if(containsPath(previous,path))viewerRefs.delete(path);
     if((oldSelection&&containsPath(previous,oldSelection))||containsPath(previous,current))engine?.clear();
   }
+  }
   explorerNavigation.value=null;
-  await reloadExplorer();
+  if(!refreshPaused.value)await reloadExplorer();
   if(!disposed&&navigation===navigationVersion&&session===props.startedAt&&project===scan.value?.root&&next)await selectExplorer(next);
 }
 // 最終更新ファイルの表示: 起動直後の最終更新と、その後の新しい最終更新を宇宙へ予約する。
@@ -95,10 +100,10 @@ watch(filter,on=>engine?.setFilter(on));
 let engine, folderMonitor;
 const monitorMessage = ref('');
 function syncFolderMonitor() {
-  folderMonitor?.configure({ enabled: props.viewMode === '2d' && autoSpin.value && !!scan.value && !document.hidden,
+  folderMonitor?.configure({ enabled: !refreshPaused.value && props.viewMode === '2d' && autoSpin.value && !!scan.value && !document.hidden,
     path: trail.value.join('/'), filter: filter.value ? 'backup' : '', session: props.startedAt });
 }
-watch([()=>props.viewMode, autoSpin, filter, ()=>trail.value.join('/'), ()=>props.startedAt, ()=>!!scan.value], syncFolderMonitor);
+watch([()=>props.viewMode, autoSpin, filter, refreshPaused, ()=>trail.value.join('/'), ()=>props.startedAt, ()=>!!scan.value], syncFolderMonitor,{flush:'sync'});
 
 watch(()=>props.startedAt,value=>{explorerNavigation.value=null;void engine?.refresh(value);});
 // 一覧からの移動中は選んだ行を保持し、中間階層を一覧へ送り返さない。
@@ -198,7 +203,7 @@ onBeforeUnmount(()=>{disposed=true;unsubscribeCenter?.();viewerRefs.clear();fold
         <button class="space-motion-toggle" :class="{driving:autoSpin&&driving}" role="switch" aria-label="自動探索" :aria-checked="autoSpin" :title="viewMode==='2d'?'最終更新のファイルを自動で開く（手動操作中は待機）':autoSpin&&driving?'自動探索中':''" @click="engine?.setAutoSpin(!autoSpin)"><span>自動探索</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ autoSpin?'ON':'OFF' }}</span></button>
       </div>
     </div>
-    <FileExplorer :apply-file-change="applyFileChange" :reload="reloadExplorer" @activity="navigationActivity();engine?.interact()" ref="explorer" :all-displays="allDisplays" @detached="value=>explorerDetached=value" v-model:open="open" :view-history="viewHistory" :view-voyages="viewVoyages" :tree="scan?.tree" :scan="scan" :root="scan?.root" :selected="explorerNavigation ? (explorerNavigation.type==='file' ? explorerNavigation.path : undefined) : selected?.path" :current="explorerNavigation ? (explorerNavigation.type==='dir' ? explorerNavigation.path : explorerNavigation.path.split('/').slice(0,-1).join('/')) : trail.join('/')" :navigating="!!explorerNavigation" :started-at="startedAt" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @clear="engine?.clear()" @marks="value=>marks=value" @latest="onLatest" @freshness="onFreshness" @route="value=>route=value" @clear-view-history="engine?.clearViewHistory()" :filter="filter" />
+    <FileExplorer @pause-refresh="pauseRefresh" :apply-file-change="applyFileChange" :reload="reloadExplorer" @activity="navigationActivity();engine?.interact()" ref="explorer" :all-displays="allDisplays" @detached="value=>explorerDetached=value" v-model:open="open" :view-history="viewHistory" :view-voyages="viewVoyages" :tree="scan?.tree" :scan="scan" :root="scan?.root" :selected="explorerNavigation ? (explorerNavigation.type==='file' ? explorerNavigation.path : undefined) : selected?.path" :current="explorerNavigation ? (explorerNavigation.type==='dir' ? explorerNavigation.path : explorerNavigation.path.split('/').slice(0,-1).join('/')) : trail.join('/')" :navigating="!!explorerNavigation" :started-at="startedAt" :color="name=>engine?.color(name)||'#bac7da'" @select="selectExplorer" @clear="engine?.clear()" @marks="value=>marks=value" @latest="onLatest" @freshness="onFreshness" @route="value=>route=value" @clear-view-history="engine?.clearViewHistory()" :filter="filter" />
     <p v-if="scan?.truncated&&!open" class="space-scan-warning" role="status">{{ scanWarning(scan) }}</p>
     <button class="space-filter-toggle" role="switch" aria-label="フィルター" :aria-checked="filter" title="AiDiy のバックアップ対象のファイルだけを表示" @click="filter=!filter"><span>フィルター</span><span class="motion-switch" aria-hidden="true"></span><span aria-hidden="true">{{ filter?'ON':'OFF' }}</span></button>
     <ViewerSession v-for="entry in viewerSessions" :key="entry.file.path" :ref="value=>value?viewerRefs.set(entry.file.path,value):viewerRefs.delete(entry.file.path)" :file="entry.file" :root="scan?.root" :auto-spin="autoSpin" @close="closeViewer(entry)" @pinning="value=>pinningViewer(entry,value)" @detached="detachedViewer(entry)" @recover="recoverViewer(entry)" />

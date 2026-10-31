@@ -13,11 +13,12 @@ const LIMIT = 20 * 1024 * 1024;
 
 for (const [name, path, pattern] of [
   ['Discordパネル', '../src/web-server.ts', /new WebSocketServer\((\{[^}]+\})\)/],
-  ['Discord Live', '../src/ライブ/ライブ会話.ts', /new WebSocket\(url, (\{[^}]+\})\)/],
+  ['Discord Live', '../src/ライブ/Coreソケット.ts', /new Socket\(url, (\{[^}]+\})\)/],
 ] as const) test(`${name}: WS 20MiB境界をsocketなしで検証する`, async () => {
   const options = readFileSync(new URL(path, import.meta.url), 'utf8').match(pattern)?.[1];
   assert.ok(options);
-  const { maxPayload } = runInNewContext(`(${options})`);
+  if (name === 'Discord Live') assert.match(readFileSync(new URL('../src/ライブ/ライブ会話.ts', import.meta.url), 'utf8'), /Coreソケット\(url, config\.coreRoot\)/);
+  const { maxPayload } = runInNewContext(`(${options})`, { Core認証: () => ({}), url: 'ws://127.0.0.1', root: undefined });
   for (const extra of [0, 1]) {
     const receiver = new Receiver({ maxPayload, isServer: false });
     let received = 0, error: (Error & { code?: string }) | undefined;

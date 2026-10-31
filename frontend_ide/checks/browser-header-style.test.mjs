@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parse,compileStyle} from '@vue/compiler-sfc';
 
-test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス・黒系文字で通常表示を保つ',()=>{
+test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス・青系文字で通常表示を保つ',()=>{
  const {descriptor}=parse(readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));
  const style=compileStyle({source:descriptor.styles[0].content,id:'data-v-browser-header',scoped:true});
  assert.deepEqual(style.errors,[]);
@@ -16,15 +16,15 @@ test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス�
  const values=selector=>Object.fromEntries(rules.find(rule=>rule.selector.replaceAll('[data-v-browser-header]','').startsWith(selector)).nodes.filter(node=>node.type==='decl').map(node=>[node.prop,node.value]));
  const header=values('.browser-header-only .browser-chrome');
  assert.equal(header['border-radius'],'0');
- assert.equal(header.background,'rgba(221,247,250,.72)');
+ assert.equal(header.background,'rgba(64,210,245,.10)');
  assert.equal(header.opacity,undefined,'内容全体のopacityは下げない');
- assert.equal(header.color,'#102c32');
- assert.equal(header['text-shadow'],'none','強い光沢や文字縁を重ねない');
- assert.equal(header['backdrop-filter'],'blur(16px)');
- assert.equal(header['-webkit-backdrop-filter'],'blur(16px)');
- assert.equal(header.border,'1px solid #4b929f70');
+ assert.equal(header.color,'#4b8eaa');
+ assert.ok(header['text-shadow'],'透過面でも文字を見分けられる薄い明部を添える');
+ assert.equal(header['backdrop-filter'],undefined,'中央はぼかさず裏のWeb本文を透かす');
+ assert.equal(header['-webkit-backdrop-filter'],undefined);
+ assert.equal(header.border,'1px solid rgba(35,147,179,.42)');
  assert.equal(header['box-shadow'],undefined);
- assert.ok(!rules.some(rule=>rule.selector.includes('.browser-chrome::')),'屈折や板厚を模した疑似要素を足さない');
+ const rim=values('.browser-header-only .browser-chrome::after');assert.equal(rim['pointer-events'],'none','ガラスの縁は操作を遮らない');assert.equal(rim.inset,'0','4辺をパネル内に収める');
  const panel=values('.development-app.browser-header-only');
  assert.equal(panel.width,'100%','800 DIPのnative窓へrendererを追従させる');
  assert.equal(panel['max-width'],'none','renderer側で別の固定幅を重ねない');
@@ -32,17 +32,8 @@ test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス�
  assert.equal(controls.nodes.find(node=>node.prop==='border-radius').value,'0');
  assert.equal(values('.browser-header-only .browser-toolbar input')['border-radius'],'0');
  assert.equal(values('.browser-chrome').background,'#000','通常表示の操作面は黒基準に揃える');
- assert.equal(values('.browser-header-only .browser-toolbar input').background,'#efffffcc','入力欄は局所的な明るい下地で黒文字を読めるようにする');
+ assert.equal(values('.browser-header-only .browser-toolbar input').background,'rgba(239,255,255,.10)','入力欄は局所的な明るい下地で黒文字を読めるようにする');
 });
-
-test('Browserすりガラス: 黒い背景でも薄シアンの下地と黒文字のコントラストを確保する',()=>{
- const luminance=rgb=>rgb.map(value=>value/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
- const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
- assert.match(source,/background:rgba\(221,247,250,\.72\)/);assert.match(source,/color:#102c32/);
- const foreground=luminance([16,44,50]);
- for(const backdrop of [0,255]){const background=luminance([221,247,250].map(value=>value*.72+backdrop*.28));assert.ok((background+.05)/(foreground+.05)>=4.5,'OSの明暗材質に関わらず小さい文字を読みやすくする');}
-});
-
 
 test('Browserすりガラス: 800 DIPを高倍率や狭い画面で表示しても操作列を折り返す',()=>{
  const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');

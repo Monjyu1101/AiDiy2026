@@ -96,16 +96,19 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 .browser-capture-status{margin-left:5px;white-space:nowrap;font-size:10px;color:#9edfff}
 .development-app.browser-panel.browser-fullscreen{border:0;position:relative}
 .browser-fullscreen:not(.browser-header-only) .browser-chrome{display:none}
-.development-app.browser-header-only{--aidiy-titlebar-background:transparent;--aidiy-titlebar-foreground:#102c32;--aidiy-titlebar-secondary:#102c32;container:browser-header / inline-size;width:100%;max-width:none;height:auto;min-height:0;background:transparent;border:0;overflow:visible}
-.browser-header-only .browser-chrome{transform:translateY(var(--header-offset));border:1px solid #4b929f70;border-radius:0;overflow:hidden;background:rgba(221,247,250,.72);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:#102c32;text-shadow:none}
+.development-app.browser-header-only{--aidiy-titlebar-background:transparent;--aidiy-titlebar-foreground:#4b8eaa;--aidiy-titlebar-secondary:#4b8eaa;container:browser-header / inline-size;width:100%;max-width:none;height:auto;min-height:0;background:transparent;border:0;overflow:visible}
+.browser-header-only .browser-chrome{position:relative;isolation:isolate;transform:translateY(var(--header-offset));border:1px solid rgba(35,147,179,.42);border-radius:0;overflow:hidden;background:rgba(64,210,245,.10);color:#4b8eaa;text-shadow:0 1px 2px rgba(255,255,255,.25)}
+/* 4辺のガラスの縁。入力を遮らず、窓や本文の寸法も変えない。 */
+.browser-header-only .browser-chrome::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border:2px solid rgba(56,171,202,.38);border-top-color:rgba(255,255,255,.58);border-left-color:rgba(170,240,255,.48);box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
+.browser-header-only :deep(.connection-bar){background:rgba(132,205,214,.16);border-top-color:rgba(118,174,184,.18);animation:none}
 .browser-header-only :deep(.panel-brand.desktop){-webkit-app-region:no-drag;background:transparent}
-.browser-header-only :deep(.panel-brand strong),.browser-header-only :deep(.connection-label),.browser-header-only .browser-page-title,.browser-header-only .browser-capture-status{color:#102c32}
-.browser-header-only :deep(button),.browser-header-only :deep(.reload-control.refresh-button[type=button]){color:#123138;background:#e5fcffd9;border-color:#3b7a8566;border-radius:0;text-shadow:none}
-.browser-header-only :deep(button:hover:not(:disabled)),.browser-header-only :deep(.reload-control.refresh-button[type=button]:hover:not(:disabled)){background:#c3f2f6eb;color:#072a32}
+.browser-header-only :deep(.panel-brand strong),.browser-header-only :deep(.connection-label),.browser-header-only .browser-page-title,.browser-header-only .browser-capture-status{color:#4b8eaa}
+.browser-header-only :deep(button),.browser-header-only :deep(.reload-control.refresh-button[type=button]){color:#4b8eaa;background:rgba(229,252,255,.10);border-color:rgba(59,122,133,.28);border-radius:0;text-shadow:0 1px 2px rgba(255,255,255,.25)}
+.browser-header-only :deep(button:hover:not(:disabled)),.browser-header-only :deep(.reload-control.refresh-button[type=button]:hover:not(:disabled)){background:rgba(195,242,246,.24);color:#377f9e}
 .browser-header-only :deep(button:focus-visible),.browser-header-only .browser-toolbar input:focus-visible{outline:2px solid #087c8c;outline-offset:1px}
 .browser-header-only .browser-toolbar{border-bottom-color:#3b7a8533}
-.browser-header-only .browser-toolbar input{background:#efffffcc;color:#10282d;border-color:#4c89946b;border-radius:0;text-shadow:none;color-scheme:light}
-.browser-header-only .browser-toolbar input::placeholder{color:#4a6269}
+.browser-header-only .browser-toolbar input{background:rgba(239,255,255,.10);color:#4b8eaa;border-color:rgba(76,137,148,.32);border-radius:0;text-shadow:0 1px 2px rgba(255,255,255,.25);color-scheme:light}
+.browser-header-only .browser-toolbar input::placeholder{color:#6aa0b5}
 .browser-header-only .browser-error{color:#631d28;background:#ffe9efcf;text-shadow:none}
 .browser-window-sizes{display:flex;gap:4px;flex:none;-webkit-app-region:no-drag}
 .browser-window-sizes button{width:auto;min-width:42px;height:24px;padding:0 7px;font-size:11px;white-space:nowrap}

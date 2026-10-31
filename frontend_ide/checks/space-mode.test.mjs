@@ -586,6 +586,65 @@ test('2D監視スナップショット: 対象フォルダだけ更新し選択�
   assert.equal(h.engine.applyFolderSnapshot(context,{tree,truncated:true}),false);
   h.engine.setAutoSpin(false);assert.equal(h.engine.applyFolderSnapshot(context,{tree}),false);
   h.engine.setAutoSpin(true);h.engine.setViewMode('3d');assert.equal(h.engine.applyFolderSnapshot(context,{tree}),false);
-  h.engine.setViewMode('2d');assert.equal(h.engine.applyFolderSnapshot(context,{tree:directory('src',[])}),true);assert.equal(h.engine.selected,null);
+  h.engine.setViewMode('2d');assert.equal(h.engine.applyFolderSnapshot(context,{tree:directory('src',[])}),false);
+  await flush();assert.equal(h.engine.selected.path,'src/main.js','監視一覧の欠落だけでは解除せず全体走査で再確認する');
+ }finally{h.dispose();}
+});
+
+for(const mode of ['2d','3d'])for(const removed of [false,true])test(`${mode}更新: 選択ファイルの一時欠落を公開せず、再走査後の${removed?'削除だけを解除':'存在で選択を保持'}する`,async t=>{
+ let pending,confirming,requests=0;
+ const h=space(t,{fetcher:()=>pending?++requests===1?pending.promise:confirming.promise:reply(snapshot())});
+ try{
+  h.engine.setViewMode(mode);await h.engine.refresh(1);h.engine.setAutoSpin(false);
+  await h.finish(h.engine.goTo({type:'file',path:'src/main.js',line:3,column:2,query:'日本語'}));
+  const before=h.engine.selected,changed=h.changes.length;
+  pending=deferred();confirming=deferred();const updating=h.engine.refresh(undefined,{fresh:false});
+  assert.equal(h.engine.selected,before);
+  pending.resolve(reply(snapshot(directory('project',['root.js'],[directory('src')]))));await flush();
+  assert.equal(requests,2);assert.match(h.requests.at(-1).url,/fresh=1/);
+  assert.equal(h.engine.selected,before,'再確認中も選択と検索位置を保持');
+  assert.ok(h.changes.slice(changed).filter(value=>'scan'in value).every(value=>value.selected?.path==='src/main.js'));
+  confirming.resolve(reply(removed?snapshot(directory('project',['root.js'],[directory('src')])):snapshot()));
+  assert.equal(await updating,true);
+  if(removed)assert.equal(h.engine.selected,null);
+  else {assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.engine.selected.line,3);assert.equal(h.engine.selected.column,2);assert.equal(h.engine.selected.query,'日本語');}
+ }finally{h.dispose();}
+});
+
+for(const action of ['select','clear','failure'])test(`更新の再確認待ち: ${action}を古い選択の復元で上書きしない`,async t=>{
+ let calls=0,checking=false,confirmation=deferred();
+ const h=space(t,{fetcher:()=>!checking?reply(snapshot()):++calls===1?reply(snapshot(directory('project',['root.js'],[directory('src')]))):confirmation.promise});
+ try{
+  h.engine.setViewMode('2d');await h.engine.refresh(1);h.engine.setAutoSpin(false);await h.engine.goTo({type:'file',path:'src/main.js'});
+  checking=true;const updating=h.engine.refresh();await flush();assert.equal(calls,2);
+  if(action==='select')await h.engine.goTo({type:'file',path:'root.js'});
+  if(action==='clear')h.engine.clear();
+  if(action==='failure')confirmation.reject(Error('確認失敗'));else confirmation.resolve(reply(snapshot()));
+  assert.equal(await updating,action!=='failure');
+  assert.equal(h.engine.selected?.path,action==='select'?'root.js':action==='failure'?'src/main.js':undefined);
+ }finally{h.dispose();}
+});
+
+test('更新が走査上限に達して現在フォルダを含まない場合は閲覧と階層を保持する',async t=>{
+ let data=snapshot();const h=space(t,{fetcher:async()=>reply(data)});
+ try{
+  h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'file',path:'src/nested/deep.js'});
+  data=snapshot(directory('project'),{truncated:true});assert.equal(await h.engine.refresh(),false);
+  assert.equal(h.engine.selected.path,'src/nested/deep.js');assert.deepEqual(h.engine.trail,['src','nested']);
+ }finally{h.dispose();}
+});
+
+test('複数チェックによる停止: 取得中の結果と監視を捨て、解除まで再取得・自動追跡しない',async t=>{
+ let pending;const h=space(t,{fetcher:()=>pending?pending.promise:reply(snapshot())});
+ try{
+  h.engine.setViewMode('2d');await h.engine.refresh(1);await h.engine.goTo({type:'file',path:'src/main.js'});
+  pending=deferred();const updating=h.engine.refresh();h.engine.setRefreshPaused(true);
+  assert.equal(h.requests.at(-1).signal.aborted,true);
+  const before=h.requests.length,scan=h.state().scan;
+  assert.equal(await h.engine.refresh(),false);assert.equal(await h.engine.follow('root.js'),false);
+  assert.equal(h.engine.applyFolderSnapshot({path:'src',filter:'backup'},{tree:directory('src',['new.js'])}),false);
+  pending.resolve(reply(snapshot(directory('project',['new.js']))));assert.equal(await updating,false);
+  assert.equal(h.state().scan,scan);assert.equal(h.engine.selected.path,'src/main.js');assert.equal(h.requests.length,before);
+  pending=null;h.engine.setRefreshPaused(false);assert.equal(await h.engine.refresh(),true);
  }finally{h.dispose();}
 });

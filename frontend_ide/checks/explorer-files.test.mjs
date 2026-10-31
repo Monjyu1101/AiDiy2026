@@ -39,6 +39,58 @@ test('Explorer: 空ファイル・フォルダを排他的に作成し、既存�
   await assert.rejects(() => service.apply({ action: 'create-folder', directory: '資料', name: '案内.md' }), { status: 409 });
   assert.equal(await readFile(join(root, '資料', '案内.md'), 'utf8'), '保護');
 });
+
+test('Explorer一括: 同一階層のコピー・複製とゴミ箱移動',async t=>{
+ const {root,native,trash}=await fixture(t),service=createExplorerFiles(root,{native});
+ await mkdir(join(root,'folder'));await mkdir(join(root,'target'));await writeFile(join(root,'folder/a.txt'),'a');await writeFile(join(root,'b.txt'),'b');
+ const paths=['folder','b.txt'];
+ const copied=await service.apply({action:'copy',paths,directory:'target'});
+ assert.equal(copied.results.length,2);assert.equal(await readFile(join(root,'target/folder/a.txt'),'utf8'),'a');
+ const duplicated=await service.apply({action:'copy',paths:['folder','b.txt'],duplicate:true});
+ assert.deepEqual(duplicated.results.map(row=>row.path),['folder - コピー','b - コピー.txt']);
+ await assert.rejects(()=>service.apply({action:'trash',paths}),{code:'confirmation_required'});
+ assert.equal(await exists(join(root,'b.txt')),true);
+ const result=await service.apply({action:'trash',paths,confirmed:true});assert.equal(result.results.length,2);
+ assert.equal(await exists(join(root,'folder')),false);assert.equal(await exists(join(root,'b.txt')),false);
+ assert.equal((await readdir(trash)).length,2);
+});
+
+test('Explorer一括: 全対象の境界・存在とコピー先を事前確認し、不正対象で変更しない',async t=>{
+ const {root,native}=await fixture(t),service=createExplorerFiles(root,{native});
+ await writeFile(join(root,'safe.txt'),'safe');await mkdir(join(root,'folder'));
+ for(const path of ['../outside.txt','', 'missing.txt'])await assert.rejects(()=>service.apply({action:'trash',paths:['safe.txt',path],confirmed:true}));
+ await assert.rejects(()=>service.apply({action:'trash',paths:['folder','folder/child.txt'],confirmed:true}),{code:'overlapping_targets'});
+  await assert.rejects(()=>service.apply({action:'rename',paths:['safe.txt'],name:'changed.txt'}),{code:'invalid_batch'});
+ await assert.rejects(()=>service.apply({action:'copy',paths:['safe.txt','folder'],directory:'folder'}),{code:'recursive_copy'});
+ assert.equal(await exists(join(root,'folder/safe.txt')),false);assert.equal(await readFile(join(root,'safe.txt'),'utf8'),'safe');
+});
+
+test('Explorer一括HTTP: 部分成功を返し、失敗対象以降を自動実行しない',async t=>{
+ const f=await serverFixture(t);await f.activate();
+ for(const name of ['a.txt','b.txt','c.txt'])await writeFile(join(f.root,name),name);
+ const move=f.native.trash;let calls=0;f.native.trash=async(...args)=>{if(++calls===2)throw Error('mock failure');return move(...args);};
+ const response=await f.post({action:'trash',paths:['a.txt','b.txt','c.txt'],confirmed:true}),body=await response.json();
+ assert.equal(response.status,503);assert.deepEqual(body.completed.map(row=>row.path),['a.txt']);assert.equal(body.failedPath,'b.txt');assert.equal(body.total,3);assert.equal(calls,2);
+ assert.equal(await exists(join(f.root,'b.txt')),true);assert.equal(await exists(join(f.root,'c.txt')),true);
+});
+
+test('Explorer一括PDF: 同一階層のMarkdownだけを処理し、混在指定では生成しない',async t=>{
+ const {root,native}=await fixture(t);let calls=0;
+ const service=createExplorerFiles(root,{native,pdfRenderer:async()=>{calls++;return Buffer.from('%PDF-1.4\nfixture');}});
+ for(const name of ['a.md','b.md','other.txt'])await writeFile(join(root,name),'text');
+ await assert.rejects(()=>service.apply({action:'pdf',paths:['a.md','other.txt']}),{code:'not_markdown'});assert.equal(calls,0);
+ const result=await service.apply({action:'pdf',paths:['a.md','b.md']});assert.equal(result.results.length,2);assert.equal(calls,2);
+ assert.equal(await exists(join(root,'a.pdf')),true);assert.equal(await exists(join(root,'b.pdf')),true);
+});
+
+test('Explorer一括: 階層の異なる個別ファイルはコピー・削除でき、親フォルダを残す',async t=>{
+ const {root,native}=await fixture(t),service=createExplorerFiles(root,{native});
+ await mkdir(join(root,'folder'));await mkdir(join(root,'target'));await writeFile(join(root,'folder/a.txt'),'a');await writeFile(join(root,'b.txt'),'b');await writeFile(join(root,'folder/keep.txt'),'keep');
+ const paths=['folder/a.txt','b.txt'];const copied=await service.apply({action:'copy',paths,directory:'target'});assert.equal(copied.results.length,2);
+ assert.equal(await readFile(join(root,'target/a.txt'),'utf8'),'a');assert.equal(await readFile(join(root,'target/b.txt'),'utf8'),'b');
+ const removed=await service.apply({action:'trash',paths,confirmed:true});assert.equal(removed.results.length,2);
+ assert.equal(await exists(join(root,'folder')),true);assert.equal(await readFile(join(root,'folder/keep.txt'),'utf8'),'keep');
+});
 test('Explorer: ファイル・フォルダ・隠しファイルをコピーし、衝突は連番で回避する', async t => {
   const { root, native } = await fixture(t), service = createExplorerFiles(root, { native });
   await mkdir(join(root, 'src')); await mkdir(join(root, 'target')); await mkdir(join(root, 'src', 'nested'));

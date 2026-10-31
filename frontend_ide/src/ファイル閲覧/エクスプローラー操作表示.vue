@@ -8,20 +8,22 @@ import { computed } from 'vue';
 import { containsPath } from './エクスプローラー操作.js';
 const props = defineProps({ actions: Object });
 const state = props.actions.state;
+const bulk=action=>!!props.actions.batchTargets?.(action)?.length||(action==='paste'&&(state.clipboard?.items?.length||0)>1);
+function confirmTrash(){return props.actions.perform({action:'trash',...(state.dialog.paths?{paths:[...state.dialog.paths]}:{path:state.dialog.path}),confirmed:true});}
 const menuItems = computed(() => {
   const menu = state.menu, item = !!menu?.target.path;
   const paste = !!state.clipboard && !(state.clipboard.type === 'dir' && containsPath(state.clipboard.path, menu?.directory || ''));
   return [
-    ...(item && menu.target.type === 'file' && /\.md$/i.test(menu.target.path) ? [['pdf','PDF化','',true,'同じフォルダに同名のPDFを作成します。']] : []),
+    ...(bulk('pdf')||item && menu.target.type === 'file' && /\.md$/i.test(menu.target.path) ? [['pdf','PDF化','',true,'同じフォルダに同名のPDFを作成します。']] : []),
     ['open-app','アプリで開く','',item && menu.target.type === 'file' && props.actions.canOpenFile,
       !props.actions.canOpenFile ? 'デスクトップ版で利用できます。' : menu?.target.type !== 'file' ? 'ファイルを選択してください。' : 'OSに関連付けられた既定のアプリで開きます。'],
     ['open-folder','フォルダを開く','',props.actions.canOpenFolder,
       !props.actions.canOpenFolder ? 'デスクトップ版で利用できます。' : menu?.target.type === 'file' ? 'このファイルの保存フォルダをOSで開きます。' : 'このフォルダをOSで開きます。'],
-    ['handoff','Code / Liveへ','',item && menu.target.type === 'file' && props.actions.canOpenDraft(),
+    ['handoff','Code / Liveへ','',(bulk('handoff')||item && menu.target.type === 'file') && props.actions.canOpenDraft(),
       menu?.target.type !== 'file' ? 'ファイルを選択してください。' : !props.actions.canOpenDraft() ? '下書き連携を利用できません。' : 'このファイルの参照をCode / Liveの下書きへ追加します。AIへの送信はしません。'],
     ['copy-path','パスのコピー','Ctrl+Shift+C',true],['copy-relative','相対パスのコピー','',true],
-    ['copy','コピー（IDE内）','Ctrl+C',item],['paste','ペースト','Ctrl+V',paste],['duplicate','複製','',item],
-    ['rename','名前の変更','F2',item],['trash','削除（ゴミ箱へ）','Delete',item],
+    ['copy','コピー（IDE内）','Ctrl+C',item||bulk('copy')],['paste','ペースト','Ctrl+V',paste],['duplicate','複製','',item||bulk('duplicate')],
+    ['rename','名前の変更','F2',item],['trash','削除（ゴミ箱へ）','Delete',item||bulk('trash')],
     ['create-file','新しいファイル…','',true],['create-folder','新しいフォルダ…','',true],
   ];
 });
@@ -43,8 +45,8 @@ function dialogKey(event) {
 </script>
 <template>
   <div v-if="state.menu" class="explorer-context-menu selection-popup" role="menu" aria-label="ファイル操作" data-aidiy-no-window-move :style="{left:state.menu.x+'px',top:state.menu.y+'px'}" @contextmenu.prevent.stop @keydown.stop="menuKey" @click.stop>
-    <p class="menu-target" :title="state.menu.target.path">{{ state.menu.target.name || 'ルートフォルダ' }}</p>
-    <button v-for="[action,label,shortcut,enabled,title] in menuItems" :key="action" role="menuitem" :data-action="action" :title="title" :disabled="!enabled||state.busy" @click="actions.action(action)"><span>{{ label }}</span><small>{{ shortcut }}</small></button>
+    <p class="menu-target" :title="state.menu.target.path">{{ state.menu.target.name || 'ルートフォルダ' }}<template v-if="state.menu.checked?.length>1"> · ☑ {{ state.menu.checked.length }}件</template></p>
+    <button v-for="[action,label,shortcut,enabled,title] in menuItems" :key="action" role="menuitem" :data-action="action" :title="title" :disabled="!enabled||state.busy" @click="actions.action(action)"><span><strong v-if="bulk(action)" class="bulk-prefix">☑︎全てを </strong>{{ label }}</span><small>{{ shortcut }}</small></button>
     <p class="menu-help">貼り付け・新規作成先: {{ state.menu.directory || 'ルート' }}<br>同名コピーは別名で作成します。</p>
     <p v-if="!actions.canOpenFile" class="menu-help">アプリで開く: デスクトップ版で利用できます。</p>
   </div>
@@ -52,9 +54,10 @@ function dialogKey(event) {
     <form class="explorer-action-dialog" role="dialog" aria-modal="true" :aria-label="state.dialog.action==='trash'?'削除の確認':state.dialog.action==='manual-copy'?'パスの手動コピー':'名前の入力'" @submit.prevent="actions.submitName">
       <template v-if="state.dialog.action==='trash'">
         <strong>ゴミ箱へ移動しますか？</strong>
-        <p class="dialog-path">{{ state.dialog.path }}</p>
-        <p>{{ state.dialog.type==='dir'?'フォルダ内のファイルも含めて移動します。':'' }}復元はOSのゴミ箱から行えます。ゴミ箱が利用できない場合は削除しません。</p>
-        <div class="dialog-buttons"><button type="button" data-initial-focus :disabled="state.busy" @click="actions.cancel">キャンセル</button><button type="button" class="danger" :disabled="state.busy" @click="actions.perform({action:'trash',path:state.dialog.path,confirmed:true})">{{ state.busy?'移動中…':'ゴミ箱へ移動' }}</button></div>
+        <p v-if="state.dialog.paths">チェックした{{ state.dialog.paths.length }}件が対象です。</p>
+        <p class="dialog-path">{{ state.dialog.targets?state.dialog.targets.map(row=>(row.type==='dir'?'[フォルダ全体] ':'')+row.path).join('\n'):state.dialog.path }}</p>
+        <p>{{ state.dialog.type==='dir'||state.dialog.targets?.some(row=>row.type==='dir')?'フォルダ内のファイルも含めて移動します。':'' }}復元はOSのゴミ箱から行えます。ゴミ箱が利用できない場合は削除しません。</p>
+        <div class="dialog-buttons"><button type="button" data-initial-focus :disabled="state.busy" @click="actions.cancel">キャンセル</button><button type="button" class="danger" :disabled="state.busy" @click="confirmTrash">{{ state.busy?'移動中…':'ゴミ箱へ移動' }}</button></div>
       </template>
       <template v-else-if="state.dialog.action==='manual-copy'">
         <strong>パスを手動でコピー</strong><p>クリップボードに書き込めませんでした。下のパスを選択してコピーしてください。</p>
@@ -71,6 +74,7 @@ function dialogKey(event) {
   <div v-if="!state.dialog&&(state.busy||state.error||state.notice)" class="explorer-operation-status" :class="{error:state.error}" role="status" @click.stop><span>{{ state.busy?'処理中…':state.error||state.notice }}</span><button v-if="!state.busy" aria-label="操作メッセージを閉じる" @click="state.error='';state.notice=''">×</button></div>
 </template>
 <style scoped>
+.bulk-prefix{font-weight:700}.dialog-path{white-space:pre-line}
 .explorer-context-menu{position:absolute;z-index:110;box-sizing:border-box;width:min(250px,calc(100% - 12px));max-height:calc(100% - 12px);overflow:auto;background:#000;border:1px solid #65748e;box-shadow:0 8px 24px #000b;padding:4px;color:#e5eaf4}
 .explorer-context-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:0;padding:7px 8px;background:transparent;font-size:12px;min-height:30px}
 .explorer-context-menu button:hover:not(:disabled),.explorer-context-menu button:focus-visible{background:#28405b;outline:1px solid #8de6eb}.explorer-context-menu button:disabled{opacity:.4;cursor:not-allowed}.explorer-context-menu small{color:#96abc8;font-size:10px;white-space:nowrap}

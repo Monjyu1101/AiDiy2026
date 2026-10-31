@@ -143,7 +143,7 @@ test('接続途中の停止とパネル終了はログイン完了を待たず�
   const panel = new Discordパネル(() => {}, f.read, () => ({
     起動: () => new Promise<void>(resolve => { launched++; finish = resolve; }),
     終了: async () => { stopped++; }, client: { isReady: () => true },
-  }), f.file, () => {}, undefined, () => f.catalog);
+  }), f.file, () => {}, undefined, () => f.catalog, async () => undefined);
   try {
     const connecting = panel.開始(); assert.equal(panel.状態.phase, 'connecting');
     await waitFor(()=>launched===1);

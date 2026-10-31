@@ -23,7 +23,7 @@ from typing import AsyncIterator, Callable
 
 from fastapi import FastAPI
 
-from .internal_auth import InternalTokenAuthority, PersistentTokenRotator
+from .internal_auth import InternalTokenAuthority, PersistentTokenRotator, internal_post_endpoints
 
 from task_proc import tasks_db, tasks_watcher
 from team_proc import team_db, team_exp_db, team_goal_db, team_pdca_db, team_talk_db, team_work_db
@@ -106,10 +106,7 @@ async def _team_initialize(logger: logging.Logger) -> None:
 def build_lifespan(logger: logging.Logger) -> Callable[[FastAPI], AsyncIterator[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        endpoints = {(method, route.path) for route in app.routes
-                     for method in getattr(route, "methods", ())
-                     if method == "POST" and (route.path.startswith(("/task/", "/team/"))
-                                              or route.path == "/task_check_okng")}
+        endpoints = internal_post_endpoints(app)
         authority = InternalTokenAuthority(endpoints=endpoints)
         rotator = PersistentTokenRotator(
             authority, BASE_DIR.parent,

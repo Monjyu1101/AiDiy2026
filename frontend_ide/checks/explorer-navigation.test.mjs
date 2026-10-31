@@ -60,6 +60,81 @@ test('最新通知: 自動追跡と独立して一覧更新を要求し、フィ
   }finally{h.dispose();}
 });
 
+test('ツリー書換えは選択移動を通知せず、新しい最終更新の検知だけで通知する',async()=>{
+ const files=[{path:'new.js',name:'new.js',mtime:5000}];
+ const h=explorer(async()=>reply({files}));
+ try{
+  const baseline=h.events.filter(([type])=>type==='latest').length;
+  h.props.selected='old.js';h.props.tree=scan(['old.js','new.js']).tree;
+  h.props.tree.f.find(row=>row[0]==='new.js')[2]=5000;
+  await vue.nextTick();await flush();
+  assert.equal(h.events.filter(([type])=>type==='latest').length,baseline);
+  assert.equal(h.props.selected,'old.js');
+  await h.state.pollLatest();
+  assert.equal(h.events.filter(([type])=>type==='latest').length,baseline+1);
+  assert.equal(h.events.filter(([type])=>type==='latest').at(-1)[1].path,'new.js');
+  h.props.tree=structuredClone(vue.toRaw(h.props.tree));await vue.nextTick();await h.state.pollLatest();
+  assert.equal(h.events.filter(([type])=>type==='latest').length,baseline+1,'同じ最終更新やツリー再作成では重ねて通知しない');
+ }finally{h.dispose();}
+});
+
+test('複数チェック: 行の修飾キーは最終選択を移し、チェック欄は移さず、取得を中断・再開する',async()=>{
+ let request;
+ const h=explorer((_url,options)=>{request={...deferred(),signal:options.signal};return request.promise;});
+ try{
+  h.props.tree=scan(['a.js','b.js','c.js']).tree;await vue.nextTick();
+  const [a,b,c]=h.state.rows.value;
+  h.state.clickRow({},a);h.props.selected=a.path;await vue.nextTick();
+  assert.deepEqual([...h.state.checkedPaths.value],[a.path]);
+  const waiting=h.state.pollLatest();const before=h.events.filter(([kind])=>kind==='select').length;
+  h.state.toggleCheck(c);
+  assert.equal(request.signal.aborted,true);assert.equal(h.state.multipleChecked.value,true);
+  assert.equal(h.events.filter(([kind])=>kind==='select').length,before,'チェック欄だけでは最終選択を変えない');
+  assert.equal(h.events.filter(([kind])=>kind==='pause-refresh').at(-1)[1],true);
+  request.resolve(reply({files:[{path:'late.js',mtime:9000}]}));await waiting;
+  assert.notEqual(h.events.filter(([kind])=>kind==='latest').at(-1)?.[1].path,'late.js');
+  h.state.clickRow({ctrlKey:true},b);assert.equal(h.events.filter(([kind])=>kind==='select').at(-1)[1].path,b.path);
+  assert.deepEqual(new Set(h.state.checkedPaths.value),new Set([a.path,b.path,c.path]));
+  h.state.clickRow({},a);await vue.nextTick();assert.equal(h.state.multipleChecked.value,false);
+  request.resolve(reply({files:[]}));await flush();
+  h.state.clickRow({shiftKey:true},c);
+  assert.deepEqual(new Set(h.state.checkedPaths.value),new Set([a.path,b.path,c.path]));
+  assert.equal(h.events.filter(([kind])=>kind==='select').at(-1)[1].path,c.path);
+  h.state.clickRow({shiftKey:true},b);assert.deepEqual([...h.state.checkedPaths.value],[a.path,b.path],'Shiftの基点を維持して範囲を縮める');
+ }finally{request?.resolve(reply({files:[]}));h.dispose();}
+});
+
+test('Explorerキーボード: Spaceはチェックだけ、Ctrl+Aは同一階層、Escは最終選択を残して解除',async()=>{
+ const h=explorer();
+ const key=(key,extra={})=>h.state.key({key,preventDefault(){},stopPropagation(){},...extra});
+ try{
+  h.props.tree={n:'root',f:[['a.txt',1,1000],['b.txt',1,1000]],d:[{n:'folder',f:[['child.txt',1,1000]],d:[]}]};
+  h.state.expanded.value=new Set(['folder']);await vue.nextTick();
+  h.props.selected='a.txt';await vue.nextTick();h.state.cursor.value='b.txt';
+  const before=h.events.filter(([type])=>type==='select').length;
+  key(' ');assert.deepEqual(new Set(h.state.checkedPaths.value),new Set(['a.txt','b.txt']));
+  assert.equal(h.events.filter(([type])=>type==='select').length,before);
+  key('a',{ctrlKey:true});assert.deepEqual(new Set(h.state.checkedPaths.value),new Set(['folder','a.txt','b.txt']));
+  assert.equal(h.state.checkedPaths.value.has('folder/child.txt'),false);
+  key('Escape');assert.deepEqual([...h.state.checkedPaths.value],['a.txt']);
+ }finally{h.dispose();}
+});
+
+test('Shiftは同一階層に限定し、Ctrlとチェック欄は階層をまたいで追加できる',async()=>{
+ const h=explorer();
+ try{
+  h.props.tree={n:'root',f:[['root.txt',1,1000]],d:[{n:'folder',f:[['a.txt',1,1000],['b.txt',1,1000]],d:[]}]};
+  h.state.expanded.value=new Set(['folder']);await vue.nextTick();
+  const find=path=>h.state.rows.value.find(row=>row.path===path);
+  h.state.clickRow({},find('folder'));h.state.clickRow({shiftKey:true},find('folder/a.txt'));
+  assert.deepEqual([...h.state.checkedPaths.value],['folder/a.txt']);
+  h.state.clickRow({shiftKey:true},find('folder/b.txt'));
+  assert.deepEqual([...h.state.checkedPaths.value],['folder/a.txt','folder/b.txt']);
+  h.state.toggleCheck(find('root.txt'));assert.deepEqual(new Set(h.state.checkedPaths.value),new Set(['folder/a.txt','folder/b.txt','root.txt']));
+  h.state.clickRow({},find('root.txt'));h.state.clickRow({ctrlKey:true},find('folder/a.txt'));assert.deepEqual(new Set(h.state.checkedPaths.value),new Set(['root.txt','folder/a.txt']));
+ }finally{h.dispose();}
+});
+
 test('最新取得: 重複取得しない。フィルター・セッション変更と破棄の後に古い応答を反映しない',async()=>{
   const requests=[];const h=explorer((_url,options)=>{const request={...deferred(),signal:options.signal};requests.push(request);return request.promise;});
   const payload=path=>reply({files:[{path,name:path,mtime:5000}]});

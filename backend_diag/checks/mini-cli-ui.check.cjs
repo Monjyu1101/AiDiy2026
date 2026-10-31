@@ -253,7 +253,7 @@ test('Chrome / Browser icons render in full and mini launchers; Chrome works wit
    assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='Chrome.svg'));assert.ok(ui.nodes().some(n=>n.tag==='img'&&n.props.src==='AiDiy_browser.png'));
    ui.button('Chrome を起動').props.onClick({});await flush();assert.deepEqual(calls.at(-1),{route:'api/起動/ブラウザ',body:{}});
    state.フォルダ.value='/project';await flush();assert.equal(ui.button('Browser を起動').props.disabled,false);
-   state.項目.value[0].利用可能=false;await flush();assert.equal(ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動')).props.disabled,true);
+   state.項目.value[0].利用可能=false;await flush();const chrome=ui.nodes().find(n=>n.tag==='button'&&String(n.props['aria-label']).startsWith('Chrome を起動'));if(name.includes('ミニ'))assert.equal(chrome,undefined);else assert.equal(chrome.props.disabled,true);state.項目.value[0].利用可能=true;await flush();assert.ok(ui.button('Chrome を起動'));
   }finally{ui.app.unmount();state.終了();}
  }
 });

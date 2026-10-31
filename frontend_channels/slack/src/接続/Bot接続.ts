@@ -49,6 +49,7 @@ export class SlackBot {
   private wake?: () => void;
   private failures = 0;
   private lastError = '';
+  private 最終会話時刻 = Date.now();
   private interval: number; private maxBackoff: number; private threadLimit: number; private threadIdleMs: number;
   // パネル下部に最後の発言を表示する。Slack への投稿とは独立している。
   表示?: (who: string, text: string, role: 'user' | 'ai') => void;
@@ -77,6 +78,7 @@ export class SlackBot {
       this.cursor = typeof top?.ts === 'string' ? top.ts : '0';
     } catch (error) { await this.終了().catch(() => {}); throw error; }
     console.log(`[Slack] 接続しました（${this.経路}）。専用チャンネルに話しかけるとスレッドで返信します。`);
+    this.最終会話時刻 = Date.now();
     this.loop = this.巡回ループ();
   }
 
@@ -94,7 +96,11 @@ export class SlackBot {
         if (text !== this.lastError || this.failures % 10 === 0) console.error(`[Slack] ${text}`);
         this.lastError = text;
       }
-      const wait = this.failures ? Math.min(this.interval * 2 ** Math.min(this.failures, 10), this.maxBackoff) : this.interval;
+      // 会話が10分なければ巡回を6秒へ落とす。回答待ちと新しい会話は通常間隔を使う。
+      const busy = [...this.chatState.values()].some(state => state.count > 0);
+      const interval = !busy && Date.now() - this.最終会話時刻 >= 10 * 60_000
+        ? Math.max(this.interval, 6000) : this.interval;
+      const wait = this.failures ? Math.min(this.interval * 2 ** Math.min(this.failures, 10), this.maxBackoff) : interval;
       await new Promise<void>(resolve => {
         const timer = setTimeout(() => { this.wake = undefined; resolve(); }, wait);
         this.wake = () => { clearTimeout(timer); this.wake = undefined; resolve(); };
@@ -186,6 +192,7 @@ export class SlackBot {
     if (this.closing || !利用許可(this.config, message)) return;
     // 取得範囲の重なりや再取得で同じ投稿を二重に実行しない。
     if (this.seen.has(message.ts)) return;
+    this.最終会話時刻 = Date.now();
     this.seen.add(message.ts);
     if (this.seen.size > 1000) this.seen.delete(this.seen.values().next().value!);
     this.スレッド登録(root, message.ts);
@@ -259,6 +266,7 @@ export class SlackBot {
       catch { /* 書き換えに失敗した場合は新しい投稿で返す。 */ }
     }
     for (const part of [first, ...parts]) if (part) await this.投稿(root, part);
+    this.最終会話時刻 = Date.now();
   }
 
   private async 投稿(root: string, text: string): Promise<string | undefined> {
@@ -266,6 +274,7 @@ export class SlackBot {
       channel: this.config.channelId, thread_ts: root, text: 本文エスケープ(text),
       unfurl_links: 'false', unfurl_media: 'false',
     });
+    this.最終会話時刻 = Date.now();
     return typeof result.ts === 'string' ? result.ts : undefined;
   }
 
