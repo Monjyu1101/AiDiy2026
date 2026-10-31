@@ -19,13 +19,15 @@ uv run python download_model.py
 uv run python download_model.py google/gemma-4-E2B-it
 
 # 3. 起動（ポート 8096）。temp/models にあればオフラインでロードされる
-uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096 --ws-max-size 20971520
+uv run uvicorn local_main:app --reload --host 127.0.0.1 --port 8096 --ws-max-size 20971520
 # または
 uv run python local_main.py
 ```
 
 `_setup.py` の「バックエンド(local)」セットアップでは 依存関係の同期 に加え、
 任意でモデルの事前ダウンロードも実行できる（トークンは AiDiy_key.json から読む）。
+
+Local は `127.0.0.1` のみで待ち受け、同一 PC 内のクライアントから利用します。LAN の別 PC からの直接接続は受け付けません。ルートの `_start.py` も `backend_local/_start.py` に委譲し、venv / uv のどちらでも同じ待受になります。Core / Apps / TaskTeam の待受は変更しません。
 
 ## モデル取得の準備
 

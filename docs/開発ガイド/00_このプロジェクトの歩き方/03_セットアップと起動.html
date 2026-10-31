@@ -228,7 +228,7 @@ python _start.py</code></pre>
 
  <h3>ローカルLLM サーバー (backend_local、必要時のみ)</h3>
  <pre><code>cd workspace/AiDiy2026/backend_local
-.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096</code></pre>
+.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 127.0.0.1 --port 8096</code></pre>
 
  <h3>Command Hermes (常駐しないCLI)</h3>
  <pre><code>cd workspace/AiDiy2026/command_hermes

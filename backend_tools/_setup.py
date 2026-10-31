@@ -32,6 +32,12 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    # セットアップ入口は古い Python でも案内を続ける。追加依存は要求しない。
+    tomllib = None
+
 if sys.platform == "win32":
     import msvcrt
 
@@ -610,7 +616,6 @@ def upsert_codex_backend_tools_config(module: dict) -> bool:
     ]
     if not upsert_toml_table(config_path, table_header, body_lines):
         return False
-    print_success(f"Codex の {server_name} 設定を書き込みました: {config_path}")
     return True
 
 
@@ -627,7 +632,6 @@ def upsert_grok_backend_tools_config(module: dict) -> bool:
     ]
     if not upsert_toml_table(config_path, table_header, body_lines):
         return False
-    print_success(f"Grok の {server_name} 設定を書き込みました: {config_path}")
     return True
 
 
@@ -779,30 +783,30 @@ def show_current_config(module: dict | None = None) -> None:
 
     print_info("─── MCP 設定ファイルの現在の状態 ───")
     for label, path, top_key in targets:
+        excluded = set()
+        if path in (Path.home() / ".codex" / "config.toml", antigravity_mcp):
+            excluded = CODE_CLI_MCP_EXCLUDE
+        elif path == vscode_mcp:
+            excluded = {"aidiy_code_agents", "aidiy_chat_llms"}
+        expected = [sn for sn in server_names if sn not in excluded]
         if path.exists():
             try:
                 if path.suffix.lower() == ".toml":
-                    content = path.read_text(encoding="utf-8")
-                    for sn in server_names:
-                        table_header = f"[mcp_servers.{sn}]"
-                        if table_header in content:
-                            print_success(f"  [{label}] {sn}: configured")
-                        else:
-                            print_warning(f"  [{label}] ファイルあり、{sn} エントリなし")
+                    if tomllib is None:
+                        print_warning(f"  [{label}] 設定確認をスキップ（TOML解析には Python 3.11 以上が必要）")
+                        continue
+                    data = tomllib.loads(path.read_text(encoding="utf-8-sig"))
+                    top_key = "mcp_servers"
                 else:
                     data = load_json_dict_file(path)
-                    servers = data.get(top_key, {})
-                    for sn in server_names:
-                        if sn in servers:
-                            entry = servers[sn] if isinstance(servers[sn], dict) else {}
-                            url = entry.get("url") or entry.get("serverUrl") or "(url なし)"
-                            print_success(f"  [{label}] {sn}: {url}")
-                        else:
-                            keys = list(servers.keys()) if servers else []
-                            if keys:
-                                print_warning(f"  [{label}] ファイルあり、{sn} エントリなし (キー: {', '.join(keys)})")
-                            else:
-                                print_warning(f"  [{label}] ファイルあり、{top_key} なし")
+                servers = data.get(top_key)
+                if not isinstance(servers, dict):
+                    print_warning(f"  [{label}] ファイルあり、{top_key} なし／形式不正")
+                    continue
+                configured = sum(isinstance(servers.get(sn), dict) for sn in expected)
+                missing = len(expected) - configured
+                report = print_warning if missing else print_success
+                report(f"  [{label}] 設定済み{configured}件／未設定{missing}件")
             except Exception:
                 print_warning(f"  [{label}] 読み取りエラー: {path}")
         else:
@@ -907,16 +911,28 @@ def configure_clients(module: dict | None = None) -> bool:
     codex_path = Path.home() / ".codex" / "config.toml"
     print_info(f"[Codex CLI]   {codex_path}")
     all_ok &= remove_codex_mcp_servers(CODE_CLI_MCP_EXCLUDE)
+    codex_written: list[str] = []
     for sn, url in code_cli_servers:
         codex_module = {**module, "server_name": sn, "sse_url": url}
-        all_ok &= upsert_codex_backend_tools_config(codex_module)
+        if upsert_codex_backend_tools_config(codex_module):
+            codex_written.append(sn)
+        else:
+            all_ok = False
+    if codex_written:
+        print_success(f"MCP設定を書き込みました: {codex_path} ({', '.join(codex_written)})")
 
     # 7) Grok CLI (TOML, native SSE)
     grok_path = get_grok_config_path()
     print_info(f"[Grok CLI]    {grok_path}")
+    grok_written: list[str] = []
     for sn, url in servers:
         grok_module = {**module, "server_name": sn, "sse_url": url}
-        all_ok &= upsert_grok_backend_tools_config(grok_module)
+        if upsert_grok_backend_tools_config(grok_module):
+            grok_written.append(sn)
+        else:
+            all_ok = False
+    if grok_written:
+        print_success(f"MCP設定を書き込みました: {grok_path} ({', '.join(grok_written)})")
 
     # 8) VS Code (servers)
     VSCODE_EXCLUDE = {"aidiy_code_agents", "aidiy_chat_llms"}

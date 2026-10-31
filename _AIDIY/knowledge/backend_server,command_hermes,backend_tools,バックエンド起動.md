@@ -34,7 +34,7 @@ cd ..\backend_taskteam
 .\.venv\Scripts\python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
 
 cd ..\backend_local
-.\.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
+.\.venv\Scripts\python.exe -m uvicorn local_main:app --reload --host 127.0.0.1 --port 8096
 
 # Hermes は on-demand CLI
 cd ..\command_hermes

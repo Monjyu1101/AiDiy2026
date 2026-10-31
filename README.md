@@ -153,7 +153,7 @@ python _start.py
 ```bash
 # バックエンド Local（OpenAI 互換 Gemma、必要時のみ）
 cd backend_local
-.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096 --ws-max-size 20971520
+.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 127.0.0.1 --port 8096 --ws-max-size 20971520
 
 # バックエンド MCP
 cd backend_tools

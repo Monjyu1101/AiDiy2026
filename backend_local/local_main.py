@@ -196,4 +196,4 @@ if __name__ == "__main__":
         logger.warning("モデルが未ダウンロードかつ HF_TOKEN 未設定です。Gemma はゲートモデルのため、")
         logger.warning("  HuggingFace でライセンス同意のうえ HF_TOKEN を設定し、")
         logger.warning("  事前に `uv run python download_model.py` を実行することを推奨します。")
-    uvicorn.run(app, host="0.0.0.0", port=PORT_LOCAL, log_level="warning", ws_max_size=int(os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")))
+    uvicorn.run(app, host="127.0.0.1", port=PORT_LOCAL, log_level="warning", ws_max_size=int(os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")))
