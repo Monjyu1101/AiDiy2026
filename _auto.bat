@@ -38,6 +38,7 @@ set "LOG=%LOG_ROOT%\automatic-%AIDIY_RUN%.log"
 if errorlevel 1 goto log_error
 >>"%LOG%" echo CWD="%AIDIY_CWD%"
 echo [WARN] 二重実行は防止しません。他の自動実行がないことを利用者が確認してください。
+echo [WARN] ローカル変更は退避し、取得したorigin/mainの内容を優先して復元します。
 set "RUN_AIDIY=y"
 set /p "RUN_AIDIY=aidiyセットアップと実行しますか？ [y]/n: "
 rem Do not expand user input as command text. Empty input keeps default Yes.
@@ -157,15 +158,20 @@ echo リポジトリの更新
 echo ============================================================
 echo(
 set "STAGE=fetch"
-git fetch --no-tags origin main
+git fetch --no-tags origin refs/heads/main
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
-set "STAGE=fast_forward_validation"
-git merge-base --is-ancestor HEAD FETCH_HEAD
-set "RC=%ERRORLEVEL%"
-if not "%RC%"=="0" goto failed
-set "STAGE=fast_forward_update"
-git merge --ff-only --no-edit --no-overwrite-ignore --no-autostash FETCH_HEAD
+set "STAGE=force_restore_backup"
+"%PYTHON%" -X utf8 -c "import builtins;builtins.exec('# force_restore_snapshot\nimport os, sys, shutil, subprocess, json\nfrom pathlib import Path, PurePosixPath\nsys.stderr.reconfigure(encoding=\'cp932\', errors=\'backslashreplace\')\nbackup = Path(os.environ[\'BACKUP\'])\ngitdir = Path(os.environ[\'AIDIY_GIT_DIR\'])\ndef git(*args):\n    return subprocess.check_output([\'git\', *args])\ndef safe(p):\n    return not (p.is_symlink() or getattr(p.lstat(), \'st_file_attributes\', 0) & 1024)\ndef guard(folder, names):\n    if not all(safe(Path(folder) / name) for name in names):\n        sys.exit(\'Snapshot refuses links/reparse points: \' + str(folder))\n    return []\ndef checked(name):\n    parts = PurePosixPath(name).parts\n    if not parts or any(p in (\'\', \'.\', \'..\') or \':\' in p or \'\\\\\' in p for p in parts) or name.startswith(\'/\'):\n        sys.exit(\'Unsafe repository path\')\n    folded = \'/\'.join(p.rstrip(\' .\').casefold() for p in parts)\n    if folded in (\'temp\', \'temp/_auto\') or folded.startswith(\'temp/_auto/\') or \'.git\' in folded.split(\'/\'):\n        sys.exit(\'Repository content overlaps launcher backup or Git metadata\')\n    return Path(*parts)\nexpected_head = (backup / \'head.txt\').read_text(encoding=\'ascii\').strip()\nif git(\'rev-parse\', \'HEAD\').decode(\'ascii\').strip() != expected_head:\n    sys.exit(\'HEAD changed after history backup; stop concurrent Git operations\')\nindex = git(\'ls-files\', \'--stage\', \'-z\')\n(backup / \'index-stages.bin\').write_bytes(index)\nentries = [entry.split(b\'\\t\', 1) for entry in index.split(b\'\\0\') if entry]\npaths = set()\nobjects = backup / \'index-blobs\'\nobjects.mkdir()\nfor meta, raw in entries:\n    mode, oid, stage = meta.decode(\'ascii\').split()\n    if mode == \'160000\':\n        sys.exit(\'Submodule index requires manual recovery\')\n    paths.add(raw.decode(\'utf-8\'))\n    dest = objects / oid\n    if not dest.exists():\n        dest.write_bytes(git(\'cat-file\', \'blob\', oid))\nremote = git(\'rev-parse\', \'--verify\', \'FETCH_HEAD^{commit}\').decode(\'ascii\').strip()\nif len(remote) not in (40, 64) or any(ch not in \'0123456789abcdef\' for ch in remote):\n    sys.exit(\'Invalid fetched commit\')\n(backup / \'remote-head.txt\').write_text(remote + \'\\n\', encoding=\'ascii\')\ntree = git(\'ls-tree\', \'-r\', \'-z\', remote)\n(backup / \'remote-tree.bin\').write_bytes(tree)\nfor entry in tree.split(b\'\\0\'):\n    if not entry:\n        continue\n    meta, raw = entry.split(b\'\\t\', 1)\n    if meta.split()[0] in (b\'160000\', b\'120000\'):\n        sys.exit(\'Remote submodule/link requires manual recovery\')\n    paths.add(raw.decode(\'utf-8\'))\nselected, missing = set(), []\nfor name in sorted(paths):\n    path = checked(name)\n    candidates = [*reversed(path.parents)][1:] + [path]\n    chosen = None\n    for part in candidates:\n        if not os.path.lexists(part):\n            break\n        if not safe(part):\n            sys.exit(\'Snapshot refuses links/reparse points: \' + str(part))\n        if part.is_file() or part == path:\n            chosen = part\n            break\n    if chosen is None:\n        missing.append(name)\n    else:\n        selected.add(chosen)\nroots = [p for p in sorted(selected, key=lambda p: (len(p.parts), str(p))) if not any(a in selected for a in p.parents)]\nsnapshot = backup / \'restore-files\'\nsnapshot.mkdir()\nfor src in roots:\n    dst = snapshot / src\n    dst.parent.mkdir(parents=True, exist_ok=True)\n    if src.is_dir():\n        shutil.copytree(src, dst, symlinks=True, ignore=guard)\n    elif src.is_file():\n        shutil.copy2(src, dst)\n    else:\n        sys.exit(\'Unsupported snapshot file type: \' + str(src))\nmetadata = backup / \'git-state\'\nmetadata.mkdir()\nfor name in (\'index\', \'MERGE_HEAD\', \'MERGE_MSG\', \'MERGE_MODE\', \'MERGE_AUTOSTASH\', \'ORIG_HEAD\'):\n    src = gitdir / name\n    if os.path.lexists(src):\n        if not safe(src) or not src.is_file():\n            sys.exit(\'Unsupported Git state file: \' + name)\n        shutil.copy2(src, metadata / name)\n(backup / \'restore-manifest.json\').write_text(json.dumps({\'saved\': [str(p) for p in roots], \'missing\': missing, \'head\': git(\'rev-parse\', \'HEAD\').decode(\'ascii\').strip(), \'remote\': remote}, ensure_ascii=True, indent=2), encoding=\'utf-8\')\nif git(\'rev-parse\', \'HEAD\').decode(\'ascii\').strip() != expected_head:\n    sys.exit(\'HEAD changed during snapshot; stop concurrent Git operations\')\n')" >"%AIDIY_TEMP%\backup.txt" 2>&1
+if errorlevel 1 goto force_backup_failed
+set "RESTORE_HEAD="
+set /p "RESTORE_HEAD="<"%BACKUP%\remote-head.txt"
+if not defined RESTORE_HEAD goto force_backup_failed
+set "STAGE=force_restore_guard"
+"%PYTHON%" -X utf8 -c "import os,sys,subprocess;from pathlib import Path;expected=(Path(os.environ['BACKUP'])/'head.txt').read_text(encoding='ascii').strip();subprocess.check_output(['git','rev-parse','HEAD']).decode('ascii').strip()==expected or sys.exit('HEAD changed before restore; stop concurrent Git operations')" >"%AIDIY_TEMP%\backup.txt" 2>&1
+if errorlevel 1 goto force_backup_failed
+set "STAGE=force_restore"
+git -c submodule.recurse=false reset --hard %RESTORE_HEAD%
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 >>"%LOG%" echo HEAD:
@@ -247,9 +253,9 @@ set "STAGE=repository_directory"
 cd /d "%TARGET%" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_files"
-echo [INFO] 必要なGit・setup・startファイル
+echo [INFO] Git管理ファイル
 >>"%LOG%" echo CHECK %STAGE%
-"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');(Path('.git').exists() and Path('_setup.py').is_file() and Path('_start.py').is_file()) or sys.exit('Required .git, _setup.py or _start.py is missing/not a file.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');Path('.git').exists() or sys.exit('Required .git is missing.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_root"
 echo [INFO] Gitルートフォルダ
@@ -288,14 +294,7 @@ if not defined AIDIY_GIT_DIR goto repository_failed
 set "STAGE=repository_operation"
 echo [INFO] 未完了のGit操作
 >>"%LOG%" echo CHECK %STAGE%
-"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');pending=[name for name in ('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply') if (Path(os.environ['AIDIY_GIT_DIR'])/name).exists()];not pending or sys.exit('Unfinished Git operation: '+', '.join(pending))" >"%AIDIY_TEMP%\validation.txt" 2>&1
-if errorlevel 1 goto repository_failed
-set "STAGE=repository_unmerged"
-echo [INFO] 未解決の競合
->>"%LOG%" echo CHECK %STAGE%
-git ls-files --unmerged >"%AIDIY_TEMP%\unmerged.txt" 2>"%AIDIY_TEMP%\validation.txt"
-if errorlevel 1 goto repository_failed
-"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');not (Path(os.environ['AIDIY_TEMP'])/'unmerged.txt').read_bytes() or sys.exit('Unresolved index conflicts exist.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');pending=[name for name in ('CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply','sequencer') if (Path(os.environ['AIDIY_GIT_DIR'])/name).exists()];not pending or sys.exit('Unfinished Git operation: '+', '.join(pending))" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 exit /b 0
 
@@ -336,10 +335,18 @@ rem Python standard library only. Never follow configuration links or junctions.
 if errorlevel 1 goto config_backup_failed
 git rev-parse HEAD >"%BACKUP%\head.txt"
 if errorlevel 1 exit /b 1
+rem history_bundle_backup: include detached merge heads as well as local refs.
+"%PYTHON%" -X utf8 -c "import os,sys,subprocess;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');gitdir=Path(os.environ['AIDIY_GIT_DIR']);heads=[h for name in ('MERGE_HEAD','MERGE_AUTOSTASH') if (gitdir/name).exists() for h in (gitdir/name).read_text(encoding='ascii').splitlines()];all(len(h) in (40,64) and all(c in '0123456789abcdef' for c in h) for h in heads) or sys.exit('Invalid merge commit');bundle=str(Path(os.environ['BACKUP'])/'history.bundle');subprocess.run(['git','bundle','create',bundle,'--all','HEAD',*heads],check=True);subprocess.run(['git','bundle','verify',bundle],check=True)" >"%AIDIY_TEMP%\backup.txt" 2>&1
+if errorlevel 1 goto config_backup_failed
 exit /b 0
 
+:force_backup_failed
+set "RC=1"
+call :config_backup_failed
+goto failed
+
 :config_backup_failed
-echo [NG] 設定ファイルを退避できません。更新せず停止します。
+echo [NG] 復元前のファイルを退避できません。強制復元せず停止します。
 type "%AIDIY_TEMP%\backup.txt"
 type "%AIDIY_TEMP%\backup.txt" >>"%LOG%"
 exit /b 1
@@ -362,7 +369,7 @@ if "%RC%"=="0" set "RC=1"
 echo [NG] "%STAGE%" で停止しました。終了コード=%RC%
 echo Git・Pythonの実行環境が必要です。版の不足だけでは停止しません。
 echo 上記の処理名とエラー表示、origin/main、競合、権限を確認してください。
-echo 既存変更・退避・途中cloneは削除していません。
+echo 退避・途中cloneは保持しています。復元開始後の失敗では作業内容が一部更新されている場合があります。
 echo [INFO] 実行記録: "%LOG%"
 if defined STAGING echo 途中clone: "%STAGING%"
 

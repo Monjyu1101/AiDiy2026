@@ -104,11 +104,31 @@ class BatchStructureTests(unittest.TestCase):
         start_section = TEXT[TEXT.index('echo SETUP_EXIT=%RC%'):TEXT.index('echo アプリケーションの起動')]
         self.assertIn('if not "%RC%"=="0" goto failed', start_section)
 
-    def test_no_destructive_reset_clean_stash_or_mcp_deletion(self):
-        self.assertNotRegex(TEXT.lower(), r"git\s+(reset|clean|stash)\b")
+    def test_only_explicit_remote_reset_no_clean_stash_or_mcp_deletion(self):
+        self.assertNotRegex(TEXT.lower(), r"git\s+(clean|stash|push)\b")
+        self.assertIn('git -c submodule.recurse=false reset --hard %RESTORE_HEAD%', TEXT)
+        self.assertNotIn('git merge --ff-only', TEXT)
         self.assertNotIn('mcp.json', TEXT)
         self.assertNotIn('chatLanguageModels.json', TEXT)
         self.assertNotRegex(TEXT.lower(), r"\b(rd|rmdir|del)\s+/s\b")
+
+    def test_force_restore_is_gated_by_backup_fetch_and_snapshot_success(self):
+        main = TEXT[TEXT.index('\n:existing\n'):TEXT.index('\n:setup\n')]
+        fetch = next(line for line in main.splitlines() if line.startswith('git fetch '))
+        self.assertIn(fetch + '\nset "RC=%ERRORLEVEL%"\nif not "%RC%"=="0" goto failed', main)
+        self.assertLess(main.index('call :backup_local_state'), main.index(fetch))
+        self.assertLess(main.index(fetch), main.index('git -c submodule.recurse=false reset --hard %RESTORE_HEAD%'))
+        self.assertIn('history_bundle_backup', TEXT)
+        self.assertIn('# force_restore_snapshot', TEXT)
+        snapshot = next(line for line in main.splitlines() if '# force_restore_snapshot' in line)
+        self.assertLess(main.index(fetch), main.index(snapshot))
+        self.assertIn(snapshot + '\nif errorlevel 1 goto force_backup_failed', main)
+        self.assertLess(main.index(snapshot), main.index('git -c submodule.recurse=false reset --hard'))
+        self.assertIn('set "RESTORE_HEAD="\nset /p "RESTORE_HEAD="<"%BACKUP%\\remote-head.txt"', main)
+        self.assertIn('if not defined RESTORE_HEAD goto force_backup_failed', main)
+        # CMDには8191文字のコマンド上限があるため、展開パスの余白も残す。
+        self.assertLess(len(snapshot), 6000)
+        self.assertNotIn('merge-base --is-ancestor', main)
 
     def test_git_redirect_environment_is_rejected_not_created(self):
         for name in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY'):
@@ -125,7 +145,7 @@ class BatchStructureTests(unittest.TestCase):
 
     def test_repository_checks_report_each_guard_without_disclosing_origin(self):
         validator = TEXT[TEXT.index('\n:validate_repository\n'):TEXT.index('\n:backup_local_state\n')]
-        for name in ('directory', 'files', 'root', 'origin', 'branch', 'gitdir', 'operation', 'unmerged'):
+        for name in ('directory', 'files', 'root', 'origin', 'branch', 'gitdir', 'operation'):
             self.assertIn(f'set "STAGE=repository_{name}"', validator)
         for line in validator.splitlines():
             if line.startswith('git '):
@@ -339,14 +359,11 @@ class RepositoryValidationTests(unittest.TestCase):
                 (self.root / 'branch.txt').write_bytes(raw)
                 self.assertEqual(self.run_guard('branch').returncode == 0, valid)
 
-    def test_files_guard_requires_real_setup_start_files_and_dotgit(self):
+    def test_files_guard_allows_missing_launchers_to_be_restored(self):
         self.assertNotEqual(self.run_guard('files').returncode, 0)
         (self.root / '.git').write_text('gitdir: fixture')
-        (self.root / '_setup.py').write_text('# fixture')
+        self.assertEqual(self.run_guard('files').returncode, 0)
         (self.root / '_start.py').mkdir()
-        self.assertNotEqual(self.run_guard('files').returncode, 0)
-        (self.root / '_start.py').rmdir()
-        (self.root / '_start.py').write_text('# fixture')
         self.assertEqual(self.run_guard('files').returncode, 0)
 
     def test_gitdir_requires_one_existing_path_with_lf_or_crlf(self):
@@ -357,19 +374,17 @@ class RepositoryValidationTests(unittest.TestCase):
             (self.root / 'gitdir.txt').write_bytes(value.encode())
             self.assertNotEqual(self.run_guard('gitdir').returncode, 0)
 
-    def test_incomplete_operation_and_unmerged_index_are_rejected(self):
+    def test_merge_conflict_is_allowed_but_other_incomplete_operations_stop(self):
         self.assertEqual(self.run_guard('operation').returncode, 0)
-        for name in ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply'):
+        (self.gitdir / 'MERGE_HEAD').write_text('fixture')
+        self.assertEqual(self.run_guard('operation').returncode, 0)
+        for name in ('CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer'):
             marker = self.gitdir / name
             marker.write_text('fixture')
             result = self.run_guard('operation')
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(name.encode(), result.stderr)
             marker.unlink()
-        (self.root / 'unmerged.txt').write_bytes(b'')
-        self.assertEqual(self.run_guard('unmerged').returncode, 0)
-        (self.root / 'unmerged.txt').write_bytes(b'100644 sha 1\tfile\n')
-        self.assertNotEqual(self.run_guard('unmerged').returncode, 0)
 
     def test_all_inline_validators_support_python_310_syntax(self):
         import ast
@@ -387,7 +402,7 @@ class ConfigurationBackupTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.backup = self.root / '退避先 (copy)'
         self.backup.mkdir()
-        line = next(line for line in TEXT.splitlines() if 'shutil.copytree(src,' in line)
+        line = next(line for line in TEXT.splitlines() if 'Configuration backup refuses' in line)
         self.code = re.search(r'-c "([^"]+)"', line).group(1)
         compile(self.code, '<batch configuration backup>', 'exec')
 
@@ -679,13 +694,48 @@ class GitContractTests(unittest.TestCase):
         self.commit()
         self.git(self.seed, 'push', 'origin', 'main')
 
-    def update(self):
-        self.git(self.repo, 'fetch', '--no-tags', 'origin', 'main')
-        result = self.git(self.repo, 'merge-base', '--is-ancestor', 'HEAD', 'FETCH_HEAD', check=False)
+    def snapshot(self, prefix=''):
+        line = next(line for line in TEXT.splitlines() if '# force_restore_snapshot' in line)
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        return subprocess.run([sys.executable, '-X', 'utf8', '-c', prefix + code],
+                              cwd=self.repo, capture_output=True,
+                              env={**os.environ, 'BACKUP': str(self.backup),
+                                   'AIDIY_GIT_DIR': str(self.repo / '.git')})
+
+    def update(self, snapshot_prefix='', bundle_blocked=False, commit_after_snapshot=False):
+        """実batの重要コマンドをfixtureのみで実行。CMDそのものの試験ではない。"""
+        self.backup = self.repo / 'temp/_auto/fixture-run'
+        self.backup.mkdir(parents=True)
+        (self.backup / 'head.txt').write_bytes(self.git(self.repo, 'rev-parse', 'HEAD').stdout)
+        if bundle_blocked:
+            (self.backup / 'history.bundle').mkdir()
+        bundle_block = TEXT.split('history_bundle_backup', 1)[1]
+        bundle = next(line for line in bundle_block.splitlines() if line.startswith('"%PYTHON%"'))
+        code = re.search(r'-c "([^"]+)"', bundle).group(1)
+        result = subprocess.run([sys.executable, '-X', 'utf8', '-c', code], cwd=self.repo,
+                                capture_output=True, env={**os.environ, 'BACKUP': str(self.backup),
+                                'AIDIY_GIT_DIR': str(self.repo / '.git')})
         if result.returncode:
             return result
-        merge = next(line for line in TEXT.splitlines() if line.startswith('git merge --'))
-        return self.git(self.repo, *shlex.split(merge)[1:], check=False)
+        fetch = next(line for line in TEXT.splitlines() if line.startswith('git fetch '))
+        result = self.git(self.repo, *shlex.split(fetch)[1:], check=False)
+        if result.returncode:
+            return result
+        result = self.snapshot(snapshot_prefix)
+        if result.returncode:
+            return result
+        if commit_after_snapshot:
+            self.git(self.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                     'commit', '--allow-empty', '-m', 'concurrent fixture change')
+        guard = next(line for line in TEXT.splitlines() if 'HEAD changed before restore' in line)
+        code = re.search(r'-c "([^"]+)"', guard).group(1)
+        result = subprocess.run([sys.executable, '-X', 'utf8', '-c', code], cwd=self.repo,
+                                capture_output=True, env={**os.environ, 'BACKUP': str(self.backup)})
+        if result.returncode:
+            return result
+        reset = next(line for line in TEXT.splitlines() if ' reset --hard ' in line and line.startswith('git '))
+        reset = reset.replace('%RESTORE_HEAD%', (self.backup / 'remote-head.txt').read_text().strip())
+        return self.git(self.repo, *shlex.split(reset)[1:], check=False)
 
     def test_no_update_is_success(self):
         self.assertEqual(self.update().returncode, 0)
@@ -727,36 +777,49 @@ class GitContractTests(unittest.TestCase):
         self.assertNotEqual(self.update().returncode, 0)
         self.assertEqual(local.read_text(), 'private backup')
 
-    def test_fast_forward_reaches_remote(self):
+    def test_clean_checkout_reaches_remote(self):
         self.advance()
         self.assertEqual(self.update().returncode, 0)
         self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, self.git(self.seed, 'rev-parse', 'HEAD').stdout)
 
-    def test_nonconflicting_unsaved_and_untracked_survive(self):
+    def test_same_named_tag_cannot_replace_remote_main_branch(self):
+        self.advance('local.txt')
+        self.git(self.seed, 'tag', 'main', 'HEAD~1')
+        self.git(self.seed, 'push', 'origin', 'refs/tags/main')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'remote\n')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout,
+                         self.git(self.seed, 'rev-parse', 'refs/heads/main').stdout)
+
+    def test_tracked_changes_are_replaced_but_unrelated_untracked_survives(self):
         (self.repo / 'local.txt').write_text('unsaved\n')
         (self.repo / '未追跡.txt').write_text('keep')
         self.advance()
         self.assertEqual(self.update().returncode, 0)
-        self.assertEqual((self.repo / 'local.txt').read_text(), 'unsaved\n')
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'base\n')
+        self.assertEqual((self.backup / 'restore-files/local.txt').read_text(), 'unsaved\n')
         self.assertEqual((self.repo / '未追跡.txt').read_text(), 'keep')
 
-    def test_conflicting_unsaved_stops_without_autostash(self):
+    def test_conflicting_unsaved_is_restored_from_remote_without_autostash(self):
         self.git(self.repo, 'config', 'merge.autoStash', 'true')
         (self.repo / 'local.txt').write_text('unsaved\n')
-        before = self.git(self.repo, 'rev-parse', 'HEAD').stdout
         self.advance('local.txt')
-        self.assertNotEqual(self.update().returncode, 0)
-        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, before)
-        self.assertEqual((self.repo / 'local.txt').read_text(), 'unsaved\n')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'remote\n')
+        self.assertEqual((self.backup / 'restore-files/local.txt').read_text(), 'unsaved\n')
         self.assertEqual(self.git(self.repo, 'stash', 'list').stdout, b'')
 
-    def test_untracked_overlap_stops(self):
+    def test_untracked_overlap_is_backed_up_then_remote_wins(self):
         (self.repo / 'remote.txt').write_text('local private')
         self.advance()
-        self.assertNotEqual(self.update().returncode, 0)
-        self.assertEqual((self.repo / 'remote.txt').read_text(), 'local private')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'remote.txt').read_text(), 'remote\n')
+        self.assertEqual((self.backup / 'restore-files/remote.txt').read_text(), 'local private')
 
-    def test_ignored_overlap_stops(self):
+    def test_ignored_overlap_is_backed_up_then_remote_wins(self):
         for repo in (self.repo, self.seed):
             (repo / '_data').mkdir()
         (self.repo / '_data' / 'db').write_text('local private')
@@ -764,14 +827,242 @@ class GitContractTests(unittest.TestCase):
         self.git(self.seed, 'add', '--force', '_data/db')
         self.git(self.seed, 'commit', '-m', 'track data')
         self.git(self.seed, 'push', 'origin', 'main')
-        self.assertNotEqual(self.update().returncode, 0)
-        self.assertEqual((self.repo / '_data' / 'db').read_text(), 'local private')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / '_data' / 'db').read_text(), 'remote')
+        self.assertEqual((self.backup / 'restore-files/_data/db').read_text(), 'local private')
 
-    def test_local_commit_stops_without_reset(self):
-        self.git(self.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', 'local')
+    def test_local_divergent_commit_is_recoverable_from_bundle(self):
+        (self.repo / 'local.txt').write_text('local committed\n')
+        self.git(self.repo, 'add', 'local.txt')
+        self.git(self.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'local')
+        before = self.git(self.repo, 'rev-parse', 'HEAD').stdout.strip().decode()
+        self.advance('local.txt')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, self.git(self.seed, 'rev-parse', 'HEAD').stdout)
+        recovered = self.base / 'recovered'
+        self.git(self.base, 'clone', str(self.backup / 'history.bundle'), str(recovered))
+        self.assertEqual(self.git(recovered, 'show', before + ':local.txt').stdout, b'local committed\n')
+
+    def test_failed_fetch_never_uses_stale_fetch_head(self):
+        self.git(self.repo, 'fetch', '--no-tags', 'origin', 'main')
+        self.git(self.repo, 'remote', 'set-url', 'origin', str(self.base / 'missing-remote.git'))
+        (self.repo / 'local.txt').write_text('keep unsaved')
         before = self.git(self.repo, 'rev-parse', 'HEAD').stdout
-        self.assertNotEqual(self.update().returncode, 0)
+        result = self.update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'keep unsaved')
         self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, before)
+
+    def test_failed_history_backup_does_not_fetch_or_reset(self):
+        (self.repo / 'local.txt').write_text('keep unsaved')
+        before = self.git(self.repo, 'rev-parse', 'HEAD').stdout
+        self.advance('local.txt')
+        result = self.update(bundle_blocked=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.repo / '.git/FETCH_HEAD').exists())
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'keep unsaved')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, before)
+
+    def test_snapshot_failure_stops_before_reset(self):
+        (self.repo / 'local.txt').write_text('keep unsaved')
+        before = self.git(self.repo, 'rev-parse', 'HEAD').stdout
+        self.advance('local.txt')
+        result = self.update("raise PermissionError('fixture backup failure');")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'fixture backup failure', result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'keep unsaved')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout, before)
+
+    def test_snapshot_copy_error_keeps_original_and_stops_before_reset(self):
+        (self.repo / 'local.txt').write_text('keep unsaved')
+        self.advance('local.txt')
+        prefix = "from unittest.mock import patch;import shutil;patch.object(shutil,'copy2',side_effect=PermissionError('fixture copy denied')).start();"
+        result = self.update(prefix)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'fixture copy denied', result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'keep unsaved')
+
+    def test_head_change_after_history_backup_stops_before_snapshot_reset(self):
+        self.advance('local.txt')
+        prefix = "import subprocess;subprocess.run(['git','-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','concurrent fixture change'],check=True);"
+        result = self.update(prefix)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'HEAD changed', result.stderr)
+        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%s').stdout.strip(),
+                         b'concurrent fixture change')
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'base\n')
+
+    def test_head_change_after_snapshot_stops_immediately_before_reset(self):
+        self.advance('local.txt')
+        result = self.update(commit_after_snapshot=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'HEAD changed before restore', result.stderr)
+        self.assertEqual(self.git(self.repo, 'log', '-1', '--format=%s').stdout.strip(),
+                         b'concurrent fixture change')
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'base\n')
+
+    def test_unrelated_ignored_runtime_and_config_are_not_cleaned(self):
+        for directory in ('_data', '_config'):
+            (self.repo / directory).mkdir()
+            (self.repo / directory / 'private').write_bytes(b'keep private')
+        self.advance()
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for directory in ('_data', '_config'):
+            self.assertEqual((self.repo / directory / 'private').read_bytes(), b'keep private')
+
+    def test_remote_backup_alias_is_rejected_before_reset(self):
+        # Windowsのcasefold/末尾空白・ドット別名をLinux一時repoで構成する。
+        alias = self.seed / 'TEMP. /_AUTO /replace.txt'
+        alias.parent.mkdir(parents=True)
+        alias.write_text('remote')
+        self.commit()
+        self.git(self.seed, 'push', 'origin', 'main')
+        (self.repo / 'local.txt').write_text('keep unsaved')
+        result = self.update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b'overlaps launcher backup', result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'keep unsaved')
+
+    def test_real_merge_conflict_is_replaced_by_remote(self):
+        (self.repo / 'local.txt').write_text('local committed\n')
+        self.git(self.repo, 'add', 'local.txt')
+        self.git(self.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'local')
+        self.advance('local.txt')
+        self.git(self.repo, 'fetch', 'origin', 'main')
+        merge = self.git(self.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'merge', 'FETCH_HEAD', check=False)
+        self.assertNotEqual(merge.returncode, 0)
+        self.assertTrue(self.git(self.repo, 'ls-files', '--unmerged').stdout)
+        conflict = (self.repo / 'local.txt').read_bytes()
+        self.assertIn(b'<<<<<<<', conflict)
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'remote\n')
+        self.assertEqual(self.git(self.repo, 'ls-files', '--unmerged').stdout, b'')
+        self.assertFalse((self.repo / '.git/MERGE_HEAD').exists())
+        self.assertEqual((self.backup / 'restore-files/local.txt').read_bytes(), conflict)
+        self.assertTrue((self.backup / 'git-state/MERGE_HEAD').is_file())
+        stages = (self.backup / 'index-stages.bin').read_bytes()
+        self.assertIn(b' 1\tlocal.txt', stages)
+        self.assertIn(b' 2\tlocal.txt', stages)
+        self.assertIn(b' 3\tlocal.txt', stages)
+        for entry in stages.split(b'\0'):
+            if entry:
+                oid = entry.split(b' ', 2)[1].decode()
+                self.assertTrue((self.backup / 'index-blobs' / oid).is_file())
+
+    def test_unreferenced_merge_commit_is_preserved_in_history_bundle(self):
+        self.git(self.repo, 'config', 'user.name', 'Fixture')
+        self.git(self.repo, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(self.repo, 'checkout', '-b', 'temporary-merge-source')
+        (self.repo / 'local.txt').write_text('unreferenced merge side\n')
+        self.git(self.repo, 'add', 'local.txt')
+        self.git(self.repo, 'commit', '-m', 'incoming')
+        incoming = self.git(self.repo, 'rev-parse', 'HEAD').stdout.strip().decode()
+        self.git(self.repo, 'checkout', 'main')
+        self.git(self.repo, 'branch', '-D', 'temporary-merge-source')
+        (self.repo / 'local.txt').write_text('main side\n')
+        self.git(self.repo, 'add', 'local.txt')
+        self.git(self.repo, 'commit', '-m', 'main side')
+        result = self.git(self.repo, 'merge', incoming, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.repo / '.git/MERGE_HEAD').read_text().strip(), incoming)
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        recovery = self.base / 'merge-recovery'
+        self.git(self.base, 'clone', str(self.backup / 'history.bundle'), str(recovery))
+        self.assertEqual(self.git(recovery, 'show', incoming + ':local.txt').stdout,
+                         b'unreferenced merge side\n')
+
+    def test_merge_autostash_is_recoverable_from_bundle(self):
+        (self.seed / 'other.txt').write_text('base other\n')
+        self.commit()
+        self.git(self.seed, 'push', 'origin', 'main')
+        self.git(self.repo, 'fetch', 'origin', 'main')
+        self.git(self.repo, 'merge', '--ff-only', 'FETCH_HEAD')
+        self.git(self.repo, 'config', 'user.name', 'Fixture')
+        self.git(self.repo, 'config', 'user.email', 'fixture@example.invalid')
+        (self.repo / 'local.txt').write_text('local side\n')
+        self.git(self.repo, 'add', 'local.txt')
+        self.git(self.repo, 'commit', '-m', 'local side')
+        (self.repo / 'other.txt').write_text('uncommitted autostash payload\n')
+        self.advance('local.txt')
+        self.git(self.repo, 'fetch', 'origin', 'main')
+        merge = self.git(self.repo, 'merge', '--autostash', 'FETCH_HEAD', check=False)
+        self.assertNotEqual(merge.returncode, 0)
+        autostash = (self.repo / '.git/MERGE_AUTOSTASH').read_text().strip()
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_text(), 'remote\n')
+        self.assertEqual((self.backup / 'git-state/MERGE_AUTOSTASH').read_text().strip(), autostash)
+        recovery = self.base / 'autostash-recovery'
+        self.git(self.base, 'clone', str(self.backup / 'history.bundle'), str(recovery))
+        self.assertEqual(self.git(recovery, 'show', autostash + ':other.txt').stdout,
+                         b'uncommitted autostash payload\n')
+
+    def test_untracked_directory_obstruction_is_saved_before_remote_file(self):
+        obstruction = self.repo / 'remote.txt'
+        obstruction.mkdir()
+        (obstruction / 'private').write_text('keep private')
+        self.advance()
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(obstruction.read_text(), 'remote\n')
+        self.assertEqual((self.backup / 'restore-files/remote.txt/private').read_text(), 'keep private')
+
+    def test_untracked_ancestor_file_is_saved_before_remote_directory(self):
+        (self.repo / 'folder').write_text('keep ancestor')
+        (self.seed / 'folder').mkdir()
+        self.advance('folder/remote.txt')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'folder/remote.txt').read_text(), 'remote\n')
+        self.assertEqual((self.backup / 'restore-files/folder').read_text(), 'keep ancestor')
+
+    def test_staged_and_unstaged_versions_can_be_recovered_separately(self):
+        (self.repo / 'local.txt').write_bytes(b'staged\x00binary')
+        self.git(self.repo, 'add', 'local.txt')
+        oid = self.git(self.repo, 'rev-parse', ':local.txt').stdout.strip().decode()
+        (self.repo / 'local.txt').write_bytes(b'unstaged\x00binary')
+        self.advance('local.txt')
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.repo / 'local.txt').read_bytes(), b'remote\n')
+        self.assertEqual((self.backup / 'restore-files/local.txt').read_bytes(), b'unstaged\x00binary')
+        self.assertEqual((self.backup / 'index-blobs' / oid).read_bytes(), b'staged\x00binary')
+        recovery = self.base / 'staged-recovery'
+        self.git(self.base, 'clone', str(self.backup / 'history.bundle'), str(recovery))
+        restored = self.git(recovery, 'hash-object', '-w', str(self.backup / 'index-blobs' / oid)).stdout.strip().decode()
+        self.assertEqual(restored, oid)
+        self.git(recovery, 'update-index', '--cacheinfo', '100644', restored, 'local.txt')
+        self.git(recovery, 'checkout-index', '--force', 'local.txt')
+        self.assertEqual((recovery / 'local.txt').read_bytes(), b'staged\x00binary')
+
+    def test_deleted_setup_and_start_are_restored_from_remote(self):
+        for name in ('_setup.py', '_start.py'):
+            (self.seed / name).write_text('# remote launcher\n')
+        self.commit()
+        self.git(self.seed, 'push', 'origin', 'main')
+        self.git(self.repo, 'fetch', 'origin', 'main')
+        self.git(self.repo, 'merge', '--ff-only', 'FETCH_HEAD')
+        self.git(self.repo, 'rm', '_setup.py')
+        (self.repo / '_start.py').unlink()
+        result = self.update()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ('_setup.py', '_start.py'):
+            self.assertEqual((self.repo / name).read_text(), '# remote launcher\n')
+
+    def test_symlink_obstruction_is_rejected_without_modifying_external_file(self):
+        outside = self.base / 'outside'
+        outside.write_text('outside private')
+        (self.repo / 'remote.txt').symlink_to(outside)
+        self.advance()
+        result = self.update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.repo / 'remote.txt').is_symlink())
+        self.assertEqual(outside.read_text(), 'outside private')
 
     def test_binary_backup_command_contains_unsaved_work(self):
         (self.repo / 'local.txt').write_text('unsaved\n')
