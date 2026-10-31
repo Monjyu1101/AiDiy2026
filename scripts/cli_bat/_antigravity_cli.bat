@@ -10,16 +10,12 @@ ECHO   %~nx0
 ECHO ============================================================
 
 set "MODEL="
-set "ANTIGRAVITY_INSTALLER=%TEMP%\aidiy_antigravity_install.cmd"
 set "AGY_EXE=%LOCALAPPDATA%\agy\bin\agy.exe"
 set /p "UPDATE=update [N]/y: "
 if /I "%UPDATE%"=="y" (
     ECHO Install/update Antigravity CLI
-    curl -fsSL https://antigravity.google/cli/install.cmd -o "%ANTIGRAVITY_INSTALLER%"
+    call "%~dp0install_antigravity.bat" /no-pause
     if errorlevel 1 goto INSTALL_FAILED
-    call "%ANTIGRAVITY_INSTALLER%"
-    if errorlevel 1 goto INSTALL_FAILED
-    del /q "%ANTIGRAVITY_INSTALLER%" >nul 2>&1
 )
 
 :SELECT_MODEL
@@ -72,7 +68,6 @@ ECHO Antigravity CLI is not installed. Restart this script and enter y at the up
 endlocal & exit /b 1
 
 :INSTALL_FAILED
-del /q "%ANTIGRAVITY_INSTALLER%" >nul 2>&1
 ECHO Antigravity CLI installation failed.
 endlocal & exit /b 1
 
