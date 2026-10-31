@@ -5,19 +5,22 @@
 // https://github.com/monjyu1101/AiDiy2026
 // Console と同じローカル Tools の ping のみ。設定・応答・例外の内容は公開しない。
 import http from 'node:http';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import {readConfig} from '../runtime/model_probe.mjs';
 
 // AI/CLI の初期化時に生じる短い応答遅延を接続断と誤判定しない。
 // 接続拒否などの確定した通信失敗は、期限を待たずに従来どおり返す。
 export const TOOLS_TIMEOUT_MS = 5000;
-export const TOOLS_RESPONSE_LIMIT = 16 * 1024;
+export const TOOLS_RESPONSE_LIMIT = DIAG_TRANSPORT_BYTE_LIMIT;
 
 function checkTools({reader, timeoutMs, signal}) {
   return new Promise(resolve => {
     let request, response, finished = false;
+    const chunks = [];
     const finish = (online = false) => {
       if (finished) return;
       finished = true;
+      chunks.length = 0;
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
       response?.destroy();
@@ -42,7 +45,6 @@ function checkTools({reader, timeoutMs, signal}) {
         incoming.on('aborted', abort);
         if (finished) return incoming.destroy();
         if (incoming.statusCode < 200 || incoming.statusCode >= 300) return finish();
-        const chunks = [];
         let size = 0;
         incoming.on('data', chunk => {
           if (finished) return;

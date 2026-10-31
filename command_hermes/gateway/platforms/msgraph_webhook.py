@@ -40,7 +40,7 @@ DEFAULT_HOST = None
 DEFAULT_PORT = 8646
 DEFAULT_WEBHOOK_PATH = "/msgraph/webhook"
 DEFAULT_MAX_SEEN_RECEIPTS = 5000
-DEFAULT_MAX_BODY_BYTES = 1_048_576
+DEFAULT_MAX_BODY_BYTES = 20 * 1024 * 1024
 NotificationScheduler = Callable[[Dict[str, Any], MessageEvent], Awaitable[None] | None]
 
 

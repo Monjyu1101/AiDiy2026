@@ -13,8 +13,10 @@ import contextlib
 import importlib.util
 import io
 import json
+import ntpath
+import posixpath
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -90,6 +92,81 @@ class DiscordSetupTest(unittest.TestCase):
                 self.launcher.assert_not_called()
                 commands = [call.args[0] for call in self.run.call_args_list]
                 self.assertEqual(commands[-1], ['npm', 'run', failed_step])
+
+
+class DiscordSetupOwnershipTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(discord_setup, '_runtime_in_use', return_value=False))
+        self.snapshot = self.enterContext(patch.object(discord_setup, 'snapshot', return_value=[]))
+        self.enterContext(patch.object(discord_setup.os, 'getpid', return_value=999))
+
+    def roots(self):
+        return ((False, PurePosixPath('/fixture/frontend_channels')),
+                (True, PureWindowsPath(r'C:\fixture\frontend_channels')))
+
+    @contextlib.contextmanager
+    def platform(self, windows, root):
+        # ホスト OS に依存せず、実パス規則と platform をセットで模擬する。
+        path_module = ntpath if windows else posixpath
+        with patch.object(discord_setup, 'THIS_DIR', root), patch.object(discord_setup.sys, 'platform', 'win32' if windows else 'linux'), patch.object(discord_setup.os, 'path', path_module), patch.object(discord_setup.os, 'sep', path_module.sep):
+            yield
+
+    def record(self, root, entry, name='node', tail='', executable=''):
+        return dict(ProcessId=10, Name=name, ExecutablePath=executable,
+                    CommandLine=f'{name} "{root / entry}" {tail}')
+
+    def test_discord_project_inside_slack_is_still_running(self):
+        for windows, root in self.roots():
+            for option in ('--project ', ''):
+                with self.subTest(windows=windows, option=option), self.platform(windows, root):
+                    self.snapshot.return_value = [self.record(root, 'panel/launch.mjs', tail=f'{option}"{root / "slack/work"}"')]
+                    self.assertTrue(discord_setup._discord_in_use())
+
+    def test_slack_entries_and_start_wrapper_do_not_block_discord(self):
+        for windows, root in self.roots():
+            for entry in ('panel/launch.mjs', 'panel/desktop.cjs', 'src/panel-worker.ts', 'src/web-server.ts', 'src/main.ts', '_start.py'):
+                name = 'python' if entry == '_start.py' else 'electron' if entry.endswith('.cjs') else 'node'
+                if windows:
+                    name += '.exe'
+                with self.subTest(windows=windows, entry=entry), self.platform(windows, root):
+                    self.snapshot.return_value = [self.record(root / 'slack', entry, name, tail=f'--project "{root}"')]
+                    self.assertFalse(discord_setup._discord_in_use())
+
+    def test_slack_orphan_electron_is_excluded_but_discord_runtime_is_protected(self):
+        for windows, root in self.roots():
+            for slack in (False, True):
+                for reported_executable in (False, True):
+                    name = 'electron.exe' if windows else 'electron'
+                    runtime = (root / 'slack' if slack else root) / 'node_modules/electron/dist' / name
+                    with self.subTest(windows=windows, slack=slack, reported_executable=reported_executable), self.platform(windows, root):
+                        self.snapshot.return_value = [dict(ProcessId=10, Name=name, CommandLine=f'"{runtime}" --type=renderer', ExecutablePath=str(runtime) if reported_executable else '')]
+                        self.assertEqual(discord_setup._discord_in_use(), not slack)
+
+    def test_slack_does_not_hide_another_discord_process(self):
+        for windows, root in self.roots():
+            with self.subTest(windows=windows), self.platform(windows, root):
+                self.snapshot.return_value = [self.record(root / 'slack', 'panel/launch.mjs'),
+                                              self.record(root, 'panel/launch.mjs', tail=f'--project "{root / "slack"}"')]
+                self.assertTrue(discord_setup._discord_in_use())
+
+    def test_other_checkout_or_argument_only_is_not_owned(self):
+        for windows, root in self.roots():
+            with self.subTest(windows=windows), self.platform(windows, root):
+                self.snapshot.return_value = [self.record(root.parent / 'other/frontend_channels', 'panel/launch.mjs', tail=f'--project "{root / "slack"}"'),
+                                              self.record(root.parent / 'other', 'worker.js', tail=f'"{root / "panel/launch.mjs"}"')]
+                self.assertFalse(discord_setup._discord_in_use())
+
+    def test_unreadable_node_command_still_fails_closed(self):
+        self.snapshot.return_value = [dict(ProcessId=10, Name='node', CommandLine='')]
+        with self.assertRaises(ValueError):
+            discord_setup._discord_in_use()
+
+    def test_launching_discord_prevents_npm_and_launcher_changes(self):
+        self.snapshot.return_value = [self.record(FRONTEND, 'panel/launch.mjs', tail=f'--project "{FRONTEND / "slack/work"}"')]
+        with patch.object(discord_setup, 'check_project_node_runtime', return_value=(True, 'fixture Node')), patch.object(discord_setup.subprocess, 'run', side_effect=AssertionError('起動中に npm を呼ばない')) as run, patch.object(discord_setup, 'install_launcher') as install, contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(discord_setup.setup())
+        run.assert_not_called()
+        install.assert_not_called()
 
 
 class DiscordLifecycleTest(unittest.TestCase):
@@ -223,6 +300,18 @@ class DiscordLifecycleTest(unittest.TestCase):
             self.assertEqual(key.read_text(encoding='utf-8'), 'keep')
             self.assertTrue((source / 'main.ts').exists()); self.assertTrue((component / 'package-lock.json').exists())
             self.assertTrue(all(not (component / name).exists() for name in discord_cleanup.TARGETS))
+
+    def test_discord_cleanup_never_removes_independent_slack_caches(self):
+        component = Path('/fixture/frontend_channels')
+        own_cache = component / 'scripts/__pycache__'
+        slack_caches = [component / 'slack/__pycache__', component / 'slack/checks/__pycache__']
+        # Slack は選択済みでも専用 cleanup が担当する。親から再帰削除しない。
+        for choices in (None, {'discord': True, 'slack': False}, {'discord': True, 'slack': True}):
+            with self.subTest(choices=choices), patch.object(discord_cleanup, 'THIS_DIR', component), patch.object(discord_cleanup, 'stop_discord_processes', return_value=True), patch.object(discord_cleanup, 'remove_launcher', return_value=True), patch.object(discord_cleanup, 'remove_directory', return_value=True) as remove, patch.object(Path, 'rglob', return_value=[own_cache, *slack_caches]):
+                self.assertTrue(discord_cleanup.cleanup(choices))
+                removed = [call.args[0] for call in remove.call_args_list]
+                self.assertIn(own_cache, removed)
+                self.assertTrue(all(cache not in removed for cache in slack_caches))
 
     def test_launch_uses_absolute_entry_and_check_cannot_connect(self):
         with patch.object(discord_start.shutil, 'which', return_value='node'), patch.object(

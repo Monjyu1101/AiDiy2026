@@ -1265,7 +1265,7 @@ def build_proxy_config(
             # The HTTPS-listener (direct TLS termination, no CONNECT)
             # gets a loopback ephemeral port — we don't expose it.
             "https_listen": "127.0.0.1:0",
-            "max_request_body_bytes": 16 * 1024 * 1024,
+            "max_request_body_bytes": 20 * 1024 * 1024,
             "max_response_body_bytes": 0,
             "upstream_response_header_timeout": "120s",
             # SSRF protection: deny outbound to cloud metadata + loopback by

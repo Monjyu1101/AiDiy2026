@@ -25,7 +25,7 @@ onUnmounted(()=>{password.value='';state.終了();});
  <div class="panel-heading tools-heading">
   <div class="heading-title"><h2>Tools管理</h2><button v-if="authenticated" class="tools-reload refresh-button" :aria-busy="state.処理中.value==='read'" :disabled="!!state.処理中.value" @click="state.再読込()"><span class="refresh-glyph" aria-hidden="true">↺</span><span>再読込</span></button></div>
   <div class="panel-actions">
-   <button v-if="authenticated" class="single-test-button tools-batch-test" :disabled="!!state.処理中.value||!state.一括対象数.value" :aria-busy="state.処理中.value==='test-all'" title="有効・利用可能なToolを順番に試験します。通知音や専用ブラウザの起動も含みます。" @click="state.一括テスト()">一括テスト</button>
+   <button v-if="authenticated" class="single-test-button tools-batch-test" :disabled="!!state.処理中.value||!state.一括対象数.value" :aria-busy="state.処理中.value==='test-all'" title="有効・利用可能なToolを順番に試験します。通知音・専用ブラウザの起動・実際のバックアップ作成も含みます。" @click="state.一括テスト()">一括テスト</button>
    <button v-if="state.処理中.value==='test-all'" @click="state.テスト中止()">一括テストを中止</button>
    <button v-if="state.認証済み.value" @click="state.ログアウト()">Coreからログアウト</button>
   </div>
@@ -71,7 +71,7 @@ onUnmounted(()=>{password.value='';state.終了();});
      </section>
      <fieldset class="tools-test-content"><legend>テスト条件</legend>
       <p v-if="!current.available" class="warning">この環境では利用できません。</p><p v-else-if="!current.enabled" class="warning">OFF（サービス外）のため実行しません。専用ブラウザを終了する場合は、先にこのToolをONへ戻してください。</p>
-      <template v-if="test"><h4>{{test.label}}</h4><p class="tools-help">{{test.description}}</p><label v-if="test.headless" class="tools-test-option"><input v-model="state.テスト条件.value[current.id].headless" type="checkbox" :disabled="!!state.処理中.value||!current.available||!current.enabled">画面を表示しない（headless）</label><div class="tools-actions"><button class="single-test-button" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id)">この条件でテスト</button><button v-if="test.close" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id,true)">専用ブラウザを終了</button></div></template>
+      <template v-if="test"><h4>{{test.label}}</h4><p class="tools-help">{{test.description}}</p><label v-if="test.headless" class="tools-test-option"><input v-model="state.テスト条件.value[current.id].headless" type="checkbox" :disabled="!!state.処理中.value||!current.available||!current.enabled">画面を表示しない（headless）</label><label v-if="test.batch" class="tools-test-option"><input v-model="state.テスト条件.value[current.id].batch" type="checkbox" :disabled="!!state.処理中.value||!current.available||!current.enabled">batch（コピーを別スレッドで実行・受付を返す）</label><p v-if="test.batch" class="warning">実際にバックアップを作成します。batch ONのOKは受付成功で、コピー完了ではありません。</p><div class="tools-actions"><button class="single-test-button" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id)">この条件でテスト</button><button v-if="test.close" :disabled="!!state.処理中.value||!current.available||!current.enabled" @click="state.テスト(current.id,true)">専用ブラウザを終了</button></div></template>
       <p v-else class="tools-help">このToolの代表機能テストは未対応です。状態の表示は機能テスト成功を意味しません。</p>
      </fieldset>
     </template><p v-else class="tools-help">一覧からToolを選択してください。</p>

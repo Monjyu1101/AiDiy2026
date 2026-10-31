@@ -49,7 +49,7 @@ test('anonymous public catalog accepts multi-MiB metadata and retains bounded sa
  const {createPublicModelCache}=await import('../モデル情報/public_models.mjs');
  const now=new Date('2026-10-15T12:00:00Z');
  const bytes=Buffer.from(JSON.stringify({data:Array.from({length:700},(_,i)=>({id:`google/example-${i}`,created:Math.floor(now.getTime()/1000),context_length:100000,architecture:{modality:'text->text'},description:'public metadata '.repeat(220)}))}));
- assert.ok(bytes.length>2*RESPONSE_LIMIT);
+ assert.ok(bytes.length>2*1024*1024);
  await transport((options,callback)=>{
   assert.equal(options.hostname,'openrouter.ai');assert.equal(options.path,'/api/v1/models');assert.deepEqual(options.headers,{Accept:'application/json'});
   const r=response(callback);for(let i=0;i<bytes.length;i+=65536)r.emit('data',bytes.subarray(i,i+65536));r.emit('end');
@@ -61,7 +61,7 @@ test('anonymous public catalog accepts multi-MiB metadata and retains bounded sa
   const result=await runner.run('test','openrt',{input:cache.input(),reader:()=> '{}'});assert.equal(result.data.状態,'未実施');assert.equal(result.data.モデル.length,0);
  });
 });
-test('larger public cap stays bounded and never expands authenticated-provider cap',async()=>{
+test('public and authenticated-provider transport caps stay bounded',async()=>{
  const {PUBLIC_RESPONSE_LIMIT}=await import('../runtime/model_probe.mjs');
  for(const [provider,headers,limit] of [['openrouter',{},PUBLIC_RESPONSE_LIMIT],['openrouter',{Authorization:'Bearer synthetic-key'},RESPONSE_LIMIT],['openai',{},RESPONSE_LIMIT]]) {
   await transport((_options,callback)=>{const r=response(callback);r.emit('data',Buffer.alloc(limit+1,32));r.emit('end');},async()=>assert.rejects(fetchMetadata(provider,headers),{message:'size'}));

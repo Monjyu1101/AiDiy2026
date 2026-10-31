@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
-_DISCORD_RESPONSE_BODY_MAX_BYTES = 4 * 1024 * 1024
+_DISCORD_RESPONSE_BODY_MAX_BYTES = 20 * 1024 * 1024
 _DISCORD_ERROR_BODY_MAX_BYTES = 64 * 1024
 
 # Application flag bits (from GET /applications/@me → "flags").

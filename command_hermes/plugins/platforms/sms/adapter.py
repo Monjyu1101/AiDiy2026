@@ -67,7 +67,7 @@ TWILIO_API_BASE = "https://api.twilio.com/2010-04-01/Accounts"
 MAX_SMS_LENGTH = 1600  # ~10 SMS segments
 DEFAULT_WEBHOOK_PORT = 8080
 DEFAULT_WEBHOOK_HOST = "127.0.0.1"
-_TWILIO_WEBHOOK_MAX_BODY_BYTES = 65_536  # 64 KiB — Twilio payloads are small
+_TWILIO_WEBHOOK_MAX_BODY_BYTES = 20 * 1024 * 1024  # 20 MiB transport cap
 
 
 def check_sms_requirements() -> bool:

@@ -16,7 +16,7 @@ import { join, resolve, basename } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CodeConnection, コード選択 } from '../../src/code-connection';
 import { InputPrediction } from '../../src/input-prediction';
-import { MAX_FILE_PACKET_CHARS, validateFileUpload, fileAttachment, isDuplicateAttachment } from '../../src/file-attachments';
+import { validateFileUpload, fileAttachment, isDuplicateAttachment } from '../../src/file-attachments';
 import { ローカル接続先 } from '../../aidiy_live/local-backend.cjs';
 import { streamControlOf, visibleStreamContent, type コードパケット } from '../../src/protocol';
 import { コードモデル読込, コードモデル保存, モデル保存先, コード設定保存先, 検証回数読込, 検証回数保存 } from '../../src/model-preferences';
@@ -235,11 +235,10 @@ export async function 単独起動(project: string, backend?: string, initialMod
         if (!allowed.origin(req.headers.origin) || !req.headers['content-type']?.startsWith('application/json')) { reply(403, {error:'Forbidden'}); return; }
         const requestEpoch = connection.epoch;
         req.setEncoding('utf8');
-        let body = '';
-        for await (const chunk of req) { body += chunk.toString(); if (body.length > MAX_FILE_PACKET_CHARS) { reply(413, {error:'Message too long'}); return; } }
+        let body = '', bytes = 0;
+        for await (const chunk of req) { bytes += Buffer.byteLength(chunk, 'utf8'); if (bytes > 20 * 1024 * 1024) { reply(413, {error:'Message too long'}); return; } body += chunk; }
         const data = JSON.parse(body);
         const type = data.メッセージ識別 ?? data.type;
-        if (type !== 'sendFile' && body.length > 1_000_000) { reply(413, {error:'Message too long'}); return; }
         // IDE埋め込み時は、親画面で選んだ利用モードを維持する。
         if (initialModel.lockedMode && ['autoConnect', 'executionMode', 'connect', 'disconnect'].includes(type)) {
           reply(409, {error:'接続モードはAiDiy IDEの利用開始画面で変更してください。'}); return;

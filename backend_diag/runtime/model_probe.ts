@@ -11,11 +11,13 @@ import os from 'node:os';
 import path from 'node:path';
 import https from 'node:https';
 import http from 'node:http';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from './transport_limit';
 import {proxyRoute,MetadataProxyAgent,networkFailure} from './environment_proxy';
 import {openrouterCatalog,googleCatalog,openaiCatalog,claudeCatalog,ollamaCatalog,codexCatalog,codexSlugs,codexFallbackCatalog,grokCatalog,idsCatalog,ollamaLocalCatalog,withoutRetired,GROK_CLI_MODELS,LOCAL_CHAT_MODELS,pythonString,type Catalog} from './model_catalog';
-export const CONFIG_LIMIT=128*1024, RESPONSE_LIMIT=1024*1024;
-// 公開一覧は説明・価格などを含む。受信上限だけを分離し、整形後の出力上限は維持する。
-export const PUBLIC_RESPONSE_LIMIT=16*1024*1024;
+export const CONFIG_LIMIT=128*1024, RESPONSE_LIMIT=DIAG_TRANSPORT_BYTE_LIMIT;
+// 公開・認証付き一覧とも同じHTTP上限。ローカルのCLIキャッシュは従来の上限を保つ。
+export const PUBLIC_RESPONSE_LIMIT=DIAG_TRANSPORT_BYTE_LIMIT;
+const MODEL_CACHE_LIMIT=1024*1024;
 function connectionFailureDescription(error:unknown):string {
  const reasons:Record<string,string>={dns:'接続先またはプロキシの名前解決に失敗しました。',tls:'接続先またはプロキシのTLS証明書を検証できませんでした。',network:'接続できませんでした。ネットワークとプロキシ設定を確認してください。','proxy-config':'HTTP_PROXY / HTTPS_PROXY のURL設定が無効です。','proxy-auth':'プロキシ認証が拒否されました。','proxy-connect':'プロキシが接続を許可しませんでした。',auth:'HTTP認証またはアクセス権が拒否されました。',http:'正常なHTTP応答を取得できませんでした。',timeout:'通信がタイムアウトしました。',stopped:'取得を中止しました。',response:'受信が途中で切断されました。',size:'受信サイズが上限を超えました。',json:'応答をJSONとして読み取れませんでした。',shape:'モデルデータ形式が想定と異なります。'};
  const reason=error instanceof Error?error.message:'';
@@ -92,13 +94,13 @@ const OAUTH_CLI:Record<OAuthKind,string>={codex:'codex',grok:'grok'};
 // API が使えないときの Codex の代替候補元（get_codex_model_ids と同じ）: config.toml の model と models_cache.json。
 export type CodexLocalReader=(name:'config.toml'|'models_cache.json')=>Promise<string|Uint8Array>|string|Uint8Array;
 export async function readCodexLocal(reader?:CodexLocalReader,env:NodeJS.ProcessEnv=process.env,home=os.homedir()):Promise<{defaultModel:string|null;cacheIds:string[]}> {
- const folder=path.dirname(oauthPath('codex',env,home)),read=async(name:'config.toml'|'models_cache.json')=>reader?await reader(name):await readLimited(path.join(folder,name),RESPONSE_LIMIT);
+ const folder=path.dirname(oauthPath('codex',env,home)),read=async(name:'config.toml'|'models_cache.json')=>reader?await reader(name):await readLimited(path.join(folder,name),MODEL_CACHE_LIMIT);
  let defaultModel:string|null=null,cacheIds:string[]=[];
  try {
   const text=Buffer.from(await read('config.toml')).toString('utf8'),top=text.split(/^\s*\[/m)[0];
   const match=/^\s*model\s*=\s*(["'])([^"'\r\n]+)\1/m.exec(top);if(match&&match[2].trim())defaultModel=match[2].trim();
  }catch{}
- try {cacheIds=codexSlugs(parseJson(await read('models_cache.json'),RESPONSE_LIMIT));}catch{}
+ try {cacheIds=codexSlugs(parseJson(await read('models_cache.json'),MODEL_CACHE_LIMIT));}catch{}
  return {defaultModel,cacheIds};
 }
 // 外部連携（モデル一覧なし）。読み取り専用の認証確認だけを行い、送信・書込・Gateway 接続はしない。
@@ -128,11 +130,12 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
  if(signal?.aborted)return reject(new Error('stopped'));
  const responseLimit=provider==='openrouter'&&Object.keys(headers).length===0?PUBLIC_RESPONSE_LIMIT:RESPONSE_LIMIT;
  let settled=false,size=0;const chunks:Buffer[]=[];
- let agent:MetadataProxyAgent|undefined,request:http.ClientRequest|undefined;
+ let agent:MetadataProxyAgent|undefined,request:http.ClientRequest|undefined,incoming:http.IncomingMessage|undefined;
  try{const proxy=local?null:proxyRoute(new URL(`https://${endpoint[0]}`));if(proxy)agent=new MetadataProxyAgent(proxy);}catch(error){return reject(new Error(networkFailure(error)));}
  // 明示した proxy のみ使用。キーは TLS 内側の API リクエストだけへ渡し、redirect は追わない。
  const respond=(response:http.IncomingMessage)=>{
-  if(!response.statusCode||response.statusCode<200||response.statusCode>=300){response.destroy();return finish(new Error([401,403].includes(response.statusCode??0)?'auth':'http'));}
+  incoming=response;if(settled){response.destroy();return;}
+  if(!response.statusCode||response.statusCode<200||response.statusCode>=300){return finish(new Error([401,403].includes(response.statusCode??0)?'auth':'http'));}
   response.on('data',(chunk:Buffer)=>{if(settled)return;size+=chunk.length;if(size>responseLimit)return finish(new Error('size'));chunks.push(chunk);});
   response.on('error',()=>finish(new Error('response')));
   response.on('aborted',()=>finish(new Error('response')));
@@ -140,7 +143,7 @@ export const fetchMetadata:Fetch=(provider,headers,pageToken,signal)=>new Promis
  };
  const cancel=()=>finish(new Error('stopped'));
  const timer=setTimeout(()=>finish(new Error('timeout')),local?10000:8000);
- function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);request?.destroy();agent?.destroy();if(error)reject(error);else resolve(value!);}
+ function finish(error?:Error,value?:Dictionary){if(settled)return;settled=true;chunks.length=0;clearTimeout(timer);signal?.removeEventListener('abort',cancel);incoming?.destroy();request?.destroy();agent?.destroy();if(error)reject(error);else resolve(value!);}
  try{
   request=local?http.request({hostname:local[0],port:local[1],path:pathname,method:'GET',agent:false,headers:{Accept:'application/json',...headers}},respond):https.request({hostname:endpoint[0],path:pathname,port:443,method:provider==='slack'?'POST':'GET',agent:agent??false,rejectUnauthorized:true,headers:{Accept:'application/json',...headers}},respond);
   signal?.addEventListener('abort',cancel,{once:true});request.on('error',error=>finish(new Error(networkFailure(error))));request.end();

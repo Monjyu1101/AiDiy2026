@@ -153,23 +153,23 @@ python _start.py
 ```bash
 # バックエンド Local（OpenAI 互換 Gemma、必要時のみ）
 cd backend_local
-.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
+.venv/Scripts/python.exe -m uvicorn local_main:app --reload --host 0.0.0.0 --port 8096 --ws-max-size 20971520
 
 # バックエンド MCP
 cd backend_tools
-.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095
+.venv/Scripts/python.exe -m uvicorn tools_main:app --reload --host 0.0.0.0 --port 8095 --ws-max-size 20971520
 
 # バックエンド Core
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091
+.venv/Scripts/python.exe -m uvicorn core_main:app --reload --host 0.0.0.0 --port 8091 --ws-max-size 20971520
 
 # バックエンド Apps
 cd backend_server
-.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098
+.venv/Scripts/python.exe -m uvicorn apps_main:app --reload --host 0.0.0.0 --port 8098 --ws-max-size 20971520
 
 # バックエンド TaskTeam
 cd backend_taskteam
-.venv/Scripts/python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
+.venv/Scripts/python.exe -m uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093 --ws-max-size 20971520
 
 # Command Hermes（対話 CLI）
 cd command_hermes

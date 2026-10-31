@@ -790,7 +790,7 @@ class MattermostAdapter(BasePlatformAdapter):
         ws_url = re.sub(r"^http", "ws", self._base_url) + "/api/v4/websocket"
         logger.info("Mattermost: connecting to %s", ws_url)
 
-        self._ws = await self._session.ws_connect(ws_url, heartbeat=30.0)
+        self._ws = await self._session.ws_connect(ws_url, heartbeat=30.0, max_msg_size=20 * 1024 * 1024)
 
         # Authenticate via the WebSocket.
         auth_msg = {

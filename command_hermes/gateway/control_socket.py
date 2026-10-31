@@ -72,8 +72,8 @@ _MAX_UNIX_PATH = 100
 
 # Requests and responses are single JSON lines. Bound them so a misbehaving
 # peer can't balloon gateway memory.
-_MAX_REQUEST_BYTES = 64 * 1024
-_MAX_RESPONSE_BYTES = 512 * 1024
+_MAX_REQUEST_BYTES = 20 * 1024 * 1024
+_MAX_RESPONSE_BYTES = 20 * 1024 * 1024
 
 _DEFAULT_CLIENT_TIMEOUT = 2.0
 
@@ -282,7 +282,7 @@ class GatewayControlServer:
         old_umask = os.umask(0o177)
         try:
             self._server = await asyncio.start_unix_server(
-                self._handle_connection, path=str(bind_path)
+                self._handle_connection, path=str(bind_path), limit=_MAX_REQUEST_BYTES
             )
         finally:
             os.umask(old_umask)

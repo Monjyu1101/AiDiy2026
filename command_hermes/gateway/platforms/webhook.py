@@ -230,8 +230,8 @@ class WebhookAdapter(BasePlatformAdapter):
 
         # Body size limit (auth-before-body pattern)
         self._max_body_bytes: int = int(
-            config.extra.get("max_body_bytes", 1_048_576)
-        )  # 1MB
+            config.extra.get("max_body_bytes", 20 * 1024 * 1024)
+        )  # 20 MiB default; explicit operator overrides remain unchanged
         self._script_timeout_seconds: int = int(
             config.extra.get(
                 "script_timeout_seconds",

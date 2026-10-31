@@ -49,7 +49,7 @@ export async function startTerminal(project, { spawnTerminal, env = process.env,
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ project, shell: cliLaunch?.name || basename(shell), cli: cliInfo }));
   });
-  const sockets = new WebSocketServer({ noServer: true, maxPayload: 65536, perMessageDeflate: false });
+  const sockets = new WebSocketServer({ noServer: true, maxPayload: 20 * 1024 * 1024, perMessageDeflate: false });
   function sendTools() {
     if (!closed) for (const ws of sockets.clients) {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'tools', online: toolsOnline, enabled: toolsEnabled }));

@@ -63,7 +63,7 @@ DEFAULT_PATH = "/wecom/callback"
 # envelopes (media is delivered out-of-band via MediaId, never inline), so
 # 64 KB is ample for any legitimate message while bounding the work an
 # unauthenticated POST can force before signature verification.
-_MAX_BODY = 65_536
+_MAX_BODY = 20 * 1024 * 1024
 ACCESS_TOKEN_TTL_SECONDS = 7200
 MESSAGE_DEDUP_TTL_SECONDS = 300
 

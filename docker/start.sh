@@ -16,13 +16,13 @@ cd /app
 # Start Backend Core API (core_main) in background
 echo "[1/3] Starting Backend Core API (port ${PORT_CORE})..."
 cd /app/backend_server
-python -m uvicorn core_main:app --host 0.0.0.0 --port "${PORT_CORE}" --log-level info &
+python -m uvicorn core_main:app --host 0.0.0.0 --port "${PORT_CORE}" --log-level info --ws-max-size "${UVICORN_WS_MAX_SIZE:-20971520}" &
 CORE_PID=$!
 sleep 2
 
 # Start Backend Apps API (apps_main) in background
 echo "[2/3] Starting Backend Apps API (port ${PORT_APPS})..."
-python -m uvicorn apps_main:app --host 0.0.0.0 --port "${PORT_APPS}" --log-level info &
+python -m uvicorn apps_main:app --host 0.0.0.0 --port "${PORT_APPS}" --log-level info --ws-max-size "${UVICORN_WS_MAX_SIZE:-20971520}" &
 APPS_PID=$!
 sleep 2
 

@@ -598,7 +598,9 @@ test('Code 添付API: scope/Origin/サイズを検証し、Core echoだけを保
     assert.equal((await post(app, { ...upload, name: '../bad.txt' })).status, 400);
     assert.equal((await post(app, { ...upload, base64: 'invalid' })).status, 400);
     assert.equal((await post(app, { ...upload, base64: Buffer.alloc(4 * 1024 * 1024 + 1).toString('base64') })).status, 400);
-    assert.equal((await post(app, { type: 'input_text', メッセージ内容: 'a'.repeat(1_000_001) })).status, 413, '通常本文の元の上限は緩めない');
+    assert.equal((await post(app, { type: 'input_text', メッセージ内容: 'a'.repeat(200001) })).status, 400, '本文の20万文字という業務上限は緩めない');
+    assert.equal((await post(app, { type: 'input_text', メッセージ内容: 'a'.repeat(1_000_001) })).status, 400, '旧HTTP上限より大きくても本文の業務検証で拒否する');
+    assert.equal((await post(app, { type: 'input_text', メッセージ内容: 'a'.repeat(20 * 1024 * 1024 + 1) })).status, 413, '20MiBを超える要求は転送前に拒否する');
     assert.equal(backend.sockets.flatMap(socket => socket.sent).filter(packet => packet.メッセージ識別 === 'input_file').length, 0);
     assert.equal((await post(app, upload)).status, 200);
     const input = backend.sockets.find(socket => socket.channel === 'input');

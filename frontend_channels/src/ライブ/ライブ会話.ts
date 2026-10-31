@@ -73,7 +73,7 @@ export class Live接続 {
     private transport = 音声トランスポート) {
     this.rate = 入力レート(config.liveModels.LIVE_AI_NAME || '');
     this.core = new LiveConnection(config.coreUrl, packet => this.受信(packet), () => this.失敗('AIコアとの接続が切れました。ボイスチャンネルに入り直してください。'), url => {
-      const socket = new WebSocket(url, { handshakeTimeout: 15000, maxPayload: 8 * 1024 * 1024 });
+      const socket = new WebSocket(url, { handshakeTimeout: 15000, maxPayload: 20 * 1024 * 1024 });
       this.sockets.add(socket);
       socket.once('close', () => this.sockets.delete(socket));
       socket.once('error', error => {

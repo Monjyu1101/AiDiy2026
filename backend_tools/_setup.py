@@ -641,7 +641,7 @@ MCP_MODULES = [
         "server_name": "aidiy_chrome_devtools",   # MCP 設定ファイル上のサーバーキー名
         "dir":         "backend_tools",
         "desc":        "Python / uv / FastAPI / MCP",
-        "start":       "uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095",
+        "start":       "uv run uvicorn tools_main:app --host 0.0.0.0 --port 8095 --ws-max-size 20971520",
         "sse_url":     "http://127.0.0.1:8095/aidiy_chrome_devtools/sse",
         # 同一プロセスで追加公開するサーバー（uv sync は不要、設定書き込みのみ）
         "extra_servers": [

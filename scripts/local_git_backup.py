@@ -14,6 +14,67 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import threading
+from collections import deque
+
+
+_PENDING_LOCK = threading.Lock()
+_PENDING = {}
+
+
+def _load_setup_module():
+    spec = importlib.util.spec_from_file_location("aidiy_local_git_setup", Path(__file__).with_name("local_git_setup.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def queue_local_backup(base_dir, files, *, logger, **exclusions):
+    """コピーとは独立して記録する。同一対象は一つの専用 worker で受付順に実行。"""
+    try:
+        root = Path(base_dir).resolve()
+        # .git のファイル/ディレクトリ/壊れたリンク、親の管理も worker 起動前に保護。
+        if _load_setup_module().has_existing_git_management(root):
+            return False
+        key = os.path.normcase(str(root))
+        job = (tuple(files), {name: tuple(value) for name, value in exclusions.items()}, logger)
+        with _PENDING_LOCK:
+            pending = _PENDING.get(key)
+            if pending is not None:
+                pending.append(job)
+                return True
+            pending = deque([job])
+            _PENDING[key] = pending
+
+            def run():
+                while True:
+                    with _PENDING_LOCK:
+                        if not pending:
+                            del _PENDING[key]
+                            return
+                        paths, options, log = pending.popleft()
+                    try:
+                        # 受付後に .git が現れた場合も .git_local を作成/更新しない。
+                        if _load_setup_module().has_existing_git_management(root):
+                            continue
+                        state, detail = commit_local_backup(root, paths, **options)
+                        if state == "error":
+                            log.warning(detail)
+                        elif state == "created":
+                            log.info("ローカル Git 変更記録を作成しました。")
+                    except Exception:
+                        log.exception("ローカル Git 記録に失敗しました。ファイルバックアップには影響しません。")
+
+            try:
+                thread = threading.Thread(target=run, name="AiDiy-backup-git", daemon=False)
+                thread.start()
+            except Exception:
+                del _PENDING[key]
+                raise
+        return True
+    except Exception:
+        logger.exception("ローカル Git 記録スレッドを開始できませんでした。ファイルバックアップを継続します。")
+        return False
 
 
 @contextmanager
@@ -35,9 +96,7 @@ def commit_local_backup(base_dir, files, *, excluded_dirs=(), excluded_files=(),
     if not git or not root.is_dir():
         return "skipped", ""
     try:
-        spec = importlib.util.spec_from_file_location("aidiy_local_git_setup", Path(__file__).with_name("local_git_setup.py"))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = _load_setup_module()
         # .git_local の有無に関わらず、既存 .git / 親の管理環境を最優先する。
         if module.has_existing_git_management(root):
             return "skipped", ""

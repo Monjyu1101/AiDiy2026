@@ -729,6 +729,7 @@ class WeComAdapter(BasePlatformAdapter):
             self._ws_url,
             heartbeat=HEARTBEAT_INTERVAL_SECONDS * 2,
             timeout=CONNECT_TIMEOUT_SECONDS,
+            max_msg_size=20 * 1024 * 1024,
         )
 
         req_id = self._new_req_id("subscribe")

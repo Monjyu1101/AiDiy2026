@@ -19,7 +19,7 @@ uv run python download_model.py
 uv run python download_model.py google/gemma-4-E2B-it
 
 # 3. 起動（ポート 8096）。temp/models にあればオフラインでロードされる
-uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096
+uv run uvicorn local_main:app --reload --host 0.0.0.0 --port 8096 --ws-max-size 20971520
 # または
 uv run python local_main.py
 ```

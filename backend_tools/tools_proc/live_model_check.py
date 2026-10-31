@@ -27,6 +27,7 @@ CONNECTION_TIMEOUT = 20
 RESPONSE_TIMEOUT = 60
 SETTLE_SECONDS = 15
 MAX_CONFIG = 1024 * 1024
+MAX_BODY_BYTES = 20 * 1024 * 1024  # JSON transport。設定ファイル・prompt の制約とは別。
 TABLE = {
     'freeai_live': ('AIコア.AIライブ_gemini', 'FREEAI', 'freeai_key_id', 'gemini_key_id'),
     'gemini_live': ('AIコア.AIライブ_gemini', 'GEMINI', 'gemini_key_id', 'freeai_key_id'),
@@ -66,9 +67,9 @@ async def validate_request(request):
         raise HTTPException(400, 'valid diagnostic JSON required')
     body = bytearray()
     async for chunk in request.stream():
-        body.extend(chunk)
-        if len(body) > 65536:
+        if len(body) + len(chunk) > MAX_BODY_BYTES:
             raise HTTPException(413, 'request too large')
+        body.extend(chunk)
     try:
         value = json.loads(body)
         return validate_manual(value)

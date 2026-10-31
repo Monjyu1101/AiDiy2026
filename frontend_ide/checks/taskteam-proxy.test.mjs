@@ -43,7 +43,7 @@ test('unknown Core API, GET writes, wrong content type and malformed JSON reject
  assert.equal((await fetch(base+'/taskteam-api/task/test')).status,405);
  assert.equal((await fetch(base+'/taskteam-api/team/test',{method:'POST',body:'{}'})).status,415);
  assert.equal((await fetch(base+'/taskteam-api/team/test',{...post(),body:'not-json'})).status,400);
- assert.equal((await fetch(base+'/taskteam-api/team/test',{...post(),body:' '.repeat(2*1024*1024+1)})).status,413);
+ assert.equal((await fetch(base+'/taskteam-api/team/test',{...post(),body:' '.repeat(20*1024*1024+1)})).status,413);
 });
 test('upstream errors are bounded and return safe feedback',async t=>{
  const {base}=await fixture(t,async()=>{throw Error('secret-detail');});

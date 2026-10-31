@@ -37,7 +37,7 @@ async function createBrowserCDP({directory,canUse,openPanel,allowedURL,sessionPr
    json({ok:true});
   }catch(error){json({error:error.message},409);}
  });
- const ws=new WebSocketServer({noServer:true,maxPayload:8*1024*1024});
+ const ws=new WebSocketServer({noServer:true,maxPayload:20*1024*1024});
  server.on('upgrade',(req,socket,head)=>{
   if(req.headers.origin||req.headers.host!==`127.0.0.1:${port}`){socket.destroy();return;}
   const page=[...pages.values()].find(p=>req.url===`/${token}/devtools/page/${p.id}`);

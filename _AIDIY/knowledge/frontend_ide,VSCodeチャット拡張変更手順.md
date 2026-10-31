@@ -220,6 +220,9 @@ node --test checks/runner.test.cjs checks/code-connection.test.cjs checks/code-e
 
 ## Code / Live のファイル添付と返却画像
 
+- HTTP本文・WebSocketメッセージの転送上限は、20 MiB未満だった固定値を20 × 1024 × 1024 bytesへそろえる。Code / LiveのHTTP中継、Live拡張ホストのAPIとWS双方向、IDEのExplorer・検索・解析・TaskTeam・共有下書き、Console・Browser CDP、Discord・SlackのパネルとDiscord Liveが対象。UTF-8の文字数ではなくbytesで判定する。既存の20 MiB以上・無制限の中継や利用者の明示設定は引き下げない。
+- 転送上限と業務上限は別。下記の添付4 MiB・10件、入力文字数、検索・解析の指示文字数、プレビュー省略、Consoleの入力chunk・未確認出力、Liveの送信待ち量、ファイル専用packet検証、TaskダイアログのIPC上限は維持する。転送できても業務検証で拒否される要求がある。
+- 転送境界は `frontend_ide/checks/transport-limits.test.mjs`、Code / Liveホスト再生成後の `host/aidiy_live/checks/host.test.cjs`、Discord / Slackそれぞれの `checks/transport-limits.test.ts` で確認する。実socketや実APIは不要で、20 MiBちょうど・1byte超過・マルチバイト・分割受信をpure/VM/mockで検証する。
 - 共通Vueの `src/添付ファイル/` と `host/src/file-attachments.ts` を使う。単独起動・IDE・VS Code拡張とも、Core接続中の現在の会話へファイルをドロップする。Codeは「＋ ファイル」でも選べる。オフラインHermesへファイルを自動転送しない。
 - 1件は空でない4 MiB以下、1回は10件まで。全件の名前・サイズを先に検証し、読込後もsession・会話・プロジェクトと接続世代を照合する。切断・会話変更・送信失敗時は残りを中止し、自動再送しない。本文の下書きは保持する。
 - Avatarと同じ `input_file` packetを既存input WebSocketへ渡す。Codeはchannel 1、Liveはchannel 0。既存のHost / Origin / ランダムURL / ワークスペース信頼境界を維持し、ファイル取得用の新規REST中継は追加しない。`/core/files` のJWT認証を迂回しない。

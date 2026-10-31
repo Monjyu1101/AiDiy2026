@@ -86,9 +86,9 @@ class RealtimeSession:
         # (newer) or extra_headers= depending on version; try the newer
         # name first and fall back.
         try:
-            self._ws = connect(url, additional_headers=headers)
+            self._ws = connect(url, additional_headers=headers, max_size=20 * 1024 * 1024)
         except TypeError:
-            self._ws = connect(url, extra_headers=headers)
+            self._ws = connect(url, extra_headers=headers, max_size=20 * 1024 * 1024)
 
         self._send_json(
             {

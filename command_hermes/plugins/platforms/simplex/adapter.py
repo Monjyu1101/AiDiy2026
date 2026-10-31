@@ -248,7 +248,7 @@ class SimplexAdapter(BasePlatformAdapter):
         # Quick connectivity check — try to open and immediately close
         try:
             import websockets as _wsclient
-            async with _wsclient.connect(self.ws_url, open_timeout=10):
+            async with _wsclient.connect(self.ws_url, open_timeout=10, max_size=20 * 1024 * 1024):
                 pass
         except Exception as e:
             logger.error("SimpleX: cannot reach daemon at %s: %s", self.ws_url, e)
@@ -327,6 +327,7 @@ class SimplexAdapter(BasePlatformAdapter):
                     ping_interval=20,
                     ping_timeout=20,
                     close_timeout=10,
+                    max_size=20 * 1024 * 1024,
                 ) as ws:
                     self._ws = ws
                     backoff = WS_RETRY_DELAY_INITIAL
@@ -1301,7 +1302,8 @@ async def _standalone_send(
         }
 
         async with _wsclient.connect(
-            ws_url, open_timeout=10, close_timeout=5
+            ws_url, open_timeout=10, close_timeout=5,
+            max_size=20 * 1024 * 1024,
         ) as ws:
             await ws.send(json.dumps(payload))
             # Give the daemon a moment to process the command before closing.

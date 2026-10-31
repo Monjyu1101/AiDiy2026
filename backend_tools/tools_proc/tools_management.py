@@ -18,6 +18,8 @@ from tools_proc.tools_settings import CONFIG_PATH, CHOICES, load_tools_settings
 
 logger = logging.getLogger(__name__)
 
+MAX_BODY_BYTES = 20 * 1024 * 1024  # Node / FastAPI 共通の transport 基準 (20 MiB)
+
 
 def unavailable(tool_id):
     return {"status": "NG", "available": False, "service_status": "out_of_service",
@@ -195,11 +197,11 @@ def register_management(app, manager, auth=authenticate):
                     raise HTTPException(403, "同じ画面から操作してください。")
                 if request.headers.get("content-type", "").split(";")[0] != "application/json":
                     raise HTTPException(400, "JSONが必要です。")
-                data = b""
+                data = bytearray()
                 async for chunk in request.stream():
-                    data += chunk
-                    if len(data) > 32768:
+                    if len(data) + len(chunk) > MAX_BODY_BYTES:
                         raise HTTPException(413, "入力が大きすぎます。")
+                    data.extend(chunk)
                 try:
                     body = json.loads(data)
                 except ValueError:

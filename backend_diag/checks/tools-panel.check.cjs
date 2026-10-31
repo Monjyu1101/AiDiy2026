@@ -62,3 +62,16 @@ test('Tools: 初期DOMはloginだけ、Core/Tools停止中は操作画面を出�
 test('Tools: システム起動の直前へ追加し、全テスト対象には混ぜない',()=>{const app=source('App.vue');assert.match(app,/class="tab-tools"[\s\S]*?>Tools<\/button><button class="tab-launch"/);assert.match(app,/tab!=='apps'&&tab!=='settings'&&tab!=='tools'/);assert.match(app,/:core-online="起動.Core利用可能.value" :tools-online="toolsOnline"/);assert.doesNotMatch(app.match(/async function 全診断\(\)[\s\S]*?async function changeTab/)[0],/Tools|tools/);});
 test('Tools: Chrome代表は固定ブラウザ起動/終了だけ、URL・コマンド・有料APIを渡さない',async()=>{const{Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const calls=[];const call=async(...args)=>calls.push(clone(args));const def=Tools代表テスト.aidiy_chrome_devtools;assert.match(def.description,/headless条件.*終了.*再テスト/);assert.equal(Object.keys(Tools代表テスト).length,20);assert.equal((await def.run({call,input:{headless:true,url:'https://ignored.invalid',command:'ignored'}})).status,'OK');await def.close({call});assert.deepEqual(calls,[['Tools/representative',{operation:'open',headless:true}],['Tools/representative',{operation:'close',headless:false}]]);});
 test('Tools: 代表testの認証期限切れも一覧と実行結果を消して再ログインへ戻す',async()=>{const{Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const{state}=setup({代表テスト:Tools代表テスト,api:async path=>path.endsWith('ログイン')?{status:'OK',data:{access_token:'token'}}:path.endsWith('representative')?{authExpired:true}:{status:'OK',data:baseline()}});await login(state);assert.equal(await state.テスト('aidiy_chrome_devtools'),false);assert.equal(state.認証済み.value,false);assert.equal(Object.keys(state.結果.value).length,0);assert.match(state.通知.value,/有効期限/);state.終了();});
+
+test('Backup: 初期true・選択したfalseの再利用・中止後の古い応答破棄を維持',async()=>{
+ const {Tools代表テスト}=dependency('Tools/Tools代表テスト.mjs');const sent=[];let delayed=null;
+ const {state}=setup({代表テスト:Tools代表テスト,api:async(path,method,signal,format,body)=>{
+  if(path.endsWith('ログイン'))return{status:'OK',data:{access_token:'fixture-token'}};
+  if(path.endsWith('representative')){sent.push(body.data.batch);if(delayed)return delayed.promise;return{status:'OK',data:{summary:body.data.batch?'受付（完了未確認）':'完了'}};}
+  return{status:'OK',data:{tools:[{id:'aidiy_backup',enabled:true,available:true}],defaults:{},schema:{}}};
+ }});
+ await login(state);assert.equal(await state.テスト('aidiy_backup'),true);assert.equal(sent[0],true);
+ state.テスト条件.value.aidiy_backup={batch:false};state.選択ID.value='other';state.選択ID.value='aidiy_backup';await state.テスト('aidiy_backup');await state.一括テスト();assert.deepEqual(sent,[true,false,false]);
+ delayed=deferred();const run=state.テスト('aidiy_backup');await new Promise(r=>setImmediate(r));state.テスト中止();assert.equal(state.結果.value.aidiy_backup.status,'中止');assert.match(state.結果.value.aidiy_backup.message,/待機を中止/);delayed.resolve({status:'OK',data:{summary:'late'}});assert.equal(await run,false);assert.notEqual(state.結果.value.aidiy_backup.message,'late');
+ delayed=null;assert.equal(await state.テスト('aidiy_backup'),true);assert.equal(sent.at(-1),false);state.終了();
+});

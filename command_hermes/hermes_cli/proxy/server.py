@@ -64,9 +64,9 @@ _HOP_BY_HOP_HEADERS = frozenset(
 DEFAULT_PORT = 8645
 DEFAULT_HOST = "127.0.0.1"
 # Body cap for forwarded requests. Chat-completion payloads with long agent
-# conversations can be large; mirror api_server's MAX_REQUEST_BYTES (10 MB).
+# conversations can be large; mirror api_server's MAX_REQUEST_BYTES (20 MiB).
 # client_max_size bounds every read path, including chunked bodies.
-MAX_REQUEST_BYTES = 10_000_000
+MAX_REQUEST_BYTES = 20 * 1024 * 1024
 
 
 def _json_error(status: int, message: str, code: str = "proxy_error") -> "web.Response":

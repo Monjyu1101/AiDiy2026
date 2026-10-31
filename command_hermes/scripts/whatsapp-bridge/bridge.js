@@ -780,7 +780,7 @@ async function startSocket() {
 
 // HTTP server
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: 20 * 1024 * 1024 }));
 
 // Host-header validation — defends against DNS rebinding.
 // The bridge binds loopback-only (127.0.0.1) but a victim browser on

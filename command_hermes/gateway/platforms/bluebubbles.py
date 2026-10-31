@@ -89,9 +89,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WEBHOOK_HOST = "127.0.0.1"
 # BlueBubbles webhook events are small JSON/form payloads; attachments come
-# through the REST API, not the webhook. 1 MiB is generous headroom while
+# through the REST API, not the webhook. The 20 MiB transport cap provides headroom while
 # keeping oversized/chunked bodies from being buffered unbounded.
-_WEBHOOK_MAX_BODY_BYTES = 1_048_576
+_WEBHOOK_MAX_BODY_BYTES = 20 * 1024 * 1024
 DEFAULT_WEBHOOK_PORT = 8645
 DEFAULT_WEBHOOK_PATH = "/bluebubbles-webhook"
 MAX_TEXT_LENGTH = 4000

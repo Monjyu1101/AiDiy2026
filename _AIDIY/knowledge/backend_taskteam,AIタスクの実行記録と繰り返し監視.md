@@ -170,7 +170,7 @@ AI エージェントが直接呼ぶ用の ASCII 専用エンドポイントと�
 ```powershell
 cd backend_taskteam
 uv sync
-uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093
+uv run uvicorn taskteam_main:app --reload --host 0.0.0.0 --port 8093 --ws-max-size 20971520
 ```
 
 通常運用はプロジェクトルートの `python _start.py` で `バックエンド(task,team)` を選択します。ルート起動は `--reload` なしです。コード変更の反映は個別起動の `--reload` または `backend_taskteam/temp/reboot_taskteam.txt` を使います。

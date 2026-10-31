@@ -22,7 +22,8 @@ async function createSharedDraftBridge({directory,records,router,readState,sessi
   const reply=(value,status=200)=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));};
   if(req.method!=='POST'||req.headers.origin||req.headers.host!==`127.0.0.1:${port}`||!req.url.startsWith('/'+token+'/')){reply({ok:false},403);return;}
   try{
-   let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>850000)throw Error('要求が大きすぎます。');}
+   const chunks=[];let bytes=0;for await(const chunk of req){bytes+=chunk.length;if(bytes>20*1024*1024)throw Error('要求が大きすぎます。');chunks.push(chunk);}
+   const text=Buffer.concat(chunks).toString('utf8');
    const data=JSON.parse(text);if(typeof data.projectPath!=='string')throw Error('プロジェクトが不正です。');
    const groups=await local(data.projectPath);
    if(req.url===`/${token}/list`){reply({ok:true,targets:groups.flatMap(({list})=>list.targets.map(t=>({...t,targetSessionKey:list.sessionKey})))});return;}

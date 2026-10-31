@@ -4,7 +4,8 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import http from 'node:http';
-import {createToolsSettingsBridge,createToolsRepresentativeBridge,TOOLS_SETTINGS_ACTIONS,TOOLS_SETTINGS_BODY_LIMIT} from './Tools/設定接続.mjs';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from './runtime/transport_limit.mjs';
+import {createToolsSettingsBridge,createToolsRepresentativeBridge,TOOLS_SETTINGS_ACTIONS,TOOLS_SETTINGS_BODY_LIMIT,BACKUP_REPRESENTATIVE_RESPONSE_TIMEOUT_MS,TOOLS_REPRESENTATIVE_BYTE_LIMIT} from './Tools/設定接続.mjs';
 import {createCoreSettingsBridge,AI_SETTINGS_ACTIONS,AI_SETTINGS_BODY_LIMIT} from './AI設定/コア設定接続.mjs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -30,6 +31,18 @@ import {createCliLauncher} from './起動/CLI起動.mjs';
 import {createVSCodeLauncher} from './起動/VSCode起動.mjs';
 import {createPortStatusChecker} from './起動/ポート状態.mjs';
 import {createWebBrowserOpener} from './起動/Webブラウザ.mjs';
+
+// 同じkeep-alive socketの複数要求が先後逆に終わっても、最後の待機終了時だけ復元する。
+const backupResponseTimeouts=new WeakMap();
+function extendBackupResponseTimeout(req){
+ const socket=req.socket;if(!socket||typeof socket.setTimeout!=='function')return ()=>{};
+ let state=backupResponseTimeouts.get(socket);
+ if(!state){state={previous:socket.timeout,users:0};backupResponseTimeouts.set(socket,state);}
+ // ServerResponse.setTimeout は未割当のpipeline応答に遅延listenerを残すので使わない。
+ state.users++;socket.setTimeout(BACKUP_REPRESENTATIVE_RESPONSE_TIMEOUT_MS);
+ let released=false;
+ return ()=>{if(released)return;released=true;if(--state.users)return;backupResponseTimeouts.delete(socket);if(Number.isFinite(state.previous)&&!socket.destroyed&&socket.timeout===BACKUP_REPRESENTATIVE_RESPONSE_TIMEOUT_MS)socket.setTimeout?.(state.previous);};
+}
 
 // 外部例外の本文・パス・引数はログへ出さず、固定の原因分類だけを表示する。
 const STARTUP_MESSAGES=Object.freeze({
@@ -114,7 +127,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const action=route.slice((isTools?'api/Tools/':'api/AI設定/').length);
         const isRepresentative=isTools&&action==='representative';
         const actions=isRepresentative?{representative:true}:isTools?TOOLS_SETTINGS_ACTIONS:AI_SETTINGS_ACTIONS;
-        const bodyLimit=isTools?TOOLS_SETTINGS_BODY_LIMIT:AI_SETTINGS_BODY_LIMIT;
+        const bodyLimit=isRepresentative?TOOLS_REPRESENTATIVE_BYTE_LIMIT:isTools?TOOLS_SETTINGS_BODY_LIMIT:AI_SETTINGS_BODY_LIMIT;
         const bridge=isRepresentative?(_action,body,options)=>toolsRepresentativeBridge(body,options):isTools?toolsSettingsBridge:coreSettingsBridge;
         if(!Object.hasOwn(actions,action))return reply(404,{エラー:'操作が見つかりません。'});
         if(req.method!=='POST')return reply(405,{エラー:'POST を使用してください。'});
@@ -128,10 +141,12 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const chunks=[];let size=0;
         for await(const chunk of req){size+=chunk.length;if(size>bodyLimit)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
+        const backupResponse=isRepresentative&&body?.data?.operation==='test'&&body?.data?.tool==='aidiy_backup';
+        const restoreTimeout=backupResponse?extendBackupResponseTimeout(req):()=>{};
         const controller=new AbortController();const cancel=()=>controller.abort();res.on?.('close',cancel);
         try{return reply(200,await bridge(action,body,{signal:controller.signal}));}
         catch(error){return reply(error.status||503,{エラー:error.status?error.message:'Core への接続を確認してください。'});}
-        finally{res.off?.('close',cancel);}
+        finally{res.off?.('close',cancel);restoreTimeout();}
       }
       if(route==='api/導入管理'&&req.method==='GET')return reply(200,await management.snapshot());
       if(route?.startsWith('api/導入管理/')&&['POST','DELETE'].includes(req.method)){
@@ -150,7 +165,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const editor=route==='api/VSCode起動/開始';
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
         const chunks=[];let size=0;
-        for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        for await(const chunk of req){size+=chunk.length;if(size>DIAG_TRANSPORT_BYTE_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
         if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!(editor?['フォルダ']:['対象','フォルダ','自動承認確認']).includes(key)))return reply(400,{エラー:'入力が不正です。'});
         try{return reply(202,(editor?await vscodeLauncher.launch(body.フォルダ):await cliLauncher.launch(body.対象,body.フォルダ,body.自動承認確認)));}
@@ -161,7 +176,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if(!['api/アプリ起動/開始','api/アプリ起動/フォルダ'].includes(route))return reply(404,{エラー:'見つかりません。'});
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
         const chunks=[];let size=0;
-        for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        for await(const chunk of req){size+=chunk.length;if(size>DIAG_TRANSPORT_BYTE_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
         const keys=route.endsWith('/開始')?['対象','フォルダ']:['フォルダ'];
         if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!keys.includes(key)))return reply(400,{エラー:'入力が不正です。'});
@@ -178,7 +193,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         if(!['api/起動/設定','api/起動/再起動','api/起動/停止','api/起動/強制停止','api/起動/ログ','api/起動/ブラウザ'].includes(route))return reply(404,{エラー:'見つかりません。'});
         if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
         const chunks=[];let size=0;
-        for await(const chunk of req){size+=chunk.length;if(size>8192)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+        for await(const chunk of req){size+=chunk.length;if(size>DIAG_TRANSPORT_BYTE_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
         let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
         if(!body||typeof body!=='object'||Array.isArray(body))return reply(400,{エラー:'入力が不正です。'});
         const keys=route.endsWith('/ブラウザ')||route.endsWith('/強制停止')?[]:route.endsWith('/設定')?['対象','設定']:route.endsWith('/ログ')?['対象','位置']:['対象'];
@@ -210,7 +225,7 @@ export function createHandler({token, prefix='/', entries=[], coverage={}, scanF
         const controller=new AbortController(),abort=()=>{if(!res.writableEnded)controller.abort();};res.once('close',abort);
         try{
           if(String(req.headers['content-type']).split(';')[0]!=='application/json')return reply(400,{エラー:'JSON形式の入力が必要です。'});
-          const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>65536)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
+          const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>DIAG_TRANSPORT_BYTE_LIMIT)return reply(413,{エラー:'入力が大きすぎます。'});chunks.push(chunk);}
           let manual;try{manual=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return reply(400,{エラー:'入力JSONが不正です。'});}
           if(!manual||typeof manual!=='object'||Array.isArray(manual))return reply(400,{エラー:'入力が不正です。'});
           if(Object.hasOwn(manual,'items')){if(Object.keys(manual).length!==1)return reply(400,{エラー:'一括試行の入力が不正です。'});return reply(200,await modelTrials.start({signal:controller.signal,manuals:manual.items}));}

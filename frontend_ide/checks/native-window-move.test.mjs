@@ -8,16 +8,19 @@ import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import vm from 'node:vm';
 import nativeMove from '../デスクトップ/長押し窓移動.cjs';
+import codeDrag from '../デスクトップ/code-drag.cjs';
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
-function fixture(kind='viewer',target=()=>Promise.resolve(1),arm=()=>Promise.resolve(true)){
+function fixture(kind='viewer',target=()=>Promise.resolve(1),arm=()=>Promise.resolve(true),realDrag=false){
  const contents=new EventEmitter(),window=new EventEmitter(),timers=new Map(),ticks=new Map(),inputs=[],calls=[],sent=[],queries=[];
- let cursor={x:100,y:100},serial=0,time=0;
+ let cursor={x:100,y:100},serial=0,time=0,bounds={x:50,y:60,width:400,height:300};
+ const positions=[],leases=new Map();
  const emit=(type,extra={})=>{const event={preventDefault(){this.prevented=true;}},mouse={type,x:20,y:30,button:'left',clickCount:1,...extra};contents.emit('before-mouse-event',event,mouse);if(!event.prevented)inputs.push(mouse);return event;};
  Object.assign(contents,{isDestroyed:()=>false,getZoomFactor:()=>1,executeJavaScript:async()=>{},executeJavaScriptInIsolatedWorld:(world,scripts)=>{const action=scripts[0].code.match(/\)\("(install|query|arm|disarm|dispose)",/)[1];queries.push({world,scripts,action});return action==='query'?target():action==='arm'?arm():Promise.resolve(true);},sendInputEvent:input=>{sent.push(input);return emit(input.type,input);},insertCSS:async()=> 'move-css',removeInsertedCSS:async key=>calls.push(['css-remove',key])});
- Object.assign(window,{webContents:contents,isDestroyed:()=>false,isMaximized:()=>false,isFullScreen:()=>false});
+ Object.assign(window,{webContents:contents,isDestroyed:()=>false,isMaximized:()=>false,isFullScreen:()=>false,isFocused:()=>true,getBounds:()=>({...bounds}),setBounds:value=>{bounds={...value};positions.push({...value});}});
  const record={kind,window};
- const dispose=nativeMove.installNativeWindowMove({record,screen:{getCursorScreenPoint:()=>({...cursor})},drag:{forRecord:r=>{assert.equal(r,record);return{begin:()=>{calls.push(['begin']);return'token';},move:()=>{calls.push(['move']);return true;},end:()=>calls.push(['end'])};}},setTimer:(fn,delay)=>{assert.equal(delay,500);timers.set(++serial,{fn,at:time+delay});return serial;},clearTimer:id=>timers.delete(id),setTick:fn=>{ticks.set(++serial,fn);return serial;},clearTick:id=>ticks.delete(id)});
- return{emit,contents,window,timers,ticks,inputs,calls,sent,queries,dispose,advance:async(ms=500)=>{time+=ms;for(const [id,timer]of [...timers])if(timer.at<=time){timers.delete(id);timer.fn();}for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
+ const realController=realDrag?codeDrag.createCodeDrag({trustedEvent:()=>null,screen:{getCursorScreenPoint:()=>({...cursor})},setTimer:fn=>{leases.set(++serial,fn);return serial;},clearTimer:id=>leases.delete(id)}):null;
+ const dispose=nativeMove.installNativeWindowMove({record,screen:{getCursorScreenPoint:()=>({...cursor})},drag:realController||{forRecord:r=>{assert.equal(r,record);return{begin:()=>{calls.push(['begin']);return'token';},move:()=>{calls.push(['move']);return true;},end:()=>calls.push(['end'])};}},setTimer:(fn,delay)=>{assert.equal(delay,500);timers.set(++serial,{fn,at:time+delay});return serial;},clearTimer:id=>timers.delete(id),setTick:fn=>{ticks.set(++serial,fn);return serial;},clearTick:id=>ticks.delete(id)});
+ return{emit,contents,window,timers,ticks,inputs,calls,sent,queries,positions,leases,dispose,advance:async(ms=500)=>{time+=ms;for(const [id,timer]of [...timers])if(timer.at<=time){timers.delete(id);timer.fn();}for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
 }
 test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止gestureだけを移動',async()=>{
  for(const kind of ['explorer','panel-routes']){
@@ -28,21 +31,34 @@ test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止
   assert.notEqual(f.emit('mouseUp').prevented,true);assert.ok(f.calls.some(call=>call[0]==='end'));assert.equal(f.ticks.size,0);f.dispose();
  }
 });
+test('Discord・Slackは実共有controllerまで通り、長押し移動・解放・再操作・blurを保つ',async()=>{
+ for(const kind of ['discord','slack']){
+  const f=fixture(kind,undefined,undefined,true);
+  f.emit('mouseDown');await f.advance(499);assert.equal(f.ticks.size,0,kind);
+  await f.advance(1);assert.equal(f.ticks.size,1,kind);assert.equal(f.leases.size,1,kind);
+  f.cursor({x:-300,y:70});assert.equal(f.emit('mouseMove').prevented,true,kind);
+  assert.deepEqual(f.positions.at(-1),{x:-350,y:30,width:400,height:300},kind);
+  assert.notEqual(f.emit('mouseUp').prevented,true,kind);assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);
+  f.emit('mouseDown');await f.advance();assert.equal(f.ticks.size,1,kind);
+  f.window.emit('blur');assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);f.dispose();
+  assert.equal(f.contents.listenerCount('before-mouse-event'),0);
+ }
+});
 test('全パネル: nativeのdown/upを直ちに一度だけ渡し、短押しを再送しない',async()=>{
- for(const kind of ['ide','code','live','console','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord']){
+ for(const kind of ['ide','code','live','console','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord','slack']){
   const f=fixture(kind);assert.notEqual(f.emit('mouseDown').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown']);assert.equal(f.calls.length,0);
   assert.notEqual(f.emit('mouseUp').prevented,true);await f.advance();assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.equal(f.timers.size,0);assert.deepEqual(f.sent,[]);assert.deepEqual(f.calls,[]);f.dispose();
  }
 });
 test('背景の長押しだけ移動し、移動後もnative upを渡して次のクリックを妨げない',async()=>{
- for(const kind of ['browser','diag','avatar','discord']){
+ for(const kind of ['browser','diag','avatar','discord','slack']){
  const f=fixture(kind);f.emit('mouseDown');f.emit('mouseMove');await f.advance();assert.deepEqual(f.calls,[['begin']]);
  f.cursor({x:-300,y:70});f.emit('mouseMove');assert.ok(f.calls.some(c=>c[0]==='move'));assert.notEqual(f.emit('mouseUp').prevented,true);assert.equal(f.inputs.filter(i=>i.type==='mouseDown').length,1);assert.equal(f.inputs.filter(i=>i.type==='mouseUp').length,1);f.inputs.length=0;assert.equal(f.ticks.size,0);
  f.emit('mouseDown');f.emit('mouseUp');assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);f.dispose();
  }
 });
 test('操作部品では長押しでもnative入力を遮断・再送せず、移動を開始しない',async()=>{
- for(const kind of ['code','live','diag','avatar','discord']){
+ for(const kind of ['code','live','diag','avatar','discord','slack']){
   const f=fixture(kind,async()=>false);assert.notEqual(f.emit('mouseDown').prevented,true);await f.advance();
   assert.notEqual(f.emit('mouseUp').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.deepEqual(f.sent,[]);assert.deepEqual(f.calls,[]);assert.equal(f.timers.size,0);f.dispose();
  }

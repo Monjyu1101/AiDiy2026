@@ -10,7 +10,7 @@ export const 代表試験 = {
  aidiy_postgres: {method:'query',body:{sql:'SELECT 1 AS diag_test',max_rows:1,allow_write:false},check:query,summary:()=> 'SELECT 1 の結果: 1（読取専用）'},
  aidiy_logs: {method:'list',body:{},check:r=>array(r.logs,'server')&&array(r.logs,'mcp'),summary:r=>`ログ登録: ${r.logs.server.length+r.logs.mcp.length}件`},
  aidiy_code_check: {method:'python_syntax',body:{file_path:'backend_tools/tools_main.py',venv_project:'backend_tools'},check:r=>r.ok===true,summary:()=> 'tools_main.py の Python 構文チェックに成功しました。'},
- aidiy_backup: {method:'save/scan',body:{},check:r=>Number.isInteger(r.count)&&r.count>=0&&array(r,'差分ファイル')&&r.count===r.差分ファイル.length,summary:r=>`差分: ${r.count}件（バックアップは作成していません）`},
+ aidiy_backup: {method:'save/run',body:{batch:false},check:r=>r.ok===true&&typeof r.batch==='boolean'&&Number.isSafeInteger(r.バックアップ件数)&&r.バックアップ件数>=0&&Number.isSafeInteger(r.全件数)&&r.全件数>=r.バックアップ件数,summary:r=>r.batch?`バックアップ受付: 予定 ${r.バックアップ件数}件（コピー完了は未確認）。完了・失敗はToolsログで確認してください。`:`バックアップ完了: ${r.バックアップ件数}件。`},
  aidiy_obs_studio_control: {method:'list_scenes',body:{},check:r=>array(r,'scenes'),summary:r=>count(r,'scenes','OBSシーン')},
  aidiy_ffmpeg_control: {method:'ffmpeg_run',body:{args_str:'-hide_banner -f lavfi -i anullsrc=r=8000:cl=mono -t 0.1 -f null -',timeout_sec:10},check:r=>r.returncode===0,summary:()=> '0.1秒の無音を処理しました（保存・再生なし）。'},
  aidiy_notification_sounds: {method:'play',body:{notification_type:'完了',scene:'legacy'},check:r=>r.status==='ok'&&r.scene==='legacy'&&r.notification_type==='完了',summary:()=> '通知音の再生処理を受け付けました。音が聞こえたか確認してください。'},

@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 // Diag の起動認証とは別に、Core の利用者認証を毎回検証する固定用途の中継。
 import http from 'node:http';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import {createHash} from 'node:crypto';
 import {readConfig} from '../runtime/model_probe.mjs';
 
@@ -13,8 +14,8 @@ export const AI_SETTINGS_ACTIONS=Object.freeze({
   初期化:'/core/AIコア/初期化', 取得:'/core/AIコア/モデル情報/取得',
   設定:'/core/AIコア/モデル情報/設定', フォルダ参照:'/core/AIコア/フォルダ参照',
 });
-export const AI_SETTINGS_BODY_LIMIT=128*1024;
-const RESPONSE_LIMIT=2*1024*1024;
+export const AI_SETTINGS_BODY_LIMIT=DIAG_TRANSPORT_BYTE_LIMIT;
+const RESPONSE_LIMIT=DIAG_TRANSPORT_BYTE_LIMIT;
 const failure=(status,message)=>Object.assign(new Error(message),{status});
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const safeText=(value,max=8192)=>typeof value==='string'&&value.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value);
@@ -56,16 +57,16 @@ function bounded(promise,signal,timeoutMs){
 }
 function requestCore({port,path,token,data,signal,timeoutMs}){
  return new Promise((resolve,reject)=>{
-  let req,res,done=false;
-  const finish=(error,result)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();error?reject(error):resolve(result);};
+  let req,res,done=false;const chunks=[];
+  const finish=(error,result)=>{if(done)return;done=true;chunks.length=0;clearTimeout(timer);signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();error?reject(error):resolve(result);};
   const abort=()=>finish(failure(503,'Core への接続を中止しました。'));
   const timer=setTimeout(()=>finish(failure(503,'Core の応答を確認できませんでした。')),timeoutMs);
   signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)return abort();
   const payload=Buffer.from(JSON.stringify(data));
   req=http.request({hostname:'127.0.0.1',port,path:encodeURI(path),method:'POST',agent:false,maxHeaderSize:8192,headers:{'Content-Type':'application/json','Content-Length':payload.length,Accept:'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}},incoming=>{
-   res=incoming;const chunks=[];let size=0;
+   res=incoming;if(done){res.destroy();return;}let size=0;
    res.on('error',abort);res.on('aborted',abort);
-   res.on('data',chunk=>{size+=chunk.length;if(size>RESPONSE_LIMIT)return finish(failure(502,'Core の応答が大きすぎます。'));chunks.push(chunk);});
+   res.on('data',chunk=>{if(done)return;size+=chunk.length;if(size>RESPONSE_LIMIT)return finish(failure(502,'Core の応答が大きすぎます。'));chunks.push(chunk);});
    res.on('end',()=>{if(done)return;if(res.statusCode===401||res.statusCode===403)return finish(null,{authExpired:true});if(res.statusCode<200||res.statusCode>=300)return finish(failure(503,'Core の応答を確認できませんでした。'));try{const body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)));if(!object(body))throw Error();finish(null,body);}catch{finish(failure(502,'Core の応答形式が不正です。'));}});
    res.on('close',()=>{if(!res.complete)abort();});
   });req.on('error',abort);req.end(payload);

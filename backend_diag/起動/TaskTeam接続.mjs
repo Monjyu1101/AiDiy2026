@@ -4,6 +4,7 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import http from 'node:http';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
@@ -20,14 +21,14 @@ export function createTaskTeamStatus({root,reader=readFile,request=http.request,
   }catch{return {利用可能:false,無効理由:'Task / Team バックエンドのポート設定を確認してください。'};}
   const online=await new Promise(resolve=>{
    let req,res,done=false,size=0;const chunks=[];
-   const finish=ok=>{if(done)return;done=true;clearTimeout(timer);res?.destroy();req?.destroy();resolve(ok);};
+   const finish=ok=>{if(done)return;done=true;chunks.length=0;clearTimeout(timer);res?.destroy();req?.destroy();resolve(ok);};
    const timer=setTimeout(()=>finish(false),timeoutMs);
    try{
     req=request({hostname:'127.0.0.1',port,path:'/health',method:'GET',agent:false,maxHeaderSize:8192,headers:{Accept:'application/json'}},incoming=>{
      res=incoming;if(done){res.destroy();return;}if(res.statusCode!==200)return finish(false);
      res.on('error',()=>finish(false));res.on('aborted',()=>finish(false));
-     res.on('data',chunk=>{size+=chunk.length;if(size>16384)return finish(false);chunks.push(chunk);});
-     res.on('end',()=>{try{const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));finish(data.status==='OK'&&data.service==='backend_taskteam');}catch{finish(false);}});
+     res.on('data',chunk=>{if(done)return;size+=chunk.length;if(size>DIAG_TRANSPORT_BYTE_LIMIT)return finish(false);chunks.push(chunk);});
+     res.on('end',()=>{if(done)return;try{const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));finish(data.status==='OK'&&data.service==='backend_taskteam');}catch{finish(false);}});
     });req.on('error',()=>finish(false));req.end();
    }catch{finish(false);}
   });

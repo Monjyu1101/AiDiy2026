@@ -20,6 +20,10 @@ import difflib
 import importlib.util
 import os
 import re
+import shutil
+import tempfile
+import threading
+from types import SimpleNamespace
 from datetime import datetime
 from typing import Optional
 
@@ -60,6 +64,60 @@ def _load_native_module():
     return module
 
 
+# 同一プロセスの同一対象では、計画中・コピー中を含めて重複実行しない。
+_RUNS_LOCK = threading.Lock()
+_RUNS = {}
+
+
+def _finish_run(key, record):
+    with _RUNS_LOCK:
+        if _RUNS.get(key) is record:
+            del _RUNS[key]
+        record.done.set()
+
+
+def _start_batch_copy(native, base_path, file_list, target_dir, key, record):
+    files = tuple(file_list)
+
+    def copy():
+        staging = None
+        try:
+            parent = os.path.dirname(target_dir)
+            os.makedirs(parent, exist_ok=True)
+            # 時刻フォルダとして読まれない一時名。完了前・失敗時は保存履歴にしない。
+            staging = tempfile.mkdtemp(prefix=".pending-", dir=parent)
+            if not native._ファイルコピー実行(base_path, list(files), staging):
+                raise BackupSaveError("ファイルコピーに失敗しました。")
+            if not all(os.path.isfile(os.path.join(staging, name)) for name in files):
+                raise BackupSaveError("コピー対象の一部を保存できませんでした。")
+            if os.path.exists(target_dir):
+                raise BackupSaveError("保存先が既に存在するため上書きしません。")
+            os.rename(staging, target_dir)
+            staging = None
+            native.logger.info(f"バッチバックアップ完了(件数={len(files)}, 保存先={target_dir})")
+        except Exception:
+            native.logger.exception(f"バッチバックアップ失敗(対象={base_path})")
+        finally:
+            try:
+                if staging is not None:
+                    shutil.rmtree(staging)
+            except OSError:
+                native.logger.exception("バッチバックアップ一時領域の削除に失敗しました。")
+            finally:
+                # 速いコピーが受付結果の確定前に重複防止を解除しないようにする。
+                record.ready.wait()
+                _finish_run(key, record)
+
+    thread = threading.Thread(target=copy, name="AiDiy-backup-copy", daemon=False)
+    record.thread = thread
+    try:
+        thread.start()
+    except BaseException:
+        record.thread = None
+        raise
+    return True
+
+
 class BackupSave:
     """AiDiy ネイティブのバックアップ機能を MCP から実行するラッパー"""
 
@@ -74,22 +132,49 @@ class BackupSave:
             self._native = _load_native_module()
         return self._native
 
-    def run(self) -> dict:
-        """ネイティブ `バックアップ実行` を呼び出して差分バックアップを作成する。"""
-        native = self._get_native()
-        try:
-            result = native.バックアップ実行(
-                アプリ設定=None,
-                backend_dir=self.backend_dir,
-                セッション設定={"CODE_BASE_PATH": self.root},
-                ログ出力=False,
-            )
-        except Exception as e:
-            raise BackupSaveError(f"バックアップ実行中に例外: {e}") from e
+    def run(self, batch: bool = False) -> dict:
+        """batch=True はコピー受付を返す。件数・保存先は予定値で、完了ではない。"""
+        if type(batch) is not bool:
+            raise BackupSaveError("batch は true / false で指定してください。")
+        key = os.path.normcase(os.path.realpath(self.root))
+        while True:
+            with _RUNS_LOCK:
+                pending = _RUNS.get(key)
+                if pending is None:
+                    record = SimpleNamespace(ready=threading.Event(), done=threading.Event(), thread=None)
+                    _RUNS[key] = record
+                    break
+            if batch:
+                # batch は同期/非同期の先行要求を待たず、既存失敗形式で再試行を案内する。
+                return {**self._result(None, True), "error": "同じ対象のバックアップを実行中です。完了後に再試行してください。"}
+            pending.done.wait()  # 通常要求は先行コピーの実完了後に従来の同期処理を行う。
 
+        try:
+            native = self._get_native()
+            options = {}
+            if batch:
+                options["コピー実行"] = lambda base, files, target: _start_batch_copy(
+                    native, base, files, target, key, record)
+            result = native.バックアップ実行(
+                アプリ設定=None, backend_dir=self.backend_dir,
+                セッション設定={"CODE_BASE_PATH": self.root}, ログ出力=False, **options,
+            )
+            response = self._result(result, batch)
+            return response
+        except Exception as exc:
+            error = BackupSaveError(f"バックアップ実行中に例外: {exc}")
+            raise error from exc
+        finally:
+            record.ready.set()
+            if record.thread is None:
+                _finish_run(key, record)
+
+    @staticmethod
+    def _result(result, batch):
         if result is None:
             return {
                 "ok": False,
+                "batch": batch,
                 "error": "バックアップが中止されました。サーバーログを確認してください。",
                 "最終時刻": "",
                 "全件数": 0,
@@ -103,6 +188,7 @@ class BackupSave:
         changed = changed_files or []
         return {
             "ok": True,
+            "batch": batch,
             "最終時刻": 最終時刻,
             "全件数": len(all_files or []),
             "バックアップ件数": len(changed),

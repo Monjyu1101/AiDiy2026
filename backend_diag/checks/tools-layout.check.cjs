@@ -9,9 +9,9 @@ const css=parseCss(source('Tools/Tools.css'));
 function rule(selector,media){let found;css.walkRules(node=>{if(node.selector===selector&&(media?node.parent.params===media:node.parent.type==='root'))found=node;});assert.ok(found,selector);return found;}
 function declarations(selector,media){return Object.fromEntries(rule(selector,media).nodes.filter(n=>n.type==='decl').map(n=>[n.prop,n.value]));}
 const rows=[{id:'aidiy_chrome_devtools',label:'Chrome',enabled:true,available:true,status:'OK',defaultsKey:null},{id:'aidiy_text_to_speech',label:'Speech',enabled:true,available:true,status:'OK',defaultsKey:'text_to_speech'}];
-async function authenticated(selected=rows[0],extraRows=[]){
+async function authenticated(selected=rows[0],extraRows=[],busy=false){
  const state=dependency('Tools/Tools状態.mjs').Tools状態を作成({api:()=>assert.fail('SSRからAPIを呼ばない'),代表テスト:dependency('Tools/Tools代表テスト.mjs').Tools代表テスト});
- state.認証済み.value=true;state.項目.value=selected?[selected,...extraRows]:[];state.選択ID.value=selected?.id||'';state.編集値.value={text_to_speech:{auto_provider:'edge'}};state.schema.value={text_to_speech:{auto_provider:['edge','openai']}};
+ state.認証済み.value=true;state.処理中.value=busy?'test':'';state.項目.value=selected?[selected,...extraRows]:[];state.選択ID.value=selected?.id||'';state.編集値.value={text_to_speech:{auto_provider:'edge'}};state.schema.value={text_to_speech:{auto_provider:['edge','openai']}};
  const module={exports:{}};const compiled=compileScript(parse(source('Tools/Toolsパネル.vue')).descriptor,{id:'tools-layout',inlineTemplate:true});
  vm.runInNewContext(transformSync(compiled.content,{format:'cjs',loader:'js'}).code,{module,exports:module.exports,require:id=>id==='vue'?vue:id.endsWith('Tools状態.mjs')?{Tools状態を作成:()=>state}:id.endsWith('Tools代表テスト.mjs')?dependency('Tools/Tools代表テスト.mjs'):id.endsWith('.vue')?component('共通表示/状態バッジ.vue'):{}});
  const html=await renderToString(vue.createSSRApp({render:()=>vue.h(module.exports.default,{connected:true,coreOnline:true,toolsOnline:true,visible:true})}));state.終了();return html;
@@ -61,4 +61,10 @@ test('未認証のログイン領域も内部スクロールに入れ、一覧�
 });
 test('Toolを選び直すと右だけ先頭へ戻し、長い一覧の位置と状態処理を変えない',()=>{
  const panel=source('Tools/Toolsパネル.vue');assert.match(panel,/watch\(\(\)=>current.value\?\.id,async\(\)=>\{await nextTick\(\);if\(detailPane.value\)detailPane.value.scrollTop=0;/);assert.match(panel,/ref="detailPane" class="tools-detail"/);assert.doesNotMatch(panel,/scrollIntoView|window.scroll|scrollTop\s*=\s*(?!0)/);
+});
+
+test('Backupの条件は初期batch ON、実保存と受付だけのOKを個別・一括で明記',async()=>{
+ const row={...rows[0],id:'aidiy_backup',label:'Backup'};
+ const html=await authenticated(row);assert.match(html,/<input[^>]*type="checkbox"[^>]*checked/);assert.match(html,/batch（コピーを別スレッド/);assert.match(html,/実際にバックアップを作成/);assert.match(html,/コピー完了ではありません/);assert.match(html,/title="[^"]*実際のバックアップ作成/);assert.doesNotMatch(html,/headless|専用ブラウザを終了/);
+ for(const [changed,busy]of [[{...row,enabled:false},false],[{...row,available:false},false],[row,true]]){const disabled=await authenticated(changed,[],busy);assert.match(disabled,/<input[^>]*type="checkbox"[^>]*disabled[^>]*checked/);}
 });

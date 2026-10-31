@@ -86,6 +86,8 @@ class NodeRefreshTests(unittest.TestCase):
                 stack.enter_context(patch.object(setup, "_read_single_key", return_value=b"b"))
                 output = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 refresh = stack.enter_context(patch.object(setup, "setup_node_refresh", return_value=failures))
+                # main の起動前整理も模擬し、実プロセスの列挙・停止へ入らない。
+                stack.enter_context(patch.object(setup, "stop_setup_apps"))
                 for name in ("ask_yes_no", "ensure_prerequisites", "setup_common_global_tools", "run_diag_headless", "_load_folder_module"):
                     stack.enter_context(patch.object(setup, name, side_effect=AssertionError("full setup forbidden")))
                 if failures:

@@ -16,6 +16,39 @@ const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const { LiveHost, backendUrl } = require('../../out/aidiy_live/host.cjs');
 
+test('Live ホスト: HTTP/WS中継はUTF-8で20MiBまで、1byte超過は中継しない', async () => {
+  const limit = 20 * 1024 * 1024, originalSocket = global.WebSocket, originalFetch = global.fetch;
+  const sockets = [], packets = [], requests = [];
+  class Socket {
+    readyState = 1; bufferedAmount = 0; sent = [];
+    constructor() { sockets.push(this); }
+    send(data) { this.sent.push(data); }
+    close() { this.onclose?.(); }
+  }
+  global.WebSocket = Socket;
+  global.fetch = async (_url, options) => { requests.push(options.body); return { ok: true, json: async () => ({ ok: true }) }; };
+  const host = new LiveHost('http://localhost:8091', packet => packets.push(packet), () => assert.fail('マイクは起動しない'), '/unused.py');
+  try {
+    await host.receive({ type: 'socket-open', id: 1 });
+    for (const extra of [0, 1]) {
+      const size = limit + extra - Buffer.byteLength(JSON.stringify({ padding: '' }));
+      const body = { padding: '日'.repeat(Math.floor(size / 3)) + 'x'.repeat(size % 3) }, data = JSON.stringify(body);
+      assert.equal(Buffer.byteLength(data), limit + extra);
+      sockets[0].onmessage({ data });
+      assert.equal(packets.filter(packet => packet.type === 'socket-data').length, 1);
+      if (!extra) assert.equal(packets.at(-1).data, data);
+      await host.receive({ type: 'socket-send', id: 1, data });
+      assert.equal(sockets[0].sent.length, 1);
+      if (extra) assert.equal(packets.at(-1).type, 'socket-send-error');
+      else assert.equal(sockets[0].sent[0], data);
+      await host.receive({ type: 'api', id: 2, path: 'core/AIコア/モデル情報/取得', body });
+      assert.equal(requests.length, 1);
+      if (extra) assert.match(packets.at(-1).error, /大きすぎ/);
+      else assert.equal(requests[0], data);
+    }
+  } finally { host.dispose(); global.WebSocket = originalSocket; global.fetch = originalFetch; }
+});
+
 test('Live ホスト: 接続先・API 制限、3ソケット、破棄で全接続を閉じる', async () => {
   assert.throws(() => backendUrl('file:///private'));
   assert.throws(() => backendUrl('http://user:password@localhost:8091'));
@@ -88,7 +121,7 @@ test('Live ホスト: APIの35秒期限と停止による中断を区別する',
   } finally { host.dispose(); global.fetch = originalFetch; t.mock.timers.reset(); }
 });
 
-test('Live ホスト添付: 128k超の有効ファイルだけを現session/project/inputへ送り、拒否理由を返す', async () => {
+test('Live ホスト添付: 有効ファイルを現session/project/inputへ送り、業務上限・拒否理由を維持する', async () => {
   const original = global.WebSocket, sockets = [], replies = [];
   class Socket {
     readyState = 1; bufferedAmount = 0; sent = [];
@@ -111,8 +144,8 @@ test('Live ホスト添付: 128k超の有効ファイルだけを現session/proj
       assert.equal(sockets[0].sent.length, before); assert.equal(replies.at(-1).type, 'socket-send-error'); assert.ok(replies.at(-1).error);
     }
     await send(upload, 2); assert.equal(sockets[1].sent.length, 0); assert.equal(replies.at(-1).id, 2);
-    await host.receive({ type: 'socket-send', id: 1, data: 'x'.repeat(6 * 1024 * 1024) }); assert.match(replies.at(-1).error, /上限/);
-    await send({ メッセージ識別: 'input_text', メッセージ内容: 'x'.repeat(128000) }); assert.match(replies.at(-1).error, /上限/);
+    await host.receive({ type: 'socket-send', id: 1, data: 'x'.repeat(20 * 1024 * 1024 + 1) }); assert.match(replies.at(-1).error, /上限/);
+    await send({ メッセージ識別: 'input_text', メッセージ内容: 'x'.repeat(128000) }); assert.equal(JSON.parse(sockets[0].sent.at(-1)).メッセージ内容.length, 128000, '従来の小さな転送上限を超えて送信できる');
     for (const [key, value] of [['bufferedAmount', 128000], ['readyState', 3], ['fail', true]]) {
       sockets[0][key] = value; const before = sockets[0].sent.length; await send(upload);
       assert.equal(sockets[0].sent.length, before); assert.match(replies.at(-1).error, /送信できません/);

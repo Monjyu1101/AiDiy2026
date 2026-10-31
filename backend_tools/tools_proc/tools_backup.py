@@ -15,7 +15,7 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 
 from log_config import get_logger
 from tools_proc.backup import BackupCheckError, BackupSave, BackupSaveError
@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 class BackupSaveRequest(BaseModel):
     project_root: Optional[str] = None
+    batch: StrictBool = False
 
 
 class BackupCheckRequest(BaseModel):
@@ -44,13 +45,15 @@ def register_tools(mcp_bk, bsave, bchk):
     # ---- save ツール ------------------------------------------------
 
     @mcp_bk.tool()
-    async def backup_run() -> str:
+    async def backup_run(batch: StrictBool = False) -> str:
         """
         対象プロジェクト直下の .aidiy_backup/ に AiDiy ネイティブの差分バックアップを保存する。
         初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）を保存。
+        batch=false（既定）は完了を待つ。trueは実コピーだけを別スレッドにし、
+        予定件数・保存先とbatch=trueを返す。okは受付成功でありコピー完了ではない。
         """
         try:
-            info = await asyncio.to_thread(bsave.run)
+            info = await asyncio.to_thread(bsave.run, batch=batch)
         except BackupSaveError as e:
             raise ValueError(str(e)) from e
         return json.dumps(info, ensure_ascii=False)
@@ -168,10 +171,11 @@ def create_router(bsave, bchk) -> APIRouter:
                     "summary": "差分バックアップ実行",
                     "description": "変更ファイルを対象プロジェクト直下の .aidiy_backup/ ディレクトリへコピーする。初回は全件スナップショット（HHMMSS.all）、以降は差分のみ（HHMMSS）保存。コード作業の区切りや本番前の安全確認として定期実行を推奨。",
                     "parameters": {
+                        "batch": {"type": "boolean", "required": False, "default": False, "description": "falseは完了待ち。trueはコピー受付を返す（件数・保存先は予定値、完了/失敗はログ）。"},
                         "project_root": {"type": "string", "required": False, "description": "対象プロジェクトルートの絶対パス（省略時は AiDiy 自身）"},
                     },
                     "example": "POST /aidiy_backup/save/run",
-                    "response_fields": {"count": "バックアップしたファイル数", "files": "バックアップしたファイルパスの配列"},
+                    "response_fields": {"ok": "falseは失敗。batch=trueのtrueは受付成功", "batch": "指定値（省略時false）", "全件数": "対象ファイル数", "バックアップ件数": "同期は保存件数、batch=trueは予定件数", "バックアップ先": "同期は保存先、batch=trueは予定保存先", "最終時刻": "従来の基準時刻", "全件フラグ": "初回全件保存か", "差分なし": "保存対象なし"},
                 },
             },
             "check_methods": {
@@ -239,6 +243,7 @@ def create_router(bsave, bchk) -> APIRouter:
         | run | 差分バックアップ実行 |
 
         JSON body（任意）: {"project_root": "対象プロジェクトルート"} 省略時は AiDiy 自身。
+        run の batch（真偽値、省略時 false）は返却にも付ける。true の件数・保存先は予定値。
         """
         req = req or BackupSaveRequest()
         saver = BackupSave(req.project_root) if req.project_root else bsave
@@ -248,14 +253,14 @@ def create_router(bsave, bchk) -> APIRouter:
                 logger.info(f"http_backup save/scan: count={result.get('count', result.get('バックアップ件数', 0))}")
                 return result
             elif method_name == "run":
-                result = await asyncio.to_thread(saver.run)
-                logger.info(f"http_backup save/run: count={result.get('count', result.get('バックアップ件数', 0))}")
+                result = await asyncio.to_thread(saver.run, batch=req.batch)
+                logger.info(f"http_backup save/run: batch={req.batch}, count={result.get('count', result.get('バックアップ件数', 0))}")
                 return result
             else:
                 return {"error": f"未知のメソッド: {method_name}"}
         except BackupSaveError as e:
             logger.warning(f"http_backup save/{method_name} error: {e}")
-            return {"error": str(e)}
+            return {"error": str(e), **({"batch": req.batch} if method_name == "run" else {})}
 
     @router.post("/aidiy_backup/check/{method_name}", summary="バックアップ参照")
     async def http_backup_check(

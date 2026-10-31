@@ -42,7 +42,7 @@ export class SlackBot {
   private threadOrder: string[] = [];
   private seen = new Set<string>();
   private chatQueue = new Map<string, Promise<void>>();
-  private chatCount = new Map<string, number>();
+  private chatState = new Map<string, { count: number; stopped: boolean }>();
   private closing = false;
   private shutdown?: Promise<void>;
   private loop?: Promise<void>;
@@ -102,10 +102,38 @@ export class SlackBot {
     }
   }
 
+  // 全ページの取得に成功するまで既読位置を変えない。途中で失敗した場合は同じ位置から再試行する。
+  private async メッセージ取得(method: 'conversations.history' | 'conversations.replies', initial: Record<string, string>) {
+    const messages: Slackメッセージ[] = [], cursors = new Set<string>();
+    let params = { ...initial };
+    while (!this.closing) {
+      const result = await this.api(method, params);
+      const page = ((result.messages as Slackメッセージ[] | undefined) ?? []).filter(message => typeof message?.ts === 'string');
+      messages.push(...page);
+      const metadata = result.response_metadata as { next_cursor?: unknown } | undefined;
+      const cursor = typeof metadata?.next_cursor === 'string' ? metadata.next_cursor.trim() : '';
+      if (cursor) {
+        if (cursors.has(cursor)) throw new SlackAPIエラー(method, 'invalid_response');
+        cursors.add(cursor); params = { ...params, cursor }; continue;
+      }
+      if (result.has_more !== true) return messages;
+      // 時刻ページングだけの応答にも対応する。履歴は新しい順、返信は古い順。
+      const sorted = page.map(message => message.ts as string).sort(ts比較);
+      const boundary = method === 'conversations.history' ? sorted[0] : sorted.at(-1);
+      const key = method === 'conversations.history' ? 'latest' : 'oldest';
+      if (!boundary || (params[key] && (method === 'conversations.history'
+        ? ts比較(boundary, params[key]) >= 0 : ts比較(boundary, params[key]) <= 0))) {
+        throw new SlackAPIエラー(method, 'invalid_response');
+      }
+      params = { ...params, [key]: boundary, inclusive: 'false' }; delete params.cursor;
+    }
+    return [];
+  }
+
   /** 1回分の取得。試験から直接呼べるよう公開する。 */
   async 巡回() {
-    const history = await this.api('conversations.history', { channel: this.config.channelId, oldest: this.cursor, inclusive: 'false', limit: '100' });
-    const messages = ((history.messages as Slackメッセージ[] | undefined) ?? []).filter(m => typeof m.ts === 'string' && ts比較(m.ts as string, this.cursor) > 0);
+    const history = await this.メッセージ取得('conversations.history', { channel: this.config.channelId, oldest: this.cursor, inclusive: 'false', limit: '100' });
+    const messages = history.filter(m => ts比較(m.ts as string, this.cursor) > 0);
     messages.sort((a, b) => ts比較(a.ts as string, b.ts as string));
     for (const message of messages) {
       this.cursor = message.ts as string;
@@ -124,12 +152,12 @@ export class SlackBot {
     this.threadOrder.push(root);
     const thread = this.threads.get(root)!;
     let replies;
-    try { replies = await this.api('conversations.replies', { channel: this.config.channelId, ts: root, oldest: thread.lastSeen, inclusive: 'false', limit: '100' }); }
+    try { replies = await this.メッセージ取得('conversations.replies', { channel: this.config.channelId, ts: root, oldest: thread.lastSeen, inclusive: 'false', limit: '100' }); }
     catch (error) {
       if (error instanceof SlackAPIエラー && error.error === 'thread_not_found') { this.スレッド削除(root); return; }
       throw error;
     }
-    const messages = ((replies.messages as Slackメッセージ[] | undefined) ?? [])
+    const messages = replies
       .filter(m => typeof m.ts === 'string' && m.ts !== root && ts比較(m.ts, thread.lastSeen) > 0);
     messages.sort((a, b) => ts比較(a.ts as string, b.ts as string));
     for (const message of messages) {
@@ -175,7 +203,10 @@ export class SlackBot {
           await reply('このチャンネルに、そのまま話しかけてください。AiDiy がスレッドで返信します。\nスレッド内の返信は同じ会話として続きます。\n`!aidiy stop` で停止、`!aidiy new` で会話をやり直し、`!aidiy status` で状態を確認できます。'); return;
         case 'status': await reply(`Code: ${this.code.実行中(key) ? '実行中' : '待機中'}`); return;
         case 'stop': {
-          const running = this.code.実行中(key); this.code.停止(key);
+          const pending = this.chatState.get(key);
+          const running = this.code.実行中(key) || !!pending?.count;
+          if (pending) { pending.stopped = true; this.chatState.delete(key); }
+          this.code.停止(key);
           await reply(running ? '停止を要求しました。実行済みの変更は残ります。' : '実行中のコード要求はありません。'); return;
         }
         case 'new': this.code.リセット(key); await reply('このスレッドで新しいコード会話を開始します。'); return;
@@ -190,16 +221,21 @@ export class SlackBot {
   }
 
   private async チャット受付(key: string, root: string, text: string) {
-    const count = this.chatCount.get(key) || 0;
-    if (count >= 10) throw new Error('返信待ちのメッセージが多いため、少し待ってから送ってください。');
-    this.chatCount.set(key, count + 1);
+    const state = this.chatState.get(key) ?? { count: 0, stopped: false };
+    if (state.count >= 10) throw new Error('返信待ちのメッセージが多いため、少し待ってから送ってください。');
+    state.count++; this.chatState.set(key, state);
     const previous = this.chatQueue.get(key) || Promise.resolve();
     // users:read 権限を求めないため、投稿者の表示名は取得しない。
     this.表示?.('あなた', text, 'user');
     const pending = previous.catch(() => {}).then(async () => {
-      if (this.closing) return;
+      if (this.closing || state.stopped) return;
       // 実行中であることを先に示し、回答で同じ投稿を書き換える。
       const placeholder = await this.投稿(root, '考えています…').catch(() => undefined);
+      if (this.closing) return;
+      if (state.stopped) {
+        if (placeholder) await this.回答送信(root, '停止しました。', placeholder);
+        return;
+      }
       const answer = await this.code.実行(key, text);
       if (this.closing) return;
       // Slack アプリ名（Bot ユーザー名）ではなく、AiDiy として表示する。
@@ -209,8 +245,8 @@ export class SlackBot {
     this.chatQueue.set(key, pending);
     try { await pending; }
     finally {
-      const remaining = (this.chatCount.get(key) || 1) - 1;
-      if (remaining) this.chatCount.set(key, remaining); else this.chatCount.delete(key);
+      state.count--;
+      if (!state.count && this.chatState.get(key) === state) this.chatState.delete(key);
       if (this.chatQueue.get(key) === pending) this.chatQueue.delete(key);
     }
   }

@@ -307,7 +307,7 @@ _WS_AUTH_TIMEOUT = 20.0
 # gateway "connected" while inbound stops; this timeout forces the normal
 # reconnect path instead.
 _WS_READ_IDLE_TIMEOUT = 300.0
-_WS_MAX_MESSAGE_BYTES = 2_000_000
+_WS_MAX_MESSAGE_BYTES = 20 * 1024 * 1024
 _WS_MEMBERSHIP_KIND = 44100
 _WS_MEMBERSHIP_SUB_ID = "hermes-buzz-membership"
 

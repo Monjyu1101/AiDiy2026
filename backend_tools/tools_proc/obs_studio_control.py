@@ -205,7 +205,7 @@ class ObsStudioControl:
                 uri,
                 open_timeout=self.timeout,
                 close_timeout=self.timeout,
-                max_size=16 * 1024 * 1024,
+                max_size=20 * 1024 * 1024,
             )
         except Exception as exc:
             raise ObsStudioControlError(

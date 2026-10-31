@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_PORT = 9900
 _ORPHAN_TIMEOUT = 300  # seconds before a pending task is considered orphaned
 _WATCHDOG_INTERVAL = 60  # seconds between orphaned task watchdog runs
-_MAX_BODY = 1_048_576  # 1MB max request body — prevents DoS via memory exhaustion
+_MAX_BODY = 20 * 1024 * 1024  # 20 MiB max request body — still bounded
 _SSE_KEEPALIVE = 5  # seconds between SSE keepalive comments
 
 

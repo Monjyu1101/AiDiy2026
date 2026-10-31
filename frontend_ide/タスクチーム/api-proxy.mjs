@@ -51,7 +51,7 @@ export function createTaskTeamProxy(root, project, { fetcher = fetch, timeout = 
         let body;
         if (!status) {
           const chunks = []; let length = 0;
-          for await (const chunk of req) { length += chunk.length; if (length > 2 * 1024 * 1024) { json(res,413,{status:'NG',message:'要求が大きすぎます。'}); return true; } chunks.push(chunk); }
+          for await (const chunk of req) { length += chunk.length; if (length > 20 * 1024 * 1024) { json(res,413,{status:'NG',message:'要求が大きすぎます。'}); return true; } chunks.push(chunk); }
           body = Buffer.concat(chunks); try { JSON.parse(body.toString('utf8')); } catch { json(res,400,{status:'NG',message:'JSONが不正です。'}); return true; }
         }
         const upstream = status ? new URL('/health', target) : new URL(path, path.startsWith('/core/') ? core : target);

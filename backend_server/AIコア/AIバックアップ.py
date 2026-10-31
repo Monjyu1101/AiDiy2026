@@ -211,24 +211,26 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
 
 
 def _ローカルGit記録(base_path: str, files: List[str]) -> None:
-    """Git の失敗で既存のファイルバックアップを止めない。"""
+    """batch に関係なく Git は別 worker へ渡し、コピーと返却を待たせない。"""
     try:
         import importlib.util
+        import sys
         from pathlib import Path
-        helper = Path(__file__).resolve().parents[2] / "scripts" / "local_git_backup.py"
-        spec = importlib.util.spec_from_file_location("aidiy_local_git_backup", helper)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        state, detail = module.commit_local_backup(
-            base_path, files, excluded_dirs=_バックアップ除外フォルダ,
+        # Tools はネイティブ実装を複数回ロードするため、helper のキューを共有する。
+        module_name = "aidiy_local_git_backup"
+        module = sys.modules.get(module_name)
+        if module is None:
+            helper = Path(__file__).resolve().parents[2] / "scripts" / "local_git_backup.py"
+            spec = importlib.util.spec_from_file_location(module_name, helper)
+            candidate = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(candidate)
+            module = sys.modules.setdefault(module_name, candidate)
+        module.queue_local_backup(
+            base_path, files, logger=logger, excluded_dirs=_バックアップ除外フォルダ,
             excluded_files=_バックアップ除外ファイル,
             excluded_suffixes=_バックアップ除外拡張子,
             excluded_pairs=_バックアップ除外フォルダ組,
         )
-        if state == "error":
-            logger.warning(detail)
-        elif state == "created":
-            logger.info("ローカル Git 変更記録を作成しました。")
     except Exception:
         logger.warning("ローカル Git 記録を実行できませんでした。通常バックアップを継続します。")
 
@@ -272,6 +274,7 @@ def バックアップ実行(
     backend_dir: Optional[str] = None,
     セッション設定: Optional[dict] = None,
     ログ出力: bool = True,
+    コピー実行=None,
 ) -> Optional[Tuple[str, List[ファイル情報], List[str], bool, str]]:
     """
     シンプル差分バックアップ実行
@@ -288,6 +291,9 @@ def バックアップ実行(
             return None
 
         backup_root = os.path.join(base_path, ".aidiy_backup")
+
+        # 通常は従来コピー。Tools の batch だけ受付用の内部関数を渡す。
+        copy_files = コピー実行 or _ファイルコピー実行
 
         # 最終バックアップ時刻を取得
         最終バックアップ結果 = _バックアップ全体の最終日時取得(backup_root)
@@ -312,11 +318,11 @@ def バックアップ実行(
             if ログ出力:
                 logger.info(f"バックアップ開始({base_path})")
             全ファイルパス一覧 = [f["パス"] for f in all_files]
-            if _ファイルコピー実行(base_path, 全ファイルパス一覧, target_dir):
+            if copy_files(base_path, 全ファイルパス一覧, target_dir):
                 if ログ出力:
                     logger.info(f"バックアップ終了(件数={len(all_files)})")
                 return (最終時刻, all_files, 全ファイルパス一覧, True, target_dir)
-            return (最終時刻, all_files, [], False, "")
+            return None
 
         # 差分バックアップ: 最終バックアップ時刻+1秒以降
         最終タイムスタンプ, _ = 最終バックアップ結果
@@ -337,11 +343,11 @@ def バックアップ実行(
 
         if ログ出力:
             logger.info(f"バックアップ開始({base_path})")
-        if _ファイルコピー実行(base_path, changed_files, target_dir):
+        if copy_files(base_path, changed_files, target_dir):
             if ログ出力:
                 logger.info(f"バックアップ終了(件数={len(changed_files)})")
             return (最終時刻, all_files, changed_files, False, target_dir)
-        return (最終時刻, all_files, [], False, "")
+        return None
 
     except Exception as e:
         logger.error(f"バックアップ実行エラー: {e}")

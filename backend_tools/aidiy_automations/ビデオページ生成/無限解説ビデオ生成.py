@@ -162,7 +162,7 @@ def ensure_backend_tools_running(current_proc: subprocess.Popen | None = None) -
     python_exe = python_exe_for_backend_tools()
     log("backend_tools MCP を起動します")
     proc = subprocess.Popen(
-        [python_exe, "-m", "uvicorn", "tools_main:app", "--host", "0.0.0.0", "--port", "8095"],
+        [python_exe, "-m", "uvicorn", "tools_main:app", "--host", "0.0.0.0", "--port", "8095", "--ws-max-size", os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")],
         cwd=str(MCP_DIR),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

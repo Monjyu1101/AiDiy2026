@@ -579,12 +579,14 @@ class WebSocketRelayTransport:
                 additional_headers=headers,
                 ping_interval=30,
                 ping_timeout=60,
+                max_size=20 * 1024 * 1024,
             )
         else:
             self._ws = await websockets.connect(  # type: ignore[union-attr]
                 self._url,
                 ping_interval=30,
                 ping_timeout=60,
+                max_size=20 * 1024 * 1024,
             )
         self._reader = asyncio.create_task(self._read_loop(), name="relay-ws-reader")
         # Send one hello PER fronted identity (Phase 1.5 Shape A). The connector

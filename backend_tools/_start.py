@@ -113,8 +113,8 @@ def check_npm_project_environment(project_dir: Path) -> tuple[bool, str]:
 def get_command() -> list[str]:
     python_path = find_python_in_env(BACKEND_TOOLS_DIR, ENV_CANDIDATES)
     if python_path is not None:
-        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS)]
-    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS)]
+        return [str(python_path), "-m", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS), "--ws-max-size", os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")]
+    return ["uv", "run", "uvicorn", APP, "--host", "0.0.0.0", "--port", str(PORT_TOOLS), "--ws-max-size", os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")]
 
 
 def check_environment() -> tuple[bool, str]:

@@ -106,6 +106,9 @@ def cleanup(choices: dict | None = None) -> bool:
     for name in TARGETS:
         remove_counted(THIS_DIR / name)
     for path in sorted(THIS_DIR.rglob('__pycache__'), key=lambda item: len(item.parts), reverse=True):
+        # 独立した Slack の生成物は slack/_cleanup.py だけが担当する。
+        if path.is_relative_to(THIS_DIR / 'slack'):
+            continue
         remove_counted(path)
     if ok and deleted_count:
         print_success(f'{LABEL} のクリーンアップ完了 ({deleted_count}個削除)')

@@ -102,8 +102,8 @@ def check_command_exists(command: str) -> bool:
 def get_backend_command(app_module: str, port: int) -> list[str]:
     backend_python = find_python_in_env(BACKEND_DIR, ENV_CANDIDATES)
     if backend_python is not None:
-        return [str(backend_python), "-m", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
-    return ["uv", "run", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port)]
+        return [str(backend_python), "-m", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port), "--ws-max-size", os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")]
+    return ["uv", "run", "uvicorn", app_module, "--host", "0.0.0.0", "--port", str(port), "--ws-max-size", os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")]
 
 
 def check_environment() -> tuple[bool, str]:

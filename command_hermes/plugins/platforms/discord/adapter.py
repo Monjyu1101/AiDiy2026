@@ -9989,7 +9989,7 @@ if DISCORD_AVAILABLE:
 # same channel on every send when the directory cache has no entry (e.g. fresh
 # install, or channel created after the last directory build).
 _DISCORD_CHANNEL_TYPE_PROBE_CACHE: Dict[str, bool] = {}
-_DISCORD_STANDALONE_JSON_BODY_LIMIT_BYTES = 1 * 1024 * 1024
+_DISCORD_STANDALONE_JSON_BODY_LIMIT_BYTES = 20 * 1024 * 1024
 _DISCORD_STANDALONE_ERROR_BODY_LIMIT_BYTES = 8 * 1024
 
 

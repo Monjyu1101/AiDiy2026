@@ -89,7 +89,7 @@ test('Diag route keeps token gate, same-origin and bounded POST JSON, authExpire
 });
 test('real transport mock: no redirects, bounded responses, timeout and safe errors',async()=>{
  let mode='ok';let hits=0;
- const server=http.createServer((req,res)=>{hits++;req.resume();if(mode==='wait')return;if(mode==='redirect'){res.writeHead(302,{Location:'http://example.invalid/'});return res.end();}if(mode==='auth'){res.writeHead(401);return res.end('secret');}if(mode==='large')return res.end('x'.repeat(2*1024*1024+1));if(mode==='invalid')return res.end('secret invalid JSON');res.end(JSON.stringify(ok({利用者ID:'fixture'})));});
+ const server=http.createServer((req,res)=>{hits++;req.resume();if(mode==='wait')return;if(mode==='redirect'){res.writeHead(302,{Location:'http://example.invalid/'});return res.end();}if(mode==='auth'){res.writeHead(401);return res.end('secret');}if(mode==='large')return res.end('x'.repeat(AI_SETTINGS_BODY_LIMIT+1));if(mode==='invalid')return res.end('secret invalid JSON');res.end(JSON.stringify(ok({利用者ID:'fixture'})));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  try{
   const bridge=createCoreSettingsBridge({reader:async()=>JSON.stringify({PORT_CORE:server.address().port}),timeoutMs:100});

@@ -95,7 +95,7 @@ DEFAULT_WEBHOOK_HOST = None
 DEFAULT_WEBHOOK_PORT = 8090
 DEFAULT_WEBHOOK_PATH = "/whatsapp/webhook"
 GRAPH_API_BASE = "https://graph.facebook.com"
-WEBHOOK_MAX_BODY_BYTES = 3 * 1024 * 1024
+WEBHOOK_MAX_BODY_BYTES = 20 * 1024 * 1024
 # Meta retries failed webhooks for up to 7 days. We don't need to remember
 # every wamid for the full retry window — the practical risk is duplicate
 # delivery within minutes, not days. 5000 entries with FIFO eviction is
@@ -1472,7 +1472,7 @@ class WhatsAppCloudAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
              multiply downstream agent work because of a transient bug
              during dispatch.
         """
-        # Meta's documented max payload is 3MB. Read one byte past the limit
+        # AiDiy transport cap is 20 MiB. Read one byte past the limit
         # so oversized chunked bodies are rejected before buffering the rest.
         try:
             raw = await _read_limited_request_body(

@@ -101,7 +101,7 @@ export async function ライブ起動(root: string, backend?: string, packaged =
       let size = 0;
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 65536) { res.writeHead(413).end(); return; }
+        if (size > 20 * 1024 * 1024) { res.writeHead(413).end(); return; }
         chunks.push(chunk);
       }
       const body = Buffer.concat(chunks);

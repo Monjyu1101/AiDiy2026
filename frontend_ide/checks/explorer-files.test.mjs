@@ -131,7 +131,7 @@ test('Explorer API: 利用開始・Content-Type・専用ヘッダー・Origin・
   assert.equal((await post(body, { headers: { ...headers, 'sec-fetch-site': 'cross-site' } })).status, 403);
   assert.equal((await fetch(new URL('/api/explorer/actions', app.url))).status, 405);
   assert.equal((await post(body, { body: '{' })).status, 400);
-  assert.equal((await post(body, { body: 'x'.repeat(20000) })).status, 413);
+  assert.equal((await post(body, { body: 'x'.repeat(20 * 1024 * 1024 + 1) })).status, 413);
   assert.equal(await exists(join(root, 'test.txt')), false);
   const response = await post(body, { headers: { ...headers, origin: new URL(app.url).origin } });
   assert.equal(response.status, 200); assert.equal((await response.json()).path, 'test.txt');
@@ -141,7 +141,7 @@ test('Explorer API: chunked過大bodyもエラーを返して変更しない', a
   const { app, root, activate } = await serverFixture(t); await activate();
   const status = await new Promise((done, reject) => {
     const req = request(new URL('/api/explorer/actions', app.url), { method: 'POST', headers }, response => { response.resume(); response.on('end', () => done(response.statusCode)); });
-    req.on('error', reject); req.write('x'.repeat(17000)); req.end('x');
+    req.on('error', reject); req.write('x'.repeat(20 * 1024 * 1024)); req.end('x');
   });
   assert.equal(status, 413); assert.deepEqual(await readdir(root), []);
 });

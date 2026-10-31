@@ -808,7 +808,7 @@ if (STREAM_SILENCE_PROBE_MS > 0) {
 // Control-message bodies are tiny; cap the body so a compromised local peer
 // can't OOM the sidecar by streaming an unbounded request (defence-in-depth on
 // the loopback channel).
-const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MiB
+const MAX_BODY_BYTES = 20 * 1024 * 1024; // 20 MiB
 async function readBody(req) {
   const chunks = [];
   let size = 0;

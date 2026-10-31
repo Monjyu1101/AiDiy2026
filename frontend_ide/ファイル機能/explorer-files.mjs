@@ -11,7 +11,7 @@ import {renderMarkdownPdf} from './MarkdownPDF.mjs';
 import { createNativeExplorer } from './explorer-native.mjs';
 
 const ACTIONS = new Set(['copy', 'rename', 'trash', 'create-file', 'create-folder', 'pdf']);
-const MAX_BODY = 16 * 1024;
+const MAX_BODY = 20 * 1024 * 1024;
 const issue = (status, message, code = 'explorer_error') => Object.assign(new Error(message), { status, code });
 const sameEntry = (a, b) => a.dev === b.dev && a.ino === b.ino && a.isDirectory() === b.isDirectory();
 const absent = async path => { try { await lstat(path); return false; } catch (error) { if (error.code === 'ENOENT') return true; throw error; } };

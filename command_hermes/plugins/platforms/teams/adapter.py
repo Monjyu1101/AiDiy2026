@@ -141,7 +141,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_PORT = 3978
 # Bot Framework activities are JSON payloads well under 1 MiB; an explicit
 # aiohttp client_max_size keeps oversized/chunked request bodies bounded.
-_MAX_BODY_BYTES = 1_048_576
+_MAX_BODY_BYTES = 20 * 1024 * 1024
 # ``None`` → aiohttp/asyncio ``create_server`` binds one listening socket per
 # address family (IPv4 + IPv6). The old hardcoded "0.0.0.0" bound IPv4 ONLY
 # and was unreachable over IPv6-only private networks (e.g. Fly.io 6PN) —

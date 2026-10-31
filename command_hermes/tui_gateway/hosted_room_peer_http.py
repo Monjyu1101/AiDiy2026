@@ -40,7 +40,7 @@ _ERROR_CODE_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 # A replay page may legitimately contain many bounded 64 KiB room events. Keep
 # enough room for the largest normal page while preventing peer-sized responses
 # from scaling memory use without limit.
-MAX_PEER_RESPONSE_BYTES = 16 * 1024 * 1024
+MAX_PEER_RESPONSE_BYTES = 20 * 1024 * 1024
 MAX_PEER_ERROR_RESPONSE_BYTES = 16 * 1024
 _PEER_RESPONSE_CHUNK_BYTES = 64 * 1024
 

@@ -202,3 +202,18 @@ aidiy_hermes -z --provider ollama --model "deepseek-v4-flash:cloud" -Q "おは�
 
 TUI / slash command の詳細調整は `command_hermes,TUI調整手順.md` を使う。
 Code CLI としての追加・表示・ANSI 対策は `backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`、`backend_server,CodeCLIプロンプト整形.md`、`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md` を使う。
+
+## 任意Gateway・proxyの通信サイズ
+
+Hermes本体は引き続きon-demand CLIです。利用者が任意で起動するGateway / webhook / Photon・WhatsApp bridge / proxy、およびそれらのHTTP応答・WebSocket中継では、20 MiB未満だった転送上限の既定を **20 × 1024 × 1024 = 20,971,520 bytes** に揃えます。HTTP本文、応答本文、WebSocketメッセージごとの上限であり、トークン数や一度に送れる業務メッセージ長の保証ではありません。control socketはJSON行の受信bufferと応答上限も同期します。
+
+利用者が`max_body_bytes`等で明示した値は、20 MiB未満も含めて保持します。既存の大きい上限（例：Desktop/TUIのWebSocket 384 MiB、CDP 50 MiB）や無制限の経路は引き下げません。HTTP header、URL、prompt、エラー表示用抜粋、ストレージのイベント蓄積予算、メディア形式ごとの制約、読み取りchunk幅は別の目的なので変更しません。認証・署名・許可送信者・接続先検証はそのまま維持します。上限が大きくなる分、同時処理時のメモリ使用量には注意してください。
+
+ソケット・外部APIを使わない回帰確認（リポジトリ直下）:
+
+```powershell
+node --test command_hermes/checks/node-body-limits.test.mjs
+backend_tools/.venv/Scripts/python.exe -B -m unittest discover -s command_hermes/checks -p test_transport_body_limits.py
+```
+
+Python試験はASTで設定・全入口を照合し、純readerと模擬request/responseで20 MiB直前・ちょうど・1 byte超を検査します。aiohttpがないPythonではその実reader試験だけskipするため、導入済みの`backend_tools/.venv`を使います。WhatsApp Node bridgeは`express.json`へ渡す設定値の確認であり、Express実parserや実サービス接続の試験ではありません。

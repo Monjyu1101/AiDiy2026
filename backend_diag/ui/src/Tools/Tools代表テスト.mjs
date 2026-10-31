@@ -18,7 +18,6 @@ const 簡単な試験={
  aidiy_postgres:['PostgreSQL 読取試験','設定済み接続先で SELECT 1 を実行します。接続設定が必要です。データは更新しません。'],
  aidiy_logs:['ログ一覧の取得','ログ登録の件数を確認します。ログ本文やパスは画面に表示しません。'],
  aidiy_code_check:['Python 構文チェック','backend_tools/tools_main.py の構文を確認します。ソースは変更しません。Python のキャッシュが作成される場合があります。'],
- aidiy_backup:['バックアップ差分スキャン','この配置先の差分件数だけを確認します。バックアップの保存・復元は行いません。'],
  aidiy_obs_studio_control:['OBS シーン一覧の取得','起動済みOBSからシーン件数を取得します。配信・録画・シーン切替は行いません。'],
  aidiy_ffmpeg_control:['短い無音の処理','ffmpegで0.1秒の無音を生成して破棄します。ファイル保存や音声再生は行いません。'],
  aidiy_notification_sounds:['短い通知音の再生','完了の通知音を1回再生します。音が聞こえるか確認してください。'],
@@ -35,3 +34,15 @@ for(const [id,[label,description]] of Object.entries(簡単な試験)){
   return {status:'OK',message:result.summary};
  }};
 }
+
+// Backup は明示テストで実際に保存する。Diag の初期値だけを true とし、必ず値を送る。
+Tools代表テスト.aidiy_backup={
+ label:'バックアップの作成',
+ description:'この配置先のバックアップを実際に作成します。batch ON（初期値）はコピーを別スレッドへ渡し、受付を返します。OFFはコピー完了を待ちます。実行応答は最長5分待機しますが、接続・保存の失敗を防ぐものではありません。待機中止・期限切れでも開始済みコピーは止まりません。受付後の完了・失敗はToolsログで確認し、完了までは元ファイルの変更・削除やサーバー停止を避けてください。',
+ defaults:{batch:true},batch:true,
+ async run({call,input={}}){
+  const result=await call('Tools/representative',{operation:'test',tool:'aidiy_backup',batch:input.batch??true});
+  if(typeof result?.summary!=='string'||!result.summary)throw Error('試験結果を確認できませんでした。');
+  return {status:'OK',message:result.summary};
+ },
+};

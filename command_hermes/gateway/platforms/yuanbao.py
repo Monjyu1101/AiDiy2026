@@ -3244,6 +3244,7 @@ class ConnectionManager:
                     ping_interval=None,
                     ping_timeout=None,
                     close_timeout=5,
+                    max_size=20 * 1024 * 1024,
                 ),
                 timeout=CONNECT_TIMEOUT_SECONDS,
             )
@@ -3731,6 +3732,7 @@ class ConnectionManager:
                         ping_interval=None,
                         ping_timeout=None,
                         close_timeout=5,
+                        max_size=20 * 1024 * 1024,
                     ),
                     timeout=CONNECT_TIMEOUT_SECONDS,
                 )

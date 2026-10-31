@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import httpx
 from fastapi import FastAPI, HTTPException
 from mcp.server.mcpserver import MCPServer
-from tools_proc.tools_management import ToolsManagement, ToolsGateMiddleware, register_management, authenticate
+from tools_proc.tools_management import ToolsManagement, ToolsGateMiddleware, register_management, authenticate, MAX_BODY_BYTES
 
 
 class ManagementTests(unittest.IsolatedAsyncioTestCase):
@@ -91,7 +91,8 @@ class ManagementTests(unittest.IsolatedAsyncioTestCase):
         self.auth.side_effect = None
         self.assertEqual((await self.request('/management/enabled', headers={'origin': 'https://evil.test'})).status_code, 403)
         self.assertEqual((await self.request('/management/enabled', headers={'origin': 'http://['})).status_code, 403)
-        self.assertEqual((await self.request('/management/enabled', {'enabled': 'x' * 33000})).status_code, 413)
+        self.assertEqual((await self.request('/management/enabled', {'enabled': 'x' * 33000})).status_code, 400)
+        self.assertEqual((await self.request('/management/enabled', {'enabled': 'x' * MAX_BODY_BYTES})).status_code, 413)
 
     async def test_write_failure_no_runtime_change(self):
         with patch('tools_proc.tools_management.os.replace', side_effect=PermissionError):

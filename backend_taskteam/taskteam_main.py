@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import os
+
 from log_config import setup_logging
 from taskteam_proc.app import create_app
 
@@ -25,4 +27,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("taskteam_main:app", host="0.0.0.0", port=PORT_TASKTEAM)
+    uvicorn.run("taskteam_main:app", host="0.0.0.0", port=PORT_TASKTEAM, ws_max_size=int(os.environ.get("UVICORN_WS_MAX_SIZE", "20971520")))

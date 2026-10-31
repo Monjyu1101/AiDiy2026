@@ -145,7 +145,7 @@ export function createAISearch(project,{state,runAgent=runSearchAgent,now=Date.n
         if(req.method==='GET')send(200,await check(url.searchParams.get('id')));
         else if(req.method==='POST') {
           const chunks=[];let bytes=0;
-          for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('検索内容が長すぎます。');chunks.push(chunk);}
+          for await(const chunk of req){bytes+=chunk.length;if(bytes>20*1024*1024)throw Error('検索内容が長すぎます。');chunks.push(chunk);}
           send(200,await start(JSON.parse(Buffer.concat(chunks).toString('utf8')).query));
         } else send(405,{error:'GET / POST required'});
       } catch(error){send(400,{error:error.message});}

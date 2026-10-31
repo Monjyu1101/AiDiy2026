@@ -10,6 +10,7 @@
 
 """Discord フロントエンドの依存導入と、共通設定の不足キー補完。"""
 import importlib.util
+import ntpath
 import shutil
 import os
 import subprocess
@@ -62,17 +63,26 @@ def _discord_in_use() -> bool:
     if _runtime_in_use(THIS_DIR):
         return True
     windows = sys.platform == 'win32'
-    # 同じ frontend_channels 配下でも、独立した Slack Bot（slack/）は Discord の稼働に数えない。
-    slack_root = os.path.normcase(str(THIS_DIR / 'slack') + os.sep)
+    slack_root = THIS_DIR / 'slack'
+    path_module = ntpath if windows else os.path
+    slack_runtime = path_module.normcase(path_module.join(str(slack_root), 'node_modules', 'electron', 'dist')) + path_module.sep
     for process in snapshot():
         if process.get('ProcessId') == os.getpid():
             continue  # この _setup.py 自身は Discord の稼働ではない。
-        if slack_root in os.path.normcase(process.get('CommandLine') or ''):
+        # 双子の実行入口を同じ matcher で照合する。--project 等の引数は所属に使わない。
+        if (is_discord_process(process, slack_root, windows)
+                or process_role(process, slack_root, windows) == 'supervisor'):
             continue
+        name = (process.get('Name') or '').lower()
+        if name.startswith('electron'):
+            # 親を失った Electron 子プロセスも、専用 runtime の配置先で分離する。
+            args = process_arguments(process.get('CommandLine') or '', windows)
+            executable = process.get('ExecutablePath') or (args[0] if args else '')
+            if path_module.normcase(path_module.normpath(executable)).startswith(slack_runtime):
+                continue
         if (process_role(process, THIS_DIR.parent, windows) == 'frontend_channels'
                 or is_discord_process(process, THIS_DIR, windows)):
             return True
-        name = (process.get('Name') or '').lower()
         if name in ('node', 'node.exe') or name.startswith('electron'):
             # 権限不足・壊れた引数一覧を「未起動」と見なさない。
             if not process_arguments(process.get('CommandLine') or '', windows):

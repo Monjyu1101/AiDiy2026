@@ -33,10 +33,10 @@ from tools.tts_tool import _get_provider, _load_tts_config, get_env_value
 logger = logging.getLogger(__name__)
 
 # Upper bound on the PCM bytes accepted from one provider stream for one
-# sentence. Mirrors the 16 MiB bounded-upstream-body invariant of the sync
+# sentence. Mirrors the 20 MiB bounded-upstream-body invariant of the sync
 # providers (``_read_tts_response_bytes`` in tools.tts_tool): a buggy or
 # hostile endpoint must not be able to feed us unbounded audio.
-_STREAM_SENTENCE_BYTE_CAP = 16 * 1024 * 1024
+_STREAM_SENTENCE_BYTE_CAP = 20 * 1024 * 1024
 
 
 def _resolve_key(env_var: str, provider_id: str) -> str:
@@ -294,7 +294,7 @@ class OpenAIStreamer(StreamingTTSProvider):
 
 
 def _capped(chunks: Iterator[bytes], label: str) -> Iterator[bytes]:
-    """Pass chunks through, aborting past the 16 MiB per-sentence cap.
+    """Pass chunks through, aborting past the 20 MiB per-sentence cap.
 
     The streaming mirror of ``_read_tts_response_bytes``'s bounded-body
     invariant: one sentence of PCM should never approach the cap, so
@@ -455,7 +455,8 @@ class XAIStreamer(StreamingTTSProvider):
         ).strip()
 
         async with websockets.connect(
-            ws_url, extra_headers={"Authorization": f"Bearer {api_key}"}
+            ws_url, extra_headers={"Authorization": f"Bearer {api_key}"},
+            max_size=20 * 1024 * 1024,
         ) as ws:
             await ws.send(_json.dumps({
                 "text": text,

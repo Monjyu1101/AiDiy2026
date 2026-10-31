@@ -513,6 +513,7 @@ class QQAdapter(BasePlatformAdapter):
             },
             timeout=CONNECT_TIMEOUT_SECONDS,
             proxy=ws_proxy,
+            max_msg_size=20 * 1024 * 1024,
         )
         logger.info("[%s] WebSocket connected to %s", self._log_tag, gateway_url)
 

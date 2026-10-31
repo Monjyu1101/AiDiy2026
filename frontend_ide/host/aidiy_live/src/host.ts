@@ -14,7 +14,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { 接続エラー詳細 } from './connection-error';
-import { MAX_FILE_PACKET_CHARS, validateFileUpload } from '../../src/file-attachments';
+import { validateFileUpload } from '../../src/file-attachments';
 
 type Message = { type?: string; id?: number; path?: string; body?: unknown; data?: string };
 type Mic = { id: number; process: ChildProcessWithoutNullStreams; stop: () => void };
@@ -48,7 +48,7 @@ export class LiveHost {
       this.sockets.set(id, socket);
       socket.onopen = () => this.post({ type: 'socket-opened', id });
       socket.onmessage = event => {
-        if (typeof event.data === 'string' && event.data.length <= 2_000_000) {
+        if (typeof event.data === 'string' && Buffer.byteLength(event.data, 'utf8') <= 20 * 1024 * 1024) {
           if (this.input?.id === id) {
             try {
               const packet = JSON.parse(event.data);
@@ -72,11 +72,10 @@ export class LiveHost {
       const socket = this.sockets.get(id), data = message.data;
       const failed = (error: string) => this.post({ type: 'socket-send-error', id, error });
       if (typeof data !== 'string') return;
-      if (data.length > MAX_FILE_PACKET_CHARS) { failed('ファイルが送信上限（4 MiB）を超えています。'); return; }
+      if (Buffer.byteLength(data, 'utf8') > 20 * 1024 * 1024) { failed('要求が送信上限（20 MiB）を超えています。'); return; }
       let packet: any;
-      try { packet = JSON.parse(data); } catch { /* 既存の非JSON音声中継は小さなメッセージに限る */ }
+      try { packet = JSON.parse(data); } catch { /* 非JSON音声も上記の転送上限内で中継する */ }
       const file = packet?.メッセージ識別 === 'input_file';
-      if (!file && data.length > 128000) { failed('要求が送信上限を超えています。'); return; }
       if (file) {
         try {
           validateFileUpload({ name: packet.ファイル名, base64: packet.メッセージ内容 });
@@ -103,7 +102,7 @@ export class LiveHost {
         this.post({ type: 'reply', id, error: '許可されていない要求です。' }); return;
       }
       const body = JSON.stringify(message.body || {});
-      if (Buffer.byteLength(body) > 65536) { this.post({ type: 'reply', id, error: '要求が大きすぎます。' }); return; }
+      if (Buffer.byteLength(body, 'utf8') > 20 * 1024 * 1024) { this.post({ type: 'reply', id, error: '要求が大きすぎます。' }); return; }
       const controller = new AbortController(); this.requests.add(controller);
       const timeout = setTimeout(() => controller.abort(new DOMException('AIコアの応答が35秒以内に返りませんでした。', 'TimeoutError')), 35000);
       try {

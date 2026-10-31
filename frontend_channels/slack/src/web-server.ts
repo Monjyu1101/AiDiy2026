@@ -74,7 +74,7 @@ export async function パネルWeb起動(options: { idleMs?: number; firstIdleMs
     } catch { if (!res.headersSent) res.writeHead(500).end(); else res.end(); }
   });
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 20 * 1024 * 1024 });
   const 待機開始 = (ms: number) => {
     clearTimeout(idle);
     // Electron 版でパネルを閉じた時と同じく、画面を閉じたら（再読込の猶予の後）Bot も終了する。

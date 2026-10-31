@@ -265,7 +265,7 @@ def _hermes_version() -> str:
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8642
 MAX_STORED_RESPONSES = 100
-MAX_REQUEST_BYTES = 10_000_000  # 10 MB — accommodates long agent conversations with tool calls
+MAX_REQUEST_BYTES = 20 * 1024 * 1024  # 20 MiB — transport cap for long agent conversations
 CHAT_COMPLETIONS_SSE_KEEPALIVE_SECONDS = 30.0
 MAX_NORMALIZED_TEXT_LENGTH = 65_536  # 64 KB cap for normalized content parts
 MAX_CONTENT_LIST_SIZE = 1_000  # Max items when content is an array
@@ -3757,6 +3757,7 @@ class APIServerAdapter(BasePlatformAdapter):
 
         ws = web.WebSocketResponse(
             heartbeat=30.0,
+            max_msg_size=MAX_REQUEST_BYTES,
             protocols=(_BROWSER_CONTROL_WS_PROTOCOL,),
         )
         await ws.prepare(request)

@@ -9,7 +9,7 @@ const reader=async()=>JSON.stringify({PORT_CORE:8091,PORT_TOOLS:8095});
 const fixtures={
  aidiy_desktop_capture:{monitors:[{width:1920,height:1080}]},
  aidiy_sqlite:{rows:[{diag_test:1}]},aidiy_postgres:{rows:[{diag_test:1}]},
- aidiy_logs:{logs:{server:[],mcp:[]}},aidiy_code_check:{ok:true},aidiy_backup:{count:0,差分ファイル:[]},
+ aidiy_logs:{logs:{server:[],mcp:[]}},aidiy_code_check:{ok:true},aidiy_backup:{ok:true,batch:false,全件数:0,バックアップ件数:0},
  aidiy_obs_studio_control:{scenes:[]},aidiy_ffmpeg_control:{returncode:0},
  aidiy_notification_sounds:{status:'ok',scene:'legacy',notification_type:'完了'},
  aidiy_team_agents:{status:'OK',items:[]},aidiy_windows_control:{windows:[]},
@@ -48,7 +48,7 @@ for(const [id,definition] of Object.entries(代表試験)){
   assert.doesNotMatch(JSON.stringify(result),/do-not-display/);
   assert.deepEqual(calls.map(r=>r.path),['/core/auth/現在利用者','/management/enabled',`/${id}/${definition.method}`]);
   assert.equal(calls[2].method,definition.httpMethod||'POST');assert.deepEqual(calls[2].data,definition.body);
-  const shown=await Tools代表テスト[id].run({call:async(action,data)=>{assert.equal(action,'Tools/representative');assert.deepEqual(data,envelope(id).data);return result.data;}});
+  const shown=await Tools代表テスト[id].run({input:id==='aidiy_backup'?{batch:false}:undefined,call:async(action,data)=>{assert.equal(action,'Tools/representative');assert.deepEqual(data,{...envelope(id).data,...(id==='aidiy_backup'?{batch:false}:{})});return result.data;}});
   assert.equal(shown.message,result.data.summary);
  });
  test(`${id}: エラー・不正応答・無効状態は成功にしない`,async()=>{

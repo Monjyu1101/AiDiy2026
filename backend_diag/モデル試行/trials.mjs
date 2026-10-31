@@ -5,6 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 // 手動の config モデル試行専用。起動・全診断・headless からは呼ばない。
 import http from 'node:http';
+import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {manualInput,manualDecisionAnswer,readManualCatalog} from './manual.mjs';
@@ -80,16 +81,16 @@ function toolPayload(result) {
 }
 
 // 固定 loopback、リダイレクトなし、応答上限。JSON と MCP SSE の双方を処理する。
-export function localRequest({port,path,method='POST',body,headers={},signal,id,timeoutMs=TRIAL_ROW_TIMEOUT_MS,responseLimit=1024*1024}) {
+export function localRequest({port,path,method='POST',body,headers={},signal,id,timeoutMs=TRIAL_ROW_TIMEOUT_MS,responseLimit=DIAG_TRANSPORT_BYTE_LIMIT}) {
   return new Promise((resolve,reject)=>{
     let req,res,done=false,size=0,buffer='';
-    const finish=(error,value)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();error?reject(error):resolve(value);};
+    const finish=(error,value)=>{if(done)return;done=true;buffer='';clearTimeout(timer);signal?.removeEventListener('abort',abort);res?.destroy();req?.destroy();error?reject(error):resolve(value);};
     const abort=()=>finish(failure('試行を中止しました。'));
     const timer=setTimeout(()=>finish(failure('応答が制限時間を超えました。')),timeoutMs);
     signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)return abort();
     const bytes=body===undefined?undefined:Buffer.from(JSON.stringify(body));
     req=http.request({hostname:'127.0.0.1',port,path,method,agent:false,maxHeaderSize:8192,headers:{Accept:'application/json, text/event-stream',...(bytes?{'Content-Type':'application/json','Content-Length':bytes.length}:{}),...headers}},incoming=>{
-      res=incoming;
+      res=incoming;if(done){res.destroy();return;}
       if(incoming.statusCode<200 || incoming.statusCode>=300)return finish(failure('Tools が要求を受け付けませんでした。'));
       const session=incoming.headers['mcp-session-id'];
       if(session!==undefined && (typeof session!=='string' || !/^[\x21-\x7e]{1,256}$/.test(session)))return finish(failure('MCP セッションが不正です。'));
@@ -97,6 +98,7 @@ export function localRequest({port,path,method='POST',body,headers={},signal,id,
       const accept=value=>{if(id!==undefined && value?.id!==id)return false;finish(null,{body:value,session});return true;};
       incoming.setEncoding('utf8');
       incoming.on('data',chunk=>{
+        if(done)return;
         size+=Buffer.byteLength(chunk);if(size>responseLimit)return finish(failure('Tools 応答が上限を超えました。'));
         buffer+=chunk;
         if(sse){buffer=buffer.replace(/\r\n/g,'\n');let end;while((end=buffer.indexOf('\n\n'))>=0){const event=buffer.slice(0,end);buffer=buffer.slice(end+2);const data=event.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');if(data)try{if(accept(JSON.parse(data)))return;}catch{return finish(failure('MCP 応答を読み取れません。'));}}}
@@ -336,7 +338,7 @@ export function createModelTrials({reader,statusFn=getToolsStatus,request=localR
           current.予測完了=経過追加(current,`予測を実行（${target.provider} / ${target.model}）`);
           payload=(await request({port:portOf(current.config),path:'/internal/prediction_llms',body:{project_path:target.project,ai_name:target.provider,ai_model:target.model,timeout_sec:cli?120:60},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:cli?135000:75000})).body;
         }
-        else if(row.区分==='LIVE')payload=(await request({port:portOf(current.config),path:'/internal/live_model_check',body:manual?{ai_name:row.プロバイダ,ai_model:row.モデル,voice:row.音声,prompt:manual.prompt}:{},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:LIVE_HTTP_TIMEOUT_MS,responseLimit:3*1024*1024})).body;
+        else if(row.区分==='LIVE')payload=(await request({port:portOf(current.config),path:'/internal/live_model_check',body:manual?{ai_name:row.プロバイダ,ai_model:row.モデル,voice:row.音声,prompt:manual.prompt}:{},headers:{'X-AiDiy-Diag':'model-trial'},signal:current.controller.signal,timeoutMs:LIVE_HTTP_TIMEOUT_MS,responseLimit:DIAG_TRANSPORT_BYTE_LIMIT})).body;
         else payload=await callMcp(row,current.config,{signal:current.controller.signal,request,manual});
         if(current.controller.signal.aborted)throw failure('試行を中止しました。');
         if((await snapshot()).version!==current.version){cancel();throw Object.assign(failure('設定が変更されました。読み直して開始してください。'),{configChanged:true});}

@@ -121,7 +121,7 @@ contentは空でない20万文字以内のMarkdownです。5分以内を目安�
       try {
         if(req.method==='GET')send(200,await get(url.searchParams.get('path')));
         else if(['POST','PUT'].includes(req.method)){
-          const chunks=[];let bytes=0;for await(const chunk of req){bytes+=chunk.length;if(bytes>24000)throw Error('解析指示が長すぎます。');chunks.push(chunk);}
+          const chunks=[];let bytes=0;for await(const chunk of req){bytes+=chunk.length;if(bytes>20*1024*1024)throw Error('解析指示が長すぎます。');chunks.push(chunk);}
           const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));
           send(200,req.method==='POST'?await start(data.path,data.instruction):await save(data.path,data.instruction));
         }else send(405,{error:'GET / POST / PUT required'});

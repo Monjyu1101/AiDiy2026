@@ -13,6 +13,9 @@ import path from "node:path";
 import https2 from "node:https";
 import http2 from "node:http";
 
+// backend_diag/runtime/transport_limit.ts
+var DIAG_TRANSPORT_BYTE_LIMIT = 20 * 1024 * 1024;
+
 // backend_diag/runtime/environment_proxy.ts
 import http from "node:http";
 import https from "node:https";
@@ -343,8 +346,9 @@ function ollamaLocalCatalog(body) {
 
 // backend_diag/runtime/model_probe.ts
 var CONFIG_LIMIT = 128 * 1024;
-var RESPONSE_LIMIT = 1024 * 1024;
-var PUBLIC_RESPONSE_LIMIT = 16 * 1024 * 1024;
+var RESPONSE_LIMIT = DIAG_TRANSPORT_BYTE_LIMIT;
+var PUBLIC_RESPONSE_LIMIT = DIAG_TRANSPORT_BYTE_LIMIT;
+var MODEL_CACHE_LIMIT = 1024 * 1024;
 function connectionFailureDescription(error) {
   const reasons = { dns: "\u63A5\u7D9A\u5148\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306E\u540D\u524D\u89E3\u6C7A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", tls: "\u63A5\u7D9A\u5148\u307E\u305F\u306F\u30D7\u30ED\u30AD\u30B7\u306ETLS\u8A3C\u660E\u66F8\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", network: "\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3068\u30D7\u30ED\u30AD\u30B7\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "proxy-config": "HTTP_PROXY / HTTPS_PROXY \u306EURL\u8A2D\u5B9A\u304C\u7121\u52B9\u3067\u3059\u3002", "proxy-auth": "\u30D7\u30ED\u30AD\u30B7\u8A8D\u8A3C\u304C\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002", "proxy-connect": "\u30D7\u30ED\u30AD\u30B7\u304C\u63A5\u7D9A\u3092\u8A31\u53EF\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002", auth: "HTTP\u8A8D\u8A3C\u307E\u305F\u306F\u30A2\u30AF\u30BB\u30B9\u6A29\u304C\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002", http: "\u6B63\u5E38\u306AHTTP\u5FDC\u7B54\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", timeout: "\u901A\u4FE1\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002", stopped: "\u53D6\u5F97\u3092\u4E2D\u6B62\u3057\u307E\u3057\u305F\u3002", response: "\u53D7\u4FE1\u304C\u9014\u4E2D\u3067\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002", size: "\u53D7\u4FE1\u30B5\u30A4\u30BA\u304C\u4E0A\u9650\u3092\u8D85\u3048\u307E\u3057\u305F\u3002", json: "\u5FDC\u7B54\u3092JSON\u3068\u3057\u3066\u8AAD\u307F\u53D6\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002", shape: "\u30E2\u30C7\u30EB\u30C7\u30FC\u30BF\u5F62\u5F0F\u304C\u60F3\u5B9A\u3068\u7570\u306A\u308A\u307E\u3059\u3002" };
   const reason = error instanceof Error ? error.message : "";
@@ -441,7 +445,7 @@ async function readOAuth(kind, reader) {
 }
 var OAUTH_CLI = { codex: "codex", grok: "grok" };
 async function readCodexLocal(reader, env = process.env, home = os.homedir()) {
-  const folder = path.dirname(oauthPath("codex", env, home)), read = async (name) => reader ? await reader(name) : await readLimited(path.join(folder, name), RESPONSE_LIMIT);
+  const folder = path.dirname(oauthPath("codex", env, home)), read = async (name) => reader ? await reader(name) : await readLimited(path.join(folder, name), MODEL_CACHE_LIMIT);
   let defaultModel = null, cacheIds = [];
   try {
     const text = Buffer.from(await read("config.toml")).toString("utf8"), top = text.split(/^\s*\[/m)[0];
@@ -450,7 +454,7 @@ async function readCodexLocal(reader, env = process.env, home = os.homedir()) {
   } catch {
   }
   try {
-    cacheIds = codexSlugs(parseJson(await read("models_cache.json"), RESPONSE_LIMIT));
+    cacheIds = codexSlugs(parseJson(await read("models_cache.json"), MODEL_CACHE_LIMIT));
   } catch {
   }
   return { defaultModel, cacheIds };
@@ -488,7 +492,7 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
   const responseLimit = provider === "openrouter" && Object.keys(headers).length === 0 ? PUBLIC_RESPONSE_LIMIT : RESPONSE_LIMIT;
   let settled = false, size = 0;
   const chunks = [];
-  let agent, request;
+  let agent, request, incoming;
   try {
     const proxy = local ? null : proxyRoute(new URL(`https://${endpoint[0]}`));
     if (proxy) agent = new MetadataProxyAgent(proxy);
@@ -496,8 +500,12 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
     return reject(new Error(networkFailure(error)));
   }
   const respond = (response) => {
-    if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+    incoming = response;
+    if (settled) {
       response.destroy();
+      return;
+    }
+    if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
       return finish(new Error([401, 403].includes(response.statusCode ?? 0) ? "auth" : "http"));
     }
     response.on("data", (chunk) => {
@@ -524,8 +532,10 @@ var fetchMetadata = (provider, headers, pageToken, signal) => new Promise((resol
   function finish(error, value) {
     if (settled) return;
     settled = true;
+    chunks.length = 0;
     clearTimeout(timer);
     signal?.removeEventListener("abort", cancel);
+    incoming?.destroy();
     request?.destroy();
     agent?.destroy();
     if (error) reject(error);

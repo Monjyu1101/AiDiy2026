@@ -26,6 +26,7 @@ from tools_proc.prediction_privacy import prediction_private_logs
 
 logger = get_logger(__name__)
 
+MAX_BODY_BYTES = 20 * 1024 * 1024  # JSON transport。project_path 等の項目制約は別途維持する。
 SERVICE_NAME = "aidiy_prediction_llms"
 INTERNAL_PATH = "/internal/prediction_llms"
 INPUT_ERROR = "ユーザー入力予測の引数が不正です。project_path と各設定値を確認してください。"
@@ -72,9 +73,9 @@ async def validate_request(request: Request) -> PredictionLLMRequest:
         raise HTTPException(400, "valid diagnostic JSON required")
     body = bytearray()
     async for chunk in request.stream():
-        body.extend(chunk)
-        if len(body) > 65536:
+        if len(body) + len(chunk) > MAX_BODY_BYTES:
             raise HTTPException(413, "request too large")
+        body.extend(chunk)
     try:
         return PredictionLLMRequest.model_validate(json.loads(body))
     except (ValidationError, ValueError, UnicodeError, RecursionError):
