@@ -68,6 +68,14 @@ class BatchStructureTests(unittest.TestCase):
             'set "STAGE=local_backup"', 'set "BACKUP=%CONTROL%\\%AIDIY_RUN%"'])
         self.assertNotRegex(TEXT.lower(), r'(?m)^.*\b(?:del|rd|rmdir)\b.*%control%')
 
+    def test_backup_output_is_in_checkout_temp_not_git_metadata(self):
+        self.assertIn('set "CONTROL=%TARGET%\\temp\\_auto"', TEXT)
+        self.assertNotIn('set "CONTROL=%AIDIY_GIT_DIR%', TEXT)
+        self.assertIn('\ntemp/\n', (ROOT / '.gitignore').read_text())
+        guard = TEXT.index('Launcher temp path must be a normal directory')
+        self.assertLess(guard, TEXT.index('mkdir "%CONTROL%"'))
+        self.assertLess(guard, TEXT.index('call :backup_local_state'))
+
     def test_log_path_is_not_displayed_before_execution_confirmation(self):
         before = TEXT.split('if not errorlevel 1 goto cancelled', 1)[0]
         self.assertNotRegex(before, r'(?m)^echo .*%LOG%')
@@ -497,6 +505,60 @@ class RoutingModelTests(unittest.TestCase):
         self.assertEqual(self.route(cwd_has=True), '起動 cwd')
 
 
+class BackupDestinationTests(unittest.TestCase):
+    """実bat内の退避先ガードを一時フォルダだけで実行する。"""
+    def test_renamed_checkout_uses_its_own_temp_not_aidiy2026(self):
+        control_line = next(line for line in TEXT.splitlines() if line.startswith('set "CONTROL='))
+        backup_line = next(line for line in TEXT.splitlines() if line.startswith('set "BACKUP='))
+        guard_line = next(line for line in TEXT.splitlines() if 'Launcher temp path must be' in line)
+        code = re.search(r'-c "([^"]+)"', guard_line).group(1)
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / '変更した Xxxxx 作業'
+            target.mkdir()
+            env = {'TARGET': str(target), 'AIDIY_RUN': 'fixture-run'}
+            for line in (control_line, backup_line):
+                name, value = re.fullmatch(r'set "(\w+)=(.*)"', line).groups()
+                env[name] = re.sub(r'%(\w+)%', lambda m: env[m.group(1)], value)
+            result = subprocess.run([sys.executable, '-c', code], cwd=target, capture_output=True)
+            self.assertEqual(result.returncode, 0)
+            backup = Path(env['BACKUP'].replace('\\', os.sep))
+            self.assertEqual(backup, target / 'temp/_auto/fixture-run')
+            backup.mkdir(parents=True)
+            self.assertTrue(backup.is_dir())
+            self.assertFalse((Path(folder) / 'AiDiy2026').exists())
+
+    def test_guard_accepts_absent_or_normal_directories_and_rejects_files_links(self):
+        line = next(line for line in TEXT.splitlines() if 'Launcher temp path must be' in line)
+        code = re.search(r'-c "([^"]+)"', line).group(1)
+        for kind in ('absent', 'normal', 'temp_file', 'control_file', 'temp_link', 'control_link', 'reparse'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                prefix = ''
+                if kind != 'absent':
+                    (root / 'outside').mkdir()
+                    if kind == 'temp_file':
+                        (root / 'temp').write_text('keep')
+                    elif kind == 'temp_link':
+                        (root / 'temp').symlink_to(root / 'outside', target_is_directory=True)
+                    else:
+                        (root / 'temp').mkdir()
+                        control = root / 'temp/_auto'
+                        if kind == 'control_file':
+                            control.write_text('keep')
+                        elif kind == 'control_link':
+                            control.symlink_to(root / 'outside', target_is_directory=True)
+                        else:
+                            control.mkdir()
+                    if kind == 'reparse':
+                        prefix = "from unittest.mock import patch;from types import SimpleNamespace;from pathlib import Path;old=Path.lstat;fake=lambda p,*a,**k:SimpleNamespace(st_mode=old(p,*a,**k).st_mode,st_file_attributes=1024);patch.object(Path,'lstat',fake).start();"
+                result = subprocess.run([sys.executable, '-c', prefix + code], cwd=root, capture_output=True)
+                self.assertEqual(result.returncode == 0, kind in ('absent', 'normal'))
+                if kind == 'temp_file':
+                    self.assertEqual((root / 'temp').read_text(), 'keep')
+                if kind == 'control_file':
+                    self.assertEqual((root / 'temp/_auto').read_text(), 'keep')
+
+
 class ConfirmationModelTests(unittest.TestCase):
     """確認部分の実コマンドを限定モデルで実行。入力/FINDSTRのみ模擬する。"""
     def confirm(self, answer):
@@ -638,6 +700,32 @@ class GitContractTests(unittest.TestCase):
         self.assertEqual(owner.read_bytes(), b'previous-interrupted-run\r\n')
         self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout,
                          self.git(self.seed, 'rev-parse', 'HEAD').stdout)
+
+    def test_backup_listing_excludes_own_temp_even_without_ignore_rule(self):
+        own = self.repo / 'temp/_auto/run'
+        own.mkdir(parents=True)
+        (own / 'status.bin').write_bytes(b'private backup')
+        (self.repo / 'temp/user.txt').write_text('user work')
+        line = next(line for line in TEXT.splitlines() if line.startswith('git -c core.quotepath=false ls-files'))
+        args = shlex.split(line.split('>')[0])[1:]
+        output = self.git(self.repo, *args).stdout.decode('utf-8')
+        self.assertNotIn('temp/_auto/', output)
+        self.assertIn('temp/user.txt', output)
+        self.assertEqual((own / 'status.bin').read_bytes(), b'private backup')
+
+    def test_ignored_backup_overlap_is_not_overwritten_by_update(self):
+        ignore = self.repo / '.gitignore'
+        ignore.write_text(ignore.read_text() + 'temp/\n')
+        local = self.repo / 'temp/_auto/run/head.txt'
+        local.parent.mkdir(parents=True)
+        local.write_text('private backup')
+        remote = self.seed / 'temp/_auto/run/head.txt'
+        remote.parent.mkdir(parents=True)
+        remote.write_text('remote tracked file')
+        self.commit()
+        self.git(self.seed, 'push', 'origin', 'main')
+        self.assertNotEqual(self.update().returncode, 0)
+        self.assertEqual(local.read_text(), 'private backup')
 
     def test_fast_forward_reaches_remote(self):
         self.advance()

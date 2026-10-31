@@ -129,8 +129,11 @@ echo(
 set "RC=3"
 call :validate_repository
 if errorlevel 1 goto failed
-set "CONTROL=%AIDIY_GIT_DIR%\aidiy-automatic"
+set "CONTROL=%TARGET%\temp\_auto"
 set "STAGE=repository_control_directory"
+rem Keep launcher backups outside Git metadata; never follow temp junctions.
+"%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');paths=[Path('temp'),Path('temp')/'_auto'];safe=lambda p:not (p.is_symlink() or getattr(p.lstat(),'st_file_attributes',0) & 1024) and p.is_dir();all(not os.path.lexists(p) or safe(p) for p in paths) or sys.exit('Launcher temp path must be a normal directory, not a link/reparse point or file.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
+if errorlevel 1 goto control_failed
 if exist "%CONTROL%\" goto control_ready
 mkdir "%CONTROL%" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto control_failed
@@ -318,7 +321,7 @@ git diff --binary --full-index --no-ext-diff --no-textconv >"%BACKUP%\working-tr
 if errorlevel 1 exit /b 1
 git diff --cached --binary --full-index --no-ext-diff --no-textconv >"%BACKUP%\staged.patch"
 if errorlevel 1 exit /b 1
-git -c core.quotepath=false ls-files --others --exclude-standard >"%AIDIY_TEMP%\untracked.txt"
+git -c core.quotepath=false ls-files --others --exclude-standard -- . ":(exclude,top)temp/_auto/**" >"%AIDIY_TEMP%\untracked.txt"
 if errorlevel 1 exit /b 1
 set "AIDIY_TEXT_FILE=%AIDIY_TEMP%\untracked.txt"
 call :convert_git_path_text
