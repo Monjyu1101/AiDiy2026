@@ -58,6 +58,44 @@ class BatchStructureTests(unittest.TestCase):
         self.assertIn('if errorlevel 1 goto make_temp', TEXT)
         self.assertIn('if /i not "%~dp0"=="%AIDIY_TEMP%\\" goto temp_error', TEXT)
 
+    def test_launcher_has_no_run_lock_or_lock_cleanup(self):
+        for token in ('run.lock', 'LOCK_OWNED', 'repository_lock', ':locked', ':clean_temp'):
+            self.assertNotIn(token.lower(), TEXT.lower())
+        self.assertIn('二重実行は防止しません', TEXT)
+        self.assertLess(TEXT.index('二重実行は防止しません'), TEXT.index('set /p "RUN_AIDIY='))
+        control = TEXT.split(':control_ready\n', 1)[1].split('call :backup_local_state', 1)[0]
+        self.assertEqual([line for line in control.splitlines() if not line.startswith(('echo ', 'echo('))], [
+            'set "STAGE=local_backup"', 'set "BACKUP=%CONTROL%\\%AIDIY_RUN%"'])
+        self.assertNotRegex(TEXT.lower(), r'(?m)^.*\b(?:del|rd|rmdir)\b.*%control%')
+
+    def test_log_path_is_not_displayed_before_execution_confirmation(self):
+        before = TEXT.split('if not errorlevel 1 goto cancelled', 1)[0]
+        self.assertNotRegex(before, r'(?m)^echo .*%LOG%')
+        self.assertIn('if not errorlevel 1 goto cancelled\necho [INFO] 実行記録: "%LOG%"', TEXT)
+        cancelled_exit = TEXT[TEXT.index('\n:cancelled\n'):TEXT.index('\n:failed\n')]
+        finish = TEXT[TEXT.index('\n:finish\n'):]
+        self.assertNotRegex(cancelled_exit + finish, r'(?m)^echo .*%LOG%')
+
+    def test_section_headings_follow_actual_branch_entry(self):
+        border = 'echo ' + '=' * 60
+        headings = {
+            '環境チェック': ('echo [INFO] 実行記録: "%LOG%"', 'set "STAGE=prerequisite_git"'),
+            'リポジトリの新規取得': ('if exist "%TARGET%" goto existing', 'set "STAGE=clone"'),
+            'リポジトリの確認': (':existing', 'call :validate_repository'),
+            '設定・変更の退避': (':control_ready', 'call :backup_local_state'),
+            'リポジトリの更新': ('echo [INFO] 退避先: "%BACKUP%"', 'set "STAGE=fetch"'),
+            'セットアップ': (':setup', 'set "STAGE=setup"'),
+            'アプリケーションの起動': ('echo SETUP_EXIT=%RC%', 'set "STAGE=start"'),
+        }
+        for title, (before, after) in headings.items():
+            with self.subTest(title=title):
+                heading = f'echo(\n{border}\necho {title}\n{border}\necho('
+                self.assertEqual(TEXT.count(heading), 1)
+                self.assertLess(TEXT.index(before), TEXT.index(heading))
+                self.assertLess(TEXT.index(heading), TEXT.index(after))
+        start_section = TEXT[TEXT.index('echo SETUP_EXIT=%RC%'):TEXT.index('echo アプリケーションの起動')]
+        self.assertIn('if not "%RC%"=="0" goto failed', start_section)
+
     def test_no_destructive_reset_clean_stash_or_mcp_deletion(self):
         self.assertNotRegex(TEXT.lower(), r"git\s+(reset|clean|stash)\b")
         self.assertNotIn('mcp.json', TEXT)
@@ -141,7 +179,7 @@ class BatchStructureTests(unittest.TestCase):
             self.assertTrue(all(line.isascii() for line in lines[:5]))
 
     def test_cleanup_does_not_remove_unknown_files_or_original(self):
-        cleanup = TEXT[TEXT.index(':clean_temp\n'):TEXT.index(':log_error\n')]
+        cleanup = TEXT[TEXT.index(':finish\n'):TEXT.index(':log_error\n')]
         self.assertNotIn('/s', cleanup.lower())
         self.assertNotIn('%AIDIY_SOURCE%', cleanup)
         self.assertIn('exit /b %RC%', cleanup)
@@ -459,6 +497,91 @@ class RoutingModelTests(unittest.TestCase):
         self.assertEqual(self.route(cwd_has=True), '起動 cwd')
 
 
+class ConfirmationModelTests(unittest.TestCase):
+    """確認部分の実コマンドを限定モデルで実行。入力/FINDSTRのみ模擬する。"""
+    def confirm(self, answer):
+        block = TEXT[TEXT.index('set "RUN_AIDIY=y"'):TEXT.index('rem Only bootstrap requirements')]
+        value, matched, output = None, False, []
+        for line in block.splitlines():
+            if not line or line.startswith('rem '):
+                continue
+            if line == 'set "RUN_AIDIY=y"':
+                value = 'y'
+            elif line == 'set /p "RUN_AIDIY=aidiyセットアップと実行しますか？ [y]/n: "':
+                value = answer or value
+            elif line == 'set RUN_AIDIY | findstr /i /x /c:"RUN_AIDIY=n" >nul':
+                matched = ('RUN_AIDIY=' + value).lower() == 'run_aidiy=n'
+            elif line == 'if not errorlevel 1 goto cancelled':
+                if matched:
+                    return False, output
+            elif line == 'echo(':
+                output.append('')
+            elif line.startswith('echo '):
+                output.append(line[5:])
+            else:
+                self.fail(f'Unsupported confirmation model command: {line}')
+        return True, output
+
+    def test_log_and_environment_title_only_on_execution(self):
+        for answer in ('n', 'N', 'y', 'Y', ''):
+            with self.subTest(answer=answer):
+                accepted, output = self.confirm(answer)
+                self.assertEqual(accepted, answer.lower() != 'n')
+                self.assertEqual(any('%LOG%' in line for line in output), accepted)
+                self.assertEqual('環境チェック' in output, accepted)
+
+
+class ExitFlowModelTests(unittest.TestCase):
+    """実batの終了部を限定モデルで追跡。CMD実行ではなく、未知の構文は失敗する。"""
+    def run_exit(self, entry, rc, restore_ok=True):
+        lines = TEXT[TEXT.index('\n:cancelled\n'):TEXT.index('\n:log_error\n')].splitlines()
+        labels = {line[1:]: i for i, line in enumerate(lines) if line.startswith(':')}
+        i, paused, cleaned, restored = labels[entry], False, False, False
+        for _ in range(100):
+            line = lines[i]
+            i += 1
+            if not line or line.startswith((':', 'rem ', 'echo ', '>>', 'if defined STAGING echo ')):
+                continue
+            if line == 'set "RC=0"':
+                rc = 0
+            elif line == 'if "%RC%"=="0" set "RC=1"':
+                if rc == 0:
+                    rc = 1
+            elif line == 'goto finish':
+                i = labels['finish']
+            elif line.startswith('for %%F in ('):
+                self.assertRegex(line, r'\) do if exist "%AIDIY_TEMP%\\%%F" del /q "%AIDIY_TEMP%\\%%F" >nul 2>&1$')
+                self.assertNotIn('run.lock', line)
+                self.assertNotIn('_auto.bat', line)
+                cleaned = True
+            elif line == 'cd /d "%AIDIY_CWD%" >nul 2>&1':
+                restored = restore_ok
+            elif line == 'if not errorlevel 1 goto exit_ready':
+                if restore_ok:
+                    i = labels['exit_ready']
+            elif line == 'if not "%RC%"=="0" pause':
+                self.assertTrue(cleaned)
+                paused = rc != 0
+            elif line == 'exit /b %RC%':
+                return rc, paused, cleaned, restored
+            else:
+                self.fail(f'Unsupported exit model command: {line}')
+        self.fail('Exit model did not terminate')
+
+    def test_normal_cancel_and_failure_exits_without_lock_ownership(self):
+        for entry, rc, expected in [('finish', 0, 0), ('cancelled', 7, 0),
+                                    ('failed', 0, 1), ('failed', 2, 2),
+                                    ('failed', 3, 3), ('failed', 17, 17)]:
+            with self.subTest(entry=entry, rc=rc):
+                self.assertEqual(self.run_exit(entry, rc), (expected, expected != 0, True, True))
+
+    def test_cwd_restore_failure_does_not_hide_original_failure(self):
+        for rc, expected in [(0, 1), (2, 2), (17, 17)]:
+            with self.subTest(rc=rc):
+                self.assertEqual(self.run_exit('finish', rc, restore_ok=False),
+                                 (expected, True, True, False))
+
+
 class GitContractTests(unittest.TestCase):
     """batと同じGitコマンドをローカル一時repoへ実行。外部通信/実setup/GUIなし。"""
     def setUp(self):
@@ -504,6 +627,17 @@ class GitContractTests(unittest.TestCase):
 
     def test_no_update_is_success(self):
         self.assertEqual(self.update().returncode, 0)
+
+    def test_stale_launcher_lock_does_not_block_git_update_or_get_removed(self):
+        lock = self.repo / '.git/aidiy-automatic/run.lock'
+        lock.mkdir(parents=True)
+        owner = lock / 'owner.txt'
+        owner.write_bytes(b'previous-interrupted-run\r\n')
+        self.advance()
+        self.assertEqual(self.update().returncode, 0)
+        self.assertEqual(owner.read_bytes(), b'previous-interrupted-run\r\n')
+        self.assertEqual(self.git(self.repo, 'rev-parse', 'HEAD').stdout,
+                         self.git(self.seed, 'rev-parse', 'HEAD').stdout)
 
     def test_fast_forward_reaches_remote(self):
         self.advance()

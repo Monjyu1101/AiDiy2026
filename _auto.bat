@@ -30,7 +30,6 @@ if not defined AIDIY_SOURCE goto temp_error
 if not defined AIDIY_SOURCE_DIR goto temp_error
 if /i not "%~dp0"=="%AIDIY_TEMP%\" goto temp_error
 set "RC=0"
-set "LOCK_OWNED="
 set "LOG_ROOT=%LOCALAPPDATA%\AiDiy\automatic\logs"
 if not defined LOCALAPPDATA set "LOG_ROOT=%USERPROFILE%\AiDiy\automatic\logs"
 if not exist "%LOG_ROOT%\" mkdir "%LOG_ROOT%" >nul 2>&1
@@ -38,23 +37,29 @@ set "LOG=%LOG_ROOT%\automatic-%AIDIY_RUN%.log"
 >"%LOG%" echo START %DATE% %TIME%
 if errorlevel 1 goto log_error
 >>"%LOG%" echo CWD="%AIDIY_CWD%"
-echo 実行記録: "%LOG%"
+echo [WARN] 二重実行は防止しません。他の自動実行がないことを利用者が確認してください。
 set "RUN_AIDIY=y"
 set /p "RUN_AIDIY=aidiyセットアップと実行しますか？ [y]/n: "
 rem Do not expand user input as command text. Empty input keeps default Yes.
 set RUN_AIDIY | findstr /i /x /c:"RUN_AIDIY=n" >nul
 if not errorlevel 1 goto cancelled
+echo [INFO] 実行記録: "%LOG%"
 
+echo(
+echo ============================================================
+echo 環境チェック
+echo ============================================================
+echo(
 rem Only bootstrap requirements are fatal here. Normal setup owns Node/npm/uv.
 set "RC=2"
 set "STAGE=prerequisite_git"
-echo [確認] Git
+echo [INFO] Git
 git --version >"%AIDIY_TEMP%\probe.txt" 2>&1
 if errorlevel 1 goto prerequisite_failed
 type "%AIDIY_TEMP%\probe.txt"
 type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
 set "STAGE=prerequisite_python"
-echo [確認] Python実行環境（3.13以上を推奨、旧版でも続行）
+echo [INFO] Python実行環境（3.13以上を推奨、旧版でも続行）
 py -3 -X utf8 -c "import sys;encoded=sys.executable.encode('cp932');encoded.decode('cp932')!=sys.executable and sys.exit(3);sys.stdout.buffer.write(encoded+b'\r\n');sys.stderr.write('Python '+sys.version.split()[0]+'\n')" >"%AIDIY_TEMP%\python.txt" 2>"%AIDIY_TEMP%\probe.txt"
 if not errorlevel 1 goto python_ready
 type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
@@ -97,9 +102,14 @@ set "TARGET=%USERPROFILE%\AiDiy2026"
 if exist "%AIDIY_SOURCE_DIR%\backend_server\" set "TARGET=%AIDIY_SOURCE_DIR%"
 if exist "%AIDIY_CWD%\backend_server\" set "TARGET=%AIDIY_CWD%"
 >>"%LOG%" echo TARGET="%TARGET%"
-echo 対象フォルダ: "%TARGET%"
+echo [INFO] 対象フォルダ: "%TARGET%"
 if exist "%TARGET%" goto existing
 
+echo(
+echo ============================================================
+echo リポジトリの新規取得
+echo ============================================================
+echo(
 set "STAGE=clone"
 set "STAGING=%USERPROFILE%\.AiDiy2026-clone-%AIDIY_RUN%"
 git clone --branch main --single-branch https://github.com/Monjyu1101/AiDiy2026.git "%STAGING%"
@@ -111,6 +121,11 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 
 :existing
+echo(
+echo ============================================================
+echo リポジトリの確認
+echo ============================================================
+echo(
 set "RC=3"
 call :validate_repository
 if errorlevel 1 goto failed
@@ -120,20 +135,24 @@ if exist "%CONTROL%\" goto control_ready
 mkdir "%CONTROL%" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto control_failed
 :control_ready
-set "STAGE=repository_lock"
-mkdir "%CONTROL%\run.lock" >nul 2>&1
-if errorlevel 1 goto locked
-set "LOCK_OWNED=1"
->"%CONTROL%\run.lock\owner.txt" echo %AIDIY_RUN%
-
+echo(
+echo ============================================================
+echo 設定・変更の退避
+echo ============================================================
+echo(
 set "STAGE=local_backup"
 set "BACKUP=%CONTROL%\%AIDIY_RUN%"
 call :backup_local_state
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 >>"%LOG%" echo BACKUP="%BACKUP%"
-echo 退避先: "%BACKUP%"
+echo [INFO] 退避先: "%BACKUP%"
 
+echo(
+echo ============================================================
+echo リポジトリの更新
+echo ============================================================
+echo(
 set "STAGE=fetch"
 git fetch --no-tags origin main
 set "RC=%ERRORLEVEL%"
@@ -158,31 +177,41 @@ set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" goto failed
 
 :setup
+echo(
+echo ============================================================
+echo セットアップ
+echo ============================================================
+echo(
 set "STAGE=setup"
 >>"%LOG%" echo SETUP %DATE% %TIME%
-echo セットアップ開始。通常の確認入力に回答してください。
+echo [INFO] セットアップ開始。通常の確認入力に回答してください。
 "%PYTHON%" -X utf8 -u _setup.py
 set "RC=%ERRORLEVEL%"
 rem Child tools may change the shared console code page. Restore before Japanese.
 chcp 932 >nul
-if errorlevel 1 (echo [ERROR] Cannot restore code page 932. TEMP and lock kept. & exit /b 2)
+if errorlevel 1 (echo [NG] Cannot restore code page 932. TEMP kept. & exit /b 2)
 >>"%LOG%" echo SETUP_EXIT=%RC%
 if not "%RC%"=="0" goto failed
+echo(
+echo ============================================================
+echo アプリケーションの起動
+echo ============================================================
+echo(
 set "STAGE=start"
 >>"%LOG%" echo START_APP %DATE% %TIME%
 "%PYTHON%" -X utf8 -u _start.py
 set "RC=%ERRORLEVEL%"
 rem Child tools may change the shared console code page. Restore before Japanese.
 chcp 932 >nul
-if errorlevel 1 (echo [ERROR] Cannot restore code page 932. TEMP and lock kept. & exit /b 2)
+if errorlevel 1 (echo [NG] Cannot restore code page 932. TEMP kept. & exit /b 2)
 >>"%LOG%" echo START_EXIT=%RC%
 if not "%RC%"=="0" goto failed
 >>"%LOG%" echo SUCCESS %DATE% %TIME%
 goto finish
 
 :python_version_warning
-echo [警告] Pythonは3.13未満です。版の判定では止めず、このPythonでsetup・起動へ進みます。
-echo [警告] setupや依存ライブラリが旧版に対応しない場合は、その実際のエラーで停止します。
+echo [WARN] Pythonは3.13未満です。版の判定では止めず、このPythonでsetup・起動へ進みます。
+echo [WARN] setupや依存ライブラリが旧版に対応しない場合は、その実際のエラーで停止します。
 >>"%LOG%" echo WARNING Python version below 3.13; continuing
 exit /b 0
 
@@ -190,20 +219,20 @@ exit /b 0
 rem Convert Git UTF-8 path data before FOR/SET reads under CP932. No replacement.
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;p=Path(os.environ['AIDIY_TEXT_FILE']);text=p.read_bytes().decode('utf-8');encoded=text.encode('cp932');encoded.decode('cp932')!=text and sys.exit(3);p.write_bytes(encoded)" >nul 2>&1
 if not errorlevel 1 exit /b 0
-echo [エラー] Gitのパス一覧をCP932へ変換できません。文字・読書き権限を確認してください。
+echo [NG] Gitのパス一覧をCP932へ変換できません。文字・読書き権限を確認してください。
 >>"%LOG%" echo PATH_ENCODING_FAILED
 exit /b 3
 
 :report_optional_check
-echo [確認] %STAGE% 終了コード=%CHECK_RC%
+echo [INFO] %STAGE% 終了コード=%CHECK_RC%
 >>"%LOG%" echo CHECK %STAGE% exit=%CHECK_RC%
 type "%AIDIY_TEMP%\probe.txt"
 type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
-if not "%CHECK_RC%"=="0" echo [警告] ツールを確認できません。通常setupの確認・選択へ進みます。
+if not "%CHECK_RC%"=="0" echo [WARN] ツールを確認できません。通常setupの確認・選択へ進みます。
 exit /b 0
 
 :prerequisite_failed
-echo [エラー] 必須ツールを実行できません: %STAGE%
+echo [NG] 必須ツールを実行できません: %STAGE%
 >>"%LOG%" echo REQUIRED_CHECK_FAILED %STAGE%
 type "%AIDIY_TEMP%\probe.txt"
 type "%AIDIY_TEMP%\probe.txt" >>"%LOG%"
@@ -215,33 +244,33 @@ set "STAGE=repository_directory"
 cd /d "%TARGET%" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_files"
-echo [確認] 必要なGit・setup・startファイル
+echo [INFO] 必要なGit・setup・startファイル
 >>"%LOG%" echo CHECK %STAGE%
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');(Path('.git').exists() and Path('_setup.py').is_file() and Path('_start.py').is_file()) or sys.exit('Required .git, _setup.py or _start.py is missing/not a file.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_root"
-echo [確認] Gitルートフォルダ
+echo [INFO] Gitルートフォルダ
 >>"%LOG%" echo CHECK %STAGE%
 git rev-parse --show-prefix >"%AIDIY_TEMP%\prefix.txt" 2>"%AIDIY_TEMP%\validation.txt"
 if errorlevel 1 goto repository_failed
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');value=(Path(os.environ['AIDIY_TEMP'])/'prefix.txt').read_bytes();value in (b'',b'\n',b'\r\n') or sys.exit('Selected directory is not the Git worktree root.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_origin"
-echo [確認] originの接続先
+echo [INFO] originの接続先
 >>"%LOG%" echo CHECK %STAGE%
 git remote get-url --all origin >"%AIDIY_TEMP%\origin.txt" 2>"%AIDIY_TEMP%\validation.txt"
 if errorlevel 1 goto repository_failed
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');urls=(Path(os.environ['AIDIY_TEMP'])/'origin.txt').read_text(encoding='utf-8').splitlines();allowed={'https://github.com/monjyu1101/aidiy2026.git','https://github.com/monjyu1101/aidiy2026','git@github.com:monjyu1101/aidiy2026.git','git@github.com:monjyu1101/aidiy2026'};urls and all(url.lower() in allowed for url in urls) or sys.exit('Origin must be Monjyu1101/AiDiy2026 on GitHub (HTTPS or git@github.com). URL values omitted for privacy.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_branch"
-echo [確認] mainブランチ
+echo [INFO] mainブランチ
 >>"%LOG%" echo CHECK %STAGE%
 git branch --show-current >"%AIDIY_TEMP%\branch.txt" 2>"%AIDIY_TEMP%\validation.txt"
 if errorlevel 1 goto repository_failed
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');lines=(Path(os.environ['AIDIY_TEMP'])/'branch.txt').read_text(encoding='utf-8').splitlines();lines==['main'] or sys.exit('Current branch must be main; detached HEAD is not supported.')" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_gitdir"
-echo [確認] Git管理フォルダ
+echo [INFO] Git管理フォルダ
 >>"%LOG%" echo CHECK %STAGE%
 git rev-parse --absolute-git-dir >"%AIDIY_TEMP%\gitdir.txt" 2>"%AIDIY_TEMP%\validation.txt"
 if errorlevel 1 goto repository_failed
@@ -254,12 +283,12 @@ set "AIDIY_GIT_DIR="
 for /f "usebackq delims=" %%G in ("%AIDIY_TEMP%\gitdir.txt") do set "AIDIY_GIT_DIR=%%G"
 if not defined AIDIY_GIT_DIR goto repository_failed
 set "STAGE=repository_operation"
-echo [確認] 未完了のGit操作
+echo [INFO] 未完了のGit操作
 >>"%LOG%" echo CHECK %STAGE%
 "%PYTHON%" -X utf8 -c "import os,sys;from pathlib import Path;sys.stderr.reconfigure(encoding='cp932',errors='backslashreplace');pending=[name for name in ('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply') if (Path(os.environ['AIDIY_GIT_DIR'])/name).exists()];not pending or sys.exit('Unfinished Git operation: '+', '.join(pending))" >"%AIDIY_TEMP%\validation.txt" 2>&1
 if errorlevel 1 goto repository_failed
 set "STAGE=repository_unmerged"
-echo [確認] 未解決の競合
+echo [INFO] 未解決の競合
 >>"%LOG%" echo CHECK %STAGE%
 git ls-files --unmerged >"%AIDIY_TEMP%\unmerged.txt" 2>"%AIDIY_TEMP%\validation.txt"
 if errorlevel 1 goto repository_failed
@@ -269,7 +298,7 @@ exit /b 0
 
 :repository_failed
 set "VALIDATION_RC=%ERRORLEVEL%"
-echo [エラー] リポジトリの安全確認に失敗しました: %STAGE%
+echo [NG] リポジトリの安全確認に失敗しました: %STAGE%
 echo 接続先・ブランチ・Gitの権限・未完了操作を確認してください。自動修正はしません。
 >>"%LOG%" echo REPOSITORY_CHECK_FAILED %STAGE% command_exit=%VALIDATION_RC%
 type "%AIDIY_TEMP%\validation.txt"
@@ -307,7 +336,7 @@ if errorlevel 1 exit /b 1
 exit /b 0
 
 :config_backup_failed
-echo [エラー] 設定ファイルを退避できません。更新せず停止します。
+echo [NG] 設定ファイルを退避できません。更新せず停止します。
 type "%AIDIY_TEMP%\backup.txt"
 type "%AIDIY_TEMP%\backup.txt" >>"%LOG%"
 exit /b 1
@@ -319,13 +348,6 @@ copy /b /v /y "%UNTRACKED_FILE%" "%BACKUP%\untracked\%UNTRACKED_FILE%" >nul
 if errorlevel 1 exit /b 1
 exit /b 0
 
-:locked
-set "RC=3"
-echo [エラー] 別の自動実行中、または前回中断したロックが残っています。
-echo 全ての自動実行が終了したことを確認してから、次のロックを手動確認してください。
-echo "%CONTROL%\run.lock"
-goto failed
-
 :cancelled
 set "RC=0"
 >>"%LOG%" echo CANCELLED
@@ -334,25 +356,21 @@ goto finish
 :failed
 if "%RC%"=="0" set "RC=1"
 >>"%LOG%" echo FAILED stage=%STAGE% exit=%RC% %DATE% %TIME%
-echo [エラー] "%STAGE%" で停止しました。終了コード=%RC%
+echo [NG] "%STAGE%" で停止しました。終了コード=%RC%
 echo Git・Pythonの実行環境が必要です。版の不足だけでは停止しません。
 echo 上記の処理名とエラー表示、origin/main、競合、権限を確認してください。
 echo 既存変更・退避・途中cloneは削除していません。
-echo 実行記録: "%LOG%"
+echo [INFO] 実行記録: "%LOG%"
 if defined STAGING echo 途中clone: "%STAGING%"
 
 :finish
-if not defined LOCK_OWNED goto clean_temp
-if exist "%CONTROL%\run.lock\owner.txt" del /q "%CONTROL%\run.lock\owner.txt" >nul 2>&1
-if exist "%CONTROL%\run.lock\" rd "%CONTROL%\run.lock" >nul 2>&1
-:clean_temp
 rem Delete only known scratch files. Never delete the currently executing batch.
 for %%F in (python.txt probe.txt prefix.txt origin.txt branch.txt gitdir.txt unmerged.txt untracked.txt backup.txt validation.txt) do if exist "%AIDIY_TEMP%\%%F" del /q "%AIDIY_TEMP%\%%F" >nul 2>&1
 >>"%LOG%" echo TEMP_COPY_RETAINED="%~f0"
 rem Restore the caller directory before returning. Do not modify that directory.
 cd /d "%AIDIY_CWD%" >nul 2>&1
 if not errorlevel 1 goto exit_ready
-echo [警告] 元の実行フォルダへ復帰できませんでした。
+echo [WARN] 元の実行フォルダへ復帰できませんでした。
 >>"%LOG%" echo CWD_RESTORE_FAILED
 if "%RC%"=="0" set "RC=1"
 :exit_ready
@@ -362,11 +380,11 @@ if not "%RC%"=="0" pause
 exit /b %RC%
 
 :log_error
-echo [エラー] 実行ログを作成できません。TEMPのファイルは保持しました。
+echo [NG] 実行ログを作成できません。TEMPのファイルは保持しました。
 pause
 exit /b 2
 :temp_error
-echo [エラー] TEMPの自己コピーまたは内部起動情報を確認できません。
+echo [NG] TEMPの自己コピーまたは内部起動情報を確認できません。
 echo 引数なしで実行し、TEMPの空き容量・権限を確認してください。ファイルは保持しています。
 pause
 exit /b 2
