@@ -53,7 +53,10 @@ test('通常のnative dragだけを止め、Vue一覧に接続し、別窓の長
   const h = setup(); const before = h.event(); h.drag.dragstart(before); assert.equal(before.prevented, undefined);
   h.drag.down(h.event()); const pending = h.event(); h.drag.dragstart(pending); assert.equal(pending.prevented, true); h.drag.dispose();
   const source = readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
-  assert.match(source, /<ul ref="treeElement" @pointerdown="treeDrag.down" @click.capture="treeDrag.click" @dblclick.capture="treeDrag.click"/);
+  // 同じ一覧要素への接続を検証し、無関係な属性追加・順序には依存しない。
+  const treeTag = source.match(/<ul\b[^>]*\bref="treeElement"[^>]*>/)?.[0];
+  assert.ok(treeTag, 'treeElement の一覧が存在する');
+  for (const attribute of ['@pointerdown="treeDrag.down"', '@click.capture="treeDrag.click"', '@dblclick.capture="treeDrag.click"', '@dragstart="treeDrag.dragstart"']) assert.ok(treeTag.includes(attribute), attribute);
   assert.match(source, /:data-aidiy-window-move-list="detached&&nativePanels\?'':undefined"/);
   assert.match(source, /onBeforeUnmount\(\(\)=>\{treeDrag.dispose\(\)/);
 });
