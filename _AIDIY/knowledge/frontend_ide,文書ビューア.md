@@ -1,6 +1,6 @@
 # 文書ビューア
 
-> 文書: `frontend_ide,文書ビューア.md` | 実装: `frontend_ide/src/ファイル閲覧/ファイルビューア.vue`, `frontend_ide/viewer/markdown-preview.mjs`, `frontend_ide/viewer/server.mjs`, `frontend_ide/viewer/preview.mjs`, `frontend_ide/viewer/web/office.js` | 検証: `frontend_ide/checks/markdown-preview.test.mjs`, `frontend_ide/viewer/checks/office.test.mjs`
+> 文書: `frontend_ide,文書ビューア.md` | 実装: `frontend_ide/src/components/ファイル閲覧/ファイルビューア.vue`, `frontend_ide/viewer/markdown-preview.mjs`, `frontend_ide/viewer/server.mjs`, `frontend_ide/viewer/preview.mjs`, `frontend_ide/viewer/web/office.js` | 検証: `frontend_ide/checks/markdown-preview.test.mjs`, `frontend_ide/viewer/checks/office.test.mjs`
 
 ## このメモを使う場面
 
@@ -52,7 +52,7 @@ VS Code の Office Viewer（cweijan/vscode-office）で採用・紹介されて�
 
 ### Markdownプレビュー
 
-- 共通画面の `frontend_ide/src/ファイル閲覧/ファイルビューア.vue` は `.md` / `.markdown` を既定でプレビュー表示し、「コード / プレビュー」を切り替える。最後に選んだ表示をMarkdown全体で記憶し、ピン留め窓でも共用する。
+- 共通画面の `frontend_ide/src/components/ファイル閲覧/ファイルビューア.vue` は `.md` / `.markdown` を既定でプレビュー表示し、「コード / プレビュー」を切り替える。最後に選んだ表示をMarkdown全体で記憶し、ピン留め窓でも共用する。
 - `/api/preview` から `viewer/preview.mjs` の別オリジンの静的サーバーへ渡し、`frontend_ide/viewer/markdown-preview.mjs` でHTMLへ変換する。元ファイルや変換ファイルは書き出さない。
 - UTF-8 / Shift_JIS の1MBまで。見出し・日本語見出しへのアンカー・表・箇条書き・コードブロック・画像に対応する。相対画像・別Markdownへのリンクは元のフォルダを基準にし、外部リンクは別タブで開く。プロジェクト外・設定・鍵・バックアップ等は既存プレビューと同じ配信制限を守る。
 - Markdown内のHTMLは文字として表示する。文書から任意のスクリプトを実行せず、操作通知だけをnonce付きで許可する。外部画像の表示にはネット接続が必要。

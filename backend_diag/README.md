@@ -19,14 +19,14 @@
 
 Electron の依存物は引き続き `backend_diag/node_modules/`、停止要求・安全ログも従来のルート直下に置きます。診断結果の保存先 `_AIDIY/aidiy_diag/` は変わりません。アプリ・CLI の起動ログは `temp/aidiy_diag/アプリ起動/`、サービス監視の実行ID JSON・OSロック・置換用一時ファイルは `temp/aidiy_diag/起動/` に保存します（いずれもリポジトリ直下の `temp/` 基準）。旧 `_AIDIY/aidiy_diag/` 内の同名サブフォルダは参照・移動・削除せず、新しい場所だけを使います。更新前に起動していた Diag と管理サービスはいったん終了してから新しい版で起動してください。実行中のロック・実行IDは手動削除しないでください。内部モジュールの移動時は import だけでなく、`import.meta.url` 基準のデータ・実行ファイル・リポジトリ位置とテスト fixture のコピー先も確認します。
 
-画面の機能フォルダ・Vue パネル・状態管理・表示モジュールはタブ名に揃えます。共有のキー状態管理は `ui/src/キー設定共通/` を使います。
+画面の機能フォルダ・Vue パネル・状態管理・表示モジュールはタブ名に揃えます。共有のキー状態管理は `ui/src/components/キー設定共通/` を使います。
 
 | タブ（左から） | 見出し | 主操作 | Vue 機能フォルダ |
 |---|---|---|---|
-| 導入状況 | 導入状況 | 状況確認・各行の確認・対応項目の導入管理 | `ui/src/導入状況/` |
-| モデル一覧 | モデル一覧取得 | 一括取得 | `ui/src/モデル一覧/` |
-| 外部連携 | 外部連携確認 | 状況確認（テストできる行を順次確認）・書込 | `ui/src/外部連携/` |
-| 設定モデル | モデル動作確認 | 動作確認（全行を順次確認） | `ui/src/設定モデル/` |
+| 導入状況 | 導入状況 | 状況確認・各行の確認・対応項目の導入管理 | `ui/src/components/導入状況/` |
+| モデル一覧 | モデル一覧取得 | 一括取得 | `ui/src/components/モデル一覧/` |
+| 外部連携 | 外部連携確認 | 状況確認（テストできる行を順次確認）・書込 | `ui/src/components/外部連携/` |
+| 設定モデル | モデル動作確認 | 動作確認（全行を順次確認） | `ui/src/components/設定モデル/` |
 
 外部連携は見出し行の「状況確認」（テストできる行を上から順に）と各行の「テスト」で、読み取り専用の認証確認を明示操作時だけ行います（下記「外部連携の認証確認」）。「書込」は直前の確認結果を `_AIDIY/aidiy_diag/integration_info.json` へ保存します。キー未設定・設定読込不可の行は確認せず、未実施と理由を表示します。設定モデルは見出し行の「再読込」と各行の「テスト」も使用できます。
 
@@ -121,7 +121,7 @@ Copilot単独契約向けの例外として、Copilot CLIが導入済みで合�
 
 Electron の初回表示は Code / Live / Console / IDE / Discord / Slack と共通の `frontend_ide/host/scripts/window-opening.cjs` を使います。中央55%から750msで拡大し、描画を待ってから本画面を表示、内容を450msでフェード表示します。実ウィンドウを連続リサイズしないため、Windowsの未描画の白い縁を避けます。ブラウザ版・headlessには適用しません。`desktop-opening` 中は内容を隠し、演出完了後に起動済みを通知します。共通演出の仕様を変更する場合は6種類への影響を確認してください。`node --test backend_diag/checks/desktop.check.mjs` で読込・演出・表示通知の順序、演出中の終了・描画失敗と既存IPCの安全境界を確認できます。実OSでの拡大・DPI・最前面表示は別途目視確認が必要です。
 
-上部は Console と同じ高さのタイトルバー・ウィンドウ操作・接続バーです。シアンバーは `frontend_ide/src/共通表示/シアンバー.css` を共有し、Web / Code / Live と同じ正弦波（4.5秒周期、黒→シアン→黒）で明滅します。透明度の `ease-in-out` へ戻さず、標本化したRGB値を `linear` で補間します。共有CSSも配布UIの整合性検証に含みます。シアンの接続バーはWindowsのアニメーション設定がOFF（`prefers-reduced-motion: reduce`）でも明滅を維持します。ブラウザ確認ではreduce / no-preferenceの両条件で、時間経過による色の変化を検査します。シアンの線は Tools の接続成功、黒は未接続を示します（Tools の確認は常に有効で、ON/OFF・再確認の操作はありません）。診断自体の接続とは別です。Tools は `_config/AiDiy_key.json` の `PORT_TOOLS`（省略時8095）に対して、固定 loopback の `/aidiy_code_agents/ping` だけを10秒間隔で確認します。キー・モデル・エージェントの実行は行いません。切断・画面破棄で確認を停止します。
+上部は Console と同じ高さのタイトルバー・ウィンドウ操作・接続バーです。シアンバーは `frontend_ide/src/components/共通表示/シアンバー.css` を共有し、Web / Code / Live と同じ正弦波（4.5秒周期、黒→シアン→黒）で明滅します。透明度の `ease-in-out` へ戻さず、標本化したRGB値を `linear` で補間します。共有CSSも配布UIの整合性検証に含みます。シアンの接続バーはWindowsのアニメーション設定がOFF（`prefers-reduced-motion: reduce`）でも明滅を維持します。ブラウザ確認ではreduce / no-preferenceの両条件で、時間経過による色の変化を検査します。シアンの線は Tools の接続成功、黒は未接続を示します（Tools の確認は常に有効で、ON/OFF・再確認の操作はありません）。診断自体の接続とは別です。Tools は `_config/AiDiy_key.json` の `PORT_TOOLS`（省略時8095）に対して、固定 loopback の `/aidiy_code_agents/ping` だけを10秒間隔で確認します。キー・モデル・エージェントの実行は行いません。切断・画面破棄で確認を停止します。
 
 「導入状況」「モデル一覧」「外部連携」「設定モデル」の Vue タブです。導入状況・モデル一覧・外部連携は保存済みの前回結果があれば初期表示し、なければ未確認です。各パネルの実行ボタン左側に「前回実行日時」を表示します。導入状況パネル右上の「状況確認」で検出・更新します。タブ欄右の「全テスト」は、導入状況・モデル一覧・外部連携をそれぞれ確認して書き込みます（前述）。左側でカテゴリを開閉し、項目を選ぶと右側でパス・バージョン・利用機能・参照ソースを表示します。
 
@@ -379,7 +379,7 @@ Tools 接続中に専用タブで開始すると、`_config/AiDiy_key.json` の�
 - MCP SDK は文字列戻り値を `structuredContent.result` に包むため、その中の JSON を解析して `status` と応答を判定します。オブジェクト形式の `structuredContent` と従来の `content[].text` にも対応します。外側の MCP 成功だけで会話を OK にしません。
 - 実キーを使わない回帰確認: `node --test backend_diag/checks/model-trials.check.mjs backend_diag/checks/model-trial-audio.check.mjs`。行順・継承・重複、設定変更、MCP 初期化・SSE・セッション破棄、認証、切断、1秒の音声境界・認証再生・一時ファイル期限・symlink保護・保存中の取消を mock / 合成WAV で検証します。実モデル・CLI・音声の疎通は利用者環境での明示試行が必要です。
 - 実 SDK 契約確認: Tools と同じ `mcp>=2,<3`・FastAPI・uvicorn を持つ Python を環境変数 `DIAG_TEST_PYTHON` に指定し、`node --test backend_diag/checks/model-trials-sdk.check.mjs` を実行します。実際の Chat / Code ツール登録と MCP SDK の初期化・セッション・SSE・文字列結果、実 Live 内部 HTTP ルートを一時 loopback サーバーで検証します。モデル実行と Live アダプターだけを合成し、キー・有料 API・稼働中の Tools は使いません。環境変数未指定時はこの契約テストをスキップします。
-- 行別ボタンと配色は `node --test backend_diag/checks/status-badge.check.cjs backend_diag/ui/src/設定モデル/checks/設定モデル.check.cjs` で確認します。実ブラウザの任意確認は `node backend_diag/checks/model-trials-browser.mjs`。既存 Chrome / Edge（必要なら `CHROME_PATH`）を使い、合成データで1回だけの実行・共有表示・見出し配置・狭幅を確認し、`temp/diag-trial-browser/`（`DIAG_SCREENSHOT_DIR` で変更可）へ画像と結果を保存します。
+- 行別ボタンと配色は `node --test backend_diag/checks/status-badge.check.cjs backend_diag/ui/src/components/設定モデル/checks/設定モデル.check.cjs` で確認します。実ブラウザの任意確認は `node backend_diag/checks/model-trials-browser.mjs`。既存 Chrome / Edge（必要なら `CHROME_PATH`）を使い、合成データで1回だけの実行・共有表示・見出し配置・狭幅を確認し、`temp/diag-trial-browser/`（`DIAG_SCREENSHOT_DIR` で変更可）へ画像と結果を保存します。
 
 ## Predictionの手動試行
 
@@ -458,7 +458,7 @@ Decisionは1問ずつpredicate / choice / scoreを選び、質問名・質問文
 
 Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付き音声APIからBlobを自動取得してネイティブプレーヤーで再生できる状態にします。自動再生しません。AIモデル・設定モデルとも、完了後のタブ移動では再生だけを停止し、結果と取得済み音声を保持します。再実行・設定再読込・切断・終了ではObject URLを解放します。通常は音声再読込の操作を求めず、取得・再生失敗時だけ「音声取得を再試行」を表示します。短い音声・音声なしは明示します。
 
-検証は実AIを使わず、`checks/manual-models.check.mjs`、`ui/src/AIモデル/checks/manual-state.check.mjs` を使います。`DIAG_TEST_PYTHON` をTools依存環境のPythonへ設定すると `checks/model-trials-sdk.check.mjs` が実MCP SDKと合成AIで経路・Liveの15秒待機を確認します。`checks/manual-models-browser.mjs` は既存Chrome/Edgeの隔離プロファイルで4画面・幅1280/720/390・合成音声再生・破棄・一括試行・非JSON表示を確認します。UI変更後は依頼に応じて `backend_diag/ui` のビルドと `node backend_diag/ui/verify.mjs` で配布物を同期します。
+検証は実AIを使わず、`checks/manual-models.check.mjs`、`ui/src/components/AIモデル/checks/manual-state.check.mjs` を使います。`DIAG_TEST_PYTHON` をTools依存環境のPythonへ設定すると `checks/model-trials-sdk.check.mjs` が実MCP SDKと合成AIで経路・Liveの15秒待機を確認します。`checks/manual-models-browser.mjs` は既存Chrome/Edgeの隔離プロファイルで4画面・幅1280/720/390・合成音声再生・破棄・一括試行・非JSON表示を確認します。UI変更後は依頼に応じて `backend_diag/ui` のビルドと `node backend_diag/ui/verify.mjs` で配布物を同期します。
 
 
 ## ミニ表示からCLIを開く
@@ -481,7 +481,7 @@ Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付
 
 Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリックごとに独立したConsole窓を開きます。起動途中や別窓の稼働中も追加起動でき、既存窓を再利用・前面化しません。各窓は別のサーバーポート・端末セッション・起動ログを持ち、1つを閉じても他の窓は続行します。確認付きの呼出しでは確認ダイアログだけを重ねず、承認後の起動は並行して受け付けます。通信の再接続・重複startはその窓が所有する同じCLIに戻り、終了済みCLIを勝手に再実行しません。Diag終了ではConsoleは終了せず、Console窓・所有サーバーを閉じるとその窓のCLIだけが停止します。ブラウザタブの一時切断は再接続のため30秒だけプロセスを保持し、戻らなければCLIと所有サーバーを終了します。初回の端末接続が表示後30秒以内に始まらない場合も終了し、次回のクリックで再起動できます。既存CLIの全OS横断検出は行いません。Avatar・Live・Discordの単一起動制限と、その他アプリの起動中の排他は変更しません。
 
-アイコンの出典・ライセンス・引用メモは保存先の `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md` に集約し、配布先にも同名の `static/LICENSE_ICONS.md` を同梱します。CopilotはGitHub Octicons、Grokはx.ai公式ブランド配布、OpenCodeは公式リポジトリ、Codex / Claude CodeはLobeHubのMIT素材です。各素材の形状・色を保持し（Copilotは記録済み単色変更）、外部CLIとHermesは白い帯・黒い名称を含む120×120pxの自己完結SVGとして表示します。PNG派生物も同梱します。Hermesは既存AiDiy画像にHERMESの帯を組み合わせ、AgyはAntigravity公式サイトの山形マークです。AiDiy6アプリは名称入りの既存画像を使い、いずれもHTMLで名前を重ねません。アイコンは上段のAiDiy6アプリ＋Hermesと、下段の外部CLI6種の計2行です。CLIは利用可能なものだけを並べます。全アイコンを名称帯込みの40px枠・40px表示へ揃え、元の縦横比を維持します。稼働インジケーター6件は1行で表示します。再生成方法と原本の場所は同フォルダのREADMEを参照してください。
+アイコンの出典・ライセンス・引用メモは保存先の `ui/src/components/アプリ起動/CLIアイコン/LICENSE_ICONS.md` に集約し、配布先にも同名の `static/LICENSE_ICONS.md` を同梱します。CopilotはGitHub Octicons、Grokはx.ai公式ブランド配布、OpenCodeは公式リポジトリ、Codex / Claude CodeはLobeHubのMIT素材です。各素材の形状・色を保持し（Copilotは記録済み単色変更）、外部CLIとHermesは白い帯・黒い名称を含む120×120pxの自己完結SVGとして表示します。PNG派生物も同梱します。Hermesは既存AiDiy画像にHERMESの帯を組み合わせ、AgyはAntigravity公式サイトの山形マークです。AiDiy6アプリは名称入りの既存画像を使い、いずれもHTMLで名前を重ねません。アイコンは上段のAiDiy6アプリ＋Hermesと、下段の外部CLI6種の計2行です。CLIは利用可能なものだけを並べます。全アイコンを名称帯込みの40px枠・40px表示へ揃え、元の縦横比を維持します。稼働インジケーター6件は1行で表示します。再生成方法と原本の場所は同フォルダのREADMEを参照してください。
 
 素材の著作権ライセンスとブランド・商標の条件は別です。Codex / Claude Code画像はベンダー公式配布ではなく第三者のLobeHub素材です。AiDiyは各社・各開発チームの提供・承認・提携を示しません。MIT等の全文と素材ごとの制約は `LICENSE_ICONS.md` に保持し、商標利用の包括的な許諾とは記載しません。
 
@@ -503,7 +503,7 @@ Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリック�
 実装上、Windowsのアイコン表示は専用の最前面レベルを設定し、表示切替完了時にも実際の最前面状態を確認します。解除時は共通ピンの選択へ戻します。ドラッグの起点はメインプロセスのマウス押下で記録し、IPC到着前にポインターが動いた場合も最初の移動量を保持します。素早い解放時も最後の位置を反映して終了します。
 - アプリとCLIの起動状態・フォルダは既存状態を共有します。CLIから開くConsoleは作業領域中央に約800×600pxで表示します。
 
-画面は backend_diag/ui/src/アプリ起動/マイクロランチャー.vue / .css、共通寸法は同フォルダの 円周配置.cjs、窓制御は backend_diag/起動/マイクロ表示.cjs です。回帰確認は node --test backend_diag/checks/micro-window.check.mjs backend_diag/checks/icon-drag.check.mjs backend_diag/checks/desktop.check.mjs。配布画面を更新するときは npm --prefix backend_diag/ui run build と npm --prefix backend_diag/ui run check を実行します。
+画面は backend_diag/ui/src/components/アプリ起動/マイクロランチャー.vue / .css、共通寸法は同フォルダの 円周配置.cjs、窓制御は backend_diag/起動/マイクロ表示.cjs です。回帰確認は node --test backend_diag/checks/micro-window.check.mjs backend_diag/checks/icon-drag.check.mjs backend_diag/checks/desktop.check.mjs。配布画面を更新するときは npm --prefix backend_diag/ui run build と npm --prefix backend_diag/ui run check を実行します。
 
 ### 再読込時の認証
 
@@ -513,7 +513,7 @@ Hermes・外部CLIは、同じDiag・同じプロジェクトでもクリック�
 
 アプリ起動・ミニ・アイコン化の外部ランチャーに VS Code を表示します。導入タブと同じ実行ファイル探索を使用し、未導入時は通常画面で無効、ミニ・アイコン化では非表示です。選択した実在プロジェクトフォルダを `--new-window` で開きます。Console・AI CLI・自動承認は使用せず、フォルダ未選択・削除済みの場合は別フォルダへ代替しません。Windows の `code.cmd` は同梱 `Code.exe` を直接起動し、パスをシェル文字列に展開しません。呼び出し元のプロキシ環境変数を引き継ぎ、Diag 終了時にも VS Code は独立して継続します。
 
-公式原画を保持したうえで、表示用は青帯・白字 VSCODE を含む SVG と120px PNGに合成しています。出典・利用条件は `ui/src/アプリ起動/CLIアイコン/LICENSE_ICONS.md`、コマンド仕様は https://code.visualstudio.com/docs/configure/command-line を参照してください。
+公式原画を保持したうえで、表示用は青帯・白字 VSCODE を含む SVG と120px PNGに合成しています。出典・利用条件は `ui/src/components/アプリ起動/CLIアイコン/LICENSE_ICONS.md`、コマンド仕様は https://code.visualstudio.com/docs/configure/command-line を参照してください。
 
 ## 設定再起動
 

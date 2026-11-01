@@ -11,8 +11,8 @@
 - `frontend_web/vite.config.ts` — Web 用 Vite Proxy（port 8090）
 - `frontend_avatar/vite.config.mts` — Avatar 用 Vite Proxy（port 8092）
 - `frontend_web/src/api/client.ts` — `baseURL: '/'` 前提の Axios クライアント
-- `frontend_avatar/src/api/config.ts` — `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASKTEAM_BASE_URL` の解決
-- `frontend_avatar/src/api/client.ts` — `apiClient`（core）、`taskClient` / `teamClient`（backend_taskteam）
+- `frontend_avatar/src/api/config.ts` — `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` の解決
+- `frontend_avatar/src/api/client.ts` — `apiClient`（core）
 - `backend_server/core_main.py` — CORS 許可リスト
 - `backend_server/apps_main.py` — CORS 許可リスト
 - `backend_taskteam/taskteam_proc/app.py` — CORS ミドルウェアなし（`/task` と `/team` はプロキシ経由前提）
@@ -23,15 +23,13 @@
 ブラウザ → Vite dev server (8090/8092)
         → /core/* → backend core (8091)
         → /apps/* → backend apps (8098)
-        → /task/* → backend taskteam (8093) ※ Avatar のみ
-        → /team/* → backend taskteam (8093) ※ Avatar のみ
         → /mcp/*  → backend tools (8095)   ※ frontend_web のみ。prefix は rewrite で除去
 ```
 
-- `frontend_web` の Task / Team 画面とメニューは削除済みです。単独アプリ `aidiy_task` / `aidiy_team` を使い、Web用の `/task` / `/team` プロキシは設けません。
-- 画面側では `/core/...`、`/apps/...`、`/task/...`、`/team/...` の相対URLだけを書く。
+- Web / Avatar の Task / Team 画面とメニューは削除済みです。単独アプリ `aidiy_task` / `aidiy_team` を使い、両Vite設定に `/task` / `/team` プロキシは設けません。
+- 画面側では `/core/...`、`/apps/...` の相対URLだけを書く。
 - backend の `http://127.0.0.1:8091` / `8098` / `8093` をコンポーネントへ直書きしない。
-- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` / `/task` / `/team` プロキシを用意する。
+- 本番では Vite dev server がいないため、Nginx 等で同等の `/core` / `/apps` プロキシを用意する。
 
 ## proxy 設定の基準
 
@@ -39,9 +37,6 @@
 proxy: {
   '/core': { target: 'http://127.0.0.1:8091', changeOrigin: true, ws: true },
   '/apps': { target: 'http://127.0.0.1:8098', changeOrigin: true, ws: true },
-  // 以下の /task と /team は frontend_avatar のみ。frontend_web には定義しない
-  '/task': { target: 'http://127.0.0.1:8093', changeOrigin: true },
-  '/team': { target: 'http://127.0.0.1:8093', changeOrigin: true },
   // frontend_web のみ。backend_tools は prefix を持たないため rewrite で除去する
   '/mcp':  { target: 'http://127.0.0.1:8095', changeOrigin: true,
              rewrite: (path: string) => path.replace(/^\/mcp/, '') },
@@ -50,7 +45,7 @@ proxy: {
 
 - `ws: true` は WebSocket 転送に必要。AIコアの `ws://127.0.0.1:8090/core/ws/AIコア` も backend core へ転送される。
 - `/core` / `/apps` の prefix は backend 側エンドポイントでも使うため、rewrite で削らない。
-- `/mcp` は `frontend_web/vite.config.ts` にだけある。`frontend_avatar` は `/core` `/apps` `/task` `/team` の 4 経路。
+- `/mcp` は `frontend_web/vite.config.ts` にだけある。`frontend_avatar` は `/core` `/apps` の2経路。
 - 現状 `frontend_web/src` から `/mcp` を呼ぶコードはない。手元検証用の経路として残っている。
 - `frontend_avatar` は `strictPort: true`。WebSocket URL を host から動的生成するため 8092 固定が前提。
 
@@ -66,13 +61,13 @@ proxy: {
 | `backend_local/local_main.py` | 8096 |
 | `backend_tools/tools_main.py` | 8095 |
 
-`backend_taskteam` には CORS ミドルウェアがないため、ブラウザからの `/task` / `/team` 呼び出しは必ず Vite proxy（または Nginx 等のリバースプロキシ）経由にする。`frontend_avatar` の Electron 本番では `TASKTEAM_BASE_URL` が `http://127.0.0.1:8093` を指し、用途別クライアントが同じ統合サーバーへ直結する。
+Task / Team は `frontend_ide` の独立アプリが担当します。接続・内部認証は [Vue共通画面変更手順](./frontend_ide,Vue共通画面変更手順.md) を参照し、Web / Avatar に旧プロキシを復活させないでください。
 
 ## ポート変更時の手順
 1. `frontend_web/vite.config.ts` または `frontend_avatar/vite.config.mts` の `server.port` を更新する。
 2. `backend_server/core_main.py` / `apps_main.py` の CORS origins にフロントの新URLを追加する。
 3. 固定URLを参照している表示部品（例: `_TopBar.vue` のサーバー状態表示）を確認する。
-4. `frontend_avatar` で明示 URL を使う場合は `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASKTEAM_BASE_URL` も更新する。
+4. `frontend_avatar` で明示 URL を使う場合は `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` も更新する。
 5. ブラウザの origin が変わるため、保存済み token / localStorage / sessionStorage を確認する。
 
 ```python
@@ -85,11 +80,11 @@ origins = [
 
 ## Avatar の接続先解決
 
-`frontend_avatar/src/api/config.ts` の優先順:
+`frontend_avatar/src/api/config.ts` ではRESTとWebSocketを別々に解決します。
 
-1. 対応する `VITE_CORE_BASE_URL` / `VITE_CORE_WS_URL` / `VITE_TASKTEAM_BASE_URL`
-2. 開発時: REST は `'/'`、WebSocket は `window.location.host` から生成した URL
-3. 本番: Core 8091、TaskTeam 8093 の各ローカル URL（Task / Team は同じ base URL）
+- REST: `VITE_CORE_BASE_URL` → 開発時 `/` → 本番 `http://127.0.0.1:8091`。
+- WebSocket: `VITE_CORE_WS_URL` → ページがHTTP(S)なら同じhostの `/core/ws/AIコア`（HTTPSならwss）→ それ以外は `ws://127.0.0.1:8091/core/ws/AIコア`。
+- TaskTeam用の環境変数・クライアントはAvatarにはありません。
 
 Electron と Web で同じ proxy 前提にできるよう、明示 URL を増やす場合は両モードで確認する。
 

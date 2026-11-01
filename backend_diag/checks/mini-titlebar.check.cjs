@@ -7,8 +7,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {createRequire}=require('node:module'),req=createRequire(path.join(__dirname,'../ui/package.json'));
 const {parse}=req('postcss'),{source}=require('./ui-components.cjs');
-const normal=parse(source('style.css')),mini=parse(source('起動/起動ミニ.css')),launcher=parse(source('アプリ起動/マイクロランチャー.css'));
-const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../ui/src/共通表示/タイトルバー配色.css'),'utf8'));
+const normal=parse(source('style.css')),mini=parse(source('components/起動/起動ミニ.css')),launcher=parse(source('components/アプリ起動/マイクロランチャー.css'));
+const palette=parse(require('node:fs').readFileSync(path.join(__dirname,'../ui/src/components/共通表示/タイトルバー配色.css'),'utf8'));
 const titleColor=value=>value.replace(/var\((--[\w-]+)\)/g,(_match,name)=>declarations(palette,':root')[name]);
 function declarations(css,selector){
  const values={};css.walkRules(rule=>{if(rule.selector===selector)rule.walkDecls(({prop,value})=>values[prop]=value);});return values;
@@ -70,8 +70,8 @@ test('ミニの内容を自然な高さで計測し、2段アイコン・案内�
 
 
 test('標準・ミニのタイトル文字と左側余白はdrag、操作ボタンと子要素だけをno-dragにする',()=>{
- const chrome=source('ウィンドウ/ステータスバー.vue');
- assert.match(chrome,/<header class="panel-brand" :class="\{desktop,compact\}">/);
+ const chrome=source('components/ウィンドウ/ステータスバー.vue');
+ assert.match(chrome,/<header class="panel-brand" :class="\{desktop,compact\}"[^>]*>/);
  const header=declarations(normal,'.panel-brand.desktop');
  for(const property of ['-webkit-app-region','app-region']){
   assert.equal(header[property],'drag');
@@ -80,7 +80,7 @@ test('標準・ミニのタイトル文字と左側余白はdrag、操作ボタ�
   assert.equal(declarations(normal,'.panel-brand button *,.window-actions *')[property],'no-drag');
  }
  assert.equal(header['user-select'],'none');
- const micro=parse(source('アプリ起動/マイクロランチャー.css'));
+ const micro=parse(source('components/アプリ起動/マイクロランチャー.css'));
  assert.equal(declarations(micro,'.launcher-selector')['-webkit-app-region'],undefined,'伸びたgrid列全体をno-dragにしない');
  assert.equal(declarations(micro,'.micro-launcher button')['-webkit-app-region'],'no-drag','microの操作方式は変えない');
  for(const css of [normal,mini,micro])css.walkRules(rule=>{
@@ -101,12 +101,12 @@ test('通常・ミニ・Web のタイトル行は共通の暗灰色と白寄り�
  assert.equal(declarations(normal,'.connection-bar.online').background,'cyan');
  assert.equal(declarations(normal,'.window-actions .window-pin').color,'#778394');assert.equal(declarations(normal,'.window-actions .window-pin.pinned').color,'#c3f7ff');
  assert.match(declarations(normal,'.window-maximized .window-maximize')['box-shadow'],/var\(--aidiy-titlebar-background\)/);
- const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"./共通表示/タイトルバー配色.css"'));
+ const imports=[];normal.walkAtRules('import',rule=>imports.push(rule.params));assert.ok(imports.includes('"./components/共通表示/タイトルバー配色.css"'));
 });
 
 
 test('起動・ミニの主面は黒を基準にし、操作階層・選択色・透明アイコン窓は維持する',()=>{
- const startup=parse(source('起動/起動.css')),micro=parse(source('アプリ起動/マイクロランチャー.css'));
+ const startup=parse(source('components/起動/起動.css')),micro=parse(source('components/アプリ起動/マイクロランチャー.css'));
  for(const selector of ['.start-panel','.start-panel .start-console'])assert.equal(declarations(startup,selector).background,'#000');
  for(const selector of ['#app:has(>.start-mini)','#app>.panel.start-mini'])assert.equal(declarations(mini,selector).background,'#000');
  assert.equal(declarations(normal,'button,input,select').background,'#1a2c3a');
@@ -114,4 +114,13 @@ test('起動・ミニの主面は黒を基準にし、操作階層・選択色�
  assert.equal(declarations(startup,'.start-targets button.active').background,'#1b2d3d');
  assert.equal(declarations(mini,'.mini-service[data-tone=running]').background,'#0d2523');
  assert.equal(declarations(micro,'html.micro-mode,html.micro-mode body,html.micro-mode #app').background,'transparent');
+});
+
+test('Windows標準タイトルだけ独自操作へ切り替え、ミニnative dragと背景長押しを競合させない',()=>{
+ const title=source('components/ウィンドウ/ステータスバー.vue');
+ assert.match(title,/customNormalTitle.value=window.aidiyWindow\?\.customNormalTitle===true/);
+ assert.ok(title.includes(':data-aidiy-standard-title="desktop&&customNormalTitle&&!compact?'));
+ assert.ok(title.includes(':data-aidiy-no-window-move="desktop&&customNormalTitle&&!compact?'));
+ assert.equal(declarations(normal,'.panel-brand.desktop')['-webkit-app-region'],'drag');
+ const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\[data-aidiy-standard-title\][^{}]*\{[^}]*-webkit-app-region:no-drag/);
 });

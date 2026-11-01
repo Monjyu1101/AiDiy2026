@@ -156,25 +156,17 @@ result = response.json()
    - `mcp_<略号> = MCPServer("aidiy_<name>", warn_on_duplicate_tools=False)`
    - `sse_app(sse_path="/sse", message_path="/messages/", host="127.0.0.1")` と `streamable_http_app(streamable_http_path="/mcp", host="127.0.0.1")` を既存の `_mcp_transport_app()` で合成する
    - `@mcp_<略号>.tool()` でツール登録
-   - Starlette `routes` に `*mcp_<略号>.sse_app().routes` を追加
+   - `MCP_MAP` へ登録し、`app.mount(MOUNT_<略号>, _mcp_transport_app(mcp_<略号>))` でマウントする。`sse_path` / `message_path` はマウント先を重ねず `/sse` / `/messages/` とする。HTTPルーターは既存の `tools_proc/tools_*.py` の構成に合わせて登録する
    - 起動ログに `logger.info(f"... SSE : http://127.0.0.1:{MCP_PORT}{MOUNT_<略号>}/sse")` を追加
 3. `_config/AiDiy_mcp.json` の `mcpServers` に `"aidiy_<name>": {"type": "sse", "url": "..."}` を追加する
 4. stdio クライアントから使う場合は `mcp_stdio.py --sse-url http://127.0.0.1:8095/aidiy_<name>/sse` で中継できることを確認する
 
-### ドキュメント更新（漏れやすいので必ず全部見る）
-5. **本ファイル** (`backend_tools,構成.md`) の「提供 MCP」テーブルと「関連ファイル」リストに新規エントリを追加する
-6. `backend_tools/AGENTS.md` の「提供 MCP」「ファイル構成」テーブル、概要文の「N 個の MCP サーバー」を更新する
-7. ルート `AGENTS.md` の「ディレクトリ概要」と「MCP 概要」テーブル、「N つの MCP サーバー」を更新する
-8. ルート `CLAUDE.md` の「**Backend MCP**: N 個の MCP サーバー」記載と内訳を更新する
-9. `_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md` の「MCP サーバー一覧」「ツール選択基準」テーブル、`tools_main.py` の N 個記載を更新する
-10. `_AIDIY/knowledge/backend_tools,backend_server,運用手順.md` の「SSE エンドポイント」テーブルを更新する
-11. `frontend_web/public/X自己紹介/index.html`（人間向け紹介ページ）の以下を更新する:
-    - hero タグ行の `MCP Hub ×N` 表記
-    - Feature Overview の `MCP Hub × N + Multi CLI` カード説明
-    - Current Numbers の `data-count="N"` と stat-sub 内訳
-    - Architecture Stack の `🔌 MCP サーバー (統合)` 説明と `SSE × N` バッジ
-    - `<!-- 7. MCP Hub × N + Multi CLI -->` セクションのタイトル / サブタイトル / 各 architecture-item カード（新規 MCP 分を追加）
-    - Self-Verification Loop の `MCP N サーバーの連携` 表記
+### ドキュメント更新
+
+- 一覧・接続URLの正本である本書の「提供 MCP」と関連実装を更新する。
+- 利用目的が増える場合は [MCP活用手順](./backend_server,backend_tools,MCP活用手順.md) の「ツール選択基準」を更新する。一覧を別文書へ複製しない。
+- `backend_tools/AGENTS.md`、ルート `AGENTS.md` / `README.md`、`frontend_web/public/X自己紹介/index.html` に構成・件数の記載があれば同期する。最小入口の `CLAUDE.md` / `_AIDIY.md` へ一覧を追加しない。
+- Windows 限定MCPを含む場合は、WindowsとLinux/macOSの件数・公開範囲を分けて確認する。
 
 ### 確認
 12. `backend_tools` 再起動後 `curl http://127.0.0.1:8095/aidiy_<name>/sse` が `text/event-stream` を返すか確認

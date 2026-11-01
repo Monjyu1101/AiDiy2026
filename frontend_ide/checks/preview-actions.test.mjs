@@ -9,17 +9,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
-import * as references from '../src/ファイル閲覧/ファイル参照.js';
-import * as actions from '../src/ファイル閲覧/ファイル操作.js';
-import * as browserLaunch from '../src/ブラウザ/起動.js';
+import * as viewerIdle from '../src/components/ファイル閲覧/閲覧待機.js';
+import * as references from '../src/components/ファイル閲覧/ファイル参照.js';
+import * as actions from '../src/components/ファイル閲覧/ファイル操作.js';
+import * as browserLaunch from '../src/components/ブラウザ/起動.js';
 import * as mediaTypes from '../viewer/media-types.mjs';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
 const { transformSync } = require('esbuild');
 // 共通ボタンも実Vueを読み込み、ビューアの現在の部品構成で検証する。
-const refreshFilename = fileURLToPath(new URL('../src/共通表示/再読込ボタン.vue', import.meta.url));
+const refreshFilename = fileURLToPath(new URL('../src/components/共通表示/再読込ボタン.vue', import.meta.url));
 const refreshDescriptor = parse(readFileSync(refreshFilename, 'utf8')).descriptor;
 const refreshScript = compileScript(refreshDescriptor, { id: 'RefreshButton', inlineTemplate: true });
 const refreshModule = { exports: {} };
@@ -55,7 +55,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     patchProp: (element, key, _old, value) => { element.props[key] = value; },
     setText: (element, text) => { element.text = text; }, setElementText: (element, text) => { element.text = text; element.children = []; },
   });
-  const filename = fileURLToPath(new URL('../src/ファイル閲覧/ファイルビューア.vue', import.meta.url));
+  const filename = fileURLToPath(new URL('../src/components/ファイル閲覧/ファイルビューア.vue', import.meta.url));
   const { descriptor } = parse(readFileSync(filename, 'utf8'));
   const script = compileScript(descriptor, { id: 'FileViewer', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, id: 'FileViewer', filename, compilerOptions: { bindingMetadata: script.bindings } });
@@ -68,7 +68,7 @@ async function viewer(t, { desktop, browserCopy = async () => {}, pinned = false
     setTimeout: (callback, delay) => { const id = ++sequence; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     require: id => id === '../共通表示/再読込ボタン.vue' ? refreshModule.exports : id === '../ファイル閲覧/閲覧待機.js' ? viewerIdle : id === 'vue' ? vue : id === '../ファイル閲覧/ファイル参照.js' ? references
       : id === '../ファイル閲覧/ファイル操作.js' ? { ...actions, copyBrowserText: async text => { copies.push(text); await browserCopy(text); } }
-        : id === '../ブラウザ/起動.js' ? browser : id === '../../viewer/media-types.mjs' ? mediaTypes : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
+        : id === '../ブラウザ/起動.js' ? browser : id === '../../../viewer/media-types.mjs' ? mediaTypes : id === '../ファイル閲覧/コード表示.js' ? { loadMonaco: async () => null, monacoLanguage: () => 'text' } : assert.fail(`Unexpected import ${id}`),
   });
   const component = module.exports, setup = component.setup;
   component.setup = (props, context) => { state = setup(props, context); return state; };

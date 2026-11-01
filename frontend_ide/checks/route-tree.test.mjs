@@ -5,8 +5,8 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {routeTreeRows,viewTreeRecords,routeNavigationSteps} from '../src/開発スペース/軌跡ツリー.js';
-import {visitPoint,searchRouteRecords} from '../src/開発スペース/経路記録.js';
+import {routeTreeRows,viewTreeRecords,routeNavigationSteps} from '../src/components/開発スペース/軌跡ツリー.js';
+import {visitPoint,searchRouteRecords} from '../src/components/開発スペース/経路記録.js';
 
 test('軌跡ツリー: 再訪からの分岐・逆辺は保存済みの親子を変えずに表示',()=>{
  const records=[];let current=null;

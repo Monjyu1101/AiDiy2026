@@ -16,7 +16,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | プロジェクト全体のセットアップ | [`../../_AIDIY/knowledge/共通,開発環境運用手順.md`](../../_AIDIY/knowledge/共通,開発環境運用手順.md) |
 | 拡張機能と生成物のクリーンアップ | [`../../_AIDIY/knowledge/共通,クリーンアップ手順.md`](../../_AIDIY/knowledge/共通,クリーンアップ手順.md) |
 | Hermes の Provider / モデル選択 | [`../../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](../../_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md) |
-| Discord / Slack Bot からの共有利用 | [`../../frontend_channels/AGENTS.md`](../../frontend_channels/AGENTS.md)、[`../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](../../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
+| Discord / Slack Bot からの共有利用 | [`../../frontend_channels/AGENTS.md`](../../frontend_channels/AGENTS.md)、[`../../_AIDIY/knowledge/frontend_channels,Discord接続変更手順.md`](../../_AIDIY/knowledge/frontend_channels,Discord接続変更手順.md) |
 | Hermes の Windows 対応 | [`../../_AIDIY/knowledge/command_hermes,Windows対応規則.md`](../../_AIDIY/knowledge/command_hermes,Windows対応規則.md) |
 
 ## 概要
@@ -86,13 +86,13 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 1. `extension.ts` または `aidiy_code/src/server.ts` が対象フォルダ・会話・モデル・添付コードを管理する。
 2. `src/code-connection.ts` が Live と共通のローカル接続先を解決し、入力・コード出力ソケットとモデルAPIを管理する。
-3. 送信・停止はAIコアへ渡し、frontend_ide の Vue 画面（`src/コード/`）が進捗・正式回答と接続状態を表示する。
+3. 送信・停止はAIコアへ渡し、frontend_ide の Vue 画面（`src/components/コード/`）が進捗・正式回答と接続状態を表示する。
 
 画面は VS Code の Webview・単独起動・IDE とも frontend_ide の Vue 画面だけです。単独起動・IDE では `aidiy_code/src/server.ts` が VS Code API の代わりに HTTP / SSE の API を提供し、接続層を共用します。
 
 AiDiy IDE はCode / Liveの単独サーバーと画面を同一公開元への中継で埋め込みます。Codeの `lockedMode` 起動オプションは、IDEの利用モードを維持し、サーバー寿命を親のIDEに委ねます。未指定の単独版の動作は従来どおりです。
 
-Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声処理は `aidiy_live/src/audio.ts`・`visualizer.ts` を共用します。VS Code 拡張では `host.ts`（拡張ホスト）が AIコアの WebSocket、モデル情報 API、Windows マイク（`microphone.py`）を扱い、Webview へ中継します。単独起動では `src/server.ts` の localhost 中継が同じ役割を担います。接続時は input / 0 / audio の 3 本の WebSocket を開き、`connect` パケットで作業フォルダ（`CODE_BASE_PATH`）と選択したモデル設定を渡します。
+Live の画面は frontend_ide の Vue 画面（`src/components/ライブ/`）で、音声処理は `aidiy_live/src/audio.ts`・`visualizer.ts` を共用します。VS Code 拡張では `host.ts`（拡張ホスト）が AIコアの WebSocket、モデル情報 API、Windows マイク（`microphone.py`）を扱い、Webview へ中継します。単独起動では `src/server.ts` の localhost 中継が同じ役割を担います。接続時は input / 0 / audio の 3 本の WebSocket を開き、`connect` パケットで作業フォルダ（`CODE_BASE_PATH`）と選択したモデル設定を渡します。
 
 ## 接続と会話
 
@@ -118,10 +118,10 @@ Live の画面は frontend_ide の Vue 画面（`src/ライブ/`）で、音声�
 - VS Code のビュー、コマンド、設定を変える場合は `package.json` と `src/extension.ts` をセットで見る。
 - CLI の探索、引数、標準入出力、停止を変える場合は `src/runner.ts` と `checks/runner.test.cjs` をセットで見る。
 - packet を変える場合は `src/protocol.ts` と既存 AIコード実装との互換性を確認する。
-- チャット UI を変える場合は frontend_ide の Vue 画面（`src/コード/`・`src/共通表示/`）を変更し、拡張の Webview・単独起動・IDE の 3 つで同じ画面になることを確認する。
-- Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord・Slack の aidiy_hermes モデル候補は AIコアのモデル情報API（`code_models.aidiy_hermes`）を優先し、停止中は `_AIDIY/aidiy_diag/code_models_info.json` を読む（各アプリの `src/コード/Hermesモデル.ts`）。
+- チャット UI を変える場合は frontend_ide の Vue 画面（`src/components/コード/`・`src/components/共通表示/`）を変更し、拡張の Webview・単独起動・IDE の 3 つで同じ画面になることを確認する。
+- Code のコードAI／モデル候補を変える場合は `src/code-connection.ts` とAIコアのモデル情報APIを確認する。Discord・Slack の aidiy_hermes モデル候補は AIコアのモデル情報API（`code_models.aidiy_hermes`）を優先し、停止中は `_AIDIY/aidiy_diag/code_models_info.json` を読む（各アプリの `src/components/コード/Hermesモデル.ts`）。
 - モデル選択の保存・復元を変える場合は `src/model-preferences.ts` と、Code / Live それぞれの拡張・単独起動の読込箇所をセットで見る。
-- Live の画面を変える場合は frontend_ide の Vue 画面（`src/ライブ/`）、音声を変える場合は `aidiy_live/src/audio.ts`・`visualizer.ts`・`aidiy_live/media/capture.js` をセットで見る。
+- Live の画面を変える場合は frontend_ide の Vue 画面（`src/components/ライブ/`）、音声を変える場合は `aidiy_live/src/audio.ts`・`visualizer.ts`・`aidiy_live/media/capture.js` をセットで見る。
 - Live の通信を変える場合は、拡張ホスト（`aidiy_live/src/host.ts`）と単独起動の中継（`aidiy_live/src/server.ts`）の許可範囲を揃える。
 - 具体的な変更手順と検証項目は `_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md` を参照する。
 

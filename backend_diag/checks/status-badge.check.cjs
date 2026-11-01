@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const { render, source } = require('./ui-components.cjs');
 test('compiled badges distinguish every state with text only, no icons', async () => {
   for (const [state, tone] of Object.entries({ 未確認: 'neutral', 未実施: 'warning', 未取得: 'neutral', 未検出: 'warning', 注意: 'warning', OK: 'success', NG: 'danger', ERR: 'danger', 取得済: 'success', 取得中: 'pending', 失敗: 'danger', 確認中: 'pending', キャッシュ利用: 'cache', PASS: 'cache' })) {
-    const html = await render('共通表示/状態バッジ.vue', { state });
+    const html = await render('components/共通表示/状態バッジ.vue', { state });
     assert.ok(html.includes(`data-state="${state}"`));
     assert.ok(html.includes(`data-tone="${tone}"`));
     assert.ok(html.includes(`aria-label="${state}"`));
@@ -19,20 +19,20 @@ test('compiled badges distinguish every state with text only, no icons', async (
 });
 
 test('untrusted labels are escaped', async () => {
-  const escaped = await render('共通表示/状態バッジ.vue', { label: '<script>alert(1)</script>' });
+  const escaped = await render('components/共通表示/状態バッジ.vue', { label: '<script>alert(1)</script>' });
   assert.doesNotMatch(escaped, /<script>/);
   assert.match(escaped, /&lt;script&gt;/);
 });
 
 test('key list keeps public acquisition and individual test outcomes separate', async () => {
-  const html = await render('モデル一覧/モデル一覧パネル.vue', {
+  const html = await render('components/モデル一覧/モデル一覧パネル.vue', {
     data: { 設定状態: '読込済み', 項目: [{ id: 'openai', 名前: 'OpenAI', キー名: 'OPENAI_API_KEY', 設定済み: true, テスト可能: true }] },
     results: { openai: { 状態: 'NG' } }, loading: false, testing: '', connected: true,
     publicModels: { 状態: '取得済', 件数: 12 }, publicBusy: false,
   });
   assert.match(html, /<span class="public-status"[^>]*>公開モデル一覧取得: <span class="badge public-indicator" data-state="OK" data-tone="success"/);
   assert.equal((html.match(/public-indicator/g) || []).length, 1);
-  const cached = await render('モデル一覧/モデル一覧パネル.vue', { data: { 設定状態: '読込済み', 項目: [] }, results: {}, connected: true, publicModels: { 状態: '取得済', 取得元: 'キャッシュ' } });
+  const cached = await render('components/モデル一覧/モデル一覧パネル.vue', { data: { 設定状態: '読込済み', 項目: [] }, results: {}, connected: true, publicModels: { 状態: '取得済', 取得元: 'キャッシュ' } });
   assert.match(cached, /class="badge public-indicator" data-state="キャッシュ利用" data-tone="cache"[^]*?<\/span><button class="public-retry refresh-button"[^>]*>[^]*?<span>再取得<\/span><\/button><\/span>/);
   assert.match(html, /data-state="NG" data-tone="danger"/);
   assert.match(html, />テスト<\/button>/);
@@ -56,12 +56,12 @@ test('vivid badge palette keeps readable contrast and unconfirmed black', () => 
   assert.doesNotMatch(css, /badge-icon|badge-neutral-dot/);
   assert.doesNotMatch(css, /\.badge::before|\.status::before/);
   // 先頭の著作表示（GitHub URL）だけを除き、外部URLの混入を検査する。
-  assert.doesNotMatch(source('共通表示/状態バッジ.vue').replace(/^<!-- COPYRIGHT \(C\)[\s\S]*?-->\r?\n/,''), /v-html|innerHTML|https?:/);
+  assert.doesNotMatch(source('components/共通表示/状態バッジ.vue').replace(/^<!-- COPYRIGHT \(C\)[\s\S]*?-->\r?\n/,''), /v-html|innerHTML|https?:/);
 });
 
 
 test('simplified key settings still display public and configuration failures', async () => {
-  const html = await render('モデル一覧/モデル一覧パネル.vue', {
+  const html = await render('components/モデル一覧/モデル一覧パネル.vue', {
     data: { 設定状態: '読込不可', 説明: '設定の読込に失敗', 項目: [] }, results: {},
     publicModels: { 状態: '失敗', 説明: '公開一覧への接続に失敗' }, connected: true,
   });

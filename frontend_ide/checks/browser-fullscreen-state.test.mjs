@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import * as addressTools from '../src/ブラウザ/URL表示.js';
+import * as addressTools from '../src/components/ブラウザ/URL表示.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 
 function fixture(props){
  const mounted=[],unmounted=[],pending=[];let listener;
- const {descriptor}=parse(readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));
+ const {descriptor}=parse(readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));
  const script=compileScript(descriptor,{id:'browser',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'Browser.vue',id:'browser',compilerOptions:{bindingMetadata:script.bindings}});
  assert.deepEqual(template.errors,[]);

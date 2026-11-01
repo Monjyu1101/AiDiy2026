@@ -29,7 +29,7 @@ const catalog = {
   },
 };
 
-const { descriptor } = parse(readFileSync(new URL('../src/ライブ/ライブパネル.vue', import.meta.url), 'utf8'));
+const { descriptor } = parse(readFileSync(new URL('../src/components/ライブ/ライブパネル.vue', import.meta.url), 'utf8'));
 const script = compileScript(descriptor, { id: 'LiveModelPicker', genDefaultAs: 'component' });
 const template = compileTemplate({ source: descriptor.template.content, filename: 'LivePanel.vue', id: 'LiveModelPicker', compilerOptions: { bindingMetadata: script.bindings } });
 assert.deepEqual(template.errors, []);
@@ -88,21 +88,21 @@ async function fixture(t, { host = false, settings = initialSettings } = {}) {
     send(...packet) { calls.packets.push(clone(packet)); return true; }
   }
   const modules = {
-    '../../host/src/file-attachments': { fileAttachment: () => undefined },
+    '../../../host/src/file-attachments': { fileAttachment: () => undefined },
     '../添付ファイル/ファイル送信.js': { readDroppedFiles: async () => 0 },
     '../添付ファイル/チャット添付.vue': {},
     '../ライブ/ライブ通信': { LiveEnvironment: Environment },
-    '../../host/aidiy_live/src/protocol': { LiveConnection: Connection, 入力レート: () => 16000, 音声入力: value => value, 音声操作: (mic, speaker) => ({ mic, speaker }) },
-    '../../host/aidiy_live/src/audio': { LiveAudio: class {
+    '../../../host/aidiy_live/src/protocol': { LiveConnection: Connection, 入力レート: () => 16000, 音声入力: value => value, 音声操作: (mic, speaker) => ({ mic, speaker }) },
+    '../../../host/aidiy_live/src/audio': { LiveAudio: class {
       async unlock() {} async start() { calls.audioStarts++; return true; }
       mute() {} stop() {} close() { calls.audioCloses++; }
     } },
-    '../../host/aidiy_live/src/visualizer': { AudioCloud: class { setVisible() {} level() {} spectrum() {} dispose() {} } },
-    '../../host/aidiy_live/src/model-catalog': catalogModule.exports,
-    '../../host/aidiy_live/src/microphone-error': { microphoneError: error => error.message },
+    '../../../host/aidiy_live/src/visualizer': { AudioCloud: class { setVisible() {} level() {} spectrum() {} dispose() {} } },
+    '../../../host/aidiy_live/src/model-catalog': catalogModule.exports,
+    '../../../host/aidiy_live/src/microphone-error': { microphoneError: error => error.message },
     '../下書き連携/下書き受け渡し.js': { createDraftReceiver: () => ({ mount: noop, publish: noop, dispose: noop }) },
     '../コード/会話到着演出': { chatArrival: () => ({ reset: noop, dispose: noop, show: noop }) },
-    '../共通表示/状態バー.vue': {}, '../ターミナル/開始表示.vue': {}, '../共通表示/共通ダイアログ.vue': {},
+    '../共通表示/状態バー.vue': {}, '../ターミナル/開始表示.vue': {}, '../../dialog/共通ダイアログ.vue': {},
   };
   vm.runInNewContext(componentCode, {
     module, URL, console, crypto: { randomUUID }, location: { href: 'http://localhost/live/' }, window: {},

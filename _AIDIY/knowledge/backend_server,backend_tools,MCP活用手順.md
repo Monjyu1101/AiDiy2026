@@ -20,28 +20,7 @@
 
 前回値の保存先と指定方法は [`command_hermes,Provider一覧と選択ロジック.md`](./command_hermes,Provider一覧と選択ロジック.md) を参照する。専用の自動テストはないため、Tools を再起動して `aidiy_code_agents` をモデル未指定と明示指定で呼び、実行ログのモデル指定を確認する。
 
-| サーバー名 | SSE URL | 主な用途 |
-|-----------|---------|---------|
-| `aidiy_chrome_devtools` | `http://127.0.0.1:8095/aidiy_chrome_devtools/sse` | ブラウザ操作、DOM取得、ナビゲーション。`session` パラメータ（省略時 `default`）で複数 Chrome を並行セッション管理でき、自動テストの並行実行が可能。使用後は `close_session` で破棄 |
-| `aidiy_desktop_capture` | `http://127.0.0.1:8095/aidiy_desktop_capture/sse` | デスクトップのスクリーンショット、クリック、キー入力 |
-| `aidiy_sqlite` | `http://127.0.0.1:8095/aidiy_sqlite/sse` | SQLite DB 参照、テーブル/件数確認 |
-| `aidiy_postgres` | `http://127.0.0.1:8095/aidiy_postgres/sse` | PostgreSQL 参照、スキーマ/件数確認 |
-| `aidiy_logs` | `http://127.0.0.1:8095/aidiy_logs/sse` | ログ tail、Traceback、ERROR 確認 |
-| `aidiy_code_check` | `http://127.0.0.1:8095/aidiy_code_check/sse` | Python 構文、ruff、TypeScript 型チェック |
-| `aidiy_backup` | `http://127.0.0.1:8095/aidiy_backup/sse` | 差分バックアップ保存 / 確認（HTTP は `save` / `check` に分岐） |
-| `aidiy_image_generation` | `http://127.0.0.1:8095/aidiy_image_generation/sse` | AI 画像生成（`auto` は codex → antigravity → openai → freeai → gemini の順でフォールバック） |
-| `aidiy_movie_generation` | `http://127.0.0.1:8095/aidiy_movie_generation/sse` | AI 動画生成（Google Gemini Veo、MP4 保存、base64 返却なし） |
-| `aidiy_speech_to_text` | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` | 音声認識（speech_recognition / Whisper） |
-| `aidiy_text_to_speech` | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` | テキスト音声合成（Edge / OpenAI / Gemini / FreeAI） |
-| `aidiy_obs_studio_control` | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` | OBS Studio 制御（配信、録画、シーン、ソース、音声） |
-| `aidiy_ffmpeg_control` | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` | ffmpeg / ffprobe / ffplay 実行（動画合成、字幕焼き込み、プレビュー再生） |
-| `aidiy_notification_sounds` | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` | 通知音のローカル再生（scene 別の開始 / 終了 / 注意音、`tts` シーンは読み上げ合成） |
-| `aidiy_code_agents` | `http://127.0.0.1:8095/aidiy_code_agents/sse` | AI コードエージェント実行（CodeAI CLI 経由） |
-| `aidiy_chat_llms` | `http://127.0.0.1:8095/aidiy_chat_llms/sse` | AIチャット の ChatAI を MCP 化。OpenAI / Ollama 互換の `aidiy_chat_completions`（HTTP のみ）の実体 |
-| `aidiy_decisions_check` | `http://127.0.0.1:8095/aidiy_decisions_check/sse` | AI判断の真偽確率・選択・段階評価 |
-| `aidiy_task_agents` | `http://127.0.0.1:8095/aidiy_task_agents/sse` | backend_taskteam の Task API への AIタスク非同期投入、要求/明細状態取得 |
-| `aidiy_team_agents` | `http://127.0.0.1:8095/aidiy_team_agents/sse` | backend_taskteam の Team API への AIチーム依頼投入、依頼/要員状態取得 |
-| `aidiy_windows_control` | `http://127.0.0.1:8095/aidiy_windows_control/sse` | Windows環境でComputer Use（computer-use）が利用できない場合の代替機能。デスクトップ操作制御（マウス/キーボード、ウィンドウ、プロセス、クリップボード、UI Automation） |
+提供サーバーと接続URLの正本は [backend_tools 構成の提供 MCP](./backend_tools,構成.md#提供-mcp)。用途ごとの選択は本書の「ツール選択基準」を参照する。
 
 ## IDEのBrowserパネル・単独Browserを操作するとき
 
@@ -118,16 +97,7 @@ SQLite / PostgreSQL は既定 read-only。書き込みが必要でも、まず�
 
 ## MCP トランスポート（3種類）と REST API
 
-各 MCP は SSE / Streamable HTTP / stdio gateway の3トランスポートに対応する。サーバー側の接続先は同一ポート（8095）で、ツールと同じ処理を直接呼ぶ REST API も提供する。
-
-| インターフェース | 説明 |
-|----------------|------|
-| **SSE（MCP標準）** | `GET /{mcp_name}/sse` + `POST /{mcp_name}/messages/` — Claude や公式 MCP SSE クライアント |
-| **Streamable HTTP** | `POST\|DELETE /{mcp_name}/sse` および `/{mcp_name}/mcp` — Codex / Antigravity は `/mcp` へ直接接続する。Grok の `type=sse` は initialize を `/sse` へ POST する。同じ URL の GET は従来 SSE のまま |
-| **stdio gateway** | `mcp_stdio.py --sse-url .../sse` — SSE を stdin/stdout に変換。stdio 接続を選ぶクライアント向け |
-| **HTTP POST（FastAPI）** | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` — REST API として直接呼び出し可能。Swagger UI (`/docs`) で試行できる |
-
-各 MCP の引数仕様 JSON: `GET http://127.0.0.1:8095/{mcp_name}/list`。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。
+接続方式・URL・一覧取得APIは [アクセスインターフェース](./backend_tools,構成.md#アクセスインターフェース) に集約する。CLIへの登録は [Code CLI MCP設定](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を参照する。
 
 ## Python から利用する場合
 

@@ -46,16 +46,21 @@ API キーが無い場合は設定を案内して停止し、`ANTHROPIC_TOKEN`�
 
 ## Provider Overlay 一覧
 
-`hermes_cli/providers.py` の `HERMES_OVERLAYS` で 32 の provider が定義されています。各 overlay は transport、auth type、env var を指定します。
+`hermes_cli/providers.py` の `HERMES_OVERLAYS` が transport・認証方式・環境変数の補足を定義し、models.dev のカタログとユーザー定義 provider を合流します。AiDiy の picker は `cli_main.py` の別レイヤです。全 provider 一覧を手書きで複製すると追加・廃止がずれるため、変更時は現行辞書を直接確認します。
 
-| カテゴリ | Provider |
-|---------|----------|
-| 汎用 API | `openrouter`, `nous`, `openai-codex`, `xai-oauth` |
-| 中国系 | `qwen-oauth`, `stepfun`, `minimax`, `minimax-oauth`, `minimax-cn`, `deepseek`, `alibaba`, `alibaba-coding-plan`, `xiaomi`, `tencent-tokenhub` |
-| Google | `google-gemini-cli` |
-| Microsoft | `copilot-acp`, `github-copilot`, `azure-foundry` |
-| Anthropic | `anthropic` |
-| コミュニティ | `lmstudio`, `zai`, `kimi-for-coding`, `vercel`, `opencode`, `opencode-go`, `kilo`, `huggingface`, `xai`, `nvidia`, `arcee`, `gmi`, `ollama-cloud`, `bedrock` |
+外部接続せず登録名を読む例（リポジトリ直下）:
+
+```python
+import ast
+from pathlib import Path
+
+tree = ast.parse(Path("command_hermes/hermes_cli/providers.py").read_text(encoding="utf-8"))
+providers = next(node.value for node in tree.body
+                 if isinstance(node, ast.AnnAssign)
+                 and isinstance(node.target, ast.Name)
+                 and node.target.id == "HERMES_OVERLAYS")
+print([ast.literal_eval(key) for key in providers.keys])
+```
 
 ## Alias 解決
 
@@ -63,18 +68,7 @@ API キーが無い場合は設定を案内して停止し、`ANTHROPIC_TOKEN`�
 
 ## Interactive Picker（/model コマンド）
 
-`/model` を引数なしで実行すると、2 段階の picker が起動します。
-
-```
-Step 1: Provider 選択
-  → list_authenticated_providers() で認証済み provider のみ表示
-  → キーボード上下 + Enter で選択
-
-Step 2: Model 選択
-  → 選択した provider の curated model 一覧から選択
-```
-
-`list_authenticated_providers()` は各 provider の認証情報（API Key の有無、OAuth トークン）をスキャンし、利用可能なものだけを表示対象とします。
+`/model` を引数なしで実行すると、AiDiy の `_handle_aidiy_model_command()` → `_open_aidiy_model_picker()` で provider → model の2段階選択を開きます。非TUIでは `_show_aidiy_model_picker_fallback()` が案内します。候補は AiDiy の設定・OAuth・外部 CLI 定義に基づき、upstream の `list_authenticated_providers()` と混同しません。
 
 AiDiy 独自の `/model` picker には `xai-oauth` を常時表示し、`grok-4.6` を既定・先頭モデルとします。未認証で選択した場合は xAI の OAuth device-code ログインを開始します。
 
@@ -107,7 +101,7 @@ OpenAI OAuthは同じファイルの `aidiy_hermes.models` から `openai_oauth/
 
 1. `hermes_cli/providers.py` の `HERMES_OVERLAYS` にエントリ追加
 2. 必要に応じて `ALIASES` にエイリアス追加
-3. `cli_main.py` の `list_authenticated_providers()` で認証チェック処理を追加
+3. AiDiy picker に出す場合は `cli_main.py` の `_aidiy_provider_slugs()`、provider 定義と認証・モデル候補取得の経路も追加
 4. `backend_server/conf/conf_model.py` でモデル一覧取得が必要なら追記
 
 ## 注意点

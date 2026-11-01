@@ -13,7 +13,7 @@ import browserModule from '../デスクトップ/ブラウザ.cjs';
 import displaysModule from '../デスクトップ/全画面横断.cjs';
 import pinsModule from '../デスクトップ/最前面ピン.cjs';
 import routerModule from '../デスクトップ/draft-router.cjs';
-import * as draftModule from '../src/下書き連携/下書き受け渡し.js';
+import * as draftModule from '../src/components/下書き連携/下書き受け渡し.js';
 
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
@@ -45,7 +45,7 @@ function draftPanel(kind,{desktop=true,linked=false}={}){
   '../コード/会話到着演出':{chatArrival:()=>({reset(){}})},
   '../下書き連携/下書き受け渡し.js':draftModule,
  };
- const path=kind==='code'?'../src/コード/コードパネル.vue':'../src/ライブ/ライブパネル.vue';
+ const path=kind==='code'?'../src/components/コード/コードパネル.vue':'../src/components/ライブ/ライブパネル.vue';
  const {descriptor}=parse(readFileSync(new URL(path,import.meta.url),'utf8'));
  const script=compileScript(descriptor,{id:path,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{

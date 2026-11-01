@@ -15,13 +15,13 @@ import assert from 'node:assert/strict';
 import { コマンド解析, 利用許可, 会話キー, ts比較, 本文復元, 本文エスケープ, 本文分割 } from '../src/接続/コマンド処理';
 import { botUserId, channelId, config, teamId, userId } from './helpers';
 
-test('通常の文章をチャットにし、明示したprefix / Botメンションの操作も解釈する', () => {
-  assert.deepEqual(コマンド解析('!aidiy 日本語で説明\nしてください', '!aidiy', botUserId), { name: 'chat', text: '日本語で説明\nしてください' });
-  assert.deepEqual(コマンド解析(`<@${botUserId}> stop`, '!aidiy', botUserId), { name: 'stop', text: '' });
-  assert.deepEqual(コマンド解析('!aidiy-extra new', '!aidiy', botUserId), { name: 'chat', text: '!aidiy-extra new' });
+test('通常の文章とBotメンションはチャットにし、旧形式はhelpにする', () => {
+  assert.deepEqual(コマンド解析('!aidiy 日本語で説明\nしてください', '!aidiy', botUserId), { name: 'help', text: '' });
+  assert.deepEqual(コマンド解析(`<@${botUserId}> stop`, '!aidiy', botUserId), { name: 'chat', text: 'stop' });
+  assert.deepEqual(コマンド解析('!aidiy-extra new', '!aidiy', botUserId), { name: 'help', text: '' });
   assert.deepEqual(コマンド解析('雑談です', '!aidiy', botUserId), { name: 'chat', text: '雑談です' });
   assert.deepEqual(コマンド解析('stop', '!aidiy', botUserId), { name: 'chat', text: 'stop' });
-  assert.deepEqual(コマンド解析('!aidiy live こんにちは', '!aidiy', botUserId), { name: 'chat', text: 'live こんにちは' }, '音声会話のコマンドは持たない');
+  assert.deepEqual(コマンド解析('!aidiy live こんにちは', '!aidiy', botUserId), { name: 'help', text: '' }, '音声会話のコマンドは持たない');
   assert.equal(コマンド解析(' \n ', '!aidiy', botUserId), undefined);
   assert.equal(コマンド解析('!aidiy', '!aidiy', botUserId)?.name, 'help');
 });
@@ -52,4 +52,32 @@ test('日本語と絵文字の長文を Slack の1投稿の目安内で欠落な
   assert.equal(parts.join(''), text);
   assert.ok(parts.every(part => part.length <= 3500 && !/[\uD800-\uDBFF]$/.test(part)));
   assert.throws(() => 本文分割('abc', 1));
+});
+
+
+test('先頭1文字だけで短縮コマンドを判定し、未知・空はhelpへ隔離する', () => {
+  for (const prefix of ['!', '！']) {
+    for (const name of ['help', 'status', 'stop', 'new', 'chat']) {
+      for (const body of [name, ` ${name.toUpperCase()}  `]) {
+        assert.deepEqual(コマンド解析(prefix + body, '!aidiy', botUserId), { name, text: '' });
+      }
+    }
+    for (const body of ['', ' ', 'unknown', 'aidiy unknown', 'aidiy-extra', '!new']) {
+      assert.deepEqual(コマンド解析(prefix + body, '!aidiy', botUserId), { name: 'help', text: '' });
+    }
+    assert.deepEqual(コマンド解析(prefix + 'chat 日本語\n本文', '!aidiy', botUserId), { name: 'chat', text: '日本語\n本文' });
+  }
+  for (const text of [' !new', '\n！stop', '文中 !help', '\t!status']) {
+    assert.deepEqual(コマンド解析(text, '!aidiy', botUserId), { name: 'chat', text: text.trim() });
+  }
+  assert.deepEqual(コマンド解析(`<@${botUserId}> 質問`, '!aidiy', botUserId), { name: 'chat', text: '質問' });
+});
+
+test('旧形式は未知コマンド扱いで、メンションは操作を実行しない', () => {
+  for (const prefix of ['!aidiy ', '！aidiy ']) for (const name of ['new', 'stop', 'status', 'chat', 'help', 'live', 'leave']) {
+    assert.deepEqual(コマンド解析(prefix + name, '!aidiy', botUserId), { name: 'help', text: '' });
+  }
+  for (const name of ['new', 'stop', 'status', 'chat', 'help', 'live', 'leave']) {
+    assert.deepEqual(コマンド解析(`<@${botUserId}> ${name}`, '!aidiy', botUserId), { name: 'chat', text: name });
+  }
 });

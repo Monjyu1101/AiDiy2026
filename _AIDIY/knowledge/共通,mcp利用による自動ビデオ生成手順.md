@@ -1,6 +1,6 @@
 # MCP 利用による自動ビデオ生成手順
 
-> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py`, `backend_tools/aidiy_automations/ビデオページ生成/_ビデオページ生成_紹介_設定.json`, `backend_tools/aidiy_automations/ビデオページ生成/_ビデオページ生成_紹介_状況.json`, `backend_tools/tools_proc/text_to_speech.py`, `backend_tools/tools_proc/ffmpeg_control.py`, `backend_tools/tools_proc/obs_studio_control.py`, `backend_tools/tools_proc/chrome_devtools.py`, `scripts/cdp_user_gesture.py`, `_config/mcp_text_to_speech.json`
+> 文書: `共通,mcp利用による自動ビデオ生成手順.md` | 実装: `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py`, `backend_tools/aidiy_automations/ビデオページ生成/_ビデオページ生成_紹介_設定.json`, `backend_tools/aidiy_automations/ビデオページ生成/_ビデオページ生成_紹介_状況.json`, `backend_tools/tools_proc/text_to_speech.py`, `backend_tools/tools_proc/ffmpeg_control.py`, `backend_tools/tools_proc/obs_studio_control.py`, `backend_tools/tools_proc/chrome_devtools.py`, `backend_tools/tools_proc/tools_chrome.py`, `_config/mcp_text_to_speech.json`
 
 ## このメモを使う場面
 
@@ -57,12 +57,12 @@ frontend_web/public/Xビデオ/
                                     [トリム済み MP4] (ffmpeg MCP)
 ```
 
-| 段階 | 使う MCP（19サーバーのうち） | 役割 |
+| 段階 | 使う MCP（登録一覧は `backend_tools/tools_main.py`） | 役割 |
 |------|--------------------------|------|
 | 1. 台本生成 | （AI コア） | `scenario.json` / `script.md` を作る |
 | 2. 音声合成 | `aidiy_text_to_speech` | `audio/scene_*.mp3` を出力。発音辞書経由 |
 | 3. 尺確定 | `aidiy_ffmpeg_control` (`ffprobe_run`) | 各 MP3 の `duration` を取得し HTML/JSON へ反映 |
-| 4. ブラウザ自動再生 | `aidiy_chrome_devtools` + `scripts/cdp_user_gesture.py` | HTML を開き、ユーザー操作扱いで `play()` 起動 |
+| 4. ブラウザ自動再生 | `aidiy_chrome_devtools` の `cdp_command` | HTML を開き、ユーザー操作扱いで `play()` 起動 |
 | 5. 録画 | `aidiy_obs_studio_control` | OBS で画面 + システム音声を一括録画 |
 | 6. 撮影中の人間ガイド | `aidiy_text_to_speech` (`local_play:true`) | 最前面化・手動録画開始など GUI 操作を音声で依頼、合図ワードで同期 |
 | 7. トリム / 整形 | `aidiy_ffmpeg_control` (`ffmpeg_analyze_audio_timerange` / `video_trimming`) | 音声起点・終点の検出、前後余白つきカット、再エンコード |
@@ -89,7 +89,7 @@ frontend_web/public/Xビデオ/
 画像は **シーンタイトルやふんわりした雰囲気だけで作らず、出典が明確な情報を元に生成する**。AiDiy 紹介動画なら、`AGENTS.md`、各サブプロジェクトの `AGENTS.md`、`_AIDIY/knowledge`、既存 UI / 実装ファイル、実際のスクリーンショットなど、**どの情報を根拠にしたか追跡できる状態**で進める。
 
 - NG: 「AIっぽい開発画面」「MCP っぽいハブ図」のような抽象語だけで投げる
-- OK: `backend_tools/AGENTS.md` の 19 MCP 一覧、`frontend_avatar/AGENTS.md` の Electron/Web 差分、`AGENTS.md` のポート一覧や命名規則、既存 UI の画面構成などを抜粋して渡す
+- OK: `backend_tools/AGENTS.md` の 現行 MCP 一覧、`frontend_avatar/AGENTS.md` の Electron/Web 差分、`AGENTS.md` のポート一覧や命名規則、既存 UI の画面構成などを抜粋して渡す
 
 ### 画像生成のためにシーンへ持たせる情報
 
@@ -99,19 +99,19 @@ frontend_web/public/Xビデオ/
 |------|------|
 | `source_documents` | どの文書 / 実装を根拠にしたか。例: `AGENTS.md`, `backend_tools/AGENTS.md` |
 | `source_summary` | そのシーンで表現すべき事実の短い要約 |
-| `factual_bullets` | 画像に反映すべき具体要素。例: `19 MCP`, `port 8095`, `Web/Electron 両対応` |
+| `factual_bullets` | 画像に反映すべき具体要素。例: `Windows 20 / Linux・macOS 19 MCP`, `port 8095`, `Web/Electron 両対応` |
 | `forbidden_elements` | 入れてはいけない誤情報。例: `未実装の製品ロゴ`, `実態にない画面構成` |
 
 例:
 
 ```json
 {
-  "title": "MCP Hub × 19",
+  "title": "MCP Hub",
   "source_documents": [
     "AGENTS.md",
     "backend_tools/AGENTS.md"
   ],
-  "source_summary": "backend_tools は port 8095 上で MCP SDK 2.x の 19 個の MCPServer を同居させるアプリケーション。",
+  "source_summary": "backend_tools は port 8095 上で MCP SDK 2.x の Windows 20 / Linux・macOS 19 個の MCPServer を同居させるアプリケーション。",
   "factual_bullets": [
     "Chrome DevTools",
     "desktop_capture",
@@ -120,7 +120,7 @@ frontend_web/public/Xビデオ/
     "image_generation / speech_to_text / text_to_speech / obs / ffmpeg"
   ],
   "forbidden_elements": [
-    "19個以外のMCP数",
+    "対象OS・現行登録数と異なるMCP数",
     "実装にない外部サービス構成"
   ],
   "image_prompt": "上記の factual_bullets を反映した 2:3 構図の技術ポスター ..."
@@ -412,7 +412,7 @@ mcp__aidiy_image_generation__generate_image
 ## 動画素材生成（aidiy_movie_generation）
 
 シーン画像の代わりに、あるいはシーン画像を重ねる下地として、**AI 生成動画クリップ**を素材として使える。
-MCP ツール `mcp__aidiy_movie_generation__generate_movie` または HTTP POST `/movieGen` から Gemini Veo を呼び出す。
+MCP ツール `mcp__aidiy_movie_generation__generate_movie` または HTTP POST `/aidiy_movie_generation/generate` から Gemini Veo を呼び出す。
 
 > **動画生成は数分かかる**（ポーリング最大 10 分）。複数シーンを並列で投げず、1 本ずつ順番に生成する。
 
@@ -467,15 +467,17 @@ Response: { "type":"video", "mimeType":"video/mp4", "save_path":"<絶対パス>"
 
 `aidiy_chrome_devtools` の `click` / `eval_js` から `play()` を呼ぶと、Chrome の autoplay ポリシーで `audioPlayer.play()` が拒否され、`.catch` 経由で `pause()` が走り、ボタンが「再生」のまま止まる（`audioSrc` はセットされるが `audioPaused: true`）。
 
-**対処**: CDP `Runtime.evaluate` を **`userGesture: true`** で投げる。MCP の `cdp_command` は `params` を JSON 文字列で受け付けず（pydantic が dict に自動パースしてしまう）この経路は使えないので、付属スクリプトで直接 WebSocket を叩く。
+**対処**: `aidiy_chrome_devtools` の `cdp_command` で `Runtime.evaluate` に `userGesture: true` を指定します。現行の `backend_tools/tools_proc/tools_chrome.py` は `params` のJSON文字列を辞書へ変換します。削除済みの一時補助スクリプトや個人の絶対パスに依存しません。
 
-```bash
-D:/OneDrive/_sandbox/AiDiy2026/backend_tools/.venv/Scripts/python.exe ^
-  D:/OneDrive/_sandbox/AiDiy2026/scripts/cdp_user_gesture.py ^
-  <tab_id> "play()"
+```json
+{
+  "method": "Runtime.evaluate",
+  "params": "{\"expression\":\"play()\",\"userGesture\":true,\"awaitPromise\":false,\"returnByValue\":true}",
+  "tab_id": "<対象タブID>"
+}
 ```
 
-スクリプトは `http://127.0.0.1:9222/json` から `webSocketDebuggerUrl` を引き、`Runtime.evaluate` を `userGesture:true, awaitPromise:false, returnByValue:true` で送る。`websockets` ライブラリは `backend_tools/.venv` に入っている（システム Python には無い）。
+`play()` は対象ページが公開する関数の例です。ページに合わせた式を指定し、返却された例外と実際の再生状態を確認します。HTTP版は `cdp_method` でCDPメソッド名を渡します。
 
 確認は `eval_js` で次の状態が取れていれば成功:
 

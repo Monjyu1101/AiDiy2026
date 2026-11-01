@@ -10,7 +10,7 @@ const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
 const store = new Map();
 globalThis.sessionStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) };
 globalThis.window = new EventTarget();
-const { default: client, configureClient, token } = await import('../src/タスクチーム/api/client.ts');
+const { default: client, configureClient, token } = await import('../src/components/タスクチーム/api/client.ts');
 test('Task / Team authentication uses isolated session keys and never Avatar credentials', async () => {
   store.set('token', 'avatar');
   configureClient('task', '/taskteam-api'); token('task-token');
@@ -40,7 +40,7 @@ test('a delayed 401 cannot clear a newly logged-in session', async () => {
   window.removeEventListener('taskteam-auth-expired', listener);
 });
 test('dedicated root uses Task / Team health, shared Code header and lifecycle cleanup', async () => {
-  const source = await read('src/タスクチーム/タスクチームパネル.vue');
+  const source = await read('src/components/タスクチーム/タスクチームパネル.vue');
   assert.match(source, /共通表示\/状態バー.vue/); assert.match(source, /taskTeamBase \+ '\/status'/);
   assert.match(source, /connected.value = result.connected === true/); assert.match(source, /:clock-pulse="true"/);
   assert.match(source, /clearTimeout\(timer\);.*lifetime.abort\(\)/); assert.doesNotMatch(source, /\/api\/connection|tools.*ping/);
@@ -48,7 +48,7 @@ test('dedicated root uses Task / Team health, shared Code header and lifecycle c
 });
 test('copied Task dialogs use independent IDE windows and keep inline Web dialogs', async () => {
   for (const file of ['AIタスク_要求一覧.vue', 'AIタスク_明細一覧.vue']) {
-    const source = await read('src/タスクチーム/components/AIタスク/components/' + file);
+    const source = await read('src/components/タスクチーム/components/AIタスク/components/' + file);
     assert.doesNotMatch(source, /desktopApi|avatar-task-dialog/);
     assert.match(source, /dialogOpen.value = true/); assert.match(source, /aidiyWindow\?\.taskWindows/); assert.match(source, /taskChannelName\('dialog'\)/);
   }
@@ -66,11 +66,11 @@ test('Task / Team build is separate and all copied imports stay within IDE', asy
       }
     }
   }
-  await inspect('src/タスクチーム');
+  await inspect('src/components/タスクチーム');
 });
 
 test('Code-style header and toolbar overrides stay inside Task / Team without changing the 3D scene', async () => {
-  const source = await read('src/タスクチーム/タスクチームパネル.vue');
+  const source = await read('src/components/タスクチーム/タスクチームパネル.vue');
   assert.match(source, /\.taskteam-shell \.taskteam-content :deep\(\.panel-header\)\{background:#000;border-bottom:1px solid #242424;box-shadow:none\}/);
   assert.match(source, /:deep\(\.scope-toggle\)\{background:#080a10;border:1px solid #343943;border-radius:0/);
   assert.match(source, /:deep\(\.talk-panel:hover\)\{border-color:#56606e;box-shadow:none\}/);

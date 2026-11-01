@@ -13,7 +13,7 @@ Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコアの WebS
 | ファイル | 役割 |
 |----------|------|
 | `src/main.ts` | 起動、設定確認、終了処理 |
-| `panel/` | `aidiy_live` に合わせた接続パネル（`desktop.cjs` の Electron 起動・安全な IPC、`launch.mjs` の起動入口、`画面/接続パネル.vue` の Vue 画面、`接続/パネル状態.js` の状態管理、`ライブ/音声表示.js` の円型インジケーター、ブラウザ版用の `web-bridge.js`） |
+| `panel/` | `aidiy_live` に合わせた接続パネル（`desktop.cjs` の Electron 起動・安全な IPC、`launch.mjs` の起動入口、`components/接続/接続パネル.vue` の Vue 画面、`components/接続/パネル状態.js` の状態管理、`components/ライブ/音声表示.js` の円型インジケーター、ブラウザ版用の `web-bridge.js`） |
 | `src/接続パネル/パネル操作.ts` | 開始・停止・起動時の自動接続、モデル選択と Live ON/OFF の保存、モニター切替 |
 | `src/接続パネル/パネル設定.ts` | `~/.aidiy/aidiy_discord.json`（`live` / `live_models` / `code_name` / `code_model`）の検証・原子的保存・旧3ファイルからの移行 |
 | `src/接続パネル/パネル中継.ts` | Electron 版（`src/panel-worker.ts`）とブラウザ版（`src/web-server.ts`）共通のパネル操作・通知の中継 |
@@ -47,7 +47,7 @@ Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコアの WebS
 - 設定値や Discord API エラーオブジェクト全体をログに出さない。
 - Bot は `tsx` で起動し、VSIX を必要としない。Vue 画面は事前コンパイル済み `panel/view.js` を同梱し、通常起動時のビルドを前提にしない。ソースと配布物の一致は `scripts/verify-panel.mjs` で確認する。
 - `aidiy_discord` は画面中央上部に小さなパネルを開き、前回のモデルで自動接続する（`--no-connect` で未接続）。初回（`aidiy_discord.json` が未保存）は自動接続せずモデル設定画面から始め、Live の初期値は OFF（`パネル操作.ts` の `設定済み` / `自動開始`、起動時の要求は `auto-start`）。切断・接続失敗ではモデル選択の画面に戻る。ルート `_start.py` の Discord 選択は既定 No とし、Yes の場合も同じく自動接続する。停止・終了はパネルから操作できる。
-- 画面下部は aidiy_code / aidiy_live と同じ「モデル ▾」と現在のモデル表示。接続中に押すと設定を開き、「適用して再接続」で切断・保存・再接続する（`panel/接続/パネル状態.js` の `モデル設定` / `設定適用` / `設定取消`）。
+- 画面下部は aidiy_code / aidiy_live と同じ「モデル ▾」と現在のモデル表示。接続中に押すと設定を開き、「適用して再接続」で切断・保存・再接続する（`panel/components/接続/パネル状態.js` の `モデル設定` / `設定適用` / `設定取消`）。
 - パネルの選択は `~/.aidiy/aidiy_discord.json` の1ファイル（`live` / `live_models` / `code_name` / `code_model`）に保存し、両方の起動方法で共通設定より優先する（`src/接続パネル/パネル設定.ts`。旧形式の3ファイルは初回に移して削除）。Slack 版の `aidiy_slack.json` と同じ作り。`code_name` は将来の別スタンドアロンハーネス用で、現在は `aidiy_hermes` だけを実行する（ない保存は読込時に書き足し、未対応の値では接続しない）。
 - コードは aidiy_hermes 固定で、モデルは1つの文字列（`auto` / `same` / `codex_cli/same` / `openai_oauth/gpt-…`）。Hermes への引数は AIコア（`AIコード_cli.py`）と同じ規則で `src/コード/Hermesモデル.ts` の `Hermes会話引数` が作る。未保存時の初期表示は `CODE_AIDIY_HERMES_MODEL`。
 - 接続中（接続処理中・再接続待ちを含む）に閉じると `panel/desktop.cjs` が終了を確認する。切断中はそのまま終了する。
@@ -55,4 +55,4 @@ Code は `aidiy_hermes` CLI を直接起動し、Live は既存 AIコアの WebS
 - 接続中のパネルへは音量と帯域分布だけを送る。PCM は「モニター」を ON にした間だけ渡し、モニターは接続ごとに OFF から始める（スピーカー音のエコー防止）。
 - Renderer は sandbox と contextIsolation を有効にし、Node API やトークンを渡さない。パネル終了時は worker 内の Code / Live 接続も回収する。
 
-導入・操作は [README.md](./README.md)、変更と検証は [接続機能の変更手順](../_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) を参照してください。
+導入・操作は [README.md](./README.md)、変更と検証は [接続機能の変更手順](../_AIDIY/knowledge/frontend_channels,Discord接続変更手順.md) を参照してください。

@@ -12,15 +12,15 @@ const descendants=node=>[node,...node.children.flatMap(descendants)];
 const text=node=>node.text+node.children.map(text).join('');
 
 test('通常のCLIアイコンは確認なしで起動し、未導入は非表示にして起動要求を送らない',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
- const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
  const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  let prompts=0,failLaunch=false;const launches=[];
  const cliState=CLI状態を作成({アプリ:state,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'codex',名前:'Codex CLI',利用可能:true},{id:'grok',名前:'Grok Build',利用可能:false}]};
   launches.push(body);if(failLaunch)throw Error('fixture CLI failure');return {通知:'fixture launch'};
  }});
- const ui=mount(compile('アプリ起動/アプリ起動パネル.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
+ const ui=mount(compile('components/アプリ起動/アプリ起動パネル.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state,cliState,online:true,visible:true}));
  try{
   await flush();assert.equal(ui.button('Grok Build をConsoleで起動'),undefined);
   await cliState.起動('grok',{確認省略:true});await flush();assert.equal(launches.length,0);assert.equal(prompts,0);
@@ -31,7 +31,7 @@ test('通常のCLIアイコンは確認なしで起動し、未導入は非表�
  }finally{ui.app.unmount();}
 });
 function compile(name,{globals={},modules={},inline=true}={}){
- modules={'./起動モーション.mjs':dependency('アプリ起動/起動モーション.mjs'),...modules};
+ modules={'./起動モーション.mjs':dependency('components/アプリ起動/起動モーション.mjs'),...modules};
  const {descriptor}=parse(source(name),{filename:name});const compiled=compileScript(descriptor,{id:name,inlineTemplate:inline,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,URLSearchParams,AbortController,ResizeObserver:class{observe(){}disconnect(){}},...globals,require:id=>id==='vue'?vue:modules[id]||{}});return module.exports;
 }
@@ -43,21 +43,21 @@ function mount(component,props){
 test('実Vueタイトル欄: ミニ→最小化→最大化→ピン→終了の順、クリックと復帰は独立する',async()=>{
  const calls=[],window=new EventTarget();window.aidiyWindow={isMaximized:async()=>false,minimize:async()=>calls.push('minimize'),maximize:async()=>calls.push('maximize'),close:async()=>calls.push('close')};
  const props=vue.reactive({connected:true,compact:false,switching:false,onMini:()=>calls.push('mini'),onRestore:()=>calls.push('restore')});
- const ui=mount(compile('ウィンドウ/ステータスバー.vue',{globals:{window}}),()=>props);
+ const ui=mount(compile('components/ウィンドウ/ステータスバー.vue',{globals:{window}}),()=>props);
  try{await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['ランチャー表示','アイコン化','最小化','最大化','ピン止め（最前面 ON）','終了']);ui.button('ランチャー表示').props.onClick();assert.deepEqual(calls,['mini']);for(const label of ['最小化','最大化','終了'])ui.button(label).props.onClick();await flush();assert.deepEqual(calls,['mini','minimize','maximize','close']);props.compact=true;await flush();assert.deepEqual(ui.nodes().filter(n=>n.tag==='button').map(n=>n.props['aria-label']),['アイコン化','最小化','元のサイズに戻す','ピン止め（最前面 ON）','終了']);assert.equal(ui.button('元のサイズに戻す').props.disabled,false);ui.button('元のサイズに戻す').props.onClick();assert.equal(calls.at(-1),'restore');props.compact=false;props.connected=false;await flush();assert.equal(ui.button('ランチャー表示').props.disabled,true);}finally{ui.app.unmount();}
  const css=source('style.css');assert.match(css,/\.panel-brand\.desktop\{[^}]*-webkit-app-region:drag[;}]/);assert.match(css,/\.panel-brand button,\.window-actions\{[^}]*-webkit-app-region:no-drag[;}]/);
 });
 async function appState(switchMini=async()=>true,globals={}){
- const {認証セッションを作成}=await import('../ui/src/ウィンドウ/認証セッション.mjs');
- const {起動ミニ表示を作成}=await import('../ui/src/ウィンドウ/起動ミニ表示.mjs');const displays=[],switches=[],noop=()=>{};
+ const {認証セッションを作成}=await import('../ui/src/components/ウィンドウ/認証セッション.mjs');
+ const {起動ミニ表示を作成}=await import('../ui/src/components/ウィンドウ/起動ミニ表示.mjs');const displays=[],switches=[],noop=()=>{};
  const methods={接続:noop,終了:noop,中止:noop,切断:noop,表示を離れる:noop,読込:async()=>{},一覧:vue.ref(null),実行中:vue.ref(false)};
  const modules={
-  './ウィンドウ/認証セッション.mjs':{認証セッションを作成:options=>認証セッションを作成({...options,storage:()=>globals.sessionStorage})},
-  './導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({一覧を反映:noop})},'./導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
-  './キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop,resetPublic:noop,設定を破棄:noop})},'./ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
-  './起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({...methods,フォルダ:vue.ref('')})},
-  './アプリ起動/CLI状態.mjs':{CLI状態を作成:()=>methods},'./ウィンドウ/起動ミニ表示.mjs':{起動ミニ表示を作成:options=>起動ミニ表示を作成({...options,切替:async value=>{switches.push(value);return switchMini(value);}})},
-  './AIモデル/AIモデル状態.mjs':{AIモデル状態を作成:()=>methods},'./設定モデル/設定モデル状態.mjs':{設定モデル状態を作成:()=>methods},
+  './components/ウィンドウ/認証セッション.mjs':{認証セッションを作成:options=>認証セッションを作成({...options,storage:()=>globals.sessionStorage})},
+  './components/導入状況/導入状況状態.mjs':{導入状況状態を作成:()=>({一覧を反映:noop})},'./components/導入状況/導入操作状態.mjs':{導入操作状態を作成:()=>methods},
+  './components/キー設定共通/キー設定状態.mjs':{キー設定状態を作成:()=>({終了:noop,resetPublic:noop,設定を破棄:noop})},'./components/ウィンドウ/Tools接続.mjs':{Tools接続を作成:()=>methods},
+  './components/起動/起動状態.mjs':{起動状態を作成:()=>({表示:(...args)=>displays.push(args),終了:noop})},'./components/アプリ起動/アプリ状態.mjs':{アプリ状態を作成:()=>({...methods,フォルダ:vue.ref('')})},
+  './components/アプリ起動/CLI状態.mjs':{CLI状態を作成:()=>methods},'./components/ウィンドウ/起動ミニ表示.mjs':{起動ミニ表示を作成:options=>起動ミニ表示を作成({...options,切替:async value=>{switches.push(value);return switchMini(value);}})},
+  './components/AIモデル/AIモデル状態.mjs':{AIモデル状態を作成:()=>methods},'./components/設定モデル/設定モデル状態.mjs':{設定モデル状態を作成:()=>methods},
  };
  const app=compile('App.vue',{inline:false,modules,globals:{location:{hash:'',pathname:'/',search:''},history:{replaceState(){}},window:{},fetch:async()=>{throw Error('unexpected request');},...globals}});
  const scope=vue.effectScope();let state;const warn=console.warn;console.warn=()=>{};try{state=scope.run(()=>app.setup({}, {expose(){}}));}finally{console.warn=warn;}
@@ -72,7 +72,7 @@ test('電光掲示板はネイティブbuttonで、全7タブのミニからア�
  const {scope,state,switches}=await appState();
  const app={項目:vue.ref([]),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  const services={進捗表示:vue.ref(null),ポート項目:vue.ref([]),項目:vue.ref([]),停止警告対象:vue.ref(new Set())};
- const panel=component('起動/起動ミニパネル.vue').default;
+ const panel=component('components/起動/起動ミニパネル.vue').default;
  const ui=mount({render:()=>state.ミニ表示.value?vue.h(panel,{appState:app,appOnline:true,state:services,online:true,onOpenApps:state.アプリ起動へ戻る}):null},()=>({}));
  try{
   state.connected.value=true;await flush();
@@ -91,13 +91,13 @@ test('電光掲示板はネイティブbuttonで、全7タブのミニからア�
  assert.match(source('App.vue'),/@open-apps="アプリ起動へ戻る"/);
 });
 test('実Vue CLI行: 確認なしで並行起動し、処理中・成功・失敗でも通知行を増やさない',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const アプリ={フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false)};
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');const アプリ={フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false)};
  const launches=[],pending=[];let prompts=0;
  const state=CLI状態を作成({アプリ,確認:()=>{prompts++;return false;},api:async(route,method,_signal,format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'copilot',名前:'GitHub Copilot CLI',モード:'YOLO',利用可能:true}]};
   assert.equal(route,'api/CLI起動/開始');launches.push({method,format,body});return new Promise((resolve,reject)=>pending.push({resolve,reject}));
  }});
- const ui=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:アプリ,online:true}));
+ const ui=mount(compile('components/アプリ起動/ミニCLI起動.vue'),()=>({state,appState:アプリ,online:true}));
  const cli=()=>ui.nodes().find(n=>n.props['data-cli']==='copilot'),message=()=>ui.nodes().find(n=>n.props.class?.includes('mini-cli-message'));
  try{
   await flush();assert.equal(cli().props.disabled,true);assert.equal(text(cli()),'');assert.equal(cli().props['aria-label'],'GitHub Copilot CLI をConsoleで起動（YOLO）');assert.equal(descendants(cli()).find(n=>n.tag==='img').props.src,'CLI_copilot.svg');assert.match(cli().props.title,/YOLO.*モデル指定なし/);
@@ -112,16 +112,16 @@ test('実Vue CLI行: 確認なしで並行起動し、処理中・成功・失�
   cli().props.onClick();await flush();assert.equal(cli().props.disabled,false);assert.doesNotMatch(text(ui.root),/Console を開始できません/);pending[3].resolve({通知:'再試行の起動受付'});await flush();assert.equal(message(),undefined);assert.doesNotMatch(text(ui.root),/再試行の起動受付/);
   アプリ.選択中.value=true;await flush();assert.equal(cli().props.disabled,true);アプリ.選択中.value=false;アプリ.処理中.value='code';await flush();assert.equal(cli().props.disabled,true);
  }finally{ui.app.unmount();}
- const panel=source('起動/起動ミニパネル.vue');assert.ok(panel.indexOf(':is="ミニアプリ起動"')<panel.indexOf(':is="ミニCLI起動"'));assert.ok(panel.indexOf(':is="ミニCLI起動"')<panel.indexOf('class="mini-services"'));
+ const panel=source('components/起動/起動ミニパネル.vue');assert.ok(panel.indexOf(':is="ミニアプリ起動"')<panel.indexOf(':is="ミニCLI起動"'));assert.ok(panel.indexOf(':is="ミニCLI起動"')<panel.indexOf('class="mini-services"'));
 });
 test('実Vue AiDiy行: 6アプリは確認なしで起動し、処理中・成功・失敗でもプロジェクト表示を保つ',async()=>{
- const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs'),icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const {アプリ状態を作成}=await import('../ui/src/components/アプリ起動/アプリ状態.mjs'),icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
  const ids=['avatar','ide','console','code','live','discord'],launches=[];let release,prompts=0;
  const state=アプリ状態を作成({api:async(route,method,_signal,format,body)=>{
   if(route==='api/アプリ起動')return {対象:ids.map(id=>({id,名前:id}))};
   assert.equal(route,'api/アプリ起動/開始');launches.push({method,format,body});return new Promise((resolve,reject)=>release={resolve,reject});
  }});
- const ui=mount(compile('アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons},globals:{confirm:()=>{prompts++;return false;}}}),()=>({state,online:true}));
+ const ui=mount(compile('components/アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons},globals:{confirm:()=>{prompts++;return false;}}}),()=>({state,online:true}));
  const buttons=()=>ui.nodes().filter(n=>n.props['data-app']),button=id=>buttons().find(n=>n.props['data-app']===id),message=()=>ui.nodes().find(n=>n.props.class?.includes('mini-app-message'));
  try{
   await flush();assert.equal(buttons().length,6);assert.ok(buttons().every(n=>n.props.disabled));assert.match(text(message()),/SELECT YOUR PROJECT/);
@@ -140,12 +140,12 @@ test('実Vue AiDiy行: 6アプリは確認なしで起動し、処理中・成�
 });
 test('CLIの名前は安全なテキスト、エラーはミニに表示しない',async()=>{
  const state={項目:vue.ref([{id:'copilot',名前:'<script>bad</script>',モード:'YOLO'}]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref('<script>error</script>'),失敗:vue.ref(true),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},切断(){}};
- const html=await render('アプリ起動/ミニCLI起動.vue',{state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true});assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;bad/);assert.doesNotMatch(html,/&lt;script&gt;error|mini-cli-message/);
+ const html=await render('components/アプリ起動/ミニCLI起動.vue',{state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true});assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;bad/);assert.doesNotMatch(html,/&lt;script&gt;error|mini-cli-message/);
 });
 
 test('ミニのCLI更新ボタンと空見出しをなくし、表示・再接続時の自動読込は維持する',async()=>{
  let reads=0,disconnects=0;const online=vue.ref(true),state={項目:vue.ref([]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref(''),失敗:vue.ref(false),読込(){reads++;},切断(){disconnects++;}};
- const ui=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:online.value}));
+ const ui=mount(compile('components/アプリ起動/ミニCLI起動.vue'),()=>({state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:online.value}));
  try{
   await flush();assert.equal(reads,1);assert.doesNotMatch(text(ui.root),/外部CLI\s*[·・]\s*自動承認|↻/);
   assert.ok(!ui.nodes().some(n=>n.props['aria-label']==='利用可能なCLIを再確認'||n.props.class==='mini-cli-heading'));
@@ -153,14 +153,14 @@ test('ミニのCLI更新ボタンと空見出しをなくし、表示・再接�
   online.value=false;await flush();assert.equal(disconnects,1);assert.equal(reads,1);
   online.value=true;await flush();assert.equal(reads,2);
  }finally{ui.app.unmount();}
- assert.doesNotMatch(source('起動/起動ミニ.css'),/mini-cli-heading/);
+ assert.doesNotMatch(source('components/起動/起動ミニ.css'),/mini-cli-heading/);
 });
 
 
 test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermesは件数に含めない',async()=>{
  const ids=['claude','codex','copilot','agy','grok','opencode'],entry=id=>({id,名前:id,モード:'YOLO'});
  const state={項目:vue.ref([entry('aidiy_hermes')]),読込中:vue.ref(false),処理中:vue.ref(''),通知:vue.ref(''),失敗:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},切断(){}};
- const ui=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true}));
+ const ui=mount(compile('components/アプリ起動/ミニCLI起動.vue'),()=>({state,appState:{フォルダ:vue.ref('/project'),処理中:vue.ref(''),選択中:vue.ref(false)},online:true}));
  try{
   for(const count of [0,1,3,6,0]){
    state.項目.value=[entry('aidiy_hermes'),...ids.slice(0,count).map(entry)];await flush();
@@ -177,12 +177,12 @@ test('外部CLI0件は行ごと非表示、1・3・6件だけ表示し、Hermes�
 });
 
 test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとCLIは並行起動・成功非表示',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');const icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
  const ids=['claude','codex','copilot','agy','grok','opencode','aidiy_hermes'],apps=['avatar','ide','console','code','live','discord'];let prompts=0;const launches=[],appLaunches=[],pending=[];
  const app={項目:vue.ref(apps.map((id,i)=>({id,名前:['Avatar','IDE','Console','Code','Live','Discord'][i]}))),結果:vue.ref({}),フォルダ:vue.ref(''),処理中:vue.ref(''),選択中:vue.ref(false),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){},利用可能:()=>true,不可理由:()=>'',起動:id=>appLaunches.push(id)};
  const state=CLI状態を作成({アプリ:app,確認:()=>{prompts++;return false;},api:async(route,_method,_signal,_format,body)=>route==='api/CLI起動'?{対象:ids.map(id=>({id,名前:id,モード:'YOLO',利用可能:true}))}:(launches.push(body),new Promise((resolve,reject)=>pending.push({resolve,reject})))});
- const upper=mount(compile('アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state:app,cliState:state,online:true}));
- const lower=mount(compile('アプリ起動/ミニCLI起動.vue'),()=>({state,appState:app,online:true}));
+ const upper=mount(compile('components/アプリ起動/ミニアプリ起動.vue',{modules:{'./アプリアイコン.mjs':icons}}),()=>({state:app,cliState:state,online:true}));
+ const lower=mount(compile('components/アプリ起動/ミニCLI起動.vue'),()=>({state,appState:app,online:true}));
  const upperButtons=()=>upper.nodes().filter(n=>n.props['data-app']||n.props['data-cli']),lowerButtons=()=>lower.nodes().filter(n=>n.props['data-cli']),hermes=()=>upper.nodes().find(n=>n.props['data-cli']==='aidiy_hermes');
  try{await flush();assert.equal(upperButtons().length,7);assert.deepEqual(upperButtons().map(n=>n.props['data-app']||n.props['data-cli']),[...apps.filter(id=>id!=='discord'),'aidiy_hermes','discord']);assert.deepEqual(lowerButtons().map(n=>n.props['data-cli']),ids.filter(id=>id!=='aidiy_hermes'));assert.equal(lowerButtons().length,6);assert.ok(!lowerButtons().some(n=>n.props['data-cli']==='aidiy_hermes'));assert.equal(hermes().props.disabled,true);
   assert.ok([...upper.nodes(),...lower.nodes()].every(n=>!n.props.class?.includes('mini-icon-caption')));
@@ -202,7 +202,7 @@ test('アイコンは上段AiDiy6種＋Hermes、下段外部CLI6種。HermesとC
   hermes().props.onClick();pending[3].reject(Error('Hermes の起動に失敗しました'));await flush();assert.equal(prompts,0);assert.equal(launches.length,4);assert.doesNotMatch(text(upper.root)+text(lower.root),/Hermes の起動に失敗しました/);assert.equal(state.通知.value,'Hermes の起動に失敗しました');assert.equal(hermes().props.disabled,false);
   state.項目.value=state.項目.value.filter(item=>item.id!=='aidiy_hermes');await flush();assert.equal(upperButtons().length,6);assert.equal(lowerButtons().length,6);assert.equal(hermes(),undefined);
  }finally{upper.app.unmount();lower.app.unmount();}
- const css=source('起動/起動ミニ.css');assert.match(css,/\.mini-app-buttons\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-cli-buttons\{display:flex;flex-wrap:wrap;justify-content:center;gap:2px\}/);assert.match(css,/\.mini-cli-buttons \.mini-cli-button\{flex:0 0 calc\(\(100% - 12px\)\/7\)/);assert.match(css,/\.mini-services\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-icon-frame\{[^}]*width:40px;height:40px/);assert.match(css,/\.mini-icon-frame img\{[^}]*width:40px;height:40px;object-fit:contain/);
+ const css=source('components/起動/起動ミニ.css');assert.match(css,/\.mini-app-buttons\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-cli-buttons\{display:flex;flex-wrap:wrap;justify-content:center;gap:2px\}/);assert.match(css,/\.mini-cli-buttons \.mini-cli-button\{flex:0 0 calc\(\(100% - 12px\)\/7\)/);assert.match(css,/\.mini-services\{display:grid;grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);assert.match(css,/\.mini-icon-frame\{[^}]*width:40px;height:40px/);assert.match(css,/\.mini-icon-frame img\{[^}]*width:40px;height:40px;object-fit:contain/);
 });
 
 test('実App認証: URLを消した後の再読込・手入力・401をセッションへ反映する',async()=>{
@@ -226,13 +226,13 @@ test('実App認証: URLを消した後の再読込・手入力・401をセッシ
  current=await appState(undefined,globals);try{assert.equal(current.state.key.value,'');}finally{current.scope.stop();}
 });
 test('VS Code は通常とミニで編集用ラベルを表示し同じフォルダの専用APIへ送る',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
- const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
  const state={項目:vue.ref([]),フォルダ:vue.ref('/fixture/日本語 project'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>'',接続(){},終了(){}};
  const launches=[];const cliState=CLI状態を作成({アプリ:state,確認:()=>assert.fail('editor confirmation'),api:async(route,_method,_signal,_format,body)=>{
   if(route==='api/CLI起動')return {対象:[{id:'vscode',名前:'VS Code',種類:'editor',モード:'プロジェクトフォルダを開く',利用可能:true}]};launches.push({route,body});return {};
  }});
- for(const [file,props] of [['アプリ起動/アプリ起動パネル.vue',{state,cliState,online:true,visible:true}],['アプリ起動/ミニCLI起動.vue',{state:cliState,appState:state,online:true}]]){
+ for(const [file,props] of [['components/アプリ起動/アプリ起動パネル.vue',{state,cliState,online:true,visible:true}],['components/アプリ起動/ミニCLI起動.vue',{state:cliState,appState:state,online:true}]]){
   const ui=mount(compile(file,{modules:{'./アプリアイコン.mjs':icons}}),()=>props);
   try{await flush();const button=ui.button('VS Code でフォルダを開く');assert.ok(button);assert.doesNotMatch(button.props.title,/モデル指定なし|自動承認/);button.props.onClick();await flush();assert.deepEqual(launches.at(-1),{route:'api/VSCode起動/開始',body:{フォルダ:state.フォルダ.value}});assert.ok(ui.nodes().some(node=>node.tag==='img'&&node.props.src==='CLI_vscode.svg'));}finally{ui.app.unmount();}
  }
@@ -240,13 +240,13 @@ test('VS Code は通常とミニで編集用ラベルを表示し同じフォル
 
 
 test('Chrome / Browser icons render in full and mini launchers; Chrome works without project and Browser stays gated',async()=>{
- const {アプリ状態を作成}=await import('../ui/src/アプリ起動/アプリ状態.mjs');
- const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
- for(const name of ['アプリ起動/アプリ起動パネル.vue','アプリ起動/ミニアプリ起動.vue']){
+ const {アプリ状態を作成}=await import('../ui/src/components/アプリ起動/アプリ状態.mjs');
+ const icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
+ for(const name of ['components/アプリ起動/アプリ起動パネル.vue','components/アプリ起動/ミニアプリ起動.vue']){
   const calls=[];const state=アプリ状態を作成({api:async(route,_method,_signal,_format,body)=>{calls.push({route,body});return route==='api/アプリ起動'?{対象:[{id:'chrome',名前:'Chrome',利用可能:true},{id:'browser',名前:'aidiy_browser',利用可能:true}],フォルダ:''}:{メッセージ:'opened'};}});
   await state.読込();const cliState={項目:vue.ref([]),全項目:vue.ref([]),読込(){},失敗:vue.ref(false)};
   const modules={'./アプリアイコン.mjs':icons};
-  const target=name.includes('ミニアプリ')?{setup:()=>()=>vue.h('div',[vue.h(compile(name,{modules}),{state,cliState,online:true}),vue.h(compile('アプリ起動/ミニCLI起動.vue',{modules}),{state:cliState,appState:state,online:true})])}:compile(name,{modules});
+  const target=name.includes('ミニアプリ')?{setup:()=>()=>vue.h('div',[vue.h(compile(name,{modules}),{state,cliState,online:true}),vue.h(compile('components/アプリ起動/ミニCLI起動.vue',{modules}),{state:cliState,appState:state,online:true})])}:compile(name,{modules});
   const ui=mount(target,()=>({state,cliState,online:true,visible:true}));
   try{
    await flush();assert.deepEqual(ui.nodes().filter(n=>n.props['data-app']).map(n=>n.props['data-app']),['browser','chrome']);assert.equal(ui.button('Chrome を起動').props.disabled,false);assert.equal(ui.button('Browser を起動').props.disabled,true);
@@ -259,9 +259,9 @@ test('Chrome / Browser icons render in full and mini launchers; Chrome works wit
 });
 
 test('通常・ミニのVS CodeとCLIは導入済みだけ表示する',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
- const icons=await import('../ui/src/アプリ起動/アプリアイコン.mjs');
- for(const name of ['アプリ起動/アプリ起動パネル.vue','アプリ起動/ミニCLI起動.vue']){
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');
+ const icons=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');
+ for(const name of ['components/アプリ起動/アプリ起動パネル.vue','components/アプリ起動/ミニCLI起動.vue']){
   const appState={項目:vue.ref([]),フォルダ:vue.ref('/fixture'),処理中:vue.ref(''),選択中:vue.ref(false),一覧:vue.ref(null),通知:vue.ref(''),結果:vue.ref({}),読込(){},利用可能:()=>true,不可理由:()=>''};
   let installed=false,launches=0;
   const cliState=CLI状態を作成({アプリ:appState,api:async route=>{

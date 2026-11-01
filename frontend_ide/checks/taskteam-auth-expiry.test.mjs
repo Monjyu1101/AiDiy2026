@@ -12,7 +12,7 @@ import axios from 'axios';
 
 function fixture(kind) {
   const storage = new Map(), events = [];
-  const source = fs.readFileSync(new URL('../src/タスクチーム/api/client.ts', import.meta.url), 'utf8')
+  const source = fs.readFileSync(new URL('../src/components/タスクチーム/api/client.ts', import.meta.url), 'utf8')
     .replace("import axios from 'axios';", '').replace(/export default client;/, '').replace(/export /g, '');
   const context = vm.createContext({ axios, Event, sessionStorage: {
     getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key),

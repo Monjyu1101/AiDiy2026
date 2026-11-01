@@ -48,7 +48,7 @@ body: { 利用者ID, パスワード }
 - 延長 API は `POST /core/auth/トークン更新`。
 - 期限切れ後の JWT では延長できない。
 - 延長対象外の操作だけを続けると、ログイン中に見えても 600 分で期限切れになる。
-- 詳細な延長対象と除外条件は `認証延長ルール.md` を確認する。
+- 更新レスポンスは `data.access_token`。保存キーは `token`。延長対象・除外条件は本書の「延長対象」「延長対象外」を参照する。
 
 ## 現在利用者取得
 
@@ -82,7 +82,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/トーク�
 
 ## 環境固有鍵と午前3時の更新
 
-- 公開固定署名鍵は使わない。通常ログインと Core 内部通信には、環境ごと・世代ごとに別のランダム鍵を生成する。
+- 鍵の管理主体は Diag ではなく Core（`backend_server/core_main.py` → `auth_keyring.py`）。公開固定署名鍵は使わない。通常ログインと Core 内部通信には、環境ごと・世代ごとに別のランダム鍵を生成する。
 - 秘密鍵一覧はプロジェクトルートの `_AIDIY/backend_core/internal_auth_keys.json`。クライアント用 `_AIDIY/backend_core/internal_auth.json` には **署名鍵を入れない**。Core と TaskTeam の鍵・内部トークンは別サービス用で、相互利用できない。
 - Core 起動時、最新鍵・内部トークンが25時間の有効期間内なら同じものを再利用する。午前3時を過ぎた起動でも、有効な最新世代を直ちに交換しない。期限外・初回のみ新世代を作る。壊れた既存秘密鍵一覧は上書きせず起動失敗にする。
 - 稼働中は OS ローカル午前3時の周期を日付で判定し、1周期に1回更新する（約1秒間隔）。午前3時より前でも最新世代が期限切れになれば更新する。時刻が最新世代の発行時刻より前へ戻った場合は、秘密ファイルを変更せず安全側で停止・再試行する。
@@ -93,6 +93,8 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/トーク�
 - 別PCへ同じ秘密鍵一覧をコピーすると環境分離が失われる。配布物やGitへ秘密ファイルを含めない。
 
 ## ローカル連携の内部認証
+
+認証とセッション所有者の照合は `backend_server/internal_api_auth.py` と `core_router/AIコア.py` を確認します。未認証は401、所有者不一致は403とし、CORSや接続元名だけを認証の代わりにしません。TaskTeamの別サービス認証は [内部認証と通常ログイン](./backend_taskteam,内部認証と通常ログイン.md) を参照します。
 
 - クライアント用 JSON は `access_token`、`token_type: "bearer"`、UTC ISO 8601 の `issued_at` / `expires_at`。パスは起動 CWD に依存しない。
 - ローカル Code / Live / Discord / Slack は接続・HTTP要求ごとにトークンファイルを再読込する。トークンを URL、ログ、ブラウザー storage、リモート宛先へ流さない。
@@ -110,3 +112,55 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8091/core/auth/トーク�
 backend_server/.venv/bin/python -m unittest discover -s backend_server/checks -p test_auth_keyring.py -v
 backend_server/.venv/bin/python -m unittest discover -s backend_server/checks -p test_internal_auth.py -v
 ```
+
+## 延長対象
+
+| 区分 | 延長タイミング |
+|------|----------------|
+| `frontend_web` C/M/T/V 操作系 API | `client.ts` のリクエストインターセプターで POST 前に延長 |
+| S系スケジュール表示 | 30秒ごとの `checkForUpdates()` 実行時 |
+| V商品推移表 | 30秒ごとの更新日監視時 |
+| AI 非音声入力 | `input_text`, `input_file`, `input_image`, `input_request` 送信前 |
+| AI ファイル一時送信 | `files_temp` 送信時 |
+
+S/V 更新監視は、実際に更新がなくても画面表示中の操作継続とみなして延長する。
+
+`frontend_web` の通常 CRUD は `frontend_web/src/api/client.ts` の `CMT操作系認証延長対象()` で判定する。新しい操作系 API を追加したときは、URL が `/core/C*`, `/core/V*`, `/apps/M*`, `/apps/T*`, `/apps/V*` のいずれかに入るか確認する。
+
+S系のように対象外 prefix で画面表示中の延長が必要な場合は、画面コンポーネント側で `useAuthStore().refreshToken()` を呼ぶ。
+
+## 延長対象外
+
+- メニュー遷移
+- ログアウト
+- 認証 API 自身
+- X系
+- `input_audio`
+- `operations`
+- `cancel_audio`
+- `cancel_run`
+- `files_backup`
+- `files_save`
+- `file_select`
+- `file_deselect`
+
+`input_audio` は高頻度送信のため延長対象にしない。音声会話だけを長時間継続する場合は、低頻度ハートビートを設計するか、現行仕様として 600 分切れを許容するかを先に決める。
+
+## 実装上の要点
+
+- `frontend_web` は `useAuthStore().refreshToken()` が `localStorage` の `token` を更新する。
+- `frontend_avatar` は Pinia 認証ストアを使わず、Electron は `localStorage`、Web モードは `sessionStorage` へ直接書き戻す。
+- `files_temp` は自動送信されるため、同時更新を避ける `トークン更新中` ガードを置く。
+- C/M/T の検索一覧は V系 JOIN API を使うことがあるため、V系 URL も延長対象に含める。
+- リクエストインターセプター内の延長は `/core/auth/トークン更新` 自身を対象にしない。対象にすると再帰する。
+- 複数 API が同時に走る画面では、`操作系認証更新Promise` で同時更新を束ねる。
+- 延長対象を広げると、画面を開いているだけでログインが維持される範囲も広がる。業務操作、画面表示中監視、AI 入力のどれに該当するかで判断する。
+
+## 認証延長の確認方法
+
+- `frontend_web` と `frontend_avatar` で `npm run type-check` を実行する。
+- C/M/T 画面の検索、登録、更新、削除ボタンで `/core/auth/トークン更新` が先に呼ばれることを Network で確認する。
+- チャット送信、ファイル添付、イメージ送信、コード要求送信時に `/core/auth/トークン更新` が呼ばれることを確認する。
+- AIファイル画面の `files_temp` 要求時に `/core/auth/トークン更新` が呼ばれることを確認する。
+- S配車/S生産の週・日表示、V商品推移表で 30 秒ごとの更新日監視時に `/core/auth/トークン更新` が呼ばれることを確認する。
+- `/core/auth/トークン更新` の直前に再度 `/core/auth/トークン更新` が連鎖していないことを確認する。

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import * as addressTools from '../src/ブラウザ/URL表示.js';
+import * as addressTools from '../src/components/ブラウザ/URL表示.js';
 import browser from '../デスクトップ/ブラウザ.cjs';
 const {displayBrowserURL,browserAddressTarget}=addressTools;
 const require=createRequire(import.meta.url),vue=require('vue');
@@ -35,7 +35,7 @@ test('Browser URL表示: ASCII・authority・不正UTF8・制御/不可視/紛�
 const flush=async()=>{for(let i=0;i<10;i++)await Promise.resolve();};
 function fixture(){
  const mounted=[],unmounted=[],calls=[];let listener,raw=encoded;
- const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
  const {descriptor}=parse(source),script=compileScript(descriptor,{id:'browser',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'Browser.vue',id:'browser',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
  const module={exports:{}},snapshot=()=>({ok:true,url:raw,available:true,back:true,forward:true});

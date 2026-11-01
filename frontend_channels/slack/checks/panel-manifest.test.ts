@@ -29,7 +29,7 @@ test('Discord 側が無い隔離環境でもビルド/manifest照合と改変検
     await symlink(join(root, 'node_modules'), join(folder, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     const run = (script: string) => spawnSync(process.execPath, [join(folder, 'scripts', script)], { cwd: folder, encoding: 'utf8' });
     assert.equal(run('verify-panel.mjs').status, 0);
-    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue', 'panel/接続/パネル状態.js', 'panel/titlebar.css', 'package-lock.json']) {
+    for (const entry of ['panel/view.js', 'panel/components/接続/接続パネル.vue', 'panel/components/接続/パネル状態.js', 'panel/titlebar.css', 'package-lock.json']) {
       const path = join(folder, entry);
       const original = await readFile(path, 'utf8');
       await writeFile(path, original + '\n// changed fixture\n');

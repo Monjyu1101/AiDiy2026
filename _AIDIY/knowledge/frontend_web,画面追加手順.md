@@ -109,6 +109,34 @@ router.push({
 4. 数値入力は内部値をカンマなし文字列で保持し、表示時だけ整形する。空欄を `0` にしない。
 5. プルダウンのラベルは `商品ID` ではなく `商品` など業務名にし、選択肢は `ID : 名称` にする。
 
+## 明細型編集画面
+
+明細型マスタや明細型トランザクションの編集画面では、ヘッダー form と `明細一覧` 配列を分ける。
+
+実装パターン:
+
+1. 明細行の Form 型を定義する。
+2. 数値欄は空欄を扱えるよう string で保持する。
+3. 行追加時は空行を push する。
+4. 行削除時は `明細SEQ` を 1 から再採番する。
+5. 送信前に空行除去、trim、数値変換を行う。
+6. 表示専用の計算値は payload に含めない。
+7. backend schema にない項目を送らない。
+
+代表実装:
+
+- `frontend_web/src/components/Mマスタ/M商品構成/M商品構成編集.vue`
+- `frontend_web/src/components/Tトラン/T生産/T生産編集.vue`
+
+## 共通実装を変更するとき
+
+- Vue 3 Composition API / `<script setup lang="ts">` を使い、API項目名はバックエンドと揃える。
+- `qAlert` / `qConfirm` は `@/utils/qAlert` から使い、標準 `alert` / `confirm` を画面ごとに追加しない。
+- `_share`、AiDiy関連部品、`utils`、`api` を変える場合は、Web / Avatar の現存する対応実装を検索し、共有する契約の変更だけを両方へ反映する。画面固有の差分を無条件にコピーしない。
+- Task / Team の画面は `frontend_ide/src/components/タスクチーム/` が所有する。Web / Avatar に旧画面を追加し直さない。
+- CSS のコピーは自動同期されない。共通UIの変更後は両方の型検査と表示を確認する。
+- 認証の保存・遷移は [Pinia Store](./frontend_web,Pinia Storeパターン.md)、[APIクライアント](./frontend_web,frontend_avatar,共通APIクライアントパターン.md)、[JWT認証](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) を正本とし、画面へ再実装しない。権限IDは文字列として比較する。
+
 ## 注意点
 - メニューカード追加だけでは遷移できない。router、カテゴリメニュー、必要ならトップ / メインメニューを確認する。
 - TypeScript の `strictNullChecks` は無効なので型エラーが出にくいが、`npm run type-check` は必ず実行する。
@@ -118,6 +146,8 @@ router.push({
 ## 確認方法
 1. `npm run dev` でブラウザを開き、追加ルートへ直接アクセスする。
 2. 一覧表示 → 編集 → 保存 → 一覧に戻る動線を確認する。
-3. `npm run type-check` で型エラーがないことを確認する。
+3. `npm run type-check` で型エラーがないことを確認する。Avatarの対応実装も変更した場合はそちらでも実行する。
 4. DevTools Network で `/core` / `/apps` の呼び先、payload、`status/message/data` を確認する。
 5. 日本語URLをリロードし、ログイン済みなら同じ画面へ復帰することを確認する。
+
+一覧の件数・ページング・ソート、登録・変更・削除後の再取得、DevTools Consoleの警告とNetworkの401 / 403 / 500も確認します。

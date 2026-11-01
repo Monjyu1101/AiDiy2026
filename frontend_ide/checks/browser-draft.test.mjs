@@ -13,7 +13,7 @@ import cdp from '../デスクトップ/ブラウザCDP.cjs';
 import browser from '../デスクトップ/ブラウザ.cjs';
 import shared from '../デスクトップ/下書き共有.cjs';
 import drafts from '../デスクトップ/draft-router.cjs';
-import {appendDraft} from '../src/下書き連携/下書き受け渡し.js';
+import {appendDraft} from '../src/components/下書き連携/下書き受け渡し.js';
 
 test('Browser連携: session・tab_idが先頭、URLと60秒以内の画像だけを後続に追加',()=>{
  const root=resolve('.'),url='https://example.com/日本語?q=1';

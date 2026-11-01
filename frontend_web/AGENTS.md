@@ -11,12 +11,12 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 
 | 目的 | 参照先 |
 |------|--------|
-| frontend_web の実装パターン、UI ルール、qTubler、明細型編集 | [`../_AIDIY/knowledge/frontend_web,実装パターン.md`](../_AIDIY/knowledge/frontend_web,実装パターン.md) |
+| frontend_web の実装パターン、UI ルール、qTubler、明細型編集 | [`../_AIDIY/knowledge/frontend_web,画面追加手順.md`](../_AIDIY/knowledge/frontend_web,画面追加手順.md) |
 | 業務画面追加 | [`../_AIDIY/knowledge/frontend_web,画面追加手順.md`](../_AIDIY/knowledge/frontend_web,画面追加手順.md) |
 | X系静的画面 / ゲーム / デモ追加 | [`../_AIDIY/knowledge/frontend_web,X系静的画面追加.md`](../_AIDIY/knowledge/frontend_web,X系静的画面追加.md) |
 | Vite proxy / CORS / ポート | [`../_AIDIY/knowledge/frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](../_AIDIY/knowledge/frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
 | JWT 認証 | [`../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
-| 認証延長 | [`../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,認証延長ルール.md) |
+| 認証延長 | [`../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](../_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
 | AI コア WebSocket | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md) |
 | AI モデル設定 | [`../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](../_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md) |
 | Pinia Store パターン | [`../_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md`](../_AIDIY/knowledge/frontend_web,Pinia Storeパターン.md) |

@@ -39,13 +39,13 @@ self.MonacoEnvironment = {
 | vue | html | 構文ハイライトが十分なため |
 | html/htm | html | |
 | css/scss/less | css/scss/less | avatar は sass のみなし |
-| js/jsx/mjs/cjs | javascript | web は js/jsx のみ |
-| ts/tsx/mts | typescript | web は ts/tsx のみ |
+| js/jsx/mjs/cjs | javascript | avatar は js/jsx のみ |
+| ts/tsx/mts | typescript | avatar は ts/tsx のみ |
 | json | json | |
 | md | markdown | |
 | yml/yaml | yaml | |
 | sh/bash | shell | avatar は sh のみ |
-| bat/cmd | bat | web は bat のみ |
+| bat/cmd | bat | 両方とも bat/cmd |
 | ps1 | powershell | |
 | sql | sql | |
 | xml/svg | xml | |
@@ -103,7 +103,7 @@ const color = await qColorPicker('#ff0000', '色を選択')
 ## AI 会話表示とメッセージ入力の文字サイズ
 
 - 会話本文とストリーム本文は `11px`、メッセージ入力欄は `12px` に揃える。
-- 対象は Web / Avatar の `AIチャット.vue`、`AIコード.vue`、`AIイメージ.vue`、AIチームの会話要求 / 依頼編集 / 応答内容、AIタスクの要求編集 / 明細編集 / 応答内容、VS Code / 単独画面の Code / Live。Code / Live の設定元は `frontend_ide/host/media/chat.css` と `frontend_ide/host/aidiy_live/media/style.css`。
+- Web / Avatar の対象は `AIチャット.vue`、`AIコード.vue`、`AIイメージ.vue`。Task / Team は `frontend_ide/src/components/タスクチーム/`、VS Code / 単独 Code / Live は `frontend_ide/src/components/コード/`・`ライブ/` と `共通表示/会話表示.css` を確認する。撤去済みのhost/mediaのCSSを編集しない。
 - Web / Avatar の入力欄は通常 `12px` とし、高さ上限に達した `.at-limit` 状態では従来どおり `8px` へ縮小する。
 - VS Code テーマの基本文字サイズを継承させず、会話本文と入力欄に上記サイズを明示する。文字送りカーソルは本文のサイズを継承する。
 
@@ -124,8 +124,8 @@ const color = await qColorPicker('#ff0000', '色を選択')
 
 | 操作 | 手順 |
 |------|------|
-| バグ修正 | 両方のファイルを同内容に修正する |
-| 機能追加 | 両方に追加する（frontend_web 優先で実装し avatar へ移植） |
+| バグ修正 | 対応実装を比較し、共通契約に関わる修正を両方へ反映する |
+| 機能追加 | 両方で必要か判断し、必要な差分だけ反映する |
 | リファクタリング | 内容を一致させた上で、共通パッケージ化を検討する |
 
 現状コピー状態のファイル:
@@ -137,7 +137,7 @@ const color = await qColorPicker('#ff0000', '色を選択')
 | `api/websocket.ts` | 同一インターフェース、実装に若干の差異あり |
 | `components/_share/*.vue`（qTublerFrame, qBooleanCheckbox など） | ほぼ同一 |
 
-Task／Teamは `frontend_ide/src/タスクチーム/` が所有します。Web／Avatar内の旧実装は撤去済みで、上記のコピー同期対象には含めません。
+Task／Teamは `frontend_ide/src/components/タスクチーム/` が所有します。Web／Avatar内の旧実装は撤去済みで、上記のコピー同期対象には含めません。
 
 コンポーネントは `<template>` だけでなく **`<style scoped>` も両方に書く**こと。
 scoped CSS は片方に入れても他方へ波及しないため、見た目だけ片側に残る差異が生まれやすい。

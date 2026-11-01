@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -204,16 +205,45 @@ class LocalBackupTests(unittest.TestCase):
         module=importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules,{"log_config":types.SimpleNamespace(get_logger=logging.getLogger)}):
             spec.loader.exec_module(module)
+        # 実workerを使い、fixture固有のhelperで生成したthreadだけを待つ。
+        # コピー完了は非同期Git記録の完了を意味しない。
+        helper_spec = importlib.util.spec_from_file_location(
+            "fixture_local_git_backup", Path(__file__).resolve().parents[1] / "local_git_backup.py")
+        helper = importlib.util.module_from_spec(helper_spec)
+        helper_spec.loader.exec_module(helper)
+        workers = []
+        def create_worker(*args, **kwargs):
+            worker = threading.Thread(*args, **kwargs)
+            workers.append(worker)
+            return worker
+        def wait_for_workers():
+            for worker in workers:
+                worker.join(timeout=60)
+                self.assertFalse(worker.is_alive(), "fixtureのGit記録workerが完了しませんでした")
+        self.addCleanup(wait_for_workers)
+        def backup_and_wait():
+            count = len(workers)
+            self.assertIsNotNone(module.バックアップ実行(セッション設定=context, ログ出力=False))
+            self.assertEqual(len(workers), count + 1, "Git記録workerが起動されていません")
+            wait_for_workers()
+            head = self.git("rev-parse", "--verify", "HEAD")
+            self.assertEqual(head.returncode, 0, head.stderr)
+            return head.stdout
         path=self.root/"source.txt";path.write_text("before")
         context={"CODE_BASE_PATH":str(self.root)}
-        self.assertIsNotNone(module.バックアップ実行(セッション設定=context, ログ出力=False))
-        first=self.git("rev-parse","HEAD").stdout
-        # 同一mtime内の変更は従来コピー差分には現れなくてもGitへ記録する。
-        timestamp=path.stat().st_mtime
-        path.write_text("after");os.utime(path,(timestamp,timestamp))
-        self.assertIsNotNone(module.バックアップ実行(セッション設定=context, ログ出力=False))
-        self.assertNotEqual(self.git("rev-parse","HEAD").stdout,first)
-        self.assertEqual(self.git("ls-files").stdout,"source.txt\n")
+        with patch.dict(sys.modules, {"aidiy_local_git_backup": helper}), \
+                patch.object(helper, "threading", types.SimpleNamespace(Thread=create_worker)):
+            try:
+                first = backup_and_wait()
+                self.assertEqual(self.git("show", "HEAD:source.txt").stdout, "before")
+                # 同一mtime内の変更は従来コピー差分には現れなくてもGitへ記録する。
+                timestamp=path.stat().st_mtime
+                path.write_text("after");os.utime(path,(timestamp,timestamp))
+                self.assertNotEqual(backup_and_wait(), first)
+                self.assertEqual(self.git("show", "HEAD:source.txt").stdout, "after")
+                self.assertEqual(self.git("ls-files").stdout,"source.txt\n")
+            finally:
+                wait_for_workers()
     def test_file_backup_continues_when_git_management_is_protected(self):
         spec = importlib.util.spec_from_file_location("protected_backup_under_test", Path(__file__).resolve().parents[2] / "backend_server/AIコア/AIバックアップ.py")
         module = importlib.util.module_from_spec(spec)

@@ -18,17 +18,20 @@ export type Slackメッセージ = {
   text?: unknown; ts?: unknown; thread_ts?: unknown; team?: unknown;
 };
 
-export function コマンド解析(content: string, prefix: string, botUserId: string): コマンド | undefined {
-  const triggers = [prefix, `<@${botUserId}>`];
-  const trigger = triggers.find(value => content === value || content.startsWith(`${value} `) || content.startsWith(`${value}\n`));
-  // 設定した利用者の通常投稿を、そのままチャットとして受け付ける。
-  if (!trigger) return content.trim() ? { name: 'chat', text: content.trim() } : undefined;
-  const body = content.slice(trigger.length).trim();
+export function コマンド解析(content: string, _prefix: string, botUserId: string): コマンド | undefined {
+  const bang = /^[!！]/.test(content);
+  // Bot メンションは通常チャットの宛先だけ。旧コマンド経路は持たない。
+  const trigger = [`<@${botUserId}>`].find(value => content === value || content.startsWith(`${value} `) || content.startsWith(`${value}\n`));
+  if (!bang) {
+    const text = (trigger ? content.slice(trigger.length) : content).trim();
+    return text ? { name: 'chat', text } : undefined;
+  }
+  const body = content.slice(1).trim();
   if (!body) return { name: 'help', text: '' };
   const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(body)!;
   const name = match[1].toLowerCase();
   if (['chat', 'stop', 'new', 'status', 'help'].includes(name)) return { name: name as コマンド['name'], text: (match[2] || '').trim() };
-  return { name: 'chat', text: body };
+  return bang ? { name: 'help', text: '' } : { name: 'chat', text: body };
 }
 
 // subtype 付き（参加通知・編集・削除・スレッドのチャンネル同時投稿など）と Bot 投稿は入力にしない。

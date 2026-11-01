@@ -8,14 +8,14 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import * as addressTools from '../src/ブラウザ/URL表示.js';
+import * as addressTools from '../src/components/ブラウザ/URL表示.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
 
 function fixture({standalone=false,headerOnly=false,title=()=>Promise.resolve('AiDiy IDE / Browser 2'),missingTitle=false}={}){
  const mounted=[],unmounted=[],calls=[];let listener,disposed=false;
- const {descriptor,errors}=parse(readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));assert.deepEqual(errors,[]);
+ const {descriptor,errors}=parse(readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));assert.deepEqual(errors,[]);
  const script=compileScript(descriptor,{id:'browser-title',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'Browser.vue',id:'browser-title',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
  const module={exports:{}},api={
@@ -61,6 +61,6 @@ test('Browser見出し: 共有の長文省略規則を再利用し、全画面�
  const css=readFileSync(new URL('../src/style.css',import.meta.url),'utf8');
  assert.match(css,/\.panel-window-title \.panel-brand\{grid-template-columns:auto minmax\(0,1fr\) auto\}/);
  assert.match(css,/\.panel-window-title \.panel-brand strong\{[^}]*min-width:0;overflow:hidden;text-overflow:ellipsis/);
- const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
  assert.match(source,/\.browser-header-only \.browser-chrome\{[^}]*background:rgba\(64,210,245,\.10\)/);
 });

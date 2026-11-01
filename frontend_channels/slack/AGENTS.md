@@ -12,7 +12,7 @@ Code は `aidiy_hermes` CLI を直接起動します。接続情報はプロジ�
 | ファイル | 役割 | Discord 版の対応先 |
 |----------|------|------|
 | `src/main.ts` | 設定確認（`--check`）と Bot だけの前面実行（`npm run bot`） | `src/main.ts` |
-| `panel/` | 接続パネル（`desktop.cjs` の Electron 起動・安全な IPC、`launch.mjs` の起動入口、`画面/接続パネル.vue` の Vue 画面、`接続/パネル状態.js` の状態管理、ブラウザ版用の `web-bridge.js`）。音声表示・モニターは持たない | `panel/` |
+| `panel/` | 接続パネル（`desktop.cjs` の Electron 起動・安全な IPC、`launch.mjs` の起動入口、`components/接続/接続パネル.vue` の Vue 画面、`components/接続/パネル状態.js` の状態管理、ブラウザ版用の `web-bridge.js`）。音声表示・モニターは持たない | `panel/` |
 | `src/接続パネル/パネル操作.ts` | 開始・停止、モデルの保存（`パネル設定.ts`：`aidiy_slack.json`）、再接続表示 | `src/接続パネル/パネル操作.ts` |
 | `src/接続パネル/パネル中継.ts` | Electron 版（`src/panel-worker.ts`）とブラウザ版（`src/web-server.ts`）共通の操作・通知の中継 | 同名 |
 | `src/接続/接続設定.ts` | 共通 JSON の読込・検証、パスと AIコア接続先の解決 | 同名 |
@@ -42,6 +42,6 @@ Code は `aidiy_hermes` CLI を直接起動します。接続情報はプロジ�
 ## 双子の保守
 
 画面・起動・停止・セットアップを変える場合は、Discord 版の同じファイルも同じように変えてください。対応表は上の「構成」です。
-Slack 固有の差分は `src/接続/`（通信・Bot）、`src/モデル情報/`（コードのみ）、`panel/接続/パネル状態.js` の Live 関連の削除、`style.css` の音声表示の削除に限ります。
+Slack 固有の差分は `src/接続/`（通信・Bot）、`src/モデル情報/`（コードのみ）、`panel/components/接続/パネル状態.js` の Live 関連の削除、`style.css` の音声表示の削除に限ります。
 
 導入・操作は [README.md](./README.md)、Discord 版は [../AGENTS.md](../AGENTS.md) を参照してください。

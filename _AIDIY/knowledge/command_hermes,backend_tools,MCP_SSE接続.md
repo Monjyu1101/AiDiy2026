@@ -1,144 +1,51 @@
-# command_hermes の MCP SSE 接続
+# command_hermes の MCP 接続と切り分け
 
-> 文書: `command_hermes,backend_tools,MCP_SSE接続.md` | 実装: `command_hermes/tools/mcp_tool.py`, `command_hermes/cli_main.py`
+> 文書: `command_hermes,backend_tools,MCP_SSE接続.md` | 実装: `command_hermes/tools/mcp_tool.py`, `command_hermes/cli_main.py`, `command_hermes/hermes_cli/tools_config.py`
 
 ## このメモを使う場面
 
-- `aidiy_hermes` TUI で MCP サーバーが `sse — failed` または `http — failed` と表示される
-- バナーに MCP ツールが表示されない / AI が MCP ツールを使えない
-- `mcp_tool.py` の SSE 関連メソッドを確認・修正する
-- `command_hermes` を新版へ更新した後に MCP 接続が壊れた
+- Hermes から AiDiy MCP に接続できない、バナーに出ない、モデルへツールが届かない
+- upstream 取り込み後に設定のマージ・transport・discovery を確認する
 
-## 構成
+Hermes が **クライアントとして** backend_tools へ接続する手順です。Hermes 自体の stdio サーバーは [MCP サーバー起動](./command_hermes,MCP_サーバー起動.md)、他の CLI への登録は [Code CLI MCP 設定](./command_hermes,backend_tools,CodeCLI_MCP設定.md)を参照します。
 
-`command_hermes` は `AiDiy_mcp.json` を自動読み込みして SSE 接続する。
+## 設定と実装の入口
 
-```
-_config/AiDiy_mcp.json  ← MCPサーバーURL一覧
-  ↓ _load_aidiy_mcp_servers()
-tools/mcp_tool.py
-  ↓ discover_mcp_tools() → register_mcp_servers() → _connect_server()
-  ↓ MCPServerTask.run() → _run_sse() ← SSE長期接続
-  ↓ _register_server_tools() → registry.register()
-base/toolsets.py: _get_plugin_toolset_names() → "mcp-aidiy_*" ツールセット
-base/model_tools.py: get_tool_definitions() → AI へ送るツール定義
-```
+1. `_load_aidiy_mcp_servers()` が `_config/AiDiy_mcp.json` の `mcpServers` を読む。URL のある設定を取り込み、未指定の `type` に `sse` を補う。
+2. `_load_mcp_config()` が Hermes の `config.yaml` と合流する。同名は Hermes 側の設定が優先する。`HERMES_SAFE_MODE` では空になる。
+3. `discover_mcp_tools()` → `register_mcp_servers()` → `_connect_server()` が接続し、`_register_server_tools()` が toolset に登録する。
+4. `cli_main.py` の `main()` は toolset 解決前に discovery を呼ぶ。対話だけでなく単発要求・一覧表示にも必要であり、`cli.run()` 直前だけへ移さない。
 
-## 必須メソッド（mcp_tool.py）
+## SSE と Streamable HTTP を混同しない
 
-`MCPServerTask` に以下がすべて揃っていること。バージョンアップで欠落しやすい。
+現行 `MCPServerTask._is_http()` は URL の有無を判定し、`_run_http()` 内の **`transport == "sse"`** で SSE 分岐へ入ります。旧版の `_is_sse()` / `_run_sse()` メソッドは存在しません。
 
-### `_is_sse()` / `_is_http()`
+一方、AiDiy 設定の loader は `type: sse` を補い、`get_mcp_status()` の表示も `type` を見ます。**表示が sse でも実際に SSE 分岐を通ったとは限りません。** 接続失敗時は loader の出力・同名上書き・`transport`・URL を照合します。秘密を含む headers / env はログへ出しません。
 
-```python
-def _is_sse(self) -> bool:
-    return "url" in self._config and str(self._config.get("type", "")).lower() == "sse"
+SSE を明示する Hermes 側の設定例（`config.yaml`、必要な対象だけ）:
 
-def _is_http(self) -> bool:
-    return "url" in self._config and not self._is_sse()
+```yaml
+mcp_servers:
+  aidiy_chrome_devtools:
+    url: http://127.0.0.1:8095/aidiy_chrome_devtools/sse
+    transport: sse
 ```
 
-`AiDiy_mcp.json` の設定は `"type": "sse"` を持つので `_is_sse()` が True になる。
-
-### `_run_sse()`
-
-```python
-async def _run_sse(self, config: dict):
-    from mcp.client.sse import sse_client
-    url = config["url"]
-    headers = dict(config.get("headers") or {})
-    sampling_kwargs = self._sampling.session_kwargs() if self._sampling else {}
-
-    async with sse_client(url, headers=headers) as (read, write):
-        async with ClientSession(read, write, **sampling_kwargs) as session:
-            await session.initialize()
-            self.session = session
-            await self._discover_tools()
-            self._ready.set()
-            await self._shutdown_event.wait()
-```
-
-`self._ready.set()` は `await self._discover_tools()` の後でなければならない。
-
-### `run()` のトランスポート分岐
-
-```python
-if self._is_sse():
-    await self._run_sse(config)
-elif self._is_http():
-    await self._run_http(config)
-else:
-    await self._run_stdio(config)
-```
-
-## cli_main.py への discover_mcp_tools() 追加
-
-`main()` の `cli.run()` 直前に必要（インタラクティブモードのみ）:
-
-```python
-# Run interactive mode
-try:
-    from tools.mcp_tool import discover_mcp_tools
-    discover_mcp_tools()
-except Exception:
-    logger.debug("MCP tool discovery failed at CLI startup", exc_info=True)
-cli.run()
-```
-
-`discover_mcp_tools()` は完了するまで block する（タイムアウト 120s）。
-その後 `cli.run()` → `show_banner()` → `get_mcp_status()` で接続済みサーバーがバナーに表示される。
-
-## AiDiy_mcp.json の確認
-
-```
-_config/AiDiy_mcp.json
-```
-
-```json
-{
-  "mcpServers": {
-    "aidiy_chrome_devtools": {
-      "type": "sse",
-      "url": "http://127.0.0.1:8095/aidiy_chrome_devtools/sse"
-    },
-    ...
-  }
-}
-```
-
-`"type": "sse"` が必須。なければ `_load_aidiy_mcp_servers()` が `entry.setdefault("type", "sse")` で補完する。
+Streamable HTTP を使う場合は `/mcp` の URL と HTTP transport を対応させます。`backend_tools` はローカルの 8095 で起動しておきます。`type` / `transport` の不一致を旧メソッドの再追加だけで解決しようとせず、現行の認証・再接続・プロトコル交渉を維持します。
 
 ## 確認方法
 
-### Python スクリプトで直接確認
+Windows PowerShell（Linux / macOS は `.venv/bin/python`）:
 
 ```powershell
 Set-Location command_hermes
-.venv\Scripts\python.exe -c "
-from tools.mcp_tool import discover_mcp_tools, get_mcp_status
-result = discover_mcp_tools()
-print('Registered tools count:', len(result))
-for s in get_mcp_status():
-    print(s)
-"
-```
-
-期待値: 全サーバーが `'connected': True`、合計 108 ツール。
-
-### TUI で確認
-
-```powershell
+.venv\Scripts\python.exe cli_main.py --list-tools
 aidiy_hermes
 ```
 
-バナーに `aidiy_chrome_devtools  sse — ok (50 tools)` のような行が並べば正常。
-
-## 注意点
-
-- `_run_sse()` が欠落していると SSE サーバーへ HTTP(StreamableHTTP) で接続しようとして失敗する。
-  TUI のバナーが `http — failed` になったら `_run_sse()` の欠落を疑う。
-- `_MCP_SSE_AVAILABLE` フラグ: `from mcp.client.sse import sse_client` が失敗した場合にフォールバックする。
-  `mcp` パッケージのバージョンによって import パスが変わることがあるため確認する。
-- `check_fn` は `server.session is not None` で評価する。
-  SSE 接続が切れると `session` が None に戻り、ツール呼び出し時に「サーバー未接続」エラーになる。
-- `.cmd` ファイルは ASCII エンコードで保存する。UTF-8 BOM 付きで保存すると `'・ｿ@echo'` エラーで起動失敗する。
+- バナーの名前・状態と、実際に列挙されたツールを照合する。無効化済み、未起動、失敗を区別する。
+- サーバー数・ツール数を固定値で判定しない。OS、設定、有効機能、接続結果により変わる。対象の現行設定と `backend_tools/tools_main.py` を同期元にする。
+- `hermes_cli/tools_config.py` の `enabled_mcp_server_names()` とバナーの cheap probe も AiDiy 設定を取り込んでいるか確認する。
+- 接続済みでも toolset の絞り込みや `tools.tool_search` によりモデルへ渡す形式が変わる。一覧表示と、許可された対象ツールの実呼び出しを別々に確認する。
+- SSE の SDK import は遅延初期化される。依存解決と `mcp.client.sse` の可用性を確認し、旧 `_MCP_SSE_AVAILABLE` フラグを前提にしない。
+- discovery には接続待ちがあり、短時間で返らないだけでは停止と判定しない。失敗内容は stderr / ログで確認する。

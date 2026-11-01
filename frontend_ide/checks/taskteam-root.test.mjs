@@ -9,8 +9,8 @@ import { readFile } from 'node:fs/promises';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { transform } from 'esbuild';
 import * as Vue from 'vue';
-import * as sessionTools from '../src/タスクチーム/task-session.js';
-const source = await readFile(new URL('../src/タスクチーム/タスクチームパネル.vue', import.meta.url), 'utf8');
+import * as sessionTools from '../src/components/タスクチーム/task-session.js';
+const source = await readFile(new URL('../src/components/タスクチーム/タスクチームパネル.vue', import.meta.url), 'utf8');
 let script = compileScript(parse(source).descriptor, { id: 'taskteam-test' }).content;
 script = script.replace(/import\s+(?:\{[^}]*\}|[\w,\s]+)\s+from\s+['"]vue['"];?/g, match => {
   const binding = match.match(/import\s+(.*?)\s+from/s)[1].replace(/\s+as\s+/g, ': ');

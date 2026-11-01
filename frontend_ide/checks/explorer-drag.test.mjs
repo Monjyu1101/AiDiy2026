@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createExplorerDrag } from '../src/ファイル閲覧/エクスプローラードラッグ.js';
+import { createExplorerDrag } from '../src/components/ファイル閲覧/エクスプローラードラッグ.js';
 function setup() {
   const win = new EventTarget(), classes = new Set(); let capture, activities = 0;
   const element = { ownerDocument: { defaultView: win }, scrollTop: 100, scrollHeight: 1000, clientHeight: 300,
@@ -52,7 +52,7 @@ test('別窓のownerDocumentを使用し、長押し窓移動のpointercancelや
 test('通常のnative dragだけを止め、Vue一覧に接続し、別窓の長押し対象指定を維持する', () => {
   const h = setup(); const before = h.event(); h.drag.dragstart(before); assert.equal(before.prevented, undefined);
   h.drag.down(h.event()); const pending = h.event(); h.drag.dragstart(pending); assert.equal(pending.prevented, true); h.drag.dispose();
-  const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
   assert.match(source, /<ul ref="treeElement" @pointerdown="treeDrag.down" @click.capture="treeDrag.click" @dblclick.capture="treeDrag.click"/);
   assert.match(source, /:data-aidiy-window-move-list="detached&&nativePanels\?'':undefined"/);
   assert.match(source, /onBeforeUnmount\(\(\)=>\{treeDrag.dispose\(\)/);

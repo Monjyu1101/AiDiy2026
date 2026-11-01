@@ -52,7 +52,7 @@ test('撮影待ちに再読込・中止された切替を後から適用しな�
  }
 });
 test('UIはミニ描画後に演出完了を通知し、完了までは切替中を保つ',async()=>{
- const {起動ミニ表示を作成}=await import('../ui/src/ウィンドウ/起動ミニ表示.mjs');
+ const {起動ミニ表示を作成}=await import('../ui/src/components/ウィンドウ/起動ミニ表示.mjs');
  const calls=[];let release;
  const state=起動ミニ表示を作成({利用可能:()=>true,切替:async value=>{calls.push(value);return true;},反映:()=>{calls.push(state.表示中.value?'mini-ready':'normal-ready');return new Promise(resolve=>release=resolve);}});
  const pending=state.変更(true);await new Promise(resolve=>setImmediate(resolve));

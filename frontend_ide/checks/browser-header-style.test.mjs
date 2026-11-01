@@ -9,7 +9,7 @@ import {readFileSync} from 'node:fs';
 import {parse,compileStyle} from '@vue/compiler-sfc';
 
 test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス・青系文字で通常表示を保つ',()=>{
- const {descriptor}=parse(readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));
+ const {descriptor}=parse(readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'));
  const style=compileStyle({source:descriptor.styles[0].content,id:'data-v-browser-header',scoped:true});
  assert.deepEqual(style.errors,[]);
  const rules=style.rawResult.root.nodes.filter(node=>node.type==='rule');
@@ -36,7 +36,7 @@ test('Browser全画面ヘッダー: 薄いシアンの四角いすりガラス�
 });
 
 test('Browserすりガラス: 800 DIPを高倍率や狭い画面で表示しても操作列を折り返す',()=>{
- const source=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8');
  const {descriptor}=parse(source),style=compileStyle({source:descriptor.styles[0].content,id:'browser-header-wrap',scoped:false});assert.deepEqual(style.errors,[]);
  const container=style.rawResult.root.nodes.find(node=>node.type==='atrule'&&node.name==='container'&&node.params==='browser-header (max-width:640px)');assert.ok(container);
  const values=selector=>Object.fromEntries(container.nodes.find(rule=>rule.selector===selector).nodes.filter(node=>node.type==='decl').map(node=>[node.prop,node.value]));

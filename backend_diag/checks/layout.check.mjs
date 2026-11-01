@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {copyFile,mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {access,copyFile,mkdir,mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -39,4 +39,14 @@ test('moved desktop module still finds Electron in the package root without a ca
   const {desktopBinary}=await import(pathToFileURL(path.join(startup,'desktop.mjs')).href);
   assert.equal(await desktopBinary(),executable);
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+// Avatar と同じ src/components・src/dialog 分離を回帰確認する。
+test('renderer keeps Japanese feature groups under components and dialogs beside them', async()=>{
+ const src=path.join(root,'ui/src');
+ assert.deepEqual((await readdir(src,{withFileTypes:true})).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort(),['components','dialog']);
+ await access(path.join(src,'dialog/AI設定再起動.vue'));
+ for(const name of ['AI設定','モデル一覧','ウィンドウ','導入状況','共通表示','Tools','AIモデル','設定モデル','アプリ起動','起動','キー設定共通','外部連携'])await access(path.join(src,'components',name));
+ await assert.rejects(access(path.join(src,'components/AI設定/AI設定再起動.vue')),{code:'ENOENT'});
+ for(const name of ['App.vue','main.js','style.css','index.html'])await access(path.join(src,name));
 });

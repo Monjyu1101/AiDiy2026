@@ -18,10 +18,10 @@ const output = process.env.AIDIY_PIN_RENDERER_SHOT || join(tmpdir(), `aidiy-pin-
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fixture = `
 import { createApp, h } from 'vue';
-import StatusBar from '/src/共通表示/状態バー.vue';
-import { mountPanelTitle } from '/src/ファイル閲覧/別窓タイトル.js';
+import StatusBar from '/src/components/共通表示/状態バー.vue';
+import { mountPanelTitle } from '/src/components/ファイル閲覧/別窓タイトル.js';
 import '/src/style.css';
-import '/src/共通表示/会話表示.css';
+import '/src/components/共通表示/会話表示.css';
 const apis = {};
 function api(name, pinned=false, locked=false) {
  let state={pinned,locked}, listeners=new Set();

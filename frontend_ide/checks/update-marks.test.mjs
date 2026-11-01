@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {fileRecency,createUpdateMarks,updateFlash} from '../src/ファイル閲覧/更新の目印.js';
+import {fileRecency,createUpdateMarks,updateFlash} from '../src/components/ファイル閲覧/更新の目印.js';
 const now=+new Date(2026,9,16,12), day=+new Date(2026,9,16);
 const files=[{path:'older',mtime:day-86400001,size:1},{path:'yesterday',mtime:day-1,size:1},{path:'today',mtime:day+1,size:1},{path:'latest-a',mtime:now,size:1},{path:'latest-b',mtime:now,size:1}];
 test('表示対象の当日更新と同率最終更新を区別し、前日と無効日時は通常表示',()=>{
@@ -31,7 +31,7 @@ test('初回/無差分/フォルダ・フィルター切替は発光せず、追
  tracker.clear();assert.deepEqual(tracker.snapshot(now).flashes,{});
 });
 for(const zone of ['UTC','Asia/Tokyo','America/New_York'])test(`ローカル日付 ${zone}: 日跨ぎ・夏時間・年跨ぎ`,()=>{
- const module=new URL('../src/ファイル閲覧/更新の目印.js',import.meta.url).href;
+ const module=new URL('../src/components/ファイル閲覧/更新の目印.js',import.meta.url).href;
  const code=`import assert from 'node:assert/strict';import {fileRecency} from ${JSON.stringify(module)};
  for(const now of [new Date(2026,0,1,0,1),new Date(2026,2,9,0,1),new Date(2026,10,2,0,1)]){
  const prev=new Date(now);prev.setDate(prev.getDate()-1);prev.setHours(0,0,1,0);

@@ -12,7 +12,7 @@ import ts from 'typescript';
 // 実コンポーネントのscriptを実行し、Electronから空セッションが返る経路を再現する。
 // Vueの描画・通信・ホストだけを置き換え、認証関数自体はコピーしない。
 function panel() {
-  const source = fs.readFileSync(new URL('../src/タスクチーム/タスクチームパネル.vue', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../src/components/タスクチーム/タスクチームパネル.vue', import.meta.url), 'utf8');
   const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^import .*;\r?\n/gm, '');
   let savedToken = '';
   const context = vm.createContext({

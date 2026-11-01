@@ -1,71 +1,36 @@
 # backend_tools HTTP API の save_path 挙動
 
-> 文書: `backend_tools,HTTP_API_save_path挙動.md` | 実装: `backend_tools/tools_main.py`
+> 文書: `backend_tools,HTTP_API_save_path挙動.md` | 実装: `backend_tools/tools_proc/tools_media.py`, `backend_tools/tools_proc/media_output.py`
 
 ## このメモを使う場面
 
-- `/aidiy_backup` `/tts` `/imageGen` `/movieGen` エンドポイントのレスポンス仕様を確認する
-- save_path の有無でレスポンス内容が変わる仕様を再実装・修正するとき
+- 画像・動画・音声生成APIの保存先とbase64返却を調べる。
+- MCPとHTTP、処理クラス直接呼出しの既定値の違いを確認する。
 
-## HTTP API 一覧
+## HTTP API と保存先
 
-| エンドポイント | MCP サーバー | 出力形式 | 備考 |
-|--------------|-------------|---------|------|
-| `POST /aidiy_backup/save/scan` | aidiy_backup | JSON | 差分スキャンのみ |
-| `POST /aidiy_backup/save/run` | aidiy_backup | JSON | 差分バックアップ実行 |
-| `POST /aidiy_backup/check/{method}` | aidiy_backup | JSON | バックアップ内容確認。`info`, `before_after`, `versions`, `changed`, `diff_stats` |
-| `POST /tts` | aidiy_text_to_speech | MP3 音声 | `speech_text` フィールド必須 |
-| `POST /imageGen` | aidiy_image_generation | PNG 画像 | Gemini / OpenAI |
-| `POST /movieGen` | aidiy_movie_generation | MP4 動画 | Gemini Veo、数分かかる |
-| `POST /agents` | aidiy_code_agents | JSON | コードエージェント実行 |
+URLは `http://127.0.0.1:8095` に次のパスを付ける。旧短縮名 `/tts` / `/imageGen` / `/movieGen` は現行ルーターにない。
 
-## save_path の挙動まとめ
+| POST エンドポイント | ファイル | save_path省略時の保存先（リポジトリルート基準） | base64 |
+|---|---|---|---|
+| `/aidiy_text_to_speech/synthesize` | MP3 | `temp/output/yyyymmdd.HHMMSS.mp3` | `base64_audio` |
+| `/aidiy_image_generation/generate` | PNG | `backend_server/temp/output/` | `data` |
+| `/aidiy_movie_generation/generate` | MP4 | `backend_server/temp/output/` | 常に返さない |
 
-| `save_path` | 保存先 | レスポンスに含まれるもの |
-|-------------|--------|--------------------------|
-| 未指定 | `../temp/output/yyyymmdd.HHmmss.{ext}` へ自動保存 | base64 データ + save_path（自動生成パス） |
-| 指定あり | 指定パスへ保存 | save_path のみ（base64 なし） |
+全てJSON応答で、音声・画像の生バイナリHTTP応答ではない。画像・動画の時刻付きファイル名は各生成クラスで決まる。保存先を指定した場合、画像と音声はbase64を生成しない。画像は `type: "file"` / `save_path` / `mimeType` 等を返し、音声は `base64_audio` を空文字として返す。動画は常に保存先とメタデータを返す。
 
-- `/tts` の拡張子: `.mp3`
-- `/imageGen` の拡張子: `.png`
-- `/movieGen` の拡張子: `.mp4`（base64 返却なし、常に `save_path` のみ返す）
-- `../temp/output/` は `backend_tools/tools_main.py` からの相対パス（= プロジェクトルートの `temp/output/`）
+- base64省略の共通判定は `media_output.base64を返すか()`。空白だけのパスなどを独自に解釈せず、利用側では有効な保存先か未指定を渡す。
+- CLI画像生成は生成元の `generated_path` を維持し、明示した `save_path` へ同じPNGをコピーする。生成元とコピー先を混同しない。
+- 画像・動画の同期元は `image_generation.py` / `movie_generation.py` の `DEFAULT_OUTPUT_DIR` と `_resolve_default_output_dir()`。
+- TTSは `tools_media.py` のMCP/HTTPラッパーが `temp/output/` を明示する。`TextToSpeech.to_base64()` の直接呼出しで使うクラス既定値 `backend_server/temp/output/` とは異なる。コメントだけでなく実際の引数を追う。
 
-## TtsRequest フィールド仕様
+## TTS の入力と再生
 
-- `speech_text` のみ（`text` フィールドは廃止済み）
-- `speech_text` 全体が JSON の空文字列 `""` の場合だけ、1秒の無音MP3を生成する。本文中の `""` は間合い記号として扱わない
-- 稼働中のサービスが空文字列を `speech_text is required` として拒否する場合は旧版が動いている。再起動後に再確認するか、現行 `backend_tools/tools_proc/text_to_speech.py` の `TextToSpeech.synthesize(speech_text="")` を直接使用する
-- `save_path` 未指定でも常にファイルへ出力する
-- `local_play=true` または `play=true` でサーバー側ローカル再生を試行する
+- 必須キーは `speech_text`。`text` は使わない。任意キーは `TtsRequest` の `language` / `provider` / `model` / `voice` / `ratio` / `save_path` / `local_play` / `play`。
+- `speech_text` 全体がJSONの空文字列 `""` なら1秒の無音MP3を作る。本文中の `""` は間合い記号ではない。
+- `save_path` 省略でもファイルへ保存する。`local_play=true` または `play=true` はサーバー側の再生試行であり、呼出し元PCの再生成功を保証しない。
+- 稼働中サービスが空文字列を拒否する場合は、配置ソースと稼働版の相違を確認し、必要なら再起動する。旧サービスでの失敗を現行実装の仕様にしない。
 
-## SSE エンドポイントのマウント方法
+## 関連する接続仕様
 
-`app.mount()` でサブアプリとして使う場合、MCP SDK 2.x の `MCPServer.sse_app()` には
-マウントポイント相対の `sse_path` / `message_path`（`/sse`, `/messages/`）を渡す。
-
-```python
-# NG: マウント後に 404 になる
-mcp_ca = MCPServer("aidiy_code_agents")
-app.mount(
-    "/aidiy_code_agents",
-    mcp_ca.sse_app(
-        sse_path="/aidiy_code_agents/sse",
-        message_path="/aidiy_code_agents/messages/",
-    ),
-)
-
-# OK: sse_path/message_path はマウントポイント相対にする
-mcp_ca = MCPServer("aidiy_code_agents")
-app.mount(
-    "/aidiy_code_agents",
-    mcp_ca.sse_app(
-        sse_path="/sse",
-        message_path="/messages/",
-        host="127.0.0.1",
-    ),
-)
-```
-
-理由: Starlette の `app.mount()` はリクエストパスからマウントプレフィックスを除去してサブアプリへ渡す。
-そのためサブアプリ内部のルートも、マウントプレフィックスを含まない相対パスで登録する必要がある。
+MCP一覧・SSE/Streamable HTTPのマウントは [backend_tools 構成](./backend_tools,構成.md)。バックアップとコード実行はメディア保存APIではないため [MCP活用手順](./backend_server,backend_tools,MCP活用手順.md) を参照する。バックアップは `/aidiy_backup/save/scan` / `/aidiy_backup/save/run` / `/aidiy_backup/check/{method}`、コード実行は `/aidiy_code_agents/run`。

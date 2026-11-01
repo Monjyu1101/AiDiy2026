@@ -11,7 +11,6 @@
 ## 関連ファイル
 - `command_hermes/cli_main.py` — CLI/TUI エントリ
 - `command_hermes/hermes_cli/commands.py` — `COMMAND_REGISTRY` と補完
-- `command_hermes_old/cli_main.py` — 旧 AiDiy Hermes 実装の参照元
 - `command_hermes/base/toolsets.py` — toolset 定義
 - `command_hermes/base/model_tools.py` — agent loop tool 定義
 - `command_hermes/tools/` — 各ツール実装
@@ -19,56 +18,14 @@
 - `_config/AiDiy_key.json` — AiDiy provider/モデル設定
 - `_config/AiDiy_mcp.json` — AiDiy MCP サーバー定義
 
-## Upstream からの調整点
+## upstream と役割分担
 
-この `command_hermes` は [Nous Research の hermes-agent](https://github.com/nousresearch/hermes-agent) **v0.21.0** (MIT License) を取り込み、AiDiy 用のレイヤを重ねたものです。
-（2026-09-04 に v0.12.0 ベースから v0.21.0 ベースへ全面同期。旧ツリーは `command_hermes_0.12/` に退避。）
-
-### レイアウトの読み替え（3点のみ）
-
-| upstream | AiDiy |
-|----------|-------|
-| リポジトリ直下のモジュール群 | `base/` |
-| `agent/` パッケージ | `core/` |
-| `cli.py` | `cli_main.py` |
-
-読み替えは `cli_main.py` 冒頭の **layout shim** が行います。`sys.path` へ `base/` と `command_hermes/` を追加し、
-`sys.modules["agent"] = core` と `sys.modules["cli"] = cli_main` を登録します。
-このため **upstream 由来コードの `from agent...` / `from cli import ...` は書き換え不要（書き換え禁止）** です。
-
-`base/hermes_constants.py` だけは `_INSTALL_ROOT` / `_NODE_BOOTSTRAP_SCRIPT` を `parent.parent` に補正しています（`base/` に置いたため）。
-
-### 同梱するもの / しないもの
-
-同梱: `core/`（upstream `agent/`）、`base/`、`tools/`、`hermes_cli/`、`gateway/`、`tui_gateway/`、`cron/`、
-`acp_adapter/`、`plugins/`、`providers/`、`skills/`、`optional-skills/`、`locales/`、`assets/`、`scripts/`、`native/`
-
-upstream から非同梱: `ui-tui/`（Node/TS TUI）、`web/`、`website/`、`evals/`、`tests/`、`docker/`、`nix/`
-
-AiDiy 固有のテストは `command_hermes/checks/` に置く。upstream のテスト除外と混同せず、更新時も保持する。
-
-0.12 系では `cron/`、`gateway/`、`tui_gateway/`、`acp_adapter/` を削除・スタブ化していましたが、
-0.21 では upstream コードが相互に参照するため **そのまま同梱**しています（AiDiy では常駐させないだけ）。
-
-### AiDiy レイヤ（upstream 追従時に再適用が必要）
-
-| 対象 | 内容 |
-|------|------|
-| `cli_main.py` | layout shim / `_AIDIY_*` 設定ブロック（`AiDiy_key.json`、外部 CLI provider 定義）/ `_aidiy_*` メソッド群（`/model` ピッカー、モデル一覧取得、外部 CLI サブプロセス実行）/ `chat()` の CLI ディスパッチ / `_handle_model_switch` フック / `_AIDIY_RESPONSE_LABEL = "AiDiy,Hermes"` / `main()` 冒頭の MCP discovery / `cli_entry()` argparse エントリ |
-| `tools/mcp_tool.py` | `_load_aidiy_mcp_servers()` と `_load_mcp_config()` へのマージ |
-| `tools/daemon_pool.py` | Python 3.14 の `ThreadPoolExecutor` 内部変更対応 |
-| `hermes_cli/main.py` | `_resolve_use_tui()` を常に False |
-| `hermes_cli/_parser.py` | `--tui` / `--dev` のヘルプ文言 |
-| `base/hermes_constants.py` | `_INSTALL_ROOT` / `_NODE_BOOTSTRAP_SCRIPT` の補正 |
-| `pyproject.toml` | upstream core 依存 + anthropic / google-genai / fal-client / mcp / windows-curses |
-| `aidiy_hermes_exec.bat`、`_setup.py`、`_start.py`、`_cleanup.py` | AiDiy 専用。upstream には対応物なし |
-
-0.12 系にあった `*_win.py` / `*_linux.py` の platform selector 層は、upstream 0.21 が Windows ネイティブ対応を
-本体に取り込んだため **廃止**しました。詳細は `command_hermes,Windows対応規則.md` を参照。
+レイアウト読み替え、同梱資産、AiDiy レイヤの再適用は [upstream 移植手順](./command_hermes,upstream移植手順.md)に集約します。
+本書は対話 UI の変更に限定します。旧版フォルダは前提にせず、必要な過去実装は Git 履歴から参照します。
 
 ## TUI 調整方針
 
-- 旧版を丸ごと戻さない。`rich` / `fire` / gateway / cron など不要依存が復活するため、必要な TUI 骨格だけ移す
+- 旧版を丸ごと戻さず、現行の TUI と依存宣言に合わせて変更する。`rich` / `fire` / gateway / cron は現行で同梱されているため、旧版の「不要なので削除」という方針を再適用しない
 - `TextArea`、`FileHistory`、`SlashCommandCompleter`、`SlashCommandAutoSuggest`、主要 keybinding を AiDiy Hermes に合わせて使う
 - 会話出力は TUI 内の出力ウィンドウに入れず、通常 stdout と `patch_stdout()` でスクロールバックへ流す
 - TUI は下部固定の入力、status、spinner、補完メニューを中心にする
@@ -131,26 +88,11 @@ AiDiy 固有のテストは `command_hermes/checks/` に置く。upstream のテ
 - `gemini` / `freeai`: `https://generativelanguage.googleapis.com/v1beta/openai`
 - `anthropic`: `https://api.anthropic.com`
 
-## 旧機能を戻す判断基準
+## ツールを調整する場合
 
-戻す対象は単体ツールとして完結するものを優先する。
-
-- `text_to_speech`
-- `image_generate`
-- `create_video_from_images`
-- `vision_analyze`
-- `todo`
-- `clarify`
-- `execute_code`
-- `process`
-- `browser_providers`
-
-戻さない/スタブに寄せるもの:
-- Slack / Discord / Telegram などチャンネル連携
-- 常駐 gateway / setup / run
-- gateway セッション前提ツール
-
-旧版由来の巨大ツールを丸ごとコピーせず、`tools.registry.register()` に合わせた軽量実装へ寄せる。registry 重複は `tools/*.py` のトップレベル `registry.register(name=...)` を AST で集計して確認する。
+単独の TUI 修正で `gateway/` や `cron/` を削除・スタブ化しません。現行コードは upstream の相互参照を保持します。
+ツール追加は `tools.registry.register()` と toolset への登録を確認し、同名登録の重複を避けます。
+AiDiy の常駐起動対象かどうかと、Python モジュールの同梱要否を区別します。
 
 ## import と依存関係
 

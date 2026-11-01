@@ -22,7 +22,7 @@ python scripts/bom_anomaly_list.py
 ```powershell
 $files = @(
   "_AIDIY/knowledge/backend_server,frontend_web,frontend_avatar,JWT認証フロー.md",
-  "_AIDIY/knowledge/共通,Markdown現状追従チェック.md"
+  "_AIDIY/knowledge/共通,ナレッジ更新手順.md"
 )
 
 foreach ($file in $files) {

@@ -81,16 +81,7 @@ uv sync --locked --no-install-project
 
 ## MCP トランスポート（3種類）と REST API
 
-`backend_tools` は SSE / Streamable HTTP / stdio gateway の3トランスポートに対応する。サーバー側の接続先は同一ポート（8095）で、ツールと同じ処理を直接呼ぶ REST API も提供する。
-
-| インターフェース | 説明 | 代表 URL / コマンド |
-|----------------|------|-------------------|
-| **SSE（MCP標準）** | AI エージェント・MCP クライアントが使う標準トランスポート | `http://127.0.0.1:8095/{mcp_name}/sse` |
-| **Streamable HTTP** | Codex / Antigravity は `/mcp` へ直接接続する。`/sse` は POST / DELETE も受け付ける | `http://127.0.0.1:8095/{mcp_name}/mcp` または `/{mcp_name}/sse` |
-| **stdio gateway** | `mcp_stdio.py` が SSE を stdin/stdout に変換。stdio 接続を選ぶクライアント向け | `mcp_stdio.py --sse-url .../sse` |
-| **HTTP POST（FastAPI）** | REST API として直接呼び出せる。Swagger UI (`/docs`) で試行可能。Python から最も簡単に利用できる | `POST http://127.0.0.1:8095/{mcp_name}/{method_name}` |
-
-各 MCP の引数仕様は `GET http://127.0.0.1:8095/{mcp_name}/list` で JSON 取得できる。Swagger UI は本体の `http://127.0.0.1:8095/docs`。`aidiy_task_agents` などは個別の `/{mcp_name}/docs` でも HTTP 利用例を返す。
+接続方式とURLは [アクセスインターフェース](./backend_tools,構成.md#アクセスインターフェース) を参照する。引数仕様は `GET /{mcp_name}/list`、Swagger UI は `http://127.0.0.1:8095/docs`。個別の `/{mcp_name}/docs` で HTTP 利用例を返すサービスもある。
 
 ### Python から利用する例
 
@@ -109,28 +100,7 @@ print(res.json())
 
 ## SSE エンドポイント
 
-| MCP | SSE |
-|-----|-----|
-| Chrome DevTools | `http://127.0.0.1:8095/aidiy_chrome_devtools/sse` |
-| Desktop Capture | `http://127.0.0.1:8095/aidiy_desktop_capture/sse` |
-| SQLite | `http://127.0.0.1:8095/aidiy_sqlite/sse` |
-| PostgreSQL | `http://127.0.0.1:8095/aidiy_postgres/sse` |
-| Logs | `http://127.0.0.1:8095/aidiy_logs/sse` |
-| Code Check | `http://127.0.0.1:8095/aidiy_code_check/sse` |
-| Backup | `http://127.0.0.1:8095/aidiy_backup/sse` |
-| Image Generation | `http://127.0.0.1:8095/aidiy_image_generation/sse` |
-| Speech-to-Text | `http://127.0.0.1:8095/aidiy_speech_to_text/sse` |
-| Text-to-Speech | `http://127.0.0.1:8095/aidiy_text_to_speech/sse` |
-| Movie Generation | `http://127.0.0.1:8095/aidiy_movie_generation/sse` |
-| OBS Studio Control | `http://127.0.0.1:8095/aidiy_obs_studio_control/sse` |
-| FFmpeg Control | `http://127.0.0.1:8095/aidiy_ffmpeg_control/sse` |
-| Notification Sounds | `http://127.0.0.1:8095/aidiy_notification_sounds/sse` |
-| Code Agents | `http://127.0.0.1:8095/aidiy_code_agents/sse` |
-| Chat LLM | `http://127.0.0.1:8095/aidiy_chat_llms/sse` |
-| Decisions Check | `http://127.0.0.1:8095/aidiy_decisions_check/sse` |
-| Task Agents | `http://127.0.0.1:8095/aidiy_task_agents/sse` |
-| Team Agents | `http://127.0.0.1:8095/aidiy_team_agents/sse` |
-| Windows Control（Windows のみ） | `http://127.0.0.1:8095/aidiy_windows_control/sse` |
+全サーバーのURLは [提供 MCP](./backend_tools,構成.md#提供-mcp) に集約する。
 
 通常の Tools 起動は `127.0.0.1` のみに待ち受けます。これは bind 制限であり、独自の host 指定やポート転送・リバースプロキシによる再公開までは防ぎません。管理 API の既存認証は維持します。
 

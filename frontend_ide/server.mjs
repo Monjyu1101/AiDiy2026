@@ -14,10 +14,10 @@ import { fileURLToPath } from 'node:url';
 import { createAISearch } from './ファイル機能/ai-search.mjs';
 import { createFileAnalysis } from './ファイル機能/file-analysis.mjs';
 import { startTerminal } from './aidiy_console/terminal.mjs';
-import { cliTitleName } from './src/ターミナル/CLIタイトル.js';
+import { cliTitleName } from './src/components/ターミナル/CLIタイトル.js';
 import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch.mjs';
 import { createFileHistory } from './ファイル機能/file-history.mjs';
-import { catppuccinAsset } from './src/ファイル閲覧/ファイルアイコン.js';
+import { catppuccinAsset } from './src/components/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
 export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
  if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('アプリはcode / live / ide / console / task / team / browserから指定してください。');

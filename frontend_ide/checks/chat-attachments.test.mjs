@@ -13,7 +13,7 @@ function moduleFrom(path,dependencies={}){
  const module={exports:{}};vm.runInNewContext(transformSync(readFileSync(new URL(path,import.meta.url),'utf8'),{format:'cjs',loader:path.endsWith('.ts')?'ts':'js'}).code,{module,atob,btoa,Uint8Array,console,require:name=>dependencies[name]});return module.exports;
 }
 const shared=moduleFrom('../host/src/file-attachments.ts');
-const {readDroppedFiles}=moduleFrom('../src/添付ファイル/ファイル送信.js',{'../../host/src/file-attachments':shared});
+const {readDroppedFiles}=moduleFrom('../src/components/添付ファイル/ファイル送信.js',{'../../../host/src/file-attachments':shared});
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6EJAAAAAASUVORK5CYII=';
 const packet=(kind='input_file',extra={})=>({セッションID:'session-a',チャンネル:'1',メッセージ識別:kind,ファイル名:'temp/input/stamp.uuid.資料.png',元ファイル名:'資料.png',サムネイル画像:png,...extra});
 const file=(name='資料.txt',text='fixture')=>({name,size:Buffer.byteLength(text),arrayBuffer:async()=>Uint8Array.from(Buffer.from(text)).buffer});
@@ -87,10 +87,10 @@ test('添付D&D: 第1件後の送信先変更や明示送信拒否で残りを�
 
 function component(attachment){
  const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc');
- const {descriptor}=parse(readFileSync(new URL('../src/添付ファイル/チャット添付.vue',import.meta.url),'utf8'));
+ const {descriptor}=parse(readFileSync(new URL('../src/components/添付ファイル/チャット添付.vue',import.meta.url),'utf8'));
  const script=compileScript(descriptor,{id:'chat-file',genDefaultAs:'component'}),template=compileTemplate({source:descriptor.template.content,filename:'ChatFile.vue',id:'chat-file',compilerOptions:{bindingMetadata:script.bindings}});
  assert.deepEqual(template.errors,[]);const module={exports:{}};
- vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{module,console,require:name=>name==='vue'?vue:name==='../../host/src/file-attachments'?shared:{}});
+ vm.runInNewContext(transformSync(script.content+'\n'+template.code+'\ncomponent.render=render;module.exports=component;',{format:'cjs'}).code,{module,console,require:name=>name==='vue'?vue:name==='../../../host/src/file-attachments'?shared:{}});
  const props={attachment},scope=vue.effectScope(),state=scope.run(()=>module.exports.setup(props,{expose(){}}));
  return{state,render:()=>module.exports.render({},[],props,vue.proxyRefs(state),{},{}),dispose:()=>scope.stop()};
 }

@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import * as draftHandoff from '../src/下書き連携/下書き受け渡し.js';
+import * as draftHandoff from '../src/components/下書き連携/下書き受け渡し.js';
 const require=createRequire(import.meta.url);
 const vue=require('vue'),{parse,compileScript}=require('@vue/compiler-sfc'),{transformSync,buildSync}=require('esbuild');
 const MarkdownIt=require('markdown-it');
@@ -34,7 +34,7 @@ function setupComponent(name,{props={},modules={},globals={}}={}) {
     require(id){
       if(id==='vue')return {...vue,onMounted:callback=>mounted.push(callback),onBeforeUnmount:callback=>unmounted.push(callback)};
       if(id==='markdown-it')return MarkdownIt;
-      if(id==='../../host/src/file-attachments')return {fileAttachment:()=>undefined};
+      if(id==='../../../host/src/file-attachments')return {fileAttachment:()=>undefined};
       if(id==='../添付ファイル/ファイル送信.js')return {readDroppedFiles:async()=>0};
       if(id==='../添付ファイル/チャット添付.vue')return {};
       if(id==='../下書き連携/下書き受け渡し.js')return draftHandoff;
@@ -77,12 +77,12 @@ async function liveFixture(t,{socketFactory,props={}}={}) {
   const fixture=setupComponent('LivePanel',{
     props:Object.assign(props,{config:{}}),modules:{
       '../ライブ/ライブ通信':{LiveEnvironment:Environment},
-      '../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
-      '../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(value){audioMutes.push(value);}stop(){}}},
-      '../../host/aidiy_live/src/visualizer':{AudioCloud:class {setVisible(){}dispose(){}}},
-      '../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
-      '../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
-      '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../共通表示/共通ダイアログ.vue':{},
+      '../../../host/aidiy_live/src/protocol':socketFactory?liveProtocol():{LiveConnection:Connection,入力レート:()=>16000,音声入力:value=>value,音声操作:(mic,speaker)=>({mic,speaker})},
+      '../../../host/aidiy_live/src/audio':{LiveAudio:class {async unlock(){}close(){audioCloses++;}mute(value){audioMutes.push(value);}stop(){}}},
+      '../../../host/aidiy_live/src/visualizer':{AudioCloud:class {setVisible(){}dispose(){}}},
+      '../../../host/aidiy_live/src/model-catalog':{ライブ選択エラー:()=>''},
+      '../../../host/aidiy_live/src/microphone-error':{microphoneError:error=>error.message},
+      '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../../dialog/共通ダイアログ.vue':{},
       '../コード/会話到着演出':{chatArrival:()=>({reset(){},dispose(){},show(){}})},
     },
   });
@@ -282,8 +282,8 @@ async function codeFixture(t){
   let receive;const sent=[],saved=[];
   const fixture=setupComponent('CodePanel',{modules:{
     '../コード/コード通信.js':{codeTransport(_props,callback){receive=callback;return{draft:()=>'',saveDraft:value=>saved.push(value),start(){},dispose(){},async send(message){sent.push(message);}};}},
-    '../../host/src/stream-control':{visibleStreamContent:value=>value},
-    '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/進捗表示.vue':{},'../共通表示/共通ダイアログ.vue':{},
+    '../../../host/src/stream-control':{visibleStreamContent:value=>value},
+    '../共通表示/状態バー.vue':{},'../ターミナル/開始表示.vue':{},'../ターミナル/進捗表示.vue':{},'../../dialog/共通ダイアログ.vue':{},
     '../コード/会話到着演出':{chatArrival:()=>({reset(){},dispose(){},show(){},reserve(){},cancelReservation(){}})},
   }});
   t.after(()=>fixture.dispose());await fixture.mount();

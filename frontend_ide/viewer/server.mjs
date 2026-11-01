@@ -21,7 +21,7 @@ import { createPreview } from './preview.mjs';
 import { vuePreview } from './vue-preview.mjs';
 import { publicMediaURL } from './登録HTMLルート.mjs';
 import { MEDIA_PATTERN } from './media-types.mjs';
-import { latestFile, latestFiles } from '../src/ファイル閲覧/最新ファイル.js';
+import { latestFile, latestFiles } from '../src/components/ファイル閲覧/最新ファイル.js';
 import { scanTree, createScanPool, scanMetadata, createBudget } from './file-scan.mjs';
 import { createExplorerFiles } from '../ファイル機能/explorer-files.mjs';
 import { hasAlwaysExcludedDirectory } from '../ファイル機能/フォルダ除外規則.mjs';

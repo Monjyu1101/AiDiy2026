@@ -13,8 +13,8 @@ const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
 const { transformSync, buildSync } = require('esbuild');
 const helper = { exports: {} };
-vm.runInNewContext(buildSync({ entryPoints: [fileURLToPath(new URL('../src/添付ファイル/ファイル送信.js', import.meta.url))], bundle: true, write: false, format: 'cjs' }).outputFiles[0].text, { module: helper, btoa, atob, Uint8Array });
-const source = readFileSync(new URL('../src/コード/コードパネル.vue', import.meta.url), 'utf8');
+vm.runInNewContext(buildSync({ entryPoints: [fileURLToPath(new URL('../src/components/添付ファイル/ファイル送信.js', import.meta.url))], bundle: true, write: false, format: 'cjs' }).outputFiles[0].text, { module: helper, btoa, atob, Uint8Array });
+const source = readFileSync(new URL('../src/components/コード/コードパネル.vue', import.meta.url), 'utf8');
 const file = (name = '画像.png', body = 'image') => ({ name, size: Buffer.byteLength(body), arrayBuffer: async () => Uint8Array.from(Buffer.from(body)).buffer });
 const flush = async () => { for (let i = 0; i < 25; i++) await Promise.resolve(); };
 function fixture(host = false) {
@@ -28,7 +28,7 @@ function fixture(host = false) {
     '../添付ファイル/ファイル送信.js': helper.exports,
     '../コード/会話到着演出': { chatArrival: () => ({ reset: no, dispose: no, show: no }) },
     '../下書き連携/下書き受け渡し.js': { createDraftReceiver: () => ({ publish: no, dispose: no }) },
-    '../../host/src/stream-control': { visibleStreamContent: text => text },
+    '../../../host/src/stream-control': { visibleStreamContent: text => text },
   };
   vm.runInNewContext(transformSync(`${script.content}\n${template.code}\ncomponent.render=render;module.exports=component;`, { format: 'cjs' }).code, {
     module, URL, console, location: { href: 'http://localhost/code/' }, crypto, setTimeout, clearTimeout,
@@ -82,7 +82,7 @@ test('Code添付: offline・実行中・不正/過大ファイルを拒否、通
 test('Code添付transport: 拡張応答を相関し、拒否・タイムアウト・破棄を処理して自動再送しない', async () => {
   const sent = [], timers = new Map(); let listener, timerId = 0;
   const module = { exports: {} };
-  vm.runInNewContext(transformSync(readFileSync(new URL('../src/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, {
+  vm.runInNewContext(transformSync(readFileSync(new URL('../src/components/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, {
     module, crypto, setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
     window: { addEventListener: (_type, fn) => { listener = fn; }, removeEventListener() {} },
   });
@@ -100,7 +100,7 @@ test('Code添付transport: 拡張応答を相関し、拒否・タイムアウ�
 test('Code添付transport: 単独HTTPの30秒期限・画面破棄は残りを止め、受理状況不明として案内する', async () => {
   const timers = new Map(), requests = []; let timerId = 0;
   const module = { exports: {} };
-  vm.runInNewContext(transformSync(readFileSync(new URL('../src/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, {
+  vm.runInNewContext(transformSync(readFileSync(new URL('../src/components/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, {
     module, URL, AbortController, location: { href: 'http://localhost/code/' }, window: { removeEventListener() {} },
     setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
     fetch: (_url, options) => new Promise((_resolve, reject) => { requests.push(options); options.signal.addEventListener('abort', () => reject(Error('aborted'))); }),

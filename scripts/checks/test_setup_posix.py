@@ -20,6 +20,7 @@ import urllib.request  # Linux 上で darwin 分岐を模擬する前に標準�
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 
 def load(path):
@@ -139,7 +140,8 @@ class PosixPathTests(unittest.TestCase):
             process.assert_not_called()
         self.assertEqual(events, ['backend_diag', 'frontend_avatar', 'command_hermes', 'frontend_ide/aidiy_console',
                                   'frontend_ide/host', 'frontend_ide/viewer', 'frontend_ide/aidiy_task',
-                                  'frontend_ide/aidiy_team', 'frontend_ide/aidiy_browser', 'frontend_channels'])
+                                  'frontend_ide/aidiy_team', 'frontend_ide/aidiy_browser', 'frontend_channels',
+                                  'frontend_channels/slack'])
 
     def test_root_repair_flag_does_not_enter_normal_setup(self):
         root = load(ROOT / '_setup.py')

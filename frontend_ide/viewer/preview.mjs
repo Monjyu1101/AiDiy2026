@@ -13,7 +13,7 @@
 // - 最初のプレビュー要求で起動し、IDE のサーバーを閉じる時に一緒に止める。ファイルは一切書き出さない（ゴミを残さない）。
 // - URL には起動ごとの合言葉（推測できない token）を入れ、IDE が渡した URL からだけ読めるようにする。
 // - 鍵・設定・依存物・隠しファイルは配らない。HTML にはサンドボックスの CSP を付ける（iframe 側でも sandbox を付ける）。
-import {viewerActivityScript} from '../src/ファイル閲覧/閲覧待機.js';
+import {viewerActivityScript} from '../src/components/ファイル閲覧/閲覧待機.js';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { open, realpath, stat, readFile } from 'node:fs/promises';

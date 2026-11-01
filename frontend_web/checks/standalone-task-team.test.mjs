@@ -46,7 +46,7 @@ test('Webの既存ルートimportは存在し、独立版・共通バックエ�
       await access(path.resolve(web, 'src/router', match[1]));
     }
   }
-  for (const app of ['frontend_ide/src/タスクチーム', 'frontend_avatar/src/AiDiy.vue', 'frontend_avatar/src/components/AIコア.vue', 'backend_taskteam/taskteam_main.py']) {
+  for (const app of ['frontend_ide/src/components/タスクチーム', 'frontend_avatar/src/AiDiy.vue', 'frontend_avatar/src/components/AIコア.vue', 'backend_taskteam/taskteam_main.py']) {
     await access(path.resolve(web, '..', app));
   }
 });

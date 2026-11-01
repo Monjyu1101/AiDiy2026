@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFolderMonitor } from '../src/ファイル閲覧/フォルダ監視.js';
+import { createFolderMonitor } from '../src/components/ファイル閲覧/フォルダ監視.js';
 const flush = async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
 function harness() {
   let now=0, id=0; const tasks=new Map(), calls=[], applied=[], messages=[];

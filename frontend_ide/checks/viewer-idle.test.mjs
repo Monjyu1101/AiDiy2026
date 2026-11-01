@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
-import * as idleModule from '../src/ファイル閲覧/閲覧待機.js';
+import * as idleModule from '../src/components/ファイル閲覧/閲覧待機.js';
 const {createViewerIdle,createViewerActivity,viewerActivityScript,VIEWER_IDLE_MS}=idleModule;
 function clock(){
  let time=0,id=0,closes=0;const tasks=new Map();
@@ -50,7 +50,7 @@ const require=createRequire(import.meta.url),vue=require('vue'),{parse,compileSc
 const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
 test('実Vue session: pinBusyは同期解除、比較/再描画/子reloadで再開せず、失敗時だけ埋込へ再開',async()=>{
  const f=clock(),provided={},unmount=[],emitted=[];let pinResolve,panelOptions;
- const {descriptor}=parse(readFileSync(new URL('../src/ファイル閲覧/閲覧セッション.vue',import.meta.url),'utf8'));
+ const {descriptor}=parse(readFileSync(new URL('../src/components/ファイル閲覧/閲覧セッション.vue',import.meta.url),'utf8'));
  const {content}=compileScript(descriptor,{id:'ViewerSession',genDefaultAs:'component'});const module={exports:{}};
  vm.runInNewContext(transformSync(content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,JSON,require:id=>id==='vue'?{...vue,provide:(key,value)=>provided[key]=value,onBeforeUnmount:fn=>unmount.push(fn)}:id.endsWith('閲覧待機.js')?{createViewerIdle:options=>createViewerIdle({...f.options,...options})}:id.endsWith('パネル別窓.js')?{createPanelWindow:options=>{panelOptions=options;return{pin:()=>new Promise(resolve=>pinResolve=resolve),close(){},focus(){return true;}};}}:{}});
  const props=vue.reactive({file:{path:'a.js',name:'a.js'},root:'/project',autoSpin:true}),scope=vue.effectScope();

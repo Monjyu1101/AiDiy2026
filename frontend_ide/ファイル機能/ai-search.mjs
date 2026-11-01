@@ -8,7 +8,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createSearchHistory } from './ai-search-history.mjs';
-import { searchRouteRecords } from '../src/開発スペース/経路記録.js';
+import { searchRouteRecords } from '../src/components/開発スペース/経路記録.js';
 import { hasAlwaysExcludedDirectory } from './フォルダ除外規則.mjs';
 import { isInternalCredentialPath } from './内部認証ファイル.mjs';
 

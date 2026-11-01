@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate as flush} from 'node:timers/promises';
 import {readFile} from 'node:fs/promises';
-import {起動状態を作成} from '../ui/src/起動/起動状態.mjs';
+import {起動状態を作成} from '../ui/src/components/起動/起動状態.mjs';
 const progress=(id,kind='start',state='running',message='Tools を起動しています。')=>({実行ID:id,種別:kind,状態:state,通知:message});
 function fixture(t){
  const data={対象:[{id:'tools',名前:'Tools',状態:'未起動',設定:{起動対象:true}}],実行中:false,一括停止中:false,一括進捗:null};
@@ -57,8 +57,8 @@ test('disconnect/unmount discards pending responses; progress is available even 
  assert.equal(f.state.進捗表示.value.実行ID,'auto');assert.equal(f.state.更新失敗.value,true);
 });
 test('dialog is a nonmodal in-flow region, shared outside tabs and compact views without navigation locks',async()=>{
- const text=await readFile(new URL('../ui/src/起動/一括進捗表示.vue',import.meta.url),'utf8');
- const css=await readFile(new URL('../ui/src/起動/一括進捗表示.css',import.meta.url),'utf8');
+ const text=await readFile(new URL('../ui/src/components/起動/一括進捗表示.vue',import.meta.url),'utf8');
+ const css=await readFile(new URL('../ui/src/components/起動/一括進捗表示.css',import.meta.url),'utf8');
  const app=await readFile(new URL('../ui/src/App.vue',import.meta.url),'utf8');
  assert.match(text,/role="status" aria-live="polite"/);assert.doesNotMatch(text,/aria-modal|showModal|autofocus|\.focus\(/);
  assert.doesNotMatch(css,/position\s*:\s*(fixed|absolute)|inset\s*:\s*0/);
@@ -72,14 +72,14 @@ test('progress component renders pending, stop, hidden completion and actionable
  const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
  const {render}=require('./ui-components.cjs');
  const state={進捗表示:{value:progress('run')},更新失敗:{value:false},進捗を閉じる(){}};
- let html=await render('起動/一括進捗表示.vue',{state});
+ let html=await render('components/起動/一括進捗表示.vue',{state});
  assert.match(html,/一括起動中/);assert.match(html,/Tools を起動しています/);assert.doesNotMatch(html,/<button/);
  state.進捗表示.value=progress('stop','stop','running','Web を停止しています。');
- html=await render('起動/一括進捗表示.vue',{state,compact:true});assert.match(html,/強制停止中/);assert.match(html,/Web を停止/);
+ html=await render('components/起動/一括進捗表示.vue',{state,compact:true});assert.match(html,/強制停止中/);assert.match(html,/Web を停止/);
  state.進捗表示.value=progress('stop','stop','error','停止できませんでした。');
- html=await render('起動/一括進捗表示.vue',{state});assert.match(html,/停止できません/);assert.match(html,/進行状況を閉じる/);
+ html=await render('components/起動/一括進捗表示.vue',{state});assert.match(html,/停止できません/);assert.match(html,/進行状況を閉じる/);
  state.進捗表示.value=progress('done','start','done','起動処理が完了しました。');
- html=await render('起動/一括進捗表示.vue',{state});assert.doesNotMatch(html,/一括起動完了|閉じる|batch-progress/);
+ html=await render('components/起動/一括進捗表示.vue',{state});assert.doesNotMatch(html,/一括起動完了|閉じる|batch-progress/);
 });
 
 for(const kind of ['start','stop'])test(`${kind}: success and cancellation disappear, failure remains dismissible, next run appears`,async t=>{
@@ -129,11 +129,11 @@ test('batch stop labels distinguish force stop from ordinary individual stop',as
  const state={進捗表示:{value:progress('stop','stop')},更新失敗:{value:false},進捗を閉じる(){}};
  for(const compact of [false,true])for(const kind of ['start','stop']){
   state.進捗表示.value=progress('run',kind);
-  const html=await render('起動/一括進捗表示.vue',{state,compact});assert.ok(html.includes('<strong>'+(kind==='stop'?'強制停止中…':'一括起動中…')+'</strong>'));
+  const html=await render('components/起動/一括進捗表示.vue',{state,compact});assert.ok(html.includes('<strong>'+(kind==='stop'?'強制停止中…':'一括起動中…')+'</strong>'));
  }
  assert.ok(source('App.vue').includes("起動.一括停止中.value?'強制停止中…'"));
- assert.ok(source('起動/起動パネル.vue').includes('停止（Ctrl+C）'));
- assert.ok(source('起動/起動状態.mjs').includes("if(item)item.状態='停止中'"));
+ assert.ok(source('components/起動/起動パネル.vue').includes('停止（Ctrl+C）'));
+ assert.ok(source('components/起動/起動状態.mjs').includes("if(item)item.状態='停止中'"));
 });
 
 test('pending acceptance names the batch operation while accepted startup retains the force-stop action',async()=>{

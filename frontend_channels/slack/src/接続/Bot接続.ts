@@ -15,6 +15,8 @@ import type { Slack設定 } from './接続設定';
 import { コマンド解析, 会話キー, 利用許可, 本文エスケープ, 本文復元, 本文分割, ts比較, type Slackメッセージ } from './コマンド処理';
 import { SlackAPIエラー, Slack通信, type SlackAPI } from './ネットワーク接続';
 
+export const コマンド案内 = 'このチャンネルに、そのまま話しかけてください。AiDiy がスレッドで返信します。\nスレッド内の返信は同じ会話として続きます。\n`!stop` で停止、`!new` で会話をやり直し、`!status` で状態、`!help` で使い方を表示します。\n先頭の ! は全角の ！ でも使えます。`!chat 本文` でも会話できます。旧形式は使わず短いコマンドを入力してください。';
+
 type スレッド = { lastSeen: string; touched: number };
 export type 巡回設定 = { interval?: number; maxBackoff?: number; threadLimit?: number; threadIdleMs?: number };
 
@@ -48,6 +50,8 @@ export class SlackBot {
   private loop?: Promise<void>;
   private wake?: () => void;
   private failures = 0;
+  private 初回案内済み = false;
+  private 返信待ち: Promise<void> = Promise.resolve();
   private lastError = '';
   private 最終会話時刻 = Date.now();
   private interval: number; private maxBackoff: number; private threadLimit: number; private threadIdleMs: number;
@@ -200,14 +204,14 @@ export class SlackBot {
   }
 
   private async メッセージ処理(content: string, root: string) {
-    const command = コマンド解析(content, '!aidiy', this.botUserId);
+    const command = コマンド解析(content, '!', this.botUserId);
     if (!command) return;
     const key = 会話キー(this.config.teamId, this.config.channelId, root);
-    const reply = (text: string) => this.投稿(root, text);
+    const reply = (text: string) => this.回答送信(root, text);
     try {
       switch (command.name) {
         case 'help':
-          await reply('このチャンネルに、そのまま話しかけてください。AiDiy がスレッドで返信します。\nスレッド内の返信は同じ会話として続きます。\n`!aidiy stop` で停止、`!aidiy new` で会話をやり直し、`!aidiy status` で状態を確認できます。'); return;
+          await reply(コマンド案内); return;
         case 'status': await reply(`Code: ${this.code.実行中(key) ? '実行中' : '待機中'}`); return;
         case 'stop': {
           const pending = this.chatState.get(key);
@@ -259,7 +263,28 @@ export class SlackBot {
   }
 
   private async 回答送信(root: string, text: string, placeholder?: string) {
+    if (this.closing) return;
+    if (this.初回案内済み) return this.回答本文送信(root, text, placeholder);
+    // 仮の「考えています…」は更新で消えるため対象外。確定返信を直列化し、
+    // 初回案内を含む全チャンクが送れた時だけ消費する（失敗時は次の返信へ）。
+    const pending = this.返信待ち.catch(() => {}).then(async () => {
+      if (this.closing) return;
+      const firstReply = !this.初回案内済み;
+      await this.回答本文送信(root, text, placeholder, firstReply && text !== コマンド案内);
+      if (firstReply) this.初回案内済み = true;
+    });
+    this.返信待ち = pending;
+    await pending;
+  }
+
+  private async 回答本文送信(root: string, text: string, placeholder?: string, appendHelp = false) {
     const parts = 本文分割(text);
+    if (appendHelp) {
+      const suffix = `\n\n${コマンド案内}`;
+      // help 自体をチャンク境界で割らず、末尾チャンクの成功で消費を確定する。
+      if (parts.length && parts.at(-1)!.length + suffix.length <= 3500) parts[parts.length - 1] += suffix;
+      else parts.push(suffix);
+    }
     let first = parts.shift() ?? '';
     if (placeholder) {
       try { await this.api('chat.update', { channel: this.config.channelId, ts: placeholder, text: 本文エスケープ(first) }); first = ''; }

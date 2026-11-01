@@ -56,13 +56,13 @@ test('normal and mini render only configured channel entries in Discord then Sla
   await f.write(Object.fromEntries(enabled.map(id=>[`${id}_bot_token`,'fixture-token'])));
   const data=await f.manager.catalog(),state={項目:ref(data.対象),フォルダ:ref('/work'),処理中:ref(''),選択中:ref(false),通知:ref(''),結果:ref({}),一覧:ref(null),利用可能:()=>false,不可理由:()=>'',読込(){},起動(){assert.fail('render must not launch');}};
   for(const name of ['アプリ起動パネル.vue','ミニアプリ起動.vue']){
-   const html=await render('アプリ起動/'+name,{state,online:true});
+   const html=await render('components/アプリ起動/'+name,{state,online:true});
    for(const id of ['discord','slack'])assert.equal(html.includes(`data-app="${id}"`),enabled.includes(id));
    if(enabled.length===2)assert.ok(html.indexOf('data-app="discord"')<html.indexOf('data-app="slack"'));
   }
  }
  // 円形も同じサーバーカタログを整列して使い、独自の固定Discord/Slack項目は持たない。
- const micro=await readFile(new URL('../ui/src/アプリ起動/マイクロランチャー.vue',import.meta.url),'utf8');
+ const micro=await readFile(new URL('../ui/src/components/アプリ起動/マイクロランチャー.vue',import.meta.url),'utf8');
  assert.match(micro,/起動項目を整列\(\[\.\.\.props\.appState\.項目\.value\.map/);
 });
 

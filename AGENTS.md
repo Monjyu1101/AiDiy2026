@@ -26,7 +26,7 @@ AI エージェントは、本書に個別手順や一時的な作業メモを�
 | frontend_ide / Console・Code・Live・IDE の Vue 共通画面 | [`_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md`](./_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md) |
 | backend_diag / 環境診断 | [`_AIDIY/knowledge/backend_diag,環境診断運用.md`](./_AIDIY/knowledge/backend_diag,環境診断運用.md) |
 | frontend_ide/host / VS Code 拡張（Code / Live） | [`_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md`](./_AIDIY/knowledge/frontend_ide,VSCodeチャット拡張変更手順.md) |
-| frontend_channels / Discord（Code / Live）・Slack（Code、双子） | [`_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md`](./_AIDIY/knowledge/frontend_discord,Discord接続変更手順.md) |
+| frontend_channels / Discord（Code / Live）・Slack（Code、双子） | [`_AIDIY/knowledge/frontend_channels,Discord接続変更手順.md`](./_AIDIY/knowledge/frontend_channels,Discord接続変更手順.md) |
 | AI コア / Code CLI / MCP | [`_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./_AIDIY/knowledge/backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./_AIDIY/knowledge/backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md`](./_AIDIY/knowledge/backend_server,backend_tools,MCP活用手順.md) |
 | command_hermes Provider / Slash Command | [`_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md`](./_AIDIY/knowledge/command_hermes,Provider一覧と選択ロジック.md)、[`_AIDIY/knowledge/command_hermes,Slash Command一覧.md`](./_AIDIY/knowledge/command_hermes,Slash Command一覧.md) |
 | GitHub issue 運用 | [`_AIDIY/knowledge/共通,GitHubIssue運用手順.md`](./_AIDIY/knowledge/共通,GitHubIssue運用手順.md) |
@@ -312,7 +312,7 @@ frontend_avatar は Electron デスクトップアプリと通常 Web ブラウ�
 
 ## frontend_ide / viewer 概要
 
-AiDiy IDE の中心となる画面は `frontend_ide/src/開発スペース/` が所有し、`frontend_ide/viewer` はファイルAPI・Office表示を担当します。AiDiy の**開発スペース**（宇宙をテーマにした IDE 開発環境）は、作業フォルダを眺め、探し、中身を読むための開発用 UI です。目指すのは「ソースをほぼ触らない IDE」で、人は宇宙で全体を眺め、エクスプローラーで辿り、ビューアで読み、変更は部品として呼び出す Code / Live を通じて AI に任せます。
+AiDiy IDE の中心となる画面は `frontend_ide/src/components/開発スペース/` が所有し、`frontend_ide/viewer` はファイルAPI・Office表示を担当します。AiDiy の**開発スペース**（宇宙をテーマにした IDE 開発環境）は、作業フォルダを眺め、探し、中身を読むための開発用 UI です。目指すのは「ソースをほぼ触らない IDE」で、人は宇宙で全体を眺め、エクスプローラーで辿り、ビューアで読み、変更は部品として呼び出す Code / Live を通じて AI に任せます。
 
 - フォルダを銀河、ファイルを星・惑星として1階層ずつ表示する。
 - 左上のバーガーボタンで左側のエクスプローラーを開閉し、右側でコード・画像・フォルダ内容を表示する。
@@ -383,6 +383,6 @@ docs と実装が食い違う場合は、現行実装を確認したうえで「
 
 ## Vue共通画面
 
-現行のConsole / Code / Live / IDE / Task / Team / Browserの画面は `frontend_ide` のVue部品を使用します。VS Code拡張はCode / Liveのみ、単独実行は7種類です。エクスプローラーは `frontend_ide/src/ファイル閲覧/ファイル一覧.vue` に集約し、選択と検索マークを宇宙表示へ通知します。既存の `frontend_ide/host` は拡張ホスト・Code/Hermes・Live音声基盤、`frontend_ide/viewer` はファイルAPI・Office表示資産を提供します。旧起動入口からもVue版へ進みます。詳細は `frontend_ide/AGENTS.md` と `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。
+現行のConsole / Code / Live / IDE / Task / Team / Browserの画面は `frontend_ide` のVue部品を使用します。VS Code拡張はCode / Liveのみ、単独実行は7種類です。エクスプローラーは `frontend_ide/src/components/ファイル閲覧/ファイル一覧.vue` に集約し、選択と検索マークを宇宙表示へ通知します。既存の `frontend_ide/host` は拡張ホスト・Code/Hermes・Live音声基盤、`frontend_ide/viewer` はファイルAPI・Office表示資産を提供します。旧起動入口からもVue版へ進みます。詳細は `frontend_ide/AGENTS.md` と `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。
 
 Diag / Code / Live / Console / IDE / Discord / Slack の独自実装は、日本語の機能名で配置し、共通処理は所有元から再利用します。`src`・`checks`・`scripts`・`dist` などの規約名、公開起動入口、配布URL、IPC/API・保存キーは互換性のため維持します。画面の所有元は Diag が `backend_diag/ui/src`、Code / Live / Console / IDE が `frontend_ide/src`、Discord が `frontend_channels/panel`、Slack が `frontend_channels/slack/panel` です。

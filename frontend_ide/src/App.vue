@@ -5,21 +5,21 @@ See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup>
 import { ref, reactive, computed, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { installWindowMove } from './共通表示/長押し窓移動.js';
-import CodePanel from './コード/コードパネル.vue';
-import ConsolePanel from './ターミナル/ターミナルパネル.vue';
-import LivePanel from './ライブ/ライブパネル.vue';
-import SpaceView from './開発スペース/開発スペース.vue';
-import StatusBar from './共通表示/状態バー.vue';
-import TerminalWelcome from './ターミナル/開始表示.vue';
-import ViewerWindow from './ファイル閲覧/閲覧ウィンドウ.vue';
-import BrowserPanel from './ブラウザ/ブラウザパネル.vue';
-import {openBrowser} from './ブラウザ/起動.js';
-import FileAnalysisDialog from './ファイル検索/ファイル解析ダイアログ.vue';
-import FileHistoryDialog from './ファイル検索/ファイル履歴ダイアログ.vue';
-import DraftHandoffDialog from './下書き連携/下書き連携ダイアログ.vue';
-import { validConnectionState } from './共通表示/接続状態.js';
-import { createDraftTargetRegistry } from './下書き連携/連携先登録.js';
+import { installWindowMove } from './components/共通表示/長押し窓移動.js';
+import CodePanel from './components/コード/コードパネル.vue';
+import ConsolePanel from './components/ターミナル/ターミナルパネル.vue';
+import LivePanel from './components/ライブ/ライブパネル.vue';
+import SpaceView from './components/開発スペース/開発スペース.vue';
+import StatusBar from './components/共通表示/状態バー.vue';
+import TerminalWelcome from './components/ターミナル/開始表示.vue';
+import ViewerWindow from './components/ファイル閲覧/閲覧ウィンドウ.vue';
+import BrowserPanel from './components/ブラウザ/ブラウザパネル.vue';
+import {openBrowser} from './components/ブラウザ/起動.js';
+import FileAnalysisDialog from './dialog/ファイル解析ダイアログ.vue';
+import FileHistoryDialog from './dialog/ファイル履歴ダイアログ.vue';
+import DraftHandoffDialog from './dialog/下書き連携ダイアログ.vue';
+import { validConnectionState } from './components/共通表示/接続状態.js';
+import { createDraftTargetRegistry } from './components/下書き連携/連携先登録.js';
 const analysis=ref(null);
 const history=ref(null),draftRequest=ref(null),codePanel=ref(),livePanel=ref();
 const draftRegistry=createDraftTargetRegistry(),pinnedViewers=new Map();

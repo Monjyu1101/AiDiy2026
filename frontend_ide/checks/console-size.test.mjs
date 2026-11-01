@@ -4,16 +4,16 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
-import * as cliTitles from '../src/ターミナル/CLIタイトル.js';
-import * as keyboard from '../src/ターミナル/キー入力.js';
+import * as cliTitles from '../src/components/ターミナル/CLIタイトル.js';
+import * as keyboard from '../src/components/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import * as completion from '../src/ターミナル/コマンド補完.js';
+import * as completion from '../src/components/ターミナル/コマンド補完.js';
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileStyle}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
-const {descriptor}=parse(readFileSync(new URL('../src/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8'));
+const {descriptor}=parse(readFileSync(new URL('../src/components/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8'));
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 
 // 実Vueのsetupと実FitAddonを通す。文字セルの測定・描画・WebSocketだけを代替する。
@@ -140,7 +140,7 @@ test('Console入力: 修飾EnterはWebSocketへ一度だけ送信し、Ctrl+Cは
 
 
 test('Console welcome: styles target the current console kind', () => {
- const css = readFileSync(new URL('../src/共通表示/会話表示.css', import.meta.url), 'utf8');
+ const css = readFileSync(new URL('../src/components/共通表示/会話表示.css', import.meta.url), 'utf8');
  assert.match(css, /\.terminal-welcome\.console h1/);
  assert.doesNotMatch(css, /\.terminal-welcome\.term[ .{]/);
 });

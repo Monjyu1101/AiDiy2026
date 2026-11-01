@@ -15,17 +15,21 @@ import type { Discord設定 } from './接続設定';
 export type コマンド = { name: 'chat' | 'live' | 'leave' | 'stop' | 'new' | 'status' | 'help'; text: string };
 export const メンション禁止 = { parse: [] as ('users' | 'roles' | 'everyone')[], repliedUser: false };
 
-export function コマンド解析(content: string, prefix: string, botId: string): コマンド | undefined {
-  const triggers = [prefix, `<@${botId}>`, `<@!${botId}>`];
-  const trigger = triggers.find(value => content === value || content.startsWith(`${value} `) || content.startsWith(`${value}\n`));
-  // 設定した利用者の通常投稿を、そのままチャットとして受け付ける。
-  if (!trigger) return content.trim() ? { name: 'chat', text: content.trim() } : undefined;
-  const body = content.slice(trigger.length).trim();
+export function コマンド解析(content: string, _prefix: string, botId: string): コマンド | undefined {
+  // 先頭の空白は除去しない。文中や空白の後の ! は通常の文章。
+  const bang = /^[!！]/.test(content);
+  // Bot メンションは通常チャットの宛先だけ。旧コマンド経路は持たない。
+  const trigger = [`<@${botId}>`, `<@!${botId}>`].find(value => content === value || content.startsWith(`${value} `) || content.startsWith(`${value}\n`));
+  if (!bang) {
+    const text = (trigger ? content.slice(trigger.length) : content).trim();
+    return text ? { name: 'chat', text } : undefined;
+  }
+  const body = content.slice(1).trim();
   if (!body) return { name: 'help', text: '' };
   const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(body)!;
   const name = match[1].toLowerCase();
   if (['chat', 'live', 'leave', 'stop', 'new', 'status', 'help'].includes(name)) return { name: name as コマンド['name'], text: (match[2] || '').trim() };
-  return { name: 'chat', text: body };
+  return bang ? { name: 'help', text: '' } : { name: 'chat', text: body };
 }
 
 export function 利用許可(config: Discord設定, guildId: string | null, channelId: string, userId: string, bot = false): boolean {

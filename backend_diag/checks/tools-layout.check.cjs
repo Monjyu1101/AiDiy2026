@@ -5,15 +5,15 @@ const {createRequire}=require('node:module'),req=createRequire(path.join(__dirna
 const {source,component,dependency,render}=require('./ui-components.cjs');
 const {parse:parseCss}=req('postcss'),{parse,compileScript}=req('@vue/compiler-sfc'),{transformSync}=req('esbuild');
 const vue=req('vue'),{renderToString}=req('@vue/server-renderer');
-const css=parseCss(source('Tools/Tools.css'));
+const css=parseCss(source('components/Tools/Tools.css'));
 function rule(selector,media){let found;css.walkRules(node=>{if(node.selector===selector&&(media?node.parent.params===media:node.parent.type==='root'))found=node;});assert.ok(found,selector);return found;}
 function declarations(selector,media){return Object.fromEntries(rule(selector,media).nodes.filter(n=>n.type==='decl').map(n=>[n.prop,n.value]));}
 const rows=[{id:'aidiy_chrome_devtools',label:'Chrome',enabled:true,available:true,status:'OK',defaultsKey:null},{id:'aidiy_text_to_speech',label:'Speech',enabled:true,available:true,status:'OK',defaultsKey:'text_to_speech'}];
 async function authenticated(selected=rows[0],extraRows=[],busy=false){
- const state=dependency('Tools/Tools状態.mjs').Tools状態を作成({api:()=>assert.fail('SSRからAPIを呼ばない'),代表テスト:dependency('Tools/Tools代表テスト.mjs').Tools代表テスト});
+ const state=dependency('components/Tools/Tools状態.mjs').Tools状態を作成({api:()=>assert.fail('SSRからAPIを呼ばない'),代表テスト:dependency('components/Tools/Tools代表テスト.mjs').Tools代表テスト});
  state.認証済み.value=true;state.処理中.value=busy?'test':'';state.項目.value=selected?[selected,...extraRows]:[];state.選択ID.value=selected?.id||'';state.編集値.value={text_to_speech:{auto_provider:'edge'}};state.schema.value={text_to_speech:{auto_provider:['edge','openai']}};
- const module={exports:{}};const compiled=compileScript(parse(source('Tools/Toolsパネル.vue')).descriptor,{id:'tools-layout',inlineTemplate:true});
- vm.runInNewContext(transformSync(compiled.content,{format:'cjs',loader:'js'}).code,{module,exports:module.exports,require:id=>id==='vue'?vue:id.endsWith('Tools状態.mjs')?{Tools状態を作成:()=>state}:id.endsWith('Tools代表テスト.mjs')?dependency('Tools/Tools代表テスト.mjs'):id.endsWith('.vue')?component('共通表示/状態バッジ.vue'):{}});
+ const module={exports:{}};const compiled=compileScript(parse(source('components/Tools/Toolsパネル.vue')).descriptor,{id:'tools-layout',inlineTemplate:true});
+ vm.runInNewContext(transformSync(compiled.content,{format:'cjs',loader:'js'}).code,{module,exports:module.exports,require:id=>id==='vue'?vue:id.endsWith('Tools状態.mjs')?{Tools状態を作成:()=>state}:id.endsWith('Tools代表テスト.mjs')?dependency('components/Tools/Tools代表テスト.mjs'):id.endsWith('.vue')?component('components/共通表示/状態バッジ.vue'):{}});
  const html=await renderToString(vue.createSSRApp({render:()=>vue.h(module.exports.default,{connected:true,coreOnline:true,toolsOnline:true,visible:true})}));state.終了();return html;
 }
 test('Tools本文は共通flex:noneを明示上書きし、残り高だけを各ペインへ渡す',()=>{
@@ -21,7 +21,7 @@ test('Tools本文は共通flex:noneを明示上書きし、残り高だけを各
  assert.equal(declarations('.tools-scroll.tools-authenticated').overflow,'hidden');
  const columns=declarations('.tools-columns');assert.equal(columns.flex,'1 1 auto');assert.equal(columns['min-height'],'0');assert.equal(columns['grid-template-rows'],'minmax(0,1fr)');assert.equal(columns.overflow,'hidden');
  const panes=declarations('.tools-list,.tools-detail');assert.equal(panes['min-height'],'0');assert.equal(panes.overflow,'auto');assert.equal(panes['overscroll-behavior'],'contain');
- assert.doesNotMatch(source('Tools/Tools.css'),/height:calc\([^)]*100(?:d?vh)/,'タイトルや折返しタブの高さを固定値で差し引かない');
+ assert.doesNotMatch(source('components/Tools/Tools.css'),/height:calc\([^)]*100(?:d?vh)/,'タイトルや折返しタブの高さを固定値で差し引かない');
 });
 test('701px以上はAIモデルと同じ左右、狭幅でも一覧40%と右内容の高さを別確保',()=>{
  let columns;css.nodes.filter(n=>n.type==='rule'&&n.selector==='.tools-columns').forEach(n=>columns=Object.fromEntries(n.nodes.map(v=>[v.prop,v.value])));
@@ -54,13 +54,13 @@ test('生成系の軽量試験は説明APIだけと表示し、Chrome専用のhe
 test('一括テストは認証後の見出し右側に置き、対象なしでは無効',async()=>{
  const html=await authenticated();assert.match(html,/<div class="panel-actions"><button[^>]*tools-batch-test/);assert.match(html,/>一括テスト<\/button>/);
  assert.match(await authenticated(null),/tools-batch-test" disabled/);
- const guest=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true});assert.doesNotMatch(guest,/tools-batch-test/);
+ const guest=await render('components/Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true});assert.doesNotMatch(guest,/tools-batch-test/);
 });
 test('未認証のログイン領域も内部スクロールに入れ、一覧・右ペインは認証後だけ',async()=>{
- const html=await render('Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true,visible:true});assert.match(html,/class="tools-scroll"/);assert.match(html,/class="tools-auth"/);assert.match(html,/Coreへログイン/);assert.doesNotMatch(html,/class="tools-columns"|aria-label="テスト結果"/);
+ const html=await render('components/Tools/Toolsパネル.vue',{connected:true,coreOnline:true,toolsOnline:true,visible:true});assert.match(html,/class="tools-scroll"/);assert.match(html,/class="tools-auth"/);assert.match(html,/Coreへログイン/);assert.doesNotMatch(html,/class="tools-columns"|aria-label="テスト結果"/);
 });
 test('Toolを選び直すと右だけ先頭へ戻し、長い一覧の位置と状態処理を変えない',()=>{
- const panel=source('Tools/Toolsパネル.vue');assert.match(panel,/watch\(\(\)=>current.value\?\.id,async\(\)=>\{await nextTick\(\);if\(detailPane.value\)detailPane.value.scrollTop=0;/);assert.match(panel,/ref="detailPane" class="tools-detail"/);assert.doesNotMatch(panel,/scrollIntoView|window.scroll|scrollTop\s*=\s*(?!0)/);
+ const panel=source('components/Tools/Toolsパネル.vue');assert.match(panel,/watch\(\(\)=>current.value\?\.id,async\(\)=>\{await nextTick\(\);if\(detailPane.value\)detailPane.value.scrollTop=0;/);assert.match(panel,/ref="detailPane" class="tools-detail"/);assert.doesNotMatch(panel,/scrollIntoView|window.scroll|scrollTop\s*=\s*(?!0)/);
 });
 
 test('Backupの条件は初期batch ON、実保存と受付だけのOKを個別・一括で明記',async()=>{

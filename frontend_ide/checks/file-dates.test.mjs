@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {fileDateInfo,nextLocalMidnight} from '../src/ファイル閲覧/ファイル日時.js';
+import {fileDateInfo,nextLocalMidnight} from '../src/components/ファイル閲覧/ファイル日時.js';
 test('日時: 無効値は例外を出さず、元日時と時刻を保持する',()=>{
  for(const value of [null,undefined,NaN,Infinity,'invalid',1e20])assert.deepEqual(fileDateInfo(value),{text:'—',today:false,iso:undefined,title:'更新日時不明'});
  const now=new Date(2026,9,16,12).getTime(), result=fileDateInfo(now,now);
@@ -15,7 +15,7 @@ test('日時: 無効値は例外を出さず、元日時と時刻を保持する
  assert.equal(new Date(nextLocalMidnight(now)).getHours(),0);
 });
 for(const zone of ['UTC','Asia/Tokyo','America/New_York'])test(`日時: ${zone} の深夜・年跨ぎ・UTC境界`,()=>{
- const module=new URL('../src/ファイル閲覧/ファイル日時.js',import.meta.url).href;
+ const module=new URL('../src/components/ファイル閲覧/ファイル日時.js',import.meta.url).href;
  const code=`import {fileDateInfo,nextLocalMidnight} from ${JSON.stringify(module)};
  const now=new Date(2026,0,1,0,1).getTime(), previous=new Date(2025,11,31,23,59).getTime();
  const boundary=Date.parse('2026-10-15T15:05:00Z'), file=Date.parse('2026-10-15T14:55:00Z');
@@ -26,7 +26,7 @@ for(const zone of ['UTC','Asia/Tokyo','America/New_York'])test(`日時: ${zone} 
 
 // 同じ本番関数を各TZの子プロセスで実行し、UTCへの読み替えと24時間固定を検出する。
 for(const zone of ['UTC','Asia/Tokyo','America/New_York'])test(`時刻プリセット: ${zone} の境界・日跨ぎ・夏時間`,()=>{
- const module=new URL('../src/ファイル閲覧/ファイル日時.js',import.meta.url).href;
+ const module=new URL('../src/components/ファイル閲覧/ファイル日時.js',import.meta.url).href;
  const code=`import assert from 'node:assert/strict';
  import {timeSearchPresets,timeSearchRange,inTimeRange,localDateTimeInput,parseLocalDateTime} from ${JSON.stringify(module)};
  assert.deepEqual(timeSearchPresets.map(([,label])=>label),['起動','15分','1時間','2時間','午前','今日','午後','解除']);

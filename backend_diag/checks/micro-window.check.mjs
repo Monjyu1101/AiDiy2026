@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import micro from '../起動/マイクロ表示.cjs';
 import pinModule from '../../frontend_ide/デスクトップ/最前面ピン.cjs';
-import layout from '../ui/src/アプリ起動/円周配置.cjs';
+import layout from '../ui/src/components/アプリ起動/円周配置.cjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 test('有効数に応じて最小半径80から広げ、回転中も40px画像同士が重ならない',()=>{
  let previous=0;

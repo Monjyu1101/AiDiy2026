@@ -20,7 +20,7 @@ function fixture(kind='viewer',target=()=>Promise.resolve(1),arm=()=>Promise.res
  const record={kind,window};
  const realController=realDrag?codeDrag.createCodeDrag({trustedEvent:()=>null,screen:{getCursorScreenPoint:()=>({...cursor})},setTimer:fn=>{leases.set(++serial,fn);return serial;},clearTimer:id=>leases.delete(id)}):null;
  const dispose=nativeMove.installNativeWindowMove({record,screen:{getCursorScreenPoint:()=>({...cursor})},drag:realController||{forRecord:r=>{assert.equal(r,record);return{begin:()=>{calls.push(['begin']);return'token';},move:()=>{calls.push(['move']);return true;},end:()=>calls.push(['end'])};}},setTimer:(fn,delay)=>{assert.equal(delay,500);timers.set(++serial,{fn,at:time+delay});return serial;},clearTimer:id=>timers.delete(id),setTick:fn=>{ticks.set(++serial,fn);return serial;},clearTick:id=>ticks.delete(id)});
- return{emit,contents,window,timers,ticks,inputs,calls,sent,queries,positions,leases,dispose,advance:async(ms=500)=>{time+=ms;for(const [id,timer]of [...timers])if(timer.at<=time){timers.delete(id);timer.fn();}for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
+ return{record,emit,contents,window,timers,ticks,inputs,calls,sent,queries,positions,leases,dispose,advance:async(ms=500)=>{time+=ms;for(const [id,timer]of [...timers])if(timer.at<=time){timers.delete(id);timer.fn();}for(let i=0;i<12;i++)await Promise.resolve();},cursor:value=>cursor=value};
 }
 test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止gestureだけを移動',async()=>{
  for(const kind of ['explorer','panel-routes']){
@@ -31,8 +31,8 @@ test('Explorer・軌跡: 499msでは通常入力のまま、500msで同じ静止
   assert.notEqual(f.emit('mouseUp').prevented,true);assert.ok(f.calls.some(call=>call[0]==='end'));assert.equal(f.ticks.size,0);f.dispose();
  }
 });
-test('Discord・Slackは実共有controllerまで通り、長押し移動・解放・再操作・blurを保つ',async()=>{
- for(const kind of ['discord','slack']){
+test('Discord・Slack・Task・Teamは実共有controllerまで通り、長押し移動・解放・再操作・blurを保つ',async()=>{
+ for(const kind of ['discord','slack','task','team']){
   const f=fixture(kind,undefined,undefined,true);
   f.emit('mouseDown');await f.advance(499);assert.equal(f.ticks.size,0,kind);
   await f.advance(1);assert.equal(f.ticks.size,1,kind);assert.equal(f.leases.size,1,kind);
@@ -45,20 +45,20 @@ test('Discord・Slackは実共有controllerまで通り、長押し移動・解�
  }
 });
 test('全パネル: nativeのdown/upを直ちに一度だけ渡し、短押しを再送しない',async()=>{
- for(const kind of ['ide','code','live','console','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord','slack']){
+ for(const kind of ['ide','code','live','console','browser','viewer','explorer','panel-viewer','panel-routes','diag','avatar','discord','slack','task','team']){
   const f=fixture(kind);assert.notEqual(f.emit('mouseDown').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown']);assert.equal(f.calls.length,0);
   assert.notEqual(f.emit('mouseUp').prevented,true);await f.advance();assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.equal(f.timers.size,0);assert.deepEqual(f.sent,[]);assert.deepEqual(f.calls,[]);f.dispose();
  }
 });
 test('背景の長押しだけ移動し、移動後もnative upを渡して次のクリックを妨げない',async()=>{
- for(const kind of ['browser','diag','avatar','discord','slack']){
+ for(const kind of ['browser','diag','avatar','discord','slack','task','team']){
  const f=fixture(kind);f.emit('mouseDown');f.emit('mouseMove');await f.advance();assert.deepEqual(f.calls,[['begin']]);
  f.cursor({x:-300,y:70});f.emit('mouseMove');assert.ok(f.calls.some(c=>c[0]==='move'));assert.notEqual(f.emit('mouseUp').prevented,true);assert.equal(f.inputs.filter(i=>i.type==='mouseDown').length,1);assert.equal(f.inputs.filter(i=>i.type==='mouseUp').length,1);f.inputs.length=0;assert.equal(f.ticks.size,0);
  f.emit('mouseDown');f.emit('mouseUp');assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);f.dispose();
  }
 });
 test('操作部品では長押しでもnative入力を遮断・再送せず、移動を開始しない',async()=>{
- for(const kind of ['code','live','diag','avatar','discord','slack']){
+ for(const kind of ['code','live','diag','avatar','discord','slack','task','team']){
   const f=fixture(kind,async()=>false);assert.notEqual(f.emit('mouseDown').prevented,true);await f.advance();
   assert.notEqual(f.emit('mouseUp').prevented,true);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);assert.deepEqual(f.sent,[]);assert.deepEqual(f.calls,[]);assert.equal(f.timers.size,0);f.dispose();
  }
@@ -217,3 +217,37 @@ test('navigation後に同じ連番になっても古いdocument ownerではarm�
 test('隔離world APIが使えない場合でも取り付け・再読込を失敗させず通常入力を渡す',async()=>{
  const f=fixture();delete f.contents.executeJavaScriptInIsolatedWorld;assert.doesNotThrow(()=>f.contents.emit('dom-ready'));f.emit('mouseDown');await f.advance();f.emit('mouseUp');assert.deepEqual(f.calls,[]);assert.deepEqual(f.inputs.map(i=>i.type),['mouseDown','mouseUp']);f.dispose();
 });
+
+for (const kind of ['task','team']) {
+ test(`${kind}: 実共有controllerで500ms移動し、解放・再操作・取消時に回収する`,async()=>{
+  for (const view of kind==='task'?['request','flow','detail','dialog']:['combined']) {
+   const f=fixture(kind,undefined,undefined,true);f.record.taskView=view;
+   try {
+    const down=f.emit('mouseDown');await f.advance(499);
+    assert.notEqual(down.prevented,true);assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);
+    await f.advance(1);assert.equal(f.ticks.size,1,view);assert.equal(f.leases.size,1,view);
+    f.cursor({x:130,y:120});assert.equal(f.emit('mouseMove').prevented,true);
+    assert.deepEqual(f.positions.at(-1),{x:80,y:80,width:400,height:300});
+    assert.notEqual(f.emit('mouseUp').prevented,true);assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);
+    // 同じ窓で再開し、Esc / blur / スクロール / 遷移 / renderer終了を各回で回収する。
+    for (const cancel of [f=>f.contents.emit('before-input-event',{preventDefault(){}},{key:'Escape'}),f=>f.window.emit('blur'),f=>f.emit('mouseWheel'),f=>f.contents.emit('did-start-navigation',{},'about:blank',false,true),f=>f.contents.emit('render-process-gone')]) {
+     f.emit('mouseDown');await f.advance();assert.equal(f.ticks.size,1);assert.equal(f.leases.size,1);
+     cancel(f);assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);
+     assert.notEqual(f.emit('mouseUp').prevented,true);
+    }
+    f.emit('mouseDown');await f.advance();f.window.emit('closed');
+    assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);assert.equal(f.contents.listenerCount('before-mouse-event'),0);
+   } finally { f.dispose(); }
+  }
+ });
+ test(`${kind}: 早い解放・選択移動・wheel・遅いDOM結果で移動を開始しない`,async()=>{
+  for (const cancel of [f=>f.emit('mouseUp'),f=>{f.cursor({x:101,y:100});f.emit('mouseMove');},f=>f.emit('mouseWheel'),f=>f.window.emit('blur')]) {
+   const pending=deferred(),f=fixture(kind,()=>pending.promise,undefined,true);
+   try {
+    f.emit('mouseDown');await f.advance();cancel(f);pending.resolve(1);await f.advance(0);
+    assert.equal(f.ticks.size,0);assert.equal(f.leases.size,0);assert.deepEqual(f.positions,[]);
+    assert.notEqual(f.emit('mouseUp').prevented,true);
+   } finally { f.dispose(); }
+  }
+ });
+}

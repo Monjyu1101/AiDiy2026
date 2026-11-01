@@ -19,9 +19,9 @@ const output = await mkdtemp(join(tmpdir(), 'aidiy-panel-controls-'));
 const entry = join(output, 'fixture-entry.js');
 await writeFile(entry, `
 import {createApp,h,reactive,nextTick} from 'vue';
-import Explorer from ${JSON.stringify(join(root, 'src/ファイル閲覧/ファイル一覧.vue'))};
+import Explorer from ${JSON.stringify(join(root, 'src/components/ファイル閲覧/ファイル一覧.vue'))};
 import ${JSON.stringify(join(root, 'src/style.css'))};
-import ${JSON.stringify(join(root, 'src/共通表示/会話表示.css'))};
+import ${JSON.stringify(join(root, 'src/components/共通表示/会話表示.css'))};
 const state=reactive({root:'/fixture/project',startedAt:1,open:true,allDisplays:false,selected:'docs/sample.txt',current:'docs'});
 const tree={n:'project',d:[{n:'docs',d:[],f:[['sample.txt',15,1000]]}],f:[['keep.txt',9,1000]]};
 const log={requests:[],errors:[],detached:false,detachedEvents:[],selected:[],resizes:[]};

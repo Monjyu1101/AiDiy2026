@@ -28,13 +28,31 @@ function load(file, dependencies = {}, globals = {}) {
   });
   return module.exports;
 }
-function connection(settings = {}) {
+const fixtureHeaders = { Authorization: 'Bearer prediction-fixture-only-token' };
+function authFixture(authorization = () => ({ ...fixtureHeaders })) {
+  return {
+    internalAuthorization: target => {
+      assert.equal(target.origin, 'http://127.0.0.1:18091');
+      return authorization;
+    },
+    internalSocket: noNetwork,
+  };
+}
+function connection(settings = {}, authorization) {
   const backend = core(settings);
   const { CodeConnection } = load('src/code-connection.ts', {
+    './internal-auth': authFixture(authorization),
     '../aidiy_live/src/host': { backendUrl: value => new URL(value) },
     '../aidiy_live/src/connection-error': { 接続エラー詳細: (_target, error) => String(error) },
   });
-  const client = new CodeConnection('http://127.0.0.1:18091', () => {}, () => {}, url => new backend.Socket(url), backend.request);
+  const client = new CodeConnection('http://127.0.0.1:18091', () => {}, () => {}, (url, headers) => {
+    assert.equal(headers.Authorization, fixtureHeaders.Authorization);
+    return new backend.Socket(url);
+  }, (url, options) => {
+    assert.equal(options.headers.Authorization, fixtureHeaders.Authorization);
+    assert.equal(options.redirect, 'error');
+    return backend.request(url, options);
+  });
   return { client, backend };
 }
 test('予測の接続パスはセッションのモデル情報だけを使い、起動フォルダや共通候補へ戻さない', async () => {
@@ -51,6 +69,18 @@ test('予測の接続パスはセッションのモデル情報だけを使い�
     assert.equal(client.projectPath, '/session-project', '共通設定取得は接続中のパスを上書きしない');
     client.disconnect();
     assert.equal(client.projectPath, '', '切断では旧セッションのパスを公開しない');
+  } finally { client.dispose(); }
+});
+test('内部認証が失敗したら予測の接続スコープを公開せず通信しない', async () => {
+  const { client, backend } = connection({}, () => { throw new Error('fixture auth unavailable'); });
+  try {
+    client.start('/launch-folder', { provider: '', model: '' });
+    await flush();
+    assert.equal(client.connected, false);
+    assert.equal(client.projectPath, '');
+    assert.equal(backend.sockets.length, 0);
+    assert.equal(backend.requests.length, 0);
+    assert.match(client.error, /fixture auth unavailable/);
   } finally { client.dispose(); }
 });
 for (const path of [undefined, '', '../relative', 'invalid\0path']) test(`パス未確定・不正値は補完しない: ${JSON.stringify(path)}`, async () => {
@@ -119,7 +149,10 @@ function hostMocks() {
   const noop = () => {}, store = { 会話保存先: noop, 会話一覧: () => [], 会話書込: noop, 会話本文上限: 100000, 履歴メッセージ長さ: item => item.本文.length };
   class Connection {
     connected = false; session = ''; projectPath = ''; model = { provider: 'codex_cli', model: 'auto' };
-    constructor(_url, _packet, state) { connection = this; this.notify = state; }
+    constructor(_url, _packet, state, _socket, _request, authorization) {
+      connection = this; this.notify = state;
+      assert.equal(authorization().Authorization, fixtureHeaders.Authorization);
+    }
     start() { this.connected = true; this.session = 'connected-session'; this.projectPath = '/connected-project'; this.notify(); }
     disconnect() { this.connected = false; this.projectPath = ''; this.notify(); }
     dispose() { this.disconnect(); }
@@ -127,7 +160,7 @@ function hostMocks() {
   class Prediction { constructor(_root, context) { prediction = this; this.context = context; } sync() {} clear() {} }
   const models = { コードモデル読込: noop, コードモデル保存: value => value, モデル保存先: () => 'mock-model', コード設定保存先: () => 'mock-options', 検証回数読込: noop };
   const offline = { Hermes既定モデル: () => 'same', オフラインモデル候補: () => [{ id: 'same' }], オフラインモデル保存先: () => 'mock-offline' };
-  const common = { 'file-attachments': require('../out/file-attachments.cjs'), 'code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider, model: value.model }) }, 'input-prediction': { InputPrediction: Prediction },
+  const common = { 'internal-auth': authFixture(), 'file-attachments': require('../out/file-attachments.cjs'), 'code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider, model: value.model }) }, 'input-prediction': { InputPrediction: Prediction },
     'model-preferences': models, 'conversation-store': store, 'local-backend.cjs': { ローカル接続先: () => 'http://127.0.0.1:18091' }, protocol: {}, offline };
   const deps = {};
   for (const prefix of ['./', '../../src/']) for (const [name, value] of Object.entries(common)) deps[prefix + name] = value;

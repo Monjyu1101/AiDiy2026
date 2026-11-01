@@ -13,7 +13,6 @@
 
 `AiDiy.vue` は frontend_avatar の唯一のエントリコンポーネントです。`src/main.ts` はこのコンポーネントを直接マウントします（Vue Router や Pinia は使用しません）。
 
-- **ファイル規模**: 約 2050 行（`.vue` SFC、`<script setup>` + `<template>` + `<style>` 一体）
 - **状態管理**: 全てコンポーネントローカルの `ref()` / `computed()`。Pinia / Vue Router なし
 - **マルチモード**: Electron と Web ブラウザの両方で動作
 

@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
-import { cliCompletions } from '../src/ターミナル/コマンド補完.js';
+import { cliCompletions } from '../src/components/ターミナル/コマンド補完.js';
 import { toolsTarget } from '../ファイル機能/ai-search.mjs';
 import { resolveCliLaunch, validateCliOptions } from './cli-launch.mjs';
 import { createCliSession } from './cli-session.mjs';

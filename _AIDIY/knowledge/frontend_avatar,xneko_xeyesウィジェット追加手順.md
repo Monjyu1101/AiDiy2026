@@ -98,6 +98,7 @@ IPC を呼ぶ箇所は optional chaining にし、戻り値がない場合の We
 
 ## xeyes 実装の要点
 - Electron では renderer だけでウィンドウ外カーソルを追えないため、main process 側で `screen.getCursorScreenPoint()` と対象 `BrowserWindow.getBounds()` を返す。
+- `window:get-pointer-snapshot` の `role` / `bounds` / `mouse` / `insideWindow` とステージの矩形からローカル座標へ変換する。CPU使用率は `system:get-cpu-usage` で取得する。
 - Web ではステージ内の `pointermove` を使う。画面外は追えない前提にする。
 - CPU 使用率は `os.cpus()` の直前サンプルとの差分から計算するため、初回値は 0 になり得る。
 - 色変化やグラフは `controlsVisible` が true のときだけ出す。表示本体の目線追従とは分離する。
@@ -107,6 +108,7 @@ IPC を呼ぶ箇所は optional chaining にし、戻り値がない場合の We
 - スプライトシートは `256x128px`、32px タイル 8列 x 4行、透過 GIF を前提にする。
 - 既存 `AIコア_xneko.vue` の `background-position` と合うよう、輪郭・透明部分を保つ。
 - 白背景画像から作る場合は、白い毛を消さないため単純な閾値除去ではなく四隅フラッドフィルで背景を除去する。
+- `.neko-sprite` の `background-image` は画像URLのcomputedへバインドし、固定CSSと二重管理しない。
 - 新しい画像を追加したら、選択 state、画像 URL computed、オプションパネルのラジオを合わせて追加する。
 - Electron のカーソル IPC は定期取得の成功を操作扱いにせず、前回の画面座標から実際に変化した時だけ未操作時間をリセットする。
 - マウス停止中は壁かき完了後に追跡目標を猫位置へ戻し、たたずみから睡眠へ遷移させる。睡眠後の自動起床では画面内だけを移動し、停止中のマウスを追って壁かきを再開させない。

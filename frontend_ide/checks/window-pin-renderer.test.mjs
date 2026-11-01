@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { compile } from '@vue/compiler-dom';
 import * as Vue from 'vue';
-import { createWindowPinController, createPanelWindowApi } from '../src/共通表示/窓操作.js';
+import { createWindowPinController, createPanelWindowApi } from '../src/components/共通表示/窓操作.js';
 
 function fixture(initial = { pinned: false, locked: false }) {
   let current = initial, notify, unsubscriptions = 0, toggles = 0;
@@ -76,7 +76,7 @@ test('別窓API: 窓名を限定して操作し、他パネルと所有元の通
   assert.deepEqual(states, [{ pinned: true, locked: true }]); stop(); assert.equal(stopped, true);
 });
 test('共有Vue: 最小化→最大化→ピン→閉じるの順、ARIA・VR無効化・購読破棄', () => {
-  const path = new URL('../src/共通表示/窓操作.vue', import.meta.url);
+  const path = new URL('../src/components/共通表示/窓操作.vue', import.meta.url);
   const source = readFileSync(path, 'utf8'), { descriptor } = parse(source);
   assert.doesNotThrow(() => compileScript(descriptor, { id: 'window-actions-check', inlineTemplate: true }));
   const template = descriptor.template.content;
@@ -86,8 +86,8 @@ test('共有Vue: 最小化→最大化→ピン→閉じるの順、ARIA・VR無
   assert.match(template, /:aria-pressed="pin.pinned"/); assert.match(template, /:disabled="!pin.ready \|\| pin.busy \|\| pin.locked"/);
   assert.match(template, /class="window-close" :disabled="hideClose"/); assert.doesNotMatch(template, /v-if="!hideClose"/);
   assert.match(source, /controller.dispose\(\)/);
-  assert.match(readFileSync(new URL('../src/共通表示/状態バー.vue', import.meta.url), 'utf8'), /<WindowActions v-if="desktop"/);
-  const panels = readFileSync(new URL('../src/ファイル閲覧/別窓タイトル.js', import.meta.url), 'utf8');
+  assert.match(readFileSync(new URL('../src/components/共通表示/状態バー.vue', import.meta.url), 'utf8'), /<WindowActions v-if="desktop"/);
+  const panels = readFileSync(new URL('../src/components/ファイル閲覧/別窓タイトル.js', import.meta.url), 'utf8');
   assert.match(panels, /h\(WindowActions/);
   assert.match(panels, /kind === 'explorer' \|\| kind === 'panel-routes'/);
   assert.match(panels, /pinOnly: true/);
@@ -96,7 +96,7 @@ test('共有Vue: 最小化→最大化→ピン→閉じるの順、ARIA・VR無
   assert.match(template, /v-if="!pinOnly" type="button" class="window-close"/);
 });
 test('ページ内Explorer: 別ウィンドウ操作はヘッダーの右端、最前面ピンとは分離する', () => {
-  const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
   const { descriptor } = parse(source);
   assert.doesNotThrow(() => compileScript(descriptor, { id: 'explorer-header-check', inlineTemplate: true }));
   const header = descriptor.template.content.match(/<aside ref="panel"[^>]*>\s*(<header[^>]*>[\s\S]*?<\/header>)/)?.[1];
@@ -111,7 +111,7 @@ test('ページ内Explorer: 別ウィンドウ操作はヘッダーの右端、�
 });
 
 test('軌跡バー: バーガーは即時ドラッグ、余分な縦線はなく、native切離し操作は重複しない', () => {
-  const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
   assert.match(source, /class="route-detach panel-detach-pin"/);
   assert.match(source, /v-if="\(!routeDetached\|\|!nativePanels\)\&\&\(!allDisplays\|\|!routeDetached\)"/);
   assert.match(source, /:aria-pressed="routeDetached"/);
@@ -123,7 +123,7 @@ test('軌跡バー: バーガーは即時ドラッグ、余分な縦線はなく
 });
 
 test('軌跡バー: VR/ALLの別窓でも縦三本を残し、クリックで窓を閉じない', () => {
-  const source = readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8');
   const button = source.match(/<button[^>]*class="burger-button route-burger"[\s\S]*?<\/button>/)?.[0];
   assert.ok(button, '実コンポーネントの縦三本を検証する');
   const render = new Function('Vue', compile(button, { mode: 'function' }).code)(Vue);

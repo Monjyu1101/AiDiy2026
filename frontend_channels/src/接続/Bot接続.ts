@@ -43,6 +43,8 @@ export class DiscordBot {
   private closing = false;
   private shutdown?: Promise<void>;
   private connected = false;
+  private initialHelpSent = false;
+  private replyQueue: Promise<void> = Promise.resolve();
   private voiceSync?: Promise<void>;
   private voiceDirty = false;
   private chatQueue = new Map<string, Promise<void>>();
@@ -81,16 +83,13 @@ export class DiscordBot {
     const command = コマンド解析(message.content, this.config.prefix, this.client.user?.id ?? '');
     if (!command) return;
     const key = 会話キー(message.guildId!, message.channelId, message.author.id);
-    const reply = (text: string) => message.reply({ content: text, allowedMentions: メンション禁止 }).then(() => {});
+    const reply = (text: string) => this.初回案内付き送信(text, async content => { await message.reply({ content, allowedMentions: メンション禁止 }); });
     try {
       if (!this.codeEnabled && ['stop', 'new', 'chat'].includes(command.name)) { if (command.name === 'chat') await reply('Code は OFF のため利用できません。'); return; }
       if (!this.liveEnabled && ['leave', 'live'].includes(command.name)) { await reply('Live は OFF のため利用できません。'); return; }
       switch (command.name) {
         case 'help':
-          await reply([
-            ...this.codeEnabled ? ['このチャンネルに、そのまま話しかけてください。AiDiy が返信します。'] : [],
-            ...this.liveEnabled ? ['音声で話すときは専用のボイスチャンネルに参加してください。退出すると音声会話も終了します。'] : [],
-          ].join('\n') || '利用できる機能がありません。'); return;
+          await reply(this.ヘルプ()); return;
         case 'status': await reply(`Code: ${!this.codeEnabled ? 'OFF' : this.code.実行中(key) ? '実行中' : '待機中'} / Live: ${!this.liveEnabled ? 'OFF' : this.live ? '接続中' : '未接続'}`); return;
         case 'stop': {
           const running = this.code.実行中(key); this.code.停止(key);
@@ -126,6 +125,34 @@ export class DiscordBot {
       }
     }
   }
+  private ヘルプ(): string {
+    return [
+      'コマンド: !help（使い方） / !status（状態） / !stop（停止） / !new（新しい会話） / !chat 本文（チャット）',
+      '先頭の ! は ！ でも使えます。未登録コマンドは使い方を表示します。',
+      ...this.codeEnabled ? ['このチャンネルに、そのまま話しかけてください。AiDiy が返信します。'] : [],
+      ...this.liveEnabled ? ['!live [本文]（音声接続・送信） / !leave（音声終了）', '音声で話すときは専用のボイスチャンネルに参加してください。退出すると音声会話も終了します。'] : [],
+    ].join('\n');
+  }
+  private 初回案内付き送信(text: string, send: (text: string) => Promise<void>): Promise<void> {
+    // Bot インスタンス単位。Gateway 再接続では戻さない。送信失敗は消費しない。
+    // 初回だけ直列化し、同時に到着した返信が案内を重複送信しないようにする。
+    if (this.initialHelpSent) return this.closing ? Promise.resolve() : send(text);
+    const pending = this.replyQueue.catch(() => {}).then(async () => {
+      if (this.closing) return;
+      const help = this.ヘルプ();
+      if (this.initialHelpSent) { await send(text); return; }
+      if (text === help) { await send(help); }
+      else if (text.length + help.length + 2 <= 1900) { await send(`${text}\n\n${help}`); }
+      else {
+        // 長文/添付の成功だけでは消費しない。末尾の案内自体の成功を待つ。
+        await send(text);
+        await send(help);
+      }
+      this.initialHelpSent = true;
+    });
+    this.replyQueue = pending;
+    return pending;
+  }
   private async チャット受付(message: Message, key: string, text: string) {
     const count = this.chatCount.get(key) || 0;
     if (count >= 10) throw new Error('返信待ちのメッセージが多いため、少し待ってから送ってください。');
@@ -141,7 +168,7 @@ export class DiscordBot {
         const answer = await run;
         if (this.closing) return;
         this.表示?.(this.client.user?.displayName ?? 'AiDiy', answer, 'ai');
-        await 回答送信(message, answer);
+        if (message.channel.isSendable()) await this.初回案内付き送信(answer, text => チャンネル回答送信(message.channel as SendableChannels, text));
       }
       finally { clearInterval(timer); }
     });
@@ -193,7 +220,7 @@ export class DiscordBot {
       if (!textChannel?.isSendable() || !('guildId' in textChannel) || textChannel.guildId !== this.config.guildId) throw new Error('音声会話の返信先がありません。');
       if (!this.connected || this.closing || this.live) return;
       if (this.希望ボイス()?.id !== channel.id) { this.voiceDirty = true; continue; }
-      const notify = (text: string) => チャンネル回答送信(textChannel, text);
+      const notify = (text: string) => this.初回案内付き送信(text, content => チャンネル回答送信(textChannel, content));
       try { await this.チャンネルライブ開始(channel, textId, notify); }
       catch (error) {
         if (!this.closing && this.connected && this.希望ボイス()?.id === channel.id) {
@@ -212,7 +239,7 @@ export class DiscordBot {
   private async ライブ開始(message: Message) {
     const channel = message.member?.voice.channel;
     if (!channel || channel.type !== ChannelType.GuildVoice) throw new Error('通常のボイスチャンネルに参加してから live を実行してください。');
-    await this.チャンネルライブ開始(channel, message.channelId, text => 回答送信(message, text));
+    await this.チャンネルライブ開始(channel, message.channelId, text => message.channel.isSendable() ? this.初回案内付き送信(text, content => チャンネル回答送信(message.channel as SendableChannels, content)) : Promise.resolve());
   }
   private async チャンネルライブ開始(channel: VoiceChannel, textId: string, notify: (text: string) => Promise<void>) {
     if (channel.id !== this.config.voiceChannelId) throw new Error('discord_voice_channel_id に設定したボイスチャンネルに参加してください。');

@@ -19,7 +19,7 @@ const output = await mkdtemp(join(tmpdir(), 'aidiy-explorer-component-'));
 const entry = join(output, 'fixture-entry.js');
 const fixture = `
 import {createApp,h,reactive,nextTick} from 'vue';
-import Explorer from ${JSON.stringify(join(root, 'src/ファイル閲覧/ファイル一覧.vue'))};
+import Explorer from ${JSON.stringify(join(root, 'src/components/ファイル閲覧/ファイル一覧.vue'))};
 import ${JSON.stringify(join(root, 'src/style.css'))};
 const files=new Map([['docs',{type:'dir'}],['target',{type:'dir'}],['docs/sample.txt',{type:'file',text:'sample original'}],['keep.txt',{type:'file',text:'untouched'}]]);
 const state=reactive({root:'/fixture/project',startedAt:1,open:true,tree:null,selected:'',current:''});

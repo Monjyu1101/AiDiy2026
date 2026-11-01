@@ -11,13 +11,13 @@ import vm from 'node:vm';
 import {parse,compileScript} from '@vue/compiler-sfc';
 import * as vue from 'vue';
 import {transformSync} from 'esbuild';
-import * as addressTools from '../src/ブラウザ/URL表示.js';
+import * as addressTools from '../src/components/ブラウザ/URL表示.js';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 
 test('Browserすりガラス: 屈折SVG・方向マップ・定期画像取得用rendererを持たない',()=>{
- const source=read('../src/ブラウザ/ブラウザパネル.vue');
+ const source=read('../src/components/ブラウザ/ブラウザパネル.vue');
  assert.doesNotMatch(source,/BrowserGlassEdge|headerGlass|stopGlass|onBrowserHeaderGlass|feDisplacementMap|capturePage/);
- for(const path of ['../src/ブラウザ/ガラス縁.vue','../src/ブラウザ/ガラス屈折.js'])assert.equal(existsSync(new URL(path,import.meta.url)),false);
+ for(const path of ['../src/components/ブラウザ/ガラス縁.vue','../src/components/ブラウザ/ガラス屈折.js'])assert.equal(existsSync(new URL(path,import.meta.url)),false);
  assert.match(source,/browserAction\('capture'\)/,'明示的なWeb画面撮影は維持する');
 });
 
@@ -35,7 +35,7 @@ test('Browserすりガラス: preloadの屈折専用APIは撤去し表示フレ�
 
 for(const headerOnly of [false,true])test(`Browserすりガラス: ${headerOnly?'専用ヘッダー':'通常表示'}は画像購読せず手動撮影・展開・破棄を維持する`,async()=>{
  const mounted=[],unmounted=[],actions=[],classes=new Set();let frameHandler,frameStops=0,glassSubscriptions=0;
- const {descriptor}=parse(read('../src/ブラウザ/ブラウザパネル.vue'));
+ const {descriptor}=parse(read('../src/components/ブラウザ/ブラウザパネル.vue'));
  const script=compileScript(descriptor,{id:'browser-frosted-lifetime',genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(script.content+'\nmodule.exports=component;',{format:'cjs'}).code,{
   module,console,requestAnimationFrame:()=>1,cancelAnimationFrame(){},ResizeObserver:class{observe(){}disconnect(){}},document:{documentElement:{classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}}},

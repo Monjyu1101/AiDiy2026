@@ -23,7 +23,7 @@
 サイズはモデル自体の scale より、カメラの引き距離で調整する。
 
 ```typescript
-const distance = Math.max(distanceForHeight, distanceForWidth) * padding * 1.08
+const distance = Math.max(distanceForHeight, distanceForWidth) * padding * 0.54
 ```
 
 - 調整箇所は `AIコア_アバター.vue` の `fitCamera`。
@@ -36,10 +36,10 @@ VRM が背中を向く場合は、モデルコンテナの初期回転を確認�
 
 ```typescript
 const container = new THREE.Group()
-container.rotation.y = 0
+container.rotation.y = Math.PI
 ```
 
-- `Math.PI` にすると 180 度回転するため、モデルによっては背面表示になる。
+- 現行Avatarは `Math.PI` と負Z側のカメラを組み合わせる。旧メモの回転0へ機械的に戻さず、モデルとカメラの両方を確認する。
 - 静的HTML埋め込みでは、無理に container を回すよりカメラ位置を `frontend_avatar` 側に寄せる方が差異が出にくい。
 
 ## VRMA 連続再生
@@ -60,18 +60,9 @@ container.rotation.y = 0
 - `表示選択 !== 'アバター'` の場合は `AIコア_アバター.vue` 自体を表示しない。アバター固有設定も表示しない。
 - `controls-visible=false` のときは、設定 UI、字幕、発光などの補助表示を隠し、表示本体だけにする。
 
-## xeyes の要点
-- Electron では `window:get-pointer-snapshot` IPC で `role` / `bounds` / `mouse` / `insideWindow` を取得し、`bounds + stageRect` からローカル座標へ変換する。
-- Web ではステージ内の `pointermove` に追従する。
-- CPU 使用率は `system:get-cpu-usage` IPC で取得する。最新サンプル群の平均を使い、低負荷は白、高負荷は赤みと血走りを増やす。
-- CPU グラフやオプションパネルは `controls-visible` が true のときだけ表示する。
-- デザイン切替などで `v-if` と `v-for` が必要な場合は、同一要素に書かず `<template v-if>` で分ける。
+## xeyes / xneko の変更
 
-## xneko の要点
-- デザイン選択は state（例: `'oneko' | 'chatora' | 'mike'`）と画像 URL computed で切り替える。
-- `.neko-sprite` の `background-image` は `:style` でバインドし、固定 CSS の URL と二重管理しない。
-- GIF は `256x128`、32px タイル 8 x 4、透過インデックス付きのスプライトシートを前提にする。
-- 白背景画像から作る場合は四隅フラッドフィルで背景を除去し、白い毛を消さない。
+Electron / Web のカーソル・CPU取得、スプライト追加、表示選択の連動修正と破棄時の後始末は [ウィジェット追加手順](./frontend_avatar,xneko_xeyesウィジェット追加手順.md) に集約します。
 
 ## 静的HTMLに VRM を埋め込む場合
 

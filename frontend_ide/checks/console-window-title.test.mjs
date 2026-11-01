@@ -3,9 +3,9 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-import * as cliTitles from '../src/ターミナル/CLIタイトル.js';
+import * as cliTitles from '../src/components/ターミナル/CLIタイトル.js';
 import test from 'node:test';
-import * as keyboard from '../src/ターミナル/キー入力.js';
+import * as keyboard from '../src/components/ターミナル/キー入力.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -15,7 +15,7 @@ const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transf
 const flush=async()=>{for(let n=0;n<10;n++)await Promise.resolve();};
 function fixture({desktop=true,linked=true,title=()=>Promise.resolve('AiDiy IDE / Console 3')}={}){
  const mounted=[],unmounted=[];let calls=0;
- const source=readFileSync(new URL('../src/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/components/ターミナル/ターミナルパネル.vue',import.meta.url),'utf8');
  const {descriptor,errors}=parse(source);assert.deepEqual(errors,[]);
  const script=compileScript(descriptor,{id:'console',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'ConsolePanel.vue',id:'console',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);

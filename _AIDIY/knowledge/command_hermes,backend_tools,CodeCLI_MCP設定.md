@@ -11,13 +11,13 @@
 
 | CLI | 主な設定場所 | 備考 |
 |-----|-------------|------|
-| Claude | `C:\Users\admin\.claude.json`、または project `.mcp.json` | `claude mcp add -s project` は `.mcp.json` を作る |
+| Claude | `~\.claude.json`、または project `.mcp.json` | `claude mcp add -s project` は `.mcp.json` を作る |
 | Gemini | project `.gemini/settings.json` | BOM なし UTF-8 で保存する |
-| Antigravity | `C:\Users\admin\.gemini\config\mcp_config.json` | Streamable HTTP の `/{mcp_name}/mcp` を `serverUrl` で登録する |
-| Codex | `C:\Users\admin\.codex\config.toml` | Streamable HTTP の `/{mcp_name}/mcp` を `url` で登録する |
-| Grok | `C:\Users\admin\.grok\config.toml` | ネイティブ SSE（`type = "sse"`）。stdio ブリッジは使わない |
-| Copilot | `C:\Users\admin\.copilot\mcp-config.json` | `_setup.py` / `_cleanup.py` の対象 |
-| OpenCode | `C:\Users\admin\.config\opencode\opencode.json` | 公式 docs では `mcp` キー配下。`.opencode/` は agents / commands / plugins などのディレクトリ用途 |
+| Antigravity | `~\.gemini\config\mcp_config.json` | Streamable HTTP の `/{mcp_name}/mcp` を `serverUrl` で登録する |
+| Codex | `~\.codex\config.toml` | Streamable HTTP の `/{mcp_name}/mcp` を `url` で登録する |
+| Grok | `~\.grok\config.toml` | ネイティブ SSE（`type = "sse"`）。stdio ブリッジは使わない |
+| Copilot | `~\.copilot\mcp-config.json` | `_setup.py` / `_cleanup.py` の対象 |
+| OpenCode | `~\.config\opencode\opencode.json` | 公式 docs では `mcp` キー配下。`.opencode/` は agents / commands / plugins などのディレクトリ用途 |
 
 ## 関連ファイル
 - `.mcp.json`
@@ -29,9 +29,9 @@
 - `scripts/cli_bat/_claude-code.bat`
 - `scripts/cli_bat/_codex_cli.bat`
 - `backend_tools/mcp_stdio.py`
-- `C:\Users\admin\.codex\config.toml`
-- `C:\Users\admin\.grok\config.toml`
-- `C:\Users\admin\.gemini\config\mcp_config.json`
+- `~\.codex\config.toml`
+- `~\.grok\config.toml`
+- `~\.gemini\config\mcp_config.json`
 
 ## Grok へ SSE で直接登録する設定
 
@@ -81,7 +81,20 @@ Antigravity CLI は `~/.gemini/config/mcp_config.json` の `mcpServers` に HTTP
 
 登録対象は Codex と共通の `CODE_CLI_MCP_EXCLUDE` に従う。同名の旧 stdio 設定があれば `command` / `args` / `env` / `cwd` と旧形式の `type` / `url` / `httpUrl` を除去し、`serverUrl` を更新する。他のサーバーや接続方式に関係しない設定は保持する。設定生成自体は Python 仮想環境や `mcp_stdio.py` に依存しない。
 
-旧設定先 `~/.gemini/antigravity-cli/mcp_config.json` への新規書き込みは行わない。cleanup は新旧両方の設定先から `aidiy_*` を解除する。詳細は [`Antigravity CLI の MCP 接続設定`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) を参照する。
+旧設定先 `~/.gemini/antigravity-cli/mcp_config.json` への新規書き込みは行わない。cleanup は新旧両方の設定先から `aidiy_*` を解除する。`mcp_stdio.py` は stdio 接続を選ぶ別クライアント向けに残す。
+
+### Antigravity の接続と権限の切り分け
+
+```powershell
+agy --version
+agy mcp list
+```
+
+`agy mcp list` の `TYPE` が `http`、接続先が `http://127.0.0.1:8095/<名前>/mcp` であることを確認する。これは設定の読み込み確認なので、実接続は `agy` から対象 MCP ツールを呼び出して確かめる。
+
+通知音で確認する場合は、`aidiy_notification_sounds.play_notification_sound` に `notification_type="完了", scene="plane"` を指定して 1 回呼び出す。CLI のツール結果と backend_tools のログを照合し、`status: ok` と再生記録を確認する。
+
+非対話の `agy --print` は、確認が必要なツールを実行できずに終了する場合がある。これは HTTP の接続失敗とは分けて扱う。依頼された通知音だけを許可する場合は、権限設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に `mcp(aidiy_notification_sounds/play_notification_sound)` を指定できる。テストのために追加した許可は検証後に取り除き、既存の権限設定は保持する。MCP 設定と権限設定ではディレクトリが異なる点に注意する。
 
 ## セットアップ/クリーンアップの方針
 
@@ -125,3 +138,9 @@ python _cleanup.py
 - Grok は各 `aidiy_*` に `type = "sse"` があり、`grok mcp list` にサーバーが出ること。
 
 `codex mcp list` は設定の読み込み確認であり、ツール実行の疎通確認とは分ける。実接続は Codex から対象 MCP のツールを呼び出して確認する。非対話の `codex exec` で承認が必要なツールが `approval policy is never` により止まる場合は、依頼済みの操作を承認審査に回せる `--approve-for-me` を使う。これは接続エラーではない。
+
+## Antigravity の仕様参照先
+
+- [MCP 設定](https://antigravity.google/docs/mcp/)
+- [非対話モードと権限](https://antigravity.google/docs/cli/headless/)
+- [権限ルール](https://antigravity.google/docs/permissions/)

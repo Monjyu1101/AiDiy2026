@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createExplorerActions, explorerNameError, parentPath, containsPath, renamedPath } from '../src/ファイル閲覧/エクスプローラー操作.js';
+import { createExplorerActions, explorerNameError, parentPath, containsPath, renamedPath } from '../src/components/ファイル閲覧/エクスプローラー操作.js';
 const file={path:'docs/sample.txt',name:'sample.txt',type:'file'},folder={path:'docs',name:'docs',type:'dir'};
 function fixture(checked=()=>[]){
   const requests=[],changes=[],copied=[];let response,resolve,pending=false,root='/project';
@@ -139,7 +139,7 @@ test('Explorerフォルダを開く: Webは無効、失敗・連打・reset後�
 test('Explorer右クリック: 実Vueテンプレートでアプリで開くの直後にフォルダを開くを表示',async()=>{
  const {createRequire}=await import('node:module'),{readFileSync}=await import('node:fs'),{default:vm}=await import('node:vm');
  const require=createRequire(import.meta.url),vue=require('vue'),{parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
- const {descriptor}=parse(readFileSync(new URL('../src/ファイル閲覧/エクスプローラー操作表示.vue',import.meta.url),'utf8'));
+ const {descriptor}=parse(readFileSync(new URL('../src/components/ファイル閲覧/エクスプローラー操作表示.vue',import.meta.url),'utf8'));
  const script=compileScript(descriptor,{id:'explorer-menu',genDefaultAs:'component'});
  const template=compileTemplate({source:descriptor.template.content,filename:'ExplorerActions.vue',id:'explorer-menu',compilerOptions:{bindingMetadata:script.bindings}});assert.deepEqual(template.errors,[]);
  const module={exports:{}};
@@ -156,6 +156,6 @@ test('Explorer右クリック: 実Vueテンプレートでアプリで開くの�
   if(desktop){await next.props.onClick();assert.deepEqual(calls,[row.path]);}
   actions.dispose();
  }
- const explorer=readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),'utf8');
+ const explorer=readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue',import.meta.url),'utf8');
  assert.match(explorer,/openFolder:typeof window\.aidiyWindow\?\.openFolder==='function'\?path=>window\.aidiyWindow\.openFolder\(path\):null/);
 });

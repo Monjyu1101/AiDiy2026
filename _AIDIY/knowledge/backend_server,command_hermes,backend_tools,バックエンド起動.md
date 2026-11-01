@@ -119,13 +119,13 @@ cd backend_server
 # 構文確認（import は実行しない）
 .\.venv\Scripts\python.exe -m py_compile apps_main.py apps_crud\init.py
 
-# import 確認（router/schema/crud まで読み込む）
+# import 確認（router/schema/crud まで読み込む。専用一時DBへの分離後だけ実行）
 .\.venv\Scripts\python.exe -c "import apps_main; import core_main"
 ```
 
 - `py_compile` は構文エラーだけを拾う。
 - `ImportError` や `AttributeError` は import 確認で拾う。
-- `startup_event()` は import 時に実行されないため、初期データとスキーマ補正は実起動で確認する。
+- `startup_event()` は import 時に実行されないが、`apps_main.py` の `create_all()` は import 時にも動く。構文確認の代用として実DBへ接続しない。初期化は [スキーマ変更手順](./backend_server,スキーマ変更手順.md) に従い一時DBで確認し、旧スキーマの自動補正を前提にしない。
 - `apps_models/__init__.py` または `apps_crud/__init__.py` の import 漏れは `AttributeError: module has no attribute` として出やすい。
 
 ## 注意点

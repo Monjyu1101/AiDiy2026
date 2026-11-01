@@ -51,7 +51,7 @@ app.whenReady().then(async()=>{
    ipcMain.on('development:draft-result',(event,value)=>router.acknowledge(records.get(event.sender),value));
    ipcMain.handle('development:draft-targets',()=>bridge.list(record));
    ipcMain.handle('development:draft-insert',async(event,value)=>{const latest=await control.action(event,'draft');return bridge.insert(record,{...value,text:latest.request.text});});
-   writeFileSync(join(captureRoot,'receiver.js'),readFileSync(resolve('frontend_ide/src/下書き連携/下書き受け渡し.js')));
+   writeFileSync(join(captureRoot,'receiver.js'),readFileSync(resolve('frontend_ide/src/components/下書き連携/下書き受け渡し.js')));
    for(const kind of ['code','live']){
     writeFileSync(join(captureRoot,kind+'.html'),`<textarea id="draft">既存の下書き</textarea><script type="module">import{createDraftReceiver}from'./receiver.js';const input=document.querySelector('textarea');createDraftReceiver({kind:'${kind}',project:()=>${JSON.stringify(captureRoot)},scope:()=>'fixture',ready:()=>true,draft:()=>input.value,setDraft:value=>input.value=value,focus:()=>{},api:window.aidiyWindow}).mount();</script>`);
     const target=new BrowserWindow({show:false,webPreferences:{preload:resolve('frontend_ide/デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});

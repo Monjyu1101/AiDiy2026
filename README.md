@@ -278,7 +278,7 @@ python _cleanup.py
 
 cleanup のために新しい Python / Node.js や対象仮想環境は要求しません（管理スクリプト自体を実行できる Python は必要）。選択したグローバル npm ツール・VS Code 拡張の解除には対応 CLI を使いますが、OS の Python / Node.js / VS Code 本体は削除しません。削除・解除に失敗した場合は場所を表示して終了コード 1 を返し、成功扱いにしません。
 
-クリーンアップ後の残骸・資料確認は [cleanup後の確認](./_AIDIY/knowledge/共通,_cleanup.py後の確認.md) に従います。再起動には再度 `python _setup.py` が必要です。
+クリーンアップ後の残骸・資料確認は [cleanup後の確認](./_AIDIY/knowledge/共通,クリーンアップ手順.md) に従います。再起動には再度 `python _setup.py` が必要です。
 
 ---
 

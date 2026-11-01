@@ -24,7 +24,7 @@ async function files(folder) {
 export async function 配布物一覧() {
   const paths = ['package.json', 'package-lock.json', 'scripts/build-panel.mjs', 'scripts/verify-panel.mjs', 'scripts/verify-lock.mjs', 'panel/main.js', 'panel/view.js', 'panel/index.html', 'panel/style.css', 'panel/titlebar.css', 'panel/visualizer.js', 'panel/THIRD_PARTY_NOTICES.txt'];
   paths.push('panel/AiDiy.png','discord/panel/AiDiy_discord.svg','discord/panel/AiDiy_discord.png','panel/AiDiy_discord.png');
-  for (const folder of ['画面', '接続', 'ライブ']) paths.push(...(await files(resolve(root, 'panel', folder))).map(path => relative(root, path).replaceAll('\\', '/')));
+  for (const folder of ['components']) paths.push(...(await files(resolve(root, 'panel', folder))).map(path => relative(root, path).replaceAll('\\', '/')));
   const entries = await Promise.all(paths.sort().map(async path => {
     const bytes = await readFile(resolve(root, path));
     const content = path.endsWith('.png') ? bytes : bytes.toString('utf8').replace(/\r\n/g, '\n');

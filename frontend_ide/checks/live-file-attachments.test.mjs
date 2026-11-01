@@ -18,10 +18,10 @@ function load(path) {
   vm.runInNewContext(code, { module, atob, btoa, Uint8Array, setTimeout, clearTimeout });
   return module.exports;
 }
-const files = load('../src/添付ファイル/ファイル送信.js');
+const files = load('../src/components/添付ファイル/ファイル送信.js');
 const attachments = load('../host/src/file-attachments.ts');
 const protocol = load('../host/aidiy_live/src/protocol.ts');
-const { descriptor } = parse(readFileSync(new URL('../src/ライブ/ライブパネル.vue', import.meta.url), 'utf8'));
+const { descriptor } = parse(readFileSync(new URL('../src/components/ライブ/ライブパネル.vue', import.meta.url), 'utf8'));
 const script = compileScript(descriptor, { id: 'LiveFiles', genDefaultAs: 'component' });
 const template = compileTemplate({ source: descriptor.template.content, filename: 'LivePanel.vue', id: 'LiveFiles', compilerOptions: { bindingMetadata: script.bindings } });
 assert.deepEqual(template.errors, []);
@@ -62,16 +62,16 @@ async function fixture(t, host = false) {
   }
   const Attachment = { name: 'ChatAttachment' };
   const modules = {
-    '../ライブ/ライブ通信': { LiveEnvironment: Environment }, '../../host/aidiy_live/src/protocol': protocol,
-    '../../host/aidiy_live/src/audio': { LiveAudio: class { async unlock() {} mute() {} close() {} stop() {} } },
-    '../../host/aidiy_live/src/visualizer': { AudioCloud: class { dispose() {} } },
-    '../../host/aidiy_live/src/model-catalog': { ライブ選択エラー: () => '' },
-    '../../host/aidiy_live/src/microphone-error': { microphoneError: error => error.message },
-    '../../host/src/file-attachments': attachments, '../添付ファイル/ファイル送信.js': files,
+    '../ライブ/ライブ通信': { LiveEnvironment: Environment }, '../../../host/aidiy_live/src/protocol': protocol,
+    '../../../host/aidiy_live/src/audio': { LiveAudio: class { async unlock() {} mute() {} close() {} stop() {} } },
+    '../../../host/aidiy_live/src/visualizer': { AudioCloud: class { dispose() {} } },
+    '../../../host/aidiy_live/src/model-catalog': { ライブ選択エラー: () => '' },
+    '../../../host/aidiy_live/src/microphone-error': { microphoneError: error => error.message },
+    '../../../host/src/file-attachments': attachments, '../添付ファイル/ファイル送信.js': files,
     '../添付ファイル/チャット添付.vue': Attachment,
     '../下書き連携/下書き受け渡し.js': { createDraftReceiver: () => ({ mount: noop, publish: noop, dispose: noop }) },
     '../コード/会話到着演出': { chatArrival: () => ({ reset: noop, dispose: noop, show: noop }) },
-    '../共通表示/状態バー.vue': {}, '../ターミナル/開始表示.vue': {}, '../共通表示/共通ダイアログ.vue': {},
+    '../共通表示/状態バー.vue': {}, '../ターミナル/開始表示.vue': {}, '../../dialog/共通ダイアログ.vue': {},
   };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, URL, crypto, console, location: { href: 'http://localhost/live/' }, window: {},
@@ -151,7 +151,7 @@ test('Live添付: 連打・未接続・バックプレッシャーで無断再�
 });
 test('Live拡張transport: host側拒否をerror表示へ中継し、ソケットを閉じず古いidは無視', () => {
   const module = { exports: {} }, sent = []; let receive;
-  vm.runInNewContext(transformSync(readFileSync(new URL('../src/ライブ/ライブ通信.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
+  vm.runInNewContext(transformSync(readFileSync(new URL('../src/components/ライブ/ライブ通信.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
     module, URL, location: { href: 'http://localhost/live/', protocol: 'http:' },
     acquireVsCodeApi: () => ({ postMessage: packet => sent.push(packet) }),
     window: { addEventListener: (_type, cb) => { receive = cb; }, removeEventListener() {} },

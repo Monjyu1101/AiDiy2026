@@ -40,7 +40,7 @@ test('他moduleのassetsが無い隔離環境でもビルド/manifest照合と�
     assert.equal(built.status, 0, built.stderr);
     assert.equal(run('verify-panel.mjs').status, 0);
     // 配布物と元ソースのどちらの変更も、再ビルド前には拒否する。
-    for (const entry of ['panel/view.js', 'panel/画面/接続パネル.vue', 'panel/titlebar.css']) {
+    for (const entry of ['panel/view.js', 'panel/components/接続/接続パネル.vue', 'panel/titlebar.css']) {
       const path = join(folder, entry);
       const original = await readFile(path, 'utf8');
       await writeFile(path, original + '\n// changed fixture\n');

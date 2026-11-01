@@ -10,7 +10,7 @@ const value=value=>({value});
 
 test('アイコン化の有効条件は通常・ランチャー表示で同じ',async()=>{
  for(const compact of [false,true])for(const connected of [false,true])for(const microAvailable of [false,true])for(const switching of [false,true]){
-  const html=await render('ウィンドウ/ステータスバー.vue',{compact,connected,microAvailable,switching});
+  const html=await render('components/ウィンドウ/ステータスバー.vue',{compact,connected,microAvailable,switching});
   const button=html.match(/<button class="title-micro-switch"[^>]*>/)[0];
   assert.equal(/ disabled(?:[ >])/.test(button),!connected||!microAvailable||switching);
  }
@@ -35,7 +35,7 @@ function appState({empty=false,folder='',busy=false}={}){
 
 test('通常のシステム起動は未接続・空・読込中・処理中でもページ内ミニボタンを持たない',async()=>{
  for(const online of [true,false])for(const options of [{},{empty:true},{loading:true},{busy:true}]){
-  const html=await render('起動/起動パネル.vue',{state:startState(options),online,visible:true});
+  const html=await render('components/起動/起動パネル.vue',{state:startState(options),online,visible:true});
   assert.doesNotMatch(html,/ミニ表示|start-mini-switch/);
   assert.match(html,/システム起動/);assert.match(html,/class="start-save"[^>]*>設定を保存しました/);
   if(!options.empty&&!options.loading){
@@ -43,12 +43,12 @@ test('通常のシステム起動は未接続・空・読込中・処理中で�
    assert.match(html,/role="log"/);assert.equal((html.match(/type="checkbox"/g)||[]).length,3);
   }
  }
- assert.doesNotMatch(source('起動/起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
+ assert.doesNotMatch(source('components/起動/起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
 });
 
 test('通常のアプリ起動は未接続・未選択・処理中でもページ内ミニボタンを持たない',async()=>{
  for(const online of [true,false])for(const options of [{},{empty:true},{folder:'/fixture/project'},{folder:'/fixture/project',busy:true}]){
-  const html=await render('アプリ起動/アプリ起動パネル.vue',{state:appState(options),online,visible:true});
+  const html=await render('components/アプリ起動/アプリ起動パネル.vue',{state:appState(options),online,visible:true});
   assert.doesNotMatch(html,/ミニ表示/);assert.match(html,/フォルダ選択/);
   if(options.folder)assert.match(html,/>解除<\/button>/);
   if(!options.empty){
@@ -58,7 +58,7 @@ test('通常のアプリ起動は未接続・未選択・処理中でもペー�
    assert.equal(/ disabled(?:[ >])/.test(launch),!online||!options.folder||!!options.busy);
   }
  }
- assert.doesNotMatch(source('アプリ起動/アプリ起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
+ assert.doesNotMatch(source('components/アプリ起動/アプリ起動パネル.vue'),/defineEmits|\$emit\(['"]mini['"]\)/);
 });
 
 test('通常画面は8アプリ・導入済みCLI・VS Codeを並べ、未導入CLIを隠す',async()=>{
@@ -68,7 +68,7 @@ test('通常画面は8アプリ・導入済みCLI・VS Codeを並べ、未導入
  const cliState={項目:value(entries.filter(item=>item.利用可能===true)),全項目:value(entries),処理中:value(''),通知:value(''),失敗:value(false),読込:async()=>{}};
  for(const online of [true,false])for(const folder of ['/fixture/project','']){
   const state=appState({folder});state.項目=value(['avatar','task','team','ide','console','code','live','discord'].map(id=>({id,名前:id})));
-  const html=await render('アプリ起動/アプリ起動パネル.vue',{state,cliState,online,visible:true});
+  const html=await render('components/アプリ起動/アプリ起動パネル.vue',{state,cliState,online,visible:true});
   assert.equal((html.match(/class="app-launch-button"/g)||[]).length,14);
   assert.equal((html.match(/width="72" height="72"/g)||[]).length,14);
   assert.match(html,/VS Code でフォルダを開く/);
@@ -90,7 +90,7 @@ test('通常のアプリ起動は受付・起動済み通知を隠し、エラ�
  const state=appState({folder:'/fixture/project'});
  for(const 種別 of ['accepted','existing','error']){
   state.結果=value({code:{種別,通知:'fixture launch notice',ログ:'/fixture/log'}});
-  const html=await render('アプリ起動/アプリ起動パネル.vue',{state,online:true,visible:true});
+  const html=await render('components/アプリ起動/アプリ起動パネル.vue',{state,online:true,visible:true});
   assert.equal(html.includes('fixture launch notice'),種別==='error');assert.doesNotMatch(html,/起動ログの保存先/);
  }
 });
@@ -104,7 +104,7 @@ test('ミニ切替の配線はタイトルバーだけに残し、通常ペー�
   assert.ok(panel.includes(`:visible="tab==='${tab}'&&!ミニ表示"`));assert.doesNotMatch(panel,/@mini=/);
  }
  for(const connected of [true,false]){
-  const html=await render('ウィンドウ/ステータスバー.vue',{connected,compact:false});
+  const html=await render('components/ウィンドウ/ステータスバー.vue',{connected,compact:false});
   assert.equal((html.match(/aria-label="ランチャー表示"/g)||[]).length,1);
   const button=html.match(/<button class="title-mini-switch"[^>]*>/)[0];
   assert.equal(/ disabled(?:[ >])/.test(button),!connected);

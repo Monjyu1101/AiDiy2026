@@ -20,111 +20,52 @@ cli_main.py の process_command()
 
 `COMMAND_REGISTRY` は `CommandDef` dataclass のリストです。
 
+主なフィールドは `name`、`description`、`category`、`aliases`、`args_hint`、`subcommands`、`cli_only`、`gateway_only` です。現在は busy 処理、共有 executor、desktop 表示などの属性もあるため、dataclass 全体を本文へ複製せずソース定義を確認します。
+
+## 一覧の確認
+
+実際の利用環境では `/help` と `/` 補完を確認します。CLI・Gateway・desktop で利用条件が異なり、登録済みの全コマンドがすべての画面で使えるわけではありません。
+
+代表例:
+
+| 目的 | コマンド |
+|------|----------|
+| 会話を作り直す・履歴を確認する | `/new`、`/history` |
+| モデル・設定を確認する | `/model`、`/config`、`/status` |
+| やり直し・分岐 | `/retry`、`/undo`、`/branch` |
+| ツール・スキル | `/tools`、`/toolsets`、`/skills` |
+| ヘルプ・終了 | `/help`、`/quit`（`/exit`） |
+
+登録全体は次の読み取り専用スクリプトで確認できます（リポジトリ直下、Python 標準ライブラリのみ）。実装を import しないため、設定読込や外部接続を起こしません。
+
 ```python
-@dataclass
-class CommandDef:
-    name: str              # 正規名（"/" 不含）
-    description: str       # 説明文
-    category: str          # カテゴリ
-    aliases: tuple[str]    # エイリアス
-    args_hint: str         # 引数ヒント
-    subcommands: tuple[str] # タブ補完用サブコマンド
-    cli_only: bool         # CLI 限定
-    gateway_only: bool     # Gateway 限定
+import ast
+from pathlib import Path
+
+source = Path("command_hermes/hermes_cli/commands.py")
+tree = ast.parse(source.read_text(encoding="utf-8"))
+registry = next(node.value for node in tree.body
+                if isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == "COMMAND_REGISTRY")
+def display(node):
+    try:
+        return ast.literal_eval(node)
+    except ValueError:
+        return ast.unparse(node)  # 動的説明文は式のまま表示
+
+for entry in registry.elts:
+    name, description, category = [display(arg) for arg in entry.args[:3]]
+    fields = {kw.arg: display(kw.value) for kw in entry.keywords}
+    print(category, "/" + name, fields.get("aliases", ()), description)
 ```
 
-## 全コマンド一覧
-
-### Session（24 コマンド）
-
-| コマンド | エイリアス | 説明 |
-|---------|-----------|------|
-| `/new` | `reset` | 新規セッション開始 |
-| `/clear` | | 画面クリア |
-| `/redraw` | | 再描画 |
-| `/history` | | 履歴表示 |
-| `/save` | | セッション保存 |
-| `/retry` | | 最後の応答を再試行 |
-| `/undo` | | 最後のターンを取り消し |
-| `/title` | | セッションタイトル変更 |
-| `/branch` | `fork` | 分岐 |
-| `/compress` | | コンテキスト圧縮 |
-| `/rollback` | | ロールバック |
-| `/snapshot` | `snap` | スナップショット |
-| `/stop` | | 実行停止 |
-| `/approve` | | 承認（Gateway） |
-| `/deny` | | 拒否（Gateway） |
-| `/background` | `bg`, `btw` | バックグラウンド実行 |
-| `/agents` | `tasks` | エージェント/タスク管理 |
-| `/queue` | `q` | キュー表示 |
-| `/steer` | | 誘導 |
-| `/goal` | | 目標設定 |
-| `/status` | | ステータス表示 |
-| `/resume` | | 再開 |
-| `/restart` | | 実行中の run を drain してから Gateway を再起動（Gateway） |
-| `/sethome` | `set-home` | ホーム設定（Gateway） |
-
-### Configuration（13 コマンド）
-
-| コマンド | エイリアス | 説明 |
-|---------|-----------|------|
-| `/config` | | 設定変更 |
-| `/model` | `provider` | モデル/プロバイダー切替 |
-| `/personality` | | 人格設定 |
-| `/statusbar` | `sb` | ステータスバー切替 |
-| `/verbose` | | 冗長出力切替 |
-| `/footer` | | フッター切替 |
-| `/yolo` | | YOLO モード |
-| `/reasoning` | | 推論表示切替 |
-| `/fast` | | 高速モード |
-| `/skin` | | スキン変更 |
-| `/indicator` | | インジケータ切替 |
-| `/voice` | | 音声設定 |
-| `/busy` | | ビジー状態 |
-
-### Tools & Skills（11 コマンド）
-
-| コマンド | エイリアス | 説明 |
-|---------|-----------|------|
-| `/tools` | | ツール一覧 |
-| `/toolsets` | | ツールセット管理 |
-| `/skills` | | スキル一覧 |
-| `/cron` | | Cron 管理 |
-| `/curator` | | キュレーター |
-| `/kanban` | | カンバン |
-| `/reload` | | リロード |
-| `/reload-mcp` | `reload_mcp` | MCP リロード |
-| `/reload-skills` | `reload_skills` | スキルリロード |
-| `/browser` | | ブラウザ操作 |
-| `/plugins` | | プラグイン管理 |
-
-### Info（12 コマンド）
-
-| コマンド | エイリアス | 説明 |
-|---------|-----------|------|
-| `/commands` | | コマンド一覧表示 |
-| `/help` | | ヘルプ |
-| `/usage` | | 使用量表示 |
-| `/insights` | | インサイト |
-| `/platforms` | `gateway` | プラットフォーム一覧 |
-| `/copy` | | コピー |
-| `/paste` | | ペースト |
-| `/image` | | 画像表示 |
-| `/update` | | アップデート確認 |
-| `/debug` | | デバッグ情報 |
-| `/profile` | | プロファイル |
-| `/gquota` | | クォータ表示 |
-
-### Exit（1 コマンド）
-
-| コマンド | エイリアス | 説明 |
-|---------|-----------|------|
-| `/quit` | `exit` | 終了 |
+一覧を文書へ追加する場合も固定の総数を合否条件にせず、同じコミットの `COMMAND_REGISTRY` と照合します。
 
 ## コマンド追加手順
 
-1. `hermes_cli/commands.py` の `COMMAND_REGISTRY` に `CommandDef` を追加
-2. `cli_main.py` の `process_command()` に分岐処理を追加
+1. `hermes_cli/commands.py` の `COMMAND_REGISTRY` に `CommandDef` を追加し、画面別の利用条件・実行中の busy 方針を指定
+2. `cli_main.py` の `process_command()`、または該当する共有 executor / Gateway handler に実処理を追加
 3. 必要に応じて `_COMMAND_LOOKUP` は import 時に自動構築されるため再起動のみで反映
 
 ## 注意点

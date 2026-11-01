@@ -34,7 +34,7 @@ test('API: 別項目の確認を並行し、同じ項目・一括・保存・再
 
 test('導入状況: 逆順完了・一方の失敗で他行を巻き戻さず、能力読込を待たず解除',async()=>{
  const pending=new Map(),background=deferred();
- const {導入状況状態を作成}=dependency('導入状況/導入状況状態.mjs');
+ const {導入状況状態を作成}=dependency('components/導入状況/導入状況状態.mjs');
  const s=導入状況状態を作成({api:url=>{const d=deferred();pending.set(url,d);return d.promise;},接続済み:ref(true),通知:ref(''),確認後:()=>background.promise});
  s.一覧を反映({項目:[{id:'python'},{id:'node'}],結果:[{id:'python',状態:'OK'},{id:'node',状態:'OK'}]});
  const a=s.個別確認('python'),b=s.個別確認('node');assert.equal(s.個別確認IDs.value.size,2);assert.equal(await s.個別確認('node'),false);
@@ -45,7 +45,7 @@ test('導入状況: 逆順完了・一方の失敗で他行を巻き戻さず、
 });
 
 test('モデル・外部連携: 個別並行、重複防止、認証世代破棄後の遅い応答を無視',async()=>{
- const pending=new Map();const {キー設定状態を作成}=dependency('キー設定共通/キー設定状態.mjs');
+ const pending=new Map();const {キー設定状態を作成}=dependency('components/キー設定共通/キー設定状態.mjs');
  const s=キー設定状態を作成({api:url=>{const d=deferred();pending.set(url,d);return d.promise;},connected:ref(true),message:ref('')});
  const a=s.testKey('openai'),b=s.testKey('gemini'),c=s.testKey('discord');assert.equal(s.keyTestingIds.value.size,3);
  await s.testKey('openai');assert.equal(pending.size,3);
@@ -60,7 +60,7 @@ test('モデル一覧・外部連携の描画: 複数の実行行だけ無効に
  const {render}=require('./ui-components.cjs');
  for(const [panel,ids] of [['モデル一覧',['gemini','openai','claude']],['外部連携',['huggingface_read','huggingface_write','discord']]]){
   const props={connected:true,data:{設定状態:'読込済み',項目:ids.map(id=>({id,名前:id,テスト可能:true}))},results:{},testing:ids[0],testingIds:new Set(ids.slice(0,2))};
-  const html=await render(`${panel}/${panel}パネル.vue`,props);
+  const html=await render(`components/${panel}/${panel}パネル.vue`,props);
   const buttons=[...html.matchAll(/<button[^>]*class="single-test-button"[^>]*>.*?<\/button>/g)].map(m=>m[0]);
   assert.equal(buttons.length,3);assert.match(buttons[0],/disabled/);assert.match(buttons[1],/disabled/);assert.doesNotMatch(buttons[2],/disabled/);
   assert.match(buttons[0],/確認中/);assert.match(buttons[1],/確認中/);

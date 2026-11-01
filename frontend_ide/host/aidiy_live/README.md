@@ -103,7 +103,7 @@ AIコアのモデル情報を取得できない場合は、実際の接続先と
 | `src/protocol.ts` | 既存 AIコアの init / input / 0 / audio 接続とパケット |
 | `src/audio.ts`, `media/capture.js` | AudioWorklet で入力を16/24kHz PCM16へ変換、24kHz出力を順次再生 |
 | `src/visualizer.ts` | 実音声に連動する円形の音量雲を Canvas へ描画 |
-| frontend_ide の `src/ライブ/`（Vue） | 会話・音声操作・モデル選択の共通画面。拡張の Webview・単独起動・IDE で共用 |
+| frontend_ide の `src/components/ライブ/`（Vue） | 会話・音声操作・モデル選択の共通画面。拡張の Webview・単独起動・IDE で共用 |
 | `src/server.ts` | localhost の HTTP / WebSocket 中継。接続先は起動時に固定 |
 | `src/extension.ts`, `src/host.ts` | 独立 Live 拡張、拡張側の通信、共通画面への IPC |
 | `../src/model-preferences.ts` | ユーザーごとの最終手動選択のJSON読込・保存（bundleへ内包） |

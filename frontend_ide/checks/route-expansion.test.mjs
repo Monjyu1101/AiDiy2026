@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRouteExpansion} from '../src/ファイル閲覧/軌跡パネル展開.js';
+import {createRouteExpansion} from '../src/components/ファイル閲覧/軌跡パネル展開.js';
 const flush=async()=>{for(let i=0;i<10;i++)await Promise.resolve();};
 function fixture(){
  let now=0,id=0,reduced=false,available=300,hold=false;const tasks=new Map(),changes=[],reserved=[],pending=[],errors=[];

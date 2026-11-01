@@ -37,8 +37,8 @@ function fixture({ host = false, offline = false } = {}) {
     },
   };
   const transport = { exports: {} };
-  vm.runInNewContext(transformSync(readFileSync(new URL('../src/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, { ...globals, module: transport });
-  const { descriptor } = parse(readFileSync(new URL('../src/コード/コードパネル.vue', import.meta.url), 'utf8'));
+  vm.runInNewContext(transformSync(readFileSync(new URL('../src/components/コード/コード通信.js', import.meta.url), 'utf8'), { format: 'cjs' }).code, { ...globals, module: transport });
+  const { descriptor } = parse(readFileSync(new URL('../src/components/コード/コードパネル.vue', import.meta.url), 'utf8'));
   const script = compileScript(descriptor, { id: 'CodePanel', genDefaultAs: 'component' });
   const template = compileTemplate({ source: descriptor.template.content, filename: 'CodePanel.vue', id: 'CodePanel', compilerOptions: { bindingMetadata: script.bindings } });
   assert.deepEqual(template.errors, []);
@@ -48,7 +48,7 @@ function fixture({ host = false, offline = false } = {}) {
     require: id => id === 'vue' ? { ...vue, withDirectives: node => node, onMounted: noop, onBeforeUnmount: fn => unmounted.push(fn) }
       : id === 'markdown-it' ? require('markdown-it')
       : id === '../コード/コード通信.js' ? { codeTransport: (props, fn) => { receive = fn; return transport.exports.codeTransport(props, fn); } }
-      : id === '../../host/src/stream-control' ? { visibleStreamContent: text => text }
+      : id === '../../../host/src/stream-control' ? { visibleStreamContent: text => text }
       : id === '../コード/会話到着演出' ? { chatArrival: () => ({ reset: noop, dispose: noop, show: noop }) }
       : id === '../下書き連携/下書き受け渡し.js' ? { createDraftReceiver: () => ({ publish: noop, dispose: noop }) } : {},
   });

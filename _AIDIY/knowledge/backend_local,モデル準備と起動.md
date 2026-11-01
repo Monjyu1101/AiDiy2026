@@ -43,4 +43,4 @@ Gemma は HuggingFace 上のゲート付きモデルです。利用前に以下�
 
 `GET http://127.0.0.1:8096/health` で稼働状態を確認します。モデルは最初の推論要求時にメモリへロードされるため、health成功だけでは推論成功を意味しません。必要メモリと速度はモデル・dtype・入力長・デバイスによって異なります。
 
-全体cleanupで `backend_local/temp/models` も削除されます。次の利用前にモデルの再取得が必要です。設定・対応APIは [実装概要](../../backend_local/AGENTS.md)、整理方法は [cleanup後の確認](./共通,_cleanup.py後の確認.md) を参照してください。
+全体cleanupで `backend_local/temp/models` も削除されます。次の利用前にモデルの再取得が必要です。設定・対応APIは [実装概要](../../backend_local/AGENTS.md)、整理方法は [cleanup後の確認](./共通,クリーンアップ手順.md) を参照してください。

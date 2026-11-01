@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ミニ高さを合わせる} from '../ui/src/ウィンドウ/ミニ高さ.mjs';
+import {ミニ高さを合わせる} from '../ui/src/components/ウィンドウ/ミニ高さ.mjs';
 const flush=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
 function fixture(resize=()=>true,style){
  let height=99.2,observer;const calls=[],observed=[];

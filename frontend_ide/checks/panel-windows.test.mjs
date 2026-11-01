@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import native from '../デスクトップ/panel-windows.cjs';
 import pinModule from '../デスクトップ/最前面ピン.cjs';
-import {popupFeatures,fadePanel} from '../src/ファイル閲覧/パネル別窓.js';
+import {popupFeatures,fadePanel} from '../src/components/ファイル閲覧/パネル別窓.js';
 const {panelBounds,createPanelWindows}=native;
 test('表示開始フェード: opacityだけ260ms、再実行で古い演出解除、OS設定にかかわらず表示',()=>{
  let reduced=false,cancelled=0;const calls=[];

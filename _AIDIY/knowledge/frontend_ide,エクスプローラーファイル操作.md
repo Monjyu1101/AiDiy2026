@@ -1,6 +1,6 @@
 # エクスプローラーファイル操作
 
-> 文書: `frontend_ide,エクスプローラーファイル操作.md` | 実装: `frontend_ide/src/ファイル閲覧/ファイル一覧.vue`, `frontend_ide/src/ファイル閲覧/エクスプローラー操作.js`, `frontend_ide/src/ファイル閲覧/エクスプローラー操作表示.vue`, `frontend_ide/ファイル機能/explorer-files.mjs`, `frontend_ide/ファイル機能/explorer-native.mjs`, `frontend_ide/ファイル機能/explorer-windows.ps1`
+> 文書: `frontend_ide,エクスプローラーファイル操作.md` | 実装: `frontend_ide/src/components/ファイル閲覧/ファイル一覧.vue`, `frontend_ide/src/components/ファイル閲覧/エクスプローラー操作.js`, `frontend_ide/src/components/ファイル閲覧/エクスプローラー操作表示.vue`, `frontend_ide/ファイル機能/explorer-files.mjs`, `frontend_ide/ファイル機能/explorer-native.mjs`, `frontend_ide/ファイル機能/explorer-windows.ps1`
 
 ## このメモを使う場面
 

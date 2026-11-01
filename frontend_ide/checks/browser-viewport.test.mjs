@@ -93,7 +93,7 @@ test('Browser本文: 破棄後の保留解除と古い測定は窓を動かさ�
  assert.equal(f.calls.length,0);assert.equal(f.control.measure(f.rect()),false);assert.equal(f.window.listenerCount('resize'),0);
 });
 test('Browser本文: rendererは同一時点のviewport/modeを渡し、Browserだけ画面外拡大を許可',()=>{
- const panel=readFileSync(new URL('../src/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'),desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
+ const panel=readFileSync(new URL('../src/components/ブラウザ/ブラウザパネル.vue',import.meta.url),'utf8'),desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  assert.match(panel,/viewportWidth:viewport.width,viewportHeight:viewport.height,fullscreen:!!page.value.fullscreen/);
  assert.match(desktop,/kind==='browser'\?\{enableLargerThanScreen:true\}:\{\}/);
  assert.match(desktop,/record.kind==='browser'&&browserViews\)return browserViews.maximize\(record\)/);

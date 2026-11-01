@@ -95,8 +95,8 @@ aidiy_hermes
 aidiy_hermes -Q -z "このフォルダの構成を要約して"
 
 # provider / model 指定
-aidiy_hermes -z --provider openai -m gpt-5.2 -Q "TODO を整理して"
-aidiy_hermes -z --provider ollama -m deepseek-v4-flash:cloud -Q "ファイル一覧を確認して"
+aidiy_hermes --provider openai -m gpt-5.2 -Q -z "TODO を整理して"
+aidiy_hermes --provider ollama -m deepseek-v4-flash:cloud -Q -z "ファイル一覧を確認して"
 ```
 
 手動実行の 1 ショットは `-Q -z "本文"` を使う。`-Q`（quiet）は真偽フラグ、`-z`（oneshot）は `nargs="?"` で本文を値に取るため、本文は `-z` の直後へ置く。
@@ -141,7 +141,9 @@ Linux / macOS は `command_hermes/.venv/bin/python` を使う。
 ## 対応 provider
 
 - API provider: `ollama`, `openai`, `openrt`, `gemini`, `freeai`, `anthropic`, `openai_oauth`, `xai-oauth`
-- CLI bridge: `claude_cli`, `codex_cli`, `antigravity_cli`, `copilot_cli`
+- CLI bridge: `claude-code`, `codex-cli`, `antigravity-cli`, `copilot-cli`, `opencode`, `grok-cli`（Hermes の provider slug。本体の Code AI 識別子とは区別する）
+
+選択優先順位・候補生成の正本は [Provider 一覧と選択ロジック](./command_hermes,Provider一覧と選択ロジック.md)。
 
 AiDiy の既定設定は `openai_oauth / gpt-6.1-sol`。OAuth 認証済みなら OpenAI を使い、別 PC の初回起動や認証切れでは `freeai / gemini-3.8-flash` へ自動退避する。OpenAI OAuth のトークンは Codex CLI と共通の `${CODEX_HOME:-~/.codex}/auth.json` に保存する。Hermes のログインと更新も同じファイルへ書き込む。`--provider openai_oauth` を明示した場合は自動退避せず OAuth 認証を開始できる。
 
@@ -196,7 +198,7 @@ Set-Location command_hermes
 .venv\Scripts\python.exe cli_main.py --list-tools
 python ..\_setup.py          # .cmd を再生成
 aidiy_hermes -Q -z "おはよう"
-aidiy_hermes -z --provider ollama --model "deepseek-v4-flash:cloud" -Q "おはよう"
+aidiy_hermes --provider ollama --model "deepseek-v4-flash:cloud" -Q -z "おはよう"
 .venv\Scripts\python.exe -c "import openai; import anthropic; import google.genai; print('provider sdks ok')"
 ```
 

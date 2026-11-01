@@ -27,3 +27,19 @@ test('最大化からミニへ切替後は現在の左肩で元の通常寸法�
 test('Windows以外では既存のnative窓をそのまま使用する',()=>{
  const f=fixture();for(const platform of ['linux','darwin'])assert.equal(通常窓サイズを作成(f.raw,f.screen,platform),f.raw);
 });
+
+test('最大化からアイコンへ切替後も通常寸法を保持し現在のアイコン位置へ復帰する',()=>{
+ const {EventEmitter}=require('node:events');
+ const {マイクロ表示を作成}=require('../起動/マイクロ表示.cjs');
+ let bounds={x:48,y:48,width:800,height:600},minimum=[420,320],maximizable=true,resizable=true;
+ const raw=new EventEmitter(),contents=new EventEmitter();
+ Object.assign(raw,{webContents:contents,getBounds:()=>({...bounds}),getNormalBounds:()=>({...bounds}),setBounds:v=>bounds={...v},isMaximized:()=>false,isDestroyed:()=>false,getMinimumSize:()=>minimum,setMinimumSize:(...v)=>minimum=v,isMaximizable:()=>maximizable,setMaximizable:v=>maximizable=v,isResizable:()=>resizable,setResizable:v=>resizable=v,isAlwaysOnTop:()=>true,setAlwaysOnTop(){},setIgnoreMouseEvents(){}});
+ const screen={getDisplayMatching:()=>({workArea:{x:-1920,y:28,width:1920,height:1052}})},window=通常窓サイズを作成(raw,screen,'win32');
+ const micro=マイクロ表示を作成(window,{screen,pins:{setLocked(){},state:()=>({pinned:false})}});
+ for(let i=0;i<3;i++){
+  window.maximize();micro.set(true);assert.equal(window.isMaximized(),false);assert.equal(window.isMaximizable(),false);
+  raw.setBounds({...raw.getBounds(),x:-900,y:150});micro.set(false);
+  assert.deepEqual(raw.getBounds(),{x:-900,y:150,width:800,height:600});assert.equal(window.isMaximized(),false);assert.equal(window.isMaximizable(),true);
+ }
+ raw.emit('closed');
+});

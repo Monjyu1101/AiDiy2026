@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveTaskView, createTaskSession, createTaskSelectionCache, taskChannelName } from '../src/タスクチーム/task-session.js';
+import { resolveTaskView, createTaskSession, createTaskSelectionCache, taskChannelName } from '../src/components/タスクチーム/task-session.js';
 test('Electron task defaults to request; each peer and editor has its own view; Web remains combined', () => {
   const api = { taskWindows() {} };
   for (const view of ['request', 'flow', 'detail', 'dialog']) assert.equal(resolveTaskView('task', '#task-view=' + view, api), view);

@@ -12,7 +12,7 @@
 
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { SlackBot } from '../src/接続/Bot接続';
+import { SlackBot, コマンド案内 } from '../src/接続/Bot接続';
 import { SlackAPIエラー, type SlackAPI } from '../src/接続/ネットワーク接続';
 import type { Code接続 } from '../src/コード/コード会話';
 import { ts比較, 本文分割 } from '../src/接続/コマンド処理';
@@ -78,7 +78,7 @@ test('起動前の投稿は無視し、許可ユーザーの新規投稿へス�
     await waitFor(() => slack.updates.length === 1);
     assert.deepEqual(runs, [{ key: `${teamId}:${channelId}:101.000001`, text: 'こんにちは <b>' }]);
     assert.equal(slack.posts[0].thread_ts, '101.000001'); assert.equal(slack.posts[0].text, '考えています…');
-    assert.equal(slack.updates[0].text, '回答:こんにちは &lt;b&gt;');
+    assert.equal(slack.updates[0].text, '回答:こんにちは &lt;b&gt;\n\n' + コマンド案内);
     // 同じ範囲を再取得しても二重に実行しない。
     await bot.巡回(); await bot.巡回();
     assert.equal(runs.length, 1);
@@ -107,16 +107,16 @@ test('コマンドに応答し、長い回答は分割して投稿する', async
   const bot = new SlackBot(config(), slack.api, code, { interval: 60_000 });
   try {
     await bot.起動();
-    slack.投稿追加({ text: '!aidiy status', ts: '104.000001' });
-    slack.投稿追加({ text: `<@${botUserId}> help`, ts: '104.000002' });
+    slack.投稿追加({ text: '!status', ts: '104.000001' });
+    slack.投稿追加({ text: '!help', ts: '104.000002' });
     slack.投稿追加({ text: '長文', ts: '104.000003' });
     await bot.巡回();
     await waitFor(() => slack.posts.length >= 5);
     assert.match(slack.posts[0].text, /Code: 待機中/);
-    assert.match(slack.posts[1].text, /話しかけてください/);
+    assert.ok(slack.posts.some(p => p.text === コマンド案内));
     const chunks = 本文分割('あ'.repeat(8000));
     assert.equal(slack.updates[0].text, chunks[0]);
-    assert.deepEqual(slack.posts.slice(3).map(p => p.text), chunks.slice(1));
+    assert.deepEqual(slack.posts.filter(p => p.text.startsWith('あ')).map(p => p.text), chunks.slice(1));
   } finally { await bot.終了(); }
 });
 
@@ -191,7 +191,7 @@ test('スレッド返信も全ページを取得し、途中失敗では既読�
   const f = 巡回準備(2);
   try {
     f.history.push(f.message('1.000001', '開始')); await f.bot.巡回(); await 処理待ち();
-    f.replies.set('1.000001', [2, 3, 4].map(i => f.message(`${i}.000001`, '!aidiy status')));
+    f.replies.set('1.000001', [2, 3, 4].map(i => f.message(`${i}.000001`, '!status')));
     f.fail('conversations.replies');
     await assert.rejects(f.bot.巡回(), { error: 'network_error' }); await 処理待ち();
     assert.equal(f.posts.filter(post => post.text.startsWith('Code:')).length, 0);
@@ -208,7 +208,7 @@ test('has_more だけの応答も時刻でページを進め、履歴とスレ�
     for (let i = 1; i <= 3; i++) f.history.push(f.message(`${i}.000001`, `要求${i}`));
     await f.bot.巡回(); await 処理待ち();
     assert.deepEqual(f.runs.map(item => item.text), ['要求1', '要求2', '要求3']);
-    f.replies.set('3.000001', [4, 5, 6].map(i => f.message(`${i}.000001`, '!aidiy status')));
+    f.replies.set('3.000001', [4, 5, 6].map(i => f.message(`${i}.000001`, '!status')));
     // 直近スレッドは履歴取得と同時に一度巡回済み。round-robinで戻るまで待つ。
     for (let i = 0; i < 3; i++) await f.bot.巡回();
     await 処理待ち();
@@ -237,7 +237,7 @@ test('同じスレッドの要求とstopを同じ巡回で受けても、未開�
   const f = 巡回準備();
   try {
     f.history.push(f.message('1.000001', '開始')); await f.bot.巡回(); await 処理待ち();
-    f.replies.set('1.000001', [f.message('2.000001', '取り消す要求'), f.message('2.000002', '!aidiy stop')]);
+    f.replies.set('1.000001', [f.message('2.000001', '取り消す要求'), f.message('2.000002', '!stop')]);
     await f.bot.巡回(); await 処理待ち();
     assert.deepEqual(f.runs.map(item => item.text), ['開始']);
     assert.ok(f.posts.some(post => post.text.startsWith('停止を要求しました')));
@@ -250,7 +250,7 @@ test('考えています投稿の待機中のstopは後続のCLI起動を防ぎ�
     f.holdPlaceholder(new Promise(resolve => { release = resolve; }));
     f.history.push(f.message('1.000001', '取り消す要求')); await f.bot.巡回(); await 処理待ち();
     assert.equal(f.runs.length, 0);
-    f.replies.set('1.000001', [f.message('2.000001', '!aidiy stop')]);
+    f.replies.set('1.000001', [f.message('2.000001', '!stop')]);
     await f.bot.巡回(); await 処理待ち();
     f.holdPlaceholder(); release({ ok: true, ts: '10.000001' }); await 処理待ち();
     assert.equal(f.runs.length, 0);
@@ -270,7 +270,7 @@ test('stopは同じスレッドの実行と待ち行列だけを停止し、別�
   try {
     f.history.push(f.message('1.000001', '実行中'), f.message('2.000001', '別スレッド'));
     await f.bot.巡回(); await 処理待ち();
-    f.replies.set('1.000001', [f.message('3.000001', '待機中'), f.message('3.000002', '!aidiy stop')]);
+    f.replies.set('1.000001', [f.message('3.000001', '待機中'), f.message('3.000002', '!stop')]);
     await f.bot.巡回(); await 処理待ち();
     assert.deepEqual(f.runs.map(item => item.text), ['実行中', '別スレッド']);
     assert.deepEqual(stopped, [`${teamId}:${channelId}:1.000001`]);
@@ -283,7 +283,7 @@ test('stop直後の新要求は、取り消した10件の待ち行列とは別�
   try {
     f.history.push(f.message('1.000001', '開始')); await f.bot.巡回(); await 処理待ち();
     f.replies.set('1.000001', [...Array.from({ length: 10 }, (_, i) => f.message(`2.${String(i + 1).padStart(6, '0')}`, `取消${i}`)),
-      f.message('3.000001', '!aidiy stop'), f.message('3.000002', '次の要求')]);
+      f.message('3.000001', '!stop'), f.message('3.000002', '次の要求')]);
     await f.bot.巡回(); await 処理待ち();
     assert.deepEqual(f.runs.map(item => item.text), ['開始', '次の要求']);
     assert.ok(!f.posts.some(post => post.text.includes('返信待ちのメッセージが多い')));
@@ -327,8 +327,8 @@ test('stopを繰り返しても新要求の順序と会話キーを保つ', asyn
   const f = 巡回準備();
   try {
     f.history.push(f.message('1.000001', '開始')); await f.bot.巡回(); await 処理待ち();
-    f.replies.set('1.000001', [f.message('2.000001', '取消'), f.message('2.000002', '!aidiy stop'),
-      f.message('2.000003', '!aidiy stop'), f.message('2.000004', '再開1'), f.message('2.000005', '再開2')]);
+    f.replies.set('1.000001', [f.message('2.000001', '取消'), f.message('2.000002', '!stop'),
+      f.message('2.000003', '!stop'), f.message('2.000004', '再開1'), f.message('2.000005', '再開2')]);
     await f.bot.巡回(); await 処理待ち();
     assert.deepEqual(f.runs.map(item => item.text), ['開始', '再開1', '再開2']);
     assert.equal(new Set(f.runs.map(item => item.key)).size, 1);
@@ -367,8 +367,90 @@ test('起動・会話直後は3秒、最後の会話から10分で6秒へ落と�
     answer('回答'); await flush();
     await poll(1_801_999); assert.equal(waits.at(-1), 3000, 'AI回答の直後から数える');
     await poll(1_802_000); assert.equal(waits.at(-1), 6000, '最後のAI回答から10分');
-    slack.返信追加('102.000001', { text: '!aidiy status', ts: '901.000001', thread_ts: '102.000001' });
+    slack.返信追加('102.000001', { text: '!status', ts: '901.000001', thread_ts: '102.000001' });
     await poll(1_803_000); assert.equal(waits.at(-1), 3000, '同じスレッドの会話でも復帰');
     assert.ok(slack.posts.some(post => post.text === 'Code: 待機中'));
+  } finally { await bot.終了(); }
+});
+
+
+test('短縮コマンドと全角・未知コマンドはAIへ渡さず、最初のhelpは重複しない', async () => {
+  const f = 巡回準備(); const resets: string[] = [];
+  f.code.リセット = key => { resets.push(key); };
+  try {
+    f.history.push(f.message('1.000001', '！unknown'), f.message('2.000001', '!new'), f.message('3.000001', '！status'));
+    await f.bot.巡回(); await 処理待ち();
+    assert.equal(f.runs.length, 0);
+    assert.equal(f.posts[0].text, コマンド案内);
+    assert.equal(f.posts.filter(p => p.text.includes(コマンド案内)).length, 1);
+    assert.deepEqual(resets, [`${teamId}:${channelId}:2.000001`]);
+    assert.equal(f.posts.at(-1)?.text, 'Code: 待機中');
+  } finally { await f.bot.終了(); }
+});
+
+test('並行する別スレッドへの初回確定返信は一度だけ案内し、Botを作り直すと復活する', async () => {
+  for (let instance = 0; instance < 2; instance++) {
+    const f = 巡回準備();
+    try {
+      f.history.push(f.message('1.000001', '最初'), f.message('2.000001', '別スレッド'));
+      await f.bot.巡回(); await 処理待ち();
+      assert.equal(f.updates.length, 2);
+      assert.equal(f.updates.filter(p => p.text.includes(コマンド案内)).length, 1);
+      assert.equal(f.posts.filter(p => p.text.includes(コマンド案内)).length, 0, '仮表示には付けない');
+      await f.bot.巡回(); await 処理待ち();
+      f.history.push(f.message('3.000001', '!status'));
+      await f.bot.巡回(); await 処理待ち();
+      assert.equal(f.posts.at(-1)?.text, 'Code: 待機中');
+    } finally { await f.bot.終了(); }
+  }
+});
+
+test('初回長文の末尾に案内を一度だけ付け、送信失敗では消費しない', async () => {
+  const { code } = 偽Code(); const sent: string[] = [];
+  let reject = true;
+  const api: SlackAPI = async (_method, params) => {
+    if (reject && params.text.includes('!stop')) throw new SlackAPIエラー('chat.postMessage', 'network_error');
+    sent.push(params.text); return { ok: true, ts: '1.000001' };
+  };
+  const bot = new SlackBot(config(), api, code);
+  // 送信境界だけを直接検証し、メッセージ処理のエラー返信と切り離す。
+  const send = (root: string, text: string) => (bot as unknown as { 回答送信(root: string, text: string): Promise<void> }).回答送信(root, text);
+  try {
+    await assert.rejects(send('1.000001', 'あ'.repeat(8000)));
+    assert.equal(sent.join(''), 'あ'.repeat(7000));
+    reject = false; sent.length = 0;
+    await Promise.all([send('2.000001', 'い'.repeat(8000)), send('3.000001', '次の返信')]);
+    assert.equal(sent.slice(0, 3).join(''), 'い'.repeat(8000) + '\n\n' + コマンド案内);
+    assert.ok(sent.every(text => text.length <= 3500));
+    assert.equal(sent.filter(text => text.includes('!stop')).length, 1);
+    assert.equal(sent.at(-1), '次の返信');
+  } finally { await bot.終了(); }
+});
+
+
+test('helpが分割境界にかかる長さでも案内全文は最後の1投稿に保つ', async () => {
+  const { code } = 偽Code(); const sent: string[] = [];
+  const bot = new SlackBot(config(), async (_method, params) => { sent.push(params.text); return { ok: true }; }, code);
+  try {
+    await (bot as unknown as { 回答送信(root: string, text: string): Promise<void> }).回答送信('1.000001', 'あ'.repeat(3499));
+    assert.deepEqual(sent, ['あ'.repeat(3499), '\n\n' + コマンド案内]);
+  } finally { await bot.終了(); }
+});
+
+
+test('同じBotの巡回通信が失敗・回復しても初回案内は復活しない', async () => {
+  const slack = 偽Slack(), { code } = 偽Code(); let fail = false;
+  const bot = new SlackBot(config(), async (method, params) => {
+    if (fail && method === 'conversations.history') throw new SlackAPIエラー(method, 'network_error');
+    return slack.api(method, params);
+  }, code, { interval: 60_000 });
+  try {
+    await bot.起動(); slack.投稿追加({ ts: '101.000001', text: '!status' });
+    await bot.巡回(); await 処理待ち();
+    assert.equal(slack.posts[0].text, 'Code: 待機中\n\n' + コマンド案内);
+    fail = true; await assert.rejects(bot.巡回(), { error: 'network_error' });
+    fail = false; slack.投稿追加({ ts: '102.000001', text: '！status' });
+    await bot.巡回(); await 処理待ち();
+    assert.equal(slack.posts[1].text, 'Code: 待機中');
   } finally { await bot.終了(); }
 });

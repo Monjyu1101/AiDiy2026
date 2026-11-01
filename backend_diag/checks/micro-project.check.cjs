@@ -11,10 +11,10 @@ const {閉じた幅}=require('../起動/マイクロ表示.cjs');
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await vue.nextTick();};
 const nodes=node=>[node,...node.children.flatMap(nodes)];
 async function fixture({switching=false}={}){
- const modules={'./アプリアイコン.mjs':await import('../ui/src/アプリ起動/アプリアイコン.mjs'),'./アイコン移動.mjs':await import('../ui/src/アプリ起動/アイコン移動.mjs'),'./円周配置.cjs':require('../ui/src/アプリ起動/円周配置.cjs')};
+ const modules={'./アプリアイコン.mjs':await import('../ui/src/components/アプリ起動/アプリアイコン.mjs'),'./アイコン移動.mjs':await import('../ui/src/components/アプリ起動/アイコン移動.mjs'),'./円周配置.cjs':require('../ui/src/components/アプリ起動/円周配置.cjs')};
  const window=new EventTarget(),calls=[],sizes=[],menus=[];let menuCallback;
  window.aidiyWindow={onMicroMenu:callback=>{menuCallback=callback;return ()=>menuCallback=null;},showMicroMenu:items=>menus.push(items),resizeMicroLabel:async height=>{sizes.push(height);return true;},expandMicro:async(...args)=>{calls.push(args);return true;}};
- const {descriptor}=parse(source('アプリ起動/マイクロランチャー.vue'));
+ const {descriptor}=parse(source('components/アプリ起動/マイクロランチャー.vue'));
  const compiled=compileScript(descriptor,{id:'micro-project',inlineTemplate:true,genDefaultAs:'component'}),module={exports:{}};
  vm.runInNewContext(transformSync(compiled.content+'\nmodule.exports=component;',{format:'cjs'}).code,{module,exports:module.exports,window,document:{documentElement:{classList:{add(){},remove(){}}}},setTimeout,clearTimeout,require:id=>id==='vue'?vue:modules[id]||{}});
  const make=(tag,text='')=>({tag,_text:text,get text(){return this._text+this.children.filter(n=>n.tag!=='#comment').map(n=>n.text).join('');},set text(value){this._text=value;},children:[],props:{},style:{},parent:null,querySelector(){return null;},querySelectorAll(){return [];},getBoundingClientRect(){return {height:Math.max(18,Math.ceil(this.text.length/10)*18)};}});
@@ -57,7 +57,7 @@ test('アイコンの下に1つだけプロジェクト名を表示し、Windows
 });
 
 test('名前は透明な同幅領域で日本語・空白なし英字も折り返す',()=>{
- const css=req('postcss').parse(source('アプリ起動/マイクロランチャー.css')),d={};
+ const css=req('postcss').parse(source('components/アプリ起動/マイクロランチャー.css')),d={};
  css.walkRules(r=>{if(r.selector==='.micro-project')r.walkDecls(v=>d[v.prop]=v.value);});
  assert.equal(d.background,'transparent');assert.equal(d['white-space'],'normal');assert.equal(d['overflow-wrap'],'anywhere');
  assert.equal(d.width,'120px');assert.equal(d['min-height'],'18px');assert.equal(d['text-overflow'],undefined);
@@ -157,7 +157,7 @@ test('起動不可の項目は円周と右クリックから消え、復帰す�
 });
 
 test('円形のVS Codeは導入状態の変化に追従して表示・非表示になる',async()=>{
- const {CLI状態を作成}=await import('../ui/src/アプリ起動/CLI状態.mjs');
+ const {CLI状態を作成}=await import('../ui/src/components/アプリ起動/CLI状態.mjs');
  const f=await fixture();let installed=false;
  const cli=CLI状態を作成({アプリ:f.appState,api:async()=>({対象:[{id:'vscode',名前:'VS Code',種類:'editor',利用可能:installed}]})});
  try{

@@ -8,15 +8,15 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import vm from 'node:vm';
-import * as latest from '../src/ファイル閲覧/最新ファイル.js';
-import * as fileDates from '../src/ファイル閲覧/ファイル日時.js';
-import * as routeExpansion from '../src/ファイル閲覧/軌跡パネル展開.js';
-import * as routeTree from '../src/開発スペース/軌跡ツリー.js';
-import * as routeRecords from '../src/開発スペース/経路記録.js';
-import * as explorerDrag from '../src/ファイル閲覧/エクスプローラードラッグ.js';
-import * as explorerActions from '../src/ファイル閲覧/エクスプローラー操作.js';
-import {scanWarning} from '../src/ファイル閲覧/走査警告.js';
-import {createSpace} from '../src/開発スペース/宇宙描画.js';
+import * as latest from '../src/components/ファイル閲覧/最新ファイル.js';
+import * as fileDates from '../src/components/ファイル閲覧/ファイル日時.js';
+import * as routeExpansion from '../src/components/ファイル閲覧/軌跡パネル展開.js';
+import * as routeTree from '../src/components/開発スペース/軌跡ツリー.js';
+import * as routeRecords from '../src/components/開発スペース/経路記録.js';
+import * as explorerDrag from '../src/components/ファイル閲覧/エクスプローラードラッグ.js';
+import * as explorerActions from '../src/components/ファイル閲覧/エクスプローラー操作.js';
+import {scanWarning} from '../src/components/ファイル閲覧/走査警告.js';
+import {createSpace} from '../src/components/開発スペース/宇宙描画.js';
 
 const require=createRequire(import.meta.url),vue=require('vue');
 const {parse,compileScript,compileTemplate}=require('@vue/compiler-sfc'),{transformSync}=require('esbuild');
@@ -26,7 +26,7 @@ const reply=value=>({ok:true,json:async()=>value});
 const scan=(files,extra={})=>({root:'/project',tree:{n:'project',d:[],f:files.map(path=>[path,20,1000])},truncated:false,...extra});
 
 function explorer(fetcher=async()=>reply({files:[]})){
-  const path=new URL('../src/ファイル閲覧/ファイル一覧.vue',import.meta.url),{descriptor}=parse(readFileSync(path,'utf8'));
+  const path=new URL('../src/components/ファイル閲覧/ファイル一覧.vue',import.meta.url),{descriptor}=parse(readFileSync(path,'utf8'));
   assert.deepEqual(compileTemplate({source:descriptor.template.content,id:'explorer',filename:path.pathname}).errors,[]);
   const script=compileScript(descriptor,{id:'explorer',genDefaultAs:'component'});
   const {code}=transformSync(`${script.content}\nmodule.exports=component;`,{format:'cjs'});

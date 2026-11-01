@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {createRequire} from 'node:module';
-import {installWindowMove,windowMoveTarget} from '../src/共通表示/長押し窓移動.js';
+import {installWindowMove,windowMoveTarget} from '../src/components/共通表示/長押し窓移動.js';
 const {createCodeDrag}=createRequire(import.meta.url)('../デスクトップ/code-drag.cjs');
 const flush=async()=>{for(let i=0;i<10;i++)await Promise.resolve();};
 function native(rounding=0,options={}){

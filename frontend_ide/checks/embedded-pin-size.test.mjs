@@ -18,7 +18,7 @@ test('本体内の3つの別窓起動ピンは本文サイズに依存せず14px
   assert.ok(css.lastIndexOf(selectors.join(',')) > css.lastIndexOf('font-size:var(--file-font-size)'));
   assert.equal(rule.trim(), selectors.join(',') + '{font-size:14px;line-height:14px}');
   // クリック領域・余白・操作は変更せず、別窓のホストには space-view を付けない。
-  const panel = readFileSync(new URL('../src/ファイル閲覧/パネル別窓.js', import.meta.url), 'utf8');
+  const panel = readFileSync(new URL('../src/components/ファイル閲覧/パネル別窓.js', import.meta.url), 'utf8');
   assert.match(panel, /host.className = 'development-app ' \+ className/);
   assert.doesNotMatch(rule, /window-actions|viewer-pinned|padding|width|height:(?!14px)/);
 });

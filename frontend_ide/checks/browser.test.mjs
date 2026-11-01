@@ -14,7 +14,7 @@ import capture from '../デスクトップ/ブラウザ撮影.cjs';
 import browser from '../デスクトップ/ブラウザ.cjs';
 import layout from '../デスクトップ/window-layout.cjs';
 import pins from '../デスクトップ/最前面ピン.cjs';
-import {openBrowser} from '../src/ブラウザ/起動.js';
+import {openBrowser} from '../src/components/ブラウザ/起動.js';
 const {HOME,browserURL,createBrowserViews}=browser;
 test('Browser: Google既定、検索語・URL・開発サーバーの解決、実行スキーム拒否',()=>{
  assert.equal(browserURL(''),HOME);

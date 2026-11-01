@@ -56,12 +56,12 @@ AiDiy の Code AI 連携では、長さにかかわらず完全プロンプト�
 | `cli_main.py` / `backend_server/AIコア/AIコード_cli.py` | Windows の argv 長制限を避けるため、AiDiy 連携の完全プロンプトを `--oneshot-stdin` + UTF-8 stdin で渡す。 |
 | `tools/daemon_pool.py` | Python 3.14 で `ThreadPoolExecutor` の worker 引数が `(ref, ctx, work_queue)` に変わったため、`_adjust_thread_count()` で `_create_worker_context` の有無を見て分岐する。upstream は `requires-python <3.14` のため未対応 |
 
-upstream の `requires-python` は `>=3.11,<3.14` ですが、AiDiy は 3.14 の venv で動かしています。
+upstream の `requires-python` は `>=3.11,<3.14` ですが、AiDiy の宣言条件は `pyproject.toml` の `>=3.13` で、3.14 を使う環境も対象にしています。
 3.14 固有の不具合を見つけたら、まず「upstream が 3.14 未対応なだけではないか」を疑ってください。
 
 ## 動作確認コマンド
 
-各修正後、以下が数秒以内に成功すること。
+各修正後、以下を確認します。MCP discovery や外部 LLM の待ち時間を含むため、数秒以内という固定条件にはしません。
 
 ```bash
 cd command_hermes
@@ -88,7 +88,7 @@ from tools.file_tools import read_file_tool, search_tool, write_file_tool, patch
 - `terminal_tool(command='pwd; python -V')` が exit_code 0 で返る
 - `terminal_tool(..., background=True)` が session_id を返す
 - `read_file_tool` / `search_tool` / `write_file_tool` / `patch_tool` が成功する
-- `tools.mcp_tool.discover_mcp_tools()` が AiDiy_mcp.json の 19 サーバー分を拾う
+- `tools.mcp_tool.discover_mcp_tools()` が 現在の OS と設定で有効な対象を拾う（件数は固定しない）
 
 統合確認:
 

@@ -8,7 +8,7 @@ import {Readable} from 'node:stream';
 import {createHandler} from '../diag_main.mjs';
 import {createToolsRepresentativeBridge,createToolsSettingsBridge,TOOLS_SETTINGS_BODY_LIMIT,TOOLS_REPRESENTATIVE_BYTE_LIMIT,BACKUP_REPRESENTATIVE_TIMEOUT_MS,BACKUP_REPRESENTATIVE_RESPONSE_TIMEOUT_MS} from '../Tools/設定接続.mjs';
 import {DIAG_TRANSPORT_BYTE_LIMIT} from '../runtime/transport_limit.mjs';
-import {Tools代表テスト} from '../ui/src/Tools/Tools代表テスト.mjs';
+import {Tools代表テスト} from '../ui/src/components/Tools/Tools代表テスト.mjs';
 const reader=async()=>JSON.stringify({PORT_CORE:8091,PORT_TOOLS:8095});
 const envelope=(batch)=>({token:'fixture.jwt',data:{operation:'test',tool:'aidiy_backup',...(batch===undefined?{}:{batch})}});
 const answer=(batch=false)=>({ok:true,batch,全件数:6000,バックアップ件数:3,バックアップ先:'/private/not-shown'});

@@ -4,6 +4,6 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 // 機能フォルダの回帰テストを通常の Node テストへ接続する。
-require('../ui/src/モデル一覧/checks/モデル一覧.check.cjs');
-require('../ui/src/外部連携/checks/外部連携.check.cjs');
-require('../ui/src/キー設定共通/checks/キー設定状態.check.cjs');
+require('../ui/src/components/モデル一覧/checks/モデル一覧.check.cjs');
+require('../ui/src/components/外部連携/checks/外部連携.check.cjs');
+require('../ui/src/components/キー設定共通/checks/キー設定状態.check.cjs');

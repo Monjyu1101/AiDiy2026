@@ -10,15 +10,18 @@
 
 ## 概要
 
-`hermes mcp serve` を実行すると command_hermes が **stdio MCP サーバー** として起動し、
+`command_hermes/hermes_main.py mcp serve` を実行すると command_hermes が **stdio MCP サーバー** として起動し、
 コードエージェントがメッセージ送受信・会話管理ツールを直接呼び出せるようになる。
 
 ```
-hermes mcp serve          # stdio サーバー起動
-hermes mcp serve -v       # verbose ログあり（stderr に出力）
+cd command_hermes
+.venv/Scripts/python.exe hermes_main.py mcp serve
+.venv/Scripts/python.exe hermes_main.py mcp serve -v  # stderr にログ
 ```
 
-## 提供ツール一覧（10ツール）
+`_setup.py` が生成するランチャーは `aidiy_hermes`（対話/ワンショット用）です。別の `hermes` コマンドが PATH にあるとは限らず、上流版が起動することもあるため、登録はこのリポジトリの Python と `hermes_main.py` の絶対パスを使います。Linux / macOS は `.venv/bin/python` を使います。
+
+## 提供ツール一覧
 
 | ツール名 | 概要 |
 |---------|------|
@@ -53,12 +56,11 @@ hermes mcp serve
 ### Claude Code（グローバル設定）
 
 ```json
-// C:\Users\admin\.claude.json の mcpServers に追加
 {
   "mcpServers": {
     "hermes": {
-      "command": "hermes",
-      "args": ["mcp", "serve"]
+      "command": "C:/path/to/AiDiy2026/command_hermes/.venv/Scripts/python.exe",
+      "args": ["C:/path/to/AiDiy2026/command_hermes/hermes_main.py", "mcp", "serve"]
     }
   }
 }
@@ -67,7 +69,7 @@ hermes mcp serve
 または Claude Code の CLI で:
 
 ```powershell
-claude mcp add hermes -- hermes mcp serve
+claude mcp add -s user hermes -- "C:/path/to/AiDiy2026/command_hermes/.venv/Scripts/python.exe" "C:/path/to/AiDiy2026/command_hermes/hermes_main.py" mcp serve
 ```
 
 ### Claude Code（プロジェクト設定）
@@ -78,8 +80,8 @@ claude mcp add hermes -- hermes mcp serve
 {
   "mcpServers": {
     "hermes": {
-      "command": "hermes",
-      "args": ["mcp", "serve"]
+      "command": "C:/path/to/AiDiy2026/command_hermes/.venv/Scripts/python.exe",
+      "args": ["C:/path/to/AiDiy2026/command_hermes/hermes_main.py", "mcp", "serve"]
     }
   }
 }
@@ -87,10 +89,7 @@ claude mcp add hermes -- hermes mcp serve
 
 ### 他の Code CLI
 
-| CLI | 設定場所 | 設定例 |
-|-----|---------|--------|
-| Gemini | `.gemini/settings.json` | `{"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}` |
-| Codex | `~/.codex/config.toml` | `[mcp_servers.hermes]` / `command = "hermes"` / `args = ["mcp", "serve"]` |
+Gemini の `.gemini/settings.json`、Codex の `~/.codex/config.toml` でも同じ Python 絶対パスを `command` に、`hermes_main.py` の絶対パス・`mcp`・`serve` を `args` に指定します。設定形式は [Code CLI MCP 設定](./command_hermes,backend_tools,CodeCLI_MCP設定.md)を参照します。例の `C:/path/to/AiDiy2026` は実際の配置先へ置き換え、既存の別サーバー設定は保持します。
 
 ## 確認方法
 
@@ -105,22 +104,14 @@ claude mcp list
 claude mcp get hermes
 ```
 
-### Python で直接テスト
+### 読み取り専用の登録確認
 
-```powershell
-Set-Location command_hermes
-.venv\Scripts\python.exe -c "
-from base.mcp_serve import create_mcp_server
-srv = create_mcp_server()
-tools = srv._tool_manager.list_tools()
-print('Tools:', [t.name for t in tools])
-"
-```
+`command_hermes/base/mcp_serve.py` の `create_mcp_server()` 内の `@mcp.tool()` を確認します。SDK の非公開 `_tool_manager` に依存した一覧取得コードは使いません。実接続はクライアント側のツール一覧と許可された読み取り操作で別途確認します。
 
 ## 注意点
 
 - `mcp>=2,<3` パッケージが必要。インストールなしで起動しようとすると ImportError で停止する。
-- MCP サーバーは `MCPServer` を `mcp.server.mcpserver` から import する。MCP 1.x の `mcp.server.fastmcp.FastMCP` は使わない。
+- MCP サーバーは `MCPServer` を `mcp.server` から import する。MCP 1.x の `mcp.server.fastmcp.FastMCP` は使わない。
 - `hermes mcp serve` は stdio サーバーなので Code CLI が子プロセスとして起動する。プロセスが落ちると接続も切れる。
-- `EventBridge` は `SessionDB` が起動時に利用可能でないとポーリングを無効化してメッセージイベントが届かなくなる。Hermes 本体が動いている状態で接続すること。
+- `EventBridge` は `SessionDB` が起動時に利用可能でないとポーリングを無効化してメッセージイベントが届かなくなる。対象のセッションDBや連携 Gateway の状態も確認すること。起動だけでは対象プラットフォームへの送受信を保証しない。
 - `hermes mcp serve` は Hermes が **クライアントとして** AiDiy MCP に接続するフロー（`mcp_tool.py`）とは別の独立した機能。混同しないこと（→ SSE 接続は [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) 参照）。

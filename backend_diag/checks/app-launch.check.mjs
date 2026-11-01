@@ -79,7 +79,7 @@ test('authenticated API rejects arbitrary commands/methods/oversized payloads',a
  assert.equal((await fetch(base+'api/アプリ起動',{headers})).status,200);
  for(const id of ['avatar','ide','console','code','live','discord']){
   const response=await fetch(base+`AiDiy_${id}.png`);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/png');
-  assert.deepEqual(Buffer.from(await response.arrayBuffer()),await readFile(new URL(`../ui/src/アプリ起動/アイコン/AiDiy_${id}.png`,import.meta.url)));
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()),await readFile(new URL(`../ui/src/components/アプリ起動/アイコン/AiDiy_${id}.png`,import.meta.url)));
  }
  assert.equal((await fetch(base+'AiDiy_unknown.png')).status,404);
  for(const [body,status] of [[{対象:'console',フォルダ:f.project,command:'bad'},400],[{対象:'bad',フォルダ:f.project},400],[{対象:'avatar',フォルダ:''},400],[{対象:'console',フォルダ:'x'.repeat(DIAG_TRANSPORT_BYTE_LIMIT+1)},413]])assert.equal((await fetch(base+'api/アプリ起動/開始',{method:'POST',headers,body:JSON.stringify(body)})).status,status);

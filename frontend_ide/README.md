@@ -18,7 +18,7 @@ IDE群全体は **Node.js 22.13 以降と npm** を使用してください。`v
 - `デスクトップ/`: preload、ウィンドウ配置、プロジェクト別プロファイル、下書き受け渡し、ネイティブプレビュー。
 - `ファイル機能/`: AiDiy検索、ファイル解析、履歴と記録保存。
 - `aidiy_console/`: Consoleの入口とPTY・端末プロセス。`aidiy_code/` / `aidiy_live/` / `aidiy_ide/` は各コマンドの入口です。
-- `src/`: 共通Vue画面。`host/`: Code / Live通信とVS Code拡張。`viewer/`: ファイルAPIと文書表示。
+- `src/`: 共通Vue画面。通常部品と機能内処理は `src/components/<日本語機能名>/`、独立ダイアログは `src/dialog/`。Task / Team は専用 bundle の機能内構成を維持。`host/`: Code / Live通信とVS Code拡張。`viewer/`: ファイルAPIと文書表示。
 - `scripts/` / `checks/`: 開発用スクリプトとテスト。
 
 ルートの `index.html`、`package.json`、`package-lock.json`、`_setup.py`、`_cleanup.py`、`.cmd` はビルド・導入・起動に必要です。`dist/` と `node_modules/` はセットアップで準備する生成物・依存関係で、ソースの移動先ではありません。
@@ -262,7 +262,7 @@ AiDiy検索の「履歴」から、検索日時・検索文・件数を確認し
 | `ファイルビューア.vue` | 読み取り専用のコード・画像・Markdown・Office/PDFプレビュー |
 | `状態バー.vue` / `開始表示.vue` | 接続表示・ウィンドウ操作・初期ターミナル演出 |
 
-Canvas描画は `src/開発スペース/宇宙描画.js`、通信は `src/コード/コード通信.js` と `src/ライブ/ライブ通信.ts` に分離します。Web版IDEのCode / LiveはVue部品を直接配置し、Electron版は同じVue部品を別ウィンドウに表示します。Office表示だけは既存の専用iframeを使用します。
+Canvas描画は `src/components/開発スペース/宇宙描画.js`、通信は `src/components/コード/コード通信.js` と `src/components/ライブ/ライブ通信.ts` に分離します。Web版IDEのCode / LiveはVue部品を直接配置し、Electron版は同じVue部品を別ウィンドウに表示します。Office表示だけは既存の専用iframeを使用します。
 
 ファイルAPI・Office依存物は `viewer/`、Code/Hermes・LiveプロトコルとVS Code拡張ホストは `host/` に統合しています。画面と実行基盤はこの `frontend_ide/` 内で管理します。AIコア・Hermes・共通設定は引き続きプロジェクト共通のものを利用します。
 

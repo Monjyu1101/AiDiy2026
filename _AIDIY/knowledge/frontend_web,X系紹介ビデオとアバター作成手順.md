@@ -1,6 +1,6 @@
 # X系紹介ビデオとアバター作成手順
 
-> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_AIコア_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_avatar_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_backend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_frontend_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_hermes_ja/`, `frontend_web/public/Xビデオ/AiDiy紹介_tools_ja/`
+> 文書: `frontend_web,X系紹介ビデオとアバター作成手順.md` | 実装: `frontend_web/public/Xビデオ/AiDiy紹介__all_ja/`, `frontend_web/public/Xビデオ/_vrm/`
 
 ## このメモを使う場面
 
@@ -134,8 +134,7 @@ scenario["short_duration_sec"] = short_cumulative
 各ビデオは `frontend_web/public/Xビデオ/AiDiy紹介_<テーマ>_ja/` 直下に配置する。
 `__all_ja` は総合版（手本）、`_<テーマ>_ja` はテーマ特化版。
 
-**1 ビデオ = 1 自己完結フォルダ**を原則とする。VRM、画像、音声は各ビデオフォルダ内に持つ（外部参照禁止）。
-これによりフォルダ単位でコピー・配布・移植・削除ができる（他フォルダへ影響しない）。
+各ビデオのシナリオ・HTML・画像・音声は動画フォルダで管理します。VRMは兄弟の `_vrm/` を共有するため、動画フォルダだけで配布が完結するとは限りません。配布時はimportmap、共有CSS / JSを含めて参照先を確認します。
 
 ### 総合版（`__all_ja`）
 
@@ -147,36 +146,14 @@ Xビデオ/AiDiy紹介__all_ja/
   scene_000.html    冒頭説明（ヒーロー）
   scene_001.html 〜 scene_NNN.html  本編
   scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
-  vrm/              VRM モデル（VRM_AiDiy.vrm）
+  ../_vrm/          共有VRMモデル（配布時も必要）
   images/           MCP 画像生成で作成した scene_NNN.png
   audio/            MCP TTS で作成した scene_NNN.mp3
 ```
 
-### テーマ特化版（`_AIコア_ja` / `_avatar_ja` / `_backend_ja` / `_frontend_ja` / `_hermes_ja` / `_tools_ja`）
+### テーマ特化版を新設する場合
 
-現在の全テーマ特化フォルダ:
-
-| フォルダ | テーマ |
-|---------|-------|
-| `AiDiy紹介_AIコア_ja/` | AIコア（AIチャット・音声・Code AI） |
-| `AiDiy紹介_avatar_ja/` | frontend_avatar（Electron/Web デュアルモード） |
-| `AiDiy紹介_backend_ja/` | backend_server（FastAPI・SQLite・4層構造） |
-| `AiDiy紹介_frontend_ja/` | frontend_web（Vue 3・Vite・TypeScript） |
-| `AiDiy紹介_hermes_ja/` | command_hermes（aidiy_hermes CLI） |
-| `AiDiy紹介_tools_ja/` | backend_tools（MCP サーバー群） |
-
-```
-Xビデオ/AiDiy紹介_<テーマ>_ja/
-  index.html        プレイヤー（VRM アバター + iframe）
-  scenario.js       テーマ特化シーン定義
-  scene.css         __all_ja から流用
-  scene_000.html    冒頭説明（ヒーロー）
-  scene_NNN.html    本編
-  scene_999.html    謝辞・まとめ・次につながる言葉（ヒーロー）
-  vrm/              VRM モデル（VRM_AiDiy.vrm）← 各フォルダに配置（自己完結）
-  images/           テーマ特化画像
-  audio/            テーマ特化音声
-```
+現行の紹介テンプレートは `frontend_web/public/Xビデオ/AiDiy紹介__all_ja/` です。旧テーマ別フォルダは現存しないため参照元にせず、新しい題材に合わせてsceneと素材を作ります。共有VRMの参照規則は次節を使います。
 
 ### VRM 参照パス（共通フォルダ集約のルール）
 
@@ -214,7 +191,7 @@ window.SCENARIO = {
   "assets_policy": {
     "audio_dir": "audio",
     "image_dir": "images",
-    "avatar": "vrm/VRM_AiDiy.vrm"  // 各フォルダ内 vrm/ への相対パス（親フォルダ参照禁止）
+    "avatar": "../_vrm/VRM_AiDiy.vrm"  // 共通VRMへの相対パス
   },
   "scenes": [
     {
@@ -294,7 +271,7 @@ window.SCENARIO = {
 ### VRM アバター統合
 
 - `index.html` の左パネル（38%）に Three.js + `@pixiv/three-vrm` でレンダリング
-- VRM ファイル: `vrm/VRM_AiDiy.vrm`（各フォルダ内の `vrm/` サブフォルダ — フォルダ相対パス）
+- VRM ファイル: `../_vrm/VRM_AiDiy.vrm`（動画フォルダの兄弟にある共有資産）
 - リップシンク: `window.audioPlayer`（`<audio>` タグ）の AudioContext + AnalyserNode で `aa` 表情を駆動
 - `window.__avatarSetExpression?.(scene.expression || "neutral")` でシーン切替時に表情を設定
 

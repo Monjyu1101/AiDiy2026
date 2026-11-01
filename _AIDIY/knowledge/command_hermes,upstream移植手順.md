@@ -8,7 +8,7 @@
 - 取り込み後に `aidiy_hermes` が起動しない / スキルや MCP が 0 件になったとき
 - AiDiy 独自改変がどこに何件あるかを確認したいとき
 
-実績: 2026-09-04 に 0.12 ベースから 0.21 ベースへ全面同期（363 ファイル → 1306 ファイル、24.6 万行 → 106 万行）。
+現行ベースは `command_hermes/pyproject.toml` と `base/hermes_constants.py` で確認します。旧版のファイル分類表ではなく、現行の AiDiy レイヤと `_verify.py` を同期元にします。
 
 ## 基本方針: 差分マージではなく「全面再取り込み + AiDiy レイヤ再適用」
 
@@ -40,14 +40,11 @@ upstream は minor バージョン間でもディレクトリ構成と関数分�
 
 ## 手順
 
-### Step 1. バックアップ
+### Step 1. 作業状態と復元点を確認する
 
-```powershell
-Copy-Item -Recurse command_hermes command_hermes_<現行バージョン>
-```
-
-`.venv` ごとコピーしておくと、動かなくなったときの参照実装として使えます（0.12 の `_dispatch_aidiy_cli_subprocess`
-などは 0.21 移植時にそのまま流用しました）。
+`git status --short` と `git diff -- command_hermes` で既存編集を確認し、取り込み前のコミットを記録します。
+他の作業者の未コミット変更を上書きしません。旧版フォルダや `_old.md` は作らず、過去の実装は Git の履歴から参照します。
+ユーザー設定・認証情報・会話履歴は移植対象に含めません。
 
 ### Step 2. 現行の AiDiy レイヤを控える
 
@@ -63,8 +60,8 @@ findstr /S /N /C:"AiDiy" /C:"aidiy" *.py
 
 `.venv` と AiDiy 専用ファイル（下表）だけ残し、それ以外を削除してから upstream をコピーします。
 
-**残すもの**: `.venv`、`_setup.py`、`_start.py`、`_cleanup.py`、`_verify.py`、`aidiy_hermes_exec.bat`、
-`aidiy_hermes_logo.txt`、`AGENTS.md`、`NOTICE.md`、`pyproject.toml`、`uv.lock`、`temp`、AiDiy 固有の `tests/`
+**残すもの**: `.venv`、`_setup.py`、`_start.py`、`_cleanup.py`、`_verify.py`、`hermes_main.py`、`aidiy_hermes_exec.bat`、
+`aidiy_hermes_logo.txt`、`AGENTS.md`、`NOTICE.md`、`pyproject.toml`、`uv.lock`、`temp`、AiDiy 固有の `checks/`
 
 **コピーするもの**: `agent/`→`core/`、ルート `*.py`→`base/`（`cli.py`・`setup.py` を除く）、`cli.py`→`cli_main.py`、
 `tools/`、`hermes_cli/`、`gateway/`、`plugins/`、`cron/`、`acp_adapter/`、`tui_gateway/`、`providers/`、
@@ -77,7 +74,7 @@ upstream ルートの `setup.py` は wheel ビルド用ガードです。`base/`
 
 ### Step 4. AiDiy レイヤを再適用
 
-下の「AiDiy レイヤ一覧」を上から順に当てます。旧ツリーの該当ブロックをコピーして、
+下の「AiDiy レイヤ一覧」を上から順に当てます。取り込み前コミットの該当ブロックを参照して、
 新版の対応する場所へ差し込むのが基本です。
 
 ### Step 5. 依存関係
@@ -85,7 +82,7 @@ upstream ルートの `setup.py` は wheel ビルド用ガードです。`base/`
 `pyproject.toml` を upstream の `[project].dependencies`（core のみ、extras は不要）+ AiDiy 追加分
 （`anthropic` / `google-genai` / `fal-client` / `mcp>=2,<3` / `windows-curses`）へ更新し、`uv sync --upgrade`。
 
-upstream はバージョンを完全固定していますが、AiDiy はバージョン指定なしで運用しています（Python 3.14 で解決させるため）。
+Python 条件は現行 `requires-python`（`>=3.13`）、依存条件は `pyproject.toml` を基準にします。AiDiy には `mcp>=2,<3` や `urllib3>=2.7.0,<3` などの制約もあるため、「すべて版指定なし」として上書きしません。OS 条件付き依存も保持します。
 
 ### Step 6. 検証
 
@@ -149,7 +146,7 @@ layout shim で `sys.modules.setdefault("cli", sys.modules[__name__])` を登録
 
 ### 2. スキルが 0 件になる
 
-**hermes は `skills/` を直接読みません。** `HERMES_HOME/skills`（`%LOCALAPPDATA%\hermes\skills`）へ
+**hermes は `skills/` を直接読みません。** `HERMES_HOME/skills`（AiDiy の既定は `~/.hermes/skills`）へ
 同期されたものだけを見ます。同期は upstream では `hermes_cli/main.py` の各エントリが `sync_skills()` を呼んで行いますが、
 AiDiy の入口は `cli_main.py` なのでそこを通りません。`main()` で明示的に呼びます。
 
@@ -205,9 +202,9 @@ Windows の既定が `~/.hermes` から `%LOCALAPPDATA%\hermes` へ変更され�
 
 | 箇所 | 症状 | 対処 |
 |------|------|------|
-| `hermes_cli/tools_config.py::enabled_mcp_server_names()` | `config.yaml` の `mcp_servers` だけを見るため、`mcp-aidiy_*` toolset が有効にならず 214 ツールがモデルへ届かない | `_load_aidiy_mcp_servers()` を合流させる |
+| `hermes_cli/tools_config.py::enabled_mcp_server_names()` | `config.yaml` の `mcp_servers` だけを見るため、`mcp-aidiy_*` toolset が有効にならず AiDiy のツールがモデルへ届かない | `_load_aidiy_mcp_servers()` を合流させる |
 | `hermes_cli/banner.py` の cheap probe | 起動バナーの「MCP Servers」セクションが丸ごと消える | probe に AiDiy 分の判定を足す |
-| `tools/mcp_tool.py::get_mcp_status()` | `type: sse` を見ず `transport` キーだけ見るのでバナーが `(http)` と誤表示。障害切り分けを誤らせる | `type == "sse"` を優先する |
+| `tools/mcp_tool.py` の接続・表示 | `type` と `transport` の判定差で表示と実通信が食い違う | [MCP 接続の切り分け](./command_hermes,backend_tools,MCP_SSE接続.md)に従い、接続側と表示側を両方確認する |
 
 **共通の教訓**: upstream が `config.yaml` を参照する新しい分岐を足したら、AiDiy の情報源（`AiDiy_key.json` / `AiDiy_mcp.json`）が無視されていないか確認する。
 `_setup.py` 側に書き込み先を増やすのではなく、hermes 側を合流させて情報源を 1 つに保ちます。
@@ -215,8 +212,8 @@ Windows の既定が `~/.hermes` から `%LOCALAPPDATA%\hermes` へ変更され�
 ### 10. Tool Search 階層（0.21 新規）
 
 0.21 は MCP / plugin ツールを `tool_search` / `tool_describe` / `tool_call` の裏へ遅延させる階層を追加しました。
-既定 (`auto`) では AiDiy の 214 ツールが名前カタログだけになり、モデルは探索経由でしか呼べません（動きますが遅く、失敗もします）。
-`~/.hermes/config.yaml` の `tools.tool_search.enabled: off` で 0.12 相当の直接渡しに戻せます（毎ターン約 23k トークン増）。
+既定 (`auto`) では対象の MCP ツールが名前カタログだけになり、モデルは探索経由でしか呼べません（動きますが遅く、失敗もします）。
+`~/.hermes/config.yaml` の `tools.tool_search.enabled: off` で直接渡しへ切り替えられます。毎ターンの入力トークンが増えるため、現行のツール件数で影響を確認します。
 中間として `enabled: auto` + `listing_max_tokens: 16000` にすると、説明付きカタログが埋め込まれ発見性が上がります。
 
 ### 11. 移植直後は「ファイルがある = 動く」ではない
@@ -224,11 +221,11 @@ Windows の既定が `~/.hermes` から `%LOCALAPPDATA%\hermes` へ変更され�
 0.21 移植では網羅性チェックが全て OK でもスキル 0 件・MCP カタログ 0 件でした。
 **必ず `_verify.py` のランタイム資産チェック（件数が 0 でないこと）まで確認してください。**
 
-## ロールバック
+## 移植後の文書確認と復元
 
-`command_hermes_<旧バージョン>` を `command_hermes` へ戻すだけです。
-`.venv` も含めてバックアップしてあれば依存関係の再構築も不要です。
-`_config/AiDiy_key.json` の `CODE_AIDIY_HERMES_MODEL` を移植で変更した場合は、それも戻します。
+- `AGENTS.md`、本書、Provider・TUI・Windows・MCP の関連ナレッジ、`NOTICE.md` と依存宣言を現行実装に合わせます。
+- 復元が必要なら、記録したコミットと現在の差分を比較し、今回の移植差分だけを戻します。他の編集・ユーザー設定を一括で巻き戻しません。
+- `.venv` は旧版コピーから戻すのではなく、復元した依存宣言と lock に基づいて再同期します。
 
 ## 関連
 
@@ -252,4 +249,4 @@ Windows の既定が `~/.hermes` から `%LOCALAPPDATA%\hermes` へ変更され�
 - 上流再取り込み後は `rg -n -i "hermes agent" command_hermes` でソース・同梱スキル・表示資産を確認する。仮想環境、実行記録、バックアップは編集しない。置換時は `.lower()` との比較、旧設定の検出、外部サービスの既存互換処理を確認する。
 - 既存会話は古いシステムプロンプトを保持する場合がある。反映確認にはプロセスを再起動して新しい会話を開始する。
 
-検証は `command_hermes/.venv/Scripts/python.exe -B -m unittest command_hermes.tests.test_aidiy_identity`。既定人格の一致、旧SOUL移行、独自人格の保持、人格の有無に関係なく実プロンプトへ製品名が入ること、スキルIDと著者表記の互換性を確認する。外部LLMへ問い合わせずに実行できる。
+確認対象は、既定人格の一致、旧SOUL移行、独自人格の保持、実プロンプトへの製品名挿入、スキルIDと著者表記の互換性です。現行 `checks/` には専用 identity テストがないため、存在しない `tests.test_aidiy_identity` を実行手順にしません。`_verify.py` の静的確認と、新しい会話での実操作確認を分けて記録します。

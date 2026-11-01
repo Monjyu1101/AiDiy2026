@@ -7,7 +7,7 @@
 const {pinLevel}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
 // 名前上端: 中央アイコン中心(64px)+回転枠の外側(48px)。CSS の .micro-project と合わせる。
 const 閉じた幅=128,開いた幅=320,名前上端=112;
-const {円周配置}=require('../ui/src/アプリ起動/円周配置.cjs');
+const {円周配置}=require('../ui/src/components/アプリ起動/円周配置.cjs');
 const {createCodeDrag}=require('../../frontend_ide/デスクトップ/code-drag.cjs');
 function マイクロ表示を作成(window,{screen,pins}={}){
  let saved,expanded=false,timer,busy=false,generation=0,ignored=false,foldedBounds,expandedBounds;

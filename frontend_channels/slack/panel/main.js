@@ -11,7 +11,7 @@
  */
 
 import { createApp } from 'vue';
-import 接続パネル from './画面/接続パネル.vue';
+import 接続パネル from './components/接続/接続パネル.vue';
 let アプリ;
 function 画面開始() {
   アプリ = createApp(接続パネル);

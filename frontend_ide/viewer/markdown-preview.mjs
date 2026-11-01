@@ -3,7 +3,7 @@
 // Commercial use requires prior written consent from all copyright holders.
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
-import {viewerActivityScript} from '../src/ファイル閲覧/閲覧待機.js';
+import {viewerActivityScript} from '../src/components/ファイル閲覧/閲覧待機.js';
 import MarkdownIt from 'markdown-it';
 
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: false });

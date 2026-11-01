@@ -140,12 +140,6 @@ backend_tools/.venv/Scripts/python.exe -X utf8 -m unittest discover -s scripts/c
 
 Web/Avatarの設定画面は4方式とautoを扱い、Diagの判断一覧を候補として読む。詳細は `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` を参照。取得済み候補と保持中の設定値を区別し、候補未取得でも既存設定は失わない。
 
-### 判断系4方式の候補管理（2026-10-18）
+### 判断系の候補管理
 
-autoの優先順は `openai_oauth` → `freeai_chat` → `openai_decisions` → `gemini_chat`。起動チェックに成功した方式だけを優先対象にする。
-
-判断系の低コスト方針は `backend_diag/モデル情報/decisions_info.mjs` の `DECISION_MODEL_CANDIDATES` で書き出す候補を絞って管理する。現在はOpenAI両方式が `gpt-6-luna`、FreeAI/Geminiが `gemini-3.5-flash-lite`。将来別モデルへ変更するときはこの候補配列を調整し、認証付き一覧を再取得・書き出しする。実行側や画面にモデル固定・恒久的な選択禁止は置かない。
-
-[Google公式alias説明](https://developers.googleblog.com/en/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/) でIDを確認した。最新への追従はGoogle側のalias更新を利用し、番号を推測・並べ替えしてモデルを生成しない。[公式モデル一覧](https://ai.google.dev/gemini-api/docs/models) では現時点の安定版Flash-Liteは `gemini-3.5-flash-lite`。latestは安定版専用aliasではなくプレビュー等を指す場合もあるため、現在の解決先バージョンはこの実装で断定しない。
-
-Diagは認証付きGET一覧に候補配列のIDそのものがある方式だけを掲載する。GoogleはgenerateContent対応を要求する。公開一覧・設定値・別バージョンから候補を捏造しない。未取得・認証なし・失敗・対象ID不在なら方式を省略し、全方式が空なら `{}`。モデル一覧は実行の許可リストではなく、設定画面の候補として扱う。
+書き出す候補の絞り込みは [Diag運用の判断用モデル一覧](./backend_diag,環境診断運用.md#判断用モデル一覧) に集約する。実行側へ固定許可リストを追加せず、起動チェックの利用可能方式・明示引数・設定値を区別する。

@@ -68,7 +68,7 @@
 | `preview.mjs` | HTML の「表示」用の別オリジン静的サーバー。最初の要求で起動し、`server.mjs` の close で停止。ファイルは書き出さない |
 | `vue-preview.mjs` | `.vue` の「表示」。`frontend_web` の Vite 開発サーバーが起動中の時だけ、その部品を使う画面（ルート）を返す |
 | `media-types.mjs` | 「ブラウザ」で再生する音声・動画の拡張子（mp3 / wav / ogg / oga / opus / flac / aac / m4a / mp4 / m4v / webm / mov）。Vue 画面・IDE サーバー・Electron で共用 |
-| `web/layout.js` | 名前のハッシュによる球内の固定3D配置・基準視点・回転と平行移動（Vue 画面の `src/開発スペース/宇宙描画.js` が取り込む） |
+| `web/layout.js` | 名前のハッシュによる球内の固定3D配置・基準視点・回転と平行移動（Vue 画面の `src/components/開発スペース/宇宙描画.js` が取り込む） |
 | `web/office.html` / `web/office.js` / `web/office.css` | Word / Excel / PowerPoint / PDF の読み取り専用ビューア |
 | `checks/` | 文書APIの自動テストと一時フォルダ用の検証データ生成 |
 | `scripts/shot.mjs` | 画面確認用スクリーンショット（ヘッドレス Chrome を DevTools Protocol で操作） |
@@ -101,7 +101,7 @@
 - [起動・操作](../README.md)
 - [Vue共通画面の変更手順](../../_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md)
 - [文書ビューアの確認手順](../../_AIDIY/knowledge/frontend_ide,文書ビューア.md)
-- [cleanup後の確認](../../_AIDIY/knowledge/共通,_cleanup.py後の確認.md)
+- [cleanup後の確認](../../_AIDIY/knowledge/共通,クリーンアップ手順.md)
 
 ## Vue共通画面
 

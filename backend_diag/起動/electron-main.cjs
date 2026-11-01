@@ -12,6 +12,7 @@ const {ミニ表示を作成,ミニ高さは有効}=require('./ミニ表示.cjs'
 const {マイクロ表示を作成,閉じた幅}=require('./マイクロ表示.cjs');
 const {画面サイズ演出を作成}=require('./サイズ切替.cjs');
 const {通常窓サイズを作成}=require('./通常窓サイズ.cjs');
+const {標準タイトル操作を取り付け}=require('./標準タイトル操作.cjs');
 const {checkPort}=require('./ポート接続.cjs');
 const {attachNativeWindowMove}=require('../../frontend_ide/デスクトップ/長押し窓移動.cjs');
 const {createWindowPins,pinLevel}=require('../../frontend_ide/デスクトップ/最前面ピン.cjs');
@@ -55,7 +56,6 @@ async function start(value) {
   window=new BrowserWindow({x:area.x+通常表示の余白,y:area.y+通常表示の余白,width:800,height:600,title:'AiDiy Diag',icon:path.join(__dirname,'../static/AiDiy_diag.png'),show:false,frame:false,roundedCorners:false,transparent:true,hasShadow:false,backgroundColor:'#00000000',minWidth:420,minHeight:320,webPreferences:{session:isolated,preload:path.join(__dirname,'preload.cjs'),additionalArguments:initialMini?['--aidiy-diag-initial-mini']:[],nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   window.setMenuBarVisibility(false);
   pins.register(window);
-  attachNativeWindowMove(window,screen,'diag');
   終了確認=終了確認を作成({window,状態取得:()=>起動状態を読む(url.href),確認:(parent,options)=>dialog.showMessageBox(parent,options)});
   Macメニューを設定({app,Menu,window,icon:path.join(__dirname,'../static/AiDiy_diag.png')});
   const sizeEffect=画面サイズ演出を作成(BrowserWindow,window,{topmostLevel:()=>micro.active&&process.platform==='win32'?'pop-up-menu':pinLevel});
@@ -64,7 +64,24 @@ async function start(value) {
   const micro=マイクロ表示を作成(sizingWindow,{screen,pins:{setLocked:(_target,value)=>pins.setLocked(window,value),state:()=>pins.state(window)}});
   window.once('closed',()=>sizeEffect.中止());
   let firstLoad=true,opening=false,pendingMiniHeight,pendingMicroHeight,displaySwitch=false,displayOrigin;
+  let maximizeOperation;
+  function 最大化取消(){if(maximizeOperation){maximizeOperation=undefined;sizeEffect.中止();}titleControls.cancel();}
+  window.once('closed',()=>最大化取消());
+  const 標準操作可能=()=>!mini.active&&!micro.active&&!opening&&!displaySwitch&&!sizeEffect.active;
+  function 最大化切替(){
+    if(!標準操作可能()||window.isFullScreen?.())return false;
+    titleControls.cancel();const operation={};maximizeOperation=operation;
+    const maximized=sizingWindow.isMaximized(),target=maximized?sizingWindow.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
+    return sizeEffect.準備(target).then(async ready=>{
+      if(!ready||maximizeOperation!==operation||window.isDestroyed()||window.isMinimized()||window.isFullScreen?.()||mini.active||micro.active||displaySwitch)return false;
+      if(maximized)sizingWindow.unmaximize();else sizingWindow.maximize();return sizeEffect.完了();
+    }).finally(()=>{if(maximizeOperation===operation){maximizeOperation=undefined;if(sizeEffect.active)sizeEffect.中止();}});
+  }
+  const titleControls=標準タイトル操作を取り付け(sizingWindow,screen,{enabled:標準操作可能,toggleMaximize:最大化切替});
+  // 長押しも同じ疑似最大化状態を見る。標準タイトルはDOM側で対象外にする。
+  attachNativeWindowMove(sizingWindow,screen,'diag');
   window.webContents.on('did-start-loading',()=>{
+    最大化取消();
     // 初回の描画より先にミニ状態にし、初期表示の高さ通知を取りこぼさない。
     // 再読込時は従来どおり通常表示へ戻す。
     sizeEffect.中止();displaySwitch=false;displayOrigin=undefined;micro.set(false);pendingMicroHeight=undefined;pendingMiniHeight=undefined;mini.set(firstLoad&&initialMini,{topLeft:true});firstLoad=false;
@@ -79,6 +96,7 @@ async function start(value) {
       iconMenu.open(value,send);return true;
     }
     if(action==='beginDisplay'){
+      最大化取消();
       if(!['normal','mini','micro'].includes(value)||opening||displaySwitch||sizeEffect.active)return false;
       displayOrigin=window.getBounds();
       const base=micro.normalBounds||mini.normalBounds||window.getNormalBounds();
@@ -105,12 +123,14 @@ async function start(value) {
       return dialog.showOpenDialog(window,{title:'プロジェクトフォルダを選択',properties:['openDirectory']}).then(result=>result.canceled?null:result.filePaths[0]||null).finally(()=>{selectingFolder=false;});
     }
     if(action==='startMini'){
+      最大化取消();
       if(typeof value!=='boolean'||micro.active)return false;
       if(value===false)pendingMiniHeight=undefined;
       if(!displaySwitch&&!opening&&window.isVisible()&&value!==mini.active)return sizeEffect.準備(mini.演出範囲(value)).then(ready=>ready&&mini.set(value));
       return mini.set(value,{origin:displayOrigin});
     }
     if(action==='startMicro'){
+      最大化取消();
       if(typeof value!=='boolean'||opening||sizeEffect.active&&!displaySwitch||mini.active)return false;
       return micro.set(value,{origin:displayOrigin});
     }
@@ -135,17 +155,13 @@ async function start(value) {
     if(action==='isMaximized')return sizingWindow.isMaximized();
     if(action==='getPinState')return pins.state(window);
     if(action==='togglePin')return pins.toggle(window);
-    if(action==='minimize')window.minimize();
-    else if(action==='maximize'&&!mini.active&&!micro.active){
-      if(sizeEffect.active)return false;
-      const maximized=sizingWindow.isMaximized(),target=maximized?sizingWindow.getNormalBounds():screen.getDisplayMatching(window.getBounds()).workArea;
-      return sizeEffect.準備(target).then(async ready=>{if(!ready||window.isDestroyed())return false;if(maximized)sizingWindow.unmaximize();else sizingWindow.maximize();return sizeEffect.完了();});
-    }
-    else if(action==='close')window.close();
+    if(action==='minimize'){最大化取消();window.minimize();}
+    else if(action==='maximize')return 最大化切替();
+    else if(action==='close'){最大化取消();window.close();}
     return false;
   });
   window.webContents.setWindowOpenHandler(({url:target}={})=>{
-    const sites=require('../ui/src/導入状況/公式サイト.json');
+    const sites=require('../ui/src/components/導入状況/公式サイト.json');
     if(Object.values(sites).includes(target))void shell.openExternal(target).catch(()=>{});
     return {action:'deny'};
   });

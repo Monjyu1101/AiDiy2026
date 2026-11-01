@@ -26,11 +26,9 @@ const apiClient = axios.create({
 | baseURL | `/` 固定 | `CORE_BASE_URL`（config.ts 解決） |
 | 解決順 | — | 1. `VITE_CORE_BASE_URL` 環境変数 → 2. 開発時 `/` → 3. `http://127.0.0.1:8091` |
 
-### backend_taskteam 用クライアント（AIタスク / AIチーム）
+### Task / Team の境界
 
-- `frontend_web` は `apiClient` のまま `/task/...` と `/team/...` を呼ぶ（Vite proxy は両方を 8093 へ転送）。
-- `frontend_avatar` は AIタスクに `taskClient`、AIチームに `teamClient` を使う。用途別クライアント名は維持するが、どちらも `createApiClient(TASKTEAM_BASE_URL)` を使い、`TASKTEAM_BASE_URL` の解決順は `VITE_TASKTEAM_BASE_URL` → 開発時 `/` → `http://127.0.0.1:8093` とする。Electron 本番も同じ統合サーバーへ直結する。
-- Avatar のAIチーム内でも `/core/*` は `apiClient`、`/task/*` は `taskClient`、`/team/*` は `teamClient` に分ける。
+Task / Team は `frontend_ide` の独立アプリ `aidiy_task` / `aidiy_team` へ移設済みです。Web / Avatar の `client.ts` に `taskClient` / `teamClient` を追加せず、[Vue共通画面変更手順](./frontend_ide,Vue共通画面変更手順.md#task--team-の独立版avatarからの移設) で接続処理を確認します。両Vite設定にも `/task` / `/team` はありません。
 
 ## 共通構成
 

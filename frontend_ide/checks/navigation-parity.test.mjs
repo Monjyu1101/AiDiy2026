@@ -10,24 +10,24 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
-import { createSpace } from '../src/開発スペース/宇宙描画.js';
-import { createFolderMonitor } from '../src/ファイル閲覧/フォルダ監視.js';
-import * as viewerIdle from '../src/ファイル閲覧/閲覧待機.js';
-import * as routeTree from '../src/開発スペース/軌跡ツリー.js';
-import * as routeRecords from '../src/開発スペース/経路記録.js';
-import * as fileDates from '../src/ファイル閲覧/ファイル日時.js';
-import * as latest from '../src/ファイル閲覧/最新ファイル.js';
-import * as pages from '../src/ファイル閲覧/フォルダページ構成.js';
-import * as references from '../src/ファイル閲覧/ファイル参照.js';
-import * as fileActions from '../src/ファイル閲覧/ファイル操作.js';
-import * as explorerDrag from '../src/ファイル閲覧/エクスプローラードラッグ.js';
-import * as explorerActions from '../src/ファイル閲覧/エクスプローラー操作.js';
-import * as browserLaunch from '../src/ブラウザ/起動.js';
+import { createSpace } from '../src/components/開発スペース/宇宙描画.js';
+import { createFolderMonitor } from '../src/components/ファイル閲覧/フォルダ監視.js';
+import * as viewerIdle from '../src/components/ファイル閲覧/閲覧待機.js';
+import * as routeTree from '../src/components/開発スペース/軌跡ツリー.js';
+import * as routeRecords from '../src/components/開発スペース/経路記録.js';
+import * as fileDates from '../src/components/ファイル閲覧/ファイル日時.js';
+import * as latest from '../src/components/ファイル閲覧/最新ファイル.js';
+import * as pages from '../src/components/ファイル閲覧/フォルダページ構成.js';
+import * as references from '../src/components/ファイル閲覧/ファイル参照.js';
+import * as fileActions from '../src/components/ファイル閲覧/ファイル操作.js';
+import * as explorerDrag from '../src/components/ファイル閲覧/エクスプローラードラッグ.js';
+import * as explorerActions from '../src/components/ファイル閲覧/エクスプローラー操作.js';
+import * as browserLaunch from '../src/components/ブラウザ/起動.js';
 import * as mediaTypes from '../viewer/media-types.mjs';
-import * as routeExpansion from '../src/ファイル閲覧/軌跡パネル展開.js';
-import * as panelWindows from '../src/ファイル閲覧/パネル別窓.js';
-import { scanWarning } from '../src/ファイル閲覧/走査警告.js';
-import { fileIcon } from '../src/ファイル閲覧/ファイルアイコン.js';
+import * as routeExpansion from '../src/components/ファイル閲覧/軌跡パネル展開.js';
+import * as panelWindows from '../src/components/ファイル閲覧/パネル別窓.js';
+import { scanWarning } from '../src/components/ファイル閲覧/走査警告.js';
+import { fileIcon } from '../src/components/ファイル閲覧/ファイルアイコン.js';
 
 const require = createRequire(import.meta.url), vue = require('vue');
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc');
@@ -102,7 +102,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
     './エクスプローラードラッグ.js': explorerDrag,
     '../ファイル閲覧/エクスプローラー操作.js': explorerActions, './エクスプローラー操作.js': explorerActions,
     '../ブラウザ/起動.js': browserLaunch,
-    '../../viewer/media-types.mjs': mediaTypes,
+    '../../../viewer/media-types.mjs': mediaTypes,
     '../ファイル閲覧/閲覧待機.js':viewerIdle,
     '../ファイル閲覧/軌跡パネル展開.js':routeExpansion,'../ファイル閲覧/パネル別窓.js':panelWindowFactory?{...panelWindows,createPanelWindow:panelWindowFactory}:panelWindows,
     './ファイル日時.js': fileDates,
@@ -125,7 +125,7 @@ async function workspace(t, { auto = false, fetcher, hash = '', mode = '2d', act
     vm.runInNewContext(transformSync(`${script.content}\n${template.code}\ncomponent.render=render;module.exports=component;`, { format: 'cjs' }).code, {
       ...globals, module, Date, console, AbortController, AbortSignal, URLSearchParams,
       require: id => id === 'vue' ? runtime : id === '../ファイル検索/AI検索パネル.vue' ? (actualAI?component('AISearchPanel'):aiPanel)
-        : id.endsWith('.vue') ? component(componentName(id)) : moduleMap[id] || assert.fail(`Unexpected import: ${id}`),
+        : id.endsWith('.vue') ? component(componentName(id, name)) : moduleMap[id.replace('../components/', '../')] || assert.fail(`Unexpected import: ${id}`),
     });
     const result = module.exports, setup = result.setup;
     result.setup = (input, context) => { props.set(name, input); const state = setup(input, context); states.set(name, state); return state; };
@@ -849,7 +849,7 @@ test('軌跡の外部Explorer配置は本体の左余白16pxで縦横共通、�
 
 
 test('Explorer日時と開閉印: SVGだけ0.7倍・展開時は輪郭▽にし、操作枠・日時欄を保持', () => {
-  const { descriptor } = parse(readFileSync(new URL('../src/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8'));
+  const { descriptor } = parse(readFileSync(new URL('../src/components/ファイル閲覧/ファイル一覧.vue', import.meta.url), 'utf8'));
   const result = require('@vue/compiler-sfc').compileStyle({ source: descriptor.styles[0].content, filename: 'FileExplorer.vue', id: 'data-v-explorer-ui', scoped: true });
   assert.deepEqual(result.errors, []);
   const css = result.code;

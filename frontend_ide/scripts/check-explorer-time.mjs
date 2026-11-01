@@ -20,7 +20,7 @@ const output = mkdtempSync(join(tmpdir(), 'aidiy-explorer-time-'));
 const entry = join(output, 'entry.js');
 writeFileSync(entry, `
 import {createApp,h,reactive,nextTick} from 'vue';
-import Explorer from ${JSON.stringify(join(root, 'src/ファイル閲覧/ファイル一覧.vue'))};
+import Explorer from ${JSON.stringify(join(root, 'src/components/ファイル閲覧/ファイル一覧.vue'))};
 import ${JSON.stringify(join(root, 'src/style.css'))};
 const now=new Date(2026,9,28,14,0,0).getTime();Date.now=()=>now;
 const at=(h,m=0,s=0,ms=0)=>new Date(2026,9,28,h,m,s,ms).getTime();

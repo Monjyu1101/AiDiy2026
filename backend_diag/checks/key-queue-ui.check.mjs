@@ -12,7 +12,7 @@ const {ref}=createRequire(new URL('../ui/package.json',import.meta.url))('vue');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function fixture(){
  const requests=[],timers=new Map();let timerId=0;
- const {キー設定状態を作成}=dependency('キー設定共通/キー設定状態.mjs');
+ const {キー設定状態を作成}=dependency('components/キー設定共通/キー設定状態.mjs');
  const state=キー設定状態を作成({connected:ref(true),message:ref(''),setTimer:fn=>{timers.set(++timerId,fn);return timerId;},clearTimer:id=>timers.delete(id),api:(url,method,signal)=>{const d=deferred();requests.push({url,method,signal,...d});return d.promise;}});
  return {state,requests,timers,async poll(){const [id,fn]=timers.entries().next().value;timers.delete(id);const done=fn();return {request:requests.at(-1),done};}};
 }
@@ -48,7 +48,7 @@ test('キー確認: 進捗取得失敗後も再取得しPOSTの成功結果を�
 });
 test('モデル・外部連携: 待機中のボタン・バッジは確認中と区別する',async()=>{
  for(const [panel,id] of [['モデル一覧','openai'],['外部連携','discord']]){
-  const html=await render(`${panel}/${panel}パネル.vue`,{connected:true,data:{設定状態:'読込済み',項目:[{id,名前:id,テスト可能:true}]},results:{[id]:{id,状態:'待機中'}},testing:id,testingIds:new Set([id])});
+  const html=await render(`components/${panel}/${panel}パネル.vue`,{connected:true,data:{設定状態:'読込済み',項目:[{id,名前:id,テスト可能:true}]},results:{[id]:{id,状態:'待機中'}},testing:id,testingIds:new Set([id])});
   assert.match(html,/<button[^>]*class="single-test-button"[^>]*disabled[^>]*>待機中…<\/button>/);assert.match(html,/data-state="待機中" data-tone="pending"/);
  }
 });

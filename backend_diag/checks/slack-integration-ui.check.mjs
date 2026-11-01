@@ -14,25 +14,25 @@ const rows=()=>ids.map(id=>({id,名前:id==='slack'?'Slack Bot':id,キー名:id=
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const fixture=()=>{
  const requests=[],connected=vue.ref(true),message=vue.ref('');
- const {キー設定状態を作成}=dependency('キー設定共通/キー設定状態.mjs');
+ const {キー設定状態を作成}=dependency('components/キー設定共通/キー設定状態.mjs');
  const state=キー設定状態を作成({connected,message,setTimer:()=>1,clearTimer(){},api:(url,method,signal)=>{const d=deferred();requests.push({url,method,signal,...d});return d.promise;}});
  return {requests,connected,message,state};
 };
 
 test('Slack は Discord の次の外部連携行で、モデル一覧へ混ざらない',async()=>{
- const {外部連携ID,外部連携か}=dependency('キー設定共通/キー設定表示.mjs');assert.deepEqual(Array.from(外部連携ID),ids);assert.equal(外部連携か({id:'slack'}),true);
+ const {外部連携ID,外部連携か}=dependency('components/キー設定共通/キー設定表示.mjs');assert.deepEqual(Array.from(外部連携ID),ids);assert.equal(外部連携か({id:'slack'}),true);
  const data={設定状態:'読込済み',項目:[{id:'openai',名前:'OpenAI',設定済み:true,テスト可能:true},...rows()]};
- const html=await render('外部連携/外部連携パネル.vue',{data,connected:true,results:{}});
+ const html=await render('components/外部連携/外部連携パネル.vue',{data,connected:true,results:{}});
  assert.equal((html.match(/class="integration-row"/g)||[]).length,4);assert.ok(html.indexOf('>Discord<')>=0 && html.indexOf('>Discord<')<html.indexOf('>Slack<'));
  assert.equal((html.match(/data-state="未実施"/g)||[]).length,4);assert.doesNotMatch(html,/準備中|接続済み|data-state="OK"|>OpenAI</);
- const models=await render('モデル一覧/モデル一覧パネル.vue',{data,connected:true,results:{}});assert.doesNotMatch(models,/Slack Bot/);
+ const models=await render('components/モデル一覧/モデル一覧パネル.vue',{data,connected:true,results:{}});assert.doesNotMatch(models,/Slack Bot/);
  assert.match(html,/auth\.test/);assert.match(html,/App トークン/);assert.match(html,/Socket Mode/);
 });
 
 test('Slack 行は未設定・設定確認不可・未認証・実行中を区別して無効化する',async()=>{
  for(const [configured,possible,connected,testing] of [[false,false,true,false],[null,false,true,false],[true,true,false,false],[true,true,true,true],[true,true,true,false]]){
   const row={...rows().at(-1),設定済み:configured,テスト可能:possible,理由:possible?'':'Bot トークンを設定してください。',token:'must-not-render-secret'};
-  const html=await render('外部連携/外部連携パネル.vue',{connected,data:{設定状態:'読込済み',項目:[row]},results:testing?{slack:{状態:'待機中'}}:{},testing:testing?'slack':'',testingIds:new Set(testing?['slack']:[])});
+  const html=await render('components/外部連携/外部連携パネル.vue',{connected,data:{設定状態:'読込済み',項目:[row]},results:testing?{slack:{状態:'待機中'}}:{},testing:testing?'slack':'',testingIds:new Set(testing?['slack']:[])});
   const button=html.match(/<button[^>]*class="single-test-button"[^>]*>.*?<\/button>/)[0];
   assert.equal(/disabled/.test(button),!possible||!connected||testing);assert.doesNotMatch(html,/must-not-render-secret/);
   if(testing)assert.match(button,/待機中…/);else assert.match(html,/data-state="未実施"/);
@@ -44,7 +44,7 @@ function mount(props){
  const make=(tag,text='')=>({tag,text,children:[],props:{},parent:null,querySelector(){return null;},querySelectorAll(){return [];}});
  const remove=node=>{if(node.parent){const list=node.parent.children,index=list.indexOf(node);if(index>=0)list.splice(index,1);node.parent=null;}};
  const renderer=vue.createRenderer({createElement:tag=>make(tag),createText:text=>make('#text',text),createComment:()=>make('#comment'),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[];},patchProp:(n,k,_p,v)=>n.props[k]=v,insert:(n,p,a)=>{remove(n);n.parent=p;const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);},remove,parentNode:n=>n.parent,nextSibling:n=>n.parent?.children[n.parent.children.indexOf(n)+1]||null});
- const root=make('root'),app=renderer.createApp({render:()=>vue.h(component('外部連携/外部連携パネル.vue').default,props)});app.mount(root);
+ const root=make('root'),app=renderer.createApp({render:()=>vue.h(component('components/外部連携/外部連携パネル.vue').default,props)});app.mount(root);
  const all=node=>[node,...node.children.flatMap(all)],text=node=>node.text+node.children.map(text).join('');
  return {app,root,all:()=>all(root),text,click:node=>{assert.notEqual(node.props.disabled,true);node.props.onClick();}};
 }

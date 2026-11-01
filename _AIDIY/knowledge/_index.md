@@ -1,103 +1,16 @@
 # _AIDIY/knowledge インデックス
 
-- [ローカルモデルの準備と起動](./backend_local,モデル準備と起動.md): モデル取得、遅延ロード、起動確認とcleanup後の再取得。
+このフォルダは現行実装の再利用 HowTo の入口です。履歴はGitと `_AIDIY/histories/` で確認し、旧版コピーは残しません。
 
-- [AiDiy アイコンの原本と配布](./共通,アイコン原本と配布.md): 所有モジュールの SVG / PNG と、ローカル配布コピーの更新・検証。
-- [_cleanup.py後の確認](./共通,_cleanup.py後の確認.md): 残留プロセス・不要フォルダ・一時テストプログラムの確認、現行実装を基準とする資料の選別・改名。
+- 文書の役割・命名・統合・削除・検証: [ナレッジ更新手順](./共通,ナレッジ更新手順.md)
+- セルフテストの冊子・画像・PDF: [説明資料の書き方](./セルフテスト,_説明資料の書き方.md)
+- 実施済み試験と未確認範囲: [確認結果](./セルフテスト,共通,確認結果.md)
+- 起動・依存・テスト: [開発環境運用手順](./共通,開発環境運用手順.md)
+- cleanup と残留確認: [クリーンアップ手順](./共通,クリーンアップ手順.md)
+- ローカルモデル: [モデル準備と起動](./backend_local,モデル準備と起動.md)
+- アイコン: [原本と配布](./共通,アイコン原本と配布.md)
 
-このフォルダは AiDiy2026 専用の再利用ナレッジ置き場です。
-残す内容は、次回の修正で使える HowTo、判断基準、注意点、確認方法だけにします。
-
-セルフテスト資料を作成・更新するときは、[最新版の維持と命名の必須ルール](./セルフテスト,_説明資料の書き方.md#必須ルール最新版だけ内容が分かる名前)を先に確認します。旧版を残さず、意味のない日付・版名をファイル名に付けません。
-
-冊子は単独起動できるアプリごとに原則1冊とします。Console・Code・Live・Browser・Discord・Slack・Hermesはそれぞれ独立冊子にし、Diag・IDEは機能別に分冊します。詳しい境界は[冊子を分ける単位](./セルフテスト,_説明資料の書き方.md#冊子を分ける単位)に従います。PDFは試験・本文・エビデンスと冊子構成が確定した最後に作成します。
-
-Toolsが利用できるときは、作業の開始・重要な進捗・完了を短い日本語の音声でも案内します。使い方は[MCP活用手順の作業中の音声案内](./backend_server,backend_tools,MCP活用手順.md#作業中の音声案内)を参照してください。
-
-## ファイル命名規則
-
-ファイル名は短い編名・確認番号・内容だけにします。日付（例：20261028）、変更後・修正後・追加後、確認02・確認03、最新版・旧版など、作業経緯や版を示す語は禁止です。試験の日時・条件は本文へ書き、再試験でも同じ内容名を使います。
-
-ナレッジファイル名は `対象モジュール,トピック名.md` とします。
-`,` の左側にどのモジュール（群）に関連するかを並べ、右側にトピックを日本語で記述します。
-
-```
-モジュール1,モジュール2,トピック名.md
-```
-
-モジュール名には以下を使います:
-
-| モジュール名 | 対象 |
-|-------------|------|
-| `共通` | プロジェクト全体、横断的な話題 |
-| `backend_diag` | aidiy_diag の環境診断・モデル情報・Vue 画面 |
-| `backend_server` | FastAPI サーバー（core_main / apps_main） |
-| `command_hermes` | `aidiy_hermes` CLI 基盤 |
-| `backend_tools` | MCP サーバー群 |
-| `backend_local` | ローカル LLM サーバー（OpenAI 互換 Gemma 推論） |
-| `backend_taskteam` | AIタスク実行 + 定期タスクと複数AIエージェントのチーム活動を統合した FastAPI サーバー |
-| `frontend_web` | Vue 3 + Vite + TypeScript Web UI |
-| `frontend_avatar` | Electron/Web デュアルモード Avatar |
-| `frontend_channels` | Discord Bot の Code（Hermes）チャット / Live（AIコア）音声接続。`slack/` に双子の Slack Bot（Code のみ、HTTPS 定期取得） |
-| `frontend_ide` | Console / Code / Live / IDEのVue共通画面、VS Code拡張ホスト、宇宙表示・ファイルビューア |
-
-例:
-
-- `backend_server,スキーマ変更手順.md` — backend_server 単独の話題
-- `frontend_avatar,frontend_web,アバター表示とVRMA.md` — 両方のフロントエンドにまたがる話題
-- `backend_server,frontend_web,frontend_avatar,JWT認証フロー.md` — 3モジュールにまたがる話題
-- `共通,開発環境運用手順.md` — プロジェクト全体の話題
-
-メタファイル（`_index.md`、`_最終変更.md`）は接頭辞をつけず、`_` 始まりのままにします。
-
-総合テストの手順・実施結果・エビデンスは `セルフテスト,アプリコマンド,xx編.md` とします。主目的は総合テストで、記録した操作と画面は副産物として操作手順書の素材に再利用します。例は `セルフテスト,aidiy_diag,システム起動編.md`。エビデンスは `Diag-システム起動_101_起動直後画面.png` のように短い編名・確認番号・場面を含め、本文にインラインで掲載します。試験・本文・エビデンスと冊子構成を確定した最後に、元のMarkdownと同じフォルダへ同名のPDFを作成します。発行後に本文を修正した場合はPDFも再生成します。
-
-説明資料の構成・文体・画像説明は[説明資料の書き方](./セルフテスト,_説明資料の書き方.md)にまとめます。文書全体を簡潔で丁寧に書き、先頭に総合評価、各画像の直前に短い説明を添えます。再試験後は本文と総合評価を一緒に更新します。解消した課題の経緯は掲載せず、修正後の最終結果だけに整理します。
-
-画像は `images/<参照元Markdownの拡張子なしファイル名>/<ファイル名>` に保存します。例は `images/セルフテスト,aidiy_diag,システム起動編/` です。ファイル名は `Diag-システム起動_101_起動直後画面.png` のように内容を先に示し、日付や実施IDを先頭に付けません。実施日時・結果・操作上の注意・画像説明は参照元のMarkdownへ直接記載します。JSON・ログ・結果テキストや、整理作業の台帳は説明資料として残さず、照合した事実と判定だけを本文に記載します。実施IDのサブフォルダは作りません。資料と画像は常に最新版だけを維持します。同じ場面の画像は最新版へ置き換え、参照されなくなった旧版は削除します。`temp/` は作業用で、正式な証跡の保存先には使いません。
-
-今回の必須対象はWindowsです。Mac／Linux実機と長時間連続運転は「PASS（環境依存・判定対象外）」として未実施を明記し、実行成功とは区別します。各冊に対象OSと推奨試験の扱いを明記します。
-
-## ファイル内容先頭書式
-
-各ナレッジファイルの先頭は以下の形式に統一します。
-
-```markdown
-# <タイトル>
-
-> 文書: `モジュール,トピック名.md` | 実装: `backend_server/path/file.py`, `frontend_web/src/path/file.vue`
-
-## このメモを使う場面
-
-- <このメモが役立つ状況を箇条書き>
-```
-
-ブロック引用（`> 文書: … | 実装: …`）行の目的:
-- `文書:` — このファイル自身のファイル名を記載する。全文検索で `文書名.md` → 該当ファイルがヒットしやすくなる。
-- `実装:` — このナレッジが参照する主要なソースファイルパスを `,` 区切りで列挙する。grep で `ファイル名.vue` → 関連ナレッジが特定できる。
-
-例:
-
-```markdown
-# AI モデル設定変更手順
-
-> 文書: `backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md` | 実装: `backend_server/conf/conf_json.py`, `frontend_web/src/components/AiDiy/dialog/AI設定再起動.vue`
-
-## このメモを使う場面
-
-- AI ベンダーやモデル名を切り替えるとき
-- `.env` の `CHAT_AI_NAME` などの設定値を変更するとき
-```
-
-- `# <タイトル>` はファイル名末尾のトピック部分と対応させる（`AIモデル設定変更手順` など）。
-- `## このメモを使う場面` は必ず箇条書きで簡潔に書く。
-
-## 使い方
-
-1. 目的に近いカテゴリから該当ファイルを開く。
-2. 使う前に、関連ファイルとして書かれているソースを確認して現行実装との差を埋める。
-3. 迷う場合は、下の「迷ったときの入口」から最初に見るファイルを決める。
-4. 知見を追記するときは、作業履歴ではなく次回使える手順へ圧縮して既存ファイルへ統合する。
+Toolsが利用できる場合の作業中の音声案内は [MCP活用手順](./backend_server,backend_tools,MCP活用手順.md#作業中の音声案内) を参照します。
 
 ## 重複しやすい話題の使い分け
 
@@ -107,12 +20,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | 音声処理 | `AudioController` 単体、マイク、再生、エコー抑制、音声 WebSocket は [`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) に集約する。 |
 | VRM / VRMA | モデルやモーションファイルを追加する場合は [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、表示サイズ・向き・表示選択 UI は [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、描画内部やカメラワークは [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) を使う。 |
 | MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、MCP サーバー構成は [`backend_tools,構成.md`](./backend_tools,構成.md)、Code CLI への MCP 登録は [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を使う。 |
-
-## 最優先ルール
-
-| 目的 | 参照ファイル |
-|------|--------------|
-| `AGENTS.md` / `_AIDIY.md` / `CLAUDE.md` を整理する | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
 
 ## 迷ったときの入口
 
@@ -140,14 +47,14 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | Avatarを実行方式ごとに確認する | [Electron実行編](./セルフテスト,aidiy_avatar,Electron実行編.md)、[Web実行編](./セルフテスト,aidiy_avatar,Web実行編.md) |
 | Electron画面の0.5秒長押しドラッグ、透明パネルで領域を先に確保する表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
 | 今後の改善提案を比較し、採用条件を検討する | [`共通,明日のために,改善提案.md`](./共通,明日のために,改善提案.md) |
-| 未解決の改善課題と再現条件・検証限界を確認する | [`共通,明日のために,改善課題.md`](./共通,明日のために,改善課題.md) |
-| AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
+| 固定版の改善課題と再現条件・検証限界を確認する | [`共通,明日のために,改善課題.md`](./共通,明日のために,改善課題.md) |
+| AGENTS / CLAUDE / _AIDIY の役割分担整理 | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
 | DB スキーマ差分、起動時のカラム不足 | [`backend_server,スキーマ変更手順.md`](./backend_server,スキーマ変更手順.md) |
 | M / T / V / S 系の追加、登録漏れ | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md)、[`backend_server,T系トランザクション追加手順.md`](./backend_server,T系トランザクション追加手順.md)、[`backend_server,V系エンドポイント追加手順.md`](./backend_server,V系エンドポイント追加手順.md)、[`backend_server,S系スケジューラ追加手順.md`](./backend_server,S系スケジューラ追加手順.md) |
-| M系マスタへのカラム追加 | [`backend_server,M系マスタカラム追加手順.md`](./backend_server,M系マスタカラム追加手順.md) |
+| M系マスタへのカラム追加 | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md) |
 | 採番、監査フィールド、初期データ | [`backend_server,C採番と監査フィールド.md`](./backend_server,C採番と監査フィールド.md) |
 | backend の層構造、実装パターン、落とし穴 | [`backend_server,実装パターン.md`](./backend_server,実装パターン.md) |
-| ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
+| ログイン、401、トークン延長、パスワード | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md)、[`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 | backend / MCP / task・team 起動、ポート残留 | [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、[`backend_tools,構成.md`](./backend_tools,構成.md) |
 | AIタスク（要求分解・明細DAG・実行開始条件）、AIチーム（依頼・経験・作業ループ・自動会話）の仕様 | `backend_taskteam/AGENTS.md`（構成・仕様の入口。実行記録と繰り返し監視の HowTo は次項） |
 | AIタスクの実行済み記録が空になる、間隔実行が1回のエラーで止まる、実行監視タスクを作る | [`backend_taskteam,AIタスクの実行記録と繰り返し監視.md`](./backend_taskteam,AIタスクの実行記録と繰り返し監視.md) |
@@ -158,29 +65,25 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | プロジェクト別に Chat / Code の会話履歴を分析する | [`backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md`](./backend_server,frontend_ide,frontend_web,frontend_avatar,会話履歴のプロジェクト識別.md) |
 | AIチャット / AIコードの引数・実行オプション（会話継続・履歴保存・ストリーム送信・出力ファイル保存）を追加・変更する | [`backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md`](./backend_server,backend_tools,AIチャット・AIコード共通パラメータ.md) |
 | AI モデル、WebSocket、code1〜code6 | [`backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md`](./backend_server,frontend_avatar,frontend_web,AIモデル設定変更手順.md)、[`backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md`](./backend_server,frontend_avatar,frontend_web,AIコアWebSocket仕様.md)、[`backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md`](./backend_server,frontend_avatar,frontend_web,AIコードパネル拡張手順.md) |
-| Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md)、[`command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) |
+| Code CLI 追加、CLI 出力、MCP 設定 | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md)、[`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md)、[`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) |
 | frontend_web 画面、X系、proxy | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)、[`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md)、[`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
-| frontend_web の UI ルール、qTubler、明細型編集 | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md) |
-| 画面コンポーネントを直す（**frontend_avatar に同名コピーがあるので両方直す**） | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md)（「frontend_avatar との二重管理」）、[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
+| frontend_web の UI ルール、qTubler、明細型編集 | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md) |
+| 画面コンポーネントを直す（Web / Avatar の対応実装と共通契約を確認） | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md)（「共通実装を変更するとき」）、[`frontend_web,frontend_avatar,共通ユーティリティ.md`](./frontend_web,frontend_avatar,共通ユーティリティ.md) |
 | frontend_avatar、Electron、VRM / VRMA、音声 | [`frontend_avatar,変更チェック.md`](./frontend_avatar,変更チェック.md)、[`frontend_avatar,ElectronIPC追加手順.md`](./frontend_avatar,ElectronIPC追加手順.md)、[`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、[`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、[`backend_server,frontend_avatar,AI音声処理.md`](./backend_server,frontend_avatar,AI音声処理.md) |
 | VS Code の AiDiy Code / AiDiy Live 拡張を変更・検証・配布する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md) |
-| Code の `out/*.cjs` など生成物6件だけが差分に出る、上書きせず再検証する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
-| Code の `out/aidiy_code/<起動ID>.json` だけが変更通知に出る | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
-| Discord の Code / Live 接続、Bot 設定、音声中継を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
-| Discord 音声のチャンク境界で無音が混ざる、発話末尾が欠ける、Opus 回帰テストを見直す | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md)（「出力チャンク境界と末尾処理の再修正チェック」） |
+| Discord の Code / Live 接続、Bot 設定、音声中継を変更・検証する | [`frontend_channels,Discord接続変更手順.md`](./frontend_channels,Discord接続変更手順.md) |
 | command_hermes の CLI 起動・確認 | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
 | backend_tools の起動・SSE・環境変数 | [`backend_tools,backend_server,運用手順.md`](./backend_tools,backend_server,運用手順.md) |
 | バックアップ保存先、旧 `.backup_local/`・`backup/` から `.aidiy_backup/` への移行、保存版との比較 | [`command_hermes,共通,MCPバックアップ検証手順.md`](./command_hermes,共通,MCPバックアップ検証手順.md) |
-| backend_tools の `/tts` `/imageGen` `/movieGen` HTTP API、save_path 挙動、SSE マウント方法 | [`backend_tools,HTTP_API_save_path挙動.md`](./backend_tools,HTTP_API_save_path挙動.md) |
-| Markdown、BOM、ナレッジ整理 | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md)、[`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
-| フォルダ確認結果の件数・参照内容・検証範囲を照合する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「フォルダ確認結果の根拠と記録の整合性」） |
+| backend_tools の メディア生成 HTTP API、save_path 挙動、SSE マウント方法 | [`backend_tools,HTTP_API_save_path挙動.md`](./backend_tools,HTTP_API_save_path挙動.md) |
+| Markdown、BOM、ナレッジ整理 | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)、[`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md) |
 | 開発環境操作、DB、Swagger、よくある問題 | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | GitHub issue の確認・close | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
 | MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) ※ 実装済み自動化: `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_紹介.py`, `backend_tools/aidiy_automations/ビデオページ生成/ビデオページ生成_解説.py` |
 | 紹介ビデオ（take）またはアバター版プレゼンターを新規作成・改版する | [`frontend_web,X系紹介ビデオとアバター作成手順.md`](./frontend_web,X系紹介ビデオとアバター作成手順.md) |
 | ニュース型掛け合いビデオ（female+male 2アバター・1ページ複数ターン）を作成・改版する | [`frontend_web,X系ニュース型掛け合いビデオ.md`](./frontend_web,X系ニュース型掛け合いビデオ.md) |
 
-既存の運用で `_最終変更.md` を参照する場合は、履歴ではなく [`再修正時の確認入口`](./_最終変更.md) として扱います。
+再修正時もこの索引から対象テーマを選び、記載された実装と検証方法を確認します。
 
 ## Backend データ・スキーマ
 
@@ -195,7 +98,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | 目的 | 参照ファイル |
 |------|--------------|
 | JWT ログインから 401 ハンドリングまで確認する | [`backend_server,frontend_web,frontend_avatar,JWT認証フロー.md`](./backend_server,frontend_web,frontend_avatar,JWT認証フロー.md) |
-| どの操作でトークンを延長するか確認する | [`backend_server,frontend_web,frontend_avatar,認証延長ルール.md`](./backend_server,frontend_web,frontend_avatar,認証延長ルール.md) |
 | C利用者のパスワード保存・照合方針を確認する | [`backend_server,C利用者パスワード運用.md`](./backend_server,C利用者パスワード運用.md) |
 
 ## Backend API 追加
@@ -203,7 +105,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | 目的 | 参照ファイル |
 |------|--------------|
 | M系マスタを追加する | [`backend_server,M系マスタ追加手順.md`](./backend_server,M系マスタ追加手順.md) |
-| M系マスタにカラムを追加する | [`backend_server,M系マスタカラム追加手順.md`](./backend_server,M系マスタカラム追加手順.md) |
 | T系トランザクションを追加する | [`backend_server,T系トランザクション追加手順.md`](./backend_server,T系トランザクション追加手順.md) |
 | V系 JOIN / 集計エンドポイントを追加する | [`backend_server,V系エンドポイント追加手順.md`](./backend_server,V系エンドポイント追加手順.md) |
 | S系スケジューラを追加する | [`backend_server,S系スケジューラ追加手順.md`](./backend_server,S系スケジューラ追加手順.md) |
@@ -224,7 +125,7 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Electron全アプリ・関連パネルの0.5秒長押しドラッグと、透明パネルで領域確保する表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
+| Electron renderer の Avatar 構成例・配置判断と、長押しドラッグ・表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
 | Avatar / VS Code の Electron を事前導入し、バイナリ・ZIP を再利用する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md)（「Electron の共通セットアップ」） |
 | Vite proxy / CORS / ポートを調整する | [`frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md`](./frontend_web,frontend_avatar,backend_server,Viteプロキシ設定.md) |
 | Axios API クライアントのパターン・token 付与・401 ハンドリングを確認する | [`frontend_web,frontend_avatar,共通APIクライアントパターン.md`](./frontend_web,frontend_avatar,共通APIクライアントパターン.md) |
@@ -236,7 +137,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | 目的 | 参照ファイル |
 |------|--------------|
 | Vue 3 の業務画面を追加する | [`frontend_web,画面追加手順.md`](./frontend_web,画面追加手順.md) |
-| qTubler、UI ルール、明細型編集を既存パターンへ合わせる | [`frontend_web,実装パターン.md`](./frontend_web,実装パターン.md) |
 | X系の静的画面・ゲーム・デモを追加する | [`frontend_web,X系静的画面追加.md`](./frontend_web,X系静的画面追加.md) |
 
 ## Frontend Avatar / Electron
@@ -272,7 +172,7 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Discord の Code / Live 接続・Vue パネル・配布物を変更・検証する | [`frontend_discord,Discord接続変更手順.md`](./frontend_discord,Discord接続変更手順.md) |
+| Discord の Code / Live 接続・Vue パネル・配布物を変更・検証する | [`frontend_channels,Discord接続変更手順.md`](./frontend_channels,Discord接続変更手順.md) |
 | Slack の接続・パネルを変更・検証する（Discord と双子） | 同上の手順に加え、[`frontend_channels/slack/AGENTS.md`](../../frontend_channels/slack/AGENTS.md) の対応表で Discord 側の同じファイルもそろえる。確認は [Slack操作編](./セルフテスト,aidiy_slack,操作編.md) |
 
 ## Frontend VS Code
@@ -280,8 +180,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | 目的 | 参照ファイル |
 |------|--------------|
 | VS Code 拡張（Code / Live）と単独起動版を変更・検証・VSIX 配布する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md) |
-| Code の生成物と生成元を `write: false` で照合し、現行生成物を対象テストで確認する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の生成物だけが差分に出た場合」） |
-| Code の起動完了JSONの形式・生成箇所・読込を検証する | [`frontend_ide,VSCodeチャット拡張変更手順.md`](./frontend_ide,VSCodeチャット拡張変更手順.md)（「Code の起動完了JSONだけが変更された場合」） |
 | 拡張機能をセットアップして VS Code へ配置する | [`共通,開発環境運用手順.md`](./共通,開発環境運用手順.md) |
 | 配置済み拡張機能と生成物を解除する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 
@@ -313,7 +211,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 |------|--------------|
 | Code CLI を追加する | [`backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md`](./backend_server,command_hermes,frontend_avatar,frontend_web,CodeCLI追加手順.md) |
 | Code CLI の MCP 設定を確認する | [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) |
-| Antigravity CLI の HTTP MCP 設定を確認・更新する | [`command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md`](./command_hermes,backend_tools,Antigravity_CLIのMCP接続設定.md) |
 | aidiy_hermes の MCP SSE 接続を修復・確認する | [`command_hermes,backend_tools,MCP_SSE接続.md`](./command_hermes,backend_tools,MCP_SSE接続.md) |
 | Code CLI のプロンプト整形責務を確認する | [`backend_server,CodeCLIプロンプト整形.md`](./backend_server,CodeCLIプロンプト整形.md) |
 | CLI 出力の ANSI 制御コードを除去する | [`backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md`](./backend_server,command_hermes,frontend_avatar,CodeCLI表示ANSI制御コード対処.md) |
@@ -323,7 +220,6 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | Hermes CLI の Slash Command 一覧・追加手順を確認する | [`command_hermes,Slash Command一覧.md`](./command_hermes,Slash Command一覧.md) |
 | command_hermes を単体 CLI として起動・確認する | [`command_hermes,backend_server,運用手順.md`](./command_hermes,backend_server,運用手順.md) |
 | hermes を MCP サーバーとして起動・Code CLI から接続する | [`command_hermes,MCP_サーバー起動.md`](./command_hermes,MCP_サーバー起動.md) |
-| hermes-agent 新バージョンへ追従・移行する | [`command_hermes,Upstream移行手順.md`](./command_hermes,Upstream移行手順.md) |
 | opencode_cli 追加（パス解決・コマンド構築・suffix除去）のパターンを確認する | [`backend_server,opencode_cli追加と実行パターン.md`](./backend_server,opencode_cli追加と実行パターン.md) |
 | grok_cli 追加（パス解決・コマンド構築・モデル候補・配線箇所）のパターンを確認する | [`backend_server,grok_cli追加と実行パターン.md`](./backend_server,grok_cli追加と実行パターン.md) |
 | antigravity_cli のタイムアウト延長・継続フラグの調整パターンを確認する | [`backend_server,antigravity_cliタイムアウトと継続オプション.md`](./backend_server,antigravity_cliタイムアウトと継続オプション.md) |
@@ -336,42 +232,31 @@ Toolsが利用できるときは、作業の開始・重要な進捗・完了を
 | MCP（TTS / OBS / ffmpeg / Chrome devtools）で紹介動画を自動生成する | [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
 | 紹介ビデオ（take）またはアバター版プレゼンターを新規作成・改版する | [`frontend_web,X系紹介ビデオとアバター作成手順.md`](./frontend_web,X系紹介ビデオとアバター作成手順.md) |
 | ニュース型掛け合いビデオ（female+male 2アバター・1ページ複数ターン）を作成・改版する | [`frontend_web,X系ニュース型掛け合いビデオ.md`](./frontend_web,X系ニュース型掛け合いビデオ.md) |
-| AI で画像素材を生成する（シーン背景・アイキャッチ） | `POST /imageGen`（`aidiy_image_generation` MCP）— 詳細は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
-| AI で動画クリップ素材を生成する（Gemini Veo） | `POST /movieGen`（`aidiy_movie_generation` MCP）— 詳細は [`共通,mcp利用による自動ビデオ生成手順.md`](./共通,mcp利用による自動ビデオ生成手順.md) |
+
+## その他の実装・運用入口
+
+- [自動更新起動](./共通,自動更新起動手順.md)
+- [TaskTeam内部認証と通常ログイン](./backend_taskteam,内部認証と通常ログイン.md)
+- [小説解説ビデオ](./frontend_web,X系小説解説ビデオ作成手順.md)
+- [IDEエクスプローラーファイル操作](./frontend_ide,エクスプローラーファイル操作.md)
 
 ## ドキュメント・共通
 
 | 目的 | 参照ファイル |
 |------|--------------|
-| Markdown を現行実装へ追従させる | [`共通,Markdown現状追従チェック.md`](./共通,Markdown現状追従チェック.md) |
-| `AGENTS.md` 系ドキュメントを概要と HowTo に分離する | [`共通,AGENTS整理手順.md`](./共通,AGENTS整理手順.md) |
-| `_AIDIY/knowledge` を更新する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
-| フォルダ確認後に知見のみ整理し、本体修正と区別する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「確認依頼と自己改善書き込みの区別」） |
-| 確認結果の根拠、索引・最終参照の整合性、未実施の検証を区別する | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md)（「フォルダ確認結果の根拠と記録の整合性」） |
+| Markdown を現行実装へ追従させる | [`共通,ナレッジ更新手順.md`](./共通,ナレッジ更新手順.md) |
 | UTF-8 BOM を検出・除去する | [`共通,UTF8BOM問題対処.md`](./共通,UTF8BOM問題対処.md) |
 | 一時ファイル・バックアップを整理する | [`共通,クリーンアップ手順.md`](./共通,クリーンアップ手順.md) |
 | Git 未管理フォルダにローカル履歴を用意する | [`共通,ローカルGit管理.md`](./共通,ローカルGit管理.md) |
 | GitHub issue を確認・close する | [`共通,GitHubIssue運用手順.md`](./共通,GitHubIssue運用手順.md) |
-| バグ修正と整理案を区別して提案する | [`共通,変更提案時の区別.md`](./共通,変更提案時の区別.md) |
 
 ## 明日のための改善検討
 
 - [共通,明日のために,改善提案.md](./共通,明日のために,改善提案.md): 既存機能を踏まえた改善提案10件、判断基準と検証方法。
-- [共通,明日のために,改善課題.md](./共通,明日のために,改善課題.md): 再現条件・影響・検証限界を伴う主な課題10件と予備候補。
-
-## 記録ルール
-
-- ファイル名は `モジュール,トピック名.md` 形式にする（上記「ファイル命名規則」参照）。
-- 同じテーマの知見は既存ファイルへ統合する。
-- 残すのは HowTo、判断基準、注意点、確認方法だけにする。
-- 日付つき履歴、担当者メモ、経緯説明、完了報告、編集対象の列挙だけの記録は残さない。
-- 現行実装と同期が必要な値は、同期元のファイルパスを併記する。
-- `_AIDIY/knowledge` 更新とアプリ本体の仕様変更は混同しない。
+- [共通,明日のために,改善課題.md](./共通,明日のために,改善課題.md): 固定コミットの調査結果。現在の未解決一覧ではなく、再現条件・受入確認の参考。
 
 ## Tools主要メソッドのセルフテスト
 
 [主要メソッド編](./セルフテスト,backend_tools,主要メソッド編.md) — 実行した18 MCP、環境依存のPASS、パラメータと結果のSVG図解。
 
-### セルフテスト証跡の整理
-
-現行の操作説明と有効な実測証跡だけを維持します。Web／Avatar内のTask／Teamは廃止済みで、単独アプリの各操作編を参照します。廃止機能の画像や未参照の重複は参照確認後に削除し、履歴はGitから復元します。撮影manifest・JSON・ログは `.aidiy_cache/selftest/` へ保存し、正式な `images` には混在させません。資料整理やsetup成功を、未実施の実画面試験の合格には読み替えません。
+セルフテスト証跡の維持方針は [説明資料の書き方](./セルフテスト,_説明資料の書き方.md) を参照します。資料整理・setup成功と実画面試験の合格を区別します。

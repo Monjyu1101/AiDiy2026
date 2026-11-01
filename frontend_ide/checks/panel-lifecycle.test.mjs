@@ -5,7 +5,7 @@
 // https://github.com/monjyu1101/AiDiy2026
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPanelWindow} from '../src/ファイル閲覧/パネル別窓.js';
+import {createPanelWindow} from '../src/components/ファイル閲覧/パネル別窓.js';
 const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
 function fixture(t,options={}){
  const intervals=new Map();let seq=0,opens=0,closed=0,recovered=0,block=false;

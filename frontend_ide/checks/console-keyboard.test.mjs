@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { terminalKeyHandler } from '../src/ターミナル/キー入力.js';
+import { terminalKeyHandler } from '../src/components/ターミナル/キー入力.js';
 const event=(key,extra={})=>({type:'keydown',key,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;},...extra});
 test('Console clipboard: 全キー段階でOSのコピー・貼付けを妨げず、制御文字も送らない',()=>{
  const sent=[],handle=terminalKeyHandler(data=>sent.push(data),{platform:'Win32'});
@@ -68,7 +68,7 @@ test('Console Mac Option: 通常文字・Shift・dead key・IMEを既定のxterm
 
 test('Console OS判定: 引数省略時は入力元navigator.platformを使う',()=>{
  const require=createRequire(import.meta.url),{transformSync}=require('esbuild');
- const source=readFileSync(new URL('../src/ターミナル/キー入力.js',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/components/ターミナル/キー入力.js',import.meta.url),'utf8');
  for(const platform of ['MacIntel','Win32','Linux x86_64']){
   const module={exports:{}};
   vm.runInNewContext(transformSync(source,{format:'cjs'}).code,{module,navigator:{platform}});
