@@ -2,15 +2,15 @@
 
 ## 認証の境界
 
-- Task / Team の画面は従来どおり Core の通常ログインを使う。API は受け取った Bearer を同居 Core の `/core/auth/現在利用者` で検証する。Core が利用不能なら 503、無効なログインなら 401。localhost や任意の利用者IDヘッダーだけで認証しない。
+- 単独起動のTask / TeamはCoreの通常ログインを使う。IDE連携起動はCoreの既存内部トークンをサーバー側で利用し、画面へ資格情報を渡さない。API は受け取った Bearer を同居 Core の `/core/auth/現在利用者` で検証する。Core内部主体は `internal_core` として識別し、利用者IDを他人やadminへ置換しない。Core が利用不能なら 503、無効なログインなら 401。localhost や任意の利用者IDヘッダーだけで認証しない。
 - `/task/*`、`/team/*`、`/task_check_okng` の業務 POST はすべて認証対象。root / health は最小限の稼働情報として公開する。待受 `0.0.0.0:8093` は維持し、Tools の loopback 制限とは分ける。
-- 通常利用者が本文へ指定する `利用者ID` / `操作利用者ID` はログイン利用者と一致が必要。省略された操作情報も実際の利用者で補完する。既存のタスクID単独CRUD・共有Teamの操作契約は変更しない（新たなレコード所有者ACLを導入したわけではない）。
+- 通常利用者・Core内部主体が本文へ指定する `利用者ID` / `操作利用者ID` はログイン利用者と一致が必要。省略された操作情報も実際の利用者で補完する。既存のタスクID単独CRUD・共有Teamの操作契約は変更しない（新たなレコード所有者ACLを導入したわけではない）。
 
 ## 内部ワーカーの資格情報
 
 TaskTeam 起動時は永続化した最新の鍵・tokenが有効ならそのまま再利用し、期限外なら生成する。稼働中はOSローカル時刻の03:00を跨ぐと鍵・25時間tokenを一度更新する。公開先は `_AIDIY/backend_taskteam/internal_auth.json`。JSON の項目は `access_token`、`token_type`、`issued_at`、`expires_at`。
 
-内部tokenは `tt1.` 形式の署名付き不透明Bearer。HMAC-SHA256、サービス専用のランダム秘密鍵、TaskTeam固有のissuer/audience/subject/scopeで検証する。通常利用者やadminを偽装せず、TaskTeam内部workerとして識別する。Coreの通常JWT・Code/Live内部JWTとは別物で、Coreへの権限は持たない。
+内部tokenは `tt1.` 形式の署名付き不透明Bearer。HMAC-SHA256、サービス専用のランダム秘密鍵、TaskTeam固有のissuer/audience/subject/scopeで検証する。通常利用者やadminを偽装せず、TaskTeam内部workerとして識別する。有効な内部トークンにAPI別の許可表による差を設けず、認証後の通常の業務条件は維持する。Coreの通常JWT・Code/Live内部JWTとは別物で、Coreへの権限は持たない。
 
 - 有効期限は発行から25時間。更新時は以前の鍵を旧側へ移し、旧tokenも自身の期限まで検証できる。再起動でもこの重なりを維持する。
 - 起動時点が03:00を過ぎていても有効な最新tokenは再利用する。次の03:00より先に期限が来る場合は期限到達時にも生成し、期限切れのまま待たない。Core再起動には依存しない。
@@ -26,7 +26,7 @@ TaskTeam 起動時は永続化した最新の鍵・tokenが有効ならそのま
 - Tools の Task Agents / Team Agents は自身の配置先からTaskTeamファイルを読み、同じ再読込規則でPOSTする。Toolsに新たなissuerは作らない。Tools自身のlocal実行境界は別途維持する。
 - 内部tokenを外部URL・環境proxy・redirect先へ送らない。リモートのTaskTeamへ接続する任意設定には内部tokenを転送しない。
 - AIからの完了報告は認証helperを使う。helperの案内だけをプロンプトへ渡し、tokenそのものは渡さない。既存custom promptを使う場合にも実行時に案内を追加する。
-- TaskTeamには現状WebSocket/SSEエンドポイントがない。通常画面は既存axiosのBearer付与・401時ログイン破棄をそのまま使う。
+- TaskTeamには現状WebSocket/SSEエンドポイントがない。単独画面は既存axiosのBearer付与・401時ログイン破棄を維持する。IDE連携はNode側で要求ごとにCore内部ファイルを再読込し、401時だけ一度再読込・再試行する。RendererのstorageやURLには内部トークンを置かない。
 
 ## 安全な検証
 

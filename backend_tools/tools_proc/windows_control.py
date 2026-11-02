@@ -19,6 +19,8 @@ UI Automation 要素操作（uiautomation）を提供する。Windows 専用。
 """
 
 import ctypes
+import math
+import time
 from contextlib import contextmanager
 from ctypes import wintypes
 from typing import Optional
@@ -261,6 +263,26 @@ class WindowsControl:
         self._ensure_gui_backend()
         pyautogui.moveTo(x1, y1)
         pyautogui.dragTo(x2, y2, duration=duration, button=button)
+        return {"from": [x1, y1], "to": [x2, y2], "button": button}
+
+    def mouse_long_press_drag(self, x1: int, y1: int, x2: int, y2: int, button: str = "left", duration: float = 0.2, hold_duration: float = 0.8) -> dict:
+        """長押し後にドラッグ。保持時間と移動時間はそれぞれ秒。"""
+        for name, value, limit in (("duration", duration, 60.0), ("hold_duration", hold_duration, 10.0)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= limit:
+                raise WindowsControlError(f"{name} は0以上{limit:g}以下の有限の秒数で指定してください")
+        if button not in ("left", "right", "middle"):
+            raise WindowsControlError("button は left/right/middle で指定してください")
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in (x1, y1, x2, y2)):
+            raise WindowsControlError("ドラッグの始点・終点は整数で指定してください")
+        self._ensure_gui_backend()
+        pyautogui.moveTo(x1, y1)
+        try:
+            pyautogui.mouseDown(button=button)
+            time.sleep(hold_duration)
+            pyautogui.moveTo(x2, y2, duration=duration)
+        finally:
+            # 押下・保持・移動の途中で例外になっても解放を試みる。
+            pyautogui.mouseUp(button=button)
         return {"from": [x1, y1], "to": [x2, y2], "button": button}
 
     def mouse_scroll(self, amount: int, x: Optional[int] = None, y: Optional[int] = None, horizontal: bool = False) -> dict:

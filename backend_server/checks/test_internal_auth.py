@@ -49,8 +49,7 @@ class TokenTests(unittest.TestCase):
         for token in invalid:
             with self.subTest(token_type='synthetic'), self.assertRaises(JWTError):
                 self.authority.verify(token, 'POST', READ)
-        with self.assertRaises(JWTError):
-            self.authority.verify(payload['access_token'], 'POST', '/core/C利用者/登録')
+        self.authority.verify(payload['access_token'], 'POST', '/core/C利用者/登録')
 
     def test_exact_expiry_boundary_and_future_issue_rejected(self):
         issued = self.now.replace(microsecond=0)
@@ -155,7 +154,7 @@ class BoundaryTests(unittest.TestCase):
         connection.headers['authorization'] = 'Bearer another'
         with self.assertRaises(HTTPException): authenticate(connection, 'WEBSOCKET', WS)
 
-    def test_session_ownership_and_no_global_settings(self):
+    def test_session_ownership_preserved_and_settings_do_not_discriminate_internal(self):
         internal = Principal('internal', 'backend_core:code_live')
         user = Principal('user', 'fixture-user')
         session = SimpleNamespace(_auth_owner=user.owner)
@@ -163,7 +162,7 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaises(HTTPException): require_session_owner(session, internal)
         for save, reset, reboot in ((True, False, {}), (False, True, {}), (False, False, {'reboot_core': True})):
             request = SimpleNamespace(save=save, リセット=reset, 再起動要求=reboot)
-            with self.assertRaises(HTTPException): require_session_settings(internal, request)
+            require_session_settings(internal, request)
             require_session_settings(user, request)
 
     def test_internal_credential_names_and_aliases_not_exposed(self):
@@ -200,14 +199,14 @@ class BoundaryTests(unittest.TestCase):
                     ordinary.write_text('ordinary-fixture')
                     self.assertFalse(is_internal_credential_path(ordinary))
 
-    def test_generic_user_dependency_never_accepts_internal_kind(self):
+    def test_common_dependency_validates_internal_without_user_impersonation(self):
         root = Path(__file__).resolve().parents[1]
         fn = next(n for n in ast.parse((root / 'deps.py').read_text()).body if isinstance(n, ast.FunctionDef) and n.name == 'get_現在利用者')
         scope = dict(Depends=lambda _: None, oauth2_scheme=None, get_db=None,
                      HTTPException=HTTPException, status=SimpleNamespace(HTTP_401_UNAUTHORIZED=401),
                      jwt=jwt, JWTError=JWTError, Session=object,
                      auth=SimpleNamespace(verify_access_token=lambda token: jwt.decode(token, TEST_KEY, algorithms=['HS256'])),
-                     KeyringError=KeyringError,
+                     KeyringError=KeyringError, SimpleNamespace=SimpleNamespace,
                      models=SimpleNamespace(C利用者=SimpleNamespace(利用者ID='利用者ID')))
         exec(compile(ast.Module(body=[fn], type_ignores=[]), '<dependency-fixture>', 'exec'), scope)
         token = jwt.encode({'sub': 'fixture-user', 'token_kind': 'internal_code_live',
@@ -215,6 +214,18 @@ class BoundaryTests(unittest.TestCase):
         db = Mock()
         with self.assertRaises(HTTPException): scope['get_現在利用者'](token=token, db=db)
         db.query.assert_not_called()
+        authority = InternalTokenAuthority(signing_key=TEST_KEY)
+        scope['auth'].get_keyring = lambda: authority
+        scope['auth'].verify_access_token = Mock(side_effect=JWTError('not normal'))
+        genuine = authority.issue(datetime.now(timezone.utc))['access_token']
+        actor = scope['get_現在利用者'](token=genuine, db=db)
+        self.assertEqual(actor.利用者ID, 'backend_core:code_live')
+        self.assertEqual(actor.権限ID, '')
+        self.assertEqual(actor.認証種別, 'internal')
+        db.query.assert_not_called()
+        for invalid in (genuine+'x', authority.issue(datetime.now(timezone.utc)-timedelta(hours=26))['access_token']):
+            with self.assertRaises(HTTPException): scope['get_現在利用者'](token=invalid, db=db)
+        scope['auth'].verify_access_token = lambda token: jwt.decode(token, TEST_KEY, algorithms=['HS256'])
         ordinary = jwt.encode({'sub': 'fixture-user', 'exp': int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())}, TEST_KEY)
         expected = db.query.return_value.filter.return_value.first.return_value
         self.assertIs(scope['get_現在利用者'](token=ordinary, db=db), expected)

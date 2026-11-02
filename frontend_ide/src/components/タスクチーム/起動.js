@@ -12,8 +12,8 @@ async function main() {
   const response = await fetch('/development/config');
   if (!response.ok) throw Error('起動設定を取得できません。');
   const config = await response.json();
-  configureClient(config.kind, config.taskTeamBase);
-  document.title = `AiDiy ${config.kind === 'task' ? 'Task' : 'Team'}`;
+  configureClient(config.kind, config.taskTeamBase, config.projectFixed === true);
+  document.title = `AiDiy ${config.projectFixed ? 'IDE / ' : ''}${config.kind.toUpperCase()}`;
   createApp(TaskTeamPanel, { config }).mount('#app');
 }
 void main().catch(error => { document.getElementById('app').textContent = error.message; });

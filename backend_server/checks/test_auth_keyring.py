@@ -205,7 +205,7 @@ class KeyringTests(unittest.TestCase):
         self.store.initialize(); internal = self.internal(); normal = self.store.issue_normal({'sub': 'same-fixture-user'})
         with self.assertRaises(JWTError): self.store.verify_normal(internal)
         with self.assertRaises(JWTError): self.store.verify(normal, 'POST', READ)
-        with self.assertRaises(JWTError): self.store.verify(internal, 'POST', '/core/C利用者/登録')
+        self.store.verify(internal, 'POST', '/core/C利用者/登録')
         with self.assertRaises(ValueError): self.store.issue_normal({'sub': 'same-fixture-user'}, timedelta(days=30))
         self.now += NORMAL_TTL
         with self.assertRaises(JWTError): self.store.verify_normal(normal)

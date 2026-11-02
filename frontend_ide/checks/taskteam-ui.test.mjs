@@ -18,6 +18,16 @@ test('Task / Team authentication uses isolated session keys and never Avatar cre
   configureClient('task', '/taskteam-api'); assert.equal(token(), 'task-token');
   token(''); assert.equal(store.get('aidiy_team_token'), 'team-token'); assert.equal(store.get('token'), 'avatar');
 });
+
+test('IDE linked client does not store or send internal credentials',async()=>{
+ configureClient('task','/taskteam-api',true);token('ide-internal');assert.equal(token(),'');
+ client.defaults.adapter=async config=>{
+  assert.equal(config.headers.Authorization,undefined);
+  return {data:{status:'OK'},status:200,statusText:'OK',headers:{},config};
+ };
+ await client.post('/core/auth/現在利用者',{});
+ configureClient('task','/taskteam-api');
+});
 test('API keeps same-origin proxy and the original long-running request timeout', async () => {
   configureClient('task', '/taskteam-api'); token('request-token');
   assert.equal(client.defaults.timeout, 0);

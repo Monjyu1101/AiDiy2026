@@ -45,7 +45,7 @@ async def call(app, path='/task/test', token=None, body=None, method='POST', ext
 
 
 class AuthorityTests(unittest.TestCase):
-    def test_included_router_endpoints_accept_registered_posts_only(self):
+    def test_valid_internal_auth_does_not_depend_on_endpoint_registry(self):
         app = FastAPI()
         nested = APIRouter()
         async def endpoint():
@@ -66,8 +66,7 @@ class AuthorityTests(unittest.TestCase):
         token = authority.issue(NOW)['access_token']
         authority.verify(token, 'POST', '/team/要員/一覧')
         for method, path in [('GET', '/team/閲覧'), ('POST', '/team/未登録'), ('POST', '/core/test')]:
-            with self.assertRaises(ValueError):
-                authority.verify(token, method, path)
+            authority.verify(token, method, path)
 
     def authority(self, now=NOW, key=b'fixture-only-key'):
         return InternalTokenAuthority(signing_key=key, clock=lambda: now, endpoints=ENDPOINTS)
@@ -77,8 +76,7 @@ class AuthorityTests(unittest.TestCase):
         old = authority.issue(NOW)['access_token']
         self.assertEqual(authority.verify(old, 'POST', '/task/test')['sub'], 'backend_taskteam:worker')
         for method, path in [('GET', '/task/test'), ('POST', '/core/auth/現在利用者'), ('POST', '/task/new')]:
-            with self.assertRaises(ValueError):
-                authority.verify(old, method, path)
+            authority.verify(old, method, path)
         for bad in [old + 'x', 'abc', 'tt1.!.$', old.replace('tt1.', 'tt2.')]:
             with self.assertRaises(ValueError):
                 authority.verify(bad, 'POST', '/task/test')

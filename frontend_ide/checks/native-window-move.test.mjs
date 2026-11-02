@@ -10,6 +10,20 @@ import vm from 'node:vm';
 import nativeMove from '../デスクトップ/長押し窓移動.cjs';
 import codeDrag from '../デスクトップ/code-drag.cjs';
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
+test('File背景と非モーダル比較だけを許可し、子入力と別モーダルを保護する',()=>{
+ const element=(selectors,parent=null)=>({parentElement:parent,matches:q=>q.split(',').some(s=>selectors.includes(s)),getRootNode:()=>({}),getClientRects:()=>[{}]});
+ const allowed=(node,popups=[])=>vm.runInNewContext(`(${nativeMove.backgroundMoveTarget.toString()})(10,20)`,{document:{elementFromPoint:()=>node,querySelector:()=>null,querySelectorAll:()=>popups},getComputedStyle:()=>({visibility:'visible'})});
+ const file=element(['section.file-container[data-aidiy-window-move-surface]','[tabindex]:not([tabindex="-1"])']);
+ const compare=element(['section.file-history-dialog.history-embedded[data-aidiy-window-move-surface]']);
+ for(const surface of [file,compare]){
+  const popups=surface===compare?[compare]:[];
+  assert.equal(allowed(element(['div'],surface),popups),true);
+  for(const control of ['input','button','select','.monaco-editor','[tabindex]:not([tabindex="-1"])','[data-aidiy-no-window-move]'])assert.equal(allowed(element([control],surface),popups),false,control);
+  assert.equal(allowed(surface,[...popups,element(['[role="dialog"]'])]),false,'別のモーダルは保護');
+ }
+ assert.equal(allowed(element(['[tabindex]:not([tabindex="-1"])'])),false,'未指定のtabindexは保護');
+ assert.equal(allowed(element(['div']),[element(['[role="dialog"]'])]),false,'通常ダイアログは保護');
+});
 function fixture(kind='viewer',target=()=>Promise.resolve(1),arm=()=>Promise.resolve(true),realDrag=false){
  const contents=new EventEmitter(),window=new EventEmitter(),timers=new Map(),ticks=new Map(),inputs=[],calls=[],sent=[],queries=[];
  let cursor={x:100,y:100},serial=0,time=0,bounds={x:50,y:60,width:400,height:300};

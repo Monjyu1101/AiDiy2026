@@ -22,6 +22,21 @@
 - FFmpegは `ffmpeg` / `ffprobe` / `ffplay` ごとに起動時の `-version` 結果で判定する。一部が動けばその機能を公開し、利用できないバイナリを必要とするHTTP実行要求には503と「現在利用不可」を返す。
 - 設定・認証・依存ツールを修正したら `backend_tools` を再起動し、クライアントを再接続してツール一覧を更新する。
 
+## Windowsの長押しドラッグ
+
+長押ししてから移動する操作には、`aidiy_windows_control.mouse_long_press_drag` を使います。通常の `mouse_drag` のAPI・動作は変更しません。
+
+- `x1`, `y1`: 押下位置、`x2`, `y2`: 移動先（整数、同じデスクトップ座標系）。直前の画面と座標系を確認します。
+- `button`: `left`（既定）/ `right` / `middle`。
+- `hold_duration`: 移動前に押したまま保持する秒数。既定0.8、範囲0〜10。
+- `duration`: 保持後に移動する秒数。既定0.2、範囲0〜60。保持時間とは別です。
+
+例: `mouse_long_press_drag(x1=600, y1=30, x2=600, y2=400, hold_duration=0.8, duration=0.6)`。座標は例であり、実画面の対象へ置き換えます。HTTPは `POST /aidiy_windows_control/mouse_long_press_drag` に同じ引数をJSONで渡します。有限の時間とボタン・座標を実入力前に検証し、押下・保持・移動の途中例外でも `finally` で解放を試みます。OS自体の障害・プロセス強制終了時まで解放を保証するものではありません。
+
+検証は `backend_tools/.venv/Scripts/python.exe -m unittest discover -s backend_tools/checks -p test_windows_drag.py -v`。GUIと待機をモックし、ASGIはプロセス内で実行するため、実マウスや稼働サーバーには触れません。Windows専用です。
+
+登録は `tools_main.py` の起動時に行われ、通常起動のuvicornにはコード再読込指定がありません。コード保存だけでは稼働中Toolsへ反映されません。利用者が許可した時点でToolsを通常手順で再起動し、MCPクライアントを再接続してツール一覧・引数を更新します。再起動中は他のMCP利用にも影響するため、実演中に勝手に停止しません。
+
 ## 関連ファイル
 
 - `backend_tools/tools_main.py`

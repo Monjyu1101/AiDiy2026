@@ -607,6 +607,7 @@ async def モデル情報取得(http_request: Request, request: モデル情報�
 @router.post("/core/AIコア/モデル情報/TASK選択肢")
 async def TASKモデル選択肢取得(http_request: Request):
     """AIタスク画面用に、セッション不要で TaskAI の候補と現在設定を返す。"""
+    authenticate(http_request, "POST", "/core/AIコア/モデル情報/TASK選択肢")
     try:
         code_models = {
             "claude_sdk": {"auto": "auto"},

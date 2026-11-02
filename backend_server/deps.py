@@ -9,6 +9,7 @@
 # -------------------------------------------------------------------------
 
 from fastapi import Depends, HTTPException, status
+from types import SimpleNamespace
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from auth_keyring import KeyringError
@@ -38,7 +39,18 @@ def get_現在利用者(token: str = Depends(oauth2_scheme), db: Session = Depen
         if 利用者ID is None:
             raise credentials_exception
     except JWTError:
-        raise credentials_exception
+        try:
+            claims = auth.get_keyring().verify(token, '', '')
+            # DBに実在する利用者へなりすまさず、通常の権限判定を通るサービス主体。
+            return SimpleNamespace(
+                利用者ID=claims['sub'], 利用者名='IDE 内部連携', 権限ID='', 有効=True,
+                利用者備考=None, 認証種別='internal',
+                登録日時='', 登録利用者ID='', 登録利用者名=None, 登録端末ID='',
+                更新日時='', 更新利用者ID='', 更新利用者名=None, 更新端末ID='')
+        except JWTError:
+            raise credentials_exception from None
+        except KeyringError:
+            raise HTTPException(status_code=503, detail="Authentication service is not ready") from None
     except KeyringError:
         raise HTTPException(status_code=503, detail="Authentication service is not ready") from None
 

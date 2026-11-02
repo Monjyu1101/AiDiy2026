@@ -10,17 +10,58 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createTaskTeamProxy, taskTeamTarget } from '../タスクチーム/api-proxy.mjs';
-async function fixture(t, fetcher) {
+async function fixture(t, fetcher, options={}) {
   const root=await mkdtemp(join(tmpdir(),'aidiy-taskteam-'));
   await mkdir(join(root,'_config'));
   await writeFile(join(root,'_config/AiDiy_key.json'),JSON.stringify({PORT_CORE:19091,PORT_TASKTEAM:19093,SECRET:'never-forward'}));
-  const proxy=createTaskTeamProxy(root,root,{fetcher});
+  if(options.projectFixed){
+    await mkdir(join(root,'backend_server'));
+    await writeFile(join(root,'backend_server/core_main.py'),'# fixture');
+    await mkdir(join(root,'_AIDIY/backend_core'),{recursive:true});
+    await writeFile(join(root,'_AIDIY/backend_core/internal_auth.json'),JSON.stringify({token_type:'bearer',access_token:'fixture-internal-credential',expires_at:new Date(Date.now()+60000).toISOString()}));
+  }
+  const proxy=createTaskTeamProxy(root,root,{fetcher,...options});
   const server=createServer(async(req,res)=>{if(!await proxy.handle(req,res,new URL(req.url,'http://localhost')))res.writeHead(404).end();});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{proxy.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});});
   return {base:`http://127.0.0.1:${server.address().port}`,root,proxy};
 }
 const post=(body={})=>({method:'POST',headers:{'content-type':'application/json',authorization:'Bearer test-token'},body:JSON.stringify(body)});
+
+test('IDE fixed project rejects changed folder before upstream; existing foreign requests cannot be retargeted',async t=>{
+ let calls=[];
+ const {base,root}=await fixture(t,async(url,opts)=>{
+  calls.push(decodeURIComponent(url.pathname));
+  assert.equal(opts.headers.authorization,'Bearer fixture-internal-credential');
+  if(calls.at(-1)==='/task/タスク要求/取得')return Response.json({status:'OK',data:{item:{プロジェクト:root+'-other'}}});
+  return Response.json({status:'OK'});
+ },{projectFixed:true});
+ const send=(path,body)=>fetch(base+'/taskteam-api'+path,post(body));
+ for(const path of ['/task/タスク要求/AI登録','/task/タスク要求/更新登録','/team/依頼/登録','/team/依頼/変更']){
+  assert.equal((await send(path,{プロジェクト:root+'-other'})).status,409);
+ }
+ assert.equal(calls.length,0);
+ assert.equal((await send('/task/タスク要求/更新登録',{タスクID:'fixture',プロジェクト:root})).status,409);
+ assert.deepEqual(calls,['/task/タスク要求/取得']);
+ assert.equal((await send('/team/依頼/登録',{プロジェクト:root})).status,200);
+ assert.deepEqual(calls,['/task/タスク要求/取得','/team/依頼/登録']);
+});
+
+test('IDE internal auth reloads credentials once on 401 and never forwards renderer credentials',async t=>{
+ let root,calls=0;
+ const f=await fixture(t,async(url,opts)=>{
+  calls++;
+  assert.equal(opts.headers.authorization,calls===1?'Bearer fixture-internal-credential':'Bearer rotated-fixture-credential');
+  if(calls===1){
+   await writeFile(join(root,'_AIDIY/backend_core/internal_auth.json'),JSON.stringify({token_type:'bearer',access_token:'rotated-fixture-credential',expires_at:new Date(Date.now()+60000).toISOString()}));
+   return Response.json({status:'NG'},{status:401});
+  }
+  return Response.json({status:'OK',data:{利用者ID:'backend_core:code_live'}});
+ },{projectFixed:true});root=f.root;
+ const response=await fetch(f.base+'/taskteam-api/core/auth/現在利用者',post());
+ assert.equal(response.status,200);assert.equal(calls,2);
+ assert.doesNotMatch(await response.text(),/credential|Bearer/);
+});
 test('Task/Team target uses shared configured port, no credentials exposed',async t=>{
  const {base,root}=await fixture(t,async(url,opts)=>{assert.equal(url.href,'http://127.0.0.1:19093/health');assert.equal(opts.headers,undefined);return Response.json({status:'OK',service:'backend_taskteam'});});
  assert.equal(taskTeamTarget(root),'http://127.0.0.1:19093');

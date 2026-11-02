@@ -57,7 +57,7 @@ class InternalTokenAuthority:
 
     def verify(self, token, method, path):
         try:
-            if (method, path) not in self._endpoints or not token.startswith(TOKEN_PREFIX):
+            if not token.startswith(TOKEN_PREFIX):
                 raise ValueError()
             content, signature = token.rsplit('.', 1)
             with self._lock:

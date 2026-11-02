@@ -14,17 +14,17 @@ function copyPayload(value){
  const text=JSON.stringify(value);if(Buffer.byteLength(text,'utf8')>2*1024*1024)throw Error('タスク編集内容が大きすぎます。');
  return JSON.parse(text);
 }
-function createTaskWindows({records,trustedEvent,createWindow,focusWindow,onLastClosed=()=>{},isQuitting=()=>false}){
- const pending=new Map();let revision=0,dialogRevision=0,ending=false,authRevision=0,token='';
- const valid=record=>record&&record.kind==='task'&&!record.window.isDestroyed()&&!isQuitting()&&!ending;
+function createTaskWindows({records,trustedEvent,createWindow,focusWindow,onLastClosed=()=>{},isQuitting=()=>false,owns=()=>true,authenticated=false}){
+ const pending=new Map();let revision=0,dialogRevision=0,ending=false,authRevision=0,token=authenticated?'ide-internal':'';
+ const valid=record=>record&&record.kind==='task'&&owns(record)&&!record.window.isDestroyed()&&!isQuitting()&&!ending;
  const live=()=>[...records.values()].filter(r=>valid(r));
  function source(event){const record=trustedEvent(event);if(!valid(record))throw Error('Task画面から操作してください。');return record;}
  const find=view=>live().find(r=>r.taskView===view);
  const session=()=>({revision:authRevision,token});
  const broadcastSession=()=>{for(const record of live())record.window.webContents?.send('development:task-session',session());};
  function closed(record){
-  if(record.kind!=='task'||ending)return;
-  if(!live().some(r=>views.has(r.taskView))){ending=true;revision++;token='';authRevision++;pending.clear();for(const r of records.values())if(r.kind==='task'&&!r.window.isDestroyed())r.window.destroy();onLastClosed();}
+  if(record.kind!=='task'||!owns(record)||ending)return;
+  if(!live().some(r=>views.has(r.taskView))){ending=true;revision++;token='';authRevision++;pending.clear();for(const r of records.values())if(r.kind==='task'&&owns(r)&&!r.window.isDestroyed())r.window.destroy();onLastClosed();}
  }
  async function open(view,payload){
   if(ending||isQuitting())return{ok:false,error:'Taskは終了しています。'};
@@ -44,14 +44,11 @@ function createTaskWindows({records,trustedEvent,createWindow,focusWindow,onLast
   source(event);
   if(!value||typeof value.token!=='string'||value.token.length>16384||/[\r\n\0]/.test(value.token)||!Number.isSafeInteger(value.expectedRevision)||value.expectedRevision<0)throw Error('Task認証情報が不正です。');
   if(value.expectedRevision!==authRevision)return{ok:false,error:'認証状態が更新されました。',...session()};
-  const wasLoggedIn=!!token;token=value.token;const run=++authRevision;
+  token=value.token;const run=++authRevision;
   // Pending windows from a previous authentication must not survive logout.
   if(!token){revision++;dialogRevision++;pending.clear();}
   broadcastSession();
-  if(token&&!wasLoggedIn){
-   const results=await Promise.all([...views].map(view=>open(view)));
-   if(run===authRevision){const failed=results.find(result=>!result.ok);if(failed)return{...failed,...session()};}
-  }else if(!token){
+  if(!token){
    // Keep a primary panel alive before removing the last surviving peer.
    const result=await open('request');
    if(run!==authRevision)return{ok:false,error:'認証状態が更新されました。',...session()};

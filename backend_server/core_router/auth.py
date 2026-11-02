@@ -72,13 +72,14 @@ def read_現在利用者(現在利用者: C利用者 = Depends(deps.get_現在�
     return schemas.ResponseBase(
         status="OK",
         message="利用者情報を取得しました",
-        data=schemas.C利用者.model_validate(現在利用者)
+        data=({'利用者ID': 現在利用者.利用者ID, '利用者名': 現在利用者.利用者名, '権限ID': 現在利用者.権限ID, '認証種別': 'internal'}
+              if getattr(現在利用者, '認証種別', '') == 'internal' else schemas.C利用者.model_validate(現在利用者))
     )
 
 @router.post("/トークン更新", response_model=schemas.ResponseBase)
-def トークン更新(現在利用者: C利用者 = Depends(deps.get_現在利用者)):
+def トークン更新(現在利用者: C利用者 = Depends(deps.get_現在利用者), token: str = Depends(deps.oauth2_scheme)):
     """操作中とみなしてトークンを再発行する（セッション延長）"""
-    token_data = issue_token(現在利用者)
+    token_data = {'access_token': token, 'token_type': 'bearer'} if getattr(現在利用者, '認証種別', '') == 'internal' else issue_token(現在利用者)
     return schemas.ResponseBase(
         status="OK",
         message="トークンを更新しました",

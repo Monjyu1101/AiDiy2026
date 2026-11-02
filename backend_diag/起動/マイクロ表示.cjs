@@ -50,7 +50,13 @@ function マイクロ表示を作成(window,{screen,pins}={}){
    const p=screen.getCursorScreenPoint(),b=window.getBounds(),x=p.x-b.x,y=p.y-b.y;
    const inside=x>=0&&y>=0&&x<b.width&&y<b.height;
    const interactive=inside&&await window.webContents.executeJavaScript(`!!document.elementFromPoint(${x},${y})?.closest('[data-micro-hit]')`);
-   if(saved&&version===generation)ignore(!interactive);
+   if(saved&&version===generation){
+    // DOM照会中に押下・移動・展開が進んだ場合、古い位置の結果でクリックを透過させない。
+    if(moveToken){ignore(false);return;}
+    const now=screen.getCursorScreenPoint(),bounds=window.getBounds();
+    if(now.x!==p.x||now.y!==p.y||bounds.x!==b.x||bounds.y!==b.y||bounds.width!==b.width||bounds.height!==b.height)return;
+    ignore(!interactive);
+   }
   }catch{if(saved&&version===generation)ignore(false);}finally{busy=false;}
  }
  function set(enabled,{origin}={}){

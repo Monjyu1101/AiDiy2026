@@ -39,7 +39,8 @@ onBeforeUnmount(() => { disposed = true; });
   </div>
 </template>
 <style scoped>
-.task-editor-window{width:100%;height:100%;background:#080a10}
+/* 独立編集面の描画を自身へ閉じ込め、GPU描画時の外側ホバーによる黒抜けを防ぐ。 */
+.task-editor-window{width:100%;height:100%;background:#080a10;contain:paint}
 .task-editor-window :deep(.dialog-overlay){position:static;inset:auto;background:transparent;z-index:auto;width:100%;height:100%;align-items:stretch;justify-content:stretch}
 .task-editor-window :deep(.dialog-content){width:100%;max-width:none;height:100%;border:none;border-radius:0;box-shadow:none}
 .task-editor-window :deep(.dialog-body){flex:1;overflow:auto}

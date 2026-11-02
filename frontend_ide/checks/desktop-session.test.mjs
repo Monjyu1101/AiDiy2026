@@ -8,8 +8,21 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import sessionModule from '../デスクトップ/desktop-session.cjs';
+import taskModule from '../デスクトップ/task-windows.cjs';
 const {validateDevelopmentState,readDevelopmentState}=sessionModule;
 const valid={active:true,mode:'online',startedAt:10,project:{path:'/fixture'}};
+
+test('IDE終了確認: 連携ピンの前に表示し、取消・失敗でも元のロックを復元する',async()=>{
+ const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
+ const body=source.slice(source.indexOf('const previousPin=windowPins.state(window);'),source.indexOf('if(response===0&&!window.isDestroyed())'));
+ for(const locked of [false,true])for(const outcome of ['cancel','close','error']){
+  const calls=[],window={isDestroyed:()=>false,moveTop:()=>calls.push('raise')};
+  const context={window,windowPins:{state:()=>({locked}),setLocked:(_w,value)=>calls.push(value)},dialog:{showMessageBox:async()=>{assert.deepEqual(calls,[true,'raise']);if(outcome==='error')throw Error('fixture');return{response:outcome==='close'?0:1};}}};
+  const result=vm.runInNewContext('(async()=>{'+body+'return response;})()',context);
+  if(outcome==='error')await assert.rejects(result,/fixture/);else assert.equal(await result,outcome==='close'?0:1);
+  assert.deepEqual(calls,[true,'raise',locked]);
+ }
+});
 
 test('Electron状態: 正常な利用中・終了だけを受理し、不正応答を終了と取り違えない',()=>{
  assert.equal(validateDevelopmentState(valid),valid);assert.deepEqual(validateDevelopmentState({active:false}),{active:false});
@@ -66,11 +79,11 @@ function launchFixture(){
   .replace("const {startDevelopment}=await import('./server.mjs');","const {startDevelopment}=testServer;");
  const windows=new Map(),state={...valid,project:{...valid.project}},starts=[],created=[],focused=[],closed=[];let launch,hold;
  const owner={kind:'ide',window:{isDestroyed:()=>false},revision:0,pending:new Map()},viewer={kind:'viewer',owner,linkKey:'online:10',window:{isDestroyed:()=>false}};
- const context={selectedAllDisplay:()=>null,ipcMain:{handle:(_name,handler)=>{launch=handler;}},windows,quitting:false,trustedEvent:event=>event.record,
+ const context={createTaskWindows:taskModule.createTaskWindows,selectedAllDisplay:()=>null,ipcMain:{handle:(_name,handler)=>{launch=handler;}},windows,quitting:false,trustedEvent:event=>event.record,
   readState:async()=>structuredClone(state),sessionKey:value=>value.active?`${value.mode}:${value.startedAt}`:'',
   focusWindow:window=>focused.push(window),closeServer:server=>{if(server)closed.push(server);},
   testServer:{startDevelopment:async(path,options)=>{starts.push({path,options});await hold;return{url:'http://127.0.0.1:1234/'};}},
-  createWindow:async(...args)=>created.push(args)};
+  createWindow:async(...args)=>{created.push(args);const window={isDestroyed:()=>false};windows.set(window,{window,kind:args[0],owner:args[3],linkKey:args[4],taskView:args[8]?.view,taskController:args[8]?.controller});return window;}};
  vm.runInNewContext(body,context);
  return{launch,state,owner,viewer,windows,starts,created,focused,closed,hold:promise=>{hold=promise;}};
 }
@@ -92,4 +105,18 @@ test('Electron明示起動: Live連打は同じ起動を待ち、終了後の遅
  assert.equal(f.starts.length,1);release();assert.equal((await one).ok,true);assert.equal((await two).ok,true);assert.equal(f.created.length,1);
  const g=launchFixture();g.hold(new Promise(resolve=>{release=resolve;}));const late=g.launch({record:g.viewer},'code');await new Promise(resolve=>setImmediate(resolve));
  g.owner.revision++;release();assert.equal((await late).ok,false);assert.equal(g.created.length,0);assert.equal(g.closed.length,1);
+});
+
+test('IDE TASK/TEAM: concurrent launch reuses owner session, fixed project and primary-only Task',async()=>{
+ for(const kind of ['task','team']){
+  let release;const f=launchFixture();f.hold(new Promise(resolve=>release=resolve));
+  const a=f.launch({record:f.owner},kind),b=f.launch({record:f.owner},kind);
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(f.starts.length,1);release();
+  assert.equal((await a).ok,true);assert.equal((await b).ok,true);
+  assert.equal(f.starts[0].options.projectFixed,true);assert.equal(f.created.length,1);
+  assert.equal(f.created[0][3],f.owner);
+  if(kind==='task')assert.equal(f.created[0][8].view,'request');
+  assert.equal((await f.launch({record:f.owner},kind)).reused,true);
+  assert.equal(f.created.length,1);assert.equal(f.focused.length,1);
+ }
 });

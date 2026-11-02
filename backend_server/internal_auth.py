@@ -16,11 +16,6 @@ ISSUER = "backend_core"
 TOKEN_KIND = "internal_code_live"
 TOKEN_TTL = timedelta(hours=25)
 SCOPES = ("models:read", "models:session", "ai:connect")
-ENDPOINT_SCOPES = {
-    ("POST", "/core/AIコア/モデル情報/取得"): "models:read",
-    ("POST", "/core/AIコア/モデル情報/設定"): "models:session",
-    ("WEBSOCKET", "/core/ws/AIコア"): "ai:connect",
-}
 
 
 def local_now():
@@ -48,9 +43,6 @@ class InternalTokenAuthority:
                 "issued_at": issued.isoformat(), "expires_at": expires.isoformat()}
 
     def verify(self, token, method, path):
-        required_scope = ENDPOINT_SCOPES.get((method, path))
-        if required_scope is None:
-            raise JWTError("Internal token endpoint is not permitted")
         claims = jwt.decode(token, self._key, algorithms=["HS256"],
                             audience=AUDIENCE, issuer=ISSUER,
                             options={"require_exp": True, "require_iat": True,
@@ -58,7 +50,7 @@ class InternalTokenAuthority:
         if (claims.get("token_kind") != TOKEN_KIND
                 or claims.get("sub") != "backend_core:code_live"
                 or not isinstance(claims.get("scope"), list)
-                or required_scope not in claims["scope"]
+                or set(claims["scope"]) != set(SCOPES)
                 or type(claims["exp"]) is not int or type(claims["iat"]) is not int
                 or self._clock().timestamp() >= claims["exp"]
                 or self._clock().timestamp() < claims["iat"]

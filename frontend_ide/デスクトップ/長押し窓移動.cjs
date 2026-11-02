@@ -13,6 +13,8 @@ const {randomUUID}=require('node:crypto');
 function backgroundMoveTarget(x,y){
  if(document.querySelector('select:open,input:open,dialog[open]'))return false;
  for(const popup of document.querySelectorAll('[aria-modal="true"],[role="dialog"],[role="combobox"][aria-expanded="true"],[role="listbox"],.config-panel-overlay,.modal-overlay,.dialog-overlay,.selection-popup')){
+  // 独立比較ビューのsectionはモーダルではない。内側に別のdialogがあれば従来どおり保護する。
+  if(popup.matches?.('section.file-history-dialog.history-embedded[data-aidiy-window-move-surface]'))continue;
   if(popup.getClientRects().length&&getComputedStyle(popup).visibility!=='hidden')return false;
  }
  let node=document.elementFromPoint(x,y);
@@ -27,13 +29,14 @@ function backgroundMoveTarget(x,y){
   if(node.isContentEditable||!routeHandle&&node.matches?.(controls))return false;
   // 別窓Explorerの一覧はキーボード操作用のtabindexを持つ。例外はこのUL自身だけ。
   const list=node.matches?.('ul[role="tree"][data-aidiy-window-move-list]');
-  if(!list&&!routeHandle&&node.matches?.('[tabindex]:not([tabindex="-1"])'))return false;
+  const fileSurface=node.matches?.('section.file-container[data-aidiy-window-move-surface]');
+  if(!list&&!fileSurface&&!routeHandle&&node.matches?.('[tabindex]:not([tabindex="-1"])'))return false;
   if(list){
    const rect=node.getBoundingClientRect();
    if(node.clientWidth>0&&node.offsetWidth>node.clientWidth+2&&(x>=rect.left+node.clientLeft+node.clientWidth||x<rect.left+node.clientLeft))return false;
    if(node.clientHeight>0&&node.offsetHeight>node.clientHeight+2&&y>=rect.top+node.clientTop+node.clientHeight)return false;
   }
-  if(routeHandle||list||node.matches?.('[data-aidiy-window-move-handle]'))handle=true;
+  if(routeHandle||list||fileSurface||node.matches?.('[data-aidiy-window-move-handle]'))handle=true;
  }
  // mousedown捕捉時は既に閉じたselectにもfocusが残る。専用の移動面だけ初回から扱う。
  // 展開中popupと移動面内の操作部品は上で除外済み。一般背景の保護は変えない。

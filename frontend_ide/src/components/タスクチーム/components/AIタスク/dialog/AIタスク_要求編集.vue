@@ -14,11 +14,12 @@
 // AIタスク_要求編集ダイアログ: マスタ保守と同じラベル/内容の行レイアウト
 // 新規: AI登録 API で仮タスク（準備開始）を作成する
 // 修正: 更新登録 API で実行中プロセスを停止してからタスク要求を更新する（準備開始で再分解）
-import { ref, computed, watch } from 'vue';
+import { inject, ref, computed, watch } from 'vue';
 import type { PropType } from 'vue';
 import apiClient, { taskClient } from '@taskteam/api/client';
 import { qMessage } from '@taskteam/utils/qAlert';
 
+const 固定プロジェクト = inject<string>('taskTeamFixedProject', '');
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
   利用者ID: { type: String, default: '' },
@@ -256,7 +257,7 @@ const 入力初期化 = () => {
   if (!props.isOpen) return;
   const 編集 = props.編集タスク;
   選択プロジェクト.value = '';
-  入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : String(props.最終タスク?.プロジェクト ?? '');
+  入力プロジェクト.value = 編集 ? String(編集.プロジェクト ?? '') : 固定プロジェクト || String(props.最終タスク?.プロジェクト ?? '');
   入力要求内容.value = 編集 ? String(編集.要求内容 ?? '') : '';
   入力実行有効.value = 編集 ? Boolean(編集.実行有効) : true;
   // 修正時は更新前の状態を初期選択にする（何も触らず登録しても状態を変えない）
@@ -275,7 +276,7 @@ const 入力初期化 = () => {
       入力TASK_AI_NAME.value = chooseAvailable(編集.TASK_AI_NAME || 'codex_cli', ai候補) || 'codex_cli';
       モデル初期化((フェーズ) => 編集[`TASK_AI_MODEL_${フェーズ}`]);
     } else {
-      入力プロジェクト.value = String(
+      入力プロジェクト.value = 固定プロジェクト || String(
         新規既定値.value.プロジェクト
         ?? props.最終タスク?.プロジェクト
         ?? currentSettings.value.CODE_BASE_PATH
@@ -300,7 +301,7 @@ const 入力初期化 = () => {
 watch([() => props.isOpen, () => props.編集タスク], 入力初期化, { immediate: true });
 
 watch(選択プロジェクト, (value) => {
-  if (value) 入力プロジェクト.value = value;
+  if (value && !固定プロジェクト) 入力プロジェクト.value = value;
 });
 
 watch(入力TASK_AI_NAME, (newValue) => {
@@ -315,6 +316,7 @@ watch(入力TASK_AI_NAME, (newValue) => {
 });
 
 const フォルダ参照 = async () => {
+  if (固定プロジェクト) return;
   参照中.value = true;
   try {
     const res = await apiClient.post('/core/AIコア/フォルダ参照', {
@@ -429,8 +431,8 @@ const 登録 = async () => {
         <div class="detail-row">
           <div class="detail-label">プロジェクト</div>
           <div class="detail-value">
-            <select v-model="選択プロジェクト" class="detail-select">
-              <option value="">候補から選択してください</option>
+            <select :value="固定プロジェクト || 選択プロジェクト" @change="選択プロジェクト = ($event.target as HTMLSelectElement).value" :disabled="!!固定プロジェクト" class="detail-select">
+              <option v-if="固定プロジェクト" :value="固定プロジェクト">IDEのプロジェクト（変更不可）</option><option v-else value="">候補から選択してください</option>
               <option v-for="opt in プロジェクト選択肢" :key="opt.value" :value="opt.value">
                 {{ opt.label }}
               </option>
@@ -442,12 +444,12 @@ const 登録 = async () => {
           <div class="detail-value">
             <div class="value-inline">
               <input
-                v-model.trim="入力プロジェクト"
+                v-model.trim="入力プロジェクト" :readonly="!!固定プロジェクト"
                 type="text"
                 class="detail-input"
                 placeholder="../ または C:/project/"
               />
-              <button class="dialog-button" :disabled="参照中" @click="フォルダ参照">参照</button>
+              <button class="dialog-button" :disabled="参照中 || !!固定プロジェクト" @click="フォルダ参照">参照</button>
             </div>
           </div>
         </div>

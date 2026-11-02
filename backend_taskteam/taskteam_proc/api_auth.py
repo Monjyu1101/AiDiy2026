@@ -71,7 +71,8 @@ async def require_auth(request: Request):
         request.state.principal = {'kind': 'internal_taskteam', 'subject': claims['sub']}
         return
     user = await asyncio.to_thread(_current_user, token)
-    request.state.principal = {'kind': 'user', 'user': user}
+    request.state.principal = ({'kind': 'internal_core', 'subject': user['利用者ID']}
+                               if user.get('認証種別') == 'internal' else {'kind': 'user', 'user': user})
     # body の任意利用者IDを認証済identityとして扱わない。所有権は既存API契約を維持。
     try:
         body = await request.json()

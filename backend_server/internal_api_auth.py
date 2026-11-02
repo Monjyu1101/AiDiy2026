@@ -74,8 +74,8 @@ def require_session_owner(session, principal):
 
 
 def require_session_settings(principal, request):
-    if principal.kind == "internal" and (request.save or request.リセット or any((request.再起動要求 or {}).values())):
-        raise HTTPException(status_code=403, detail="Internal token permits session settings only")
+    # 認証種別では操作権限を分けない。セッション所有者の照合は呼出元で維持する。
+    return
 
 
 def require_manager_owner(manager, session_id, principal):

@@ -7,17 +7,19 @@ const {app,BrowserWindow,WebContentsView,ipcMain,shell,clipboard,session,screen,
 const {join}=require('node:path');
 const {mkdirSync,mkdtempSync,rmSync}=require('node:fs');
 const {projectProfile}=require('./デスクトップ/project-profile.cjs');
+const {taskTeamProfile}=require('./デスクトップ/タスクチーム起動.cjs');
+const projectFixed=process.env.AIDIY_DEVELOPMENT_PROJECT_FIXED==='1';
 const url=process.env.AIDIY_DEVELOPMENT_URL,kind=process.env.AIDIY_DEVELOPMENT_KIND;
 if(!url||!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)||!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('起動元が不正です。');
 const cliConsoleWindow=kind==='console'&&process.env.AIDIY_DEVELOPMENT_CLI_WINDOW==='1';
 const appName=`AiDiy ${kind==='ide'?'IDE':kind==='code'?'Code':kind==='live'?'Live':kind==='task'?'Task':kind==='team'?'Team':kind==='browser'?'Browser':'Console'}`;
 app.setName(process.platform==='darwin'?appName:`aidiy_${kind}`);
 // ランチャーが引数を解決したプロジェクトで、ロック取得より先にIDEのプロファイルを分ける。
-const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):join(app.getPath('appData'),`aidiy_${kind}_vue`);
-if(kind==='ide')mkdirSync(profile,{recursive:true});
+const profile=kind==='ide'?projectProfile(app.getPath('appData'),process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd()):[ 'task','team'].includes(kind)?taskTeamProfile(app.getPath('appData'),kind,process.env.AIDIY_DEVELOPMENT_PROJECT||process.cwd(),projectFixed):join(app.getPath('appData'),`aidiy_${kind}_vue`);
+if(['ide','task','team'].includes(kind))mkdirSync(profile,{recursive:true});
 app.setPath('userData',profile);
 if(kind==='ide')app.setPath('sessionData',profile);
-const independent=kind==='console'||kind==='browser'||kind!=='live'&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
+const independent=kind==='console'||kind==='browser'||!['live','task','team'].includes(kind)&&process.env.AIDIY_DEVELOPMENT_NEW_WINDOW==='1';
 if(independent){
  const temporaryProfile=mkdtempSync(join(app.getPath('temp'),`aidiy-${kind}-profile-`));
  app.setPath('userData',temporaryProfile);
@@ -34,7 +36,7 @@ if(!independent&&!app.requestSingleInstanceLock()){
  return;
 }
 const windows=new Map(),closing=new Set(),closedServers=new WeakSet();
-const taskWindows=createTaskWindows({records:windows,trustedEvent,focusWindow,isQuitting:()=>quitting,onLastClosed:()=>app.quit(),createWindow:(view,payload)=>createWindow('task',url+'#task-view='+view,undefined,undefined,undefined,undefined,undefined,undefined,{view,payload})});
+const taskWindows=createTaskWindows({authenticated:projectFixed,owns:record=>!record.owner,records:windows,trustedEvent,focusWindow,isQuitting:()=>quitting,onLastClosed:()=>app.quit(),createWindow:(view,payload)=>createWindow('task',url+'#task-view='+view,undefined,undefined,undefined,undefined,undefined,undefined,{view,payload})});
 const {createWindowPins}=require('./デスクトップ/最前面ピン.cjs');
 const windowPins=createWindowPins({onChanged(window,state){
  const record=windows.get(window.webContents);if(!record)return;
@@ -43,7 +45,7 @@ const windowPins=createWindowPins({onChanged(window,state){
  if(receiver&&!receiver.window.isDestroyed()&&!receiver.window.webContents.isDestroyed?.())receiver.window.webContents.send('development:pin-changed',{...state,...(record.name?{panelName:record.name}:{})});
 }});
 function registerWindowPin(record){
- windowPins.register(record.window,{pinned:!!record.owner,locked:!!record.owner&&allDisplays.isActive(record.owner)});
+ windowPins.register(record.window,{pinned:!!record.owner||(projectFixed&&['task','team'].includes(record.kind)),locked:!!record.owner&&allDisplays.isActive(record.owner)});
  vrPanelStacking.register(record);
 }
 const {createDraftRouter}=require('./デスクトップ/draft-router.cjs');
@@ -195,7 +197,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
   bounds=display?allWindowBounds(kind,display.workArea,displaySlot):(anchor&&owner?panelBounds(anchor,owner,screen):null)||windowBounds(kind,area,ownerBounds,slot,cliConsoleWindow&&!owner);
  }catch(error){placement?.close();throw error;}
  if(kind==='task')bounds=taskWindowBounds(taskView,area);
- const baseTitle=kind==='task'?`AiDiy Task / ${{request:'要求',flow:'フロー図',detail:'明細',dialog:'編集'}[taskView]}`:kind==='browser'?(owner?`AiDiy IDE / Browser ${slot+1}`:'AiDiy Browser'):kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
+ const baseTitle=['task','team'].includes(kind)?`AiDiy ${(owner||projectFixed)?'IDE / ':''}${kind.toUpperCase()}`:kind==='browser'?(owner?`AiDiy IDE / Browser ${slot+1}`:'AiDiy Browser'):kind==='viewer'?`AiDiy IDE / Viewer - ${viewerPath.split('/').at(-1)}`:`AiDiy ${owner?'IDE / ':''}${kind==='ide'?'IDE':kind==='code'?`Code${owner?' '+(slot+1):''}`:kind==='console'?`Console${owner?' '+(slot+1):''}`:kind==='task'?'Task':kind==='team'?'Team':'Live'}`;
  let window;
  let title=baseTitle+(kind==='console'&&!owner&&cliConsoleWindow&&process.env.AIDIY_DEVELOPMENT_CLI_NAME?' / '+process.env.AIDIY_DEVELOPMENT_CLI_NAME:'');
  try{window=new BrowserWindow({title,...bounds,...(kind==='task'?{minWidth:bounds.minWidth,minHeight:bounds.minHeight}:windowMinimumSize(kind,bounds)),show:false,frame:false,roundedCorners:false,...(kind==='browser'?{enableLargerThanScreen:true}:{}),backgroundColor:'#000',autoHideMenuBar:true,icon:kind==='browser'&&!owner?join(__dirname,'public','AiDiy.png'):join(__dirname,'public',`AiDiy_${['code','live','console','task','team'].includes(kind)?kind:'ide'}.png`),webPreferences:{preload:join(__dirname,'デスクトップ/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,autoplayPolicy:'no-user-gesture-required'}});}catch(error){placement?.close();throw error;}
@@ -206,7 +208,7 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
  const contents=window.webContents;
  contents.on('page-title-updated',event=>{event.preventDefault();window.setTitle(title);});
  // 窓番号は全体で一意、重ね位置は選択した画面ごとに数える。
- const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,taskView,taskPayload:taskOptions?.payload,revision:0,pending:new Map()};windows.set(contents,record);
+ const record={window,kind,url:base,viewerPath,server,owner,linkKey,slot,displayId,displaySlot,taskView,taskController:taskOptions?.controller||taskWindows,taskPayload:taskOptions?.payload,revision:0,pending:new Map()};windows.set(contents,record);
  // 起動元・寿命はrecord.ownerで管理し、OS上は独立したパネルのままピンを設定する。
  registerWindowPin(record);
  attachWindowMove(record);
@@ -223,13 +225,17 @@ async function createWindow(kind,url,server,owner,linkKey,anchor,displayId,brows
     const active=await readState(record).then(state=>state.active,()=>true);
     if(window.isDestroyed())return;
     if(!active){approved=true;window.close();return;}
-    const {response}=await dialog.showMessageBox(window,{type:'question',title:'AiDiy IDE',message:'AiDiy IDE を終了しますか？',buttons:['終了する','キャンセル'],defaultId:1,cancelId:1,noLink:true});
+    // 📌連携窓の背後に終了確認を隠さない。確認中だけ同じ前面層へ上げ、取消時も元の状態へ戻す。
+    const previousPin=windowPins.state(window);let response;
+    windowPins.setLocked(window,true);window.moveTop();
+    try{({response}=await dialog.showMessageBox(window,{type:'question',title:'AiDiy IDE',message:'AiDiy IDE を終了しますか？',buttons:['終了する','キャンセル'],defaultId:1,cancelId:1,noLink:true}));}
+    finally{if(!window.isDestroyed())windowPins.setLocked(window,previousPin.locked);}
     if(response===0&&!window.isDestroyed()){approved=true;window.close();}
    })().catch(error=>console.error(error)).finally(()=>{confirming=false;});
   });
  }
  const monitor=kind==='ide'?setInterval(()=>void checkChildren(record),400):kind==='browser'&&!owner?setInterval(()=>void checkStandaloneBrowser(record),400):undefined;monitor?.unref();
- window.once('closed',()=>{if(kind==='task')taskWindows.closed(record);clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);if(kind==='browser'&&!owner&&!standaloneBrowsers().length){const pending=standaloneBrowserBridge;standaloneBrowserBridge=undefined;void pending?.then(bridge=>bridge.close(),()=>{});}closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
+ window.once('closed',()=>{if(kind==='task')record.taskController.closed(record);clearInterval(monitor);draftRouter.invalidate(record);nativePreviewActions.invalidate(record);closeChildren(record);windows.delete(contents);if(kind==='browser'&&!owner&&!standaloneBrowsers().length){const pending=standaloneBrowserBridge;standaloneBrowserBridge=undefined;void pending?.then(bridge=>bridge.close(),()=>{});}closeServer(server);if(kind==='viewer'&&owner&&!owner.window.isDestroyed())owner.window.webContents.send('development:viewer-closed',viewerPath);});
  contents.on('did-start-navigation',(_event,_url,isInPlace,isMainFrame)=>{if(isMainFrame){nativePreviewActions.invalidate(record);if(!isInPlace)draftRouter.invalidate(record);}});
  contents.on('render-process-gone',()=>{draftRouter.invalidate(record);nativePreviewActions.invalidate(record);});
  contents.on('will-navigate',(event,target)=>{if(target.split('#')[0]!==base)event.preventDefault();});
@@ -285,8 +291,8 @@ app.whenReady().then(async()=>{
   return sameOrigin&&audioAllowed(contents,permission,details)&&details.mediaType==='audio';
  });
  session.defaultSession.setPermissionRequestHandler((contents,permission,callback,details)=>callback(audioAllowed(contents,permission,details)&&details.mediaTypes?.length===1&&details.mediaTypes[0]==='audio'));
- ipcMain.handle('development:task-windows',(event,action,payload)=>taskWindows.handle(event,action,payload));
- ipcMain.handle('development:task-session',(event,action,value)=>taskWindows.session(event,action,value));
+ ipcMain.handle('development:task-windows',(event,action,payload)=>(trustedEvent(event)?.taskController||taskWindows).handle(event,action,payload));
+ ipcMain.handle('development:task-session',(event,action,value)=>(trustedEvent(event)?.taskController||taskWindows).session(event,action,value));
  ipcMain.handle('development:window',(event,action)=>{
   const record=trustedEvent(event);if(!record)return;
   if(action==='minimize')record.window.minimize();else if(action==='close')record.window.close();
@@ -346,7 +352,7 @@ app.whenReady().then(async()=>{
  });
  ipcMain.handle('development:open-app',async(event,type,displayId)=>{
   const source=trustedEvent(event),record=source?.kind==='viewer'?source.owner:source;
-  if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','console'].includes(type))return{ok:false,error:'この画面からは開けません。'};
+  if(!record||record.kind!=='ide'||!['ide','viewer'].includes(source.kind)||!['code','live','console','task','team'].includes(type))return{ok:false,error:'この画面からは開けません。'};
   // ピン留めからの明示起動も、元のIDEと同じ利用セッションだけに限定する。
   const revision=record.revision;let state;
   try{
@@ -354,25 +360,33 @@ app.whenReady().then(async()=>{
    selectedAllDisplay(record,displayId);
    state=await readState(record);
    if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.window.isDestroyed()||record.revision!==revision||!state.active||!state.project?.path||(source!==record&&source.linkKey!==sessionKey(state)))throw Error('IDEの利用状態が変わりました。');
-   if(type==='live'&&state.mode!=='online')throw Error('LiveはAiDiy接続利用で開けます。');
+   if(['live','task','team'].includes(type)&&state.mode!=='online')throw Error('Live / TASK / TEAMはAiDiy接続利用で開けます。');
   }catch(error){return{ok:false,error:error.message};}
   // Codeは依頼ごとに別窓。Liveだけ初期化中も共有して1窓にする。
-  if(type==='live'&&record.pending.has(type))return record.pending.get(type);
+  if(['live','task','team'].includes(type)&&record.pending.has(type))return record.pending.get(type);
   const opening=(async()=>{
    let child;
    try{
     const key=sessionKey(state);
     const existing=[...windows.values()].find(item=>item.owner===record&&item.kind===type&&item.linkKey===key&&!item.window.isDestroyed());
-    if(type==='live'&&existing){focusWindow(existing.window);return{ok:true,reused:true};}
+    if(['live','task','team'].includes(type)&&existing){focusWindow(existing.window);return{ok:true,reused:true};}
     const {startDevelopment}=await import('./server.mjs');
-    child=await startDevelopment(state.project.path,{kind:type,offline:state.mode==='offline',linked:true});
+    child=await startDevelopment(state.project.path,{kind:type,offline:state.mode==='offline',linked:true,projectFixed:['task','team'].includes(type)});
     const current=await readState(record);
     if(quitting||trustedEvent(event)!==source||source.window.isDestroyed()||record.revision!==revision||record.window.isDestroyed()||!current.active||current.project?.path!==state.project.path||sessionKey(current)!==key||(source!==record&&source.linkKey!==key))throw Error('IDEの利用状態が変わりました。もう一度開いてください。');
-    await createWindow(type,child.url,child,record,key,undefined,displayId);child=undefined;
+    if(type==='task'){
+     const service=child;
+     const controller=createTaskWindows({authenticated:true,records:windows,trustedEvent,focusWindow,isQuitting:()=>quitting||record.window.isDestroyed()||record.revision!==revision,
+      owns:item=>item.taskController===controller,
+      onLastClosed:()=>closeServer(service),
+      createWindow:(view,payload)=>createWindow('task',service.url+'#task-view='+view,undefined,record,key,undefined,displayId,undefined,{view,payload,controller})});
+     const result=await controller.start();if(!result.ok)throw Error(result.error);
+    }else await createWindow(type,child.url,child,record,key,undefined,displayId);
+    child=undefined;
     return{ok:true};
    }catch(error){closeServer(child);return{ok:false,error:error.message};}
   })();
-  if(type==='live')record.pending.set(type,opening);
+  if(['live','task','team'].includes(type))record.pending.set(type,opening);
   try{return await opening;}finally{if(record.pending.get(type)===opening)record.pending.delete(type);}
  });
  ipcMain.handle('development:code-move-begin',event=>codeDrag.begin(event));

@@ -19,12 +19,13 @@ import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch
 import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/components/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
-export async function startDevelopment(project,{kind='ide',linked=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
+export async function startDevelopment(project,{kind='ide',linked=false,projectFixed=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
  if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('アプリはcode / live / ide / console / task / team / browserから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  const cliLaunch=cli?await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env}):undefined;
  const taskTeam=['task','team'].includes(kind);
- const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project):undefined;
+ if(projectFixed){if(!taskTeam)throw Error('プロジェクト固定はTask / Team専用です。');project=require('./デスクトップ/project-profile.cjs').projectIdentity(project).path;}
+ const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project,{projectFixed}):undefined;
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
  connection??=['ide','browser'].includes(kind)?createCoreConnection(project,{keepActive:kind==='browser'}):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
@@ -44,7 +45,7 @@ export async function startDevelopment(project,{kind='ide',linked=false,port=0,s
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;
    if(kind==='ide'&&await fileHistory.handle(req,res,url))return true;
    if(url.pathname==='/development/config'){
-    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(cliLaunch?{cliName:cliTitleName(cliLaunch)}:{}),...(taskTeam?{taskTeamBase:'/taskteam-api'}:{}),icon:'/development/AiDiy.png'}));return true;
+    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(cliLaunch?{cliName:cliTitleName(cliLaunch)}:{}),...(taskTeam?{taskTeamBase:'/taskteam-api',projectFixed,fixedProject:projectFixed?project:undefined}:{}),icon:'/development/AiDiy.png'}));return true;
    }
    const iconAsset=url.pathname.startsWith('/development/')?catppuccinAsset(url.pathname.slice('/development/'.length)):undefined;
    const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset){if(taskTeam){res.writeHead(404).end();return true;}return false;}

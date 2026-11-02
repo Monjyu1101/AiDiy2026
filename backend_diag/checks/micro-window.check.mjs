@@ -10,6 +10,17 @@ import micro from '../起動/マイクロ表示.cjs';
 import pinModule from '../../frontend_ide/デスクトップ/最前面ピン.cjs';
 import layout from '../ui/src/components/アプリ起動/円周配置.cjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+test('透過判定のDOM応答待ちにカーソルが変わったら古い判定を捨てる',async()=>{
+ const {w,screen,control}=fixture();let point={x:110,y:90},resolve,called=false;
+ screen.getCursorScreenPoint=()=>point;
+ w.webContents.executeJavaScript=()=>{called=true;return new Promise(done=>resolve=done);};
+ control.set(true);
+ try{
+  for(let n=0;n<20&&!called;n++)await sleep(10);
+  assert.ok(called);point={x:150,y:130};resolve(false);await sleep(1);
+  assert.notEqual(w.ignored,true,'旧位置のfalseで新位置のクリックを透過しない');
+ }finally{control.set(false);resolve?.(false);}
+});
 test('有効数に応じて最小半径80から広げ、回転中も40px画像同士が重ならない',()=>{
  let previous=0;
  for(let n=0;n<=32;n++){

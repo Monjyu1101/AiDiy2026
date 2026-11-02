@@ -12,10 +12,10 @@
 
 import asyncio
 import json
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from log_config import get_logger
 from tools_proc.windows_control import WindowsControlError
@@ -40,6 +40,7 @@ class WindowsControlRequest(BaseModel):
     button: str = "left"
     clicks: int = 1
     duration: Optional[float] = None
+    hold_duration: Annotated[float, Field(ge=0, le=10, allow_inf_nan=False)] = 0.8
     amount: Optional[int] = None
     horizontal: bool = False
     text: Optional[str] = None
@@ -95,6 +96,15 @@ def register_tools(mcp_wc, wc):
         """(x1,y1) から (x2,y2) へドラッグする"""
         try:
             result = await asyncio.to_thread(wc.mouse_drag, x1, y1, x2, y2, button, duration)
+        except WindowsControlError as e:
+            raise ValueError(str(e)) from e
+        return json.dumps(result, ensure_ascii=False)
+
+    @mcp_wc.tool()
+    async def mouse_long_press_drag(x1: int, y1: int, x2: int, y2: int, button: str = "left", duration: Annotated[float, Field(ge=0, le=60, allow_inf_nan=False)] = 0.2, hold_duration: Annotated[float, Field(ge=0, le=10, allow_inf_nan=False)] = 0.8) -> str:
+        """押下→保持→移動→解放。hold_durationは移動前の保持秒数(0〜10、既定0.8)、durationは移動秒数(0〜60、既定0.2)。"""
+        try:
+            result = await asyncio.to_thread(wc.mouse_long_press_drag, x1, y1, x2, y2, button, duration, hold_duration)
         except WindowsControlError as e:
             raise ValueError(str(e)) from e
         return json.dumps(result, ensure_ascii=False)
@@ -309,9 +319,10 @@ DESCRIPTION + "参考: https://github.com/CursorTouch/Windows-MCP"
                 "IME が有効な環境では keyboard_type がローマ字変換される場合がある。"
                 "確実な文字入力には set_clipboard_text + keyboard_shortcut(['ctrl','v']) を使う。",
                 "ui_snapshot の element_id は直後の ui_click/ui_set_focus/ui_type でのみ有効。",
+                "mouse_long_press_drag: hold_durationは移動前の保持秒数(0〜10、既定0.8)、durationは移動秒数(0〜60、既定0.2)。mouse_dragは従来通り。",
             ],
             "methods": [
-                "mouse_click", "mouse_move", "mouse_drag", "mouse_scroll",
+                "mouse_click", "mouse_move", "mouse_drag", "mouse_long_press_drag", "mouse_scroll",
                 "keyboard_type", "keyboard_key", "keyboard_shortcut",
                 "list_windows", "focus_window", "move_window", "resize_window", "set_window_state",
                 "launch_app", "list_processes", "kill_process",
@@ -329,6 +340,8 @@ DESCRIPTION + "参考: https://github.com/CursorTouch/Windows-MCP"
                 return await asyncio.to_thread(wc.mouse_move, req.x, req.y, req.duration or 0.0)
             elif method_name == "mouse_drag":
                 return await asyncio.to_thread(wc.mouse_drag, req.x1, req.y1, req.x2, req.y2, req.button, req.duration or 0.2)
+            elif method_name == "mouse_long_press_drag":
+                return await asyncio.to_thread(wc.mouse_long_press_drag, req.x1, req.y1, req.x2, req.y2, req.button, 0.2 if req.duration is None else req.duration, req.hold_duration)
             elif method_name == "mouse_scroll":
                 return await asyncio.to_thread(wc.mouse_scroll, req.amount, req.x, req.y, req.horizontal)
             elif method_name == "keyboard_type":

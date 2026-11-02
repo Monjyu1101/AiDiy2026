@@ -907,6 +907,7 @@ defineExpose({
   <section
     ref="fileコンテナ"
     class="file-container"
+    data-aidiy-window-move-surface
     tabindex="0"
     @mousedown.capture="コンポーネントマウスダウン"
   >

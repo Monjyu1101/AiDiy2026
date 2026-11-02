@@ -4,7 +4,7 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, provide, onMounted, onBeforeUnmount } from 'vue';
 import StatusBar from '../共通表示/状態バー.vue';
 import TaskPanel from './components/AIタスク/AIタスク.vue';
 import TeamPanel from './components/AIチーム/AIチーム.vue';
@@ -14,18 +14,19 @@ import TaskDetail from './components/AIタスク/windows/AIタスク_明細ウ�
 import TaskEditor from './components/AIタスク/windows/AIタスク_編集ウィンドウ.vue';
 import { resolveTaskView, createTaskSession, createTaskSelectionCache } from './task-session';
 import apiClient, { token } from './api/client';
-const props = defineProps<{ config: { kind: 'task' | 'team'; taskTeamBase: string; project?: string } }>();
+const props = defineProps<{ config: { kind: 'task' | 'team'; taskTeamBase: string; project?: string; projectFixed?: boolean; fixedProject?: string } }>();
 const desktop = !!window.aidiyWindow;
 const taskView = resolveTaskView(props.config.kind, window.location.hash, window.aidiyWindow);
-const suffix = ({ request: '要求', flow: 'フロー図', detail: '明細', dialog: '編集' } as Record<string, string>)[taskView] || '';
-const title = props.config.kind === 'task' ? `AiDiy Task${suffix ? ' / ' + suffix : ''}` : 'AiDiy Team';
+
+const title = `AiDiy ${props.config.projectFixed ? 'IDE / ' : ''}${props.config.kind.toUpperCase()}`;
+provide('taskTeamFixedProject', props.config.projectFixed ? props.config.fixedProject || '' : '');
 const connected = ref(false), port = ref(8093), checking = ref(true);
 // Avatar と同じ初期表示。前回 ID だけをアプリ別に保存し、パスワードは保存しない。
 const lastUserKey = `aidiy_${props.config.kind}_last_user`;
 function initialUserId() { try { return localStorage.getItem(lastUserKey) || 'admin'; } catch { return 'admin'; } }
 const initialPassword = '********';
 const user = ref<Record<string, string> | null>(null), userId = ref(initialUserId()), password = ref(initialPassword);
-const error = ref(''), busy = ref(false), restoring = ref(taskView !== 'combined' || !!token());
+const error = ref(''), busy = ref(false), restoring = ref(!!props.config.projectFixed || taskView !== 'combined' || !!token());
 let disposed = false, revision = 0, timer: ReturnType<typeof setTimeout>;
 const lifetime = new AbortController();
 let sessionSync: ReturnType<typeof createTaskSession> | null = null;
@@ -69,10 +70,20 @@ async function health() {
     const result = await response.json();
     if (!disposed) { connected.value = result.connected === true; if (Number.isInteger(result.port)) port.value = result.port; }
   } catch { if (!disposed) connected.value = false; }
-  finally { if (!disposed) { checking.value = false; timer = setTimeout(health, 5000); } }
+  finally { if (!disposed) {
+      checking.value = false;
+      if (props.config.projectFixed && connected.value && !user.value && !restoring.value) {
+        restoring.value = true; const run = revision;
+        try { await currentUser(run); if (user.value) { error.value = ''; if (taskView !== 'combined' && !selectionCache) selectionCache = createTaskSelectionCache(); } }
+        catch { if (!disposed) error.value = '内部認証を確認できません。Coreの復旧後に再確認します。'; }
+        finally { if (!disposed) restoring.value = false; }
+      }
+      timer = setTimeout(health, 5000);
+    } }
 }
 function logout(message = '') {
   clearSession(message);
+  if (props.config.projectFixed) return; // 内部資格情報はNode側が再読込し、窓間に配布しない。
   if (sessionSync) void sessionSync.set('').catch(() => { if (!disposed) error.value = '他のタスク画面へのログアウト通知に失敗しました。'; });
 }
 function expired() { logout('認証の有効期限が切れました。再ログインしてください。'); }
@@ -109,7 +120,7 @@ onMounted(async () => {
     return;
   }
 
-  if (!token()) return;
+  if (!token() && !props.config.projectFixed) return;
   const run = revision;
   try { await currentUser(run); }
   catch { if (!disposed && run === revision) logout('認証を確認できませんでした。再ログインしてください。'); }
@@ -119,12 +130,14 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
 </script>
 <template>
   <main class="taskteam-shell" :data-app="config.kind">
-    <StatusBar :title="user ? title : `AiDiy ${config.kind === 'task' ? 'Task' : 'Team'}`" :connected="connected" :busy="checking" :desktop="desktop" :clock-pulse="true" :status="`Task / Team :${port} ${connected ? '接続済み' : '未接続'}`" />
-    <div class="component-toolbar"><span>{{ user ? `${user.利用者名 || user.利用者ID} (${user.利用者ID})` : '利用者認証' }}</span><nav><template v-if="user && taskView !== 'combined' && taskView !== 'dialog'"><button v-for="view in (['request','flow','detail'] as const).filter(view => view !== taskView && !openViews.includes(view))" :key="view" @click="openTaskWindows(view)">{{ {request:'要求',flow:'フロー図',detail:'明細'}[view] }}</button></template><button v-if="user" @click="logout()">ログアウト</button></nav></div>
+    <StatusBar :title="title" :connected="connected" :busy="checking" :desktop="desktop" :clock-pulse="true" :status="`Task / Team :${port} ${connected ? '接続済み' : '未接続'}`" />
+    <div class="component-toolbar"><span>{{ user ? `${user.利用者名 || user.利用者ID} (${user.利用者ID})` : '利用者認証' }}</span><nav><template v-if="user && taskView !== 'combined' && taskView !== 'dialog'"><button v-for="view in (['request','flow','detail'] as const).filter(view => view !== taskView && !openViews.includes(view))" :key="view" @click="openTaskWindows(view)">{{ {request:'要求',flow:'フロー図',detail:'明細'}[view] }}</button></template><button v-if="user && !config.projectFixed" @click="logout()">ログアウト</button></nav></div>
+    <p v-if="config.projectFixed" class="fixed-project">IDE連携・プロジェクト固定: {{ config.fixedProject }}（変更不可）</p>
     <p v-if="restoring" class="taskteam-message" role="status">認証を確認しています…</p>
     <div v-else-if="!user" class="taskteam-login-screen">
       <div class="welcome-mark" aria-hidden="true"><img :src="'/development/AiDiy.png'" alt=""></div>
-    <form class="taskteam-login" @submit.prevent="login">
+    <p v-if="config.projectFixed" class="taskteam-message" role="alert">{{ error || "内部認証を確認しています…" }}</p>
+    <form v-else class="taskteam-login" @submit.prevent="login">
       <label>利用者ID<input v-model="userId" autocomplete="username" required :disabled="busy" /></label>
       <label>パスワード<input v-model="password" type="password" autocomplete="current-password" required :disabled="busy" /></label>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -143,6 +156,7 @@ onBeforeUnmount(() => { disposed = true; revision++; clearTimeout(timer); clearT
   </main>
 </template>
 <style scoped>
+.fixed-project{flex:none;margin:0;padding:4px 8px;font-size:11px;overflow-wrap:anywhere}
 .taskteam-shell{width:100%;height:100%;box-sizing:border-box;border:1px solid var(--aidiy-panel-border);background:#000;display:flex;flex-direction:column;overflow:hidden;color:#d9e0f2}
 .taskteam-content{flex:1;min-height:0;overflow:auto;position:relative}
 .taskteam-login{box-sizing:border-box;width:min(408px,calc(100% - 32px));margin:auto;display:grid;gap:16px;background:#000;border:1px solid rgba(143,104,221,.5);border-radius:12px;padding:32px 28px 24px;box-shadow:0 16px 48px #0005,inset 0 1px 0 #c4b5fd14}

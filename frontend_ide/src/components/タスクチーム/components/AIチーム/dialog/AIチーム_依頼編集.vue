@@ -4,11 +4,12 @@ Commercial use requires prior written consent from all copyright holders.
 See LICENSE for full terms. Thank you for keeping the rules.
 https://github.com/monjyu1101/AiDiy2026 -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { inject, computed, ref, watch } from 'vue';
 import apiClient, { taskClient, teamClient } from '@taskteam/api/client';
 import { qMessage } from '@taskteam/utils/qAlert';
 import type { チーム依頼 } from '../AIチーム_型';
 
+const 固定プロジェクト = inject<string>('taskTeamFixedProject', '');
 const props = defineProps<{
   isOpen: boolean;
   編集依頼: チーム依頼 | null;
@@ -154,7 +155,7 @@ const フォーム初期化 = async () => {
     : props.最終依頼
       ? props.最終依頼.プロジェクト
       : String(currentSettings.value.CODE_BASE_PATH || '../');
-  入力プロジェクト.value = initialProject;
+  入力プロジェクト.value = !work && 固定プロジェクト ? 固定プロジェクト : initialProject;
   選択プロジェクト.value = プロジェクト選択肢.value.some(
     (option) => option.value === initialProject,
   )
@@ -180,7 +181,7 @@ watch(
 );
 
 watch(選択プロジェクト, (value) => {
-  if (value) 入力プロジェクト.value = value;
+  if (value && !固定プロジェクト) 入力プロジェクト.value = value;
 });
 
 watch(入力TEAM_AI_NAME, (value) => {
@@ -208,6 +209,7 @@ watch(入力TASK_AI_NAME, (value) => {
 }, { flush: 'sync' });
 
 const フォルダ参照 = async () => {
+  if (固定プロジェクト) return;
   参照中.value = true;
   try {
     const response = await apiClient.post('/core/AIコア/フォルダ参照', {
@@ -297,8 +299,8 @@ const 登録 = async () => {
           <div class="detail-row">
             <div class="detail-label">プロジェクト</div>
             <div class="detail-value">
-              <select v-model="選択プロジェクト" class="detail-select">
-                <option value="">候補から選択してください</option>
+              <select :value="固定プロジェクト || 選択プロジェクト" @change="選択プロジェクト = ($event.target as HTMLSelectElement).value" :disabled="!!固定プロジェクト" class="detail-select">
+                <option v-if="固定プロジェクト" :value="固定プロジェクト">IDEのプロジェクト（変更不可）</option><option v-else value="">候補から選択してください</option>
                 <option v-for="option in プロジェクト選択肢" :key="option.value" :value="option.value">
                   {{ option.label }}
                 </option>
@@ -308,8 +310,8 @@ const 登録 = async () => {
           <div class="detail-row">
             <div class="detail-label">フォルダ指定</div>
             <div class="detail-value value-inline">
-              <input v-model.trim="入力プロジェクト" class="detail-input" type="text" />
-              <button type="button" class="dialog-button browse" :disabled="参照中" @click="フォルダ参照">
+              <input v-model.trim="入力プロジェクト" :readonly="!!固定プロジェクト" class="detail-input" type="text" />
+              <button type="button" class="dialog-button browse" :disabled="参照中 || !!固定プロジェクト" @click="フォルダ参照">
                 参照
               </button>
             </div>

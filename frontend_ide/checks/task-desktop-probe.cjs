@@ -25,11 +25,13 @@ app.on('browser-window-created',(_,owner)=>{
    await until(()=>evaluate(owner,`!!document.querySelector('.taskteam-login button:not(:disabled)')`),'初期ログイン');
    await until(()=>shown,'起動完了通知');
    assert.equal(peers().length,1,JSON.stringify(peers().map(w=>({title:w.getTitle(),url:w.webContents.getURL()}))));
-   assert.equal(await evaluate(owner,`document.querySelector('.panel-brand strong')?.textContent`),'AiDiy Task');
+   assert.equal(await evaluate(owner,`document.querySelector('.panel-brand strong')?.textContent`),'AiDiy TASK');
    await evaluate(owner,`document.querySelector('.taskteam-login').requestSubmit()`);
-   await until(()=>peers().length===3,'ログイン後3窓');
+   await ready(owner);assert.equal(peers().length,1,'ログイン後もメインのみ');
+   await evaluate(owner,`for(const caption of ['フロー図','明細'])Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent===caption).click()`);
+   await until(()=>peers().length===3,'明示操作後3窓');
    for(const w of peers())await ready(w);
-   console.log('Task: 実Core認証・3窓表示 OK');
+   console.log('Task: 実Core認証・初期メインのみ・明示操作で3窓表示 OK');
    if(process.env.AIDIY_TEST_CONNECTION_INTERRUPT==='1'){
     const allStatus=async text=>(await Promise.all(peers().map(w=>evaluate(w,`document.body.textContent.includes(${JSON.stringify(text)})`)))).every(Boolean);
     await until(()=>allStatus('接続済み'),'3窓接続');
@@ -56,7 +58,9 @@ app.on('browser-window-created',(_,owner)=>{
    await until(()=>evaluate(primary,`!!document.querySelector('.taskteam-login button:not(:disabled)')`),'ログアウト後ログイン');
    assert.equal(await evaluate(primary,`Object.keys(localStorage).some(k=>/password|token/i.test(k))`),false);
    await evaluate(primary,`document.querySelector('.taskteam-login').requestSubmit()`);
-   await until(()=>peers().length===3,'再ログイン後3窓');for(const w of peers())await ready(w);
+   await ready(primary);assert.equal(peers().length,1,'再ログイン後もメインのみ');
+   await evaluate(primary,`for(const caption of ['フロー図','明細'])Array.from(document.querySelectorAll('.component-toolbar button')).find(b=>b.textContent===caption).click()`);
+   await until(()=>peers().length===3,'再表示後3窓');for(const w of peers())await ready(w);
    console.log('Task: 主画面なしのログアウト・主画面復元・再ログイン OK');
    const dir=join(__dirname,'../../temp/task-check');mkdirSync(dir,{recursive:true});
    for(const name of ['request','flow','detail'])writeFileSync(join(dir,`task-${name}.png`),(await view(name).webContents.capturePage()).toPNG());

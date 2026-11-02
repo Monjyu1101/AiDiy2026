@@ -36,8 +36,9 @@ async function launchDetached(defaultKind,args){
  }catch(error){if(child.connected)child.disconnect();child.kill();throw error;}
 }
 export async function launch(defaultKind='ide',args=process.argv.slice(2)){
- const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},provider:{type:'string'},model:{type:'string'},cli:{type:'string'},'cli-auto-approve':{type:'boolean'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
+ const {values,positionals}=parseArgs({args,allowPositionals:true,options:{app:{type:'string'},project:{type:'string'},'project-fixed':{type:'boolean'},provider:{type:'string'},model:{type:'string'},cli:{type:'string'},'cli-auto-approve':{type:'boolean'},port:{type:'string'},'strict-port':{type:'boolean'},browser:{type:'boolean'},'no-open':{type:'boolean'},offline:{type:'boolean'},connect:{type:'boolean'},foreground:{type:'boolean'},serve:{type:'boolean'},wait:{type:'boolean'},'ready-file':{type:'string'},'new-window':{type:'boolean'},help:{type:'boolean'}}});
  const kind=values.app||defaultKind;
+ if(values['project-fixed']&&!['task','team'].includes(kind))throw Error('--project-fixed はTask / Team専用です。');
  if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('--app はcode / live / ide / console / task / team / browserから指定してください。');
  if(values.help&&kind==='browser'){console.log('aidiy_browser [作業フォルダ | --project 作業フォルダ] [--port 番号] [--strict-port] [--new-window] [--foreground | --wait]');console.log('IDE共通のBrowserをElectronで単独起動します。tools接続時にchrome_devtoolsから操作できます。Web版への切り替えは行いません。');return;}
  if(values.help){console.log(`aidiy_${kind} [作業フォルダ | --project 作業フォルダ] [--browser] [--no-open] [--port 番号] [--strict-port]${['task','team'].includes(kind)?'':' [--provider 名前] [--model モデル]'}${kind==='code'?' [--offline]':''}${kind==='live'?'':' [--new-window]'}${kind==='console'?' [--cli 名前] [--cli-auto-approve]':''} [--foreground | --wait]`);console.log('起動フォルダをプロジェクトにしてElectronで開きます。Codespaces等ではWeb版。ポートは自動割り当て。');console.log('単独ウィンドウの表示後はプロンプトへ戻ります。--foreground / --wait で終了まで待機します。');return;}
@@ -46,7 +47,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  validateCliOptions(kind,{cli:values.cli,cliAutoApprove:values['cli-auto-approve'],provider:values.provider,model:values.model});
  const cliLaunch=values.cli?await resolveCliLaunch(values.cli,{autoApprove:!!values['cli-auto-approve']}):undefined;
  const requestedProject=projectFolder(positionals,values.project);
- const project=kind==='ide'?projectIdentity(requestedProject).path:requestedProject,port=values.port===undefined?0:Number(values.port);
+ const project=['ide','task','team'].includes(kind)?projectIdentity(requestedProject).path:requestedProject,port=values.port===undefined?0:Number(values.port);
  if(!Number.isInteger(port)||port<0||port>65535)throw Error('--port は0〜65535で指定してください。');
  if(values.offline&&['live','task','team'].includes(kind))throw Error(`${kind}はAiDiy接続が必要です。`);
  let provider=values.provider?.trim(),model=values.model?.trim();
@@ -61,7 +62,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  let app,desktop,lifetime,stopping=false;
  const stop=async()=>{if(stopping)return;stopping=true;lifetime?.dispose();if(desktop?.connected)desktop.disconnect();await app?.close();};
  if(values.cli)lifetime=createCliOwnerLifetime(stop);
- app=await startDevelopment(project,{kind,port,strict:values['strict-port'],offline:values.offline,provider,model,cli:values.cli,cliAutoApprove:values['cli-auto-approve'],autoConnect:values.connect,onCliStarted:()=>lifetime?.started(),onCliAbandoned:stop});
+ app=await startDevelopment(project,{kind,projectFixed:!!values['project-fixed'],port,strict:values['strict-port'],offline:values.offline,provider,model,cli:values.cli,cliAutoApprove:values['cli-auto-approve'],autoConnect:values.connect,onCliStarted:()=>lifetime?.started(),onCliAbandoned:stop});
  const launcherChild=process.env.AIDIY_LAUNCHER_CHILD==='1'&&!!process.send;
  if(launcherChild)process.once('disconnect',stop);
  const notifyReady=message=>{if(launcherChild){process.removeListener('disconnect',stop);process.send?.({launchReady:true,...message});}};
@@ -77,7 +78,7 @@ export async function launch(defaultKind='ide',args=process.argv.slice(2)){
  let browser=kind!=='browser'&&(values.browser||useBrowser());
  if(!browser){
   try{
-   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliTitleName(cliLaunch),AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
+   const env={...process.env,AIDIY_DEVELOPMENT_URL:app.url,AIDIY_DEVELOPMENT_KIND:kind,AIDIY_DEVELOPMENT_PROJECT:project,AIDIY_DEVELOPMENT_PROJECT_FIXED:values['project-fixed']?'1':'0',AIDIY_DEVELOPMENT_CLI_WINDOW:values.cli?'1':'0',AIDIY_DEVELOPMENT_CLI_NAME:cliTitleName(cliLaunch),AIDIY_DEVELOPMENT_NEW_WINDOW:values['new-window']&&kind!=='live'?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
    let executable;try{executable=electronExecutable();}catch{executable=electronExecutable(new URL('./host/package.json',import.meta.url));}
    desktop=spawnDesktop(executable,[fileURLToPath(new URL('./desktop.cjs',import.meta.url)),'--app',kind],{cwd:project,env,background:launcherChild});
    const shown=await new Promise((done,reject)=>{const timer=setTimeout(()=>reject(Error('Electronの表示がタイムアウトしました。')),20000);desktop.once('error',error=>{clearTimeout(timer);reject(error);});desktop.once('exit',code=>{clearTimeout(timer);reject(Error(`Electron終了: ${code}`));});desktop.on('message',message=>{if(message?.windowShown===true||message?.existingWindow===true){clearTimeout(timer);done(message);}});});
