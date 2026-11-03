@@ -18,7 +18,7 @@ test('standalone slots remain independent and released slots retain identity',as
 test('standalone config, API, model persistence and no file mutation API',async()=>{
  const root=await mkdtemp(join(tmpdir(),'navi-server-test-'));let a,b;
  try{
-  const options={kind:'navi',navigationOptions:{stateRoot:join(root,'states'),runAgent:()=>{throw Error('No AI calls expected');}}};
+  const options={kind:'navi',navigationOptions:{defaultModel:async()=>({provider:'aidiy_hermes',model:'auto'}),stateRoot:join(root,'states'),runAgent:()=>{throw Error('No AI calls expected');}}};
   a=await startDevelopment(root,options);b=await startDevelopment(root,options);
   const ca=await(await fetch(a.url+'development/config')).json(),cb=await(await fetch(b.url+'development/config')).json();
   assert.equal(ca.kind,'navi');assert.equal(ca.project.path,root);assert.notEqual(ca.navigationInstance,cb.navigationInstance);
@@ -26,6 +26,6 @@ test('standalone config, API, model persistence and no file mutation API',async(
   assert.equal((await fetch(a.url+'api/files/create',{method:'POST'})).status,404);
   assert.equal((await fetch(endpoint(a),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({provider:'aidiy_hermes',model:'openai_oauth/test'})})).status,200);
   assert.equal((await(await fetch(endpoint(a))).json()).selection.model,'openai_oauth/test');
-  assert.equal((await(await fetch(endpoint(b))).json()).selection.model,'same');
+  assert.equal((await(await fetch(endpoint(b))).json()).selection.model,'auto');
  }finally{await a?.close();await b?.close();await rm(root,{recursive:true,force:true});}
 });

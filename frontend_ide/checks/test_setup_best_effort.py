@@ -59,12 +59,15 @@ class BestEffortTests(unittest.TestCase):
             self.assertFalse(m.setup_assets('npm',choices={'continue_on_error':True}));install.assert_not_called();launcher.assert_called_once()
     def test_parent_continues_other_children(self):
         m=load('frontend_ide/_setup.py'); child=Mock();child.setup.return_value=False
-        with patch.object(m,'load_setup_module',return_value=child),patch.object(m,'register_launchers',return_value=True) as register:
-            self.assertFalse(m.setup({'continue_on_error':True}));self.assertEqual(child.setup.call_count,6);register.assert_called_once()
+        with patch.object(m,'load_setup_module',return_value=child) as load_child,patch.object(m,'register_launchers',return_value=True) as register:
+            self.assertFalse(m.setup({'continue_on_error':True}));self.assertEqual(child.setup.call_count,7);register.assert_called_once()
+            self.assertEqual([call.args[0] for call in load_child.call_args_list], [f'frontend_ide/{folder}/_setup.py' for folder in ('aidiy_navi', 'aidiy_console', 'host', 'viewer', 'aidiy_task', 'aidiy_team', 'aidiy_browser')])
             child.reset_mock();register.reset_mock();self.assertFalse(m.setup());self.assertEqual(child.setup.call_count,1);register.assert_not_called()
     def test_launcher_failure_does_not_skip_remaining(self):
         m=load('frontend_ide/_setup.py');launcher=Mock();launcher.install_launcher.side_effect=OSError('fixture');host=Mock();host.install_standalone_launcher.return_value=False
         with patch.object(m,'load_setup_module',return_value=launcher):
-            self.assertFalse(m.register_launchers(host,continue_on_error=True));self.assertEqual(launcher.install_launcher.call_count,5);launcher.ensure_launcher_path.assert_called_once()
+            self.assertFalse(m.register_launchers(host,continue_on_error=True));self.assertEqual(launcher.install_launcher.call_count,6);launcher.ensure_launcher_path.assert_called_once()
+            self.assertEqual([call.args[1] for call in launcher.install_launcher.call_args_list], ['navi', 'console', 'ide', 'task', 'team', 'browser'])
+            host.install_standalone_launcher.assert_called_once_with(register_path=False)
 
 if __name__=='__main__': unittest.main()

@@ -9,7 +9,9 @@ const {setWindowBounds}=require('./全画面横断.cjs');
 // 保存するのはVRの位置だけ。窓の作り直しを越えて保持し、IDE終了で忘れる。
 function createVRPanelPlacement({windows,screen,isActive,feedback=showWindowMoveFeedback,setBounds=setWindowBounds,now=()=>performance.now(),setTimer=setTimeout,clearTimer=clearTimeout,duration=650}){
  const positions=new WeakMap(),flights=new Map(),kinds=['explorer','panel-routes','panel-navigation'];
- const children=owner=>kinds.map(kind=>[...windows.values()].find(child=>child.owner===owner&&child.kind===kind&&child.shown&&!child.window.isDestroyed())).filter(Boolean);
+ const children=owner=>[...windows.values()].filter(child=>child.owner===owner&&kinds.includes(child.kind)&&child.shown&&!child.window.isDestroyed());
+ // 単独パネルは再生成後も種類のキーを共有。複数Navigatorは窓ごとに保持する。
+ const key=child=>child.kind==='panel-navigation'?child.window:child.kind;
  function cancel(owner){
   const flight=flights.get(owner);if(!flight)return;
   flight.cancelled=true;clearTimer(flight.timer);flight.wake?.();
@@ -19,7 +21,7 @@ function createVRPanelPlacement({windows,screen,isActive,feedback=showWindowMove
   // 移行を途中で中断したときは、通過点で前回の目的地を上書きしない。
   if(!flights.has(owner)){
    const saved=positions.get(owner)||new Map();
-   for(const child of children(owner)){const bounds=child.window.isMaximized()?child.window.getNormalBounds():child.window.getBounds();saved.set(child.kind,{x:bounds.x,y:bounds.y});}
+   for(const child of children(owner)){const bounds=child.window.isMaximized()?child.window.getNormalBounds():child.window.getBounds();saved.set(key(child),{x:bounds.x,y:bounds.y});}
    positions.set(owner,saved);
   }
   cancel(owner);
@@ -34,7 +36,7 @@ function createVRPanelPlacement({windows,screen,isActive,feedback=showWindowMove
    // pin()でWeb側の元表示を除去済み。その消去が描画されてから別窓を動かす。
    await owner.window.webContents.executeJavaScript('new Promise(resolve=>{const timer=setTimeout(resolve,250);requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timer);resolve();}));})');
    for(const child of children(owner)){
-    const point=saved.get(child.kind),win=child.window;if(!point||!alive())continue;
+    const point=saved.get(key(child)),win=child.window;if(!point||!alive())continue;
     const start=win.getBounds(),area=screen.getDisplayMatching({...start,...point}).workArea;
     // 消えた画面や配置変更では、現在の大きさを保ち、少なくともバーを画面内に残す。
     const end={...start,x:Math.round(Math.max(area.x+8,Math.min(point.x,area.x+area.width-start.width-8))),y:Math.round(Math.max(area.y+8,Math.min(point.y,area.y+area.height-Math.min(start.height,area.height-16)-8)))};

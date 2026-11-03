@@ -74,3 +74,17 @@ test('IDE終了・新しい管理インスタンス・別IDEでは位置を引�
  await f.manager.restore({...f.owner});assert.equal(a.window.getBounds().x,10);
  f.manager.forget(f.owner);await f.manager.restore(f.owner);assert.deepEqual(f.events,[]);
 });
+
+test('複数Navigatorを窓ごとに復元し、新規窓へ古い位置を流用しない',async()=>{
+ const f=fixture(),a=f.add('panel-navigation',100,100),b=f.add('panel-navigation',700,200);
+ f.manager.remember(f.owner);
+ a.window.setBounds({...a.window.getBounds(),x:20,y:20});b.window.setBounds({...b.window.getBounds(),x:30,y:30});
+ const fresh=f.add('panel-navigation',900,300);
+ await f.finish(f.manager.restore(f.owner));
+ assert.equal(a.window.getBounds().x,100);assert.equal(a.window.getBounds().y,100);
+ assert.equal(b.window.getBounds().x,700);assert.equal(b.window.getBounds().y,200);
+ assert.equal(fresh.window.getBounds().x,900);
+ a.destroyed=true;f.windows.delete(a);f.manager.remember(f.owner);
+ b.window.setBounds({...b.window.getBounds(),x:40});await f.finish(f.manager.restore(f.owner));
+ assert.equal(b.window.getBounds().x,700);assert.equal(f.timers.size,0);
+});

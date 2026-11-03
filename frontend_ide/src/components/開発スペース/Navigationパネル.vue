@@ -26,7 +26,9 @@ const matchesResult=computed(()=>!!result.value&&goal.value.trim()===result.valu
 const canEvaluate=computed(()=>!busy.value&&availability.value.available&&matchesResult.value);
 let draftInitialized=false,draftEdited=false,pendingGoal=null;
 function editGoal(){draftEdited=true;}
-const busy=computed(()=>savingModel.value||submitting.value||job.value?.status==='running');
+// 応答を失った開始要求はGETで状態を確認するまで再送しない。
+const reconciling=ref(false);
+const busy=computed(()=>savingModel.value||submitting.value||reconciling.value||job.value?.status==='running');
 let windowPanel,timer,disposed=false,version=0,request;
 
 async function api(method='GET',body){
@@ -35,7 +37,7 @@ async function api(method='GET',body){
 }
 async function refresh(){
  const generation=version;
- try{if(props.standalone){try{const r=await fetch('/api/connection',{signal:AbortSignal.timeout(3000)});if(r.ok)toolsState.value=await r.json();else toolsState.value.connected=false;}catch{toolsState.value.connected=false;}}const data=await api();if(disposed||generation!==version)return;result.value=data.result;job.value=data.job;availability.value=data.availability||{available:true,reason:""};selection.value=data.selection||selection.value;if(!draftInitialized){draftInitialized=true;if(!draftEdited&&data.result)goal.value=data.result.goal;}if(pendingGoal&&data.job?.id===pendingGoal.id&&data.job.status!=='running'){if(data.job.status==='complete'&&goal.value===pendingGoal.text&&!draftEdited)goal.value=data.result.goal;pendingGoal=null;}}
+ try{if(props.standalone){try{const r=await fetch('/api/connection',{signal:AbortSignal.timeout(3000)});if(r.ok)toolsState.value=await r.json();else toolsState.value.connected=false;}catch{toolsState.value.connected=false;}}const data=await api();if(disposed||generation!==version)return;result.value=data.result;job.value=data.job;reconciling.value=false;availability.value=data.availability||{available:true,reason:""};selection.value=data.selection||selection.value;if(!draftInitialized){draftInitialized=true;if(!draftEdited&&data.result)goal.value=data.result.goal;}if(pendingGoal&&data.job?.id===pendingGoal.id&&data.job.status!=='running'){if(data.job.status==='complete'&&goal.value===pendingGoal.text&&!draftEdited)goal.value=data.result.goal;pendingGoal=null;}}
  catch(e){if(!disposed&&generation===version&&e.name!=='AbortError')error.value=e.message;}
  finally{if(!disposed&&generation===version&&visible.value){clearTimeout(timer);timer=setTimeout(refresh,job.value?.status==='running'?2000:5000);}}
 }
@@ -53,9 +55,9 @@ async function navigate(action='navigate'){
  if(busy.value||!availability.value.available||(action==='evaluate'&&!canEvaluate.value))return;
  if(!goal.value.trim()){error.value='開発目標を入力してください。';return;}
  const submittedGoal=goal.value;draftEdited=false;submitting.value=true;error.value='';copied.value=false;const generation=++version;clearTimeout(timer);
- try{const data=await api('POST',{goal:submittedGoal,action});if(generation===version){job.value=data.job;pendingGoal={id:data.job.id,text:submittedGoal};void refresh();}}
- catch(e){if(generation===version)error.value=e.message;}
- finally{if(generation===version)submitting.value=false;}
+ try{const data=await api('POST',{goal:submittedGoal,action});if(generation===version){job.value=data.job;pendingGoal={id:data.job.id,text:submittedGoal};}}
+ catch(e){if(generation===version){error.value=e.message;reconciling.value=true;}}
+ finally{if(generation===version){submitting.value=false;void refresh();}}
 }
 async function toggleHistory(){if(busy.value)return;history.value=!history.value;if(history.value)try{const r=await fetch('/api/navigation?instance='+encodeURIComponent(props.instance)+'&list=1',{cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error);historyItems.value=data.items;}catch(e){error.value=e.message;}}
 async function selectHistory(id){if(busy.value)return;submitting.value=true;try{const data=await api('POST',{action:id?'select':'new',id});result.value=data.result;job.value=data.job;goal.value=data.result?.goal||DEFAULT_NAVIGATION_GOAL;draftInitialized=true;draftEdited=false;pendingGoal=null;selection.value=data.selection||selection.value;history.value=false;error.value='';}catch(e){error.value=e.message;}finally{submitting.value=false;}}

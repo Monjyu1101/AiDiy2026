@@ -1,6 +1,6 @@
 # AiDiy IDE（Vue）
 
-Console / Code / Live / IDE / Task / Team / Browser の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は7種類です。
+Navigator / Console / Code / Live / IDE / Task / Team / Browser の画面をVue 3で共通化します。VS Code拡張はCode / Live、単独実行は8種類です。
 
 
 ## 導入・起動の要件

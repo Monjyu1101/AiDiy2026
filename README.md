@@ -38,6 +38,7 @@
 - フロントエンド VS Code: Node.js + Vue 3 共通画面 + TypeScript + VS Code Extension API + Electron（AiDiy (Code) / AiDiy (Live) の 2 拡張と単独起動版。さらに開発スペース `aidiy_ide` の部品としても動作、常駐なし）
 - フロントエンド Slack: Node.js + Vue 3 接続パネル + Electron / Web + TypeScript（HTTPS定期取得によるHermesチャット、音声なし）
 - フロントエンド Discord: Node.js + Vue 3 接続パネル + Electron / Web + TypeScript + discord.js（Hermes チャット / AIコア Live 音声接続、任意起動の Bot）
+- フロントエンド Navigator: `aidiy_navi` で開く読み取り専用の開発案内画面。目標・作業項目・推定達成率・次のプロンプトを表示し、提案を自動実行しません
 - フロントエンド IDE（開発スペース）: Node.js + Vue 3 + Canvas 2D + Monaco Editor + Electron（宇宙をテーマにした IDE 開発環境。Code / Live を部品として組み込んだ `aidiy_ide`、ポート自動割り当て）
 - 常駐バックエンドは **5 サーバー構成**
   - `core_main.py` : `8091`
@@ -104,7 +105,7 @@ python _setup.py
 6. `frontend_web` の `npm install`
 7. `frontend_avatar` の `npm install`、必要に応じて Electron バイナリの補完
 8. `command_hermes` の `.venv` 作成 / `uv sync --upgrade` / `aidiy_hermes` 登録試行
-9. `frontend_ide` の共通Vue依存、Console / Code / Live / IDE / Task / Team / Browserのセットアップ、ランチャー登録、Code / LiveのVS Code拡張配置
+9. `frontend_ide` の共通Vue依存、Navigator / Console / Code / Live / IDE / Task / Team / Browserのセットアップ、ランチャー登録、Code / LiveのVS Code拡張配置
 10. `frontend_channels` のDiscord依存・パネル・ランチャー準備
 11. `frontend_channels/slack` のSlack依存・パネル・ランチャー準備
 
@@ -147,6 +148,8 @@ python _start.py
 `frontend_channels` は `_config/AiDiy_key.json` の `DISCORD_*` を設定後、全体 `_start.py` で選択して起動します（デフォルト No）。`aidiy_discord` または `cd frontend_channels && npm start` での個別起動も可能です。保存済みの設定（`~/.aidiy/aidiy_discord.json`）があれば起動時に自動接続し、初回はモデル設定画面から始まります。専用テキストチャンネルへの普通の投稿に Hermes が返信し、専用ボイスチャンネルへの入退室に合わせて AIコアとの音声会話を自動開始・終了します。導入と権限設定は [frontend_channels/README.md](./frontend_channels/README.md) を参照してください。
 
 `frontend_channels/slack` は `_config/AiDiy_key.json` の `slack_*` を設定後、同じく全体 `_start.py` で選択するか `aidiy_slack` で起動します（デフォルト No）。Discord 版と双子の接続パネルで、専用チャンネルへの投稿にスレッドで返信します（HTTPS の定期取得、音声なし）。保存は `~/.aidiy/aidiy_slack.json` です。導入は [frontend_channels/slack/README.md](./frontend_channels/slack/README.md) を参照してください。
+
+Navigator はセットアップ後に `aidiy_navi` で単独起動するか、IDE の「＋ Navigator」から開きます。全体 `_start.py` の自動起動対象ではありません。使い方は [frontend_ide/README.md](./frontend_ide/README.md) を参照してください。
 
 ### 個別起動
 
@@ -306,9 +309,18 @@ cleanup のために新しい Python / Node.js や対象仮想環境は要求し
 7. [frontend_web/AGENTS.md](./frontend_web/AGENTS.md)
 8. [frontend_avatar/AGENTS.md](./frontend_avatar/AGENTS.md)
 9. [backend_diag/AGENTS.md](./backend_diag/AGENTS.md) — Diag の診断・Vue 画面
-10. [frontend_ide/AGENTS.md](./frontend_ide/AGENTS.md) — Console / Code / Live / IDE の共通 Vue 画面
+10. [frontend_ide/AGENTS.md](./frontend_ide/AGENTS.md) — Navigator / Console / Code / Live / IDE / Task / Team / Browser の共通 Vue 画面
 11. [frontend_ide/host/AGENTS.md](./frontend_ide/host/AGENTS.md) — Code / Live の拡張ホスト・通信
 12. [frontend_channels/AGENTS.md](./frontend_channels/AGENTS.md) — Discord の接続・Vue パネル
 13. [frontend_channels/slack/AGENTS.md](./frontend_channels/slack/AGENTS.md) — Slack の接続・Vue パネル（Discord の双子）
 14. [frontend_ide/viewer/AGENTS.md](./frontend_ide/viewer/AGENTS.md) — ファイルAPI・Office表示
 15. [docs/開発ガイド/README.md](./docs/開発ガイド/README.md)
+
+
+## 著作権・ライセンス
+
+Copyright (c) 2014-2026 Mitsuo KONDOU and contributors
+
+AiDiy 独自部分の利用条件は [AiDiy 公開利用ライセンス v1.1](./LICENSE) を参照してください。非商用利用に限る公開ライセンスで、OSI が定義するオープンソースライセンスではありません。商用利用には事前に全著作権者の書面承諾が必要です。再配布時はライセンス全文と著作権表示を含めてください。
+
+第三者のコード・ライブラリ・画像等は、それぞれのライセンスと表示を確認・保持してください。主な確認先は [Hermes の出典](./command_hermes/NOTICE.md)、[IDE ビューアの第三者表記](./frontend_ide/viewer/web/THIRD_PARTY_NOTICES.txt)、[Discord パネル](./frontend_channels/panel/THIRD_PARTY_NOTICES.txt)、[Slack パネル](./frontend_channels/slack/panel/THIRD_PARTY_NOTICES.txt)、[Diag UI](./backend_diag/ui/THIRD_PARTY_NOTICES.txt) および各資材に付属する LICENSE / NOTICE です。この一覧は第三者資材の全件一覧ではありません。
