@@ -10,13 +10,17 @@ import {mkdtemp,writeFile,readFile,rm,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createNavigation,validateNavigation,navigationModels,navigationCatalog,navigationDefaultModel} from '../ファイル機能/navigation.mjs';
-const valid=(id='one',goal='検索画面を整える')=>({requestId:id,goal,items:[{id:'1',name:'入力を整える',progress:25,reason:'入力欄が存在、検証は未確認'}],nextPrompt:'入力の空状態を確認してください。'});
+const valid=(id='one',goal='検索画面を整える')=>({schemaVersion:2,requestId:id,goal,items:[{id:'1',name:'入力を整える',progress:25,reason:'入力欄が存在、検証は未確認',weight:100,weightReason:'目標を達成するための主要作業'}],overall:{progress:25,reason:'主要作業の確認結果から評価'},nextPrompt:'入力の空状態を確認してください。'});
 test('結果: 根拠/0と100/空リストを保持し未知の属性を除外',()=>{
- const data=valid();data.items.push({...data.items[0],id:'2',progress:100});data.items[0].progress=0;data.secret='ignore';
+ const data=valid();data.items.push({...data.items[0],id:'2',progress:100});data.items[0].progress=0;data.items.forEach(item=>item.weight=50);data.overall.progress=50;data.secret='ignore';
  const {secret,...expected}=data;assert.deepEqual(validateNavigation(data,{id:'one',goal:data.goal}),{...expected,inferred:false});
- assert.equal(validateNavigation({...data,items:[]},{id:'one',goal:data.goal}).items.length,0);
+ assert.equal(validateNavigation({...data,items:[],overall:{progress:null,reason:'項目がないため未評価'}},{id:'one',goal:data.goal}).items.length,0);
 });
 for(const [name,change]of [
+ ['版なし',d=>delete d.schemaVersion],['旧版',d=>d.schemaVersion=1],['未来版',d=>d.schemaVersion=3],['版文字列',d=>d.schemaVersion='2'],['版null',d=>d.schemaVersion=null],
+ ['重みなし',d=>delete d.items[0].weight],['重みゼロ',d=>d.items[0].weight=0],['重み負値',d=>d.items[0].weight=-1],['重み上限超過',d=>d.items[0].weight=101],['重み小数',d=>d.items[0].weight=99.5],['重み文字列',d=>d.items[0].weight='100'],['重みNaN',d=>d.items[0].weight=NaN],['重みInfinity',d=>d.items[0].weight=Infinity],['重み合計不足',d=>d.items[0].weight=99],['重み合計超過',d=>d.items.push({...d.items[0],id:'2'})],
+ ['重み根拠なし',d=>delete d.items[0].weightReason],['重み根拠空白',d=>d.items[0].weightReason='  '],['重み根拠長過ぎ',d=>d.items[0].weightReason='x'.repeat(2001)],
+ ['総合なし',d=>delete d.overall],['総合進捗なし',d=>delete d.overall.progress],['総合不一致',d=>d.overall.progress=26],['総合未評価不一致',d=>d.overall.progress=null],['総合小数',d=>d.overall.progress=25.5],['総合文字列',d=>d.overall.progress='25'],['総合NaN',d=>d.overall.progress=NaN],['総合Infinity',d=>d.overall.progress=Infinity],['総合負値',d=>d.overall.progress=-1],['総合上限超過',d=>d.overall.progress=101],['総合根拠なし',d=>delete d.overall.reason],['総合根拠空白',d=>d.overall.reason='  '],['総合根拠長過ぎ',d=>d.overall.reason='x'.repeat(4001)],['未評価項目と数値総合',d=>d.items[0].progress=null],['空項目と数値総合',d=>d.items=[]],
  ['別要求',d=>d.requestId='other'],['別目標',d=>d.goal='other'],['負値',d=>d.items[0].progress=-1],['上限超過',d=>d.items[0].progress=101],['文字列',d=>d.items[0].progress='50'],['NaN',d=>d.items[0].progress=NaN],['小数',d=>d.items[0].progress=2.5],['根拠なし',d=>d.items[0].reason=''],['ID重複',d=>d.items.push({...d.items[0]})],['巨大リスト',d=>d.items=Array(51).fill(d.items[0])],['プロンプトなし',d=>d.nextPrompt=''],
 ])test(`不正な結果を拒否: ${name}`,()=>{const d=valid(),job={id:d.requestId,goal:d.goal};change(d);assert.throws(()=>validateNavigation(d,job));});
 async function fixture(t,run,options={}){
@@ -24,7 +28,7 @@ async function fixture(t,run,options={}){
  const service=createNavigation(root,{state:()=>state,stateRoot,defaultModel:async()=>({provider:'aidiy_hermes',model:'same'}),runAgent:args=>run(args,root),...options});
  t.after(async()=>{service.close();await rm(temporary,{recursive:true,force:true});});return{service,root,state,stateRoot};
 }
-async function respond(prompt,root,mutate=d=>d){const shape=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1));return {content:JSON.stringify(mutate(valid(shape.requestId,shape.goal)))};}
+async function respond(prompt,root,mutate=d=>d){const shape=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1).replace(/^出力形式: /,''));return {content:JSON.stringify(mutate(valid(shape.requestId,shape.goal)))};}
 async function finish(service){for(let n=0;n<100;n++){const v=await service.get();if(v.job?.status!=='running')return v;await new Promise(r=>setTimeout(r,5));}throw Error('test timeout');}
 test('通常経路1回→JSON保存→再起動読戻し、失敗時に前回成功を保持',async t=>{
  let calls=0;const {service,root,state,stateRoot}=await fixture(t,async({prompt},root)=>{calls++;return respond(prompt,root,d=>calls===1?d:{...d,items:[{...d.items[0],progress:999}]});});
@@ -46,12 +50,12 @@ test('既定指示は最近の日時と内容から仮目標を提案、GETで�
 });
 
 test('評価は保存済み目標と項目を固定し採点のみ更新、削除・改名を拒否',async t=>{
- let calls=0;const {service}=await fixture(t,async({prompt})=>{calls++;const shape=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1).replace(/^出力形式: /,''));const data=valid(shape.requestId,shape.goal);data.items[0].progress=75;if(calls===3)data.items[0].name='別の項目';return {content:JSON.stringify(data)};});
+ let calls=0;const {service}=await fixture(t,async({prompt})=>{calls++;const shape=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1).replace(/^出力形式: /,''));const data=valid(shape.requestId,shape.goal);data.items[0].progress=75;data.overall.progress=75;if(calls===3)data.items[0].name='別の項目';return {content:JSON.stringify(data)};});
  await assert.rejects(service.start('', 'evaluate'));await service.start('目標');await finish(service);await service.start('無視する入力','evaluate');let value=await finish(service);assert.equal(value.job.status,'complete',value.job.message);assert.equal(value.result.goal,'目標');assert.equal(value.result.items[0].progress,75);await service.start('','evaluate');value=await finish(service);assert.equal(value.job.status,'failed');assert.equal(value.result.items[0].name,'入力を整える');
 });
-for(const action of ['remove','rename','reorder','goal'])test('評価の構造変更を拒否: '+action,()=>{
- const d=valid();d.items.push({...d.items[0],id:'2',name:'2番目'});const job={id:d.requestId,goal:d.goal,items:structuredClone(d.items),action:'evaluate'};
- if(action==='remove')d.items.pop();if(action==='rename')d.items[0].name='変更';if(action==='reorder')d.items.reverse();if(action==='goal')d.goal='変更';assert.throws(()=>validateNavigation(d,job));
+for(const action of ['add','remove','rename','id','reorder','goal'])test('評価の構造変更を拒否: '+action,()=>{
+ const d=valid();d.items.push({...d.items[0],id:'2',name:'2番目'});d.items.forEach(item=>item.weight=50);const job={id:d.requestId,goal:d.goal,items:structuredClone(d.items),action:'evaluate'};
+ if(action==='add')d.items.push({...d.items[0],id:'3'});if(action==='id')d.items[0].id='changed';if(action==='remove')d.items.pop();if(action==='rename')d.items[0].name='変更';if(action==='reorder')d.items.reverse();if(action==='goal')d.goal='変更';assert.throws(()=>validateNavigation(d,job));
 });
 
 test('モデル初期値と保存/再読込、ナビと評価は同じ選択を固定して使用',async t=>{
@@ -131,4 +135,61 @@ test('Navi専用一覧の欠損・旧形式・破損は安全な基本候補と�
  await writeFile(file,JSON.stringify({_meta:{schema:1,readOnly:true},aidiy_hermes:{models:{'copilot-cli/same':'unsafe','openai_oauth/x':'safe'}},copilot_cli:{models:{'claude-sonnet':'Claude'}}}));
  const c=await navigationCatalog('aidiy_hermes',file);assert.equal(c.notice,'');assert.ok(c.items.some(x=>x.id==='openai_oauth/x'));assert.ok(!c.items.some(x=>x.id==='copilot-cli/same'));
  assert.ok((await navigationModels('copilot_cli',file)).some(x=>x.id==='claude-sonnet'));
+});
+
+test('加重総合は整数に丸め、未評価を0扱いせず全体も未評価にする',()=>{
+ const d=valid();d.items[0].weight=35;d.items[0].progress=100;
+ d.items.push({...d.items[0],id:'2',name:'残りの作業',weight:65,progress:10});d.overall.progress=42;
+ let result=validateNavigation(d,{id:d.requestId,goal:d.goal});assert.equal(result.overall.progress,42);assert.equal(result.items[0].weight,35);assert.equal(result.schemaVersion,2);
+ d.items[1].progress=null;d.overall={progress:null,reason:'未確認の作業が残る'};
+ result=validateNavigation(d,{id:d.requestId,goal:d.goal});assert.equal(result.items[1].progress,null);assert.equal(result.overall.progress,null);
+ d.items[0].progress=null;assert.equal(validateNavigation(d,{id:d.requestId,goal:d.goal}).overall.progress,null);
+});
+
+test('評価で工数比率・両根拠・総合評価を変更し、保存・再起動・履歴選択で保持する',async t=>{
+ let calls=0;const {service,root,state,stateRoot}=await fixture(t,async({prompt})=>{
+  calls++;const shape=JSON.parse(prompt.split('\n').at(-1).replace(/^出力形式: /,''));const d=valid(shape.requestId,shape.goal);
+  d.items[0].progress=100;d.items[0].weight=calls===1?50:80;d.items[0].weightReason=calls===1?'初回の作業量':'調査後の主要作業量';
+  d.items.push({...d.items[0],id:'2',name:'追加確認',progress:0,weight:calls===1?50:20,weightReason:'残りの作業量'});
+  d.overall={progress:calls===1?50:80,reason:calls===1?'初回評価':'追加調査に基づく工数比率の再評価'};
+  return {content:JSON.stringify(d)};
+ });
+ await service.start('目標');const first=(await finish(service)).result;
+ await service.start('','evaluate');const updated=await finish(service);assert.equal(updated.job.status,'complete',updated.job.message);
+ assert.deepEqual(updated.result.items.map(({id,name})=>({id,name})),first.items.map(({id,name})=>({id,name})));
+ assert.deepEqual(updated.result.items.map(item=>item.weight),[80,20]);assert.equal(updated.result.overall.progress,80);assert.equal(updated.result.navigationId,first.navigationId);
+ const reopened=createNavigation(root,{state:()=>state,stateRoot});t.after(()=>reopened.close());assert.deepEqual((await reopened.get()).result,updated.result);
+ await reopened.fresh();await reopened.select(first.navigationId);assert.deepEqual((await reopened.get()).result,updated.result);
+ assert.equal((await service.list()).length,1);
+});
+
+for(const mutation of ['old-schema','wrong-overall','wrong-weights'])test('保存済み不正結果を修復せず拒否: '+mutation,async t=>{
+ const {service,root,state,stateRoot}=await fixture(t,async({prompt},root)=>respond(prompt,root));
+ await service.start('目標');const saved=(await finish(service)).result;
+ const projectDir=join(stateRoot,(await readdir(stateRoot))[0]);const latest=join(projectDir,'default','latest.json');const history=join(projectDir,'history',saved.navigationId+'.json');
+ const invalid=JSON.parse(await readFile(latest,'utf8'));
+ if(mutation==='old-schema'){delete invalid.schemaVersion;delete invalid.overall;for(const item of invalid.items){delete item.weight;delete item.weightReason;}}
+ if(mutation==='wrong-overall')invalid.overall.progress=99;
+ if(mutation==='wrong-weights')invalid.items[0].weight=99;
+ const contents=JSON.stringify(invalid);await writeFile(latest,contents);await writeFile(history,contents);
+ const reopened=createNavigation(root,{state:()=>state,stateRoot});t.after(()=>reopened.close());
+ await assert.rejects(reopened.get());await assert.rejects(reopened.select(saved.navigationId));assert.deepEqual(await reopened.list(),[]);
+ assert.equal(await readFile(latest,'utf8'),contents);assert.equal(await readFile(history,'utf8'),contents);
+});
+
+
+test('旧形式は新規作成を案内する明確なエラーにして自動移行しない',()=>{
+ const d=valid();delete d.schemaVersion;
+ assert.throws(()=>validateNavigation(d,{id:d.requestId,goal:d.goal}),/新規.*再作成/);
+ assert.equal(d.schemaVersion,undefined);
+});
+
+test('AI指示の出力例も加重評価schemaVersion 2の検証を通る',async t=>{
+ const prompts=[];const {service}=await fixture(t,async({prompt})=>{
+  prompts.push(prompt);const example=JSON.parse(prompt.split('\n').at(-1).replace(/^出力形式: /,''));
+  validateNavigation(example,{id:example.requestId,goal:example.goal});return {content:JSON.stringify(example)};
+ });
+ await service.start('検証目標');assert.equal((await finish(service)).job.status,'complete');
+ await service.start('','evaluate');assert.equal((await finish(service)).job.status,'complete');
+ assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);}
 });

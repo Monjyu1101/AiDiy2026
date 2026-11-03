@@ -22,11 +22,8 @@ const availability=ref({available:false,reason:'実行環境を確認してい�
 const history=ref(false),historyItems=ref([]);
 const scored=value=>Number.isInteger(value)&&value>=0&&value<=100;
 const progressStyle=value=>scored(value)?{'--progress-width':value+'%','--progress-fill':`hsl(${value*1.2} 65% 23%)`,'--progress-accent':`hsl(${value*1.2} 65% 72%)`}: {'--progress-width':'0%','--progress-fill':'#263445','--progress-accent':'#b3c5d8'};
-// 項目は同じ重みで集計し、未評価を0%として扱わない。
-const overall=computed(()=>{
- const items=result.value?.items||[],values=items.filter(item=>scored(item.progress));
- return {progress:values.length?Math.round(values.reduce((sum,item)=>sum+item.progress,0)/values.length):null,evaluated:values.length,total:items.length};
-});
+// 総合値・理由はAIの検証済み回答をそのまま表示する。旧形式を補完しない。
+const overall=computed(()=>result.value?.overall);
 const matchesResult=computed(()=>!!result.value&&goal.value.trim()===result.value.goal);
 const canEvaluate=computed(()=>!busy.value&&availability.value.available&&matchesResult.value);
 let draftInitialized=false,draftEdited=false,pendingGoal=null;
@@ -65,7 +62,7 @@ async function navigate(action='navigate'){
  finally{if(generation===version){submitting.value=false;void refresh();}}
 }
 async function toggleHistory(){if(busy.value)return;history.value=!history.value;if(history.value)try{const r=await fetch('/api/navigation?instance='+encodeURIComponent(props.instance)+'&list=1',{cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error);historyItems.value=data.items;}catch(e){error.value=e.message;}}
-async function selectHistory(id){if(busy.value)return;submitting.value=true;try{const data=await api('POST',{action:id?'select':'new',id});result.value=data.result;job.value=data.job;goal.value=data.result?.goal||DEFAULT_NAVIGATION_GOAL;draftInitialized=true;draftEdited=false;pendingGoal=null;selection.value=data.selection||selection.value;history.value=false;error.value='';}catch(e){error.value=e.message;}finally{submitting.value=false;}}
+async function selectHistory(id){if(busy.value)return;submitting.value=true;try{const data=await api('POST',{action:id?'select':'new',id});result.value=data.result;job.value=data.job;availability.value=data.availability||availability.value;goal.value=data.result?.goal||DEFAULT_NAVIGATION_GOAL;draftInitialized=true;draftEdited=false;pendingGoal=null;selection.value=data.selection||selection.value;history.value=false;error.value='';}catch(e){error.value=e.message;}finally{submitting.value=false;}}
 async function loadModels(){const version=++catalogVersion;catalogBusy.value=true;try{const r=await fetch('/api/navigation?instance='+encodeURIComponent(props.instance)+'&catalog='+encodeURIComponent(chosenProvider.value));const data=await r.json();if(!r.ok)throw Error(data.error);if(version===catalogVersion){modelItems.value=data.items;catalogNotice.value=data.notice||'';if(modelChoice.value==='__custom__'&&data.items.some(item=>item.id===chosenModel.value))modelChoice.value=chosenModel.value;}}catch(e){if(version===catalogVersion)error.value=e.message;}finally{if(version===catalogVersion)catalogBusy.value=false;}}
 watch(chosenProvider,()=>{if(modelOpen.value){modelItems.value=[];void loadModels();}});
 function chooseModel(){chosenProvider.value=selection.value.provider;chosenModel.value=selection.value.model;modelChoice.value=['same','auto'].includes(selection.value.model)?selection.value.model:'__custom__';modelOpen.value=!modelOpen.value;if(modelOpen.value)void loadModels();}
@@ -95,13 +92,13 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
    <template v-if="result">
     <div class="navigation-result-heading"><small>{{result.inferred?'仮の開発目標（AIの推測・編集できます）':'保存済みの目標'}}</small><h2>{{result.goal}}</h2><small>達成度はAIの推定です。根拠と実際の状態を確認してください。</small></div>
     <div class="navigation-overall">
-     <div class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="scored(overall.progress)?overall.progress:undefined" :aria-valuetext="scored(overall.progress)?overall.progress+'%（評価済み項目の平均・AIの推定）':'未評価'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{scored(overall.progress)?overall.progress:'未評価'}}<small v-if="scored(overall.progress)">%</small></strong></div>
-     <small>{{overall.evaluated}} / {{overall.total}}項目を評価済み<span v-if="overall.evaluated">・評価済み項目の単純平均</span></small>
+     <div class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="scored(overall.progress)?overall.progress:undefined" :aria-valuetext="scored(overall.progress)?overall.progress+'%（AIの工数比率による加重評価）':'未評価'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{scored(overall.progress)?overall.progress:'未評価'}}<small v-if="scored(overall.progress)">%</small></strong></div>
+     <small>AIが見積もった工数比率による総合評価。実測値ではありません。</small><p class="navigation-overall-reason">{{overall.reason}}</p>
     </div>
     <p v-if="!result.items.length">対象の作業項目はありません。次のプロンプト案を確認してください。</p>
     <ol class="navigation-items"><li v-for="item in result.items" :key="item.id">
      <div class="navigation-progress" :style="progressStyle(item.progress)" role="progressbar" :aria-label="item.name" :aria-valuenow="scored(item.progress)?item.progress:undefined" :aria-valuetext="scored(item.progress)?item.progress+'%（AIの推定）':'未評価'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">{{item.name}}</span><strong>{{scored(item.progress)?item.progress:'未評価'}}<small v-if="scored(item.progress)">%</small></strong></div>
-     <p>{{item.reason}}</p>
+     <p>{{item.reason}}</p><div class="navigation-effort"><strong>工数比率 {{item.weight}}%</strong><span>{{item.weightReason}}</span></div>
     </li></ol>
 
    </template>
@@ -168,4 +165,9 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
 .navigation-panel>.navigation-next h2{font-size:13px;margin:0}
 .navigation-panel>.navigation-next .navigation-prompt{min-height:0;overflow:auto;overflow-wrap:anywhere;margin:6px 0;line-height:1.5;font-size:12px}
 .navigation-panel>.navigation-next>small{font-size:10px}
+</style>
+
+<style>
+.navigation-overall-reason{margin:6px 0 0;color:#c5d7e6;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.navigation-effort{display:grid;gap:3px;margin:7px 12px 10px;font-size:11px;line-height:1.5;color:#b8cadc;white-space:pre-wrap;overflow-wrap:anywhere}.navigation-effort strong{color:#d4e8f8}
 </style>

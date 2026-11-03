@@ -40,7 +40,7 @@ const connection = createCoreConnection(project, { target: `http://127.0.0.1:${c
 let aiCalls=0,failNext=false;
 const app = await startDevelopment(project, { connection, navigationOptions:{stateRoot:join(temporary,'navigation-state'),runAgent:async({prompt})=>{
  aiCalls++;if(failNext){failNext=false;await new Promise(r=>setTimeout(r,800));throw Error('表示試験の失敗');}const shape=JSON.parse(prompt.slice(prompt.lastIndexOf('\n')+1).replace(/^出力形式: /,''));
- shape.items=[{id:'one',name:'検索画面の入力を整える',progress:65,reason:'入力欄を確認。空入力の検証を次に行います。'},{id:'two',name:'操作ガイドを整える',progress:20,reason:'既存の章に追記する方針です。'}];shape.nextPrompt='検索画面の空入力とエラー表示を確認し、必要なテストを追加してください。';
+ shape.items=[{id:'one',name:'検索画面の入力を整える',progress:65,reason:'入力欄を確認。空入力の検証を次に行います。'},{id:'two',name:'操作ガイドを整える',progress:20,reason:'既存の章に追記する方針です。'}];shape.schemaVersion=2;shape.items.forEach((item,index)=>{item.weight=[80,20][index];item.weightReason='表示試験用の作業量見積もり';});shape.overall={progress:56,reason:'作業量に基づく加重評価の模擬結果'};shape.nextPrompt='検索画面の空入力とエラー表示を確認し、必要なテストを追加してください。';
  await new Promise(r=>setTimeout(r,1000));return {content:JSON.stringify(shape)};
 }} });
 const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(temporary, 'browser')}`,
@@ -82,7 +82,9 @@ try {
   await until(()=>child(0,`!!document.querySelector('.navigation-display.running')`),'nav busy');
   assert.equal(await child(0,`getComputedStyle(document.querySelector('.navigation-display'),'::before').animationName`),'prompt-reflect');
   await until(()=>child(0,`document.querySelectorAll('.navigation-items .navigation-progress').length===2`),'Navi 1 result');
-  assert.equal(await child(0,`document.querySelector('.navigation-overall [role="progressbar"]').getAttribute('aria-valuenow')`),'43');
+  assert.equal(await child(0,`document.querySelector('.navigation-overall [role="progressbar"]').getAttribute('aria-valuenow')`),'56');
+  assert.equal(await child(0,`document.querySelector('.navigation-overall-reason').textContent`),'作業量に基づく加重評価の模擬結果');
+  assert.ok(await child(0,`document.querySelector('.navigation-effort').textContent.includes('80%')&&document.querySelector('.navigation-effort').textContent.includes('表示試験用の作業量見積もり')`));
   assert.equal(await child(0,`document.querySelector('.navigation-next').parentElement.classList.contains('navigation-panel')`),true);
   const resultLayout=await child(0,`(()=>{const panel=document.querySelector('.navigation-panel'),content=panel.querySelector('.navigation-display'),next=panel.querySelector('.navigation-next'),footer=panel.querySelector('.navigation-model-footer');return {contentBottom:content.getBoundingClientRect().bottom,nextTop:next.getBoundingClientRect().top,nextBottom:next.getBoundingClientRect().bottom,footerTop:footer.getBoundingClientRect().top,footerBottom:footer.getBoundingClientRect().bottom,height:innerHeight};})()`);
   assert.ok(resultLayout.contentBottom<=resultLayout.nextTop+1);assert.ok(resultLayout.nextBottom<=resultLayout.footerTop+1);assert.ok(resultLayout.footerBottom<=resultLayout.height+1);
