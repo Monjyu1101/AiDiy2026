@@ -158,6 +158,11 @@ Thumbs.db
 **/_AIDIY/aidiy_diag/
 _cache/
 .aidiy_cache/
+
+# docs に集約したセルフテスト証拠は、追加分も含めて収録する。
+!/docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/
+!/docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/**
+
 _controls/
 _datas/
 .aidiy_backup/
