@@ -35,7 +35,7 @@ test('ALL起動先: IDEがALL中の実在する画面IDだけを許可する',()
  const source=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('function selectedAllDisplay('),source.indexOf('async function createWindow('));
  const owner={},display={id:17,workArea:{x:-1600,y:0,width:1600,height:900}};let active=true,displays=[display];
- const context={cliConsoleWindow:false,allDisplays:{state:record=>({active:record===owner&&active})},screen:{getAllDisplays:()=>displays}};
+ const context={taskWindows:{},cliConsoleWindow:false,allDisplays:{state:record=>({active:record===owner&&active})},screen:{getAllDisplays:()=>displays}};
  vm.runInNewContext(body+';globalThis.select=selectedAllDisplay;',context);
  assert.equal(context.select(owner,undefined),null);assert.equal(context.select(owner,17),display);
  for(const id of [null,'17',{},18])assert.throws(()=>context.select(owner,id));
@@ -84,7 +84,7 @@ test('Electron生成: 単独Console・IDE子Consoleの双方へ最小寸法を�
   constructor(options){this.options=options;this.webContents={on(){},setWindowOpenHandler(){},async executeJavaScript(){}};}
   once(){} on(){} setBounds(bounds){this.bounds=bounds;} getBounds(){return this.bounds;} setAlwaysOnTop(){} isDestroyed(){return false;} async loadURL(){}
  }
- const context={cliConsoleWindow:false,allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:0,y:0})},reserveConsoleSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}})};
+ const context={taskWindows:{},cliConsoleWindow:false,allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:()=>({workArea:area}),getDisplayNearestPoint:()=>({workArea:area}),getCursorScreenPoint:()=>({x:0,y:0})},reserveConsoleSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}})};
  context.registerWindowPin=()=>{};context.attachWindowMove=()=>{};
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>windowBounds('ide',area),isDestroyed:()=>false},revision:0};
@@ -134,7 +134,7 @@ test('Electron生成: 親IDE側の画面を選び、Code番号・閉鎖後のslo
   once(name,fn){if(name==='closed')this.closed.push(fn);} on(){} setBounds(bounds){this.bounds=bounds;} getBounds(){return this.bounds;} setAlwaysOnTop(){} isDestroyed(){return !!this.destroyed;} async loadURL(){}
   destroy(){this.destroyed=true;for(const fn of this.closed)fn();} isMinimized(){return true;} restore(){} show(){} focus(){}
  }
- const context={cliConsoleWindow:false,allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:bounds=>{matched.push(bounds);return{workArea:secondary};},getDisplayNearestPoint:()=>({workArea:primary}),getCursorScreenPoint:()=>({x:100,y:100})},reserveConsoleSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}}),clearInterval(){},draftRouter:{invalidate(){}},nativePreviewActions:{invalidate(){}},closeChildren(){},closeServer(){}};
+ const context={taskWindows:{},cliConsoleWindow:false,allDisplays:{register(){}},BrowserWindow:Window,windows,windowBounds,windowMinimumSize,screen:{getDisplayMatching:bounds=>{matched.push(bounds);return{workArea:secondary};},getDisplayNearestPoint:()=>({workArea:primary}),getCursorScreenPoint:()=>({x:100,y:100})},reserveConsoleSlot:async()=>({slot:0,close(){}}),quitting:false,join:(...parts)=>parts.join('/'),__dirname:'/fixture',拡大表示:async()=>true,setInterval:()=>({unref(){}}),clearInterval(){},draftRouter:{invalidate(){}},nativePreviewActions:{invalidate(){}},closeChildren(){},closeServer(){}};
  context.registerWindowPin=()=>{};context.attachWindowMove=()=>{};
  vm.runInNewContext(body+';globalThis.create=createWindow;',context);
  const owner={window:{getBounds:()=>({x:-900,y:150,width:700,height:800}),isDestroyed:()=>false},revision:0};

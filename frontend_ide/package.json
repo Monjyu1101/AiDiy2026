@@ -15,7 +15,8 @@
     "taskteam:type-check": "vue-tsc --noEmit -p tsconfig.taskteam.json",
     "task": "node launch.mjs --app task",
     "team": "node launch.mjs --app team",
-    "browser": "node launch.mjs --app browser"
+    "browser": "node launch.mjs --app browser",
+    "navi": "node launch.mjs --app navi"
   },
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",

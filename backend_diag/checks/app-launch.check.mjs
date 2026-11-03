@@ -25,7 +25,7 @@ async function fixture(t){
 test('unconfigured channel apps hidden; missing/relative/file/unknown inputs never launch or check tasks',async t=>{
  const f=await fixture(t);let reads=0;
  const manager=createAppLauncher({chromeInstalled:async()=>true,root:f.root,portStatusFn:async()=>({対象:[]}),taskTeamStatus:async()=>({利用可能:false}),tasks:async()=>{reads++;return [];}});
- assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','console','code','live','chrome','browser']);
+ assert.deepEqual((await manager.catalog()).対象.map(x=>x.id),['avatar','task','team','ide','navi','console','code','live','chrome','browser']);
  for(const id of ['avatar','ide','console','code','live','discord'])for(const path of ['',undefined,'relative',join(f.root,'missing')])await assert.rejects(manager.launch(id,path),{status:400});
  await writeFile(join(f.root,'file'),'x');await assert.rejects(manager.launch('avatar',join(f.root,'file')),{status:400});
  await assert.rejects(manager.launch('arbitrary-command',f.project),{status:400});assert.equal(reads,0);
@@ -131,4 +131,10 @@ test('configured ../ and relative folders resolve against backend_server for val
  await assert.rejects(f.manager.launch('code',(await f.manager.catalog()).起動フォルダ),{status:400});
  // 任意のAPI相対入力を許可する変更ではない。
  await assert.rejects(f.manager.launch('code','../'),{status:400});
+});
+
+test('Navigator is before Console and launches only selected project in a separate window',async t=>{
+ const {起動項目を整列,アプリアイコン}=await import('../ui/src/components/アプリ起動/アプリアイコン.mjs');const f=await fixture(t);
+ const items=起動項目を整列((await f.manager.catalog()).対象);assert.equal(items.findIndex(x=>x.id==='navi')+1,items.findIndex(x=>x.id==='console'));assert.equal(items.find(x=>x.id==='navi').名前,'Navigator');assert.equal(アプリアイコン.navi,'AiDiy_navi.png');
+ await f.manager.launch('navi',f.project);assert.deepEqual(f.calls[0].args,[join(f.root,'frontend_ide','launch.mjs'),'--app','navi','--project',f.project,'--new-window']);assert.equal(f.calls[0].options.cwd,f.project);
 });

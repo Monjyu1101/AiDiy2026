@@ -20,6 +20,7 @@ import { 白うさぎ定義, 黒うさぎ定義 } from './AIチーム_NPC動作_
 import { うさぎ穴定義 } from './AIチーム_NPC動作_うさぎ穴';
 import { 白馬定義, 黒馬定義 } from './AIチーム_NPC動作_馬';
 import type { NPC個体, NPC更新引数, NPC配置, 造形ヘルパー } from './AIチーム_NPC型';
+import { ローポリ調にそろえる } from './AIチーム_造形_共通';
 
 /** 種別 → 動作モジュールの登録表。NPC を増やすときはここへ 1 行追加する */
 const NPC定義一覧 = {
@@ -53,7 +54,10 @@ export const NPCを配置 = <T extends NPC種別>(
 ): NPC個体 => {
   const 定義 = NPC定義一覧[種別];
   const 設定 = { ...定義.既定設定, ...上書き };
-  return 定義.生成(scene, ヘルパー, 配置, 設定 as never);
+  const 個体 = 定義.生成(scene, ヘルパー, 配置, 設定 as never);
+  // 草原の木や建物と同じローポリ調にそろえる（形・大きさ・動きはそのまま）
+  ローポリ調にそろえる(個体.group, ヘルパー);
+  return 個体;
 };
 
 /**

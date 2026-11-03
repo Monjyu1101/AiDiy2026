@@ -8,7 +8,7 @@ const {setWindowBounds}=require('./全画面横断.cjs');
 
 // 保存するのはVRの位置だけ。窓の作り直しを越えて保持し、IDE終了で忘れる。
 function createVRPanelPlacement({windows,screen,isActive,feedback=showWindowMoveFeedback,setBounds=setWindowBounds,now=()=>performance.now(),setTimer=setTimeout,clearTimer=clearTimeout,duration=650}){
- const positions=new WeakMap(),flights=new Map(),kinds=['explorer','panel-routes'];
+ const positions=new WeakMap(),flights=new Map(),kinds=['explorer','panel-routes','panel-navigation'];
  const children=owner=>kinds.map(kind=>[...windows.values()].find(child=>child.owner===owner&&child.kind===kind&&child.shown&&!child.window.isDestroyed())).filter(Boolean);
  function cancel(owner){
   const flight=flights.get(owner);if(!flight)return;

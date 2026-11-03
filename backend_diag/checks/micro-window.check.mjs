@@ -21,23 +21,23 @@ test('透過判定のDOM応答待ちにカーソルが変わったら古い判�
   assert.notEqual(w.ignored,true,'旧位置のfalseで新位置のクリックを透過しない');
  }finally{control.set(false);resolve?.(false);}
 });
-test('有効数に応じて最小半径80から広げ、回転中も40px画像同士が重ならない',()=>{
+test('有効数に応じて最小半径80から広げ、回転中も48pxクリック領域同士が重ならない',()=>{
  let previous=0;
  for(let n=0;n<=32;n++){
   const {半径,幅,内半径,内側数,外側数}=layout.円周配置(n);assert.ok(半径>=80&&半径>=previous);previous=半径;
   assert.equal(幅,2*(半径+38));
   assert.equal(内側数,n>=11?Math.round(n*.4):n);assert.equal(内側数+外側数,n);
-  if(内側数>1)assert.ok(2*内半径*Math.sin(Math.PI/内側数)>=40*Math.SQRT2);
-  if(外側数){assert.ok(半径-内半径>=58);assert.ok(2*半径*Math.sin(Math.PI/外側数)>=40*Math.SQRT2);}
+  if(内側数>1)assert.ok(2*内半径*Math.sin(Math.PI/内側数)>=48*Math.SQRT2);
+  if(外側数){assert.ok(半径-内半径>=70);assert.ok(2*半径*Math.sin(Math.PI/外側数)>=48*Math.SQRT2);}
  }
- assert.equal(layout.円周配置(6).幅,236);assert.equal(layout.円周配置(13).幅,352);
+ assert.equal(layout.円周配置(6).幅,236);assert.equal(layout.円周配置(13).幅,376);
  for(const n of [-1,33,NaN,'13',1.5])assert.equal(layout.円周配置(n),null);
 });
 test('展開中の有効数変更でも画面内に収まり、収納位置と移動量を保持',()=>{
  const {w,control}=fixture();control.set(true);w.bounds={x:1792,y:952,width:128,height:128};
  control.expand(true,6);assert.equal(w.bounds.width,236);
  w.bounds.x-=20;w.bounds.y-=30;
- control.expand(true,13);assert.equal(w.bounds.width,352);assert.ok(w.bounds.x+352<=1920&&w.bounds.y+352<=1080);
+ control.expand(true,13);assert.equal(w.bounds.width,376);assert.ok(w.bounds.x+376<=1920&&w.bounds.y+376<=1080);
  control.expand(true,6);assert.equal(w.bounds.width,236);
  assert.equal(control.expand(true,33),false);assert.equal(w.bounds.width,236);
  control.expand(false);assert.deepEqual(w.bounds,{x:1772,y:922,width:128,height:128});control.set(false);
@@ -60,7 +60,7 @@ test('アイコン化は最前面をロックし、展開・収納・復帰で�
   const {w,pins,control}=fixture(),original=w.getBounds();if(pinned)pins.toggle(w);
   assert.equal(control.expand(true),false);assert.equal(control.set('true'),false);
   control.set(true);assert.equal(w.bounds.x,original.x);assert.equal(w.bounds.y,original.y);assert.equal(w.bounds.width,128);assert.deepEqual(pins.state(w),{pinned:true,locked:true});pins.toggle(w);assert.equal(w.top,true);
-  const center=[w.bounds.x+64,w.bounds.y+64];control.expand(true);assert.equal(w.bounds.width,352);assert.deepEqual([w.bounds.x+176,w.bounds.y+176],center.map(value=>Math.max(176,value)));
+  const center=[w.bounds.x+64,w.bounds.y+64];control.expand(true);assert.equal(w.bounds.width,376);assert.deepEqual([w.bounds.x+188,w.bounds.y+188],center.map(value=>Math.max(188,value)));
   control.expand(false);assert.equal(w.bounds.width,128);control.set(false);assert.deepEqual(w.bounds,original);assert.equal(w.top,pinned);assert.equal(w.resizable,true);assert.equal(pins.state(w).locked,false);
  }
 });
@@ -76,14 +76,14 @@ test('透明部分は背後へ通し、操作対象で解除。復帰後に遅�
 });
 test('画面端の展開は領域内に収まり、通常復帰はフォーム左肩を保持',()=>{
  const {w,control}=fixture();w.bounds={x:1700,y:900,width:800,height:600};w.maximized=true;
- control.set(true);control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.x+352<=1920);assert.ok(w.bounds.y>=0&&w.bounds.y+352<=1080);
+ control.set(true);control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.x+376<=1920);assert.ok(w.bounds.y>=0&&w.bounds.y+376<=1080);
  const origin=w.getBounds();control.set(false);assert.equal(w.maximized,false);assert.equal(w.bounds.x,origin.x);assert.equal(w.bounds.y,origin.y);assert.equal(w.bounds.width,800);
 });
 
 test('四隅では展開だけ内側へ補正し、収納後は元のアイコン位置へ戻る',()=>{
  for(const point of [{x:0,y:0},{x:1792,y:0},{x:0,y:952},{x:1792,y:952}]){
   const {w,control}=fixture();control.set(true);w.bounds={...point,width:128,height:128};const before=w.getBounds();
-  control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.y>=0&&w.bounds.x+352<=1920&&w.bounds.y+352<=1080);
+  control.expand(true);assert.ok(w.bounds.x>=0&&w.bounds.y>=0&&w.bounds.x+376<=1920&&w.bounds.y+376<=1080);
   control.expand(false);assert.deepEqual(w.getBounds(),before);
   control.set(false);
  }
@@ -95,7 +95,7 @@ test('端数DPIの寸法差を補正し、上中央の反復収納と別画面�
  w.setBounds=b=>{w.bounds={...b,height:b.height+1};};
  control.set(true);w.bounds={x:-704,y:0,width:128,height:128};
  for(let i=0;i<5;i++){
-  control.expand(true);assert.deepEqual(w.bounds,{x:-816,y:0,width:352,height:352});
+  control.expand(true);assert.deepEqual(w.bounds,{x:-828,y:0,width:376,height:376});
   control.expand(false);assert.deepEqual(w.bounds,{x:-704,y:0,width:128,height:128});
  }
  control.expand(true);w.bounds.x+=60;w.bounds.y+=40;control.expand(false);
@@ -165,9 +165,9 @@ test('名前の折り返し高さだけ縦に広げ、中央アイコンの位�
  const {w,control}=fixture();assert.equal(control.resizeLabel(54),false);control.set(true);
  const original=w.getBounds();assert.equal(control.resizeLabel(90),true);
  assert.deepEqual(w.bounds,{...original,height:210});
- control.expand(true,13);assert.equal(w.bounds.width,352);
- assert.equal(w.bounds.x+176,Math.max(176,original.x+64));
- assert.equal(w.bounds.y+176,Math.max(176,original.y+64));
+ control.expand(true,13);assert.equal(w.bounds.width,376);
+ assert.equal(w.bounds.x+188,Math.max(188,original.x+64));
+ assert.equal(w.bounds.y+188,Math.max(188,original.y+64));
  assert.equal(control.resizeLabel(18),false);control.expand(false);
  assert.deepEqual(w.bounds,{...original,height:210});
  // 1行の名前は回転枠の下に置くため、収納窓は 112+18+8=138px。

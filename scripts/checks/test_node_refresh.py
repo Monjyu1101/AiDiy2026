@@ -115,6 +115,7 @@ class NodeRefreshTests(unittest.TestCase):
             "frontend_avatar": SimpleNamespace(install_standalone_launcher=Mock(return_value=True)),
             "frontend_ide/host": SimpleNamespace(setup_assets=Mock(return_value=True)),
             "frontend_ide/viewer": SimpleNamespace(install_launcher=Mock(return_value=None)),
+            "frontend_ide/aidiy_navi": SimpleNamespace(setup=Mock(return_value=True)),
             "frontend_ide/aidiy_console": SimpleNamespace(setup=Mock(return_value=True)),
             "frontend_ide/aidiy_task": SimpleNamespace(setup=Mock(return_value=True)),
             "frontend_ide/aidiy_team": SimpleNamespace(setup=Mock(return_value=True)),
@@ -182,7 +183,7 @@ class NodeRefreshTests(unittest.TestCase):
 
     def test_dependency_recovery_keeps_refresh_flags_and_rebuilds(self):
         run = Mock(side_effect=[False, True, True])
-        with patch.object(common, "prepare_electron_binary", return_value=True), patch.object(common, "electron_binary_ready", return_value=True):
+        with patch.object(common, "frontend_dependency_guard", return_value=None), patch.object(common, "prepare_electron_binary", return_value=True), patch.object(common, "electron_binary_ready", return_value=True):
             self.assertTrue(common.setup_dependencies(ROOT, "npm", "fixture", run, update=False))
         self.assertEqual([call.args[0] for call in run.call_args_list], [
             ["npm", "install", "--include=dev", "--no-fund", "--no-audit"],

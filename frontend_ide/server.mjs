@@ -11,6 +11,8 @@ import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { basename,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { reserveNavigationSlot } from './ファイル機能/navigation-slot.mjs';
+import { createNavigationInstances } from './ファイル機能/navigation.mjs';
 import { createAISearch } from './ファイル機能/ai-search.mjs';
 import { createFileAnalysis } from './ファイル機能/file-analysis.mjs';
 import { startTerminal } from './aidiy_console/terminal.mjs';
@@ -19,8 +21,8 @@ import { validateCliOptions, resolveCliLaunch } from './aidiy_console/cli-launch
 import { createFileHistory } from './ファイル機能/file-history.mjs';
 import { catppuccinAsset } from './src/components/ファイル閲覧/ファイルアイコン.js';
 const require=createRequire(import.meta.url),root=fileURLToPath(new URL('.',import.meta.url)),vscodeRoot=fileURLToPath(new URL('./host/',import.meta.url));
-export async function startDevelopment(project,{kind='ide',linked=false,projectFixed=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,fileAnalysisOptions,explorerOptions}={}){
- if(!['code','live','ide','console','task','team','browser'].includes(kind))throw Error('アプリはcode / live / ide / console / task / team / browserから指定してください。');
+export async function startDevelopment(project,{kind='ide',linked=false,projectFixed=false,port=0,strict=false,offline=false,provider,model,cli,cliAutoApprove=false,onCliStarted,onCliAbandoned,autoConnect=false,env=process.env,connection,aiSearchOptions,navigationOptions,fileAnalysisOptions,explorerOptions}={}){
+ if(!['code','live','ide','console','task','team','browser','navi'].includes(kind))throw Error('アプリはcode / live / ide / console / task / team / browser / naviから指定してください。');
  validateCliOptions(kind,{cli,cliAutoApprove,provider,model});
  const cliLaunch=cli?await resolveCliLaunch(cli,{autoApprove:cliAutoApprove,env}):undefined;
  const taskTeam=['task','team'].includes(kind);
@@ -28,24 +30,29 @@ export async function startDevelopment(project,{kind='ide',linked=false,projectF
  const taskTeamProxy=taskTeam?createTaskTeamProxy(root,project,{projectFixed}):undefined;
  const backend=coreTarget(root,project);
  const standalone={active:true,mode:offline?'offline':'online',connected:false,startedAt:Date.now(),backend,project:{name:basename(project),path:project}};
- connection??=['ide','browser'].includes(kind)?createCoreConnection(project,{keepActive:kind==='browser'}):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
- if(kind==='browser')void connection.connect();
+ connection??=['ide','browser','navi'].includes(kind)?createCoreConnection(project,{keepActive:kind!=='ide'}):{state:()=>standalone,close(){standalone.active=false;},connect:async()=>standalone,disconnect:()=>standalone,offline:()=>standalone};
+ if(kind==='browser'||kind==='navi'&&!offline)void connection.connect();
+ if(kind==='navi'&&offline)connection.offline();
  const files={'/':[taskTeam?'taskteam.html':'index.html','text/html; charset=utf-8'],'/development/app.js':['app.js','text/javascript; charset=utf-8'],'/development/app.css':['app.css','text/css; charset=utf-8'],'/development/AiDiy.png':['AiDiy.png','image/png'],'/development/sending.png':['sending.png','image/png'],'/development/abort.png':['abort.png','image/png'],'/development/speaker.png':['speaker.png','image/png'],'/development/microphone.png':['microphone.png','image/png'],'/development/THIRD_PARTY_NOTICES.txt':['THIRD_PARTY_NOTICES.txt','text/plain; charset=utf-8'],'/development/LICENSE':['LICENSE','text/plain; charset=utf-8']};
  files['/development/taskteam.js']=['taskteam.js','text/javascript; charset=utf-8'];
  files['/development/taskteam.css']=['taskteam.css','text/css; charset=utf-8'];
  const aiSearch=createAISearch(project,{...aiSearchOptions,state:connection.state});
+ let navigationSlot;
+ const navigation=createNavigationInstances(project,{...navigationOptions,instancePrefix:kind==='navi'?'standalone-':'',state:connection.state});
  const fileAnalysis=createFileAnalysis(project,{...fileAnalysisOptions,state:connection.state});
  const fileHistory=createFileHistory(project,{state:connection.state});
  const app=await startServer(project,port,{strict,env,connection,explorerOptions,
   requestHandler:async(req,res,url)=>{
    // Browser単独画面にはプロジェクト操作・Console/AI起動APIを公開しない。
    if(kind==='browser'&&url.pathname.startsWith('/api/')&&url.pathname!=='/api/connection'){res.writeHead(url.pathname.startsWith('/api/connection/')?405:404).end();return true;}
+   if(kind==='navi'&&url.pathname.startsWith('/api/')&&!['/api/navigation','/api/connection'].includes(url.pathname)){res.writeHead(404).end();return true;}
    if(taskTeamProxy && await taskTeamProxy.handle(req,res,url))return true;
+   if(['ide','navi'].includes(kind)&&await navigation.handle(req,res,url))return true;
    if(kind==='ide'&&await aiSearch.handle(req,res,url))return true;
    if(kind==='ide'&&await fileAnalysis.handle(req,res,url))return true;
    if(kind==='ide'&&await fileHistory.handle(req,res,url))return true;
    if(url.pathname==='/development/config'){
-    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,...(cliLaunch?{cliName:cliTitleName(cliLaunch)}:{}),...(taskTeam?{taskTeamBase:'/taskteam-api',projectFixed,fixedProject:projectFixed?project:undefined}:{}),icon:'/development/AiDiy.png'}));return true;
+    res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify({kind,linked,host:false,project:standalone.project,navigationInstance:navigationSlot?.instance,...(cliLaunch?{cliName:cliTitleName(cliLaunch)}:{}),...(taskTeam?{taskTeamBase:'/taskteam-api',projectFixed,fixedProject:projectFixed?project:undefined}:{}),icon:'/development/AiDiy.png'}));return true;
    }
    const iconAsset=url.pathname.startsWith('/development/')?catppuccinAsset(url.pathname.slice('/development/'.length)):undefined;
    const asset=Object.hasOwn(files,url.pathname)?files[url.pathname]:iconAsset;if(!asset){if(taskTeam){res.writeHead(404).end();return true;}return false;}
@@ -63,7 +70,8 @@ export async function startDevelopment(project,{kind='ide',linked=false,projectF
    return bundle.ライブ起動(vscodeRoot,backend,false,folder,settings,undefined,autoConnect);
   })
  });
- app.server.once('close',()=>{taskTeamProxy?.close();aiSearch.close();fileAnalysis.close();});
- const close=app.close;app.close=async()=>{taskTeamProxy?.close();aiSearch.close();fileAnalysis.close();await close();};
+ if(kind==='navi'){try{navigationSlot=await reserveNavigationSlot(project);}catch(error){await app.close();throw error;}}
+ app.server.once('close',()=>{void navigationSlot?.close();taskTeamProxy?.close();aiSearch.close();navigation.close();fileAnalysis.close();});
+ const close=app.close;app.close=async()=>{await navigationSlot?.close();taskTeamProxy?.close();aiSearch.close();navigation.close();fileAnalysis.close();await close();};
  return app;
 }

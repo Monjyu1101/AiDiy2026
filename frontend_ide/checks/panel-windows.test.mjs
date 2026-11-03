@@ -50,7 +50,7 @@ function fixture({all=false,area={x:0,y:0,width:1920,height:1040}}={}){
 }
 test('ALL中の新規パネルは仮想領域でなく操作画面へ収め、元画面のキャプチャを要求しない',async()=>{
  const area={x:-1280,y:350,width:1280,height:984},f=fixture({all:true,area});
- for(const kind of ['panel-viewer','panel-routes','explorer']){
+ for(const kind of ['panel-viewer','panel-routes','panel-navigation','explorer']){
   const request=await f.controller.prepare(f.event,{left:9000,top:-9000,width:8000,height:4000},kind,{left:9000,top:-9000,width:8000,height:4000});assert.equal(request.ok,true);assert.equal(request.preview,undefined);
   const details={url:'about:blank',frameName:request.name},bounds=f.controller.open(f.owner,details).overrideBrowserWindowOptions;
   assert.ok(bounds.x>=area.x&&bounds.y>=area.y&&bounds.x+bounds.width<=area.x+area.width&&bounds.y+bounds.height<=area.y+area.height);assert.ok(bounds.width<=680);
@@ -143,7 +143,7 @@ test('共通タイトルバー: 所有する別窓だけ操作し、別親・古
 });
 
 test('別窓ピン: Explorer・比較Viewer・軌跡はIDE由来ON、OFF後の再表示・高さ変更で再固定しない',async()=>{
- for(const kind of ['explorer','panel-viewer','panel-routes']){
+ for(const kind of ['explorer','panel-viewer','panel-routes','panel-navigation']){
   const f=fixture(),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
   f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
   assert.deepEqual(f.controller.action(f.event,request.name,'pin-state'),{pinned:true,locked:false});assert.equal(child.parent,null);
@@ -158,7 +158,7 @@ test('別窓ピン: Explorer・比較Viewer・軌跡はIDE由来ON、OFF後の�
 });
 
 test('VR中に作成する全別窓はON固定、軌跡の最小化・最大化は拒否する',async()=>{
- for(const kind of ['explorer','panel-viewer','panel-routes']){
+ for(const kind of ['explorer','panel-viewer','panel-routes','panel-navigation']){
   const f=fixture({all:true}),request=await f.controller.prepare(f.event,f.rect,kind),details={url:'about:blank',frameName:request.name};
   f.controller.open(f.owner,details);const child=new f.Window();f.controller.created(f.owner,child,details);
   assert.deepEqual(f.controller.action(f.event,request.name,'toggle-pin'),{pinned:true,locked:true});assert.equal(child.top,true);assert.equal(child.parent,null);

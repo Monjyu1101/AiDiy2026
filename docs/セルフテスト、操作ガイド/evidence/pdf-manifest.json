@@ -1,6 +1,6 @@
 {
-  "count": 22,
-  "pages": 371,
+  "count": 23,
+  "pages": 383,
   "generation": "docs/セルフテスト、操作ガイド/_tools/総合テストPDF.mjs",
   "files": [
     {
@@ -156,6 +156,13 @@
       "sha256": "00634f987ea45af48aa6c120355a774bdc611a7c6ea40b32deea5aad35f92ff1",
       "source_sha256": "e473817db8e0bb8a8c888401b04fd89383298fc2af3d0b4ca447f1b5dbb6aae1",
       "review": "2026-11-03 Core再起動結果の追記末尾を目視。欠け・重なりなし。"
+    },
+    {
+      "file": "セルフテスト,aidiy_navi,操作編.pdf",
+      "pages": 12,
+      "sha256": "a09531a03146e8981921f12613f2000aec8a6cd5c6344e98fe080f681ffe5186",
+      "source_sha256": "c90982d50381f33f016216a9eeac475ad17f57bab3de5291616f876b26e31e3f",
+      "review": "長押し移動の図202と追記末尾を目視確認。文字欠け・重なりなし。"
     }
   ],
   "visual_review": "2026-11-03: 全22冊の追記を描画して目視確認。PDFテキスト抽出の日本語判定は使用せず、実表示で確認。"

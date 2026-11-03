@@ -548,3 +548,7 @@ npm --prefix backend_diag/ui run check
 生成・AI系の8項目は説明APIの疎通確認です。生成やAI実行の成功とは区別します。他の項目はモニター数、SELECT 1、ログ件数、構文、差分件数、OBSシーン数、短い無音処理、通知音、要員数、ウィンドウ数、専用Chromeの起動を確認します。PostgreSQLの接続設定やOBSの稼働など、必要な実行条件を満たさなければ失敗になります。
 
 Toolsの一括試験は、通常タブの「全テスト」および `--headless` とは独立しています。詳細は [AIモデル・Tools編](../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,AIモデル・Tools編.md) を参照してください。
+
+### Navigator用のread-onlyモデル候補
+
+モデル情報の通常書出しは、Code一覧から `navi_models_info.json` も同じ `_AIDIY/aidiy_diag/` へ生成します。Hermes・Codex CLI・Copilot CLIのみを掲載し、Hermesから外部CLIへ転送する候補は除きます。Code用一覧は変更しません。形式1/readOnlyのメタ情報を持ちますが、候補掲載は認証や実行許可の証明ではありません。Navigatorは実行時にもread-onlyを強制し、欠損・旧形式・破損時は更新案内を表示します。Tools接続やモデルへの試験送信は一覧読込に必要ありません。

@@ -16,8 +16,10 @@ import {
   type NPC配置,
   type 手動操作状態,
   type 造形ヘルパー,
+  乱数を作る,
   範囲乱数,
 } from './AIチーム_NPC型';
+import { ローポリ部品, 色を混ぜる, 部品を結合, 配置行列, 頂点色マテリアル } from './AIチーム_造形_共通';
 
 export type 四足状態 = '歩く' | 'やすむ' | '眠る';
 
@@ -152,86 +154,104 @@ const 寝息テクスチャを作る = (
   return texture;
 };
 
-/** 四足の体（胴・頭・脚・尾）を組む */
+/** 四足の体（胴・頭・脚・尾）を組む。動かすのは各 Group で、形はローポリ部品を結合したメッシュ */
 const 体を組む = (
   設定: 四足設定,
   ヘルパー: 造形ヘルパー,
 ): { group: THREE.Group; 部位: 四足部位 } => {
-  const { ジオメトリ, マテリアル } = ヘルパー;
-  const 体材 = マテリアル(設定.体色, { roughness: 0.85, metalness: 0.02 });
-  const 腹材 = マテリアル(設定.腹色, { roughness: 0.85, metalness: 0.02 });
-  const 鼻材 = マテリアル(設定.鼻色, { roughness: 0.6, metalness: 0.02 });
-  const 目材 = マテリアル(0x23303d, { roughness: 0.3, metalness: 0.05 });
+  const 材 = 頂点色マテリアル(ヘルパー, { roughness: 0.85 });
+  const 乱数 = 乱数を作る(Math.round(設定.体長 * 1000 + 設定.体色));
+  const 縞あり = 設定.耳形 === '立ち耳';
+  const h = 設定.頭径;
+  const 濃い体色 = 色を混ぜる(設定.体色, 0x000000, 0.22);
+  const メッシュ = (部品: THREE.BufferGeometry[]) =>
+    new THREE.Mesh(ヘルパー.ジオメトリ(部品を結合(部品)), 材);
+  const 玉 = (半径: number, 位置: [number, number, number], 色: THREE.ColorRepresentation | [THREE.ColorRepresentation, THREE.ColorRepresentation], 拡大: number | [number, number, number] = 1, 詳細 = 1) =>
+    ローポリ部品(new THREE.IcosahedronGeometry(半径, 詳細), 乱数, {
+      変換: 配置行列(位置, [0, 0, 0], 拡大),
+      色,
+      ばらつき: 0.04,
+    });
 
   const group = new THREE.Group();
 
-  // 胴（脚の付け根の高さに置き、伏せるときはこの Group を下げる）
+  // 胴（脚の付け根の高さに置き、伏せるときはこの Group を下げる）。
+  // 背は体色、下側は腹色。ネコは背に縞を入れる
   const 胴 = new THREE.Group();
   胴.position.y = 設定.脚長 + 設定.体高 * 0.5;
-  const 胴体 = new THREE.Mesh(
-    ジオメトリ(new THREE.CapsuleGeometry(設定.体高 * 0.5, 設定.体長 - 設定.体高, 4, 12)),
-    体材,
+  胴.add(
+    メッシュ([
+      ローポリ部品(new THREE.CapsuleGeometry(設定.体高 * 0.5, 設定.体長 - 設定.体高, 3, 9), 乱数, {
+        変換: 配置行列([0, 0, 0], [Math.PI / 2, 0, 0], [設定.体幅 / 設定.体高, 1, 1]),
+        面色: (t, _法線, _乱数, 中心) => {
+          if (中心.y < -設定.体高 * 0.14) return 設定.腹色;
+          if (縞あり && 中心.y > 0 && Math.sin(中心.z * 38) > 0.55) return 濃い体色;
+          return 色を混ぜる(濃い体色, 設定.体色, Math.min(1, t * 1.6));
+        },
+        ばらつき: 0.04,
+      }),
+      // 胸のふくらみ
+      玉(設定.体高 * 0.36, [0, -設定.体高 * 0.08, -設定.体長 * 0.36], 設定.腹色, [1, 1, 0.9]),
+    ]),
   );
-  胴体.rotation.x = Math.PI / 2;
-  胴体.scale.set(設定.体幅 / 設定.体高, 1, 1);
-  胴.add(胴体);
-  const 腹 = new THREE.Mesh(
-    ジオメトリ(new THREE.CapsuleGeometry(設定.体高 * 0.34, 設定.体長 - 設定.体高, 4, 10)),
-    腹材,
-  );
-  腹.rotation.x = Math.PI / 2;
-  腹.position.y = -設定.体高 * 0.24;
-  腹.scale.set((設定.体幅 / 設定.体高) * 0.9, 1, 0.92);
-  胴.add(腹);
   group.add(胴);
 
   // 頭（胴の前側 = -z 方向）
   const 頭 = new THREE.Group();
-  頭.position.set(0, 設定.体高 * 0.42, -(設定.体長 * 0.5 + 設定.頭径 * 0.35));
-  const 顔 = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(設定.頭径, 16, 12)), 体材);
-  顔.scale.set(1, 0.94, 1.02);
-  頭.add(顔);
-  const 口元 = new THREE.Mesh(
-    ジオメトリ(new THREE.SphereGeometry(設定.頭径 * 0.44, 12, 10)),
-    腹材,
-  );
-  口元.position.set(0, -設定.頭径 * 0.3, -設定.頭径 * 0.66);
-  口元.scale.set(0.95, 0.72, 1.1);
-  頭.add(口元);
-  const 鼻 = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(設定.頭径 * 0.16, 8, 6)), 鼻材);
-  鼻.position.set(0, -設定.頭径 * 0.22, -設定.頭径 * 1.16);
-  頭.add(鼻);
-  const 目形 = ジオメトリ(new THREE.SphereGeometry(設定.頭径 * 0.13, 8, 6));
-  const 左目 = new THREE.Mesh(目形, 目材);
-  左目.position.set(-設定.頭径 * 0.42, 設定.頭径 * 0.18, -設定.頭径 * 0.74);
-  const 右目 = new THREE.Mesh(目形, 目材);
-  右目.position.set(設定.頭径 * 0.42, 設定.頭径 * 0.18, -設定.頭径 * 0.74);
-  頭.add(左目, 右目);
-
-  if (設定.耳形 === '立ち耳') {
-    const 耳形 = ジオメトリ(new THREE.ConeGeometry(設定.頭径 * 0.42, 設定.頭径 * 0.72, 4));
-    [-1, 1].forEach((向き) => {
-      const 耳 = new THREE.Mesh(耳形, 体材);
-      耳.position.set(向き * 設定.頭径 * 0.55, 設定.頭径 * 0.78, 設定.頭径 * 0.1);
-      耳.rotation.z = 向き * 0.24;
-      頭.add(耳);
-    });
-  } else {
-    const 耳形 = ジオメトリ(new THREE.SphereGeometry(設定.頭径 * 0.44, 10, 8));
-    [-1, 1].forEach((向き) => {
-      const 耳 = new THREE.Mesh(耳形, 体材);
-      耳.position.set(向き * 設定.頭径 * 0.82, 設定.頭径 * 0.32, 設定.頭径 * 0.05);
-      耳.scale.set(0.42, 1.05, 0.7);
-      耳.rotation.z = 向き * 0.3;
-      頭.add(耳);
-    });
-  }
+  頭.position.set(0, 設定.体高 * 0.42, -(設定.体長 * 0.5 + h * 0.35));
+  const 頭部品: THREE.BufferGeometry[] = [
+    玉(h, [0, 0, 0], [濃い体色, 設定.体色], [1, 0.94, 1.02]),
+    玉(h * 0.44, [0, -h * 0.3, -h * 0.66], 設定.腹色, [0.95, 0.72, 1.1]),
+    玉(h * 0.17, [0, -h * 0.2, -h * 1.15], 設定.鼻色, [1.3, 0.8, 1], 0),
+  ];
+  [-1, 1].forEach((向き) => {
+    頭部品.push(
+      玉(h * 0.13, [向き * h * 0.42, h * 0.18, -h * 0.74], 0x23303d, [1, 1.15, 0.8]),
+      玉(h * 0.045, [向き * h * 0.42 + h * 0.04, h * 0.24, -h * 0.84], 0xffffff, 1, 0),
+    );
+    if (設定.耳形 === '立ち耳') {
+      // 三角の耳と、内側の桃色
+      頭部品.push(
+        ローポリ部品(new THREE.ConeGeometry(h * 0.42, h * 0.72, 4), 乱数, {
+          変換: 配置行列([向き * h * 0.55, h * 0.78, h * 0.1], [0, Math.PI / 4, 向き * 0.24]),
+          色: [濃い体色, 設定.体色],
+        }),
+        ローポリ部品(new THREE.ConeGeometry(h * 0.24, h * 0.46, 4), 乱数, {
+          変換: 配置行列([向き * h * 0.53, h * 0.74, -h * 0.02], [0, Math.PI / 4, 向き * 0.24]),
+          色: 0xf2b8c0,
+        }),
+      );
+      // ひげ（3 本ずつ）
+      [-0.08, 0, 0.08].forEach((傾き) => {
+        const 根元: [number, number, number] = [向き * h * 0.3, -h * 0.3, -h * 0.9];
+        const 長さ = h * 0.9;
+        const 方向 = new THREE.Vector3(向き, 傾き * 3, -0.15).normalize();
+        const 中点 = new THREE.Vector3(...根元).addScaledVector(方向, 長さ / 2);
+        頭部品.push(
+          ローポリ部品(new THREE.CylinderGeometry(h * 0.012, h * 0.012, 長さ, 3), 乱数, {
+            変換: new THREE.Matrix4().compose(
+              中点,
+              new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), 方向),
+              new THREE.Vector3(1, 1, 1),
+            ),
+            色: 0xf7f3ea,
+          }),
+        );
+      });
+    } else {
+      // 垂れ耳（体色より少し濃い）
+      頭部品.push(
+        ローポリ部品(new THREE.IcosahedronGeometry(h * 0.44, 1), 乱数, {
+          変換: 配置行列([向き * h * 0.82, h * 0.26, h * 0.05], [0, 0, 向き * 0.3], [0.42, 1.1, 0.72]),
+          色: [色を混ぜる(設定.体色, 0x000000, 0.35), 濃い体色],
+        }),
+      );
+    }
+  });
+  頭.add(メッシュ(頭部品));
   胴.add(頭);
 
-  // 脚（前左・前右・後左・後右の順。Group を回して振る）
-  const 脚形 = ジオメトリ(
-    new THREE.CapsuleGeometry(設定.脚長 * 0.19, 設定.脚長 * 0.72, 4, 8),
-  );
+  // 脚（前左・前右・後左・後右の順。Group を回して振る）。足先は腹色の靴下
   const 脚: THREE.Group[] = [];
   const 前後 = [-(設定.体長 * 0.3), 設定.体長 * 0.3];
   const 左右 = [-(設定.体幅 * 0.42), 設定.体幅 * 0.42];
@@ -239,16 +259,16 @@ const 体を組む = (
     左右.forEach((ox) => {
       const 脚Group = new THREE.Group();
       脚Group.position.set(ox, -設定.体高 * 0.44, oz);
-      const 本体 = new THREE.Mesh(脚形, 体材);
-      本体.position.y = -設定.脚長 * 0.42;
-      脚Group.add(本体);
-      const 足 = new THREE.Mesh(
-        ジオメトリ(new THREE.SphereGeometry(設定.脚長 * 0.2, 8, 6)),
-        腹材,
+      脚Group.add(
+        メッシュ([
+          ローポリ部品(
+            new THREE.CylinderGeometry(設定.脚長 * 0.2, 設定.脚長 * 0.15, 設定.脚長 * 0.82, 6, 1),
+            乱数,
+            { 変換: 配置行列([0, -設定.脚長 * 0.41, 0]), 色: [設定.体色, 濃い体色], ばらつき: 0.04 },
+          ),
+          玉(設定.脚長 * 0.2, [0, -設定.脚長 * 0.82, -設定.脚長 * 0.03], 設定.腹色, [1, 0.7, 1.25]),
+        ]),
       );
-      足.position.y = -設定.脚長 * 0.82;
-      足.scale.set(1, 0.7, 1.2);
-      脚Group.add(足);
       胴.add(脚Group);
       脚.push(脚Group);
     });
@@ -261,18 +281,16 @@ const 体を組む = (
   const 尾長 = 設定.体長 * 0.42;
   const 尾軸 = new THREE.Group();
   尾軸.rotation.x = 設定.尾基準角;
-  const 尾本体 = new THREE.Mesh(
-    ジオメトリ(new THREE.CapsuleGeometry(設定.体高 * 0.1, 尾長, 4, 8)),
-    体材,
+  尾軸.add(
+    メッシュ([
+      ローポリ部品(new THREE.CylinderGeometry(設定.体高 * 0.07, 設定.体高 * 0.11, 尾長, 6, 3), 乱数, {
+        変換: 配置行列([0, 尾長 * 0.5, 0]),
+        面色: (t) => (縞あり && Math.sin(t * 18) > 0.4 ? 濃い体色 : 設定.体色),
+        ばらつき: 0.04,
+      }),
+      玉(設定.体高 * 0.1, [0, 尾長 + 設定.体高 * 0.03, 0], 縞あり ? 濃い体色 : 設定.腹色),
+    ]),
   );
-  尾本体.position.y = 尾長 * 0.5;
-  尾軸.add(尾本体);
-  const 尾先 = new THREE.Mesh(
-    ジオメトリ(new THREE.SphereGeometry(設定.体高 * 0.11, 8, 6)),
-    腹材,
-  );
-  尾先.position.y = 尾長 + 設定.体高 * 0.06;
-  尾軸.add(尾先);
   尾.add(尾軸);
   胴.add(尾);
 

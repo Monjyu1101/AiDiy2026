@@ -24,7 +24,7 @@ AI CLI ツール導入）のみこのスクリプトが直接担当し、フォ�
 - frontend_web/_setup.py     フロントエンド(Web)
 - frontend_avatar/_setup.py  フロントエンド(Avatar)
 - command_hermes/_setup.py   コマンド(hermes)
-- frontend_ide/_setup.py     IDE群(Console / Code / Live / IDE / Task / Team)
+- frontend_ide/_setup.py     IDE群(Navigator / Console / Code / Live / IDE / Task / Team)
 - frontend_channels/_setup.py フロントエンド(Discord、任意)
 - frontend_channels/slack/_setup.py フロントエンド(Slack、任意)
 
@@ -750,7 +750,7 @@ def collect_setup_choices() -> dict | None:
     choices["web"] = ask_yes_no("Web のセットアップを実行しますか？", default="y")
     choices["avatar"] = ask_yes_no("Avatar のセットアップを実行しますか？", default="y")
     choices["hermes"] = ask_yes_no("Hermes のセットアップを実行しますか？", default="y")
-    choices["ide"] = ask_yes_no("Console / Code / Live / IDE / Task / Team のセットアップを実行しますか？", default="y")
+    choices["ide"] = ask_yes_no("Navigator / Console / Code / Live / IDE / Task / Team のセットアップを実行しますか？", default="y")
     choices["discord"] = ask_yes_no("Discord のセットアップを実行しますか？", default="y")
     choices["slack"] = ask_yes_no("Slack のセットアップを実行しますか？", default="y")
 
@@ -785,7 +785,7 @@ def check_refresh_node_runtime(version: str) -> bool:
 def setup_node_refresh() -> list[str]:
     """依存同期・既存ビルド・ランチャー再配置のみ。初期設定や診断は実行しない。"""
     print_header("Node.js系の再ビルド")
-    print_info("対象: Diag / Web / Avatar / Console / Code / Live / IDE / Task / Team / Discord")
+    print_info("対象: Diag / Web / Avatar / Navigator / Console / Code / Live / IDE / Task / Team / Discord")
     print_info("依存同期 / 再ビルド / 起動コマンド登録")
     print_info("Python環境・モデル・共通設定・グローバルCLIは変更しません。")
     node_version = get_node_version()
@@ -835,6 +835,7 @@ def setup_node_refresh() -> list[str]:
         ("Code / Live / IDE: ビルド・配置", lambda: _load_folder_module("frontend_ide/host").setup_assets(npm)),
         ("IDE Viewer: 依存", lambda: dependencies("frontend_ide/viewer", electron=True)),
         ("IDE: aidiy_ide", lambda: _load_folder_module("frontend_ide/viewer").install_launcher(BASE_DIR / "frontend_ide/viewer")),
+        ("Navigator: aidiy_navi", lambda: _load_folder_module("frontend_ide/aidiy_navi").setup()),
         ("Console: aidiy_console", lambda: _load_folder_module("frontend_ide/aidiy_console").setup()),
         ("Task: aidiy_task", lambda: _load_folder_module("frontend_ide/aidiy_task").setup()),
         ("Team: aidiy_team", lambda: _load_folder_module("frontend_ide/aidiy_team").setup()),
@@ -867,6 +868,7 @@ def setup_launchers_only() -> list[str]:
         ('Diag', lambda: _load_folder_module('backend_diag').setup(desktop=False)),
         ('Avatar', lambda: _load_folder_module('frontend_avatar').install_standalone_launcher()),
         ('Hermes', lambda: _load_folder_module('command_hermes').install_standalone_launcher()),
+        ('Navigator', lambda: _load_folder_module('frontend_ide/aidiy_navi').setup()),
         ('Console', lambda: _load_folder_module('frontend_ide/aidiy_console').setup()),
         ('Code / Live', lambda: _load_folder_module('frontend_ide/host').install_standalone_launcher()),
         ('IDE', lambda: _load_folder_module('frontend_ide/viewer').install_launcher(BASE_DIR / 'frontend_ide/viewer')),
@@ -893,6 +895,7 @@ def print_app_launch_commands():
         ('Avatar', 'aidiy_avatar （または cd frontend_avatar && npm run dev）'),
         ('Diag', 'aidiy_diag （ブラウザ版: aidiy_diag --browser）'),
         ('Hermes', 'aidiy_hermes'),
+        ('Navigator', 'aidiy_navi'),
         ('Console', 'aidiy_console'),
         ('Task', 'aidiy_task'),
         ('Team', 'aidiy_team'),
@@ -926,7 +929,7 @@ def main():
     print_info("  6. Web")
     print_info("  7. Avatar")
     print_info("  8. Hermes")
-    print_info("  9. Console / Code / Live / IDE / Task / Team")
+    print_info("  9. Navigator / Console / Code / Live / IDE / Task / Team")
     print_info(" 10. Discord")
     print_info(" 11. Slack")
     print_info("外部チャンネル: Discord / Slack")
@@ -1111,12 +1114,12 @@ def main():
     print()
     if choices.get("ide"):
         if not _load_folder_module("frontend_ide").setup(choices):
-            error_locations.append("Console / Code / Live / IDE / Task / Team")
+            error_locations.append("Navigator / Console / Code / Live / IDE / Task / Team")
             if not continue_on_error:
                 print_setup_summary(error_locations)
                 sys.exit(1)
     else:
-        print_warning("Console / Code / Live / IDE / Task / Team のセットアップをスキップしました。")
+        print_warning("Navigator / Console / Code / Live / IDE / Task / Team のセットアップをスキップしました。")
 
     print()
     if choices.get("discord"):

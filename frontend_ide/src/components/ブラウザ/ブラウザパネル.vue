@@ -82,7 +82,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
    <input v-model="address" :disabled="!page.available" aria-label="URLまたは検索語" placeholder="URLまたはGoogleで検索" spellcheck="false" @focus="editing=true" @blur="editing=false">
    <button type="submit" :disabled="!page.available">開く</button>
   </form>
-  <p class="browser-page-title" :title="page.title">{{ page.loading?'読み込み中…':page.title||'Browser' }}<span v-if="page.session"> · session={{ page.session }}</span></p>
+  <p class="browser-page-title" :class="{'browser-loading':page.loading&&!page.error}" :title="page.title" role="status" :aria-busy="page.loading&&!page.error">{{ page.loading&&!page.error?'Loading…':page.title||'Browser' }}<span v-if="page.session"> · session={{ page.session }}</span></p>
   <p v-if="error||page.error" class="error browser-error" role="status">{{ error||page.error }}</p>
   </div>
   <div v-if="!headerOnly" ref="surface" class="browser-surface"></div>
@@ -115,6 +115,7 @@ onBeforeUnmount(()=>{disposed=true;stop();stopFrame();stopDraft();if(props.heade
 .browser-toolbar{display:flex;align-items:center;gap:5px;padding:7px 9px;border-bottom:1px solid #2c4055;flex:none}
 .browser-toolbar button{padding:5px 9px;flex:none}.browser-toolbar input{flex:1;min-width:60px;background:#080f1b;color:#e2ecf8;border:1px solid #375067;border-radius:3px;padding:6px 9px;font:inherit}
 .browser-page-title{margin:0;padding:3px 10px;font-size:11px;color:#9eb4c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.browser-page-title.browser-loading{color:#fff;background:#17334b;font-weight:600}
 .browser-error{margin:0;padding:6px 10px;flex:none}.browser-surface{flex:1;min-height:0}
 /* 幅800 DIPを高倍率で使う時も、操作列を切らず高さの測定でnative窓へ返す。 */
 @container browser-header (max-width:640px){

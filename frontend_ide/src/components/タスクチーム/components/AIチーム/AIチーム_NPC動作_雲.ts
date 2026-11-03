@@ -37,7 +37,7 @@ export const 雲既定設定: 雲設定 = {
   流れ速度: 0.4,
   折返しX: 86,
   色: 0xffffff,
-  不透明度: 0.9,
+  不透明度: 1,
 };
 
 export const 雲定義: NPC定義<雲設定> = {
@@ -45,11 +45,15 @@ export const 雲定義: NPC定義<雲設定> = {
   既定設定: 雲既定設定,
   生成: (scene, ヘルパー, 配置, 設定): NPC個体 => {
     const 乱数 = 乱数を作る(配置.種 ?? 1);
+    // 半透明の球を重ねると重なり順でちらつくので、不透明度が 1 未満のときだけ透かす。
+    // 影の側も白く見えるよう、ほんのり自発光させる
     const 雲材 = new THREE.MeshStandardMaterial({
       color: 設定.色,
       roughness: 1,
       metalness: 0,
-      transparent: true,
+      emissive: 設定.色,
+      emissiveIntensity: 0.35,
+      transparent: 設定.不透明度 < 1,
       opacity: 設定.不透明度,
     });
     ヘルパー.マテリアル登録(雲材);

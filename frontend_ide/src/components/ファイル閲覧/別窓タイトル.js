@@ -15,7 +15,7 @@ export function mountPanelTitle(host, child, owner, title, kind, { restore } = {
   if (kind === 'panel-routes') host.append(container);
   else host.prepend(container);
   const state = reactive({ connected: false, mode: '', hideClose: false });
-  const preserveDuringVR = kind === 'explorer' || kind === 'panel-routes';
+  const preserveDuringVR = kind === 'explorer' || kind === 'panel-routes' || kind === 'panel-navigation';
   const ide = owner.document.querySelector('.development-app.ide');
   const source = owner.document.querySelector('.development-app.ide .ide-heading > .connection-bar');
   const sync = () => {
@@ -32,7 +32,7 @@ export function mountPanelTitle(host, child, owner, title, kind, { restore } = {
   const returnButton = () => restore && !state.hideClose ? h('button', { type: 'button', class: 'panel-return', title: '閉じて本体へ戻す', 'aria-label': title + 'を閉じて本体へ戻す', onClick: restore }, [h('span', { class: 'close-icon', 'aria-hidden': 'true' })]) : null;
   const app = createApp({ render: () => kind === 'panel-routes'
     ? h('span', { class: 'route-pin-tools' }, [h(WindowActions, { windowApi, windowContext: child, pinOnly: true }), returnButton()])
-    : h(StatusBar, { title: kind === 'explorer' ? 'AiDiy IDE / Explorer' : title, status: '別ウィンドウ', ...state, desktop: true, windowApi, windowContext: child }) });
+    : h(StatusBar, { title: kind === 'explorer' ? 'AiDiy IDE / Explorer' : kind === 'panel-navigation' ? 'AiDiy IDE / '+title : title, status: kind === 'panel-navigation' ? undefined : '別ウィンドウ', clockPulse: kind === 'panel-navigation', ...state, desktop: true, windowApi, windowContext: child }) });
   app.mount(container);
   return () => { observer.disconnect(); app.unmount(); container.remove(); };
 }

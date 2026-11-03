@@ -11,6 +11,8 @@ function panelBounds(rect,owner,screen,kind='explorer'){
  if(!rect||!['left','top','width','height'].every(key=>Number.isFinite(rect[key]))||rect.width<=0||rect.height<=0)return null;
  const origin=owner.window.getContentBounds(),zoom=owner.window.webContents.getZoomFactor();
  const desired={x:Math.round(origin.x+rect.left*zoom),y:Math.round(origin.y+rect.top*zoom),width:Math.round(Math.max(300,rect.width)*zoom),height:Math.round(Math.max(kind==='panel-routes'?40:320,rect.height)*zoom)};
+ // NavigatorもCode同様にDIPで初期寸法を指定。表示後の手動リサイズは変更しない。
+ if(kind==='panel-navigation'){desired.width=500;desired.height=600;}
  // 別画面へまたがるパネルは、そのパネルが最も重なるディスプレイを選ぶ。
  const area=screen.getDisplayMatching(desired).workArea,margin=8;
  const width=Math.min(desired.width,Math.max(1,area.width-margin*2)),height=Math.min(desired.height,Math.max(1,area.height-margin*2));
@@ -22,7 +24,7 @@ function panelBounds(rect,owner,screen,kind='explorer'){
 function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,BrowserWindow,拡大表示,isQuitting,isAllDisplays=()=>false,attachWindowMove=()=>{},registerWindowPin=()=>{},windowPins}){
  const requests=new WeakMap();
  async function prepare(event,rect,kind='explorer',previewRect){
-  if(!['explorer','panel-viewer','panel-routes'].includes(kind))return{ok:false,error:'対応していないパネルです。'};
+  if(!['explorer','panel-viewer','panel-routes','panel-navigation'].includes(kind))return{ok:false,error:'対応していないパネルです。'};
   const owner=trustedEvent(event);if(!owner||owner.kind!=='ide')return{ok:false,error:'この画面からは開けません。'};
   const revision=owner.revision;
   try{
@@ -34,7 +36,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
     // ALLの仮想的な右端には実画面がないことがある。操作した画面の作業領域へ新規窓を収める。
     const area=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     const slot=[...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).length;
-    bounds=kind==='panel-viewer'?windowBounds('viewer',area,undefined,slot):{x:area.x+8,y:area.y+8,width:Math.min(kind==='panel-routes'?360:340,area.width-16),height:Math.min(kind==='panel-routes'?40:700,area.height-16)};
+    bounds=kind==='panel-navigation'?windowBounds('navi',area,undefined,slot):kind==='panel-viewer'?windowBounds('viewer',area,undefined,slot):{x:area.x+8,y:area.y+8,width:Math.min(kind==='panel-routes'?360:340,area.width-16),height:Math.min(kind==='panel-routes'?40:700,area.height-16)};
    }else bounds=panelBounds(rect,owner,screen,kind);
    if(!bounds)throw Error('パネルの位置を取得できません。');
    const existing=[...windows.values()].find(item=>item.owner===owner&&item.kind==='explorer'&&!item.window.isDestroyed());
@@ -79,7 +81,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   record.timeout=setTimeout(()=>{if(!record.shown&&!window.isDestroyed())window.destroy();},12000);record.timeout.unref?.();
  }
  async function show(event,name){
-  const owner=trustedEvent(event),child=[...windows.values()].find(item=>['explorer','panel-viewer','panel-routes'].includes(item.kind)&&item.owner===owner&&item.name===name&&!item.window.isDestroyed());
+  const owner=trustedEvent(event),child=[...windows.values()].find(item=>['explorer','panel-viewer','panel-routes','panel-navigation'].includes(item.kind)&&item.owner===owner&&item.name===name&&!item.window.isDestroyed());
   if(!owner||owner.kind!=='ide'||!child||isQuitting())return{ok:false,error:'Explorerの利用が終了しました。'};
   try{if(child.linkKey!==sessionKey(await readState(owner))||owner.window.isDestroyed()||child.window.isDestroyed())return{ok:false,error:'IDEの利用状態が変わりました。'};}catch{return{ok:false,error:'IDEの利用状態を確認できません。'};}
   // 旧IPCの第3引数が届いても、全パネルで共通の表示開始演出を使う。
@@ -99,7 +101,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
   return{ok:true,height:win.getContentBounds().height/zoom};
  }
  function action(event,name,value){
-  const owner=trustedEvent(event),child=[...windows.values()].find(item=>item.owner===owner&&item.name===name&&['explorer','panel-viewer','panel-routes'].includes(item.kind)&&!item.window.isDestroyed());
+  const owner=trustedEvent(event),child=[...windows.values()].find(item=>item.owner===owner&&item.name===name&&['explorer','panel-viewer','panel-routes','panel-navigation'].includes(item.kind)&&!item.window.isDestroyed());
   if(!owner||owner.kind!=='ide'||!child||owner.revision!==child.ownerRevision||isQuitting()||!['minimize','maximize','isMaximized','close','pin-state','toggle-pin'].includes(value))return false;
   const target=child.window;
   if(value==='pin-state')return windowPins?.state(target)||{pinned:false,locked:false};
@@ -112,7 +114,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
  }
  function dragTarget(owner,name){
   if(!owner||owner.kind!=='ide'||owner.window.isDestroyed()||isQuitting())return null;
-  return [...windows.values()].find(child=>child.owner===owner&&child.name===name&&['explorer','panel-viewer','panel-routes'].includes(child.kind)&&child.shown&&child.ownerRevision===owner.revision&&!child.window.isDestroyed())||null;
+  return [...windows.values()].find(child=>child.owner===owner&&child.name===name&&['explorer','panel-viewer','panel-routes','panel-navigation'].includes(child.kind)&&child.shown&&child.ownerRevision===owner.revision&&!child.window.isDestroyed())||null;
  }
  return{prepare,open,created,show,resizeRoutes,action,dragTarget};
 }

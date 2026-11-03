@@ -653,3 +653,48 @@ Taskの帯/文字は `#0F5C3A` / `#7DD3FC`、Teamはその反転（4.82:1）。C
 帯は従来の下25%、原画・透過・寸法は変更しない。SVGがpathならfill/strokeだけを変更する。Avatar/Hermesは環境フォントで旧字形が変わるため、正本SVG内の `caption-source` に従来PNGを固定埋込し、`caption-ink` の色変換filterと帯clipで字形を再着色する（画像ピクセルを編集しない）。Hermesの縮小済原画も同じ固定素材で保持する。Browserの既存描画に一致する字形はpathに固定済み。通常buildはPNGを使い、Inkscapeやフォントを要求しない。
 
 素材変更時だけ正本SVGをheadless InkscapeでPNGへ描画し、上部原画のRGBA不変・帯色対比・帯だけの枠を検証する。各ownerのSVG/PNGを正本とし、IDE内publicコピーはIDE build、Diag内PNGコピーは変更時の明示コピーで追従する。Diag通常build/verify/testsが他moduleの素材へ依存する仕組みを追加しない。VSCode upstream原本は変更しない。
+
+
+## Navigator の変更・確認
+
+開発目標のNavigationは `src/components/開発スペース/Navigationパネル.vue`、APIと結果検証は `ファイル機能/navigation.mjs` が所有します。IDEの起動欄で「＋ Console」の手前にある「＋ Navigator」から、独立した作業窓を追加します。Explorerのバーガーや上下分割とは連動しません。既存の `createPanelWindow` を使い、Electronでは独立窓、Webではポップアップで開きます。複数窓は起動順のID（navi-1等）ごとに目標・結果・評価・モデル・実行状態を分離します。VRでは既存の独立窓の配置・ピン動作に従い、移行/復帰で窓を増やさず、入力と結果を保持します。パネル表示だけではAIを実行しません。
+
+「Navigator」または「評価」を押したときだけ、`navigation_readonly.py` から既存CodeAgentsの選択済みモデルを使い、`AI実行オプション.読取専用予測()` を固定して目標とプロジェクト調査を依頼します。通常HTTP runや変更可能な経路へフォールバックしません。モデルには読取専用ツール境界が適用され、会話継続・履歴保存・出力ファイル保存は無効です。読取専用に未対応の設定では失敗として表示します。実作業の開始ではありません。オフラインでは送信しません。依頼ID・目標・最大50項目・一意ID・整数0〜100の達成度・根拠・次のプロンプト案を検証し、成功結果を `~/.aidiy/navigation/<プロジェクト実パスのSHA-256>/<窓ID>/latest.json` に原子的に保存します。AIはJSONを返答するだけで、アプリが検証後に専用状態へ保存します。対象プロジェクトに結果ファイルを作成しません。達成度はAI推定であり、人による検証済みの意味ではありません。無効な結果・期限切れ・利用セッション変更を成功扱いせず、前回の正常結果を維持します。表示はテキスト補間に限定し、AIのHTMLやコードを実行しません。
+
+関連確認は `node --test frontend_ide/checks/navigation.test.mjs frontend_ide/checks/panel-windows.test.mjs frontend_ide/checks/panel-lifecycle.test.mjs frontend_ide/checks/vr-panel-placement.test.mjs`。画面変更後は配布物を生成したうえで `node frontend_ide/scripts/check-navigation.mjs`（専用一時プロジェクト・模擬AI・実ブラウザ）と `node frontend_ide/scripts/check-navigation-desktop.mjs`（専用Electron・送信なし）を使います。既存利用者のIDE・サーバーを再起動する必要はありません。模擬AIの成功と実AIの調査品質は区別してください。
+
+
+Navigationはパネル表示・VR移行だけではAIを呼びません。「Navigator」の明示操作で初回分析を開始します。既定指示を入力欄へ実値として表示し、その指示でナビを押した場合は既存のファイル走査・除外規則から最近のファイル相対パスと更新日時（最大30件）を取得し、関連内容を読んだうえで仮目標を推測します。走査が上限に達した場合はその制約もAIへ伝えます。更新日時だけで達成を断定させず、推定目標と未確認部分を画面へ明記します。目標は利用者が編集できます。
+
+「評価」は保存済みの目標と項目を対象にします。項目ID・名前・順序・数を変えた回答は拒否し、達成率・根拠・次のプロンプト案だけを更新します。入力欄の目標変更を項目に反映する場合は「Navigator」を使います。どちらの操作も結果の提案までで、プロンプト案の自動送信はありません。
+
+
+モデル選択はCode同様パネル最下部から行い、初期値は `aidiy_hermes` とCode共通の `CODE_AIDIY_HERMES_MODEL`（省略時auto）です。読取専用対応の `aidiy_hermes` / `codex_cli` / `copilot_cli`、`same` / `auto` または設定済みのモデル名を選択します。Code本体の選択値を上書きせず、`~/.aidiy/navigation/<プロジェクト実パスのSHA-256>/<窓ID>/model.json` へCodeと同じ検証→専用一時JSON→原子的renameの方式（ファイルmode 0600）で保存します。IDE再起動後も同じ起動順IDの選択と成功結果を復元し、ナビ・評価の開始時に選択を固定します。実行中のモデル保存は拒否します。Hermesは既存読取専用アダプターのツール許可リスト、Codex/Copilotは既存の各CLI制約を再利用します。未対応の実行方式へ自動フォールバックしません。通常ランタイムの認証・診断キャッシュまで禁止するOS全体の隔離とは区別してください。
+
+Navigationの外枠はCodeと同じ状態バー・窓操作とプロジェクト表示を使います。最下部のモデルボタンは共通ダイアログを開き、コードAI、same/auto、Diagが生成するread-only専用の `navi_models_info.json`、任意の設定済みモデルIDを選択します。読取専用非対応のHermes外部CLI候補は除外します。許可するAI方式は既存read-only対応の3方式に限定し、選択を他のNaviやCodeへ反映しません。
+
+
+### Navigatorの単独起動と履歴
+
+- `aidiy_navi [作業フォルダ | --project 作業フォルダ]` はCode同様に起動フォルダを対象にする。`--browser`、`--new-window`、`--foreground`、`--port` を共通起動処理で扱う。モデルは画面から選び、起動引数で上書きしない。
+- 単独タイトルは `AiDiy Navigator`。IDEの「＋ Navigator」からの窓は `AiDiy IDE / Navigator 1` のように実際の起動番号を表示する。
+- 「＋ 新規」は現在窓の選択を解除する。「一覧」で同一プロジェクトの過去ナビを選ぶと目標・項目・評価・モデルを復元する。評価は元の項目構成を保持し、そのナビの履歴を更新する。選択と一覧閲覧ではAIを呼ばない。
+- 保存先は対象プロジェクト外の `~/.aidiy/navigation/<プロジェクト実パスのSHA256>/`。窓別の `navi-N/`（単独は `standalone-navi-N/`）に現在状態とモデル、`history/` にナビ単位のJSONを保存する。プロジェクトの内容は変更しない。
+- 単独の複数プロセスは一時領域のPID付き予約で状態番号を分離し、終了後に最小空き番号を再利用する。履歴は同一プロジェクト内で共有するが、各窓の選択・入力・処理は独立する。
+- Hermesの読取専用実行はユーザー文脈設定を読み込まない。`same` は保存済みOpenAI OAuthモデルを明示値へ解決して渡す。解決できない場合はローカルモデルへ推測で接続せず失敗にする。その他の対応モデルは明示選択する。
+
+### Navigator の実行経路と Tools 稼働状態
+
+Navigator は `navigation-agent.mjs` からセットアップ済み `backend_tools/.venv` の Python を起動し、`navigation_readonly.py` が `CodeAgents.run_async` と既存 Code CLI 基盤を読み取り専用オプションで呼びます。常駐 Tools（8095）の HTTP/MCP API や独立した `aidiy_code_agent` コマンドは呼びません。Tools サーバーの起動状態でナビ・評価を無効化せず、Python・選択した CLI・認証・モデルが利用できない場合は実行エラーとして表示します。通常実行へのフォールバックは行いません。
+
+Navigator の戻り値は `requestId, goal, items[{id,name,progress,reason}], nextPrompt` の固定JSONです。`progress` は0〜100の整数、項目は最大50件、IDは重複不可です。評価時は保存済みの目標・項目ID・名前・順序・件数を照合し、変更を拒否します。パース・検証に成功するまで前回の正常結果を置き換えません。AI検索の結果ファイル検証と同様に構造を検証しますが、読み取り専用を守るためAIにプロジェクト内のJSON作成を依頼せず、アプリが専用状態領域へ保存します。
+
+Navigatorの依存可否は `navigationAvailability` でローカルPython・CLIのみ確認します。起動・履歴読戻しを拒否せず、実行APIとボタンで判定し、画面は5秒ごとに再確認します。認証や利用枠を探る自動AI送信は行いません。
+
+Navigatorの空入力はUI・APIの両方で拒否し、AIを呼びません。「＋ 新規」は既定指示へ戻し、履歴選択は保存済み目標へ戻します。Code共通の開始表示部品にnavi用の英文を渡し、帯なしAiDiy画像を使います。タイトル行はCodeと同じ31px・14px文字、本文は黒、外枠はタイトル色1pxです。単独の接続表示は既存createCoreConnectionのTools ping、IDE別窓は所有IDEの接続バーに同期します。ナビ／評価の処理中はCodeのprompt-reflect演出を共有し、接続状態の表示とは分けます。
+
+
+### 独立アプリ追加時のConsoleとの照合
+
+Navigator等の追加時は、起動入口・setup/cleanupの表示と登録順・setup/startの停止所属判定・共有依存使用中保護・Diagカタログ/アイコン配布・IDE起動導線・タイトル/サイズ・長押し移動のmain/renderer両側・ピン/VR・履歴/モデル保存・文書索引を確認する。旧アプリ一覧を固定したテストfixtureも更新する。
+NavigatorはConsoleのPTY、シェル自動承認、CLI補完、端末入力中継を使用しない。全体startの自動起動一覧へ追加せず、手動で開く。Diag診断の過去インベントリや過去試験結果を、現在の追加機能の実機確認済みとして書き換えない。

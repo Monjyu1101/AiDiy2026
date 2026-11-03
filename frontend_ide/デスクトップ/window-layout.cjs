@@ -39,8 +39,8 @@ function windowBounds(kind,area,owner,slot=0,cli=false){
   return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
  }
  // Code / LiveはIDEの位置によらず同じディスプレイの左上 / 右上へ置く。
- const width=Math.min(size.幅,available.width);
- const height=Math.min(size.会話高さ,available.height);
+ const width=Math.min(kind==='navi'?500:size.幅,available.width);
+ const height=Math.min(kind==='navi'?600:size.会話高さ,available.height);
  // 先頭窓以外は24〜120pxを循環させ、7枚目以降も先頭位置へ戻さない。
  const offset=owner&&kind==='code'&&slot>0?((slot-1)%5+1)*24:0;
  const x=kind==='code'?available.x+offset:available.x+available.width-width;

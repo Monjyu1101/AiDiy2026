@@ -17,6 +17,8 @@ import type {
   手動操作状態,
   造形ヘルパー,
 } from './AIチーム_NPC型';
+import { 乱数を作る } from './AIチーム_NPC型';
+import { ローポリ部品, 色を混ぜる, 部品を結合, 配置行列, 頂点色マテリアル } from './AIチーム_造形_共通';
 
 type 馬状態 = '走る' | '歩く' | 'とどまる';
 
@@ -63,75 +65,131 @@ const 放牧目的地 = (基準: THREE.Vector3, 設定: 馬設定, 広がり = 1
 };
 
 const 馬体を作る = (ヘルパー: 造形ヘルパー, 設定: 馬設定) => {
-  const { ジオメトリ, マテリアル } = ヘルパー;
-  const 体材 = マテリアル(設定.体色, { roughness: 0.82, metalness: 0.01 });
-  const 毛材 = マテリアル(設定.たてがみ色, { roughness: 0.95 });
-  const 蹄材 = マテリアル(設定.蹄色, { roughness: 0.78 });
-  const 目材 = マテリアル(0x151719, { roughness: 0.3 });
+  const 材 = 頂点色マテリアル(ヘルパー, { roughness: 0.8 });
+  const 乱数 = 乱数を作る(設定.体色 % 100000);
+  const 体色 = new THREE.Color(設定.体色);
+  const 影色 = 色を混ぜる(体色, 0x000000, 0.25);
+  const 明色 = 色を混ぜる(体色, 0xffffff, 0.12);
+  const 鼻面色 = 色を混ぜる(体色, 0x5a4a44, 0.35);
+  const メッシュ = (部品: THREE.BufferGeometry[]) => new THREE.Mesh(ヘルパー.ジオメトリ(部品を結合(部品)), 材);
+  const 玉 = (
+    半径: number,
+    位置: [number, number, number],
+    色: THREE.ColorRepresentation | [THREE.ColorRepresentation, THREE.ColorRepresentation],
+    拡大: number | [number, number, number] = 1,
+    回転: [number, number, number] = [0, 0, 0],
+    詳細 = 1,
+  ) =>
+    ローポリ部品(new THREE.IcosahedronGeometry(半径, 詳細), 乱数, {
+      変換: 配置行列(位置, 回転, 拡大),
+      色,
+      ばらつき: 0.04,
+    });
+  const 筒 = (
+    上径: number,
+    下径: number,
+    高さ: number,
+    位置: [number, number, number],
+    色: THREE.ColorRepresentation | [THREE.ColorRepresentation, THREE.ColorRepresentation],
+    回転: [number, number, number] = [0, 0, 0],
+    分割 = 7,
+  ) =>
+    ローポリ部品(new THREE.CylinderGeometry(上径, 下径, 高さ, 分割, 2), 乱数, {
+      変換: 配置行列(位置, 回転),
+      色,
+      ばらつき: 0.04,
+    });
+
   const group = new THREE.Group();
   group.scale.setScalar(1.18);
 
-  const 胴 = new THREE.Mesh(ジオメトリ(new THREE.CapsuleGeometry(0.48, 1.45, 6, 16)), 体材);
-  胴.rotation.x = Math.PI / 2;
-  胴.scale.x = 0.78;
+  // 胴（上下に弾ませるのはこの Group）。樽形の胴に、胸と尻の張りを足す
+  const 胴 = new THREE.Group();
   胴.position.y = 1.42;
+  胴.add(
+    メッシュ([
+      ローポリ部品(new THREE.CapsuleGeometry(0.48, 1.45, 3, 10), 乱数, {
+        変換: 配置行列([0, 0, 0], [Math.PI / 2, 0, 0], [0.78, 1, 1]),
+        色: [影色, 明色],
+        ばらつき: 0.04,
+      }),
+      玉(0.42, [0, 0.06, -0.78], [影色, 体色], [0.82, 0.98, 0.78]),
+      玉(0.46, [0, 0.12, 0.66], [影色, 明色], [0.86, 0.94, 0.86]),
+    ]),
+  );
   group.add(胴);
 
+  // 首と頭（首の付け根の Group を前後に振る）
   const 首 = new THREE.Group();
   首.position.set(0, 1.62, 首基準Z);
   首.rotation.x = 首基準角;
-  const 首本体 = new THREE.Mesh(ジオメトリ(new THREE.CapsuleGeometry(0.27, 0.78, 5, 12)), 体材);
-  首本体.position.y = 0.42;
-  首.add(首本体);
-  const 頭 = new THREE.Mesh(ジオメトリ(new THREE.CapsuleGeometry(0.25, 0.42, 5, 12)), 体材);
-  頭.rotation.x = Math.PI / 2;
-  頭.position.set(0, 0.9, -0.25);
-  頭.scale.set(0.9, 1, 0.82);
-  首.add(頭);
-  const 鼻先 = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(0.22, 12, 8)), 体材);
-  鼻先.position.set(0, 0.87, -0.59);
-  鼻先.scale.set(1, 0.72, 1.18);
-  首.add(鼻先);
-  const 目形 = ジオメトリ(new THREE.SphereGeometry(0.045, 8, 6));
+  const 首部品: THREE.BufferGeometry[] = [
+    筒(0.2, 0.3, 0.98, [0, 0.42, 0], [体色, 明色], [0.08, 0, 0]),
+    // 頭は鼻先へ向かって細くなる筒。上径（細い側）が -z を向くよう倒す
+    筒(0.15, 0.24, 0.62, [0, 0.9, -0.36], [影色, 体色], [-Math.PI / 2, 0, 0]),
+    玉(0.2, [0, 0.85, -0.62], 鼻面色, [1, 0.76, 1.1]),
+    玉(0.24, [0, 0.98, -0.12], 体色, [0.9, 0.85, 0.9]),
+  ];
   [-1, 1].forEach((左右) => {
-    const 目 = new THREE.Mesh(目形, 目材);
-    目.position.set(左右 * 0.22, 1.03, -0.31);
-    首.add(目);
-    const 耳 = new THREE.Mesh(ジオメトリ(new THREE.ConeGeometry(0.09, 0.34, 6)), 体材);
-    耳.position.set(左右 * 0.16, 1.25, -0.08);
-    耳.rotation.z = 左右 * 0.12;
-    首.add(耳);
+    首部品.push(
+      玉(0.05, [左右 * 0.2, 1.02, -0.33], 0x151719, [0.8, 1, 1]),
+      玉(0.016, [左右 * 0.215, 1.035, -0.37], 0xffffff, 1, [0, 0, 0], 0),
+      玉(0.03, [左右 * 0.08, 0.86, -0.82], 0x1a1412, [1, 0.6, 0.6], [0, 0, 0], 0),
+      ローポリ部品(new THREE.ConeGeometry(0.09, 0.32, 5), 乱数, {
+        変換: 配置行列([左右 * 0.15, 1.25, -0.06], [0.15, 0, 左右 * 0.14]),
+        色: [体色, 明色],
+      }),
+    );
   });
-  const たてがみ = new THREE.Mesh(ジオメトリ(new THREE.BoxGeometry(0.11, 0.9, 0.44)), 毛材);
-  たてがみ.position.set(0, 0.46, 0.2);
-  たてがみ.rotation.x = 0.28;
-  首.add(たてがみ);
+  // たてがみ: 首の後ろに沿って房を並べ、額にも前髪をのせる
+  for (let index = 0; index < 7; index += 1) {
+    const y = 0.05 + index * 0.15;
+    首部品.push(
+      玉(0.15, [0, y, 0.25 - index * 0.012], 設定.たてがみ色, [0.4, 1.05, 0.95], [0.25, 0, (乱数() - 0.5) * 0.3]),
+    );
+  }
+  首部品.push(玉(0.1, [0, 1.17, -0.22], 設定.たてがみ色, [0.7, 0.5, 1.1]));
+  首.add(メッシュ(首部品));
   group.add(首);
 
+  // 脚（付け根の Group を振る）。太もも・膝・細い管・蹄の毛・蹄
   const 脚: THREE.Group[] = [];
-  const 脚形 = ジオメトリ(new THREE.CapsuleGeometry(0.105, 0.72, 4, 8));
-  const 蹄形 = ジオメトリ(new THREE.BoxGeometry(0.23, 0.16, 0.32));
   [-0.56, 0.56].forEach((前後) => {
     [-0.28, 0.28].forEach((左右) => {
       const 脚Group = new THREE.Group();
       脚Group.position.set(左右, 1.22, 前後);
-      const 脚本体 = new THREE.Mesh(脚形, 体材);
-      脚本体.position.y = -0.52;
-      const 蹄 = new THREE.Mesh(蹄形, 蹄材);
-      蹄.position.set(0, -1.01, -0.04);
-      脚Group.add(脚本体, 蹄);
+      脚Group.add(
+        メッシュ([
+          筒(0.12, 0.15, 0.5, [0, -0.22, 0], [体色, 明色]),
+          玉(0.1, [0, -0.5, 0], 体色, [1, 1.1, 1.05]),
+          筒(0.075, 0.085, 0.42, [0, -0.72, 0], [影色, 体色], [0, 0, 0], 6),
+          玉(0.1, [0, -0.93, 0.01], 設定.たてがみ色, [1, 0.8, 1.05]),
+          筒(0.12, 0.14, 0.14, [0, -1.02, -0.02], 設定.蹄色, [0, 0, 0], 8),
+        ]),
+      );
       group.add(脚Group);
       脚.push(脚Group);
     });
   });
 
+  // 尾（尻から後方へ出て自然に下へ垂れる）。根元は細く、先はふさふさに広がる
   const 尾 = new THREE.Group();
   尾.position.set(0, 1.58, 0.93);
-  // 馬の尾は通常、尻から後方へ出て自然に下へ垂れる
   尾.rotation.x = Math.PI * 0.73;
-  const 尾本体 = new THREE.Mesh(ジオメトリ(new THREE.CapsuleGeometry(0.12, 0.82, 5, 10)), 毛材);
-  尾本体.position.y = 0.43;
-  尾.add(尾本体);
+  尾.add(
+    メッシュ([
+      ローポリ部品(new THREE.CylinderGeometry(0.17, 0.08, 0.86, 7, 4), 乱数, {
+        変形: (頂点) => {
+          頂点.x += Math.sin(頂点.y * 4) * 0.03;
+        },
+        揺らぎ: 0.015,
+        変換: 配置行列([0, 0.43, 0]),
+        色: [設定.たてがみ色, 色を混ぜる(設定.たてがみ色, 0xffffff, 0.12)],
+        ばらつき: 0.05,
+      }),
+      玉(0.17, [0, 0.86, 0], 設定.たてがみ色, [0.85, 1.15, 0.85]),
+    ]),
+  );
   group.add(尾);
 
   group.traverse((object) => {
@@ -142,7 +200,6 @@ const 馬体を作る = (ヘルパー: 造形ヘルパー, 設定: 馬設定) =>
   });
   return { group, 胴, 首, 脚, 尾 };
 };
-
 const 馬を生成 = (
   種別: string,
   scene: THREE.Scene,

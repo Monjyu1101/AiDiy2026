@@ -225,6 +225,7 @@ SERVICE_CLEANUP_TARGETS = (
         "フロントエンド(Avatar)",
         ("フロントエンド(Avatar)",),
     ),
+    ("ide", "frontend_ide/aidiy_navi", "フロントエンド(Navigator)", ("フロントエンド(navi)",)),
     ("ide", "frontend_ide/aidiy_console", "フロントエンド(console)", ("フロントエンド(console)",)),
     ("ide", "frontend_ide/viewer", "フロントエンド(IDE)", ("フロントエンド(IDE)",)),
     ("discord", "frontend_channels", "フロントエンド(Discord)", ("フロントエンド(Discord)",)),
@@ -699,7 +700,7 @@ def collect_cleanup_choices(base_dir: Path) -> dict | None:
                         f"  {BACKEND_HERMES_PATH}/{env_name} を削除しますか？", default="y",
                     )
 
-    choices["ide"] = ask_yes_no("IDE群(Console / Code / Live / IDE)をクリーンアップしますか？", default="y")
+    choices["ide"] = ask_yes_no("IDE群(Navigator / Console / Code / Live / IDE / Task / Team / Browser)をクリーンアップしますか？", default="y")
     choices["discord"] = ask_yes_no("フロントエンド(Discord)をクリーンアップしますか？", default="y")
     choices["slack"] = ask_yes_no("フロントエンド(Slack)をクリーンアップしますか？", default="y")
 
@@ -783,9 +784,9 @@ def execute_cleanup(base_dir: Path, choices: dict) -> bool:
     print()
     if choices.get("ide"):
         if not _run_folder_cleanup("frontend_ide", choices):
-            cleanup_errors.append("IDE群(Console / Code / Live / IDE)")
+            cleanup_errors.append("IDE群(Navigator / Console / Code / Live / IDE / Task / Team / Browser)")
     else:
-        print_info("IDE群(Console / Code / Live / IDE)のクリーンアップをスキップしました")
+        print_info("IDE群(Navigator / Console / Code / Live / IDE / Task / Team / Browser)のクリーンアップをスキップしました")
 
     print()
     if choices.get("discord"):
@@ -852,7 +853,7 @@ def main():
     print_info("  6. フロントエンド(Web)")
     print_info("  7. フロントエンド(Avatar)")
     print_info("  8. コマンド(hermes)")
-    print_info("  9. IDE群(Console / Code / Live / IDE)")
+    print_info("  9. IDE群(Navigator / Console / Code / Live / IDE / Task / Team / Browser)")
     print_info(" 10. フロントエンド(Discord)")
     print_info(" 11. フロントエンド(Slack)")
     print_info("外部チャンネル: Discord / Slack")

@@ -53,6 +53,7 @@ frontend_avatar/
 |--------|--------------|------------------------------|
 | Diag | `backend_diag/diag_main.mjs` → `起動/electron-main.cjs` | `backend_diag/ui/src` → `static/app.js` |
 | Avatar | `frontend_avatar/launch.mjs` → `electron/main.ts` | `frontend_avatar/src` |
+| Navigator | `frontend_ide/aidiy_navi/launch.mjs` | `frontend_ide/src` → `dist/app.js` |
 | Console | `frontend_ide/aidiy_console/launch.mjs` | `frontend_ide/src` → `dist/app.js` |
 | Code | `frontend_ide/aidiy_code/launch.mjs` | 同上。VS Code 拡張へも同じ bundle を配布 |
 | Live | `frontend_ide/aidiy_live/launch.mjs` | 同上。VS Code 拡張へも同じ bundle を配布 |

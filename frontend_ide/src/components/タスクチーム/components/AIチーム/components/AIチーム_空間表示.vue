@@ -29,6 +29,12 @@ import {
 } from '../AIチーム_NPC制御';
 // 草原の小物は毎回同じ配置にしたいので、NPC と同じシード付き擬似乱数で座標を決める
 import { 乱数を作る } from '../AIチーム_NPC型';
+// 植物・地面の形と色（ローポリ調）。置き場所はこの画面が決める
+import { type 植物造形, 植物造形を作る } from '../AIチーム_造形_植物';
+import { 床テクスチャを作る, 草原の地面を作る, 小道を作る as 小道の造形を作る } from '../AIチーム_造形_地面';
+import { type 水面造形, 水面造形を作る } from '../AIチーム_造形_水面';
+import { type 建物造形, 建物造形を作る } from '../AIチーム_造形_建物';
+import { type 要員造形, 要員造形を作る, 文字列の種 } from '../AIチーム_造形_要員';
 
 type 実行状態 = {
   group: THREE.Group;
@@ -141,10 +147,11 @@ const マテリアル = (
   color: number,
   options: THREE.MeshStandardMaterialParameters = {},
 ): THREE.MeshStandardMaterial => {
+  // 環境マップを持たないので、金属感は金属部品だけに明示する（既定は非金属）
   const material = new THREE.MeshStandardMaterial({
     color,
     roughness: 0.55,
-    metalness: 0.18,
+    metalness: 0,
     ...options,
   });
   破棄対象.push(material);
@@ -163,6 +170,22 @@ const NPC造形ヘルパー: 造形ヘルパー = {
   マテリアル登録: (material) => 破棄対象.push(material),
   テクスチャ登録: (texture) => 破棄テクスチャ.push(texture),
 };
+
+// 木や花の形は種類ごとに作り置きして共有する（画面を閉じるときに破棄リストごと片付く）
+let 植物: 植物造形 | null = null;
+const 植物を用意 = (): 植物造形 => (植物 ??= 植物造形を作る(NPC造形ヘルパー));
+let 建物: 建物造形 | null = null;
+const 建物を用意 = (): 建物造形 => (建物 ??= 建物造形を作る(NPC造形ヘルパー));
+let 要員造形: 要員造形 | null = null;
+const 要員を用意 = (): 要員造形 => (要員造形 ??= 要員造形を作る(NPC造形ヘルパー));
+
+// 池の水面。空のグラデーション（空を作る() で用意）を映り込みに使う
+let 空の映り込み: THREE.Texture | null = null;
+let 水面: 水面造形 | null = null;
+const 水面を用意 = (): 水面造形 => (水面 ??= 水面造形を作る(NPC造形ヘルパー, 空の映り込み));
+
+/** 斜めから見た文字や芝がぼやけないよう、GPU が許す範囲で異方性フィルタを効かせる */
+const 最大異方性 = () => renderer?.capabilities.getMaxAnisotropy() ?? 1;
 
 const メッシュ = (
   geometry: THREE.BufferGeometry,
@@ -272,71 +295,9 @@ const はまる穴を探す = (位置: THREE.Vector3): THREE.Group | null => {
   return null;
 };
 
-// 草原の小物は数が多いため、ジオメトリとマテリアルを 1 組だけ作って共有する
-type 共有部品 = {
-  幹: THREE.CylinderGeometry;
-  葉: THREE.SphereGeometry;
-  葉小: THREE.SphereGeometry;
-  茂み: THREE.SphereGeometry;
-  石: THREE.DodecahedronGeometry;
-  草: THREE.ConeGeometry;
-  花芯: THREE.SphereGeometry;
-  茎: THREE.CylinderGeometry;
-  サボテン: THREE.CapsuleGeometry;
-  サボテン腕: THREE.CapsuleGeometry;
-  幹材: THREE.MeshStandardMaterial;
-  葉材: THREE.MeshStandardMaterial[];
-  茂み材: THREE.MeshStandardMaterial;
-  石材: THREE.MeshStandardMaterial;
-  草材: THREE.MeshStandardMaterial;
-  花材: THREE.MeshStandardMaterial[];
-  茎材: THREE.MeshStandardMaterial;
-  木材: THREE.MeshStandardMaterial;
-  濃木材: THREE.MeshStandardMaterial;
-  布材: THREE.MeshStandardMaterial;
-  金属材: THREE.MeshStandardMaterial;
-  サボテン材: THREE.MeshStandardMaterial;
-};
 
-let 部品: 共有部品 | null = null;
-
-const 部品を用意 = (): 共有部品 => {
-  if (部品) return 部品;
-  部品 = {
-    幹: ジオメトリ(new THREE.CylinderGeometry(0.16, 0.24, 1.7, 8)),
-    葉: ジオメトリ(new THREE.SphereGeometry(1, 12, 10)),
-    葉小: ジオメトリ(new THREE.SphereGeometry(0.7, 10, 8)),
-    茂み: ジオメトリ(new THREE.SphereGeometry(0.55, 10, 8)),
-    石: ジオメトリ(new THREE.DodecahedronGeometry(0.42, 0)),
-    草: ジオメトリ(new THREE.ConeGeometry(0.11, 0.5, 5)),
-    花芯: ジオメトリ(new THREE.SphereGeometry(0.075, 8, 6)),
-    茎: ジオメトリ(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 4)),
-    サボテン: ジオメトリ(new THREE.CapsuleGeometry(0.22, 0.9, 4, 8)),
-    サボテン腕: ジオメトリ(new THREE.CapsuleGeometry(0.13, 0.5, 4, 8)),
-    幹材: マテリアル(0x8a6244, { roughness: 0.92, metalness: 0.02 }),
-    葉材: [
-      マテリアル(0x4f9e46, { roughness: 0.88, metalness: 0.02 }),
-      マテリアル(0x63b356, { roughness: 0.88, metalness: 0.02 }),
-      マテリアル(0x3d8a41, { roughness: 0.9, metalness: 0.02 }),
-    ],
-    茂み材: マテリアル(0x59a84c, { roughness: 0.9, metalness: 0.02 }),
-    石材: マテリアル(0x9ba49f, { roughness: 0.85, metalness: 0.05 }),
-    草材: マテリアル(0x74bb55, { roughness: 0.9, metalness: 0.02 }),
-    花材: [
-      マテリアル(0xffe066, { roughness: 0.7, metalness: 0.02 }),
-      マテリアル(0xff9ec0, { roughness: 0.7, metalness: 0.02 }),
-      マテリアル(0xfdfdfd, { roughness: 0.7, metalness: 0.02 }),
-      マテリアル(0xc79bff, { roughness: 0.7, metalness: 0.02 }),
-    ],
-    茎材: マテリアル(0x4f9245, { roughness: 0.9, metalness: 0.02 }),
-    木材: マテリアル(0xb5824a, { roughness: 0.82, metalness: 0.03 }),
-    濃木材: マテリアル(0x8a5c33, { roughness: 0.86, metalness: 0.03 }),
-    布材: マテリアル(0xf6f1e2, { roughness: 0.88, metalness: 0.0 }),
-    金属材: マテリアル(0x9aa7ad, { roughness: 0.35, metalness: 0.7 }),
-    サボテン材: マテリアル(0x4f8f5c, { roughness: 0.85, metalness: 0.02 }),
-  };
-  return 部品;
-};
+// 見た目の太陽の位置。影を落とす太陽光もこの方向から当て、影の向きと太陽をそろえる
+const 太陽位置 = new THREE.Vector3(-46, 60, -62);
 
 const 空を作る = () => {
   if (!scene) return;
@@ -356,11 +317,18 @@ const 空を作る = () => {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   破棄テクスチャ.push(texture);
+  // 同じグラデーションを正距円筒の空として、池の水面への映り込みにも使う
+  空の映り込み = new THREE.CanvasTexture(canvas);
+  空の映り込み.colorSpace = THREE.SRGBColorSpace;
+  空の映り込み.mapping = THREE.EquirectangularReflectionMapping;
+  破棄テクスチャ.push(空の映り込み);
+  // 空の球は霧の範囲に入るため、霧を無効にしないとグラデーションが霧色に塗りつぶされる
   const skyMaterial = new THREE.MeshBasicMaterial({
     map: texture,
     side: THREE.BackSide,
     depthWrite: false,
     toneMapped: false,
+    fog: false,
   });
   破棄対象.push(skyMaterial);
   const sky = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(118, 24, 16)), skyMaterial);
@@ -368,55 +336,20 @@ const 空を作る = () => {
   scene.add(sky);
 
   // 太陽（見た目だけの発光球）
-  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfff6d8, toneMapped: false });
+  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xfff6d8, toneMapped: false, fog: false });
   破棄対象.push(sunMaterial);
   const sun = new THREE.Mesh(ジオメトリ(new THREE.SphereGeometry(2.4, 16, 12)), sunMaterial);
-  sun.position.set(-52, 48, -68);
+  sun.position.copy(太陽位置);
   scene.add(sun);
-
 };
 
-const 草地テクスチャを作る = (): THREE.Texture | null => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  context.fillStyle = '#69ab4f';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  const 乱数 = 乱数を作る(777);
-  // 明暗の斑と草の筋を重ねて、単色に見えない芝生にする
-  for (let index = 0; index < 900; index += 1) {
-    const x = 乱数() * canvas.width;
-    const y = 乱数() * canvas.height;
-    const 明るさ = 乱数();
-    context.fillStyle = 明るさ > 0.62
-      ? 'rgba(139, 200, 106, 0.55)'
-      : 明るさ > 0.3
-        ? 'rgba(88, 154, 68, 0.5)'
-        : 'rgba(60, 121, 55, 0.45)';
-    context.fillRect(x, y, 1 + 乱数() * 3, 2 + 乱数() * 5);
-  }
-  for (let index = 0; index < 220; index += 1) {
-    const x = 乱数() * canvas.width;
-    const y = 乱数() * canvas.height;
-    context.strokeStyle = 乱数() > 0.5 ? 'rgba(160, 214, 120, 0.4)' : 'rgba(66, 126, 58, 0.4)';
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(x, y);
-    context.lineTo(x + (乱数() - 0.5) * 4, y - 4 - 乱数() * 5);
-    context.stroke();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(85, 85);
-  破棄テクスチャ.push(texture);
-  return texture;
-};
-
-// 丘は「潰した半球」なので、足元（xz平面）の位置から表面の高さを楕円体の式で逆算できる
+// 丘は裾の傾きが 0 で地面へ溶け込む、べちゃっとした丸い盛り上がり。
+// 中心からの距離の割合 r（0〜1）での高さの割合は (1 - r²)² で、頂上も裾も平らにつながる。
+// 形（回転体）と足元の高さ（丘の高さ()）はどちらもこの式から作るので、必ず一致する
+const 丘の断面 = (r二乗: number) => (1 - r二乗) * (1 - r二乗);
+// 裾が地面と同じ高さで重なるとちらつくので、丘はわずかに地面へ沈めて置く
+const 丘の沈み = 0.08;
+// ry は頂上の高さ（地面 y=0 から）
 const 丘一覧: Array<{ x: number; z: number; rx: number; ry: number; rz: number }> = [];
 
 /** 指定位置が丘の footprint（楕円）の中かどうか。余裕を足すと少し広めに判定する */
@@ -429,9 +362,8 @@ const 丘と重なる = (x: number, z: number, 余裕 = 0) =>
 
 /**
  * 指定位置での丘の表面高さ（地面 y=0 基準）。
- * 丘は中心 y=-0.6 に置いた単位半球を非一様スケールした楕円体なので、
- * 足元の (x,z) を楕円体の断面に当てはめて y を求める。footprint の外や
- * 丘の縁（半球の -0.6 側で地面より低くなる部分）では 0 を返し、平地と滑らかにつながる
+ * 足元の (x,z) を楕円の footprint で正規化し、丘の断面() から y を求める。
+ * footprint の外や、地面へ沈めた裾の部分では 0 を返し、平地と滑らかにつながる
  */
 const 丘の高さ = (x: number, z: number): number => {
   let 最大高さ = 0;
@@ -440,467 +372,176 @@ const 丘の高さ = (x: number, z: number): number => {
     const nz = (z - 丘.z) / 丘.rz;
     const 二乗和 = nx * nx + nz * nz;
     if (二乗和 >= 1) continue;
-    const 高さ = -0.6 + Math.sqrt(1 - 二乗和) * 丘.ry;
+    const 高さ = -丘の沈み + (丘.ry + 丘の沈み) * 丘の断面(二乗和);
     if (高さ > 最大高さ) 最大高さ = 高さ;
   }
   return 最大高さ;
 };
 
+/** 半径 1・高さ 1 の丘の回転体。裾は地面色へ、頂上は丘の色へ頂点色でぼかす */
+const 丘の形を作る = (頂上色: number) => {
+  const 段数 = 28;
+  const 断面: THREE.Vector2[] = [];
+  for (let index = 0; index <= 段数; index += 1) {
+    const r = 1 - index / 段数;
+    断面.push(new THREE.Vector2(Math.max(r, 1e-4), 丘の断面(r * r)));
+  }
+  const 形 = ジオメトリ(new THREE.LatheGeometry(断面, 56));
+  const 位置 = 形.getAttribute('position') as THREE.BufferAttribute;
+  const 色配列 = new Float32Array(位置.count * 3);
+  const 裾色 = new THREE.Color(0x74ad55);
+  const 頂上 = new THREE.Color(頂上色);
+  const 色 = new THREE.Color();
+  for (let index = 0; index < 位置.count; index += 1) {
+    色.copy(裾色).lerp(頂上, Math.min(1, 位置.getY(index) * 1.6));
+    色.toArray(色配列, index * 3);
+  }
+  形.setAttribute('color', new THREE.BufferAttribute(色配列, 3));
+  return 形;
+};
+
 const 草原を作る = () => {
   if (!scene) return;
-  const 草地材 = マテリアル(0x74b155, { roughness: 0.95, metalness: 0.02 });
-  const texture = 草地テクスチャを作る();
-  if (texture) 草地材.map = texture;
   // 霧が完全に覆う距離（146）より外側まで芝生を敷き、縁が見えないようにする
-  const ground = new THREE.Mesh(ジオメトリ(new THREE.CircleGeometry(220, 72)), 草地材);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  scene.add(草原の地面を作る(NPC造形ヘルパー, 最大異方性()));
 
-  // 遠景の丘（つぶした半球）で草原が続いている感じを出す
-  const 丘材 = [
-    マテリアル(0x5c9e52, { roughness: 0.96, metalness: 0.0 }),
-    マテリアル(0x4c8b47, { roughness: 0.96, metalness: 0.0 }),
-  ];
-  const 丘 = ジオメトリ(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2));
+  // 遠景の丘で草原が続いている感じを出す。裾が地面へ溶け込むなめらかな形なので、
+  // ローポリ調の面の陰影にはしない（色は頂点色が持つので素材色は白）
+  const 丘材 = マテリアル(0xffffff, { roughness: 0.96, metalness: 0.0, vertexColors: true });
+  const 丘形 = [丘の形を作る(0x5c9e52), 丘の形を作る(0x4c8b47)];
   const 乱数 = 乱数を作る(31415);
-  // なだらかな稜線にしたいので、遠くに低く広い丘を並べる
+  // なだらかな稜線にしたいので、遠くに低く広い丘を並べる（置き場所と広さは従来どおり）
   for (let index = 0; index < 20; index += 1) {
     const 角度 = (index / 20) * Math.PI * 2 + 乱数() * 0.22;
     const 距離 = 82 + 乱数() * 14;
-    const hill = new THREE.Mesh(丘, 丘材[index % 丘材.length]);
-    hill.position.set(Math.cos(角度) * 距離, -0.6, Math.sin(角度) * 距離);
-    hill.scale.set(19 + 乱数() * 13, 3.0 + 乱数() * 3.2, 16 + 乱数() * 11);
+    const rx = 19 + 乱数() * 13;
+    // 頂上の高さ（従来の半球を 0.6 沈めて見えていた高さと同じ）
+    const 頂上 = 3.0 + 乱数() * 3.2 - 0.6;
+    const rz = 16 + 乱数() * 11;
+    const hill = new THREE.Mesh(丘形[index % 丘形.length], 丘材);
+    hill.position.set(Math.cos(角度) * 距離, -丘の沈み, Math.sin(角度) * 距離);
+    hill.scale.set(rx, 頂上 + 丘の沈み, rz);
+    hill.receiveShadow = true;
     scene.add(hill);
-    丘一覧.push({
-      x: hill.position.x,
-      z: hill.position.z,
-      rx: hill.scale.x,
-      ry: hill.scale.y,
-      rz: hill.scale.z,
-    });
+    丘一覧.push({ x: hill.position.x, z: hill.position.z, rx, ry: 頂上, rz });
   }
 };
 
+// 植物と石の形は AIチーム_造形_植物.ts が持つ。ここでは置き場所・大きさ・向きだけを決める
 const 木を作る = (x: number, z: number, scale = 1, seed = 1) => {
   if (!scene) return;
-  const p = 部品を用意();
-  const 乱数 = 乱数を作る(seed);
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  group.rotation.y = 乱数() * Math.PI * 2;
-
-  const trunk = new THREE.Mesh(p.幹, p.幹材);
-  trunk.position.y = 0.85;
-  trunk.castShadow = true;
-  trunk.receiveShadow = true;
-  group.add(trunk);
-  const 葉数 = 3 + Math.floor(乱数() * 2);
-  for (let index = 0; index < 葉数; index += 1) {
-    const leaf = new THREE.Mesh(index === 0 ? p.葉 : p.葉小, p.葉材[index % p.葉材.length]);
-    leaf.position.set(
-      (乱数() - 0.5) * 0.9,
-      1.85 + index * 0.42 + 乱数() * 0.2,
-      (乱数() - 0.5) * 0.9,
-    );
-    leaf.scale.setScalar(0.85 + 乱数() * 0.5);
-    leaf.castShadow = true;
-    leaf.receiveShadow = true;
-    group.add(leaf);
-  }
-  scene.add(group);
+  const tree = 植物を用意().木(seed);
+  tree.position.set(x, 0, z);
+  tree.scale.setScalar(scale);
+  scene.add(tree);
 };
 
 const サボテンを作る = (x: number, z: number, scale = 1, seed = 1) => {
   if (!scene) return;
-  const p = 部品を用意();
-  const 乱数 = 乱数を作る(seed);
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  group.rotation.y = 乱数() * Math.PI * 2;
-
-  const trunk = new THREE.Mesh(p.サボテン, p.サボテン材);
-  trunk.position.y = 0.67;
-  trunk.castShadow = true;
-  trunk.receiveShadow = true;
-  group.add(trunk);
-
-  // サボテンらしいシルエットにするため、腕を0〜2本ランダムに生やす
-  const 腕数 = Math.floor(乱数() * 3);
-  for (let index = 0; index < 腕数; index += 1) {
-    const 向き = index === 0 ? 1 : -1;
-    const arm = new THREE.Mesh(p.サボテン腕, p.サボテン材);
-    arm.position.set(向き * 0.24, 0.75 + 乱数() * 0.3, 0);
-    arm.rotation.z = 向き * (0.9 + 乱数() * 0.3);
-    arm.castShadow = true;
-    arm.receiveShadow = true;
-    group.add(arm);
-  }
-
-  if (乱数() > 0.55) {
-    const 花 = new THREE.Mesh(p.花芯, p.花材[1]);
-    花.position.set(0, 1.15, 0);
-    花.scale.setScalar(1.4);
-    group.add(花);
-  }
-
-  scene.add(group);
+  const cactus = 植物を用意().サボテン(seed);
+  cactus.position.set(x, 0, z);
+  cactus.scale.setScalar(scale);
+  scene.add(cactus);
 };
 
 const 茂みを作る = (x: number, z: number, scale = 1, seed = 2) => {
   if (!scene) return;
-  const p = 部品を用意();
-  const 乱数 = 乱数を作る(seed);
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  for (let index = 0; index < 3; index += 1) {
-    const bush = new THREE.Mesh(p.茂み, index === 1 ? p.茂み材 : p.葉材[index % p.葉材.length]);
-    bush.position.set((乱数() - 0.5) * 0.7, 0.34 + 乱数() * 0.14, (乱数() - 0.5) * 0.7);
-    bush.scale.setScalar(0.8 + 乱数() * 0.5);
-    bush.castShadow = true;
-    bush.receiveShadow = true;
-    group.add(bush);
-  }
-  scene.add(group);
+  const bush = 植物を用意().茂み(seed);
+  bush.position.set(x, 0, z);
+  bush.scale.setScalar(scale);
+  scene.add(bush);
 };
 
 const 花畑を作る = (x: number, z: number, 半径 = 1.6, 本数 = 10, seed = 3) => {
   if (!scene) return;
-  const p = 部品を用意();
-  const 乱数 = 乱数を作る(seed);
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  for (let index = 0; index < 本数; index += 1) {
-    const 角度 = 乱数() * Math.PI * 2;
-    const 距離 = 乱数() * 半径;
-    const fx = Math.cos(角度) * 距離;
-    const fz = Math.sin(角度) * 距離;
-    const stem = new THREE.Mesh(p.茎, p.茎材);
-    stem.position.set(fx, 0.15, fz);
-    group.add(stem);
-    const flower = new THREE.Mesh(p.花芯, p.花材[Math.floor(乱数() * p.花材.length)]);
-    flower.position.set(fx, 0.3, fz);
-    // 平たくして、棒付きの球ではなく花びららしく見せる
-    const 大きさ = 1.1 + 乱数() * 0.7;
-    flower.scale.set(大きさ, 大きさ * 0.42, 大きさ);
-    group.add(flower);
-    if (乱数() > 0.45) {
-      const blade = new THREE.Mesh(p.草, p.草材);
-      blade.position.set(fx + (乱数() - 0.5) * 0.4, 0.24, fz + (乱数() - 0.5) * 0.4);
-      blade.rotation.set((乱数() - 0.5) * 0.3, 乱数() * 3, (乱数() - 0.5) * 0.3);
-      group.add(blade);
-    }
-  }
-  scene.add(group);
+  const flowers = 植物を用意().花畑(半径, 本数, seed);
+  flowers.position.set(x, 0, z);
+  scene.add(flowers);
 };
 
 const 石を置く = (x: number, z: number, scale = 1, seed = 4) => {
   if (!scene) return;
-  const p = 部品を用意();
   const 乱数 = 乱数を作る(seed);
-  const rock = new THREE.Mesh(p.石, p.石材);
+  const rock = 植物を用意().石(seed);
   rock.position.set(x, 0.16 * scale, z);
   rock.scale.set(scale, scale * 0.62, scale * 0.9);
   rock.rotation.set(乱数(), 乱数() * 3, 乱数());
-  rock.castShadow = true;
-  rock.receiveShadow = true;
   scene.add(rock);
 };
 
 const 小道を作る = () => {
   if (!scene) return;
-  const 土材 = マテリアル(0xcbb185, { roughness: 0.95, metalness: 0.0 });
-  const 縦 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(通路幅 + 0.5, グリッド間隔 * 2.05)), 土材);
-  縦.rotation.x = -Math.PI / 2;
-  縦.position.y = 0.012;
-  縦.receiveShadow = true;
-  const 横 = new THREE.Mesh(ジオメトリ(new THREE.PlaneGeometry(グリッド間隔 * 2.05, 通路幅 + 0.5)), 土材);
-  横.rotation.x = -Math.PI / 2;
-  横.position.y = 0.012;
-  横.receiveShadow = true;
-  scene.add(縦, 横);
+  scene.add(小道の造形を作る(NPC造形ヘルパー, { 幅: 通路幅 + 0.5, 長さ: グリッド間隔 * 2.05 }));
+};
+
+// 建物・家具の形は AIチーム_造形_建物.ts が持つ。ここでは置き場所と向きだけを決める。
+// 種（シード）を持たない家具は、置き場所から種を作って個体ごとに少し形を変える
+const 位置の種 = (x: number, z: number) => Math.abs(Math.round(x * 131 + z * 71)) + 1;
+
+const 家具を置く = (group: THREE.Group, x: number, z: number, rotation = 0) => {
+  if (!scene) return;
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  scene.add(group);
 };
 
 const 作業テントを作る = (x: number, z: number, color: number) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  // エリア色を落ち着いた帆布色へ寄せ、面ごとに陰影を付けて布のテントらしく見せる
-  const 天幕 = マテリアル(
-    new THREE.Color(color).lerp(new THREE.Color(0x2c6379), 0.74).getHex(),
-    { roughness: 0.98, metalness: 0.0, side: THREE.DoubleSide, flatShading: true },
-  );
-  const 支柱 = ジオメトリ(new THREE.CylinderGeometry(0.08, 0.08, 2.7, 8));
-  const 柱位置: [number, number][] = [
-    [-4.4, -3.4],
-    [4.4, -3.4],
-    [-4.4, 3.6],
-    [4.4, 3.6],
-  ];
-  柱位置.forEach(([px, pz]) => {
-    group.add(メッシュ(支柱, p.木材, [px, 1.35, pz]));
-  });
-  const roof = メッシュ(ジオメトリ(new THREE.ConeGeometry(6.4, 2.2, 4)), 天幕, [0, 3.8, 0]);
-  roof.rotation.y = Math.PI / 4;
-  group.add(roof);
-  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.13, 10, 8)), p.木材, [0, 4.98, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(8.95, 0.1, 0.1)), p.濃木材, [0, 2.68, -3.4]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(8.95, 0.1, 0.1)), p.濃木材, [0, 2.68, 3.6]));
-  scene.add(group);
+  家具を置く(建物を用意().作業テント(color), x, z);
 };
 
 const 作業机を作る = (x: number, z: number, rotation = 0) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.rotation.y = rotation;
-
-  const 画面 = マテリアル(0x21455c, {
-    emissive: 0x49d2ff,
-    emissiveIntensity: 0.95,
-    roughness: 0.25,
-  });
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(2.2, 0.14, 1.05)), p.木材, [0, 0.94, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.12, 0.86, 0.12)), p.濃木材, [-0.9, 0.5, -0.35]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.12, 0.86, 0.12)), p.濃木材, [0.9, 0.5, -0.35]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.12, 0.86, 0.12)), p.濃木材, [-0.9, 0.5, 0.35]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.12, 0.86, 0.12)), p.濃木材, [0.9, 0.5, 0.35]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(1.1, 0.68, 0.07)), 画面, [0, 1.42, -0.2]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.1, 0.34, 0.1)), p.金属材, [0, 1.1, -0.2]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.5, 0.03, 0.24)), p.金属材, [0.05, 1.02, 0.28]));
-  // 切り株の椅子
-  const stump = メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.3, 0.34, 0.52, 12)), p.濃木材, [0, 0.26, 1.15]);
-  group.add(stump);
-  scene.add(group);
+  家具を置く(建物を用意().作業机(位置の種(x, z)), x, z, rotation);
 };
 
 const 雑談スペースを作る = (x: number, z: number, color: number) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  const 傘布 = マテリアル(color, { roughness: 0.92, metalness: 0.0, side: THREE.DoubleSide });
-
-  // 丸テーブルとパラソル
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(1.6, 1.6, 0.12, 28)), p.木材, [0, 0.78, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.14, 0.18, 0.78, 12)), p.濃木材, [0, 0.39, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.055, 0.055, 3.0, 8)), p.木材, [0, 1.5, 0]));
-  const 傘 = メッシュ(ジオメトリ(new THREE.ConeGeometry(2.3, 1.2, 10)), 傘布, [0, 2.86, 0]);
-  group.add(傘);
-  group.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.09, 10, 8)), p.木材, [0, 3.52, 0]));
-
-  // 丸太スツール（要員の立ち位置の内側に並べる）
-  const 丸太 = ジオメトリ(new THREE.CylinderGeometry(0.3, 0.32, 0.48, 12));
-  const スツール位置: [number, number][] = [
-    [-2.5, -1.1],
-    [2.5, -1.1],
-    [-2.5, 1.6],
-    [2.5, 1.6],
-    [0, -2.7],
-    [0, 3.0],
-  ];
-  スツール位置.forEach(([sx, sz]) => {
-    group.add(メッシュ(丸太, p.濃木材, [sx, 0.24, sz]));
-  });
-
-  // マグカップ 3 つ
-  const カップ = ジオメトリ(new THREE.CylinderGeometry(0.09, 0.08, 0.16, 10));
-  group.add(メッシュ(カップ, p.布材, [-0.5, 0.92, 0.3]));
-  group.add(メッシュ(カップ, p.布材, [0.55, 0.92, -0.18]));
-  group.add(メッシュ(カップ, p.布材, [0.1, 0.92, 0.72]));
-  scene.add(group);
+  家具を置く(建物を用意().雑談テーブル(color), x, z);
 };
 
 const 瞑想スペースを作る = (x: number, z: number, seed = 5) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  const 敷石 = マテリアル(0xb9b3a2, { roughness: 0.92, metalness: 0.03 });
-  const 座布 = マテリアル(0xd8a25c, { roughness: 0.9, metalness: 0.0 });
-
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(1.7, 1.8, 0.1, 36)), 敷石, [0, 0.05, 0]));
-  const cushion = メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.66, 0.72, 0.2, 24)), 座布, [0, 0.2, 0]);
-  cushion.scale.z = 0.82;
-  group.add(cushion);
-  // 縁を小石で囲む
-  const 乱数 = 乱数を作る(seed);
-  for (let index = 0; index < 9; index += 1) {
-    const 角度 = (index / 9) * Math.PI * 2;
-    const rock = new THREE.Mesh(p.石, p.石材);
-    rock.position.set(Math.cos(角度) * 1.62, 0.12, Math.sin(角度) * 1.62);
-    rock.scale.setScalar(0.34 + 乱数() * 0.22);
-    rock.rotation.set(乱数(), 乱数() * 3, 乱数());
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    group.add(rock);
-  }
-  scene.add(group);
+  家具を置く(建物を用意().瞑想の座(seed), x, z);
 };
 
 const 石灯籠を作る = (x: number, z: number) => {
-  if (!scene) return;
-  const 石 = マテリアル(0xa8a294, { roughness: 0.9, metalness: 0.04 });
-  const 灯 = マテリアル(0xfff0c4, {
-    emissive: 0xffc861,
-    emissiveIntensity: 1.1,
-    roughness: 0.4,
-  });
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.26, 0.32, 0.6, 8)), 石, [0, 0.3, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 8)), 石, [0, 0.85, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(0.42, 0.34, 0.42)), 灯, [0, 1.25, 0]));
-  const 笠 = メッシュ(ジオメトリ(new THREE.ConeGeometry(0.42, 0.3, 8)), 石, [0, 1.56, 0]);
-  group.add(笠);
-  scene.add(group);
+  家具を置く(建物を用意().石灯籠(位置の種(x, z)), x, z);
 };
 
 const ベンチを作る = (x: number, z: number, rotation = 0) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.rotation.y = rotation;
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(1.9, 0.1, 0.62)), p.木材, [0, 0.46, 0]));
-  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(1.9, 0.5, 0.09)), p.木材, [0, 0.74, -0.28]));
-  const 脚 = ジオメトリ(new THREE.BoxGeometry(0.1, 0.46, 0.5));
-  group.add(メッシュ(脚, p.濃木材, [-0.78, 0.23, 0]));
-  group.add(メッシュ(脚, p.濃木材, [0.78, 0.23, 0]));
-  scene.add(group);
+  家具を置く(建物を用意().ベンチ(位置の種(x, z)), x, z, rotation);
 };
 
 const ハンモックを作る = (x: number, z: number) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  const 布 = マテリアル(0x7be3b0, { roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide });
-  const 支柱 = ジオメトリ(new THREE.CylinderGeometry(0.09, 0.11, 1.7, 8));
-  group.add(メッシュ(支柱, p.濃木材, [-1.5, 0.85, 0]));
-  group.add(メッシュ(支柱, p.濃木材, [1.5, 0.85, 0]));
-  // 上半分を開いた半円筒を吊って、たわんだ布に見せる
-  const hammock = メッシュ(
-    ジオメトリ(new THREE.CylinderGeometry(0.52, 0.52, 2.4, 16, 1, true, 0, Math.PI)),
-    布,
-    [0, 0.95, 0],
-  );
-  hammock.rotation.z = Math.PI / 2;
-  hammock.rotation.x = Math.PI;
-  group.add(hammock);
-  const 吊り紐 = ジオメトリ(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 6));
-  group.add(メッシュ(吊り紐, p.木材, [-1.4, 1.3, 0]), メッシュ(吊り紐, p.木材, [1.4, 1.3, 0]));
-  scene.add(group);
+  家具を置く(建物を用意().ハンモック(エリア座標.休憩.色), x, z);
 };
 
 // 炎は出さず、石で囲った薪だけを置く（焚き火跡）
 const 焚き火跡を作る = (x: number, z: number) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  for (let index = 0; index < 7; index += 1) {
-    const 角度 = (index / 7) * Math.PI * 2;
-    const rock = new THREE.Mesh(p.石, p.石材);
-    rock.position.set(Math.cos(角度) * 0.62, 0.1, Math.sin(角度) * 0.62);
-    rock.scale.setScalar(0.3);
-    rock.castShadow = true;
-    group.add(rock);
-  }
-  const 薪 = ジオメトリ(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6));
-  for (let index = 0; index < 3; index += 1) {
-    const log = メッシュ(薪, p.濃木材, [0, 0.14, 0]);
-    log.rotation.set(Math.PI / 2.4, (index / 3) * Math.PI, 0);
-    group.add(log);
-  }
-  scene.add(group);
+  家具を置く(建物を用意().焚き火跡(位置の種(x, z)), x, z);
 };
 
 const 道標を作る = (x: number, z: number) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.09, 0.11, 2.3, 8)), p.濃木材, [0, 1.15, 0]));
-  // 4エリアの方向へ矢印板を向ける
-  const 板 = ジオメトリ(new THREE.BoxGeometry(1.0, 0.2, 0.05));
-  (Object.keys(エリア座標) as エリアキー[]).forEach((key, index) => {
+  // 4エリアの方向へ、エリア色の矢先を付けた矢印板を向ける
+  const 矢印 = (Object.keys(エリア座標) as エリアキー[]).map((key) => {
     const [cx, cz] = エリア中心(key);
-    const 矢印 = メッシュ(板, p.木材, [0, 1.95 - index * 0.32, 0]);
-    矢印.rotation.y = Math.atan2(cx - x, cz - z);
-    矢印.position.x = Math.sin(矢印.rotation.y) * 0.44;
-    矢印.position.z = Math.cos(矢印.rotation.y) * 0.44;
-    group.add(矢印);
+    return { 方位: Math.atan2(cx - x, cz - z), 色: エリア座標[key].色 };
   });
-  group.add(メッシュ(ジオメトリ(new THREE.ConeGeometry(0.14, 0.22, 8)), p.濃木材, [0, 2.4, 0]));
-  scene.add(group);
+  家具を置く(建物を用意().道標(矢印), x, z);
 };
 
 const 池を作る = (x: number, z: number, radius = 2.4, seed = 9) => {
   if (!scene) return;
-  const p = 部品を用意();
-  const 乱数 = 乱数を作る(seed);
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-  const 水 = マテリアル(0x5fb3d4, {
-    roughness: 0.18,
-    metalness: 0.35,
-    transparent: true,
-    opacity: 0.88,
-  });
-  const 岸 = マテリアル(0xc4b48c, { roughness: 0.95, metalness: 0.02 });
-  const bank = メッシュ(ジオメトリ(new THREE.CylinderGeometry(radius + 0.35, radius + 0.5, 0.12, 36)), 岸, [0, 0.02, 0]);
-  bank.castShadow = false;
-  group.add(bank);
-  const water = メッシュ(ジオメトリ(new THREE.CircleGeometry(radius, 36)), 水, [0, 0.09, 0]);
-  water.rotation.x = -Math.PI / 2;
-  water.castShadow = false;
+  // 岸・石・葦・睡蓮は AIチーム_造形_建物.ts、水面は AIチーム_造形_水面.ts
+  group.add(建物を用意().池の岸辺(radius, seed));
+  // 空が映り込み、さざ波の上がやわらかく光る水面
+  const water = 水面を用意().水面(radius, seed + 77);
+  water.position.y = 0.09;
   group.add(water);
-  // 岸辺の石と葦
-  for (let index = 0; index < 7; index += 1) {
-    const 角度 = (index / 7) * Math.PI * 2 + 乱数();
-    const rock = new THREE.Mesh(p.石, p.石材);
-    rock.position.set(Math.cos(角度) * (radius + 0.4), 0.12, Math.sin(角度) * (radius + 0.4));
-    rock.scale.setScalar(0.4 + 乱数() * 0.3);
-    rock.rotation.set(乱数(), 乱数() * 3, 乱数());
-    rock.castShadow = true;
-    group.add(rock);
-  }
-  for (let index = 0; index < 12; index += 1) {
-    const 角度 = 乱数() * Math.PI * 2;
-    const reed = new THREE.Mesh(p.草, p.草材);
-    reed.position.set(
-      Math.cos(角度) * (radius + 0.15 + 乱数() * 0.5),
-      0.34,
-      Math.sin(角度) * (radius + 0.15 + 乱数() * 0.5),
-    );
-    reed.scale.set(0.8, 2.1 + 乱数(), 0.8);
-    group.add(reed);
-  }
   scene.add(group);
 };
 
 const 柵を作る = (x: number, z: number, rotation = 0, 本数 = 4) => {
-  if (!scene) return;
-  const p = 部品を用意();
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.rotation.y = rotation;
-  const 杭 = ジオメトリ(new THREE.CylinderGeometry(0.06, 0.07, 1, 6));
-  const 横板 = ジオメトリ(new THREE.BoxGeometry(1.5, 0.1, 0.05));
-  for (let index = 0; index < 本数; index += 1) {
-    group.add(メッシュ(杭, p.濃木材, [index * 1.5, 0.5, 0]));
-    if (index < 本数 - 1) {
-      group.add(メッシュ(横板, p.木材, [index * 1.5 + 0.75, 0.72, 0]));
-      group.add(メッシュ(横板, p.木材, [index * 1.5 + 0.75, 0.42, 0]));
-    }
-  }
-  scene.add(group);
+  家具を置く(建物を用意().柵(本数, 位置の種(x, z)), x, z, rotation);
 };
 
 const 地面パッチを作る = (
@@ -911,33 +552,21 @@ const 地面パッチを作る = (
   種類: '芝' | 'デッキ' | '砂利' | '石畳',
 ) => {
   if (!scene) return;
-  const 下地色 = 種類 === 'デッキ' ? 0xb5824a : 種類 === '砂利' ? 0xd9c9a3 : 種類 === '石畳' ? 0xbdb7a6 : 0x86bd63;
-  const 下地 = マテリアル(下地色, { roughness: 0.93, metalness: 0.02 });
-  const patch = メッシュ(
-    ジオメトリ(new THREE.CylinderGeometry(radius, radius + 0.12, 0.12, 48)),
-    下地,
-    [x, 0.03, z],
-  );
-  patch.castShadow = false;
+  // 側面は縁石・縁板の色、上面には種類ごとの模様（AIチーム_造形_地面.ts）を貼る。
+  // 高さは従来どおり（上面 y=0.09。うさぎが乗るときの高さもこれを前提にしている）
+  const 縁色 = 種類 === 'デッキ' ? 0x7a5132 : 種類 === '芝' ? 0x8f8a7a : 0x9c958a;
+  const 縁 = マテリアル(縁色, { roughness: 0.93, metalness: 0, flatShading: true });
+  const 模様 = 床テクスチャを作る(種類, 最大異方性());
+  if (模様) 破棄テクスチャ.push(模様);
+  const 上面 = マテリアル(0xffffff, { roughness: 種類 === 'デッキ' ? 0.8 : 0.95, metalness: 0, ...(模様 ? { map: 模様 } : {}) });
+  const patch = new THREE.Mesh(ジオメトリ(new THREE.CylinderGeometry(radius, radius + 0.12, 0.12, 48)), [
+    縁,
+    上面,
+    縁,
+  ]);
+  patch.position.set(x, 0.03, z);
+  patch.receiveShadow = true;
   scene.add(patch);
-
-  if (種類 === 'デッキ') {
-    const 板 = マテリアル(0x9c6a3c, { roughness: 0.88, metalness: 0.02 });
-    // 板の長さを円の弦から求め、丸いデッキの継ぎ目に見えるようにする
-    const 本数 = 6;
-    const 間隔 = radius / (本数 + 1);
-    for (let index = -本数; index <= 本数; index += 1) {
-      const オフセット = index * 間隔;
-      const 長さ = Math.sqrt(Math.max(radius * radius - オフセット * オフセット, 0)) * 1.94;
-      const plank = メッシュ(
-        ジオメトリ(new THREE.BoxGeometry(長さ, 0.02, 0.07)),
-        板,
-        [x, 0.095, z + オフセット],
-      );
-      plank.castShadow = false;
-      scene.add(plank);
-    }
-  }
 
   const ringMaterial = new THREE.MeshBasicMaterial({
     color,
@@ -1216,7 +845,8 @@ const 掲示板を作る = (
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.minFilter = THREE.LinearFilter;
+  // 遠くから見ても文字がちらつかないよう、ミップマップと異方性フィルタを使う
+  texture.anisotropy = 最大異方性();
   texture.needsUpdate = true;
   破棄テクスチャ.push(texture);
 
@@ -1224,8 +854,9 @@ const 掲示板を作る = (
   group.position.set(position[0], 掲示板高さ, position[1]);
   group.name = 'area-board';
   const frameMaterial = マテリアル(0x8a5c33, {
-    metalness: 0.04,
+    metalness: 0,
     roughness: 0.85,
+    flatShading: true,
   });
   const screenMaterial = new THREE.MeshBasicMaterial({
     map: texture,
@@ -1243,7 +874,21 @@ const 掲示板を作る = (
   const 縄材 = マテリアル(0xcdb182, { roughness: 0.95, metalness: 0.0 });
   const 縄 = ジオメトリ(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6));
   group.add(メッシュ(縄, 縄材, [-1.2, 1.11, 0]), メッシュ(縄, 縄材, [1.2, 1.11, 0]));
-  scene.add(group);
+  // 横木の両端の飾り玉と、雨よけの小さな切妻屋根（エリア色の屋根板）
+  const 飾り玉 = ジオメトリ(new THREE.IcosahedronGeometry(0.1, 0));
+  group.add(メッシュ(飾り玉, frameMaterial, [-1.98, 1.3, 0]), メッシュ(飾り玉, frameMaterial, [1.98, 1.3, 0]));
+  const 屋根材 = マテリアル(new THREE.Color(color).lerp(new THREE.Color(0x3a4a5a), 0.35).getHex(), {
+    roughness: 0.85,
+    metalness: 0,
+    flatShading: true,
+  });
+  const 屋根板 = ジオメトリ(new THREE.BoxGeometry(4.3, 0.06, 0.42));
+  [-1, 1].forEach((前後) => {
+    const 板 = メッシュ(屋根板, 屋根材, [0, 1.5, 前後 * 0.17]);
+    板.rotation.x = 前後 * 0.62;
+    group.add(板);
+  });
+  group.add(メッシュ(ジオメトリ(new THREE.BoxGeometry(4.36, 0.07, 0.07)), frameMaterial, [0, 1.62, 0]));  scene.add(group);
   掲示板一覧.push(group);
 };
 
@@ -1251,76 +896,11 @@ const エージェントモデルを作る = (agent: エージェント): THREE.
   const group = new THREE.Group();
   group.userData.agentId = agent.id;
 
-  // 上着は要員色、下半身と装備は共通色で人型のシルエットを作る
-  const 上着 = マテリアル(agent.色, {
-    emissive: agent.色,
-    emissiveIntensity: 0.06,
-    metalness: 0.1,
-    roughness: 0.62,
-  });
-  const 濃色 = マテリアル(0x3c4a5c, { metalness: 0.12, roughness: 0.72 });
-  const 肌 = マテリアル(0xf3ddc4, { metalness: 0.02, roughness: 0.78 });
-  const 髪 = マテリアル(0x4a3b32, { metalness: 0.05, roughness: 0.8 });
-  const 白 = マテリアル(0xf7fbff, { metalness: 0.04, roughness: 0.5 });
-  const 目 = マテリアル(0x23303d, { metalness: 0.05, roughness: 0.35 });
-  const 発光 = マテリアル(0xffffff, {
-    emissive: agent.色,
-    emissiveIntensity: 1.5,
-    roughness: 0.2,
-  });
-
-  // 脚（歩行アニメーション用に前後へ振る）
-  const 脚形 = ジオメトリ(new THREE.CapsuleGeometry(0.11, 0.42, 4, 8));
-  const 靴形 = ジオメトリ(new THREE.BoxGeometry(0.2, 0.1, 0.3));
-  const leftLeg = new THREE.Group();
-  leftLeg.name = 'leftLeg';
-  leftLeg.position.set(-0.15, 0.62, 0);
-  leftLeg.add(メッシュ(脚形, 濃色, [0, -0.3, 0]), メッシュ(靴形, 髪, [0, -0.57, 0.05]));
-  const rightLeg = new THREE.Group();
-  rightLeg.name = 'rightLeg';
-  rightLeg.position.set(0.15, 0.62, 0);
-  rightLeg.add(メッシュ(脚形, 濃色, [0, -0.3, 0]), メッシュ(靴形, 髪, [0, -0.57, 0.05]));
-
-  // 胴（上着 + 襟 + 胸の要員色ランプ）
-  const body = new THREE.Group();
-  body.name = 'body';
-  body.add(メッシュ(ジオメトリ(new THREE.CapsuleGeometry(0.28, 0.42, 5, 14)), 上着, [0, 0.95, 0]));
-  body.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.3, 0.34, 0.14, 14)), 濃色, [0, 0.66, 0]));
-  body.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.14, 0.17, 0.1, 12)), 白, [0, 1.24, 0]));
-  body.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.055, 10, 8)), 発光, [0, 1.06, 0.27]));
-
-  // 腕（肩を支点に振る）
-  const 腕形 = ジオメトリ(new THREE.CapsuleGeometry(0.085, 0.36, 4, 8));
-  const 手形 = ジオメトリ(new THREE.SphereGeometry(0.1, 10, 8));
-  const leftArm = new THREE.Group();
-  leftArm.name = 'leftArm';
-  leftArm.position.set(-0.36, 1.19, 0);
-  leftArm.rotation.z = 0.16;
-  leftArm.add(メッシュ(腕形, 上着, [0, -0.22, 0]), メッシュ(手形, 肌, [0, -0.46, 0]));
-  const rightArm = new THREE.Group();
-  rightArm.name = 'rightArm';
-  rightArm.position.set(0.36, 1.19, 0);
-  rightArm.rotation.z = -0.16;
-  rightArm.add(メッシュ(腕形, 上着, [0, -0.22, 0]), メッシュ(手形, 肌, [0, -0.46, 0]));
-
-  // 頭（顔・髪・目・アンテナ）
-  const head = new THREE.Group();
-  head.name = 'head';
-  head.position.set(0, 1.34, 0);
-  const 顔 = メッシュ(ジオメトリ(new THREE.SphereGeometry(0.27, 20, 16)), 肌, [0, 0.27, 0]);
-  顔.scale.set(1, 1.06, 0.96);
-  head.add(顔);
-  const 前髪 = メッシュ(
-    ジオメトリ(new THREE.SphereGeometry(0.285, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.9)),
-    髪,
-    [0, 0.29, 0],
+  // 服・顔・髪の形は AIチーム_造形_要員.ts。歩行や首振りで回す支点グループの名前と位置は従来どおり
+  const { leftLeg, rightLeg, body, leftArm, rightArm, head } = 要員を用意().部位を作る(
+    agent.色,
+    文字列の種(agent.id),
   );
-  前髪.scale.set(1, 0.92, 1);
-  head.add(前髪);
-  const 目形 = ジオメトリ(new THREE.SphereGeometry(0.037, 10, 8));
-  head.add(メッシュ(目形, 目, [-0.095, 0.28, 0.235]), メッシュ(目形, 目, [0.095, 0.28, 0.235]));
-  head.add(メッシュ(ジオメトリ(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 6)), 濃色, [0.1, 0.55, 0]));
-  head.add(メッシュ(ジオメトリ(new THREE.SphereGeometry(0.055, 10, 8)), 発光, [0.1, 0.67, 0]));
 
   const ringMaterial = new THREE.MeshBasicMaterial({
     color: agent.色,
@@ -1399,10 +979,11 @@ const シーンを作る = () => {
     powerPreference: 'high-performance',
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.28;
+  // 色の濁りが少ないトーンマップで、露出を上げすぎずに陰影のコントラストを残す
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
 
   controls = new OrbitControls(camera, renderer.domElement);
@@ -1417,15 +998,18 @@ const シーンを作る = () => {
   controls.update();
 
   // 昼の草原の光（空色の環境光 + 温かい太陽光）
-  scene.add(new THREE.HemisphereLight(0xdff1ff, 0x6f9c52, 1.15));
-  const keyLight = new THREE.DirectionalLight(0xfff3d6, 2.5);
-  keyLight.position.set(-24, 30, -18);
+  // 環境光を控えめにして太陽光を主役にし、日向と日陰の差をはっきりさせる
+  scene.add(new THREE.HemisphereLight(0xd6ecff, 0x5f8a45, 0.95));
+  const keyLight = new THREE.DirectionalLight(0xfff0d0, 2.7);
+  keyLight.position.copy(太陽位置).normalize().multiplyScalar(48);
+  keyLight.shadow.radius = 2.5;
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.camera.left = -32;
-  keyLight.shadow.camera.right = 32;
-  keyLight.shadow.camera.top = 32;
-  keyLight.shadow.camera.bottom = -32;
+  // エリア外周の木立まで影が落ちる広さにする
+  keyLight.shadow.camera.left = -40;
+  keyLight.shadow.camera.right = 40;
+  keyLight.shadow.camera.top = 40;
+  keyLight.shadow.camera.bottom = -40;
   keyLight.shadow.camera.far = 110;
   keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
@@ -1765,8 +1349,7 @@ const サイズ更新 = () => {
   const height = Math.max(stageRef.value.clientHeight, 1);
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-};
+  camera.updateProjectionMatrix();};
 
 const 描画 = (時刻: number) => {
   if (!renderer || !scene || !camera) return;
@@ -1966,6 +1549,7 @@ const 描画 = (時刻: number) => {
   // 一人称でその生き物に乗って動くと配置ごと引きずられてしまうため
   const 俯瞰位置 = 一人称ラベル.value ? 復帰カメラ位置 : camera.position;
   NPC群を更新(NPC一覧, { 経過時間, delta, 時刻, camera: camera!, 俯瞰位置 });
+  水面?.更新(経過時間);
   // 操作対象が動いたあとにカメラを合わせる。追えなくなったら俯瞰へ戻す
   if (一人称ラベル.value && !一人称を進める(delta, 時刻)) 一人称を解除();
   ラベル位置を更新();
@@ -2404,7 +1988,11 @@ onBeforeUnmount(() => {
   // うさぎ穴のように自前で資源を持つ NPC を片付けてから一覧を空にする
   NPC一覧.forEach((npc) => npc.破棄?.());
   NPC一覧.length = 0;
-  部品 = null;
+  植物 = null;
+  建物 = null;
+  要員造形 = null;
+  水面 = null;
+  空の映り込み = null;
   ラベル要素.clear();
   scene = null;
   camera = null;

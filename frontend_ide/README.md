@@ -143,7 +143,7 @@ CLI窓のタイトル（ネイティブ窓・画面上部・ブラウザタブ�
 ## 起動
 
 セットアップはリポジトリ直下で `python frontend_ide/_setup.py`。既存の全体セットアップからも共通画面を準備します。
-セットアップ済みなら、表示したいフォルダで `aidiy_console`、`aidiy_code`、`aidiy_live`、`aidiy_ide` を実行します。4つのコマンドは共通のVue画面を起動します。IDEの起動名は `aidiy_ide`、アプリ指定は `--app ide` です。
+セットアップ済みなら、表示したいフォルダで `aidiy_console`、`aidiy_code`、`aidiy_live`、`aidiy_ide` を実行します。これらと `aidiy_navi` は共通のVue画面を起動します。IDEの起動名は `aidiy_ide`、アプリ指定は `--app ide` です。
 
 PATH登録なしでも `node <配置先>/frontend_ide/launch.mjs --app ide`（console / code / liveも可）。引数を省略した作業フォルダは実行時のカレントフォルダです。`--project <フォルダ>`、`--browser`、`--no-open`、`--port <番号>`、`--strict-port` に対応します。ポートの既定は0（自動割り当て）。Electronを使えない環境とCodespacesはWebで開きます。Codeの `--offline` はHermesを直接使用します。Liveの `--connect` は初回だけ接続します。
 
@@ -314,3 +314,10 @@ https://github.com/monjyu1101/AiDiy2026
 ## Task / Team の独立起動
 
 Avatar の Task / Team をコピーした独立版を `aidiy_task` / `aidiy_team` で起動できます。元Avatarの機能はそのまま残ります。IDE群のsetupで両コマンドを登録します。TaskのElectron版は要求・フロー図・明細の3窓で、各窓右上から閉じた他画面を再表示できます。3画面をすべて閉じるとTaskアプリを終了します。Core（既定8091）と共通Task / Teamサーバー（既定8093）を別途起動してログインしてください。`--browser` も利用可能です。シアンの状態バーはTask / Teamポートの疎通に連動します。詳しくは `_AIDIY/knowledge/frontend_ide,Vue共通画面変更手順.md` を参照してください。
+
+
+### Navigator
+
+`aidiy_navi [プロジェクトフォルダ]` で独立した `AiDiy Navigator` を開きます。`--browser` はWeb表示、`--new-window` は追加窓です。IDEでは「＋ Navigator」から `AiDiy IDE / Navigator 1`、`2` …を開きます。
+
+「Navigator」は作業項目を提案し、「評価」は項目構成を保って達成度と次のプロンプトを更新します。AIは明示操作時だけ読取専用で使用し、プロンプト案を自動実行しません。「＋ 新規」「一覧」でプロジェクト別の履歴を切り替えます。モデル選択は最下部のCode共通ダイアログ形式で、初期値は `aidiy_hermes / same`。状態は対象フォルダ外の `~/.aidiy/navigation` に保存します。

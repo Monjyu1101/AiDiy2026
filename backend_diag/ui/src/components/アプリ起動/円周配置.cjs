@@ -4,8 +4,8 @@
 // See LICENSE for full terms. Thank you for keeping the rules.
 // https://github.com/monjyu1101/AiDiy2026
 'use strict';
-// 40px正方形の対角線より広い中心間隔。向きを保って回転しても画像が重ならない。
-const 最小半径=80,中心間隔=58,外周余白=38;
+// 48pxクリック領域の対角線より広い中心間隔。向きを保って回転しても画像が重ならない。
+const 最小半径=80,中心間隔=70,外周余白=38;
 function 円周配置(count){
  if(!Number.isInteger(count)||count<0||count>32)return null;
  const radius=n=>Math.max(最小半径,n>1?Math.ceil(中心間隔/(2*Math.sin(Math.PI/n))):0);
