@@ -16,3 +16,19 @@ test('Navigator initial DIP and screen-edge clamp',()=>{
   }
  }
 });
+
+test('Navigator goal starts at three rows and preserves vertical resizing',()=>{
+ const {readFileSync}=require('node:fs');
+ const {join}=require('node:path');
+ const source=readFileSync(join(__dirname,'../src/components/開発スペース/Navigationパネル.vue'),'utf8');
+ assert.match(source,/<textarea[^>]*v-model="goal"[^>]*rows="3"[^>]*@input="editGoal"/);
+ assert.match(source,/\.navigation-goal-form textarea\{[^}]*resize:vertical;[^}]*min-height:48px;max-height:120px;/);
+});
+
+test('Navigator prompt sits outside the scrolling items and before the model footer',()=>{
+ const {readFileSync}=require('node:fs');const {join}=require('node:path');
+ const source=readFileSync(join(__dirname,'../src/components/開発スペース/Navigationパネル.vue'),'utf8');
+ assert.match(source,/<\/div>\s*<\/div>\s*<section v-if="result&&!history" class="navigation-next"/);
+ assert.ok(source.indexOf('class="navigation-next"')<source.indexOf('<footer class="navigation-model-footer">'));
+ assert.match(source,/\.navigation-panel>\.navigation-next \.navigation-prompt\{[^}]*overflow:auto/);
+});

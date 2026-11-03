@@ -11,7 +11,7 @@ import {ref,computed} from 'vue';
 const source=readFileSync(new URL('../src/components/開発スペース/Navigationパネル.vue',import.meta.url),'utf8').split('<script setup>')[1].split('</script>')[0].replace(/^import .*;\n/gm,'');
 function fixture(){
  const calls=[],pending=[],timers=new Map();let serial=0;
- const api=vm.runInNewContext(source+`;({navigate,refresh,busy,job,error,visible,availability})`,{
+ const api=vm.runInNewContext(source+`;({navigate,refresh,busy,job,error,visible,availability,result,overall})`,{
   ref,computed,watch(){},onMounted(){},onBeforeUnmount(){},nextTick:async()=>{},defineProps:()=>({instance:'navi-1',standalone:false}),defineEmits:()=>()=>{},window:{},DEFAULT_NAVIGATION_GOAL:'目標',AbortController,AbortSignal,
   setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id),
   fetch:(url,options)=>{calls.push(options.method);return new Promise((resolve,reject)=>pending.push({resolve,reject}));},
@@ -41,4 +41,11 @@ test('状態取得も失敗した場合は再送禁止のまま定期確認し�
  const retry=f.api.navigate();assert.equal(f.calls.filter(x=>x==='POST').length,2);
  await f.answer({job:{id:'retry',status:'running'}});await retry;await f.answer(state({id:'retry',status:'running'}));
  assert.equal(f.api.busy.value,true);assert.equal(f.timers.size,1);
+});
+
+test('総合評価は評価済み項目を同じ重みで平均し、未評価と0%を区別する',()=>{
+ const {api}=fixture();
+ for(const [items,progress,evaluated,total] of [[[],null,0,0],[[{progress:0}],0,1,1],[[{progress:100},{progress:70},{progress:0}],57,3,3],[[{progress:null},{progress:undefined}],null,0,2],[[{progress:80},{progress:null},{progress:-1},{progress:101}],80,1,4]]){
+  api.result.value={items};assert.equal(api.overall.value.progress,progress);assert.equal(api.overall.value.evaluated,evaluated);assert.equal(api.overall.value.total,total);
+ }
 });
