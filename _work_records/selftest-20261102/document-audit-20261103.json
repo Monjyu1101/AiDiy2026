@@ -1,0 +1,199 @@
+{
+  "date": "2026-11-03",
+  "books": 22,
+  "audit_sections": 22,
+  "audit_local_refs_checked": 17,
+  "broken_audit_refs": [],
+  "paused_source_edits": [
+    {
+      "file": "backend_taskteam/team_proc/team_pdca_db.py",
+      "sha256": "9acae7bc2a123f0b017a410daa1e9521794976fb7a79192f158e06cde171c81d",
+      "changed_from_saved_before": true,
+      "tests": "未実行",
+      "runtime_reflection": "この監査では反映操作なし"
+    },
+    {
+      "file": "backend_taskteam/team_sub/sub_SPDCA__common.py",
+      "sha256": "b9b8d4293ac61b4274833d5158cd4efc0dd595e90da4a6b339caa8bd05ffe036",
+      "changed_from_saved_before": true,
+      "tests": "未実行",
+      "runtime_reflection": "この監査では反映操作なし"
+    },
+    {
+      "file": "backend_server/AIコア/AIバックアップ.py",
+      "sha256": "1ede72ac2df89394bd55c78f5f2841fd2c3603e136048cf6e0ac8db1462929f8",
+      "changed_from_saved_before": true,
+      "tests": "未実行",
+      "runtime_reflection": "この監査では反映操作なし"
+    },
+    {
+      "file": "backend_tools/tools_proc/backup.py",
+      "sha256": "f626964ca188d82e39b2dd3ed223ca725df647b94d94aca751104509810cd557",
+      "changed_from_saved_before": true,
+      "tests": "未実行",
+      "runtime_reflection": "この監査では反映操作なし"
+    }
+  ],
+  "new_runtime_tests": 0,
+  "new_ai_sends": 0,
+  "source_edits_during_audit": 0,
+  "legacy_restart_scope": "旧互換2入力は本文に未実施。現行必須要件の根拠なし。再試験要求から除外。",
+  "residual_case_count": null,
+  "reason": "85章は16冊の章数であり、22冊全体の独立ケース数ではない。全形態の直積を追加しない。",
+  "pdf_count": 22,
+  "pdf_pages": 363,
+  "pdf_review": "全22冊末尾2ページ目視確認",
+  "local_references": 437,
+  "broken_local_references": 0,
+  "backup_followup": {
+    "status": "Tools経路修正確認済み",
+    "tests": 54,
+    "evidence": ".aidiy_cache/selftest/セルフテスト,backend_tools,主要メソッド編/Tools_901_空対象バックアップ.json",
+    "Team": "保存済み2ファイルのハッシュ不変・未テスト"
+  },
+  "team_raw_followup": {
+    "status": "修正・自動/実機確認済み",
+    "tests_passed": 24,
+    "environment_unconfirmed": 1,
+    "evidence": ".aidiy_cache/selftest/セルフテスト,aidiy_team,操作編/Team_405_D原文引継ぎ.json",
+    "source_state": "監査時のpaused_source_editsは当時の記録。最新差分・ハッシュはTeam_405参照。",
+    "runtime": "専用SPDCA1周、D原文とC入力一致、二文条件未達の根拠付き評価、自動OFF・2周目なし",
+    "pdf_check": "team-raw-pdf-check.json"
+  },
+  "diag_folder_followup": {
+    "result": "PASS",
+    "evidence": ".aidiy_cache\\selftest\\セルフテスト,aidiy_diag,設定再起動編\\Diag-設定再起動_502_フォルダ参照取消.json",
+    "date": "2026-11-03T12:43:17.690136",
+    "config_files_unchanged": 16,
+    "pdf_verified": true
+  },
+  "hermes_cli_followup": {
+    "model_switch_restore": "PASS",
+    "conversation": "送信文脈の承認範囲未確定・未送信",
+    "evidence": ".aidiy_cache\\selftest\\セルフテスト,aidiy_hermes,操作編\\Hermes_201_CLIモデル切替復帰.json",
+    "pdf_verified": true
+  },
+  "avatar_image_followup": {
+    "result": "部分確認・画面観察拒否",
+    "evidence": ".aidiy_cache\\selftest\\セルフテスト,aidiy_avatar,Electron実行編\\Avatar-Electron_602_Image素材自動送信.json",
+    "image_inputs": 1,
+    "questions": 0
+  },
+  "channel_cancellation_followup": {
+    "discord": {
+      "date": "2026-11-03T04:09:39.413616+00:00",
+      "scope": "read-only cancellation evidence audit",
+      "guide": "_AIDIY/knowledge/セルフテスト,aidiy_discord,操作編.md",
+      "past_evidence": "Discord_503_待機中の停止.png",
+      "original_explicit_not_tested_line": 200,
+      "configured_destination_ids_available": true,
+      "specific_test_destination_and_content_approval_found": false,
+      "result": "投稿先/内容未指定のため未実施（保留）",
+      "posts": 0,
+      "ai_requests": 0,
+      "runtime_cancel_actions": 0,
+      "source_changes": 0,
+      "settings_changes": 0
+    },
+    "slack": {
+      "date": "2026-11-03T04:09:39.419232+00:00",
+      "scope": "read-only cancellation evidence audit",
+      "guide": "_AIDIY/knowledge/セルフテスト,aidiy_slack,操作編.md",
+      "past_evidence": "Slack_503_待機中の停止.png",
+      "original_explicit_not_tested_line": 213,
+      "configured_destination_ids_available": true,
+      "specific_test_destination_and_content_approval_found": false,
+      "result": "投稿先/内容未指定のため未実施（保留）",
+      "posts": 0,
+      "ai_requests": 0,
+      "runtime_cancel_actions": 0,
+      "source_changes": 0,
+      "settings_changes": 0
+    },
+    "verification": {
+      "pdf_hash_mismatches": [],
+      "broken_local_refs": [],
+      "servers_http200": [
+        8091,
+        8098,
+        8095,
+        8093,
+        8090
+      ],
+      "local8096": "stopped",
+      "diag": "mini",
+      "audio_played_serial": 4
+    }
+  },
+  "diag_tools_defaults_followup": {
+    "result": "PASS for aspect ratio only; ON/OFF untested",
+    "evidence": "_work_records\\selftest-20261102\\diag-tools-defaults.json",
+    "verification": {
+      "pdf_hash_mismatches": [],
+      "broken_refs": []
+    }
+  },
+  "code_folder_race_review": {
+    "date": "2026-11-03",
+    "status": "original runtime race conditions undefined; minimal case proposed, not executed",
+    "guide": "_AIDIY\\knowledge\\セルフテスト,aidiy_code,操作編.md",
+    "evidence": "guide multi-folder runtime 2026-11-02, extension.ts 121-138/161-165/250-258",
+    "new_ai_requests": 0,
+    "runtime_tests": 0,
+    "settings_changes": 0,
+    "source_changes": 0,
+    "verification": {
+      "hash_mismatches": [],
+      "broken_refs": []
+    }
+  },
+  "live_model_review": {
+    "date": "2026-11-03",
+    "result": "405 evidence unconfirmed, failure condition undefined; no provider cross-product requirement",
+    "ai_sends": 0,
+    "connection_changes": 0,
+    "settings_changes": 0,
+    "source_changes": 0,
+    "verification": {
+      "hash_mismatches": [],
+      "broken_refs": []
+    }
+  },
+  "browser_boundary_review": {
+    "date": "2026-11-03",
+    "boundary": "existing automated PASS, not mandatory new runtime test",
+    "live_image_draft": "runtime evidence unconfirmed; real bridge with mock receiver distinct",
+    "new_capture": 0,
+    "transfer": 0,
+    "ai_sends": 0,
+    "source_changes": 0,
+    "verification": {
+      "hash_mismatches": [],
+      "broken_refs": []
+    }
+  },
+  "task_calendar_review": {
+    "date": "2026-11-03",
+    "existing_result": "watch-fix-tests.json 10:57:59 calendar tests2 exit0",
+    "conditions": 10,
+    "new_tests": 0,
+    "new_ai": 0,
+    "result": "calendar fixed-time PASS adopted; real week/month duration unconfirmed and not mandatory"
+  },
+  "twelve_item_final_check": {
+    "books": 22,
+    "pages": 363,
+    "hash_mismatches": [],
+    "broken_references": [],
+    "remaining_mismatches": [],
+    "servers_http200": [
+      8091,
+      8098,
+      8095,
+      8093,
+      8090
+    ],
+    "local": "stopped",
+    "all85pass": false
+  }
+}

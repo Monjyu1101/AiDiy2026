@@ -27,11 +27,11 @@ test('証跡画像は内容順の名前を使い、再撮影は掲載番号を�
   assert.equal(first.file, 'Diag-システム起動_101_起動直後画面.png');
   assert.equal(second.file, 'Diag-システム起動_101_起動直後画面.png');
   assert.equal(third.file, 'Diag-システム起動_101_起動直後画面.png');
-  const folder = join(root, '_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編');
+  const folder = join(root, 'docs/セルフテスト、操作ガイド/images/セルフテスト,aidiy_diag,システム起動編');
   for (const row of [first, second, third]) assert.deepEqual(await readFile(join(folder, row.file)), bytes);
   assert.deepEqual(await readdir(folder), [first.file]);
   await assert.rejects((await createEvidenceRecorder('collision', 'system'))(entry), /evidenceNumber/);
-  const cache = join(root, '.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
+  const cache = join(root, 'docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
   assert.equal((await readdir(cache)).filter(name => name.endsWith('__evidence.json')).length, 3);
   const next = await (await createEvidenceRecorder('20261023-first', 'system'))(entry);
   assert.equal(next.id, '102');
@@ -46,11 +46,11 @@ async function fixture(t) {
   await mkdir(join(root, 'scripts/checks'), {recursive: true});
   await copyFile(new URL('./実画面試験記録.mjs', import.meta.url), script);
   const {createEvidenceRecorder} = await import(pathToFileURL(script).href);
-  const folder = join(root, '_AIDIY/knowledge/images/セルフテスト,aidiy_diag,システム起動編');
+  const folder = join(root, 'docs/セルフテスト、操作ガイド/images/セルフテスト,aidiy_diag,システム起動編');
   const bytes = Buffer.from('89504e470d0a1a0a00000000', 'hex');
   const entry = {paragraph: 1, title: '並行記録画面', status: '観測', note: '合成試験',
     state: {screenshots: [{url: 'data:image/png;base64,' + bytes.toString('base64')}]}};
-  const work = join(root, '.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
+  const work = join(root, 'docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest/セルフテスト,aidiy_diag,システム起動編');
   const manifest = join(work, 'shared__evidence.json');
   return {root, script, folder, work, bytes, entry, manifest,
     recorder: options => createEvidenceRecorder('shared', 'system', options),

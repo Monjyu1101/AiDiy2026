@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "path": "temp\\live-audit-pdf\\14.png",
+      "sha256": "7edecb92d98aaed59354b03ca9deeabd21930778e6be4b7da13783a5f7abf66e"
+    },
+    {
+      "path": "temp\\live-audit-pdf\\15.png",
+      "sha256": "8c78b340e9a4c258945a72f380e653df361c66238974d8f7b4a4f1d43aeefbc4"
+    },
+    {
+      "path": "temp\\live-audit-pdf\\r.mjs",
+      "sha256": "0123ed29e0ae665123f7c5874fc504e0fe20d429907842f82695f913a5a012d2"
+    },
+    {
+      "path": "temp\\output\\20261103.132439.mp3",
+      "sha256": "b3a94627a463417157acef2b777e733033e9d14b600cc5ac4adeed77f8dc9dd0"
+    },
+    {
+      "path": "temp\\output\\20261103.132615.mp3",
+      "sha256": "0a06d111f9a17b4507a0a19e653ef9837eaeab89ea9b33724b9bc14480ed6612"
+    }
+  ]
+}

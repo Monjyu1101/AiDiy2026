@@ -16,6 +16,20 @@ const { transformSync } = require('esbuild');
 const clone = value => JSON.parse(JSON.stringify(value));
 const flush = async () => { for (let n = 0; n < 30; n++) await Promise.resolve(); };
 const initialSettings = { LIVE_AI_NAME: 'freeai_live', LIVE_FREEAI_MODEL: 'free-first', LIVE_FREEAI_VOICE: 'Zephyr' };
+test('Live拡張: 未選択はモデル取得・接続を行わず入力上に案内、フォルダ案内のみ有効', async t => {
+  const f = await fixture(t, { host: true, folder: null });
+  assert.equal(f.calls.api.length, 0);
+  assert.equal(f.data.blocked.value, true);
+  assert.equal(f.button('接続').props.disabled, true);
+  assert.ok(!f.button('接続').props.class.includes('awaiting'));
+  assert.equal(walk(f.render(), n => n?.type === 'textarea').props.disabled, true);
+  const notice = walk(f.render(), n => n?.props?.class === 'workspace-required');
+  assert.ok(contents(notice).includes('先にプロジェクトフォルダを開いてください'));
+  walk(notice, n => n?.type === 'button').props.onClick();
+  assert.equal(f.calls.openFolder, 1);
+  await f.data.connect(); await f.data.openModels();
+  assert.equal(f.calls.connects.length, 0); assert.equal(f.calls.api.length, 0);
+});
 const catalog = {
   live_models: {
     freeai_live: { 'free-first': 'Free 最初', 'free-second': 'Free 次のモデル' },
@@ -54,7 +68,7 @@ function contents(node) {
 }
 
 // 実SFCと実カタログ検証を通す。通信・保存・音声デバイス・描画だけを隔離する。
-async function fixture(t, { host = false, settings = initialSettings } = {}) {
+async function fixture(t, { host = false, settings = initialSettings, folder = { 名前: 'fixture', パス: '/fixture' } } = {}) {
   const noop = () => {}, mounted = [], unmounted = [], module = { exports: {} };
   const calls = { api: [], saves: [], connects: [], packets: [], disconnects: 0, audioStarts: 0, audioCloses: 0 };
   const controls = { catalog: clone(catalog), apiError: '', saveError: '', saveGate: null, connectGate: null };
@@ -62,7 +76,8 @@ async function fixture(t, { host = false, settings = initialSettings } = {}) {
   let saved = clone(settings), sessionSettings = clone(settings);
   class Environment {
     host = host; socketUrl = ''; captureUrl = '';
-    async context() { return { 作業フォルダ: { 名前: 'fixture', パス: '/fixture' }, 保存モデル設定: clone(saved) }; }
+    async context() { return { 作業フォルダ: folder, 保存モデル設定: clone(saved) }; }
+    openFolder() { calls.openFolder = (calls.openFolder || 0) + 1; }
     async api(path, body) {
       calls.api.push({ path, body: clone(body) });
       if (controls.apiError) throw Error(controls.apiError);
@@ -131,7 +146,7 @@ async function fixture(t, { host = false, settings = initialSettings } = {}) {
   t.after(() => { if (!disposed) { disposed = true; for (const callback of unmounted) callback(); scope.stop(); } });
   for (const callback of mounted) await callback();
   await flush();
-  return { data, calls, controls, dialog, selectNodes, button, apply, intervals,
+  return { data, calls, controls, dialog, selectNodes, button, apply, intervals, render,
     async open() {
       const trigger = walk(render(), node => node?.type === 'button' && node.props?.onClick === data.openModels);
       assert.ok(trigger); assert.equal(Boolean(trigger.props.disabled), false);

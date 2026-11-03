@@ -1,0 +1,31 @@
+{
+  "observed": "2026-11-03T12:12:30.684746",
+  "goal": {
+    "CODE_BASE_PATH": "C:/Users/admin/Desktop/AiDiy2026_dev/temp/selftest-finite-20261103/team",
+    "チーム目標": "セルフテスト専用：朝の挨拶を一文で返す有限SPDCA確認",
+    "自動作業設定": 0,
+    "チーム作業": "おはよう。挨拶を一文だけ返してください。Sで一案を相談、Pで一手順を計画、Dで挨拶一文を回答、Cで文数を確認、Aで短い改善所見を述べ、1周で終了。ファイル変更・コマンド実行・追加の作業や外部投稿は不要です。",
+    "作業ループ": 1,
+    "作業ループ回数": 1,
+    "動員要員数": 1,
+    "パターン": "SPDCA",
+    "TEAM_AI_NAME": "codex_cli",
+    "TEAM_AI_MODEL_plan": "auto",
+    "TEAM_AI_MODEL_do": "auto",
+    "TEAM_AI_MODEL_check": "auto",
+    "TASK_AI_NAME": "codex_cli",
+    "TASK_AI_MODEL_plan": "auto",
+    "TASK_AI_MODEL_do": "auto",
+    "TASK_AI_MODEL_check": "auto",
+    "更新連番": 4,
+    "登録日時": "2026-11-03 10:40:19",
+    "登録利用者ID": "admin",
+    "登録利用者名": "Administrator",
+    "登録端末ID": "aidiy_team",
+    "更新日時": "2026-11-03 12:12:11",
+    "更新利用者ID": "admin",
+    "更新利用者名": "Administrator",
+    "更新端末ID": "aidiy_team"
+  },
+  "work": []
+}

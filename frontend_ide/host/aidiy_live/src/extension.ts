@@ -11,6 +11,7 @@
  */
 
 import * as vscode from 'vscode';
+import { usableFolder, folderRequired } from '../../src/workspace-folder';
 import { developmentHtml } from '../../src/vscode-html';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -25,17 +26,24 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
   private view?: vscode.WebviewView;
   private browser?: Awaited<ReturnType<typeof import('./server').ライブ起動>>;
   private generation = 0;
+  private boundFolder = '';
+  private viewResources: vscode.Disposable[] = [];
   ready = false;
   constructor(private context: vscode.ExtensionContext) {}
   private folder() {
     const uri = vscode.window.activeTextEditor?.document.uri;
     const folder = (uri ? vscode.workspace.getWorkspaceFolder(uri) : undefined)
-      || vscode.workspace.workspaceFolders?.find(folder => folder.uri.scheme === 'file');
-    return folder?.uri.scheme === 'file' ? { 名前: folder.name, パス: folder.uri.fsPath } : null;
+      || vscode.workspace.workspaceFolders?.find(folder => usableFolder(folder));
+    return vscode.workspace.isTrusted && usableFolder(folder) && folder ? { 名前: folder.name, パス: folder.uri.fsPath } : null;
   }
-  folderChanged() { void this.view?.webview.postMessage({ type: 'folder', 作業フォルダ: this.folder() }); }
+  folderChanged() {
+    if (this.view && this.boundFolder !== (this.folder()?.パス || '')) this.resolveWebviewView(this.view);
+  }
   resolveWebviewView(view: vscode.WebviewView) {
-    this.host?.dispose(); this.view = view; this.ready = false;
+    this.host?.dispose(); this.viewResources.splice(0).forEach(item => item.dispose());
+    this.view = view; this.ready = false;
+    const folder = this.folder(); this.boundFolder = folder?.パス || '';
+    const viewGeneration = ++this.generation;
     const backend = ローカル接続先(this.context.extensionPath, this.folder()?.パス);
     view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media'), vscode.Uri.joinPath(this.context.extensionUri, 'dist')] };
     const resource = (path: string) => view.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, path)).toString();
@@ -44,7 +52,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
     const pending: { message: unknown; size: number }[] = [];
     let pendingSize = 0;
     const host = this.host = new LiveHost(backend, message => {
-      if (this.view !== view) return;
+      if (this.view !== view || viewGeneration !== this.generation) return;
       if (view.visible) { void view.webview.postMessage(message); return; }
       const packet = message as { type?: string; data?: string };
       // 非表示中の音声を復帰時にまとめて再生しない。会話と接続通知は保持する。
@@ -58,9 +66,18 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
       vscode.workspace.getConfiguration('aidiyLive').get<string>('pythonPath', ''),
       (vscode.workspace.workspaceFolders || []).filter(folder => folder.uri.scheme === 'file').map(folder => folder.uri.fsPath)
     ), join(this.context.extensionPath, 'dist/microphone.py'), internalAuthorization(new URL(backend), [this.context.extensionPath, this.folder()?.パス]));
-    const resources = [
+    const resources = this.viewResources = [
       view.webview.onDidReceiveMessage(message => {
-        if (!vscode.workspace.isTrusted) { host.stop(); return; }
+        if (viewGeneration !== this.generation) return;
+        if (message?.type === 'open-folder') { void vscode.commands.executeCommand('workbench.action.files.openFolder'); return; }
+        if (message?.type !== 'ui-ready' && (!folder || this.folder()?.パス !== folder.パス)) {
+          host.stop();
+          if (Number.isSafeInteger(message?.id)) {
+            void view.webview.postMessage({ type: 'reply', id: message.id, error: folderRequired });
+            if (message.type?.startsWith('socket-')) void view.webview.postMessage({ type: 'socket-closed', id: message.id });
+          }
+          this.folderChanged(); return;
+        }
         if (message?.type === 'ui-ready') this.ready = true;
         else if (message?.type === 'save-model' && Number.isSafeInteger(message.id) && message.id > 0) {
           try {
@@ -80,10 +97,11 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
         }
       }),
     ];
-    view.onDidDispose(() => { host.dispose(); resources.forEach(resource => resource.dispose()); if (this.view === view) { this.view = undefined; this.host = undefined; } });
+    resources.push(view.onDidDispose(() => { host.dispose(); resources.forEach(resource => resource.dispose()); if (this.view === view) { this.view = undefined; this.host = undefined; } }));
   }
   stop() { this.host?.stop(); }
   async standalone() {
+    if (!this.folder()) { void vscode.window.showInformationMessage(folderRequired); return; }
     if (!vscode.workspace.isTrusted) throw new Error('ライブ会話は信頼済みのワークスペースで開いてください。');
     this.stop();
     const generation = ++this.generation;
@@ -96,7 +114,7 @@ class LiveView implements vscode.WebviewViewProvider, vscode.Disposable {
     this.browser = server;
     await vscode.env.openExternal(vscode.Uri.parse(server.url));
   }
-  dispose() { ++this.generation; this.host?.dispose(); this.host = undefined; this.view = undefined; void this.browser?.close(); this.browser = undefined; }
+  dispose() { ++this.generation; this.viewResources.splice(0).forEach(item => item.dispose()); this.host?.dispose(); this.host = undefined; this.view = undefined; void this.browser?.close(); this.browser = undefined; }
 }
 
 export function activate(context: vscode.ExtensionContext) {

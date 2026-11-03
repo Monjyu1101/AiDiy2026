@@ -47,7 +47,9 @@ const busy = computed(() => !!state.実行中 || !!state.モデル変更中 || p
 // 一度本文が届いた依頼では、進捗100件の窓から本文が消えても待機演出へ戻さない。
 // ストリーム枠が開いている間は、光をストリーム枠側（共通表示/会話表示.css）で流す。
 const waitingForStream = computed(() => !!state.実行中 && !hasStreamContent.value && !stream.value?.visible);
-const operable = computed(() => state.信頼済み && state.画面接続済み !== false);
+const folderMissing = computed(() => props.host && !state.作業フォルダ);
+const operable = computed(() => state.信頼済み && state.画面接続済み !== false && !folderMissing.value);
+watch(folderMissing, missing => { if (missing) { picker.value = false; history.value = false; prompt.value = ''; error.value = ''; } });
 const allowed = computed(() => state.信頼済み && state.画面接続済み !== false && !!state.作業フォルダ && (offline.value || state.接続済み));
 const canSend = computed(() => allowed.value && !busy.value && !predicting.value && prompt.value.trim());
 const canStop = computed(() => allowed.value && state.実行中 && !state.停止中 && !stopPending.value);
@@ -333,7 +335,7 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
     <StatusBar :title="windowTitle || (linked ? 'AiDiy IDE / Code' : 'AiDiy Code')" :mode="state.自動接続 ? 'online' : 'offline'" :connected="state.接続済み" :busy="state.接続中" :active="state.実行中" :desktop="desktop" clock-pulse />
     <div class="component-toolbar"><span :title="state.作業フォルダ?.パス">プロジェクト: {{ state.作業フォルダ?.名前 }}</span><nav>
       <button v-if="!embedded" class="auto-connect" role="switch" :aria-checked="state.自動接続" :title="`自動接続 ${state.自動接続 ? 'ON' : 'OFF'}`" :disabled="busy || autoPending || !operable" @click="toggleAuto"><span>自動接続</span><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span></button>
-      <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>
+      <button :disabled="busy || autoPending || !operable || (!offline && !state.接続済み) || (!state.作業フォルダ && !state.新規可能)" @click="send('new')">＋ 新規</button><button :disabled="!operable" :aria-expanded="history" @click="arrivals.reset(); history = !history">{{ history ? '戻る' : '一覧' }}</button>
     </nav></div>
     <p v-if="changingConversation" role="status" class="error">会話の切り替えを確認しています。完了しない場合は、下書きを控えてから画面を再読み込みしてください。</p>
     <div v-if="history" class="history-list" role="list">
@@ -357,10 +359,11 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
       <p v-if="draggingFiles" class="file-drop-hint">ここにドロップして送信（1件4MiB・10件まで）</p><p v-else-if="uploading || fileNotice" class="file-transfer-status" role="status">{{ uploading ? 'ファイル送信中…' : fileNotice }}</p>
       <div v-if="state.添付" class="attachment">{{ state.添付 }} <button :disabled="busy || !operable" aria-label="添付を外す" @click="send('removeAttachment')"><span class="close-icon" aria-hidden="true"></span></button></div>
       <p v-if="!state.信頼済み && host" class="error">VS Codeでワークスペースを信頼してください。</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '予測中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">予測中、、、</span></div>
+      <p v-if="folderMissing" class="workspace-required" role="alert">先にプロジェクトフォルダを開いてください <button type="button" @click="transport.send({ type: 'openFolder' })">フォルダを開く</button></p>
+      <form :class="{ running: waitingForStream || predicting, predicting }" @submit.prevent="submit"><div class="prompt-frame"><textarea ref="input" :disabled="folderMissing" v-model="prompt" rows="3" maxlength="200000" :readonly="predicting" :aria-busy="predicting" :placeholder="predicting ? '予測中、、、' : 'AiDiyに依頼する…'" aria-label="Codeへの依頼" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && canSend) { event.preventDefault(); sendButton.focus(); } }"></textarea><span v-if="predicting && prompt" class="prediction-status" aria-hidden="true">予測中、、、</span></div>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="busy || autoPending || !operable || (!offline && !state.作業フォルダ)" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label" :title="modelLabel">{{ modelLabel }}</span></div>
-          <div class="prediction-options"><label class="prediction-caption">予測</label><button type="button" class="auto-connect auto-suggest" role="switch" :aria-checked="autoSuggest" aria-label="予測" :title="`予測 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span><span>{{ autoSuggest ? 'ON' : 'OFF' }}</span></button></div>
-          <div class="verification-options"><label>検証</label><select :value="offline ? 0 : checks" :disabled="offline" aria-label="検証回数" @change="checks = Number($event.target.value); checksRestored = true; send('setSelfCheckLoop', { count: checks })"><option v-for="n in [0,1,2,3]" :key="n" :value="n">{{ n }}回</option></select><span class="verification-hint">0回:バックアップ・検証無</span></div>
+          <div class="prediction-options"><label class="prediction-caption">予測</label><button type="button" class="auto-connect auto-suggest" :disabled="!operable" role="switch" :aria-checked="autoSuggest" aria-label="予測" :title="`予測 ${autoSuggest ? 'ON' : 'OFF'}`" @click="toggleSuggestion"><span class="auto-connect-track" aria-hidden="true"><span class="auto-connect-thumb"></span></span><span>{{ autoSuggest ? 'ON' : 'OFF' }}</span></button></div>
+          <div class="verification-options"><label>検証</label><select :value="offline ? 0 : checks" :disabled="offline || !operable" aria-label="検証回数" @change="checks = Number($event.target.value); checksRestored = true; send('setSelfCheckLoop', { count: checks })"><option v-for="n in [0,1,2,3]" :key="n" :value="n">{{ n }}回</option></select><span class="verification-hint">0回:バックアップ・検証無</span></div>
           <button v-if="state.実行中" type="button" class="stop" :disabled="!canStop" aria-label="実行を停止" title="実行を停止" @click="stop"><img class="stop-icon" :src="stopIcon" alt=""><span class="stop-label" aria-hidden="true">STOP</span></button>
           <button v-else ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !allowed }" :disabled="!canSend" aria-label="送信"><img :src="sendIcon" alt=""></button>
         </div>
@@ -378,6 +381,7 @@ onBeforeUnmount(() => { cancelPrediction(); draftReceiver.dispose(); disposed = 
   </section>
 </template>
 <style scoped>
+.workspace-required{color:#ff6666;margin:4px 0;font-weight:600;line-height:1.5}
 .composer.file-drop-active{outline:2px dashed #8ecbff;outline-offset:-2px;border-radius:6px;background:rgba(102,126,234,.18)}
 .file-drop-hint,.file-transfer-status{margin:4px 0;font-size:12px;line-height:1.4;color:#a9b8cc;overflow-wrap:anywhere}
 .file-drop-hint{color:#9edfff;font-weight:600}

@@ -637,3 +637,21 @@ def 作業クリア(プロジェクト: str) -> int:
         return cursor.rowcount
     finally:
         conn.close()
+
+
+def 実施明細取得(作業ID: str) -> list[dict]:
+    """同じプロジェクトのD作業に紐づく実施原文。開始・終了通知は含めない。"""
+    conn = 接続取得()
+    try:
+        rows = conn.execute(
+            "SELECT d.明細SEQ, d.タイプ, d.状態, d.応答内容 "
+            "FROM Aチーム作業 w JOIN Aチーム依頼 r ON r.依頼ID = w.依頼ID "
+            "AND r.プロジェクト = w.プロジェクト "
+            "JOIN Aタスク明細 d ON d.タスクID = r.タスクID "
+            "WHERE w.作業ID = ? AND w.PDCA区分 = 'D' "
+            "AND d.タイプ = 'do' ORDER BY d.明細SEQ",
+            [作業ID],
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()

@@ -23,15 +23,15 @@ test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通�
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const extensionPath = join(__dirname, '..');
   const packets = [], sockets = [], timers = new Map();
-  let provider, options, receive, visibility, dispose, timerId = 0;
+  let provider, options, receive, visibility, dispose, folderChanged, timerId = 0;
   const resource = fsPath => ({ fsPath, scheme: 'file', toString: () => `https://webview.test/${fsPath}` });
   const disposable = () => ({ dispose() {} });
   const vscode = {
     Uri: { joinPath: (uri, ...parts) => resource(join(uri.fsPath, ...parts)) },
     workspace: {
-      isTrusted: true, workspaceFolders: [],
+      isTrusted: true, workspaceFolders: [{ name: 'fixture', uri: resource(home) }],
       getConfiguration: () => ({ get: (_key, fallback) => fallback }),
-      onDidChangeWorkspaceFolders: disposable, onDidChangeConfiguration: disposable,
+      onDidChangeWorkspaceFolders: fn => { folderChanged = fn; return disposable(); }, onDidChangeConfiguration: disposable,
     },
     window: {
       registerWebviewViewProvider: (_id, value, config) => { provider = value; options = config; return disposable(); },
@@ -114,6 +114,25 @@ test('Live のタブ切り替え: 同じ接続を保持し、会話と切断通�
     assert.equal(timers.size, 0);
     view.visible = true; visibility();
     assert.ok(packets.some(packet => packet.type === 'socket-closed' && packet.id === 1));
+    const oldReceive = receive, oldSockets = sockets.length;
+    vscode.workspace.workspaceFolders = []; folderChanged();
+    assert.ok(sockets.every(socket => socket.closed));
+    receive({ type: 'socket-open', id: 200 });
+    receive({ type: 'api', id: 201, path: 'core/AIコア/モデル情報/取得' });
+    receive({ type: 'save-model', id: 202, settings: { ...settings, LIVE_AI_NAME: 'gemini_live' } });
+    assert.equal(sockets.length, oldSockets);
+    assert.match(packets.at(-1).error, /フォルダ/);
+    assert.deepEqual(JSON.parse(readFileSync(join(home, '.aidiy/aidiy_live_model.json'), 'utf8')), settings);
+    const empty = JSON.parse(view.webview.html.match(/id="development-config"[^>]*>(.*?)<\/script>/)[1]);
+    assert.equal(empty.live.作業フォルダ, null);
+    vscode.workspace.workspaceFolders = [{ name: 'second', uri: resource(extensionPath) }]; folderChanged();
+    const reopened = JSON.parse(view.webview.html.match(/id="development-config"[^>]*>(.*?)<\/script>/)[1]);
+    assert.equal(reopened.live.作業フォルダ.パス, extensionPath);
+    oldReceive({ type: 'socket-open', id: 203 });
+    assert.equal(sockets.length, oldSockets, '古いWebviewからの要求は再利用しない');
+    receive({ type: 'socket-open', id: 204 });
+    assert.equal(sockets.length, oldSockets + 1);
+
   } finally { dispose(); context.subscriptions[0].dispose(); }
   assert.ok(sockets.every(socket => socket.closed));
   assert.equal(timers.size, 0);

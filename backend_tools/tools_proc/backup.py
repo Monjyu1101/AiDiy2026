@@ -190,6 +190,7 @@ class BackupSave:
             "ok": True,
             "batch": batch,
             "最終時刻": 最終時刻,
+            "対象なし": not all_files,
             "全件数": len(all_files or []),
             "バックアップ件数": len(changed),
             "全件フラグ": bool(全件フラグ),

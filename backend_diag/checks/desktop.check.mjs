@@ -74,7 +74,7 @@ test('Windows EOF stdin no longer exits; IPC starts a secure Electron window',as
 test('Tools 8095 open starts mini at primary work-area top-left before show, while closed/unknown use normal',async()=>{
  for(const toolsOpen of [true,false,null]){
   const f=await mainFixture({toolsOpen,opening:window=>{
-   if(toolsOpen===true){assert.equal(window.bounds.width,384);assert.equal(window.bounds.height,134);assert.equal(window.bounds.x,8);assert.equal(window.bounds.y,36);assert.equal(window.top,false);}
+   if(toolsOpen===true){assert.equal(window.bounds.width,330);assert.equal(window.bounds.height,134);assert.equal(window.bounds.x,8);assert.equal(window.bounds.y,36);assert.equal(window.top,false);}
    else assert.equal(window.bounds,undefined);
    window.show();return true;
   }});
@@ -91,7 +91,7 @@ test('initial mini accepts renderer height during loading and later reload resto
  const f=await mainFixture({toolsOpen:true,load:()=>new Promise(resolve=>loaded=resolve)});
  f.proc.emit('message',{type:'diag-start',url});await new Promise(resolve=>setImmediate(resolve));
  const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
- assert.deepEqual(f.win.getBounds(),{x:8,y:36,width:384,height:134});assert.equal(f.openings.length,0);
+ assert.deepEqual(f.win.getBounds(),{x:8,y:36,width:330,height:134});assert.equal(f.openings.length,0);
  assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);assert.equal(control({...event,sender:{}},'resizeMini',200),false);
  assert.equal(control(event,'resizeMini',186),true);assert.equal(f.win.bounds.height,186);
  loaded();await new Promise(resolve=>setImmediate(resolve));
@@ -116,7 +116,7 @@ test('mini height stays stable during opening and applies only the latest valid 
  const control=f.handlers['diag:window'],event={sender:f.win.webContents,senderFrame:f.win.webContents.mainFrame};
  for(const height of [186,200,186]){assert.equal(control(event,'resizeMini',height),true);assert.equal(f.win.bounds.height,134);}
  assert.equal(control(event,'resizeMini',361),false);assert.equal(control(event,'resizeMini','200'),false);assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);
- finish(true);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.bounds.height,186);assert.deepEqual(f.win.minimum,[384,186]);
+ finish(true);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.win.bounds.height,186);assert.deepEqual(f.win.minimum,[330,186]);
  control(event,'startMini',false);assert.deepEqual(f.win.getBounds(),{x:8,y:36,width:800,height:600});
 });
 test('leaving mini during opening discards a queued height rather than changing normal bounds',async()=>{
@@ -242,7 +242,7 @@ test('native mini height IPC stays main-frame-only, bounded and cannot resize no
  assert.equal(control(event,'startMini',true),true);
  for(const height of [undefined,null,false,true,'134',{},[],NaN,Infinity,-Infinity,0,79,361,134.5])assert.equal(control(event,'resizeMini',height),false);
  assert.equal(control({...event,senderFrame:{}},'resizeMini',200),false);assert.equal(control({...event,sender:{}},'resizeMini',200),false);assert.equal(f.win.bounds.height,134);
- for(const height of [134,186,200,134]){assert.equal(control(event,'resizeMini',height),true);assert.equal(f.win.bounds.height,height);assert.equal(f.win.bounds.width,384);assert.equal(control(event,'startMini',true),true);}
+ for(const height of [134,186,200,134]){assert.equal(control(event,'resizeMini',height),true);assert.equal(f.win.bounds.height,height);assert.equal(f.win.bounds.width,330);assert.equal(control(event,'startMini',true),true);}
  assert.equal(control(event,'startMini',false),true);assert.deepEqual(f.win.getBounds(),original);assert.deepEqual(f.win.minimum,[420,320]);assert.equal(f.win.top,false);
  assert.equal(control(event,'resizeMini',186),false);assert.deepEqual(f.win.getBounds(),original);
 });

@@ -1,0 +1,16 @@
+[
+  "temp/stage-pdf-review",
+  "temp/record-tetris.py",
+  "temp/record-hermes.py",
+  "temp/stage-pdf-check.py",
+  "temp/tetris-layout-check.mjs",
+  "temp/tetris-layout-profile",
+  "temp/narration-taskteam/tetris_layout_intro.mp3",
+  "temp/narration-taskteam/tetris_layout_intro.json",
+  "temp/narration-taskteam/tetris_layout_end.mp3",
+  "temp/narration-taskteam/tetris_layout_end.json",
+  "temp/narration-taskteam/hermes_cli_intro.mp3",
+  "temp/narration-taskteam/hermes_cli_intro.json",
+  "temp/narration-taskteam/hermes_cli_end.mp3",
+  "temp/narration-taskteam/hermes_cli_end.json"
+]

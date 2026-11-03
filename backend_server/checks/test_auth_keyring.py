@@ -118,6 +118,37 @@ class KeyringTests(unittest.TestCase):
         self.assertEqual(self.state()['previous'], [])
         self.assertEqual(len([self.state()['current'], *self.state()['previous']]), 1)
 
+    def test_wall_clock_expired_persisted_generation_can_rotate(self):
+        # 2050年固定の通常fixtureではjose内部の実時刻による期限切れを再現しない。
+        self.now = datetime(2000, 1, 1, tzinfo=UTC)
+        old_kid = self.store.initialize()
+        old_token = self.internal()
+        self.now = datetime.now(UTC)
+        restarted = self.new_store()
+        self.assertNotEqual(restarted.initialize(), old_kid)
+        self.assertEqual(self.state()['previous'], [])
+        restarted.verify(self.internal(), 'POST', READ)
+        with self.assertRaises(JWTError):
+            restarted.verify(old_token, 'POST', READ)
+
+    def test_missing_or_wrong_persisted_time_claim_is_rejected(self):
+        self.store.initialize()
+        good = self.store.path.read_bytes()
+        for field in ('iat', 'exp'):
+            for missing in (True, False):
+                state = json.loads(good)
+                generation = state['current']
+                claims = jwt.get_unverified_claims(generation['internal_token'])
+                if missing:
+                    claims.pop(field)
+                else:
+                    claims[field] += 1
+                generation['internal_token'] = jwt.encode(claims, generation['internal_key'],
+                    algorithm='HS256', headers={'kid': generation['kid']})
+                self.store.path.write_text(json.dumps(state))
+                with self.assertRaises(KeyringError):
+                    self.new_store().initialize()
+
     def test_backward_clock_fails_closed_without_mutation(self):
         self.store.initialize(); before = self.store.path.read_bytes()
         self.now -= timedelta(hours=1)

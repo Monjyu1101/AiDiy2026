@@ -2,7 +2,7 @@
 
 `backend_diag` は、Node.js の診断サーバーと Vue 3 配布画面を Electron / Web で表示する任意起動の診断ツールです。起動・認証・Codespaces・検証の詳細は [backend_diag/README.md](../../backend_diag/README.md) を参照してください。
 
-総合テストの手順・実施結果・エビデンスと、その副産物として残す操作手順書素材は、別冊の[環境確認編](./セルフテスト,aidiy_diag,環境確認編.md)を参照してください。[システム起動編](./セルフテスト,aidiy_diag,システム起動編.md)・[ランチャー編](./セルフテスト,aidiy_diag,ランチャー編.md)とは、手順と実施結果を分けます。本書は実装・保守の運用情報を扱います。
+総合テストの手順・実施結果・エビデンスと、その副産物として残す操作手順書素材は、別冊の[環境確認編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,環境確認編.md)を参照してください。[システム起動編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,システム起動編.md)・[ランチャー編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,ランチャー編.md)とは、手順と実施結果を分けます。本書は実装・保守の運用情報を扱います。
 
 Electronの長押し操作と表示開始ズームは [共通の基本方針](./共通,Electronウィンドウ基本方針.md) に従う。初期ミニ表示でも最終位置・寸法を先に確定し、透明パネル内でズームする。表示中の通常・ミニ切替には登場ズームを再実行しない。
 
@@ -75,7 +75,7 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 - 専用窓の終了確認は `起動/終了確認.cjs` と Electron の `close` イベントで扱う。タイトルバー・OS の閉じる・ミニ表示に共通で、renderer の表示タブやポーリング済み状態には依存させない。固定 loopback の認証付き `api/起動` を3秒以内に再取得し、`終了時停止あり` が true のときだけ停止の確認を表示する。この値は順次起動の実行中または未終了の管理子プロセスがある間 true とし、起動処理の完了後も稼働中なら true のまま。状態取得失敗時も確認し、既定と Escape はキャンセルとする。連打中は同じ確認を共有する。親サーバーの切断は既存の自動終了を継続する。検証は `close-confirm.check.cjs` と `desktop.check.mjs` で、未起動・稼働中・キャンセル・承認・二重操作・状態取得失敗・認証・外部 redirect の非追従を確認する。
 - Mac のアプリ名とメニューは `起動/MacOS-Menu.cjs` から全7アプリ共通の `frontend_ide/host/scripts/MacOS-Menu.cjs` を使う。`electron-main.cjs` が ready 前に `app.setName('AiDiy 診断')`、ウィンドウと終了確認の作成後に最小メニューと Dock のアイコンを設定する。独自メニューの閉じる・⌘Q / ⌘W は `window.close()` を呼び、確認を飛ばす `app.exit()` は呼ばない。編集メニューを表示せず、非表示の native role と `acceleratorWorksWhenHidden` でコピー・貼付・選択・元に戻す等を維持する。`before-input-event` でキー入力を横取りしない。Windows / Linux へは適用しない。`desktop.check.mjs` で終了キャンセル・承認と編集メニュー構成を確認する。`app.setName` は OS 側の Dock 名を変更しない。Dock 名の変更にはアプリバンドルの名称・Info.plist 等の配布設定が必要で、[Electron 公式のパッケージ化手順](https://www.electronjs.org/docs/latest/tutorial/application-distribution)を参照する。
 - 順次起動の表示追従は `api/起動` の `起動表示: {対象, 実行ID}` を使う。サーバーは各機能の再起動開始前に実行IDを更新し、完了・失敗後も最後の対象を保持する。UI は未反映の実行IDだけでタブを選択し、同じ対象の再起動にも対応する。通知文の解析や状態配列の先頭検索で対象を推測しない。定期取得のたびに選択を上書きせず、手動で別タブを見た場合は次の開始まで維持する。ミニ表示を解除せず、表示追従から起動・停止 API を呼ばない。単体確認は `start-follow.check.mjs`、実画面は `start-browser.mjs` で6機能の準備完了を順に保留・解放し、途中の自動表示と手動選択の保持を確認する。
-- 起動画面のミニ表示は `ui/src/components/起動/起動ミニパネル.vue`、切替状態は `ui/src/components/ウィンドウ/起動ミニ表示.mjs`、専用窓の寸法管理は `起動/ミニ表示.cjs` が担当する。上部の6アプリ、利用可能なCLIのアイコンと名称帯、下部の6機能の状態を幅384px・内容に追従する高さで表示し、通常表示で元の位置・寸法・最大化状態を戻す。ミニ中はログの取得を止め、管理状態とポート開放状態を約5秒ごとに取得する。画面切替は起動・停止 API を呼ばない。どのタブからでもミニに入り、復帰は元タブを保持する。切断や画面再読込では通常の窓寸法を復元する。切替IPCは主フレームからの真偽値だけを受け付ける。高さ専用IPCはミニ中だけ80〜360pxの整数を受け付け、幅と位置の指定は公開しない。`ウィンドウ/ミニ高さ.mjs` が自然な内容高と共通タイトル31px・接続線3pxを測り、同値を再送せず、通常表示への復帰で監視を破棄する。検証は `start-mini.check.mjs` と既存 `desktop.check.mjs`、実ブラウザの `start-browser.mjs` で行う。
+- 起動画面のミニ表示は `ui/src/components/起動/起動ミニパネル.vue`、切替状態は `ui/src/components/ウィンドウ/起動ミニ表示.mjs`、専用窓の寸法管理は `起動/ミニ表示.cjs` が担当する。上部の6アプリ、利用可能なCLIのアイコンと名称帯、下部の6機能の状態を幅330px・内容に追従する高さで表示し、通常表示で元の位置・寸法・最大化状態を戻す。ミニ中はログの取得を止め、管理状態とポート開放状態を約5秒ごとに取得する。画面切替は起動・停止 API を呼ばない。どのタブからでもミニに入り、復帰は元タブを保持する。切断や画面再読込では通常の窓寸法を復元する。切替IPCは主フレームからの真偽値だけを受け付ける。高さ専用IPCはミニ中だけ80〜360pxの整数を受け付け、幅と位置の指定は公開しない。`ウィンドウ/ミニ高さ.mjs` が自然な内容高と共通タイトル31px・接続線3pxを測り、同値を再送せず、通常表示への復帰で監視を破棄する。検証は `start-mini.check.mjs` と既存 `desktop.check.mjs`、実ブラウザの `start-browser.mjs` で行う。
 - ミニのサーバー表示は管理プロセスの状態に依存させず、認証付き `GET /api/起動/ポート` と `起動/ポート状態.mjs` を使う。`scripts/起動対象.json` の管理対象6機能のポートだけを127.0.0.1へ並列TCP接続し、1接続500msで打ち切る。任意のホスト・ポート・入力は受け付けず、HTTP本文や認証情報を送らない。開放は緑、未開放・確認不可は灰色。tooltipにポート番号と状態を出す。確認不可を過去の開放結果で補わない。
 - `ui/src/components/起動/起動状態.mjs` は通常表示の更新を800ms、ミニ表示は5秒に分ける。ミニ退出・切断でタイマーと取得中のリクエストを破棄する。管理状態は終了確認・コンソール・停止の所有権に引き続き使い、外部 `_start.py` のサーバーを検出しても所有・停止対象へ加えない。アプリ起動のAvatar / Live / Discordの二重起動確認は押下時だけのまま。
 - ポートの検証は `checks/port-status.check.mjs` の無害なTCP待受で開放・終了・再開、無送信、タイムアウト・キャンセル・固定対象・認証を確認する。`checks/start-mini.check.mjs` は5秒の更新間隔・退出時の停止・未管理サーバーの検出を確認する。`checks/start-browser.mjs` は管理状態とポート状態を独立して変化させ、5秒ごとの色の更新とログ取得停止を実画面で確認する。
@@ -98,7 +98,7 @@ Webの「ブラウザで開く」の右に「手動で開く」を置く。Tools
 - モジュール移動時は import、`import.meta.url`、Electron の package main / preload、fixture の差し替え先を追従させます。Electron の依存物・安全ログ・停止要求は従来の `backend_diag/` 基準、永続的な診断・モデル情報JSONは `_AIDIY/aidiy_diag/` に維持します。一時用途のアプリ/CLI起動ログは `temp/aidiy_diag/アプリ起動/`、サービス監視の実行ID JSON・OSロック・置換用一時ファイルは `temp/aidiy_diag/起動/` を使います。旧場所の自動移動・削除・フォールバックは行いません。更新前の Diag と管理サービスは終了してから起動し直し、稼働中のロック・実行IDは手動削除しません。停止API・cleanupの対象は変更せず、`backend_diag/.stop-request` の位置も維持します。
 - `node --test backend_diag/checks/*.check.mjs backend_diag/checks/*.check.cjs` の layout / bundled-models / launcher / startup / headless テストでパスと起動の回帰を確認します。UI・runtime を変更しない配置変更では配布物を無用に再生成せず、`node backend_diag/ui/verify.mjs` で一致を確認します。
 
-ミニ表示の外部アイコンは7列相当の幅で折り返します。8個以上で1列に固定すると、中央寄せの両端が窓の外へ出るため、`.mini-cli-buttons` の `flex-wrap:wrap` を維持します。高さは内容とタイトル・接続線・外周枠から測り、横方向にはスクロールを作りません。`node backend_diag/checks/initial-mini-desktop.mjs` は実Electronの端数DPI、全外部アイコンの画面内配置、縦スクロール残り、最前面の切替、通常表示への復帰と操作領域を検証します。CLIの導入状態は読み取り、アプリは実起動しません。
+ミニ表示の外部アイコンは6列相当の幅で折り返します。7個以上で1列に固定すると、中央寄せの両端が窓の外へ出るため、`.mini-cli-buttons` の `flex-wrap:wrap` を維持します。高さは内容とタイトル・接続線・外周枠から測り、横方向にはスクロールを作りません。`node backend_diag/checks/initial-mini-desktop.mjs` は実Electronの端数DPI、全外部アイコンの画面内配置、縦スクロール残り、最前面の切替、通常表示への復帰と操作領域を検証します。CLIの導入状態は読み取り、アプリは実起動しません。
 
 ## ソース調査の基準
 
@@ -221,7 +221,7 @@ Liveの応答テキストと1秒以上のWAVを表示し、受信時に認証付
 ## アプリ起動
 
 - ミニ表示は `ui/src/components/アプリ起動/ミニアプリ起動.vue` を使い、Appの同じアプリ状態（選択フォルダ・処理中・結果）を共有する。aidiy_diag起動・再読込時は毎回フォルダ未選択で始める。稼働数の集計行を置かず、「□」の復帰操作はタイトルバーから同じミニ解除イベントを呼ぶ。ミニの6起動ボタンはアイコンのみ、名称はtitleとaria-labelへ残す。サービス状態は3列2行の短い名称と色で表示し、詳細はtitleで確認する。稼働中はミニの項目全体（`起動ミニ.css` の `mini-blink`）と通常画面のタブ下線（`起動.css` の `start-bar-blink`）を緑で非線形に明滅させる。表示灯の丸印は置かない。周期（約4.5秒、項目ごとに4.32〜4.68秒）と開始位置は `ui/src/components/起動/明滅.mjs` が項目ごとにずらし、表示のたびに乱数の揺らぎを加える。明るさはタイトルバーのシアン帯と同じ |sin(πt)| を2.5%刻みで直線補間する。ミニはポート確認が未確認のとき直前の表示を保つ。プロジェクト未選択時は赤字の英語案内「SELECT YOUR PROJECT ▸▸ READY FOR LAUNCH」を電光掲示板風に右端から左端へ流し（`mini-marquee`、黒い格子線を `::after` で重ねたドット文字、titleは「プロジェクト選択してね」）、無効な6起動ボタンを表示する。通常画面のプロジェクト欄も未選択時は赤い枠で選択を促す（`アプリ起動.css` の `app-project-alert`）。アプリ一覧の読込だけを表示時に行い、タスク確認・起動は押下時だけ。ミニと通常で起動経路を複製しない。
-- アイコンは Avatar の `frontend_avatar/public/icons/`、IDE / Console / Code / Live の `frontend_ide/public/`、Discord の `frontend_channels/panel/` から `ui/src/components/アプリ起動/アイコン/` へコピーしたPNG。ビルドでstaticへ同梱し、認証情報を含まない固定6ファイルだけをHTTP公開する。ソースと配布PNGをmanifestで照合し、起動時に他アプリのフォルダを配信しない。アイコン更新後はUIビルドと一致確認を行う。`app-launch-browser.mjs` が6画像の読込、ミニ幅384px・内容高の収まり、赤字・不活性、選択フォルダの共有、ミニからの起動・排他を確認する。
+- アイコンは Avatar の `frontend_avatar/public/icons/`、IDE / Console / Code / Live の `frontend_ide/public/`、Discord の `frontend_channels/panel/` から `ui/src/components/アプリ起動/アイコン/` へコピーしたPNG。ビルドでstaticへ同梱し、認証情報を含まない固定6ファイルだけをHTTP公開する。ソースと配布PNGをmanifestで照合し、起動時に他アプリのフォルダを配信しない。アイコン更新後はUIビルドと一致確認を行う。`app-launch-browser.mjs` が6画像の読込、ミニ幅330px・内容高の収まり、赤字・不活性、選択フォルダの共有、ミニからの起動・排他を確認する。
 - 画面は `ui/src/components/アプリ起動/`、固定起動対象・タスク確認・プロセス生成は `起動/アプリ起動.mjs`、認証付き API は `/api/アプリ起動` と `/api/アプリ起動/{開始,フォルダ}`。システム起動の管理・停止・終了確認に参加させない。
 - 起動には存在する絶対パスのフォルダが必要。Avatar にも選択を必須とするが、Avatar 自体の作業パスは AiDiy 本体にする。他の5種類は選択したパスを `cwd` と `--project` の単一引数に渡す。シェル文字列や任意コマンド・引数は受け付けない。共有設定の `CODE_BASE_PATH` を書き換えない。
 - Electron の `selectProject` は主ウィンドウの主フレームだけが呼べる固定フォルダダイアログ。Web はサーバー側フォルダだけを列挙する。選択は画面内だけで保持し、再読込時は未選択とする。
@@ -269,7 +269,7 @@ AIチャット・AIコードの最終応答が空文字・空白だけ、また�
 - `ui/src/components/アプリ起動/CLI状態.mjs` と `ミニCLI起動.vue` が確認・利用可能項目・名称帯を管理する。プロジェクトは既存アプリ状態を共有する。Hermes・外部CLIは起動中も追加起動でき、要求ごとの処理中状態を管理する。確認ダイアログ・他アプリの起動・フォルダ選択は重ねない。ミニ表示時と再接続時は存在確認だけで、CLI・ログイン・導入を実行しない。
 - `起動/CLI起動.mjs` は固定ID・絶対プロジェクト・自動承認指定だけを受け付け、固定 `frontend_ide/launch.mjs --app console --cli <ID> --cli-auto-approve` へ渡す。ミニの明示クリックは確認ダイアログなしで従来の起動指定を送り、成功後の説明を表示しない。エラー・処理中の状態は通常画面で確認できるまま保持し、ミニには表示しない。同じCLI・プロジェクトでもクリックごとに別のConsole窓を開く。モデル・コマンド文字列を受け付けず、実行ファイルの探索と引数は `frontend_ide/aidiy_console/cli-launch.mjs` を共有する。公式フラグ・出典・古いCLIでの失敗時の扱いは backend_diag/README.md の「ミニ表示からCLIを開く」を参照する。
 - 起動通知はIPCでConsole窓の準備完了を待つ。CLI自身の起動結果はConsoleに表示する。同じDiagで同じCLI・正規化済みプロジェクトでも並行起動し、既存窓へ戻らない。Consoleごとに動的ポート・端末セッション・起動ログを分ける。1つの窓の起動失敗・終了では他の窓のCLIやサーバーを止めない。ブラウザの最後の有効な端末接続が切れて30秒戻らない場合と、表示後30秒以内に初回端末接続が始まらない場合はその窓のCLIと所有サーバーだけを終了する。Diag終了とConsole終了は連動させない。Avatar・Live・Discordの単一起動制限は維持する。
-- タイトル欄はdrag、ボタンはno-dragを維持する。ミニは幅384pxで高さは表示内容に追従する。外部CLIのSVG・PNG・出典・ライセンスは `ui/src/components/アプリ起動/CLIアイコン/` に保持する。AiDiy系は各所有moduleが正本を持ち、DiagはローカルPNGコピーだけを使う（[共通手順](./共通,アイコン原本と配布.md)）。CopilotはGitHub Octicons、Codex / Claude CodeはLobeHub、Grok / OpenCodeは公式配布元の実素材。Hermesは既存AiDiy画像、AgyはAntigravity公式サイトの山形マーク。画像はSVGで作ってPNG化し、生成スクリプトは常設しない。外部CLIのSVGとPNG派生物、HermesのPNG、出典・ライセンス全文 `LICENSE_ICONS.md` をstaticへ配布する。Hermesの正本は `command_hermes/assets/`、Diagでは保守時にコピーしたPNGだけを表示する。通常build/verifyでは他moduleのassetを読まない。AiDiy6アプリも画像内の名称を使い、HTMLの名前は重ねない。上段はAiDiy6アプリ＋Hermes、下段は存在する外部CLIだけを同じ幅で中央寄せする。外部CLI0件なら下段と余白を出さず、更新ボタンも置かない。全画像は名称帯込みの40px枠・40px表示（縦横比維持）、稼働インジケーター6件は1行。変更後はUIビルドとmanifest照合を行う。
+- タイトル欄はdrag、ボタンはno-dragを維持する。ミニは幅330pxで高さは表示内容に追従する。外部CLIのSVG・PNG・出典・ライセンスは `ui/src/components/アプリ起動/CLIアイコン/` に保持する。AiDiy系は各所有moduleが正本を持ち、DiagはローカルPNGコピーだけを使う（[共通手順](./共通,アイコン原本と配布.md)）。CopilotはGitHub Octicons、Codex / Claude CodeはLobeHub、Grok / OpenCodeは公式配布元の実素材。Hermesは既存AiDiy画像、AgyはAntigravity公式サイトの山形マーク。画像はSVGで作ってPNG化し、生成スクリプトは常設しない。外部CLIのSVGとPNG派生物、HermesのPNG、出典・ライセンス全文 `LICENSE_ICONS.md` をstaticへ配布する。Hermesの正本は `command_hermes/assets/`、Diagでは保守時にコピーしたPNGだけを表示する。通常build/verifyでは他moduleのassetを読まない。AiDiy6アプリも画像内の名称を使い、HTMLの名前は重ねない。上段はAiDiy6アプリ＋Hermes、下段は存在する外部CLIだけを同じ幅で中央寄せする。外部CLI0件なら下段と余白を出さず、更新ボタンも置かない。全画像は名称帯込みの40px枠・40px表示（縦横比維持）、稼働インジケーター6件は1行。変更後はUIビルドとmanifest照合を行う。
 - 回帰確認: `node --test backend_diag/checks/{cli-launch,cli-launch-state,mini-cli-ui,start-mini}.check.*` と frontend_ide のCLI/端末テスト（`cli-parallel-lifecycle.test.mjs`を含む）。全タブ復帰・ミニの確認なし起動と成功説明の非表示・連続／同時起動・個別終了・切断・起動失敗・日本語と記号付きパス・モデル引数なし・再接続での再実行なしをfixtureで確認する。実CLI自動作業や有料APIを回帰テストに使わない。
 
 
@@ -370,7 +370,7 @@ Task / Team停止時はTask・Team、Tools停止時はBrowser・Chromeが非表�
 
 変更後はDiagを開き直す。Vueの変更がない場合はUIビルド不要。確認は `node --test backend_diag/checks/icon-menu.check.cjs backend_diag/checks/close-confirm.check.cjs`。下図は実装部品を18項目・2列で開いた確認画面。
 
-![右クリックメニュー](images/backend_diag,アイコンメニュー/右クリックメニュー.jpg)
+![右クリックメニュー](../../docs/セルフテスト、操作ガイド/images/backend_diag,アイコンメニュー/右クリックメニュー.jpg)
 
 ### すりガラス表示
 

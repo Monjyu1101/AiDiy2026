@@ -124,7 +124,10 @@ function createBrowserViews({BrowserWindow,WebContentsView,session,screen,window
    else if(name==='back'){if(contents.navigationHistory.canGoBack())contents.navigationHistory.goBack();}
    else if(name==='forward'){if(contents.navigationHistory.canGoForward())contents.navigationHistory.goForward();}
    else if(name==='reload'){entry.error='';contents.reload();}
-   else if(name==='stop')contents.stop();
+   else if(name==='stop'){
+    // 手動停止後にloadURLのrejectが届いても、取消済みの読込を通信障害として表示しない。
+    ++entry.run;entry.error='';contents.stop();
+   }
    else if(name==='draft')return{ok:true,request:browserDraftRequest(projectRoot,contents.getURL(),entry.capture,now(),{session:record.browserSession,tabId:record.browserTabId})};
    else if(name==='draft-dialog'){entry.dialogOpen=value===true;entry.layout();entry.pointer();}
    else if(name==='open-draft'){record.window.webContents.send('development:browser-open-draft');}

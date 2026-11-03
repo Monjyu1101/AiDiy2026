@@ -235,7 +235,7 @@ Windowsのフレームレス窓には細いOS外枠が残るため、`全画面�
 
 拡大率の違う画面への復帰では、最初の座標設定が旧DPIで換算されることがあります。大きな寸法差は端数補正へ加算せず、移動先で保存寸法を再適用します。125%などの端数DPIでは、1 DIP小さく指定しても実寸が変わらない場合があります。端数の補正は元の目標値から毎回作り直さず、直前の指定値へ残差を加えて実寸を再確認します。最大4回で制限し、同じ指定値への再訪は打ち切り、一致不能なら最も近かった指定値へ戻します。
 
-環境変数 `AIDIY_ALL_EDGE_ONLY=1` を設定して `node frontend_ide/scripts/check-all-displays.mjs` を実行すると、実Electronの画面外への枠配置・VRの5往復・通常窓の復帰位置と寸法の完全一致を検証し、上端画像と `temp/all-displays-check/edge-result.json` を保存します。Electronが`host/node_modules`にある環境では、`ELECTRON_PATH`に`frontend_ide/host/node_modules/electron/dist/electron.exe`の絶対パスを指定します。検証窓はGPU負荷を避けるためソフトウェア描画、窓座標とDPIは実OSです。確認後は環境変数を解除してください。手動相当の再確認ではIDEを再起動してから復帰ボタンとF11の両方を試し、移行前後のキャプチャ寸法・原点も比較します。実施記録は[IDE操作編](./セルフテスト,aidiy_ide,操作編.md)を参照してください。
+環境変数 `AIDIY_ALL_EDGE_ONLY=1` を設定して `node frontend_ide/scripts/check-all-displays.mjs` を実行すると、実Electronの画面外への枠配置・VRの5往復・通常窓の復帰位置と寸法の完全一致を検証し、上端画像と `temp/all-displays-check/edge-result.json` を保存します。Electronが`host/node_modules`にある環境では、`ELECTRON_PATH`に`frontend_ide/host/node_modules/electron/dist/electron.exe`の絶対パスを指定します。検証窓はGPU負荷を避けるためソフトウェア描画、窓座標とDPIは実OSです。確認後は環境変数を解除してください。手動相当の再確認ではIDEを再起動してから復帰ボタンとF11の両方を試し、移行前後のキャプチャ寸法・原点も比較します。実施記録は[IDE操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_ide,操作編.md)を参照してください。
 
 `App.vue` の `canEnterAll` は、Electron版・利用開始済み・3D表示の3条件で判定します。起動画面、2D表示、`--browser` のWeb版ではVRボタンを表示しません。切り替え処理の入口と準備完了後でも同じ条件を確認し、VRから戻す操作は許可します。
 
@@ -568,7 +568,7 @@ Web別窓はOS背景の透明化を保証できず、ブラウザーが最小窓
 
 一時プロジェクトと隔離Chromeを使い、最終更新の通知データだけを試験用に指定します。CSSアニメーションを25%／75%などの途中時刻で固定し、斜線の座標・旧ページの切り抜き・設定時間を比較して撮影します。設定時間800ms／650msは実機のフレームレート測定とは区別してください。経由ページにも `folder-page-sheet` が付くため、旧ページの検査には `[data-page-layer="outgoing"]` を使います。
 
-画像・結果・ハッシュは `images/セルフテスト,aidiy_ide,操作編/` に `<実施ID>-ide-2d-motion__ide-操作_5nn_…画面.png` として保存します。記録先は `セルフテスト,aidiy_ide,操作編.md` の5章です。関連確認は `node --test frontend_ide/checks/folder-pages.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/space-mode.test.mjs` です。
+画像・結果・ハッシュは `docs/セルフテスト、操作ガイド/images/セルフテスト,aidiy_ide,操作編/` に `<実施ID>-ide-2d-motion__ide-操作_5nn_…画面.png` として保存します。記録先は `セルフテスト,aidiy_ide,操作編.md` の5章です。関連確認は `node --test frontend_ide/checks/folder-pages.test.mjs frontend_ide/checks/navigation-parity.test.mjs frontend_ide/checks/space-mode.test.mjs` です。
 
 ## 横画面のビューアとVR操作領域の余白
 
@@ -618,7 +618,7 @@ Electron・Web・VS Code の共通画面はタイトル背景と同じグレー 
 
 ## Browserの日本語URL表示
 
-「Code / Liveへ」は、実際の `session` と送信元の `tab_id` を先頭に付け、表示中URLを同じプロジェクトの下書きへ追加します。IDE配下はBrowser窓ごとの `aidiy_ide N` と同じNのタイトル、単独Browserは起動中固定の `aidiy_browser <UUID>` とタイトル `AiDiy Browser` を使います。空白を含むsession名をそのままMCPへ渡します。単独版の複数窓とIDE番号再利用後の誤操作を避けるため、`tab_id` も併記します。名前の割当とtab IDは `ブラウザCDP.cjs` が所有し、下書きはフォーカス中の窓ではなく送信元レコードから作成します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](./セルフテスト,aidiy_browser,操作編.md)を参照してください。
+「Code / Liveへ」は、実際の `session` と送信元の `tab_id` を先頭に付け、表示中URLを同じプロジェクトの下書きへ追加します。IDE配下はBrowser窓ごとの `aidiy_ide N` と同じNのタイトル、単独Browserは起動中固定の `aidiy_browser <UUID>` とタイトル `AiDiy Browser` を使います。空白を含むsession名をそのままMCPへ渡します。単独版の複数窓とIDE番号再利用後の誤操作を避けるため、`tab_id` も併記します。名前の割当とtab IDは `ブラウザCDP.cjs` が所有し、下書きはフォーカス中の窓ではなく送信元レコードから作成します。撮影後60秒以内だけ、画像の絶対パスも添えます。`デスクトップ/ブラウザ.cjs` が撮影時刻と直近画像を保持し、追加直前にも再判定します。単独Code／Liveと別IDEの候補は `デスクトップ/下書き共有.cjs` のloopback・トークン付き共有口から探し、実際の配送と受信ACKは既存の `draft-router.cjs` を使います。別プロジェクト・古い会話へ渡さず、AIの送信ボタンは自動で押しません。ダイアログ中はWebContentsViewを隠し、閉じると復帰させます。専用試験・画面・PDFは[Browser操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_browser,操作編.md)を参照してください。
 
 Browserの接続表示の右には「撮影」を置きます。表示中のWebContentsViewだけを`capturePage()`でPNG化し、選択プロジェクトの`temp/input/browser-<UUID>.png`へ保存します。タイトルバー・URL欄・デスクトップ全体・スクロール外のページは含めません。任意の保存パスはrendererから受け取らず、撮影中の連打・切断・ページ遷移は拒否します。保存後は画面に保存先を示します。Avatarの`input_image`はAIコアの`backend_server/temp/input`への保存とLive送信であり、このBrowserのプロジェクト内保存とは別の経路です。Browserの撮影だけではLiveやAI推論を起動しません。
 

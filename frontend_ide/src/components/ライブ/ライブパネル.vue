@@ -44,7 +44,8 @@ let cloud, audio, connection, heartbeat, generation = 0, micGeneration = 0, disp
 let preserveOnConnectionLost = false;
 const keys = (name = provider.value) => { const vendor = name === 'openai_live' ? 'OPENAI' : name === 'freeai_live' ? 'FREEAI' : 'GEMINI'; return { model: `LIVE_${vendor}_MODEL`, voice: `LIVE_${vendor}_VOICE` }; };
 const modelLabel = computed(() => [settings.value.LIVE_AI_NAME, settings.value[keys(settings.value.LIVE_AI_NAME).model]].filter(Boolean).join(' - ') || 'AiDiy のライブ会話');
-const blocked = computed(() => busy.value || modelSaving.value);
+const folderMissing = computed(() => environment.host && !project.value?.パス);
+const blocked = computed(() => folderMissing.value || busy.value || modelSaving.value);
 const audible = computed(() => props.visible !== false && speaker.value);
 const selectedModel = computed(() => ({ LIVE_AI_NAME: provider.value, [keys().model]: model.value, [keys().voice]: voice.value }));
 const selectionError = computed(() => ライブ選択エラー(selectedModel.value, { models: models.value, voices: voices.value }));
@@ -119,6 +120,7 @@ function receive(packet) {
   }
 }
 async function loadModels(session = '') {
+  if (folderMissing.value) return;
   const run = generation;
   const data = await environment.api('core/AIコア/モデル情報/取得', { セッションID: session });
   if (disposed || run !== generation) return;
@@ -140,7 +142,7 @@ function disconnect(clear = true) {
   if (clear) { messages.value = []; prompt.value = ''; welcomeKey.value++; welcomeVisible.value = true; }
 }
 async function connect(preserve = false, automatic = false) {
-  if (busy.value || disposed) return;
+  if (folderMissing.value || busy.value || disposed) return;
   const run = ++generation; draftGeneration.value++; busy.value = true; error.value = '';
   preserveOnConnectionLost = preserve;
   try {
@@ -281,7 +283,7 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
 <template>
   <section class="ai-component live-component" :class="{ 'desktop-window': desktop, connected, 'file-drop-active': draggingFiles }" data-component="LivePanel" @dragover="dragFiles" @dragleave="leaveFiles" @drop="dropFiles">
     <StatusBar :title="linked ? 'AiDiy IDE / Live' : 'AiDiy Live'" :connected="connected" :busy="busy" :active="mic" :status="changing ? '再接続中' : connected && mic ? '会話中' : undefined" :desktop="desktop" :clock-pulse="visible !== false" />
-    <div class="component-toolbar"><span :title="project?.パス">プロジェクト: {{ project?.名前 || '未選択' }}</span><nav><button :disabled="blocked || modelLoading" @click="newChat">新しい会話</button><button class="live-connect" :class="{ awaiting: !connected && !busy }" :disabled="blocked || modelLoading" @click="connected ? disconnect() : connect()">{{ busy ? '接続中…' : connected ? '切断' : '接続' }}</button></nav></div>
+    <div class="component-toolbar"><span :title="project?.パス">プロジェクト: {{ project?.名前 || '未選択' }}</span><nav><button :disabled="blocked || modelLoading" @click="newChat">新しい会話</button><button class="live-connect" :class="{ awaiting: !connected && !busy && !blocked && !modelLoading }" :disabled="blocked || modelLoading" @click="connected ? disconnect() : connect()">{{ busy ? '接続中…' : connected ? '切断' : '接続' }}</button></nav></div>
     <canvas ref="canvas" class="audio-cloud"></canvas>
     <div class="audio-actions"><button class="audio-button" :disabled="!connected || blocked" :aria-pressed="connected && speaker" :aria-label="`スピーカー ${connected && speaker ? 'ON' : 'OFF'}`" @click="sound"><span class="symbol speaker-symbol" :style="{ '--symbol-image': `url('${speakerIcon}')` }"></span><strong>{{ connected && speaker ? 'ON' : 'OFF' }}</strong></button><button class="audio-button microphone" :disabled="!connected || blocked || micBusy" :aria-pressed="mic" :aria-busy="micBusy" :aria-label="micBusy ? 'マイク準備中' : `マイク ${mic ? 'ON' : 'OFF'}`" @click="microphone"><span class="symbol" :style="{ '--symbol-image': `url('${microphoneIcon}')` }"></span><strong>{{ mic ? 'ON' : 'OFF' }}</strong></button></div>
     <main ref="conversation" class="conversation live-conversation" aria-label="会話の記録" role="log" aria-live="polite">
@@ -289,7 +291,8 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
       <article v-for="item in messages" :ref="el => el ? rows.set(item.id, el) : rows.delete(item.id)" :key="item.id" :class="['message',item.role,item.type, { recognition: item.type.startsWith('recognition_') }]" :title="!item.attachment && (item.role === 'user' || item.type.startsWith('recognition_')) ? 'クリックして入力欄へ戻す' : undefined" @click="copyInput(item)"><ChatAttachment v-if="item.attachment" :attachment="item.attachment" /><template v-else>{{ item.text }}</template></article>
     </main>
     <footer class="composer" :class="{ 'file-drop-active': draggingFiles }"><p v-if="draggingFiles" class="file-drop-hint">ここにドロップして送信（1件4MiB・10件まで）</p><p v-else-if="fileStatus" class="file-transfer-status" role="status">{{ fileStatus }}</p><p v-if="error" role="alert" class="error">{{ error }}</p>
-      <form @submit.prevent="submit"><textarea ref="input" v-model="prompt" rows="3" maxlength="20000" placeholder="AiDiyに話しかける…" aria-label="Liveへのメッセージ" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && event.keyCode !== 229 && connected && !blocked && !uploadingFiles && prompt.trim()) { event.preventDefault(); sendButton.focus(); } }"></textarea>
+      <p v-if="folderMissing" class="workspace-required" role="alert">先にプロジェクトフォルダを開いてください <button type="button" @click="environment.openFolder()">フォルダを開く</button></p>
+      <form @submit.prevent="submit"><textarea :disabled="folderMissing" ref="input" v-model="prompt" rows="3" maxlength="20000" placeholder="AiDiyに話しかける…" aria-label="Liveへのメッセージ" @keydown.tab="event => { if (!event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing && event.keyCode !== 229 && connected && !blocked && !uploadingFiles && prompt.trim()) { event.preventDefault(); sendButton.focus(); } }"></textarea>
         <div class="composer-actions"><div class="keyboard-hint">Enter で改行 · Tab → Enter で送信</div><div class="composer-meta"><button type="button" :disabled="blocked || modelLoading" @click="openModels"><span class="model-caption">モデル</span> <span class="model-chevron">▾</span></button><span class="model-label">{{ modelLabel }}</span></div><button ref="sendButton" type="submit" class="send" :class="{ 'ws-disabled': !connected }" :disabled="!connected || blocked || uploadingFiles || !prompt.trim()" aria-label="送信"><img :src="sendIcon" alt=""></button></div>
       </form>
     </footer>
@@ -305,6 +308,8 @@ onBeforeUnmount(() => { draftReceiver.dispose(); disposed = true; disconnect(); 
 </template>
 
 <style scoped>
+.workspace-required{color:#ff6666;margin:4px 0;font-weight:600;line-height:1.5}
+.live-component:has(.workspace-required) .live-connect:disabled{opacity:.4;background:transparent;color:inherit;border-color:#444}
 .composer.file-drop-active{outline:2px dashed #8ecbff;outline-offset:-2px;border-radius:6px;background:rgba(102,126,234,.18)}
 .file-drop-hint,.file-transfer-status{margin:4px 0;font-size:12px;line-height:1.4;color:#a9b8cc;overflow-wrap:anywhere}
 .file-drop-hint{color:#9edfff;font-weight:600}

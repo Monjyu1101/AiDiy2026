@@ -1,0 +1,34 @@
+{
+  "tests": {
+    "host": 5,
+    "vue": 21,
+    "fail": 0
+  },
+  "typecheck": "exit0",
+  "package": "exit0",
+  "installed_hashes": {
+    "code": {
+      "extension.js": true,
+      "development/app.js": true,
+      "development/app.css": true
+    },
+    "live": {
+      "extension.js": true,
+      "development/app.js": true,
+      "development/app.css": true
+    }
+  },
+  "warnings": [
+    "VSCode CLI DEP0169 url.parse deprecation"
+  ],
+  "real_ui": [
+    "Code Live empty folder red notice and input disabled",
+    "open workspace notice disappears",
+    "close workspace notice returns"
+  ],
+  "not_tested": [
+    "real multiroot switch",
+    "AI send"
+  ],
+  "servers": "5 TCP and HTTP 200"
+}

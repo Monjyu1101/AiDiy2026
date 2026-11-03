@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "path": "temp\\browser-audit-pdf\\14.png",
+      "sha256": "d1855212fc3a360ed514139cb7bb24f5c71aeaa93d9c8ee6c5dcb19604d0e952"
+    },
+    {
+      "path": "temp\\browser-audit-pdf\\15.png",
+      "sha256": "7a3146150e6e493704ec3eb7a71e1dcc581f5a9ac4e3fe66f970c9bb56708f90"
+    },
+    {
+      "path": "temp\\browser-audit-pdf\\r.mjs",
+      "sha256": "bf15a69fb01ec0a619a69ec560dad17e79db231ff05c14e9588e8ca3049ac805"
+    },
+    {
+      "path": "temp\\output\\20261103.132918.mp3",
+      "sha256": "643f215cafcb58b0e6dbc6eb5fc60300a8279a69aceba7a362fca2c16b0b81d6"
+    },
+    {
+      "path": "temp\\output\\20261103.133041.mp3",
+      "sha256": "3fe4efa507ebf810c2ee6c7464380e108d487779979fcc918b03aa3b96d78073"
+    }
+  ]
+}

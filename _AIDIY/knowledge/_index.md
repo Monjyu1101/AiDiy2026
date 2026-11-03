@@ -5,7 +5,7 @@
 - 文書の役割・命名・統合・削除・検証: [ナレッジ更新手順](./共通,ナレッジ更新手順.md)
 - セルフテストの冊子・画像・PDF: [説明資料の書き方](./セルフテスト,_説明資料の書き方.md)
 - セルフテストの音声解説と実演: [セルフテスト解説・ナレーション方法](./共通,セルフテスト解説・ナレーション方法.md)
-- 実施済み試験と未確認範囲: [確認結果](./セルフテスト,共通,確認結果.md)
+- 実施済み試験と未確認範囲: [確認結果](../../docs/セルフテスト、操作ガイド/セルフテスト,共通,確認結果.md)
 - 起動・依存・テスト: [開発環境運用手順](./共通,開発環境運用手順.md)
 - cleanup と残留確認: [クリーンアップ手順](./共通,クリーンアップ手順.md)
 - ローカルモデル: [モデル準備と起動](./backend_local,モデル準備と起動.md)
@@ -22,30 +22,69 @@ Toolsが利用できる場合の作業中の音声案内は [MCP活用手順](./
 | VRM / VRMA | モデルやモーションファイルを追加する場合は [`frontend_avatar,VRM_VRMA追加手順.md`](./frontend_avatar,VRM_VRMA追加手順.md)、表示サイズ・向き・表示選択 UI は [`frontend_avatar,frontend_web,アバター表示とVRMA.md`](./frontend_avatar,frontend_web,アバター表示とVRMA.md)、描画内部やカメラワークは [`frontend_avatar,3Dアバター制御(Three.js VRM).md`](<./frontend_avatar,3Dアバター制御(Three.js VRM).md>) を使う。 |
 | MCP / 起動 | backend 常駐サーバーの起動は [`backend_server,command_hermes,backend_tools,バックエンド起動.md`](./backend_server,command_hermes,backend_tools,バックエンド起動.md)、MCP サーバー構成は [`backend_tools,構成.md`](./backend_tools,構成.md)、Code CLI への MCP 登録は [`command_hermes,backend_tools,CodeCLI_MCP設定.md`](./command_hermes,backend_tools,CodeCLI_MCP設定.md) を使う。 |
 
+## セルフテスト資料の使い方
+
+
+
+最初に共通準備・Diagを確認し、使うアプリまたはWeb業務の冊子へ進みます。Toolsは連携機能の確認時、確認結果は実施範囲と残件の照合時に参照します。すべてを順に実行する必要はありません。サーバー停止・外部送信・登録更新を伴う章は、その操作条件を確認してから実施します。
+
+冊子の役割と実行形態の一覧はここに集約しています。**操作・検証ガイド21冊＋結果台帳1冊＝22冊**です。PDFの存在は全項目の合格を意味しません。実機試験、自動・隔離試験、音声解説、過去の証拠と今回の結果を区別し、各冊子の未確認範囲も確認してください。
+
+共通の準備・記録・命名規則は[説明資料の書き方](./セルフテスト,_説明資料の書き方.md)、解説音声の段取りは[ナレーション方法](./共通,セルフテスト解説・ナレーション方法.md)です。この2文書と本索引は22冊のPDFに含めません。
+
+### 共通準備・Diag
+
+| 冊子・本文 | PDF | 役割 | 対象実行形態 |
+|---|---|---|---|
+| [aidiy_diag ／ システム起動編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,システム起動編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,システム起動編.pdf) | システムの起動・停止と稼働確認 | Diag Electron／管理サーバー |
+| [aidiy_diag ／ ランチャー編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,ランチャー編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,ランチャー編.pdf) | 作業フォルダ選択、試験アカウント、アプリ起動 | Diag 標準・ミニ・アイコン |
+| [aidiy_diag ／ 環境確認編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,環境確認編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,環境確認編.pdf) | 導入状況、モデル一覧、外部連携の確認 | Diag 環境確認タブ |
+| [aidiy_diag ／ AIモデル・Tools編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,AIモデル・Tools編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,AIモデル・Tools編.pdf) | モデル応答とTools管理の確認 | Diag 診断画面／各接続先 |
+| [aidiy_diag ／ 設定再起動編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,設定再起動編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_diag,設定再起動編.pdf) | 設定保存・取消、再起動と復帰の確認 | Diag 設定画面／管理サーバー |
+
+### 各アプリ
+
+| 冊子・本文 | PDF | 役割 | 対象実行形態 |
+|---|---|---|---|
+| [aidiy_console ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_console,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_console,操作編.pdf) | CLIを開く入口とConsole画面 | 単独Electron（CLI個別操作はHermes編等） |
+| [aidiy_hermes ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_hermes,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_hermes,操作編.pdf) | ヘルプ・状態確認とCLI会話 | CLI。Electronアプリではありません |
+| [aidiy_code ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_code,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_code,操作編.pdf) | コード支援チャットの起動・入力・応答 | 単独Electron／--browser／VS Code拡張 |
+| [aidiy_live ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_live,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_live,操作編.pdf) | Live接続、文字・音声会話 | 単独Electron／--browser／VS Code拡張 |
+| [aidiy_ide ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_ide,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_ide,操作編.pdf) | 閲覧・検索・銀河表示とアプリ連携 | IDE Electron／ブラウザ。呼び出し・受渡しを扱う |
+| [aidiy_browser ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_browser,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_browser,操作編.pdf) | ページ閲覧、表示サイズ、パネルと連携 | 専用Browser Electron。Code/Liveの--browserとは別 |
+| [aidiy_task ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_task,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_task,操作編.pdf) | 要求・明細・開始条件と実行結果 | 単独Task／IDE連携起動 |
+| [aidiy_team ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_team,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_team,操作編.pdf) | 要員・依頼・作業ループと結果 | 単独Team／IDE連携起動 |
+| [aidiy_avatar ／ Electron実行編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_avatar,Electron実行編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_avatar,Electron実行編.pdf) | 独立窓の認証・会話・表示・ファイル閲覧 | Avatar Electron（8092） |
+| [aidiy_avatar ／ Web実行編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_avatar,Web実行編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_avatar,Web実行編.pdf) | 左右パネル・タブの認証と会話 | Avatar Web（8092）。通常Web8090とは別 |
+| [aidiy_discord ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_discord,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_discord,操作編.pdf) | Discord接続・会話・設定・終了 | Discordパネル／Bot。外部投稿・音声は別条件 |
+| [aidiy_slack ／ 操作編](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_slack,操作編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,aidiy_slack,操作編.pdf) | Slack接続・スレッド会話・設定・終了 | Slackパネル／Bot。外部投稿は別条件 |
+
+### Web業務・共通画面
+
+| 冊子・本文 | PDF | 役割 | 対象実行形態 |
+|---|---|---|---|
+| [frontend_web ／ AiDiy編](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,AiDiy編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,AiDiy編.pdf) | ログイン、AI画面、共通ナビ・管理・X系デモ | 通常Web（8090）。X系は第7章で、独立冊子なし |
+| [frontend_web ／ 配車管理編](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,配車管理編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,配車管理編.pdf) | 配車関連マスタ・伝票・日／週予定 | 通常Web（8090） |
+| [frontend_web ／ 生産・在庫管理編](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,生産・在庫管理編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,frontend_web,生産・在庫管理編.pdf) | 生産・在庫マスタ、伝票、予定・推移 | 通常Web（8090） |
+
+### Tools
+
+| 冊子・本文 | PDF | 役割 | 対象実行形態 |
+|---|---|---|---|
+| [backend_tools ／ 主要メソッド編](../../docs/セルフテスト、操作ガイド/セルフテスト,backend_tools,主要メソッド編.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,backend_tools,主要メソッド編.pdf) | 代表的なMCPメソッドと入出力の確認 | Tools API／MCP。全メソッド網羅ではない |
+
+### 確認結果
+
+| 冊子・本文 | PDF | 役割 | 対象実行形態 |
+|---|---|---|---|
+| [共通 ／ 確認結果](../../docs/セルフテスト、操作ガイド/セルフテスト,共通,確認結果.md) | [PDF](../../docs/セルフテスト、操作ガイド/セルフテスト,共通,確認結果.pdf) | 実施範囲・判定・未確認事項の照合 | 全体の結果台帳。操作ガイドの代わりにはしない |
+
 ## 迷ったときの入口
 
-セルフテストの現行構成・確認済み範囲・対象外条件は、[確認結果](./セルフテスト,共通,確認結果.md)を入口にします。操作手順と画面は、下記の各操作編を参照します。
+セルフテストの冊子選びは上の「セルフテスト資料の使い方」に集約しています。以下は実装・運用ナレッジへの案内です。
 
 | 症状・依頼 | 最初に見るファイル |
 |-----------|------------------|
-| 総合テストの説明資料を、簡潔・丁寧に、画像説明を添えてまとめる | [説明資料の書き方](./セルフテスト,_説明資料の書き方.md) |
-| aidiy_diagの起動・停止を総合テストし、操作手順書素材を残す | [システム起動編](./セルフテスト,aidiy_diag,システム起動編.md) |
-| aidiy_diagのプロジェクト選択・アプリ起動を総合テストし、操作手順書素材を残す | [ランチャー編](./セルフテスト,aidiy_diag,ランチャー編.md) |
-| aidiy_diagの導入状況・モデル・外部連携を総合テストし、操作手順書素材を残す | [環境確認編](./セルフテスト,aidiy_diag,環境確認編.md) |
-| aidiy_diagの設定モデル・AIモデルの応答とTools管理・代表試験を確認する | [AIモデル・Tools編](./セルフテスト,aidiy_diag,AIモデル・Tools編.md) |
-| aidiy_diagの設定保存・キャンセル・バックエンド再起動を確認する | [設定再起動編](./セルフテスト,aidiy_diag,設定再起動編.md) |
-| Consoleの単独操作を確認する | [Console操作編](./セルフテスト,aidiy_console,操作編.md) |
-| Codeの単独操作を確認する | [Code操作編](./セルフテスト,aidiy_code,操作編.md) |
-| Liveの単独操作を確認する | [Live操作編](./セルフテスト,aidiy_live,操作編.md) |
-| Discordの単独操作を確認する | [Discord操作編](./セルフテスト,aidiy_discord,操作編.md) |
-| Hermesの単独操作を確認する | [Hermes操作編](./セルフテスト,aidiy_hermes,操作編.md) |
-| IDEの利用開始・閲覧・Code/Live連携を総合テストし、操作手順書素材を残す | [IDE操作編](./セルフテスト,aidiy_ide,操作編.md) |
-| Browserの表示・撮影・Code/Live連携を確認する | [Browser操作編](./セルフテスト,aidiy_browser,操作編.md) |
-| Slackの起動・応答・スレッド継続・モデル設定を確認する | [Slack操作編](./セルフテスト,aidiy_slack,操作編.md) |
-| WebのAI機能を確認する | [AiDiy編](./セルフテスト,frontend_web,AiDiy編.md) |
-| 独立Task・Teamを操作・確認する | [確認結果](./セルフテスト,共通,確認結果.md)。[Task操作編](./セルフテスト,aidiy_task,操作編.md)・[Team操作編](./セルフテスト,aidiy_team,操作編.md)に現行の操作と確認結果をまとめています。 |
-| Webの配車・生産・在庫を確認する | [配車管理編](./セルフテスト,frontend_web,配車管理編.md)、[生産・在庫管理編](./セルフテスト,frontend_web,生産・在庫管理編.md) |
-| Avatarを実行方式ごとに確認する | [Electron実行編](./セルフテスト,aidiy_avatar,Electron実行編.md)、[Web実行編](./セルフテスト,aidiy_avatar,Web実行編.md) |
 | Electron画面の0.5秒長押しドラッグ、透明パネルで領域を先に確保する表示開始ズーム | [`共通,Electronウィンドウ基本方針.md`](./共通,Electronウィンドウ基本方針.md) |
 | 今後の改善提案を比較し、採用条件を検討する | [`共通,明日のために,改善提案.md`](./共通,明日のために,改善提案.md) |
 | 固定版の改善課題と再現条件・検証限界を確認する | [`共通,明日のために,改善課題.md`](./共通,明日のために,改善課題.md) |
@@ -174,7 +213,6 @@ Toolsが利用できる場合の作業中の音声案内は [MCP活用手順](./
 | 目的 | 参照ファイル |
 |------|--------------|
 | Discord の Code / Live 接続・Vue パネル・配布物を変更・検証する | [`frontend_channels,Discord接続変更手順.md`](./frontend_channels,Discord接続変更手順.md) |
-| Slack の接続・パネルを変更・検証する（Discord と双子） | 同上の手順に加え、[`frontend_channels/slack/AGENTS.md`](../../frontend_channels/slack/AGENTS.md) の対応表で Discord 側の同じファイルもそろえる。確認は [Slack操作編](./セルフテスト,aidiy_slack,操作編.md) |
 
 ## Frontend VS Code
 
@@ -258,6 +296,6 @@ Toolsが利用できる場合の作業中の音声案内は [MCP活用手順](./
 
 ## Tools主要メソッドのセルフテスト
 
-[主要メソッド編](./セルフテスト,backend_tools,主要メソッド編.md) — 実行した18 MCP、環境依存のPASS、パラメータと結果のSVG図解。
+[主要メソッド編](../../docs/セルフテスト、操作ガイド/セルフテスト,backend_tools,主要メソッド編.md) — 実行した18 MCP、環境依存のPASS、パラメータと結果のSVG図解。
 
 セルフテスト証跡の維持方針は [説明資料の書き方](./セルフテスト,_説明資料の書き方.md) を参照します。資料整理・setup成功と実画面試験の合格を区別します。

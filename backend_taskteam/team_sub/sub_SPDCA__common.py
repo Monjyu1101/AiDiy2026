@@ -110,12 +110,17 @@ def 最新の成功記録(成功一覧: list[dict]) -> dict:
 
 
 def まとめ内容(記録: dict) -> str:
-    """まとめ内容（無ければ応答内容）を、次段へ引き渡す本文として返す。"""
-    for キー in ("まとめ内容", "応答内容"):
-        内容 = str(記録.get(キー, "")).strip()
-        if 内容:
-            return 内容
-    return ""
+    """要約を維持し、Dは紐づくdo明細の原文・状態を別枠で次段へ渡す。"""
+    内容 = next((str(記録.get(k, "")).strip() for k in ("まとめ内容", "応答内容")
+                 if str(記録.get(k, "")).strip()), "")
+    if 記録.get("PDCA区分") == "D" and 記録.get("作業ID"):
+        明細 = team_pdca_db.実施明細取得(str(記録["作業ID"]))
+        if 明細:
+            内容 += "\n\n## Dの実施明細原文（要約とは別の記録）\n" + json.dumps(
+                明細, ensure_ascii=False, indent=2)
+        elif 内容:
+            内容 += "\n\nDの実施明細原文はありません。まとめや終了通知を実回答の原文として扱わないでください。"
+    return 内容
 
 
 

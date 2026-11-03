@@ -92,6 +92,7 @@ export class LiveEnvironment {
   onStop(listener: (error?: string) => void) { this.stopListeners.push(listener); }
   onMicrophoneStop(listener: () => void) { this.microphoneStopListeners.push(listener); }
   onFolder(listener: (folder?: Folder | null) => void) { this.folderListeners.push(listener); }
+  openFolder() { this.vscode?.postMessage({ type: 'open-folder' }); }
   ready() {
     this.vscode?.postMessage({ type: 'ui-ready', audioWorklet: typeof AudioWorkletNode !== 'undefined' });
     if (!this.host && !this.presence) this.presence = new EventSource(new URL('presence', this.base));

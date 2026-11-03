@@ -18,7 +18,7 @@ function fakeWindow(maximized=false){
 }
 test('mini window has fixed width and compact fallback height, restoring original bounds and minimum',()=>{
  const window=fakeWindow(),controller=miniWindow.ミニ表示を作成(window),original=structuredClone(window.bounds);
- assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:384,height:134});assert.deepEqual(window.minimum,[384,134]);assert.equal(window.maximizable,false);
+ assert.equal(controller.set(true),true);assert.equal(controller.active,true);assert.deepEqual(window.bounds,{...original,width:330,height:134});assert.deepEqual(window.minimum,[330,134]);assert.equal(window.maximizable,false);
  controller.set(true);controller.set(false);assert.deepEqual(window.bounds,original);assert.deepEqual(window.minimum,[420,320]);assert.equal(window.maximizable,true);assert.equal(controller.active,false);
 });
 test('最大化からミニにした後も、現在のフォーム左肩から通常寸法へ戻る',()=>{
@@ -28,7 +28,7 @@ test('最大化からミニにした後も、現在のフォーム左肩から�
 test('startup mini preserves pin and restores normal size at its current form origin',()=>{
  for(const top of [true,false]){
   const window=fakeWindow();window.top=top;const original=structuredClone(window.bounds),controller=miniWindow.ミニ表示を作成(window,{screen:{getPrimaryDisplay:()=>({workArea:{x:-1920,y:32}})}});
-  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1912,y:40,width:384,height:134});assert.equal(window.top,top);
+  controller.set(true,{topLeft:true});assert.deepEqual(window.bounds,{x:-1912,y:40,width:330,height:134});assert.equal(window.top,top);
   controller.set(false);assert.deepEqual(window.bounds,{...original,x:-1912,y:40});assert.equal(window.top,top);
  }
 });
@@ -43,7 +43,7 @@ test('mini height follows zero CLI, CLI, error and zero CLI without losing saved
   for(const height of [134,186,200,134]){
    const before=window.resizes,minimumBefore=window.minimumChanges;
    const previous=window.bounds.height;
-   assert.equal(controller.resize(height),true);assert.deepEqual(window.bounds,{x:-400,y:20,width:384,height});assert.deepEqual(window.minimum,[384,height]);
+   assert.equal(controller.resize(height),true);assert.deepEqual(window.bounds,{x:-400,y:20,width:330,height});assert.deepEqual(window.minimum,[330,height]);
    assert.equal(window.resizes,before+(previous===height?0:1));assert.equal(window.minimumChanges,minimumBefore+(previous===height?0:1));
    assert.equal(controller.set(true),true);assert.equal(controller.resize(height),true);assert.equal(window.resizes,before+(previous===height?0:1),'同じ高さで再度リサイズしない');
   }
@@ -59,7 +59,7 @@ test('mini resizing accepts only bounded integer heights on a live active mini w
  controller.set(true);const mini=window.getBounds(),before=window.resizes;
  for(const height of [undefined,null,false,true,'134',{},[],[134],NaN,Infinity,-Infinity,0,79,361,134.5,Number.MAX_SAFE_INTEGER])assert.equal(controller.resize(height),false);
  assert.deepEqual(window.bounds,mini);assert.equal(window.resizes,before);
- for(const height of [80,360,80]){assert.equal(controller.resize(height),true);assert.equal(window.bounds.height,height);assert.deepEqual(window.minimum,[384,height]);}
+ for(const height of [80,360,80]){assert.equal(controller.resize(height),true);assert.equal(window.bounds.height,height);assert.deepEqual(window.minimum,[330,height]);}
  window.destroyed=true;assert.equal(controller.resize(134),false);assert.equal(window.bounds.height,80);
 });
 

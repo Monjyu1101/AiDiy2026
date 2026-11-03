@@ -102,6 +102,22 @@ test('Browser: ページを権限なしで分離し、IDEへの要求と別画�
  control.setAvailable(record,true);
  let prevented=false;view.webContents.emit('will-navigate',{preventDefault(){prevented=true;}},'javascript:alert(1)');assert.equal(prevented,true);
  assert.deepEqual(view.webContents.popup({url:'https://example.com/'}),{action:'deny'});assert.equal(view.webContents.url,'https://example.com/');
+ // 利用者の停止による遅延rejectは通信障害にしない。通常の読込失敗は表示する。
+ let rejectNavigation;
+ const originalLoad=view.webContents.loadURL;
+ view.webContents.loadURL=()=>new Promise((_,reject)=>{rejectNavigation=reject;});
+ await control.action(event,'navigate','https://example.com/slow');
+ await control.action(event,'stop');
+ rejectNavigation(new Error('net::ERR_FAILED'));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal((await control.action(event,'state')).error,'','手動停止後に届く失敗を表示しない');
+ await control.action(event,'navigate','https://example.com/fail');
+ rejectNavigation(new Error('net::ERR_FAILED'));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.match((await control.action(event,'state')).error,/ページを読み込めません/,'停止していない通信失敗は表示する');
+ view.webContents.loadURL=originalLoad;
+ await control.action(event,'navigate',HOME);
+ assert.equal((await control.action(event,'state')).error,'');
  const hostContents=window.webContents;Object.defineProperty(window,'webContents',{get(){throw Error('Object has been destroyed');}});
  assert.doesNotThrow(()=>window.emit('closed'));assert.equal(hostContents.listenerCount('before-input-event'),0);assert.equal(view.webContents.listenerCount('before-input-event'),0);
  assert.deepEqual(view.webContents.closed,{waitForBeforeUnload:false});assert.equal((await control.action(event,'state')).ok,false);

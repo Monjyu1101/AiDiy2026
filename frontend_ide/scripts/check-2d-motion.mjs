@@ -29,11 +29,13 @@ const chrome=spawn(chromePath,['--headless=new','--remote-debugging-port=0',`--u
   ...(process.platform==='linux'?['--no-sandbox','--disable-dev-shm-usage']:[]),'about:blank'],{stdio:'ignore',windowsHide:true});
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const stamp=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date()).replace(/\D/g,'');
-const output=resolve('_AIDIY/knowledge/images/セルフテスト,aidiy_ide,操作編');
+const output=resolve('docs/セルフテスト、操作ガイド/images/セルフテスト,aidiy_ide,操作編');
 mkdirSync(output,{recursive:true});
+const records=resolve('docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest/セルフテスト,aidiy_ide,操作編');
+mkdirSync(records,{recursive:true});
 const checks=[],shots=[],errors=[];
 let ws,send,evaluate;
-function save(status,error){writeFileSync(join(output,`${stamp}-ide-2d-motion__result.json`),JSON.stringify({status,date:new Date().toISOString(),os:process.platform,method:'隔離Chromeの実CSS・Canvas描画。CSSの途中時刻を固定して撮影します。最終更新の通知データは試験用に指定し、ページ・ツリー・ビューアは実物を使います。',checks,shots,errors,...(error?{error:String(error.stack||error)}:{})},null,2));}
+function save(status,error){writeFileSync(join(records,`${stamp}-ide-2d-motion__result.json`),JSON.stringify({status,date:new Date().toISOString(),os:process.platform,method:'隔離Chromeの実CSS・Canvas描画。CSSの途中時刻を固定して撮影します。最終更新の通知データは試験用に指定し、ページ・ツリー・ビューアは実物を使います。',checks,shots,errors,...(error?{error:String(error.stack||error)}:{})},null,2));}
 try{
   let port;
   for(let i=0;i<60&&!port;i++){try{port=Number(readFileSync(join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]);}catch{await sleep(100);}}

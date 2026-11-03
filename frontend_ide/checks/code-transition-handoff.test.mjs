@@ -90,6 +90,15 @@ async function panel(t, { host = false, desktop = false } = {}) {
 }
 
 async function extensionPanel(t) {
+  // 現行ホストの実在判定をそのまま使い、試験所有のローカルフォルダだけを渡す。
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'aidiy-code-transition-'));
+  const projectPath = mkdtempSync(join(fixtureRoot, 'project-'));
+  const otherPath = mkdtempSync(join(fixtureRoot, 'other-'));
+  t.after(() => rmSync(fixtureRoot, { recursive: true, force: true }));
+  const workspaceModule = { exports: {} };
+  vm.runInNewContext(transformSync(readFileSync(new URL('../host/src/workspace-folder.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
+    module: workspaceModule, require,
+  });
   const predictionModule = { exports: {} };
   vm.runInNewContext(transformSync(readFileSync(new URL('../host/src/input-prediction.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
     module: predictionModule, exports: predictionModule.exports, AbortController,
@@ -98,7 +107,7 @@ async function extensionPanel(t) {
   });
   const f = await panel(t, { host: true }), pending = [], posts = [];
   const uri = path => ({ scheme: 'file', fsPath: path, toString: () => `file://${path}` });
-  const folders = ['/project', '/other'].map(path => ({ name: path.slice(1), uri: uri(path) }));
+  const folders = [projectPath, otherPath].map((path, index) => ({ name: index ? 'other' : 'project', uri: uri(path) }));
   const subscription = { dispose() {} }; let provider, receive, editorChanged;
   const vscode = { workspace: { isTrusted: true, workspaceFolders: folders, getConfiguration: () => ({ get: (_key, fallback) => fallback }),
     getWorkspaceFolder: value => folders.find(folder => value.fsPath.startsWith(folder.uri.fsPath)), onDidChangeWorkspaceFolders: () => subscription },
@@ -106,14 +115,14 @@ async function extensionPanel(t) {
       onDidChangeActiveTextEditor(callback) { editorChanged = callback; return subscription; },
       createOutputChannel: () => ({ appendLine() {}, clear() {}, dispose() {} }), registerWebviewViewProvider(_id, value) { provider = value; return subscription; } },
     Uri: { joinPath: (_root, path) => uri(path) }, commands: { registerCommand: () => subscription } };
-  const modules = { vscode, './file-attachments': {},
+  const modules = { vscode, './workspace-folder': workspaceModule.exports, './file-attachments': {},
     './internal-auth': { internalAuthorization: () => assert.fail('この会話切替試験ではCoreへの外部接続は禁止') },
     './input-prediction': predictionModule.exports,
     './vscode-html': { developmentHtml: () => '' },
     './code-connection': { コード選択: value => ({ provider: value.provider || '', model: value.model || '' }), CodeConnection: class { constructor() { assert.fail('外部接続は禁止'); } } },
     './model-preferences': { モデル保存先: () => 'model.json', オフラインモデル保存先: () => 'offline.json', コードモデル読込() {}, コード設定保存先: () => 'options.json', 検証回数読込: () => 0 },
     '../aidiy_code/src/offline': { オフラインモデル候補: () => [{ id: 'same' }], Hermes既定モデル: () => 'same', オフラインモデル保存先: () => 'offline.json' },
-    './conversation-store': { 会話保存先: path => path, 会話一覧: path => path === '/project' ? ['first', 'second'].map((id, i) => ({ id, 更新日時: i + 1, 初回依頼: i ? '次の会話' : '最初の会話', メッセージ: [], provider: '', model: '', 実行モード: 'online' })) : [], 会話書込() {}, 会話削除() {}, 会話本文上限: 4e6, 履歴メッセージ長さ: item => item.本文.length },
+    './conversation-store': { 会話保存先: path => path, 会話一覧: path => path === projectPath ? ['first', 'second'].map((id, i) => ({ id, 更新日時: i + 1, 初回依頼: i ? '次の会話' : '最初の会話', メッセージ: [], provider: '', model: '', 実行モード: 'online' })) : [], 会話書込() {}, 会話削除() {}, 会話本文上限: 4e6, 履歴メッセージ長さ: item => item.本文.length },
     './runner': {}, './protocol': {}, '../aidiy_live/local-backend.cjs': {},
   };
   const module = { exports: {} };
@@ -128,16 +137,16 @@ async function extensionPanel(t) {
     onDidDispose: () => subscription, onDidChangeVisibility: () => subscription });
   t.after(() => provider.dispose());
   f.onPost(packet => pending.push(packet)); receive({ type: 'ready' }); await flush();
-  return { ...f, posts, provider, pending, activateOther() { editorChanged({ document: { uri: folders[1].uri } }); },
+  return { ...f, projectPath, otherPath, posts, provider, pending, activateOther() { editorChanged({ document: { uri: folders[1].uri } }); },
     async dispatch() { receive(pending.shift()); await flush(); } };
 }
 
 test('Code: 実VS CodeホストのNewは固定中の会話Aからアクティブな別ルートBへ安全に切り替わる', async t => {
   const f = await extensionPanel(t), target = f.exposed.draftTarget();
-  f.activateOther(); await flush(); assert.equal(f.state.state.作業フォルダ.パス, '/project');
+  f.activateOther(); await flush(); assert.equal(f.state.state.作業フォルダ.パス, f.projectPath);
   const click = await f.action('new'); click(); assert.equal(f.exposed.draftTarget(), null);
   await f.dispatch();
-  const current = f.exposed.draftTarget(); assert.ok(current); assert.equal(current.projectPath, '/other');
+  const current = f.exposed.draftTarget(); assert.ok(current); assert.equal(current.projectPath, f.otherPath);
   assert.equal(f.state.changingConversation.value, false); assert.equal(f.state.busy.value, false);
   assert.equal(f.exposed.insertDraft({ ...target, text: '前のプロジェクトへの追加' }).ok, false);
   assert.equal(f.exposed.insertDraft({ ...current, text: '新しいプロジェクトへの追加' }).ok, true);
@@ -175,7 +184,7 @@ for (const type of ['selectHistory', 'deleteHistory']) {
     const f = await extensionPanel(t), target = f.exposed.draftTarget();
     if (type === 'deleteHistory') void f.state.send(type, { id: 'first' }); else (await f.action(type))();
     assert.equal(f.exposed.draftTarget(), null); await f.dispatch();
-    const current = f.exposed.draftTarget(); assert.ok(current); assert.equal(current.projectPath, '/project');
+    const current = f.exposed.draftTarget(); assert.ok(current); assert.equal(current.projectPath, f.projectPath);
     assert.notEqual(current.contextId, target.contextId); assert.equal(f.state.changingConversation.value, false);
   });
 }

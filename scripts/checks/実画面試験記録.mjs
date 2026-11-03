@@ -105,10 +105,10 @@ export async function createEvidenceRecorder(runId, book = 'environment', { toPn
   if (!prefix) throw new Error('冊子は system / apps / environment / ide を指定してください');
   if (typeof runId !== 'string' || !/^[\p{L}\p{N}][\p{L}\p{N}_-]{0,100}$/u.test(runId)) throw new Error('実施IDは日付・時刻などの名前を指定してください（パスは不可）');
   if (!Number.isFinite(lockTimeoutMs) || lockTimeoutMs < 0) throw new Error('ロック待機時間は0以上の有限数にしてください');
-  const images = fileURLToPath(new URL('../../_AIDIY/knowledge/images/', import.meta.url));
+  const images = fileURLToPath(new URL('../../docs/セルフテスト、操作ガイド/images/', import.meta.url));
   const root = path.join(images, BOOK_DOCUMENTS[book]);
   await fs.mkdir(root, { recursive: true });
-  const work = fileURLToPath(new URL(`../../.aidiy_cache/selftest/${BOOK_DOCUMENTS[book]}/`, import.meta.url));
+  const work = fileURLToPath(new URL(`../../docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest/${BOOK_DOCUMENTS[book]}/`, import.meta.url));
   await fs.mkdir(work, { recursive: true });
   const manifest = path.join(work, `${runId}__evidence.json`);
   await readRecords(manifest);

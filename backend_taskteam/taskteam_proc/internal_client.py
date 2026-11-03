@@ -55,6 +55,16 @@ def _read_token() -> str:
 def post_json(url: str, payload: dict, timeout: int = 600) -> dict:
     protected = _needs_token(url)
     parts = urlsplit(url)
+    # Task/Team の設定由来の相対プロジェクトは _config 基準。
+    # Tools の絶対パス検証へ渡す前に解決し、呼出元の辞書やDBの値は変更しない。
+    if (parts.scheme == "http" and parts.hostname in ("127.0.0.1", "localhost", "::1")
+            and parts.port == 8095 and parts.path in
+            ("/aidiy_code_agents/run", "/aidiy_task_agents/submit")
+            and payload.get("project_path")):
+        project = Path(str(payload["project_path"]))
+        if not project.is_absolute():
+            project = PROJECT_ROOT / "_config" / project
+        payload = {**payload, "project_path": str(project.resolve())}
     encoded_url = urlunsplit((parts.scheme, "127.0.0.1:8093" if protected else parts.netloc,
                              quote(parts.path, safe="/%"), parts.query, parts.fragment))
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

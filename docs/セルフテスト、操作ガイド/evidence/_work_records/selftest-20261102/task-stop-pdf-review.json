@@ -1,0 +1,30 @@
+[
+  {
+    "file": "セルフテスト,aidiy_task,操作編.pdf",
+    "pages": 17,
+    "review": [
+      {
+        "page": 16,
+        "image": "temp/task-stop-pdf-0-16.png"
+      },
+      {
+        "page": 17,
+        "image": "temp/task-stop-pdf-0-17.png"
+      }
+    ]
+  },
+  {
+    "file": "セルフテスト,共通,確認結果.pdf",
+    "pages": 28,
+    "review": [
+      {
+        "page": 27,
+        "image": "temp/task-stop-pdf-1-27.png"
+      },
+      {
+        "page": 28,
+        "image": "temp/task-stop-pdf-1-28.png"
+      }
+    ]
+  }
+]

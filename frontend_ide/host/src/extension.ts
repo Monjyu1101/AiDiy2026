@@ -11,6 +11,7 @@
  */
 
 import * as vscode from 'vscode';
+import { usableFolder, folderRequired } from './workspace-folder';
 import { developmentHtml } from './vscode-html';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -119,12 +120,22 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     Object.assign(this.会話, コード選択(this.会話));
     const 作業更新 = (editor: vscode.TextEditor | undefined) => {
       if (editor && vscode.workspace.getWorkspaceFolder(editor.document.uri)) this.最終作業URI = editor.document.uri;
+      if (this.会話 && !this.会話.作業URI) this.接続更新();
       this.通知();
     };
     作業更新(vscode.window.activeTextEditor);
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor(作業更新),
-      vscode.workspace.onDidChangeWorkspaceFolders(() => { this.書込実行(); this.履歴読込(); this.接続更新(); this.通知(); })
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.書込実行(); this.履歴読込();
+        if (!this.現在フォルダ()) {
+          this.prediction.clear(); this.オフラインジョブ?.停止(); this.オフラインジョブ = undefined;
+          this.connection?.dispose(); this.connection = undefined; this.接続フォルダ = '';
+          this.実行中 = false; this.停止中 = false; this.添付 = undefined; this.進捗 = [];
+          this.会話 = { メッセージ: [], 作業URI: '', ...this.最終モデル, モデル選択済み: true }; this.会話ID = randomUUID();
+        }
+        this.接続更新(); this.通知();
+      })
     );
   }
 
@@ -141,7 +152,7 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     view.onDidChangeVisibility(() => this.通知(), undefined, this.context.subscriptions);
   }
 
-  private フォルダ一覧() { return (vscode.workspace.workspaceFolders ?? []).filter(item => item.uri.scheme === 'file'); }
+  private フォルダ一覧() { return (vscode.workspace.workspaceFolders ?? []).filter(item => usableFolder(item)); }
   private 選択フォルダ(): vscode.WorkspaceFolder | undefined {
     const folders = this.フォルダ一覧();
     const active = this.最終作業URI && vscode.workspace.getWorkspaceFolder(this.最終作業URI);
@@ -231,7 +242,9 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     this.会話.メッセージ.push({ 種別: 'error', 本文: text });
     this.保存(); this.通知();
   }
+  操作可能(): boolean { return vscode.workspace.isTrusted && !!this.現在フォルダ(); }
   private 信頼確認(): void {
+    if (!this.現在フォルダ()) throw new Error(folderRequired);
     if (!vscode.workspace.isTrusted) throw new Error('ワークスペースを信頼してから実行してください。');
   }
   private 会話変更(type: 'new' | 'selectHistory' | 'deleteHistory', id: unknown, requestId: unknown): void {
@@ -267,6 +280,16 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
   private async 受信(message: unknown): Promise<void> {
     if (!message || typeof message !== 'object') return;
     const data = message as Record<string, unknown>;
+    const type = data.メッセージ識別 ?? data.type;
+    if (type === 'openFolder') { await vscode.commands.executeCommand('workbench.action.files.openFolder'); return; }
+    if (type !== 'ready' && !this.操作可能()) {
+      this.通知();
+      const message = !this.現在フォルダ() ? folderRequired : 'ワークスペースを信頼してください。';
+      if (type === 'sendFile') void this.view?.webview.postMessage({ type: 'fileUploadResult', requestId: data.requestId, ok: false, message });
+      if (['new', 'selectHistory', 'deleteHistory'].includes(String(type))) void this.view?.webview.postMessage({ type: 'conversationChangeResult', requestId: data.requestId, ok: false, message });
+      if (type === 'chooseModel') void this.view?.webview.postMessage({ type: 'modelCatalogError', provider: data.provider, message });
+      return;
+    }
     switch (data.メッセージ識別 ?? data.type) {
       case 'ready': this.接続更新(); this.通知(); break;
       case 'predictInput': {
@@ -338,7 +361,8 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 
   private 接続更新(force = false): void {
     const folder = this.現在フォルダ();
-    if (!this.自動接続 || !vscode.workspace.isTrusted || !folder || this.破棄済み) { this.connection?.disconnect(); this.接続フォルダ = ''; return; }
+    if (!this.自動接続 || !vscode.workspace.isTrusted || !folder || this.破棄済み) { this.connection?.dispose(); this.connection = undefined; this.接続フォルダ = ''; return; }
+    if (this.connection && this.接続フォルダ !== folder.uri.fsPath) { this.connection.dispose(); this.connection = undefined; }
     if (!this.connection) this.connection = new CodeConnection(
       ローカル接続先(this.context.extensionPath, folder.uri.fsPath), packet => {
         if (!this.オフラインジョブ) this.パケット受信(packet);
@@ -420,14 +444,16 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
       this.オフラインモデル = コードモデル保存({ provider: selectedProvider, model: selectedModel }, this.オフライン保存先);
       this.通知(); return;
     }
-    this.作業フォルダ();
+    const projectPath = this.作業フォルダ().uri.fsPath;
+    const connection = this.connection;
     if (selectedProvider) {
       const providers = await this.候補取得();
       if (!providers.some(item => item.id === selectedProvider)) throw new Error('選択したプロバイダを確認できません。');
     }
-    if (!this.connection?.connected) throw new Error('接続が切れました。モデルを選び直してください。');
+    if (!this.操作可能() || this.現在フォルダ()?.uri.fsPath !== projectPath || this.connection !== connection || !this.connection?.connected) throw new Error('接続が切れました。モデルを選び直してください。');
     const selected = コード選択({ provider: selectedProvider, model: selectedModel });
     await this.connection.setModel(selected);
+    if (!this.操作可能() || this.現在フォルダ()?.uri.fsPath !== projectPath || this.connection !== connection) return;
     const persisted = コードモデル保存(selected);
     this.会話.provider = persisted.provider; this.会話.model = persisted.model;
     this.会話.モデル選択済み = true;
@@ -457,14 +483,14 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
     if (offline) {
       try {
         const job = オフライン実行(this.context.extensionPath, folder.uri.fsPath, this.オフラインモデル.model,
-          fullPrompt, this.会話.HermesセッションID, packet => this.パケット受信(packet), launch);
+          fullPrompt, this.会話.HermesセッションID, packet => { if (this.現在フォルダ()?.uri.fsPath === folder.uri.fsPath && this.会話.作業URI === folder.uri.toString()) this.パケット受信(packet); }, launch);
         this.オフラインジョブ = job;
         void job.完了.then(result => {
-          if (this.破棄済み) return;
+          if (this.破棄済み || this.オフラインジョブ !== job) return;
           if (result.セッションID || result.セッション復旧) this.会話.HermesセッションID = result.セッションID;
           if (result.停止理由) this.エラー(result.停止理由);
           else if (result.終了コード !== 0) this.エラー(`Hermesが終了コード ${result.終了コード} で終了しました。`);
-        }).catch(error => { if (!this.破棄済み) this.エラー(error); }).finally(() => {
+        }).catch(error => { if (!this.破棄済み && this.オフラインジョブ === job) this.エラー(error); }).finally(() => {
           if (this.オフラインジョブ !== job) return;
           this.オフラインジョブ = undefined; this.実行中 = false; this.停止中 = false;
           if (!this.破棄済み) { this.保存(); this.通知(); }
@@ -535,7 +561,9 @@ class Hermesチャット implements vscode.WebviewViewProvider, vscode.Disposabl
 export function activate(context: vscode.ExtensionContext): void {
   const chat = new Hermesチャット(context);
   const command = (name: string, action: () => unknown) => vscode.commands.registerCommand(name, async () => {
-    try { await action(); } catch (error) { void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error)); }
+    try {
+      if (name !== 'aidiyHermes.open' && !chat.操作可能()) { await vscode.window.showInformationMessage(folderRequired); return; }
+      await action(); } catch (error) { void vscode.window.showErrorMessage(error instanceof Error ? error.message : String(error)); }
   });
   context.subscriptions.push(chat,
     vscode.window.registerWebviewViewProvider('aidiyHermes.chat', chat, { webviewOptions: { retainContextWhenHidden: true } }),

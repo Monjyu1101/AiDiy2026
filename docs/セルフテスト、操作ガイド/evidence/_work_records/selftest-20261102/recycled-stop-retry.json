@@ -1,0 +1,18 @@
+{
+  "count": 12,
+  "files": [
+    "temp/narration-taskteam/stop_retry_close.json",
+    "temp/narration-taskteam/stop_retry_close.mp3",
+    "temp/narration-taskteam/stop_retry_close.txt",
+    "temp/narration-taskteam/stop_retry_intro.json",
+    "temp/narration-taskteam/stop_retry_intro.mp3",
+    "temp/narration-taskteam/stop_retry_intro.txt",
+    "temp/stop-retry-pdf.mjs",
+    "temp/setup-observation/current.png",
+    "temp/stop-retry-pdf-0.png",
+    "temp/stop-retry-pdf-1.png",
+    "tmp/pdfs/セルフテスト,aidiy_task,操作編.html",
+    "tmp/pdfs/セルフテスト,共通,確認結果.html"
+  ],
+  "status": "completed"
+}

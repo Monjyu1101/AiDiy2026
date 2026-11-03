@@ -128,8 +128,8 @@ https://github.com/monjyu1101/AiDiy2026 -->
         .game-content {
             display: flex;
             gap: 2vh;
-            flex: 1;
-            min-height: 0;
+            /* 盤面の高さを確保し、収まらない画面は親でスクロールする。 */
+            flex: 1 0 auto;
             align-items: stretch;
         }
 

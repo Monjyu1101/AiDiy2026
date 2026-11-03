@@ -164,7 +164,11 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
     workspace_root = os.path.abspath(ベースパス)
     # 高速ルックアップ用セット
     _除外フォルダセット = set(_バックアップ除外フォルダ)
-    for root, dirs, file_names in os.walk(workspace_root):
+    def 走査エラー(error):
+        # 読取不能を正常な対象0件へ読み替えない。
+        raise error
+
+    for root, dirs, file_names in os.walk(workspace_root, onerror=走査エラー):
         # 除外は選択したプロジェクトの内側だけに適用する。
         # 親が temp/log 等でも、明示された作業フォルダを丸ごと除外しない。
         root_parts = os.path.relpath(root, workspace_root).split(os.sep)
@@ -202,7 +206,8 @@ def _全ファイルスキャン(ベースパス: str, 最大件数: Optional[in
             try:
                 mtime = os.path.getmtime(file_path)
             except OSError:
-                continue
+                # 取得失敗を対象なしとして成功させない。
+                raise
             rel_path = os.path.relpath(file_path, workspace_root).replace("\\", "/")
             更新日時 = datetime.fromtimestamp(mtime).strftime("%Y/%m/%d %H:%M:%S")
             files.append({"パス": rel_path, "更新日時": 更新日時, "更新時刻": mtime})
@@ -306,7 +311,8 @@ def バックアップ実行(
         all_scan = _全ファイルスキャン(base_path, 最大件数=_バックアップキャンセル件数)
         _ローカルGit記録(base_path, [f["パス"] for f in all_scan])
         if not all_scan:
-            return None
+            # 正常な空の対象。失敗のNoneと分け、コピー先も作らない。
+            return ("", [], [], False, "")
         max_mtime = max(f["更新時刻"] for f in all_scan)
         all_files: List[ファイル情報] = [{"パス": f["パス"], "更新日時": f["更新日時"]} for f in all_scan]
 

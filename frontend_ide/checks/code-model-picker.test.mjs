@@ -78,7 +78,7 @@ function fixture({ host = false, offline = false } = {}) {
   };
   const providerSelect = () => walk(component.render({}, [], props, vue.proxyRefs(data), {}, {}), node => node?.type === 'select' && node.props?.onChange === data.changeProvider);
   const modelSelect = () => walk(component.render({}, [], props, vue.proxyRefs(data), {}, {}), node => node?.type === 'select' && node.props?.['onUpdate:modelValue'] && node.props['onUpdate:modelValue'].toString().includes('model'));
-  return { data, calls,
+  return { data, calls, walk, render: () => component.render({}, [], props, vue.proxyRefs(data), {}, {}),
     async start() { await data.transport.start(); receive(state); await flush(); },
     providerSelect, modelSelect,
     chooseProvider: value => select(providerSelect(), value, data.provider.value),
@@ -86,6 +86,25 @@ function fixture({ host = false, offline = false } = {}) {
     dispose() { for (const fn of unmounted) fn(); scope.stop(); },
   };
 }
+
+test('Code拡張: フォルダなしは入力直上の案内と操作抑止、選択後に解除', async () => {
+  const f = fixture({ host: true });
+  try {
+    await f.start(); f.data.state.作業フォルダ = null; await flush();
+    assert.equal(f.data.operable.value, false);
+    assert.equal(f.walk(f.render(), n => n?.type === 'textarea').props.disabled, true);
+    const notice = f.walk(f.render(), n => n?.props?.class === 'workspace-required');
+    assert.ok(notice);
+    f.walk(notice, n => n?.type === 'button').props.onClick();
+    assert.equal(f.calls.at(-1).type, 'openFolder');
+    const before = f.calls.length; await f.data.openModels();
+    assert.equal(f.calls.length, before);
+    f.data.state.作業フォルダ = { パス: '/new-project' }; await flush();
+    assert.equal(f.data.operable.value, true);
+    assert.equal(f.walk(f.render(), n => n?.props?.class === 'workspace-required'), undefined);
+    assert.equal(f.walk(f.render(), n => n?.type === 'textarea').props.disabled, false);
+  } finally { f.dispose(); }
+});
 
 for (const host of [false, true]) for (const offline of [false, true]) {
   test(`Code: Hermesのprovider付きモデルを表示・選択できる (${host ? '拡張' : '単独/IDE'}, ${offline ? '未接続' : '接続済み'})`, async () => {

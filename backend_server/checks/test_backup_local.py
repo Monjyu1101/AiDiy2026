@@ -69,7 +69,7 @@ class BackupLocalTest(unittest.TestCase):
         result = self.saver.run()
         self.assertTrue(result['ok'])
         target = Path(result['バックアップ先'])
-        actual = sorted(str(p.relative_to(target)) for p in target.rglob('*') if p.is_file())
+        actual = sorted(p.relative_to(target).as_posix() for p in target.rglob('*') if p.is_file())
         self.assertEqual(actual, ['_AIDIY/backend_core/README.md', 'main.txt', 'nested/internal_auth.example.json'])
 
     def test_first_save_uses_new_store_and_keeps_ordinary_backup_sources(self):

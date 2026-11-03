@@ -376,3 +376,7 @@ cleanup は VS Code 本体を終了しない。起動中の拡張ホストには
 - `checks/internal-auth.test.cjs` と `checks/internal-auth-transport.test.cjs` は一時 fixture / メモリ内 mock で実行します。実際の認証ファイルや利用者の設定・DBをテストに使いません。配置名変更、期限切れ、不正JSON、ローテーション、別origin拒否、画面・URLへの漏洩防止を検証します。
 - Core 再起動時、Code の既存10秒再接続が新しいトークンを再読込すること、切断・破棄で停止すること、依頼を二重送信しないことを確認します。Live の手動再接続方針は変更しません。
 - undici は Node bundle に含め、Web / Vue bundle に含めません。Live VSIX は `dist/THIRD_PARTY_NOTICES.txt` も配布します。
+
+## フォルダ未選択時の操作保護
+
+Code / LiveのVS Code版は、`host/src/workspace-folder.ts`で実在ローカルディレクトリを判定する。赤字案内は両Vueパネルの入力欄直上に置き、フォルダを開く導線だけを残す。拡張ホストでも要求を拒否し、フォルダ削除・切替時は接続を破棄して認証を読み直す。LiveはWebviewを再初期化し、古い世代の要求を破棄する。信頼・認証チェックや単独版の挙動は維持する。確認は `checks/workspace-folder.test.cjs`、`checks/code-extension.test.cjs`、`aidiy_live/checks/extension.test.cjs` とVueのCode/Liveモデル選択テストを使う。

@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "path": "temp\\output\\20261103.130751.mp3",
+      "sha256": "4863aa32ad2afc6c3c0b4bfde0876c68fc7fac88e8f74661b33580b7bcb2c3e9"
+    },
+    {
+      "path": "temp\\output\\20261103.130843.mp3",
+      "sha256": "ee2467fafe347cc38f3922421642a613fd7d6d047c479af3a161a06887e9a873"
+    },
+    {
+      "path": "temp\\output\\20261103.130902.mp3",
+      "sha256": "e9fac1443b428fa6c14ebefb03685ce27be8b8b767c6e29d7f19031fed150270"
+    },
+    {
+      "path": "temp\\output\\20261103.130955.mp3",
+      "sha256": "a75d42b594eedc4db8cf778f6c71ee2a0183084a1bc1000743dd6c5a4abce942"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\discord-22.png",
+      "sha256": "8a9f34b7af3106b98e9e3da3db51cdfbc217c48b08f8fbab5749370a2ec99bf0"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\discord-23.png",
+      "sha256": "598b1451ff30dbbec01b676563f7d170e69dc2c4a5a73c985acd64b8fe66cc36"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\pages.json",
+      "sha256": "39439cb33c396518616a5beea6396aa9ccef71a51c2df0200f14f9de3ed7c39a"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\review.mjs",
+      "sha256": "26013829f6fc6e56b58c00466c7502af17345bd0e928fdb6505183dd16ae46c9"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\slack-21.png",
+      "sha256": "f7375c15483201d7eb15fadb5ee7e05c44982eb19ccf99f16cf08a24ea5e3570"
+    },
+    {
+      "path": "temp\\channel-cancellation-pdf-review\\slack-22.png",
+      "sha256": "38907bceb83a44ec6286564aa95927c4a0591a2c4e247432a420160eae284d79"
+    }
+  ]
+}

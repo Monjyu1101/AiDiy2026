@@ -1,0 +1,1435 @@
+{
+  "status": "recycled",
+  "items": [
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ae_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ae_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ae_live.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avatar_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avatar_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avatar_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avatar_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avatar_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avc_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avc_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avc_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avc_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avc_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_left.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_return.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\avw_right.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\bn_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\bn_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\bn_stop.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cb_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cb_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cb_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cb_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ce_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ce_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ce_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_folder.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_ready.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\codeg_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_folder.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_interval.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_schedule.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_time.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cond_week.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_move.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\cube_rotate.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dc_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dc_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dc_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\diagread_select.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dm_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dm_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_roll.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\dog_view.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\drag_finish.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\drag_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\drag_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\drag_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\drag_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\final_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_notice.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\folder_select.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_finish.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_found.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_open.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_results.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\grep_run.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_filter.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hermes_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_back.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_close.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_forward.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\history_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hs_before.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hs_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hs_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hs_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\hs_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_correct.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_fire.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_move.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\inv_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ip_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\ip_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\lb_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\lb_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\lb_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_cancel.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_fields.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_open.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\live2_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\md_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\md_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\md_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\md_return.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\md_switch.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_local.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_open.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\model_open_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_18.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_20.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\motion_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\mt_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\mt_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\mw_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\mw_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_off.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_on.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\pin_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_open.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reopen_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\reuse_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\rev_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\rev_flip.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\rev_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\rev_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\rev_place.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_back.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_credit.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_next.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sc_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_adjust.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_finish.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_portrait.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\size_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_fast.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sol_still.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sqlite_before.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sqlite_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sqlite_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\sqlite_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_form.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_progress.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_register.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\taskg_wait.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_detail.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\task_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_form.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_register.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\teamg_wait.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_drag.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\team_return.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_drop.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_move.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tet_pause.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tf_detail.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tf_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tf_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tf_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tf_wait.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tl_auto.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tl_close.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tl_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tl_loop.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\tl_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\view_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\view_prepare.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\view_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\view_return.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\view_switch.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vscode_width.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_block.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_fix.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_prep.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\vslive_result.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wc_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wc_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wc_send.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_nav.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_notes.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_out.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\web_top.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wl_done.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wl_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_end.json",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_end.mp3",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_end.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_intro.json",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_intro.mp3",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_intro.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_schedule.json",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_schedule.mp3",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_schedule.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_search.json",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_search.mp3",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_search.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_stock.json",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_stock.mp3",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\narration-taskteam\\wr_stock.txt",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,aidiy_browser,操作編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,aidiy_diag,ランチャー編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,aidiy_slack,操作編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,backend_tools,主要メソッド編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,frontend_web,生産・在庫管理編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,frontend_web,配車管理編.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\tmp\\pdfs\\セルフテスト,共通,確認結果.html",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\setup-observation\\current.png",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\audit-evidence.py",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\organize-selftests.py",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\finish-document-organization.py",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\verify-organized-pdf.py",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\web-readonly-ui.py",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\_work_records\\selftest-20261102\\pdf-inventory.md",
+      "kind": "file",
+      "files": 1
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\pdf-organization-review",
+      "kind": "directory",
+      "files": 135
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\web-readonly-profile",
+      "kind": "directory",
+      "files": 922
+    },
+    {
+      "path": "C:\\Users\\admin\\Desktop\\AiDiy2026_dev\\temp\\finalize-organization.py",
+      "kind": "file",
+      "files": 1
+    }
+  ]
+}

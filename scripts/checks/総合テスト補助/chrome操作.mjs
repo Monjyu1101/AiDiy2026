@@ -67,12 +67,12 @@ const evDir = () => {
   if (!/^[\p{L}\p{N}][\p{L}\p{N}_-]{0,100}$/u.test(RUN_ID)) throw new Error('RUN_ID は実施IDを指定してください（パスは不可）');
   const document = BOOK_DOCUMENTS[BOOK];
   if (!document) throw new Error(`対応する冊子がありません: ${BOOK}`);
-  return `${ROOT}/_AIDIY/knowledge/images/${document}`;
+  return `${ROOT}/docs/セルフテスト、操作ガイド/images/${document}`;
 };
 
 const workDir = () => {
   evDir(); // 実施IDと現行冊子を共通検証する。
-  const dir = `${ROOT}/.aidiy_cache/selftest/${BOOK_DOCUMENTS[BOOK]}`;
+  const dir = `${ROOT}/docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest/${BOOK_DOCUMENTS[BOOK]}`;
   mkdirSync(dir, { recursive: true });
   return dir;
 };

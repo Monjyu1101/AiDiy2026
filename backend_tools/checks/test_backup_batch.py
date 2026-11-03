@@ -64,7 +64,7 @@ class BackupBatchTests(unittest.TestCase):
     def write(self, name, text, when=1_800_000_000):
         path = self.root / name
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding='utf-8')
+        path.write_text(text, encoding='utf-8', newline='')
         os.utime(path, (when, when))
 
     def blocked_copy(self, root, files, target):
@@ -287,7 +287,7 @@ class BackupBatchTests(unittest.TestCase):
         self.assertTrue(result['差分なし'])
         self.assertEqual(result['バックアップ件数'], 0)
 
-    def test_strict_bool_input_and_empty_project_failure_echo_batch(self):
+    def test_strict_bool_input_and_empty_project_success_echo_batch(self):
         for value in (None, 0, 1, 'true', 'false'):
             with self.assertRaises(backup.BackupSaveError):
                 self.saver.run(batch=value)
@@ -296,7 +296,8 @@ class BackupBatchTests(unittest.TestCase):
         saver = backup.BackupSave(str(empty));saver._native = self.native
         for value in (False, True):
             result = saver.run(batch=value)
-            self.assertFalse(result['ok'])
+            self.assertTrue(result['ok'])
+            self.assertTrue(result['対象なし'])
             self.assertIs(result['batch'], value)
 
 
@@ -313,7 +314,7 @@ class BackupBatchApiTests(unittest.IsolatedAsyncioTestCase):
         self.saver._native = self.native
         self.app = FastAPI()
         self.app.include_router(tools_backup.create_router(self.saver, SimpleNamespace()))
-        self.expected = {'ok': True, '最終時刻': 'fixture-time', '全件数': 1,
+        self.expected = {'ok': True, '対象なし': False, '最終時刻': 'fixture-time', '全件数': 1,
                          'バックアップ件数': 1, '全件フラグ': True,
                          'バックアップ先': '/fixture/snapshot', '差分なし': False}
 
@@ -340,7 +341,7 @@ class BackupBatchApiTests(unittest.IsolatedAsyncioTestCase):
             result = (await self.request({'batch': batch})).json()
             self.assertFalse(result['ok'])
             self.assertIs(result['batch'], batch)
-            self.assertEqual(set(result), set(self.expected) | {'batch', 'error'})
+            self.assertEqual(set(result), (set(self.expected) - {'対象なし'}) | {'batch', 'error'})
 
     async def test_mcp_omitted_false_true_preserve_exact_fields(self):
         import json

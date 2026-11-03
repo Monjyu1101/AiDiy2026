@@ -894,6 +894,8 @@ class LiveAI:
                             elif msg_type in [
                                 "session.created",
                                 "conversation.item.created", "rate_limits.updated",
+                                # GAの項目追加・確定通知。回答はresponse系で扱い、二重転送しない。
+                                "conversation.item.added", "conversation.item.done",
                                 "response.output_item.added", "response.audio.done",
                                 "response.output_audio.done",
                                 "response.content_part.added", "response.content_part.done",

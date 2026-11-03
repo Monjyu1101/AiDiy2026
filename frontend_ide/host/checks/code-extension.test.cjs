@@ -44,6 +44,7 @@ test('Code 拡張: 本文上限の日本語履歴をworkspaceStateから保存�
   runInNewContext(transformSync(readFileSync('src/extension.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code, {
     module: loaded, exports: loaded.exports, setTimeout, clearTimeout, console, URL,
     require(name) {
+      if (name === './workspace-folder') return { usableFolder: folder => folder?.uri.scheme === 'file', folderRequired: '先にプロジェクトフォルダを開いてください' };
       if (name === './internal-auth') return { internalAuthorization: () => () => ({}) };
       if (name === './file-attachments') return require('../out/file-attachments.cjs');
       if (name === 'vscode') return vscode;
@@ -78,13 +79,13 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
   const posts = [], saved = [], context = { extensionPath: process.cwd(), extensionUri: {fsPath:process.cwd()}, subscriptions:[],
     workspaceState:{get(){},update(key,value){saved.push(value);return Promise.resolve();}}, globalState:{get(){},update(){return Promise.resolve();}} };
   const uri = { scheme:'file',fsPath:'/project',toString:()=> 'file:///project' }, folder = {uri,name:'project'};
-  let provider, receive, disposed, visibility, selected;
+  let provider, receive, disposed, visibility, selected, folderChanged;
   const preferences = new Map([['online.json', {provider:'codex_cli',model:'auto'}],
     ['online_offline.json', {provider:'aidiy_hermes',model:'openai_oauth/gpt-6.1-sol'}]]);
   const runs = [];
   const subscription = {dispose(){}};
   const vscode = { workspace:{isTrusted:true,workspaceFolders:[],getConfiguration:()=>({get:(_key,fallback)=>fallback}),
-    getWorkspaceFolder:()=>folder,onDidChangeWorkspaceFolders:()=>subscription},
+    getWorkspaceFolder:()=>folder,onDidChangeWorkspaceFolders:fn=>{folderChanged=fn;return subscription;}},
     window:{activeTextEditor:undefined,onDidChangeActiveTextEditor:()=>subscription,
       createOutputChannel:()=>({appendLine(){},clear(){},dispose(){}}),registerWebviewViewProvider(_id,object){provider=object;return subscription;}},
     Uri:{joinPath:(_uri,path)=>({fsPath:path})},commands:{registerCommand:()=>subscription,executeCommand:async()=>{}},
@@ -92,6 +93,7 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
   const loaded = {exports:{}};
   runInNewContext(transformSync(readFileSync('src/extension.ts','utf8'),{loader:'ts',format:'cjs'}).code,{
     exports:loaded.exports,module:loaded,require(name){
+      if (name === './workspace-folder') return { usableFolder: folder => folder?.uri.scheme === 'file', folderRequired: '先にプロジェクトフォルダを開いてください' };
       if (name === './internal-auth') return { internalAuthorization: () => () => ({}) };
       if(name.endsWith('/vscode-html')) { const m={exports:{}}; runInNewContext(transformSync(readFileSync(require('node:path').resolve(__dirname, '../src/vscode-html.ts'),'utf8'),{loader:'ts',format:'cjs'}).code,{module:m,exports:m.exports}); return m.exports; }
       if(name==='./file-attachments') return require('../out/file-attachments.cjs');
@@ -135,9 +137,10 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.equal(latest().実行モード,'offline');assert.equal(latest().オフライン対応,true);
     // 画面（Vue）が送るメッセージを直接送り、拡張が返す状態を確認する。
     receive({type:'chooseModel',provider:''});await flush();
-    assert.ok(posts.findLast(p=>p.type==='modelCatalog'));
+    assert.equal(posts.findLast(p=>p.type==='modelCatalog'),undefined);
+    assert.match(posts.at(-1).message,/フォルダ/);
     receive({type:'setModel',provider:'aidiy_hermes',model:'same'});await flush();
-    assert.equal(latest().model,'same');
+    assert.equal(latest().model,'openai_oauth/gpt-6.1-sol');
     // 作業フォルダを開くと、接続失敗・再試行中も入力とモデル選択を許可する。
     vscode.workspace.workspaceFolders=[folder];backend.unavailable=true;
     receive({type:'ready'});await flush();
@@ -259,10 +262,24 @@ test('Code 拡張: 接続状態ごとのモデル保存・復元、Hermes実行�
     assert.equal(latest().自動接続,true);
     receive({type:'disconnect'});await flush();vscode.workspace.isTrusted=false;
     receive({メッセージ識別:'input_text',メッセージ内容:'未信頼'});await flush();assert.equal(runs.length,2);
-    assert.match(latest().メッセージ.at(-1).本文,/信頼/);vscode.workspace.isTrusted=true;
+    assert.equal(latest().信頼済み,false);vscode.workspace.isTrusted=true;
     receive({メッセージ識別:'input_text',メッセージ内容:'破棄前'});await flush();
     disposed();assert.ok(backend.sockets.every(s=>s.readyState===3));
     assert.equal(runs[2].stops,1);runs[2].finish();await flush();
+    provider.resolveWebviewView(view);
+    // フォルダを閉じると通信・保存・実行を抑止し、別フォルダで新しい接続を作る。
+    vscode.workspace.workspaceFolders=[];folderChanged();await flush();
+    assert.equal(latest().作業フォルダ,null);
+    const socketsBefore=backend.sockets.length, runsBefore=runs.length, settingsBefore=JSON.stringify([...preferences]);
+    for (const message of [{type:'connect'}, {type:'setModel',provider:'aidiy_hermes',model:'copilot_cli/auto'},
+      {メッセージ識別:'input_text',メッセージ内容:'拒否するfixture'}]) receive(message);
+    await flush();assert.equal(backend.sockets.length,socketsBefore);assert.equal(runs.length,runsBefore);
+    assert.equal(JSON.stringify([...preferences]),settingsBefore);
+    const nextFolder={name:'next',uri:{scheme:'file',fsPath:'/next',toString:()=> 'file:///next'}};
+    vscode.workspace.workspaceFolders=[nextFolder];folderChanged();await flush();
+    assert.equal(latest().作業フォルダ.パス,'/next');
+    receive({type:'connect'});await flush();assert.equal(latest().接続済み,true);
+    assert.equal(latest().作業フォルダ.パス,'/next');
   } finally { provider.dispose(); }
 });
 
@@ -278,7 +295,7 @@ test('Code 拡張添付: 信頼済みonlineの現scopeだけ送信、echo画像�
     constructor(_backend, receive, notify) { connection = this; this.receive = receive; this.notify = notify; }
     start() { this.notify(); } disconnect() { this.connected = false; } dispose() {} send(packet) { sent.push(packet); return true; }
   }
-  const dependencies = { './internal-auth': { internalAuthorization: () => () => ({}) }, vscode, './vscode-html': { developmentHtml: () => '' }, './file-attachments': require('../out/file-attachments.cjs'),
+  const dependencies = { './workspace-folder': { usableFolder: folder => folder?.uri.scheme === 'file', folderRequired: '先にプロジェクトフォルダを開いてください' }, './internal-auth': { internalAuthorization: () => () => ({}) }, vscode, './vscode-html': { developmentHtml: () => '' }, './file-attachments': require('../out/file-attachments.cjs'),
     './code-connection': { CodeConnection: Connection, コード選択: value => ({ provider: value.provider || '', model: value.model || '' }) },
     './input-prediction': { InputPrediction: class { sync() {} clear() {} } }, './protocol': require('../out/protocol.cjs'),
     './model-preferences': { モデル保存先: () => 'model', コードモデル読込() {}, コード設定保存先: () => 'options', 検証回数読込() {} },

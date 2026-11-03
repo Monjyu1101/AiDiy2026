@@ -1,0 +1,2582 @@
+[
+  {
+    "Path": "temp\\narration-taskteam\\avatar_end.json",
+    "Bytes": 1134,
+    "Sha256": "7266BC718181D35CC60011D715793C4660BF3B01D268FC4E135C9921417C0E77"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_end.mp3",
+    "Bytes": 73728,
+    "Sha256": "F6C90D724796FE19F343C01839224BAE8A638FE6BE8905F6CB31F1CC8B9D478A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_intro.json",
+    "Bytes": 1196,
+    "Sha256": "264109F1A1B172823ED8F243FDECC4AD54CB4BD2AE7BA6AB241A660C1830F325"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_intro.mp3",
+    "Bytes": 81504,
+    "Sha256": "EDE276AE3B804DB5971244363258CFB048A5C81483301A916DD4F176164A08F6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_notes.json",
+    "Bytes": 1040,
+    "Sha256": "3751F4C95BA56F6B126D7CCDB94EB7045CE9F5A2118A0D980AE2702C6A5AFAB3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_notes.mp3",
+    "Bytes": 63072,
+    "Sha256": "8A224C275F6117BDCD4DF54E37F703205AAA996C87E5025BD9C574A01BFE68D6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_prep.json",
+    "Bytes": 961,
+    "Sha256": "00C894AE8CC7DED653603853805B6DB112C8C64D262226EF13F999A24ED7462E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_prep.mp3",
+    "Bytes": 52560,
+    "Sha256": "678AF1C80EEA874ABED482707B5CCEBBC1B3C153AD63EC6008A2C582DB02A7C8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_result.json",
+    "Bytes": 1173,
+    "Sha256": "195CA6E763C05BF4161D30A9744F81AC1B4D546EA25E209EA207419CA30E8A5E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avatar_result.mp3",
+    "Bytes": 87264,
+    "Sha256": "E74CCF8043BA733D8F9C8E908B15D39B67DE356AABA02861D2D8D52C4F7F7186"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_intro.json",
+    "Bytes": 1013,
+    "Sha256": "3A4B7DC76780CD52E291916F05812951E60414CA9D4405DCBC589395DC8C15E7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_intro.mp3",
+    "Bytes": 63792,
+    "Sha256": "ABF7D62ED63C71DC17D3C3C24677AF832BCD4E824E3B6178D52B4B3DB6A89E68"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_notes.json",
+    "Bytes": 935,
+    "Sha256": "DB10B17DA3A11905EEFCE0FD53CACD22F45BAB3E8558A2CDD186526FC03F28EC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_notes.mp3",
+    "Bytes": 54288,
+    "Sha256": "E883693F193D9ECD659040FF688CC9BEF474F8BDA64FFBC4649F239294823644"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_pause.json",
+    "Bytes": 917,
+    "Sha256": "8E86B062E6FDACF4EE5B3A7AD462264B0E7C5B15710A23D887852E9EADABA23A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_pause.mp3",
+    "Bytes": 49248,
+    "Sha256": "285DB8D2066ED0D0E3BC4A97F46A3F35FA6A24B1A9C13AF1B1033354C685F67F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_result.json",
+    "Bytes": 1164,
+    "Sha256": "61CF046A343C2614A237FEE36AA65FE5455062EB6404833296D4B139386C2284"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_result.mp3",
+    "Bytes": 86256,
+    "Sha256": "37F96B88ECEA588970DB4D0417F4056A4E363FCD02103465970A5A410A085F7D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_send.json",
+    "Bytes": 1006,
+    "Sha256": "9EC9AB863939760548E27587E0B4A2F9BD6E1D67872A968EC9A048DAB7CB9F2E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avc_send.mp3",
+    "Bytes": 63648,
+    "Sha256": "BE038889900C10FDEDC827BA5CA09E46D74848A50A8526E40987E0A08804837F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_end.json",
+    "Bytes": 1095,
+    "Sha256": "5D8B55A67CD1F9089D4BE843D8F49F91F45D19D6B41CD075F8B25FD8E1A99D60"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_end.mp3",
+    "Bytes": 70416,
+    "Sha256": "A1E573A58225EA90B74D0E86E0D71FE506E98EE31E91A134EE7349D4E53A1658"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_intro.json",
+    "Bytes": 1091,
+    "Sha256": "2AF33A2C872A777F5E8D2221B30CA66C0F6CCEE8F44BFB4F7DC3CD1392A80F54"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_intro.mp3",
+    "Bytes": 69552,
+    "Sha256": "141A76535D4A6684547C81637E8833D17D573EC44FD86A5C8C81B553623A1153"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_left.json",
+    "Bytes": 982,
+    "Sha256": "0E08E9E6C1E73FBB921282FE45775FF3492331C81B5CB6CCB0B96B1E585747EE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_left.mp3",
+    "Bytes": 63360,
+    "Sha256": "91820EF3FE2300CDC65DEBA673C3A8BA743391B7859C047B1DB05B55AD2388D6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_notes.json",
+    "Bytes": 1031,
+    "Sha256": "7A608A8F98DEE954E827282BA2F57F07D1F87D8A67A2A17AA9A2C81669E3C847"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_notes.mp3",
+    "Bytes": 63936,
+    "Sha256": "4642A4FDC20EC5CCB76B35F27D588EEEC2C55AEBDE45E6A88BFA7A64DF63EB8E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_return.json",
+    "Bytes": 1122,
+    "Sha256": "8699B5226711485B3264996D07DD3FD03B7E7A59AB70589B3AC6B80ACD06A406"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_return.mp3",
+    "Bytes": 79344,
+    "Sha256": "C2332C8593A0D12A37FBB12FA2F655978A0D958FF7BBCC3439E059A8BAED8E4C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_right.json",
+    "Bytes": 947,
+    "Sha256": "62575662409E749C5D8609388D51F06E9BE7D682BE833888D2873748245B1246"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\avw_right.mp3",
+    "Bytes": 50400,
+    "Sha256": "BE9DF1279B9D13F8EE0CFE2273BEB07B795F876B0E1D59B586A69BECED4EEB78"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_done.json",
+    "Bytes": 975,
+    "Sha256": "AD009898369C4BF1048C6FF5C0DCD4751040ECA9D4C0775F902A973AEEBFB2C0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_done.mp3",
+    "Bytes": 54144,
+    "Sha256": "5ADAE63212988E22E4C12B911EA4C369AA68408D7E91F0F86A69A859FB41B2CE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_intro.json",
+    "Bytes": 1060,
+    "Sha256": "0A3BC8F346D567345D5D6C1577A50B727F032AE93629531A119BFC246DAA007B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_intro.mp3",
+    "Bytes": 64080,
+    "Sha256": "6F746A4CC58BFC3EEAB0AD7BC32B2882FC0F9A52B5F6BE101695D025DEA1E4D4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_stop.json",
+    "Bytes": 1023,
+    "Sha256": "8D362DDBC026FB5835B1D147DDD5FEE66D3E03CA815D0B1C1CD9A94B46EB2CA8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\bn_stop.mp3",
+    "Bytes": 61200,
+    "Sha256": "88260EF4810E20C60AB7596A95249F922D3959FDAC828AFC2FE8F8A4AD2DA92A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_done.json",
+    "Bytes": 1107,
+    "Sha256": "C656442C0FFB657D2AC889FDD0F9E859CA59936BF07958CB25999EDBBD68BE14"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_done.mp3",
+    "Bytes": 82800,
+    "Sha256": "F9CE8C13D42289F639229D2AE7FD0C8E5986335B3DA49430056FC18F627FCBF3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_intro.json",
+    "Bytes": 1162,
+    "Sha256": "2889BB93D0FFC475965C67233E3B93B2AF08B9B774207C51C1F5B1471F6ED93E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_intro.mp3",
+    "Bytes": 83520,
+    "Sha256": "08ACA11EB997F3CDCCCA3051AE6FB2113B4B02C4A8CD0D5F688A7F6CB9054FA2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_notes.json",
+    "Bytes": 832,
+    "Sha256": "BA96CC4146FCBB7D74BF61A6A10B6A13B7D951EAD636D2C3DABE8D73106F7FA5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_notes.mp3",
+    "Bytes": 30960,
+    "Sha256": "ABCC606A3746459AE48DB66D28690CFB7C5B94098D2B0391592B311F4D826CFC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_send.json",
+    "Bytes": 975,
+    "Sha256": "7ADB1D9050BF1ACEE247494B87078E0798C8FC194E7FAF391947D694028EA8CB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cb_send.mp3",
+    "Bytes": 60912,
+    "Sha256": "16D61BFDFB8E79388163E0639997CCDE3FB22DB4F18E427EE01275BF61AC0D82"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_done.json",
+    "Bytes": 933,
+    "Sha256": "0736DC50C6E83A7E7925A0569FE994B2C24D94674074CC5DF7E82051FA4638FA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_done.mp3",
+    "Bytes": 52128,
+    "Sha256": "1963E92531949C0A89B25D45B5E0B9D375FF23B622A43B1D65B2AA579F79A9C1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_intro.json",
+    "Bytes": 982,
+    "Sha256": "31231B43EE8F03599E248C0ABB13A436196FA2ADE9928BAF48B1DAC4954CE2A4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_intro.mp3",
+    "Bytes": 55440,
+    "Sha256": "7126C64543AA9B8D41B631A3F460F0BE03979B77D5D0A4A17FE667BCD22E61B1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_send.json",
+    "Bytes": 939,
+    "Sha256": "7FADC84BEEAFA4241604B9555D1966BFFC56A7B4B1525C7B7BCBB555CF786CBC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ce_send.mp3",
+    "Bytes": 52992,
+    "Sha256": "F9CF73B9576FB560788FACACA987309B3E76DA9ADFA99DDE4432AF4473971159"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\check.json",
+    "Bytes": 961,
+    "Sha256": "E854E1CB3B385BAEE5D0C84D7A3491CD36DAAD4F8F1A4710862D8517CD4B82B6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\check.mp3",
+    "Bytes": 50832,
+    "Sha256": "2BAEA71526054C47825ED0AD8676F0ACB85E1C2AFD0AC1A868066DCABFEF1B4B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cleanup.json",
+    "Bytes": 855,
+    "Sha256": "90A9CECFFC98F29140EB60DAF6D76CE78417D275151FD83A72ACA234BD076E9F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cleanup.mp3",
+    "Bytes": 39600,
+    "Sha256": "AA4CE2FC1348640A7117E5F80F0A9795818601015F601EE9770350C8420304F1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_folder.json",
+    "Bytes": 1064,
+    "Sha256": "C6D042468A447F73477305311E268014D84E336E50C0162248D69AE7F9C05C8B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_folder.mp3",
+    "Bytes": 70992,
+    "Sha256": "8F871989FF6AB7BD7F670A560282624D912BF0DF034FE59FD575AAC9754C5C4F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_intro.json",
+    "Bytes": 1051,
+    "Sha256": "E9F3C7BF1B5C62BA4AEB7BB649011698B2C487343D1A32444AE9DBAA8992F1E8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_intro.mp3",
+    "Bytes": 67536,
+    "Sha256": "EF32A44CC2873E9325B5DF3BC5D45D52434F0CB9833AD5B3E59C3459C9579EE9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_notes.json",
+    "Bytes": 1033,
+    "Sha256": "DBB6CD8C9B6AFEED68F4AE58BB556E2B0A1751FC85A2303A04DC550316683638"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_notes.mp3",
+    "Bytes": 64944,
+    "Sha256": "3094B9965A432EFDDECF63F527B961E21F104D04942F080E77A867945D31B504"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_ready.json",
+    "Bytes": 1105,
+    "Sha256": "449FB8D7EF98051D6CB1E1B4E3C269D3CE62E4C8DB42086C01107EC3E579FB16"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_ready.mp3",
+    "Bytes": 74592,
+    "Sha256": "90FADE8E237829052ABB23A6E48039BE29ECBE9CB1DFC97CBD72EEDBC395A1F5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_result.json",
+    "Bytes": 1094,
+    "Sha256": "CDBC069390F2E9758041991ACC092538101F38ECD68BF80506F793A87C523CA5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_result.mp3",
+    "Bytes": 77904,
+    "Sha256": "CA7DC8ED6F6BD71AE272E42C43E2D95CAF1599D6EAD03E4AD7EBF07DC84FC313"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_send.json",
+    "Bytes": 1020,
+    "Sha256": "E9BEF1E21D0B3D1657A6D9ABC3935A9DD504CA14165459F206734DA900E982DD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\codeg_send.mp3",
+    "Bytes": 61776,
+    "Sha256": "991D29E7812D6301B9DCCC241B2FDF6CC86364DB172B57F48E9DE0BA4017E487"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_end.json",
+    "Bytes": 1180,
+    "Sha256": "F2613DE4538597E33A791D6C7DA1B98673E1AAB4612BC2E4F9A2220C58F115C8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_end.mp3",
+    "Bytes": 97920,
+    "Sha256": "CA224E52176948931C9EAA831E9B953FA80D2665222A732DC14F0775A6A09619"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_folder.json",
+    "Bytes": 1341,
+    "Sha256": "A7358846792C10E246097E3F6305255EC68133989ADDC503FADCBFFD85264097"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_folder.mp3",
+    "Bytes": 114480,
+    "Sha256": "12C908534EBB7BD95E9BB97591B15776C4416E5DF9FE408430CE86C4B3AF4A60"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_interval.json",
+    "Bytes": 1137,
+    "Sha256": "AE7C1B7491FB41D456D0B99CEB0A0B76A1ECD7FD958AB14580C042B3BD262EE3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_interval.mp3",
+    "Bytes": 84960,
+    "Sha256": "0F1A50FA015102409F430C14562DD7817A9507CFBC108C4989CAA3DA4253EBCE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_intro.json",
+    "Bytes": 1394,
+    "Sha256": "416C73CE4EA239EA3EC7A0A020EA2EB5CAD4B92E3A0285B70954BE0250CF9334"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_intro.mp3",
+    "Bytes": 129456,
+    "Sha256": "6F9C861F2C2A64DA2BC22EAD9BF0437883538A5063AC319CFF89DDCD1E428DDB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_notes.json",
+    "Bytes": 1056,
+    "Sha256": "B17E5B1B827F7F679E47F148B89042ED6FF686A56A5AEC5380D7BEBDE983FEDC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_notes.mp3",
+    "Bytes": 73584,
+    "Sha256": "2500AE79DE7A1600815D41F2E94273DEDD415BD454775288F8B666C0A0AFE694"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_schedule.json",
+    "Bytes": 1023,
+    "Sha256": "2EEB133EF0A5CE5B14E5ACA9FF6BEE238499201500BC07453C3752A77780A3EC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_schedule.mp3",
+    "Bytes": 71856,
+    "Sha256": "ABDEB4B4DE1CF88EF9A892BDDB4955CC5FBD0C688BE9A1375A81FE8972F6A2B9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_time.json",
+    "Bytes": 1037,
+    "Sha256": "B49BDC18837DF065AE7199AE3B139C4C7AE0208E03E06F1A0274644D5A6B7EE6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_time.mp3",
+    "Bytes": 72288,
+    "Sha256": "40585D2C9834B9DBC7695AD71FBEBCF38F7504B2AE0A76E14DBD102702A98014"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_week.json",
+    "Bytes": 1043,
+    "Sha256": "2B4C8EF33272CEC8089CD61D1176C83CF838BCC26A50A0BACDC12004C7F163E4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cond_week.mp3",
+    "Bytes": 66528,
+    "Sha256": "5DF3B0333891123F2D394EBB48D0A7442A509F77302F7992023819A0CC90813B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\connect.json",
+    "Bytes": 1023,
+    "Sha256": "4102DC3AB9D2C4E7C934520777896522DD76F6D5CB11FFE9077A8456AB66EF8A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\connect.mp3",
+    "Bytes": 58752,
+    "Sha256": "DCC2EB0A0A34F62BD30F8CBBF7ABEFCBD8B0618A8B4A810260B3FA3FDE5FF4FF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_end.json",
+    "Bytes": 1090,
+    "Sha256": "C278736D619966884E12BF641F70A125971A298F5FD82AEFB8C6A4D2F6555C60"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_end.mp3",
+    "Bytes": 75744,
+    "Sha256": "DBD495D07A2C6A2B5C395BD391B27C9690A512DB7BBB488A1847F1619BC856C0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_intro.json",
+    "Bytes": 1200,
+    "Sha256": "10D1204FA82E08537B8355CAA845D8E85D0EBB87DF3B37582A3011D14B0034E3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_intro.mp3",
+    "Bytes": 92736,
+    "Sha256": "E124F8F0F1E0CC28C2AEDA70B5A5F0E0447FE9D9CB4E256C7C535E6DE87470F1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_move.json",
+    "Bytes": 1157,
+    "Sha256": "D6EA83FE2CB8830FDE90383C67550000F0A4CAA8F4235FB31DC1C3642E65FB79"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_move.mp3",
+    "Bytes": 86256,
+    "Sha256": "4A9D2A50377F74DFD54BF265C94F0A13FF30ED2883FFCF32652A215543383A46"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_notes.json",
+    "Bytes": 1020,
+    "Sha256": "484F5F2597980C5F78E7713B9979F86622E7877BA675C704538057804F69BE12"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_notes.mp3",
+    "Bytes": 63792,
+    "Sha256": "34B3F1B56A8A4E9E8C9DEB9E3C2BFC01551271608D4F049CED556C0BACBA2896"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_result.json",
+    "Bytes": 1135,
+    "Sha256": "974AC7D44AFE9F25B900B66BB603B5BC481BA4DCEE7EDC45FD27D480F9C3B5A3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_result.mp3",
+    "Bytes": 86976,
+    "Sha256": "525DBAA463997B60220E14F5846879252A3D8CBFA3F95D135F200E22EF43C310"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_rotate.json",
+    "Bytes": 1105,
+    "Sha256": "A27131CDE3602D3974E7ABD075202F404CB227540050ADA3BD057E07D31FAE57"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\cube_rotate.mp3",
+    "Bytes": 83664,
+    "Sha256": "C8097EC4A4F967957411194B96CF19ECA1B5214C859FDC6EE3AB266E8AA1F4EF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_done.json",
+    "Bytes": 927,
+    "Sha256": "BDF89B7608E25CADA046588A23B9DEC51985F15EB35C72AA131E14353C58B32D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_done.mp3",
+    "Bytes": 46944,
+    "Sha256": "55CCB46698F407FADC3AFB4BFF79A3A98212CD3237EB2D257397934662B96DFA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_intro.json",
+    "Bytes": 1036,
+    "Sha256": "1F78C9B15842A8DD6DCF20784E887DDAE8BEDC9480867ECCDC8DD81860A13B63"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_intro.mp3",
+    "Bytes": 65376,
+    "Sha256": "CBEBB3BA4F59213EBF82371F4BA5DFD71D050B56FA0307E0254274CD04266F6B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_result.json",
+    "Bytes": 1025,
+    "Sha256": "1E05B2956E88CA800F181255969D953B9FF0A185C255120FDA5898A9B92663FE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dc_result.mp3",
+    "Bytes": 60912,
+    "Sha256": "252BC91062D1788066128625F63A2708D87168708E0A78B4007A03A4DF397F7D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_end.json",
+    "Bytes": 1112,
+    "Sha256": "47C0B536C21B676327B9808AABEA2E685D2D888C960B42BDC6DF2A2558380F17"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_end.mp3",
+    "Bytes": 80352,
+    "Sha256": "513126EDBB965CA0766C3DB2FB7389C5BEC1F21419ADF6BAF00BA6F2824EF981"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_intro.json",
+    "Bytes": 1150,
+    "Sha256": "618B527226313832E8484F30EC4EC5F977B1F220CA62F8D373B74663C7C89E18"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_intro.mp3",
+    "Bytes": 87408,
+    "Sha256": "6499A63572B74D78955A8CD4C34A06FD8EB66FB53AB41EBF9BE091D0879D164C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_notes.json",
+    "Bytes": 988,
+    "Sha256": "082852C7B2C87DC1F3557AF9EB402278B0871A8FE15384EE89908AEF756A6073"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_notes.mp3",
+    "Bytes": 58320,
+    "Sha256": "DEB5AAD480F1277087E5E8361D2F3856C7053C494408E2A22650678F19423925"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_prep.json",
+    "Bytes": 1101,
+    "Sha256": "0BD9804BB6EB02DC1333677717E092D43B1F22EA734803860445FD6C7E2606A0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_prep.mp3",
+    "Bytes": 76464,
+    "Sha256": "D79CDE4D5042A627798A53E1369673E46CF8C9802E0F066CB405FF5B9927C03A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_result.json",
+    "Bytes": 1547,
+    "Sha256": "5949E56C52A81A7DC3E53B35EB76AF86059A5A8B48A4933511CF1B90F8CEF144"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_result.mp3",
+    "Bytes": 131760,
+    "Sha256": "07CBEAA47E049D93285D4525C0268375220C0D8CCDB4D4FE9620BED2A84656A8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_select.json",
+    "Bytes": 1079,
+    "Sha256": "276DE4FF483438708FA2CC2DDA77E0239F4BF87A57B50F67E9A4718223B362F3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\diagread_select.mp3",
+    "Bytes": 73008,
+    "Sha256": "FE39DD804536AAC096287E77F1925C9ABA0AF9753391606154F82F4FAB81C6A6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dm_done.json",
+    "Bytes": 1081,
+    "Sha256": "94C62647C557D330A0A0A9DCC486929F9F8A3BE1E0C0B02923B4260FA89102FF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dm_done.mp3",
+    "Bytes": 71136,
+    "Sha256": "27F2FCAA52B5D171F4D77C4962850726C22C253A06FB18FCB845ED3FB4ED1956"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dm_intro.json",
+    "Bytes": 1004,
+    "Sha256": "C0872DCA75E0A4DCC9538FD0A42E697C82CCE4C439C80DB5BCA97EE96776730C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dm_intro.mp3",
+    "Bytes": 57888,
+    "Sha256": "A23D48E74A6CBC5F6A2929E137B7AF2D001A3E404EE731D8E14F37CCAAB41B18"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_end.json",
+    "Bytes": 1161,
+    "Sha256": "4ACF43594D8F761EC797F36CC36963D76AFA4AFFAB1E7FB3A72B8B922629F910"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_end.mp3",
+    "Bytes": 93600,
+    "Sha256": "4450E7C9E56BCC19458EA49879658E32BEFDC6E6396820F8013B62F7CA940EF2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_intro.json",
+    "Bytes": 1255,
+    "Sha256": "9BEAB9B1D1EA81A9F9579BA94F45287881FECC016A30249AACDCF6459959997A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_intro.mp3",
+    "Bytes": 109440,
+    "Sha256": "332877CA9D72C790C3C9285ABFB438706CA0A2900803553207E091D4A863BD53"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_notes.json",
+    "Bytes": 1055,
+    "Sha256": "8D8DB963851D23F58BB44AE5FFA8C3B6F32DBCE71E50712A43C4A3057F46D3ED"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_notes.mp3",
+    "Bytes": 66240,
+    "Sha256": "AE3A784D0222DD94FCDC0F8DC1DBE2A4F5D82CB686E3CAB737C7176A08EC47BB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_result.json",
+    "Bytes": 1194,
+    "Sha256": "95A7701D1FD0CE360703B00B71CD936E4E4D33A4576A92F42D1641D21A487C17"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_result.mp3",
+    "Bytes": 98352,
+    "Sha256": "3295DCC2AD6BE8B0974A5E0C752CA354289453476E275D2F83EE755EF6C62813"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_roll.json",
+    "Bytes": 1150,
+    "Sha256": "A134AFA46E603B891CB0DDF252AE821C45D6089450DF0705B99F1CE5A79BE3B4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_roll.mp3",
+    "Bytes": 83952,
+    "Sha256": "D25A1FE36A4D9F2C4F35D211311F7F64AB1095B33AB390BEAE7652D3D63D22B5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_view.json",
+    "Bytes": 1018,
+    "Sha256": "C392E7A112B750C3B1C8C2CB29350C959909BAEE111B5716AFAAFBF26B16D567"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\dog_view.mp3",
+    "Bytes": 64656,
+    "Sha256": "532A87B4F0929C1C710260394E3922839E60CA9FC9D39578D98ECF6ABE65DE14"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_finish.json",
+    "Bytes": 1287,
+    "Sha256": "1DE3AF3651CFFB545F3550E8415BABDA77FBD1AB608FB8C6249C538ADF21E30B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_finish.mp3",
+    "Bytes": 109728,
+    "Sha256": "543E027F4E28C493CFEF3A4D5E83F747C28607291185B71712AE665812D890B2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_intro.json",
+    "Bytes": 1152,
+    "Sha256": "88AB6CDC71ADEF0574BB5D69EE9DD662A75122C0D9E0A891C8AE6C633683BDE2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_intro.mp3",
+    "Bytes": 80208,
+    "Sha256": "4FEBEAF8E2D8B7651C2CA2DBB61450EE56D52A36A8A881CC1FBFF67634EB6A68"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_notes.json",
+    "Bytes": 1008,
+    "Sha256": "0256ACF89BE5BDF9960D4DB7F88DF78B473EFB71F3DB03DB701D755ED63D2963"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_notes.mp3",
+    "Bytes": 58464,
+    "Sha256": "3CF7BF85CE90AD6EA07FA65221D796C08EE8CAB54B83F3AEAF341BC5F444B69F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_prepare.json",
+    "Bytes": 1082,
+    "Sha256": "2EA53CB153910D86F47F1362A223F8C7A09E37EB1C3D4AA533B28BD3F6FF8398"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_prepare.mp3",
+    "Bytes": 72720,
+    "Sha256": "00FA901650C1A48C1A7CEAB96D35B1DFE7CB00064EF2FCAC18BE5D1376A579D5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_result.json",
+    "Bytes": 1147,
+    "Sha256": "2D9274AB37416C3AFA3A8EF15C0700BE07CFECE80CB47CCF798133499C514305"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\drag_result.mp3",
+    "Bytes": 83808,
+    "Sha256": "E29351BDA937547164CE865795D7D6B1581654F5E76343CFC23D3482F792F270"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\final_result.json",
+    "Bytes": 1328,
+    "Sha256": "300416F0CD96355F30FDEC8CFB90C5DA7C65CD262736EB32D83B5E5AFACDE6F0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\final_result.mp3",
+    "Bytes": 105408,
+    "Sha256": "9E4FF36114A0CDFF2867C01A9A639F951E36CFC6E22E9EC59AE7D3BDB6BB5B68"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_end.json",
+    "Bytes": 1086,
+    "Sha256": "FB849331D8F8D150F1818C3E8F4D7AD624E800AE0A66E831451D0D135C8DE335"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_end.mp3",
+    "Bytes": 73584,
+    "Sha256": "70A0B0C8A400F742430629655EBB5D7F8BD2FEBD9FC88F8254A77F39D54DC8FA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_intro.json",
+    "Bytes": 1094,
+    "Sha256": "A52F1B3D8DF54FB43D362F5FD16267B8E9FDF02ECA06A0A8BAC4F91FC89200D4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_intro.mp3",
+    "Bytes": 66816,
+    "Sha256": "1F9DAF0B08D4D89CB195CB5449CC93F795ED688A36E5F8F1B4C1AD81F9F300CD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_notes.json",
+    "Bytes": 1052,
+    "Sha256": "B5C6C98F2918D9F90486F1252AC71AAA52B8CE4BC800336744C28FDAA343EDD8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_notes.mp3",
+    "Bytes": 66528,
+    "Sha256": "0EFC207C967196E1C08BF088D756EFCCA96BA755F687E63D51BBE2182DB0B820"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_notice.json",
+    "Bytes": 1191,
+    "Sha256": "EC15AA704368B549C863FDAE6A5B12A5F8B1CA423D649FFDA5DCE02AEEA3DAB2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_notice.mp3",
+    "Bytes": 89568,
+    "Sha256": "F92FBCE74E11CE7A5182A39815755173C1898985ADD4A9913734CDC2F51C5E93"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_result.json",
+    "Bytes": 1113,
+    "Sha256": "9DC869B09C0783875377A207BB27812979BA3E9DEB59D9B27E20BB0FEE1EBFD3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_result.mp3",
+    "Bytes": 77040,
+    "Sha256": "104BCBFD5DCBCD5DEE3E7AA8E9D5597E7A5B1720F89F420AABBDDF0266DA352A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_select.json",
+    "Bytes": 1083,
+    "Sha256": "02FA5E6EB797DFB177BA26055FF6D6DCA4A4479B3F8ADDDA38E674EC1A4E867E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\folder_select.mp3",
+    "Bytes": 60336,
+    "Sha256": "0720298966172E785399656FB734EF235C77170EC099D75665596224051CEA33"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_finish.json",
+    "Bytes": 1123,
+    "Sha256": "30B24526852944406CFDA8DC3EB5E09EBA863C8D43F20A3C4FBE7D4052D9D051"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_finish.mp3",
+    "Bytes": 81648,
+    "Sha256": "AD75145AF83288B70B68919112D640FB8E129435325ED96971519AE0AEDAB256"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_found.json",
+    "Bytes": 1266,
+    "Sha256": "D636962E59D197E9C09C5772F61F667D5F78E66C16E74F29A7992BBC36B0D737"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_found.mp3",
+    "Bytes": 105408,
+    "Sha256": "F5FDC017D432FEB53829513844B3559AA4333FB3080A6B43E7EE9A886F972E9D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_intro.json",
+    "Bytes": 1310,
+    "Sha256": "6E3496FCCD1C8A66A537B94C14F6FAA8E0BA97E964A706F8DE81694214C399C4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_intro.mp3",
+    "Bytes": 107280,
+    "Sha256": "1DDC921BEB4677979254C547520B7C65242C847695F44738EEF047297C6D3AB8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_open.json",
+    "Bytes": 969,
+    "Sha256": "A8F5447B60DF2AA8122E8271A829B9880AB558A42BF6AE7C9ABA2D8E78AAA68C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_open.mp3",
+    "Bytes": 55152,
+    "Sha256": "6C671410C521DC9FCAC18F12E476B7131301154A8972A02602E38935F54FD694"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_prepare.json",
+    "Bytes": 1124,
+    "Sha256": "96137773B4915734962FB897DE0171A3E0B1E0524642B0AD23214AA1DFF16E13"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_prepare.mp3",
+    "Bytes": 78048,
+    "Sha256": "3BC0842E73D4EEAD8A215456A6DB436F46AE13BB4EA25DCE8318AD595361406B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_results.json",
+    "Bytes": 1200,
+    "Sha256": "73D0C5555137042C0F2D56CF1857CF08DA3A4F182CD65142E38815F4FF5038D5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_results.mp3",
+    "Bytes": 93744,
+    "Sha256": "F462F398847A24E9AA1A4D251999E31BE0DDB848255C7B921E7FD38B10148283"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_run.json",
+    "Bytes": 976,
+    "Sha256": "1FBE647346A9A789FBC628323DCFA0F77D1071C26DB1A656B81B01B83FDE24A4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\grep_run.mp3",
+    "Bytes": 59760,
+    "Sha256": "6AAF754980075C15283DC5D29E2E54F03F0FE2341FBC6D8E721793D0DCA9FCB2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_end.json",
+    "Bytes": 1096,
+    "Sha256": "C6AC0A13DB46AC33C2E3E4C5990C1242F009D5142D7F6D1DBD471A0CA13DFE19"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_end.mp3",
+    "Bytes": 61344,
+    "Sha256": "C6D7DA5170714CD6A23EEA1A3514109670D676CB803FE4D1DC417A9599A94D26"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_filter.json",
+    "Bytes": 1119,
+    "Sha256": "0846EF18BF9DAE573FA0BBD49B9DFC1CFF6011F550B1EA95734045C9E7B2D06B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_filter.mp3",
+    "Bytes": 80496,
+    "Sha256": "3DA94F5070F169B74B38A0C40DC719543F06DB940BAA09058EBF6988C2102F95"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_intro.json",
+    "Bytes": 1130,
+    "Sha256": "091734F0289B642410053099E32571AAD0F32C3307C6FC663E650FDDA5E92E47"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_intro.mp3",
+    "Bytes": 76032,
+    "Sha256": "182CDFEF8650D5A69A18C46E11F5DCE126877E9658C6A3D58EB2C43DCCE520C5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_notes.json",
+    "Bytes": 1016,
+    "Sha256": "0ED0A70348815FD30042C82CE271318BF7E5CDD4C3257285B0A7A979F94D732D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_notes.mp3",
+    "Bytes": 61632,
+    "Sha256": "5405E3C0688B8AE81213CFC8EB35795AAB7711BEFB342D0612307D00125142DD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_prep.json",
+    "Bytes": 1033,
+    "Sha256": "964DBA72C5A9636C311FF88003B0FD02CDBE6B9B5193488682649596B9EF823D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_prep.mp3",
+    "Bytes": 67824,
+    "Sha256": "7D3EBBFEB204618552F260C902CF14FFB3ED229B080E18924818473450E2AF2F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_result.json",
+    "Bytes": 1149,
+    "Sha256": "FEA2DF38BF7C5ADEA43298A3BC1B2B01EB41FC49FD0D5190B15CFFD7352E4A7E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hermes_result.mp3",
+    "Bytes": 81072,
+    "Sha256": "65A9B0C68D4ECB0C55DB20C93E5F45831CDE84CB3651C3EE2592966E6F319CE1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_back.json",
+    "Bytes": 1160,
+    "Sha256": "702EB7B7AB512781AEA67FC742FB22B4D4579FDA14D36D8EC85B90E2D0947F7A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_back.mp3",
+    "Bytes": 89136,
+    "Sha256": "AAABB6159B2C1249259B9A3C89CF6C3306B7E5DB3936B0C251AA932736862333"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_close.json",
+    "Bytes": 843,
+    "Sha256": "A790BED6F83796685B3E8D700EA9CD380FA0F1761E641EFB1BAB435E84194529"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_close.mp3",
+    "Bytes": 31680,
+    "Sha256": "AFDFA5A5E1FD3B1E890C957190807D58FE7E0484B5EB8457B7D0ED2F58DFCBF4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_forward.json",
+    "Bytes": 1259,
+    "Sha256": "02D634ED5143051063A2472FCBCEB0445AF8F3A4A1776A3A5149B76344F89263"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_forward.mp3",
+    "Bytes": 99504,
+    "Sha256": "E5426BD7D78420AA00B25E139CF296ACC939236DCE3CA0640BE068B923EB163E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_intro.json",
+    "Bytes": 1215,
+    "Sha256": "7A97A93D2408181DD28CED947CC1344EF5E5D8C54E6A5E4267361B366E92175E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_intro.mp3",
+    "Bytes": 97488,
+    "Sha256": "540FA9EA585D39D6479EAC58EB159C024C1BF9EB3ED296A28681B1C26EEAED8B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_notes.json",
+    "Bytes": 1065,
+    "Sha256": "88142D5CCF023351F4FA051015224A71358911087B1FB289AA59E751A1EF0835"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_notes.mp3",
+    "Bytes": 67824,
+    "Sha256": "F3D7A255022289F474A15D72C1987C012A0A749157FD30D1F9F56981E544923F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_prepare.json",
+    "Bytes": 1139,
+    "Sha256": "D33698E8F5DAA2A9189B887EA48E6FEFD7918BDE316CE19CA6EBDFF77AAEA7E4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\history_prepare.mp3",
+    "Bytes": 83088,
+    "Sha256": "1622CB85DE50BF0C1AC4FAE4E8F519934DC9727A99BF142DFF233A121D454CB3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_before.json",
+    "Bytes": 977,
+    "Sha256": "4E582F75939ED40065001DD143979B37501DE3679624FFCE06322783BBA2EE3C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_before.mp3",
+    "Bytes": 57024,
+    "Sha256": "BBED6FE879702E70615CEBC9B4D09BF78B2A21B859B179F553235F38F65D181C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_end.json",
+    "Bytes": 962,
+    "Sha256": "13CB22F118DDB447C05BC1DCCC702701E7DC2F7C7242CCF162A5F45FA07AFAD8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_end.mp3",
+    "Bytes": 54864,
+    "Sha256": "6933AC102750BD795E6BD346B786DAE672C1517F82C0149C77FE22EB8E971EAC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_intro.json",
+    "Bytes": 1090,
+    "Sha256": "6BC26022EBF346462DCE0FA68D01B01E95032879F0F723B127CC001C572DC7C4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_intro.mp3",
+    "Bytes": 75600,
+    "Sha256": "055AA469F6D56BD6DF1C4FB4FAE6CC7358020DCBFCECAF1775663FB9E1CD2E1A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_notes.json",
+    "Bytes": 1054,
+    "Sha256": "EBF90133F8F03A1CBC8A3B84F71DEFE49C84E948062DEA146BC3694A6FA60D3B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_notes.mp3",
+    "Bytes": 72720,
+    "Sha256": "51C9C3466FF77222B49363DF45C08EAF0F38D736C6F44ED5E1FA667B4688A0F2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_result.json",
+    "Bytes": 1235,
+    "Sha256": "0BD121DEF044DAAD5AEA993C6DC1F42C90FD6E83A91B433416054D01D34434AB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\hs_result.mp3",
+    "Bytes": 91872,
+    "Sha256": "CAF0F510AAC48F2FD88C03D5394B536288BC3DDBD242678ED1CCF28EEDB64255"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\intro.json",
+    "Bytes": 1123,
+    "Sha256": "7894647C3B20DCF4B396BF6EEC6AAF1006ABFFF9C19DED6DDB729EC23EEDE27B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\intro.mp3",
+    "Bytes": 75024,
+    "Sha256": "5B7FFFE82DDA4FB00544214F59632E8BECB9FE7EBE9FA5807169E076EE90DFB9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_correct.json",
+    "Bytes": 1105,
+    "Sha256": "59763D1209E0961BDA5549B773D16FB1D79255D406FA77DA3975ADE9E07A1AC0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_correct.mp3",
+    "Bytes": 80352,
+    "Sha256": "DF4F3A45E100951ED4F6E47AD40870F60B1B70365C61964256420C6614F0CAAE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_end.json",
+    "Bytes": 1059,
+    "Sha256": "F3CB4EDBF2CA0F7CC8297BC17061A69606D0333B1DAE8945DF719EF4D2FE431B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_end.mp3",
+    "Bytes": 76464,
+    "Sha256": "668BFFBA5CD707B4742E96F34DF767B8BD3FCA43A3B23F68F8B235D3323646A3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_fire.json",
+    "Bytes": 1048,
+    "Sha256": "C23F73985859EA70A0ACAB0613B1FA349AC8D908EBE271CE085EBB49001455E9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_fire.mp3",
+    "Bytes": 74016,
+    "Sha256": "7266F2D18CD286B49AC148709A12B648C23A6A0CB0AF4FE434D035E780E8CA48"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_intro.json",
+    "Bytes": 1163,
+    "Sha256": "94348D5E5FBA2B5BE7F4DC4FA5D31EDB7B431A2FE713FF814939E0AAC8337433"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_intro.mp3",
+    "Bytes": 89136,
+    "Sha256": "01E94DEE23AE19D286D92141E661B995DBB67E6B41C85E71D79A8B824DC21F30"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_move.json",
+    "Bytes": 1000,
+    "Sha256": "457C2AA2AEF8639F6870431A97772B26483B45276DB6DFEB9B4E20D0A384A089"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_move.mp3",
+    "Bytes": 63504,
+    "Sha256": "F307051C7FA9A3F1A3922246A92480E0981FE9F0447A43B504922839B0290C48"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_notes.json",
+    "Bytes": 1055,
+    "Sha256": "D8BDA686B0401E3A3B64E186BF61E3D06720CA42AFABD73D06D1570D55492DDF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_notes.mp3",
+    "Bytes": 69120,
+    "Sha256": "08091ACA8BD74DFBC4FEE59B9B46623AB387C372D745A8DEEE8AE66A66659AD8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_pause.json",
+    "Bytes": 1103,
+    "Sha256": "2BD99D27C7094C322BD67F236120EE65961797B33AE743D726A7156794BA1246"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\inv_pause.mp3",
+    "Bytes": 77616,
+    "Sha256": "52CC7ABA211431CBAF3946E7439202814CACFE883D1C8510EDAB4E2DC4A13A13"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ip_done.json",
+    "Bytes": 1129,
+    "Sha256": "B85A2CCF245383D5555A2EEFADC16BA61D14C9ADA81289EE1EA2B5D6D867E4DC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ip_done.mp3",
+    "Bytes": 78624,
+    "Sha256": "0D438D756EF25D6BEB43D5FC09C2DFB534B5AE83C62EC75EAD56F7851045CDE1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ip_intro.json",
+    "Bytes": 1184,
+    "Sha256": "C2054CA3308E5ED8054F3FBE0E23B17AAD0EE93D1197D4F2B37B3243E7AE8894"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\ip_intro.mp3",
+    "Bytes": 85536,
+    "Sha256": "C6934FFFE2067C86BC4220F2A2A75BACD84222289E4788BB7DE67FD1381C926B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_done.json",
+    "Bytes": 945,
+    "Sha256": "66E1DD5660EECF6CFE47A48CC747A3CDFFCED18450146268E2C71CAD0D8C009E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_done.mp3",
+    "Bytes": 54000,
+    "Sha256": "ABEB1067E793A975186148538AC4154F5BBEBFBCCFA6A30F82C9E15F7A880581"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_intro.json",
+    "Bytes": 1162,
+    "Sha256": "943F807357FAE830EF25590BFD6F05FD9CBCAC0AB1E17DA576C086DCEA9D17EB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_intro.mp3",
+    "Bytes": 82080,
+    "Sha256": "A1EF8485AAF75C42ED5726205D0A9B89AFB8B54CFF234443398938AA48BD81D6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_send.json",
+    "Bytes": 885,
+    "Sha256": "0F8F0E8E2DD030154FB009B7BDD047D509DE0D6E19A763B0A4965D33232208E6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\lb_send.mp3",
+    "Bytes": 44352,
+    "Sha256": "32E034D894887A4DFA166F519301DB04E61233EDE256C116AFAB63D1D430ACF8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_cancel.json",
+    "Bytes": 944,
+    "Sha256": "115B2F6CCCA85BAA3B7EFE75D298D37DFCED651AA3C2A3F6B02D728C9360B847"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_cancel.mp3",
+    "Bytes": 51696,
+    "Sha256": "B4A568F14862FD03F9C0A24ACD8D3DC7B937092AF202B5CA43EFEC205AF49915"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_fields.json",
+    "Bytes": 1178,
+    "Sha256": "54B292ED0CC7B1F952C47EF09A780E71C68150FEE8C44ACEB0113090EE8816E1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_fields.mp3",
+    "Bytes": 91008,
+    "Sha256": "CB06F8607CD7355D19C63D536BD4A636271A620F71A6DCA00DFE8BA7CEA7CC13"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_intro.json",
+    "Bytes": 1087,
+    "Sha256": "0851AE9C2E96581AC82B2EDA36A2AAD9FBEF6B56A88E7F4547822CEBC1B9D69C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_intro.mp3",
+    "Bytes": 70704,
+    "Sha256": "0E407BADC44B3685053243AC647E11A7AD34667668BFCB59BD32DA93D57432C6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_notes.json",
+    "Bytes": 991,
+    "Sha256": "C6A834B743807C816B9B07C0E8D50FD6D913D37962CC697CCAC1B603DE3B364B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_notes.mp3",
+    "Bytes": 60192,
+    "Sha256": "EE9E7CD06FD320A10C417540DBE3836CC9D0E46AC6C39834247BD78E1A09A2F7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_open.json",
+    "Bytes": 870,
+    "Sha256": "CA715FD67D054596F802940C6CFEBC5D4E06537DE3F1BE12FFFE5B7592608307"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_open.mp3",
+    "Bytes": 40752,
+    "Sha256": "0B60DD3E83C1665719F5D19B16F371E687BA4D269243C333D7BF0A3617AF1B55"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_result.json",
+    "Bytes": 1238,
+    "Sha256": "87DC10E7DEC3464439563F989FD22F7ECFEBB9D30DBC893E5D845DF3273BFF56"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\live2_result.mp3",
+    "Bytes": 97776,
+    "Sha256": "420A573E769C81BC4889403879B9ACF54028EE5DF30D89182FD78517DA001582"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_intro.json",
+    "Bytes": 1154,
+    "Sha256": "4145CDC427D4FA309A7D40A96727C1F121734BEC4517B0759187C2B88750D2FD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_intro.mp3",
+    "Bytes": 80928,
+    "Sha256": "348B8E6AD8385A5F581A7757F500134EBA2B59FEC374CB34E389D9599035BC35"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_prepare.json",
+    "Bytes": 1126,
+    "Sha256": "07A8883EED752FE6FF6FD2D3C44CA6972812C3787A8C675AA108C413C9D63AF5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_prepare.mp3",
+    "Bytes": 83952,
+    "Sha256": "4EEFD1E211138FFF592B0AFB9EE2ADEFEDC1E9C030E735A366BD5A3922D7153F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_result.json",
+    "Bytes": 1083,
+    "Sha256": "252C0A57B03A5306BE62CE157FEC1880B04B5FB101A6BCF76ED4550043148A0F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_result.mp3",
+    "Bytes": 67680,
+    "Sha256": "620081E892F56F223059EFC341B13F15EF4A47D1B31D7333A9CB63B3AF305522"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_return.json",
+    "Bytes": 969,
+    "Sha256": "755DE076A4ED2AC40A0346FF4AD72E3D33B6BBFD6A6790062BE93AED3291F945"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_return.mp3",
+    "Bytes": 59184,
+    "Sha256": "C4591702FA190C4B7CE8781B6F501F0E596B282700395B8ECE64A6C3D066E001"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_switch.json",
+    "Bytes": 921,
+    "Sha256": "3E32210CD4D7414C54D0A807894141EABD330EE364AEB941CF8262D2205435CB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\md_switch.mp3",
+    "Bytes": 44640,
+    "Sha256": "B5DA420D8431DFF4E4E1BC2684C5A16085266572F3E8A1A515D6D3BD1076F96C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_end.json",
+    "Bytes": 1037,
+    "Sha256": "8B402CDE72146D988298311DE72D305935AE480551489339E5B75D82C7B4964F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_end.mp3",
+    "Bytes": 65376,
+    "Sha256": "33675DF7BDEB27D396AB8A6C07D7112B040936266818E60FE960D716597E88C6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_intro.json",
+    "Bytes": 1159,
+    "Sha256": "A8D753BD21186AEDB6F330C84D9156F57DF06957BFD4BE0085EB0E26EB1D7856"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_intro.mp3",
+    "Bytes": 81504,
+    "Sha256": "3EE6D8A3B084A7830FCFC68EDB42C9590DEF1B6241B5566EFB6239070347A4A4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_local.json",
+    "Bytes": 1207,
+    "Sha256": "CECBA8A8BE86D5FC3907835DD68ACE71B6C70EC909F434414B5CAB2965E37F0C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_local.mp3",
+    "Bytes": 94464,
+    "Sha256": "5FB20901F7CA84CAAADCFEC8E095D835524B3270288C6FE0CEC767ED2A0FD853"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_notes.json",
+    "Bytes": 1039,
+    "Sha256": "B3508984F5FDFC7AF754026AF6DE52CF06D15861554B497B3A113F84FCEF2A2B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_notes.mp3",
+    "Bytes": 64944,
+    "Sha256": "67DDE1C636138E0E87164DE3CA07CAF9A9971C12DDFC2644F12E998E3C95FF66"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_open_result.json",
+    "Bytes": 1237,
+    "Sha256": "ABFF8706FF7F3B592CEB49A1EF6AB85D1860C0CB884A3B2586B96C5CA2F9279D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_open_result.mp3",
+    "Bytes": 94896,
+    "Sha256": "117EA7EBE29390A1481A2FFCAB94ADE152945307F6E0B0F87EFEEB07FF998C2D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_open.json",
+    "Bytes": 1086,
+    "Sha256": "71AA05DB5578B28648265D7D2ABDBF9EC057ADBD6295E35DEA44AB1186F358DF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\model_open.mp3",
+    "Bytes": 77760,
+    "Sha256": "D5938E27E148C295556FB8C993798751215A7598E693BAF34901FC6D45E26AF5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_18.json",
+    "Bytes": 923,
+    "Sha256": "A91BB5CBE1F6809E8A4B942689DDCC694CA6FEBC37A33C6B801C83F3E49EC955"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_18.mp3",
+    "Bytes": 51264,
+    "Sha256": "409B564ED6AA737776275F218D858F66EBEA7F5994AA0C872A2C3651C7DB9AB0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_20.json",
+    "Bytes": 911,
+    "Sha256": "4BC6B821FB46DC1580B524CD9A87A74709F46F6462F544092F5CE58FC988F70A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_20.mp3",
+    "Bytes": 48816,
+    "Sha256": "811EDBEBF387D6F9E4DBA87277C10DDE81B9F00896114A8B228079EE40C0EE3C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_end.json",
+    "Bytes": 1044,
+    "Sha256": "3E8F8431EF3E9E474D24E6BFE20E257FCEF95AA57686749444D2B38B56185594"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_end.mp3",
+    "Bytes": 62640,
+    "Sha256": "5FD6DEDFFAED4F104F0A30B05979B55FED115460C9AE5F7340D3FCAA2AA3CBB6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_intro.json",
+    "Bytes": 1166,
+    "Sha256": "44A4DFA3038EF3D79CE4A3C9C8C4A75B6F4DC84FFFEFF2DAE5D0412F91913BDA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_intro.mp3",
+    "Bytes": 85968,
+    "Sha256": "7151450A1A283E6EAB2A8E72D1F382CDE37EBD832DB9C260894FACE54F982CA3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_notes.json",
+    "Bytes": 1064,
+    "Sha256": "640439C1C0D101A9B38E616DC8E75783FD66CC6B1EC3A1C2BA89A6C5DA0ED801"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_notes.mp3",
+    "Bytes": 67968,
+    "Sha256": "B1FFAF4C53958D5A4D4AC749CC884C824327746444F575F1FF008551ADCD44FB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_result.json",
+    "Bytes": 1083,
+    "Sha256": "97348D546AE31A86D3659B65BBC03BABDC41C389D0A4DCAE7B3B04405F7B1EE0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\motion_result.mp3",
+    "Bytes": 74304,
+    "Sha256": "2834C0DF0462A5BDB0119EF44FE3099246645288E5CE6FF142942E2CFCCF6F97"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mt_intro.json",
+    "Bytes": 1048,
+    "Sha256": "91FAD11623C62B861CD5DA8060A560682179A88F4E0E68085FBA330628630709"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mt_intro.mp3",
+    "Bytes": 59328,
+    "Sha256": "B49B534A313248EFECD498154F23EF0B660F2C33C74ADE6B1E9E2D618512122E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mt_result.json",
+    "Bytes": 1079,
+    "Sha256": "3937606F6B8B1DF776BC6075085DBE6F53D05F2518ABBDD8763ADB22E563CBFC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mt_result.mp3",
+    "Bytes": 65952,
+    "Sha256": "D0A7F2683E81D36B65686D14586F3456712C20F6C32CE4A6C195605E1543DD57"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mw_done.json",
+    "Bytes": 1041,
+    "Sha256": "5DC4CB86119A2D09DA6C55DED71B0D2CC42CB2D40F6BDB08EBDBC040F5A20BC0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mw_done.mp3",
+    "Bytes": 64080,
+    "Sha256": "EC5693043DCFEADBC7B799B6BF48F76A551CD54509B17B54451D2C1886B2F104"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mw_intro.json",
+    "Bytes": 1150,
+    "Sha256": "A66A58770077AE6D0F872924C11AA264C0ED899E240BD7E0875376CBE563DB53"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\mw_intro.mp3",
+    "Bytes": 71136,
+    "Sha256": "981E0310CB9195C7475BAEB6DB491C2A9D12BB457D28383A14AD3FC12F2CBE50"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\open_task.json",
+    "Bytes": 923,
+    "Sha256": "23EB93882E43737D72AB7333263651FF05BE98B11350EC42ACE2C123FC5D8C6A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\open_task.mp3",
+    "Bytes": 44352,
+    "Sha256": "0C3BEBFA876CA10AE7BB9549F0DE9CCDDB446C1531DFD989A8B0473382912106"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\open_team.json",
+    "Bytes": 929,
+    "Sha256": "3C3AD7932B4AA8499EF7560B01D8E73CC6E893BACC3BD5B74DB7302621E70C2B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\open_team.mp3",
+    "Bytes": 46944,
+    "Sha256": "54F8A166DBF6AB287634254EB52A4B8AB53E5B8068376701DEF97B0695840293"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_end.json",
+    "Bytes": 1143,
+    "Sha256": "57F0658CED53A8A4E5EA2EE8B2152D08DF1BFC9F5E129F5128B1E194373CAF77"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_end.mp3",
+    "Bytes": 85680,
+    "Sha256": "41E99FE3D2A22D79F6457A97C0FF8A684890697D133A03D54C04EB62C45D1362"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_intro.json",
+    "Bytes": 1061,
+    "Sha256": "53BB6B005FB68B4FBD6F033BE2815E246A941138816867F2EB9BC805E201B29F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_intro.mp3",
+    "Bytes": 70560,
+    "Sha256": "E5BE84DF5F3AE105EDDEFABD900C11CDBA42579B201FEDEFD039F2C63FF30823"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_notes.json",
+    "Bytes": 1001,
+    "Sha256": "4174055799F24CF625682B123271B8461D2D0E70C406E3EF1EE5B5954D64DD99"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_notes.mp3",
+    "Bytes": 57312,
+    "Sha256": "10FC5022C572F32F05F2B88227FF6772AA5FF1498938285859C8DA3EA22F52DB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_off.json",
+    "Bytes": 933,
+    "Sha256": "D94A77769F2A282743B2BDD0183C8B9B3A353B80A21439B47EF99FF20CAD6F86"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_off.mp3",
+    "Bytes": 51264,
+    "Sha256": "93994DAE8B6CF838621066D6AAA1B6CB4E6D1B082F01117F159DA4020C411DE5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_on.json",
+    "Bytes": 962,
+    "Sha256": "9DC7BA1B1886ACD8DEF37A3F745C2DF311DE44116FC6AD3510CB34CA3F58F9FA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_on.mp3",
+    "Bytes": 53856,
+    "Sha256": "67CE7E627D4B88C834A0DC0926132869E9EB9B6DC1925E986ADFEED5AAE1FBD7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_prep.json",
+    "Bytes": 1030,
+    "Sha256": "9E695098C1C7AA48E9CA200AAF42FAE88541CF2125525A2A09A3D7840A112202"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\pin_prep.mp3",
+    "Bytes": 68544,
+    "Sha256": "4157CCF6F166190F9D66F1B315045CBFED4C07B05D8812B4510D725A84222C1E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_end.json",
+    "Bytes": 1008,
+    "Sha256": "0157CB790245C47BFA26AEB08ADC1D4820ED2B0795E3768A24B24D646345F006"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_end.mp3",
+    "Bytes": 61920,
+    "Sha256": "533496862CA5812D051F164BE80E3CCE4ED931C5DF0A443F23E59908E33CB0A1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_intro.json",
+    "Bytes": 1106,
+    "Sha256": "F74873212468A71A6B15032AB2DD67D606989D7249A614DC9BD1011935E4A121"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_intro.mp3",
+    "Bytes": 73728,
+    "Sha256": "FC12C396AAB3F776C6EF2309E559B0571C70667B9CEC326D7EC1DEE5E8611C66"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_notes.json",
+    "Bytes": 1064,
+    "Sha256": "5CA8BDF1EC8DC9E4CBA2D45060940A2789BD200CDF84299EF621AB8B52E3A9F3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_notes.mp3",
+    "Bytes": 70848,
+    "Sha256": "D799CFCDDE44FF2FD8F8D1FB3E102C5FC2EE8718AD155DF5E0EE41996143CE64"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_open.json",
+    "Bytes": 919,
+    "Sha256": "DEC95AFDE6B0989A695789FBF8F0CE542B135CDCCF78F05741146C2C5321CCFB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_open.mp3",
+    "Bytes": 44208,
+    "Sha256": "35809D6547C6E152E8053125B16DE6C55CC538D89EE08A1588D9006025003FF1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_prep.json",
+    "Bytes": 985,
+    "Sha256": "6609F5E50A22F9229FEA746E6A09500CC67821AA23A4C2F121A6CAE057A8039D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_prep.mp3",
+    "Bytes": 58464,
+    "Sha256": "B20BB0901D16F089B8569F36854AE146043485653B3125981BEDDE360FA9B418"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_result.json",
+    "Bytes": 1095,
+    "Sha256": "96507C437EF77B685696D196F4CA9C6F67C029A2E2888C89AFA777599D9500E2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reopen_result.mp3",
+    "Bytes": 77760,
+    "Sha256": "8A56C042B28F73EADD60B657CAB410D4B771AD5EC41549A5544093AB80D090DD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reuse_result.json",
+    "Bytes": 1194,
+    "Sha256": "0EC911CB1346D8030488C6F1922F35945F67A20F2E88FA44EEDB1469D643C16B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reuse_result.mp3",
+    "Bytes": 87552,
+    "Sha256": "3B32E611E66D6D67040597EB5AABABAD2A007DA40153578FE7572A7E72C44326"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reuse.json",
+    "Bytes": 919,
+    "Sha256": "E72AB8F378ABD373171E7AA2E1D14F16CFE09596B7FFA820CF40CE67DE04E12E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\reuse.mp3",
+    "Bytes": 45216,
+    "Sha256": "9C0312468FA670CB78B923C41C43E742AA5477894029629A65EAE30BFF8D1AF6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_end.json",
+    "Bytes": 1257,
+    "Sha256": "4B634C622FD33DD0BCA84390FB6A278E2BBB41B0A23809E0E78191EE5DCD9D5F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_end.mp3",
+    "Bytes": 96480,
+    "Sha256": "53E8ADECE0BA9132CD501EDB4CD26F681A8A38EB740759DF1FE51CCE288C474C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_flip.json",
+    "Bytes": 1006,
+    "Sha256": "9DB35C3D387C83F7750FE371048A251CDE107EDE48A5CA238D5C70BABB8A4E15"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_flip.mp3",
+    "Bytes": 61200,
+    "Sha256": "E1AB2AC8365B7485CF9F9B8306FC41875F0ECD38DE254E136969F2BF8D5C04D1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_intro.json",
+    "Bytes": 1145,
+    "Sha256": "CF41C7A07C891F5166825C9F03226DCEA922522CAEED7A5BC42716B9358B8B4E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_intro.mp3",
+    "Bytes": 82224,
+    "Sha256": "7EC2923B87BE66F5EDDFE8EBCC326950AD4ED2E7972941C1F8E8E043259A12B0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_notes.json",
+    "Bytes": 1025,
+    "Sha256": "E4AAFF0D6FC4F62CA5D29B13CB2A242373D77CE7C9669B3C28B030BCEE963BF8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_notes.mp3",
+    "Bytes": 66960,
+    "Sha256": "4C77538E02585FF8B8A51C010CCF3308121B292256FE0CC662A4C231A2F236F4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_place.json",
+    "Bytes": 1115,
+    "Sha256": "43DD4AB711F15BB2E7D3C5A1845946F6E3A5607F161342EF90081BE09BBD57B0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\rev_place.mp3",
+    "Bytes": 89280,
+    "Sha256": "4BEF723771C112AD5918F659CB6CA305BCF1E88DE99EC03F52F32D2F8D82544E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_back.json",
+    "Bytes": 1053,
+    "Sha256": "D5721B8577A52F0944562CE303802F37C24E16CF3E44E41057FDE09C0744BA08"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_back.mp3",
+    "Bytes": 72576,
+    "Sha256": "EA76C048C919D57A3A66CAB66910EF1CF5AB3FCC2997B2A7EC5745E07B239B4F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_credit.json",
+    "Bytes": 1181,
+    "Sha256": "C1409C4B43B8B306E3A5F8E83ECD1E2C425CC6436D193315447E12FECE51C772"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_credit.mp3",
+    "Bytes": 86976,
+    "Sha256": "7FACBE9442527A7AABFFE32440182A692814DB789805D4B826F5CBD0246D8E48"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_end.json",
+    "Bytes": 1142,
+    "Sha256": "8D62469812A277B39F9DE788345B19EE43B80F0AEF39204B40E57AB513B75FD2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_end.mp3",
+    "Bytes": 84384,
+    "Sha256": "7428731FE7AB735828D8CC1227F10195216E31EBC95FBD7738E877B36A06BC0C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_intro.json",
+    "Bytes": 988,
+    "Sha256": "5239F4FCC8FBE175AE0113EDED373F75A504A7ACE4FD1A9DDE464756ECF30106"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_intro.mp3",
+    "Bytes": 64224,
+    "Sha256": "A43363828E8CA4AC2E99C2395617DA3D8DDAD8430EB82F33C4A44DFF2433EED7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_next.json",
+    "Bytes": 1011,
+    "Sha256": "BF6AA33CA85F8062F4C3F352D38A1691DF0FE9C12B966AE44E176AA6D35C4487"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_next.mp3",
+    "Bytes": 64656,
+    "Sha256": "4FA9490997F9D076563D44351F3942BF903A56F68B8451BB855CABFF3FDCE398"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_notes.json",
+    "Bytes": 1012,
+    "Sha256": "8DEDB80349639B98769B8AEBF32CCE0BD8A56A82FD2F4B48E3B235F39E2880ED"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sc_notes.mp3",
+    "Bytes": 63216,
+    "Sha256": "0E3B4D4E6A623C645BE9C0D78A3AF1F6F9BBFF9A54D7027E8E9F86DB56CCBB03"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_adjust.json",
+    "Bytes": 1139,
+    "Sha256": "408C6797D0E0B61A9608E7149D5180E32BFEC3F5D519B02FB62DA37F33A08234"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_adjust.mp3",
+    "Bytes": 84384,
+    "Sha256": "1F5E869228ADAA1932FEC8E411FE5DEB7E0F7141EE64CEB0B5C3C9B6E5D16D35"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_finish.json",
+    "Bytes": 1165,
+    "Sha256": "CC01575F448963B815A413D006FCACD2CD633CB1A8D6290F72064E16CF6071E5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_finish.mp3",
+    "Bytes": 87984,
+    "Sha256": "9C5B4E39C8430A9464851EC0A778420748FF79DE6EE81A47461B85BC394C82A9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_intro.json",
+    "Bytes": 1262,
+    "Sha256": "17D8CE9806C45685BD6CCE5BF569637C63BBC8695C5CA300359C4A030AA8C847"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_intro.mp3",
+    "Bytes": 100656,
+    "Sha256": "9AC2BD9BC6199B40315F449DC0154BDD441C823B659C505776F87350795F9355"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_portrait.json",
+    "Bytes": 1137,
+    "Sha256": "8374815A04812A5D1F95BE1DA8366AC5E01A2F5A0EDBC80FE18620544F427F6F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_portrait.mp3",
+    "Bytes": 81216,
+    "Sha256": "1A7599C8F406CB88369CD0E4488A203BE78C4E77D8075E463D7C2FE503F992D0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_prepare.json",
+    "Bytes": 1118,
+    "Sha256": "1294C4D371B03675261BF8116F3865021CB07FA8220ED1102CA7C707690D7727"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_prepare.mp3",
+    "Bytes": 79920,
+    "Sha256": "6441BB078C03A25839240B0DC80211C2B991180CD80A7DA3E486735341097ED0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_result.json",
+    "Bytes": 1187,
+    "Sha256": "930C236E5F5B13A3AF07249BFA02B535F0BDAE38167027E5BC33A137AD422088"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\size_result.mp3",
+    "Bytes": 88704,
+    "Sha256": "93CB899D0F67C17209060418ACAF39CB619EF3249DF440EC5E89EEBDF178E165"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_fast.json",
+    "Bytes": 946,
+    "Sha256": "DF7C5512D96897EFD2651B7676F8F3B2F8AD4BF9244D799AF08E94D8E67505DE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_fast.mp3",
+    "Bytes": 56592,
+    "Sha256": "1DFDC45D7778C50DFAA5BEC8302F281194BC4CD9434760EF17E682FDCEEA2CC6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_intro.json",
+    "Bytes": 1163,
+    "Sha256": "50DBD2A2EA767832D68F7B96D7618C40C21AB112CF3DF6464801C999C2964F8B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_intro.mp3",
+    "Bytes": 89568,
+    "Sha256": "AE8287E045458A3FB6B9D9BEF85210802DA03DD613CEA7ED2C3733F7B117F172"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_notes.json",
+    "Bytes": 965,
+    "Sha256": "CDCA248B9F57AD4F3ED5785ECABEB32F10F5A4DB12C4BBC53012F30C28ABEDF1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_notes.mp3",
+    "Bytes": 54864,
+    "Sha256": "D98C18D47FFE8AB42F983F6D12080C74FA96572258CA3C12CDE4EF226DAED95D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_pause.json",
+    "Bytes": 893,
+    "Sha256": "9571694C0D178A715125061C608FC0EDEC9FC2DA429C394C6C64054CDEEDD2EB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_pause.mp3",
+    "Bytes": 43056,
+    "Sha256": "CF363F8F720DF8B1839DA711CEDE60E699AFB5F9CAC49FCC4B692C937C3B7A59"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_result.json",
+    "Bytes": 1256,
+    "Sha256": "84D12915BC9AB4C845F50462D18D4985F808817A004E1C0D345A3147471F2A9D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_result.mp3",
+    "Bytes": 101088,
+    "Sha256": "6300A736953B64AD9CD88F54F3E96D395B4DA718AAF2BD0D8567E0C660A588EA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_still.json",
+    "Bytes": 1085,
+    "Sha256": "537661DA09D70DF96BD3287560561769E86D4191D472126555048AB86FA60A7F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sol_still.mp3",
+    "Bytes": 79632,
+    "Sha256": "8F104F5DE64F5C1376AFEC55E808320973DC7AB8EBEBD0AADE3B58676C95D35E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_before.json",
+    "Bytes": 1185,
+    "Sha256": "D70E3463F5C5F40B2541239AB5D0AA3D1D56012755C6E3CBD22BEBE8676A6954"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_before.mp3",
+    "Bytes": 88128,
+    "Sha256": "2CB532D646C621FE4CFB619D4C1FE396D44D5C806F6D62D9E1BAD9A9DE98595A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_intro.json",
+    "Bytes": 1112,
+    "Sha256": "1582DE6B55D8B7FEAA94C08AD8F29151AF41968A010AF9096E9C32F21211D705"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_intro.mp3",
+    "Bytes": 67824,
+    "Sha256": "35FC603416B87D1F4AFDA93C59BBDA259B2388FABE782F9CEB530B61AB9EE1E2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_notes.json",
+    "Bytes": 1010,
+    "Sha256": "F7DFE2238C87C77A6D448341FC79A852992053ACA7365C224D5680872B821F28"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_notes.mp3",
+    "Bytes": 60480,
+    "Sha256": "A7BD66C3C0E8F33298F02AACF55FCF5A5A61645590FDF64006FC392A150C8DBC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_result.json",
+    "Bytes": 1355,
+    "Sha256": "934CD9BF3644F3ECF357B712A2E9ECC6FF2D376898E1777A74BF9D5A1AE721B9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\sqlite_result.mp3",
+    "Bytes": 112464,
+    "Sha256": "1DD8EE0F50BED20F450199E0030869ECF14EA1443672B168162F5B5A2FA9654F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_detail.json",
+    "Bytes": 1099,
+    "Sha256": "815DDFB4318A2B3B44FC3733CDB886FF2F321B6551A297201DFBF8B4B1B187D5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_detail.mp3",
+    "Bytes": 80064,
+    "Sha256": "ECA0817324D2E27821509BEE46417EAB06712EBB6D8DFF5625CB1E938B3DDF54"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_end.json",
+    "Bytes": 1120,
+    "Sha256": "5579D91642924DFACD06AADC3A6EFE7274445EBF48ED3EAC6B98870B6DA2CD41"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_end.mp3",
+    "Bytes": 80496,
+    "Sha256": "33DD1A2C7A468655DE185B63FCF205B2F2D4C63434A93DEDCD1DDEC1EBB40E28"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_intro.json",
+    "Bytes": 1062,
+    "Sha256": "87CF8EE74E011CBC54BBB223C52DE4281873C3A8CA4A1A876E58EB933094353E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_intro.mp3",
+    "Bytes": 68976,
+    "Sha256": "D8998EB6A5726E3314D5F73E988617925866740743857008DD680821176D6286"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_notes.json",
+    "Bytes": 1026,
+    "Sha256": "AD4F4165B49DE2AF1AD3A1CF0A8707D7AE99A3729353C81F205F5BF37429F2B2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_notes.mp3",
+    "Bytes": 63792,
+    "Sha256": "EC80CE7B085CA524A6D0C4E677B427C6EE647DF587129DC44281F3825B5DF5FA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_prep.json",
+    "Bytes": 947,
+    "Sha256": "D1AF67A4BE87C3BE63E5E0F7475C3F8E208F2384FE14ADD7EBC6D55A312F31FA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_prep.mp3",
+    "Bytes": 54288,
+    "Sha256": "736D7274CF6C89EA422604EB4008EB193570E0819625A1321E8372E5956009DC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_result.json",
+    "Bytes": 1309,
+    "Sha256": "B3DDD4C57A14234A4F05FD9D9A6F915A9ADA078FEE71D7D7CCE5664670DC6F33"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\task_result.mp3",
+    "Bytes": 101952,
+    "Sha256": "D296F062FD5370DF25D8B46716D3839280725BDF17C85D4061C3E94D12C3EC86"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_form.json",
+    "Bytes": 1122,
+    "Sha256": "F9D2F4878A0ECEB04109C01D6C28901646AD6F812F35DB4767D9F94BB4776C7E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_form.mp3",
+    "Bytes": 86544,
+    "Sha256": "3BCED9918C0EC2E6CD730B7B17CDA9610832FDBD8F1F44B1AB321D528E1F27BB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_intro.json",
+    "Bytes": 1045,
+    "Sha256": "D232DBE40807C3E107FBAC1EFB1EA34F26C6E7AD859B6A639E5C53270023E655"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_intro.mp3",
+    "Bytes": 73008,
+    "Sha256": "2353B0C647CCC3A80EDD0E5F8C6A27399F73F82DF8ED3FEDF89F3EEE26C3D0ED"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_notes.json",
+    "Bytes": 967,
+    "Sha256": "950BFBF3F02ECE70134911A63854B43647499D519D196BBE6AAB9C2BE9D6BA70"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_notes.mp3",
+    "Bytes": 57600,
+    "Sha256": "68BDE696CD3FC8A9B8FB1652ED18F72366817CB9CA555FBA0CA6CE8B63BA467A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_pause.json",
+    "Bytes": 973,
+    "Sha256": "6B4672CDB392AA9E557A8A96C29B4D5348873F5801AB7DB2A50ADED4F1A1F989"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_pause.mp3",
+    "Bytes": 56160,
+    "Sha256": "5C61645B6221AD15C6E53827CC5AB6E33F9AB6FA38A085E9394906FB05F3CE1B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_progress.json",
+    "Bytes": 994,
+    "Sha256": "731506B7E3A51DACA80BDE679D954223555088E4CCF1FC0A4AF6D62CE481A8E4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_progress.mp3",
+    "Bytes": 58896,
+    "Sha256": "A4EDC8A1290FCCD48CAB3D4B0379C70176C89E137B5E004EE9698E0F051A8E2C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_register.json",
+    "Bytes": 946,
+    "Sha256": "31C0614F458E6DCD1C11D776D9EAF169F6069B54ED4AD97B181012719A06CF7A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_register.mp3",
+    "Bytes": 61776,
+    "Sha256": "27378679F89CF14471084C2EBD664CC8892D763457F4E21B21F683E3807EB668"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_result.json",
+    "Bytes": 1118,
+    "Sha256": "48C7D416118EA07ABF3700507F178723F2B92D2EA3220F47740899D61F8D0405"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_result.mp3",
+    "Bytes": 81504,
+    "Sha256": "FFFA9596066569FCFE8DB86AF370A35E54E4CDEF4B8AAF17B52097737364AF0A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_wait.json",
+    "Bytes": 1056,
+    "Sha256": "0AB915DB4E351187DB12EC1EB77DAB94C1C13D544CE77B043258C7E28C1739D0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\taskg_wait.mp3",
+    "Bytes": 71568,
+    "Sha256": "1B10C583ECD8CA15B1751B7CACC933C358B7E4D58ECB45A8E6748F8E218DF788"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_drag.json",
+    "Bytes": 1073,
+    "Sha256": "EA262D92FD10D84B66752F6A134312A28CB7358980A30BF9B7224DDED876725E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_drag.mp3",
+    "Bytes": 70992,
+    "Sha256": "051DCC9DADFCFE18BA007F18F3E2CCF88F2F1A6DC2D765E690D46E560CB75FFA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_end.json",
+    "Bytes": 1036,
+    "Sha256": "1F6EBA9E2508BC4A5AD55D9E34ED6861CF98727284B11B4751A069A735BBBD7E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_end.mp3",
+    "Bytes": 71568,
+    "Sha256": "9F66B048CA83361ECFD866191293B5C79084C6C06FB26467CDFC7F079761DD77"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_intro.json",
+    "Bytes": 1080,
+    "Sha256": "410BCC00F6B3AAB29DBDAF81CF99783795FE5D4342F9D879BAF18E7E684F9FCA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_intro.mp3",
+    "Bytes": 72576,
+    "Sha256": "5CCA712C8D26AD2CA4E4DAC76303923DDAB9345836E34D103313ABCB784E5D2C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_notes.json",
+    "Bytes": 972,
+    "Sha256": "70BD27A48E07DDCE2E4FEEB9EAEB1551E16F422D2659AA563215D8F83AD8DF1B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_notes.mp3",
+    "Bytes": 58032,
+    "Sha256": "4D2C4C119DD92C71BDCD8CED9307953705783C1F8EDE8E1D4BF1D680AF4CCC22"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_prep.json",
+    "Bytes": 887,
+    "Sha256": "1469FDBE0B0A629D840249CB5779B6D4C296E7F82293D2E03F36D28FE3AFCB59"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_prep.mp3",
+    "Bytes": 47088,
+    "Sha256": "9CB8F10D1C0F1EA817B5ED2DD6AC24206B01D97146CC26A24F2ED36830A16504"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_result.json",
+    "Bytes": 1145,
+    "Sha256": "DDC4987C7234CCFF7EA30B32E136F497ED25BD43BA18A89AD2200B9139E686D4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_result.mp3",
+    "Bytes": 74304,
+    "Sha256": "F4621ACDD7FD6A485AF039211D6B78D79BEE952E1F186270AE6B9ECEFB00C1CF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_return.json",
+    "Bytes": 1051,
+    "Sha256": "A1D3FE3EFF819ED5AB9B3E8AC6111CA937CA504F83A135A6768A3891860357C1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\team_return.mp3",
+    "Bytes": 71280,
+    "Sha256": "5928C1132B840AE2C9BA2ABA20C1D09FAF746DA6A9F6DB4E1192859340D2645E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_form.json",
+    "Bytes": 1098,
+    "Sha256": "B652711CFF8BA15E1C4F3CB3511BED9603C040EBD47A8E86288BF4C6B67E62B0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_form.mp3",
+    "Bytes": 79632,
+    "Sha256": "581683696AD606AFFBDEC505DD954E43C901B2A9689B848AADBA99915CE3D1FC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_intro.json",
+    "Bytes": 1069,
+    "Sha256": "BFC0624020734612FA17F78D3A999BAB9A939C291A6E072482AC338ACDCB9A6D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_intro.mp3",
+    "Bytes": 75024,
+    "Sha256": "7BBAA62594D1FF7918DAE0698CB26E24F4CD3AEDD64E0A576B9B13BEF0CAE819"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_notes.json",
+    "Bytes": 943,
+    "Sha256": "5E94AAD4CA4E214F9910FB608A53B8A353FF4E3AEEADB7CD6E4B873DCE3CA0EC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_notes.mp3",
+    "Bytes": 53280,
+    "Sha256": "E805586AD38ABA7AFCD2C876C054EB9DD9D37E2A0A2B0BACE96313A092E605BE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_pause.json",
+    "Bytes": 943,
+    "Sha256": "91761BCE6923AA27E2A2E588953E074D84C2D03889160250E12C172990055573"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_pause.mp3",
+    "Bytes": 51840,
+    "Sha256": "BFFFCFB15C52D443454E2C4F5B60AB07DFE2884166C7ECC7EA393851DCBDB0D5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_register.json",
+    "Bytes": 1000,
+    "Sha256": "5AD3E479D13BDEE4581B6491863135E78C4A0779579FF7D1B69CFF199BE3AF0C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_register.mp3",
+    "Bytes": 61056,
+    "Sha256": "B7FF72C0B9E4DFB4B8AEACA15C2692A8F64C89EFDB28021300D19FA2351858F5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_result.json",
+    "Bytes": 1100,
+    "Sha256": "954301931D8583F633A0F8A3DA0A7FF25D2C454C64D93C34CB875835BF11C41E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_result.mp3",
+    "Bytes": 77184,
+    "Sha256": "E8822B6358BC758C3CD2F4049C9408FC82355372222CFAAEF7835893C30DC108"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_wait.json",
+    "Bytes": 1068,
+    "Sha256": "83042DABFB486F56ECCD3F137F74D022A6450B36924C65934B292CA73E3B2B56"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\teamg_wait.mp3",
+    "Bytes": 73728,
+    "Sha256": "813477E59DB8F80030DC8EC17D4D03A8D64FD6889D6B0587834B69D8EF7B3540"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_drop.json",
+    "Bytes": 988,
+    "Sha256": "5D2CD9D4143FAD413E8F04BDA20D391383CF3F36D8AB78C2DE8A519D816AE1FF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_drop.mp3",
+    "Bytes": 51840,
+    "Sha256": "3E250C3C2448D6B03C8C5D64E0285A0AB77E4DFEC5BAD1C4392084D091E18A89"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_end.json",
+    "Bytes": 1101,
+    "Sha256": "15A1CC9F24C3590DB5018BB5EAB2F83A969F1FE1A126D44715AD4FF121073158"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_end.mp3",
+    "Bytes": 80640,
+    "Sha256": "6633E4EA8124318C7790149B84268931617228502BEF8617C0288C3AC20476D2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_intro.json",
+    "Bytes": 1115,
+    "Sha256": "CD07A36238694D6A91869AD7220CC86F27FC262E0073B76C81706F5C331A31EE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_intro.mp3",
+    "Bytes": 83376,
+    "Sha256": "865E6198CC1B9151E5FB46C6169CD8188DA121E0172845E18BB89E80AAD0A6CC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_move.json",
+    "Bytes": 1120,
+    "Sha256": "D2197D03ACDE353B8D3E2E4D95999D1DBBA086FBA3FAE1D52B09182EE2418BBE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_move.mp3",
+    "Bytes": 81216,
+    "Sha256": "6D728862794CD6DC73AD2D3EF175C2C0D2EEDE3A387B060EBD3F299B8D14287D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_notes.json",
+    "Bytes": 1019,
+    "Sha256": "D45FB8220732A23949A9A623F21DEFE1E430DC4C7A69129C312891B4E6EE22C2"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_notes.mp3",
+    "Bytes": 63360,
+    "Sha256": "D90A6908D7566636D04E4E831C6F0D62BEA2165E59D4986A9794CD90CCF92A28"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_pause.json",
+    "Bytes": 1073,
+    "Sha256": "68A230798631EA35076EB2679A01F9A25487D1762767C22397FF25E2DDA7822A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tet_pause.mp3",
+    "Bytes": 69120,
+    "Sha256": "9D7AFA0A3EDAB84DC26B6C2F06E0C95A5444278D8F97BAA3E2D39403B191E499"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_detail.json",
+    "Bytes": 1179,
+    "Sha256": "4EE286A9869E7BD6E582C3D95D1659687D5D78D1F8BCF5BFE96D75E21B4BD812"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_detail.mp3",
+    "Bytes": 89568,
+    "Sha256": "79B9C642278789E187C6CDD9DC5C3AE71D9060E7608E71435EB624269B96271B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_done.json",
+    "Bytes": 1039,
+    "Sha256": "7056B06D86DA179F1C2E07F50A03B4A0D06F1F13661B54E47403467F8F7B09C4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_done.mp3",
+    "Bytes": 64656,
+    "Sha256": "3E5E86FE55DA8E6CFC6305522682690FD7494C7D69104FA69D2CDEE69A0D8A96"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_intro.json",
+    "Bytes": 1094,
+    "Sha256": "0D9B6144B2D54C36EF543E0F0444B749C558233032B5FB70F99B81EC343E0020"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_intro.mp3",
+    "Bytes": 81648,
+    "Sha256": "338ECD629D71F94890BA38BCC3D3FAE652F6FB750E78362E371C89F12572D4DF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_send.json",
+    "Bytes": 1057,
+    "Sha256": "108607EA7E89F655A59D7C60FB38E2FBC19B7D562CB47A9DDFE50DCF772960B0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_send.mp3",
+    "Bytes": 74160,
+    "Sha256": "72861FB954256A534418BF97D82F1034C4600914450FF976F4A788B6BB283F0C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_wait.json",
+    "Bytes": 1087,
+    "Sha256": "6B03FB88853FA293BCCEF03A0E62715D4BFB1893C969278B786F7695B7EFA84D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tf_wait.mp3",
+    "Bytes": 79776,
+    "Sha256": "F4F71AD52037C1A69B7AD9E4286A15BBF73AEC4C0F1779D47AD8395392369ACB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_auto.json",
+    "Bytes": 1227,
+    "Sha256": "9D457CEDADC816521363EF2763CEEC0CF6AB8D7577AE90A950D84EFE30F13DA7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_auto.mp3",
+    "Bytes": 94032,
+    "Sha256": "035253A52B114E7BFD96FD90ED9071D06E89FDFAEBE6D8A5BA5CBE2CA31DEED5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_close.json",
+    "Bytes": 1114,
+    "Sha256": "DDD520BF31CF3A72D631502256A599C84A66E79C90FA42B6486635B67AB990B9"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_close.mp3",
+    "Bytes": 83232,
+    "Sha256": "9BE6B6E4D0212FAFC1165744D2CAF776CF663A7DAED075DD571249D1A38B3D82"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_intro.json",
+    "Bytes": 1290,
+    "Sha256": "C3CC4C3D88F98F8CC77765AFB21AFEE479AA4FC4C27C175713B348D58F71EE8C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_intro.mp3",
+    "Bytes": 108144,
+    "Sha256": "E365305DDD9CDD3B2D2937BE6A31F434BD258343680880E6FB58DDAD2F202FAD"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_loop.json",
+    "Bytes": 1313,
+    "Sha256": "16A01A3E75EC182C1C8D8250621FE6CE66B27A19D5146240A7B4C683ADEE4B88"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_loop.mp3",
+    "Bytes": 117792,
+    "Sha256": "34D4E6DA9D08094407E00D5D2EEEA0D658CE6BF041B685602DC0EA994286DD37"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_notes.json",
+    "Bytes": 1018,
+    "Sha256": "93738E3DA7CDE0DFED605888AAD154067BA8A0266DDF9536F4752F41F3A98A7E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\tl_notes.mp3",
+    "Bytes": 63216,
+    "Sha256": "2F4416683553097482048F82A24F529E925A13517BE38597E043FF036476B9FE"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_intro.json",
+    "Bytes": 1216,
+    "Sha256": "AFBAF7C0B7A487ADE15FE2A9F3AD368BAAB815DE4F1A9BF966C36D86E2B1DB8B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_intro.mp3",
+    "Bytes": 92880,
+    "Sha256": "26FF244BC2BECEEE17F752DCE38B1B6F8F7412CD44AB9AE1D034CEC8F8DE266E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_prepare.json",
+    "Bytes": 1080,
+    "Sha256": "5EEB50BA5381A7D24FBA1E712522106150192B03B23B33DABC1F56E93FCF507C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_prepare.mp3",
+    "Bytes": 77184,
+    "Sha256": "78DD18DC2C918477F3C4425370CAF49BCC20AB982568EF8076F74083D7FAB391"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_result.json",
+    "Bytes": 1121,
+    "Sha256": "5ED09E365B046108D50172AC84F84684DEDB8ACFA614146F4FF7C57DA9C2071C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_result.mp3",
+    "Bytes": 76752,
+    "Sha256": "4A082E47361CBD23D5AA2950B437A2A0367B3C9A138B0B5AF2694AF3669AFE18"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_return.json",
+    "Bytes": 1007,
+    "Sha256": "69FCC64602CC1D5F3BAAF08915D12428B2420E798FE25BFC2ADCD7922EFB839C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_return.mp3",
+    "Bytes": 60048,
+    "Sha256": "4D4F1B3BA179C93557BE9F6F43B8F445DA9F848314E0464418EE7DD15314470E"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_switch.json",
+    "Bytes": 1091,
+    "Sha256": "B50E1685AAA74DBC56C81BED820AA97D942C90EA605445591DBF7CDE82AFF226"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\view_switch.mp3",
+    "Bytes": 73008,
+    "Sha256": "F015DF1F67E198A92B1055C15ACF14D67622EF756E97FB5493DE173F24C3DDDB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_end.json",
+    "Bytes": 1096,
+    "Sha256": "C6C6655B13508EE4C12C564D6F9FC3943C78F380BF0F19374CB92FEBAC6FAAF3"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_end.mp3",
+    "Bytes": 66096,
+    "Sha256": "2FB64BD6FCAFD2DC02B619E589CA638F57DB65A70AE454CC60828225F51382F4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_intro.json",
+    "Bytes": 1130,
+    "Sha256": "2EAB9762286A080232690FEF35149D69673C77E0470354B5743458ACC95ADA1A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_intro.mp3",
+    "Bytes": 72864,
+    "Sha256": "DA1C007B4958E72B96F4AE2EC8849A9ADF1A01F75E6005AD7AE65B0D67C8B4A6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_notes.json",
+    "Bytes": 1040,
+    "Sha256": "E7969813CFF7B27BD13936211A1B595C314E937D8607A4CFCA6E2BDDE5A8C0F8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_notes.mp3",
+    "Bytes": 65520,
+    "Sha256": "1E4D0DBF4037B91712F785E4A9C3201F95A800A0C830CD5AB1C605334FE458CB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_prep.json",
+    "Bytes": 1069,
+    "Sha256": "0C145FDE73038A9E6F20F4207F02946C8C3971C1408D1F31AD306E83E85C0CD1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_prep.mp3",
+    "Bytes": 64368,
+    "Sha256": "588CB520C6A57512EE8CCF131FCF814084A5A34CB04832F305158E8154A02370"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_result.json",
+    "Bytes": 1149,
+    "Sha256": "BFA823DA09EFDB77164F8737579F07C2183627FD67E11FFF07FA782A02CEBD98"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_result.mp3",
+    "Bytes": 81792,
+    "Sha256": "FABFDFE897D926921DA101587D574E360955C53EAA6D73D99154031A83C2121C"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_width.json",
+    "Bytes": 1028,
+    "Sha256": "0702D6293ED49ACEB4169C247ED1173A0C0E29AA84AD979A9FD4FBDCDE7738C6"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vscode_width.mp3",
+    "Bytes": 67536,
+    "Sha256": "9508E94B813ED5CD751D01DF0289C515FF0A457195C1FCC0B925228E051E1740"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_block.json",
+    "Bytes": 1354,
+    "Sha256": "19B0A5C9007F92017DF581F9982D05EEFEBB3820D650580353AA8846C0BC8C27"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_block.mp3",
+    "Bytes": 118656,
+    "Sha256": "C0D01EA574FFE4FBBAB847F5636A26783EA8CD760C15BC41AF451ECABDF407B0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_end.json",
+    "Bytes": 1050,
+    "Sha256": "D389FD83916A54E409B71F6B8D67627206D81C0FE43C939DFDD302ADB4F378C8"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_end.mp3",
+    "Bytes": 71712,
+    "Sha256": "059CB60D30878D3140774E77E5EF9496ABAF5D5FC69ADA0A8260FD256A6C5F95"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_fix.json",
+    "Bytes": 1550,
+    "Sha256": "4164409BA85E0DB7CED017DCDC08A6E2B4E50438D91A6480551FAB17E9562FC1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_fix.mp3",
+    "Bytes": 141552,
+    "Sha256": "8BD4FF4D860C91EA549847EA761FDAB18BBD431D48F63410E3722F15CD4B1A19"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_intro.json",
+    "Bytes": 1046,
+    "Sha256": "34E4C4A49DD1BC7C7A1577B48F694AF587DDBA238EC06B4AC177B41861A9E523"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_intro.mp3",
+    "Bytes": 60768,
+    "Sha256": "2D5BDCFBADFBD4D72E9D8A8760B10C1A48F28BE19E16DA58B34785698163FBDA"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_notes.json",
+    "Bytes": 968,
+    "Sha256": "AD9F319EE8CB5049EF29DBB7AD4B5FB5E35B18C686B71D7C82E03FD51119E627"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_notes.mp3",
+    "Bytes": 54144,
+    "Sha256": "584C59CACA7F7A337DA41E68EE819BF1234CF7E22F1938CA774EF31142273C14"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_prep.json",
+    "Bytes": 1051,
+    "Sha256": "2020D5242C9329426643A09CDE4781083461359CAC81287BF4A8E5CF24D0EE7D"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_prep.mp3",
+    "Bytes": 63360,
+    "Sha256": "2BB980165301350F2B3B595663CF91CB3EDB8E9C4CACC38074767AFA901D4411"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_result.json",
+    "Bytes": 1259,
+    "Sha256": "098471FB1A16AF5B9C994835E3E7F139286F745B1E9D9784E87947588E5A100A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\vslive_result.mp3",
+    "Bytes": 103968,
+    "Sha256": "A5FA65B6BE1DA393168693EB8039850789BFF33977BFF4C378878AEAE9040EB1"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_done.json",
+    "Bytes": 987,
+    "Sha256": "5BB4627C32B0A498CAFCCA77FF43F67492F237ECED2266FDF3D55AC87A7290C7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_done.mp3",
+    "Bytes": 59328,
+    "Sha256": "E7955E5093F7BBB07374AC59F2CEC0E0B9F84A05FCF29C70AF11E1446DE3D894"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_intro.json",
+    "Bytes": 988,
+    "Sha256": "FEDCE231E578C7F7A3E19A5DA7FA82BC7AEA8CD7D584A2BE963A122B935650E7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_intro.mp3",
+    "Bytes": 59904,
+    "Sha256": "E055E967F1CE831BCA15F02366473F49821BE14EBAAB5A95D20BB6D1608B0316"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_send.json",
+    "Bytes": 951,
+    "Sha256": "1C8105397BE8B3582F03ED628AA041873D06552F8456FC5D3F6E53FCB03ABDF0"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wc_send.mp3",
+    "Bytes": 57456,
+    "Sha256": "6969F1678417746887597193C396B6C30D76064CD5ED3FA9292564E9C3F818E7"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_end.json",
+    "Bytes": 1023,
+    "Sha256": "DC3978493A18772394303FACB616F1AFF88D0E5B54D480E5E219D0E043F90EDC"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_end.mp3",
+    "Bytes": 65232,
+    "Sha256": "EB80AEEF5E7E9EE56F7032E0F26400A2C971FF08887D7FF27747096EEDFED68F"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_intro.json",
+    "Bytes": 999,
+    "Sha256": "A33B3AFCA30C7C0E5EB28790E5D323666088032B487E893B31EF861FF8E12448"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_intro.mp3",
+    "Bytes": 57744,
+    "Sha256": "40A634080AFEAB315CD77F64B64078616BD273D59AFEFB3D4376AB343BFEE611"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_nav.json",
+    "Bytes": 1005,
+    "Sha256": "39065B973F9B9389B243EE0E0A27366A8BD403F49C7D1AD23DAD0B11E6831B8A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_nav.mp3",
+    "Bytes": 65376,
+    "Sha256": "02A5AAA7B653CB3F58CABC5E964BAD2FAE7202F3F89618C901863D92DCEC28B4"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_notes.json",
+    "Bytes": 911,
+    "Sha256": "7363EE3399EDD7963565F9FB77F822D4D856174A3FC98CF04D24A74008E3BDAB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_notes.mp3",
+    "Bytes": 44640,
+    "Sha256": "E0A08846762BC6C7DCBF94710A068916068DD2AFCB06427163A7D3825FA0D1C5"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_out.json",
+    "Bytes": 963,
+    "Sha256": "6394185C9E74457A5F496D604B1C5A133D31A5107C0E6949B1CF5C62C082AA4A"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_out.mp3",
+    "Bytes": 51840,
+    "Sha256": "0C389100CF6FDFA5B4F2E62DD4987B286B083DB969D40ECAEC5FD2AEF736E269"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_top.json",
+    "Bytes": 975,
+    "Sha256": "2C8E27868DCBFB5EDD14D7C237C446CFB901A92ACAE2EF0C9C22551106AB8797"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\web_top.mp3",
+    "Bytes": 54288,
+    "Sha256": "D33DBDD4D579A938296A798A3419FBCB8DD8EC89B2F4D9479877DF6CAD127BDF"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wl_done.json",
+    "Bytes": 963,
+    "Sha256": "685A2CF10C8661A76B65EE0B3460BCC395143754191CB59584A1E15F39481DEB"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wl_done.mp3",
+    "Bytes": 50976,
+    "Sha256": "C15B0DF855616F39E224A18F9B4AF50E96B10D143450103BD64055117026D82B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wl_intro.json",
+    "Bytes": 988,
+    "Sha256": "308753D05F7AB28C0E32A7112D80E92B1713D64F8D02579642A48F7038521E1B"
+  },
+  {
+    "Path": "temp\\narration-taskteam\\wl_intro.mp3",
+    "Bytes": 58896,
+    "Sha256": "EE743453374DCBCDF7F6C07B52A64848DFCC769F61D00E8CC15B134C27BEE0BA"
+  }
+]

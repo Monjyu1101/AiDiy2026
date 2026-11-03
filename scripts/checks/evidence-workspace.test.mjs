@@ -36,9 +36,9 @@ test('補助ツールは現行Task/Teamの画像と作業JSONを分離する（�
     helper.setBook(book);
     await helper.shot('101', '合成確認', 'fixture');
     helper.record({status: '合成試験'});
-    const folder = join(root, '_AIDIY/knowledge/images', document);
+    const folder = join(root, 'docs/セルフテスト、操作ガイド/images', document);
     assert.deepEqual(await readdir(folder), [`${prefix}_101_合成確認.png`]);
-    const work = join(root, '.aidiy_cache/selftest', document);
+    const work = join(root, 'docs/セルフテスト、操作ガイド/evidence/.aidiy_cache/selftest', document);
     assert.equal(JSON.parse(await readFile(join(work, 'synthetic-run__evidence.json'))).images.length, 1);
     assert.equal(JSON.parse(await readFile(join(work, 'synthetic-run__results.json'))).length, 1);
     await assert.rejects(helper.shot('101', '合成確認', 'fixture'), /上書きしません/);
@@ -56,7 +56,7 @@ test('Electron統合監査の既定出力はキャッシュ、明示出力先は
 });
 
 test('正式証跡に日付先頭名や作業JSON・ログ・スクリプトを混在させない', async () => {
-  const images = new URL('../../_AIDIY/knowledge/images/', import.meta.url);
+  const images = new URL('../../docs/セルフテスト、操作ガイド/images/', import.meta.url);
   const files = await readdir(images, {recursive: true, withFileTypes: true});
   const invalid = files.filter(file => file.isFile() &&
     (/^20\d{6}/u.test(file.name) || /\.(?:json|txt|log|mjs)$/iu.test(file.name)));

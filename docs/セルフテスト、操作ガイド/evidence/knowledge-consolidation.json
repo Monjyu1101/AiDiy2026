@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-03",
+  "operation": "knowledge個別入口22件を共通実施方法へ統合、画像/ツール/補助保存先をdocsへ移設",
+  "method": "_AIDIY/knowledge/セルフテスト,_説明資料の書き方.md",
+  "recycled": {
+    "entry_documents": 22,
+    "directory": "_AIDIY/knowledge/images",
+    "permanent_delete": false
+  },
+  "assets": [
+    {
+      "file": "_tools\\画像サイズ調整.py",
+      "sha256": "37a9553415df53852ffb24d9050278535bcd87e632207b1ef06ab98132b30623"
+    },
+    {
+      "file": "images\\backend_diag,アイコンメニュー\\右クリックメニュー.jpg",
+      "sha256": "0425e2b631e85e589b9ce75c23207ce08220d7491b62c0d974d3c8412320b10e"
+    }
+  ],
+  "validation": {
+    "isolated_save_tests_pass": 15,
+    "resize_path_tests_pass": 2,
+    "node_syntax_files": 3,
+    "python_ast": true,
+    "checked_links": 839,
+    "broken_links": [],
+    "pdf_source_mismatch": [],
+    "active_old_image_paths": []
+  },
+  "scope": "既存実機セルフテスト/AI送信/サービス操作なし。既存結果とPDF22冊371ページは不変。"
+}

@@ -6,7 +6,8 @@
 'use strict';
 const {setWindowBounds}=require('../../frontend_ide/デスクトップ/全画面横断.cjs');
 
-const ミニ幅=384,初期ミニ高さ=134,最小ミニ高さ=80,最大ミニ高さ=360,ミニの余白=8;
+// 7列384pxからアイコン枠＋間隔1列分（約54px）を減らした6列幅。
+const ミニ幅=330,初期ミニ高さ=134,最小ミニ高さ=80,最大ミニ高さ=360,ミニの余白=8;
 const ミニ高さは有効=height=>Number.isInteger(height)&&height>=最小ミニ高さ&&height<=最大ミニ高さ;
 // 通常時の寸法を保持し、表示切替では現在の左肩を引き継ぐ。
 function ミニ表示を作成(window,{screen}={}){
@@ -51,4 +52,4 @@ function ミニ表示を作成(window,{screen}={}){
   },
  };
 }
-module.exports={ミニ表示を作成,ミニ高さは有効};
+module.exports={ミニ表示を作成,ミニ高さは有効,ミニ幅};
