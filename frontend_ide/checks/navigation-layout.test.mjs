@@ -59,3 +59,11 @@ test('おすすめプロンプトはAI本文をそのまま表示し機械的な
  assert.doesNotMatch(descriptor.template.content,/プロンプト案です。/);
  const alert=walk(section).find(node=>hasClass(node,'navigation-copy-error'));assert.equal(attr(alert,'role'),'alert');
 });
+
+test('CODE/LIVEへは見出しのすぐ右に置き同じ窓内の共通ダイアログで選択する',()=>{
+ const nodes=walk(baseParse(descriptor.template.content)),row=nodes.find(node=>hasClass(node,'navigation-prompt-actions'));
+ const children=elements(row);assert.equal(children[0].tag,'h2');assert.equal(children[1].children[0].content,'CODE/LIVEへ');
+ assert.equal(children[1].props.find(p=>p.type===7&&p.name==='if').exp.content,'nextItem');
+ const dialog=nodes.find(node=>node.tag==='DraftHandoffDialog');assert.ok(dialog);assert.match(source,/:insert-draft="draftActions.insertDraft"/);assert.match(source,/:load-targets="draftActions.loadTargets"/);
+ assert.doesNotMatch(source,/postMessage|BroadcastChannel|localStorage/);
+});

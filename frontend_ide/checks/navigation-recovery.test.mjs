@@ -9,10 +9,10 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {ref,computed} from 'vue';
 const source=readFileSync(new URL('../src/components/開発スペース/Navigationパネル.vue',import.meta.url),'utf8').split('<script setup>')[1].split('</script>')[0].replace(/^import .*;\n/gm,'');
-function fixture(){
+function fixture({props={},draftActions=null,native=false}={}){
  const calls=[],pending=[],timers=new Map();let serial=0;
- const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,recommendedPrompt,nextItem,copy,copied,copying,copyError,panel,busy,job,error,visible,availability,result,overall})`,{
-  ref,computed,watch(){},onMounted(){},onBeforeUnmount(){},nextTick:async()=>{},defineProps:()=>({instance:'navi-1',standalone:false}),defineEmits:()=>()=>{},window:{},DEFAULT_NAVIGATION_GOAL:'目標',AbortController,AbortSignal,
+ const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,recommendedPrompt,nextItem,copy,copied,copying,copyError,panel,busy,job,error,visible,availability,result,overall,handoff,canHandoff,draftRequest})`,{
+  ref,computed,inject:()=>draftActions,watch(){},onMounted(){},onBeforeUnmount(){},nextTick:async()=>{},defineProps:()=>({instance:'navi-1',standalone:false,...props}),defineEmits:()=>()=>{},window:native?{aidiyWindow:{}}:{},DEFAULT_NAVIGATION_GOAL:'目標',AbortController,AbortSignal,
   setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id),
   fetch:(url,options)=>{calls.push(options.method);return new Promise((resolve,reject)=>pending.push({resolve,reject}));},
  });
@@ -131,4 +131,27 @@ test('コピー連打は重複せず、完了前に結果が変わると成功�
 });
 test('コピー失敗後の再試行成功で通知を消し、空の提案をコピーしない',async()=>{
  const f=copyFixture({legacy:false});await f.api.copy();assert.ok(f.api.copyError.value);f.doc.execCommand=()=>true;await f.api.copy();assert.equal(f.api.copyError.value,'');assert.equal(f.api.copied.value,true);f.api.result.value={items:[],nextPrompt:''};f.doc.execCommand=()=>{throw Error('must not call');};await f.api.copy();
+});
+
+for(const mode of ['web-ide','desktop-ide','desktop-navi'])test(`CODE/LIVEへ: ${mode}は共通選択用の要求だけを作り本文を改変しない`,()=>{
+ let calls=0;const actions={loadTargets(){calls++;},insertDraft(){calls++;}};
+ const f=fixture({props:{project:{path:'/project'},standalone:mode==='desktop-navi'},native:mode!=='web-ide',draftActions:actions});
+ const text='今回の目標\n対処内容\n今回の作業 <本文>  ';
+ f.api.result.value={items:[{progress:0}],nextPrompt:text};f.api.handoff();
+ assert.equal(f.api.draftRequest.value.projectPath,'/project');assert.equal(f.api.draftRequest.value.text,text);assert.equal(calls,0);
+ const first=f.api.draftRequest.value;f.api.handoff();assert.equal(f.api.draftRequest.value,first);
+ f.api.goal.value='未反映の編集';assert.equal(first.text,text);
+});
+for(const options of [{props:{project:{path:'/p'},standalone:true}},{props:{project:null}},{draftActions:null}])test('利用できない連携・プロジェクト未確定では受け渡しを作らない '+JSON.stringify(options),()=>{
+ const f=fixture({props:{project:{path:'/p'}},draftActions:{},...options});f.api.result.value={items:[{progress:0}],nextPrompt:'本文'};f.api.handoff();assert.equal(f.api.draftRequest.value,null);
+});
+test('全件完了でおすすめがないときは受け渡しを作らない',()=>{
+ const f=fixture({props:{project:{path:'/p'}},draftActions:{}});f.api.result.value={items:[{progress:100}],nextPrompt:''};f.api.handoff();assert.equal(f.api.draftRequest.value,null);
+});
+
+test('デスクトップのNaviは共有下書き経路を使いBrowserの本文取得・通常Routerを呼ばない',async()=>{
+ const desktop=readFileSync(new URL('../desktop.cjs',import.meta.url),'utf8'),start=desktop.indexOf(" ipcMain.handle('development:draft-targets'"),end=desktop.indexOf(" ipcMain.on('development:draft-result'",start);
+ const handlers={},calls=[],source={kind:'navi'},value={text:'AI本文\nそのまま  ',projectPath:'/project'};
+ vm.runInNewContext(desktop.slice(start,end),{ipcMain:{handle:(name,fn)=>handlers[name]=fn},trustedEvent:()=>source,sharedDrafts:async()=>({list:async s=>{assert.equal(s,source);calls.push('list');return{ok:true};},insert:async(s,v)=>{assert.equal(s,source);assert.equal(v,value);calls.push('insert');return{ok:true};}}),draftRouter:{list(){throw Error('wrong router');},insert(){throw Error('wrong router');}},browserViews:{action(){throw Error('wrong browser');}}});
+ assert.equal((await handlers['development:draft-targets']({})).ok,true);assert.equal((await handlers['development:draft-insert']({},value)).ok,true);assert.deepEqual(calls,['list','insert']);
 });

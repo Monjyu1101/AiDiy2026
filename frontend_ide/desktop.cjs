@@ -336,9 +336,11 @@ app.whenReady().then(async()=>{
  ipcMain.handle('development:copy-file-path',(event,path)=>nativePreviewActions.copyFilePath(event,path));
  ipcMain.handle('development:open-file',(event,path)=>nativePreviewActions.openFile(event,path));
  ipcMain.handle('development:open-folder',(event,path)=>nativePreviewActions.openFolder(event,path));
- ipcMain.handle('development:draft-targets',async event=>{const source=trustedEvent(event);try{return source?.kind==='browser'?await(await sharedDrafts()).list(source):await draftRouter.list(source);}catch(error){return{ok:false,error:error.message};}});
+ ipcMain.handle('development:draft-targets',async event=>{const source=trustedEvent(event);try{return ['browser','navi'].includes(source?.kind)?await(await sharedDrafts()).list(source):await draftRouter.list(source);}catch(error){return{ok:false,error:error.message};}});
  ipcMain.handle('development:draft-insert',async(event,value)=>{
-  const source=trustedEvent(event);if(source?.kind!=='browser')return draftRouter.insert(source,value);
+  const source=trustedEvent(event);
+  if(source?.kind==='navi'){try{return await(await sharedDrafts()).insert(source,value);}catch(error){return{ok:false,error:error.message};}}
+  if(source?.kind!=='browser')return draftRouter.insert(source,value);
   try{const draft=await browserViews.action(event,'draft');if(!draft.ok)return draft;return await(await sharedDrafts()).insert(source,{...value,text:draft.request.text});}catch(error){return{ok:false,error:error.message};}
  });
  ipcMain.on('development:draft-result',(event,value)=>draftRouter.acknowledge(trustedEvent(event),value));
