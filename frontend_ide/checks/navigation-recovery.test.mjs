@@ -11,7 +11,7 @@ import {ref,computed} from 'vue';
 const source=readFileSync(new URL('../src/components/開発スペース/Navigationパネル.vue',import.meta.url),'utf8').split('<script setup>')[1].split('</script>')[0].replace(/^import .*;\n/gm,'');
 function fixture(){
  const calls=[],pending=[],timers=new Map();let serial=0;
- const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,recommendedPrompt,nextItem,copy,panel,busy,job,error,visible,availability,result,overall})`,{
+ const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,recommendedPrompt,nextItem,copy,copied,copying,copyError,panel,busy,job,error,visible,availability,result,overall})`,{
   ref,computed,watch(){},onMounted(){},onBeforeUnmount(){},nextTick:async()=>{},defineProps:()=>({instance:'navi-1',standalone:false}),defineEmits:()=>()=>{},window:{},DEFAULT_NAVIGATION_GOAL:'目標',AbortController,AbortSignal,
   setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id),
   fetch:(url,options)=>{calls.push(options.method);return new Promise((resolve,reject)=>pending.push({resolve,reject}));},
@@ -107,4 +107,28 @@ test('先頭未完了のAI本文だけを表示・コピーし、全件完了で
 test('APIから対象不一致の提案が届いても表示に採用しない',async()=>{
  const f=fixture();const refresh=f.api.refresh();await f.answer({...state(null),result:{schemaVersion:3,goal:'目標',items:[{id:'1',progress:0},{id:'2',progress:50}],overall:{progress:25},nextItemId:'2',nextPrompt:'後続の作業'}});await refresh;
  assert.equal(f.api.result.value,null);assert.match(f.api.error.value,/対象が一致しません/);
+});
+
+function copyFixture({writeText,legacy=true,throws=false}={}){
+ const {api}=fixture(),events=[],writes=[];const range={cloneRange(){return this;}};
+ const selection={rangeCount:1,getRangeAt:()=>range,removeAllRanges(){events.push('clear');},addRange(r){assert.equal(r,range);events.push('restore-range');}};
+ const input={style:{},focus(){events.push('focus-input');},select(){events.push('select');},setSelectionRange(a,b){assert.equal(a,0);assert.equal(b,input.value.length);},remove(){events.push('remove');}};
+ const doc={defaultView:{navigator:{clipboard:writeText?{writeText}:undefined}},activeElement:{focus(){events.push('restore-focus');}},getSelection:()=>selection,createElement(tag){assert.equal(tag,'textarea');return input;},body:{appendChild(){events.push('append');}},execCommand(command){assert.equal(command,'copy');writes.push(input.value);if(throws)throw Error('denied');return legacy;}};
+ api.panel.value={ownerDocument:doc};api.result.value={items:[{id:'a',progress:0}],nextPrompt:'今回の目標\n対処内容\n今回の作業 <そのまま>  '};
+ return {api,events,writes,doc};
+}
+test('Clipboard API成功では本文そのままを書き込み従来方式を呼ばない',async()=>{
+ const writes=[],f=copyFixture({writeText:async text=>writes.push(text)});await f.api.copy();assert.deepEqual(writes,[f.api.recommendedPrompt.value]);assert.equal(f.api.copied.value,true);assert.deepEqual(f.events,[]);assert.equal(f.api.copyError.value,'');
+});
+for(const mode of ['missing','reject'])test(`Clipboard API ${mode}でも表示先documentの従来コピーを使用する`,async()=>{
+ const f=copyFixture({writeText:mode==='reject'?async()=>{throw Error('NotAllowedError');}:undefined});await f.api.copy();assert.deepEqual(f.writes,[f.api.recommendedPrompt.value]);assert.equal(f.api.copied.value,true);assert.deepEqual(f.events,['append','focus-input','select','remove','restore-focus','clear','restore-range']);
+});
+for(const mode of ['false','throws'])test(`両方式が失敗(${mode})すると成功表示せず手動コピー方法を示す`,async()=>{
+ const f=copyFixture({legacy:false,throws:mode==='throws'});f.api.copied.value=true;await f.api.copy();assert.equal(f.api.copied.value,false);assert.equal(f.api.copying.value,false);assert.match(f.api.copyError.value,/Ctrl\+C.*⌘C/);assert.ok(f.events.includes('remove'));assert.ok(f.events.includes('restore-focus'));
+});
+test('コピー連打は重複せず、完了前に結果が変わると成功表示を付けない',async()=>{
+ let resolve,calls=0;const f=copyFixture({writeText:()=>{calls++;return new Promise(r=>resolve=r);}});const pending=f.api.copy();await f.api.copy();assert.equal(calls,1);assert.equal(f.api.copying.value,true);f.api.result.value={items:[],nextPrompt:''};resolve();await pending;assert.equal(f.api.copied.value,false);assert.equal(f.api.copying.value,false);
+});
+test('コピー失敗後の再試行成功で通知を消し、空の提案をコピーしない',async()=>{
+ const f=copyFixture({legacy:false});await f.api.copy();assert.ok(f.api.copyError.value);f.doc.execCommand=()=>true;await f.api.copy();assert.equal(f.api.copyError.value,'');assert.equal(f.api.copied.value,true);f.api.result.value={items:[],nextPrompt:''};f.doc.execCommand=()=>{throw Error('must not call');};await f.api.copy();
 });

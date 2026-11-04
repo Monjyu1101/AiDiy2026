@@ -55,5 +55,7 @@ test('おすすめプロンプトはAI本文をそのまま表示し機械的な
  const body=elements(prompt)[0];assert.equal(body.children[0].content.content,'recommendedPrompt');
  assert.equal(body.props.find(prop=>prop.type===7&&prop.name==='if').exp.content,'nextItem');
  assert.doesNotMatch(descriptor.template.content,/navigation-purpose|navigation-target|次の一歩/);
- assert.match(source,/clipboard\.writeText\(recommendedPrompt\.value\)/);
+ assert.match(source,/clipboard\.writeText\(text\)/);
+ assert.doesNotMatch(descriptor.template.content,/プロンプト案です。/);
+ const alert=walk(section).find(node=>hasClass(node,'navigation-copy-error'));assert.equal(attr(alert,'role'),'alert');
 });
