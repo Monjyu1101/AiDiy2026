@@ -11,7 +11,7 @@ import {ref,computed} from 'vue';
 const source=readFileSync(new URL('../src/components/開発スペース/Navigationパネル.vue',import.meta.url),'utf8').split('<script setup>')[1].split('</script>')[0].replace(/^import .*;\n/gm,'');
 function fixture(){
  const calls=[],pending=[],timers=new Map();let serial=0;
- const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,busy,job,error,visible,availability,result,overall})`,{
+ const api=vm.runInNewContext(source+`;({navigate,refresh,selectHistory,goal,recommendedPrompt,nextItem,copy,panel,busy,job,error,visible,availability,result,overall})`,{
   ref,computed,watch(){},onMounted(){},onBeforeUnmount(){},nextTick:async()=>{},defineProps:()=>({instance:'navi-1',standalone:false}),defineEmits:()=>()=>{},window:{},DEFAULT_NAVIGATION_GOAL:'目標',AbortController,AbortSignal,
   setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id),
   fetch:(url,options)=>{calls.push(options.method);return new Promise((resolve,reject)=>pending.push({resolve,reject}));},
@@ -45,7 +45,7 @@ test('状態取得も失敗した場合は再送禁止のまま定期確認し�
 
 test('総合評価はAIの値・根拠を直接表示し、等分平均や項目からの再計算を行わない',()=>{
  const {api}=fixture();
- api.result.value={schemaVersion:2,items:[{progress:100,weight:90},{progress:0,weight:10}],overall:{progress:90,reason:'主要作業の比率90%を完了'}};
+ api.result.value={schemaVersion:3,items:[{progress:100,weight:90},{progress:0,weight:10}],overall:{progress:90,reason:'主要作業の比率90%を完了'}};
  assert.equal(api.overall.value.progress,90);assert.equal(api.overall.value.reason,'主要作業の比率90%を完了');
  // API検証済み値が画面の唯一の情報源。画面側では再計算しない。
  api.result.value.overall.progress=73;assert.equal(api.overall.value.progress,73);
@@ -72,8 +72,8 @@ test('旧記録の取得失敗後も新規操作で即座に実行可能状態�
 });
 
 
-for(const [name,result] of [['総合null',{schemaVersion:2,items:[{progress:0}],overall:{progress:null}}],['総合欠損',{schemaVersion:2,items:[{progress:0}]}],['項目null',{schemaVersion:2,items:[{progress:null}],overall:{progress:0}}],['旧形式',{items:[{progress:0}],overall:{progress:0}}]])test('旧APIや不正応答を数値のない成功表示へ流さない: '+name,async()=>{
- const f=fixture(),saved={schemaVersion:2,items:[{progress:25}],overall:{progress:25}};f.api.result.value=saved;
+for(const [name,result] of [['総合null',{schemaVersion:3,items:[{progress:0}],overall:{progress:null}}],['総合欠損',{schemaVersion:3,items:[{progress:0}]}],['項目null',{schemaVersion:3,items:[{progress:null}],overall:{progress:0}}],['旧形式',{items:[{progress:0}],overall:{progress:0}}]])test('旧APIや不正応答を数値のない成功表示へ流さない: '+name,async()=>{
+ const f=fixture(),saved={schemaVersion:3,items:[{progress:25}],overall:{progress:25}};f.api.result.value=saved;
  const refresh=f.api.refresh();await f.answer({...state(null),result});await refresh;assert.deepEqual(f.api.result.value,saved);assert.match(f.api.error.value,/数値評価/);
  const select=f.api.selectHistory('old');await f.answer({...state(null),result});await select;assert.deepEqual(f.api.result.value,saved);assert.match(f.api.error.value,/数値評価/);
 });
@@ -83,7 +83,28 @@ test('初回の不正API応答を0%へ補完せず明示的に拒否する',asyn
 
 test('完了応答の評価が不正でも実行中ロックを解放し新規作成で復帰できる',async()=>{
  const f=fixture();f.api.job.value={id:'old',status:'running'};assert.equal(f.api.busy.value,true);
- const refresh=f.api.refresh();await f.answer({...state({id:'old',status:'complete'}),result:{schemaVersion:2,items:[{progress:0}],overall:{progress:null}}});await refresh;
+ const refresh=f.api.refresh();await f.answer({...state({id:'old',status:'complete'}),result:{schemaVersion:3,items:[{progress:0}],overall:{progress:null}}});await refresh;
  assert.match(f.api.error.value,/数値評価/);assert.equal(f.api.busy.value,false);
  const fresh=f.api.selectHistory();await f.answer(state(null));await fresh;assert.equal(f.api.result.value,null);assert.equal(f.api.error.value,'');assert.equal(f.api.busy.value,false);
+});
+
+test('おすすめプロンプトの目的は入力下書きでなく表示結果の目標に対応する',async()=>{
+ const f=fixture();assert.equal(f.api.recommendedPrompt.value,'');
+ f.api.result.value={schemaVersion:3,goal:'保存済みの目標',items:[{id:'1',name:'最初の項目',progress:0}],overall:{progress:0},nextItemId:'1',nextPrompt:'次の作業'};
+ f.api.goal.value='編集中の別目標';assert.equal(f.api.recommendedPrompt.value,'目的: 保存済みの目標\n対象: 最初の項目\n\n次の作業');
+ const texts=[];f.api.panel.value={ownerDocument:{defaultView:{navigator:{clipboard:{writeText:async text=>texts.push(text)}}}}};
+ await f.api.copy();assert.deepEqual(texts,['目的: 保存済みの目標\n対象: 最初の項目\n\n次の作業']);
+ const select=f.api.selectHistory('history');await f.answer({...state(null),result:{schemaVersion:3,goal:'履歴の目標',items:[{id:'2',name:'履歴の項目',progress:0}],overall:{progress:0},nextItemId:'2',nextPrompt:'履歴の提案'}});await select;
+ assert.equal(f.api.recommendedPrompt.value,'目的: 履歴の目標\n対象: 履歴の項目\n\n履歴の提案');
+ const fresh=f.api.selectHistory();await f.answer(state(null));await fresh;assert.equal(f.api.recommendedPrompt.value,'');
+});
+
+test('先頭未完了の対象名を目的とともに表示・コピーし、全件完了で提案をなくす',()=>{
+ const {api}=fixture();api.result.value={goal:'目的',items:[{id:'a',name:'完了',progress:100},{id:'b',name:'対象',progress:99},{id:'c',name:'後続',progress:0}],nextItemId:'b',nextPrompt:'対象だけ確認'};
+ assert.equal(api.nextItem.value.id,'b');assert.equal(api.recommendedPrompt.value,'目的: 目的\n対象: 対象\n\n対象だけ確認');
+ api.result.value.items.forEach(item=>item.progress=100);api.result.value.nextItemId=null;api.result.value.nextPrompt='';assert.equal(api.nextItem.value,undefined);assert.equal(api.recommendedPrompt.value,'');
+});
+test('APIから対象不一致の提案が届いても表示に採用しない',async()=>{
+ const f=fixture();const refresh=f.api.refresh();await f.answer({...state(null),result:{schemaVersion:3,goal:'目標',items:[{id:'1',progress:0},{id:'2',progress:50}],overall:{progress:25},nextItemId:'2',nextPrompt:'後続の作業'}});await refresh;
+ assert.equal(f.api.result.value,null);assert.match(f.api.error.value,/対象が一致しません/);
 });

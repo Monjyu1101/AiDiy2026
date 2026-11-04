@@ -25,11 +25,15 @@ const progressStyle=value=>scored(value)?{'--progress-width':value+'%','--progre
 // APIの旧版・不正応答を数値のない成功表示へ流さない。保存済み結果を画面で補完しない。
 function verifiedResult(value){
  if(value===null)return null;
- if(value?.schemaVersion!==2||!scored(value.overall?.progress)||!Array.isArray(value.items)||value.items.some(item=>!scored(item?.progress)))throw Error('数値評価を含まないNavigator結果です。最新版へ更新し、「＋ 新規」からナビを再作成してください。');
+ if(value?.schemaVersion!==3||!scored(value.overall?.progress)||!Array.isArray(value.items)||value.items.some(item=>!scored(item?.progress)))throw Error('Navigator結果の形式または数値評価を確認できません。最新版へ更新し、「＋ 新規」からナビを再作成してください。');
+ const next=value.items.find(item=>item.progress<100);
+ if(value.nextItemId!==(next?.id??null)||(next?typeof value.nextPrompt!=='string'||!value.nextPrompt.trim():value.nextPrompt!==''))throw Error('おすすめプロンプトの対象が一致しません。「＋ 新規」からナビを再作成してください。');
  return value;
 }
 // 総合値・理由はAIの検証済み回答をそのまま表示する。旧形式を補完しない。
 const overall=computed(()=>result.value?.overall);
+const nextItem=computed(()=>result.value?.items.find(item=>item.progress<100));
+const recommendedPrompt=computed(()=>result.value&&nextItem.value?`目的: ${result.value.goal}\n対象: ${nextItem.value.name}\n\n${result.value.nextPrompt}`:'');
 const matchesResult=computed(()=>!!result.value&&goal.value.trim()===result.value.goal);
 const canEvaluate=computed(()=>!busy.value&&availability.value.available&&matchesResult.value);
 let draftInitialized=false,draftEdited=false,pendingGoal=null;
@@ -73,7 +77,7 @@ async function loadModels(){const version=++catalogVersion;catalogBusy.value=tru
 watch(chosenProvider,()=>{if(modelOpen.value){modelItems.value=[];void loadModels();}});
 function chooseModel(){chosenProvider.value=selection.value.provider;chosenModel.value=selection.value.model;modelChoice.value=['same','auto'].includes(selection.value.model)?selection.value.model:'__custom__';modelOpen.value=!modelOpen.value;if(modelOpen.value)void loadModels();}
 async function saveModel(){if(busy.value)return;savingModel.value=true;error.value='';try{const data=await api('PUT',{provider:chosenProvider.value,model:modelChoice.value==='__custom__'?chosenModel.value:modelChoice.value});selection.value=data.selection;modelOpen.value=false;}catch(e){error.value=e.message;}finally{savingModel.value=false;}}
-async function copy(){try{await panel.value.ownerDocument.defaultView.navigator.clipboard.writeText(result.value.nextPrompt);copied.value=true;}catch{error.value='コピーできません。プロンプトを選択してコピーしてください。';}}
+async function copy(){try{await panel.value.ownerDocument.defaultView.navigator.clipboard.writeText(recommendedPrompt.value);copied.value=true;}catch{error.value='コピーできません。プロンプトを選択してコピーしてください。';}}
 
 watch(()=>props.startedAt,()=>{version++;request?.abort();close();windowPanel?.close();windowPanel=null;draftInitialized=false;draftEdited=false;pendingGoal=null;goal.value=DEFAULT_NAVIGATION_GOAL;result.value=null;job.value=null;error.value='';submitting.value=false;modelOpen.value=false;selection.value={provider:'aidiy_hermes',model:'same'};});
 onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(props.instance),{method:'DELETE'}).catch(()=>{});disposed=true;version++;request?.abort();clearTimeout(timer);windowPanel?.close();});
@@ -97,7 +101,7 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
    <p v-if="job" role="status" aria-live="polite" :aria-busy="busy" :class="{'navigation-error':job.status==='failed'}">{{job.message}}</p>
    <template v-if="result">
     <div class="navigation-result-heading"><small>{{result.inferred?'仮の開発目標（AIの推測・編集できます）':'保存済みの目標'}}</small><h2>{{result.goal}}</h2><small>達成度はAIの推定です。根拠と実際の状態を確認してください。</small></div>
-    <p v-if="!result.items.length">対象の作業項目はありません。次のプロンプト案を確認してください。</p>
+    <p v-if="!result.items.length">対象の作業項目はありません。</p>
     <ol class="navigation-items" :key="result.navigationId||result.requestId"><li v-for="item in result.items" :key="item.id"><details class="navigation-disclosure">
      <summary>
      <span class="navigation-progress" :style="progressStyle(item.progress)" role="progressbar" :aria-label="item.name" :aria-valuenow="item.progress" :aria-valuetext="item.progress+'%（AIの推定）'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-disclosure-arrow" aria-hidden="true"></span><span class="navigation-name">{{item.name}}</span><strong>{{item.progress}}<small>%</small></strong></span>
@@ -113,7 +117,7 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
      <span class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="overall.progress" :aria-valuetext="overall.progress+'%（AIの工数比率による加重評価）'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-disclosure-arrow" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{overall.progress}}<small>%</small></strong></span>
      </summary><div class="navigation-reasons"><small>AIが見積もった工数比率による総合評価。実測値ではありません。</small><p class="navigation-overall-reason">{{overall.reason}}</p></div></details>
     </section>
-    <section v-if="result&&!history" class="navigation-next" aria-label="次にやることのプロンプト案"><div><h2>次の一歩</h2><button @click="copy">{{copied?'コピーしました':'コピー'}}</button></div><p class="navigation-prompt">{{result.nextPrompt}}</p><small>プロンプト案です。自動送信・作業実行はしません。</small></section>
+    <section v-if="result&&!history" class="navigation-next" aria-label="おすすめプロンプト(案)"><div><h2>おすすめプロンプト(案)</h2><button v-if="nextItem" @click="copy">{{copied?'コピーしました':'コピー'}}</button></div><p class="navigation-prompt"><strong class="navigation-purpose">目的: {{result.goal}}</strong><template v-if="nextItem"><strong class="navigation-target">対象: {{nextItem.name}}</strong><span>{{result.nextPrompt}}</span></template><span v-else>{{result.items.length?'全項目が100%です。おすすめの追加作業はありません。':'作業項目がないため、おすすめプロンプトはありません。'}}</span></p><small>プロンプト案です。自動送信・作業実行はしません。</small></section>
   <footer class="navigation-model-footer">
    <div class="navigation-model-line composer-meta"><button type="button" :disabled="busy" :aria-expanded="modelOpen" @click="chooseModel"><span class="model-caption">モデル</span> ▾</button><span class="model-label" :title="selection.provider+' / '+selection.model">{{selection.provider}} / {{selection.model}}</span></div>
   </footer>
@@ -173,6 +177,8 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
 .navigation-panel>.navigation-next h2{font-size:13px;margin:0}
 .navigation-panel>.navigation-next .navigation-prompt{min-height:0;overflow:auto;overflow-wrap:anywhere;margin:6px 0;line-height:1.5;font-size:12px}
 .navigation-panel>.navigation-next>small{font-size:10px}
+.navigation-target{display:block;margin-bottom:8px;color:#b8cadc}
+.navigation-purpose{display:block;margin-bottom:8px;color:#d4e8f8}
 </style>
 
 <style>

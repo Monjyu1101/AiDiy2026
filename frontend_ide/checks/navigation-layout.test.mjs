@@ -14,7 +14,7 @@ const compiled=compileTemplate({source:descriptor.template.content,filename:'Nav
 const attr=(node,name)=>node.props?.find(prop=>prop.type===6&&prop.name===name)?.value?.content;
 const hasClass=(node,name)=>attr(node,'class')?.split(' ').includes(name);
 const elements=node=>(node.children||[]).filter(child=>child.type===1);
-test('総合評価・次の一歩・モデル欄を明細スクロール外に順序どおり固定する',()=>{
+test('総合評価・おすすめプロンプト・モデル欄を明細スクロール外に順序どおり固定する',()=>{
  assert.deepEqual(errors,[]);assert.deepEqual(compiled.errors,[]);
  const panel=elements(baseParse(descriptor.template.content))[0],children=elements(panel);
  const positions=['navigation-display','navigation-overall','navigation-next','navigation-model-footer'].map(name=>children.findIndex(node=>hasClass(node,name)));
@@ -45,4 +45,19 @@ test('明細と総合の理由は独立したネイティブ開閉で、初期�
  assert.match(source,/content:'▶'/);assert.match(source,/\[open\]>summary .*content:'▽'/);
  assert.match(source,/>summary:focus-visible/);
  assert.equal((source.match(/:key="result.navigationId\|\|result.requestId"/g)||[]).length,2);
+});
+
+test('おすすめプロンプトの内容先頭に結果の目的を表示する',()=>{
+ const nodes=walk(baseParse(descriptor.template.content)),section=nodes.find(node=>hasClass(node,'navigation-next'));
+ assert.equal(attr(section,'aria-label'),'おすすめプロンプト(案)');
+ const heading=walk(section).find(node=>node.tag==='h2');assert.equal(heading.children[0].content,'おすすめプロンプト(案)');
+ const prompt=walk(section).find(node=>hasClass(node,'navigation-prompt'));
+ const [purpose,body]=elements(prompt);assert.equal(hasClass(purpose,'navigation-purpose'),true);
+ assert.equal(purpose.children.find(node=>node.type===5).content.content,'result.goal');
+ assert.equal(elements(body)[1].children[0].content.content,'result.nextPrompt');
+ assert.equal(body.props.find(prop=>prop.type===7&&prop.name==='if').exp.content,'nextItem');
+ const target=elements(body)[0];assert.equal(hasClass(target,'navigation-target'),true);
+ assert.equal(target.children.find(node=>node.type===5).content.content,'nextItem.name');
+ assert.match(source,/clipboard\.writeText\(recommendedPrompt\.value\)/);
+ assert.doesNotMatch(descriptor.template.content,/次の一歩/);
 });
