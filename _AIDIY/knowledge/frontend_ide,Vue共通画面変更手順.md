@@ -687,7 +687,7 @@ Navigationの外枠はCodeと同じ状態バー・窓操作とプロジェクト
 
 Navigator は `navigation-agent.mjs` からセットアップ済み `backend_tools/.venv` の Python を起動し、`navigation_readonly.py` が `CodeAgents.run_async` と既存 Code CLI 基盤を読み取り専用オプションで呼びます。常駐 Tools（8095）の HTTP/MCP API や独立した `aidiy_code_agent` コマンドは呼びません。Tools サーバーの起動状態でナビ・評価を無効化せず、Python・選択した CLI・認証・モデルが利用できない場合は実行エラーとして表示します。通常実行へのフォールバックは行いません。
 
-Navigator の戻り値は `requestId, goal, items[{id,name,progress,reason}], nextPrompt` の固定JSONです。`progress` は0〜100の整数、項目は最大50件、IDは重複不可です。評価時は保存済みの目標・項目ID・名前・順序・件数を照合し、変更を拒否します。パース・検証に成功するまで前回の正常結果を置き換えません。AI検索の結果ファイル検証と同様に構造を検証しますが、読み取り専用を守るためAIにプロジェクト内のJSON作成を依頼せず、アプリが専用状態領域へ保存します。
+Navigator の戻り値は `schemaVersion:2, requestId, goal, items[{id,name,progress,reason,weight,weightReason}], overall:{progress,reason}, nextPrompt` の固定JSONです。`progress` は0〜100の整数、未実施・未評価・根拠不足は0%として理由に明記し、nullは受け付けません。項目は最大50件、IDは重複不可です。各項目の全体工数比率 `weight` は1〜100の整数で合計100%。総合は全項目の `sum(weight*progress)/100` を四捨五入した整数で、項目がない場合は0%です。工数比率・配分理由と総合値・根拠はAIが返し、APIが検証します。画面側で別の平均値を作りません。旧形式やnullを含む保存済み記録は補完・自動移行せず、「＋ 新規」から作り直します。評価時は保存済みの目標・項目ID・名前・順序・件数を照合し、変更を拒否します。パース・検証に成功するまで前回の正常結果を置き換えません。AI検索の結果ファイル検証と同様に構造を検証しますが、読み取り専用を守るためAIにプロジェクト内のJSON作成を依頼せず、アプリが専用状態領域へ保存します。
 
 Navigatorの依存可否は `navigationAvailability` でローカルPython・CLIのみ確認します。起動・履歴読戻しを拒否せず、実行APIとボタンで判定し、画面は5秒ごとに再確認します。認証や利用枠を探る自動AI送信は行いません。
 
@@ -698,3 +698,7 @@ Navigatorの空入力はUI・APIの両方で拒否し、AIを呼びません。�
 
 Navigator等の追加時は、起動入口・setup/cleanupの表示と登録順・setup/startの停止所属判定・共有依存使用中保護・Diagカタログ/アイコン配布・IDE起動導線・タイトル/サイズ・長押し移動のmain/renderer両側・ピン/VR・履歴/モデル保存・文書索引を確認する。旧アプリ一覧を固定したテストfixtureも更新する。
 NavigatorはConsoleのPTY、シェル自動承認、CLI補完、端末入力中継を使用しない。全体startの自動起動一覧へ追加せず、手動で開く。Diag診断の過去インベントリや過去試験結果を、現在の追加機能の実機確認済みとして書き換えない。
+
+
+
+Navigatorの入力欄は「目標」と表示します。総合評価は明細のスクロール外に置き、パネル下部の「次の一歩」の上へ固定します。長い総合根拠と次のプロンプトは各領域内でスクロールし、履歴一覧や新規状態では結果の下部欄を隠します。`checks/navigation-layout.test.mjs` でVueのコンパイル、下部欄の配置と数値のアクセシビリティ属性を確認します。実画面では縮小窓、長文、明細スクロール、履歴への往復、新規作成を確認してください。

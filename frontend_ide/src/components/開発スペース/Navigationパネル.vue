@@ -79,8 +79,8 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
   <header class="navigation-local-header" v-else-if="!detached||!native"><span class="navigation-emblem" aria-hidden="true">◇</span><strong>{{title}}</strong><span class="navigation-header-space"></span><button v-if="!detached" aria-label="Navigatorを別窓にピン留め" title="別窓にピン留め" @click="pin">📌</button><button aria-label="Navigatorを閉じる" @click="close">×</button></header>
   <div class="component-toolbar navigation-project"><span :title="project?.path">プロジェクト: {{project?.name || project?.path}}</span><nav><small>読取専用</small><button :disabled="busy" @click="selectHistory()">＋ 新規</button><button :disabled="busy" :aria-expanded="history" @click="toggleHistory">{{history?'戻る':'一覧'}}</button></nav></div>
    <form class="navigation-goal-form" @submit.prevent="navigate()">
-    <label :for="instance+'-goal'">開発目標</label>
-    <textarea :id="instance+'-goal'" v-model="goal" maxlength="4000" rows="3" @input="editGoal" placeholder="開発目標を入力してください"></textarea>
+    <label :for="instance+'-goal'">目標</label>
+    <textarea :id="instance+'-goal'" v-model="goal" maxlength="4000" rows="3" @input="editGoal" placeholder="目標を入力してください"></textarea>
     <div class="navigation-form-foot"><small>設定済みAIへ読取専用で調査を依頼します。ファイルは変更しません。</small><button type="submit" class="navigation-start" :disabled="busy||!availability.available">{{busy?'確認中…':'ナビ'}}</button><button type="button" class="navigation-evaluate" :disabled="!canEvaluate" title="保存済みの作業項目を変えずに採点" @click="navigate('evaluate')">評価</button></div>
     <p v-if="result&&!matchesResult" class="navigation-draft-note" role="status">入力が保存済みの目標と異なります。ナビを作成すると評価できます。</p>
    </form>
@@ -91,13 +91,9 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
    <p v-if="job" role="status" aria-live="polite" :aria-busy="busy" :class="{'navigation-error':job.status==='failed'}">{{job.message}}</p>
    <template v-if="result">
     <div class="navigation-result-heading"><small>{{result.inferred?'仮の開発目標（AIの推測・編集できます）':'保存済みの目標'}}</small><h2>{{result.goal}}</h2><small>達成度はAIの推定です。根拠と実際の状態を確認してください。</small></div>
-    <div class="navigation-overall">
-     <div class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="scored(overall.progress)?overall.progress:undefined" :aria-valuetext="scored(overall.progress)?overall.progress+'%（AIの工数比率による加重評価）':'未評価'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{scored(overall.progress)?overall.progress:'未評価'}}<small v-if="scored(overall.progress)">%</small></strong></div>
-     <small>AIが見積もった工数比率による総合評価。実測値ではありません。</small><p class="navigation-overall-reason">{{overall.reason}}</p>
-    </div>
     <p v-if="!result.items.length">対象の作業項目はありません。次のプロンプト案を確認してください。</p>
     <ol class="navigation-items"><li v-for="item in result.items" :key="item.id">
-     <div class="navigation-progress" :style="progressStyle(item.progress)" role="progressbar" :aria-label="item.name" :aria-valuenow="scored(item.progress)?item.progress:undefined" :aria-valuetext="scored(item.progress)?item.progress+'%（AIの推定）':'未評価'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">{{item.name}}</span><strong>{{scored(item.progress)?item.progress:'未評価'}}<small v-if="scored(item.progress)">%</small></strong></div>
+     <div class="navigation-progress" :style="progressStyle(item.progress)" role="progressbar" :aria-label="item.name" :aria-valuenow="item.progress" :aria-valuetext="item.progress+'%（AIの推定）'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">{{item.name}}</span><strong>{{item.progress}}<small>%</small></strong></div>
      <p>{{item.reason}}</p><div class="navigation-effort"><strong>工数比率 {{item.weight}}%</strong><span>{{item.weightReason}}</span></div>
     </li></ol>
 
@@ -105,6 +101,10 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
    <TerminalWelcome v-else-if="!busy" kind="navi" icon="/development/AiDiy.png" :started="draftEdited" />
   </div>
   </div>
+    <section v-if="result&&!history" class="navigation-overall" aria-label="総合評価の詳細">
+     <div class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="overall.progress" :aria-valuetext="overall.progress+'%（AIの工数比率による加重評価）'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{overall.progress}}<small>%</small></strong></div>
+     <small>AIが見積もった工数比率による総合評価。実測値ではありません。</small><p class="navigation-overall-reason">{{overall.reason}}</p>
+    </section>
     <section v-if="result&&!history" class="navigation-next" aria-label="次にやることのプロンプト案"><div><h2>次の一歩</h2><button @click="copy">{{copied?'コピーしました':'コピー'}}</button></div><p class="navigation-prompt">{{result.nextPrompt}}</p><small>プロンプト案です。自動送信・作業実行はしません。</small></section>
   <footer class="navigation-model-footer">
    <div class="navigation-model-line composer-meta"><button type="button" :disabled="busy" :aria-expanded="modelOpen" @click="chooseModel"><span class="model-caption">モデル</span> ▾</button><span class="model-label" :title="selection.provider+' / '+selection.model">{{selection.provider}} / {{selection.model}}</span></div>
@@ -159,7 +159,7 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
 </style>
 
 <style>
-.navigation-overall{margin:0 0 10px}.navigation-overall>small{display:block;margin-top:4px;color:#b3c5d8;font-size:10px}
+.navigation-panel>.navigation-overall{flex:none;display:flex;flex-direction:column;min-height:0;max-height:25%;box-sizing:border-box;margin:0;padding:8px 12px;border-top:1px solid #395069;background:#000}.navigation-overall>.navigation-progress,.navigation-overall>small{flex:none}.navigation-overall>.navigation-overall-reason{min-height:0;overflow:auto}.navigation-overall>small{display:block;margin-top:4px;color:#b3c5d8;font-size:10px}
 .navigation-panel>.navigation-next{flex:none;display:flex;flex-direction:column;min-height:0;max-height:30%;box-sizing:border-box;margin:0;padding:8px 12px;border:0;border-top:1px solid #3e6b7b;border-radius:0}
 .navigation-panel>.navigation-next>div,.navigation-panel>.navigation-next>small{flex:none}
 .navigation-panel>.navigation-next h2{font-size:13px;margin:0}
@@ -171,3 +171,4 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
 .navigation-overall-reason{margin:6px 0 0;color:#c5d7e6;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .navigation-effort{display:grid;gap:3px;margin:7px 12px 10px;font-size:11px;line-height:1.5;color:#b8cadc;white-space:pre-wrap;overflow-wrap:anywhere}.navigation-effort strong{color:#d4e8f8}
 </style>
+

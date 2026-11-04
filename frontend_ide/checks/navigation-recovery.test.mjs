@@ -49,7 +49,6 @@ test('総合評価はAIの値・根拠を直接表示し、等分平均や項目
  assert.equal(api.overall.value.progress,90);assert.equal(api.overall.value.reason,'主要作業の比率90%を完了');
  // API検証済み値が画面の唯一の情報源。画面側では再計算しない。
  api.result.value.overall.progress=73;assert.equal(api.overall.value.progress,73);
- api.result.value.overall={progress:null,reason:'確認不足'};assert.equal(api.overall.value.progress,null);assert.equal(api.overall.value.reason,'確認不足');
  api.result.value.overall={progress:0,reason:'未着手を確認'};assert.equal(api.overall.value.progress,0);
  delete api.result.value.overall;assert.equal(api.overall.value,undefined);
  api.result.value=null;assert.equal(api.overall.value,undefined);
@@ -71,3 +70,4 @@ test('旧記録の取得失敗後も新規操作で即座に実行可能状態�
  await f.answer({job:{id:'recreated',status:'running'}});await navigate;await f.answer(state({id:'recreated',status:'running'}));
  assert.equal(f.api.busy.value,true);
 });
+

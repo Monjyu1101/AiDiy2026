@@ -14,13 +14,13 @@ const valid=(id='one',goal='検索画面を整える')=>({schemaVersion:2,reques
 test('結果: 根拠/0と100/空リストを保持し未知の属性を除外',()=>{
  const data=valid();data.items.push({...data.items[0],id:'2',progress:100});data.items[0].progress=0;data.items.forEach(item=>item.weight=50);data.overall.progress=50;data.secret='ignore';
  const {secret,...expected}=data;assert.deepEqual(validateNavigation(data,{id:'one',goal:data.goal}),{...expected,inferred:false});
- assert.equal(validateNavigation({...data,items:[],overall:{progress:null,reason:'項目がないため未評価'}},{id:'one',goal:data.goal}).items.length,0);
+ assert.equal(validateNavigation({...data,items:[],overall:{progress:0,reason:'項目がないため0%'}},{id:'one',goal:data.goal}).items.length,0);
 });
 for(const [name,change]of [
  ['版なし',d=>delete d.schemaVersion],['旧版',d=>d.schemaVersion=1],['未来版',d=>d.schemaVersion=3],['版文字列',d=>d.schemaVersion='2'],['版null',d=>d.schemaVersion=null],
  ['重みなし',d=>delete d.items[0].weight],['重みゼロ',d=>d.items[0].weight=0],['重み負値',d=>d.items[0].weight=-1],['重み上限超過',d=>d.items[0].weight=101],['重み小数',d=>d.items[0].weight=99.5],['重み文字列',d=>d.items[0].weight='100'],['重みNaN',d=>d.items[0].weight=NaN],['重みInfinity',d=>d.items[0].weight=Infinity],['重み合計不足',d=>d.items[0].weight=99],['重み合計超過',d=>d.items.push({...d.items[0],id:'2'})],
  ['重み根拠なし',d=>delete d.items[0].weightReason],['重み根拠空白',d=>d.items[0].weightReason='  '],['重み根拠長過ぎ',d=>d.items[0].weightReason='x'.repeat(2001)],
- ['総合なし',d=>delete d.overall],['総合進捗なし',d=>delete d.overall.progress],['総合不一致',d=>d.overall.progress=26],['総合未評価不一致',d=>d.overall.progress=null],['総合小数',d=>d.overall.progress=25.5],['総合文字列',d=>d.overall.progress='25'],['総合NaN',d=>d.overall.progress=NaN],['総合Infinity',d=>d.overall.progress=Infinity],['総合負値',d=>d.overall.progress=-1],['総合上限超過',d=>d.overall.progress=101],['総合根拠なし',d=>delete d.overall.reason],['総合根拠空白',d=>d.overall.reason='  '],['総合根拠長過ぎ',d=>d.overall.reason='x'.repeat(4001)],['未評価項目と数値総合',d=>d.items[0].progress=null],['空項目と数値総合',d=>d.items=[]],
+ ['総合なし',d=>delete d.overall],['総合進捗なし',d=>delete d.overall.progress],['総合不一致',d=>d.overall.progress=26],['総合未評価不一致',d=>d.overall.progress=null],['総合小数',d=>d.overall.progress=25.5],['総合文字列',d=>d.overall.progress='25'],['総合NaN',d=>d.overall.progress=NaN],['総合Infinity',d=>d.overall.progress=Infinity],['総合負値',d=>d.overall.progress=-1],['総合上限超過',d=>d.overall.progress=101],['総合根拠なし',d=>delete d.overall.reason],['総合根拠空白',d=>d.overall.reason='  '],['総合根拠長過ぎ',d=>d.overall.reason='x'.repeat(4001)],['達成度null',d=>d.items[0].progress=null],['達成度なし',d=>delete d.items[0].progress],['空項目と数値総合',d=>d.items=[]],
  ['別要求',d=>d.requestId='other'],['別目標',d=>d.goal='other'],['負値',d=>d.items[0].progress=-1],['上限超過',d=>d.items[0].progress=101],['文字列',d=>d.items[0].progress='50'],['NaN',d=>d.items[0].progress=NaN],['小数',d=>d.items[0].progress=2.5],['根拠なし',d=>d.items[0].reason=''],['ID重複',d=>d.items.push({...d.items[0]})],['巨大リスト',d=>d.items=Array(51).fill(d.items[0])],['プロンプトなし',d=>d.nextPrompt=''],
 ])test(`不正な結果を拒否: ${name}`,()=>{const d=valid(),job={id:d.requestId,goal:d.goal};change(d);assert.throws(()=>validateNavigation(d,job));});
 async function fixture(t,run,options={}){
@@ -137,13 +137,13 @@ test('Navi専用一覧の欠損・旧形式・破損は安全な基本候補と�
  assert.ok((await navigationModels('copilot_cli',file)).some(x=>x.id==='claude-sonnet'));
 });
 
-test('加重総合は整数に丸め、未評価を0扱いせず全体も未評価にする',()=>{
+test('加重総合は整数に丸め、未実施・未評価の0%を分母に含める',()=>{
  const d=valid();d.items[0].weight=35;d.items[0].progress=100;
  d.items.push({...d.items[0],id:'2',name:'残りの作業',weight:65,progress:10});d.overall.progress=42;
  let result=validateNavigation(d,{id:d.requestId,goal:d.goal});assert.equal(result.overall.progress,42);assert.equal(result.items[0].weight,35);assert.equal(result.schemaVersion,2);
- d.items[1].progress=null;d.overall={progress:null,reason:'未確認の作業が残る'};
- result=validateNavigation(d,{id:d.requestId,goal:d.goal});assert.equal(result.items[1].progress,null);assert.equal(result.overall.progress,null);
- d.items[0].progress=null;assert.equal(validateNavigation(d,{id:d.requestId,goal:d.goal}).overall.progress,null);
+ d.items[1].progress=0;d.items[1].reason='根拠不足で未評価のため0%';d.overall={progress:35,reason:'未確認の作業は0%として含める'};
+ result=validateNavigation(d,{id:d.requestId,goal:d.goal});assert.equal(result.items[1].progress,0);assert.equal(result.overall.progress,35);
+ d.items[0].progress=0;d.overall.progress=0;assert.equal(validateNavigation(d,{id:d.requestId,goal:d.goal}).overall.progress,0);
 });
 
 test('評価で工数比率・両根拠・総合評価を変更し、保存・再起動・履歴選択で保持する',async t=>{
@@ -163,7 +163,7 @@ test('評価で工数比率・両根拠・総合評価を変更し、保存・�
  assert.equal((await service.list()).length,1);
 });
 
-for(const mutation of ['old-schema','wrong-overall','wrong-weights'])test('保存済み不正結果を修復せず拒否: '+mutation,async t=>{
+for(const mutation of ['old-schema','wrong-overall','wrong-weights','null-progress'])test('保存済み不正結果を修復せず拒否: '+mutation,async t=>{
  const {service,root,state,stateRoot}=await fixture(t,async({prompt},root)=>respond(prompt,root));
  await service.start('目標');const saved=(await finish(service)).result;
  const projectDir=join(stateRoot,(await readdir(stateRoot))[0]);const latest=join(projectDir,'default','latest.json');const history=join(projectDir,'history',saved.navigationId+'.json');
@@ -171,6 +171,7 @@ for(const mutation of ['old-schema','wrong-overall','wrong-weights'])test('保�
  if(mutation==='old-schema'){delete invalid.schemaVersion;delete invalid.overall;for(const item of invalid.items){delete item.weight;delete item.weightReason;}}
  if(mutation==='wrong-overall')invalid.overall.progress=99;
  if(mutation==='wrong-weights')invalid.items[0].weight=99;
+ if(mutation==='null-progress'){invalid.items[0].progress=null;invalid.overall.progress=null;}
  const contents=JSON.stringify(invalid);await writeFile(latest,contents);await writeFile(history,contents);
  const reopened=createNavigation(root,{state:()=>state,stateRoot});t.after(()=>reopened.close());
  await assert.rejects(reopened.get());await assert.rejects(reopened.select(saved.navigationId));assert.deepEqual(await reopened.list(),[]);
@@ -191,5 +192,6 @@ test('AI指示の出力例も加重評価schemaVersion 2の検証を通る',asyn
  });
  await service.start('検証目標');assert.equal((await finish(service)).job.status,'complete');
  await service.start('','evaluate');assert.equal((await finish(service)).job.status,'complete');
- assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);}
+ assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);assert.match(prompt,/未実施・未評価.*0%/);assert.match(prompt,/項目なしなら0/);assert.doesNotMatch(prompt,/場合はnull|ならnull/);}
 });
+
