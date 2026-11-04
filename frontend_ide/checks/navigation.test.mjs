@@ -286,7 +286,8 @@ test('生成から再評価で対象を進め、全件完了後は提案なし�
  await service.start('','evaluate');v=await finish(service);assert.equal(v.result.nextItemId,'2');assert.equal(v.job.status,'complete',v.job.message);
  await service.start('','evaluate');v=await finish(service);assert.equal(v.job.status,'complete',v.job.message);assert.equal(v.result.nextItemId,null);assert.equal(v.result.nextPrompt,'');
  const reopened=createNavigation(root,{state:()=>state,stateRoot});t.after(()=>reopened.close());assert.deepEqual((await reopened.get()).result,v.result);await reopened.fresh();await reopened.select(v.result.navigationId);assert.equal((await reopened.get()).result.nextPrompt,'');
- for(const prompt of prompts){assert.match(prompt,/最初にprogressが100未満/);assert.match(prompt,/後続項目・複数項目/);assert.match(prompt,/新たな仕事を作らない/);}
+ for(const prompt of prompts){assert.match(prompt,/最初にprogressが100未満/);assert.match(prompt,/後続項目・複数項目/);assert.match(prompt,/新たな仕事を作らない/);assert.match(prompt,/「今回の目標」「対処しようとしている内容」「今回の作業」/);assert.match(prompt,/機械的に転記するだけにせず/);assert.match(prompt,/画面・コピー側では説明を追加しない/);}
+ for(const prompt of prompts.slice(1)){assert.match(prompt,/最新の根拠から.*依頼文として書き直し/);assert.match(prompt,/保存済みの提案を機械的に再利用しない/);}
 });
 test('対象IDを持たない旧形式を自動補完しない',()=>{
  const d=valid();d.schemaVersion=2;delete d.nextItemId;assert.throws(()=>validateNavigationResponse(d,{id:d.requestId,goal:d.goal}),/新規.*再作成/);assert.equal(d.nextItemId,undefined);

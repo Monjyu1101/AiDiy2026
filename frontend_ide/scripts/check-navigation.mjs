@@ -89,7 +89,8 @@ try {
   assert.equal(await child(0,`document.querySelector('.navigation-overall').parentElement.classList.contains('navigation-panel')`),true);
   assert.equal(await child(0,`document.querySelector('.navigation-goal-form label').textContent`),'目標');
   assert.equal(await child(0,`document.querySelector('.navigation-next h2').textContent`),'おすすめプロンプト(案)');
-  assert.equal(await child(0,`document.querySelector('.navigation-purpose').textContent`),await child(0,`'目的: '+document.querySelector('.navigation-result-heading h2').textContent`));
+  assert.equal(await child(0,`document.querySelectorAll('.navigation-purpose,.navigation-target').length`),0);
+  assert.equal(await child(0,`document.querySelector('.navigation-prompt').textContent`),'検索画面の空入力とエラー表示を確認し、必要なテストを追加してください。');
   assert.equal(await child(0,`document.querySelectorAll('.navigation-disclosure[open]').length`),0);
   assert.equal(await child(0,`(()=>{const items=document.querySelectorAll('.navigation-items details'),overall=document.querySelector('.navigation-overall details');items[0].querySelector('summary').click();return items[0].open&&!items[1].open&&!overall.open;})()`),true);
   assert.equal(await child(0,`(()=>{const items=document.querySelectorAll('.navigation-items details'),overall=document.querySelector('.navigation-overall details');overall.querySelector('summary').click();return items[0].open&&!items[1].open&&overall.open;})()`),true);

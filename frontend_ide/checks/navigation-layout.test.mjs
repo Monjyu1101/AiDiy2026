@@ -47,17 +47,13 @@ test('明細と総合の理由は独立したネイティブ開閉で、初期�
  assert.equal((source.match(/:key="result.navigationId\|\|result.requestId"/g)||[]).length,2);
 });
 
-test('おすすめプロンプトの内容先頭に結果の目的を表示する',()=>{
+test('おすすめプロンプトはAI本文をそのまま表示し機械的な説明を付けない',()=>{
  const nodes=walk(baseParse(descriptor.template.content)),section=nodes.find(node=>hasClass(node,'navigation-next'));
  assert.equal(attr(section,'aria-label'),'おすすめプロンプト(案)');
  const heading=walk(section).find(node=>node.tag==='h2');assert.equal(heading.children[0].content,'おすすめプロンプト(案)');
  const prompt=walk(section).find(node=>hasClass(node,'navigation-prompt'));
- const [purpose,body]=elements(prompt);assert.equal(hasClass(purpose,'navigation-purpose'),true);
- assert.equal(purpose.children.find(node=>node.type===5).content.content,'result.goal');
- assert.equal(elements(body)[1].children[0].content.content,'result.nextPrompt');
+ const body=elements(prompt)[0];assert.equal(body.children[0].content.content,'recommendedPrompt');
  assert.equal(body.props.find(prop=>prop.type===7&&prop.name==='if').exp.content,'nextItem');
- const target=elements(body)[0];assert.equal(hasClass(target,'navigation-target'),true);
- assert.equal(target.children.find(node=>node.type===5).content.content,'nextItem.name');
+ assert.doesNotMatch(descriptor.template.content,/navigation-purpose|navigation-target|次の一歩/);
  assert.match(source,/clipboard\.writeText\(recommendedPrompt\.value\)/);
- assert.doesNotMatch(descriptor.template.content,/次の一歩/);
 });

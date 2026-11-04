@@ -33,7 +33,7 @@ function verifiedResult(value){
 // 総合値・理由はAIの検証済み回答をそのまま表示する。旧形式を補完しない。
 const overall=computed(()=>result.value?.overall);
 const nextItem=computed(()=>result.value?.items.find(item=>item.progress<100));
-const recommendedPrompt=computed(()=>result.value&&nextItem.value?`目的: ${result.value.goal}\n対象: ${nextItem.value.name}\n\n${result.value.nextPrompt}`:'');
+const recommendedPrompt=computed(()=>result.value&&nextItem.value?result.value.nextPrompt:'');
 const matchesResult=computed(()=>!!result.value&&goal.value.trim()===result.value.goal);
 const canEvaluate=computed(()=>!busy.value&&availability.value.available&&matchesResult.value);
 let draftInitialized=false,draftEdited=false,pendingGoal=null;
@@ -117,7 +117,7 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
      <span class="navigation-progress" :style="progressStyle(overall.progress)" role="progressbar" aria-label="総合評価" :aria-valuenow="overall.progress" :aria-valuetext="overall.progress+'%（AIの工数比率による加重評価）'" aria-valuemin="0" aria-valuemax="100"><span class="navigation-fill" aria-hidden="true"></span><span class="navigation-disclosure-arrow" aria-hidden="true"></span><span class="navigation-name">総合評価</span><strong>{{overall.progress}}<small>%</small></strong></span>
      </summary><div class="navigation-reasons"><small>AIが見積もった工数比率による総合評価。実測値ではありません。</small><p class="navigation-overall-reason">{{overall.reason}}</p></div></details>
     </section>
-    <section v-if="result&&!history" class="navigation-next" aria-label="おすすめプロンプト(案)"><div><h2>おすすめプロンプト(案)</h2><button v-if="nextItem" @click="copy">{{copied?'コピーしました':'コピー'}}</button></div><p class="navigation-prompt"><strong class="navigation-purpose">目的: {{result.goal}}</strong><template v-if="nextItem"><strong class="navigation-target">対象: {{nextItem.name}}</strong><span>{{result.nextPrompt}}</span></template><span v-else>{{result.items.length?'全項目が100%です。おすすめの追加作業はありません。':'作業項目がないため、おすすめプロンプトはありません。'}}</span></p><small>プロンプト案です。自動送信・作業実行はしません。</small></section>
+    <section v-if="result&&!history" class="navigation-next" aria-label="おすすめプロンプト(案)"><div><h2>おすすめプロンプト(案)</h2><button v-if="nextItem" @click="copy">{{copied?'コピーしました':'コピー'}}</button></div><p class="navigation-prompt"><span v-if="nextItem">{{recommendedPrompt}}</span><span v-else>{{result.items.length?'全項目が100%です。おすすめの追加作業はありません。':'作業項目がないため、おすすめプロンプトはありません。'}}</span></p><small>プロンプト案です。自動送信・作業実行はしません。</small></section>
   <footer class="navigation-model-footer">
    <div class="navigation-model-line composer-meta"><button type="button" :disabled="busy" :aria-expanded="modelOpen" @click="chooseModel"><span class="model-caption">モデル</span> ▾</button><span class="model-label" :title="selection.provider+' / '+selection.model">{{selection.provider}} / {{selection.model}}</span></div>
   </footer>
@@ -177,8 +177,6 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
 .navigation-panel>.navigation-next h2{font-size:13px;margin:0}
 .navigation-panel>.navigation-next .navigation-prompt{min-height:0;overflow:auto;overflow-wrap:anywhere;margin:6px 0;line-height:1.5;font-size:12px}
 .navigation-panel>.navigation-next>small{font-size:10px}
-.navigation-target{display:block;margin-bottom:8px;color:#b8cadc}
-.navigation-purpose{display:block;margin-bottom:8px;color:#d4e8f8}
 </style>
 
 <style>

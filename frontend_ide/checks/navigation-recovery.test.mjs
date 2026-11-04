@@ -88,20 +88,20 @@ test('完了応答の評価が不正でも実行中ロックを解放し新規�
  const fresh=f.api.selectHistory();await f.answer(state(null));await fresh;assert.equal(f.api.result.value,null);assert.equal(f.api.error.value,'');assert.equal(f.api.busy.value,false);
 });
 
-test('おすすめプロンプトの目的は入力下書きでなく表示結果の目標に対応する',async()=>{
+test('AI生成本文は入力編集で変わらず、履歴・コピーでも加筆しない',async()=>{
  const f=fixture();assert.equal(f.api.recommendedPrompt.value,'');
- f.api.result.value={schemaVersion:3,goal:'保存済みの目標',items:[{id:'1',name:'最初の項目',progress:0}],overall:{progress:0},nextItemId:'1',nextPrompt:'次の作業'};
- f.api.goal.value='編集中の別目標';assert.equal(f.api.recommendedPrompt.value,'目的: 保存済みの目標\n対象: 最初の項目\n\n次の作業');
+ f.api.result.value={schemaVersion:3,goal:'保存済みの目標',items:[{id:'1',name:'最初の項目',progress:0}],overall:{progress:0},nextItemId:'1',nextPrompt:'今回の目標: 保存済みの意図\n対処しようとしている内容: 未確認の表示\n今回の作業: <確認>を行ってください。  '};
+ f.api.goal.value='編集中の別目標';assert.equal(f.api.recommendedPrompt.value,'今回の目標: 保存済みの意図\n対処しようとしている内容: 未確認の表示\n今回の作業: <確認>を行ってください。  ');
  const texts=[];f.api.panel.value={ownerDocument:{defaultView:{navigator:{clipboard:{writeText:async text=>texts.push(text)}}}}};
- await f.api.copy();assert.deepEqual(texts,['目的: 保存済みの目標\n対象: 最初の項目\n\n次の作業']);
+ await f.api.copy();assert.deepEqual(texts,['今回の目標: 保存済みの意図\n対処しようとしている内容: 未確認の表示\n今回の作業: <確認>を行ってください。  ']);
  const select=f.api.selectHistory('history');await f.answer({...state(null),result:{schemaVersion:3,goal:'履歴の目標',items:[{id:'2',name:'履歴の項目',progress:0}],overall:{progress:0},nextItemId:'2',nextPrompt:'履歴の提案'}});await select;
- assert.equal(f.api.recommendedPrompt.value,'目的: 履歴の目標\n対象: 履歴の項目\n\n履歴の提案');
+ assert.equal(f.api.recommendedPrompt.value,'履歴の提案');
  const fresh=f.api.selectHistory();await f.answer(state(null));await fresh;assert.equal(f.api.recommendedPrompt.value,'');
 });
 
-test('先頭未完了の対象名を目的とともに表示・コピーし、全件完了で提案をなくす',()=>{
+test('先頭未完了のAI本文だけを表示・コピーし、全件完了で提案をなくす',()=>{
  const {api}=fixture();api.result.value={goal:'目的',items:[{id:'a',name:'完了',progress:100},{id:'b',name:'対象',progress:99},{id:'c',name:'後続',progress:0}],nextItemId:'b',nextPrompt:'対象だけ確認'};
- assert.equal(api.nextItem.value.id,'b');assert.equal(api.recommendedPrompt.value,'目的: 目的\n対象: 対象\n\n対象だけ確認');
+ assert.equal(api.nextItem.value.id,'b');assert.equal(api.recommendedPrompt.value,'対象だけ確認');
  api.result.value.items.forEach(item=>item.progress=100);api.result.value.nextItemId=null;api.result.value.nextPrompt='';assert.equal(api.nextItem.value,undefined);assert.equal(api.recommendedPrompt.value,'');
 });
 test('APIから対象不一致の提案が届いても表示に採用しない',async()=>{
