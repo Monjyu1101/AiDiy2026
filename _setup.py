@@ -806,7 +806,7 @@ def setup_node_refresh() -> list[str]:
         directory = BASE_DIR / folder
         if electron:
             return helper.setup_dependencies(directory, npm, folder, run_command,
-                                             update=False, desktop=desktop,
+                                             update=False, desktop=desktop, locked=(folder == "frontend_channels"),
                                              info=print_info, warning=print_warning, error=print_error)
         guarded = helper.frontend_dependency_guard(
             directory, folder, desktop=False, info=print_info, warning=print_warning, error=print_error,

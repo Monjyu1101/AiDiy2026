@@ -141,9 +141,12 @@ class NodeRefreshTests(unittest.TestCase):
         for _ in range(2):
             self.assertEqual(setup.setup_node_refresh(), [])
         commands = [call.args[0] for call in run.call_args_list]
-        self.assertEqual(sum(command[1] == "install" for command in commands), 18)
-        self.assertTrue(all(command[1] in ("install", "run") for command in commands))
-        self.assertTrue(all("--include=dev" in command for command in commands if command[1] == "install"))
+        self.assertEqual(sum(command[1] == "install" for command in commands), 16)
+        self.assertTrue(all(command[1] in ("install", "ci", "run") for command in commands))
+        self.assertTrue(all("--include=dev" in command for command in commands if command[1] in ("install", "ci")))
+        clean_installs = [call.kwargs["cwd"].relative_to(ROOT).as_posix()
+                          for call in run.call_args_list if call.args[0][1] == "ci"]
+        self.assertEqual(clean_installs, ["frontend_channels"] * 2)
         builds = [(call.kwargs["cwd"].relative_to(ROOT).as_posix(), call.args[0][-1])
                   for call in run.call_args_list if call.args[0][1] == "run"]
         self.assertEqual(builds, [("backend_diag/ui", "build"), ("frontend_web", "build"),
@@ -190,6 +193,26 @@ class NodeRefreshTests(unittest.TestCase):
             ["npm", "install", "--include=dev", "--no-fund", "--no-audit", "--ignore-scripts"],
             ["npm", "rebuild"],
         ])
+
+    def test_locked_refresh_keeps_ci_on_recovery_and_failure(self):
+        for continued in (False, True):
+            run = Mock(side_effect=[False, True, True] if not continued else [False])
+            with patch.object(common, "frontend_dependency_guard", return_value=None):
+                self.assertEqual(common.setup_dependencies(ROOT, "npm", "Discord", run,
+                    update=False, locked=True, desktop=False, continue_on_error=continued), not continued)
+            commands = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(commands[0], ["npm", "ci", "--include=dev", "--no-fund", "--no-audit"])
+            self.assertFalse(any(command[1] == "install" for command in commands))
+            if not continued:
+                self.assertEqual(commands[1], [*commands[0], "--ignore-scripts"])
+                self.assertEqual(commands[2], ["npm", "rebuild"])
+
+    def test_locked_refresh_respects_running_app_guard(self):
+        run = Mock()
+        with patch.object(common, "frontend_dependency_guard", return_value=False):
+            self.assertFalse(common.setup_dependencies(ROOT, "npm", "Discord", run,
+                update=False, locked=True))
+        run.assert_not_called()
 
     def test_host_assets_use_existing_compile_or_package_and_stop_on_failure(self):
         for cli, success in [(None, True), ("code", True), (None, False)]:

@@ -34,6 +34,14 @@ Electronの基本操作・表示は [共通,Electronウィンドウ基本方針.
 9. 画面下部は aidiy_code / aidiy_live と同じ「モデル ▾」と現在のモデル（`Live: … · Code: aidiy_hermes - …`）を表示し、接続中に押すと設定を開いて「適用して再接続」で切断・保存・再接続する。接続中（接続処理中・再接続待ちを含む）に閉じると `panel/desktop.cjs` が終了を確認し、切断中はそのまま終了する。Slack 版（`frontend_channels/slack`）は同じ作りの双子で、変更時は対応するファイルを同じように変える（`frontend_channels/slack/AGENTS.md` の対応表）。
 10. 音声の自動接続は Bot 起動・Gateway 復旧・許可ユーザーの入退室で参加状態を照合する。接続準備中の退出を直ちに反映し、接続処理と通知先の取得が遅れても退出済みの利用者に対して開始しない。ミュート切替や Bot 自身の参加で重複接続しない。
 
+## 一括 build の依存同期
+
+`_setup.py` の `b=build` は Discord だけ `npm ci --include=dev` で配布 lock を固定して導入する。他の画面の `npm install` と混同しない。npm 11 の `install` は `@discordjs/voice` 配下の optional peer `opusscript@0.0.8` を削除し、ルートの `0.1.1` では prism-media の要求を満たせず `build:panel` が失敗する場合がある。lock 検証は無効化しない。
+
+以前の実行で lock が変更された場合は、`git diff -- frontend_channels/package-lock.json` で変更を確認し、必要な変更を退避してから配布版へ戻して再実行する。独自の依存変更は上書きしない。稼働中の Discord の保護は共通 `frontend_dependency_guard` に従う。
+
+回帰確認: `python -B -m unittest discover -s scripts/checks -p test_node_refresh.py`。Discord だけが ci を使うこと、再試行でも install に戻らないこと、使用中の保護と失敗通知を確認する。
+
 ## 確認
 
 起動ログは配置先リポジトリの `temp/aidiy_discord/logs/<UUID>.stdout.log` / `.stderr.log`、起動完了通知は `temp/aidiy_discord/runtime/<UUID>.ready.json` に保存する。`panel/launch.mjs` が保存先を決め、Electron / Web の通知書込先は `AIDIY_DISCORD_READY` で渡す。終了中の再起動も同じ通知ファイルで確認する。旧ログの移行・削除・旧保存先への退避は行わない。Windowsブラウザ版の `frontend_channels/out/aidiy_discord/browser-profile` と Electron の userData、モデル設定は従来のまま維持する。`checks/launch-restart.test.ts` で新保存先・profile維持・再起動・書込失敗時の非起動を、`checks/launch.test.ts` で設定検証失敗時に一時ファイルを作らないことを確認する。

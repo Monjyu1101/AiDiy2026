@@ -363,18 +363,23 @@ def frontend_dependency_guard(frontend_dir: Path, label: str, *, info=print, war
         return False
 
 
-def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True, continue_on_error=False, copy_warnings=None) -> bool:
+def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *, info=print, warning=print, error=print, update=True, desktop=True, continue_on_error=False, copy_warnings=None, locked=False) -> bool:
     """npm での重複取得を避け、依存導入後に Electron を一度だけ準備する。"""
     guarded = frontend_dependency_guard(frontend_dir, label, info=info, warning=warning, error=error, desktop=desktop, continue_on_error=continue_on_error)
     if guarded is not None:
         return guarded
+    # Discord の optional Opus peer は npm install で prune されるため、
+    # 配布 lock を固定する経路では ci を使い、依存更新と混在させない。
+    if locked and update:
+        raise ValueError("locked と update は同時に指定できません。")
+    install_action = "ci" if locked else "install"
     env = {**os.environ, "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"}
     recovery_needed = False
     if continue_on_error:
         # 各段階を一度だけ試す。失敗を成功にせず、後続の独立した処理は実行する。
         failed = False
         flags = [] if update else ["--include=dev", "--no-fund", "--no-audit"]
-        for action in (("install", "update") if update else ("install",)):
+        for action in ((install_action, "update") if update else (install_action,)):
             try:
                 ok = run_command([npm, action, *flags], cwd=frontend_dir, env=env)
             except (OSError, subprocess.SubprocessError) as exc:
@@ -390,9 +395,9 @@ def setup_dependencies(frontend_dir: Path, npm: str, label: str, run_command, *,
                 error(f"{label}: Electron の準備に失敗しました。失敗を記録して続行します。")
                 failed = True
         return not failed
-    # pull後の再配置では導入済み依存を残して同期し、範囲内最新版への更新は行わない。
+    # pull後は範囲内最新版へ更新しない。locked 指定時は配布 lock から再導入する。
     flags = [] if update else ["--include=dev", "--no-fund", "--no-audit"]
-    for action in (("install", "update") if update else ("install",)):
+    for action in ((install_action, "update") if update else (install_action,)):
         command = [npm, action, *flags]
         if not run_command(command, cwd=frontend_dir, env=env):
             warning(f"{label}: npm {action} を --ignore-scripts で再試行します。")
