@@ -97,8 +97,15 @@ test('目標は4行で、説明の下にモデル選択と同サイズのナビ�
  const textarea=children.find(node=>node.tag==='textarea');assert.equal(attr(textarea,'rows'),'4');
  const hint=children.findIndex(node=>hasClass(node,'navigation-input-hint')),row=children.findIndex(node=>hasClass(node,'navigation-form-foot'));assert.ok(hint>=0&&row>hint);
  const controls=elements(children[row]);assert.ok(hasClass(controls[0],'navigation-model-line'));assert.ok(hasClass(controls[1],'navigation-run-actions'));
- const [navi,evaluate]=elements(controls[1]);assert.ok(hasClass(navi,'navigation-run')&&hasClass(evaluate,'navigation-run'));assert.equal(attr(elements(navi)[0],'src'),'/development/sending.png');assert.equal(evaluate.children[0].content,'再評価');
+ const [navi,evaluate]=elements(controls[1]);assert.ok(hasClass(navi,'navigation-run')&&hasClass(evaluate,'navigation-run'));assert.equal(elements(navi)[0].props.find(p=>p.type===7&&p.name==='bind'&&p.arg?.content==='src').exp.content,'sendIcon');assert.equal(evaluate.children[0].content,'再評価');
  assert.equal(navi.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'busy||!availability.available');assert.equal(evaluate.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'!canEvaluate');
  assert.doesNotMatch(descriptor.template.content,/navigation-model-footer/);
  assert.match(source,/grid-template-columns:minmax\(0,1fr\) auto/);assert.match(source,/width:58px;height:58px/);assert.match(source,/\.navigation-form-foot \.navigation-model-line\{min-width:0;flex-wrap:wrap/);
+});
+
+
+test('送信アイコンはCode同様の実行時URLで参照しViteの静的画像importを作らない',()=>{
+ assert.match(source,/const sendIcon=computed\(\(\)=>new URL\('sending.png',new URL\('\/development\/AiDiy.png',location.href\)\).href\)/);
+ assert.doesNotMatch(compiled.code,/import[^\n]*sending\.png/);
+ assert.doesNotMatch(descriptor.template.content,/(?<!:)src="\/development\/sending\.png"/);
 });

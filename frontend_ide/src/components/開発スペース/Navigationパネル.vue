@@ -15,6 +15,8 @@ const props=defineProps({standalone:Boolean,startedAt:Number,allDisplays:Boolean
 const emit=defineEmits(['closed']);
 const title=computed(()=>props.standalone?'AiDiy Navigator':'AiDiy IDE / Navigator '+props.instance.slice(5));
 const native=!!window.aidiyWindow;
+// Code同様、ビルド後に配布される画像を実行時URLで参照する。静的srcはViteのimport対象になる。
+const sendIcon=computed(()=>new URL('sending.png',new URL('/development/AiDiy.png',location.href)).href);
 const visible=ref(false),detached=ref(false),panel=ref(),goal=ref(DEFAULT_NAVIGATION_GOAL),result=ref(null),job=ref(null),error=ref(''),submitting=ref(false),copied=ref(false),copyError=ref(''),copying=ref(false);
 const selection=ref({provider:'aidiy_hermes',model:'same'}),modelOpen=ref(false),chosenProvider=ref('aidiy_hermes'),chosenModel=ref('same'),savingModel=ref(false),modelChoice=ref('same');
 const modelItems=ref([]),catalogBusy=ref(false),catalogNotice=ref('');let catalogVersion=0;
@@ -124,7 +126,7 @@ onBeforeUnmount(()=>{void fetch('/api/navigation?instance='+encodeURIComponent(p
     <label :for="instance+'-goal'">目標</label>
     <textarea :id="instance+'-goal'" v-model="goal" maxlength="4000" rows="4" @input="editGoal" placeholder="目標を入力してください"></textarea>
     <small class="navigation-input-hint">設定済みAIへ読取専用で調査を依頼します。ファイルは変更しません。</small>
-    <div class="navigation-form-foot"><div class="navigation-model-line composer-meta"><button type="button" :disabled="busy" :aria-expanded="modelOpen" @click="chooseModel"><span class="model-caption">モデル</span> ▾</button><span class="model-label" :title="selection.provider+' / '+selection.model">{{selection.provider}} / {{selection.model}}</span></div><div class="navigation-run-actions"><button type="submit" class="navigation-start navigation-run" :disabled="busy||!availability.available"><img src="/development/sending.png" alt="" /><span>{{busy?'確認中…':'ナビ'}}</span></button><button type="button" class="navigation-evaluate navigation-run" :disabled="!canEvaluate" title="保存済みの作業項目を変えずに再採点" @click="navigate('evaluate')">再評価</button></div></div>
+    <div class="navigation-form-foot"><div class="navigation-model-line composer-meta"><button type="button" :disabled="busy" :aria-expanded="modelOpen" @click="chooseModel"><span class="model-caption">モデル</span> ▾</button><span class="model-label" :title="selection.provider+' / '+selection.model">{{selection.provider}} / {{selection.model}}</span></div><div class="navigation-run-actions"><button type="submit" class="navigation-start navigation-run" :disabled="busy||!availability.available"><img :src="sendIcon" alt="" /><span>{{busy?'確認中…':'ナビ'}}</span></button><button type="button" class="navigation-evaluate navigation-run" :disabled="!canEvaluate" title="保存済みの作業項目を変えずに再採点" @click="navigate('evaluate')">再評価</button></div></div>
     <p v-if="result&&!matchesResult" class="navigation-draft-note" role="status">入力が保存済みの目標と異なります。ナビを作成すると評価できます。</p>
    </form>
   <div v-if="history" class="navigation-history" role="list"><p v-if="!historyItems.length">このフォルダにナビ履歴はありません</p><button v-for="item in historyItems" :key="item.id" :disabled="busy" @click="selectHistory(item.id)"><time>{{new Date(item.updatedAt).toLocaleString()}}</time><span>{{item.goal}}</span></button></div>
