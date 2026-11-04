@@ -92,12 +92,14 @@ test('目標入力とおすすめ本文は同じ角丸なしの背景・枠・�
 });
 
 
-test('目標は4行、左の説明・モデル2段の右に同サイズのナビ・再評価を置く',()=>{
+test('目標は4行、左の説明・目標差異・モデル3段の右に同サイズのナビ・再評価を置く',()=>{
  const nodes=walk(baseParse(descriptor.template.content)),form=nodes.find(node=>hasClass(node,'navigation-goal-form')),children=elements(form);
  const textarea=children.find(node=>node.tag==='textarea');assert.equal(attr(textarea,'rows'),'4');
  const row=children.find(node=>hasClass(node,'navigation-form-foot'));assert.ok(row);
  const controls=elements(row);assert.ok(hasClass(controls[0],'navigation-input-meta'));assert.ok(hasClass(controls[1],'navigation-run-actions'));
- const meta=elements(controls[0]);assert.ok(hasClass(meta[0],'navigation-input-hint'));assert.ok(hasClass(meta[1],'navigation-model-line'));
+ const meta=elements(controls[0]);assert.ok(hasClass(meta[0],'navigation-input-hint'));assert.ok(hasClass(meta[1],'navigation-draft-note'));assert.ok(hasClass(meta[2],'navigation-model-line'));
+ assert.equal(meta[1].props.find(p=>p.type===7&&p.name==='if').exp.content,'result&&!matchesResult');assert.equal(attr(meta[1],'role'),'status');
+ assert.equal(nodes.filter(node=>hasClass(node,'navigation-draft-note')).length,1);assert.ok(!children.some(node=>hasClass(node,'navigation-draft-note')));
  const [navi,evaluate]=elements(controls[1]);assert.ok(hasClass(navi,'navigation-run')&&hasClass(evaluate,'navigation-run'));assert.equal(elements(navi)[0].props.find(p=>p.type===7&&p.name==='bind'&&p.arg?.content==='src').exp.content,'sendIcon');assert.equal(evaluate.children[0].content,'再評価');
  assert.equal(navi.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'busy||!availability.available');assert.equal(evaluate.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'!canEvaluate');
  assert.doesNotMatch(descriptor.template.content,/navigation-model-footer/);
@@ -117,4 +119,5 @@ test('ナビの手紙は大きく、文字を重ねても同サイズのボタ�
  assert.match(source,/\.navigation-button-label\{position:relative;z-index:1;[^}]*font-weight:700;[^}]*background:/);
  assert.match(source,/\.navigation-input-meta\{display:flex;flex-direction:column;gap:6px;min-width:0/);
  assert.match(source,/\.navigation-input-hint\{[^}]*overflow-wrap:anywhere/);
+ assert.match(source,/\.navigation-draft-note\{[^}]*margin:0;overflow-wrap:anywhere/);
 });
