@@ -22,3 +22,7 @@ test('本体内の3つの別窓起動ピンは本文サイズに依存せず14px
   assert.match(panel, /host.className = 'development-app ' \+ className/);
   assert.doesNotMatch(rule, /window-actions|viewer-pinned|padding|width|height:(?!14px)/);
 });
+
+test('Viewerのピン内部spanは本文サイズでなくボタンの14pxを継承する', () => {
+  assert.match(css, /\.space-view \.viewer-popup header \.viewer-pin>span\{font-size:inherit;line-height:inherit\}/);
+});

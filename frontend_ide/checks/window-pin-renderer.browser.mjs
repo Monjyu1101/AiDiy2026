@@ -19,9 +19,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const fixture = `
 import { createApp, h } from 'vue';
 import StatusBar from '/src/components/共通表示/状態バー.vue';
+import FileViewer from '/src/components/ファイル閲覧/ファイルビューア.vue';
 import { mountPanelTitle } from '/src/components/ファイル閲覧/別窓タイトル.js';
 import '/src/style.css';
 import '/src/components/共通表示/会話表示.css';
+const embedded=document.createElement('section');embedded.className='development-app space-view';embedded.dataset.kind='embeddedViewer';document.body.append(embedded);
+const viewerState={pins:0,closes:0};
+createApp({render:()=>h(FileViewer,{file:{name:'sample.bin',path:'sample.bin'},root:'/fixture',onPin:()=>viewerState.pins++,onClose:()=>viewerState.closes++})}).mount(embedded);
 const apis = {};
 function api(name, pinned=false, locked=false) {
  let state={pinned,locked}, listeners=new Set();
@@ -57,7 +61,7 @@ for(const name of ['explorer','comparison']){
 const route=document.createElement('section');route.dataset.kind='routes';route.className='routes-window native-route-window';route.innerHTML='<div class="explorer-routes"><div class="route-controls"><button class="burger-button route-burger" aria-label="軌跡バーを閉じる"><span class="burger burger-v" aria-hidden="true"><i></i><i></i><i></i></span></button><button class="route-choice" title="閲覧軌跡">閲覧軌跡</button><button class="route-choice" title="検索軌跡">検索軌跡</button><button class="route-choice" title="AiDiy検索軌跡">AiDiy検索軌跡</button><button>ルート</button><button>&lt;</button><button>&gt;</button></div></div>';document.body.append(route);
 const bar=route.querySelector('.route-controls'),beforeHeight=bar.getBoundingClientRect().height;
 unmount.push(mountPanelTitle(bar,{name:'routes',document,addEventListener:window.addEventListener.bind(window),removeEventListener:window.removeEventListener.bind(window)},window,'軌跡','panel-routes',{restore:()=>restores.push('routes')}));
-window.fixture={apis,panels,panelCalls,restores,beforeHeight,setAllDisplays:value=>ownerState.classList.toggle('all-displays',value),emitPanel:(name,value)=>{panels[name]=value;for(const fn of listeners)fn({panelName:name,...value});},cleanup:()=>unmount.forEach(fn=>fn()),listenerCount:()=>listeners.size};
+window.fixture={viewerState,apis,panels,panelCalls,restores,beforeHeight,setAllDisplays:value=>ownerState.classList.toggle('all-displays',value),emitPanel:(name,value)=>{panels[name]=value;for(const fn of listeners)fn({panelName:name,...value});},cleanup:()=>unmount.forEach(fn=>fn()),listenerCount:()=>listeners.size};
 `;
 const server = await createServer({
   root, configFile: false, plugins: [vue(), {
@@ -66,9 +70,10 @@ const server = await createServer({
     load(id) { if (id === '\0pin-renderer-fixture') return fixture; },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        if (req.url.startsWith('/api/file')) { res.setHeader('Content-Type','application/json');res.end(JSON.stringify({kind:'binary',size:0,versions:[]}));return; }
         if (req.url !== '/__pin_fixture') return next();
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><style>html,body{overflow:auto!important;height:auto!important}body{padding:20px!important;background:#080c16!important}section{margin-bottom:18px;background:#000;width:760px;border:1px solid #26394a}.routes-window{width:360px;height:auto!important}.panel-brand{--muted:#9aa7b8;--surface:#080c16;--hover-surface:#202737}</style><body><script type="module" src="/__pin_fixture.mjs"></script></body></html>');
+        res.end('<!doctype html><html lang="ja"><meta charset="utf-8"><style>html,body{overflow:auto!important;height:auto!important}body{padding:20px!important;background:#080c16!important}section{margin-bottom:18px;background:#000;width:760px;border:1px solid #26394a}[data-kind=embeddedViewer] .viewer-popup{position:relative;inset:auto;width:auto;animation:none}[data-kind=embeddedViewer]{width:760px}.routes-window{width:360px;height:auto!important}.panel-brand{--muted:#9aa7b8;--surface:#080c16;--hover-surface:#202737}</style><body><script type="module" src="/__pin_fixture.mjs"></script></body></html>');
       });
     },
   }], server: { host: '127.0.0.1', port: 0 },
@@ -95,10 +100,18 @@ try {
   async function evaluate(expression) { const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); assert.equal(result.result?.exceptionDetails, undefined, JSON.stringify(result.result)); return result.result.result.value; }
   async function until(expression) { for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await sleep(50); } assert.fail(expression); }
   await send('Runtime.enable');
-  await send('Emulation.setDeviceMetricsOverride', { width: 820, height: 680, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setDeviceMetricsOverride', { width: 820, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: `http://127.0.0.1:${server.httpServer.address().port}/__pin_fixture` });
   await until('!!window.fixture && document.querySelectorAll(".window-pin").length===9');
   await until('!document.querySelector("[data-kind=IDE] .window-pin").disabled');
+  for (const size of ['10px','18px']) {
+    await evaluate(`document.documentElement.style.setProperty('--file-font-size','${size}')`);
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-kind=embeddedViewer] .viewer-pin span')).fontSize`), '14px');
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-kind=embeddedViewer] header>span')).fontSize`), size);
+  }
+  await evaluate(`document.documentElement.style.setProperty('--file-font-size','10px');document.querySelector('[data-kind=embeddedViewer] .viewer-pin').click();document.querySelector('[data-kind=embeddedViewer] .viewer-close').click()`);
+  assert.deepEqual(await evaluate('fixture.viewerState'),{pins:1,closes:1});
+  for (const kind of ['IDE','Code','Viewer']) assert.equal(await evaluate(`getComputedStyle(document.querySelector('[data-kind=${kind}] .window-pin span')).fontSize`),'14px');
   assert.deepEqual(await evaluate(`Array.from(document.querySelector('[data-kind=IDE] .window-actions').children).map(b=>b.className||b.getAttribute('aria-label'))`), ['最小化', '最大化', 'window-pin', 'window-close']);
   assert.equal(await evaluate(`document.querySelector('[data-kind=IDE] .window-pin').getAttribute('aria-pressed')`), 'false');
   assert.equal(await evaluate(`document.querySelector('[data-kind=Code] .window-pin').getAttribute('aria-pressed')`), 'true');
