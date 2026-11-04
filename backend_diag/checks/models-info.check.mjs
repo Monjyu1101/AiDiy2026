@@ -49,12 +49,16 @@ test('merged code includes only installed CLIs and Hermes starts with installed 
    await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{...allClis,[cli]:false}});
    code=await load();
    assert.equal(Object.hasOwn(code,cli),false,cli);
+   if(['codex_cli','copilot_cli'].includes(cli))assert.equal(Object.hasOwn(JSON.parse(await readFile(path.join(directory,'navi_models_info.json'),'utf8')),cli),false,cli+' Navi');
    if(cli==='claude_cli')assert.equal(Object.hasOwn(code,'claude_sdk'),false);
    assert.deepEqual(Object.keys(code.aidiy_hermes.models),[...Object.keys(allClis).filter(key=>key!==cli).map(key=>key+'/same'),'openai_oauth/m1']);
   }
   await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{}});
   code=await load();
   assert.deepEqual(code,{aidiy_hermes:{models:{'openai_oauth/m1':'2026/10/01 - openai_oauth/m1'}}});
+  const navi=JSON.parse(await readFile(path.join(directory,'navi_models_info.json'),'utf8'));assert.equal(Object.hasOwn(navi,'codex_cli'),false);assert.equal(Object.hasOwn(navi,'copilot_cli'),false);
+  await writeModelsInfo([{id:'openai_oauth',名前:'OAuth'}],{openai_oauth:ok()},{directory,now,installedClis:{codex_cli:true},naviHermesAvailable:false});
+  const withoutHermes=JSON.parse(await readFile(path.join(directory,'navi_models_info.json'),'utf8'));assert.equal(Object.hasOwn(withoutHermes,'aidiy_hermes'),false);assert.equal(Object.hasOwn(withoutHermes,'codex_cli'),true);
   const installed=await installedCodeClis({loadEntries:async()=>[{id:'claude'},{id:'agy'}],resolve:async entry=>'/fixture/'+entry.id});
   assert.deepEqual(installed,{...Object.fromEntries(Object.keys(allClis).map(key=>[key,false])),claude_cli:true,antigravity_cli:true});
  }finally{await rm(directory,{recursive:true,force:true});}

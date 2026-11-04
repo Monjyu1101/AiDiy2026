@@ -7,7 +7,7 @@
 // 用途の分け方は本体（backend_server/conf/conf_model.py の get_chat_models / get_live_models / get_code_models）に合わせる。
 // 取得結果を優先し、Chat が空または local のみなら設定モデルを未検証の候補として補う。
 import path from 'node:path';
-import {NAVI_MODELS_FILE,naviModelsInfo} from './navi_info.mjs';
+import {NAVI_MODELS_FILE,naviModelsInfo,naviHermesInstalled} from './navi_info.mjs';
 import {readFile} from 'node:fs/promises';
 import { OUTPUT_DIRECTORY, writeResult } from '../診断/headless.mjs';
 import {catalog, resolveProgram} from '../診断/probes.mjs';
@@ -280,7 +280,7 @@ async function writeMergedModelsInfo(directory, installedClis, providers, result
     const file = modelsInfoFile(group);
     await writeResult(path.join(directory, file), nonempty);
     saved.push(file);
-    if(group==='code'){await writeResult(path.join(directory,NAVI_MODELS_FILE),naviModelsInfo(nonempty,options));saved.push(NAVI_MODELS_FILE);}
+    if(group==='code'){const naviHermesAvailable=options.naviHermesAvailable??await naviHermesInstalled();await writeResult(path.join(directory,NAVI_MODELS_FILE),naviModelsInfo(nonempty,{...options,naviHermesAvailable}));saved.push(NAVI_MODELS_FILE);}
   }
   return saved;
 }

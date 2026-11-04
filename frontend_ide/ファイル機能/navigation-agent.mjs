@@ -35,8 +35,13 @@ export async function navigationAvailability(selection){
  if(selection.provider==='aidiy_hermes'){
   try{await access(join(root,'command_hermes','prediction_main.py'));await access(join(root,'command_hermes','.venv',process.platform==='win32'?'Scripts/python.exe':'bin/python'));}catch{return {available:false,reason:'Hermesの実行環境が見つかりません。セットアップ後に再確認してください。'};}
  }else{
-  const command=selection.provider==='codex_cli'?'codex':'copilot';
-  try{await promisify(execFile)(process.platform==='win32'?'where.exe':'which',[command],{timeout:3000,windowsHide:true});}catch{return {available:false,reason:command+' コマンドが見つかりません。導入状態を確認してください。'};}
+  const command={codex_cli:'codex',copilot_cli:'copilot',claude_cli:'claude',grok_cli:'grok'}[selection.provider];
+  if(!command)return {available:false,reason:'対応していないAIです。'};
+  try{await promisify(execFile)(process.platform==='win32'?'where.exe':'which',[command],{timeout:10000,windowsHide:true});}catch(error){
+   if(error.killed||error.signal)return {available:false,reason:command+' コマンドの確認がタイムアウトしました。しばらくしてから再確認してください。'};
+   if(error.code===1)return {available:false,reason:command+' コマンドが見つかりません。導入状態を確認してください。'};
+   return {available:false,reason:command+' コマンドの確認に失敗しました。実行環境を確認してください。'};
+  }
  }
  return {available:true,reason:''};
 }

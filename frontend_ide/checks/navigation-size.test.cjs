@@ -9,26 +9,27 @@ const {panelBounds}=require('../デスクトップ/panel-windows.cjs');
 test('Navigator initial DIP and screen-edge clamp',()=>{
  for(const area of [{x:0,y:0,width:1920,height:1040},{x:-900,y:-50,width:900,height:700},{x:0,y:0,width:400,height:480}]){
   const expected=[Math.min(500,area.width-16),Math.min(600,area.height-16)];
-  const standalone=windowBounds('navi',area);assert.deepEqual([standalone.width,standalone.height],expected);
+  const standalone=windowBounds('navi',area);assert.deepEqual([standalone.width,standalone.height],expected);assert.equal(standalone.x,area.x+8);assert.equal(standalone.y,area.y+area.height-8-standalone.height);
   for(const zoom of [1,1.25,1.5,2]){
    const b=panelBounds({left:1900,top:900,width:400,height:700},{window:{getContentBounds:()=>area,webContents:{getZoomFactor:()=>zoom}}},{getDisplayMatching:()=>({workArea:area})},'panel-navigation');
-   assert.deepEqual([b.width,b.height],expected);assert.ok(b.x>=area.x&&b.y>=area.y&&b.x+b.width<=area.x+area.width&&b.y+b.height<=area.y+area.height);
+   assert.deepEqual(b,standalone);
   }
  }
 });
 
-test('Navigator goal starts at three rows and preserves vertical resizing',()=>{
+test('Navigator goal starts at four rows and preserves vertical resizing',()=>{
  const {readFileSync}=require('node:fs');
  const {join}=require('node:path');
  const source=readFileSync(join(__dirname,'../src/components/開発スペース/Navigationパネル.vue'),'utf8');
- assert.match(source,/<textarea[^>]*v-model="goal"[^>]*rows="3"[^>]*@input="editGoal"/);
- assert.match(source,/\.navigation-goal-form textarea\{[^}]*resize:vertical;[^}]*min-height:48px;max-height:120px;/);
+ assert.match(source,/<textarea[^>]*v-model="goal"[^>]*rows="4"[^>]*@input="editGoal"/);
+ assert.match(source,/\.navigation-goal-form textarea\{[^}]*resize:vertical;[^}]*min-height:48px;max-height:120px[;}]/);
 });
 
-test('Navigator prompt sits outside the scrolling items and before the model footer',()=>{
+test('Navigator prompt sits outside the scrolling items after the overall evaluation',()=>{
  const {readFileSync}=require('node:fs');const {join}=require('node:path');
  const source=readFileSync(join(__dirname,'../src/components/開発スペース/Navigationパネル.vue'),'utf8');
- assert.match(source,/<\/div>\s*<\/div>\s*<section v-if="result&&!history" class="navigation-next"/);
- assert.ok(source.indexOf('class="navigation-next"')<source.indexOf('<footer class="navigation-model-footer">'));
+ assert.ok(source.indexOf('class="navigation-display"')<source.indexOf('class="navigation-overall"'));
+ assert.ok(source.indexOf('class="navigation-overall"')<source.indexOf('class="navigation-next"'));
+ assert.match(source,/\.navigation-panel>\.navigation-next\{flex:none;/);
  assert.match(source,/\.navigation-panel>\.navigation-next \.navigation-prompt\{[^}]*overflow:auto/);
 });

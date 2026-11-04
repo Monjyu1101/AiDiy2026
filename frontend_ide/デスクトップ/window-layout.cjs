@@ -13,6 +13,10 @@ function windowBounds(kind,area,owner,slot=0,cli=false){
  const margin=kind==='ide'?Math.min(32,Math.max(12,Math.round(Math.min(area.width,area.height)*.025))):8;
  const available={x:area.x+margin,y:area.y+margin,width:Math.max(1,area.width-margin*2),height:Math.max(1,area.height-margin*2)};
  if(kind==='ide')return available;
+ if(kind==='navi'){
+  const width=Math.min(500,available.width),height=Math.min(600,available.height);
+  return{x:available.x,y:available.y+available.height-height,width,height};
+ }
  if(kind==='task'||kind==='team'){
   const width=Math.min(1200,available.width),height=Math.min(820,available.height);
   return{x:Math.round(area.x+(area.width-width)/2),y:Math.round(area.y+(area.height-height)/2),width,height};
@@ -39,8 +43,8 @@ function windowBounds(kind,area,owner,slot=0,cli=false){
   return{x:Math.round(Math.max(available.x,Math.min(x,available.x+available.width-width))),y:Math.round(Math.max(available.y,Math.min(y,available.y+available.height-height))),width,height};
  }
  // Code / LiveはIDEの位置によらず同じディスプレイの左上 / 右上へ置く。
- const width=Math.min(kind==='navi'?500:size.幅,available.width);
- const height=Math.min(kind==='navi'?600:size.会話高さ,available.height);
+ const width=Math.min(size.幅,available.width);
+ const height=Math.min(size.会話高さ,available.height);
  // 先頭窓以外は24〜120pxを循環させ、7枚目以降も先頭位置へ戻さない。
  const offset=owner&&kind==='code'&&slot>0?((slot-1)%5+1)*24:0;
  const x=kind==='code'?available.x+offset:available.x+available.width-width;

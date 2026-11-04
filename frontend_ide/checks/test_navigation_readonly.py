@@ -61,6 +61,16 @@ class NavigationReadonlyTest(unittest.TestCase):
                 asyncio.run(module.run({"project": folder, "prompt": "test"}, code))
             self.assertEqual(len(code.calls), 1)
 
+    def test_all_providers_use_readonly_options_without_custom_system_instruction(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for provider in ("codex_cli", "copilot_cli", "aidiy_hermes", "claude_cli", "grok_cli"):
+                with self.subTest(provider=provider):
+                    code = FakeCode({"status": "OK", "result": "{}"})
+                    asyncio.run(module.run({"project": folder, "prompt": "調査", "selection": {"provider": provider, "model": "auto"}}, code))
+                    self.assertNotIn("system_instruction", code.calls[0])
+                    self.assertTrue(code.calls[0]["実行オプション"].CLI読取専用)
+                    self.assertEqual(code.calls[0]["code_permissions"], "none")
+
     def test_failed_response_not_accepted(self):
         with tempfile.TemporaryDirectory() as folder:
             code = FakeCode({"status": "NG", "result": "failure"})
@@ -71,7 +81,7 @@ class NavigationReadonlyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             code = FakeCode({})
             with self.assertRaises(ValueError):
-                asyncio.run(module.run({"project": folder, "prompt": "test", "selection": {"provider": "claude_cli", "model": "same"}}, code))
+                asyncio.run(module.run({"project": folder, "prompt": "test", "selection": {"provider": "unknown_cli", "model": "same"}}, code))
             self.assertEqual(code.calls, [])
 
     def test_saved_model_uses_aidiy_cli_default_home(self):

@@ -37,7 +37,9 @@ export function installWindowMove({kind,host=false,win=window,api=win.aidiyWindo
  return()=>{if(disposed)return;disposed=true;for(const stop of surfaces.values())stop();surfaces.clear();activeFinish=()=>{};};
 }
 export function windowMoveTarget(target,x,y,win){
- if(!target?.closest||target.closest(controls))return false;
+ if(!target?.closest)return false;
+ const control=target.closest(controls);
+ if(control&&!control.matches('.navigation-panel .navigation-items summary,.navigation-panel .navigation-overall summary'))return false;
  for(let node=target;node&&node!==win.document.documentElement;node=node.parentElement){
   if(win.getComputedStyle(node).webkitAppRegion==='drag')return false;
   const rect=node.getBoundingClientRect();

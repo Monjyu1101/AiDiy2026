@@ -332,7 +332,9 @@ Args:
 
         # 予測専用の制約は通常の permissions=none と別扱い。初期化・CLI起動より前に確認。
         prediction_readonly = bool(getattr(実行オプション, "CLI読取専用", False))
-        if prediction_readonly and (ai_name not in {"codex_cli", "copilot_cli", "aidiy_hermes"} or self_check_loop > 0):
+        if prediction_readonly:
+            from AIコア.AI実行オプション import 読取専用CLI対応方式
+        if prediction_readonly and (ai_name not in 読取専用CLI対応方式 or self_check_loop > 0):
             return {
                 "status": "NG",
                 "result": "! 指定CLIまたは自己検証ループは予測用の読取専用実行に未対応です。",

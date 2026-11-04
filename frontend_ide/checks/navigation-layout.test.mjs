@@ -103,7 +103,7 @@ test('目標は4行、左の説明・目標差異・モデル3段の右に同サ
  const [navi,evaluate]=elements(controls[1]);assert.ok(hasClass(navi,'navigation-run')&&hasClass(evaluate,'navigation-run'));assert.equal(elements(navi)[0].props.find(p=>p.type===7&&p.name==='bind'&&p.arg?.content==='src').exp.content,'sendIcon');assert.equal(evaluate.children[0].content,'再評価');
  assert.equal(navi.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'busy||!availability.available');assert.equal(evaluate.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'!canEvaluate');
  assert.doesNotMatch(descriptor.template.content,/navigation-model-footer/);
- assert.match(source,/grid-template-columns:minmax\(0,1fr\) auto/);assert.match(source,/width:58px;height:58px/);assert.match(source,/\.navigation-form-foot \.navigation-model-line\{min-width:0;flex-wrap:wrap/);
+ assert.match(source,/grid-template-columns:minmax\(0,1fr\) auto/);assert.match(source,/width:40\.6px;height:40\.6px/);assert.match(source,/\.navigation-form-foot \.navigation-model-line\{min-width:0;flex-wrap:wrap/);
 });
 
 
@@ -115,7 +115,7 @@ test('送信アイコンはCode同様の実行時URLで参照しViteの静的画
 
 
 test('ナビの手紙は大きく、文字を重ねても同サイズのボタンと文字の読みやすさを保つ',()=>{
- assert.match(source,/\.navigation-run img\{position:absolute;inset:3px;width:50px;height:50px/);
+ assert.match(source,/\.navigation-run img\{position:absolute;inset:2px;width:35px;height:35px/);
  assert.match(source,/\.navigation-button-label\{position:relative;z-index:1;[^}]*font-weight:700;[^}]*background:/);
  assert.match(source,/\.navigation-input-meta\{display:flex;flex-direction:column;gap:6px;min-width:0/);
  assert.match(source,/\.navigation-input-hint\{[^}]*overflow-wrap:anywhere/);

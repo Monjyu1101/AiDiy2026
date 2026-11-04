@@ -10,7 +10,7 @@
 # -------------------------------------------------------------------------
 
 from AIコア.AI応答 import 応答正規化, エラー応答
-from AIコア.AI実行オプション import 既定実行オプション
+from AIコア.AI実行オプション import 既定実行オプション, 読取専用CLI対応方式
 from log_config import get_logger
 logger = get_logger(__name__)
 
@@ -559,10 +559,10 @@ class CodeAI:
             return ""
 
     def _予測CLI確認(self) -> None:
-        if self.code_ai not in {"codex_cli", "copilot_cli", "aidiy_hermes"}:
+        if self.code_ai not in 読取専用CLI対応方式:
             raise 予測読取専用利用不可(
                 f"{self.code_ai} は予測用の読取専用実行に未対応です。"
-                "codex_cli、copilot_cli または aidiy_hermes を選択してください。"
+                "対応する読取専用CLIを選択してください。"
             )
 
     def _予測Hermesコマンド(self, repo_path: str) -> list:
@@ -595,6 +595,10 @@ class CodeAI:
             'history.persistence="none"', 'web_search="disabled"',
         ):
             args.extend(["-c", value])
+        # WindowsはMXCが使える場合、read-onlyのまま読み取りコマンドを実行できる。
+        # 非対応環境ではCodex側の既存sandbox選択に従い、権限を広げない。
+        if os.name == "nt":
+            args.extend(["-c", "features.prefer_mxc=true"])
         for feature in _予測CODEX無効機能:
             args.extend(["--disable", feature])
         return args
@@ -683,6 +687,17 @@ class CodeAI:
                 "exec", "--skip-git-repo-check", "--sandbox", "read-only",
                 "--ephemeral", "--ignore-rules",
             ])
+        elif self.code_ai == "claude_cli":
+            # 読取ツールのみ。通常のMCP・プラグイン・フック・セッション継続を無効化する。
+            # 古いCLIがこれらの引数を受け付けない場合は通常実行へ戻さず失敗する。
+            common = base + ["--restricted", "--safe-mode", "--strict-mcp-config",
+                "--tools", "Read,Glob,Grep", "--disallowedTools", "mcp__*",
+                "--permission-mode", "dontAsk", "--permission-prompts", "none",
+                "--no-session-persistence", "--disable-slash-commands"]
+        elif self.code_ai == "grok_cli":
+            # 明示された読み取りツールだけを公開。サブエージェントとMCPのメタツールを除外する。
+            common = base + ["--tools", "read_file,grep,list_dir", "--disallowed-tools", "search_tool,use_tool,task",
+                "--permission-mode", "dontAsk", "--no-subagents", "--disable-web-search", "--sandbox", "read-only"]
         else:
             # available-tools は許可対象のみをモデルへ公開する。MCPや委譲も含めて除外。
             # https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference

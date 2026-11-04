@@ -15,6 +15,7 @@ function panelBounds(rect,owner,screen,kind='explorer'){
  if(kind==='panel-navigation'){desired.width=500;desired.height=600;}
  // 別画面へまたがるパネルは、そのパネルが最も重なるディスプレイを選ぶ。
  const area=screen.getDisplayMatching(desired).workArea,margin=8;
+ if(kind==='panel-navigation')return windowBounds('navi',area);
  const width=Math.min(desired.width,Math.max(1,area.width-margin*2)),height=Math.min(desired.height,Math.max(1,area.height-margin*2));
  return {x:Math.max(area.x+margin,Math.min(desired.x,area.x+area.width-width-margin)),y:Math.max(area.y+margin,Math.min(desired.y,area.y+area.height-height-margin)),width,height};
 }
@@ -36,7 +37,7 @@ function createPanelWindows({windows,trustedEvent,readState,sessionKey,screen,Br
     // ALLの仮想的な右端には実画面がないことがある。操作した画面の作業領域へ新規窓を収める。
     const area=screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     const slot=[...windows.values()].filter(item=>item.owner===owner&&item.kind===kind&&!item.window.isDestroyed()).length;
-    bounds=kind==='panel-navigation'?windowBounds('navi',area,undefined,slot):kind==='panel-viewer'?windowBounds('viewer',area,undefined,slot):{x:area.x+8,y:area.y+8,width:Math.min(kind==='panel-routes'?360:340,area.width-16),height:Math.min(kind==='panel-routes'?40:700,area.height-16)};
+    bounds=kind==='panel-navigation'?windowBounds('navi',area):kind==='panel-viewer'?windowBounds('viewer',area,undefined,slot):{x:area.x+8,y:area.y+8,width:Math.min(kind==='panel-routes'?360:340,area.width-16),height:Math.min(kind==='panel-routes'?40:700,area.height-16)};
    }else bounds=panelBounds(rect,owner,screen,kind);
    if(!bounds)throw Error('パネルの位置を取得できません。');
    const existing=[...windows.values()].find(item=>item.owner===owner&&item.kind==='explorer'&&!item.window.isDestroyed());

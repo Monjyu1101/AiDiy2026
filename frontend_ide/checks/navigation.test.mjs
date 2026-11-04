@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {createNavigation,validateNavigation,validateNavigationResponse,parseNavigationResponse,navigationModels,navigationCatalog,navigationDefaultModel} from '../ファイル機能/navigation.mjs';
+import {createNavigation,validateNavigation,validateNavigationResponse,parseNavigationResponse,navigationModels,navigationCatalog,navigationProviders,navigationDefaultModel} from '../ファイル機能/navigation.mjs';
 const valid=(id='one',goal='検索画面を整える')=>({schemaVersion:3,requestId:id,goal,items:[{id:'1',name:'入力を整える',progress:25,reason:'入力欄が存在、検証は未確認',weight:100,weightReason:'目標を達成するための主要作業'}],overall:{progress:25,reason:'主要作業の確認結果から評価'},nextItemId:'1',nextPrompt:'入力の空状態を確認してください。'});
 test('結果: 根拠/0と100/空リストを保持し未知の属性を除外',()=>{
  const data=valid();data.items.push({...data.items[0],id:'2',progress:100});data.items[0].progress=0;data.items.forEach(item=>item.weight=50);data.overall.progress=50;data.secret='ignore';
@@ -64,7 +64,7 @@ test('モデル初期値と保存/再読込、ナビと評価は同じ選択を�
  await service.saveModel({provider:'codex_cli',model:'model-fixture'});
  const other=createNavigation(root,{state:()=>state,stateRoot});assert.deepEqual((await other.get()).selection,{provider:'codex_cli',model:'model-fixture'});other.close();
  await service.start('目標');await finish(service);await service.start('','evaluate');await finish(service);assert.deepEqual(selections,[{provider:'codex_cli',model:'model-fixture'},{provider:'codex_cli',model:'model-fixture'}]);
- await assert.rejects(service.saveModel({provider:'claude_cli',model:'same'}));assert.deepEqual((await service.get()).selection,{provider:'codex_cli',model:'model-fixture'});
+ await assert.rejects(service.saveModel({provider:'unknown_cli',model:'same'}));assert.deepEqual((await service.get()).selection,{provider:'codex_cli',model:'model-fixture'});
 });
 test('実行中のモデル保存拒否、現在の処理へ途中反映しない',async t=>{
  let release;const {service}=await fixture(t,()=>new Promise(r=>release=r));await service.start('目標');await assert.rejects(service.saveModel({provider:'codex_cli',model:'same'}));release({content:'invalid'});await finish(service);
@@ -137,6 +137,15 @@ test('Navi専用一覧の欠損・旧形式・破損は安全な基本候補と�
  assert.ok((await navigationModels('copilot_cli',file)).some(x=>x.id==='claude-sonnet'));
 });
 
+test('Naviの方式候補はDiag一覧にある安全な方式だけ',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'navi-providers-'));t.after(()=>rm(root,{recursive:true,force:true}));const file=join(root,'models.json');
+ await writeFile(file,JSON.stringify({_meta:{schema:1,readOnly:true},aidiy_hermes:{models:{'openai_oauth/test':'Hermes'}},codex_cli:{models:{test:'Codex'}},copilot_cli:{models:{test:'Copilot'}}}));
+ assert.deepEqual((await navigationProviders(file)).providers,['aidiy_hermes','codex_cli','copilot_cli']);
+ await writeFile(file,JSON.stringify({_meta:{schema:1,readOnly:true},aidiy_hermes:{models:{'copilot_cli/same':'外部CLI'}},codex_cli:{models:{test:'Codex'}}}));
+ assert.deepEqual((await navigationProviders(file)).providers,['codex_cli']);
+ assert.ok((await navigationProviders(join(root,'missing'))).notice);
+});
+
 test('加重総合は整数に丸め、未実施・未評価の0%を分母に含める',()=>{
  const d=valid();d.items[0].weight=35;d.items[0].progress=100;d.nextItemId='2';
  d.items.push({...d.items[0],id:'2',name:'残りの作業',weight:65,progress:10});d.overall.progress=42;
@@ -192,7 +201,7 @@ test('AI指示の出力例も加重評価schemaVersion 3の検証を通る',asyn
  });
  await service.start('検証目標');assert.equal((await finish(service)).job.status,'complete');
  await service.start('','evaluate');assert.equal((await finish(service)).job.status,'complete');
- assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);assert.match(prompt,/未実施・未評価.*0%/);assert.match(prompt,/項目なしなら0/);assert.doesNotMatch(prompt,/達成度.*場合はnull/);}
+ assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);assert.match(prompt,/未実施・未評価.*0%/);assert.match(prompt,/項目なしなら0/);assert.doesNotMatch(prompt,/達成度.*場合はnull/);assert.doesNotMatch(prompt,/コマンド実行はしない/);}
 });
 
 

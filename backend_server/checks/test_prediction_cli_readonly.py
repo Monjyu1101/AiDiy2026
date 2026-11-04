@@ -128,6 +128,14 @@ class PredictionReadonlyCommandTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(cli.予測読取専用利用不可):
             self.build(ai)
 
+    def test_windows_prefers_mxc_without_relaxing_readonly(self):
+        ai = self.make_cli()
+        with patch.object(cli.os, "name", "nt"):
+            args = ai._予測Codex共通引数()
+        self.assertIn(["-c", "features.prefer_mxc=true"], [args[i:i + 2] for i in range(len(args) - 1)])
+        self.assertIn('sandbox_mode="read-only"', args)
+        self.assertIn('approval_policy="never"', args)
+
     async def test_empty_mcp_config_is_verified_not_assumed_cleared(self):
         ai = self.make_cli()
         ai._予測CodexMCP一覧 = AsyncMock(side_effect=[[], []])
@@ -161,9 +169,30 @@ class PredictionReadonlyCommandTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cmd[-2:], ["-p", "fixture prompt"])
 
     def test_unsupported_provider_never_uses_normal_builder(self):
-        for provider in ("claude_cli", "claude_sdk", "unknown_cli"):
+        for provider in ("claude_sdk", "unknown_cli"):
             with self.subTest(provider=provider), self.assertRaises(cli.予測読取専用利用不可):
                 self.build(self.make_cli(provider))
+
+    def test_claude_readonly_uses_only_read_tools_and_disables_customizations(self):
+        cmd = self.build(self.make_cli('claude_cli'))
+        for flag in ('--restricted', '--safe-mode', '--strict-mcp-config', '--no-session-persistence', '--disable-slash-commands'):
+            self.assertIn(flag, cmd)
+        self.assertEqual(cmd[cmd.index('--tools') + 1], 'Read,Glob,Grep')
+        self.assertEqual(cmd[cmd.index('--disallowedTools') + 1], 'mcp__*')
+        self.assertEqual(cmd[cmd.index('--permission-mode') + 1], 'dontAsk')
+        self.assertNotIn('--dangerously-skip-permissions', cmd)
+        self.assertNotIn('--continue', cmd)
+        self.assertEqual(cmd[-2:], ['-p', 'fixture prompt'])
+
+    def test_grok_readonly_allows_only_read_tools(self):
+        cmd = self.build(self.make_cli('grok_cli'))
+        self.assertEqual(cmd[cmd.index('--tools') + 1], 'read_file,grep,list_dir')
+        self.assertEqual(cmd[cmd.index('--disallowed-tools') + 1], 'search_tool,use_tool,task')
+        self.assertEqual(cmd[cmd.index('--permission-mode') + 1], 'dontAsk')
+        self.assertEqual(cmd[cmd.index('--sandbox') + 1], 'read-only')
+        self.assertIn('--no-subagents', cmd)
+        self.assertNotIn('--always-approve', cmd)
+        self.assertEqual(cmd[-2:], ['-p', 'fixture prompt'])
 
     def test_hermes_uses_only_bundled_adapter_and_stdin(self):
         ai = self.make_cli("aidiy_hermes")
@@ -301,7 +330,7 @@ class PredictionReadonlyCommandTest(unittest.IsolatedAsyncioTestCase):
         service._setup_sys_path = Mock()
         service._resolve_project_path = Mock(return_value="/fixture/project")
         service._resolve_ai_params = Mock(side_effect=lambda name, model: (name, model))
-        for provider, loops in [("claude_cli", 0), ("codex_cli", 1)]:
+        for provider, loops in [("claude_sdk", 0), ("codex_cli", 1)]:
             result = await service.run_async(
                 "fixture prompt", ai_name=provider, self_check_loop=loops,
                 実行オプション=options.AI実行オプション.読取専用予測(),

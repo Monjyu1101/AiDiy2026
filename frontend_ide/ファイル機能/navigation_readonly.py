@@ -56,7 +56,7 @@ def resolve_model(selection):
 
 
 async def run(request, code=None):
-    from AIコア.AI実行オプション import AI実行オプション
+    from AIコア.AI実行オプション import AI実行オプション, 読取専用CLI対応方式
     if code is None:
         from tools_proc.code_agents import CodeAgents
         code = CodeAgents(str(ROOT))
@@ -64,13 +64,12 @@ async def run(request, code=None):
     if not project.is_absolute() or not project.is_dir():
         raise ValueError("対象プロジェクトを確認できません。")
     selection = request.get("selection", {"provider": "aidiy_hermes", "model": "same"})
-    if selection.get("provider") not in {"aidiy_hermes", "codex_cli", "copilot_cli"} or not isinstance(selection.get("model"), str) or not selection["model"].strip() or len(selection["model"]) > 300 or any(ord(c) < 32 for c in selection["model"]):
+    if selection.get("provider") not in 読取専用CLI対応方式 or not isinstance(selection.get("model"), str) or not selection["model"].strip() or len(selection["model"]) > 300 or any(ord(c) < 32 for c in selection["model"]):
         raise ValueError("読取専用対応AIとモデルを選択してください。")
     response = await code.run_async(
         prompt=request["prompt"], project_path=str(project),
         ai_name=selection["provider"], ai_model=resolve_model(selection), code_permissions="none",
         code_plan="off", code_verify="off", max_turns=12,
-        system_instruction="開発Navigationの読取専用調査です。変更・実行はせず、指定JSONだけを回答してください。",
         resume=False, timeout_sec=280, self_check_loop=0,
         実行オプション=AI実行オプション.読取専用予測(),
     )
