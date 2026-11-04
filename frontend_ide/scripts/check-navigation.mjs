@@ -77,7 +77,7 @@ try {
   await evaluate(`aidiyIDE.setAutoSpin(false);window.testNavi=[];const originalOpen=window.open;window.open=(...args)=>{const child=originalOpen.apply(window,args);testNavi.push(child);return child;};document.querySelector('.navigation-launch').click()`);
   const child=(index,expression)=>evaluate(`testNavi[${index}].eval(${JSON.stringify(expression)})`);
   await until(()=>evaluate(`!!testNavi[0]?.document.querySelector('textarea')`),'Navi 1');
-  assert.equal(await child(0,`document.querySelector('textarea').rows`),3);
+  assert.equal(await child(0,`document.querySelector('textarea').rows`),4);
   await child(0,`(()=>{const t=document.querySelector('textarea');t.value='検索画面を整える';t.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.navigation-start').click();})()`);
   await until(()=>child(0,`!!document.querySelector('.navigation-display.running')`),'nav busy');
   assert.equal(await child(0,`getComputedStyle(document.querySelector('.navigation-display'),'::before').animationName`),'prompt-reflect');
@@ -96,8 +96,8 @@ try {
   assert.equal(await child(0,`(()=>{const items=document.querySelectorAll('.navigation-items details'),overall=document.querySelector('.navigation-overall details');overall.querySelector('summary').click();return items[0].open&&!items[1].open&&overall.open;})()`),true);
   assert.equal(await child(0,`(()=>{document.querySelectorAll('.navigation-disclosure[open]>summary').forEach(summary=>summary.click());return document.querySelectorAll('.navigation-disclosure[open]').length;})()`),0);
 
-  const resultLayout=await child(0,`(()=>{const panel=document.querySelector('.navigation-panel'),content=panel.querySelector('.navigation-display'),overall=panel.querySelector('.navigation-overall'),next=panel.querySelector('.navigation-next'),footer=panel.querySelector('.navigation-model-footer');return {contentBottom:content.getBoundingClientRect().bottom,overallTop:overall.getBoundingClientRect().top,overallBottom:overall.getBoundingClientRect().bottom,nextTop:next.getBoundingClientRect().top,nextBottom:next.getBoundingClientRect().bottom,footerTop:footer.getBoundingClientRect().top,footerBottom:footer.getBoundingClientRect().bottom,height:innerHeight};})()`);
-  assert.ok(resultLayout.contentBottom<=resultLayout.overallTop+1);assert.ok(resultLayout.overallBottom<=resultLayout.nextTop+1);assert.ok(resultLayout.nextBottom<=resultLayout.footerTop+1);assert.ok(resultLayout.footerBottom<=resultLayout.height+1);
+  const resultLayout=await child(0,`(()=>{const panel=document.querySelector('.navigation-panel'),content=panel.querySelector('.navigation-display'),overall=panel.querySelector('.navigation-overall'),next=panel.querySelector('.navigation-next');return {contentBottom:content.getBoundingClientRect().bottom,overallTop:overall.getBoundingClientRect().top,overallBottom:overall.getBoundingClientRect().bottom,nextTop:next.getBoundingClientRect().top,nextBottom:next.getBoundingClientRect().bottom,height:innerHeight};})()`);
+  assert.ok(resultLayout.contentBottom<=resultLayout.overallTop+1);assert.ok(resultLayout.overallBottom<=resultLayout.nextTop+1);assert.ok(resultLayout.nextBottom<=resultLayout.height+1);
 
   assert.equal(aiCalls,1);
   await evaluate(`document.querySelector('.navigation-launch').click()`);
@@ -141,7 +141,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride',{width:500,height:600,deviceScaleFactor:1,mobile:false});
   await send('Page.navigate',{url:standalone.url});
   await until(()=>evaluate(`!!document.querySelector('.navigation-panel.standalone textarea')`),'standalone Navigation');
-  assert.equal(await evaluate(`document.querySelector('.navigation-panel.standalone textarea').rows`),3);
+  assert.equal(await evaluate(`document.querySelector('.navigation-panel.standalone textarea').rows`),4);
   const goalLayout=await evaluate(`(()=>{const t=document.querySelector('.navigation-panel.standalone textarea'),s=getComputedStyle(t);return {height:t.getBoundingClientRect().height,resize:s.resize,maxHeight:s.maxHeight};})()`);
   assert.ok(goalLayout.height>48&&goalLayout.height<=120);assert.equal(goalLayout.resize,'vertical');assert.equal(goalLayout.maxHeight,'120px');
   const inputCapture=await send('Page.captureScreenshot',{format:'png'});

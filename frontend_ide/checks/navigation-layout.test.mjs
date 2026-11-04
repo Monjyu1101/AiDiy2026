@@ -14,10 +14,10 @@ const compiled=compileTemplate({source:descriptor.template.content,filename:'Nav
 const attr=(node,name)=>node.props?.find(prop=>prop.type===6&&prop.name===name)?.value?.content;
 const hasClass=(node,name)=>attr(node,'class')?.split(' ').includes(name);
 const elements=node=>(node.children||[]).filter(child=>child.type===1);
-test('総合評価・おすすめプロンプト・モデル欄を明細スクロール外に順序どおり固定する',()=>{
+test('総合評価・おすすめプロンプトを明細スクロール外に順序どおり固定する',()=>{
  assert.deepEqual(errors,[]);assert.deepEqual(compiled.errors,[]);
  const panel=elements(baseParse(descriptor.template.content))[0],children=elements(panel);
- const positions=['navigation-display','navigation-overall','navigation-next','navigation-model-footer'].map(name=>children.findIndex(node=>hasClass(node,name)));
+ const positions=['navigation-display','navigation-overall','navigation-next'].map(name=>children.findIndex(node=>hasClass(node,name)));
  assert.ok(positions.every(index=>index>=0));assert.deepEqual([...positions].sort((a,b)=>a-b),positions);
  const overall=children[positions[1]],next=children[positions[2]];
  for(const node of [overall,next])assert.equal(node.props.find(prop=>prop.type===7&&prop.name==='if').exp.content,'result&&!history');
@@ -66,4 +66,39 @@ test('CODE/LIVEへは見出しのすぐ右に置き同じ窓内の共通ダイ�
  assert.equal(children[1].props.find(p=>p.type===7&&p.name==='if').exp.content,'nextItem');
  const dialog=nodes.find(node=>node.tag==='DraftHandoffDialog');assert.ok(dialog);assert.match(source,/:insert-draft="draftActions.insertDraft"/);assert.match(source,/:load-targets="draftActions.loadTargets"/);
  assert.doesNotMatch(source,/postMessage|BroadcastChannel|localStorage/);
+});
+
+test('明細項目と総合評価の枠はスクエアで、パネル外枠は変更しない',()=>{
+ const css=descriptor.styles.map(style=>style.content).join('\n');
+ const rules=selector=>[...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(match=>match[1].trim()===selector).map(match=>match[2]);
+ for(const selector of ['.navigation-items li','.navigation-progress','.navigation-items .navigation-progress']){
+  const radii=rules(selector).flatMap(rule=>[...rule.matchAll(/(?:^|;)border-radius:([^;]+)/g)].map(match=>match[1]));assert.ok(radii.length);assert.ok(radii.every(radius=>radius==='0'));
+ }
+ const nodes=walk(baseParse(descriptor.template.content)),overall=nodes.find(node=>hasClass(node,'navigation-overall'));
+ assert.ok(walk(overall).some(node=>hasClass(node,'navigation-progress')));
+ assert.match(rules('.navigation-panel').join(''),/border-radius:10px/);
+});
+
+
+test('目標入力とおすすめ本文は同じ角丸なしの背景・枠・文字を使い、本文は閲覧専用',()=>{
+ const css=descriptor.styles.map(style=>style.content).join('\n');
+ const shared=css.match(/\.navigation-goal-form textarea,\.navigation-panel>\.navigation-next \.navigation-prompt\{([^}]+)\}/)?.[1];assert.ok(shared);
+ for(const value of ['background:#000','color:#edf5ff','border:1px solid #47637b','border-radius:0','padding:10px','font:inherit','line-height:1.5'])assert.ok(shared.includes(value),value);
+ const nodes=walk(baseParse(descriptor.template.content)),prompt=nodes.find(node=>hasClass(node,'navigation-prompt'));
+ assert.equal(prompt.tag,'p');assert.equal(attr(prompt,'contenteditable'),undefined);
+ assert.ok(nodes.some(node=>node.tag==='textarea'&&node.props.some(p=>p.type===7&&p.name==='model'&&p.exp.content==='goal')));
+ assert.match(css,/\.navigation-panel>\.navigation-next \.navigation-prompt\{[^}]*overflow:auto/);
+ assert.match(css,/\.navigation-prompt\{[^}]*white-space:pre-wrap[^}]*user-select:text/);
+});
+
+
+test('目標は4行で、説明の下にモデル選択と同サイズのナビ・再評価を置く',()=>{
+ const nodes=walk(baseParse(descriptor.template.content)),form=nodes.find(node=>hasClass(node,'navigation-goal-form')),children=elements(form);
+ const textarea=children.find(node=>node.tag==='textarea');assert.equal(attr(textarea,'rows'),'4');
+ const hint=children.findIndex(node=>hasClass(node,'navigation-input-hint')),row=children.findIndex(node=>hasClass(node,'navigation-form-foot'));assert.ok(hint>=0&&row>hint);
+ const controls=elements(children[row]);assert.ok(hasClass(controls[0],'navigation-model-line'));assert.ok(hasClass(controls[1],'navigation-run-actions'));
+ const [navi,evaluate]=elements(controls[1]);assert.ok(hasClass(navi,'navigation-run')&&hasClass(evaluate,'navigation-run'));assert.equal(attr(elements(navi)[0],'src'),'/development/sending.png');assert.equal(evaluate.children[0].content,'再評価');
+ assert.equal(navi.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'busy||!availability.available');assert.equal(evaluate.props.find(p=>p.type===7&&p.arg?.content==='disabled').exp.content,'!canEvaluate');
+ assert.doesNotMatch(descriptor.template.content,/navigation-model-footer/);
+ assert.match(source,/grid-template-columns:minmax\(0,1fr\) auto/);assert.match(source,/width:58px;height:58px/);assert.match(source,/\.navigation-form-foot \.navigation-model-line\{min-width:0;flex-wrap:wrap/);
 });
