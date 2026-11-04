@@ -22,7 +22,27 @@ test('総合評価・次の一歩・モデル欄を明細スクロール外に�
  const overall=children[positions[1]],next=children[positions[2]];
  for(const node of [overall,next])assert.equal(node.props.find(prop=>prop.type===7&&prop.name==='if').exp.content,'result&&!history');
  assert.match(source,/\.navigation-panel>\.navigation-overall\{flex:none;/);
- assert.match(source,/\.navigation-overall>\.navigation-overall-reason\{min-height:0;overflow:auto\}/);
+ assert.match(source,/\.navigation-overall>\.navigation-disclosure\{min-height:0;overflow:auto\}/);
  assert.match(source,/>目標<\/label>/);assert.doesNotMatch(descriptor.template.content,/未評価|>開発目標<\/label>/);
  assert.match(source,/:aria-valuenow="overall.progress"/);assert.match(source,/:aria-valuenow="item.progress"/);
+});
+
+const walk=node=>[node,...(node.children||[]).flatMap(walk)];
+test('明細と総合の理由は独立したネイティブ開閉で、初期は折りたたむ',()=>{
+ const nodes=walk(baseParse(descriptor.template.content));
+ const disclosures=nodes.filter(node=>node.tag==='details');
+ assert.equal(disclosures.length,2);
+ for(const details of disclosures){
+  assert.equal(hasClass(details,'navigation-disclosure'),true);
+  assert.ok(details.props.every(prop=>!['open','name'].includes(prop.name)));
+  const [summary,reasons]=elements(details);
+  assert.equal(summary.tag,'summary');assert.equal(hasClass(reasons,'navigation-reasons'),true);
+  assert.ok(summary.props.every(prop=>!['role','tabindex'].includes(prop.name)));
+  const arrow=walk(summary).find(node=>hasClass(node,'navigation-disclosure-arrow'));
+  assert.equal(attr(arrow,'aria-hidden'),'true');
+  assert.ok(walk(summary).some(node=>attr(node,'role')==='progressbar'));
+ }
+ assert.match(source,/content:'▶'/);assert.match(source,/\[open\]>summary .*content:'▽'/);
+ assert.match(source,/>summary:focus-visible/);
+ assert.equal((source.match(/:key="result.navigationId\|\|result.requestId"/g)||[]).length,2);
 });

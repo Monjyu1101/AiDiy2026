@@ -31,6 +31,15 @@ export function validateNavigation(data,job){
  return {schemaVersion:2,requestId:job.id,goal:data.goal,inferred:!!job.inferred,items,overall:{progress:data.overall.progress,reason:data.overall.reason},nextPrompt:data.nextPrompt};
 }
 
+// 今回のAI応答だけに適用する未評価0%の規約。保存済み記録の読戻しには使わない。
+export function validateNavigationResponse(data,job){
+ if(data?.schemaVersion!==2||!Array.isArray(data.items)||!data.overall)return validateNavigation(data,job);
+ const note=(reason,extra,max)=>text(reason,max)&&reason.length+extra.length<=max?reason+extra:reason;
+ const items=data.items.map(item=>item?.progress===null?{...item,progress:0,reason:note(item.reason,'\n未評価のため0%として集計。',2000)}:item);
+ const overall=data.overall.progress===null?{...data.overall,progress:Math.round(items.reduce((sum,item)=>sum+(item?.weight*item?.progress),0)/100),reason:note(data.overall.reason,'\n未実施・未評価を0%とする規約に従い、全項目の工数比率による加重評価を数値化。',4000)}:data.overall;
+ return validateNavigation({...data,items,overall},job);
+}
+
 export function validateNavigationModel(value){
  if(!value||!['aidiy_hermes','codex_cli','copilot_cli'].includes(value.provider)||!text(value.model,300)||/[\x00-\x1f]/.test(value.model))throw Error('読取専用対応AIとモデルを選択してください。');
  return {provider:value.provider,model:value.model.trim()};
@@ -87,7 +96,7 @@ export function createNavigation(project,{state,defaultModel=navigationDefaultMo
    const content=typeof answer==='string'?answer:answer?.content;
    if(typeof content!=='string'||Buffer.byteLength(content)>1024*1024)throw Error('Navigatorの回答サイズ・形式が不正です。');
    const json=content.trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/,'$1');
-   const result={...validateNavigation(JSON.parse(json),j),createdAt:j.createdAt||now(),updatedAt:now(),navigationId:j.navigationId||j.id,selection:j.selection};
+   const result={...validateNavigationResponse(JSON.parse(json),j),createdAt:j.createdAt||now(),updatedAt:now(),navigationId:j.navigationId||j.id,selection:j.selection};
    if(!current(j))return;
    const temporary=join(dir,randomUUID()+'.tmp');await writeFile(temporary,JSON.stringify(result,null,2),{encoding:'utf8',flag:'wx'});
    if(!current(j))return;

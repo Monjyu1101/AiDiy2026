@@ -88,6 +88,11 @@ try {
   assert.equal(await child(0,`document.querySelector('.navigation-next').parentElement.classList.contains('navigation-panel')`),true);
   assert.equal(await child(0,`document.querySelector('.navigation-overall').parentElement.classList.contains('navigation-panel')`),true);
   assert.equal(await child(0,`document.querySelector('.navigation-goal-form label').textContent`),'目標');
+  assert.equal(await child(0,`document.querySelectorAll('.navigation-disclosure[open]').length`),0);
+  assert.equal(await child(0,`(()=>{const items=document.querySelectorAll('.navigation-items details'),overall=document.querySelector('.navigation-overall details');items[0].querySelector('summary').click();return items[0].open&&!items[1].open&&!overall.open;})()`),true);
+  assert.equal(await child(0,`(()=>{const items=document.querySelectorAll('.navigation-items details'),overall=document.querySelector('.navigation-overall details');overall.querySelector('summary').click();return items[0].open&&!items[1].open&&overall.open;})()`),true);
+  assert.equal(await child(0,`(()=>{document.querySelectorAll('.navigation-disclosure[open]>summary').forEach(summary=>summary.click());return document.querySelectorAll('.navigation-disclosure[open]').length;})()`),0);
+
   const resultLayout=await child(0,`(()=>{const panel=document.querySelector('.navigation-panel'),content=panel.querySelector('.navigation-display'),overall=panel.querySelector('.navigation-overall'),next=panel.querySelector('.navigation-next'),footer=panel.querySelector('.navigation-model-footer');return {contentBottom:content.getBoundingClientRect().bottom,overallTop:overall.getBoundingClientRect().top,overallBottom:overall.getBoundingClientRect().bottom,nextTop:next.getBoundingClientRect().top,nextBottom:next.getBoundingClientRect().bottom,footerTop:footer.getBoundingClientRect().top,footerBottom:footer.getBoundingClientRect().bottom,height:innerHeight};})()`);
   assert.ok(resultLayout.contentBottom<=resultLayout.overallTop+1);assert.ok(resultLayout.overallBottom<=resultLayout.nextTop+1);assert.ok(resultLayout.nextBottom<=resultLayout.footerTop+1);assert.ok(resultLayout.footerBottom<=resultLayout.height+1);
 

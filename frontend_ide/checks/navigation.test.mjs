@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {createNavigation,validateNavigation,navigationModels,navigationCatalog,navigationDefaultModel} from '../ファイル機能/navigation.mjs';
+import {createNavigation,validateNavigation,validateNavigationResponse,navigationModels,navigationCatalog,navigationDefaultModel} from '../ファイル機能/navigation.mjs';
 const valid=(id='one',goal='検索画面を整える')=>({schemaVersion:2,requestId:id,goal,items:[{id:'1',name:'入力を整える',progress:25,reason:'入力欄が存在、検証は未確認',weight:100,weightReason:'目標を達成するための主要作業'}],overall:{progress:25,reason:'主要作業の確認結果から評価'},nextPrompt:'入力の空状態を確認してください。'});
 test('結果: 根拠/0と100/空リストを保持し未知の属性を除外',()=>{
  const data=valid();data.items.push({...data.items[0],id:'2',progress:100});data.items[0].progress=0;data.items.forEach(item=>item.weight=50);data.overall.progress=50;data.secret='ignore';
@@ -195,3 +195,36 @@ test('AI指示の出力例も加重評価schemaVersion 2の検証を通る',asyn
  assert.equal(prompts.length,2);for(const prompt of prompts){assert.match(prompt,/weightReason/);assert.match(prompt,/overall/);assert.match(prompt,/schemaVersion/);assert.match(prompt,/未実施・未評価.*0%/);assert.match(prompt,/項目なしなら0/);assert.doesNotMatch(prompt,/場合はnull|ならnull/);}
 });
 
+
+for(const [progress,overall,expected] of [[null,null,0],[0,null,0],[25,null,25],[100,null,100],[null,0,0]])test(`今回のAI応答の未評価を数値化: ${progress}/${overall}`,()=>{
+ const d=valid();d.items[0].progress=progress;d.overall.progress=overall;const before=structuredClone(d);
+ const result=validateNavigationResponse(d,{id:d.requestId,goal:d.goal});
+ assert.equal(result.items[0].progress,progress===null?0:progress);assert.equal(result.overall.progress,expected);assert.deepEqual(d,before);
+});
+test('今回のAI応答の空項目・混合未評価も全体工数の加重数値にする',()=>{
+ const d=valid();d.items[0].weight=35;d.items[0].progress=100;d.items.push({...d.items[0],id:'2',weight:65,progress:null});d.overall.progress=null;
+ const result=validateNavigationResponse(d,{id:d.requestId,goal:d.goal});assert.equal(result.overall.progress,35);assert.equal(result.items[1].progress,0);assert.match(result.overall.reason,/数値化/);
+ d.items=[];assert.equal(validateNavigationResponse(d,{id:d.requestId,goal:d.goal}).overall.progress,0);
+});
+for(const [name,mutate] of [
+ ['旧形式',d=>delete d.schemaVersion],['項目率欠損',d=>delete d.items[0].progress],['総合率欠損',d=>delete d.overall.progress],['総合欠損',d=>delete d.overall],['率文字列',d=>d.items[0].progress='未評価'],['率範囲外',d=>d.items[0].progress=101],['比率欠損',d=>delete d.items[0].weight],['比率不足',d=>d.items[0].weight=50],['項目根拠欠損',d=>delete d.items[0].reason],['総合根拠欠損',d=>delete d.overall.reason],['不整合な数値総合',d=>d.overall.progress=99]
+])test('未評価0%処理でも壊れたAI応答を成功にしない: '+name,()=>{
+ const d=valid();d.items[0].progress=null;d.overall.progress=null;mutate(d);assert.throws(()=>validateNavigationResponse(d,{id:d.requestId,goal:d.goal}));
+});
+test('長さ上限の根拠は切り捨てず保持して数値化する',()=>{
+ const d=valid();d.items[0].progress=null;d.overall.progress=null;d.items[0].reason='x'.repeat(2000);d.overall.reason='y'.repeat(4000);
+ const result=validateNavigationResponse(d,{id:d.requestId,goal:d.goal});assert.equal(result.items[0].reason,d.items[0].reason);assert.equal(result.overall.reason,d.overall.reason);assert.equal(result.overall.progress,0);
+});
+test('現行AIのnull回答を数値で保存・再評価・再起動・履歴復元し、失敗時は前回数値を保つ',async t=>{
+ let calls=0;const {service,root,state,stateRoot}=await fixture(t,async({prompt},root)=>{
+  calls++;if(calls===3)throw Error('AIとの通信失敗');
+  return respond(prompt,root,d=>{d.items[0].weight=35;d.items[0].progress=100;d.items.push({...d.items[0],id:'2',weight:65,progress:calls===1?null:0});d.overall.progress=null;return d;});
+ });
+ await service.start('目標');let value=await finish(service);assert.equal(value.job.status,'complete',value.job.message);assert.equal(value.result.overall.progress,35);assert.equal(value.result.items[1].progress,0);
+ await service.start('','evaluate');value=await finish(service);assert.equal(value.job.status,'complete',value.job.message);assert.equal(value.result.overall.progress,35);
+ const saved=value.result;await service.start('','evaluate');value=await finish(service);assert.equal(value.job.status,'failed');assert.match(value.job.message,/通信失敗/);assert.deepEqual(value.result,saved);
+ const reopened=createNavigation(root,{state:()=>state,stateRoot});t.after(()=>reopened.close());assert.deepEqual((await reopened.get()).result,saved);await reopened.fresh();await reopened.select(saved.navigationId);assert.deepEqual((await reopened.get()).result,saved);
+});
+test('初回AI通信失敗は0%の成功結果を捏造しない',async t=>{
+ const {service}=await fixture(t,async()=>{throw Error('通信エラー');});await service.start('目標');const value=await finish(service);assert.equal(value.job.status,'failed');assert.equal(value.result,null);
+});

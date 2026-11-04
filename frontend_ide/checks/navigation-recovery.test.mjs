@@ -71,3 +71,19 @@ test('旧記録の取得失敗後も新規操作で即座に実行可能状態�
  assert.equal(f.api.busy.value,true);
 });
 
+
+for(const [name,result] of [['総合null',{schemaVersion:2,items:[{progress:0}],overall:{progress:null}}],['総合欠損',{schemaVersion:2,items:[{progress:0}]}],['項目null',{schemaVersion:2,items:[{progress:null}],overall:{progress:0}}],['旧形式',{items:[{progress:0}],overall:{progress:0}}]])test('旧APIや不正応答を数値のない成功表示へ流さない: '+name,async()=>{
+ const f=fixture(),saved={schemaVersion:2,items:[{progress:25}],overall:{progress:25}};f.api.result.value=saved;
+ const refresh=f.api.refresh();await f.answer({...state(null),result});await refresh;assert.deepEqual(f.api.result.value,saved);assert.match(f.api.error.value,/数値評価/);
+ const select=f.api.selectHistory('old');await f.answer({...state(null),result});await select;assert.deepEqual(f.api.result.value,saved);assert.match(f.api.error.value,/数値評価/);
+});
+test('初回の不正API応答を0%へ補完せず明示的に拒否する',async()=>{
+ const f=fixture();const refresh=f.api.refresh();await f.answer({...state(null),result:{overall:{progress:null}}});await refresh;assert.equal(f.api.result.value,null);assert.match(f.api.error.value,/数値評価/);
+});
+
+test('完了応答の評価が不正でも実行中ロックを解放し新規作成で復帰できる',async()=>{
+ const f=fixture();f.api.job.value={id:'old',status:'running'};assert.equal(f.api.busy.value,true);
+ const refresh=f.api.refresh();await f.answer({...state({id:'old',status:'complete'}),result:{schemaVersion:2,items:[{progress:0}],overall:{progress:null}}});await refresh;
+ assert.match(f.api.error.value,/数値評価/);assert.equal(f.api.busy.value,false);
+ const fresh=f.api.selectHistory();await f.answer(state(null));await fresh;assert.equal(f.api.result.value,null);assert.equal(f.api.error.value,'');assert.equal(f.api.busy.value,false);
+});
